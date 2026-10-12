@@ -42,7 +42,9 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -58,7 +60,11 @@ import static org.testng.Assert.assertTrue;
 public class PinotIngestionRestletResourceStatelessTest extends ControllerTest {
   private static final String TABLE_NAME = "testTable";
   private static final String TABLE_NAME_WITH_TYPE = "testTable_OFFLINE";
+  private static final String MULTI_VALUE_IN_SINGLE_VALUE_COLUMN = "cooper;max";
+  private static final String ROOT_CAUSE =
+      "Cannot read single-value from Object[]: [cooper, max] for column: name";
   private File _inputFile;
+  private File _invalidInputFile;
 
   @BeforeClass
   public void setUp()
@@ -83,6 +89,13 @@ public class PinotIngestionRestletResourceStatelessTest extends ControllerTest {
       bw.write("dog|cooper\n");
       bw.write("cat|kylo\n");
       bw.write("dog|cookie\n");
+    }
+
+    _invalidInputFile = new File(FileUtils.getTempDirectory(), "pinotIngestionRestletResourceTest_invalidData.csv");
+    try (BufferedWriter bw = new BufferedWriter(new FileWriter(_invalidInputFile))) {
+      bw.write("breed|name\n");
+      bw.write("cat|kylo\n");
+      bw.write("dog|" + MULTI_VALUE_IN_SINGLE_VALUE_COLUMN + "\n");
     }
   }
 
@@ -141,11 +154,101 @@ public class PinotIngestionRestletResourceStatelessTest extends ControllerTest {
     assertTrue(ingestionDir.exists());
   }
 
+  @Test(dependsOnMethods = "testIngestEndpoint", alwaysRun = true)
+  public void testIngestFromFileReturnsRootCauseOfSegmentCreationFailure()
+      throws Exception {
+    PinotAdminClient adminClient = getOrCreateAdminClient();
+    int numSegments = _helixResourceManager.getSegmentsFor(TABLE_NAME_WITH_TYPE, false).size();
+
+    String response = sendHttpPost(
+        adminClient.getFileIngestClient().buildIngestFromFileUrl(TABLE_NAME_WITH_TYPE, getCsvBatchConfigMap()),
+        _invalidInputFile, 500);
+
+    assertEquals(getError(response), "Caught exception when ingesting file into table: " + TABLE_NAME_WITH_TYPE
+        + ". Caught exception while reading data -> Caught exception while transforming data type for column: name -> "
+        + ROOT_CAUSE);
+    assertEquals(_helixResourceManager.getSegmentsFor(TABLE_NAME_WITH_TYPE, false).size(), numSegments);
+  }
+
+  @Test(dependsOnMethods = "testIngestEndpoint", alwaysRun = true)
+  public void testIngestFromFileReturnsOnlyTheMessageWhenCausesAreTurnedOff()
+      throws Exception {
+    PinotAdminClient adminClient = getOrCreateAdminClient();
+
+    _controllerConfig.setProperty(ControllerConf.API_ERROR_RESPONSE_INCLUDE_CAUSES, false);
+    String response;
+    try {
+      response = sendHttpPost(
+          adminClient.getFileIngestClient().buildIngestFromFileUrl(TABLE_NAME_WITH_TYPE, getCsvBatchConfigMap()),
+          _invalidInputFile, 500);
+    } finally {
+      _controllerConfig.setProperty(ControllerConf.API_ERROR_RESPONSE_INCLUDE_CAUSES, true);
+    }
+
+    assertEquals(getError(response),
+        "Caught exception when ingesting file into table: " + TABLE_NAME_WITH_TYPE + ". Caught exception while reading "
+            + "data");
+  }
+
+  @Test(dependsOnMethods = "testIngestEndpoint", alwaysRun = true)
+  public void testIngestFromFileKeepsIllegalArgumentMessage()
+      throws Exception {
+    PinotAdminClient adminClient = getOrCreateAdminClient();
+    Map<String, String> batchConfigMap = getCsvBatchConfigMap();
+    batchConfigMap.put(BatchConfigProperties.INPUT_FORMAT, "unknownFormat");
+
+    String response = sendHttpPost(
+        adminClient.getFileIngestClient().buildIngestFromFileUrl(TABLE_NAME_WITH_TYPE, batchConfigMap), _inputFile,
+        400);
+
+    assertEquals(getError(response), "Got illegal argument when ingesting file into table: " + TABLE_NAME_WITH_TYPE
+        + ". No enum constant " + FileFormat.class.getCanonicalName() + ".UNKNOWNFORMAT");
+  }
+
+  @Test(dependsOnMethods = "testIngestEndpoint", alwaysRun = true)
+  public void testIngestFromUriDoesNotReturnCauseChain()
+      throws Exception {
+    PinotAdminClient adminClient = getOrCreateAdminClient();
+    int numSegments = _helixResourceManager.getSegmentsFor(TABLE_NAME_WITH_TYPE, false).size();
+
+    _controllerConfig.setProperty(ControllerConf.INGEST_FROM_URI_ALLOW_LOCAL_FILE_SYSTEM, true);
+    String response;
+    try {
+      response = sendHttpPost(adminClient.getFileIngestClient()
+          .buildIngestFromUriUrl(TABLE_NAME_WITH_TYPE, getCsvBatchConfigMap(),
+              String.format("file://%s", _invalidInputFile.getAbsolutePath())), 500);
+    } finally {
+      _controllerConfig.setProperty(ControllerConf.INGEST_FROM_URI_ALLOW_LOCAL_FILE_SYSTEM, false);
+    }
+
+    assertEquals(getError(response), "Failed to ingest from URI");
+    assertFalse(response.contains(_invalidInputFile.getName()), response);
+    assertFalse(response.contains("cooper"), response);
+    assertEquals(_helixResourceManager.getSegmentsFor(TABLE_NAME_WITH_TYPE, false).size(), numSegments);
+  }
+
+  private static Map<String, String> getCsvBatchConfigMap() {
+    Map<String, String> batchConfigMap = new HashMap<>();
+    batchConfigMap.put(BatchConfigProperties.INPUT_FORMAT, "csv");
+    batchConfigMap.put(String.format("%s.delimiter", BatchConfigProperties.RECORD_READER_PROP_PREFIX), "|");
+    return batchConfigMap;
+  }
+
+  private static String getError(String responseBody)
+      throws IOException {
+    return JsonUtils.stringToJsonNode(responseBody).get("error").asText();
+  }
+
   private String sendHttpPost(String uri, int expectedStatusCode)
+      throws IOException {
+    return sendHttpPost(uri, _inputFile, expectedStatusCode);
+  }
+
+  private String sendHttpPost(String uri, File file, int expectedStatusCode)
       throws IOException {
     HttpPost httpPost = new HttpPost(uri);
     HttpEntity reqEntity =
-        MultipartEntityBuilder.create().addPart("file", new FileBody(_inputFile.getAbsoluteFile())).build();
+        MultipartEntityBuilder.create().addPart("file", new FileBody(file.getAbsoluteFile())).build();
     httpPost.setEntity(reqEntity);
     try (CloseableHttpClient httpClient = HttpClientBuilder.create().build()) {
       return httpClient.execute(httpPost, response -> {
@@ -165,6 +268,7 @@ public class PinotIngestionRestletResourceStatelessTest extends ControllerTest {
   @AfterClass
   public void tearDown() {
     FileUtils.deleteQuietly(_inputFile);
+    FileUtils.deleteQuietly(_invalidInputFile);
     stopFakeInstances();
     stopController();
     stopZk();

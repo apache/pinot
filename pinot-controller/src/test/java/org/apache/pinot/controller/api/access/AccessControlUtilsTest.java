@@ -70,6 +70,7 @@ public class AccessControlUtilsTest {
     } catch (ControllerApplicationException e) {
       Assert.assertTrue(e.getMessage().contains("Caught exception while validating permission"));
       Assert.assertEquals(e.getResponse().getStatus(), Response.Status.INTERNAL_SERVER_ERROR.getStatusCode());
+      Assert.assertNull(e.getCause());
     }
   }
 }

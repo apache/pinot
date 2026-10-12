@@ -246,7 +246,7 @@ public class PinotInstanceRestletResource {
       PinotResourceManagerResponse response = _pinotHelixResourceManager.addInstance(instance, updateBrokerResource);
       return new SuccessResponse(response.getMessage());
     } catch (ClientErrorException e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), e.getResponse().getStatus());
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), e.getResponse().getStatus(), e);
     } catch (ConfigValidationException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
     } catch (Exception e) {
@@ -444,7 +444,7 @@ public class PinotInstanceRestletResource {
           _pinotHelixResourceManager.updateInstance(instanceName, instance, updateBrokerResource);
       return new SuccessResponse(response.getMessage());
     } catch (ClientErrorException e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), e.getResponse().getStatus());
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), e.getResponse().getStatus(), e);
     } catch (ConfigValidationException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
     } catch (Exception e) {
@@ -483,7 +483,7 @@ public class PinotInstanceRestletResource {
           _pinotHelixResourceManager.updateInstanceTags(instanceName, tags, updateBrokerResource);
       return new SuccessResponse(response.getMessage());
     } catch (ClientErrorException e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), e.getResponse().getStatus());
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), e.getResponse().getStatus(), e);
     } catch (ConfigValidationException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
     } catch (Exception e) {
@@ -516,7 +516,7 @@ public class PinotInstanceRestletResource {
       PinotResourceManagerResponse response = _pinotHelixResourceManager.updateBrokerResource(instanceName);
       return new SuccessResponse(response.getMessage());
     } catch (ClientErrorException e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), e.getResponse().getStatus());
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), e.getResponse().getStatus(), e);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, "Failed to update broker resource for instance: " + instanceName,
           Response.Status.INTERNAL_SERVER_ERROR, e);
@@ -542,7 +542,7 @@ public class PinotInstanceRestletResource {
               .map(instance -> _pinotHelixResourceManager.instanceDropSafetyCheck(instance))
               .collect(Collectors.toList());
     } catch (ClientErrorException e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), e.getResponse().getStatus());
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), e.getResponse().getStatus(), e);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, "Failed to check the safety for instance drop operation.",
           Response.Status.INTERNAL_SERVER_ERROR, e);

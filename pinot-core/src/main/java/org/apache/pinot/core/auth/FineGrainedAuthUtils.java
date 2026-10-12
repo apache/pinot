@@ -132,7 +132,7 @@ public class FineGrainedAuthUtils {
         String errorMsg = "Failed to check for access for target type " + auth.targetType() + " and target ID "
             + targetId + " with action " + auth.action();
         LOGGER.error(errorMsg, t);
-        throw new WebApplicationException(errorMsg, t, Response.Status.INTERNAL_SERVER_ERROR);
+        throw new WebApplicationException(errorMsg, Response.Status.INTERNAL_SERVER_ERROR);
       }
 
       // Check for access now

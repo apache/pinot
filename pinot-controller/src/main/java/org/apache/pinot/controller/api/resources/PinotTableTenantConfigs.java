@@ -90,9 +90,9 @@ public class PinotTableTenantConfigs {
           _helixResourceManager.rebuildBrokerResourceFromHelixTags(tableNameWithType);
       return new SuccessResponse(pinotResourceManagerResponse.getMessage());
     } catch (InvalidConfigException e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
     } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
 }

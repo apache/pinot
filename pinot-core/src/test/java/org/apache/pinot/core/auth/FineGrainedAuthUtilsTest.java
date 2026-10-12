@@ -101,6 +101,7 @@ public class FineGrainedAuthUtilsTest {
     } catch (WebApplicationException e) {
       Assert.assertTrue(e.getMessage().contains("Failed to check for access"));
       Assert.assertEquals(e.getResponse().getStatus(), Response.Status.INTERNAL_SERVER_ERROR.getStatusCode());
+      Assert.assertNull(e.getCause());
     }
   }
 

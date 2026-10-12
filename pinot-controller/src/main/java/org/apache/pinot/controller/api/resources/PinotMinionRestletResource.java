@@ -84,7 +84,7 @@ public class PinotMinionRestletResource {
     try {
       return _pinotHelixTaskResourceManager.getMinionStatus(status, includeTaskCounts);
     } catch (IllegalArgumentException e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, "Failed to get minion status",
           Response.Status.INTERNAL_SERVER_ERROR, e);

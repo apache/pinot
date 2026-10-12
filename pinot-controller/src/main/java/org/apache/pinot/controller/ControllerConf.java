@@ -362,6 +362,8 @@ public class ControllerConf extends PinotConfiguration {
   /// paths are fully trusted.
   public static final String INGEST_FROM_URI_ALLOW_LOCAL_FILE_SYSTEM =
       "controller.ingestFromURI.allowLocalFileSystem";
+  /// Whether controller API error responses include the cause chain of the failure.
+  public static final String API_ERROR_RESPONSE_INCLUDE_CAUSES = "controller.api.error.response.include.causes";
   public static final String ACCESS_CONTROL_FACTORY_CLASS = "controller.admin.access.control.factory.class";
   public static final String ACCESS_CONTROL_USERNAME = "access.control.init.username";
   public static final String ACCESS_CONTROL_PASSWORD = "access.control.init.password";
@@ -410,6 +412,7 @@ public class ControllerConf extends PinotConfiguration {
   public static final int DEFAULT_TABLE_MIN_REPLICAS = 1;
   public static final int DEFAULT_JERSEY_ADMIN_PORT = 21000;
   public static final boolean DEFAULT_INGEST_FROM_URI_ALLOW_LOCAL_FILE_SYSTEM = false;
+  public static final boolean DEFAULT_API_ERROR_RESPONSE_INCLUDE_CAUSES = true;
   public static final String DEFAULT_ACCESS_CONTROL_FACTORY_CLASS =
       "org.apache.pinot.controller.api.access.AllowAllAccessFactory";
   public static final String DEFAULT_ACCESS_CONTROL_USERNAME = "admin";
@@ -1200,6 +1203,10 @@ public class ControllerConf extends PinotConfiguration {
 
   public boolean isIngestFromUriLocalFileSystemAllowed() {
     return getProperty(INGEST_FROM_URI_ALLOW_LOCAL_FILE_SYSTEM, DEFAULT_INGEST_FROM_URI_ALLOW_LOCAL_FILE_SYSTEM);
+  }
+
+  public boolean isApiErrorResponseIncludeCauses() {
+    return getProperty(API_ERROR_RESPONSE_INCLUDE_CAUSES, DEFAULT_API_ERROR_RESPONSE_INCLUDE_CAUSES);
   }
 
   public void setInitAccessControlUsername(String username) {

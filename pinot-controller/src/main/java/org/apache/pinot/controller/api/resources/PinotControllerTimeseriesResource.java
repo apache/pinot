@@ -49,10 +49,9 @@ public class PinotControllerTimeseriesResource {
     try {
       return _controllerConf.getTimeseriesLanguages();
     } catch (Exception e) {
-      LOGGER.error("Error fetching timeseries languages from controller configuration", e);
       throw new ControllerApplicationException(LOGGER,
           "Error fetching timeseries languages from controller configuration: " + e.getMessage(),
-          Response.Status.INTERNAL_SERVER_ERROR);
+          Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
 }

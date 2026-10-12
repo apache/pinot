@@ -25,6 +25,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
+import org.apache.pinot.controller.api.exception.ControllerApplicationException.ExceptionLogMode;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,7 +68,8 @@ public final class AccessControlUtils {
       // catch and log Throwable for NoSuchMethodError which can happen when there are classpath conflicts
       // otherwise, grizzly will return a 500 without any logs or indication of what failed
       throw new ControllerApplicationException(LOGGER,
-          "Caught exception while validating permission for " + userMessage, Response.Status.INTERNAL_SERVER_ERROR, t);
+          "Caught exception while validating permission for " + userMessage, Response.Status.INTERNAL_SERVER_ERROR, t,
+          ExceptionLogMode.LOG_ONLY);
     }
 
     throw new ControllerApplicationException(LOGGER, "Permission is denied for " + userMessage,

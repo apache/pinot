@@ -324,7 +324,7 @@ public class PinotSegmentRestletResource {
       return tableMetadataReader.getSegmentMetadata(tableName, segmentName, columns,
           _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
     } catch (InvalidConfigException e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Status.BAD_REQUEST);
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Status.BAD_REQUEST, e);
     } catch (IOException ioe) {
       throw new ControllerApplicationException(LOGGER, "Error parsing Pinot server response: " + ioe.getMessage(),
           Status.INTERNAL_SERVER_ERROR, ioe);
@@ -381,11 +381,11 @@ public class PinotSegmentRestletResource {
     } catch (IllegalStateException e) {
       throw new ControllerApplicationException(LOGGER,
           String.format("Failed to reset segments in table: %s. %s", tableNameWithType, e.getMessage()),
-          Status.NOT_FOUND);
+          Status.NOT_FOUND, e);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
           String.format("Failed to reset segment: %s of table: %s. %s", segmentName, tableNameWithType, e.getMessage()),
-          Status.INTERNAL_SERVER_ERROR);
+          Status.INTERNAL_SERVER_ERROR, e);
     }
   }
 
@@ -418,11 +418,11 @@ public class PinotSegmentRestletResource {
     } catch (IllegalStateException e) {
       throw new ControllerApplicationException(LOGGER,
           String.format("Failed to reset segments in table: %s. %s", tableNameWithType, e.getMessage()),
-          Status.NOT_FOUND);
+          Status.NOT_FOUND, e);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
           String.format("Failed to reset segments in table: %s. %s", tableNameWithType, e.getMessage()),
-          Status.INTERNAL_SERVER_ERROR);
+          Status.INTERNAL_SERVER_ERROR, e);
     }
   }
 
@@ -680,7 +680,7 @@ public class PinotSegmentRestletResource {
       JsonNode segmentsMetadataJson = getSegmentsMetadataFromServer(tableNameWithType, columns, segments);
       segmentsMetadata = JsonUtils.objectToPrettyString(segmentsMetadataJson);
     } catch (InvalidConfigException e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Status.BAD_REQUEST);
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Status.BAD_REQUEST, e);
     } catch (IOException ioe) {
       throw new ControllerApplicationException(LOGGER, "Error parsing Pinot server response: " + ioe.getMessage(),
           Status.INTERNAL_SERVER_ERROR, ioe);
@@ -706,7 +706,7 @@ public class PinotSegmentRestletResource {
       return tableMetadataReader.getStaleSegments(tableNameWithType,
           _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
     } catch (InvalidConfigException e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Status.BAD_REQUEST);
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Status.BAD_REQUEST, e);
     } catch (IOException ioe) {
       throw new ControllerApplicationException(LOGGER, "Error parsing Pinot server response: " + ioe.getMessage(),
           Status.INTERNAL_SERVER_ERROR, ioe);

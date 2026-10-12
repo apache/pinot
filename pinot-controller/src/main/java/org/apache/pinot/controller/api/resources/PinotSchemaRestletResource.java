@@ -499,7 +499,7 @@ public class PinotSchemaRestletResource {
       } catch (IOException e) {
         throw new ControllerApplicationException(LOGGER,
             "Caught exception while de-serializing the schema from request body: " + e.getMessage(),
-            Response.Status.BAD_REQUEST);
+            Response.Status.BAD_REQUEST, e);
       }
     } finally {
       multiPart.cleanup();
