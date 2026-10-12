@@ -70,7 +70,9 @@ import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.DatabaseUtils;
+import org.apache.pinot.common.utils.LoggerUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.common.utils.request.QueryFingerprintUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
@@ -90,6 +92,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.exception.DatabaseConflictException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.trace.QueryFingerprint;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -105,6 +108,7 @@ import org.apache.pinot.tsdb.planner.TimeSeriesTableMetadataProvider;
 import org.apache.pinot.tsdb.spi.RangeTimeSeriesRequest;
 import org.apache.pinot.tsdb.spi.TimeSeriesLogicalPlanResult;
 import org.apache.pinot.tsdb.spi.TimeSeriesLogicalPlanner;
+import org.glassfish.grizzly.http.server.Request;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -113,6 +117,8 @@ import org.slf4j.LoggerFactory;
 public class PinotQueryResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotQueryResource.class);
   private static final String SQL_ENDPOINT = "/sql";
+  /// Logged in place of the fingerprint of a `DELETE` that cannot be fingerprinted, see [#deleteLogMessage]
+  private static final String REDACTED = "REDACTED";
 
   @Inject
   SqlQueryExecutor _sqlQueryExecutor;
@@ -131,7 +137,8 @@ public class PinotQueryResource {
   // Queries and DELETE are authorized by this resource (queries also by the broker), INSERT INTO ... FROM FILE by the
   // task API that it calls with the request headers
   @ManualAuthorization
-  public StreamingOutput handlePostSql(String requestJsonStr, @Context HttpHeaders httpHeaders) {
+  public StreamingOutput handlePostSql(String requestJsonStr, @Context HttpHeaders httpHeaders,
+      @Context Request request) {
     JsonNode requestJson;
     try {
       requestJson = JsonUtils.stringToJsonNode(requestJsonStr);
@@ -151,7 +158,7 @@ public class PinotQueryResource {
     if (requestJson.has("queryOptions")) {
       queryOptions = requestJson.get("queryOptions").asText();
     }
-    return executeSqlQueryCatching(httpHeaders, sqlQuery, traceEnabled, queryOptions, false);
+    return executeSqlQueryCatching(httpHeaders, request, sqlQuery, traceEnabled, queryOptions, false);
   }
 
   @GET
@@ -161,7 +168,7 @@ public class PinotQueryResource {
       @QueryParam("queryOptions") String queryOptions, @Context HttpHeaders httpHeaders) {
     // Only queries, as on the broker: a browser holding credentials must not follow a link that runs a DML statement
     // (e.g. deletes rows)
-    return executeSqlQueryCatching(httpHeaders, sqlQuery, traceEnabled, queryOptions, true);
+    return executeSqlQueryCatching(httpHeaders, null, sqlQuery, traceEnabled, queryOptions, true);
   }
 
   @GET
@@ -377,15 +384,16 @@ public class PinotQueryResource {
     }
   }
 
-  private StreamingOutput executeSqlQueryCatching(HttpHeaders httpHeaders, String sqlQuery, String traceEnabled,
-      String queryOptions, boolean isGet) {
+  private StreamingOutput executeSqlQueryCatching(HttpHeaders httpHeaders, @Nullable Request request,
+      String sqlQuery, String traceEnabled, String queryOptions, boolean isGet) {
     try {
-      return executeSqlQuery(httpHeaders, sqlQuery, traceEnabled, queryOptions, isGet);
+      return executeSqlQuery(httpHeaders, request, sqlQuery, traceEnabled, queryOptions, isGet);
     } catch (ProcessingException pe) {
-      LOGGER.error("Caught exception while processing get request {}", pe.getMessage());
+      // Kept on a single line: the message can carry caller-controlled text, e.g. a rejected statement
+      LOGGER.error("Caught exception while processing get request {}", LoggerUtils.toSingleLine(pe.getMessage()));
       return constructQueryExceptionResponse(QueryErrorCode.fromErrorCode(pe.getErrorCode()), pe.getMessage());
     } catch (QueryException ex) {
-      LOGGER.warn("Caught exception while processing get request {}", ex.getMessage());
+      LOGGER.warn("Caught exception while processing get request {}", LoggerUtils.toSingleLine(ex.getMessage()));
       return constructQueryExceptionResponse(ex.getErrorCode(), ex.getMessage());
     } catch (WebApplicationException wae) {
       LOGGER.error("Caught exception while processing get request", wae);
@@ -396,16 +404,22 @@ public class PinotQueryResource {
     }
   }
 
-  private StreamingOutput executeSqlQuery(@Context HttpHeaders httpHeaders, String sqlQuery, String traceEnabled,
-      @Nullable String queryOptions, boolean isGet)
+  private StreamingOutput executeSqlQuery(@Context HttpHeaders httpHeaders, @Nullable Request request,
+      String sqlQuery, String traceEnabled, @Nullable String queryOptions, boolean isGet)
       throws Exception {
-    LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, sqlQuery);
     // Parse with the exact payload forwarded to the broker, so that the options used to route the query (engine,
     // database) are the ones the broker will apply
     ObjectNode requestJson = getRequestJson(sqlQuery, traceEnabled, queryOptions);
     SqlNodeAndOptions sqlNodeAndOptions = RequestUtils.parseQuery(sqlQuery, requestJson);
     Map<String, String> options = sqlNodeAndOptions.getOptions();
     PinotSqlType sqlType = sqlNodeAndOptions.getSqlType();
+    if (sqlType == PinotSqlType.DML) {
+      // The text of a DML statement is never logged, see deleteLogMessage: only its kind is traced
+      LOGGER.debug("Trace: {}, Running DML statement of type: {}", traceEnabled,
+          sqlNodeAndOptions.getSqlNode().getKind());
+    } else {
+      LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, sqlQuery);
+    }
     if (sqlType == PinotSqlType.DDL) {
       throw QueryErrorCode.QUERY_VALIDATION.asException(
           "DDL statements are not supported on /sql; use POST /sql/ddl instead.");
@@ -432,7 +446,7 @@ public class PinotQueryResource {
             : getQueryResponse(sqlQuery, sqlNodeAndOptions, requestJson, httpHeaders);
       case DML:
         if (sqlNodeAndOptions.getSqlNode() instanceof SqlDelete) {
-          return executeDelete(sqlNodeAndOptions, httpHeaders);
+          return executeDelete(sqlNodeAndOptions, httpHeaders, request);
         }
         Map<String, String> headers = extractHeaders(httpHeaders);
         return output -> {
@@ -459,11 +473,14 @@ public class PinotQueryResource {
   /// The executor runs before the response streams, so that an exception it lets escape is mapped to an error
   /// response by [#executeSqlQueryCatching] rather than failing the request with HTTP 500.
   ///
+  /// @param request request the statement came with, whose remote address the log line names; null when the
+  ///                statement did not come with one
   /// @throws QueryException with [QueryErrorCode#ACCESS_DENIED] if the caller is not authorized, with
   ///                        [QueryErrorCode#QUERY_VALIDATION] if the table is a logical table, with
   ///                        [QueryErrorCode#TABLE_DOES_NOT_EXIST] if the table does not exist, and with the errors of
   ///                        [DataManipulationStatementParser#parse] and [DeleteStatement#resolveTableName]
-  private StreamingOutput executeDelete(SqlNodeAndOptions sqlNodeAndOptions, HttpHeaders httpHeaders) {
+  private StreamingOutput executeDelete(SqlNodeAndOptions sqlNodeAndOptions, HttpHeaders httpHeaders,
+      @Nullable Request request) {
     AccessControl accessControl = _accessControlFactory.create();
     if (!accessControl.hasAccess(AccessType.READ, httpHeaders, SQL_ENDPOINT)) {
       throw QueryErrorCode.ACCESS_DENIED.asException("Permission denied to delete rows");
@@ -480,7 +497,7 @@ public class PinotQueryResource {
     if (!statement.tableExists()) {
       throw QueryErrorCode.TABLE_DOES_NOT_EXIST.asException("Table does not exist: " + writtenTableName);
     }
-    LOGGER.info(deleteLogMessage(statement, httpHeaders));
+    LOGGER.info(deleteLogMessage(statement, sqlNodeAndOptions, httpHeaders, request));
     BrokerResponse response = _sqlQueryExecutor.executeStatement(statement, extractHeaders(httpHeaders));
     return output -> {
       try (OutputStream os = output) {
@@ -489,41 +506,70 @@ public class PinotQueryResource {
     };
   }
 
-  /// Formats the log line of a `DELETE` the executor is about to run: the resolved table, the predicate, the option
-  /// keys and the client of the request, in the format of the broker's line so that it parses the same way in the
-  /// logs of both roles. The predicate, the option keys and the client are kept on a single line (see
-  /// [#toSingleLine]), so that a line ending in the statement, in a request option or in a proxy header cannot forge
-  /// a log record.
+  /// Formats the log line of a `DELETE` the executor is about to run: the resolved table, the fingerprint of the
+  /// statement in place of the predicate, the option keys and the client of the request, in the format of the
+  /// broker's line so that it parses the same way in the logs of both roles, followed by the remote address of the
+  /// request, which the broker's line does not log.
+  ///
+  /// This line never carries the predicate, whatever the brokers log. The broker redacts it with the SQL redaction
+  /// mode of its query log, but that mode is a broker instance config (`pinot.broker.query.log.sqlRedaction`) the
+  /// controller cannot read, and the literals of the predicate are the very values a privacy-driven delete removes:
+  /// the controller logs the fingerprint of the statement instead (`DELETE FROM t WHERE c = ?`, the shape the broker
+  /// logs in its `literal_values` mode), which keeps the shape of the statement without its literals, or `REDACTED`
+  /// when the statement cannot be fingerprinted. The `DEBUG` trace line of [#executeSqlQuery] logs a DML statement
+  /// by its kind rather than by its text for the same reason. A statement the parser rejects is reported like any
+  /// other parse failure (its message, which can quote the rejected clause, is logged at `WARN` by
+  /// [#executeSqlQueryCatching]).
+  ///
+  /// The `client` field means the same as the broker's: the client a proxy reports (see [#forwardedClient]), or
+  /// [CommonConstants#UNKNOWN] when the request carries no such header. The controller has no equivalent of the
+  /// broker's `pinot.broker.request.client.ip.logging` config, so the forwarded client is logged whenever a header
+  /// carries one, where the broker logs `unknown` unless that config is enabled. The `remote` field, which the
+  /// broker's line does not have, is the remote address of the request, which the caller cannot forge. The option
+  /// keys and both addresses are kept on a single line (see [LoggerUtils#toSingleLine]), so that a line ending in a
+  /// request option or in a proxy header cannot forge a log record.
+  ///
+  /// @param sqlNodeAndOptions parsed statement, which is fingerprinted
+  /// @param request request the statement came with, null when it did not come with one: the remote address is
+  ///                then [CommonConstants#UNKNOWN]
   @VisibleForTesting
-  static String deleteLogMessage(DeleteStatement statement, HttpHeaders httpHeaders) {
+  static String deleteLogMessage(DeleteStatement statement, SqlNodeAndOptions sqlNodeAndOptions,
+      HttpHeaders httpHeaders, @Nullable Request request) {
+    String remoteAddr = request != null ? request.getRemoteAddr() : null;
+    String remote = remoteAddr != null ? LoggerUtils.toSingleLine(remoteAddr) : CommonConstants.UNKNOWN;
     return "Executing DELETE on table: " + statement.getTableName() + ", predicate: "
-        + toSingleLine(statement.getPredicate()) + ", options: "
-        + toSingleLine(statement.getOptions().keySet().toString()) + ", client: "
-        + toSingleLine(getClientIp(httpHeaders));
+        + fingerprint(statement, sqlNodeAndOptions) + ", options: "
+        + LoggerUtils.toSingleLine(statement.getOptions().keySet().toString()) + ", client: "
+        + LoggerUtils.toSingleLine(forwardedClient(httpHeaders)) + ", remote: " + remote;
   }
 
-  /// Client of the request for the log: the `X-Forwarded-For` header, else the `X-Real-IP` header, else
-  /// [CommonConstants#UNKNOWN]. The addresses of a comma-separated `X-Forwarded-For` value are joined with `;`, the
-  /// format the broker's `HttpRequesterIdentity#getClientIp` logs, so that the field parses the same way in the logs
-  /// of both roles. Both headers are set by the caller unless a proxy overwrites them.
-  private static String getClientIp(HttpHeaders httpHeaders) {
+  /// Fingerprint of the statement, its literals replaced with `?`, or `REDACTED` when it cannot be fingerprinted,
+  /// so that the log line never carries the literals of the predicate.
+  private static String fingerprint(DeleteStatement statement, SqlNodeAndOptions sqlNodeAndOptions) {
+    try {
+      QueryFingerprint fingerprint = QueryFingerprintUtils.generateFingerprint(sqlNodeAndOptions);
+      if (fingerprint != null) {
+        return fingerprint.getFingerprint();
+      }
+      LOGGER.warn("Could not fingerprint a DELETE on table: {}", statement.getTableName());
+    } catch (Exception e) {
+      LOGGER.warn("Failed to fingerprint a DELETE on table: {}", statement.getTableName(), e);
+    }
+    return REDACTED;
+  }
+
+  /// Client of the request as a proxy reports it, for the log: the `X-Forwarded-For` header, else the `X-Real-IP`
+  /// header, else [CommonConstants#UNKNOWN]. The addresses of a comma-separated `X-Forwarded-For` value are joined
+  /// with `;`, the value the broker's `HttpRequesterIdentity#getClientIp` logs under `client`, so that the field
+  /// parses the same way in the logs of both roles. Both headers are set by the caller unless a proxy overwrites
+  /// them, which is why the log line names the remote address of the request as well.
+  private static String forwardedClient(HttpHeaders httpHeaders) {
     String forwardedFor = httpHeaders.getHeaderString("X-Forwarded-For");
     if (forwardedFor != null) {
       return forwardedFor.replace(',', ';');
     }
     String realIp = httpHeaders.getHeaderString("X-Real-IP");
     return realIp != null ? realIp : CommonConstants.UNKNOWN;
-  }
-
-  /// Escapes backslashes, CR and LF as `\\`, `\r` and `\n`, as the broker's query log does, so that a value the
-  /// caller controls (a string literal or a quoted identifier of the predicate, an option key from `SET`, the legacy
-  /// `OPTION(...)` suffix or the request `queryOptions`, a proxy header) cannot split a log record or append a line
-  /// that looks like a log entry.
-  private static String toSingleLine(String value) {
-    if (value.indexOf('\\') < 0 && value.indexOf('\n') < 0 && value.indexOf('\r') < 0) {
-      return value;
-    }
-    return value.replace("\\", "\\\\").replace("\r", "\\r").replace("\n", "\\n");
   }
 
   /// Authorizes the caller, who passed the caller-level check of [#executeDelete], to delete rows from the table.
@@ -533,11 +579,20 @@ public class PinotQueryResource {
   /// action, the `DELETE` access type with the `/sql` endpoint and the fine-grained [Actions.Table#DELETE_ROWS]
   /// action. The `READ` and `QUERY` checks are there because the WHERE clause reads the table, the `DELETE` and
   /// `DELETE_ROWS` ones because rows are deleted, as the other deletions of the controller (e.g. of segments) check
-  /// `DELETE` on the raw table name. This is stricter than the controller's query path, which only checks the `READ`
-  /// access type with `"Query"` as the endpoint and no fine-grained action, and it does not apply the row-level
-  /// security of the brokers. Unlike the broker, which has no access type to tell a deletion from a query and denies
-  /// it by default, an access control that does not tell access types apart and allows every fine-grained action
-  /// lets every reader of the table delete rows, as it lets them delete segments.
+  /// `DELETE` on the raw table name. When the resolved name has a type suffix, the fine-grained `QUERY` and
+  /// `DELETE_ROWS` actions are then also checked on that name, which the broker checks, so that a fine-grained rule
+  /// keyed on the typed name cannot be bypassed by sending the statement to the controller rather than to a broker,
+  /// nor a rule keyed on the raw name by adding the suffix.
+  ///
+  /// This is stricter than the controller's query path, which only checks the `READ` access type with `"Query"` as
+  /// the endpoint and no fine-grained action. It applies no row-level security: the controller [AccessControl] has no
+  /// row-level security surface, while a broker denies a `DELETE` on a table its row-level security filters. A
+  /// deployment that relies on the row-level security of its brokers must therefore not install an executor that
+  /// deletes rows on the controller (see `BaseControllerStarter#createSqlQueryExecutor`), or must enforce equivalent
+  /// filtering in that executor, since a statement a broker refuses is otherwise executed here. Unlike the broker,
+  /// which has no access type to tell a deletion from a query and denies it by default, an access control that does
+  /// not tell access types apart and allows every fine-grained action lets every reader of the table delete rows, as
+  /// it lets them delete segments.
   ///
   /// @param tableName resolved table name the caller is authorized on
   /// @param writtenTableName table name as the caller wrote it, which the denial names so that the denial does not
@@ -546,10 +601,16 @@ public class PinotQueryResource {
   private void authorizeDelete(AccessControl accessControl, String tableName, String writtenTableName,
       HttpHeaders httpHeaders) {
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
-    if (!accessControl.hasAccess(rawTableName, AccessType.READ, httpHeaders, SQL_ENDPOINT)
-        || !accessControl.hasAccess(httpHeaders, TargetType.TABLE, rawTableName, Actions.Table.QUERY)
-        || !accessControl.hasAccess(rawTableName, AccessType.DELETE, httpHeaders, SQL_ENDPOINT)
-        || !accessControl.hasAccess(httpHeaders, TargetType.TABLE, rawTableName, Actions.Table.DELETE_ROWS)) {
+    boolean authorized = accessControl.hasAccess(rawTableName, AccessType.READ, httpHeaders, SQL_ENDPOINT)
+        && accessControl.hasAccess(httpHeaders, TargetType.TABLE, rawTableName, Actions.Table.QUERY)
+        && accessControl.hasAccess(rawTableName, AccessType.DELETE, httpHeaders, SQL_ENDPOINT)
+        && accessControl.hasAccess(httpHeaders, TargetType.TABLE, rawTableName, Actions.Table.DELETE_ROWS);
+    if (authorized && !rawTableName.equals(tableName)) {
+      // The fine-grained rules keyed on the typed name, which the broker consults
+      authorized = accessControl.hasAccess(httpHeaders, TargetType.TABLE, tableName, Actions.Table.QUERY)
+          && accessControl.hasAccess(httpHeaders, TargetType.TABLE, tableName, Actions.Table.DELETE_ROWS);
+    }
+    if (!authorized) {
       throw QueryErrorCode.ACCESS_DENIED.asException(
           "Permission denied to delete rows from table: " + writtenTableName);
     }

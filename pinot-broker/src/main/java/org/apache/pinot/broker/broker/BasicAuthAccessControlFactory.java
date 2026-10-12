@@ -36,14 +36,11 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.auth.BasicAuthPrincipal;
 import org.apache.pinot.core.auth.BasicAuthPrincipalUtils;
 import org.apache.pinot.spi.auth.AuthorizationResult;
-import org.apache.pinot.spi.auth.BasicAuthorizationResultImpl;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.auth.TableRowColAccessResult;
 import org.apache.pinot.spi.auth.TableRowColAccessResultImpl;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
-import org.apache.pinot.spi.config.user.AccessType;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 /// Basic Authentication based on http headers. Configured via the "pinot.broker.access.control" family of properties.
@@ -147,23 +144,12 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
     @Override
     public AuthorizationResult authorizeDeleteRows(RequesterIdentity requesterIdentity,
         @Nullable HttpHeaders httpHeaders, String tableName) {
-      Optional<BasicAuthPrincipal> principalOpt = getPrincipalOpt(requesterIdentity);
-      if (principalOpt.isEmpty()) {
-        return new BasicAuthorizationResultImpl(false, "Missing or invalid credentials");
-      }
-      BasicAuthPrincipal principal = principalOpt.get();
-      // `tables` matches the name as given, as for queries, while `excludeTables` lists raw names: also check the
-      // exclusion list on the raw name, so that a name with a type suffix cannot bypass an excluded table
-      if (!principal.hasTable(tableName)
-          || principal.isTableExcluded(TableNameBuilder.extractRawTableName(tableName))) {
-        return new BasicAuthorizationResultImpl(false,
-            "Principal: " + principal.getName() + " does not have access to table: " + tableName);
-      }
-      if (!principal.hasExplicitPermission(AccessType.DELETE.name())) {
-        return new BasicAuthorizationResultImpl(false,
-            "Principal: " + principal.getName() + " is not granted the DELETE permission");
-      }
-      return BasicAuthorizationResultImpl.success();
+      BasicAuthPrincipal principal = getPrincipalOpt(requesterIdentity).orElse(null);
+      // The table is matched by the name as given, as for queries: `tables` lists the name as given, and `hasTable`
+      // checks `excludeTables`, which lists raw names, on the raw name too, so that a type suffix cannot bypass an
+      // excluded table
+      return BasicAuthPrincipalUtils.authorizeDeleteRows(principal, tableName,
+          principal != null && principal.hasTable(tableName));
     }
 
     @Override

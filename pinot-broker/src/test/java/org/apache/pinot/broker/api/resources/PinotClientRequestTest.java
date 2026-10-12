@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -429,6 +430,30 @@ public class PinotClientRequestTest {
   }
 
   @Test
+  public void testDeleteWithACursorIsNotExecuted()
+      throws Exception {
+    // A cursor pages the rows of a query, which a DELETE does not return: the statement is rejected before the
+    // cursor options are set on it and the cursor metric is counted, rather than executed with options it does not
+    // support, which the client would then try to page
+    AsyncResponse asyncResponse = mock(AsyncResponse.class);
+    _pinotClientRequest.processSqlQueryPost(
+        JsonUtils.newObjectNode().put("sql", "DELETE FROM myTable WHERE col1 = 'a'").toString(), asyncResponse, true,
+        10, mockRequest(), _httpHeaders);
+
+    assertErrorCode(asyncResponse, QueryErrorCode.SQL_PARSING);
+    ArgumentCaptor<Response> captor = ArgumentCaptor.forClass(Response.class);
+    verify(asyncResponse).resume(captor.capture());
+    ByteArrayOutputStream responseBody = new ByteArrayOutputStream();
+    ((StreamingOutput) captor.getValue().getEntity()).write(responseBody);
+    String body = new String(responseBody.toByteArray(), StandardCharsets.UTF_8);
+    assertTrue(body.contains("Unsupported SQL type - DML, cursors only support DQL."), body);
+    verify(_sqlQueryExecutor, never()).executeDMLStatement(any(), any());
+    verify(_requestHandler, never()).handleRequest(any(), any(), any(), any(), any());
+    verify(_accessControlFactory, never()).create();
+    verify(_brokerMetrics, never()).addMeteredGlobalValue(BrokerMeter.CURSOR_QUERIES_GLOBAL, 1L);
+  }
+
+  @Test
   public void testDeleteIsExecutedOnTheAuthorizedTable()
       throws Exception {
     RecordingAccessControl accessControl = new RecordingAccessControl();
@@ -553,6 +578,52 @@ public class PinotClientRequestTest {
 
     assertEquals(assertForbidden(postSql("DELETE FROM mytable WHERE col1 = 'a'"), "mytable", null), message);
     assertEquals(accessControl._checks, List.of("broker", "tables []", "tables [mytable]"));
+  }
+
+  @Test
+  public void testDeleteDenialKeepsTheReasonUnlessItNamesTheTableAsAWord()
+      throws Exception {
+    // The reason is only dropped when it names the table as a whole word: the default reason of an access control
+    // written before DELETE existed, "does not allow deleting rows", is kept for a table named "row" (a reserved
+    // word, hence quoted), though "rows" contains the name
+    when(_accessControlFactory.create()).thenReturn(new AccessControl() {
+      @Override
+      public TableAuthorizationResult authorize(RequesterIdentity requesterIdentity, Set<String> tables) {
+        return TableAuthorizationResult.success();
+      }
+    });
+    assertForbidden(postSql("DELETE FROM \"row\" WHERE col1 = 'a'"), "row",
+        "The access control of the broker does not allow deleting rows");
+
+    // The table check names the table between brackets, "Authorization Failed for tables: [myTable]": a word is
+    // delimited by any character but a letter, a digit or an underscore, so the reason is dropped
+    clearInvocations(_brokerMetrics);
+    when(_accessControlFactory.create()).thenReturn(new RecordingAccessControl(null, "tables"));
+    assertEquals(assertForbidden(postSql("DELETE FROM myTable WHERE col1 = 'a'"), "myTable", null),
+        "Permission denied to delete rows from table: myTable");
+  }
+
+  @Test
+  public void testDeleteDenialOfATableNamedLikeATypeSuffixKeepsTheReason()
+      throws Exception {
+    // The raw name of a table literally named like a type suffix is empty: it is not looked for in the reason, which
+    // an empty word would be found in (between the ":" and the space), so the reason, which names no table, is kept.
+    // The fine-grained check of the right to delete rows is not run on the empty raw name either
+    RecordingAccessControl accessControl = new RecordingAccessControl() {
+      @Override
+      public AuthorizationResult authorizeDeleteRows(RequesterIdentity requesterIdentity,
+          @Nullable HttpHeaders httpHeaders, String tableName) {
+        super.authorizeDeleteRows(requesterIdentity, httpHeaders, tableName);
+        return new BasicAuthorizationResultImpl(false, "Principal: x is not granted the DELETE permission");
+      }
+    };
+    when(_accessControlFactory.create()).thenReturn(accessControl);
+
+    assertForbidden(postSql("DELETE FROM _OFFLINE WHERE col1 = 'a'"), "_OFFLINE",
+        "Principal: x is not granted the DELETE permission");
+    assertEquals(accessControl._checks, List.of("broker", "tables []", "tables [_OFFLINE]",
+        Actions.Table.QUERY + " TABLE _OFFLINE", Actions.Table.DELETE_ROWS + " TABLE _OFFLINE",
+        "deleteRows _OFFLINE"));
   }
 
   @Test

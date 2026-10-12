@@ -39,10 +39,8 @@ import org.apache.pinot.core.auth.BasicAuthPrincipal;
 import org.apache.pinot.core.auth.BasicAuthPrincipalUtils;
 import org.apache.pinot.core.auth.ZkBasicAuthPrincipal;
 import org.apache.pinot.spi.auth.AuthorizationResult;
-import org.apache.pinot.spi.auth.BasicAuthorizationResultImpl;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
-import org.apache.pinot.spi.config.user.AccessType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
@@ -126,21 +124,10 @@ public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
     @Override
     public AuthorizationResult authorizeDeleteRows(RequesterIdentity requesterIdentity,
         @Nullable HttpHeaders httpHeaders, String tableName) {
-      Optional<ZkBasicAuthPrincipal> principalOpt = getPrincipalAuth(requesterIdentity);
-      if (principalOpt.isEmpty()) {
-        return new BasicAuthorizationResultImpl(false, "Missing or invalid credentials");
-      }
-      ZkBasicAuthPrincipal principal = principalOpt.get();
-      // Tables are matched by raw name, as for queries
-      if (!principal.hasTable(TableNameBuilder.extractRawTableName(tableName))) {
-        return new BasicAuthorizationResultImpl(false,
-            "Principal: " + principal.getName() + " does not have access to table: " + tableName);
-      }
-      if (!principal.hasExplicitPermission(AccessType.DELETE.name())) {
-        return new BasicAuthorizationResultImpl(false,
-            "Principal: " + principal.getName() + " is not granted the DELETE permission");
-      }
-      return BasicAuthorizationResultImpl.success();
+      ZkBasicAuthPrincipal principal = getPrincipalAuth(requesterIdentity).orElse(null);
+      // The table is matched by raw name, as for queries
+      return BasicAuthPrincipalUtils.authorizeDeleteRows(principal, tableName,
+          principal != null && principal.hasTable(TableNameBuilder.extractRawTableName(tableName)));
     }
 
     private Optional<ZkBasicAuthPrincipal> getPrincipalAuth(RequesterIdentity requesterIdentity) {

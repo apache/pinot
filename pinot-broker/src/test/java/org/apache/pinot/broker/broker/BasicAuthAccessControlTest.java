@@ -247,6 +247,36 @@ public class BasicAuthAccessControlTest {
   }
 
   @Test
+  public void testExcludedTableIsNotQueriedByItsTypedName() {
+    // excludeTables lists raw names, and the query path checks it on the raw name as the DELETE path does: a type
+    // suffix does not bypass an excluded table, while the other tables are still queried
+    Multimap<String, String> headers = ArrayListMultimap.create();
+    headers.put(HEADER_AUTHORIZATION, TOKEN_EXCLUDER);
+    HttpRequesterIdentity identity = new HttpRequesterIdentity();
+    identity.setHttpHeaders(headers);
+
+    for (String tableName : List.of("billing", "billing_OFFLINE", "billing_REALTIME")) {
+      AuthorizationResult authorizationResult = _accessControl.authorize(identity, Set.of(tableName));
+      Assert.assertFalse(authorizationResult.hasAccess(), tableName);
+      assertEquals(authorizationResult.getFailureMessage(), "Authorization Failed for tables: [" + tableName + "]");
+
+      QuerySource source = new QuerySource();
+      source.setTableName(tableName);
+      BrokerRequest request = new BrokerRequest();
+      request.setQuerySource(source);
+      authorizationResult = _accessControl.authorize(identity, request);
+      Assert.assertFalse(authorizationResult.hasAccess(), tableName);
+      assertEquals(authorizationResult.getFailureMessage(), "Authorization Failed for tables: [" + tableName + "]");
+    }
+    AuthorizationResult authorizationResult =
+        _accessControl.authorize(identity, Set.of("lessImportantStuff", "billing_OFFLINE"));
+    Assert.assertFalse(authorizationResult.hasAccess());
+    assertEquals(authorizationResult.getFailureMessage(), "Authorization Failed for tables: [billing_OFFLINE]");
+    Assert.assertTrue(_accessControl.authorize(identity, Set.of("other", "other_OFFLINE")).hasAccess());
+    Assert.assertTrue(_accessControl.authorize(identity, _tableNames).hasAccess());
+  }
+
+  @Test
   public void testDeleteRowsChecksTheRawTableName() {
     // excludeTables lists raw names: a type suffix does not bypass it
     assertDeleteRows(TOKEN_EXCLUDER, "billing", false, "Principal: excluder does not have access to table: billing");

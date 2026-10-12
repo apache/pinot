@@ -35,6 +35,9 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
+/// Tests that [BrokerRequestHandlerDelegate] answers a DML statement with an error rather than handing it to a query
+/// engine: the gRPC and custom request containers reach the delegate without the authorization of the REST endpoint,
+/// which is the only path a `DELETE` is authorized and executed on.
 public class BrokerRequestHandlerDelegateTest {
 
   @Test

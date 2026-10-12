@@ -716,6 +716,10 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     LOGGER.info("Registered PinotLLCRealtimeSegmentManager as cluster config change listener");
     // Keeps the legacy OPTION(...) syntax mode cluster config in effect for the statements the controller parses on
     // /sql, including the DML it executes itself (a DELETE carrying legacy options fails in IGNORE and REJECT mode).
+    // The mode is JVM-wide (QueryOptionsUtils.getLegacyOptionSyntaxMode, read by every parse), so it also governs
+    // the other statements the controller parses: the recommender (InputManager), /query/tableNames
+    // (TableNameExtractor) and validateMultiStageQuery. A cluster that rejects or ignores OPTION(...) does so on
+    // those endpoints too, which matches what the broker would do with the same statement at runtime.
     // The query option validation mode is not applied here: the broker validates every query the controller forwards,
     // and the REJECT allowlist of registered SET keys is per JVM (broker plugins register their keys in the broker
     // only), so applying it here would reject options the broker accepts
@@ -845,6 +849,12 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   /// The broker has the same hook, `BaseBrokerStarter#createSqlQueryExecutor`: a statement is executed by the role
   /// that receives it, so both hooks must be overridden for a DELETE to be executed consistently whichever role it is
   /// sent to.
+  ///
+  /// The controller applies no row-level security to a `DELETE`: its access control has no row-level security
+  /// surface, while a broker denies a `DELETE` on a table its row-level security filters (see
+  /// `PinotQueryResource#authorizeDelete`). A deployment that relies on the row-level security of its brokers must
+  /// therefore not install an executor that deletes rows here, or must enforce equivalent filtering in that
+  /// executor: otherwise a statement a broker refuses can be sent to the controller and executed.
   protected SqlQueryExecutor createSqlQueryExecutor() {
     return new SqlQueryExecutor(_config.generateVipUrl());
   }

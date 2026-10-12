@@ -28,11 +28,14 @@ import org.apache.calcite.sql.SqlFunction;
 import org.apache.calcite.sql.SqlFunctionCategory;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.SqlLiteral;
+import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlWriter;
 import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.ReturnTypes;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.spi.exception.DatabaseConflictException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
@@ -50,11 +53,16 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
 
+/// Tests [DeleteStatement]: parsing a `DELETE` with its options, resolving its table name against a mocked
+/// [TableCache], serializing its WHERE clause into a predicate that compiles back into the same expression, and
+/// rejecting the statements and predicates it does not support. Some tests switch the default locale of the JVM and
+/// restore it, so the class is not safe to run in parallel with other test classes.
 public class DeleteStatementTest {
 
   @Test
@@ -335,25 +343,27 @@ public class DeleteStatementTest {
       assertInvalid("DELETE FROM myTable WHERE " + predicate,
           "LIKE ... ESCAPE is not supported in a DELETE predicate");
     }
-    // An exact integer literal outside the long range wraps around when it is compiled
+    // An exact integer literal outside the long range wraps around when it is compiled. The messages do not echo the
+    // literal, which the caller sees in their own statement: they are logged by the controller
     for (String literal : List.of("9223372036854775808", "18446744073709551616", "-9223372036854775809")) {
-      assertInvalid("DELETE FROM myTable WHERE x > " + literal, "integer literal out of the long range: " + literal);
-      assertInvalid("DELETE FROM myTable WHERE x IN (1, " + literal + ")",
-          "integer literal out of the long range: " + literal);
+      assertInvalid("DELETE FROM myTable WHERE x > " + literal, "integer literal out of the long range", literal);
+      assertInvalid("DELETE FROM myTable WHERE x IN (1, " + literal + ")", "integer literal out of the long range",
+          literal);
     }
     // Every other numeric literal compiles to a double: a decimal literal that a double does not represent exactly
     // is rounded, moving the bound a BIG_DECIMAL column is compared against (2^63 is exact in a double, but its
     // Double.toString rendering 9.223372036854776E18, which the bound is parsed from, is not)
     for (String literal : List.of("12345678901234567.89", "9007199254740993.0", "9223372036854775808.0")) {
       assertInvalid("DELETE FROM myTable WHERE x <= " + literal,
-          "decimal literal " + literal + " loses precision as a double: use CAST('" + literal + "' AS DECIMAL)");
+          "decimal literal loses precision as a double: use CAST('<digits>' AS DECIMAL)", literal);
       assertInvalid("DELETE FROM myTable WHERE x IN (1, " + literal + ")",
-          "decimal literal " + literal + " loses precision as a double");
+          "decimal literal loses precision as a double", literal);
     }
     // A numeric literal outside the double range becomes an infinity or zero
     for (String literal : List.of("1E999", "-1E999", "1E-999")) {
-      assertInvalid("DELETE FROM myTable WHERE x > " + literal, "numeric literal out of the double range");
-      assertInvalid("DELETE FROM myTable WHERE a = 1 OR x = " + literal, "numeric literal out of the double range");
+      assertInvalid("DELETE FROM myTable WHERE x > " + literal, "numeric literal out of the double range", literal);
+      assertInvalid("DELETE FROM myTable WHERE a = 1 OR x = " + literal, "numeric literal out of the double range",
+          literal);
     }
     // The same predicates keeping their unit, flag, escape or value are supported
     for (String predicate : List.of(
@@ -368,6 +378,50 @@ public class DeleteStatementTest {
         "x <= CAST('12345678901234567.89' AS DECIMAL)")) {
       parse("DELETE FROM myTable WHERE " + predicate);
     }
+  }
+
+  @Test
+  public void testParseRejectsLikeEscapeAsAFunctionCall() {
+    // like(col, pattern, escape) parses as a plain function, not as the LIKE operator the node checker rejects: the
+    // three-operand expression it compiles to is rejected on the compiled expression, with the same message, as the
+    // single-stage engine ignores the escape operand (an escaped wildcard would still match anything). Unlike the
+    // operator form, the function call takes any number of operands, and the engine ignores every operand past the
+    // pattern: a call with more than three operands is rejected too
+    for (String predicate : List.of(
+        "like(code, 'a!%b', '!')",
+        "LIKE(code, 'a!%b', '!')",
+        "NOT like(code, 'a!%b', '!')",
+        "a = 1 AND (b = 2 OR like(code, 'x!_', '!'))",
+        "lower(code) = 'x' OR like(code, 'a!%b', '!')",
+        "like(code, 'a!%b', '!', 'x')",
+        "NOT like(code, 'a!%b', '!', 'x')",
+        "LIKE(code, 'a%', '!', 'y', 'z')")) {
+      assertInvalid("DELETE FROM myTable WHERE " + predicate,
+          "LIKE ... ESCAPE is not supported in a DELETE predicate");
+    }
+    // The operator form is still rejected
+    assertInvalid("DELETE FROM myTable WHERE code LIKE 'a!%b' ESCAPE '!'",
+        "LIKE ... ESCAPE is not supported in a DELETE predicate");
+    // Without an escape character, the function call is a plain LIKE
+    for (String predicate : List.of("like(code, 'a%')", "NOT like(code, 'a%')", "a = 1 AND like(code, 'a%')")) {
+      parse("DELETE FROM myTable WHERE " + predicate);
+    }
+  }
+
+  @Test
+  public void testPredicateExpression() {
+    DeleteStatement statement = parse("DELETE FROM myTable WHERE userId = 'u1' AND ts < 1700000000000");
+
+    // The expression is the one the predicate compiles to, which the round-trip check validated
+    Expression expected = CalciteSqlParser.compileToExpression(statement.getPredicate());
+    assertEquals(statement.getPredicateExpression(), expected);
+    // Resolving the table name keeps it
+    assertEquals(statement.resolveTableName(null, mock(TableCache.class)).getPredicateExpression(), expected);
+    // Every call returns a copy: mutating it does not affect the statement
+    Expression copy = statement.getPredicateExpression();
+    copy.getFunctionCall().setOperator("OR");
+    assertNotEquals(copy, expected);
+    assertEquals(statement.getPredicateExpression(), expected);
   }
 
   @Test
@@ -419,15 +473,54 @@ public class DeleteStatementTest {
         SqlFunctionCategory.USER_DEFINED_FUNCTION) {
       @Override
       public void unparse(SqlWriter writer, SqlCall call, int leftPrec, int rightPrec) {
-        writer.print("bar(a)");
+        SqlWriter.Frame frame = writer.startFunCall("bar");
+        for (SqlNode operand : call.getOperandList()) {
+          writer.sep(",");
+          operand.unparse(writer, 0, 0);
+        }
+        writer.endFunCall(frame);
       }
     };
     SqlDelete sqlDelete = new SqlDelete(SqlParserPos.ZERO, new SqlIdentifier("myTable", SqlParserPos.ZERO),
-        foo.createCall(SqlParserPos.ZERO, new SqlIdentifier("a", SqlParserPos.ZERO)), null, null);
+        foo.createCall(SqlParserPos.ZERO, new SqlIdentifier("a", SqlParserPos.ZERO),
+            SqlLiteral.createCharString("secret", SqlParserPos.ZERO)), null, null);
 
     IllegalArgumentException e = expectThrows(IllegalArgumentException.class,
         () -> DeleteStatement.parse(new SqlNodeAndOptions(sqlDelete, PinotSqlType.DML, Map.of())));
-    assertTrue(e.getMessage().contains("cannot be serialized back into the same expression"), e.getMessage());
+    assertTrue(e.getMessage().contains("cannot be serialized back into the same expression: "), e.getMessage());
+    // The message renders the WHERE clause with its literals masked, see testParseRejectionMessagesCarryNoLiterals
+    assertTrue(e.getMessage().contains("?"), e.getMessage());
+    assertFalse(e.getMessage().contains("secret"), e.getMessage());
+  }
+
+  @Test
+  public void testParseRejectionMessagesCarryNoLiterals() {
+    // The messages that render the WHERE clause replace its literals with ?, since a literal may carry data the
+    // caller controls (an email address, a line ending that splits a log record) and the message is returned to the
+    // caller and logged by the controller. The subquery makes the WHERE clause one that Pinot cannot compile
+    IllegalArgumentException e = expectThrows(IllegalArgumentException.class, () -> parse(
+        "DELETE FROM myTable WHERE col1 = 'secret' AND n = 4242 AND ts > TIMESTAMP '2024-01-01 00:00:00' "
+            + "AND country IN ('UK1', 'FR2') AND flag = true AND x BETWEEN 1.25 AND 2.75 AND other IS NOT NULL "
+            + "AND userId IN (SELECT userId FROM other)"));
+    String message = e.getMessage();
+    assertTrue(message.startsWith("Unsupported WHERE clause in DELETE: "), message);
+    // The shape of the clause is kept
+    for (String text : List.of("col1", "= ?", "> ?", "IN (?, ?)", "BETWEEN", "? AND ?", "IS NOT NULL", "SELECT")) {
+      assertTrue(message.contains(text), message);
+    }
+    for (String literal : List.of("secret", "4242", "2024", "UK1", "FR2", "TRUE", "true", "1.25", "2.75")) {
+      assertFalse(message.contains(literal), message);
+    }
+    // A chain of string literals ('a' 'b') unparses its literals directly, so it is masked as a whole
+    e = expectThrows(IllegalArgumentException.class,
+        () -> parse("DELETE FROM myTable WHERE col1 = 'sec' 'ret' AND userId IN (SELECT userId FROM other)"));
+    assertTrue(e.getMessage().contains("= ?"), e.getMessage());
+    assertFalse(e.getMessage().contains("sec"), e.getMessage());
+    // A WHERE clause that cannot be rendered (AT TIME ZONE has no unparse support) is described by its kind
+    e = expectThrows(IllegalArgumentException.class,
+        () -> parse("DELETE FROM myTable WHERE ts AT TIME ZONE 'secret' > 123"));
+    assertTrue(e.getMessage().contains("expression that cannot be rendered"), e.getMessage());
+    assertFalse(e.getMessage().contains("secret"), e.getMessage());
   }
 
   @Test
@@ -501,6 +594,9 @@ public class DeleteStatementTest {
     // The serialized predicate compiles into the same filter as the original WHERE clause
     assertEquals(CalciteSqlParser.compileToExpression(statement.getPredicate()),
         CalciteSqlParser.compileToExpression(predicate), statement.getPredicate());
+    // And the statement carries that filter
+    assertEquals(statement.getPredicateExpression(), CalciteSqlParser.compileToExpression(predicate),
+        statement.getPredicate());
   }
 
   private static DeleteStatement parse(String sql) {
@@ -524,5 +620,12 @@ public class DeleteStatementTest {
   private static void assertInvalid(String sql, String expectedMessage) {
     IllegalArgumentException e = expectThrows(IllegalArgumentException.class, () -> parse(sql));
     assertTrue(e.getMessage().contains(expectedMessage), e.getMessage());
+  }
+
+  /// Also asserts that the message does not carry `unexpectedText`, e.g. a literal of the statement.
+  private static void assertInvalid(String sql, String expectedMessage, String unexpectedText) {
+    IllegalArgumentException e = expectThrows(IllegalArgumentException.class, () -> parse(sql));
+    assertTrue(e.getMessage().contains(expectedMessage), e.getMessage());
+    assertFalse(e.getMessage().contains(unexpectedText), e.getMessage());
   }
 }

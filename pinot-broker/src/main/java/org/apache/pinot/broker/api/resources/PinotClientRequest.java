@@ -42,6 +42,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Named;
@@ -63,7 +64,6 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
 import org.apache.calcite.sql.SqlDelete;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.api.HttpRequesterIdentity;
@@ -81,6 +81,7 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.mapper.TimeSeriesResponseMapper;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.LoggerUtils;
 import org.apache.pinot.common.utils.request.QueryFingerprintUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.auth.Actions;
@@ -696,7 +697,14 @@ public class PinotClientRequest {
     if (forceUseMultiStage) {
       sqlNodeAndOptions.setExtraOptions(Map.of(Request.QueryOptionKey.USE_MULTISTAGE_ENGINE, "true"));
     }
+    PinotSqlType sqlType = sqlNodeAndOptions.getSqlType();
     if (getCursor) {
+      // A cursor pages the rows of a query: a DML statement returns none, so it is rejected before the cursor options
+      // are set on it and the cursor metric is counted, rather than executed with options it does not support
+      if (sqlType != PinotSqlType.DQL) {
+        return new BrokerResponseNative(QueryErrorCode.SQL_PARSING,
+            "Unsupported SQL type - " + sqlType + ", cursors only support DQL.");
+      }
       if (numRows == 0) {
         numRows = _brokerConf.getProperty(CommonConstants.CursorConfigs.CURSOR_FETCH_ROWS,
             CommonConstants.CursorConfigs.DEFAULT_CURSOR_FETCH_ROWS);
@@ -706,7 +714,6 @@ public class PinotClientRequest {
               Integer.toString(numRows)));
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.CURSOR_QUERIES_GLOBAL, 1);
     }
-    PinotSqlType sqlType = sqlNodeAndOptions.getSqlType();
     if (onlyDql && sqlType != PinotSqlType.DQL) {
       return new BrokerResponseNative(QueryErrorCode.SQL_PARSING,
           "Unsupported SQL type - " + sqlType + ", this API only supports DQL.");
@@ -822,17 +829,12 @@ public class PinotClientRequest {
       }
     }
     String predicate = QueryLogger.redactQuery(statement.getPredicate(), sqlRedactionMode, fingerprint);
-    String options = toSingleLine(statement.getOptions().keySet().toString());
+    String options = LoggerUtils.toSingleLine(statement.getOptions().keySet().toString());
     String client = _brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_REQUEST_CLIENT_IP_LOGGING,
         CommonConstants.Broker.DEFAULT_BROKER_REQUEST_CLIENT_IP_LOGGING)
-        ? toSingleLine(requesterIdentity.getClientIp()) : CommonConstants.UNKNOWN;
+        ? LoggerUtils.toSingleLine(requesterIdentity.getClientIp()) : CommonConstants.UNKNOWN;
     return "Executing DELETE on table: " + statement.getTableName() + ", predicate: " + predicate + ", options: "
         + options + ", client: " + client;
-  }
-
-  /// Escapes backslashes, CR and LF as `\\`, `\r` and `\n`, as `QueryLogger` does to log a query on a single line.
-  private static String toSingleLine(String text) {
-    return text.replace("\\", "\\\\").replace("\r", "\\r").replace("\n", "\\n");
   }
 
   /// Authorizes the caller, who passed the first-step access control, to delete rows from the table.
@@ -861,8 +863,11 @@ public class PinotClientRequest {
         tableName, writtenTableName);
     checkDeleteAccess(accessControl.authorize(httpHeaders, TargetType.TABLE, tableName, Actions.Table.DELETE_ROWS),
         tableName, writtenTableName);
+    // The raw name of a table literally named like a type suffix (e.g. "_OFFLINE") is empty: no rule can be
+    // configured on it, so the fine-grained check is not run on an empty target, which the access control may not
+    // expect. The caller still has to pass the checks on the name as given and authorizeDeleteRows below
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
-    if (!rawTableName.equals(tableName)) {
+    if (!rawTableName.isEmpty() && !rawTableName.equals(tableName)) {
       checkDeleteAccess(
           accessControl.authorize(httpHeaders, TargetType.TABLE, rawTableName, Actions.Table.DELETE_ROWS), tableName,
           writtenTableName);
@@ -921,8 +926,8 @@ public class PinotClientRequest {
       // The name, which is the one written when the table cache does not know it, and the reason come from the
       // request and from the access control: escaped as the predicate of the log line of a DELETE is, so that they
       // cannot forge a log record
-      LOGGER.info("Access denied to delete rows from table: {}, reason: {}", toSingleLine(tableName),
-          reason != null ? toSingleLine(reason) : null);
+      LOGGER.info("Access denied to delete rows from table: {}, reason: {}", LoggerUtils.toSingleLine(tableName),
+          LoggerUtils.toSingleLine(reason));
       if (reason != null && (mentionsTable(reason, tableName) || mentionsTable(reason, writtenTableName))) {
         reason = null;
       }
@@ -937,10 +942,31 @@ public class PinotClientRequest {
   }
 
   /// Whether the reason of a denial mentions the table name, or its raw name (the fine-grained check of the right to
-  /// delete rows also runs on the raw name), ignoring case, since `enable.case.insensitive` resolves it.
+  /// delete rows also runs on the raw name), as a whole word, ignoring case, since `enable.case.insensitive` resolves
+  /// it. The name is matched where it is neither preceded nor followed by a letter, a digit or an underscore, so that
+  /// a name that is part of a word of the reason does not suppress it: the default reason "does not allow deleting
+  /// rows" is kept for a table named `row`. A table literally named like a word of the reason (e.g. `rows`) still
+  /// suppresses it, which only costs its caller the explanation: the log line keeps the reason. The raw name of a
+  /// table literally named like a type suffix (e.g. `_OFFLINE`) is empty, and is not looked for: an empty word is
+  /// found in nearly every reason (between two punctuation characters, e.g. in "Principal: x is not granted ...").
   private static boolean mentionsTable(String reason, @Nullable String tableName) {
-    return tableName != null && (StringUtils.containsIgnoreCase(reason, tableName)
-        || StringUtils.containsIgnoreCase(reason, TableNameBuilder.extractRawTableName(tableName)));
+    if (tableName == null) {
+      return false;
+    }
+    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+    return containsWord(reason, tableName) || (!rawTableName.isEmpty() && !rawTableName.equals(tableName)
+        && containsWord(reason, rawTableName));
+  }
+
+  /// Whether the text contains the word, ignoring case, where it is neither preceded nor followed by a letter, a
+  /// digit or an underscore. An empty word is never contained, since the pattern of an empty word would match at
+  /// any boundary of the text. Only runs when a `DELETE` is denied, so the pattern is compiled per call.
+  private static boolean containsWord(String text, String word) {
+    if (word.isEmpty()) {
+      return false;
+    }
+    return Pattern.compile("(?<![\\p{Alnum}_])" + Pattern.quote(word) + "(?![\\p{Alnum}_])",
+        Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE).matcher(text).find();
   }
 
   /// Returns whether row-level security filters apply to the table for the caller, when the broker enables row-level

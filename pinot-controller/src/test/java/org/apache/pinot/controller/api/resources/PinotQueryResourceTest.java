@@ -49,6 +49,7 @@ import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.sql.parsers.dml.DataManipulationStatement;
 import org.apache.pinot.sql.parsers.dml.DataManipulationStatementParser;
 import org.apache.pinot.sql.parsers.dml.DeleteStatement;
+import org.glassfish.grizzly.http.server.Request;
 import org.mockito.AdditionalAnswers;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
@@ -73,6 +74,7 @@ import static org.testng.Assert.expectThrows;
 
 public class PinotQueryResourceTest {
   private static final Map<String, String> REQUEST_HEADERS = Map.of("Authorization", "Basic abc");
+  private static final String REMOTE_ADDR = "127.0.0.1";
 
   @Mock
   PinotHelixResourceManager _resourceManager;
@@ -168,15 +170,43 @@ public class PinotQueryResourceTest {
   }
 
   @Test
-  public void testDeleteFromATableWithATypeIsAuthorizedOnItsRawName() {
+  public void testDeleteFromATableWithATypeIsAuthorizedOnItsRawNameThenOnItsTypedName() {
     RecordingAccessControl accessControl = allowEveryCheck();
 
     postSql("DELETE FROM t_OFFLINE WHERE a = 1", null);
 
-    // Like the table APIs of the controller, while the executor deletes from the table named by the statement
+    // On the raw name like the table APIs of the controller, then the fine-grained actions on the typed name as the
+    // broker checks them, while the executor deletes from the table named by the statement
     assertEquals(accessControl._checks, List.of("READ null", "READ t", Actions.Table.QUERY + " TABLE t", "DELETE t",
-        Actions.Table.DELETE_ROWS + " TABLE t"));
+        Actions.Table.DELETE_ROWS + " TABLE t", Actions.Table.QUERY + " TABLE t_OFFLINE",
+        Actions.Table.DELETE_ROWS + " TABLE t_OFFLINE"));
     assertEquals(executedDelete().getTableName(), "t_OFFLINE");
+  }
+
+  @DataProvider
+  public Object[][] typedNameChecks() {
+    List<String> checks = List.of("READ null", "READ t", Actions.Table.QUERY + " TABLE t", "DELETE t",
+        Actions.Table.DELETE_ROWS + " TABLE t", Actions.Table.QUERY + " TABLE t_OFFLINE",
+        Actions.Table.DELETE_ROWS + " TABLE t_OFFLINE");
+    return new Object[][]{
+        {Actions.Table.QUERY + " TABLE t_OFFLINE", checks.subList(0, 6)},
+        {Actions.Table.DELETE_ROWS + " TABLE t_OFFLINE", checks}
+    };
+  }
+
+  @Test(dataProvider = "typedNameChecks")
+  public void testDeleteFromATableWithATypeIsDeniedByAFineGrainedRuleOnItsTypedNameAlone(String deniedCheck,
+      List<String> expectedChecks) {
+    // Every check on the raw name passes: a rule keyed on the typed name, which the broker consults, denies here too
+    RecordingAccessControl accessControl = new RecordingAccessControl(deniedCheck);
+    when(_accessControlFactory.create()).thenReturn(accessControl);
+
+    String response = postSql("DELETE FROM t_OFFLINE WHERE a = 1", null);
+
+    assertTrue(response.contains(String.valueOf(QueryErrorCode.ACCESS_DENIED.getId())), response);
+    assertTrue(response.contains("Permission denied to delete rows from table: t_OFFLINE"), response);
+    assertEquals(accessControl._checks, expectedChecks);
+    verify(_sqlQueryExecutor, never()).executeStatement(any(), any());
   }
 
   @DataProvider
@@ -377,7 +407,7 @@ public class PinotQueryResourceTest {
   @DataProvider
   public Object[][] clientHeaders() {
     return new Object[][]{
-        // The addresses of X-Forwarded-For are joined with ';', the format the broker logs
+        // The addresses of X-Forwarded-For are joined with ';', the value the broker logs under client
         {"203.0.113.7, 10.0.0.1", null, "203.0.113.7; 10.0.0.1"},
         {"203.0.113.7, 10.0.0.1", "10.0.0.2", "203.0.113.7; 10.0.0.1"},
         {null, "10.0.0.2", "10.0.0.2"},
@@ -386,27 +416,75 @@ public class PinotQueryResourceTest {
   }
 
   @Test(dataProvider = "clientHeaders")
-  public void testDeleteLogMessageLogsTheClientAsTheBroker(@Nullable String forwardedFor, @Nullable String realIp,
-      String expectedClient) {
-    DeleteStatement statement = resolvedDelete("DELETE FROM myTable WHERE a = 1", null);
+  public void testDeleteLogMessageLogsTheForwardedClientThenTheRemoteAddress(@Nullable String forwardedFor,
+      @Nullable String realIp, String expectedClient) {
+    SqlNodeAndOptions sqlNodeAndOptions = parse("DELETE FROM myTable WHERE a = 1", null);
+    DeleteStatement statement = resolvedDelete(sqlNodeAndOptions);
 
-    String message = PinotQueryResource.deleteLogMessage(statement, headersWithClient(forwardedFor, realIp));
+    String message = PinotQueryResource.deleteLogMessage(statement, sqlNodeAndOptions,
+        headersWithClient(forwardedFor, realIp), mockRequest());
 
-    assertEquals(message,
-        "Executing DELETE on table: myTable, predicate: a = 1, options: [], client: " + expectedClient);
+    // The client a proxy reports, as the broker logs it under the same field (unknown without a header, as the
+    // broker logs by default), then the remote address of the request, which the caller cannot forge
+    assertEquals(message, "Executing DELETE on table: myTable, predicate: DELETE FROM `myTable` WHERE `a` = ?, "
+        + "options: [], client: " + expectedClient + ", remote: " + REMOTE_ADDR);
+  }
+
+  @Test
+  public void testDeleteLogMessageWithoutARequestLogsAnUnknownRemoteAddress() {
+    SqlNodeAndOptions sqlNodeAndOptions = parse("DELETE FROM myTable WHERE a = 1", null);
+    DeleteStatement statement = resolvedDelete(sqlNodeAndOptions);
+
+    String message = PinotQueryResource.deleteLogMessage(statement, sqlNodeAndOptions,
+        headersWithClient("203.0.113.7", null), null);
+
+    assertEquals(message, "Executing DELETE on table: myTable, predicate: DELETE FROM `myTable` WHERE `a` = ?, "
+        + "options: [], client: 203.0.113.7, remote: " + CommonConstants.UNKNOWN);
+  }
+
+  @Test
+  public void testDeleteLogMessageNeverLogsTheLiteralsOfThePredicate() {
+    // The controller cannot read the redaction mode of the brokers, and the literals are the very values a
+    // privacy-driven delete removes: the fingerprint of the statement is logged whatever the brokers log
+    SqlNodeAndOptions sqlNodeAndOptions = parse("DELETE FROM myTable WHERE email = 'alice@example.com'", null);
+    DeleteStatement statement = resolvedDelete(sqlNodeAndOptions);
+
+    String message = PinotQueryResource.deleteLogMessage(statement, sqlNodeAndOptions, headersWithClient(null, null),
+        mockRequest());
+
+    assertEquals(message, "Executing DELETE on table: myTable, predicate: DELETE FROM `myTable` WHERE `email` = ?, "
+        + "options: [], client: " + CommonConstants.UNKNOWN + ", remote: " + REMOTE_ADDR);
+    assertFalse(message.contains("alice"), message);
+  }
+
+  @Test
+  public void testDeleteLogMessageRedactsAStatementItCannotFingerprint() {
+    SqlNodeAndOptions sqlNodeAndOptions = parse("DELETE FROM myTable WHERE email = 'alice@example.com'", null);
+    DeleteStatement statement = resolvedDelete(sqlNodeAndOptions);
+    SqlNodeAndOptions failing = mock(SqlNodeAndOptions.class);
+    when(failing.getSqlNode()).thenThrow(new RuntimeException("cannot fingerprint"));
+
+    String message = PinotQueryResource.deleteLogMessage(statement, failing, headersWithClient(null, null),
+        mockRequest());
+
+    // Fails closed: the predicate is not logged in place of the fingerprint
+    assertEquals(message, "Executing DELETE on table: myTable, predicate: REDACTED, options: [], client: "
+        + CommonConstants.UNKNOWN + ", remote: " + REMOTE_ADDR);
+    assertFalse(message.contains("alice"), message);
   }
 
   @Test
   public void testDeleteLogMessageIsASingleLine() {
-    // A line ending in a string literal of the predicate, in a key of the request options or in a proxy header is
-    // escaped, as in a query logged by the broker, so that it cannot forge a log record
-    DeleteStatement statement = resolvedDelete("DELETE FROM myTable WHERE col1 = 'a\nb'", "x\ny=1");
+    // A line ending in a key of the request options or in a proxy header is escaped, as in a query logged by the
+    // broker, so that it cannot forge a log record; one in a string literal of the predicate is fingerprinted away
+    SqlNodeAndOptions sqlNodeAndOptions = parse("DELETE FROM myTable WHERE col1 = 'a\nb'", "x\ny=1");
+    DeleteStatement statement = resolvedDelete(sqlNodeAndOptions);
 
-    String message = PinotQueryResource.deleteLogMessage(statement,
-        headersWithClient("10.0.0.1,\r\n2026-10-10 INFO forged log record", null));
+    String message = PinotQueryResource.deleteLogMessage(statement, sqlNodeAndOptions,
+        headersWithClient("10.0.0.1,\r\n2026-10-10 INFO forged log record", null), mockRequest());
 
-    assertEquals(message, "Executing DELETE on table: myTable, predicate: col1 = 'a\\nb', options: [x\\ny], "
-        + "client: 10.0.0.1;\\r\\n2026-10-10 INFO forged log record");
+    assertEquals(message, "Executing DELETE on table: myTable, predicate: DELETE FROM `myTable` WHERE `col1` = ?, "
+        + "options: [x\\ny], client: 10.0.0.1;\\r\\n2026-10-10 INFO forged log record, remote: " + REMOTE_ADDR);
     assertFalse(message.contains("\n") || message.contains("\r"), message);
   }
 
@@ -494,19 +572,30 @@ public class PinotQueryResourceTest {
     HttpHeaders httpHeaders = mock(HttpHeaders.class);
     when(httpHeaders.getRequestHeaders()).thenReturn(new MultivaluedHashMap<>(REQUEST_HEADERS));
     when(httpHeaders.getHeaderString(CommonConstants.DATABASE)).thenReturn(database);
-    return streamingOutputToString(
-        _pinotQueryResource.handlePostSql(JsonUtils.newObjectNode().put("sql", sql).toString(), httpHeaders));
+    return streamingOutputToString(_pinotQueryResource.handlePostSql(
+        JsonUtils.newObjectNode().put("sql", sql).toString(), httpHeaders, mockRequest()));
   }
 
-  /// Parses the `DELETE` with the `queryOptions` of the request payload, if any, and resolves its table with the table
-  /// cache, as the query endpoint does.
-  private DeleteStatement resolvedDelete(String sql, @Nullable String queryOptions) {
+  /// Mocks the request of a caller at `REMOTE_ADDR`.
+  private static Request mockRequest() {
+    Request request = mock(Request.class);
+    when(request.getRemoteAddr()).thenReturn(REMOTE_ADDR);
+    return request;
+  }
+
+  /// Parses the `DELETE` with the `queryOptions` of the request payload, if any, as the query endpoint does.
+  private static SqlNodeAndOptions parse(String sql, @Nullable String queryOptions) {
     ObjectNode request = JsonUtils.newObjectNode();
     if (queryOptions != null) {
       request.put(CommonConstants.Broker.Request.QUERY_OPTIONS, queryOptions);
     }
-    return ((DeleteStatement) DataManipulationStatementParser.parse(RequestUtils.parseQuery(sql, request)))
-        .resolveTableName(null, _tableCache);
+    return RequestUtils.parseQuery(sql, request);
+  }
+
+  /// Resolves the table of the parsed `DELETE` with the table cache, as the query endpoint does.
+  private DeleteStatement resolvedDelete(SqlNodeAndOptions sqlNodeAndOptions) {
+    return ((DeleteStatement) DataManipulationStatementParser.parse(sqlNodeAndOptions)).resolveTableName(null,
+        _tableCache);
   }
 
   /// Mocks the headers of a request with the given `X-Forwarded-For` and `X-Real-IP` values, `null` leaving a header

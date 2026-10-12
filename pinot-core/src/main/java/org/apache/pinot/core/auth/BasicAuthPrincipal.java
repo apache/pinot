@@ -26,6 +26,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 /// Container object for basic auth principal
@@ -93,15 +94,11 @@ public class BasicAuthPrincipal {
     return _tables.isEmpty() || _tables.contains(tableName);
   }
 
+  /// The `excludeTables` list holds raw table names, so a name with a type suffix is also checked by its raw name:
+  /// with `excludeTables=[t]`, `t_OFFLINE` is excluded as `t` is, and a type suffix cannot bypass an excluded table.
   private boolean isTableNotExcluded(String tableName) {
-    return !_excludeTables.contains(tableName);
-  }
-
-  /// Returns whether the table is listed in the `excludeTables` of this principal, regardless of its `tables`. The
-  /// exclusion list holds raw table names, so a caller checking a name with a type suffix passes the raw name here,
-  /// while [#hasTable(String)] also applies the `tables` inclusion list, which may list the name with its type suffix.
-  public boolean isTableExcluded(String tableName) {
-    return _excludeTables.contains(tableName);
+    return !_excludeTables.contains(tableName)
+        && !_excludeTables.contains(TableNameBuilder.extractRawTableName(tableName));
   }
 
   public boolean hasPermission(String permission) {

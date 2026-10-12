@@ -40,6 +40,9 @@ import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
 
+/// Tests the `DELETE` dispatch of [SqlQueryExecutor]: an unresolved statement is refused, a resolved one is handed to
+/// the overriding [SqlQueryExecutor#executeDelete] hook, and a failure of the hook is returned in the response with its
+/// error code and message. No controller is contacted. The tests share no state.
 public class SqlQueryExecutorTest {
   // No controller is contacted by these statements, which are rejected or executed without submitting any task
   private static final String CONTROLLER_URL = "http://localhost:1";
@@ -162,6 +165,41 @@ public class SqlQueryExecutorTest {
         sqlQueryExecutor.executeStatement(resolvedDelete("DELETE FROM myTable WHERE col1 = 'a'"), null);
 
     assertError(response, QueryErrorCode.QUERY_EXECUTION, "Unable to reach the controller");
+  }
+
+  @Test
+  public void testDeleteExceptionCauseMessageIsReturned() {
+    // The message of the cause surfaces too, so that a wrapping exception does not hide the real failure
+    SqlQueryExecutor sqlQueryExecutor = new SqlQueryExecutor(CONTROLLER_URL) {
+      @Override
+      protected BrokerResponse executeDelete(DeleteStatement statement, @Nullable Map<String, String> headers) {
+        throw new IllegalStateException("Unable to reach the controller",
+            new IllegalArgumentException("Connection refused"));
+      }
+    };
+
+    BrokerResponse response =
+        sqlQueryExecutor.executeStatement(resolvedDelete("DELETE FROM myTable WHERE col1 = 'a'"), null);
+
+    assertError(response, QueryErrorCode.QUERY_EXECUTION, "Unable to reach the controller. Connection refused");
+  }
+
+  @Test
+  public void testDeleteQueryExceptionCauseMessageIsReturned() {
+    // A QueryException wrapping the real cause keeps its error code and surfaces the message of the cause
+    SqlQueryExecutor sqlQueryExecutor = new SqlQueryExecutor(CONTROLLER_URL) {
+      @Override
+      protected BrokerResponse executeDelete(DeleteStatement statement, @Nullable Map<String, String> headers) {
+        throw QueryErrorCode.QUERY_VALIDATION.asException("Invalid predicate",
+            new IllegalArgumentException("Column col1 does not exist in table " + statement.getTableName()));
+      }
+    };
+
+    BrokerResponse response =
+        sqlQueryExecutor.executeStatement(resolvedDelete("DELETE FROM myTable WHERE col1 = 'a'"), null);
+
+    assertError(response, QueryErrorCode.QUERY_VALIDATION,
+        "Invalid predicate. Column col1 does not exist in table myTable");
   }
 
   @Test

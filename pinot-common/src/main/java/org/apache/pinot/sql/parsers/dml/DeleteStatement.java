@@ -31,6 +31,7 @@ import org.apache.calcite.avatica.util.Casing;
 import org.apache.calcite.sql.SqlCall;
 import org.apache.calcite.sql.SqlDelete;
 import org.apache.calcite.sql.SqlDialect;
+import org.apache.calcite.sql.SqlDynamicParam;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlIntervalLiteral;
 import org.apache.calcite.sql.SqlKind;
@@ -115,16 +116,56 @@ public class DeleteStatement implements DataManipulationStatement {
     }
   };
 
+  /// Replaces every literal (string, numeric, date-time, binary, boolean, interval) with a dynamic parameter, which
+  /// unparses as `?`, so that an error message renders the shape of a WHERE clause without the values it compares
+  /// against: those may be data the caller of a request controls, and the message is returned to the caller and
+  /// logged by the controller. A chain of string literals (`'a' 'b'`) unparses its literals directly, so the chain is
+  /// replaced as a whole. The parameters all get the index 0, which the rendering does not show.
+  private static final SqlShuttle LITERAL_MASKER = new SqlShuttle() {
+    @Override
+    public SqlNode visit(SqlLiteral literal) {
+      return new SqlDynamicParam(0, literal.getParserPosition());
+    }
+
+    @Override
+    public SqlNode visit(SqlCall call) {
+      if (call.getKind() == SqlKind.LITERAL_CHAIN) {
+        return new SqlDynamicParam(0, call.getParserPosition());
+      }
+      return super.visit(call);
+    }
+  };
+
   /// Canonical names (upper case, without underscores) of the functions that read another table than the one the
   /// statement deletes from, which the caller is not authorized to read. Upper case because the compiled function
   /// names are lower-cased with the default locale, and lower-casing with a Turkish locale turns `I` into the dotless
   /// `ı` (U+0131), which only an upper-case fold with [Locale#ROOT] maps back to `I`.
+  ///
+  /// Nothing derives this set from the function registries, so a function that reads another table must be added
+  /// here when it is defined: `lookUp` is `TransformFunctionType#LOOKUP` (with `LookupTransformFunction` in
+  /// pinot-core), `inSubquery` is rewritten by `BaseSingleStageBrokerRequestHandler#IN_SUBQUERY` in pinot-broker, and
+  /// `inPartitionedSubquery` by `ServerQueryExecutorV1Impl#IN_PARTITIONED_SUBQUERY` in pinot-core.
   private static final Set<String> CROSS_TABLE_FUNCTIONS = Set.of("LOOKUP", "INSUBQUERY", "INPARTITIONEDSUBQUERY");
 
   /// Canonical names of the functions that run a script. Rejected because the broker's groovy policy
   /// (`pinot.broker.disable.query.groovy`, the per-table `queryConfig.disableGroovy` override and the static
   /// analyzer) only applies to queries, not to a `DELETE`, and the executor may run the predicate on another role.
+  /// Like [#CROSS_TABLE_FUNCTIONS], it is maintained by hand: `groovy` is `TransformFunctionType#GROOVY` (with
+  /// `GroovyTransformFunction` in pinot-core), and a new script function must be added here.
   private static final Set<String> SCRIPT_FUNCTIONS = Set.of("GROOVY");
+
+  /// Canonical names of the `LIKE` family, whose third operand is the escape character. The operators `LIKE`,
+  /// `NOT LIKE`, `ILIKE` and `NOT ILIKE` compile to `LIKE` (Calcite gives them the kind `LIKE`), `SIMILAR TO` to
+  /// `SIMILAR`, and a function-call spelling such as `like(col, pattern, escape)`, which parses as a plain function,
+  /// to its own name. [#PREDICATE_NODE_CHECKER] rejects the operator form `LIKE ... ESCAPE`, and [#checkFunctions]
+  /// the function-call form, which the node checker cannot tell from any other function. The grammar bounds the
+  /// operator form to two or three operands, but the function-call form takes any number: a call with a third or
+  /// later operand is rejected, as the single-stage filter reads the first two operands only and silently drops the
+  /// others.
+  private static final Set<String> LIKE_FUNCTIONS = Set.of("LIKE", "NOTLIKE", "ILIKE", "SIMILAR", "SIMILARTO");
+
+  private static final String LIKE_ESCAPE_MESSAGE = "Unsupported WHERE clause in DELETE, LIKE ... ESCAPE is not "
+      + "supported in a DELETE predicate, the escape character is ignored by the single-stage engine";
 
   /// Canonical names of the window function operators. A window function is never valid in a `DELETE` predicate, and
   /// the compiled expression hides its window specification (and any cross-table or script function call in it) in a
@@ -157,6 +198,8 @@ public class DeleteStatement implements DataManipulationStatement {
   ///   `BIG_DECIMAL` column is compared against, and a literal outside the double range (`1E999`, `1E-999`)
   ///   becomes infinite or zero. The exact value is kept with `CAST('<digits>' AS DECIMAL)`, which compiles to a
   ///   `BigDecimal` literal.
+  ///
+  /// The messages do not echo the literal, see [#LITERAL_MASKER]: the caller sees it in their own statement.
   private static final SqlBasicVisitor<Void> PREDICATE_NODE_CHECKER = new SqlBasicVisitor<>() {
     @Override
     public Void visit(SqlLiteral literal) {
@@ -164,24 +207,21 @@ public class DeleteStatement implements DataManipulationStatement {
       if (literal instanceof SqlNumericLiteral) {
         SqlNumericLiteral numericLiteral = (SqlNumericLiteral) literal;
         BigDecimal value = numericLiteral.bigDecimalValue();
-        checkArgument(value != null, "Unsupported WHERE clause in DELETE, invalid numeric literal: %s",
-            numericLiteral.toValue());
+        checkArgument(value != null, "Unsupported WHERE clause in DELETE, invalid numeric literal");
         if (numericLiteral.isExact() && numericLiteral.isInteger()) {
           checkArgument(value.compareTo(LONG_MIN_VALUE) >= 0 && value.compareTo(LONG_MAX_VALUE) <= 0,
-              "Unsupported WHERE clause in DELETE, integer literal out of the long range: %s",
-              numericLiteral.toValue());
+              "Unsupported WHERE clause in DELETE, integer literal out of the long range");
         } else {
           // Compiled as a double (RequestUtils.getLiteral): reject the overflow to an infinity and the underflow to 0
           double doubleValue = value.doubleValue();
           checkArgument(!Double.isInfinite(doubleValue) && (doubleValue != 0 || value.signum() == 0),
-              "Unsupported WHERE clause in DELETE, numeric literal out of the double range: %s",
-              numericLiteral.toValue());
+              "Unsupported WHERE clause in DELETE, numeric literal out of the double range");
           if (numericLiteral.isExact()) {
             // BigDecimal.valueOf(double) is new BigDecimal(Double.toString(double)), the bound a BIG_DECIMAL column is
             // compared against: the literal is accepted iff it survives the round trip through a double
             checkArgument(BigDecimal.valueOf(doubleValue).compareTo(value) == 0,
-                "Unsupported WHERE clause in DELETE, decimal literal %s loses precision as a double: "
-                    + "use CAST('%s' AS DECIMAL)", numericLiteral.toValue(), numericLiteral.toValue());
+                "Unsupported WHERE clause in DELETE, decimal literal loses precision as a double: "
+                    + "use CAST('<digits>' AS DECIMAL)");
           }
         }
       }
@@ -197,10 +237,10 @@ public class DeleteStatement implements DataManipulationStatement {
         checkArgument(((SqlBetweenOperator) call.getOperator()).flag != SqlBetweenOperator.Flag.SYMMETRIC,
             "Unsupported WHERE clause in DELETE, BETWEEN SYMMETRIC is not supported in a DELETE predicate");
       }
-      // Also NOT LIKE, ILIKE and SIMILAR TO, which share the operator class
+      // Also NOT LIKE, ILIKE and SIMILAR TO, which share the operator class. The function-call form, like(col,
+      // pattern, escape), parses as a plain function: checkFunctions rejects it on the compiled expression
       if (call.getOperator() instanceof SqlLikeOperator) {
-        checkArgument(call.operandCount() != 3, "Unsupported WHERE clause in DELETE, LIKE ... ESCAPE is not supported "
-            + "in a DELETE predicate, the escape character is ignored by the single-stage engine");
+        checkArgument(call.operandCount() != 3, LIKE_ESCAPE_MESSAGE);
       }
       return super.visit(call);
     }
@@ -208,6 +248,9 @@ public class DeleteStatement implements DataManipulationStatement {
 
   private final String _tableName;
   private final String _predicate;
+  /// The expression [#_predicate] compiles to. [Expression] is mutable: never handed out, see
+  /// [#getPredicateExpression()].
+  private final Expression _predicateExpression;
   @Nullable
   private final String _database;
   private final Map<String, String> _options;
@@ -215,14 +258,17 @@ public class DeleteStatement implements DataManipulationStatement {
   private final boolean _tableExists;
   private final boolean _logicalTable;
 
-  private DeleteStatement(String tableName, String predicate, @Nullable String database, Map<String, String> options) {
-    this(tableName, predicate, database, options, false, false, false);
+  private DeleteStatement(String tableName, CompiledPredicate predicate, @Nullable String database,
+      Map<String, String> options) {
+    this(tableName, predicate._sql, predicate._expression, database, options, false, false, false);
   }
 
-  private DeleteStatement(String tableName, String predicate, @Nullable String database, Map<String, String> options,
-      boolean resolved, boolean tableExists, boolean logicalTable) {
+  private DeleteStatement(String tableName, String predicate, Expression predicateExpression,
+      @Nullable String database, Map<String, String> options, boolean resolved, boolean tableExists,
+      boolean logicalTable) {
     _tableName = tableName;
     _predicate = predicate;
+    _predicateExpression = predicateExpression;
     _database = database;
     _options = Collections.unmodifiableMap(new HashMap<>(options));
     _resolved = resolved;
@@ -236,7 +282,8 @@ public class DeleteStatement implements DataManipulationStatement {
   ///                                  table alias, a WHERE clause that Pinot can parse as an expression, that does
   ///                                  not read another table (e.g. with `lookUp` or `IN_SUBQUERY`), that does not
   ///                                  run a script (`groovy`), that uses no window function, interval literal
-  ///                                  (quoted or not), `BETWEEN SYMMETRIC`, `LIKE ... ESCAPE`, integer literal
+  ///                                  (quoted or not), `BETWEEN SYMMETRIC`, `LIKE ... ESCAPE` (as an operator or as
+  ///                                  the function call `like(col, pattern, escape)`), integer literal
   ///                                  outside the long range, decimal literal that a double does not represent
   ///                                  exactly or numeric literal outside the double range (see
   ///                                  [#PREDICATE_NODE_CHECKER]), and set the database with the `database` option
@@ -251,7 +298,7 @@ public class DeleteStatement implements DataManipulationStatement {
     SqlNode condition = sqlDelete.getCondition();
     checkArgument(condition != null, "DELETE requires a WHERE clause to prevent an accidental full-table delete; use "
         + "an explicit always-true predicate or delete the table segments to remove all rows");
-    String predicate = toPinotSql(condition);
+    CompiledPredicate predicate = toPinotSql(condition);
 
     String database = null;
     Map<String, String> options = new HashMap<>();
@@ -284,8 +331,20 @@ public class DeleteStatement implements DataManipulationStatement {
     return tableName;
   }
 
-  /// Serializes a WHERE clause back into SQL, and verifies that Pinot parses it into the same expression.
-  private static String toPinotSql(SqlNode condition) {
+  /// A WHERE clause serialized into Pinot SQL, with the expression that SQL compiles to, see [#toPinotSql].
+  private static final class CompiledPredicate {
+    private final String _sql;
+    private final Expression _expression;
+
+    private CompiledPredicate(String sql, Expression expression) {
+      _sql = sql;
+      _expression = expression;
+    }
+  }
+
+  /// Serializes a WHERE clause back into SQL, and verifies that Pinot parses it into the same expression. Returns the
+  /// SQL with the expression it compiles to, which is the one the check validated.
+  private static CompiledPredicate toPinotSql(SqlNode condition) {
     // Before compiling, as the compiled expression does not tell these nodes apart from supported ones
     condition.accept(PREDICATE_NODE_CHECKER);
     Expression expression;
@@ -303,28 +362,34 @@ public class DeleteStatement implements DataManipulationStatement {
       throw new IllegalArgumentException("Unsupported WHERE clause in DELETE: " + describe(condition), e);
     }
     // Fail rather than hand over a predicate that selects other rows than the statement
-    checkArgument(serializedExpression.equals(expression),
-        "Unsupported WHERE clause in DELETE, it cannot be serialized back into the same expression: %s", condition);
-    checkFunctions(expression);
-    return predicate;
+    if (!serializedExpression.equals(expression)) {
+      throw new IllegalArgumentException(
+          "Unsupported WHERE clause in DELETE, it cannot be serialized back into the same expression: "
+              + describe(condition));
+    }
+    checkFunctions(serializedExpression);
+    return new CompiledPredicate(predicate, serializedExpression);
   }
 
-  /// Renders a node for an error message without failing: rendering it is what may have failed, e.g. for an operator
-  /// without unparse support such as `AT TIME ZONE`, in which case the cause of the error carries the detail.
+  /// Renders a node for an error message with its literals replaced by `?`, see [#LITERAL_MASKER], and without
+  /// failing: rendering it is what may have failed, e.g. for an operator without unparse support such as
+  /// `AT TIME ZONE`, in which case the cause of the error carries the detail.
   private static String describe(SqlNode node) {
     try {
-      return node.toString();
+      return node.accept(LITERAL_MASKER).toString();
     } catch (RuntimeException e) {
       return "<" + node.getKind() + " expression that cannot be rendered>";
     }
   }
 
   /// Rejects the functions that read another table, as the caller is only authorized for the table it deletes from,
-  /// the functions that run a script, see [#SCRIPT_FUNCTIONS], and the window functions, which
-  /// [#PREDICATE_NODE_CHECKER] already rejects on the parsed node. Function names are folded with
-  /// `toUpperCase(Locale.ROOT)`, see [#CROSS_TABLE_FUNCTIONS], and a function name with non-ASCII characters is
-  /// rejected outright: no supported function has one, and a look-alike spelling (e.g. with a dotless `ı`) may be
-  /// resolved case-insensitively to the real function by an executor.
+  /// the functions that run a script, see [#SCRIPT_FUNCTIONS], the window functions, which
+  /// [#PREDICATE_NODE_CHECKER] already rejects on the parsed node, and a `LIKE` with an escape character (a third or
+  /// later operand) written as a function call, see [#LIKE_FUNCTIONS]. Function names are folded with
+  /// `toUpperCase(Locale.ROOT)`, see
+  /// [#CROSS_TABLE_FUNCTIONS], and a function name with non-ASCII characters is rejected outright: no supported
+  /// function has one, and a look-alike spelling (e.g. with a dotless `ı`) may be resolved case-insensitively to the
+  /// real function by an executor.
   private static void checkFunctions(Expression expression) {
     if (expression.getType() != ExpressionType.FUNCTION) {
       return;
@@ -338,6 +403,7 @@ public class DeleteStatement implements DataManipulationStatement {
         "Unsupported WHERE clause in DELETE, %s is not supported in a DELETE predicate", operator);
     checkArgument(!WINDOW_FUNCTIONS.contains(functionName),
         "Unsupported WHERE clause in DELETE, window functions are not supported in a DELETE predicate");
+    checkArgument(!LIKE_FUNCTIONS.contains(functionName) || function.getOperandsSize() < 3, LIKE_ESCAPE_MESSAGE);
     checkArgument(operator.chars().allMatch(c -> c < 128),
         "Unsupported WHERE clause in DELETE, non-ASCII function name: %s", operator);
     if (function.getOperands() != null) {
@@ -379,8 +445,8 @@ public class DeleteStatement implements DataManipulationStatement {
     String tableName = DatabaseUtils.translateTableName(_tableName, database, tableCache.isIgnoreCase());
     String actualTableName = tableCache.getActualTableName(tableName);
     boolean logicalTable = actualTableName == null && tableCache.getActualLogicalTableName(tableName) != null;
-    return new DeleteStatement(actualTableName != null ? actualTableName : tableName, _predicate, null, _options, true,
-        actualTableName != null, logicalTable);
+    return new DeleteStatement(actualTableName != null ? actualTableName : tableName, _predicate,
+        _predicateExpression, null, _options, true, actualTableName != null, logicalTable);
   }
 
   /// Whether the table name is resolved with [#resolveTableName]. The query endpoints of the broker and the
@@ -427,14 +493,31 @@ public class DeleteStatement implements DataManipulationStatement {
   /// It is a standalone expression, e.g. `a = 1 OR b = 2`: wrap it in parentheses to combine it with other conditions.
   /// It reads no other table (`lookUp`, `IN_SUBQUERY` and `IN_PARTITIONED_SUBQUERY` are rejected), runs no script
   /// (`groovy` is rejected, as the broker's groovy policy is not applied to a `DELETE`), and uses no window function,
-  /// interval literal (quoted or not), `BETWEEN SYMMETRIC`, `LIKE ... ESCAPE`, integer literal outside the long range,
-  /// decimal literal that a double does not represent exactly (e.g. `12345678901234567.89`: use
-  /// `CAST('12345678901234567.89' AS DECIMAL)` to keep the exact value) or numeric literal outside the double range,
-  /// which the expression would not represent faithfully. Pinot parses it as an expression but does not validate it
-  /// as a filter of the table, e.g. that its columns exist or that it has no aggregation, so executors must validate
-  /// it before deleting rows.
+  /// interval literal (quoted or not), `BETWEEN SYMMETRIC`, `LIKE ... ESCAPE` (as an operator or as the function call
+  /// `like(col, pattern, escape)`), integer literal outside the long range, decimal literal that a double does not
+  /// represent exactly (e.g. `12345678901234567.89`: use `CAST('12345678901234567.89' AS DECIMAL)` to keep the exact
+  /// value) or numeric literal outside the double range, which the expression would not represent faithfully. Pinot
+  /// parses it as an expression but does not validate it as a filter of the table, e.g. that its columns exist or
+  /// that it has no aggregation, so executors must validate it before deleting rows.
   public String getPredicate() {
     return _predicate;
+  }
+
+  /// The predicate as the [Expression] that [CalciteSqlParser#compileToExpression(String)] compiles [#getPredicate()]
+  /// to: the exact expression the round-trip check of the parser validated against the WHERE clause of the statement.
+  /// It is the parser's compiled form only, not a broker-rewritten filter: the query rewriters that
+  /// `compileToPinotQuery` applies to the WHERE clause of a query (e.g. `PredicateComparisonRewriter`, which moves a
+  /// literal to the right-hand side of a comparison, or `CompileTimeFunctionsInvoker`, which folds
+  /// `now() - 86400000`) have not run on it, so an executor that evaluates it on the single-stage engine must still
+  /// apply them, e.g. by embedding [#getPredicate()] in a query compiled with
+  /// [CalciteSqlParser#compileToPinotQuery(String)]: as is, `DELETE FROM t WHERE 1 = id` fails on that engine where
+  /// `SELECT ... FROM t WHERE 1 = id` works. It is subject to the same limits as [#getPredicate()], and executors must
+  /// validate it as a filter of the table before deleting rows.
+  ///
+  /// Returns a deep copy on every call, as [Expression] is mutable: the statement stays immutable, and a copy an
+  /// executor rewrites does not leak into another call.
+  public Expression getPredicateExpression() {
+    return _predicateExpression.deepCopy();
   }
 
   /// Options of the statement other than the database: the `SET` statements, the legacy `OPTION(...)` suffix and the

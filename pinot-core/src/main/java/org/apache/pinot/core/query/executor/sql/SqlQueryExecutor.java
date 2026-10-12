@@ -31,6 +31,7 @@ import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.utils.ExceptionUtils;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.spi.config.task.AdhocTaskConfig;
 import org.apache.pinot.spi.exception.QueryErrorCode;
@@ -202,7 +203,9 @@ public class SqlQueryExecutor {
   /// only checks that the statement is resolved, see [DeleteStatement#isResolved()], not that the caller is
   /// authorized: an entry point other than those endpoints must authorize the caller itself.
   ///
-  /// Implementations validate the predicate (see [DeleteStatement#getPredicate()]) and the options they read (see
+  /// Implementations validate the predicate as a filter of the table, using [DeleteStatement#getPredicateExpression()]
+  /// (the exact expression the parser validated, so it need not be compiled again; [DeleteStatement#getPredicate()] is
+  /// its SQL form, for logging and serialization, and documents its limits), and the options they read (see
   /// [DeleteStatement#getOptions()]) before deleting rows, and forward the request headers to the APIs they call, which
   /// authorize the caller again. They report a validation or execution failure either in the response they return or
   /// by throwing a [QueryException] with the [QueryErrorCode] to surface, which [#executeStatement] returns as the
@@ -217,11 +220,12 @@ public class SqlQueryExecutor {
     return new BrokerResponseNative(QueryErrorCode.QUERY_VALIDATION, DeleteStatement.NOT_SUPPORTED_MESSAGE);
   }
 
-  /// Message of an exception for the error of a response: its message, or, when it has none, its string form (its
-  /// class name), as the response constructor would otherwise print `null`.
+  /// Message of an exception for the error of a response: the non-blank messages of its cause chain, see
+  /// [ExceptionUtils#consolidateExceptionMessages], so that the cause of a wrapping exception surfaces, or, when none
+  /// has one, its string form (its class name), as the response constructor would otherwise print `null`.
   private static String errorMessage(Exception e) {
-    String message = e.getMessage();
-    return message != null ? message : e.toString();
+    String message = ExceptionUtils.consolidateExceptionMessages(e);
+    return !message.isEmpty() ? message : e.toString();
   }
 
   private MinionClient getMinionClient() {
