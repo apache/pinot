@@ -53,3 +53,16 @@ OPTIONAL:
   -k, --keep-cluster-on-failure          Keep cluster on test failure
   -h, --help                             Prints this help
 ```
+
+## T-digest accuracy baseline
+
+Run `compatibility-verifier/tdigest-compatibility/generate-rank-errors.sh` from a checkout with JDK 25+ to verify the
+270 seeded case/input fingerprints and rank-error envelopes in
+`pinot-core/src/test/resources/data/tdigest-3.3-k1-rank-errors.csv`. The standalone script compiles only the generator,
+Pinot's pinned `f818bae6d75a91228eb3aac95c921bca4aeb2128` utility and the genuine `com.tdunning:t-digest:3.3` jar;
+it does not depend on the current accumulator or a Pinot build. It fetches the pinned commit and jar if missing.
+
+The reference environment is Ubuntu x86_64 with Temurin 25. `StrictMath` makes seeded input fingerprints portable,
+but the legacy library's `Math` trigonometric functions can change exact rank errors across architectures or JVMs.
+Investigate regeneration differences on the reference environment before changing the CSV. Use `--update` only
+after intentionally changing the seeded corpus; it writes an unverified reference that must be reviewed.

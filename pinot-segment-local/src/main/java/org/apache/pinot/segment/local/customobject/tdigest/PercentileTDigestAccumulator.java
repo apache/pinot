@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.aggregation.function;
+package org.apache.pinot.segment.local.customobject.tdigest;
 
 import com.tdunning.math.stats.Centroid;
 import com.tdunning.math.stats.MergingDigest;
@@ -50,7 +50,7 @@ import org.apache.pinot.segment.local.utils.TDigestUtils;
 /// input must be merged. The raw-value buffer remains unallocated for serialized state until a raw value is added.
 ///
 /// Instances are externally serialized per aggregation or group key and are not safe for concurrent mutation.
-final class PercentileTDigestAccumulator extends TDigest {
+public final class PercentileTDigestAccumulator extends TDigest {
   private static final int MIN_RAW_BUFFER_SIZE = 256;
   private static final int MAX_RAW_BUFFER_SIZE = 10_000;
   private static final int MIN_COMPRESSION = 10;
@@ -100,7 +100,7 @@ final class PercentileTDigestAccumulator extends TDigest {
   private double _min = Double.POSITIVE_INFINITY;
   private double _max = Double.NEGATIVE_INFINITY;
 
-  PercentileTDigestAccumulator(int compression) {
+  public PercentileTDigestAccumulator(int compression) {
     this((double) compression, true, true);
   }
 
@@ -127,19 +127,19 @@ final class PercentileTDigestAccumulator extends TDigest {
     }
   }
 
-  static PercentileTDigestAccumulator forSerializedTDigest(byte[] bytes) {
+  public static PercentileTDigestAccumulator forSerializedTDigest(byte[] bytes) {
     return new PercentileTDigestAccumulator(readCompression(bytes), false, false);
   }
 
-  static PercentileTDigestAccumulator forSerializedTDigest(SerializedTDigestInput input) {
+  public static PercentileTDigestAccumulator forSerializedTDigest(SerializedTDigestInput input) {
     return new PercentileTDigestAccumulator(input._compression, false, false);
   }
 
-  static PercentileTDigestAccumulator forSerializedTDigestWithMergeBuffers(byte[] bytes) {
+  public static PercentileTDigestAccumulator forSerializedTDigestWithMergeBuffers(byte[] bytes) {
     return new PercentileTDigestAccumulator(readCompression(bytes), false, true);
   }
 
-  static PercentileTDigestAccumulator forSerializedTDigest(ByteBuffer input) {
+  public static PercentileTDigestAccumulator forSerializedTDigest(ByteBuffer input) {
     byte[] bytes = new byte[input.remaining()];
     input.get(bytes);
     PercentileTDigestAccumulator accumulator = forSerializedTDigest(bytes);
@@ -147,11 +147,11 @@ final class PercentileTDigestAccumulator extends TDigest {
     return accumulator;
   }
 
-  static PercentileTDigestAccumulator forReduction(double compression) {
+  public static PercentileTDigestAccumulator forReduction(double compression) {
     return new PercentileTDigestAccumulator(compression, false, false);
   }
 
-  void add(double[] values, int from, int toExclusive) {
+  public void add(double[] values, int from, int toExclusive) {
     if (from >= toExclusive) {
       return;
     }
@@ -253,7 +253,7 @@ final class PercentileTDigestAccumulator extends TDigest {
     _max = Math.max(_max, other._max);
   }
 
-  void addSerializedTDigest(byte[] bytes) {
+  public void addSerializedTDigest(byte[] bytes) {
     if (!_hasSerializedInput && _numCentroids == 0 && _totalWeight == 0.0 && _numRawValues == 0
         && _numIncomingCentroids == 0) {
       byte[] retainedBytes = bytes.clone();
@@ -272,7 +272,7 @@ final class PercentileTDigestAccumulator extends TDigest {
     _hasSerializedInput = true;
   }
 
-  void addSerializedTDigest(SerializedTDigestInput input) {
+  public void addSerializedTDigest(SerializedTDigestInput input) {
     if (!_hasSerializedInput && _numCentroids == 0 && _totalWeight == 0.0 && _numRawValues == 0
         && _numIncomingCentroids == 0) {
       _pendingSerializedTDigest = input.retainBytes();
@@ -286,7 +286,7 @@ final class PercentileTDigestAccumulator extends TDigest {
     _hasSerializedInput = true;
   }
 
-  void addSerializedTDigestDirect(SerializedTDigestInput input) {
+  public void addSerializedTDigestDirect(SerializedTDigestInput input) {
     if (!_hasSerializedInput && _numCentroids == 0 && _totalWeight == 0.0 && _numRawValues == 0
         && _numIncomingCentroids == 0) {
       _pendingSerializedTDigest = input.retainBytes();
@@ -702,7 +702,7 @@ final class PercentileTDigestAccumulator extends TDigest {
     return _max;
   }
 
-  byte[] serialize() {
+  public byte[] serialize() {
     if (_pendingSerializedTDigest != null) {
       getSerializedTotalWeight(_pendingSerializedTDigest);
       if (ByteBuffer.wrap(_pendingSerializedTDigest).getInt() == VERBOSE_ENCODING) {
@@ -715,7 +715,7 @@ final class PercentileTDigestAccumulator extends TDigest {
     return TDigestUtils.makeLegacyCompatible(toVerboseBytes());
   }
 
-  TDigest toTDigest() {
+  public TDigest toTDigest() {
     if (_pendingSerializedTDigest != null) {
       return TDigestUtils.deserialize(_pendingSerializedTDigest);
     }
@@ -1436,7 +1436,7 @@ final class PercentileTDigestAccumulator extends TDigest {
   /// state. A pending accumulator requests an immutable byte snapshot, created at most once per reset and shared by
   /// the row's group fanout. The input must remain thread-confined and must not outlive the aggregation call that owns
   /// it.
-  static final class SerializedTDigestInput {
+  public static final class SerializedTDigestInput {
     private byte[] _bytes;
     private byte[] _retainedBytes;
     private double _min;
@@ -1452,7 +1452,7 @@ final class PercentileTDigestAccumulator extends TDigest {
     private double _totalWeight;
     private boolean _decoded;
 
-    void reset(byte[] bytes) {
+    public void reset(byte[] bytes) {
       _retainedBytes = null;
       ByteBuffer input = ByteBuffer.wrap(bytes);
       int encoding = input.getInt();

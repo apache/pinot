@@ -25,6 +25,7 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.segment.local.customobject.SerializedTDigest;
+import org.apache.pinot.segment.local.customobject.tdigest.PercentileTDigestAccumulator;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.annotations.Test;
 
