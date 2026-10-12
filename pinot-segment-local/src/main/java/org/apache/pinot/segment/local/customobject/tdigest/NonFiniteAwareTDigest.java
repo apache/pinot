@@ -547,10 +547,12 @@ public final class NonFiniteAwareTDigest extends TDigest {
           TDigestCodec.getMaxLegacyCompatibleByteSize(compression(), finiteDigest.getCentroidCountUpperBound()));
     }
     boolean hasFiniteValues = _finiteDigest.getTotalWeight() > 0.0;
+    boolean negativeInfinityAtUpperBoundary = !hasFiniteValues && _positiveInfinityWeight == 0.0;
+    boolean positiveInfinityAtLowerBoundary = !hasFiniteValues && _negativeInfinityWeight == 0.0;
     int negativeInfinityCount = getInfinityCentroidCount(_negativeInfinityWeight, true,
-        !hasFiniteValues && _positiveInfinityWeight == 0.0);
+        negativeInfinityAtUpperBoundary);
     int positiveInfinityCount = getInfinityCentroidCount(_positiveInfinityWeight,
-        !hasFiniteValues && _negativeInfinityWeight == 0.0, true);
+        positiveInfinityAtLowerBoundary, true);
     int tailCount = Math.addExact(negativeInfinityCount, positiveInfinityCount);
     int tailByteSize = Math.multiplyExact(TDigestCodec.VERBOSE_CENTROID_SIZE, tailCount);
     long finiteCount = hasFiniteValues ? finiteDigest.getCentroidCountUpperBound() : 0L;
@@ -603,6 +605,8 @@ public final class NonFiniteAwareTDigest extends TDigest {
   private List<Centroid> getAllCentroids() {
     List<Centroid> finiteCentroids = getFiniteCentroids();
     boolean hasFiniteValues = _finiteDigest.getTotalWeight() > 0.0;
+    boolean negativeInfinityAtUpperBoundary = !hasFiniteValues && _positiveInfinityWeight == 0.0;
+    boolean positiveInfinityAtLowerBoundary = !hasFiniteValues && _negativeInfinityWeight == 0.0;
     List<Centroid> centroids = new ArrayList<>(finiteCentroids.size() + 6);
     if (_unrepresentableInfinityTail) {
       if (_negativeInfinityWeight > 0.0) {
@@ -615,10 +619,10 @@ public final class NonFiniteAwareTDigest extends TDigest {
       return centroids;
     }
     appendInfinityCentroids(centroids, Double.NEGATIVE_INFINITY, _negativeInfinityWeight, true,
-        !hasFiniteValues && _positiveInfinityWeight == 0L);
+        negativeInfinityAtUpperBoundary);
     centroids.addAll(finiteCentroids);
     appendInfinityCentroids(centroids, Double.POSITIVE_INFINITY, _positiveInfinityWeight,
-        !hasFiniteValues && _negativeInfinityWeight == 0L, true);
+        positiveInfinityAtLowerBoundary, true);
     return centroids;
   }
 
@@ -640,20 +644,22 @@ public final class NonFiniteAwareTDigest extends TDigest {
     invalidateDerivedCaches();
     int finiteCentroidCount = _finiteDigest.centroidCount();
     boolean hasFiniteValues = _finiteDigest.getTotalWeight() > 0.0;
+    boolean negativeInfinityAtUpperBoundary = !hasFiniteValues && _positiveInfinityWeight == 0.0;
+    boolean positiveInfinityAtLowerBoundary = !hasFiniteValues && _negativeInfinityWeight == 0.0;
     int negativeInfinityCentroidCount = getInfinityCentroidCount(_negativeInfinityWeight, true,
-        !hasFiniteValues && _positiveInfinityWeight == 0.0);
+        negativeInfinityAtUpperBoundary);
     int positiveInfinityCentroidCount = getInfinityCentroidCount(_positiveInfinityWeight,
-        !hasFiniteValues && _negativeInfinityWeight == 0.0, true);
+        positiveInfinityAtLowerBoundary, true);
     int centroidCount = Math.addExact(finiteCentroidCount,
         Math.addExact(negativeInfinityCentroidCount, positiveInfinityCentroidCount));
     double[] means = new double[Math.addExact(centroidCount, 2)];
     double[] weights = new double[means.length];
     _finiteDigest.copyCentroids(means, weights, negativeInfinityCentroidCount);
     appendInfinityCentroids(means, weights, 0, Double.NEGATIVE_INFINITY, _negativeInfinityWeight, true,
-        !hasFiniteValues && _positiveInfinityWeight == 0.0);
+        negativeInfinityAtUpperBoundary);
     appendInfinityCentroids(means, weights, negativeInfinityCentroidCount + finiteCentroidCount,
         Double.POSITIVE_INFINITY, _positiveInfinityWeight,
-        !hasFiniteValues && _negativeInfinityWeight == 0.0, true);
+        positiveInfinityAtLowerBoundary, true);
     centroidCount = TDigestAccumulator.normalizeSerializedBoundaries(
         means, weights, centroidCount, getMin(), getMax());
     return TDigestCodec.serializeCompatibleCentroids(compression(), getMin(), getMax(), means, weights, centroidCount,

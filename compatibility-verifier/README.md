@@ -139,12 +139,16 @@ Healthy empty inputs remain no-ops. Identify affected stored BYTES with
 reingest affected segments from a known-good source, then rerun rollup or rebuild the star-tree. Retrying the same
 stored bytes cannot repair the distribution. These payloads remain readable individually with NaN statistics and
 their original bytes, including inverted extrema; structural errors such as truncated encodings still fail validation.
+Raw percentile results retain `Double.compare` ordering: a corrupted group's NaN quantile sorts last in ascending
+order and first in descending order, ahead of positive infinity. Such a group can occupy an `ORDER BY ... DESC LIMIT`
+slot; repair the affected data as described above before relying on that ranking.
 
 Downgrade note: retaining an opaque payload does not make it safe for an old reader. For example, Pinot preserves
 a verbose payload with compression 100, 300 centroids and a NaN interior mean byte-for-byte, while both tdunning
-3.2 and 3.3 throw `ArrayIndexOutOfBoundsException` during decoding. The isolated legacy-reader gate verifies this
-limitation explicitly. Byte-exact historical fractional or unrepairable-boundary payloads can also exceed an old
-reader's allocation despite having valid statistics: for example, compression 100.5 with 212 centroids exceeds
+3.2 and 3.3 throw `ArrayIndexOutOfBoundsException` during decoding. A retained degraded header with compression 5
+and 25 centroids also exceeds 3.2's raw-header allocation; 3.3 clamps the header before allocating and can decode it.
+The isolated legacy-reader gate verifies both cases. Byte-exact historical fractional or unrepairable-boundary
+payloads can also exceed an old reader's allocation despite having valid statistics: for example, compression 100.5 with 212 centroids exceeds
 the 3.3 reader's capacity of 211. Rebuild affected stored digests from the original measurements before a downgrade
 or before allowing them to reach old readers in a mixed-version cluster.
 

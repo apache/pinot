@@ -34,8 +34,8 @@ import java.util.SplittableRandom;
 /// Initial value parity covers ordinary continuous/empty/singleton inputs and huge-mean fallback. Weighted endpoint
 /// or capacity repair can change interpolation, and 3.2 has older singleton rules; those fixtures retain structural,
 /// mass, extrema, and monotonicity checks rather than widening the numerical tolerance.
-/// An oversized degraded fixture separately verifies the known decode failure of both legacy readers; preserving
-/// opaque bytes does not guarantee reverse-upgrade compatibility.
+/// Degraded fixtures characterize oversized and sub-10-header decoding in both legacy readers; preserving opaque
+/// bytes does not guarantee reverse-upgrade compatibility.
 public final class LegacyReader {
   private static final double[] QUANTILES = {0, 0.25, 0.5, 0.75, 0.99, 1};
 
@@ -61,6 +61,18 @@ public final class LegacyReader {
         byte[] bytes = Files.readAllBytes(directory.resolve(fields[0] + ".bin"));
         if (fields[0].equals("degraded-over-capacity")) {
           verifyDegradedDecodeFailure(bytes);
+          degradedCases++;
+          continue;
+        }
+        if (fields[0].equals("degraded-low-compression-header")) {
+          if (args[1].equals("3.2")) {
+            verifyDegradedDecodeFailure(bytes);
+          } else {
+            TDigest degraded = MergingDigest.fromBytes(ByteBuffer.wrap(bytes));
+            assert degraded.compression() == 10 : "Legacy 3.3 must clamp before allocating";
+            assert degraded.size() == 25 && degraded.centroidCount() == 25 : "Lost degraded centroids";
+            assert degraded.centroids().stream().anyMatch(c -> Double.isNaN(c.mean())) : "Lost opaque NaN mean";
+          }
           degradedCases++;
           continue;
         }
@@ -96,7 +108,7 @@ public final class LegacyReader {
       }
     }
     assert nativeQuantileCases > 0 : "Missing initial native quantile comparisons";
-    assert degradedCases == 1 : "Missing known degraded reverse-upgrade limitation";
+    assert degradedCases == 2 : "Missing degraded reverse-upgrade cases";
     // Construct inputs in the historical library too, rather than only rewriting Pinot-normalized endpoints.
     MergingDigest weighted = new MergingDigest(100);
     if (args[1].equals("3.3")) {
@@ -120,11 +132,11 @@ public final class LegacyReader {
     Files.writeString(output.resolve("manifest.tsv"), reverseManifest);
     System.out.println("Legacy " + args[1] + ": " + (manifest.size() - degradedCases)
         + " read/add/compress/rewrite cases passed, " + nativeQuantileCases + " initial native quantile comparisons, "
-        + degradedCases + " known degraded decode limitation verified");
+        + degradedCases + " degraded reverse-upgrade cases verified");
   }
 
   private static void verifyDegradedDecodeFailure(byte[] bytes) {
-    // Pinot retains this opaque payload unchanged; both old readers overrun their 210-centroid default arrays.
+    // Pinot retains this opaque payload unchanged; the old reader allocates fewer entries than its centroid count.
     try {
       MergingDigest.fromBytes(ByteBuffer.wrap(bytes));
     } catch (ArrayIndexOutOfBoundsException e) {

@@ -125,18 +125,22 @@ public class LegacyTDigestCompatibilityTest {
     double[] hugeExpected = quantiles(digest);
     write(directory, manifest, "huge-mean-small-fallback", digest, TDigestTestUtils.compactFixture(digest),
         hugeExpected, true);
-    // Opaque degraded state retains its bytes even when neither old reader can fit its centroid count.
-    ByteBuffer degraded = ByteBuffer.allocate(32 + 16 * 300);
-    degraded.putInt(1).putDouble(0).putDouble(299).putDouble(100).putInt(300);
-    for (int i = 0; i < 300; i++) {
-      degraded.putDouble(1).putDouble(i == 150 ? Double.NaN : i);
+    // Opaque degraded state retains raw headers even when an old reader cannot fit its centroid count.
+    for (int compression : new int[]{100, 5}) {
+      int centroidCount = compression == 100 ? 300 : 25;
+      ByteBuffer degraded = ByteBuffer.allocate(32 + 16 * centroidCount);
+      degraded.putInt(1).putDouble(0).putDouble(centroidCount - 1).putDouble(compression).putInt(centroidCount);
+      for (int i = 0; i < centroidCount; i++) {
+        degraded.putDouble(1).putDouble(i == centroidCount / 2 ? Double.NaN : i);
+      }
+      assertEquals(TDigestCodec.makeLegacyCompatible(degraded.array()), degraded.array());
+      digest = TDigestAccumulator.fromBytes(degraded.array());
+      assertFalse(digest.hasValidStatistics());
+      byte[] preserved = digest.serialize();
+      assertEquals(preserved, degraded.array());
+      String name = compression == 100 ? "degraded-over-capacity" : "degraded-low-compression-header";
+      write(directory, manifest, name, digest, preserved, quantiles(digest), false);
     }
-    assertEquals(TDigestCodec.makeLegacyCompatible(degraded.array()), degraded.array());
-    digest = TDigestAccumulator.fromBytes(degraded.array());
-    assertFalse(digest.hasValidStatistics());
-    byte[] preserved = digest.serialize();
-    assertEquals(preserved, degraded.array());
-    write(directory, manifest, "degraded-over-capacity", digest, preserved, quantiles(digest), false);
     Files.writeString(directory.resolve("manifest.tsv"), manifest);
     Files.writeString(directory.resolve("pinot-reader-classpath.txt"), String.join(File.pathSeparator,
         Path.of(LoggerFactory.class.getProtectionDomain().getCodeSource().getLocation().toURI()).toString(),

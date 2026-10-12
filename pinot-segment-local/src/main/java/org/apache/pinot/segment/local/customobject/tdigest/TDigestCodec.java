@@ -608,7 +608,7 @@ public final class TDigestCodec {
         }
       }
       if (means != null) {
-        means[i] = Math.max(min, Math.min(mean, max));
+        means[i] = restoreCentroidMean(mean, min, max);
       }
       if (weights != null) {
         weights[i] = weight;
@@ -628,7 +628,7 @@ public final class TDigestCodec {
       if (nanMean && !Double.isNaN(infinityMean)) {
         mean = infinityMean;
       }
-      double boundaryMean = Math.max(min, Math.min(mean, max));
+      double boundaryMean = restoreCentroidMean(mean, min, max);
       if (weight > 0.0) {
         // Match the stored centroid sort, including signed zeros after the decoder's endpoint clamp.
         // Stable sorting keeps the first lower endpoint and the last upper endpoint among equal means.
@@ -684,7 +684,7 @@ public final class TDigestCodec {
     if (means != null && !Double.isNaN(recoveredInfinityMean)) {
       for (int i = 0; i < centroidCount; i++) {
         if (Double.isNaN(means[i])) {
-          means[i] = recoveredInfinityMean;
+          means[i] = restoreCentroidMean(means[i], min, max, recoveredInfinityMean);
         }
       }
     }
@@ -724,9 +724,16 @@ public final class TDigestCodec {
     for (int i = 0; i < state._centroidCount; i++) {
       weights[i] = state._centroidSize == VERBOSE_CENTROID_SIZE ? state.readDouble() : state.readFloat();
       double mean = state._centroidSize == VERBOSE_CENTROID_SIZE ? state.readDouble() : state.readFloat();
-      means[i] = Double.isNaN(mean) ? state._recoveredInfinityMean
-          : Math.max(state._min, Math.min(mean, state._max));
+      means[i] = restoreCentroidMean(mean, state._min, state._max, state._recoveredInfinityMean);
     }
+  }
+
+  private static double restoreCentroidMean(double mean, double min, double max) {
+    return Math.max(min, Math.min(mean, max));
+  }
+
+  private static double restoreCentroidMean(double mean, double min, double max, double recoveredInfinityMean) {
+    return Double.isNaN(mean) ? recoveredInfinityMean : restoreCentroidMean(mean, min, max);
   }
 
   private static void checkSmallArrayCapacity(int capacity) {

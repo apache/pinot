@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import java.nio.ByteBuffer;
+import java.util.Comparator;
 import java.util.List;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -57,6 +58,9 @@ public class PercentileRawTDigestAggregationFunctionTest {
     assertTrue(finite.compareTo(infinity) < 0);
     assertTrue(infinity.compareTo(unknown) < 0);
     assertTrue(finite.compareTo(unknown) < 0);
+    List<SerializedTDigest> results = List.of(unknown, finite, infinity);
+    assertEquals(results.stream().sorted().toList(), List.of(finite, infinity, unknown));
+    assertEquals(results.stream().sorted(Comparator.reverseOrder()).toList(), List.of(unknown, infinity, finite));
     for (SerializedTDigest first : List.of(finite, infinity, unknown)) {
       for (SerializedTDigest second : List.of(finite, infinity, unknown)) {
         assertEquals(Integer.signum(first.compareTo(second)), -Integer.signum(second.compareTo(first)));
