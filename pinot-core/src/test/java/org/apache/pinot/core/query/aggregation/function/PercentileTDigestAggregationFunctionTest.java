@@ -1149,6 +1149,43 @@ public class PercentileTDigestAggregationFunctionTest {
       Assert.assertSame(function.merge(result, createReducerSource(new double[0], 100, reducerInput)), result);
       assertValidReducerResult(result, new double[]{42.0}, "singleton/" + reducerInput);
     }
+    for (int centroidCount : new int[]{0, 2}) {
+      ByteBuffer emptyBytes = ByteBuffer.allocate(32 + 16 * centroidCount);
+      emptyBytes.putInt(1).putDouble(Double.NaN).putDouble(Double.NaN).putDouble(100.0).putInt(centroidCount);
+      for (int i = 0; i < centroidCount; i++) {
+        emptyBytes.putDouble(0.0).putDouble(Double.NaN);
+      }
+      for (boolean nullHandlingEnabled : new boolean[]{true, false}) {
+        PercentileTDigestAggregationFunction extraction =
+            new PercentileTDigestAggregationFunction(EXPRESSION, 75.0, nullHandlingEnabled);
+        for (TDigest empty : List.of(ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(emptyBytes.array()),
+            aggregateSerialized(new byte[][]{emptyBytes.array()}, null, nullHandlingEnabled))) {
+          assertTrue(empty.isEmpty());
+          if (nullHandlingEnabled) {
+            assertNull(extraction.extractFinalResult(empty));
+          } else {
+            assertTrue(Double.isNaN(extraction.extractFinalResult(empty)));
+          }
+        }
+        for (boolean emptyFirst : new boolean[]{true, false}) {
+          TDigest empty = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(emptyBytes.array());
+          TDigest singleton = new TDigestAccumulator(100);
+          singleton.add(42.0);
+          byte[] singletonBytes = ObjectSerDeUtils.TDIGEST_SER_DE.serialize(singleton);
+          TDigest merged = emptyFirst ? extraction.merge(empty, singleton) : extraction.merge(singleton, empty);
+          byte[][] inputs = emptyFirst ? new byte[][]{emptyBytes.array(), singletonBytes}
+              : new byte[][]{singletonBytes, emptyBytes.array()};
+          TDigest aggregate = aggregateSerialized(inputs, null, nullHandlingEnabled);
+          GroupByResultHolder groups = extraction.createGroupByResultHolder(1, 1);
+          extraction.aggregateGroupBySV(2, new int[]{0, 0}, groups,
+              Map.of(EXPRESSION, bytesBlockValSet(inputs, null)));
+          for (TDigest result : List.of(merged, aggregate, extraction.extractGroupByResult(groups, 0))) {
+            assertEquals(result.getTotalWeight(), 1.0);
+            assertEquals(extraction.extractFinalResult(result), 42.0);
+          }
+        }
+      }
+    }
   }
 
   @Test

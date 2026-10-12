@@ -80,11 +80,14 @@ Use `TDigestAccumulator.forLegacyAggregation(compression)` for general/Star-tree
 
 Byte compatibility does not imply identical quantile/CDF results:
 
-- Duplicate-value plateaus are treated as point mass, changing interpolation within and adjacent to plateaus.
+- Duplicate-value plateaus, including repaired endpoints, retain their full point mass. Identical bytes can
+  therefore yield different quantiles in old and new reducers. Roundoff gaps before the last centroid center
+  return that centroid's mean instead of the old non-monotonic jump to the maximum.
 - Healthy stored mass between zero and one survives merges and returns its percentile instead of being dropped
   or returning SQL NULL/NaN; a stored centroid `(42, 0.5)` returns 42.
-- Corrupt payloads remain present with NaN statistics, even for zero/NaN total mass with null handling enabled.
-  They no longer appear empty or return SQL NULL; `IS NULL` and JDBC null mapping cannot identify them.
+- Corrupt distributions remain present with NaN statistics, including negative weights cancelling to zero or
+  NaN total mass. `IS NULL` and JDBC null mapping cannot identify them. Payloads containing only zero weights
+  are empty even with unusable extrema or means.
 - SmartTDigest MV aggregation with null handling now includes each non-null row once. Previously, batches with
   null rows replayed all rows for each non-null range, including null rows and duplicate values.
 - An empty SmartTDigest digest returns NULL with null handling, otherwise -Infinity, matching its empty list state
@@ -109,6 +112,10 @@ serialization, but merging with nonempty input fails the query, rollup or star-t
 mode or per-row quarantine; healthy empty inputs remain no-ops. Structural errors such as truncation still fail
 validation. RAW results use `Double.compare`: a NaN group sorts last ascending and first descending, so it can
 occupy a descending LIMIT slot.
+
+Old servers can also emit corrupt intermediates from finite inputs such as +/-1.7e308 when their centroid arithmetic
+overflows. During rolling upgrades, these intermediates follow the same failure policy; old reducers could
+complete with NaN or garbage results. Rebuild poisoned stored digests and finish upgrading the producing servers.
 
 An error starting with `Cannot merge or mutate a historically corrupted TDigest` identifies this condition.
 A rate-limited WARN from `TDigestAccumulator` includes encoding/size metadata, but no stored values or segment

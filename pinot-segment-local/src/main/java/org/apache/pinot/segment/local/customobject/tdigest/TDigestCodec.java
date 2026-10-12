@@ -124,7 +124,9 @@ public final class TDigestCodec {
   static void checkLegacyBoundaryWeights(int count, double firstWeight, double lastWeight) {
     if (count > 0 && (firstWeight < 1.0 || lastWeight < 1.0
         || count == 1 && firstWeight != 1.0 && firstWeight < 2.0)) {
-      throw new IllegalArgumentException("Cannot serialize fractional TDigest boundary mass for legacy readers");
+      throw new IllegalArgumentException("Cannot serialize fractional TDigest boundary mass for legacy readers: "
+          + "check add(value, weight) inputs; firstWeight=" + firstWeight + ", lastWeight=" + lastWeight
+          + "; unit endpoints are required, while fractional interior mass remains supported");
     }
   }
 
@@ -572,6 +574,7 @@ public final class TDigestCodec {
     boolean unorderedMeans = false;
     boolean fractionalWeights = false;
     boolean hasZeroWeightCentroids = false;
+    boolean hasNonZeroWeight = false;
     int positiveCentroidCount = 0;
     double lowerPositiveMean = Double.POSITIVE_INFINITY;
     double upperPositiveMean = Double.NEGATIVE_INFINITY;
@@ -597,6 +600,7 @@ public final class TDigestCodec {
     for (int i = 0; i < centroidCount; i++) {
       double weight = centroidSize == VERBOSE_CENTROID_SIZE ? state.readDouble() : state.readFloat();
       double mean = centroidSize == VERBOSE_CENTROID_SIZE ? state.readDouble() : state.readFloat();
+      hasNonZeroWeight |= weight != 0.0;
       // Legacy readers admitted raw non-finite weights. Their mass cannot be recovered, so preserve the bytes
       // as opaque state while keeping the same finite-weight validation for newly created distributions.
       needsLegacyFallback |= !Double.isFinite(weight);
@@ -682,6 +686,8 @@ public final class TDigestCodec {
     // unknown distribution: retain their original bytes and NaN statistics instead of inventing clamped quantiles.
     needsLegacyFallback |= !withinBounds
         || hasNaNMeans && (!identifiableInfinityTail || min != max && !hasFiniteMeans);
+    // Empty encoded mass has no extrema; cancellation of positive and negative weights remains opaque.
+    needsLegacyFallback &= hasNonZeroWeight;
     double recoveredInfinityMean = hasNaNMeans && !needsLegacyFallback ? infinityMean : Double.NaN;
     if (means != null && !Double.isNaN(recoveredInfinityMean)) {
       for (int i = 0; i < centroidCount; i++) {

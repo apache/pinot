@@ -20,12 +20,14 @@ package org.apache.pinot.segment.local.customobject.tdigest;
 
 import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 import java.util.SplittableRandom;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigest.Centroid;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -152,6 +154,23 @@ public class TDigestAccumulatorTest {
     assertEquals(digest.quantile(0), 0.0);
     assertEquals(digest.quantile(1), 10.0);
     assertEquals(digest.serialize(), historical);
+  }
+
+  @Test
+  public void testRoundedLastCentroidCenterDoesNotJumpToMax() {
+    byte[] bytes = TDigestCodec.serializeCentroids(100, 0, 100, new double[]{0, 10, 20, 90},
+        new double[]{1, 2.0000000000000004, 5.000000000000001, 3}, 4);
+    TDigestAccumulator digest = fromBytes(bytes);
+    double quantile = 0.8636363636363635;
+    double previous = Double.NEGATIVE_INFINITY;
+    // On these same bytes, 3.3 returns 100, 100, 90 across the one-ULP gap: preserve monotonicity instead.
+    for (double q : new double[]{Math.nextDown(quantile), quantile, Math.nextUp(quantile)}) {
+      double actual = digest.quantile(q);
+      assertEquals(actual, 90.0);
+      assertTrue(actual >= previous);
+      assertEquals(TDigestCodec.quantile(bytes, q), actual);
+      previous = actual;
+    }
   }
 
   @Test
@@ -587,9 +606,37 @@ public class TDigestAccumulatorTest {
     assertEquals(digest.quantile(1), 20.0);
   }
 
-  @Test
-  public void testZeroMassBytesHaveConsistentEmptyViewsAndDoNotChangeExtrema() {
-    byte[] empty = verbose(new double[]{-100, 100}, new double[]{0, 0});
+  @DataProvider(name = "zeroMassBytes")
+  public static Object[][] zeroMassBytes() {
+    List<Object[]> cases = new ArrayList<>();
+    cases.add(new Object[]{verbose(new double[]{-100, 100}, new double[]{0, 0})});
+    for (int encoding : new int[]{TDigestCodec.VERBOSE_ENCODING, TDigestCodec.SMALL_ENCODING}) {
+      for (int scenario = 0; scenario < 3; scenario++) {
+        int count = scenario == 0 ? 0 : 2;
+        boolean verbose = encoding == TDigestCodec.VERBOSE_ENCODING;
+        ByteBuffer bytes = ByteBuffer.allocate((verbose ? 32 : 30) + count * (verbose ? 16 : 8));
+        bytes.putInt(encoding).putDouble(scenario == 2 ? 100 : Double.NaN)
+            .putDouble(scenario == 2 ? -100 : Double.NaN);
+        if (verbose) {
+          bytes.putDouble(100).putInt(count);
+        } else {
+          bytes.putFloat(100).putShort((short) 50).putShort((short) 250).putShort((short) count);
+        }
+        for (int i = 0; i < count; i++) {
+          if (verbose) {
+            bytes.putDouble(0).putDouble(Double.NaN);
+          } else {
+            bytes.putFloat(0).putFloat(Float.NaN);
+          }
+        }
+        cases.add(new Object[]{bytes.array()});
+      }
+    }
+    return cases.toArray(new Object[0][]);
+  }
+
+  @Test(dataProvider = "zeroMassBytes")
+  public void testZeroMassBytesHaveConsistentEmptyViewsAndDoNotChangeExtrema(byte[] empty) {
     TDigestAccumulator pending = fromBytes(empty);
     for (int phase = 0; phase < 2; phase++) {
       assertTrue(pending.isEmpty());

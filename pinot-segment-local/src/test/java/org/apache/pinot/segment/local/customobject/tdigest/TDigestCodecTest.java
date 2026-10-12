@@ -41,6 +41,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 /// Verifies legacy byte compatibility and numerical validation with invocation-local, unshared digest fixtures.
 public class TDigestCodecTest {
@@ -196,7 +197,11 @@ public class TDigestCodecTest {
       double[] means = new double[weights.length];
       Arrays.setAll(means, i -> i + 1.0);
       byte[] verbose = verboseBytes(100.0, means, weights);
-      assertThrows(IllegalArgumentException.class, () -> TDigestCodec.makeLegacyCompatible(verbose));
+      IllegalArgumentException exception =
+          expectThrows(IllegalArgumentException.class, () -> TDigestCodec.makeLegacyCompatible(verbose));
+      assertTrue(exception.getMessage().contains("add(value, weight)"));
+      assertTrue(exception.getMessage().contains("firstWeight=" + weights[0]));
+      assertTrue(exception.getMessage().contains("lastWeight=" + weights[weights.length - 1]));
       // Reading historical bytes retains their exact mass and payload instead of minting a new legacy shape.
       TDigest historical = TDigestAccumulator.fromBytes(verbose);
       assertTrue(historical.hasValidStatistics());
