@@ -22,7 +22,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.function.BiFunction;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -45,27 +44,7 @@ public class ConcurrentIndexedTable extends IndexedTable {
     if (_hasOrderBy) {
       upsertWithOrderBy(key, record);
     } else {
-      upsertWithoutOrderBy(key, record);
-    }
-    return true;
-  }
-
-  @Override
-  public boolean upsertSingleAggregationResult(Key key, @Nullable Object result) {
-    assert _aggregationFunctions.length == 1;
-    if (_hasOrderBy) {
-      return super.upsertSingleAggregationResult(key, result);
-    }
-    BiFunction<Key, Record, Record> mergeResult = (k, record) -> record == null
-        ? createSingleAggregationRecord(k, result)
-        : updateSingleAggregationRecord(record, result);
-    if (_noMoreNewRecords.get()) {
-      _lookupMap.computeIfPresent(key, mergeResult);
-    } else {
-      _lookupMap.compute(key, mergeResult);
-      if (_lookupMap.size() >= _resultSize) {
-        _noMoreNewRecords.set(true);
-      }
+      upsertWithoutOrderBy(key, record, null);
     }
     return true;
   }
@@ -90,11 +69,12 @@ public class ConcurrentIndexedTable extends IndexedTable {
     }
   }
 
-  protected void upsertWithoutOrderBy(Key key, Record record) {
+  @Override
+  protected void upsertWithoutOrderBy(Key key, @Nullable Record record, @Nullable Object result) {
     if (_noMoreNewRecords.get()) {
-      updateExistingRecord(key, record);
+      updateExistingRecord(key, record, result);
     } else {
-      addOrUpdateRecord(key, record);
+      addOrUpdateRecord(key, record, result);
       if (_lookupMap.size() >= _resultSize) {
         _noMoreNewRecords.set(true);
       }

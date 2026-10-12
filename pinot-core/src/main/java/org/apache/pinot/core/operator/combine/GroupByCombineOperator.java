@@ -78,8 +78,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     assert _queryContext.getGroupByExpressions() != null;
     _numKeyColumns = _queryContext.getNumGroupByKeyColumns();
     _numColumns = _numKeyColumns + _numAggregationFunctions;
-    _useSingleAggregationResult = _numAggregationFunctions == 1
-        && _queryContext.getOrderByExpressions() == null && !_queryContext.isGroupingSets();
+    _useSingleAggregationResult = _numAggregationFunctions == 1;
     _operatorLatch = new CountDownLatch(_numTasks);
   }
 

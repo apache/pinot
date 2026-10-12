@@ -20,6 +20,7 @@ package org.apache.pinot.core.data.table;
 
 import java.util.HashMap;
 import java.util.concurrent.ExecutorService;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -44,12 +45,17 @@ public class SimpleIndexedTable extends IndexedTable {
         resize();
       }
     } else {
-      if (_lookupMap.size() < _resultSize) {
-        addOrUpdateRecord(key, record);
-      } else {
-        updateExistingRecord(key, record);
-      }
+      upsertWithoutOrderBy(key, record, null);
     }
     return true;
+  }
+
+  @Override
+  protected void upsertWithoutOrderBy(Key key, @Nullable Record record, @Nullable Object result) {
+    if (_lookupMap.size() < _resultSize) {
+      addOrUpdateRecord(key, record, result);
+    } else {
+      updateExistingRecord(key, record, result);
+    }
   }
 }

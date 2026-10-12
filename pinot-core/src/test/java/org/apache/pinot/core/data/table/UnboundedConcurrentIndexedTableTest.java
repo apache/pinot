@@ -21,12 +21,14 @@ package org.apache.pinot.core.data.table;
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -46,6 +48,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotSame;
 import static org.testng.Assert.assertSame;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
@@ -56,12 +59,24 @@ public class UnboundedConcurrentIndexedTableTest {
     return new Object[][]{{false, false}, {true, false}, {false, true}, {true, true}};
   }
 
+  @DataProvider(name = "concurrentInputModes")
+  public Object[][] concurrentInputModes() {
+    return new Object[][]{{false, false, false}, {true, false, false}, {false, true, false}, {true, true, false},
+        {false, false, true}, {true, false, true}, {false, true, true}, {true, true, true}};
+  }
+
+  @DataProvider(name = "scalarInputs")
+  public Object[][] scalarInputs() {
+    return new Object[][]{{false}, {true}};
+  }
+
   @DataProvider(name = "singleAggregations")
   public Object[][] singleAggregations() {
     Supplier<Object[]> numericInputs = () -> new Object[]{3d, 5d};
     Supplier<Object[]> avgInputs = () -> new Object[]{new AvgPair(9, 3), new AvgPair(11, 1)};
     Supplier<Object[]> distinctInputs = () -> new Object[]{new IntOpenHashSet(new int[]{1, 2}),
         new IntOpenHashSet(new int[]{2, 3})};
+    Supplier<Object[]> finalDistinctInputs = () -> new Object[]{3, 5};
     Supplier<Object[]> hllInputs = () -> {
       HyperLogLog first = new HyperLogLog(8);
       first.offer(1);
@@ -82,6 +97,7 @@ public class UnboundedConcurrentIndexedTableTest {
         {"MAX(metric)", true, numericInputs, 5d, null},
         {"AVG(metric)", false, avgInputs, 5d, null},
         {"DISTINCTCOUNT(metric)", false, distinctInputs, 3, 0},
+        {"DISTINCTCOUNT(metric)", true, finalDistinctInputs, 8, null},
         {"DISTINCTCOUNTHLL(metric)", false, hllInputs, 3L, 0L},
         {"ARRAYAGG(metric, 'INT')", false, arrayInputs, new IntArrayList(new int[]{1, 2, 2, 3}), new IntArrayList()}
     };
@@ -89,13 +105,21 @@ public class UnboundedConcurrentIndexedTableTest {
 
   @Test(dataProvider = "singleAggregations")
   public void testSingleAggregationParity(String expression, boolean hasFinalInput, Supplier<Object[]> inputSupplier,
-      Object mergedResult, Object emptyResult) {
+      Object mergedResult, Object emptyResult)
+      throws IOException {
     ExecutorService executor = Executors.newSingleThreadExecutor();
     try {
-      Map<Key, Object> eagerResults =
-          singleAggregationResults(expression, hasFinalInput, inputSupplier, false, executor);
-      Map<Key, Object> scalarResults =
-          singleAggregationResults(expression, hasFinalInput, inputSupplier, true, executor);
+      IndexedTable eagerTable = singleAggregationTable(expression, hasFinalInput, inputSupplier, false, executor);
+      IndexedTable scalarTable = singleAggregationTable(expression, hasFinalInput, inputSupplier, true, executor);
+      assertEquals(scalarTable._lookupMap.keySet(), eagerTable._lookupMap.keySet());
+      if (!hasFinalInput) {
+        for (Map.Entry<Key, Record> entry : eagerTable._lookupMap.entrySet()) {
+          assertEquivalentResult(scalarTable._lookupMap.get(entry.getKey()).getValues()[2],
+              entry.getValue().getValues()[2], expression + ": intermediate " + entry.getKey());
+        }
+      }
+      Map<Key, Object> eagerResults = finishSingleAggregation(eagerTable);
+      Map<Key, Object> scalarResults = finishSingleAggregation(scalarTable);
       assertEquals(eagerResults.size(), 3);
       assertEquals(scalarResults.keySet(), eagerResults.keySet());
       for (String group : List.of("null-first", "null-last", "all-null")) {
@@ -110,8 +134,9 @@ public class UnboundedConcurrentIndexedTableTest {
     }
   }
 
-  @Test(dataProvider = "inputModes", timeOut = 30_000)
-  public void testConcurrentCountsWithHashCollisions(boolean scalarInput, boolean hasFinalInput)
+  @Test(dataProvider = "concurrentInputModes", timeOut = 30_000)
+  public void testConcurrentCountsWithHashCollisions(boolean scalarInput, boolean hasFinalInput,
+      boolean deterministicTable)
       throws InterruptedException, ExecutionException, TimeoutException {
     int numThreads = 4;
     int iterations = 1_000;
@@ -120,7 +145,12 @@ public class UnboundedConcurrentIndexedTableTest {
     CountDownLatch ready = new CountDownLatch(numThreads);
     CountDownLatch start = new CountDownLatch(1);
     try {
-      IndexedTable table = newTable(Integer.MAX_VALUE, hasFinalInput, executor);
+      QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+          "SELECT COUNT(*) FROM testTable GROUP BY tv_id, weights");
+      IndexedTable table = deterministicTable
+          ? new DeterministicConcurrentIndexedTable(newDataSchema(), hasFinalInput, queryContext, Integer.MAX_VALUE,
+              Integer.MAX_VALUE, Integer.MAX_VALUE, 1, executor)
+          : newTable(Integer.MAX_VALUE, hasFinalInput, executor);
       List<Future<?>> futures = new ArrayList<>();
       for (int threadIndex = 0; threadIndex < numThreads; threadIndex++) {
         String distinctKey = "thread-" + threadIndex;
@@ -140,7 +170,7 @@ public class UnboundedConcurrentIndexedTableTest {
       for (Future<?> future : futures) {
         future.get(10, TimeUnit.SECONDS);
       }
-      Map<Key, Long> counts = counts(table, hasFinalInput);
+      Map<Key, Long> counts = finishAndCount(table, hasFinalInput);
       assertEquals(counts.size(), numThreads + 2);
       assertEquals(counts.get(new Key(new Object[]{"Aa", 1d})), Long.valueOf(numThreads * iterations));
       assertEquals(counts.get(new Key(new Object[]{"BB", 1d})), Long.valueOf(numThreads * iterations));
@@ -149,6 +179,74 @@ public class UnboundedConcurrentIndexedTableTest {
       }
     } finally {
       start.countDown();
+      executor.shutdownNow();
+    }
+  }
+
+  @Test(dataProvider = "scalarInputs", timeOut = 30_000)
+  public void testConcurrentSaturatedMutableUpdates(boolean scalarInput)
+      throws InterruptedException, ExecutionException, TimeoutException {
+    int numThreads = 4;
+    int iterations = 1_000;
+    ExecutorService executor = Executors.newFixedThreadPool(numThreads);
+    CountDownLatch ready = new CountDownLatch(numThreads);
+    CountDownLatch start = new CountDownLatch(1);
+    try {
+      QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+          "SELECT AVG(metric) FROM testTable GROUP BY tv_id, weights");
+      DataSchema dataSchema = new DataSchema(new String[]{"tv_id", "weights", "avg(metric)"},
+          new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.DOUBLE, ColumnDataType.OBJECT});
+      IndexedTable table = new UnboundedConcurrentIndexedTable(dataSchema, false, queryContext, 1, 1, executor);
+      Key hotKey = new Key(new Object[]{"hot", 1d});
+      upsert(table, new Record(new Object[]{"hot", 1d, new AvgPair(9, 3)}), scalarInput);
+      List<Future<?>> futures = new ArrayList<>();
+      for (int threadIndex = 0; threadIndex < numThreads; threadIndex++) {
+        String rejectedKey = "rejected-" + threadIndex;
+        futures.add(executor.submit(() -> {
+          ready.countDown();
+          start.await();
+          for (int i = 0; i < iterations; i++) {
+            upsert(table, new Record(new Object[]{"hot", 1d, new AvgPair(3, 1)}), scalarInput);
+            upsert(table, new Record(new Object[]{rejectedKey, 1d, new AvgPair(100, 1)}), scalarInput);
+          }
+          return null;
+        }));
+      }
+      assertTrue(ready.await(10, TimeUnit.SECONDS), "Writers did not become ready");
+      start.countDown();
+      for (Future<?> future : futures) {
+        future.get(10, TimeUnit.SECONDS);
+      }
+      assertEquals(table._lookupMap.keySet(), Set.of(hotKey));
+      AvgPair result = (AvgPair) table._lookupMap.get(hotKey).getValues()[2];
+      assertEquals(result.getCount(), 3L + numThreads * iterations);
+      assertEquals(result.getSum(), 9d + 3d * numThreads * iterations);
+      assertEquals(finishSingleAggregation(table), Map.of(hotKey, 3d));
+    } finally {
+      start.countDown();
+      executor.shutdownNow();
+    }
+  }
+
+  @Test
+  public void testScalarInputRequiresSingleAggregation() {
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+          "SELECT COUNT(*), SUM(metric) FROM testTable GROUP BY tv_id, weights");
+      DataSchema dataSchema = new DataSchema(new String[]{"tv_id", "weights", "count(*)", "sum(metric)"},
+          new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.DOUBLE, ColumnDataType.LONG,
+              ColumnDataType.DOUBLE});
+      List<IndexedTable> tables = List.of(
+          new SimpleIndexedTable(dataSchema, false, queryContext, 1, Integer.MAX_VALUE, Integer.MAX_VALUE, 1, executor),
+          new ConcurrentIndexedTable(dataSchema, false, queryContext, 1, Integer.MAX_VALUE, Integer.MAX_VALUE, 1,
+              executor));
+      for (IndexedTable table : tables) {
+        assertThrows(IllegalStateException.class,
+            () -> table.upsertSingleAggregationResult(new Key(new Object[]{"hot", 1d}), 1L));
+        assertEquals(table.size(), 0);
+      }
+    } finally {
       executor.shutdownNow();
     }
   }
@@ -164,7 +262,7 @@ public class UnboundedConcurrentIndexedTableTest {
         upsert(table, new Record(new Object[]{key[0], key[1], 1L}), scalarInput);
         upsert(table, new Record(new Object[]{key[0], key[1], 1L}), scalarInput);
       }
-      assertEquals(counts(table, hasFinalInput), Map.of(new Key(new Object[]{null, null}), 2L,
+      assertEquals(finishAndCount(table, hasFinalInput), Map.of(new Key(new Object[]{null, null}), 2L,
           new Key(new Object[]{"", 0d}), 2L, new Key(new Object[]{null, 0d}), 2L,
           new Key(new Object[]{"", null}), 2L, new Key(new Object[]{"zero", 0d}), 2L,
           new Key(new Object[]{"zero", -0d}), 2L, new Key(new Object[]{"nan", Double.NaN}), 4L));
@@ -213,22 +311,20 @@ public class UnboundedConcurrentIndexedTableTest {
           "SELECT COUNT(*) FROM testTable GROUP BY tv_id, weights");
       QueryContext orderedQueryContext = QueryContextConverterUtils.getQueryContext(
           "SELECT COUNT(*) FROM testTable GROUP BY tv_id, weights ORDER BY COUNT(*) DESC");
-      IndexedTable[] tables = {
+      Map<Key, Long> firstGroup = Map.of(new Key(new Object[]{"BB", 1d}), 12L);
+      Map<IndexedTable, Map<Key, Long>> expectedByTable = Map.of(
           new SimpleIndexedTable(newDataSchema(), hasFinalInput, queryContext, 1, Integer.MAX_VALUE,
-              Integer.MAX_VALUE, 1, executor),
+              Integer.MAX_VALUE, 1, executor), firstGroup,
           new DeterministicConcurrentIndexedTable(newDataSchema(), hasFinalInput, queryContext, 1,
-              Integer.MAX_VALUE, Integer.MAX_VALUE, 1, executor),
-          new ConcurrentIndexedTable(newDataSchema(), hasFinalInput, orderedQueryContext, 1, 1, 2, 1, executor)
-      };
-      for (int i = 0; i < tables.length; i++) {
-        IndexedTable table = tables[i];
+              Integer.MAX_VALUE, Integer.MAX_VALUE, 1, executor), Map.of(new Key(new Object[]{"Aa", 1d}), 3L),
+          new ConcurrentIndexedTable(newDataSchema(), hasFinalInput, orderedQueryContext, 1, 1, 2, 1, executor),
+          firstGroup);
+      for (Map.Entry<IndexedTable, Map<Key, Long>> entry : expectedByTable.entrySet()) {
+        IndexedTable table = entry.getKey();
         upsert(table, new Record(new Object[]{"BB", 1d, 7L}), scalarInput);
         upsert(table, new Record(new Object[]{"Aa", 1d, 3L}), scalarInput);
         upsert(table, new Record(new Object[]{"BB", 1d, 5L}), scalarInput);
-        Map<Key, Long> expected = i == 1
-            ? Map.of(new Key(new Object[]{"Aa", 1d}), 3L)
-            : Map.of(new Key(new Object[]{"BB", 1d}), 12L);
-        assertEquals(counts(table, hasFinalInput), expected);
+        assertEquals(finishAndCount(table, hasFinalInput), entry.getValue());
       }
     } finally {
       executor.shutdownNow();
@@ -241,7 +337,7 @@ public class UnboundedConcurrentIndexedTableTest {
     return new UnboundedConcurrentIndexedTable(newDataSchema(), hasFinalInput, queryContext, resultSize, 1, executor);
   }
 
-  private Map<Key, Object> singleAggregationResults(String expression, boolean hasFinalInput,
+  private IndexedTable singleAggregationTable(String expression, boolean hasFinalInput,
       Supplier<Object[]> inputSupplier, boolean scalarInput, ExecutorService executor) {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
         "SET enableNullHandling=true; SELECT " + expression + " FROM testTable GROUP BY tv_id, weights");
@@ -262,6 +358,10 @@ public class UnboundedConcurrentIndexedTableTest {
     upsert(table, new Record(new Object[]{"null-last", 1d, nullLastInputs[1]}), scalarInput);
     upsert(table, new Record(new Object[]{"null-last", 1d, null}), scalarInput);
     upsert(table, new Record(new Object[]{"all-null", 1d, null}), scalarInput);
+    return table;
+  }
+
+  private Map<Key, Object> finishSingleAggregation(IndexedTable table) {
     table.finish(false, true);
     Map<Key, Object> results = new HashMap<>();
     Iterator<Record> iterator = table.iterator();
@@ -270,6 +370,21 @@ public class UnboundedConcurrentIndexedTableTest {
       results.put(new Key(new Object[]{values[0], values[1]}), values[2]);
     }
     return results;
+  }
+
+  private void assertEquivalentResult(Object actual, Object expected, String message)
+      throws IOException {
+    if (expected instanceof AvgPair expectedPair) {
+      assertTrue(actual instanceof AvgPair, message);
+      AvgPair actualPair = (AvgPair) actual;
+      assertEquals(actualPair.getSum(), expectedPair.getSum(), message);
+      assertEquals(actualPair.getCount(), expectedPair.getCount(), message);
+    } else if (expected instanceof HyperLogLog expectedHll) {
+      assertTrue(actual instanceof HyperLogLog, message);
+      assertEquals(((HyperLogLog) actual).getBytes(), expectedHll.getBytes(), message);
+    } else {
+      assertTrue(Objects.deepEquals(actual, expected), message);
+    }
   }
 
   private DataSchema newDataSchema() {
@@ -286,7 +401,7 @@ public class UnboundedConcurrentIndexedTableTest {
     }
   }
 
-  private Map<Key, Long> counts(Table table, boolean hasFinalInput) {
+  private Map<Key, Long> finishAndCount(Table table, boolean hasFinalInput) {
     table.finish(false, hasFinalInput);
     Map<Key, Long> counts = new HashMap<>();
     Iterator<Record> iterator = table.iterator();
