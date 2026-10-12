@@ -1790,10 +1790,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _realtimeTableDataManager.downloadAndReplaceConsumingSegment(segmentZKMetadata);
   }
 
-  /// Whether replacing this segment rewrites the key map, which the next consuming segment must not run against.
-  /// These tables hold the semaphore across both the build and the download, the way DISALLOW_ALWAYS does.
-  /// Upsert reverts the keys the consuming rows wrote; dedup removes them when the mutable segment is offloaded,
-  /// and a replay in between is dropped as a duplicate against a key that is about to disappear.
+  /// The replace rewrites the key map, so hold the semaphore across the build and the download like
+  /// DISALLOW_ALWAYS: upsert reverts those keys, dedup removes them when the mutable segment is offloaded.
   private boolean holdsConsumerSemaphoreForMetadata() {
     return revertsUpsertMetadata() || _partitionDedupMetadataManager != null;
   }
