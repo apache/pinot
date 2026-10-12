@@ -25,7 +25,7 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.segment.local.customobject.SerializedTDigest;
-import org.apache.pinot.segment.local.customobject.tdigest.PercentileTDigestAccumulator;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigestAccumulator;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.annotations.Test;
 
@@ -34,7 +34,7 @@ import static org.testng.Assert.assertTrue;
 
 
 /// Tests that the final result of `percentileRawTDigest` stays readable by a plain t-digest
-/// [MergingDigest#fromBytes] reader when the intermediate [PercentileTDigestAccumulator] holds
+/// [MergingDigest#fromBytes] reader when the intermediate [TDigestAccumulator] holds
 /// capacity-preserving state (a digest with more centroids than a freshly allocated
 /// [MergingDigest] of the same compression can hold).
 public class PercentileRawTDigestAggregationFunctionTest {
@@ -54,7 +54,7 @@ public class PercentileRawTDigestAggregationFunctionTest {
         new PercentileRawTDigestAggregationFunction(EXPRESSION, 50.0, (int) compression, false);
     TDigest intermediateResult = function.deserializeIntermediateResult(
         new CustomObject(ObjectSerDeUtils.ObjectType.TDigest.getValue(), ByteBuffer.wrap(small)));
-    assertTrue(intermediateResult instanceof PercentileTDigestAccumulator);
+    assertTrue(intermediateResult instanceof TDigestAccumulator);
 
     SerializedTDigest finalResult = function.extractFinalResult(intermediateResult);
     byte[] serialized = BytesUtils.toBytes(finalResult.toString());
@@ -107,7 +107,7 @@ public class PercentileRawTDigestAggregationFunctionTest {
     byte[] verbose = createVerboseUnitCentroidDigest(51, 20.0);
     TDigest intermediateResult = function.deserializeIntermediateResult(
         new CustomObject(ObjectSerDeUtils.ObjectType.TDigest.getValue(), ByteBuffer.wrap(verbose)));
-    assertTrue(intermediateResult instanceof PercentileTDigestAccumulator);
+    assertTrue(intermediateResult instanceof TDigestAccumulator);
 
     SerializedTDigest finalResult = function.extractFinalResult(intermediateResult);
     byte[] serialized = BytesUtils.toBytes(finalResult.toString());

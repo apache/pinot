@@ -50,7 +50,7 @@ import org.apache.pinot.segment.local.utils.TDigestUtils;
 /// input must be merged. The raw-value buffer remains unallocated for serialized state until a raw value is added.
 ///
 /// Instances are externally serialized per aggregation or group key and are not safe for concurrent mutation.
-public final class PercentileTDigestAccumulator extends TDigest {
+public final class TDigestAccumulator extends TDigest {
   private static final int MIN_RAW_BUFFER_SIZE = 256;
   private static final int MAX_RAW_BUFFER_SIZE = 10_000;
   private static final int MIN_COMPRESSION = 10;
@@ -100,11 +100,11 @@ public final class PercentileTDigestAccumulator extends TDigest {
   private double _min = Double.POSITIVE_INFINITY;
   private double _max = Double.NEGATIVE_INFINITY;
 
-  public PercentileTDigestAccumulator(int compression) {
+  public TDigestAccumulator(int compression) {
     this((double) compression, true, true);
   }
 
-  private PercentileTDigestAccumulator(double compression, boolean allocateRawBuffer, boolean allocateMergeBuffers) {
+  private TDigestAccumulator(double compression, boolean allocateRawBuffer, boolean allocateMergeBuffers) {
     if (!(compression > 0.0) || !Double.isFinite(compression)) {
       throw new IllegalArgumentException("TDigest compression must be positive: " + compression);
     }
@@ -127,28 +127,28 @@ public final class PercentileTDigestAccumulator extends TDigest {
     }
   }
 
-  public static PercentileTDigestAccumulator forSerializedTDigest(byte[] bytes) {
-    return new PercentileTDigestAccumulator(readCompression(bytes), false, false);
+  public static TDigestAccumulator forSerializedTDigest(byte[] bytes) {
+    return new TDigestAccumulator(readCompression(bytes), false, false);
   }
 
-  public static PercentileTDigestAccumulator forSerializedTDigest(SerializedTDigestInput input) {
-    return new PercentileTDigestAccumulator(input._compression, false, false);
+  public static TDigestAccumulator forSerializedTDigest(SerializedTDigestInput input) {
+    return new TDigestAccumulator(input._compression, false, false);
   }
 
-  public static PercentileTDigestAccumulator forSerializedTDigestWithMergeBuffers(byte[] bytes) {
-    return new PercentileTDigestAccumulator(readCompression(bytes), false, true);
+  public static TDigestAccumulator forSerializedTDigestWithMergeBuffers(byte[] bytes) {
+    return new TDigestAccumulator(readCompression(bytes), false, true);
   }
 
-  public static PercentileTDigestAccumulator forSerializedTDigest(ByteBuffer input) {
+  public static TDigestAccumulator forSerializedTDigest(ByteBuffer input) {
     byte[] bytes = new byte[input.remaining()];
     input.get(bytes);
-    PercentileTDigestAccumulator accumulator = forSerializedTDigest(bytes);
+    TDigestAccumulator accumulator = forSerializedTDigest(bytes);
     accumulator.addSerializedTDigest(bytes);
     return accumulator;
   }
 
-  public static PercentileTDigestAccumulator forReduction(double compression) {
-    return new PercentileTDigestAccumulator(compression, false, false);
+  public static TDigestAccumulator forReduction(double compression) {
+    return new TDigestAccumulator(compression, false, false);
   }
 
   public void add(double[] values, int from, int toExclusive) {
@@ -212,8 +212,8 @@ public final class PercentileTDigestAccumulator extends TDigest {
 
   @Override
   public void add(TDigest other) {
-    if (other instanceof PercentileTDigestAccumulator) {
-      addAccumulator((PercentileTDigestAccumulator) other);
+    if (other instanceof TDigestAccumulator) {
+      addAccumulator((TDigestAccumulator) other);
       return;
     }
     if (other instanceof MergingDigest && other.size() > Integer.MAX_VALUE) {
@@ -239,7 +239,7 @@ public final class PercentileTDigestAccumulator extends TDigest {
     }
   }
 
-  private void addAccumulator(PercentileTDigestAccumulator other) {
+  private void addAccumulator(TDigestAccumulator other) {
     if (other._pendingSerializedTDigest != null) {
       addSerializedTDigest(other._pendingSerializedTDigest);
       return;
@@ -670,7 +670,7 @@ public final class PercentileTDigestAccumulator extends TDigest {
   @Override
   public void setScaleFunction(ScaleFunction scaleFunction) {
     if (scaleFunction != ScaleFunction.K_1) {
-      throw new UnsupportedOperationException("PercentileTDigestAccumulator only supports ScaleFunction.K_1");
+      throw new UnsupportedOperationException("TDigestAccumulator only supports ScaleFunction.K_1");
     }
     super.setScaleFunction(scaleFunction);
   }

@@ -53,7 +53,16 @@ git -C "$TDIGEST_ROOT" show \
   "$TDIGEST_BASELINE:pinot-segment-local/src/main/java/org/apache/pinot/segment/local/utils/TDigestUtils.java" \
   > "$TDIGEST_WORK/TDigestUtils.java"
 if [[ ! -s "$TDIGEST_JAR" ]]; then
-  "$TDIGEST_ROOT/mvnw" -f "$TDIGEST_ROOT/pom.xml" -N -B -ntp \
+  # Resolve the legacy jar without requiring a locally installed Pinot BOM.
+  cat > "$TDIGEST_WORK/pom.xml" <<'POM'
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>org.apache.pinot.compatibility</groupId>
+  <artifactId>tdigest-rank-oracle</artifactId>
+  <version>1.0</version>
+</project>
+POM
+  "$TDIGEST_ROOT/mvnw" -f "$TDIGEST_WORK/pom.xml" -B -ntp \
     org.apache.maven.plugins:maven-dependency-plugin:3.8.1:copy \
     -Dartifact=com.tdunning:t-digest:3.3:jar "-DoutputDirectory=$TDIGEST_JAR_DIR"
 fi

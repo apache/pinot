@@ -36,7 +36,7 @@ import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
-import org.apache.pinot.segment.local.customobject.tdigest.PercentileTDigestAccumulator;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigestAccumulator;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -185,7 +185,7 @@ public class PercentileSmartTDigestAggregationFunction extends BaseSingleInputAg
   }
 
   private TDigest convertValueListToTDigest(DoubleArrayList valueList) {
-    TDigest tDigest = new PercentileTDigestAccumulator(_compression);
+    TDigest tDigest = new TDigestAccumulator(_compression);
     DoubleListIterator iterator = valueList.iterator();
     while (iterator.hasNext()) {
       tDigest.add(iterator.nextDouble());
@@ -296,11 +296,11 @@ public class PercentileSmartTDigestAggregationFunction extends BaseSingleInputAg
 
   @Override
   public Object merge(Object intermediateResult1, Object intermediateResult2) {
-    if (intermediateResult1 instanceof PercentileTDigestAccumulator) {
-      return mergeIntoAccumulator((PercentileTDigestAccumulator) intermediateResult1, intermediateResult2);
+    if (intermediateResult1 instanceof TDigestAccumulator) {
+      return mergeIntoAccumulator((TDigestAccumulator) intermediateResult1, intermediateResult2);
     }
-    if (intermediateResult2 instanceof PercentileTDigestAccumulator) {
-      return mergeIntoAccumulator((PercentileTDigestAccumulator) intermediateResult2, intermediateResult1);
+    if (intermediateResult2 instanceof TDigestAccumulator) {
+      return mergeIntoAccumulator((TDigestAccumulator) intermediateResult2, intermediateResult1);
     }
     DoubleArrayList valueList1 = (DoubleArrayList) intermediateResult1;
     DoubleArrayList valueList2 = (DoubleArrayList) intermediateResult2;
@@ -308,7 +308,7 @@ public class PercentileSmartTDigestAggregationFunction extends BaseSingleInputAg
     return valueList1.size() > _threshold ? convertValueListToTDigest(valueList1) : valueList1;
   }
 
-  private static PercentileTDigestAccumulator mergeIntoAccumulator(PercentileTDigestAccumulator accumulator,
+  private static TDigestAccumulator mergeIntoAccumulator(TDigestAccumulator accumulator,
       Object intermediateResult) {
     if (intermediateResult instanceof TDigest) {
       accumulator.add((TDigest) intermediateResult);
@@ -343,7 +343,7 @@ public class PercentileSmartTDigestAggregationFunction extends BaseSingleInputAg
     if (customObject.getType() == ObjectSerDeUtils.ObjectType.TDigest.getValue()) {
       // Generic TDigest deserialization returns a plain MergingDigest. Keep this function's TDigest intermediates as
       // accumulators so subsequent merges retain the capacity-preserving serialization path.
-      return PercentileTDigestAccumulator.forSerializedTDigest(customObject.getBuffer());
+      return TDigestAccumulator.forSerializedTDigest(customObject.getBuffer());
     }
     return ObjectSerDeUtils.deserialize(customObject);
   }
