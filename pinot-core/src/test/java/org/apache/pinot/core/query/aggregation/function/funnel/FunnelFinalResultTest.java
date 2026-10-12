@@ -19,13 +19,18 @@
 package org.apache.pinot.core.query.aggregation.function.funnel;
 
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
+import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.PriorityQueue;
+import java.util.Set;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
@@ -39,6 +44,10 @@ import org.roaringbitmap.RoaringBitmap;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 
 
@@ -91,6 +100,54 @@ public class FunnelFinalResultTest {
     assertEquals(function.extractFinalResult(intermediateResult), expectedPartialResult);
     assertEquals(function.extractFinalResult(function.merge(intermediateResult, otherIntermediateResult)),
         expectedMergedResult);
+  }
+
+  @Test
+  public void testSetFinalExtractionAvoidsTraversingLargeFirstStep() {
+    Set<?> firstStep = mock(Set.class);
+    when(firstStep.size()).thenReturn(1_000_000);
+    when(firstStep.contains(2)).thenReturn(true);
+    when(firstStep.iterator()).thenThrow(new AssertionError("Large first-step population must not be traversed"));
+    assertEquals(new SetMergeStrategy(1).extractFinalResult(List.of(firstStep)),
+        LongArrayList.wrap(new long[]{1_000_000}));
+    assertEquals(new SetMergeStrategy(3).extractFinalResult(List.of(firstStep, Set.of(), Set.of(2))),
+        LongArrayList.wrap(new long[]{1_000_000, 0, 0}));
+    assertEquals(new SetMergeStrategy(3).extractFinalResult(List.of(firstStep, Set.of(2, 3), Set.of(2, 4, 5))),
+        LongArrayList.wrap(new long[]{1_000_000, 1, 1}));
+    verify(firstStep, never()).iterator();
+    verify(firstStep, never()).toArray();
+  }
+
+  @DataProvider
+  public Object[][] stepSets() {
+    float floatNaN1 = Float.intBitsToFloat(0x7fc00001);
+    float floatNaN2 = Float.intBitsToFloat(0x7fc00002);
+    double doubleNaN1 = Double.longBitsToDouble(0x7ff8000000000001L);
+    double doubleNaN2 = Double.longBitsToDouble(0x7ff8000000000002L);
+    return new Object[][]{
+        {List.of(new IntOpenHashSet(new int[]{1, 2, 3}), new IntOpenHashSet(new int[]{2, 3}),
+            new IntOpenHashSet(new int[]{3, 4, 5, 6})), new long[]{3, 2, 1}},
+        {List.of(new LongOpenHashSet(new long[]{1, 2, 3}), new LongOpenHashSet(new long[]{2, 3}),
+            new LongOpenHashSet(new long[]{3, 4, 5, 6})), new long[]{3, 2, 1}},
+        {List.of(new FloatOpenHashSet(new float[]{floatNaN1, floatNaN2, -0.0f, 0.0f}),
+            new FloatOpenHashSet(new float[]{floatNaN1, floatNaN2, 0.0f}),
+            new FloatOpenHashSet(new float[]{floatNaN2, 0.0f, 1, 2})), new long[]{4, 3, 2}},
+        {List.of(new DoubleOpenHashSet(new double[]{doubleNaN1, doubleNaN2, -0.0, 0.0}),
+            new DoubleOpenHashSet(new double[]{doubleNaN1, doubleNaN2, 0.0}),
+            new DoubleOpenHashSet(new double[]{doubleNaN2, 0.0, 1, 2})), new long[]{4, 3, 2}},
+        {List.of(Set.of("1", "2", "3"), Set.of("2", "3"), Set.of("3", "4", "5", "6")), new long[]{3, 2, 1}}
+    };
+  }
+
+  @Test(dataProvider = "stepSets")
+  public void testSetFinalExtractionPreservesStepPopulations(List<Set> steps, long[] expectedCounts) {
+    Object[][] originalSteps = steps.stream().map(Set::toArray).toArray(Object[][]::new);
+    SetMergeStrategy strategy = new SetMergeStrategy(3);
+    assertEquals(strategy.extractFinalResult(steps), LongArrayList.wrap(expectedCounts));
+    assertEquals(strategy.extractFinalResult(steps), LongArrayList.wrap(expectedCounts));
+    for (int i = 0; i < steps.size(); i++) {
+      assertEquals(steps.get(i).toArray(), originalSteps[i]);
+    }
   }
 
   private static PriorityQueue<FunnelStepEvent> events(int step) {
