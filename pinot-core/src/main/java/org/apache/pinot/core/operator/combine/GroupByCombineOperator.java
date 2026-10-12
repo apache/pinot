@@ -35,7 +35,6 @@ import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
-import org.apache.pinot.core.query.aggregation.function.CountAggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -80,7 +79,6 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     _numKeyColumns = _queryContext.getNumGroupByKeyColumns();
     _numColumns = _numKeyColumns + _numAggregationFunctions;
     _useSingleAggregationResult = _numAggregationFunctions == 1
-        && aggregationFunctions[0] instanceof CountAggregationFunction
         && _queryContext.getOrderByExpressions() == null && !_queryContext.isGroupingSets();
     _operatorLatch = new CountDownLatch(_numTasks);
   }

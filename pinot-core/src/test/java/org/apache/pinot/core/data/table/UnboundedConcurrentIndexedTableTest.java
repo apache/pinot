@@ -18,11 +18,15 @@
  */
 package org.apache.pinot.core.data.table;
 
+import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -30,10 +34,12 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Supplier;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.segment.local.customobject.AvgPair;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -48,6 +54,60 @@ public class UnboundedConcurrentIndexedTableTest {
   @DataProvider(name = "inputModes")
   public Object[][] inputModes() {
     return new Object[][]{{false, false}, {true, false}, {false, true}, {true, true}};
+  }
+
+  @DataProvider(name = "singleAggregations")
+  public Object[][] singleAggregations() {
+    Supplier<Object[]> numericInputs = () -> new Object[]{3d, 5d};
+    Supplier<Object[]> avgInputs = () -> new Object[]{new AvgPair(9, 3), new AvgPair(11, 1)};
+    Supplier<Object[]> distinctInputs = () -> new Object[]{new IntOpenHashSet(new int[]{1, 2}),
+        new IntOpenHashSet(new int[]{2, 3})};
+    Supplier<Object[]> hllInputs = () -> {
+      HyperLogLog first = new HyperLogLog(8);
+      first.offer(1);
+      first.offer(2);
+      HyperLogLog second = new HyperLogLog(8);
+      second.offer(2);
+      second.offer(3);
+      return new Object[]{first, second};
+    };
+    Supplier<Object[]> arrayInputs = () -> new Object[]{new IntArrayList(new int[]{1, 2}),
+        new IntArrayList(new int[]{2, 3})};
+    return new Object[][]{
+        {"SUM(metric)", false, numericInputs, 8d, null},
+        {"SUM(metric)", true, numericInputs, 8d, null},
+        {"MIN(metric)", false, numericInputs, 3d, null},
+        {"MIN(metric)", true, numericInputs, 3d, null},
+        {"MAX(metric)", false, numericInputs, 5d, null},
+        {"MAX(metric)", true, numericInputs, 5d, null},
+        {"AVG(metric)", false, avgInputs, 5d, null},
+        {"DISTINCTCOUNT(metric)", false, distinctInputs, 3, 0},
+        {"DISTINCTCOUNTHLL(metric)", false, hllInputs, 3L, 0L},
+        {"ARRAYAGG(metric, 'INT')", false, arrayInputs, new IntArrayList(new int[]{1, 2, 2, 3}), new IntArrayList()}
+    };
+  }
+
+  @Test(dataProvider = "singleAggregations")
+  public void testSingleAggregationParity(String expression, boolean hasFinalInput, Supplier<Object[]> inputSupplier,
+      Object mergedResult, Object emptyResult) {
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      Map<Key, Object> eagerResults =
+          singleAggregationResults(expression, hasFinalInput, inputSupplier, false, executor);
+      Map<Key, Object> scalarResults =
+          singleAggregationResults(expression, hasFinalInput, inputSupplier, true, executor);
+      assertEquals(eagerResults.size(), 3);
+      assertEquals(scalarResults.keySet(), eagerResults.keySet());
+      for (String group : List.of("null-first", "null-last", "all-null")) {
+        Key key = new Key(new Object[]{group, 1d});
+        assertTrue(eagerResults.containsKey(key));
+        Object expectedResult = group.equals("all-null") ? emptyResult : mergedResult;
+        assertTrue(Objects.deepEquals(eagerResults.get(key), expectedResult), expression + ": " + group);
+        assertTrue(Objects.deepEquals(scalarResults.get(key), eagerResults.get(key)), expression + ": " + group);
+      }
+    } finally {
+      executor.shutdownNow();
+    }
   }
 
   @Test(dataProvider = "inputModes", timeOut = 30_000)
@@ -179,6 +239,37 @@ public class UnboundedConcurrentIndexedTableTest {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
         "SELECT COUNT(*) FROM testTable GROUP BY tv_id, weights");
     return new UnboundedConcurrentIndexedTable(newDataSchema(), hasFinalInput, queryContext, resultSize, 1, executor);
+  }
+
+  private Map<Key, Object> singleAggregationResults(String expression, boolean hasFinalInput,
+      Supplier<Object[]> inputSupplier, boolean scalarInput, ExecutorService executor) {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SET enableNullHandling=true; SELECT " + expression + " FROM testTable GROUP BY tv_id, weights");
+    ColumnDataType resultType = hasFinalInput
+        ? queryContext.getAggregationFunctions()[0].getFinalResultColumnType()
+        : queryContext.getAggregationFunctions()[0].getIntermediateResultColumnType();
+    DataSchema dataSchema = new DataSchema(new String[]{"tv_id", "weights", expression},
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.DOUBLE, resultType});
+    IndexedTable table = new UnboundedConcurrentIndexedTable(dataSchema, hasFinalInput, queryContext, 3, 1, executor);
+    Object[] nullFirstInputs = inputSupplier.get();
+    Object[] nullLastInputs = inputSupplier.get();
+    upsert(table, new Record(new Object[]{"null-first", 1d, null}), scalarInput);
+    upsert(table, new Record(new Object[]{"null-last", 1d, nullLastInputs[0]}), scalarInput);
+    upsert(table, new Record(new Object[]{"all-null", 1d, null}), scalarInput);
+    upsert(table, new Record(new Object[]{"rejected", 1d, inputSupplier.get()[0]}), scalarInput);
+    upsert(table, new Record(new Object[]{"null-first", 1d, nullFirstInputs[0]}), scalarInput);
+    upsert(table, new Record(new Object[]{"null-first", 1d, nullFirstInputs[1]}), scalarInput);
+    upsert(table, new Record(new Object[]{"null-last", 1d, nullLastInputs[1]}), scalarInput);
+    upsert(table, new Record(new Object[]{"null-last", 1d, null}), scalarInput);
+    upsert(table, new Record(new Object[]{"all-null", 1d, null}), scalarInput);
+    table.finish(false, true);
+    Map<Key, Object> results = new HashMap<>();
+    Iterator<Record> iterator = table.iterator();
+    while (iterator.hasNext()) {
+      Object[] values = iterator.next().getValues();
+      results.put(new Key(new Object[]{values[0], values[1]}), values[2]);
+    }
+    return results;
   }
 
   private DataSchema newDataSchema() {
