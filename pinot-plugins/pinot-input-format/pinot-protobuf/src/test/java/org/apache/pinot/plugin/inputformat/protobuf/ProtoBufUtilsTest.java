@@ -20,6 +20,7 @@ package org.apache.pinot.plugin.inputformat.protobuf;
 
 import com.google.protobuf.Descriptors;
 import java.net.URL;
+import java.net.URLClassLoader;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -54,7 +55,7 @@ public class ProtoBufUtilsTest {
   @Test
   public void testGetTypeStrFromProto() throws Exception {
     URL jarFile = getClass().getClassLoader().getResource("complex_types.jar");
-    ClassLoader clsLoader = ProtoBufCodeGenMessageDecoder.loadClass(jarFile.getPath());
+    ClassLoader clsLoader = new URLClassLoader(new URL[]{jarFile});
     Descriptors.Descriptor desc = ProtoBufCodeGenMessageDecoder.getDescriptorForProtoClass(clsLoader,
         "org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes$TestMessage");
     Assert.assertEquals(ProtoBufUtils.getFullJavaName(desc),
