@@ -193,7 +193,7 @@
     <jackson.version>2.22.3</jackson.version>
     <fory.version>1.7.3</fory.version>
     <zookeeper.version>3.9.6</zookeeper.version>
-    <async-http-client.version>3.0.14</async-http-client.version>
+    <async-http-client.version>3.0.13</async-http-client.version>
     <jersey.version>2.48</jersey.version>
     <hk2.version>2.6.1</hk2.version>
     <swagger.version>1.6.16</swagger.version>
@@ -238,6 +238,7 @@
     <plexus-classworlds.version>2.12.1</plexus-classworlds.version>
     <protobuf-dynamic.version>1.0.1</protobuf-dynamic.version>
     <localstack-utils.version>0.2.23</localstack-utils.version>
+    <jspecify.version>1.0.1</jspecify.version>
     <checker-qual.version>4.2.3</checker-qual.version>
     <groovy.version>3.0.25</groovy.version>
     <xml-apis.version>2.0.2</xml-apis.version>
@@ -693,6 +694,11 @@
         <version>${arrow.version}</version>
       </dependency>
 
+      <dependency>
+        <groupId>org.jspecify</groupId>
+        <artifactId>jspecify</artifactId>
+        <version>${jspecify.version}</version>
+      </dependency>
       <dependency>
         <groupId>org.checkerframework</groupId>
         <artifactId>checker-qual</artifactId>
