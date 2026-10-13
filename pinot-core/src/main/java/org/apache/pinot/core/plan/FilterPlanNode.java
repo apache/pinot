@@ -21,13 +21,16 @@ package org.apache.pinot.core.plan;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
+import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.request.context.predicate.JsonMatchPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
@@ -60,6 +63,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.creator.VectorBackendType;
@@ -73,6 +77,7 @@ import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -327,6 +332,9 @@ public class FilterPlanNode implements PlanNode {
                   jsonIndex =
                       (JsonIndexReader) dataSource.getIndex(compositeIndex.get());
                 }
+              }
+              if (jsonIndex == null && dataSource instanceof OpenStructDataSource) {
+                jsonIndex = sparseJsonIndexFor((OpenStructDataSource) dataSource, (JsonMatchPredicate) predicate);
               }
               Preconditions.checkState(jsonIndex != null, "Cannot apply JSON_MATCH on column: %s without json index",
                   column);
@@ -639,5 +647,79 @@ public class FilterPlanNode implements PlanNode {
     }
     return backendType.supportsMutableSegments() ? "vector_index_missing"
         : backendType.name().toLowerCase() + "_index_unavailable";
+  }
+
+  /// An OPEN_STRUCT column carries its JSON index on the sparse blob child rather than on the column, so
+  /// `dataSource.getJsonIndex()` finds nothing and JSON_MATCH would be refused outright. The blob is a real
+  /// JSON document of the keys that were left in the residual, so the index over it can answer a path --
+  /// but only a path whose data is actually in the blob.
+  ///
+  /// That is the whole subtlety. A materialized key is lifted out into its own dense column and is **not**
+  /// written to the blob, so a path naming one is simply absent from the index: the postings would say "no
+  /// document matches" and that answer would be wrong, silently. `props['key'] = v` never hits this because
+  /// [MapFilterOperator] resolves the key's own DataSource first and only takes the index when the key is
+  /// sparse; JSON_MATCH names its paths inside an opaque filter string, so the same check has to be done here.
+  ///
+  /// Returns the blob's index when every top-level key the filter names is sparse and indexed, and `null`
+  /// otherwise -- which leaves the existing refusal in place. Refusing is the right failure: JSON_MATCH has no
+  /// scan fallback, so the alternative to "cannot apply" would be a confidently empty answer.
+  @Nullable
+  private static JsonIndexReader sparseJsonIndexFor(OpenStructDataSource dataSource, JsonMatchPredicate predicate) {
+    JsonIndexReader sparseJsonIndex = dataSource.getSparseJsonIndex();
+    if (sparseJsonIndex == null) {
+      return null;
+    }
+    Set<String> paths = new HashSet<>();
+    try {
+      collectIdentifiers(RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression(predicate.getValue())),
+          paths);
+    } catch (Exception e) {
+      // An unparseable filter is the index reader's error to raise, with its own message. Declining here keeps
+      // this from turning into a confusing "without json index" instead.
+      return null;
+    }
+    if (paths.isEmpty()) {
+      return null;
+    }
+    for (String path : paths) {
+      if (dataSource.isMaterialized(topLevelKeyOf(path)) || !sparseJsonIndex.isPathIndexed(path)) {
+        return null;
+      }
+    }
+    return sparseJsonIndex;
+  }
+
+  /// The key a JSON path starts at: `$.items[0].promo.code` and `$.items` both belong to `items`. Anything that
+  /// does not name a key under the document root -- a bare `$`, a wildcard, an array index at the root -- yields
+  /// an empty key, which no column can claim is materialized, so such a path declines the index rather than
+  /// quietly matching a key it does not name.
+  private static String topLevelKeyOf(String jsonPath) {
+    String path = jsonPath.startsWith("$.") ? jsonPath.substring(2) : "";
+    int end = path.length();
+    for (int i = 0; i < path.length(); i++) {
+      char c = path.charAt(i);
+      if (c == '.' || c == '[') {
+        end = i;
+        break;
+      }
+    }
+    return path.substring(0, end);
+  }
+
+  private static void collectIdentifiers(FilterContext filter, Set<String> paths) {
+    List<FilterContext> children = filter.getChildren();
+    if (children != null) {
+      for (FilterContext child : children) {
+        collectIdentifiers(child, paths);
+      }
+      return;
+    }
+    Predicate predicate = filter.getPredicate();
+    if (predicate != null) {
+      ExpressionContext lhs = predicate.getLhs();
+      if (lhs.getType() == ExpressionContext.Type.IDENTIFIER) {
+        paths.add(lhs.getIdentifier());
+      }
+    }
   }
 }

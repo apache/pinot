@@ -26,6 +26,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.predicate.IsNullPredicate;
+import org.apache.pinot.common.request.context.predicate.JsonMatchPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.common.request.context.predicate.VectorSimilarityPredicate;
@@ -46,6 +47,7 @@ import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
+import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
@@ -53,6 +55,7 @@ import org.apache.pinot.segment.spi.index.reader.FilterAwareVectorIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
+import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
@@ -69,6 +72,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -794,5 +798,112 @@ public class FilterPlanNodeTest {
     ImmutableRoaringBitmap emptyBitmap = ImmutableRoaringBitmap.bitmapOf();
     when(reader.getDictIds(Mockito.anyString())).thenReturn(emptyBitmap);
     return reader;
+  }
+
+  /// An OPEN_STRUCT column keeps its JSON index on the sparse blob child, so `getJsonIndex()` is null and
+  /// JSON_MATCH used to be refused outright. It can be served from the blob's index -- but only for a path
+  /// whose data is really in the blob, which is what these four cases pin down.
+  private static SegmentContext openStructSegment(OpenStructDataSource dataSource) {
+    IndexSegment segment = mock(IndexSegment.class);
+    SegmentMetadata metadata = mock(SegmentMetadata.class);
+    when(metadata.getTotalDocs()).thenReturn(4);
+    when(segment.getSegmentMetadata()).thenReturn(metadata);
+    when(segment.getDataSource("props", null)).thenReturn(dataSource);
+    return new SegmentContext(segment);
+  }
+
+  private static QueryContext jsonMatchOn(String filterString) {
+    QueryContext queryContext = mock(QueryContext.class);
+    when(queryContext.getFilter()).thenReturn(FilterContext.forPredicate(
+        new JsonMatchPredicate(ExpressionContext.forIdentifier("props"), filterString, null)));
+    return queryContext;
+  }
+
+  private static OpenStructDataSource openStructWithSparseIndex(JsonIndexReader jsonIndex) {
+    OpenStructDataSource dataSource = mock(OpenStructDataSource.class);
+    when(dataSource.getSparseJsonIndex()).thenReturn(jsonIndex);
+    return dataSource;
+  }
+
+  @Test
+  public void testJsonMatchOnAnOpenStructColumnIsServedByTheSparseBlobIndex() {
+    JsonIndexReader jsonIndex = mock(JsonIndexReader.class);
+    when(jsonIndex.getMatchingDocIds(anyString(), any())).thenReturn(bitmapOf(1, 3));
+    // Mockito answers false for an unstubbed boolean, including an interface default that returns true.
+    when(jsonIndex.isPathIndexed(anyString())).thenReturn(true);
+    OpenStructDataSource dataSource = openStructWithSparseIndex(jsonIndex);
+    when(dataSource.isMaterialized("items")).thenReturn(false);
+
+    Assert.assertEquals(getFilteredDocIds(new FilterPlanNode(openStructSegment(dataSource),
+        jsonMatchOn("\"$.items[0].promo.code\" = 'P0'")).run()), bitmapOf(1, 3));
+  }
+
+  /// The case that makes the guard worth having. A materialized key is lifted into its own dense column and is
+  /// never written to the blob, so the blob's index holds no postings for it -- serving this from the index
+  /// would answer "no documents match" with total confidence and be wrong. Refusing is the correct outcome.
+  @Test
+  public void testJsonMatchOnAMaterializedKeyIsRefusedRatherThanAnsweredFromTheBlob() {
+    JsonIndexReader jsonIndex = mock(JsonIndexReader.class);
+    when(jsonIndex.isPathIndexed(anyString())).thenReturn(true);
+    OpenStructDataSource dataSource = openStructWithSparseIndex(jsonIndex);
+    when(dataSource.isMaterialized("page_type")).thenReturn(true);
+
+    try {
+      new FilterPlanNode(openStructSegment(dataSource), jsonMatchOn("\"$.page_type\" = 'HOME'")).run();
+      Assert.fail("a materialized key is absent from the blob, so the index must not be allowed to answer it");
+    } catch (IllegalStateException e) {
+      Assert.assertTrue(e.getMessage().contains("without json index"), e.getMessage());
+    }
+    verify(jsonIndex, never()).getMatchingDocIds(anyString(), any());
+  }
+
+  /// A composite index is told which paths to hold. One it was not told about has no postings either, and the
+  /// same reasoning applies.
+  @Test
+  public void testJsonMatchOnAPathTheSparseIndexDoesNotHoldIsRefused() {
+    JsonIndexReader jsonIndex = mock(JsonIndexReader.class);
+    when(jsonIndex.isPathIndexed(anyString())).thenReturn(false);
+    OpenStructDataSource dataSource = openStructWithSparseIndex(jsonIndex);
+    when(dataSource.isMaterialized("items")).thenReturn(false);
+
+    try {
+      new FilterPlanNode(openStructSegment(dataSource), jsonMatchOn("\"$.items[0].code\" = 'P0'")).run();
+      Assert.fail("an unindexed path has no postings, so it must not be served");
+    } catch (IllegalStateException e) {
+      Assert.assertTrue(e.getMessage().contains("without json index"), e.getMessage());
+    }
+  }
+
+  /// Every path in the filter has to clear the bar, not just the first one read: an AND of a sparse path and a
+  /// materialized one is still partly unanswerable, and a half-right postings list is the thing to avoid.
+  @Test
+  public void testJsonMatchIsRefusedWhenAnyOneOfSeveralPathsIsMaterialized() {
+    JsonIndexReader jsonIndex = mock(JsonIndexReader.class);
+    when(jsonIndex.isPathIndexed(anyString())).thenReturn(true);
+    OpenStructDataSource dataSource = openStructWithSparseIndex(jsonIndex);
+    when(dataSource.isMaterialized("user_tier")).thenReturn(false);
+    when(dataSource.isMaterialized("page_type")).thenReturn(true);
+
+    try {
+      new FilterPlanNode(openStructSegment(dataSource),
+          jsonMatchOn("\"$.user_tier\" = 'gold' AND \"$.page_type\" = 'HOME'")).run();
+      Assert.fail("one materialized path is enough to make the whole filter unanswerable from the blob");
+    } catch (IllegalStateException e) {
+      Assert.assertTrue(e.getMessage().contains("without json index"), e.getMessage());
+    }
+    verify(jsonIndex, never()).getMatchingDocIds(anyString(), any());
+  }
+
+  /// With no index on the blob at all, nothing changes: the column is refused exactly as before.
+  @Test
+  public void testJsonMatchStillRefusesAnOpenStructColumnWithNoSparseIndex() {
+    OpenStructDataSource dataSource = openStructWithSparseIndex(null);
+
+    try {
+      new FilterPlanNode(openStructSegment(dataSource), jsonMatchOn("\"$.items[0].code\" = 'P0'")).run();
+      Assert.fail("there is no index to serve the predicate");
+    } catch (IllegalStateException e) {
+      Assert.assertTrue(e.getMessage().contains("without json index"), e.getMessage());
+    }
   }
 }
