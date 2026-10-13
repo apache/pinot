@@ -21,16 +21,15 @@ package org.apache.pinot.controller.api.resources;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.helix.zookeeper.zkclient.exception.ZkMarshallingError;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
@@ -46,6 +45,7 @@ import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -276,7 +276,7 @@ public class PinotSegmentRestletResourceTest {
   public void testUpdateSegmentZKMetadataCustomMapRejectsNestedPath() {
     String modifier = new SegmentZKMetadataCustomMapModifier(
         SegmentZKMetadataCustomMapModifier.ModifyMode.UPDATE, Map.of("key", "value")).toJsonString();
-    for (String segmentName : List.of("nested%2Fsegment", "nested%5Csegment", "")) {
+    for (String segmentName : List.of("nested%2Fsegment", "")) {
       ControllerApplicationException exception = expectThrows(ControllerApplicationException.class,
           () -> _pinotSegmentRestletResource.updateSegmentZKMetadataCustomMap("testTable_OFFLINE", segmentName,
               "123", new ByteArrayInputStream(modifier.getBytes(StandardCharsets.UTF_8)), null));
@@ -286,6 +286,46 @@ public class PinotSegmentRestletResourceTest {
         () -> _pinotSegmentRestletResource.updateSegmentZKMetadataCustomMap("nested/table_OFFLINE", "segment",
             "123", new ByteArrayInputStream(modifier.getBytes(StandardCharsets.UTF_8)), null));
     assertEquals(invalidTable.getResponse().getStatus(), 400);
+    verify(_pinotHelixResourceManager, never()).getSegmentMetadataZnRecord(any(), any());
+  }
+
+  @Test
+  public void testUpdateSegmentZKMetadataCustomMapDecodesPathComponent() {
+    String tableNameWithType = "testTable_OFFLINE";
+    String modifier = new SegmentZKMetadataCustomMapModifier(
+        SegmentZKMetadataCustomMapModifier.ModifyMode.UPDATE, Map.of("key", "value")).toJsonString();
+    Map<String, String> encodedToDecoded = Map.of(
+        "segment+plus", "segment+plus", "segment%2Bplus", "segment+plus",
+        "segment%20space", "segment space", "segment%25percent", "segment%percent");
+    for (Map.Entry<String, String> entry : encodedToDecoded.entrySet()) {
+      SegmentZKMetadata metadata = new SegmentZKMetadata(entry.getValue());
+      metadata.setCrc(123L);
+      ZNRecord record = metadata.toZNRecord();
+      record.setVersion(7);
+      when(_pinotHelixResourceManager.getSegmentMetadataZnRecord(tableNameWithType, entry.getValue()))
+          .thenReturn(record);
+      when(_pinotHelixResourceManager.updateZkMetadataWithoutDataChange(eq(tableNameWithType), any(), eq(7)))
+          .thenReturn(true);
+
+      _pinotSegmentRestletResource.updateSegmentZKMetadataCustomMap(tableNameWithType, entry.getKey(), "123",
+          new ByteArrayInputStream(modifier.getBytes(StandardCharsets.UTF_8)), null);
+
+      verify(_pinotHelixResourceManager).getSegmentMetadataZnRecord(tableNameWithType, entry.getValue());
+      clearInvocations(_pinotHelixResourceManager);
+    }
+  }
+
+  @Test
+  public void testUpdateSegmentZKMetadataCustomMapRejectsOversizedModifier() {
+    String modifier = new SegmentZKMetadataCustomMapModifier(
+        SegmentZKMetadataCustomMapModifier.ModifyMode.UPDATE, Map.of("key", "x".repeat(64 * 1024)))
+        .toJsonString();
+
+    ControllerApplicationException exception = expectThrows(ControllerApplicationException.class,
+        () -> _pinotSegmentRestletResource.updateSegmentZKMetadataCustomMap("testTable_OFFLINE", "segment", "123",
+            new ByteArrayInputStream(modifier.getBytes(StandardCharsets.UTF_8)), null));
+
+    assertEquals(exception.getResponse().getStatus(), 413);
     verify(_pinotHelixResourceManager, never()).getSegmentMetadataZnRecord(any(), any());
   }
 
@@ -315,7 +355,7 @@ public class PinotSegmentRestletResourceTest {
   }
 
   @Test
-  public void testUpdateSegmentZKMetadataCustomMapRejectsOversizedRecord() {
+  public void testUpdateSegmentZKMetadataCustomMapDoesNotAddRecordSizeLimit() {
     String tableNameWithType = "testTable_OFFLINE";
     String segmentName = "testSegment";
     SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
@@ -325,16 +365,16 @@ public class PinotSegmentRestletResourceTest {
     segmentMetadataRecord.setVersion(7);
     when(_pinotHelixResourceManager.getSegmentMetadataZnRecord(tableNameWithType, segmentName))
         .thenReturn(segmentMetadataRecord);
+    when(_pinotHelixResourceManager.updateZkMetadataWithoutDataChange(eq(tableNameWithType), any(), eq(7)))
+        .thenReturn(true);
     String modifier = new SegmentZKMetadataCustomMapModifier(
         SegmentZKMetadataCustomMapModifier.ModifyMode.UPDATE, Map.of("task.lastProcessedTime", "1234"))
         .toJsonString();
 
-    ControllerApplicationException exception = expectThrows(ControllerApplicationException.class,
-        () -> _pinotSegmentRestletResource.updateSegmentZKMetadataCustomMap(tableNameWithType, segmentName, "123",
-            new ByteArrayInputStream(modifier.getBytes(StandardCharsets.UTF_8)), null));
+    _pinotSegmentRestletResource.updateSegmentZKMetadataCustomMap(tableNameWithType, segmentName, "123",
+        new ByteArrayInputStream(modifier.getBytes(StandardCharsets.UTF_8)), null);
 
-    assertEquals(exception.getResponse().getStatus(), 413);
-    verify(_pinotHelixResourceManager, never()).updateZkMetadataWithoutDataChange(eq(tableNameWithType), any(), eq(7));
+    verify(_pinotHelixResourceManager).updateZkMetadataWithoutDataChange(eq(tableNameWithType), any(), eq(7));
   }
 
   @Test
@@ -343,13 +383,12 @@ public class PinotSegmentRestletResourceTest {
     String segmentName = "testSegment";
     SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
     segmentZKMetadata.setCrc(123L);
-    byte[] randomBytes = new byte[1_100_000];
-    new Random(0).nextBytes(randomBytes);
-    segmentZKMetadata.getSimpleFields().put("oversized", Base64.getEncoder().encodeToString(randomBytes));
     ZNRecord segmentMetadataRecord = segmentZKMetadata.toZNRecord();
     segmentMetadataRecord.setVersion(7);
     when(_pinotHelixResourceManager.getSegmentMetadataZnRecord(tableNameWithType, segmentName))
         .thenReturn(segmentMetadataRecord);
+    when(_pinotHelixResourceManager.updateZkMetadataWithoutDataChange(eq(tableNameWithType), any(), eq(7)))
+        .thenThrow(new ZkMarshallingError("ZNRecord exceeds the serializer write limit"));
     String modifier = new SegmentZKMetadataCustomMapModifier(
         SegmentZKMetadataCustomMapModifier.ModifyMode.UPDATE, Map.of("task.lastProcessedTime", "1234"))
         .toJsonString();
@@ -359,7 +398,7 @@ public class PinotSegmentRestletResourceTest {
             new ByteArrayInputStream(modifier.getBytes(StandardCharsets.UTF_8)), null));
 
     assertEquals(exception.getResponse().getStatus(), 413);
-    verify(_pinotHelixResourceManager, never()).updateZkMetadataWithoutDataChange(eq(tableNameWithType), any(), eq(7));
+    verify(_pinotHelixResourceManager).updateZkMetadataWithoutDataChange(eq(tableNameWithType), any(), eq(7));
   }
 
   private List<String> getSegmentForPartition(String tableName, int partitionID, int sequenceNumberOffset,
