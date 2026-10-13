@@ -755,11 +755,10 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       } catch (Throwable t) {
         LOGGER.warn("Caught exception cancelling request {} via SubmitWithStream", cancel.getRequestId(), t);
       }
-      // Once this stream's request is cancelled, no further meaningful OpChainComplete reports will arrive — in
-      // particular, opchains cancelled before they register never fire the completion listener, so _completedOpChains
-      // would never reach _expectedOpChains and ServerDone would never be sent. Close the stream promptly so the
-      // broker stops waiting out its full drain window. Gated on the ack so the broker still sees submit_ack before
-      // ServerDone; cleanupListener and sendDoneAndComplete are both idempotent, so racing onOpChainComplete is safe.
+      // Once this stream's request is cancelled, no further meaningful OpChainComplete reports will arrive. Close the
+      // stream promptly so the broker stops waiting out its full drain window. Gated on the ack so the broker still
+      // sees submit_ack before ServerDone; cleanupListener and sendDoneAndComplete are both idempotent, so racing
+      // onOpChainComplete is safe.
       if (cancel.getRequestId() == _requestId) {
         _ackSentFuture.thenRun(() -> {
           cleanupListener();

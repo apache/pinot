@@ -332,11 +332,10 @@ public class QueryRunner {
       // This can fail if the executor rejects the task.
       _opChainScheduler.register(opChain);
     } catch (RuntimeException e) {
-      // register() can fail after the op chain was built — the query was cancelled/terminated before scheduling
-      // (checkTermination / cancelled-query cache), or the executor rejected the task (e.g. under load shedding). In
-      // those cases the op chain is never scheduled, so the scheduler's FutureCallback, which normally close()s the
-      // chain on completion, never fires — leaking any operator resources that are released only in close(). Close the
-      // built chain here (idempotent; guarded so a close failure cannot mask the original error).
+      // register() can fail after the op chain was built, when the executor rejects the task (e.g. under load
+      // shedding). In that case the op chain is never scheduled, so the scheduler's FutureCallback, which normally
+      // close()s the chain on completion, never fires — leaking any operator resources that are released only in
+      // close(). Close the built chain here (idempotent; guarded so a close failure cannot mask the original error).
       if (opChain != null) {
         try {
           opChain.close();

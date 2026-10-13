@@ -259,16 +259,18 @@ public class QueryThreadContext implements AutoCloseable {
   }
 
   /// Returns a new [ExecutorService] whose tasks will be executed with the [QueryThreadContext] initialized with the
-  /// state of the thread submitting the tasks. Tasks are registered for cancellation when the query is terminated.
+  /// state of the thread submitting the tasks. The [Future] of each task passed to `submit()` is registered for
+  /// cancellation when the query is terminated. Tasks passed to `execute()` are not registered.
   public static ExecutorService contextAwareExecutorService(ExecutorService executorService) {
     return contextAwareExecutorService(executorService, true);
   }
 
   /// Returns a new [ExecutorService] whose tasks will be executed with the [QueryThreadContext] initialized with the
   /// state of the thread submitting the tasks.
-  /// @param registerTaskForCancellation If true, tasks are registered with QueryExecutionContext.addTask() and will
-  ///                                    be cancelled (via Thread.interrupt()) when the query is terminated. Set to
-  ///                                    false for executors where interrupt could cause corruption
+  /// @param registerTaskForCancellation If true, tasks passed to `submit()` are registered with
+  ///                                    QueryExecutionContext.addTask() and will be cancelled (via Thread.interrupt())
+  ///                                    when the query is terminated. Set to false for executors where interrupt could
+  ///                                    cause corruption
   public static ExecutorService contextAwareExecutorService(ExecutorService executorService,
       boolean registerTaskForCancellation) {
     Consumer<Future<?>> onSubmit = registerTaskForCancellation
