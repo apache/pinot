@@ -250,7 +250,7 @@ public class PinotSegmentRecordReader implements RecordReader {
       }
 
       _skipDefaultNullValues = skipDefaultNullValues;
-      _primaryKeyColumns = primaryKeyColumns == null ? null : new HashSet<>(primaryKeyColumns);
+      _primaryKeyColumns = primaryKeyColumns == null ? new HashSet<>() : new HashSet<>(primaryKeyColumns);
     }
   }
 
