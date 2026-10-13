@@ -172,14 +172,19 @@ public class JsonUtilsTest {
     List<Object> withinLimits = List.of(Map.of(maxName, "v"), Map.of("s", maxString),
         Map.of("n", new BigInteger(maxDigits), "neg", new BigInteger("-" + maxDigits)),
         JsonNodeFactory.instance.objectNode().put(maxName, new BigInteger("-" + maxDigits)),
-        Map.of("d", new BigDecimal("1." + maxDigits.substring(1))), nestedMap(maxDepth), nestedList(maxDepth),
-        nestedArray(maxDepth), nestedJsonNode(maxDepth), nestedObjectNode(maxDepth),
-        Map.of("node", nestedJsonNode(maxDepth - 1)));
+        Map.of("d", new BigDecimal("1." + maxDigits.substring(1))));
     for (int i = 0; i < withinLimits.size(); i++) {
       Object value = withinLimits.get(i);
       assertTrue(JsonUtils.canFlattenParsedValue(value), "withinLimits[" + i + "]");
       assertEqualsNoOrder(flattenParsed(value, config).toArray(),
           JsonUtils.flatten(forwardValue(value), config).toArray(), "withinLimits[" + i + "]");
+    }
+    // Documents nested this deep are only classified: serializing and flattening them recursively (on either path) can
+    // need more stack than a test thread has.
+    List<Object> deepWithinLimits = List.of(nestedMap(maxDepth), nestedList(maxDepth), nestedArray(maxDepth),
+        nestedJsonNode(maxDepth), nestedObjectNode(maxDepth), Map.of("node", nestedJsonNode(maxDepth - 1)));
+    for (int i = 0; i < deepWithinLimits.size(); i++) {
+      assertTrue(JsonUtils.canFlattenParsedValue(deepWithinLimits.get(i)), "deepWithinLimits[" + i + "]");
     }
 
     JsonIndexConfig skipInvalidJson = new JsonIndexConfig();
@@ -190,7 +195,6 @@ public class JsonUtilsTest {
     assertEquals(flattenParsed(decimalDocument, skipInvalidJson),
         JsonUtils.flatten(forwardValue(decimalDocument), skipInvalidJson));
 
-    // Objects nested one level deeper than the limit can still be serialized, so they are cached.
     String longName = maxName + "k";
     String longDigits = maxDigits + "9";
     List<Object> exceedingLimits = List.of(Map.of("ok", "v", longName, "v"), Map.of("ok", "v", "s", maxString + "s"),
@@ -198,8 +202,7 @@ public class JsonUtilsTest {
         new Object[]{Map.of(longName, 1)}, JsonNodeFactory.instance.objectNode().put("ok", "v").put(longName, "v"),
         JsonNodeFactory.instance.arrayNode().add(maxString + "s"),
         JsonNodeFactory.instance.objectNode().put("ok", "v").put("n", new BigInteger(longDigits)),
-        Map.of("node", JsonNodeFactory.instance.objectNode().put(longName, "v")), nestedMap(maxDepth + 1),
-        nestedObjectNode(maxDepth + 1));
+        Map.of("node", JsonNodeFactory.instance.objectNode().put(longName, "v")));
     for (int i = 0; i < exceedingLimits.size(); i++) {
       assertFalse(JsonUtils.canFlattenParsedValue(exceedingLimits.get(i)), "exceedingLimits[" + i + "]");
       assertSkippedOnBothPaths(exceedingLimits.get(i), config, skipInvalidJson);
@@ -214,6 +217,17 @@ public class JsonUtilsTest {
     for (int i = 0; i < decimalsExceedingLimits.size(); i++) {
       assertTrue(JsonUtils.canFlattenParsedValue(decimalsExceedingLimits.get(i)), "decimalsExceedingLimits[" + i + "]");
       assertSkippedOnBothPaths(decimalsExceedingLimits.get(i), config, skipInvalidJson);
+    }
+
+    // Objects nested one level deeper than the limit can still be serialized, so they are cached, but the string path
+    // rejects their forward value. Build that forward value directly instead of serializing such a deep document.
+    String deepForwardValue = "{\"a\":".repeat(maxDepth + 1) + "\"v\"" + "}".repeat(maxDepth + 1);
+    assertEquals(JsonUtils.flatten(deepForwardValue, skipInvalidJson), JsonUtils.SKIPPED_FLATTENED_RECORD);
+    for (Object value : List.of(nestedMap(maxDepth + 1), nestedObjectNode(maxDepth + 1))) {
+      assertFalse(JsonUtils.canFlattenParsedValue(value));
+      assertEquals(JsonUtils.flattenParsed(value, deepForwardValue, skipInvalidJson),
+          JsonUtils.SKIPPED_FLATTENED_RECORD);
+      assertThrows(IOException.class, () -> JsonUtils.flattenParsed(value, deepForwardValue, config));
     }
 
     // An array nested deeper than the limit cannot be serialized, so the value has no forward value and is not cached.

@@ -178,23 +178,17 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
   }
 
   /// A document whose forward value the string path cannot parse (here a name, an integer, or a decimal longer than
-  /// Jackson's limits, or objects nested deeper than its limit) must not be indexed from its cached parsed value: with
-  /// `skipInvalidJson`, the immutable index built from the forward value after sealing skips the whole document, so
-  /// the consuming index must skip it as well.
+  /// Jackson's limits) must not be indexed from its cached parsed value: with `skipInvalidJson`, the immutable index
+  /// built from the forward value after sealing skips the whole document, so the consuming index must skip it as well.
   @Test
   public void testMutableJsonIndexCachedValueRespectsParserConstraints()
       throws Exception {
     StreamReadConstraints constraints = StreamReadConstraints.defaults();
     String longName = "k".repeat(constraints.getMaxNameLength() + 1);
     String longInteger = "9".repeat(constraints.getMaxNumberLength() + 1);
-    Object deepObject = "v";
-    for (int i = 0; i < constraints.getMaxNestingDepth(); i++) {
-      deepObject = Map.of("a", deepObject);
-    }
     List<Object> docs = List.of(Map.of("ok", "v", longName, "v"), Map.of("ok", "v", "n", new BigInteger(longInteger)),
         JsonNodeFactory.instance.objectNode().put("ok", "v").put(longName, "v"),
-        Map.of("ok", "v", "d", new BigDecimal("1." + longInteger.substring(1))), Map.of("ok", "v", "deep", deepObject),
-        Map.of("ok", "v"));
+        Map.of("ok", "v", "d", new BigDecimal("1." + longInteger.substring(1))), Map.of("ok", "v"));
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("col", DataType.JSON).build();
     TableConfig withIndex = new TableConfigBuilder(TableType.REALTIME).setTableName("table")
         .setJsonIndexColumns(List.of("col")).build();
@@ -223,12 +217,12 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
       File indexFile = new File(INDEX_DIR, ON_HEAP_COLUMN_NAME + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
       try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(indexFile);
           JsonIndexReader sealed = new ImmutableJsonIndexReader(buffer, docs.size())) {
-        assertDocIds(sealed, "ok='v'", ids(5));
+        assertDocIds(sealed, "ok='v'", ids(4));
         for (String filter : new String[]{"ok='v'", "n='" + longInteger + "'"}) {
           assertEquals(consuming.getMatchingDocIds(filter), sealed.getMatchingDocIds(filter), "filter: " + filter);
         }
         Map<String, RoaringBitmap> skipped = getMatchingDocsMap(sealed, "$");
-        assertEquals(skipped, Map.of(JsonUtils.SKIPPED_VALUE_REPLACEMENT, RoaringBitmap.bitmapOf(0, 1, 2, 3, 4)));
+        assertEquals(skipped, Map.of(JsonUtils.SKIPPED_VALUE_REPLACEMENT, RoaringBitmap.bitmapOf(0, 1, 2, 3)));
         assertEquals(consuming.getMatchingFlattenedDocsMap("$", null), skipped);
       }
     }
