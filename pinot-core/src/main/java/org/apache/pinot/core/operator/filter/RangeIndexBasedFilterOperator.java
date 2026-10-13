@@ -26,6 +26,7 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
+import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.traits.DoubleRange;
 import org.apache.pinot.core.operator.filter.predicate.traits.DoubleValue;
@@ -85,7 +86,7 @@ public class RangeIndexBasedFilterOperator extends BaseColumnFilterOperator {
     if (_rangeIndexReader.isExact()) {
       ImmutableRoaringBitmap matches = getMatchingDocIds();
       recordFilter(matches);
-      return new BitmapDocIdSet(matches, _numDocs);
+      return BitmapDocIdSet.create(matches, _numDocs);
     }
     return evaluateLegacyRangeFilter();
   }
@@ -98,7 +99,7 @@ public class RangeIndexBasedFilterOperator extends BaseColumnFilterOperator {
     ImmutableRoaringBitmap partialMatches = getPartiallyMatchingDocIds();
     // this branch is likely until RangeIndexReader reimplemented and enabled by default
     if (partialMatches == null) {
-      return new BitmapDocIdSet(matches == null ? new MutableRoaringBitmap() : matches, _numDocs);
+      return matches != null ? BitmapDocIdSet.create(matches, _numDocs) : EmptyDocIdSet.unscanned();
     }
     // Need to scan the first and last range as they might be partially matched
     ScanBasedFilterOperator scanBasedFilterOperator =
@@ -109,13 +110,7 @@ public class RangeIndexBasedFilterOperator extends BaseColumnFilterOperator {
       docIds.or(matches);
     }
     recordFilter(matches);
-    return new BitmapDocIdSet(docIds, _numDocs) {
-      // Override this method to reflect the entries scanned
-      @Override
-      public long getNumEntriesScannedInFilter() {
-        return scanBasedDocIdSet.getNumEntriesScannedInFilter();
-      }
-    };
+    return BitmapDocIdSet.create(docIds, _numDocs, scanBasedDocIdSet.getNumEntriesScannedInFilter());
   }
 
   ImmutableRoaringBitmap getMatchingDocIds() {

@@ -1,0 +1,360 @@
+{
+  "idset_filters": {
+    "comments": "IDSET builds the set in the multi-stage engine and IN_ID_SET consumes it, compared with the equivalent IN subquery in H2. A scalar subquery as the IdSet argument is joined in, so IN_ID_SET runs as a scalar function above the join; a literal IdSet on base table columns runs in the leaf stage. The STRING, BYTES, FLOAT and DOUBLE sets are Bloom filters, sized so that these few values cannot produce false positives.",
+    "tables": {
+      "tbl": {
+        "schema": [
+          {"name": "intCol", "type": "INT"},
+          {"name": "longCol", "type": "LONG"},
+          {"name": "floatCol", "type": "FLOAT"},
+          {"name": "doubleCol", "type": "DOUBLE"},
+          {"name": "strCol", "type": "STRING"},
+          {"name": "bytesCol", "type": "BYTES"},
+          {"name": "boolCol", "type": "BOOLEAN"},
+          {"name": "tsCol", "type": "TIMESTAMP"},
+          {"name": "grp", "type": "STRING"}
+        ],
+        "inputs": [
+          [1, 10000000001, 1.5, 1.25, "a", "AA01", true, "2020-01-01 00:00:00", "g1"],
+          [2, 10000000002, 2.5, 2.25, "b", "AA02", true, "2020-01-02 00:00:00", "g1"],
+          [3, 10000000003, 3.5, 3.25, "c", "AA03", false, "2020-01-03 00:00:00", "g1"],
+          [4, 10000000004, 4.5, 4.25, "d", "AA04", false, "2020-01-04 00:00:00", "g2"],
+          ["------"],
+          [5, 10000000005, 5.5, 5.25, "e", "AA05", true, "2020-01-05 00:00:00", "g2"],
+          [6, 10000000006, 6.5, 6.25, "f", "AA06", false, "2020-01-06 00:00:00", "g2"]
+        ]
+      },
+      "tbl2": {
+        "schema": [
+          {"name": "intCol", "type": "INT"},
+          {"name": "longCol", "type": "LONG"},
+          {"name": "floatCol", "type": "FLOAT"},
+          {"name": "doubleCol", "type": "DOUBLE"},
+          {"name": "strCol", "type": "STRING"},
+          {"name": "bytesCol", "type": "BYTES"},
+          {"name": "boolCol", "type": "BOOLEAN"},
+          {"name": "tsCol", "type": "TIMESTAMP"},
+          {"name": "grp", "type": "STRING"}
+        ],
+        "inputs": [
+          [2, 10000000002, 2.5, 2.25, "b", "AA02", true, "2020-01-02 00:00:00", "g1"],
+          [3, 10000000003, 3.5, 3.25, "c", "AA03", false, "2020-01-03 00:00:00", "g1"],
+          [4, 10000000004, 4.5, 4.25, "d", "AA04", true, "2020-01-04 00:00:00", "g2"],
+          ["------"],
+          [7, 10000000007, 7.5, 7.25, "g", "AA07", false, "2020-01-07 00:00:00", "g2"],
+          [8, 10000000008, 8.5, 8.25, "h", "AA08", true, "2020-01-08 00:00:00", "g3"],
+          [2, 10000000002, 2.5, 2.25, "b", "AA02", false, "2020-01-02 00:00:00", "g3"],
+          [9, 10000000009, 9.5, 9.25, "i", "AA09", false, "2020-01-09 00:00:00", "g4"],
+          [10, 10000000010, 10.5, 10.25, "j", "AA10", true, "2020-01-10 00:00:00", "g4"],
+          [11, 10000000011, 11.5, 11.25, "k", "AA11", true, "2020-01-11 00:00:00", "g4"]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "INT set (RoaringBitmap) from a scalar subquery",
+        "sql": "SELECT COUNT(*) FROM {tbl2} WHERE IN_ID_SET(intCol, (SELECT IDSET(intCol) FROM {tbl} WHERE grp = 'g1')) = 1",
+        "h2Sql": "SELECT COUNT(*) FROM {tbl2} WHERE intCol IN (SELECT intCol FROM {tbl} WHERE grp = 'g1')"
+      },
+      {
+        "description": "INT set (RoaringBitmap), negated",
+        "sql": "SELECT COUNT(*) FROM {tbl2} WHERE IN_ID_SET(intCol, (SELECT IDSET(intCol) FROM {tbl} WHERE grp = 'g1')) = 0",
+        "h2Sql": "SELECT COUNT(*) FROM {tbl2} WHERE intCol NOT IN (SELECT intCol FROM {tbl} WHERE grp = 'g1')"
+      },
+      {
+        "description": "INT set forced into a Bloom filter",
+        "sql": "SELECT COUNT(*) FROM {tbl2} WHERE IN_ID_SET(intCol, (SELECT IDSET(intCol, 'sizeThresholdInBytes=0;expectedInsertions=100;fpp=0.0001') FROM {tbl} WHERE grp = 'g2')) = 1",
+        "h2Sql": "SELECT COUNT(*) FROM {tbl2} WHERE intCol IN (SELECT intCol FROM {tbl} WHERE grp = 'g2')"
+      },
+      {
+        "description": "LONG set (Roaring64NavigableMap)",
+        "sql": "SELECT COUNT(*) FROM {tbl2} WHERE IN_ID_SET(longCol, (SELECT IDSET(longCol) FROM {tbl} WHERE grp = 'g1')) = 1",
+        "h2Sql": "SELECT COUNT(*) FROM {tbl2} WHERE longCol IN (SELECT longCol FROM {tbl} WHERE grp = 'g1')"
+      },
+      {
+        "description": "FLOAT set (Bloom filter)",
+        "sql": "SELECT COUNT(*) FROM {tbl2} WHERE IN_ID_SET(floatCol, (SELECT IDSET(floatCol, 'expectedInsertions=100;fpp=0.0001') FROM {tbl} WHERE grp = 'g1')) = 1",
+        "h2Sql": "SELECT COUNT(*) FROM {tbl2} WHERE floatCol IN (SELECT floatCol FROM {tbl} WHERE grp = 'g1')"
+      },
+      {
+        "description": "DOUBLE set (Bloom filter)",
+        "sql": "SELECT COUNT(*) FROM {tbl2} WHERE IN_ID_SET(doubleCol, (SELECT IDSET(doubleCol, 'expectedInsertions=100;fpp=0.0001') FROM {tbl} WHERE grp = 'g2')) = 1",
+        "h2Sql": "SELECT COUNT(*) FROM {tbl2} WHERE doubleCol IN (SELECT doubleCol FROM {tbl} WHERE grp = 'g2')"
+      },
+      {
+        "description": "STRING set (Bloom filter)",
+        "sql": "SELECT COUNT(*) FROM {tbl2} WHERE IN_ID_SET(strCol, (SELECT IDSET(strCol, 'expectedInsertions=100;fpp=0.0001') FROM {tbl} WHERE grp = 'g1')) = 1",
+        "h2Sql": "SELECT COUNT(*) FROM {tbl2} WHERE strCol IN (SELECT strCol FROM {tbl} WHERE grp = 'g1')"
+      },
+      {
+        "description": "A 9 MB STRING set crosses the mailbox in more than one chunk",
+        "sql": "SELECT COUNT(*) FROM {tbl2} WHERE IN_ID_SET(strCol, (SELECT IDSET(strCol, 'expectedInsertions=10000000;fpp=0.03') FROM {tbl} WHERE grp = 'g1')) = 1",
+        "h2Sql": "SELECT COUNT(*) FROM {tbl2} WHERE strCol IN (SELECT strCol FROM {tbl} WHERE grp = 'g1')"
+      },
+      {
+        "description": "BYTES set (Bloom filter)",
+        "sql": "SELECT COUNT(*) FROM {tbl2} WHERE IN_ID_SET(bytesCol, (SELECT IDSET(bytesCol, 'expectedInsertions=100;fpp=0.0001') FROM {tbl} WHERE grp = 'g2')) = 1",
+        "h2Sql": "SELECT COUNT(*) FROM {tbl2} WHERE bytesCol IN (SELECT bytesCol FROM {tbl} WHERE grp = 'g2')"
+      },
+      {
+        "description": "BOOLEAN set, looked up through the stored INT value",
+        "sql": "SELECT COUNT(*) FROM {tbl2} WHERE IN_ID_SET(boolCol, (SELECT IDSET(boolCol) FROM {tbl} WHERE intCol = 1)) = 1",
+        "h2Sql": "SELECT COUNT(*) FROM {tbl2} WHERE boolCol IN (SELECT boolCol FROM {tbl} WHERE intCol = 1)"
+      },
+      {
+        "description": "TIMESTAMP set, looked up through the stored LONG value",
+        "sql": "SELECT COUNT(*) FROM {tbl2} WHERE IN_ID_SET(tsCol, (SELECT IDSET(tsCol) FROM {tbl} WHERE grp = 'g1')) = 1",
+        "h2Sql": "SELECT COUNT(*) FROM {tbl2} WHERE tsCol IN (SELECT tsCol FROM {tbl} WHERE grp = 'g1')"
+      },
+      {
+        "description": "A subquery that matches no rows yields a NULL set with null handling on, which holds no ids",
+        "sql": "SELECT COUNT(*) FROM {tbl2} WHERE IN_ID_SET(intCol, (SELECT IDSET(intCol) FROM {tbl} WHERE intCol < 0)) = 1",
+        "h2Sql": "SELECT COUNT(*) FROM {tbl2} WHERE intCol IN (SELECT intCol FROM {tbl} WHERE intCol < 0)"
+      },
+      {
+        "description": "A subquery that matches no rows yields a NULL set with null handling on, negated",
+        "sql": "SELECT COUNT(*) FROM {tbl2} WHERE IN_ID_SET(intCol, (SELECT IDSET(intCol) FROM {tbl} WHERE intCol < 0)) = 0",
+        "h2Sql": "SELECT COUNT(*) FROM {tbl2} WHERE intCol NOT IN (SELECT intCol FROM {tbl} WHERE intCol < 0)"
+      },
+      {
+        "description": "A subquery that matches no rows yields an empty set with null handling off",
+        "sql": "SET enableNullHandling=false; SELECT COUNT(*) FROM {tbl2} WHERE IN_ID_SET(intCol, (SELECT IDSET(intCol) FROM {tbl} WHERE intCol < 0)) = 1",
+        "h2Sql": "SELECT COUNT(*) FROM {tbl2} WHERE intCol IN (SELECT intCol FROM {tbl} WHERE intCol < 0)"
+      },
+      {
+        "description": "A subquery that matches no rows yields an empty set with null handling off, negated",
+        "sql": "SET enableNullHandling=false; SELECT COUNT(*) FROM {tbl2} WHERE IN_ID_SET(intCol, (SELECT IDSET(intCol) FROM {tbl} WHERE intCol < 0)) = 0",
+        "h2Sql": "SELECT COUNT(*) FROM {tbl2} WHERE intCol NOT IN (SELECT intCol FROM {tbl} WHERE intCol < 0)"
+      },
+      {
+        "description": "Correlated subquery: one set per group, built by a grouped IDSET",
+        "sql": "SELECT COUNT(*) FROM {tbl2} b WHERE IN_ID_SET(b.intCol, (SELECT IDSET(a.intCol) FROM {tbl} a WHERE a.grp = b.grp)) = 1",
+        "h2Sql": "SELECT COUNT(*) FROM {tbl2} b WHERE b.intCol IN (SELECT a.intCol FROM {tbl} a WHERE a.grp = b.grp)"
+      },
+      {
+        "description": "Correlated subquery, negated: groups with no match see an empty set",
+        "sql": "SELECT COUNT(*) FROM {tbl2} b WHERE IN_ID_SET(b.intCol, (SELECT IDSET(a.intCol) FROM {tbl} a WHERE a.grp = b.grp)) = 0",
+        "h2Sql": "SELECT COUNT(*) FROM {tbl2} b WHERE b.intCol NOT IN (SELECT a.intCol FROM {tbl} a WHERE a.grp = b.grp)"
+      },
+      {
+        "description": "CTE cross join supplies the set as a column",
+        "sql": "WITH s AS (SELECT IDSET(strCol, 'expectedInsertions=100;fpp=0.0001') AS ids FROM {tbl} WHERE grp = 'g2') SELECT COUNT(*) FROM {tbl2}, s WHERE IN_ID_SET({tbl2}.strCol, s.ids) = 1",
+        "h2Sql": "SELECT COUNT(*) FROM {tbl2} WHERE strCol IN (SELECT strCol FROM {tbl} WHERE grp = 'g2')"
+      },
+      {
+        "description": "HAVING with a set from a scalar subquery",
+        "sql": "SELECT grp, COUNT(*) FROM {tbl2} GROUP BY grp HAVING IN_ID_SET(MAX(intCol), (SELECT IDSET(intCol) FROM {tbl})) = 1",
+        "h2Sql": "SELECT grp, COUNT(*) FROM {tbl2} GROUP BY grp HAVING MAX(intCol) IN (SELECT intCol FROM {tbl})"
+      },
+      {
+        "description": "Post-join filter on columns of both sides, set from a scalar subquery",
+        "sql": "SELECT COUNT(*) FROM {tbl} a JOIN {tbl2} b ON a.grp = b.grp WHERE IN_ID_SET(a.intCol + b.intCol, (SELECT IDSET(intCol) FROM {tbl2})) = 1",
+        "h2Sql": "SELECT COUNT(*) FROM {tbl} a JOIN {tbl2} b ON a.grp = b.grp WHERE a.intCol + b.intCol IN (SELECT intCol FROM {tbl2})"
+      },
+      {
+        "description": "Literal set in a leaf filter (the two-query flow); the set holds 2, 4 and 6",
+        "sql": "SELECT COUNT(*) FROM {tbl2} WHERE IN_ID_SET(intCol, 'ATowAAABAAAAAAACABAAAAACAAQABgA=') = 1",
+        "h2Sql": "SELECT COUNT(*) FROM {tbl2} WHERE intCol IN (2, 4, 6)"
+      },
+      {
+        "description": "Literal set in a leaf filter, bare boolean and negated",
+        "sql": "SELECT COUNT(*) FROM {tbl2} WHERE NOT IN_ID_SET(intCol, 'ATowAAABAAAAAAACABAAAAACAAQABgA=')",
+        "h2Sql": "SELECT COUNT(*) FROM {tbl2} WHERE intCol NOT IN (2, 4, 6)"
+      },
+      {
+        "description": "Literal set in a post-join filter on columns of both sides",
+        "sql": "SELECT COUNT(*) FROM {tbl} a JOIN {tbl2} b ON a.grp = b.grp WHERE IN_ID_SET(a.intCol + b.intCol, 'ATowAAABAAAAAAACABAAAAACAAQABgA=') = 1",
+        "h2Sql": "SELECT COUNT(*) FROM {tbl} a JOIN {tbl2} b ON a.grp = b.grp WHERE a.intCol + b.intCol IN (2, 4, 6)"
+      },
+      {
+        "description": "Literal set in a join condition",
+        "sql": "SELECT COUNT(*) FROM {tbl} a JOIN {tbl2} b ON a.grp = b.grp AND IN_ID_SET(a.intCol + b.intCol, 'ATowAAABAAAAAAACABAAAAACAAQABgA=') = 1",
+        "h2Sql": "SELECT COUNT(*) FROM {tbl} a JOIN {tbl2} b ON a.grp = b.grp AND a.intCol + b.intCol IN (2, 4, 6)"
+      },
+      {
+        "description": "Literal set in HAVING",
+        "sql": "SELECT grp, COUNT(*) FROM {tbl2} GROUP BY grp HAVING IN_ID_SET(MAX(intCol), 'ATowAAABAAAAAAACABAAAAACAAQABgA=') = 1",
+        "h2Sql": "SELECT grp, COUNT(*) FROM {tbl2} GROUP BY grp HAVING MAX(intCol) IN (2, 4, 6)"
+      },
+      {
+        "description": "Scalar path rejects a set of another value type",
+        "sql": "SELECT COUNT(*) FROM {tbl2} WHERE IN_ID_SET(intCol, (SELECT IDSET(longCol) FROM {tbl})) = 1",
+        "expectedException": ".*Cannot look up INT values in an IdSet built from LONG values.*"
+      },
+      {
+        "description": "Leaf path rejects a set of another value type",
+        "sql": "SELECT COUNT(*) FROM {tbl2} WHERE IN_ID_SET(longCol, 'ATowAAABAAAAAAACABAAAAACAAQABgA=') = 1",
+        "expectedException": ".*Cannot look up LONG values in an IdSet built from INT values.*"
+      }
+    ]
+  },
+  "idset_nullable_probe": {
+    "comments": "IN_ID_SET returns NULL for a NULL value, except with an empty or NULL set, where it is false, as for an IN subquery. The planner must type it as nullable, or it simplifies IS NOT TRUE and COALESCE away. NULL values come from outer joins and from nullable columns, which the planner sees only with column-based null handling.",
+    "extraProps": {
+      "enableColumnBasedNullHandling": true
+    },
+    "tables": {
+      "tbl": {
+        "schema": [
+          {"name": "intCol", "type": "INT"}
+        ],
+        "inputs": [
+          [1],
+          [2],
+          ["------"],
+          [3],
+          [4]
+        ]
+      },
+      "tbl2": {
+        "schema": [
+          {"name": "intCol", "type": "INT"}
+        ],
+        "inputs": [
+          [2],
+          [4]
+        ]
+      },
+      "nullable": {
+        "schema": [
+          {"name": "intCol", "type": "INT"}
+        ],
+        "inputs": [
+          [1],
+          [2],
+          [null]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "IS NOT TRUE over the NULL values of a left join; the set holds 2, 4 and 6",
+        "sql": "SELECT COUNT(*) FROM {tbl} a LEFT JOIN {tbl2} b ON a.intCol = b.intCol WHERE IN_ID_SET(b.intCol, 'ATowAAABAAAAAAACABAAAAACAAQABgA=') IS NOT TRUE",
+        "h2Sql": "SELECT COUNT(*) FROM {tbl} a LEFT JOIN {tbl2} b ON a.intCol = b.intCol WHERE (b.intCol IN (2, 4, 6)) IS NOT TRUE"
+      },
+      {
+        "description": "IS FALSE over the NULL values of a left join",
+        "sql": "SELECT COUNT(*) FROM {tbl} a LEFT JOIN {tbl2} b ON a.intCol = b.intCol WHERE IN_ID_SET(b.intCol, 'ATowAAABAAAAAAACABAAAAACAAQABgA=') IS FALSE",
+        "h2Sql": "SELECT COUNT(*) FROM {tbl} a LEFT JOIN {tbl2} b ON a.intCol = b.intCol WHERE (b.intCol IN (2, 4, 6)) IS FALSE"
+      },
+      {
+        "description": "NOT COALESCE over the NULL values of a left join",
+        "sql": "SELECT COUNT(*) FROM {tbl} a LEFT JOIN {tbl2} b ON a.intCol = b.intCol WHERE NOT COALESCE(IN_ID_SET(b.intCol, 'ATowAAABAAAAAAACABAAAAACAAQABgA='), FALSE)",
+        "h2Sql": "SELECT COUNT(*) FROM {tbl} a LEFT JOIN {tbl2} b ON a.intCol = b.intCol WHERE NOT COALESCE(b.intCol IN (2, 4, 6), FALSE)"
+      },
+      {
+        "description": "COALESCE in the SELECT list over the NULL values of a left join",
+        "sql": "SELECT a.intCol, COALESCE(IN_ID_SET(b.intCol, 'ATowAAABAAAAAAACABAAAAACAAQABgA='), FALSE) FROM {tbl} a LEFT JOIN {tbl2} b ON a.intCol = b.intCol",
+        "h2Sql": "SELECT a.intCol, COALESCE(b.intCol IN (2, 4, 6), FALSE) FROM {tbl} a LEFT JOIN {tbl2} b ON a.intCol = b.intCol"
+      },
+      {
+        "description": "= 0 over the NULL values of a left join drops them, like NOT IN",
+        "sql": "SELECT COUNT(*) FROM {tbl} a LEFT JOIN {tbl2} b ON a.intCol = b.intCol WHERE IN_ID_SET(b.intCol, 'ATowAAABAAAAAAACABAAAAACAAQABgA=') = 0",
+        "h2Sql": "SELECT COUNT(*) FROM {tbl} a LEFT JOIN {tbl2} b ON a.intCol = b.intCol WHERE b.intCol NOT IN (2, 4, 6)"
+      },
+      {
+        "description": "IS NOT TRUE on a nullable column in a leaf stage",
+        "sql": "SELECT COUNT(*) FROM {nullable} WHERE IN_ID_SET(intCol, 'ATowAAABAAAAAAACABAAAAACAAQABgA=') IS NOT TRUE",
+        "h2Sql": "SELECT COUNT(*) FROM {nullable} WHERE (intCol IN (2, 4, 6)) IS NOT TRUE"
+      },
+      {
+        "description": "A NULL value is in no empty set, from a subquery that matches no rows",
+        "sql": "SELECT COUNT(*) FROM {nullable} WHERE IN_ID_SET(intCol, (SELECT IDSET(intCol) FROM {tbl} WHERE intCol < 0)) = 0",
+        "h2Sql": "SELECT COUNT(*) FROM {nullable} WHERE intCol NOT IN (SELECT intCol FROM {tbl} WHERE intCol < 0)"
+      },
+      {
+        "description": "A NULL value is in no empty set, from a literal in a leaf stage",
+        "sql": "SELECT COUNT(*) FROM {nullable} WHERE IN_ID_SET(intCol, 'AA==') = 0",
+        "h2Sql": "SELECT COUNT(*) FROM {nullable} WHERE intCol NOT IN (SELECT intCol FROM {tbl} WHERE intCol < 0)"
+      },
+      {
+        "description": "A literal value is left to the runtime instead of being folded at planning time",
+        "sql": "SELECT COUNT(*) FROM {tbl} WHERE IN_ID_SET(2, 'ATowAAABAAAAAAACABAAAAACAAQABgA=') = 1",
+        "h2Sql": "SELECT COUNT(*) FROM {tbl} WHERE 2 IN (2, 4, 6)"
+      }
+    ]
+  },
+  "idset_serialized_output": {
+    "comments": "IDSET in the multi-stage engine returns the same bytes as an IdSet built directly from the values, which is what the single-stage engine returns, so a set built by either engine works in the other.",
+    "tables": {
+      "tbl": {
+        "schema": [
+          {"name": "intCol", "type": "INT"},
+          {"name": "longCol", "type": "LONG"},
+          {"name": "strCol", "type": "STRING"},
+          {"name": "grp", "type": "STRING"}
+        ],
+        "inputs": [
+          [1, 10000000001, "a", "g1"],
+          [2, 10000000002, "b", "g1"],
+          [3, 10000000003, "c", "g1"],
+          ["------"],
+          [4, 10000000004, "d", "g2"],
+          [5, 10000000005, "e", "g2"],
+          [6, 10000000006, "f", "g2"]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "INT values 1 to 6 as a RoaringBitmap",
+        "sql": "SELECT IDSET(intCol) FROM {tbl}",
+        "outputs": [["ATowAAABAAAAAAAFABAAAAABAAIAAwAEAAUABgA="]]
+      },
+      {
+        "description": "LONG values as a Roaring64NavigableMap",
+        "sql": "SELECT IDSET(longCol) FROM {tbl}",
+        "outputs": [["AgAAAAABAAAAAjowAAABAAAAC1QFABAAAAAB5ALkA+QE5AXkBuQ="]]
+      },
+      {
+        "description": "STRING values as a Bloom filter",
+        "sql": "SELECT IDSET(strCol, 'expectedInsertions=100;fpp=0.0001') FROM {tbl}",
+        "outputs": [["AwIBDQAAAB4AAoACAAEAAkAAAAAIAACAgCBAABAAAAAAABAAAAAAAASgAAAAAAAAAAAABAAAAAAgAAAEAACAAgAAAAAgAAEAQAAAAABAgAAIAAIAAEAAAAAAAQAAAAAAAAQAAAAAAAgAAEAAAAAAAAAAAAAAAAAAAAAAQCIQAAAAAAAgAAAAAACQAAACAAAAAAAAAAwAAACAAAAEgAAAAAAAAgAAAACABEAAAAIAQAAAAAAgASAAAAAAACAAAIAAIAgEAAAAAEAAEACAAAAAAAAASAAAACAAACAIAEAAAAgQAAAAAAAAAAAAAIQAAgAABAAAAAIEAAA="]]
+      },
+      {
+        "description": "One set per group",
+        "sql": "SELECT grp, IDSET(intCol) FROM {tbl} GROUP BY grp",
+        "outputs": [
+          ["g1", "ATowAAABAAAAAAACABAAAAABAAIAAwA="],
+          ["g2", "ATowAAABAAAAAAACABAAAAAEAAUABgA="]
+        ]
+      }
+    ]
+  },
+  "idset_multi_value": {
+    "comments": "IDSET over a multi-value column adds every element.",
+    "tables": {
+      "mv": {
+        "schema": [
+          {"name": "mvCol", "type": "INT", "isSingleValue": false}
+        ],
+        "inputs": [
+          [[1, 2]],
+          [[3]]
+        ]
+      },
+      "probe": {
+        "schema": [
+          {"name": "intCol", "type": "INT"}
+        ],
+        "inputs": [
+          [1],
+          [2],
+          [3],
+          [4],
+          [5]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "sql": "SELECT COUNT(*) FROM {probe} WHERE IN_ID_SET(intCol, (SELECT IDSET(mvCol) FROM {mv})) = 1",
+        "outputs": [[3]]
+      },
+      {
+        "sql": "SELECT COUNT(*) FROM {probe} WHERE IN_ID_SET(intCol, (SELECT IDSET(mvCol) FROM {mv})) = 0",
+        "outputs": [[2]]
+      }
+    ]
+  }
+}

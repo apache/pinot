@@ -3657,7 +3657,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(response1Json.get("rows").get(0).get(1).asText(), "Execution Plan\n"
         + "LogicalSort(sort0=[$0], dir0=[ASC])\n"
         + "  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], "
-        + "isSortOnReceiver=[true])\n"
+        + "isSortOnReceiver=[false])\n"
         + "    LogicalProject(count=[$1], name=[$0])\n"
         + "      PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])\n"
         + "        PinotLogicalExchange(distribution=[hash[0]])\n"

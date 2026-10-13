@@ -21,7 +21,6 @@ package org.apache.pinot.sql.parsers;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
-import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -72,6 +71,7 @@ import org.apache.pinot.common.utils.config.QueryOptionsUtils.SqlOptionsMode;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.sql.FilterKind;
+import org.apache.pinot.sql.parsers.parser.GrowingCharStream;
 import org.apache.pinot.sql.parsers.parser.SqlInsertFromFile;
 import org.apache.pinot.sql.parsers.parser.SqlParserImpl;
 import org.apache.pinot.sql.parsers.parser.SqlPinotCreateMaterializedView;
@@ -137,9 +137,10 @@ public class CalciteSqlParser {
       }
     }
 
-    try (StringReader inStream = new StringReader(sql)) {
-      SqlParserImpl sqlParser = newSqlParser(inStream);
+    try {
+      SqlParserImpl sqlParser = newSqlParser(sql);
       SqlNodeList sqlNodeList = sqlParser.parseSqlStmtList();
+      sqlNodeList = (SqlNodeList) PostgreSqlCastRewriter.rewrite(sqlNodeList);
       // Extract OPTION statements from sql.
       SqlNodeAndOptions sqlNodeAndOptions = extractSqlNodeAndOptions(sqlNodeList);
       // add legacy OPTIONS keyword-based options
@@ -666,18 +667,21 @@ public class CalciteSqlParser {
   /// @throws SqlCompilationException if String is not a valid expression.
   public static Expression compileToExpression(String expression) {
     SqlNode sqlNode;
-    try (StringReader inStream = new StringReader(expression)) {
-      SqlParserImpl sqlParser = newSqlParser(inStream);
+    try {
+      SqlParserImpl sqlParser = newSqlParser(expression);
       sqlNode = sqlParser.parseSqlExpressionEof();
     } catch (Throwable e) {
       throw new SqlCompilationException("Caught exception while parsing expression: " + expression, e);
     }
+    // Outside the try: the rewriter already throws SqlCompilationException, and wrapping it would drop its message.
+    sqlNode = PostgreSqlCastRewriter.rewrite(sqlNode);
     return toExpression(sqlNode);
   }
 
   @VisibleForTesting
-  static SqlParserImpl newSqlParser(StringReader inStream) {
-    SqlParserImpl sqlParser = new SqlParserImpl(inStream);
+  static SqlParserImpl newSqlParser(String sql) {
+    // Reads long tokens, e.g. a multi-MB IdSet literal, in linear time
+    SqlParserImpl sqlParser = GrowingCharStream.newParser(sql);
     sqlParser.switchTo(SqlAbstractParserImpl.LexicalState.DQID);
     // TODO: convert to MySQL conformance once we retired most of the un-tested BABEL tokens
     sqlParser.setConformance(SqlConformanceEnum.BABEL);

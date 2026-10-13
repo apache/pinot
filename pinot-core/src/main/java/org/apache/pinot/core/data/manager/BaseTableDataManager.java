@@ -38,6 +38,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Phaser;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -134,6 +135,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected static final Logger LOGGER = LoggerFactory.getLogger(BaseTableDataManager.class);
 
   protected final ConcurrentHashMap<String, SegmentDataManager> _segmentDataManagerMap = new ConcurrentHashMap<>();
+  /// Admission barrier for immutable segment additions. One party belongs to shutdown. Additions register under the
+  /// segment map monitor and finish without holding it, so metadata updates, lifecycle hooks and replacement cleanup
+  /// complete before shutdown stops the partition managers and drains the map.
+  private final Phaser _immutableSegmentAdds = new Phaser(1);
   protected final ServerMetrics _serverMetrics = ServerMetrics.get();
   protected TableUpsertMetadataManager _tableUpsertMetadataManager;
 
@@ -176,6 +181,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   // Caches the latest TableConfig and Schema pair. The cache should not be modified.
   protected volatile Pair<TableConfig, Schema> _cachedTableConfigAndSchema;
+  protected volatile IndexLoadingConfig _cachedIndexLoadingConfig;
 
   protected volatile boolean _shutDown;
   protected volatile boolean _isDeleted;
@@ -306,7 +312,12 @@ public abstract class BaseTableDataManager implements TableDataManager {
       return;
     }
     _logger.info("Shutting down table data manager");
-    _shutDown = true;
+    // Close admission atomically with immutable additions and consuming segment startup. Downloads, construction
+    // and blocking cleanup must remain outside this monitor.
+    synchronized (_segmentDataManagerMap) {
+      _shutDown = true;
+    }
+    _immutableSegmentAdds.arriveAndAwaitAdvance();
     doShutdown();
     _logger.info("Shut down table data manager");
   }
@@ -369,9 +380,30 @@ public abstract class BaseTableDataManager implements TableDataManager {
   /// @param immutableSegment Immutable segment to add
   @Override
   public void addSegment(ImmutableSegment immutableSegment, @Nullable SegmentZKMetadata zkMetadata) {
+    boolean admitted;
+    synchronized (_segmentDataManagerMap) {
+      admitted = !_shutDown;
+      if (admitted) {
+        _immutableSegmentAdds.register();
+      }
+    }
+    if (!admitted) {
+      // Loading can complete after shutdown. This segment was never registered or counted in table gauges.
+      immutableSegment.destroy();
+      throw new IllegalStateException("Table data manager is already shut down, cannot add segment: "
+          + immutableSegment.getSegmentName() + " to table: " + _tableNameWithType);
+    }
+    try {
+      doAddSegment(immutableSegment, zkMetadata);
+    } finally {
+      _immutableSegmentAdds.arriveAndDeregister();
+    }
+  }
+
+  /// Adds an admitted immutable segment, including its metadata and replacement cleanup. Shutdown waits for this
+  /// operation to finish before stopping partition managers and draining registered segments.
+  protected void doAddSegment(ImmutableSegment immutableSegment, @Nullable SegmentZKMetadata zkMetadata) {
     String segmentName = immutableSegment.getSegmentName();
-    Preconditions.checkState(!_shutDown, "Table data manager is already shut down, cannot add segment: %s to table: %s",
-        segmentName, _tableNameWithType);
     _logger.info("Adding immutable segment: {}", segmentName);
     _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.DOCUMENT_COUNT,
         immutableSegment.getSegmentMetadata().getTotalDocs());
@@ -437,6 +469,21 @@ public abstract class BaseTableDataManager implements TableDataManager {
     return indexLoadingConfig;
   }
 
+  /// Returns the shared processed config for ordinary loads. Segment-specific settings are applied with the
+  /// `with...` methods on [IndexLoadingConfig], which share its processed table-level state.
+  /// Explicit reloads and config/schema refresh messages still use [#fetchIndexLoadingConfig()].
+  protected IndexLoadingConfig getCachedIndexLoadingConfig() {
+    Pair<TableConfig, Schema> cached = _cachedTableConfigAndSchema;
+    IndexLoadingConfig indexLoadingConfig = _cachedIndexLoadingConfig;
+    if (indexLoadingConfig == null || indexLoadingConfig.getTableConfig() != cached.getLeft()
+        || indexLoadingConfig.getSchema() != cached.getRight()) {
+      indexLoadingConfig = new IndexLoadingConfig(_instanceDataManagerConfig, cached.getLeft(), cached.getRight());
+      indexLoadingConfig.setTableDataDir(_tableDataDir);
+      _cachedIndexLoadingConfig = indexLoadingConfig;
+    }
+    return indexLoadingConfig;
+  }
+
   @Override
   public Pair<TableConfig, Schema> getCachedTableConfigAndSchema() {
     return _cachedTableConfigAndSchema;
@@ -444,6 +491,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   @Override
   public void updateCachedTableConfigAndSchema(TableConfig tableConfig, Schema schema) {
+    // Normalize before publishing so segment loads never add timestamp fields to a shared schema.
+    if (schema != null) {
+      TimestampIndexUtils.applyTimestampIndex(tableConfig, schema);
+    }
     _cachedTableConfigAndSchema = Pair.of(tableConfig, schema);
   }
 
@@ -921,7 +972,13 @@ public abstract class BaseTableDataManager implements TableDataManager {
     Preconditions.checkState(partitionId != null,
         "Failed to get partition id for segment: %s in upsert-enabled table: %s", zkMetadata.getSegmentName(),
         _tableNameWithType);
-    _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionId).preloadSegments(indexLoadingConfig);
+    PartitionUpsertMetadataManager partitionManager;
+    synchronized (_segmentDataManagerMap) {
+      Preconditions.checkState(!_shutDown, "Table data manager is already shut down, cannot preload table: %s",
+          _tableNameWithType);
+      partitionManager = _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionId);
+    }
+    partitionManager.preloadSegments(indexLoadingConfig);
   }
 
   protected void handleUpsert(ImmutableSegment immutableSegment, @Nullable SegmentZKMetadata zkMetadata) {
@@ -1100,7 +1157,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       SegmentMetadata localMetadata, boolean forceDownload)
       throws Exception {
     String segmentTier = getSegmentCurrentTier(segmentName);
-    indexLoadingConfig.setSegmentTier(segmentTier);
+    indexLoadingConfig = indexLoadingConfig.copyWithSegmentTier(segmentTier);
     indexLoadingConfig.setTableDataDir(_tableDataDir);
     File indexDir = getSegmentDataDir(segmentName, segmentTier, indexLoadingConfig.getTableConfig());
     _segmentReloadSemaphore.acquire(segmentName, _logger);
@@ -1175,7 +1232,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         _logger.info("Reloading existing segment: {} on tier: {}", segmentName,
             TierConfigUtils.normalizeTierName(segmentTier));
         SegmentDirectory segmentDirectory =
-            initSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()), indexLoadingConfig, zkMetadata);
+            initSegmentDirectory(segmentName, zkMetadata.getCrc(), indexLoadingConfig, zkMetadata);
         // We should first try to reuse existing segment directory
         if (canReuseExistingDirectoryForReload(zkMetadata, segmentTier, segmentDirectory, indexLoadingConfig)) {
           _logger.info("Reloading segment: {} using existing segment directory as no reprocessing needed", segmentName);
@@ -1468,6 +1525,13 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected File moveSegment(String segmentName, File untarredSegmentDir)
       throws IOException {
     File indexDir = getSegmentDataDir(segmentName);
+    // Replacing the segment data directory is destructive, and a deleted table shares the directory with a same-name
+    // recreated table. Abort stale operations instead of mutating the directory after shutdown. Callers hold the
+    // per-segment lock from the instance-wide SegmentLocks shared across table data managers, so the recreated
+    // table's lock-holding operations on the same segment cannot interleave with this method.
+    Preconditions.checkState(!_shutDown,
+        "Table data manager is already shut down, cannot replace data directory of segment: %s of table: %s",
+        segmentName, _tableNameWithType);
     try {
       FileUtils.deleteDirectory(indexDir);
       FileUtils.moveDirectory(untarredSegmentDir, indexDir);
@@ -1587,7 +1651,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     // Creates the SegmentDirectory object to access the segment metadata.
     // The metadata is null if the segment doesn't exist yet.
     SegmentDirectory segmentDirectory =
-        tryInitSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()), indexLoadingConfig, zkMetadata);
+        tryInitSegmentDirectory(segmentName, zkMetadata.getCrc(), indexLoadingConfig, zkMetadata);
     SegmentMetadataImpl segmentMetadata = (segmentDirectory == null) ? null : segmentDirectory.getSegmentMetadata();
 
     /*
@@ -1630,8 +1694,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         // Close the stale SegmentDirectory object and recreate it with reprocessed segment.
         closeSegmentDirectoryQuietly(segmentDirectory);
         ImmutableSegmentLoader.preprocess(indexDir, indexLoadingConfig, _segmentOperationsThrottlerSet, zkMetadata);
-        segmentDirectory = initSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()),
-            indexLoadingConfig, zkMetadata);
+        segmentDirectory = initSegmentDirectory(segmentName, zkMetadata.getCrc(), indexLoadingConfig, zkMetadata);
       }
       ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig);
       _logger.info("Loaded existing segment: {} with CRC: {} on tier: {}", segmentName, zkMetadata.getCrc(),
@@ -1646,7 +1709,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   @Nullable
-  protected SegmentDirectory tryInitSegmentDirectory(String segmentName, String segmentCrc,
+  protected SegmentDirectory tryInitSegmentDirectory(String segmentName, long segmentCrc,
       IndexLoadingConfig indexLoadingConfig, @Nullable SegmentZKMetadata zkMetadata) {
     try {
       return initSegmentDirectory(segmentName, segmentCrc, indexLoadingConfig, zkMetadata);
@@ -1984,7 +2047,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     return new StaleSegment(segmentName, false, null);
   }
 
-  protected SegmentDirectory initSegmentDirectory(String segmentName, String segmentCrc,
+  protected SegmentDirectory initSegmentDirectory(String segmentName, long segmentCrc,
       IndexLoadingConfig indexLoadingConfig, @Nullable SegmentZKMetadata zkMetadata)
       throws Exception {
     SegmentDirectoryLoaderContext loaderContext = new SegmentDirectoryLoaderContext.Builder()
@@ -2009,13 +2072,13 @@ public abstract class BaseTableDataManager implements TableDataManager {
   // CRC check can be performed on both segment CRC and data CRC (if available) based on the ZK property value of
   // useDataCRC.
   public static boolean hasSameCRC(SegmentZKMetadata zkMetadata, SegmentMetadata localMetadata) {
-    if (zkMetadata.getCrc() == Long.parseLong(localMetadata.getCrc())) {
+    if (zkMetadata.getCrc() == localMetadata.getCrc()) {
       return true;
     }
     return zkMetadata.isUseDataCrc()
         && zkMetadata.getDataCrc() >= 0
-        && Long.parseLong(localMetadata.getDataCrc()) >= 0
-        && zkMetadata.getDataCrc() == Long.parseLong(localMetadata.getDataCrc());
+        && localMetadata.getDataCrc() >= 0
+        && zkMetadata.getDataCrc() == localMetadata.getDataCrc();
   }
 
   protected static void recoverReloadFailureQuietly(String tableNameWithType, String segmentName, File indexDir) {

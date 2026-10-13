@@ -463,6 +463,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       FileUtils.deleteQuietly(tempEncryptedFile);
       FileUtils.deleteQuietly(tempDecryptedFile);
       FileUtils.deleteQuietly(tempSegmentDir);
+      cleanupMultiPart(multiPart);
     }
   }
 
@@ -555,6 +556,7 @@ public class PinotSegmentUploadDownloadRestletResource {
     } finally {
       FileUtils.deleteQuietly(tempTarFile);
       FileUtils.deleteQuietly(tempSegmentDir);
+      cleanupMultiPart(multiPart);
     }
   }
 
@@ -724,7 +726,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       }
     } finally {
       cleanupTempFiles(tempFiles);
-      multiPart.cleanup();
+      cleanupMultiPart(multiPart);
     }
 
     return new SuccessResponse(String.format("Successfully uploaded segments: %s of table: %s in %s ms",
@@ -734,6 +736,21 @@ public class PinotSegmentUploadDownloadRestletResource {
   private void cleanupTempFiles(List<File> tempFiles) {
     for (File tempFile : tempFiles) {
       FileUtils.deleteQuietly(tempFile);
+    }
+  }
+
+  /// Releases the temporary files Jersey spilled the multipart body into. Safe to call more than once, and safe on the
+  /// paths where the request carried no multipart body at all.
+  @VisibleForTesting
+  static void cleanupMultiPart(@Nullable FormDataMultiPart multiPart) {
+    if (multiPart == null) {
+      return;
+    }
+    try {
+      multiPart.cleanup();
+    } catch (Exception e) {
+      // Never let cleanup mask the outcome of the request it belongs to.
+      LOGGER.warn("Caught exception while cleaning up the multipart request", e);
     }
   }
 
@@ -893,7 +910,7 @@ public class PinotSegmentUploadDownloadRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.APPLICATION_JSON)
   @Path("/segments")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPLOAD_SEGMENT)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPLOAD_SEGMENT, tableScopeParam = "tableName")
   @Authenticate(AccessType.CREATE)
   @ApiOperation(value = "Upload a segment", notes = "Upload a segment as json")
   @ApiResponses(value = {
@@ -936,7 +953,7 @@ public class PinotSegmentUploadDownloadRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.MULTIPART_FORM_DATA)
   @Path("/segments")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPLOAD_SEGMENT)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPLOAD_SEGMENT, tableScopeParam = "tableName")
   @Authenticate(AccessType.CREATE)
   @ApiOperation(value = "Upload a segment", notes = "Upload a segment as binary")
   @ApiResponses(value = {

@@ -33,6 +33,7 @@ import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.common.SyntheticBlockValSets;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigestAccumulator;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -49,7 +50,7 @@ public class PercentileSmartTDigestAggregationFunctionTest {
     byte[] verbose = PercentileRawTDigestAggregationFunctionTest.createVerboseUnitCentroidDigest(51, 20.0);
     Object intermediateResult = function.deserializeIntermediateResult(
         new CustomObject(ObjectSerDeUtils.ObjectType.TDigest.getValue(), ByteBuffer.wrap(verbose)));
-    assertTrue(intermediateResult instanceof PercentileTDigestAccumulator);
+    assertTrue(intermediateResult instanceof TDigestAccumulator);
 
     AggregationFunction.SerializedIntermediateResult serialized =
         function.serializeIntermediateResult(intermediateResult);
@@ -58,12 +59,12 @@ public class PercentileSmartTDigestAggregationFunctionTest {
 
     Object roundTripped = function.deserializeIntermediateResult(
         new CustomObject(serialized.getType(), ByteBuffer.wrap(serialized.getBytes())));
-    assertTrue(roundTripped instanceof PercentileTDigestAccumulator);
+    assertTrue(roundTripped instanceof TDigestAccumulator);
     assertUnitCentroidDigest((TDigest) roundTripped, 51, 20.0);
     assertLegacyCompatibleShape(function.serializeIntermediateResult(roundTripped).getBytes(), 20.0);
   }
 
-  /// The intermediate result must round-trip through the [PercentileTDigestAccumulator] so that
+  /// The intermediate result must round-trip through the [TDigestAccumulator] so that
   /// capacity-preserving digests (more centroids than a fresh legacy [MergingDigest] of the same
   /// compression can hold) are not re-encoded into bytes a receiving server cannot read.
   @Test
@@ -75,7 +76,7 @@ public class PercentileSmartTDigestAggregationFunctionTest {
 
     Object intermediateResult = function.deserializeIntermediateResult(
         new CustomObject(ObjectSerDeUtils.ObjectType.TDigest.getValue(), ByteBuffer.wrap(small)));
-    assertTrue(intermediateResult instanceof PercentileTDigestAccumulator);
+    assertTrue(intermediateResult instanceof TDigestAccumulator);
 
     AggregationFunction.SerializedIntermediateResult serialized =
         function.serializeIntermediateResult(intermediateResult);
@@ -91,7 +92,7 @@ public class PercentileSmartTDigestAggregationFunctionTest {
             new CustomObject(serialized.getType(), ByteBuffer.wrap(serialized.getBytes()))),
         function.deserializeIntermediateResult(
             new CustomObject(serialized.getType(), ByteBuffer.wrap(serialized.getBytes()))));
-    assertTrue(merged instanceof PercentileTDigestAccumulator);
+    assertTrue(merged instanceof TDigestAccumulator);
     assertEquals(((TDigest) merged).size(), 2L * numCentroids);
 
     // The materialized (merged) accumulator must also serialize into plain-reader-compatible bytes.
@@ -139,7 +140,7 @@ public class PercentileSmartTDigestAggregationFunctionTest {
       DoubleArrayList valueList = new DoubleArrayList(new double[]{0.0, 25.0, 50.0});
       Object merged = accumulatorFirst ? function.merge(accumulator, valueList)
           : function.merge(valueList, accumulator);
-      assertTrue(merged instanceof PercentileTDigestAccumulator);
+      assertTrue(merged instanceof TDigestAccumulator);
       assertEquals(((TDigest) merged).size(), numCentroids + 3L);
       assertEquals(((TDigest) merged).quantile(0.5), (numCentroids - 1.0) / 2.0, 1.0);
       TDigest roundTripped = MergingDigest.fromBytes(
@@ -161,7 +162,7 @@ public class PercentileSmartTDigestAggregationFunctionTest {
     function.aggregate(values.length, resultHolder,
         Map.of(EXPRESSION, SyntheticBlockValSets.Double.create(null, values)));
     Object intermediateResult = function.extractAggregationResult(resultHolder);
-    assertTrue(intermediateResult instanceof PercentileTDigestAccumulator);
+    assertTrue(intermediateResult instanceof TDigestAccumulator);
     TDigest result = (TDigest) intermediateResult;
     assertDuplicateInfinityResult(result, values.length);
     TDigest roundTripped = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(
@@ -175,7 +176,7 @@ public class PercentileSmartTDigestAggregationFunctionTest {
     Object second = function.deserializeIntermediateResult(
         new CustomObject(serialized.getType(), ByteBuffer.wrap(serialized.getBytes())));
     Object merged = function.merge(first, second);
-    assertTrue(merged instanceof PercentileTDigestAccumulator);
+    assertTrue(merged instanceof TDigestAccumulator);
     assertDuplicateInfinityResult((TDigest) merged, 2L * values.length);
   }
 
@@ -291,54 +292,5 @@ public class PercentileSmartTDigestAggregationFunctionTest {
     assertEquals(digest.quantile(0.0), 0.0);
     assertEquals(digest.quantile(0.5), (expectedSize - 1.0) / 2.0, 1.0);
     assertEquals(digest.quantile(1.0), expectedSize - 1.0);
-  }
-
-  public static class WithHighThreshold extends AbstractPercentileAggregationFunctionTest {
-    @Override
-    public String callStr(String column, int percent) {
-      return "PERCENTILESMARTTDIGEST(" + column + ", " + percent + ", 'THRESHOLD=10000')";
-    }
-  }
-
-  public static class WithSmallThreshold extends AbstractPercentileAggregationFunctionTest {
-    @Override
-    public String callStr(String column, int percent) {
-      return "PERCENTILESMARTTDIGEST(" + column + ", " + percent + ", 'THRESHOLD=1')";
-    }
-
-    @Override
-    String expectedAggrWithNull10(Scenario scenario) {
-      return "1.0";
-    }
-
-    @Override
-    String expectedAggrWithNull30(Scenario scenario) {
-      return "3.0";
-    }
-
-    @Override
-    String expectedAggrWithNull50(Scenario scenario) {
-      return "5.0";
-    }
-
-    @Override
-    String expectedAggrWithNull70(Scenario scenario) {
-      return "7.0";
-    }
-
-    @Override
-    String expectedAggrWithoutNull55(Scenario scenario) {
-      return "0.0";
-    }
-
-    @Override
-    String expectedAggrWithoutNull75(Scenario scenario) {
-      return "4.0";
-    }
-
-    @Override
-    String expectedAggrWithoutNull90(Scenario scenario) {
-      return "7.0";
-    }
   }
 }

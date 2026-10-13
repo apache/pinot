@@ -79,6 +79,17 @@ public class VarByteChunkV4Test implements PinotBuffersAfterClassCheckRule {
     return params;
   }
 
+  @DataProvider
+  public Object[][] compressionTypes() {
+    return new Object[][]{
+        {ChunkCompressionType.PASS_THROUGH},
+        {ChunkCompressionType.LZ4},
+        {ChunkCompressionType.LZ4_LENGTH_PREFIXED},
+        {ChunkCompressionType.SNAPPY},
+        {ChunkCompressionType.ZSTANDARD}
+    };
+  }
+
   protected String getTestDirName() {
     return "VarByteChunkV4Test";
   }
@@ -191,6 +202,61 @@ public class VarByteChunkV4Test implements PinotBuffersAfterClassCheckRule {
       }
     }
     FileUtils.deleteQuietly(mapSVFile);
+  }
+
+  /// A value larger than the chunk size is stored alone in a huge chunk, which has no regular chunk header. Reading
+  /// the same doc repeatedly with one context returns the written value every time.
+  @Test(dataProvider = "compressionTypes")
+  public void testHugeValueReadTwiceSV(ChunkCompressionType compressionType)
+      throws IOException {
+    File file = new File(_dirs[0], "testHugeValueReadTwiceSV" + compressionType);
+    int chunkSize = 1024;
+    String[] values = {"small", "huge".repeat(chunkSize), "small"};
+    try (VarByteChunkWriter writer = createWriter(file, compressionType, chunkSize)) {
+      for (String value : values) {
+        writer.putString(value);
+      }
+    }
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(file);
+        VarByteChunkForwardIndexReaderV4 reader = createReader(buffer, FieldSpec.DataType.STRING, true);
+        VarByteChunkForwardIndexReaderV4.ReaderContext context = reader.createContext()) {
+      for (int docId = 0; docId < values.length; docId++) {
+        assertEquals(reader.getString(docId, context), values[docId]);
+        assertEquals(reader.getString(docId, context), values[docId]);
+      }
+    }
+    FileUtils.deleteQuietly(file);
+  }
+
+  /// Multi-value counterpart of [#testHugeValueReadTwiceSV], reading the huge doc through each MV accessor in turn.
+  @Test(dataProvider = "compressionTypes")
+  public void testHugeValueReadTwiceMV(ChunkCompressionType compressionType)
+      throws IOException {
+    File file = new File(_dirs[0], "testHugeValueReadTwiceMV" + compressionType);
+    int chunkSize = 1024;
+    String[] hugeValue = new String[chunkSize];
+    for (int i = 0; i < hugeValue.length; i++) {
+      hugeValue[i] = "huge-" + i;
+    }
+    String[][] values = {{"small"}, hugeValue, {"small", "values"}};
+    try (VarByteChunkWriter writer = createWriter(file, compressionType, chunkSize)) {
+      for (String[] value : values) {
+        writer.putStringMV(value);
+      }
+    }
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(file);
+        VarByteChunkForwardIndexReaderV4 reader = createReader(buffer, FieldSpec.DataType.STRING, false);
+        VarByteChunkForwardIndexReaderV4.ReaderContext context = reader.createContext()) {
+      String[] valueBuffer = new String[hugeValue.length];
+      for (int docId = 0; docId < values.length; docId++) {
+        String[] expected = values[docId];
+        assertEquals(reader.getNumValuesMV(docId, context), expected.length);
+        assertEquals(reader.getStringMV(docId, context), expected);
+        assertEquals(reader.getStringMV(docId, valueBuffer, context), expected.length);
+        assertEquals(Arrays.copyOf(valueBuffer, expected.length), expected);
+      }
+    }
+    FileUtils.deleteQuietly(file);
   }
 
   static class StringSplitterMV implements Function<String, String[]> {

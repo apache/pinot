@@ -74,7 +74,7 @@ public class NotFilterOperator extends BaseFilterOperator {
   protected BlockDocIdSet getNotFalses() {
     BlockDocIdSet childTrues = _filterOperator.getTrues();
     if (childTrues instanceof MatchAllDocIdSet) {
-      return EmptyDocIdSet.getInstance();
+      return EmptyDocIdSet.unscanned();
     }
     if (childTrues instanceof EmptyDocIdSet) {
       return new MatchAllDocIdSet(_numDocs);

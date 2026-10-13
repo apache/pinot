@@ -99,7 +99,7 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
   protected BlockDocIdSet getTrues() {
     if (_upperBound < 0 || _lowerBound > _upperBound) {
       // Invalid upper bound, return an empty block
-      return EmptyDocIdSet.getInstance();
+      return EmptyDocIdSet.unscanned();
     }
 
     try {
@@ -116,7 +116,7 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
           MutableRoaringBitmap matchAllDocIds = new MutableRoaringBitmap();
           matchAllDocIds.add(0L, _numDocs);
           matchAllDocIds.andNot(nullDocIds);
-          return new BitmapDocIdSet(matchAllDocIds, _numDocs);
+          return BitmapDocIdSet.create(matchAllDocIds, _numDocs);
         }
 
         // Upper bound only
@@ -246,12 +246,7 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
         (ScanBasedDocIdIterator) expressionFilterOperator.getTrues().iterator();
     MutableRoaringBitmap result = docIdIterator.applyAnd(partialMatchDocIds);
     result.or(fullMatchDocIds);
-    return new BitmapDocIdSet(result, _numDocs) {
-      @Override
-      public long getNumEntriesScannedInFilter() {
-        return docIdIterator.getNumEntriesScanned();
-      }
-    };
+    return BitmapDocIdSet.create(result, _numDocs, docIdIterator.getNumEntriesScanned());
   }
 
   /// Returns the null document IDs for the indexed column when query null handling is enabled and the column has a

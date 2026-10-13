@@ -27,6 +27,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.annotations.Test;
 import org.xerial.snappy.Snappy;
 
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
@@ -91,11 +92,19 @@ public class CompressionCodecCorruptInputTest {
 
   @Test
   public void testSnappyDecodeRejectsOversizedDeclaredSize() {
-    // The sanity cap must fire before the destination-capacity guard. The declared size is
-    // the smallest rejected value (cap + 1), pinning the inclusive boundary: exactly 1 GiB is accepted.
-    IOException exception = expectThrows(IOException.class,
+    // Snappy may reject this impossible expansion ratio before Pinot checks the shared sanity cap.
+    assertThrows(IOException.class,
         () -> SnappyCodecDefinition.INSTANCE.decode(SnappyCodecDefinition.OPTIONS, CTX,
             oversizedSnappyFrame(), ByteBuffer.allocateDirect(16)));
+  }
+
+  @Test
+  public void testDeclaredDecompressedSizeSanityCap() throws IOException {
+    // Pin the inclusive 1 GiB boundary independently of the compression library's frame validation.
+    int cap = 1 << 30;
+    assertEquals(CodecBufferUtils.checkDeclaredDecompressedSize(cap, "Snappy", "varint length header"), cap);
+    IOException exception = expectThrows(IOException.class,
+        () -> CodecBufferUtils.checkDeclaredDecompressedSize(cap + 1, "Snappy", "varint length header"));
     assertTrue(exception.getMessage().contains("out of range"), exception.getMessage());
   }
 
@@ -189,21 +198,21 @@ public class CompressionCodecCorruptInputTest {
 
   @Test
   public void testMultiStageDecodeBoundsInnerSnappyOutput() throws Exception {
-    // A valid Snappy frame that expands to 1 MiB is far larger than the four-byte final INT
+    // A valid Snappy frame that expands to 64 bytes is larger than the four-byte final INT
     // chunk declared by the outer format. The executor must supply a four-byte scratch bound
     // instead of sizing the destination from the inner frame header.
-    byte[] compressed = Snappy.compress(new byte[1024 * 1024]);
-    // Keep only a small prefix: it contains Snappy's claimed decoded length and stays below the
-    // executor's outer encoded-size bound, so this specifically exercises the inner-frame guard.
-    ByteBuffer encoded = ByteBuffer.allocateDirect(16);
-    encoded.put(compressed, 0, encoded.capacity()).flip();
+    byte[] compressed = Snappy.compress(new byte[64]);
+    // Keep the complete frame below the executor's outer encoded-size bound so Snappy accepts
+    // the frame header and this specifically exercises Pinot's inner-frame guard.
+    ByteBuffer encoded = ByteBuffer.allocateDirect(compressed.length);
+    encoded.put(compressed).flip();
     ByteBuffer decoded = ByteBuffer.allocateDirect(Integer.BYTES);
     CodecPipelineExecutor executor = CodecPipelineExecutor.create(
         "DELTA,SNAPPY", CTX, CodecRegistry.DEFAULT);
 
     IllegalArgumentException exception = expectThrows(IllegalArgumentException.class,
         () -> CodecTestUtils.decode(executor, encoded, decoded, Integer.BYTES));
-    assertTrue(exception.getMessage().contains("Snappy: decompressed size"), exception.getMessage());
+    assertEquals(exception.getMessage(), "Snappy: decompressed size 64 exceeds dst capacity 4");
   }
 
   @Test

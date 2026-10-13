@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator.filter;
 import com.google.common.base.CaseFormat;
 import java.util.List;
 import org.apache.pinot.common.request.context.predicate.Predicate;
+import org.apache.pinot.common.utils.MutableRoaringBitmapUnion;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.ExplainAttributeBuilder;
@@ -62,7 +63,7 @@ public class InvertedIndexFilterOperator extends BaseColumnFilterOperator {
     int[] dictIds = _exclusive ? _predicateEvaluator.getNonMatchingDictIds() : _predicateEvaluator.getMatchingDictIds();
     int numDictIds = dictIds.length;
     if (numDictIds == 0) {
-      return EmptyDocIdSet.getInstance();
+      return EmptyDocIdSet.unscanned();
     }
     if (numDictIds == 1) {
       ImmutableRoaringBitmap docIds = _invertedIndexReader.getDocIds(dictIds[0]);
@@ -70,12 +71,12 @@ public class InvertedIndexFilterOperator extends BaseColumnFilterOperator {
         if (docIds instanceof MutableRoaringBitmap) {
           MutableRoaringBitmap mutableRoaringBitmap = (MutableRoaringBitmap) docIds;
           mutableRoaringBitmap.flip(0L, _numDocs);
-          return new BitmapDocIdSet(mutableRoaringBitmap, _numDocs);
+          return BitmapDocIdSet.create(mutableRoaringBitmap, _numDocs);
         } else {
-          return new BitmapDocIdSet(ImmutableRoaringBitmap.flip(docIds, 0L, _numDocs), _numDocs);
+          return BitmapDocIdSet.create(ImmutableRoaringBitmap.flip(docIds, 0L, _numDocs), _numDocs);
         }
       } else {
-        return new BitmapDocIdSet(docIds, _numDocs);
+        return BitmapDocIdSet.create(docIds, _numDocs);
       }
     } else {
       ImmutableRoaringBitmap[] bitmaps = new ImmutableRoaringBitmap[numDictIds];
@@ -92,7 +93,7 @@ public class InvertedIndexFilterOperator extends BaseColumnFilterOperator {
         recording.setNumDocsMatchingAfterFilter(docIds.getCardinality());
         recording.setFilter(FilterType.INDEX, String.valueOf(_predicateEvaluator.getPredicateType()));
       }
-      return new BitmapDocIdSet(docIds, _numDocs);
+      return BitmapDocIdSet.create(docIds, _numDocs);
     }
   }
 
@@ -145,11 +146,13 @@ public class InvertedIndexFilterOperator extends BaseColumnFilterOperator {
               _invertedIndexReader.getDocIds(dictIds[1]));
           break;
         default:
-          MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
+          // Union lazily and finalize once at the end: the fold still materializes the union, but skips per-union
+          // cardinality maintenance
+          MutableRoaringBitmapUnion union = new MutableRoaringBitmapUnion();
           for (int dictId : dictIds) {
-            bitmap.or(_invertedIndexReader.getDocIds(dictId));
+            union.add(_invertedIndexReader.getDocIds(dictId));
           }
-          count = bitmap.getCardinality();
+          count = union.get().getCardinality();
           break;
       }
     }

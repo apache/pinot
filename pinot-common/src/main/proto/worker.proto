@@ -94,6 +94,22 @@ message WorkerMetadata {
   int32 workedId = 1;
   map<int32, bytes> mailboxInfos = 2; // Stage id to serialized MailboxInfos
   map<string, string> customProperty = 3;
+  // Leaf-stage segments to scan, keyed by table type (OFFLINE / REALTIME). Presence marks a leaf-stage worker.
+  // Sent instead of the JSON-encoded "tableSegmentsMap" custom property when the broker enables the proto segment
+  // list encoding (see the "pinot.broker.mse.enable.proto.segment.list" broker config); otherwise, and on older
+  // brokers, the custom property is sent.
+  SegmentsMap tableSegmentsMap = 4;
+  // Leaf-stage segments of a logical table, keyed by physical table name (with type suffix). Same encoding rules.
+  SegmentsMap logicalTableSegmentsMap = 5;
+}
+
+// Segment names to scan per table type or physical table name, see WorkerMetadata.
+message SegmentsMap {
+  map<string, SegmentList> segments = 1;
+}
+
+message SegmentList {
+  repeated string segment = 1;
 }
 
 message MailboxInfos {

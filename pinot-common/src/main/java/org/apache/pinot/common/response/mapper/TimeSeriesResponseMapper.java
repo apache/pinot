@@ -166,6 +166,10 @@ public class TimeSeriesResponseMapper {
         getIntMetadataValue(metadata, DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_LIMIT));
     map.merge(BrokerResponseNativeV2.StatKey.NUM_SEGMENTS_PRUNED_BY_VALUE,
         getIntMetadataValue(metadata, DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_VALUE));
+    map.merge(BrokerResponseNativeV2.StatKey.NUM_REMOTE_ACCESSES,
+        getLongMetadataValue(metadata, DataTable.MetadataKey.NUM_REMOTE_ACCESSES));
+    map.merge(BrokerResponseNativeV2.StatKey.REMOTE_ACCESS_BYTES,
+        getLongMetadataValue(metadata, DataTable.MetadataKey.REMOTE_ACCESS_BYTES));
     brokerResponse.addBrokerStats(map);
     brokerResponse.setTimeUsedMs(getLongMetadataValue(metadata, DataTable.MetadataKey.TIME_USED_MS));
   }

@@ -186,6 +186,9 @@ public class FastFilteredCountTest extends BaseQueriesTest {
             + " where " + SORTED_COLUMN + " in " + allBuckets
             + " and " + CLASSIFICATION_COLUMN + " in " + allBuckets, BUCKET_SIZE},
         {"select count(*) from " + RAW_TABLE_NAME
+            + " where " + SORTED_COLUMN + " in " + twoBuckets
+            + " and " + CLASSIFICATION_COLUMN + " in " + twoBuckets, 2},
+        {"select count(*) from " + RAW_TABLE_NAME
             + " where " + CLASSIFICATION_COLUMN + " <> 1", bucketCountComplement},
         {"select count(*) from " + RAW_TABLE_NAME
             + " where " + CLASSIFICATION_COLUMN + " in " + twoBuckets, 2 * bucketCount},

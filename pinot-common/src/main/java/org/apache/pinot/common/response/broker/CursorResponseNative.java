@@ -25,14 +25,14 @@ import org.apache.pinot.common.response.CursorResponse;
 
 @JsonPropertyOrder({
     "resultTable", "numRowsResultSet", "partialResult", "exceptions", "numGroupsLimitReached",
-    "numGroupsWarningLimitReached", "timeUsedMs", "requestId", "brokerId",
-    "numDocsScanned", "totalDocs",
+    "numGroupsWarningLimitReached", "timeUsedMs", "requestId", "brokerId", "numDocsScanned", "totalDocs",
     "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numServersQueried", "numServersResponded",
     "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried",
     "numConsumingSegmentsProcessed", "numConsumingSegmentsMatched", "minConsumingFreshnessTimeMs",
     "numSegmentsPrunedByBroker", "numSegmentsPrunedByServer", "numSegmentsPrunedInvalid", "numSegmentsPrunedByLimit",
-    "numSegmentsPrunedByValue", "brokerReduceTimeMs", "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs",
-    "offlineSystemActivitiesCpuTimeNs", "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
+    "numSegmentsPrunedByValue", "numRemoteAccesses", "remoteAccessBytes", "brokerReduceTimeMs",
+    "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs", "offlineSystemActivitiesCpuTimeNs",
+    "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
     "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs", "realtimeTotalCpuTimeNs",
     "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tableQueries",
     "groupsTrimmed", "approximateFunctionApplied",
@@ -83,6 +83,8 @@ public class CursorResponseNative extends BrokerResponseNative implements Cursor
     setNumSegmentsPrunedInvalid(response.getNumSegmentsPrunedInvalid());
     setNumSegmentsPrunedByLimit(response.getNumSegmentsPrunedByLimit());
     setNumSegmentsPrunedByValue(response.getNumSegmentsPrunedByValue());
+    setNumRemoteAccesses(response.getNumRemoteAccesses());
+    setRemoteAccessBytes(response.getRemoteAccessBytes());
     setBrokerReduceTimeMs(response.getBrokerReduceTimeMs());
     setOfflineThreadCpuTimeNs(response.getOfflineThreadCpuTimeNs());
     setRealtimeThreadCpuTimeNs(response.getRealtimeThreadCpuTimeNs());

@@ -51,8 +51,8 @@ public class FunctionRegistryTest {
       TransformFunctionType.JSON_EXTRACT_KEY, TransformFunctionType.TIME_CONVERT,
       TransformFunctionType.DATE_TIME_CONVERT_WINDOW_HOP, TransformFunctionType.ARRAY_LENGTH,
       TransformFunctionType.ARRAY_AVERAGE, TransformFunctionType.ARRAY_MIN, TransformFunctionType.ARRAY_MAX,
-      TransformFunctionType.ARRAY_SUM, TransformFunctionType.VALUE_IN, TransformFunctionType.IN_ID_SET,
-      TransformFunctionType.GROOVY, TransformFunctionType.CLP_DECODE, TransformFunctionType.CLP_ENCODED_VARS_MATCH,
+      TransformFunctionType.ARRAY_SUM, TransformFunctionType.VALUE_IN, TransformFunctionType.GROOVY,
+      TransformFunctionType.CLP_DECODE, TransformFunctionType.CLP_ENCODED_VARS_MATCH,
       TransformFunctionType.ST_POLYGON, TransformFunctionType.ST_AREA, TransformFunctionType.ITEM,
       TransformFunctionType.TIME_SERIES_BUCKET);
   private static final EnumSet<FilterKind> IGNORED_FILTER_KINDS = EnumSet.of(

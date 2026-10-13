@@ -119,8 +119,8 @@ public class IdealStateGroupCommit {
         ArrayList<Entry> processed = new ArrayList<>();
         try {
           if (queue._pending.peek() == null) {
-            // All pending entries have been processed, the updatedIdealState should be set.
-            return entry._updatedIdealState;
+            // The entry was already processed; check its outcome below.
+            break;
           }
           updateIdealState(helixManager, resourceName, idealState -> {
             IdealState updatedIdealState = idealState;

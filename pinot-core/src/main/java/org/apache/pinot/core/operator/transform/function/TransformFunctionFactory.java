@@ -370,7 +370,7 @@ public class TransformFunctionFactory {
         }
 
         try {
-          transformFunction.init(transformFunctionArguments, columnContextMap, queryContext.isNullHandlingEnabled());
+          transformFunction.init(transformFunctionArguments, columnContextMap, queryContext);
         } catch (Exception e) {
           throw new BadQueryRequestException("Caught exception while initializing transform function: "
               + functionName + ": " + e.getMessage(), e);

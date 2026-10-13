@@ -132,12 +132,7 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
     ScanBasedDocIdIterator docIdIterator = (ScanBasedDocIdIterator) expressionFilterOperator.getTrues().iterator();
     MutableRoaringBitmap result = docIdIterator.applyAnd(partialMatchDocIds);
     result.or(fullMatchDocIds);
-    return new BitmapDocIdSet(result, _numDocs) {
-      @Override
-      public long getNumEntriesScannedInFilter() {
-        return docIdIterator.getNumEntriesScanned();
-      }
-    };
+    return BitmapDocIdSet.create(result, _numDocs, docIdIterator.getNumEntriesScanned());
   }
 
   /// Returns the null document IDs for the indexed column when query null handling is enabled and the column has a

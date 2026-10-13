@@ -200,6 +200,26 @@ public class ControllerConfTest {
   }
 
   @Test
+  public void testControllerAccessProtocolsFromClusterConfig() {
+    // ServiceStartableUtils.applyClusterConfig applies cluster configs with setProperty, which doesn't split lists
+    ControllerConf conf = new ControllerConf();
+    conf.setProperty(ControllerConf.CONTROLLER_ACCESS_PROTOCOLS, "http,https");
+    conf.setProperty(ControllerConf.CONTROLLER_ACCESS_PROTOCOLS + ".https.port", "8443");
+    conf.setProperty(ControllerConf.CONTROLLER_ACCESS_PROTOCOLS + ".https.vip", "true");
+    Assert.assertEquals(conf.getControllerAccessProtocols(), List.of("http", "https"));
+    Assert.assertEquals(conf.getControllerVipPort(), "8443");
+  }
+
+  @Test
+  public void testControllerAccessProtocolsDefault() {
+    ControllerConf conf = new ControllerConf();
+    Assert.assertEquals(conf.getControllerAccessProtocols(), List.of("http"));
+
+    conf.setProperty(ControllerConf.CONTROLLER_PORT, "9000");
+    Assert.assertEquals(conf.getControllerAccessProtocols(), List.of());
+  }
+
+  @Test
   public void testConcurrentSchedulingEnabledDefault() {
     ControllerConf conf = new ControllerConf();
     Assert.assertFalse(conf.isPinotTaskManagerConcurrentSchedulingEnabled(),

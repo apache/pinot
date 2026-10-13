@@ -109,23 +109,30 @@ public class RealtimeNgramFilteringIndex implements MutableTextIndex {
   /// @param searchQuery as a literal string
   @Override
   public MutableRoaringBitmap getDocIds(String searchQuery) {
-    _readLock.lock();
+    // Generated outside the read lock: it only reads the query string and the immutable n-gram length settings.
     Iterable<String> ngrams = generateNgrams(searchQuery);
     if (!ngrams.iterator().hasNext()) {
       return null; // No n-grams generated, return null.
     }
-    ArrayList<MutableRoaringBitmap> bitmapLst = new ArrayList<>();
+    _readLock.lock();
     try {
+      MutableRoaringBitmap resultBitmap = null;
       for (String ngram : ngrams) {
         int dictId = _ngramToDictIdMapping.getInt(ngram);
-        bitmapLst.add(_invertedIndex.getDocIds(dictId));
-      }
-      if (bitmapLst.isEmpty()) {
-        return null; // No n-grams found in the index.
-      }
-      MutableRoaringBitmap resultBitmap = bitmapLst.get(0);
-      for (int i = 1; i < bitmapLst.size(); i++) {
-        resultBitmap.and(bitmapLst.get(i));
+        if (dictId < 0) {
+          // The n-gram has never been indexed, so no document can contain all the n-grams of the search query.
+          return new MutableRoaringBitmap();
+        }
+        // getDocIds returns a private copy, so it is safe to intersect into the first one.
+        MutableRoaringBitmap docIds = _invertedIndex.getDocIds(dictId);
+        if (resultBitmap == null) {
+          resultBitmap = docIds;
+        } else {
+          resultBitmap.and(docIds);
+        }
+        if (resultBitmap.isEmpty()) {
+          return resultBitmap;
+        }
       }
       return resultBitmap;
     } finally {

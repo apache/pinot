@@ -68,7 +68,9 @@ public class TimeSeriesExchangeReceiveOperator extends BaseTimeSeriesOperator {
       DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_SERVER,
       DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_INVALID,
       DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_LIMIT,
-      DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_VALUE
+      DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_VALUE,
+      DataTable.MetadataKey.NUM_REMOTE_ACCESSES,
+      DataTable.MetadataKey.REMOTE_ACCESS_BYTES
   );
 
   private static final List<DataTable.MetadataKey> MIN_STATS_KEYS = List.of(

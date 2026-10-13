@@ -160,11 +160,15 @@ public interface DataTable {
     // inputs. How a downstream consumer reacts (skip, retry, accept with annotation) is the
     // consumer's policy.
     INCOMPLETE_MERGE(43, "incompleteMerge", MetadataValueType.STRING),
-    LITE_MODE_LEAF_STAGE_LIMIT_REACHED(44, "liteModeLeafStageLimitReached", MetadataValueType.STRING);
+    LITE_MODE_LEAF_STAGE_LIMIT_REACHED(44, "liteModeLeafStageLimitReached", MetadataValueType.STRING),
+    // Number of remote accesses (local cache misses) made to read segment data from a remote storage tier, and the
+    // number of bytes they read.
+    NUM_REMOTE_ACCESSES(45, "numRemoteAccesses", MetadataValueType.LONG),
+    REMOTE_ACCESS_BYTES(46, "remoteAccessBytes", MetadataValueType.LONG);
 
     // We keep this constant to track the max id added so far for backward compatibility.
     // Increase it when adding new keys, but NEVER DECREASE IT!!!
-    private static final int MAX_ID = LITE_MODE_LEAF_STAGE_LIMIT_REACHED.getId();
+    private static final int MAX_ID = REMOTE_ACCESS_BYTES.getId();
 
     private static final MetadataKey[] ID_TO_ENUM_KEY_MAP = new MetadataKey[MAX_ID + 1];
     private static final Map<String, MetadataKey> NAME_TO_ENUM_KEY_MAP = new HashMap<>();

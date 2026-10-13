@@ -147,7 +147,7 @@ public abstract class BaseFilterOperator extends BaseOperator<FilterBlock> {
 
   /// @return document IDs in which the predicate evaluates to NULL.
   protected BlockDocIdSet getNulls() {
-    return EmptyDocIdSet.getInstance();
+    return EmptyDocIdSet.unscanned();
   }
 
   /// Returns the document IDs in which the predicate does not evaluate to false: the true ones and, with null
@@ -171,13 +171,13 @@ public abstract class BaseFilterOperator extends BaseOperator<FilterBlock> {
   /// Only for operators that override [#getNotFalses]. The default [#getNotFalses] reads [#getNulls], so an operator
   /// that keeps it would recurse; a leaf returns its UNKNOWN documents directly instead.
   protected BlockDocIdSet deriveNulls(@Nullable Map<String, String> queryOptions) {
-    BlockDocIdSet notFalses = getNotFalses().getOptimizedDocIdSet();
+    BlockDocIdSet notFalses = getNotFalses();
     if (notFalses instanceof EmptyDocIdSet) {
-      return EmptyDocIdSet.getInstance();
+      return EmptyDocIdSet.unscanned();
     }
-    BlockDocIdSet trues = getTrues().getOptimizedDocIdSet();
+    BlockDocIdSet trues = getTrues();
     if (trues instanceof MatchAllDocIdSet) {
-      return EmptyDocIdSet.getInstance();
+      return EmptyDocIdSet.unscanned();
     }
     if (trues instanceof EmptyDocIdSet) {
       return notFalses;
@@ -191,7 +191,7 @@ public abstract class BaseFilterOperator extends BaseOperator<FilterBlock> {
   protected BlockDocIdSet getFalses() {
     BlockDocIdSet notFalses = getNotFalses();
     if (notFalses instanceof MatchAllDocIdSet) {
-      return EmptyDocIdSet.getInstance();
+      return EmptyDocIdSet.unscanned();
     }
     if (notFalses instanceof EmptyDocIdSet) {
       return new MatchAllDocIdSet(_numDocs);

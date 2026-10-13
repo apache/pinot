@@ -21,11 +21,14 @@ package org.apache.pinot.core.operator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.operator.combine.BaseCombineOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.testng.annotations.Test;
 
@@ -123,5 +126,38 @@ public class InstanceResponseOperatorTest {
 
     assertTrue(responseBlock.getResponseMetadata()
         .containsKey(MetadataKey.LITE_MODE_LEAF_STAGE_LIMIT_REACHED.getName()));
+  }
+
+  @Test
+  public void testRemoteAccessesSummedAcrossFetchContexts() {
+    SelectionResultsBlock resultsBlock = mock(SelectionResultsBlock.class);
+    when(resultsBlock.getResultsMetadata()).thenReturn(new HashMap<>());
+    QueryContext queryContext = mock(QueryContext.class);
+    when(queryContext.getQueryOptions()).thenReturn(new HashMap<>());
+    FetchContext fetchContext1 = new FetchContext(UUID.randomUUID(), "segment1", Set.of("col"));
+    fetchContext1.addRemoteAccesses(3, 300);
+    FetchContext fetchContext2 = new FetchContext(UUID.randomUUID(), "segment2", Set.of("col"));
+    fetchContext2.addRemoteAccesses(4, 400);
+    InstanceResponseOperator operator = new InstanceResponseOperator(mock(BaseCombineOperator.class), List.of(),
+        List.of(fetchContext1, fetchContext2), queryContext);
+    InstanceResponseBlock responseBlock = operator.buildInstanceResponseBlock(resultsBlock);
+    Map<String, String> metadata = responseBlock.getResponseMetadata();
+    assertEquals(metadata.get(MetadataKey.NUM_REMOTE_ACCESSES.getName()), "7");
+    assertEquals(metadata.get(MetadataKey.REMOTE_ACCESS_BYTES.getName()), "700");
+  }
+
+  @Test
+  public void testNoRemoteAccessMetadataWithoutRemoteAccesses() {
+    SelectionResultsBlock resultsBlock = mock(SelectionResultsBlock.class);
+    when(resultsBlock.getResultsMetadata()).thenReturn(new HashMap<>());
+    QueryContext queryContext = mock(QueryContext.class);
+    when(queryContext.getQueryOptions()).thenReturn(new HashMap<>());
+    FetchContext fetchContext = new FetchContext(UUID.randomUUID(), "segment", Set.of("col"));
+    InstanceResponseOperator operator = new InstanceResponseOperator(mock(BaseCombineOperator.class), List.of(),
+        List.of(fetchContext), queryContext);
+    InstanceResponseBlock responseBlock = operator.buildInstanceResponseBlock(resultsBlock);
+    Map<String, String> metadata = responseBlock.getResponseMetadata();
+    assertFalse(metadata.containsKey(MetadataKey.NUM_REMOTE_ACCESSES.getName()));
+    assertFalse(metadata.containsKey(MetadataKey.REMOTE_ACCESS_BYTES.getName()));
   }
 }
