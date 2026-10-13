@@ -190,10 +190,10 @@
     <hive.version>4.2.1</hive.version>
     <helix.version>2.0.1</helix.version>
     <zkclient.version>0.11</zkclient.version>
-    <jackson.version>2.22.2</jackson.version>
+    <jackson.version>2.22.3</jackson.version>
     <fory.version>1.7.3</fory.version>
     <zookeeper.version>3.9.6</zookeeper.version>
-    <async-http-client.version>3.0.13</async-http-client.version>
+    <async-http-client.version>3.0.14</async-http-client.version>
     <jersey.version>2.48</jersey.version>
     <hk2.version>2.6.1</hk2.version>
     <swagger.version>1.6.16</swagger.version>
@@ -213,7 +213,7 @@
     <dropwizard-metrics.version>4.2.40</dropwizard-metrics.version>
     <snappy-java.version>1.1.10.8</snappy-java.version>
     <zstd-jni.version>1.5.7-16</zstd-jni.version>
-    <lz4-java.version>1.11.3</lz4-java.version>
+    <lz4-java.version>1.11.4</lz4-java.version>
     <libthrift.version>0.24.0</libthrift.version>
     <log4j.version>2.26.1</log4j.version>
     <slf4j.version>2.0.19</slf4j.version>
@@ -301,6 +301,7 @@
     <!-- Google Libraries -->
     <protobuf.version>4.36.1</protobuf.version>
     <grpc.version>1.84.0</grpc.version>
+    <guava.version>33.7.2-jre</guava.version>
     <google.cloud.libraries.version>26.88.1</google.cloud.libraries.version>
     <opentelemetry.gcp.resources.version>1.60.0-alpha</opentelemetry.gcp.resources.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
@@ -1139,7 +1140,15 @@
         <type>pom</type>
         <scope>import</scope>
       </dependency>
-      <!-- libraries-bom should be imported after protobuf-bom and grpc-bom to honor their versions -->
+      <!-- guava-bom -->
+      <dependency>
+        <groupId>com.google.guava</groupId>
+        <artifactId>guava-bom</artifactId>
+        <version>${guava.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <!-- libraries-bom should be imported after protobuf-bom, grpc-bom and guava-bom to honor their versions -->
       <dependency>
         <groupId>com.google.cloud</groupId>
         <artifactId>libraries-bom</artifactId>
