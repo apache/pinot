@@ -100,6 +100,23 @@ public class BasicAuthTest {
   }
 
   @Test
+  public void testNoExcludeTables() {
+    // A principal without exclusions grants raw and typed names alike, through the allow-list and without one
+    BasicAuthPrincipal unrestricted = new BasicAuthPrincipal("name", "token", Set.of(), Set.of(), Set.of("read"));
+    assertTrue(unrestricted.hasTable("t"));
+    assertTrue(unrestricted.hasTable("t_OFFLINE"));
+    assertTrue(unrestricted.hasTable("t_REALTIME"));
+    assertTrue(unrestricted.hasUnrestrictedTableAccess());
+
+    BasicAuthPrincipal allowListed =
+        new BasicAuthPrincipal("name", "token", Set.of("t", "t_OFFLINE"), Set.of(), Set.of("read"));
+    assertTrue(allowListed.hasTable("t"));
+    assertTrue(allowListed.hasTable("t_OFFLINE"));
+    assertFalse(allowListed.hasTable("t_REALTIME"));
+    assertFalse(allowListed.hasTable("other"));
+  }
+
+  @Test
   public void testExcludeTablesAlsoMatchTheRawName() {
     // excludeTables lists raw names: a type suffix must not bypass an excluded table
     BasicAuthPrincipal principal = new BasicAuthPrincipal("name", "token", Set.of(), Set.of("t"), Set.of("read"));

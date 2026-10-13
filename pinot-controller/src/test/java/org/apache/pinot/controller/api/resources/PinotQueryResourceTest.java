@@ -27,7 +27,9 @@ import javax.annotation.Nullable;
 import javax.ws.rs.NotAuthorizedException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedHashMap;
+import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
+import org.apache.pinot.common.auth.BasicAuthTokenUtils;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
@@ -37,11 +39,13 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessType;
+import org.apache.pinot.controller.api.access.BasicAuthAccessControlFactory;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -75,6 +79,10 @@ import static org.testng.Assert.expectThrows;
 public class PinotQueryResourceTest {
   private static final Map<String, String> REQUEST_HEADERS = Map.of("Authorization", "Basic abc");
   private static final String REMOTE_ADDR = "127.0.0.1";
+  // The config keys of the controller's basic auth, see BasicAuthAccessControlFactory
+  private static final String BASIC_AUTH_PRINCIPALS_PREFIX = "controller.admin.access.control.principals";
+  private static final String BASIC_AUTH_PRINCIPAL = "deleter";
+  private static final String BASIC_AUTH_PASSWORD = "deleterPassword";
 
   @Mock
   PinotHelixResourceManager _resourceManager;
@@ -158,11 +166,11 @@ public class PinotQueryResourceTest {
     String response = postSql("DELETE FROM T WHERE a = 1", "db1");
 
     assertFalse(response.contains("errorCode"), response);
-    // The caller-level check before the table is looked up, then READ and QUERY on the table because the WHERE clause
-    // reads it, then DELETE and DELETE_ROWS on it: stricter than the query path of the controller, which only checks
-    // READ
-    assertEquals(accessControl._checks, List.of("READ null", "READ db1.t", Actions.Table.QUERY + " TABLE db1.t",
-        "DELETE db1.t", Actions.Table.DELETE_ROWS + " TABLE db1.t"));
+    // READ and QUERY on the table because the WHERE clause reads it, then DELETE and DELETE_ROWS on it: stricter than
+    // the query path of the controller, which only checks READ. No check without a table: the cluster-wide check of
+    // basic auth would deny a principal scoped to the table
+    assertEquals(accessControl._checks, List.of("READ db1.t", Actions.Table.QUERY + " TABLE db1.t", "DELETE db1.t",
+        Actions.Table.DELETE_ROWS + " TABLE db1.t"));
     DeleteStatement statement = executedDelete();
     assertEquals(statement.getTableName(), "db1.t");
     assertEquals(statement.getPredicate(), "a = 1");
@@ -177,7 +185,7 @@ public class PinotQueryResourceTest {
 
     // On the raw name like the table APIs of the controller, then the fine-grained actions on the typed name as the
     // broker checks them, while the executor deletes from the table named by the statement
-    assertEquals(accessControl._checks, List.of("READ null", "READ t", Actions.Table.QUERY + " TABLE t", "DELETE t",
+    assertEquals(accessControl._checks, List.of("READ t", Actions.Table.QUERY + " TABLE t", "DELETE t",
         Actions.Table.DELETE_ROWS + " TABLE t", Actions.Table.QUERY + " TABLE t_OFFLINE",
         Actions.Table.DELETE_ROWS + " TABLE t_OFFLINE"));
     assertEquals(executedDelete().getTableName(), "t_OFFLINE");
@@ -185,11 +193,11 @@ public class PinotQueryResourceTest {
 
   @DataProvider
   public Object[][] typedNameChecks() {
-    List<String> checks = List.of("READ null", "READ t", Actions.Table.QUERY + " TABLE t", "DELETE t",
+    List<String> checks = List.of("READ t", Actions.Table.QUERY + " TABLE t", "DELETE t",
         Actions.Table.DELETE_ROWS + " TABLE t", Actions.Table.QUERY + " TABLE t_OFFLINE",
         Actions.Table.DELETE_ROWS + " TABLE t_OFFLINE");
     return new Object[][]{
-        {Actions.Table.QUERY + " TABLE t_OFFLINE", checks.subList(0, 6)},
+        {Actions.Table.QUERY + " TABLE t_OFFLINE", checks.subList(0, 5)},
         {Actions.Table.DELETE_ROWS + " TABLE t_OFFLINE", checks}
     };
   }
@@ -211,14 +219,13 @@ public class PinotQueryResourceTest {
 
   @DataProvider
   public Object[][] deleteChecks() {
-    List<String> checks = List.of("READ null", "READ t", Actions.Table.QUERY + " TABLE t", "DELETE t",
+    List<String> checks = List.of("READ t", Actions.Table.QUERY + " TABLE t", "DELETE t",
         Actions.Table.DELETE_ROWS + " TABLE t");
     String deniedOnTable = "Permission denied to delete rows from table: t";
     return new Object[][]{
-        {"READ null", checks.subList(0, 1), "Permission denied to delete rows"},
-        {"READ t", checks.subList(0, 2), deniedOnTable},
-        {Actions.Table.QUERY + " TABLE t", checks.subList(0, 3), deniedOnTable},
-        {"DELETE t", checks.subList(0, 4), deniedOnTable},
+        {"READ t", checks.subList(0, 1), deniedOnTable},
+        {Actions.Table.QUERY + " TABLE t", checks.subList(0, 2), deniedOnTable},
+        {"DELETE t", checks.subList(0, 3), deniedOnTable},
         {Actions.Table.DELETE_ROWS + " TABLE t", checks, deniedOnTable}
     };
   }
@@ -271,8 +278,8 @@ public class PinotQueryResourceTest {
     assertTrue(response.contains("DELETE does not support logical tables: lt"), response);
     // Rejected only once the caller is authorized on the name, like an unknown table, so that the names of the
     // logical tables are not leaked to a caller who is not authorized for them
-    assertEquals(accessControl._checks, List.of("READ null", "READ lt", Actions.Table.QUERY + " TABLE lt",
-        "DELETE lt", Actions.Table.DELETE_ROWS + " TABLE lt"));
+    assertEquals(accessControl._checks, List.of("READ lt", Actions.Table.QUERY + " TABLE lt", "DELETE lt",
+        Actions.Table.DELETE_ROWS + " TABLE lt"));
     verify(_sqlQueryExecutor, never()).executeStatement(any(), any());
   }
 
@@ -304,8 +311,8 @@ public class PinotQueryResourceTest {
     assertTrue(response.contains(String.valueOf(QueryErrorCode.ACCESS_DENIED.getId())), response);
     assertTrue(response.contains("Permission denied to delete rows from table: secrettable"), response);
     assertFalse(response.contains("SecretTable"), response);
-    assertEquals(accessControl._checks, List.of("READ null", "READ SecretTable",
-        Actions.Table.QUERY + " TABLE SecretTable", "DELETE SecretTable"));
+    assertEquals(accessControl._checks, List.of("READ SecretTable", Actions.Table.QUERY + " TABLE SecretTable",
+        "DELETE SecretTable"));
     verify(_sqlQueryExecutor, never()).executeStatement(any(), any());
   }
 
@@ -358,7 +365,7 @@ public class PinotQueryResourceTest {
     assertTrue(response.contains(String.valueOf(QueryErrorCode.TABLE_DOES_NOT_EXIST.getId())), response);
     assertTrue(response.contains("Table does not exist: unknown"), response);
     // Authorized first, with the name as written since the cache does not know its case
-    assertEquals(accessControl._checks, List.of("READ null", "READ unknown", Actions.Table.QUERY + " TABLE unknown",
+    assertEquals(accessControl._checks, List.of("READ unknown", Actions.Table.QUERY + " TABLE unknown",
         "DELETE unknown", Actions.Table.DELETE_ROWS + " TABLE unknown"));
     verify(_sqlQueryExecutor, never()).executeStatement(any(), any());
   }
@@ -510,16 +517,66 @@ public class PinotQueryResourceTest {
   }
 
   @Test
-  public void testUnauthenticatedDeleteDoesNotLookUpTheTable() {
+  public void testUnauthenticatedDeleteFromALogicalTableDoesNotLeakIt() {
     unauthenticatedAccessControl();
     when(_tableCache.getActualTableName("lt")).thenReturn(null);
     when(_tableCache.getActualLogicalTableName("lt")).thenReturn("lt");
 
-    // The caller is checked before the table cache is consulted, so that an unauthenticated caller does not even
-    // reach the table lookup that tells logical tables and unknown tables apart
-    expectThrows(NotAuthorizedException.class, () -> postSql("DELETE FROM lt WHERE a = 1", null));
-    verify(_tableCache, never()).getActualTableName(any());
-    verify(_tableCache, never()).getActualLogicalTableName(any());
+    // The table is looked up before the first check, which is the one that authenticates the caller, but nothing
+    // that depends on the lookup is observable before it: an unauthenticated caller gets HTTP 401 and no error
+    // message, so the lookup that tells logical tables and unknown tables apart leaks nothing
+    NotAuthorizedException exception =
+        expectThrows(NotAuthorizedException.class, () -> postSql("DELETE FROM lt WHERE a = 1", null));
+    assertEquals(exception.getResponse().getStatus(), Response.Status.UNAUTHORIZED.getStatusCode());
+    assertFalse(String.valueOf(exception.getMessage()).contains("logical"), exception.getMessage());
+    verify(_sqlQueryExecutor, never()).executeStatement(any(), any());
+  }
+
+  @Test
+  public void testTableScopedBasicAuthPrincipalDeletesFromItsTable() {
+    // The cluster-wide check of basic auth denies every principal with a table allow-list, so a DELETE on the
+    // controller must not run it: a principal allowed to read and delete on the table deletes from it, as it does
+    // through a broker
+    tableScopedBasicAuth("read,delete");
+    when(_sqlQueryExecutor.executeStatement(any(), any())).thenReturn(new BrokerResponseNative());
+    Map<String, String> headers = basicAuthHeaders(BASIC_AUTH_PASSWORD);
+
+    String response = postSql("DELETE FROM t WHERE a = 1", null, headers);
+
+    assertFalse(response.contains("errorCode"), response);
+    assertEquals(executedDelete(headers).getTableName(), "t");
+  }
+
+  @Test
+  public void testTableScopedBasicAuthPrincipalIsDeniedOnAnotherTable() {
+    tableScopedBasicAuth("read,delete");
+
+    String response = postSql("DELETE FROM u WHERE a = 1", null, basicAuthHeaders(BASIC_AUTH_PASSWORD));
+
+    assertTrue(response.contains(String.valueOf(QueryErrorCode.ACCESS_DENIED.getId())), response);
+    assertTrue(response.contains("Permission denied to delete rows from table: u"), response);
+    verify(_sqlQueryExecutor, never()).executeStatement(any(), any());
+  }
+
+  @Test
+  public void testTableScopedBasicAuthPrincipalWithoutTheDeletePermissionIsDenied() {
+    tableScopedBasicAuth("read");
+
+    String response = postSql("DELETE FROM t WHERE a = 1", null, basicAuthHeaders(BASIC_AUTH_PASSWORD));
+
+    assertTrue(response.contains(String.valueOf(QueryErrorCode.ACCESS_DENIED.getId())), response);
+    assertTrue(response.contains("Permission denied to delete rows from table: t"), response);
+    verify(_sqlQueryExecutor, never()).executeStatement(any(), any());
+  }
+
+  @Test
+  public void testBasicAuthPrincipalWithAWrongPasswordIsUnauthorized() {
+    tableScopedBasicAuth("read,delete");
+
+    NotAuthorizedException exception = expectThrows(NotAuthorizedException.class,
+        () -> postSql("DELETE FROM t WHERE a = 1", null, basicAuthHeaders("wrong")));
+
+    assertEquals(exception.getResponse().getStatus(), Response.Status.UNAUTHORIZED.getStatusCode());
     verify(_sqlQueryExecutor, never()).executeStatement(any(), any());
   }
 
@@ -568,9 +625,33 @@ public class PinotQueryResourceTest {
     when(_accessControlFactory.create()).thenReturn(accessControl);
   }
 
+  /// Installs the controller's basic auth, as an operator configures it, with a single principal scoped to table `t`
+  /// (`BASIC_AUTH_PRINCIPAL` with `BASIC_AUTH_PASSWORD`) and the given comma-separated permissions.
+  private void tableScopedBasicAuth(String permissions) {
+    String principal = BASIC_AUTH_PRINCIPALS_PREFIX + "." + BASIC_AUTH_PRINCIPAL;
+    BasicAuthAccessControlFactory factory = new BasicAuthAccessControlFactory();
+    factory.init(new PinotConfiguration(Map.of(BASIC_AUTH_PRINCIPALS_PREFIX, BASIC_AUTH_PRINCIPAL,
+        principal + ".password", BASIC_AUTH_PASSWORD, principal + ".tables", "t",
+        principal + ".permissions", permissions)));
+    when(_accessControlFactory.create()).thenReturn(factory.create());
+  }
+
+  /// Request headers carrying the basic auth token of `BASIC_AUTH_PRINCIPAL` with the given password.
+  private static Map<String, String> basicAuthHeaders(String password) {
+    return Map.of(HttpHeaders.AUTHORIZATION, BasicAuthTokenUtils.toBasicAuthToken(BASIC_AUTH_PRINCIPAL, password));
+  }
+
   private String postSql(String sql, @Nullable String database) {
+    return postSql(sql, database, REQUEST_HEADERS);
+  }
+
+  /// Posts the statement with the given request headers, which basic auth reads with `getRequestHeader` and the
+  /// executor gets through `getRequestHeaders`.
+  private String postSql(String sql, @Nullable String database, Map<String, String> headers) {
+    MultivaluedHashMap<String, String> requestHeaders = new MultivaluedHashMap<>(headers);
     HttpHeaders httpHeaders = mock(HttpHeaders.class);
-    when(httpHeaders.getRequestHeaders()).thenReturn(new MultivaluedHashMap<>(REQUEST_HEADERS));
+    when(httpHeaders.getRequestHeaders()).thenReturn(requestHeaders);
+    when(httpHeaders.getRequestHeader(any())).then(invocation -> requestHeaders.get(invocation.<String>getArgument(0)));
     when(httpHeaders.getHeaderString(CommonConstants.DATABASE)).thenReturn(database);
     return streamingOutputToString(_pinotQueryResource.handlePostSql(
         JsonUtils.newObjectNode().put("sql", sql).toString(), httpHeaders, mockRequest()));
@@ -610,15 +691,20 @@ public class PinotQueryResourceTest {
   /// Returns the `DELETE` handed to the executor, checking that the executor also gets the request headers, which the
   /// APIs it calls use to authorize the caller again.
   private DeleteStatement executedDelete() {
+    return executedDelete(REQUEST_HEADERS);
+  }
+
+  /// Returns the `DELETE` handed to the executor along with the given request headers.
+  private DeleteStatement executedDelete(Map<String, String> expectedHeaders) {
     ArgumentCaptor<DataManipulationStatement> captor = ArgumentCaptor.forClass(DataManipulationStatement.class);
-    verify(_sqlQueryExecutor).executeStatement(captor.capture(), eq(REQUEST_HEADERS));
+    verify(_sqlQueryExecutor).executeStatement(captor.capture(), eq(expectedHeaders));
     DeleteStatement statement = (DeleteStatement) captor.getValue();
     assertTrue(statement.isResolved());
     return statement;
   }
 
-  /// Access control that records its checks as `<access type> <table name>` (the table name being `null` for the
-  /// caller-level check) and `<action> <target type> <target id>`, and denies the check it is given.
+  /// Access control that records its checks as `<access type> <table name>` and `<action> <target type> <target id>`,
+  /// and denies the check it is given.
   private static class RecordingAccessControl implements AccessControl {
     private final List<String> _checks = new ArrayList<>();
     @Nullable

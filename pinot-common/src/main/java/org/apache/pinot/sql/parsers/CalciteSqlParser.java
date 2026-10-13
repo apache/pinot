@@ -124,13 +124,31 @@ public class CalciteSqlParser {
 
     // extract and remove OPTIONS string
     SqlOptionsMode legacyOptionSyntaxMode = QueryOptionsUtils.getLegacyOptionSyntaxMode();
-    List<String> options = extractOptionsFromSql(sql);
-    if (!options.isEmpty()) {
-      if (legacyOptionSyntaxMode == SqlOptionsMode.REJECT) {
-        throw new SqlCompilationException("Legacy OPTION(...) query options are not allowed on this cluster, use "
-            + "'SET <key> = <value>;' statements instead: " + options);
+    List<String> options = List.of();
+    // The suffix text dropped in IGNORE mode, kept only to fail a DELETE (its options configure it)
+    String ignoredOptions = null;
+    if (legacyOptionSyntaxMode == SqlOptionsMode.IGNORE) {
+      // IGNORE differs from the other modes: the options are never applied, so a single regex pass both detects and
+      // strips the suffix, and the common no-suffix path pays for one scan without materializing an option list
+      Matcher matcher = OPTIONS_REGEX_PATTEN.matcher(sql);
+      if (matcher.find()) {
+        ignoredOptions = matcher.group(1);
+        StringBuilder strippedSql = new StringBuilder(sql.length());
+        do {
+          matcher.appendReplacement(strippedSql, "");
+        } while (matcher.find());
+        matcher.appendTail(strippedSql);
+        sql = strippedSql.toString();
       }
-      sql = removeOptionsFromSql(sql);
+    } else {
+      options = extractOptionsFromSql(sql);
+      if (!options.isEmpty()) {
+        if (legacyOptionSyntaxMode == SqlOptionsMode.REJECT) {
+          throw new SqlCompilationException("Legacy OPTION(...) query options are not allowed on this cluster, use "
+              + "'SET <key> = <value>;' statements instead: " + options);
+        }
+        sql = removeOptionsFromSql(sql);
+      }
     }
 
     try {
@@ -139,23 +157,20 @@ public class CalciteSqlParser {
       sqlNodeList = (SqlNodeList) PostgreSqlCastRewriter.rewrite(sqlNodeList);
       // Extract OPTION statements from sql.
       SqlNodeAndOptions sqlNodeAndOptions = extractSqlNodeAndOptions(sqlNodeList);
+      // Dropping a DELETE option (e.g. dryRun) would change its effect
+      if (ignoredOptions != null && sqlNodeAndOptions.getSqlNode() instanceof SqlDelete) {
+        throw new SqlCompilationException("Legacy OPTION(...) options are ignored on this cluster, use "
+            + "'SET <key> = <value>;' statements to configure DELETE: OPTION(" + ignoredOptions + ")");
+      }
       // add legacy OPTIONS keyword-based options
       if (!options.isEmpty()) {
-        if (legacyOptionSyntaxMode == SqlOptionsMode.IGNORE) {
-          // Dropping a DML option (e.g. the dryRun of a DELETE, the taskName of an INSERT) would change its effect.
-          if (sqlNodeAndOptions.getSqlType() == PinotSqlType.DML) {
-            throw new SqlCompilationException("Legacy OPTION(...) options are ignored on this cluster, use "
-                + "'SET <key> = <value>;' statements to configure a DML statement (INSERT, DELETE): " + options);
-          }
-        } else {
-          Map<String, String> optionMap = extractOptionsMap(options);
-          if (sqlNodeAndOptions.getSqlType() == PinotSqlType.DQL) {
-            // No-op unless the broker enables query option validation. DML (e.g.
-            // INSERT INTO FILE OPTION(taskName=...)) carries free-form task/FS properties, like DML SET.
-            QueryOptionsUtils.validateSqlQueryOptions(optionMap);
-          }
-          sqlNodeAndOptions.setExtraOptions(optionMap);
+        Map<String, String> optionMap = extractOptionsMap(options);
+        if (sqlNodeAndOptions.getSqlType() == PinotSqlType.DQL) {
+          // No-op unless the broker enables query option validation. DML (e.g.
+          // INSERT INTO FILE OPTION(taskName=...)) carries free-form task/FS properties, like DML SET.
+          QueryOptionsUtils.validateSqlQueryOptions(optionMap);
         }
+        sqlNodeAndOptions.setExtraOptions(optionMap);
       }
       sqlNodeAndOptions.setParseTimeNs(System.nanoTime() - parseStartTimeNs);
       return sqlNodeAndOptions;

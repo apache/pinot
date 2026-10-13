@@ -56,27 +56,28 @@ public class SqlOptionsModeTest {
   public void testIgnoredLegacyOptionSyntaxIsStrippedAndDropped() {
     QueryOptionsUtils.setLegacyOptionSyntaxMode(SqlOptionsMode.IGNORE);
     assertEquals(sqlOptionsOf("select * from vegetables OPTION(timeoutMs=1000)"), Map.of());
+    // INSERT is unaffected: its suffix is dropped silently, as always
+    assertEquals(sqlOptionsOf("INSERT INTO db.tbl FROM FILE 'file:///tmp/file1' OPTION(taskName=myTask-1)"), Map.of());
     // SET statements are unaffected
     assertEquals(sqlOptionsOf("SET timeoutMs='2000'; select * from vegetables OPTION(timeoutMs=1000, skipUpsert=true)"),
         Map.of("timeoutMs", "2000"));
+    assertEquals(sqlOptionsOf("SET taskName='myTask-1'; INSERT INTO db.tbl FROM FILE 'file:///tmp/file1'"),
+        Map.of("taskName", "myTask-1"));
   }
 
   @Test
-  public void testIgnoredLegacyOptionSyntaxFailsDml() {
+  public void testIgnoredLegacyOptionSyntaxFailsDelete() {
     QueryOptionsUtils.setLegacyOptionSyntaxMode(SqlOptionsMode.IGNORE);
-    // Dropping dryRun could run a DELETE for real, and dropping taskName would submit an INSERT as another task
-    for (String sql : List.of("DELETE FROM vegetables WHERE name = 'kale' OPTION(dryRun=true)",
-        "INSERT INTO db.tbl FROM FILE 'file:///tmp/file1' OPTION(taskName=myTask-1)")) {
-      SqlCompilationException e = expectThrows(SqlCompilationException.class, () -> sqlOptionsOf(sql));
-      assertTrue(e.getMessage().contains("OPTION(...)"), e.getMessage());
-      assertTrue(e.getMessage().contains("SET"), e.getMessage());
-      assertTrue(e.getMessage().contains("DML"), e.getMessage());
-    }
+    // Dropping dryRun could run the DELETE for real
+    SqlCompilationException e = expectThrows(SqlCompilationException.class,
+        () -> sqlOptionsOf("DELETE FROM vegetables WHERE name = 'kale' OPTION(dryRun=true)"));
+    assertTrue(e.getMessage().contains("OPTION(...)"), e.getMessage());
+    assertTrue(e.getMessage().contains("SET"), e.getMessage());
+    assertTrue(e.getMessage().contains("DELETE"), e.getMessage());
+    assertTrue(e.getMessage().contains("dryRun=true"), e.getMessage());
     // SET statements are unaffected
     assertEquals(sqlOptionsOf("SET dryRun='true'; DELETE FROM vegetables WHERE name = 'kale'"),
         Map.of("dryRun", "true"));
-    assertEquals(sqlOptionsOf("SET taskName='myTask-1'; INSERT INTO db.tbl FROM FILE 'file:///tmp/file1'"),
-        Map.of("taskName", "myTask-1"));
   }
 
   @Test
@@ -104,25 +105,26 @@ public class SqlOptionsModeTest {
   public void testIgnoredSqlOptionsAreDropped() {
     assertEquals(parse("SET timeoutMs='1000'; select * from vegetables OPTION(skipUpsert=true)",
         "timeoutMs=2000;sqlOptionsMode=ignore"), Map.of("timeoutMs", "2000", "sqlOptionsMode", "ignore"));
+    // INSERT is unaffected: its SQL options are dropped silently, as always
+    for (String sql : List.of("SET taskName='myTask-1'; INSERT INTO db.tbl FROM FILE 'file:///tmp/file1'",
+        "INSERT INTO db.tbl FROM FILE 'file:///tmp/file1' OPTION(taskName=myTask-1)")) {
+      assertEquals(parse(sql, "sqlOptionsMode=ignore"), Map.of("sqlOptionsMode", "ignore"));
+    }
   }
 
   @Test
-  public void testIgnoredSqlOptionsFailDml() {
-    // Dropping dryRun could run a DELETE for real, and dropping taskName would submit an INSERT as another task
+  public void testIgnoredSqlOptionsFailDelete() {
+    // Dropping dryRun could run the DELETE for real
     for (String sql : List.of("SET dryRun='true'; DELETE FROM vegetables WHERE name = 'kale'",
         "SET database='db1'; DELETE FROM vegetables WHERE name = 'kale'",
-        "DELETE FROM vegetables WHERE name = 'kale' OPTION(dryRun=true)",
-        "SET taskName='myTask-1'; INSERT INTO db.tbl FROM FILE 'file:///tmp/file1'",
-        "INSERT INTO db.tbl FROM FILE 'file:///tmp/file1' OPTION(taskName=myTask-1)")) {
+        "DELETE FROM vegetables WHERE name = 'kale' OPTION(dryRun=true)")) {
       QueryException e = expectThrows(QueryException.class, () -> parse(sql, "sqlOptionsMode=ignore"));
       assertEquals(e.getErrorCode(), QueryErrorCode.QUERY_VALIDATION);
-      assertTrue(e.getMessage().contains("DML"), e.getMessage());
+      assertTrue(e.getMessage().contains("DELETE"), e.getMessage());
     }
-    // A DML statement without SQL options is unaffected.
+    // A DELETE without SQL options is unaffected
     assertEquals(parse("DELETE FROM vegetables WHERE name = 'kale'", "dryRun=true;sqlOptionsMode=ignore"),
         Map.of("dryRun", "true", "sqlOptionsMode", "ignore"));
-    assertEquals(parse("INSERT INTO db.tbl FROM FILE 'file:///tmp/file1'", "taskName=myTask-1;sqlOptionsMode=ignore"),
-        Map.of("taskName", "myTask-1", "sqlOptionsMode", "ignore"));
   }
 
   @Test

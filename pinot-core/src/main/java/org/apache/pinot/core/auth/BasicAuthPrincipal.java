@@ -96,9 +96,19 @@ public class BasicAuthPrincipal {
 
   /// The `excludeTables` list holds raw table names, so a name with a type suffix is also checked by its raw name:
   /// with `excludeTables=[t]`, `t_OFFLINE` is excluded as `t` is, and a type suffix cannot bypass an excluded table.
+  /// The raw-name lookup only runs for a typed name: a principal without exclusions returns at once, and a raw name
+  /// is already covered by the first lookup, so neither pays for the suffix strip or the second lookup.
   private boolean isTableNotExcluded(String tableName) {
-    return !_excludeTables.contains(tableName)
-        && !_excludeTables.contains(TableNameBuilder.extractRawTableName(tableName));
+    if (_excludeTables.isEmpty()) {
+      return true;
+    }
+    if (_excludeTables.contains(tableName)) {
+      return false;
+    }
+    // extractRawTableName returns the name itself when it carries no type suffix, so the second lookup is skipped for
+    // raw names without an extra suffix scan
+    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+    return rawTableName.equals(tableName) || !_excludeTables.contains(rawTableName);
   }
 
   public boolean hasPermission(String permission) {

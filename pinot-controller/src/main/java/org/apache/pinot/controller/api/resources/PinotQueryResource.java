@@ -461,14 +461,18 @@ public class PinotQueryResource {
 
   /// Executes a `DELETE` once the caller is authorized to delete rows from its table, see [#authorizeDelete].
   ///
-  /// The caller is first checked without a table (the `READ` access type with the `/sql` endpoint, as for a
-  /// multi-stage query), before the statement is parsed and its table looked up: with basic auth, an unauthenticated
-  /// caller gets HTTP 401 here, before the table cache is consulted. The table is then resolved, with the database of
-  /// the request and in the case it is defined with, and the caller authorized to delete rows from the resolved
-  /// table. Only then is the table checked not to be a logical table and to exist, and every error message names the
-  /// table as the caller wrote it, so that a caller who is not authorized for a table learns neither whether it exists
-  /// nor the case it is defined with, nor whether the name is a logical table. The executor deletes rows from the
-  /// exact resolved table.
+  /// The statement is parsed and its table resolved, with the database of the request and in the case it is defined
+  /// with, before the caller is authorized to delete rows from the resolved table. The first check that
+  /// authenticates the caller is therefore the table-level `READ` check of [#authorizeDelete] (with basic auth, an
+  /// unauthenticated caller gets HTTP 401 from it), not a cluster-wide check without a table as a multi-stage query
+  /// runs first: the controller [AccessControl] has no authentication-only method, and its cluster-wide check denies
+  /// every principal with a table allow-list or exclude-list, which would deny a principal allowed to delete rows
+  /// from the table on the controller alone while a broker executes the statement. Running the table lookup before
+  /// the first check leaks nothing: no outcome that depends on the table is observable before the caller is
+  /// authorized on it, since the table is only then checked not to be a logical table and to exist, and every error
+  /// message names the table as the caller wrote it, so that a caller who is not authorized for a table learns
+  /// neither whether it exists nor the case it is defined with, nor whether the name is a logical table. The executor
+  /// deletes rows from the exact resolved table.
   ///
   /// The executor runs before the response streams, so that an exception it lets escape is mapped to an error
   /// response by [#executeSqlQueryCatching] rather than failing the request with HTTP 500.
@@ -482,9 +486,6 @@ public class PinotQueryResource {
   private StreamingOutput executeDelete(SqlNodeAndOptions sqlNodeAndOptions, HttpHeaders httpHeaders,
       @Nullable Request request) {
     AccessControl accessControl = _accessControlFactory.create();
-    if (!accessControl.hasAccess(AccessType.READ, httpHeaders, SQL_ENDPOINT)) {
-      throw QueryErrorCode.ACCESS_DENIED.asException("Permission denied to delete rows");
-    }
     DeleteStatement parsed = (DeleteStatement) DataManipulationStatementParser.parse(sqlNodeAndOptions);
     DeleteStatement statement = parsed.resolveTableName(httpHeaders.getHeaderString(CommonConstants.DATABASE),
         _pinotHelixResourceManager.getTableCache());
@@ -572,7 +573,9 @@ public class PinotQueryResource {
     return realIp != null ? realIp : CommonConstants.UNKNOWN;
   }
 
-  /// Authorizes the caller, who passed the caller-level check of [#executeDelete], to delete rows from the table.
+  /// Authorizes the caller of [#executeDelete] to delete rows from the table. This is the first check the caller
+  /// goes through, so it is also the one that authenticates the caller (with basic auth, the table-level `READ`
+  /// check throws `NotAuthorizedException`, i.e. HTTP 401, for a missing principal).
   ///
   /// It checks, on the raw table name and in this order, the `READ` access type with the `/sql` endpoint (the request
   /// path, as the authentication filter passes for the other endpoints), the fine-grained [Actions.Table#QUERY]
