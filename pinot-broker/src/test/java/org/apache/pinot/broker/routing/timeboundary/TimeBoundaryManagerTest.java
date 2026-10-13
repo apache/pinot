@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import org.apache.helix.api.exceptions.HelixMetaDataAccessException;
 import org.apache.helix.manager.zk.ZkBaseDataAccessor;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
@@ -53,6 +54,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.Segmen
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertThrows;
 
 
 public class TimeBoundaryManagerTest extends ControllerTest {
@@ -300,6 +302,49 @@ public class TimeBoundaryManagerTest extends ControllerTest {
     setSegmentZKMetadata(rawTableName, segment3, 8, timeUnit);
     timeBoundaryManager.onAssignmentChange(idealState, externalView, onlineSegments);
     verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), 7);
+  }
+
+  /// A ZK read failure other than a missing node must propagate, and must leave the time boundary and the state as they
+  /// were, so that the next assignment change can replace the segments.
+  @Test
+  public void testReadFailureDuringReplacementKeepsTimeBoundary() {
+    String rawTableName = "testTableReadFailure";
+    TableConfig tableConfig = getTableConfig(rawTableName, "DAILY");
+    TimeUnit timeUnit = TimeUnit.DAYS;
+    setSchemaTimeFieldSpec(rawTableName, timeUnit);
+    ZkHelixPropertyStore<ZNRecord> propertyStore = Mockito.spy(_propertyStore);
+    TimeBoundaryManager timeBoundaryManager =
+        new TimeBoundaryManager(tableConfig, propertyStore, Mockito.mock(BrokerMetrics.class));
+
+    ExternalView externalView = new ExternalView(tableConfig.getTableName());
+    Map<String, Map<String, String>> segmentAssignment = externalView.getRecord().getMapFields();
+    Map<String, String> onlineInstanceStateMap = Map.of("server", ONLINE);
+    Set<String> onlineSegments = new HashSet<>();
+    IdealState idealState = new IdealState("");
+    String oldSegment = "replacedSegment";
+    onlineSegments.add(oldSegment);
+    segmentAssignment.put(oldSegment, onlineInstanceStateMap);
+    setSegmentZKMetadata(rawTableName, oldSegment, 3, timeUnit);
+    timeBoundaryManager.init(idealState, externalView, onlineSegments);
+    verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), 2);
+
+    // Replace the old segment with a new one, and fail the read of the new segment ZK metadata
+    String newSegment = "replacingSegment";
+    setSegmentZKMetadata(rawTableName, newSegment, 5, timeUnit);
+    onlineSegments.remove(oldSegment);
+    segmentAssignment.remove(oldSegment);
+    onlineSegments.add(newSegment);
+    segmentAssignment.put(newSegment, onlineInstanceStateMap);
+    Mockito.doThrow(new HelixMetaDataAccessException("Failed to read node, return code: OPERATIONTIMEOUT"))
+        .when(propertyStore).get(Mockito.anyList(), Mockito.any(), Mockito.anyInt(), Mockito.eq(true));
+    assertThrows(HelixMetaDataAccessException.class,
+        () -> timeBoundaryManager.onAssignmentChange(idealState, externalView, onlineSegments));
+    verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), 2);
+
+    // The next assignment change reads the new segment again and replaces the old one
+    Mockito.reset(propertyStore);
+    timeBoundaryManager.onAssignmentChange(idealState, externalView, onlineSegments);
+    verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), 4);
   }
 
   private TableConfig getTableConfig(String rawTableName, String pushFrequency) {

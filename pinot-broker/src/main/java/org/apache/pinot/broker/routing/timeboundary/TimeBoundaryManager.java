@@ -222,6 +222,10 @@ public class TimeBoundaryManager {
         }
       }
     }
+    // NOTE: Read before changing any state, so that a failed read leaves the state as it was. The read throws on a ZK
+    //       error other than a missing node, so that the routing entry keeps its IS/EV versions and retries.
+    List<ZNRecord> znRecords = newSegments.isEmpty() ? List.of()
+        : _propertyStore.get(newSegmentZKMetadataPaths, null, AccessOption.PERSISTENT, true);
     boolean recomputeMaxEndTime = false;
     // NOTE: Removing a segment can only lower the max end time, so a full scan is needed only when a removed segment
     //       holds the current max end time.
@@ -238,24 +242,19 @@ public class TimeBoundaryManager {
     if (recomputeMaxEndTime) {
       _maxEndTimeMs = computeMaxEndTimeMs();
     }
-    if (!newSegments.isEmpty()) {
-      List<ZNRecord> znRecords =
-          _propertyStore.get(newSegmentZKMetadataPaths, null, AccessOption.PERSISTENT, false);
-      int numNewSegments = newSegments.size();
-      for (int i = 0; i < numNewSegments; i++) {
-        String segment = newSegments.get(i);
-        ZNRecord znRecord = znRecords.get(i);
-        if (znRecord == null) {
-          // NOTE: The batched read returns null for a missing node and for a failed read. Do not record the segment, so
-          //       that the next assignment change reads it again.
-          LOGGER.warn("Failed to read segment ZK metadata for segment: {}, table: {}, will retry on next change",
-              segment, _offlineTableName);
-          continue;
-        }
-        long endTimeMs = extractEndTimeMsFromSegmentZKMetadataZNRecord(segment, znRecord);
-        _endTimeMsMap.put(segment, endTimeMs);
-        _maxEndTimeMs = Math.max(_maxEndTimeMs, endTimeMs);
+    int numNewSegments = newSegments.size();
+    for (int i = 0; i < numNewSegments; i++) {
+      String segment = newSegments.get(i);
+      ZNRecord znRecord = znRecords.get(i);
+      if (znRecord == null) {
+        // NOTE: The node does not exist. Do not record the segment, so that the next assignment change reads it again.
+        LOGGER.warn("Failed to find segment ZK metadata for segment: {}, table: {}, will retry on next change", segment,
+            _offlineTableName);
+        continue;
       }
+      long endTimeMs = extractEndTimeMsFromSegmentZKMetadataZNRecord(segment, znRecord);
+      _endTimeMsMap.put(segment, endTimeMs);
+      _maxEndTimeMs = Math.max(_maxEndTimeMs, endTimeMs);
     }
     updateTimeBoundaryInfo(_maxEndTimeMs);
   }

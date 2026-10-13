@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.broker.routing.segmentpartition;
 
+import com.google.common.annotations.VisibleForTesting;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -63,6 +65,7 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
   private final String _partitionFunctionName;
   private final int _numPartitions;
   private final long _newSegmentExpirationMs;
+  private final Clock _clock;
 
   // cache-able content, only follow changes if onlineSegments list (of ideal-state) is changed.
   private final Map<String, SegmentInfo> _segmentInfoMap = new HashMap<>();
@@ -85,11 +88,19 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
 
   public SegmentPartitionMetadataManager(String tableNameWithType, String partitionColumn, String partitionFunctionName,
       int numPartitions, long newSegmentExpirationMs) {
+    this(tableNameWithType, partitionColumn, partitionFunctionName, numPartitions, newSegmentExpirationMs,
+        Clock.systemUTC());
+  }
+
+  @VisibleForTesting
+  SegmentPartitionMetadataManager(String tableNameWithType, String partitionColumn, String partitionFunctionName,
+      int numPartitions, long newSegmentExpirationMs, Clock clock) {
     _tableNameWithType = tableNameWithType;
     _partitionColumn = partitionColumn;
     _partitionFunctionName = partitionFunctionName;
     _numPartitions = numPartitions;
     _newSegmentExpirationMs = newSegmentExpirationMs;
+    _clock = clock;
   }
 
   @Override
@@ -232,7 +243,7 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
     }
     if (partitionsChanged) {
       computeAllTablePartitionInfo();
-    } else if (onlineServersChanged || System.currentTimeMillis() > _nextNewSegmentExpirationTimeMs) {
+    } else if (onlineServersChanged || _clock.millis() > _nextNewSegmentExpirationTimeMs) {
       computeTablePartitionReplicatedServersInfo();
     }
   }
@@ -274,7 +285,7 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
     List<Pair<String, Integer>> unavailableSegments = new ArrayList<>();
     List<Triple<String, Integer, Integer>> segmentsReducingFullyReplicatedServers = new ArrayList<>();
     List<Map.Entry<String, SegmentInfo>> newSegmentInfoEntries = new ArrayList<>();
-    long currentTimeMs = System.currentTimeMillis();
+    long currentTimeMs = _clock.millis();
     long nextNewSegmentExpirationTimeMs = Long.MAX_VALUE;
     for (Map.Entry<String, SegmentInfo> entry : _segmentInfoMap.entrySet()) {
       String segment = entry.getKey();
