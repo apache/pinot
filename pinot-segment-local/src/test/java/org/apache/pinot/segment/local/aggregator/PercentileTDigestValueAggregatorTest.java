@@ -701,6 +701,9 @@ public class PercentileTDigestValueAggregatorTest {
             for (TDigest retained : List.of(historical, copied, merged)) {
               assertEquals(retained.serialize(), original);
               assertEquals(retained.maxSerializedByteSize(), original.length);
+              assertEquals(retained.quantile(0), retained.getMin());
+              assertEquals(retained.quantile(1), retained.getMax());
+              assertEquals(aggregator.deserializeAggregatedValue(retained.serialize()).cdf(0), retained.cdf(0));
               assertTrue(retained.centroids().contains(new Centroid(infinity, weight)));
               assertThrows(IllegalArgumentException.class, () -> retained.add(0.5));
               assertEquals(retained.serialize(), original);
@@ -860,6 +863,54 @@ public class PercentileTDigestValueAggregatorTest {
     for (TDigest view : List.of(digest, aggregator.cloneAggregatedValue(digest))) {
       assertEquals(new ArrayList<>(view.centroids()), List.of(new Centroid(1.0, 10.0), new Centroid(10.0, 10.0)));
       assertEquals(view.serialize(), unrepresentable);
+    }
+  }
+
+  @Test
+  public void testHistoricalInfinityBoundaryReadsMatchSerializationAndPositiveUpdates() {
+    PercentileTDigestValueAggregator aggregator = newAggregator(100);
+    for (boolean positiveTail : new boolean[]{false, true}) {
+      double infinity = positiveTail ? Double.POSITIVE_INFINITY : Double.NEGATIVE_INFINITY;
+      for (double[] weights : new double[][]{{1, 1, 1, 1}, {2}, {1, 2.5},
+          {positiveTail ? 1.1 : 0.1, positiveTail ? 0.1 : 1.1},
+          {positiveTail ? 0.1 : 1.1, positiveTail ? 1.1 : 0.1},
+          {positiveTail ? 0.1 : 2.5, positiveTail ? 2.5 : 0.1}}) {
+        double finiteBoundary = (positiveTail ? 1 : -1) * (weights.length == 4 ? 23 : 3);
+        double[] means = new double[weights.length];
+        Arrays.fill(means, weights.length == 4 ? Double.NaN : infinity);
+        if (weights.length == 4) {
+          means[positiveTail ? 0 : means.length - 1] = positiveTail ? 54.7 : -54.7;
+        }
+        byte[] original = TDigestCodec.serializeCentroids(100, positiveTail ? finiteBoundary : infinity,
+            positiveTail ? infinity : finiteBoundary, means, weights, weights.length);
+        TDigest digest = aggregator.deserializeAggregatedValue(original);
+        byte[] serialized = digest.serialize();
+        if (weights.length == 2) {
+          assertEquals(serialized, original);
+          assertEquals(digest.maxSerializedByteSize(), original.length);
+        }
+        double size = Arrays.stream(weights).sum();
+        double finiteWeight = weights.length == 2 && weights[positiveTail ? 0 : 1] < 1 ? 0 : 1;
+        for (TDigest view : List.of(digest, aggregator.cloneAggregatedValue(digest),
+            aggregator.deserializeAggregatedValue(serialized))) {
+          assertEquals(view.quantile(0), view.getMin());
+          assertEquals(view.quantile(1), view.getMax());
+          assertEquals(view.quantile(positiveTail ? 0 : 1), finiteBoundary);
+          assertEquals(view.getTotalWeight(), size);
+          double value = positiveTail ? 55 : -55;
+          assertEquals(view.cdf(value), positiveTail ? finiteWeight / size : 1 - finiteWeight / size, 1e-15);
+          assertEquals(view.serialize(), serialized);
+          assertEquals(aggregator.cloneAggregatedValue(view).serialize(), serialized);
+          view.add(infinity);
+          assertEquals(view.quantile(positiveTail ? 0 : 1), finiteBoundary);
+          assertEquals(view.getTotalWeight(), size + 1);
+          assertEquals(view.cdf(value),
+              positiveTail ? finiteWeight / (size + 1) : 1 - finiteWeight / (size + 1), 1e-15);
+          TDigest restored = aggregator.deserializeAggregatedValue(view.serialize());
+          assertEquals(restored.quantile(positiveTail ? 0 : 1), finiteBoundary);
+          assertEquals(restored.cdf(value), view.cdf(value), 1e-15);
+        }
+      }
     }
   }
 

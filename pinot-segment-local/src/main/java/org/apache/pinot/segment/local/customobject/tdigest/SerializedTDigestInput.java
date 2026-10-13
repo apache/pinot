@@ -34,7 +34,6 @@ public final class SerializedTDigestInput {
   double[] _weights;
   private boolean _decoded;
   private boolean _boundariesNormalized;
-  private boolean _metadataInspected;
 
   final SerializedTDigestState _metadata = new SerializedTDigestState();
   private SerializedTDigestMetadata _metadataSnapshot;
@@ -64,7 +63,7 @@ public final class SerializedTDigestInput {
     _metadata.reset(bytes);
     _metadata.copyFrom(metadata);
     resetState(bytes);
-    _metadataSnapshot = _metadataInspected ? metadata : null;
+    _metadataSnapshot = _metadata._inspected ? metadata : null;
   }
 
   private void resetState(byte[] bytes) {
@@ -73,7 +72,6 @@ public final class SerializedTDigestInput {
     _numCentroids = _metadata._centroidCount;
     _decoded = false;
     _boundariesNormalized = false;
-    _metadataInspected = !Double.isNaN(_metadata._totalWeight);
   }
 
   public double getCompression() {
@@ -90,9 +88,8 @@ public final class SerializedTDigestInput {
   }
 
   void inspectMetadata() {
-    if (!_metadataInspected) {
+    if (!_metadata._inspected) {
       TDigestCodec.inspectSerialized(_metadata, null, null);
-      _metadataInspected = true;
     }
   }
 
@@ -123,9 +120,8 @@ public final class SerializedTDigestInput {
     }
     int encodedCentroidCount = _numCentroids;
     ensureCapacity(Math.addExact(encodedCentroidCount, 2));
-    if (!_metadataInspected) {
+    if (!_metadata._inspected) {
       TDigestCodec.inspectSerialized(_metadata, _means, _weights);
-      _metadataInspected = true;
     } else {
       // Pending state was already inspected before retaining bytes. Its later first read only materializes
       // those validated centroids; regular merged inputs compute flags and weights in the decode pass above.

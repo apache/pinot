@@ -513,6 +513,8 @@ public final class TDigestAccumulator extends TDigest {
   }
 
   private boolean prepareSerializedTDigest(SerializedTDigestInput input) {
+    assert input != _serializedTDigestInput || _pendingSerializedTDigest == null
+        : "Materialize pending TDigest before resetting its reusable input";
     if (_pendingSerializedTDigest == null && hasNoInputs()) {
       input.inspectMetadata();
       _hasFractionalWeights |= input._metadata._fractionalWeights;
@@ -785,8 +787,12 @@ public final class TDigestAccumulator extends TDigest {
     if (firstWeight >= 1.0 && index < 1.0) {
       return min;
     }
-    if (weight(weights, encoded, 0) > 1.0 && index < weight(weights, encoded, 0) / 2.0) {
-      return min + (index - 1.0) / (weight(weights, encoded, 0) / 2.0 - 1.0) * (mean(means, encoded, 0) - min);
+    if (firstWeight > 1.0 && index < firstWeight / 2.0) {
+      double firstMean = mean(means, encoded, 0);
+      if (!Double.isFinite(min) || !Double.isFinite(firstMean)) {
+        return weightedAverage(min, firstWeight / 2.0 - index, firstMean, index - 1.0);
+      }
+      return min + (index - 1.0) / (firstWeight / 2.0 - 1.0) * (firstMean - min);
     }
     int lastIndex = count - 1;
     double lastWeight = weight(weights, encoded, lastIndex);
@@ -797,10 +803,17 @@ public final class TDigestAccumulator extends TDigest {
     if (lastWeight >= 1.0 && index > totalWeight - 1.0) {
       return max;
     }
-    if (weight(weights, encoded, lastIndex) > 1.0
-        && totalWeight - index <= weight(weights, encoded, lastIndex) / 2.0) {
-      return max - (totalWeight - index - 1.0) / (weight(weights, encoded, lastIndex) / 2.0 - 1.0)
-          * (max - mean(means, encoded, lastIndex));
+    if (lastWeight > 1.0 && totalWeight - index <= lastWeight / 2.0) {
+      double lastMean = mean(means, encoded, lastIndex);
+      // A weight-two centroid's center and final unit-tail boundary coincide.
+      if (lastWeight == 2.0) {
+        return lastMean;
+      }
+      if (!Double.isFinite(max) || !Double.isFinite(lastMean)) {
+        return weightedAverage(lastMean, totalWeight - index - 1.0, max,
+            lastWeight / 2.0 - (totalWeight - index));
+      }
+      return max - (totalWeight - index - 1.0) / (lastWeight / 2.0 - 1.0) * (max - lastMean);
     }
 
     double weightSoFar = weight(weights, encoded, 0) / 2.0;

@@ -1126,6 +1126,56 @@ public class TDigestAccumulatorTest {
   }
 
   @Test
+  public void testLastWeightTwoQuantileCenterAfterZeroWeightFiltering() {
+    for (boolean zeroWeightTail : new boolean[]{false, true}) {
+      double[] means = zeroWeightTail ? new double[]{-40.17, -24.0, -21.23, -2.0}
+          : new double[]{-40.17, -24.0, -21.23};
+      double[] weights = zeroWeightTail ? new double[]{1, 1, 2, 0} : new double[]{1, 1, 2};
+      byte[] bytes = verbose(100, -40.17, -2.0, means, weights);
+      TDigestAccumulator digest = fromBytes(bytes);
+      double previous = Double.NEGATIVE_INFINITY;
+      for (double quantile : new double[]{Math.nextDown(0.75), 0.75, Math.nextUp(0.75)}) {
+        double value = digest.quantile(quantile);
+        assertFalse(Double.isNaN(value));
+        assertEquals(TDigestCodec.quantile(bytes, quantile), value);
+        assertTrue(value >= previous);
+        previous = value;
+      }
+      assertEquals(digest.quantile(0.75), -21.23);
+      TDigestAccumulator reference = new TDigestAccumulator(100);
+      reference.add(-21.23);
+      assertEquals(new SerializedTDigest(digest, 75).compareTo(new SerializedTDigest(reference, 75)), 0);
+    }
+  }
+
+  @Test
+  public void testRecoveredWeightedInfinityTailQuantilesHaveNoNaNGaps() {
+    double[] quantiles = {0, 0.10, Math.nextDown(0.15), 0.15, Math.nextUp(0.15), 0.20, 0.80,
+        Math.nextDown(0.85), 0.85, Math.nextUp(0.85), 0.90, 1};
+    for (boolean negative : new boolean[]{false, true}) {
+      for (double tailWeight : new double[]{3, 4}) {
+        double infinity = negative ? Double.NEGATIVE_INFINITY : Double.POSITIVE_INFINITY;
+        double[] means = negative ? new double[]{Double.NaN, 1, 2, 3, 4, 5}
+            : new double[]{-5, -4, -3, -2, -1, Double.NaN};
+        double[] weights = negative ? new double[]{tailWeight, 1, 1, 1, 1, 1}
+            : new double[]{1, 1, 1, 1, 1, tailWeight};
+        byte[] bytes = verbose(100, negative ? infinity : -5, negative ? 5 : infinity, means, weights);
+        TDigestAccumulator digest = fromBytes(bytes);
+        assertTrue(digest.hasValidStatistics());
+        double previous = Double.NEGATIVE_INFINITY;
+        for (double quantile : quantiles) {
+          double value = digest.quantile(quantile);
+          assertFalse(Double.isNaN(value));
+          assertEquals(TDigestCodec.quantile(bytes, quantile), value);
+          assertTrue(value >= previous);
+          previous = value;
+        }
+        assertEquals(digest.quantile(negative ? 0.15 : 0.85), infinity);
+      }
+    }
+  }
+
+  @Test
   public void testDuplicatePlateauKeepsItsFullMassAndCdfAgreesAtItsEdges() {
     TDigestAccumulator digest = fromBytes(verbose(new double[]{0, 10, 10, 20, 30},
         new double[]{1, 2, 6, 2, 1}));

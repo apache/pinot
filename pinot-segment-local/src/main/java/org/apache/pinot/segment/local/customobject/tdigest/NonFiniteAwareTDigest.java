@@ -80,8 +80,15 @@ public final class NonFiniteAwareTDigest extends TDigest {
       return new NonFiniteAwareTDigest(TDigestAccumulator.fromBytes(validated), 0.0, 0.0);
     }
     validated.decode();
-    if (!TDigestAccumulator.canNormalizeBoundaries(validated._means, validated._weights,
-        validated._numCentroids, metadata.min(), metadata.max())) {
+    int lastIndex = validated._numCentroids - 1;
+    // Tail extraction cannot turn a sub-unit infinity endpoint into the unit at a finite header extreme.
+    boolean retainFractionalInfinityBoundary = lastIndex > 0 && validated._means[0] == validated._means[lastIndex]
+        && (validated._means[0] == Double.POSITIVE_INFINITY && Double.isFinite(metadata.min())
+        && validated._weights[0] < 1.0
+        || validated._means[lastIndex] == Double.NEGATIVE_INFINITY && Double.isFinite(metadata.max())
+        && validated._weights[lastIndex] < 1.0);
+    if (retainFractionalInfinityBoundary || !TDigestAccumulator.canNormalizeBoundaries(validated._means,
+        validated._weights, validated._numCentroids, metadata.min(), metadata.max())) {
       return new NonFiniteAwareTDigest(TDigestAccumulator.fromBytes(validated), 0.0, 0.0);
     }
     double encodedMin = metadata.min();
@@ -396,6 +403,15 @@ public final class NonFiniteAwareTDigest extends TDigest {
       means[count] = Double.POSITIVE_INFINITY;
       weights[count++] = _positiveInfinityWeight;
     }
+    // Combining fractional tails can hide a repairable endpoint behind the sub-two singleton rule.
+    if (count == 1 && weights[0] < 2.0 && _originalBytes != null) {
+      SerializedTDigestInput original = new SerializedTDigestInput();
+      original.reset(_originalBytes);
+      original.decode();
+      means = original._means;
+      weights = original._weights;
+      count = original._numCentroids;
+    }
     count = TDigestAccumulator.normalizeSerializedBoundaries(means, weights, count, encodedMin, encodedMax);
     int finiteCount = 0;
     double min = Double.POSITIVE_INFINITY;
@@ -488,6 +504,9 @@ public final class NonFiniteAwareTDigest extends TDigest {
     if (Double.isNaN(value) || Double.isInfinite(value)) {
       throw new IllegalArgumentException(String.format("Invalid value: %f", value));
     }
+    if (_pendingHistoricalBoundaryRepair && !_unrepresentableInfinityTail) {
+      return boundaryPreparedView().cdf(value);
+    }
     double size = getTotalWeight();
     if (size == 0.0 || !hasValidStatistics()) {
       return Double.NaN;
@@ -505,6 +524,17 @@ public final class NonFiniteAwareTDigest extends TDigest {
     double size = getTotalWeight();
     if (size == 0.0 || !hasValidStatistics()) {
       return Double.NaN;
+    }
+    if (_pendingHistoricalBoundaryRepair && !_unrepresentableInfinityTail) {
+      return boundaryPreparedView().quantile(quantile);
+    }
+    if (_negativeInfinityWeight > 0.0 || _positiveInfinityWeight > 0.0) {
+      if (quantile == 0.0) {
+        return getMin();
+      }
+      if (quantile == 1.0) {
+        return getMax();
+      }
     }
     double index = quantile * size;
     if (_negativeInfinityWeight > 0L && index < _negativeInfinityWeight) {

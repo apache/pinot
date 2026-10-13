@@ -603,15 +603,20 @@ public class TDigestCodecTest {
   @Test
   public void testHistoricalNonFiniteMassRetainsOpaqueBytesWithoutRepeatedInspection() {
     for (int encoding : new int[]{VERBOSE_ENCODING, SMALL_ENCODING}) {
-      for (double weight : new double[]{Double.NaN, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY}) {
+      for (double[] weights : new double[][]{{Double.NaN, 1}, {Double.NEGATIVE_INFINITY, 1},
+          {Double.POSITIVE_INFINITY, 1}, {Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY}}) {
         byte[] bytes = legacyBytes(encoding, 100.0, 1.0, 2.0, new double[]{1.0, 2.0},
-            new double[]{weight, 1.0});
+            weights);
         SerializedTDigestInput input = new SerializedTDigestInput();
         input.reset(bytes);
         TDigestCodec.SerializedTDigestMetadata metadata = input.getMetadata();
         assertTrue(metadata.needsLegacyFallback());
         assertFalse(metadata.isCanonicalPayload());
         assertSame(input.getMetadata(), metadata, "Even an inspected NaN total must be cached");
+        input.decode();
+        assertSame(input.getMetadata(), metadata);
+        input.reset(bytes, metadata);
+        assertSame(input.getMetadata(), metadata, "Fanout must reuse inspected metadata even for a NaN total");
         input.decode();
         assertSame(input.getMetadata(), metadata);
         for (TDigest digest : new TDigest[]{TDigestAccumulator.fromBytes(bytes),
@@ -624,7 +629,7 @@ public class TDigestCodecTest {
           List<Centroid> centroids = List.copyOf(digest.centroids());
           assertEquals(centroids.size(), 2);
           assertEquals(centroids.get(0).mean(), 1.0);
-          assertEquals(centroids.get(0).weight(), weight);
+          assertEquals(centroids.get(0).weight(), weights[0]);
           assertThrows(IllegalArgumentException.class, () -> digest.add(3.0));
           TDigest healthy = TDigestAccumulator.forLegacyAggregation(100.0);
           healthy.add(42.0);
@@ -1425,7 +1430,7 @@ public class TDigestCodecTest {
 
   @Test
   public void testOversizedVerbosePayloadActuallyReducesToLegacyCapacity() {
-    double compression = 100.1;
+    double compression = 20.0;
     int legacyCapacity = Math.min(TDigestCodec.getLegacyDefaultCentroidCapacity(compression),
         TDigestCodec.getDefaultCentroidCapacity(compression));
     int count = legacyCapacity + 3;
@@ -1455,15 +1460,17 @@ public class TDigestCodecTest {
         double[] weights = new double[count];
         Arrays.setAll(means, i -> i);
         Arrays.fill(weights, 1.0);
-        byte[] bytes = TDigestCodec.makeLegacyCompatible(verboseBytes(compression, means, weights));
-        TDigestCodec.SerializedTDigestMetadata metadata = TDigestCodec.inspectSerialized(ByteBuffer.wrap(bytes));
+        byte[] verbose = verboseBytes(compression, means, weights);
         if (count > defaultCapacity) {
-          assertEquals(metadata.encoding(), VERBOSE_ENCODING);
-          assertEquals(metadata.centroidCount(), legacyCapacity);
-        } else {
-          assertEquals(metadata.encoding(), count <= legacyCapacity ? VERBOSE_ENCODING : SMALL_ENCODING);
-          assertEquals(metadata.centroidCount(), count);
+          assertThrows(IllegalArgumentException.class, () -> TDigestCodec.makeLegacyCompatible(verbose));
+          SerializedTDigestMetadata metadata = TDigestCodec.inspectSerialized(ByteBuffer.wrap(verbose), false);
+          assertThrows(IllegalArgumentException.class, () -> TDigestCodec.makeLegacyCompatible(verbose, metadata));
+          continue;
         }
+        byte[] bytes = TDigestCodec.makeLegacyCompatible(verbose);
+        TDigestCodec.SerializedTDigestMetadata metadata = TDigestCodec.inspectSerialized(ByteBuffer.wrap(bytes));
+        assertEquals(metadata.encoding(), count <= legacyCapacity ? VERBOSE_ENCODING : SMALL_ENCODING);
+        assertEquals(metadata.centroidCount(), count);
         assertTrue(bytes.length <= TDigestCodec.getMaxLegacyCompatibleByteSize(compression, count));
         TDigest digest = TDigestAccumulator.fromBytes(bytes);
         assertEquals(digest.getTotalWeight(), (double) count);
@@ -1476,21 +1483,21 @@ public class TDigestCodecTest {
 
   @Test
   public void testLegacyCapacityRepairRemovesAdjacentZeroMassBeforeMerging() {
-    double compression = 100.1;
+    double compression = 20.0;
     int legacyCapacity = Math.min(TDigestCodec.getLegacyDefaultCentroidCapacity(compression),
         TDigestCodec.getDefaultCentroidCapacity(compression));
     for (int positiveCount : new int[]{2, legacyCapacity + 8}) {
       for (boolean unusedNaN : new boolean[]{false, true}) {
-        double[] means = new double[positiveCount + 100];
+        double[] means = new double[positiveCount + 10];
         double[] weights = new double[means.length];
         means[0] = 1e18;
         weights[0] = 1.0;
-        for (int i = 1; i <= 100; i++) {
+        for (int i = 1; i <= 10; i++) {
           means[i] = unusedNaN ? Double.NaN : 1e18 + 256.0 * i;
         }
         for (int i = 1; i < positiveCount; i++) {
-          means[i + 100] = 1e18 + 256.0 * i;
-          weights[i + 100] = 1.0;
+          means[i + 10] = 1e18 + 256.0 * i;
+          weights[i + 10] = 1.0;
         }
         byte[] compatible = TDigestCodec.makeLegacyCompatible(verboseBytes(compression, means, weights));
         ByteBuffer output = ByteBuffer.wrap(compatible);
@@ -1532,6 +1539,8 @@ public class TDigestCodecTest {
     assertTrue(metadata.needsLegacyFallback());
     assertEquals(metadata.totalWeight(), 300.0);
     assertEquals(TDigestCodec.validateSerialized(historical), 300.0);
+    assertEquals(TDigestCodec.makeLegacyCompatible(historical), historical);
+    assertEquals(TDigestCodec.makeLegacyCompatible(historical, metadata), historical);
     TDigest retained = TDigestAccumulator.fromBytes(historical);
     assertFalse(retained.hasValidStatistics());
     assertTrue(Double.isNaN(retained.quantile(0.5)));

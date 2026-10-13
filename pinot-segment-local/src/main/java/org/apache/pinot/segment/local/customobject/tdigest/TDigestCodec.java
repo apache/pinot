@@ -115,7 +115,7 @@ public final class TDigestCodec {
         compression, count,
         VERBOSE_HEADER_SIZE, VERBOSE_CENTROID_SIZE, buffer.capacity(), encodedWeight,
         hasNonFiniteMeans, false, false, fractionalWeights, weightedBoundaries, false, compression, Double.NaN,
-        Double.NaN, Double.NaN);
+        Double.NaN, Double.NaN, true);
     return makeLegacyCompatible(buffer.array(), metadata, inheritedFractionalBoundaries);
   }
 
@@ -170,13 +170,19 @@ public final class TDigestCodec {
   /// otherwise reduces interior centroids without narrowing doubles. Compression below ten is normalized in the
   /// output header because the 3.2 verbose reader sizes its arrays from the raw header before applying that minimum.
   /// Opaque degraded state is retained without reducing its unknown distribution, including over-capacity payloads.
+  /// Healthy input must fit the larger of the two legacy default capacities.
   /// Fresh fractional endpoints that legacy unit-boundary repair cannot represent are rejected without reweighting.
   public static byte[] makeLegacyCompatible(byte[] verboseBytes) {
-    return makeLegacyCompatible(verboseBytes, inspectSerialized(ByteBuffer.wrap(verboseBytes), false));
+    return makeLegacyCompatible(verboseBytes, inspectSerialized(ByteBuffer.wrap(verboseBytes)));
   }
 
   /// Uses metadata validated for these exact retained bytes, avoiding another centroid validation walk.
   public static byte[] makeLegacyCompatible(byte[] verboseBytes, SerializedTDigestMetadata metadata) {
+    if (!metadata.needsLegacyFallback() && metadata.centroidCount()
+        > Math.max(getDefaultCentroidCapacity(metadata.compression()),
+            getLegacyDefaultCentroidCapacity(metadata.compression()))) {
+      throw new IllegalArgumentException("TDigest centroid count exceeds capacity: " + metadata.centroidCount());
+    }
     return makeLegacyCompatible(verboseBytes, metadata, false);
   }
 
@@ -301,7 +307,7 @@ public final class TDigestCodec {
   }
 
   /// Header and numerical metadata for one legacy byte payload. The centroid bytes remain owned by the caller.
-  /// Header-only inspection leaves total weight as NaN until centroid inspection validates the numerical fields.
+  /// `inspected` distinguishes header-only metadata from validated numerical fields, including degraded NaN totals.
   ///
   /// Legacy writers can emit poisoned numerical state after overflow or broken fractional boundary repair.
   /// Such state is retained with degraded quantiles, rather than being passed to the sorted K1 kernel.
@@ -310,7 +316,7 @@ public final class TDigestCodec {
       int encodedLength, double totalWeight, boolean hasNonFiniteMeans, boolean needsLegacyFallback,
       boolean unorderedMeans, boolean fractionalWeights, boolean weightedBoundaries, boolean hasZeroWeightCentroids,
       double encodedCompression, double recoveredInfinityMean, double historicalFractionalMinMean,
-      double historicalFractionalMaxMean) {
+      double historicalFractionalMaxMean, boolean inspected) {
     /// Whether the encoded centroid view can be used unchanged by healthy pending-state readers and writers.
     public boolean isCanonicalPayload() {
       return !needsLegacyFallback && !weightedBoundaries && !unorderedMeans && !hasZeroWeightCentroids
@@ -335,6 +341,7 @@ public final class TDigestCodec {
     int _centroidSize;
     int _encodedLength;
     double _totalWeight;
+    boolean _inspected;
     boolean _hasNonFiniteMeans;
     boolean _needsLegacyFallback;
     boolean _unorderedMeans;
@@ -351,6 +358,7 @@ public final class TDigestCodec {
     private int _limit;
 
     void reset(byte[] bytes) {
+      _inspected = false;
       _bytes = bytes;
       _buffer = null;
       _position = 0;
@@ -358,6 +366,7 @@ public final class TDigestCodec {
     }
 
     void reset(ByteBuffer input) {
+      _inspected = false;
       _bytes = null;
       _buffer = input.slice().order(ByteOrder.BIG_ENDIAN);
       _position = 0;
@@ -374,6 +383,7 @@ public final class TDigestCodec {
       _centroidSize = metadata.centroidSize();
       _encodedLength = metadata.encodedLength();
       _totalWeight = metadata.totalWeight();
+      _inspected = metadata.inspected();
       _hasNonFiniteMeans = metadata.hasNonFiniteMeans();
       _needsLegacyFallback = metadata.needsLegacyFallback();
       _unorderedMeans = metadata.unorderedMeans();
@@ -390,7 +400,7 @@ public final class TDigestCodec {
       return new SerializedTDigestMetadata(_encoding, _min, _max, _compression, _centroidCount, _centroidOffset,
           _centroidSize, _encodedLength, _totalWeight, _hasNonFiniteMeans, _needsLegacyFallback, _unorderedMeans,
           _fractionalWeights, _weightedBoundaries, _hasZeroWeightCentroids, _encodedCompression, _recoveredInfinityMean,
-          _historicalFractionalMinMean, _historicalFractionalMaxMean);
+          _historicalFractionalMinMean, _historicalFractionalMaxMean, _inspected);
     }
 
     double weight(int index) {
@@ -444,7 +454,7 @@ public final class TDigestCodec {
     SerializedTDigestState state = new SerializedTDigestState();
     state.reset(bytes);
     readSerializedHeader(state, true);
-    if (Double.isNaN(state._totalWeight)) {
+    if (!state._inspected) {
       inspectSerialized(state, null, null);
     }
     if (state._needsLegacyFallback || state._totalWeight == 0.0) {
@@ -472,7 +482,7 @@ public final class TDigestCodec {
     SerializedTDigestState state = new SerializedTDigestState();
     state.reset(input);
     readSerializedHeader(state, checkCapacity);
-    if (Double.isNaN(state._totalWeight)) {
+    if (!state._inspected) {
       inspectSerialized(state, null, null);
     }
     return state.snapshot();
@@ -543,6 +553,7 @@ public final class TDigestCodec {
     state._centroidSize = centroidSize;
     state._encodedLength = encodedLength;
     state._totalWeight = Double.NaN;
+    state._inspected = false;
     state._hasNonFiniteMeans = false;
     state._needsLegacyFallback = Double.isNaN(min) || Double.isNaN(max) || centroidCount > 0 && min > max;
     state._unorderedMeans = false;
@@ -705,6 +716,7 @@ public final class TDigestCodec {
     double historicalFractionalMaxMean = !needsLegacyFallback && positiveCentroidCount > 0
         && (upperPositiveWeight < 1.0 || fractionalSingleton) ? upperPositiveMean : Double.NaN;
     state._totalWeight = totalWeight;
+    state._inspected = true;
     state._hasNonFiniteMeans = hasNonFiniteMeans;
     state._needsLegacyFallback = needsLegacyFallback;
     state._unorderedMeans = unorderedMeans;

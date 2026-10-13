@@ -110,8 +110,10 @@ as old Pinot did, versus NaN in 3.3. Not every weighted-infinity quantile is def
 Identifiable infinity tails remain usable. NaN extrema, ambiguous infinity mixtures, non-finite/overflowing
 weights and other numerical corruption remain opaque: individually readable with NaN statistics and byte-exact
 serialization, but merging with nonempty input fails the query, rollup or star-tree build. There is no lenient
-mode or per-row quarantine; healthy empty inputs remain no-ops. Structural errors such as truncation still fail
-validation. RAW results use `Double.compare`: a NaN group sorts last ascending and first descending, so it can
+mode or per-row quarantine; healthy empty inputs remain no-ops. Structural errors still fail validation; negative
+counts and healthy over-capacity input throw `IllegalArgumentException`, and truncation throws
+`BufferUnderflowException`, rather than tdunning's incidental array exceptions. RAW results use `Double.compare`:
+a NaN group sorts last ascending and first descending, so it can
 occupy a descending LIMIT slot.
 
 Old servers can also emit corrupt intermediates from finite inputs such as +/-1.7e308 when their centroid arithmetic
