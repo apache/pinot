@@ -411,11 +411,11 @@ public abstract class BaseBrokerRoutingManager
         _brokerMetrics.addTimedTableValue(tableNameWithType, BrokerTimer.ROUTING_TABLE_UPDATE_TIME, updateTimeNs,
             TimeUnit.NANOSECONDS);
         _brokerMetrics.addTimedValue(BrokerTimer.ROUTING_TABLE_UPDATE_TIME, updateTimeNs, TimeUnit.NANOSECONDS);
-        _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.ROUTING_TABLE_UPDATES, 1L);
+        _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.ROUTING_TABLE_UPDATE_SUCCESS, 1L);
       } catch (Exception e) {
         LOGGER.error("Caught unexpected exception while updating routing entry on segment assignment change for "
             + "table: {}", tableNameWithType, e);
-        _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.ROUTING_TABLE_UPDATE_FAILURES, 1L);
+        _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.ROUTING_TABLE_UPDATE_FAILURE, 1L);
       }
       updateRoutingSegmentsMetric(routingEntry);
       updateReplicaHealthMetrics(routingEntry);
@@ -795,7 +795,7 @@ public abstract class BaseBrokerRoutingManager
   /// Reports the number of segments the routing entry tracks. Callers must hold the table's routing build lock.
   private void updateRoutingSegmentsMetric(RoutingEntry routingEntry) {
     _brokerMetrics.setValueOfTableGauge(routingEntry.getTableNameWithType(), BrokerGauge.ROUTING_TABLE_SEGMENTS,
-        routingEntry.getNumSegments());
+        routingEntry.getNumPreSelectedOnlineSegments());
   }
 
   /// Stops reporting the table's replica health gauges, so that they do not keep being exported frozen at a
@@ -1447,14 +1447,14 @@ public abstract class BaseBrokerRoutingManager
     transient boolean _disabled;
 
     // Number of pre-selected online segments at the last build or assignment change
-    transient int _numSegments;
+    transient int _numPreSelectedOnlineSegments;
 
     RoutingEntry(String tableNameWithType, String idealStatePath, String externalViewPath,
         SegmentPreSelector segmentPreSelector, SegmentSelector segmentSelector, List<SegmentPruner> segmentPruners,
         InstanceSelector instanceSelector, int lastUpdateIdealStateVersion, int lastUpdateExternalViewVersion,
         SegmentZkMetadataFetcher segmentZkMetadataFetcher, @Nullable TimeBoundaryManager timeBoundaryManager,
         @Nullable SegmentPartitionMetadataManager partitionMetadataManager, @Nullable Long queryTimeoutMs,
-        Map<String, SamplerInfo> samplerInfos, boolean disabled, int numSegments) {
+        Map<String, SamplerInfo> samplerInfos, boolean disabled, int numPreSelectedOnlineSegments) {
       _tableNameWithType = tableNameWithType;
       _idealStatePath = idealStatePath;
       _externalViewPath = externalViewPath;
@@ -1470,7 +1470,7 @@ public abstract class BaseBrokerRoutingManager
       _samplerInfos = samplerInfos;
       _segmentZkMetadataFetcher = segmentZkMetadataFetcher;
       _disabled = disabled;
-      _numSegments = numSegments;
+      _numPreSelectedOnlineSegments = numPreSelectedOnlineSegments;
     }
 
     String getTableNameWithType() {
@@ -1507,8 +1507,8 @@ public abstract class BaseBrokerRoutingManager
       return _disabled;
     }
 
-    int getNumSegments() {
-      return _numSegments;
+    int getNumPreSelectedOnlineSegments() {
+      return _numPreSelectedOnlineSegments;
     }
 
     private void updateSamplerInfos(IdealState idealState, ExternalView externalView,
@@ -1555,7 +1555,7 @@ public abstract class BaseBrokerRoutingManager
       _disabled = !idealState.isEnabled();
       Set<String> onlineSegments = getOnlineSegments(idealState);
       Set<String> preSelectedOnlineSegments = _segmentPreSelector.preSelect(onlineSegments);
-      _numSegments = preSelectedOnlineSegments.size();
+      _numPreSelectedOnlineSegments = preSelectedOnlineSegments.size();
       _segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, preSelectedOnlineSegments);
       _segmentSelector.onAssignmentChange(idealState, externalView, preSelectedOnlineSegments);
       _instanceSelector.onAssignmentChange(idealState, externalView, preSelectedOnlineSegments);

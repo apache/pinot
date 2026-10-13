@@ -580,9 +580,9 @@ public class BrokerRoutingManagerTest {
   }
 
   @Test
-  public void testAssignmentChangeReportsRebuildMetrics()
+  public void testAssignmentChangeReportsRoutingUpdateMetrics()
       throws Exception {
-    // Every rebuild triggered by an ideal state or external view change is timed, counted and reports the
+    // Every routing update triggered by an ideal state or external view change is timed, counted and reports the
     // number of segments the routing tracks
     InstanceSelector instanceSelector = mock(InstanceSelector.class);
     putRoutingEntry(TEST_TABLE, createRoutingEntry(TEST_TABLE, null, null, Map.of(), instanceSelector, false));
@@ -598,9 +598,9 @@ public class BrokerRoutingManagerTest {
         eq(TimeUnit.NANOSECONDS));
     verify(_brokerMetrics).addTimedValue(eq(BrokerTimer.ROUTING_TABLE_UPDATE_TIME), anyLong(),
         eq(TimeUnit.NANOSECONDS));
-    verify(_brokerMetrics).addMeteredTableValue(TEST_TABLE, BrokerMeter.ROUTING_TABLE_UPDATES, 1L);
+    verify(_brokerMetrics).addMeteredTableValue(TEST_TABLE, BrokerMeter.ROUTING_TABLE_UPDATE_SUCCESS, 1L);
     verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.ROUTING_TABLE_SEGMENTS, 2L);
-    verify(_brokerMetrics, never()).addMeteredTableValue(TEST_TABLE, BrokerMeter.ROUTING_TABLE_UPDATE_FAILURES, 1L);
+    verify(_brokerMetrics, never()).addMeteredTableValue(TEST_TABLE, BrokerMeter.ROUTING_TABLE_UPDATE_FAILURE, 1L);
   }
 
   @Test
@@ -617,8 +617,8 @@ public class BrokerRoutingManagerTest {
 
     _routingManager.processSegmentAssignmentChangeInternal();
 
-    verify(_brokerMetrics).addMeteredTableValue(TEST_TABLE, BrokerMeter.ROUTING_TABLE_UPDATE_FAILURES, 1L);
-    verify(_brokerMetrics, never()).addMeteredTableValue(TEST_TABLE, BrokerMeter.ROUTING_TABLE_UPDATES, 1L);
+    verify(_brokerMetrics).addMeteredTableValue(TEST_TABLE, BrokerMeter.ROUTING_TABLE_UPDATE_FAILURE, 1L);
+    verify(_brokerMetrics, never()).addMeteredTableValue(TEST_TABLE, BrokerMeter.ROUTING_TABLE_UPDATE_SUCCESS, 1L);
     verify(_brokerMetrics, never()).addTimedTableValue(eq(TEST_TABLE), eq(BrokerTimer.ROUTING_TABLE_UPDATE_TIME),
         anyLong(), any());
     verify(_brokerMetrics, never()).addTimedValue(eq(BrokerTimer.ROUTING_TABLE_UPDATE_TIME), anyLong(), any());
