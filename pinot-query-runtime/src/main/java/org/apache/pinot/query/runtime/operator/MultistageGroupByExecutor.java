@@ -26,6 +26,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelFieldCollation;
@@ -216,7 +217,7 @@ public class MultistageGroupByExecutor {
       }
     }
     if (!finalizeSortValues) {
-      return getResult(new SortUtils.SortComparator(collations, true), maxRows, Function.identity(),
+      return getResult(new SortUtils.SortComparator(collations, true), maxRows, (row, reusable) -> row,
           Function.identity());
     }
     SortUtils.SortComparator[] comparators = new SortUtils.SortComparator[numCollations];
@@ -231,18 +232,19 @@ public class MultistageGroupByExecutor {
         int index = sortColumnIndexes[i];
         cacheSortValue(r1, i, index, sortFunctions[i]);
         cacheSortValue(r2, i, index, sortFunctions[i]);
-        int result = comparators[i].compare(r1.sortKeys(), r2.sortKeys());
+        int result = comparators[i].compare(r1._sortKeys, r2._sortKeys);
         if (result != 0) {
           return result;
         }
       }
       return 0;
     };
-    return getResult(comparator, maxRows, row -> getSortedRow(row, numCollations), SortedRow::row);
+    return getResult(comparator, maxRows, (row, reusable) -> getSortedRow(row, numCollations, reusable),
+        row -> row._row);
   }
 
   /// Select groups with a shared heap loop; scalar rows use identity functions without allocating heap wrappers.
-  private <T> List<Object[]> getResult(Comparator<T> comparator, int maxRows, Function<Object[], T> decorate,
+  private <T> List<Object[]> getResult(Comparator<T> comparator, int maxRows, BiFunction<Object[], T, T> decorate,
       Function<T, Object[]> unwrap) {
     int numGroups = Math.min(_groupIdGenerator.getNumGroups(), maxRows);
     if (numGroups == 0) {
@@ -258,18 +260,21 @@ public class MultistageGroupByExecutor {
 
     int idx = 0;
     while (idx < numGroups && groupKeyIterator.hasNext()) {
-      T row = decorate.apply(getRow(groupKeyIterator, numKeys, numFunctions, resultStoredTypes));
+      T row = decorate.apply(getRow(groupKeyIterator, numKeys, numFunctions, resultStoredTypes), null);
       sortedRows.add(row);
       idx++;
     }
 
+    T reusable = null;
     while (groupKeyIterator.hasNext()) {
       idx++;
       // TODO: allocate new array row only if row enters set
-      T row = decorate.apply(getRow(groupKeyIterator, numKeys, numFunctions, resultStoredTypes));
+      T row = decorate.apply(getRow(groupKeyIterator, numKeys, numFunctions, resultStoredTypes), reusable);
       if (comparator.compare(sortedRows.peek(), row) < 0) {
-        sortedRows.poll();
+        reusable = sortedRows.poll();
         sortedRows.offer(row);
+      } else {
+        reusable = row;
       }
     }
 
@@ -285,24 +290,36 @@ public class MultistageGroupByExecutor {
     return result;
   }
 
-  private SortedRow getSortedRow(Object[] row, int numCollations) {
-    Object[] sortKeys = new Object[numCollations];
-    Arrays.fill(sortKeys, UNINITIALIZED_SORT_VALUE);
-    return new SortedRow(row, sortKeys);
+  private SortedRow getSortedRow(Object[] row, int numCollations, @Nullable SortedRow reusable) {
+    if (reusable == null) {
+      reusable = new SortedRow(row, new Object[numCollations]);
+    } else {
+      reusable._row = row;
+    }
+    // Only rejected or evicted entries are reused; never change a row or cached key while it is in the heap.
+    Arrays.fill(reusable._sortKeys, UNINITIALIZED_SORT_VALUE);
+    return reusable;
   }
 
   private void cacheSortValue(SortedRow row, int sortIndex, int columnIndex,
       @Nullable AggregationFunction aggFunction) {
-    if (row.sortKeys()[sortIndex] == UNINITIALIZED_SORT_VALUE) {
-      Object value = row.row()[columnIndex];
+    if (row._sortKeys[sortIndex] == UNINITIALIZED_SORT_VALUE) {
+      Object value = row._row[columnIndex];
       // Like SSE, compare native final objects before output conversion (e.g. BigDecimal, SerializedHLL, lists).
       // Extract lazily and retain the intermediate row for merging. Cache null results as well as non-null results.
-      row.sortKeys()[sortIndex] = aggFunction != null ? aggFunction.extractFinalResult(value) : value;
+      row._sortKeys[sortIndex] = aggFunction != null ? aggFunction.extractFinalResult(value) : value;
     }
   }
 
-  /// Query-local heap entry caching only ORDER BY values, separately from the mergeable output row.
-  private record SortedRow(Object[] row, Object[] sortKeys) {
+  /// Query-local heap entry caching ORDER BY values. Its row and cache can be reset only outside the heap.
+  private static final class SortedRow {
+    private Object[] _row;
+    private final Object[] _sortKeys;
+
+    private SortedRow(Object[] row, Object[] sortKeys) {
+      _row = row;
+      _sortKeys = sortKeys;
+    }
   }
 
   /// Get aggregation result limited to `maxRows` rows.
