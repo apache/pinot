@@ -367,9 +367,18 @@ public class RexExpressionUtils {
     // CAST is being rewritten into "rexCall.CAST<targetType>(inputValue)",
     //   - e.g. result type has already been converted into the CAST RexCall, so we assert single operand.
     assert rexCall.operands.size() == 1;
+    RexNode operand = rexCall.operands.get(0);
+    RexExpression value = fromRexNode(operand);
+    if (RelToPlanNodeConverter.isCastThroughLong(rexCall.type, operand.getType())) {
+      // Drop the fraction, which a CAST to BIG_DECIMAL keeps
+      value = cast(value, ColumnDataType.LONG);
+    }
+    return cast(value, RelToPlanNodeConverter.convertToColumnDataType(rexCall.type));
+  }
+
+  private static RexExpression.FunctionCall cast(RexExpression value, ColumnDataType castType) {
     List<RexExpression> operands = new ArrayList<>(2);
-    operands.add(fromRexNode(rexCall.operands.get(0)));
-    ColumnDataType castType = RelToPlanNodeConverter.convertToColumnDataType(rexCall.type);
+    operands.add(value);
     operands.add(new RexExpression.Literal(ColumnDataType.STRING, castType.name()));
     return new RexExpression.FunctionCall(castType, SqlKind.CAST.name(), operands);
   }
@@ -421,8 +430,8 @@ public class RexExpressionUtils {
   ///   result is `AND(NOT_IN(x, <list>), x > 0)`.
   /// - When both forms apply, the one with fewer values is used.
   ///
-  /// `BIG_DECIMAL` ranges always become comparisons: an intermediate stage matches `IN` values with `equals`, which
-  /// depends on the scale of the value.
+  /// `BIG_DECIMAL` ranges always become comparisons: an intermediate stage of an older server matches `IN` values with
+  /// `equals`, which depends on the scale of the value.
   private static RexExpression convertRanges(ColumnDataType dataType, RexNode leftOperand, RangeSet rangeSet) {
     Set<Range> ranges = rangeSet.asRanges();
     if (dataType == ColumnDataType.BIG_DECIMAL) {

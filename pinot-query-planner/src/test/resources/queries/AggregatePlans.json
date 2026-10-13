@@ -2,6 +2,19 @@
   "aggregates_planning_tests": {
     "queries": [
       {
+        "description": "ARRAY_AGG casts its value to its data type, so that the result type is the type of the array that it returns",
+        "sql": "EXPLAIN PLAN FOR SELECT ARRAY_AGG(col3, 'LONG'), ARRAY_AGG(col7, 'LONG'), ARRAY_AGG(col3, 'INT') FROM a",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{}], agg#0=[ARRAYAGG($0, _UTF-8'LONG')], agg#1=[ARRAYAGG($1, _UTF-8'LONG')], agg#2=[ARRAYAGG($2, _UTF-8'INT')], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash])",
+          "\n    PinotLogicalAggregate(group=[{}], agg#0=[ARRAYAGG($0, _UTF-8'LONG')], agg#1=[ARRAYAGG($2, _UTF-8'LONG')], agg#2=[ARRAYAGG($3, _UTF-8'INT')], aggType=[LEAF])",
+          "\n      LogicalProject($f0=[CAST($2):BIGINT NOT NULL], $f1=[_UTF-8'LONG'], col7=[$6], col3=[$2], $f4=[_UTF-8'INT'])",
+          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
         "description": "Select AVG aggregation for a BIG_DECIMAL column, TODO:(No need to cast in LogicalProject)",
         "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col4) as avg FROM a WHERE a.col3 >= (SELECT AVG(a.col4) FROM a)",
         "output": [

@@ -156,6 +156,36 @@ public class RelToPlanNodeConverterTest {
   }
 
   @Test
+  public void testIsCastThroughLong() {
+    RelDataType doubleType = new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DOUBLE);
+    RelDataType decimal19 = new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DECIMAL, 19);
+    RelDataType decimal38 = new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DECIMAL, 38);
+    // Types that can have a fraction convert through LONG to DECIMAL(p, 0) with 19 <= p <= 38
+    Assert.assertTrue(RelToPlanNodeConverter.isCastThroughLong(decimal19, doubleType));
+    Assert.assertTrue(RelToPlanNodeConverter.isCastThroughLong(decimal38, doubleType));
+    Assert.assertTrue(RelToPlanNodeConverter.isCastThroughLong(decimal19,
+        new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DECIMAL, 10, 2)));
+    Assert.assertTrue(RelToPlanNodeConverter.isCastThroughLong(decimal19,
+        new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.VARCHAR)));
+    // Integer types convert directly
+    Assert.assertFalse(RelToPlanNodeConverter.isCastThroughLong(decimal19,
+        new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.INTEGER)));
+    Assert.assertFalse(RelToPlanNodeConverter.isCastThroughLong(decimal19,
+        new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.BIGINT)));
+    Assert.assertFalse(RelToPlanNodeConverter.isCastThroughLong(decimal19,
+        new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DECIMAL, 20)));
+    // Other target types: LONG drops the fraction itself, and BIG_DECIMAL beyond 38 digits keeps it as before
+    Assert.assertFalse(RelToPlanNodeConverter.isCastThroughLong(
+        new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DECIMAL, 18), doubleType));
+    Assert.assertFalse(RelToPlanNodeConverter.isCastThroughLong(
+        new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DECIMAL, 39), doubleType));
+    Assert.assertFalse(RelToPlanNodeConverter.isCastThroughLong(
+        new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DECIMAL, 20, 2), doubleType));
+    Assert.assertFalse(RelToPlanNodeConverter.isCastThroughLong(
+        new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.BIGINT), doubleType));
+  }
+
+  @Test
   public void testConvertToColumnDataTypeForArray() {
     Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
             new ArraySqlType(new ObjectSqlType(SqlTypeName.BOOLEAN, SqlIdentifier.STAR, true, null, null), true)),

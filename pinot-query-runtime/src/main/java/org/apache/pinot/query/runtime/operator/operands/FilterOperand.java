@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.operator.operands;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Ordering;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.IntPredicate;
@@ -132,11 +133,20 @@ public abstract class FilterOperand implements TransformOperand {
         if (result == null) {
           return null;
         }
-        if (firstResult.equals(result)) {
+        if (valuesEqual(firstResult, result)) {
           return _isNotIn ? 0 : 1;
         }
       }
       return _isNotIn ? 1 : 0;
+    }
+
+    /// Compares `BIG_DECIMAL` values by number, like a comparison does and like the single-stage engine does for IN.
+    /// `BigDecimal.equals()` also compares the scale, so 1.0 (e.g. a SUM, which is a DOUBLE) does not equal 1.
+    private static boolean valuesEqual(Object value1, Object value2) {
+      if (value1 instanceof BigDecimal && value2 instanceof BigDecimal) {
+        return ((BigDecimal) value1).compareTo((BigDecimal) value2) == 0;
+      }
+      return value1.equals(value2);
     }
   }
 

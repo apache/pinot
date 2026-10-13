@@ -115,18 +115,20 @@
     ]
   },
   "exact_literals_beyond_int_and_long": {
-    "comment": "Calcite gives an integer literal beyond the BIGINT range, and CAST(... AS DECIMAL(p, 0)), the type DECIMAL(p, 0). 7766279631452241919 is 99999999999999999999 wrapped around to a LONG, and -1294967296 is 3000000000 wrapped around to an INT.",
+    "comment": "Calcite gives an integer literal beyond the BIGINT range, and CAST(... AS DECIMAL(p, 0)), the type DECIMAL(p, 0). 7766279631452241919 is 99999999999999999999 wrapped around to a LONG, and -1294967296 is 3000000000 wrapped around to an INT. The fractions of doubleCol and bigDecimalCol are below 0.5, because Pinot drops the fraction in a CAST to an integer type, and H2 rounds it.",
     "tables": {
       "tbl": {
         "schema": [
           {"name": "intCol", "type": "INT"},
-          {"name": "longCol", "type": "LONG"}
+          {"name": "longCol", "type": "LONG"},
+          {"name": "doubleCol", "type": "DOUBLE"},
+          {"name": "bigDecimalCol", "type": "BIG_DECIMAL"}
         ],
         "inputs": [
-          [1, 1],
-          [100, 7766279631452241919],
-          [-1294967296, -2],
-          [2147483647, 5]
+          [1, 1, 1.2, "2.25"],
+          [100, 7766279631452241919, -1.3, "-7.1"],
+          [-1294967296, -2, 0.4, "0"],
+          [2147483647, 5, 2.25, "3.3"]
         ]
       }
     },
@@ -194,6 +196,43 @@
       {
         "description": "group by aggregation of DECIMAL(10, 0) values beyond the INT range",
         "sql": "SELECT intCol > 0, SUM(CAST(intCol AS DECIMAL(10, 0))) FROM {tbl} GROUP BY intCol > 0"
+      },
+      {
+        "description": "IN on the SUM of DECIMAL(19, 0) values, which is a BIG_DECIMAL with a scale that the IN values do not have",
+        "sql": "SELECT SUM(CAST(intCol AS DECIMAL(19, 0))) IN (CAST(1 AS DECIMAL(19, 0)), CAST(2 AS DECIMAL(19, 0))) FROM {tbl} WHERE intCol = 1",
+        "h2Sql": "SELECT SUM(intCol) IN (1, 2) FROM {tbl} WHERE intCol = 1"
+      },
+      {
+        "description": "IN and NOT IN on the SUM of DECIMAL(p, 0) values in HAVING",
+        "sql": "SELECT intCol, SUM(CAST(intCol AS DECIMAL(19, 0))) IN (1, 100), SUM(CAST(intCol AS DECIMAL(40, 0))) NOT IN (1, 100) FROM {tbl} GROUP BY intCol HAVING SUM(CAST(intCol AS DECIMAL(19, 0))) IN (1, 100, 2147483647)"
+      },
+      {
+        "description": "CAST of values with a fraction to DECIMAL(19, 0) and DECIMAL(38, 0) in the leaf stage drops the fraction",
+        "sql": "SELECT intCol, CAST(doubleCol AS DECIMAL(19, 0)), CAST(bigDecimalCol AS DECIMAL(38, 0)) FROM {tbl} WHERE doubleCol > 0"
+      },
+      {
+        "description": "CAST of values with a fraction to DECIMAL(19, 0) in an intermediate stage drops the fraction",
+        "sql": "SELECT doubleCol, CAST(doubleCol AS DECIMAL(19, 0)), CAST(bigDecimalCol AS DECIMAL(19, 0)) FROM (SELECT doubleCol, bigDecimalCol FROM {tbl} GROUP BY doubleCol, bigDecimalCol)"
+      },
+      {
+        "description": "CAST of a value with a fraction to DECIMAL(19, 0) that is evaluated during planning drops the fraction",
+        "sql": "SELECT intCol, CAST(roundDecimal(1.55, 1) AS DECIMAL(19, 0)) FROM {tbl}",
+        "h2Sql": "SELECT intCol, CAST(1 AS DECIMAL(19, 0)) FROM {tbl}"
+      },
+      {
+        "description": "ARRAY_AGG of DECIMAL(p, 0) values returns arrays of its data type",
+        "sql": "SELECT arraySumLong(ARRAY_AGG(CAST(longCol AS DECIMAL(19, 0)), 'LONG')), arraySumInt(ARRAY_AGG(CAST(intCol AS DECIMAL(10, 0)), 'INT')) FROM {tbl} WHERE intCol < 1000",
+        "h2Sql": "SELECT SUM(longCol), SUM(intCol) FROM {tbl} WHERE intCol < 1000"
+      },
+      {
+        "description": "ARRAY_AGG of DOUBLE values as FLOAT and BIG_DECIMAL keeps the fraction",
+        "sql": "SELECT arrayElementAtFloat(ARRAY_AGG(doubleCol, 'FLOAT'), 1), arrayElementAtDouble(ARRAY_AGG(doubleCol, 'BIG_DECIMAL'), 1) FROM {tbl} WHERE intCol = 1",
+        "h2Sql": "SELECT CAST(doubleCol AS REAL), doubleCol FROM {tbl} WHERE intCol = 1"
+      },
+      {
+        "description": "ARRAY_AGG of values of another type returns arrays of its data type",
+        "sql": "SELECT arraySumLong(ARRAY_AGG(intCol, 'LONG')), ARRAYLENGTH(ARRAY_AGG(doubleCol, 'FLOAT')), ARRAYLENGTH(ARRAY_AGG(longCol, 'BIG_DECIMAL', true)) FROM {tbl}",
+        "h2Sql": "SELECT SUM(intCol), COUNT(*), COUNT(DISTINCT longCol) FROM {tbl}"
       }
     ]
   }

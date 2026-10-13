@@ -1139,6 +1139,38 @@ public final class RelToPlanNodeConverter {
     }
   }
 
+  /// Returns whether a CAST of a value of the operand type to the target type converts the value to LONG first.
+  ///
+  /// [#resolveDecimal] gives DECIMAL(p, 0) with 19 <= p <= 38 the type BIG_DECIMAL, which keeps the fraction of a
+  /// value. A CAST to these types from a type that is not an integer type (e.g. DOUBLE) converts the value through
+  /// LONG, as it did when the planner gave these types the type LONG, so that the result is an integer. As before, such
+  /// a CAST does not hold values beyond the LONG range: a DOUBLE saturates, a BIG_DECIMAL wraps around, and a STRING
+  /// fails to parse. A CAST to DECIMAL(p, 0) with p > 38 keeps the fraction, as before.
+  public static boolean isCastThroughLong(RelDataType targetType, RelDataType operandType) {
+    if (targetType.getSqlTypeName() != SqlTypeName.DECIMAL || targetType.getScale() != 0) {
+      return false;
+    }
+    int precision = targetType.getPrecision();
+    if (precision <= 18 || precision > 38) {
+      return false;
+    }
+    switch (operandType.getSqlTypeName()) {
+      case TINYINT:
+      case SMALLINT:
+      case INTEGER:
+      case BIGINT:
+      case UTINYINT:
+      case USMALLINT:
+      case UINTEGER:
+      case UBIGINT:
+        return false;
+      case DECIMAL:
+        return operandType.getScale() != 0;
+      default:
+        return true;
+    }
+  }
+
   public static String getTableNameFromTableScan(TableScan tableScan) {
     return getTableNameFromRelTable(tableScan.getTable());
   }
