@@ -241,6 +241,8 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
   ColumnDataType getFinalResultColumnType();
 
   /// Extracts the final result used in the broker response from the given intermediate result.
+  /// When final results are extracted for group-by sorting, preserve the intermediate information needed for
+  /// subsequent merging and final extraction.
   ///
   /// A `null` intermediate result means nothing was aggregated, and this method decides what that means for this
   /// particular aggregation. It is the only place where that per-function answer is expressed, so it must never

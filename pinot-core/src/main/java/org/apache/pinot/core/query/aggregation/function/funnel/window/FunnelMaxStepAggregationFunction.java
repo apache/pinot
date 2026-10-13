@@ -51,6 +51,7 @@ public class FunnelMaxStepAggregationFunction extends FunnelBaseAggregationFunct
     if (stepEvents == null || stepEvents.isEmpty()) {
       return finalMaxStep;
     }
+    stepEvents = new PriorityQueue<>(stepEvents);
     ArrayDeque<FunnelStepEvent> slidingWindow = new ArrayDeque<>();
     while (!stepEvents.isEmpty()) {
       fillWindow(stepEvents, slidingWindow);
