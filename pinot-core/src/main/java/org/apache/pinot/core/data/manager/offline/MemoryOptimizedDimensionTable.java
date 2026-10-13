@@ -20,7 +20,7 @@ package org.apache.pinot.core.data.manager.offline;
 
 import it.unimi.dsi.fastutil.objects.Object2LongOpenCustomHashMap;
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -54,7 +54,7 @@ public class MemoryOptimizedDimensionTable implements DimensionTable {
       List<PinotSegmentRecordReader> recordReaders,
       TableDataManager tableDataManager) {
     _tableSchema = tableSchema;
-    _primaryKeyColumns = new HashSet<>(primaryKeyColumns);
+    _primaryKeyColumns = new LinkedHashSet<>(primaryKeyColumns);
     _lookupTable = lookupTable;
     _segmentDataManagers = segmentDataManagers;
     _recordReaders = recordReaders;

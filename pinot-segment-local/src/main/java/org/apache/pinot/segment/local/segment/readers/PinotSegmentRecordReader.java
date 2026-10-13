@@ -22,7 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -250,7 +250,7 @@ public class PinotSegmentRecordReader implements RecordReader {
       }
 
       _skipDefaultNullValues = skipDefaultNullValues;
-      _primaryKeyColumns = primaryKeyColumns == null ? new HashSet<>() : new HashSet<>(primaryKeyColumns);
+      _primaryKeyColumns = primaryKeyColumns == null ? new LinkedHashSet<>() : new LinkedHashSet<>(primaryKeyColumns);
     }
   }
 
