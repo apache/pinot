@@ -136,6 +136,7 @@ public class QueryServer {
           .childHandler(new ChannelInitializer<SocketChannel>() {
             @Override
             protected void initChannel(SocketChannel ch) {
+              // Register first so shutdown sees this channel, or the check below closes a late registration.
               _allChannels.put(ch, true);
               ch.closeFuture().addListener(f -> _allChannels.remove(ch));
               if (_shuttingDown) {

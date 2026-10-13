@@ -345,7 +345,8 @@ public final class TlsUtils {
     // Keep Pinot's existing TLS behavior: verify certificate trust without hostname verification.
     // Netty 4.2 enables hostname verification by default, which requires a peer hostname.
     SslContextBuilder sslContextBuilder = SslContextBuilder.forClient()
-        .sslProvider(SslProvider.valueOf(tlsConfig.getSslProvider())).endpointIdentificationAlgorithm(null);
+        .sslProvider(SslProvider.valueOf(tlsConfig.getSslProvider()))
+        .endpointIdentificationAlgorithm(null);
     sslFactory.getKeyManagerFactory().ifPresent(sslContextBuilder::keyManager);
     sslFactory.getTrustManagerFactory().ifPresent(sslContextBuilder::trustManager);
 
