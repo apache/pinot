@@ -66,3 +66,85 @@ The reference environment is Ubuntu x86_64 with Temurin 25. `StrictMath` makes s
 but the legacy library's `Math` trigonometric functions can change exact rank errors across architectures or JVMs.
 Investigate regeneration differences on the reference environment before changing the CSV. Use `--update` only
 after intentionally changing the seeded corpus; it writes an unverified reference that must be reviewed.
+
+## T-digest migration
+
+Pinot removes `com.tdunning:t-digest` while retaining legacy verbose/compact BYTES and object type 10.
+Plugins using tdunning types must recompile against `org.apache.pinot.segment.local.customobject.tdigest.TDigest`.
+Replace `CustomSerDeUtils.TDIGEST_SER_DE` with `fromBytes(bytes)`/`serialize()` for stored digests.
+Use `TDigestAccumulator.forLegacyAggregation(compression)` for general/Star-tree aggregation,
+`forReduction(compression)` for SQL reducers, or `fromBytes(bytes)` for stored input. Add values with
+`digest.add(value, doubleWeight)`; `serialize()` returns independently owned bytes. `Centroid.weight()` and
+`getTotalWeight()` expose fractional mass without integer truncation.
+
+### Behavior changes
+
+Byte compatibility does not imply identical quantile/CDF results:
+
+- Duplicate-value plateaus, including repaired endpoints, retain their full point mass. Identical bytes can
+  therefore yield different quantiles in old and new reducers. Roundoff gaps before the last centroid center
+  return that centroid's mean instead of the old non-monotonic jump to the maximum.
+- Healthy stored mass between zero and one survives merges and returns its percentile instead of being dropped
+  or returning SQL NULL/NaN; a stored centroid `(42, 0.5)` returns 42.
+- Corrupt distributions remain present with NaN statistics, including negative weights cancelling to zero or
+  NaN total mass. `IS NULL` and JDBC null mapping cannot identify them. Payloads containing only zero weights
+  are empty even with unusable extrema or means.
+- SmartTDigest MV aggregation with null handling now includes each non-null row once. Previously, batches with
+  null rows replayed all rows for each non-null range, including null rows and duplicate values.
+- An empty SmartTDigest digest returns NULL with null handling, otherwise -Infinity, matching its empty list state
+  (previously NaN without null handling). Ordinary TDigest still returns NaN without null handling.
+- Native factories normalize finite compression below 10 to 10, including formerly rejected accumulator inputs
+  such as `PERCENTILETDIGEST(col, 50, 0)` and SmartTDigest `compression=-5`. The standard SQL factory still rejects
+  negative literals; NaN/infinite compression remains invalid.
+
+Infinity interpolation also differs. Native CDF now retains defined values after negative-infinity tails and
+uses 3.3 half-centroid/unit-exclusion rules before positive infinity. For centroids `(5, 4), (+Infinity, 1)`,
+`cdf(6)` changes from the old Pinot accumulator's 0.8 to 0.4. The infinity wrapper keeps its finite/tail formula:
+for `(-Infinity, 3), (10, 4), (20, 1)`, `cdf(0)` remains 3/8 while 3.3 returns NaN.
+For `(-Infinity, 2), (+Infinity, 2)`, `quantile(0.5)` returns -Infinity (old Pinot: +Infinity; 3.3: NaN).
+Zero interpolation weights avoid `0 * Infinity`: `(0, 1), (10, 4), (+Infinity, 3)` returns 10 at quantile 0.375
+as old Pinot did, versus NaN in 3.3. Not every weighted-infinity quantile is defined.
+
+### Historical payload limits and remediation
+
+Identifiable infinity tails remain usable. NaN extrema, ambiguous infinity mixtures, non-finite/overflowing
+weights and other numerical corruption remain opaque: individually readable with NaN statistics and byte-exact
+serialization, but merging with nonempty input fails the query, rollup or star-tree build. There is no lenient
+mode or per-row quarantine; healthy empty inputs remain no-ops. Structural errors still fail validation; negative
+counts and healthy over-capacity input throw `IllegalArgumentException`, and truncation throws
+`BufferUnderflowException`, rather than tdunning's incidental array exceptions. RAW results use `Double.compare`:
+a NaN group sorts last ascending and first descending, so it can
+occupy a descending LIMIT slot.
+
+Old servers can also emit corrupt intermediates from finite inputs such as +/-1.7e308 when their centroid arithmetic
+overflows. During rolling upgrades, these intermediates follow the same failure policy; old reducers could
+complete with NaN or garbage results. Rebuild poisoned stored digests and finish upgrading the producing servers.
+
+An error starting with `Cannot merge or mutate a historically corrupted TDigest` identifies this condition.
+A rate-limited WARN from `TDigestAccumulator` includes encoding/size metadata, but no stored values or segment
+identity. Locate affected data using the query's segment context and `fromBytes(bytes).hasValidStatistics()`.
+Rebuild from original measurements or reingest from a known-good source before rerunning queries, rollup or
+star-tree builds; retrying the same bytes cannot repair them.
+
+Historical weighted boundaries retain their bytes until modified or rewritten, even at a different compression.
+Unit-endpoint repair requires exact mass subtraction and bounded first-moment roundoff. If repair cannot
+preserve these, unchanged bytes stay readable, but mutation/nonempty merges fail with
+`Cannot merge or mutate a historical TDigest whose unit boundary repair cannot preserve its mass or first moment`.
+Infinity-tail updates likewise reject absorbed positive mass or inexact unit subtraction (for example, adding
+one to weight 2^53 or splitting weight 2^53 + 2). Rebuild these digests before mutation or nonempty merges.
+
+Fresh fractional boundaries below unit mass, or a fractional singleton below mass two, cannot be serialized with legacy
+unit endpoints. Fractional interior mass remains supported: `add(5, 0.5)` needs unit mass at 4 and 6 before
+serialization. Historical fractional bytes remain readable and byte-exact; after a merge, inherited fractional
+boundaries use exact verbose weights when unit repair is impossible. These forms retain t-digest 3.3's
+assertion-enabled deserialization/recompression limitation; fresh unsupported boundaries still fail serialization.
+
+Byte retention does not guarantee downgrade safety. Retained corrupt or unrepairable/fractional payloads can
+exceed old readers' header-based capacity, even when statistics are valid (compression 100.5 with 212 centroids
+exceeds 3.3's capacity of 211). Rebuild affected digests before downgrading or exposing them to old readers.
+
+### Regression coverage
+
+`TDigestCodecTest` reads frozen verbose/compact bytes and expectations produced by t-digest 3.2/3.3, then checks
+native decoding, mutation, merging and serialization. These offline fixtures need no legacy JAR or generator at
+runtime. The frozen accuracy oracle above remains part of the regular percentile aggregation tests.

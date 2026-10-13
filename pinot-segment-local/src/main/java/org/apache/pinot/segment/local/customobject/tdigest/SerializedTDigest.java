@@ -16,32 +16,34 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.customobject;
+package org.apache.pinot.segment.local.customobject.tdigest;
 
-import com.tdunning.math.stats.TDigest;
-import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
-/// Serialized and comparable version of TDigest. Compares TDigest for a specific percentile value.
+/// Immutable serialized result and comparison key for a specific percentile value.
+/// Uses Double.compare ordering: NaN quantiles sort last ascending and first descending, ahead of positive infinity.
 public class SerializedTDigest implements Comparable<SerializedTDigest> {
   private final double _percentile;
-  private final TDigest _tDigest;
+  private final byte[] _serializedBytes;
+  private final double _quantile;
 
   public SerializedTDigest(TDigest tDigest, double percentile) {
-    _tDigest = tDigest;
     _percentile = percentile / 100.0;
+    // Finalize a snapshot: trim survivors continue aggregating, and the key must match the emitted encoding.
+    _serializedBytes = tDigest.serializeSnapshot();
+    _quantile = TDigestCodec.quantile(_serializedBytes, _percentile);
   }
 
   @Override
   public int compareTo(SerializedTDigest other) {
     checkArgument(other._percentile == _percentile, "Percentile number doesn't match!");
-    return Double.compare(_tDigest.quantile(_percentile), other._tDigest.quantile(_percentile));
+    return Double.compare(_quantile, other._quantile);
   }
 
   @Override
   public String toString() {
-    return BytesUtils.toHexString(CustomSerDeUtils.TDIGEST_SER_DE.serialize(_tDigest));
+    return BytesUtils.toHexString(_serializedBytes);
   }
 }

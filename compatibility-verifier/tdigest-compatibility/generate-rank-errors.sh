@@ -25,7 +25,6 @@ set -euo pipefail
 export MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.wagon.httpconnectionManager.ttlSeconds=25 \
 -Dmaven.wagon.http.retryHandler.count=30 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false"
 TDIGEST_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-# CI checks this pinned reference on Ubuntu x86_64 with Temurin 25; see ../README.md for portability limits.
 TDIGEST_BASELINE=f818bae6d75a91228eb3aac95c921bca4aeb2128
 TDIGEST_WORK="$TDIGEST_ROOT/pinot-segment-local/target/tdigest-rank-oracle"
 TDIGEST_JAR_DIR="$TDIGEST_ROOT/pinot-segment-local/target/tdigest-legacy-reader"
