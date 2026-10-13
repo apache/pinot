@@ -308,6 +308,14 @@
           [null], [2], [null], [null]
         ],
         "ignoreLiteMode": true
+      },
+      {
+        "description": "Checking left join with comparison operator to test case where predicates can possibly fail on a byte[] expecting a ByteArray, ensuring the comparison value is considered bytes",
+        "sql": "SELECT  /*+ joinOptions(join_strategy='lookup') */ {dim_tbl}.int_value FROM {fact_tbl} LEFT JOIN {dim_tbl} ON {dim_tbl}.bytes_value = {fact_tbl}.bytes_value AND {dim_tbl}.bytes_value < X'a1b2c3d4e5f64a7b8c9d0e1f2a3b4c5d'",
+        "outputs": [
+          [null], [2], [null], [null]
+        ],
+        "ignoreLiteMode": true
       }
     ]
   },
@@ -372,6 +380,14 @@
       {
         "description": "Checking left join with comparison operator to test case where predicates can possibly fail on a byte[] expecting a ByteArray",
         "sql": "SELECT  /*+ joinOptions(join_strategy='lookup') */ {dim_tbl}.int_value FROM {fact_tbl} LEFT JOIN {dim_tbl} ON {dim_tbl}.bytes_value = {fact_tbl}.bytes_value AND {dim_tbl}.bytes_value < 'a1b2c3d4e5f64a7b8c9d0e1f2a3b4c5d'",
+        "outputs": [
+          [null], [2], [null], [null]
+        ],
+        "ignoreLiteMode": true
+      },
+      {
+        "description": "Checking left join with comparison operator to test case where predicates can possibly fail on a byte[] expecting a ByteArray, ensuring the comparison value is considered bytes",
+        "sql": "SELECT  /*+ joinOptions(join_strategy='lookup') */ {dim_tbl}.int_value FROM {fact_tbl} LEFT JOIN {dim_tbl} ON {dim_tbl}.bytes_value = {fact_tbl}.bytes_value AND {dim_tbl}.bytes_value < X'a1b2c3d4e5f64a7b8c9d0e1f2a3b4c5d'",
         "outputs": [
           [null], [2], [null], [null]
         ],

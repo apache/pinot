@@ -19,7 +19,10 @@
 package org.apache.pinot.core.data.manager.offline;
 
 import it.unimi.dsi.fastutil.objects.Object2LongOpenCustomHashMap;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
@@ -28,6 +31,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,7 +41,7 @@ public class MemoryOptimizedDimensionTable implements DimensionTable {
 
   private final Object2LongOpenCustomHashMap<Object[]> _lookupTable;
   private final Schema _tableSchema;
-  private final List<String> _primaryKeyColumns;
+  private final Set<String> _primaryKeyColumns;
   private final ThreadLocal<GenericRow> _reuse = ThreadLocal.withInitial(GenericRow::new);
   private final List<SegmentDataManager> _segmentDataManagers;
   private final List<PinotSegmentRecordReader> _recordReaders;
@@ -50,7 +54,7 @@ public class MemoryOptimizedDimensionTable implements DimensionTable {
       List<PinotSegmentRecordReader> recordReaders,
       TableDataManager tableDataManager) {
     _tableSchema = tableSchema;
-    _primaryKeyColumns = primaryKeyColumns;
+    _primaryKeyColumns = new HashSet<>(primaryKeyColumns);
     _lookupTable = lookupTable;
     _segmentDataManagers = segmentDataManagers;
     _recordReaders = recordReaders;
@@ -59,7 +63,7 @@ public class MemoryOptimizedDimensionTable implements DimensionTable {
 
   @Override
   public List<String> getPrimaryKeyColumns() {
-    return _primaryKeyColumns;
+    return new ArrayList<>(_primaryKeyColumns);
   }
 
   @Override
@@ -108,7 +112,11 @@ public class MemoryOptimizedDimensionTable implements DimensionTable {
     int readerIdx = (int) (readerIdxAndDocId >> 32);
 
     PinotSegmentRecordReader recordReader = _recordReaders.get(readerIdx);
-    return recordReader.getValue(docId, columnName);
+    Object value = recordReader.getValue(docId, columnName);
+    if (_primaryKeyColumns.contains(columnName) && value instanceof byte[]) {
+      value = new ByteArray((byte[]) value);
+    }
+    return value;
   }
 
   @Nullable
@@ -127,6 +135,9 @@ public class MemoryOptimizedDimensionTable implements DimensionTable {
     Object[] values = new Object[numColumns];
     for (int i = 0; i < numColumns; i++) {
       values[i] = recordReader.getValue(docId, columnNames[i]);
+      if (_primaryKeyColumns.contains(columnNames[i]) && values[i] instanceof byte[]) {
+        values[i] = new ByteArray((byte[]) values[i]);
+      }
     }
     return values;
   }

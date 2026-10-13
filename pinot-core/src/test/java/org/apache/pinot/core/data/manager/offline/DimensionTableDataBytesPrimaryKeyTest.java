@@ -121,7 +121,7 @@ public class DimensionTableDataBytesPrimaryKeyTest {
     _indexDir = new File(tableDataDir, segmentName);
     SegmentMetadata segmentMetadata = new SegmentMetadataImpl(_indexDir);
     SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
-    segmentZKMetadata.setCrc(Long.parseLong(segmentMetadata.getCrc()));
+    segmentZKMetadata.setCrc(segmentMetadata.getCrc());
   }
 
   @AfterClass
@@ -240,13 +240,16 @@ public class DimensionTableDataBytesPrimaryKeyTest {
     GenericRow row = tableDataManager.lookupRow(key);
     assertNotNull(row, "Should return response after segment load");
     assertEquals(row.getFieldToValueMap().size(), 3);
+    assertEquals(row.getValue("assetId"), keyValue);
     assertEquals(row.getValue("assetName"), "logo-final-v2.svg");
     assertEquals(row.getValue("contentHash"), contentHashBytes);
+    assertEquals(tableDataManager.lookupValue(key, "assetId"), keyValue);
     assertEquals(tableDataManager.lookupValue(key, "assetName"), "logo-final-v2.svg");
     assertEquals(tableDataManager.lookupValue(key, "contentHash"), contentHashBytes);
     Object[] values = tableDataManager.lookupValues(key, new String[]{"assetId", "assetName", "contentHash"});
     assertNotNull(values);
     assertEquals(values.length, 3);
+    assertEquals(values[0], keyValue);
     assertEquals(values[1], "logo-final-v2.svg");
     assertEquals(values[2], contentHashBytes);
   }

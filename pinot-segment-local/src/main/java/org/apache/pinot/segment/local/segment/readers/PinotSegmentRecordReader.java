@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -40,6 +41,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -68,7 +70,7 @@ public class PinotSegmentRecordReader implements RecordReader {
   private boolean _skipDefaultNullValues;
 
   private int _nextDocId = 0;
-  private List<String> _primaryKeyColumns;
+  private Set<String> _primaryKeyColumns;
   private int[] _primaryKeyIndexes;
 
   public PinotSegmentRecordReader() {
@@ -248,7 +250,7 @@ public class PinotSegmentRecordReader implements RecordReader {
       }
 
       _skipDefaultNullValues = skipDefaultNullValues;
-      _primaryKeyColumns = primaryKeyColumns;
+      _primaryKeyColumns = primaryKeyColumns == null ? null : new HashSet<>(primaryKeyColumns);
     }
   }
 
@@ -320,8 +322,13 @@ public class PinotSegmentRecordReader implements RecordReader {
     for (Map.Entry<String, PinotSegmentColumnReader> entry : _columnReaderMap.entrySet()) {
       String column = entry.getKey();
       PinotSegmentColumnReader columnReader = entry.getValue();
+      boolean isPrimaryKey = _primaryKeyColumns.contains(column);
       if (!columnReader.isNull(docId)) {
-        buffer.putValue(column, columnReader.getValue(docId));
+        Object value = columnReader.getValue(docId);
+        if (isPrimaryKey && value instanceof byte[]) {
+          value = new ByteArray((byte[]) value);
+        }
+        buffer.putValue(column, value);
       } else if (!_skipDefaultNullValues) {
         buffer.putDefaultNullValue(column, columnReader.getValue(docId));
       }
@@ -425,7 +432,7 @@ public class PinotSegmentRecordReader implements RecordReader {
     if (_primaryKeyIndexes != null) {
       return _primaryKeyIndexes;
     }
-    _primaryKeyIndexes = getIndexesForColumns(_primaryKeyColumns);
+    _primaryKeyIndexes = getIndexesForColumns(new ArrayList<>(_primaryKeyColumns));
     return _primaryKeyIndexes;
   }
 }
