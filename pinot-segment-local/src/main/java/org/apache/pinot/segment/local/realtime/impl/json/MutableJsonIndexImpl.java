@@ -116,12 +116,14 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
   }
 
   /// Indexes an already-parsed JSON document (e.g. a Map cached on the GenericRow), flattening it directly via
-  /// {@link JsonUtils#flattenParsed} instead of re-parsing the string the document was serialized into for the
-  /// forward index.
-  public void addParsed(Object parsedValue)
+  /// {@link JsonUtils#flattenParsed(Object, String, JsonIndexConfig)} instead of re-parsing `jsonString`, the string
+  /// the document was serialized into for the forward index. A document that cannot be flattened directly is indexed
+  /// from `jsonString`, as {@link #add(String)} does.
+  public void addParsed(Object parsedValue, String jsonString)
       throws IOException {
     try {
-      List<Map<String, String>> flattenedRecords = JsonUtils.flattenParsed(parsedValue, _jsonIndexConfig);
+      List<Map<String, String>> flattenedRecords =
+          JsonUtils.flattenParsed(parsedValue, jsonString, _jsonIndexConfig);
       _writeLock.lock();
       try {
         addFlattenedRecords(flattenedRecords);

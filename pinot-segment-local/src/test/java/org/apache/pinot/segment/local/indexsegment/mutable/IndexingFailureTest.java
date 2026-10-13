@@ -26,6 +26,7 @@ import java.util.Set;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
+import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -152,6 +153,25 @@ public class IndexingFailureTest implements PinotBuffersAfterMethodCheckRule {
 
     assertEquals(_mutableSegment.getDataSource(JSON_COL).getJsonIndex().getMatchingDocIds("cached = 'value'"),
         ImmutableRoaringBitmap.bitmapOf(0));
+    verify(_serverMetrics, never()).addMeteredTableValue(matches("indexingError$"), eq(ServerMeter.INDEXING_FAILURES),
+        anyLong());
+  }
+
+  @Test
+  public void testJsonIndexUsesForwardValueForUnsupportedParsedCache()
+      throws IOException {
+    GenericRow row = new GenericRow();
+    row.putValue(INT_COL, 0);
+    row.putValue(STRING_COL, "a");
+    row.putValue(JSON_COL, "{\"forward\":\"value\"}");
+    // A Float leaf cannot be flattened directly, so the index flattens the forward value instead.
+    row.putParsedJsonValue(JSON_COL, Map.of("cached", 0.5f));
+
+    _mutableSegment.index(row, METADATA);
+
+    JsonIndexReader jsonIndex = _mutableSegment.getDataSource(JSON_COL).getJsonIndex();
+    assertEquals(jsonIndex.getMatchingDocIds("forward = 'value'"), ImmutableRoaringBitmap.bitmapOf(0));
+    assertEquals(jsonIndex.getMatchingDocIds("cached = '0.5'"), ImmutableRoaringBitmap.bitmapOf());
     verify(_serverMetrics, never()).addMeteredTableValue(matches("indexingError$"), eq(ServerMeter.INDEXING_FAILURES),
         anyLong());
   }

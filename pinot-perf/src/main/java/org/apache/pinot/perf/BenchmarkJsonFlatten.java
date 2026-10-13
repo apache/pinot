@@ -43,9 +43,9 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 /// already-parsed **Map** (the parse-once cache: the index flattens the Map directly via `valueToTree`).
 ///
 /// - `flattenFromString` - current per-row index cost (`stringToJsonNode` + flatten).
-/// - `flattenFromMap` - cache preflight plus `valueToTree` + flatten when supported.
+/// - `flattenFromMap` - classification plus `valueToTree` + flatten when supported.
 /// - `serializeMap` - the Map to String serialization that stays (the forward index stores it).
-/// Float/binary leaves decline the optimization and use the serialized forward value.
+/// Float/binary leaves decline the optimization after classification and flatten the serialized forward value.
 @State(Scope.Benchmark)
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -54,7 +54,7 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 @Measurement(iterations = 8, time = 1)
 public class BenchmarkJsonFlatten {
 
-  // A representative structured log line (nested "log" object, ids, an array) similar to the zomato `message` field.
+  // A representative structured log line (nested "log" object, ids, an array).
   private static final String MESSAGE_JSON =
       "{\"x_gr_trace_id\":\"a1b2c3d4-e5f6-7890-abcd-ef1234567890\","
           + "\"user_id\":\"user-99174432\","
@@ -97,9 +97,7 @@ public class BenchmarkJsonFlatten {
   @Benchmark
   public Object flattenFromMap()
       throws Exception {
-    return JsonUtils.canFlattenParsedValue(_messageMap)
-        ? JsonUtils.flattenParsed(_messageMap, _config)
-        : JsonUtils.flatten(_forwardValue, _config);
+    return JsonUtils.flattenParsed(_messageMap, _forwardValue, _config);
   }
 
   @Benchmark

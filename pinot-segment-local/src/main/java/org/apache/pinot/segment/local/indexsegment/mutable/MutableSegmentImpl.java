@@ -967,10 +967,11 @@ public class MutableSegmentImpl implements MutableSegment {
             if (mutableIndex instanceof MutableJsonIndexImpl) {
               // Feed the JSON index the parsed value cached by the DataTypeTransformer (if any), so it flattens the
               // document directly instead of re-parsing the string this column was serialized into for the forward
-              // index. This is intentionally scoped to Pinot's built-in JSON index implementation.
+              // index; the index falls back to that string for documents it cannot flatten directly. This is
+              // intentionally scoped to Pinot's built-in JSON index implementation.
               Object parsedValue = row.getParsedJsonValue(column);
-              if (parsedValue != null) {
-                ((MutableJsonIndexImpl) mutableIndex).addParsed(parsedValue);
+              if (parsedValue != null && value instanceof String) {
+                ((MutableJsonIndexImpl) mutableIndex).addParsed(parsedValue, (String) value);
                 updateIndexCapacityThresholdBreached(mutableIndex, indexEntry.getKey(), column);
                 continue;
               }

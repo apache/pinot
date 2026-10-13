@@ -18,9 +18,10 @@
  */
 package org.apache.pinot.segment.local.recordtransformer;
 
+import com.fasterxml.jackson.core.StreamReadConstraints;
 import com.fasterxml.jackson.databind.JsonNode;
+import java.math.BigInteger;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +40,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertEqualsNoOrder;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
@@ -59,7 +61,7 @@ public class DataTypeTransformerTest {
     doc.put("b", "x");
 
     TableConfig withIndex = new TableConfigBuilder(TableType.OFFLINE).setTableName("t")
-        .setJsonIndexColumns(Collections.singletonList("jsonCol")).build();
+        .setJsonIndexColumns(List.of("jsonCol")).build();
     GenericRow indexed = new GenericRow();
     indexed.putValue("jsonCol", doc);
     new DataTypeTransformer(withIndex, schema).transform(indexed);
@@ -71,15 +73,19 @@ public class DataTypeTransformerTest {
     GenericRow arrays = new GenericRow();
     arrays.putValue("jsonCol", Map.of("array", new Object[]{Map.of("n", 1), 2}));
     new DataTypeTransformer(withIndex, schema).transform(arrays);
-    assertEquals(JsonUtils.flattenParsed(arrays.getParsedJsonValue("jsonCol"), new JsonIndexConfig()),
-        JsonUtils.flatten((String) arrays.getValue("jsonCol"), new JsonIndexConfig()));
+    String arraysForwardValue = (String) arrays.getValue("jsonCol");
+    JsonIndexConfig config = new JsonIndexConfig();
+    assertEquals(JsonUtils.flattenParsed(arrays.getParsedJsonValue("jsonCol"), arraysForwardValue, config),
+        JsonUtils.flatten(arraysForwardValue, config));
 
-    // Avro-style leaves must reuse the forward string, without another tree conversion or serialization.
-    for (Object unsafe : new Object[]{0.1f, new byte[]{1, 2, 3}}) {
+    // Avro-style leaves, and values exceeding the string path's parser limits, are cached unchanged: the JSON index
+    // classifies the value and flattens the forward string instead, without another tree conversion or serialization.
+    BigInteger longInteger = new BigInteger("9".repeat(StreamReadConstraints.defaults().getMaxNumberLength() + 1));
+    for (Object unsafe : new Object[]{0.1f, new byte[]{1, 2, 3}, longInteger}) {
       GenericRow fallback = new GenericRow();
       fallback.putValue("jsonCol", Map.of("value", unsafe));
       new DataTypeTransformer(withIndex, schema).transform(fallback);
-      assertNull(fallback.getParsedJsonValue("jsonCol"));
+      assertEquals(fallback.getParsedJsonValue("jsonCol"), Map.of("value", unsafe));
       GenericRow reference = new GenericRow();
       reference.putValue("jsonCol", Map.of("value", unsafe));
       new DataTypeTransformer(new TableConfigBuilder(TableType.OFFLINE).setTableName("t").build(), schema)
@@ -103,7 +109,7 @@ public class DataTypeTransformerTest {
   public void testJsonParseOnceCacheFromString() {
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("jsonCol", FieldSpec.DataType.JSON).build();
     TableConfig withIndex = new TableConfigBuilder(TableType.OFFLINE).setTableName("t")
-        .setJsonIndexColumns(Collections.singletonList("jsonCol")).build();
+        .setJsonIndexColumns(List.of("jsonCol")).build();
     TableConfig noIndex = new TableConfigBuilder(TableType.OFFLINE).setTableName("t").build();
 
     // Includes a fractional number (BigDecimal canonicalization) and an integer to cover both flatten paths.
@@ -144,7 +150,7 @@ public class DataTypeTransformerTest {
     jsonSpec.setMaxLength(8);
     jsonSpec.setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.TRIM_LENGTH);
     TableConfig withIndex = new TableConfigBuilder(TableType.OFFLINE).setTableName("t")
-        .setJsonIndexColumns(Collections.singletonList("jsonCol")).build();
+        .setJsonIndexColumns(List.of("jsonCol")).build();
 
     GenericRow row = new GenericRow();
     row.putValue("jsonCol", "{\"a\":\"averylongvalue\",\"b\":2}");
@@ -157,6 +163,15 @@ public class DataTypeTransformerTest {
     new SanitizationTransformer(schema).transform(row);
     assertTrue(((String) row.getValue("jsonCol")).length() <= 8);
     assertNull(row.getParsedJsonValue("jsonCol"));
+
+    // A value within the max length is left unchanged, so its cached node survives sanitization.
+    GenericRow shortRow = new GenericRow();
+    shortRow.putValue("jsonCol", "{\"a\":1}");
+    new DataTypeTransformer(withIndex, schema).transform(shortRow);
+    new SanitizationTransformer(schema).transform(shortRow);
+    assertEquals(shortRow.getValue("jsonCol"), "{\"a\":1}");
+    assertTrue(shortRow.getParsedJsonValue("jsonCol") instanceof JsonNode);
+    assertFalse(shortRow.isSanitized());
   }
 
   @Test

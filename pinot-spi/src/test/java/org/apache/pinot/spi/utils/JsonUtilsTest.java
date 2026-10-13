@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.spi.utils;
 
+import com.fasterxml.jackson.core.StreamReadConstraints;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.google.common.collect.ImmutableSet;
 import java.io.File;
 import java.io.IOException;
@@ -48,7 +50,9 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertEqualsNoOrder;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
@@ -84,7 +88,7 @@ public class JsonUtilsTest {
     for (int maxLevels : new int[]{-1, 1, 2, 3}) {
       JsonIndexConfig config = new JsonIndexConfig();
       config.setMaxLevels(maxLevels);
-      List<Map<String, String>> fromParsed = JsonUtils.flattenParsed(doc, config);
+      List<Map<String, String>> fromParsed = JsonUtils.flattenParsed(doc, oldPathInput, config);
       List<Map<String, String>> fromString = JsonUtils.flatten(oldPathInput, config);
       assertEqualsNoOrder(fromParsed.toArray(), fromString.toArray(),
           "flattenParsed(Map) must match serialize+reparse at maxLevels=" + maxLevels);
@@ -93,7 +97,8 @@ public class JsonUtilsTest {
     // Top-level list input (the cache stores List values too).
     List<Object> topList = List.of(Map.of("k", "a"), Map.of("k", "b"));
     JsonIndexConfig config = new JsonIndexConfig();
-    assertEqualsNoOrder(JsonUtils.flattenParsed(topList, config).toArray(),
+    assertTrue(JsonUtils.canFlattenParsedValue(topList));
+    assertEqualsNoOrder(flattenParsed(topList, config).toArray(),
         JsonUtils.flatten(JsonUtils.objectToString(topList), config).toArray());
   }
 
@@ -109,12 +114,13 @@ public class JsonUtilsTest {
     JsonIndexConfig config = new JsonIndexConfig();
     for (Map<String, Object> doc : List.<Map<String, Object>>of(decimals, collision, Map.of("nested", collision))) {
       assertTrue(JsonUtils.canFlattenParsedValue(doc));
-      assertEqualsNoOrder(JsonUtils.flattenParsed(doc, config).toArray(),
+      assertEqualsNoOrder(flattenParsed(doc, config).toArray(),
           JsonUtils.flatten(MapUtils.toString(doc), config).toArray());
     }
     // A List forward value preserves map insertion order instead of using MapUtils' sorted writer.
     List<Object> list = List.of(collision, decimals);
-    assertEqualsNoOrder(JsonUtils.flattenParsed(list, config).toArray(),
+    assertTrue(JsonUtils.canFlattenParsedValue(list));
+    assertEqualsNoOrder(flattenParsed(list, config).toArray(),
         JsonUtils.flatten(JsonUtils.objectToString(list), config).toArray());
   }
 
@@ -139,14 +145,189 @@ public class JsonUtilsTest {
         + "\"i\":42,\"s\":\"hi\"}";
     for (String json : new String[]{noDecimal, withDecimal}) {
       JsonNode node = JsonUtils.stringToJsonNodeWithBigDecimal(json);
+      assertTrue(JsonUtils.canFlattenParsedValue(node));
       for (int maxLevels : new int[]{-1, 1, 2, 3}) {
         JsonIndexConfig config = new JsonIndexConfig();
         config.setMaxLevels(maxLevels);
-        assertEqualsNoOrder(JsonUtils.flattenParsed(node, config).toArray(),
+        assertEqualsNoOrder(JsonUtils.flattenParsed(node, node.toString(), config).toArray(),
             JsonUtils.flatten(node.toString(), config).toArray(),
             "flattenParsed(JsonNode) must match flatten(node.toString()) for " + json + " at maxLevels=" + maxLevels);
       }
     }
+  }
+
+  /// A parsed value must not bypass the parser constraints of the string path; otherwise the consuming index would
+  /// differ from the immutable index built from the forward value (e.g. a matching document vs. a skipped one with
+  /// `skipInvalidJson`). Values at the parser limits stay on the parsed path.
+  @Test
+  public void testFlattenParsedRespectsParserConstraints()
+      throws Exception {
+    StreamReadConstraints constraints = StreamReadConstraints.defaults();
+    String maxName = "k".repeat(constraints.getMaxNameLength());
+    String maxString = "s".repeat(constraints.getMaxStringLength());
+    String maxDigits = "9".repeat(constraints.getMaxNumberLength());
+    int maxDepth = constraints.getMaxNestingDepth();
+    JsonIndexConfig config = new JsonIndexConfig();
+
+    List<Object> withinLimits = List.of(Map.of(maxName, "v"), Map.of("s", maxString),
+        Map.of("n", new BigInteger(maxDigits), "neg", new BigInteger("-" + maxDigits)),
+        JsonNodeFactory.instance.objectNode().put(maxName, new BigInteger("-" + maxDigits)),
+        Map.of("d", new BigDecimal("1." + maxDigits.substring(1))), nestedMap(maxDepth), nestedList(maxDepth),
+        nestedArray(maxDepth), nestedJsonNode(maxDepth), nestedObjectNode(maxDepth),
+        Map.of("node", nestedJsonNode(maxDepth - 1)));
+    for (int i = 0; i < withinLimits.size(); i++) {
+      Object value = withinLimits.get(i);
+      assertTrue(JsonUtils.canFlattenParsedValue(value), "withinLimits[" + i + "]");
+      assertEqualsNoOrder(flattenParsed(value, config).toArray(),
+          JsonUtils.flatten(forwardValue(value), config).toArray(), "withinLimits[" + i + "]");
+    }
+
+    JsonIndexConfig skipInvalidJson = new JsonIndexConfig();
+    skipInvalidJson.setSkipInvalidJson(true);
+    // A decimal document is a bare token in its forward value, which Jackson currently accepts with one digit over the
+    // number-length limit at the end of the input. Both paths must agree either way.
+    JsonNode decimalDocument = JsonNodeFactory.instance.numberNode(new BigDecimal("1." + maxDigits));
+    assertEquals(flattenParsed(decimalDocument, skipInvalidJson),
+        JsonUtils.flatten(forwardValue(decimalDocument), skipInvalidJson));
+
+    // Objects nested one level deeper than the limit can still be serialized, so they are cached.
+    String longName = maxName + "k";
+    String longDigits = maxDigits + "9";
+    List<Object> exceedingLimits = List.of(Map.of("ok", "v", longName, "v"), Map.of("ok", "v", "s", maxString + "s"),
+        Map.of("ok", "v", "n", new BigInteger(longDigits)), List.of("v", new BigInteger("-" + longDigits)),
+        new Object[]{Map.of(longName, 1)}, JsonNodeFactory.instance.objectNode().put("ok", "v").put(longName, "v"),
+        JsonNodeFactory.instance.arrayNode().add(maxString + "s"),
+        JsonNodeFactory.instance.objectNode().put("ok", "v").put("n", new BigInteger(longDigits)),
+        Map.of("node", JsonNodeFactory.instance.objectNode().put(longName, "v")), nestedMap(maxDepth + 1),
+        nestedObjectNode(maxDepth + 1));
+    for (int i = 0; i < exceedingLimits.size(); i++) {
+      assertFalse(JsonUtils.canFlattenParsedValue(exceedingLimits.get(i)), "exceedingLimits[" + i + "]");
+      assertSkippedOnBothPaths(exceedingLimits.get(i), config, skipInvalidJson);
+    }
+
+    // Decimal tokens are checked when the parsed path re-parses them, including a token that becomes too long when its
+    // BigDecimal is rendered for the forward value.
+    BigDecimal longDecimal = new BigDecimal("1." + maxDigits);
+    List<Object> decimalsExceedingLimits = List.of(Map.of("ok", "v", "d", longDecimal),
+        JsonNodeFactory.instance.objectNode().put("ok", "v").put("d", longDecimal),
+        JsonUtils.stringToJsonNodeWithBigDecimal("{\"ok\":\"v\",\"d\":" + maxDigits.substring(3) + "e5}"));
+    for (int i = 0; i < decimalsExceedingLimits.size(); i++) {
+      assertTrue(JsonUtils.canFlattenParsedValue(decimalsExceedingLimits.get(i)), "decimalsExceedingLimits[" + i + "]");
+      assertSkippedOnBothPaths(decimalsExceedingLimits.get(i), config, skipInvalidJson);
+    }
+
+    // An array nested deeper than the limit cannot be serialized, so the value has no forward value and is not cached.
+    List<Object> tooDeep = List.of(nestedList(maxDepth + 1), nestedArray(maxDepth + 1), nestedJsonNode(maxDepth + 1),
+        Map.of("node", nestedJsonNode(maxDepth)));
+    for (int i = 0; i < tooDeep.size(); i++) {
+      assertFalse(JsonUtils.canFlattenParsedValue(tooDeep.get(i)), "tooDeep[" + i + "]");
+    }
+  }
+
+  /// Over 32,768 chars, the string path reads the forward value in chunks, and a plain decimal token one digit over the
+  /// number-length limit is accepted when it ends a chunk. The parsed path then defers to the string path instead of
+  /// rejecting the token in its normalization.
+  @Test
+  public void testFlattenParsedDefersToStringPathAtReaderBufferBoundaries()
+      throws Exception {
+    BigDecimal longDecimal = new BigDecimal("1." + "9".repeat(StreamReadConstraints.defaults().getMaxNumberLength()));
+    JsonIndexConfig skipInvalidJson = new JsonIndexConfig();
+    skipInvalidJson.setSkipInvalidJson(true);
+    int numAccepted = 0;
+    for (int padding = 33_000; padding < 37_000; padding += 7) {
+      Map<String, Object> value = Map.of("a", "x".repeat(padding), "d", longDecimal, "z", 1);
+      String forwardValue = forwardValue(value);
+      List<Map<String, String>> expected = JsonUtils.flatten(forwardValue, skipInvalidJson);
+      if (!expected.equals(JsonUtils.SKIPPED_FLATTENED_RECORD)) {
+        numAccepted++;
+      }
+      assertEquals(JsonUtils.flattenParsed(value, forwardValue, skipInvalidJson), expected, "padding: " + padding);
+    }
+    assertTrue(numAccepted > 0,
+        "The string path no longer accepts the decimal token at reader buffer boundaries; revisit this fallback");
+  }
+
+  /// The JSON index passes the forward value along with the cached value, so a value that cannot be flattened directly
+  /// is flattened from that string instead of being serialized again, while a supported value ignores it.
+  @Test
+  public void testFlattenParsedFallsBackToSerializedForm()
+      throws Exception {
+    JsonIndexConfig config = new JsonIndexConfig();
+    String serializedForm = "{\"serialized\":\"form\"}";
+    List<Object> unsupported = List.of(Map.of("f", 0.1f), Map.of("b", new byte[]{1, 2, 3}),
+        JsonNodeFactory.instance.objectNode().put("f", 0.1f),
+        Map.of("k".repeat(StreamReadConstraints.defaults().getMaxNameLength() + 1), "v"));
+    for (int i = 0; i < unsupported.size(); i++) {
+      assertEquals(JsonUtils.flattenParsed(unsupported.get(i), serializedForm, config),
+          JsonUtils.flatten(serializedForm, config), "unsupported[" + i + "]");
+    }
+    Map<String, Object> supported = Map.of("a", 1, "d", new BigDecimal("2.0"));
+    assertEquals(JsonUtils.flattenParsed(supported, serializedForm, config),
+        JsonUtils.flatten(MapUtils.toString(supported), config));
+  }
+
+  private static void assertSkippedOnBothPaths(Object value, JsonIndexConfig config, JsonIndexConfig skipInvalidJson)
+      throws IOException {
+    String forwardValue = forwardValue(value);
+    assertEquals(JsonUtils.flatten(forwardValue, skipInvalidJson), JsonUtils.SKIPPED_FLATTENED_RECORD);
+    assertEquals(JsonUtils.flattenParsed(value, forwardValue, skipInvalidJson), JsonUtils.SKIPPED_FLATTENED_RECORD);
+    assertThrows(IOException.class, () -> JsonUtils.flatten(forwardValue, config));
+    assertThrows(IOException.class, () -> JsonUtils.flattenParsed(value, forwardValue, config));
+  }
+
+  /// Flattens a parsed value as the realtime JSON index does, along with the forward value it was serialized into.
+  private static List<Map<String, String>> flattenParsed(Object value, JsonIndexConfig config)
+      throws IOException {
+    return JsonUtils.flattenParsed(value, forwardValue(value), config);
+  }
+
+  /// Serializes a parsed value the way the forward index does for JSON columns.
+  @SuppressWarnings("unchecked")
+  private static String forwardValue(Object value)
+      throws IOException {
+    return value instanceof Map ? MapUtils.toString((Map<String, Object>) value) : JsonUtils.objectToString(value);
+  }
+
+  private static Object nestedMap(int depth) {
+    Object value = "v";
+    for (int i = 0; i < depth; i++) {
+      value = Map.of("a", value);
+    }
+    return value;
+  }
+
+  private static Object nestedList(int depth) {
+    Object value = "v";
+    for (int i = 0; i < depth; i++) {
+      value = List.of(value);
+    }
+    return value;
+  }
+
+  private static Object nestedArray(int depth) {
+    Object value = "v";
+    for (int i = 0; i < depth; i++) {
+      value = new Object[]{value};
+    }
+    return value;
+  }
+
+  private static JsonNode nestedJsonNode(int depth) {
+    JsonNode value = JsonNodeFactory.instance.textNode("v");
+    for (int i = 0; i < depth; i++) {
+      value = i % 2 == 0
+          ? JsonNodeFactory.instance.arrayNode().add(value)
+          : JsonNodeFactory.instance.objectNode().set("a", value);
+    }
+    return value;
+  }
+
+  private static JsonNode nestedObjectNode(int depth) {
+    JsonNode value = JsonNodeFactory.instance.textNode("v");
+    for (int i = 0; i < depth; i++) {
+      value = JsonNodeFactory.instance.objectNode().set("a", value);
+    }
+    return value;
   }
 
   @Test

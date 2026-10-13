@@ -21,6 +21,7 @@ package org.apache.pinot.spi.utils;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.StreamReadConstraints;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -35,6 +36,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.datatype.jsr310.ser.LocalDateSerializer;
 import com.fasterxml.jackson.datatype.jsr310.ser.LocalTimeSerializer;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.MapDifference;
 import com.google.common.collect.Maps;
@@ -793,33 +795,41 @@ public class JsonUtils {
   }
 
   /// Flattens an already-parsed JSON value ({@link Map} / {@link List} / {@link JsonNode}) for the JSON index, avoiding
-  /// the string tokenization that {@link #flatten(String, JsonIndexConfig)} performs. Used by the realtime JSON index
-  /// when the source value is already a parsed object (e.g. cached on the `GenericRow` before it is serialized to a
-  /// string for the forward index), so the document is parsed once at ingestion instead of being serialized and
-  /// re-parsed here. The result matches flattening the forward value: Maps use {@link MapUtils#toString(Map)}, while
-  /// Lists and JsonNodes use {@link #objectToString(Object)}. A String input uses the existing string path.
-  public static List<Map<String, String>> flattenParsed(Object jsonValue, JsonIndexConfig jsonIndexConfig)
+  /// the string tokenization that {@link #flatten(String, JsonIndexConfig)} performs on `jsonString`, the value's
+  /// serialized form. Used by the realtime JSON index for the value cached on the `GenericRow` before it is serialized
+  /// into the forward-index value, so the document is parsed once at ingestion instead of being serialized and
+  /// re-parsed here. The result matches flattening `jsonString` (Maps serialize via {@link MapUtils#toString(Map)},
+  /// Lists and JsonNodes via {@link #objectToString(Object)}): a value that cannot be flattened identically, or whose
+  /// direct conversion fails, flattens `jsonString` instead. Jackson's hash-flooding defense, which rejects a document
+  /// with many field names colliding in its name table, is not replicated: such a document is indexed here although
+  /// the string path rejects it (or skips it with `skipInvalidJson`).
+  public static List<Map<String, String>> flattenParsed(Object jsonValue, String jsonString,
+      JsonIndexConfig jsonIndexConfig)
       throws IOException {
-    if (jsonValue instanceof String) {
-      return flatten((String) jsonValue, jsonIndexConfig);
+    // A single traversal checks the value against the string path's parser constraints and finds BigDecimal leaves.
+    int classification = classifyParsedValue(jsonValue);
+    if (classification == FLATTEN_UNSAFE) {
+      return flatten(jsonString, jsonIndexConfig);
     }
-    if (!canFlattenParsedValue(jsonValue)) {
-      // Ingestion excludes these values from the cache, so its index reuses the existing forward string.
-      return flatten(jsonValue instanceof Map ? MapUtils.toString((Map<String, Object>) jsonValue)
-          : objectToString(jsonValue), jsonIndexConfig);
-    }
-    JsonNode jsonNode = jsonValue instanceof JsonNode ? (JsonNode) jsonValue
-        : (jsonValue instanceof Map ? PARSED_JSON_MAP_MAPPER : PARSED_JSON_MAPPER).valueToTree(jsonValue);
-    int classification = classifyForFlatten(jsonNode);
+    JsonNode toFlatten;
     try {
+      JsonNode jsonNode = jsonValue instanceof JsonNode
+          ? (JsonNode) jsonValue
+          : (jsonValue instanceof Map ? PARSED_JSON_MAP_MAPPER : PARSED_JSON_MAPPER).valueToTree(jsonValue);
       // A DecimalNode (a BigDecimal float, e.g. from stringToJsonNodeWithBigDecimal) renders its plain value, but the
       // string path re-parses its serialized token as an integer or double (possibly in scientific notation).
       // Re-parse just those leaves the same way so flatten matches, without re-tokenizing the
       // whole document as the serialize+reparse fallback would.
-      JsonNode toFlatten =
-          classification == FLATTEN_SAFE_WITH_BIG_DECIMAL ? normalizeBigDecimalNodes(jsonNode) : jsonNode;
-      return JsonUtils.flatten(toFlatten, jsonIndexConfig);
+      toFlatten = classification == FLATTEN_SAFE_WITH_BIG_DECIMAL ? normalizeBigDecimalNodes(jsonNode) : jsonNode;
     } catch (Exception e) {
+      // Let the string path decide how to index the document. For example, its reader accepts a decimal token one
+      // digit longer than the number-length limit at an input buffer boundary, which the normalization rejects.
+      return flatten(jsonString, jsonIndexConfig);
+    }
+    try {
+      return flatten(toFlatten, jsonIndexConfig);
+    } catch (Exception e) {
+      // The string path flattens the same tree, so it fails the same way.
       if (jsonIndexConfig.getSkipInvalidJson()) {
         return SKIPPED_FLATTENED_RECORD;
       } else {
@@ -828,77 +838,97 @@ public class JsonUtils {
     }
   }
 
-  /// Returns whether a parsed value can use the JSON index cache. Check before converting or caching a tree so
-  /// unsupported leaves (such as Avro Float/binary values) retain the existing forward-string indexing path.
-  public static boolean canFlattenParsedValue(@Nullable Object value) {
-    if (value instanceof JsonNode) {
-      return classifyForFlatten((JsonNode) value) != FLATTEN_UNSAFE;
-    }
-    if (value instanceof Map) {
-      for (Map.Entry<?, ?> entry : ((Map<?, ?>) value).entrySet()) {
-        if (!(entry.getKey() instanceof String) || !canFlattenParsedValue(entry.getValue())) {
-          return false;
-        }
-      }
-      return true;
-    }
-    if (value instanceof List) {
-      for (Object child : (List<?>) value) {
-        if (!canFlattenParsedValue(child)) {
-          return false;
-        }
-      }
-      return true;
-    }
-    if (value instanceof Object[]) {
-      for (Object child : (Object[]) value) {
-        if (!canFlattenParsedValue(child)) {
-          return false;
-        }
-      }
-      return true;
-    }
-    return value == null || value instanceof String || value instanceof Boolean || value instanceof Character
-        || value instanceof Byte || value instanceof Short || value instanceof Integer || value instanceof Long
-        || value instanceof Double || value instanceof BigInteger || value instanceof BigDecimal;
+  /// Returns whether {@link #flattenParsed} flattens the value directly rather than its serialized form.
+  @VisibleForTesting
+  static boolean canFlattenParsedValue(@Nullable Object value) {
+    return classifyParsedValue(value) != FLATTEN_UNSAFE;
   }
 
   private static final int FLATTEN_UNSAFE = 0;
   private static final int FLATTEN_SAFE = 1;
   private static final int FLATTEN_SAFE_WITH_BIG_DECIMAL = 2;
 
+  /// Constraints of the reader {@link #flatten(String, JsonIndexConfig)} parses with. A parsed value must not bypass
+  /// them, or the consuming index would contain a document that the string path (e.g. the immutable index built from
+  /// the forward value after the segment is sealed) rejects or skips. Classification checks nesting depth, name length,
+  /// string length, and integer length; decimal tokens are checked when {@link #normalizeBigDecimalNodes(JsonNode)}
+  /// re-parses them with the same reader.
+  private static final StreamReadConstraints FLATTEN_READ_CONSTRAINTS =
+      DEFAULT_READER.getFactory().streamReadConstraints();
+  /// The longest number token that an int, long, or double leaf can serialize to is shorter than this.
+  private static final int MAX_FIXED_SIZE_NUMBER_LENGTH = 32;
+  /// Whether any parsed value can be flattened directly. Classification does not track document length (which requires
+  /// serializing) or token count, and a number limit shorter than a primitive's token would require counting every
+  /// number, so such constraints send every value through the string path.
+  private static final boolean PARSED_FLATTEN_SUPPORTED =
+      !FLATTEN_READ_CONSTRAINTS.hasMaxDocumentLength() && !FLATTEN_READ_CONSTRAINTS.hasMaxTokenCount()
+          && FLATTEN_READ_CONSTRAINTS.getMaxNumberLength() >= MAX_FIXED_SIZE_NUMBER_LENGTH;
+  /// Bounds of log10(2) for the digit count bounds in {@link #isWithinIntegerLength(BigInteger)}.
+  private static final double LOG10_2_LOWER_BOUND = 0.30102;
+  private static final double LOG10_2_UPPER_BOUND = 0.30103;
+
   /// Classifies whether a parsed value can be flattened directly so the records are byte-for-byte identical to
   /// flattening its serialized string (both paths render each leaf via {@link JsonNode#asText()}). {@code Integer},
-  /// {@code Long}, {@code Double} and {@code BigInteger} nodes render identically to the string path
-  /// ({@link #FLATTEN_SAFE}); a {@code DecimalNode} (a {@code BigDecimal} float) renders its plain value while the
-  /// string path re-parses it (an integer token as an int/long, a floating-point token as a double), so it is re-parsed
-  /// the same way first ({@link #FLATTEN_SAFE_WITH_BIG_DECIMAL}), preserving scale-zero integers and tokens like 2.0;
-  /// e.g. {@code "1234567890.5"} -> {@code "1.2345678905E9"}. A {@code FloatNode} or a binary / POJO node does not
-  /// round-trip and forces the serialize+reparse fallback ({@link #FLATTEN_UNSAFE}). The JSON decoders only produce
-  /// String / Integer / Long / Double / BigInteger / BigDecimal, so a parsed {@link JsonNode} is never
-  /// {@code FLATTEN_UNSAFE}; the fallback only applies to Float / byte[] leaves from a non-JSON RecordReader.
-  private static int classifyForFlatten(JsonNode node) {
+  /// {@code Long}, {@code Double} and {@code BigInteger} leaves render identically to the string path
+  /// ({@link #FLATTEN_SAFE}); a {@code BigDecimal} leaf renders its plain value while the string path re-parses it (an
+  /// integer token as an int/long, a floating-point token as a double), so it is re-parsed the same way first
+  /// ({@link #FLATTEN_SAFE_WITH_BIG_DECIMAL}), preserving scale-zero integers and tokens like 2.0; e.g.
+  /// {@code "1234567890.5"} -> {@code "1.2345678905E9"}. A {@code Float}, binary, POJO, or other unsupported leaf does
+  /// not round-trip, and the string path would reject a value exceeding the limits checked against
+  /// {@link #FLATTEN_READ_CONSTRAINTS}; both are flattened from the serialized form instead ({@link #FLATTEN_UNSAFE}).
+  private static int classifyParsedValue(@Nullable Object value) {
+    return PARSED_FLATTEN_SUPPORTED ? classifyForFlatten(value, 0) : FLATTEN_UNSAFE;
+  }
+
+  /// Classifies a {@link Map} / {@link List} / {@code Object[]} / {@link JsonNode} / leaf value nested inside `depth`
+  /// containers. See {@link #classifyParsedValue(Object)}.
+  private static int classifyForFlatten(@Nullable Object value, int depth) {
+    if (value instanceof JsonNode) {
+      return classifyForFlatten((JsonNode) value, depth);
+    }
+    if (value instanceof Map) {
+      return classifyEntriesForFlatten(((Map<?, ?>) value).entrySet(), depth);
+    }
+    if (value instanceof List) {
+      return classifyElementsForFlatten((List<?>) value, depth);
+    }
+    if (value instanceof Object[]) {
+      return classifyElementsForFlatten((Object[]) value, depth);
+    }
+    if (value instanceof String) {
+      return isWithinStringLength((String) value) ? FLATTEN_SAFE : FLATTEN_UNSAFE;
+    }
+    if (value instanceof BigInteger) {
+      return isWithinIntegerLength((BigInteger) value) ? FLATTEN_SAFE : FLATTEN_UNSAFE;
+    }
+    if (value instanceof BigDecimal) {
+      return FLATTEN_SAFE_WITH_BIG_DECIMAL;
+    }
+    boolean supportedLeaf = value == null || value instanceof Boolean || value instanceof Character
+        || value instanceof Byte || value instanceof Short || value instanceof Integer || value instanceof Long
+        || value instanceof Double;
+    return supportedLeaf ? FLATTEN_SAFE : FLATTEN_UNSAFE;
+  }
+
+  /// Classifies a {@link JsonNode} nested inside `depth` containers. See {@link #classifyParsedValue(Object)}. A
+  /// {@code DecimalNode} (a {@code BigDecimal} float) needs normalization, and a {@code FloatNode} or a binary / POJO
+  /// node does not round-trip. A {@link JsonNode} built by a non-JSON RecordReader may exceed the reader constraints.
+  private static int classifyForFlatten(JsonNode node, int depth) {
     switch (node.getNodeType()) {
       case NUMBER:
         if (node.isFloat()) {
           return FLATTEN_UNSAFE;
         }
-        return node.isBigDecimal() ? FLATTEN_SAFE_WITH_BIG_DECIMAL : FLATTEN_SAFE;
-      case OBJECT:
-      case ARRAY: {
-        int result = FLATTEN_SAFE;
-        for (JsonNode child : node) {
-          int childClassification = classifyForFlatten(child);
-          if (childClassification == FLATTEN_UNSAFE) {
-            return FLATTEN_UNSAFE;
-          }
-          if (childClassification == FLATTEN_SAFE_WITH_BIG_DECIMAL) {
-            result = FLATTEN_SAFE_WITH_BIG_DECIMAL;
-          }
+        if (node.isBigDecimal()) {
+          return FLATTEN_SAFE_WITH_BIG_DECIMAL;
         }
-        return result;
-      }
+        return !node.isBigInteger() || isWithinIntegerLength(node.bigIntegerValue()) ? FLATTEN_SAFE : FLATTEN_UNSAFE;
+      case OBJECT:
+        return classifyEntriesForFlatten(node.properties(), depth);
+      case ARRAY:
+        return classifyElementsForFlatten(node, depth);
       case STRING:
+        return isWithinStringLength(node.textValue()) ? FLATTEN_SAFE : FLATTEN_UNSAFE;
       case BOOLEAN:
       case NULL:
         return FLATTEN_SAFE;
@@ -908,28 +938,111 @@ public class JsonUtils {
     }
   }
 
+  /// Classifies the entries of an object nested inside `depth` containers.
+  private static int classifyEntriesForFlatten(Iterable<? extends Map.Entry<?, ?>> entries, int depth) {
+    if (depth >= FLATTEN_READ_CONSTRAINTS.getMaxNestingDepth()) {
+      return FLATTEN_UNSAFE;
+    }
+    int result = FLATTEN_SAFE;
+    for (Map.Entry<?, ?> entry : entries) {
+      Object key = entry.getKey();
+      if (!(key instanceof String) || ((String) key).length() > FLATTEN_READ_CONSTRAINTS.getMaxNameLength()) {
+        return FLATTEN_UNSAFE;
+      }
+      int classification = classifyForFlatten(entry.getValue(), depth + 1);
+      if (classification == FLATTEN_UNSAFE) {
+        return FLATTEN_UNSAFE;
+      }
+      result = Math.max(result, classification);
+    }
+    return result;
+  }
+
+  /// Classifies the elements of an array nested inside `depth` containers.
+  private static int classifyElementsForFlatten(Iterable<?> elements, int depth) {
+    if (depth >= FLATTEN_READ_CONSTRAINTS.getMaxNestingDepth()) {
+      return FLATTEN_UNSAFE;
+    }
+    int result = FLATTEN_SAFE;
+    for (Object element : elements) {
+      int classification = classifyForFlatten(element, depth + 1);
+      if (classification == FLATTEN_UNSAFE) {
+        return FLATTEN_UNSAFE;
+      }
+      result = Math.max(result, classification);
+    }
+    return result;
+  }
+
+  /// Same as {@link #classifyElementsForFlatten(Iterable, int)} for an {@code Object[]}, without wrapping it in a List.
+  private static int classifyElementsForFlatten(Object[] elements, int depth) {
+    if (depth >= FLATTEN_READ_CONSTRAINTS.getMaxNestingDepth()) {
+      return FLATTEN_UNSAFE;
+    }
+    int result = FLATTEN_SAFE;
+    for (Object element : elements) {
+      int classification = classifyForFlatten(element, depth + 1);
+      if (classification == FLATTEN_UNSAFE) {
+        return FLATTEN_UNSAFE;
+      }
+      result = Math.max(result, classification);
+    }
+    return result;
+  }
+
+  private static boolean isWithinStringLength(String value) {
+    return value.length() <= FLATTEN_READ_CONSTRAINTS.getMaxStringLength();
+  }
+
+  /// Returns whether the string path can parse the integer token. Like the parser, this counts digits without the sign.
+  private static boolean isWithinIntegerLength(BigInteger value) {
+    int maxLength = FLATTEN_READ_CONSTRAINTS.getMaxNumberLength();
+    // The magnitude is in [2^(bitLength - 1), 2^(bitLength + 1)), so only values near the limit need their digits
+    // counted.
+    int bitLength = value.bitLength();
+    if ((bitLength + 1) * LOG10_2_UPPER_BOUND + 1 <= maxLength) {
+      return true;
+    }
+    if ((bitLength - 1) * LOG10_2_LOWER_BOUND >= maxLength) {
+      return false;
+    }
+    return value.toString().length() - (value.signum() < 0 ? 1 : 0) <= maxLength;
+  }
+
   /// Returns a copy of the tree with every {@code DecimalNode} re-parsed the way the string path does (serialize via
   /// {@code toString}, parse with the default reader), so {@link #flatten}'s {@code asText()} is identical -- whether
   /// the value renders as an integer, a double, or in scientific notation -- while sharing all other leaf nodes. Only
   /// called when the tree actually contains a {@code BigDecimal} node. Using {@code doubleValue()} instead would be
   /// wrong: the serialized token determines whether the result is an integer or double, and integer tokens past
-  /// 2^53 must retain their precision.
+  /// 2^53 must retain their precision. The re-parse also applies the reader's number-length limit, so a token the
+  /// string path rejects fails here as well.
   private static JsonNode normalizeBigDecimalNodes(JsonNode node)
       throws IOException {
+    // A decimal document is a bare token in the forward value, which the string path parses at the end of the input.
+    return node.isBigDecimal() ? stringToJsonNode(node.toString()) : normalizeNestedBigDecimalNodes(node);
+  }
+
+  private static JsonNode normalizeNestedBigDecimalNodes(JsonNode node)
+      throws IOException {
     if (node.isBigDecimal()) {
-      return stringToJsonNode(node.toString());
+      // Parse a token near the number-length limit inside a container, as in the forward value: at the end of the
+      // input, Jackson accepts a plain decimal token one digit longer than the limit.
+      String token = node.toString();
+      return token.length() <= FLATTEN_READ_CONSTRAINTS.getMaxNumberLength()
+          ? stringToJsonNode(token)
+          : stringToJsonNode("[" + token + "]").get(0);
     }
     if (node.isObject()) {
       ObjectNode result = JsonNodeFactory.instance.objectNode();
       for (Map.Entry<String, JsonNode> field : node.properties()) {
-        result.set(field.getKey(), normalizeBigDecimalNodes(field.getValue()));
+        result.set(field.getKey(), normalizeNestedBigDecimalNodes(field.getValue()));
       }
       return result;
     }
     if (node.isArray()) {
       ArrayNode result = JsonNodeFactory.instance.arrayNode(node.size());
       for (JsonNode child : node) {
-        result.add(normalizeBigDecimalNodes(child));
+        result.add(normalizeNestedBigDecimalNodes(child));
       }
       return result;
     }

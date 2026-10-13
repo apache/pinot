@@ -59,8 +59,8 @@ public class DataTypeTransformer implements RecordTransformer {
   private final Map<String, PinotDataType> _dataTypes;
   /// JSON-typed columns that have a JSON index. For these the parsed value is cached on the row (before it is
   /// serialized to a string for the forward index) so the JSON index can flatten it directly instead of re-parsing.
-  /// Computed once here so we only pay for the cache when a JSON index will actually consume the parsed value. Empty
-  /// for the source-field usage, which runs before indexing.
+  /// Only the consuming segment's JSON index reads the cache; caching costs a reference per row elsewhere. Empty for
+  /// the source-field usage, which runs before indexing.
   private final Set<String> _jsonCacheColumns;
   private final boolean _continueOnError;
   private final ThrottledLogger _throttledLogger;
@@ -174,10 +174,9 @@ public class DataTypeTransformer implements RecordTransformer {
         Object parsedToCache = null;
         if (value != null && !_jsonCacheColumns.isEmpty() && _jsonCacheColumns.contains(column)) {
           if (value instanceof Map || value instanceof List || value instanceof JsonNode) {
-            // Already-parsed JSON: serialize it for the forward index (below) and cache the parsed value for the index.
-            if (JsonUtils.canFlattenParsedValue(value)) {
-              parsedToCache = value;
-            }
+            // Already-parsed JSON: serialize it for the forward index (below) and cache the parsed value for the index,
+            // which flattens the forward string instead for a value it cannot flatten directly (e.g. Float leaves).
+            parsedToCache = value;
             value = DataTypeTransformerUtils.transformValue(column, value, entry.getValue());
           } else if (value instanceof String) {
             // The column value is JSON text. The JSON conversion parses it (preserving BigDecimal) and re-serializes it
