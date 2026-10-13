@@ -374,6 +374,46 @@
         ]
       },
       {
+        "description": "timestamp plus month interval times a decimal",
+        "sql": "EXPLAIN PLAN FOR SELECT TIMESTAMP '2019-01-01 00:00:00' + INTERVAL '100' MONTH * 0.29 FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[2021-06-01 00:00:00])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "timestamp plus month interval times another decimal",
+        "sql": "EXPLAIN PLAN FOR SELECT TIMESTAMP '2019-01-01 00:00:00' + INTERVAL '100' MONTH * 1.11 FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[2028-04-01 00:00:00])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "timestamp plus year interval divided by an integer",
+        "sql": "EXPLAIN PLAN FOR SELECT TIMESTAMP '2019-01-01 00:00:00' + INTERVAL '1' YEAR / 4 FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[2019-04-01 00:00:00])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "timestamp plus difference of year and month intervals",
+        "sql": "EXPLAIN PLAN FOR SELECT TIMESTAMP '2019-01-01 00:00:00' + (INTERVAL '1' YEAR - INTERVAL '1' MONTH) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[2019-12-01 00:00:00])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
         "description": "timestamp plus day interval",
         "sql": "EXPLAIN PLAN FOR SELECT TIMESTAMP '2019-01-01 00:00:00' + INTERVAL '1' DAY FROM a",
         "output": [
@@ -409,6 +449,16 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[2019-01-03 00:00:00])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "timestamp plus day interval times a decimal",
+        "sql": "EXPLAIN PLAN FOR SELECT TIMESTAMP '2019-01-01 00:00:00' + INTERVAL '1' DAY * 0.7 FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[2019-01-01 16:48:00])",
           "\n  PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
