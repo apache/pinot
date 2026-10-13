@@ -90,7 +90,7 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 /// is the primary cost of the feature relative to a plain GROUP BY.
 ///
 /// Run with:
-/// `mvn -pl pinot-perf exec:java -Dexec.mainClass=org.apache.pinot.perf.BenchmarkGroupingSetsQueriesSSE`
+/// `./mvnw -pl pinot-perf exec:java -Dexec.mainClass=org.apache.pinot.perf.BenchmarkGroupingSetsQueriesSSE`
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @Fork(1)
@@ -138,7 +138,7 @@ public class BenchmarkGroupingSetsQueriesSSE {
   @Param({ROLLUP_2, ROLLUP_3, CUBE_3, GROUPING_SETS_3, PLAIN_GROUP_BY_3})
   private String _query;
 
-  /// `true` (default engine behavior) aggregates the base grouping once per segment and derives the grouping
+  /// `true` opts in to aggregating the base grouping once per segment and deriving the grouping
   /// sets; `false` forces the legacy per-row expansion path. Lets the benchmark compare the two directly.
   @Param({"true", "false"})
   private boolean _baseAggregation;
@@ -280,8 +280,6 @@ public class BenchmarkGroupingSetsQueriesSSE {
     try {
       byte[] serializedResponse = instanceResponse.toDataTable().toBytes();
       dataTableMap.put(new ServerRoutingInstance("localhost", 1234, TableType.OFFLINE),
-          DataTableFactory.getDataTable(serializedResponse));
-      dataTableMap.put(new ServerRoutingInstance("localhost", 1234, TableType.REALTIME),
           DataTableFactory.getDataTable(serializedResponse));
     } catch (Exception e) {
       throw new RuntimeException(e);

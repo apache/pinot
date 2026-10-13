@@ -26,6 +26,7 @@ import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import java.util.Iterator;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.BaseProjectOperator;
@@ -115,6 +116,12 @@ public class GroupingSetsGroupKeyGenerator implements GroupKeyGenerator {
   /// Per-column reserved id used for a NULL value or a rolled-up (non-participating) column when long-packing.
   /// Equal to the column's dictionary cardinality, so it never collides with a real dict-id (`0..card-1`).
   private final int[] _nullPackedIds;
+  /// For the single-value packed path: per-set column mask and fixed rolled-up NULL / ordinal bits.
+  /// Unused on the MV path or when the composite key does not fit in a long.
+  @Nullable
+  private final long[] _setKeepMasks;
+  @Nullable
+  private final long[] _setPackedConstants;
 
   /// Reusable single-element id list for a rolled-up (non-participating) column on the MV path. Per-instance
   /// (segment-confined, never shared across query threads) and treated as read-only: expandGroupIds copies its
@@ -196,6 +203,29 @@ public class GroupingSetsGroupKeyGenerator implements GroupKeyGenerator {
     }
     _longPacking = longPacking;
 
+    if (_longPacking && !_hasMvColumn) {
+      _setKeepMasks = new long[_numSets];
+      _setPackedConstants = new long[_numSets];
+      for (int s = 0; s < _numSets; s++) {
+        long keepMask = 0L;
+        long packedConstant = ((long) s) << _bitShifts[_numGroupByExpressions];
+        for (int col = 0; col < _numGroupByExpressions; col++) {
+          int shift = _bitShifts[col];
+          int width = _bitShifts[col + 1] - shift;
+          if (_setContains[s][col]) {
+            // The ordinal shift is below 64, so a column's width is at most 63.
+            keepMask |= ((1L << width) - 1L) << shift;
+          } else {
+            packedConstant |= ((long) _nullPackedIds[col]) << shift;
+          }
+        }
+        _setKeepMasks[s] = keepMask;
+        _setPackedConstants[s] = packedConstant;
+      }
+    } else {
+      _setKeepMasks = null;
+      _setPackedConstants = null;
+    }
     if (_longPacking) {
       _longGroupKeyMap = new Long2IntOpenHashMap();
       _longGroupKeyMap.defaultReturnValue(INVALID_ID);
@@ -265,21 +295,19 @@ public class GroupingSetsGroupKeyGenerator implements GroupKeyGenerator {
     }
   }
 
-  /// Single-value long-packed path: pack the composite key (per-column dict-ids plus the set ordinal) into a
-  /// single `long` and resolve it through [#_longGroupKeyMap], avoiding any per-(row, set) key allocation.
+  /// Single-value long-packed path: pack native dict-ids once per row, then project the bits into each set.
+  /// The fixed set bits carry rolled-up NULL sentinels and the set ordinal; the mask retains participating
+  /// column bits, including a genuine NULL sentinel if one is present.
   private void generateKeysForBlockSvLongPacked(int numDocs, int[][] columnIds, int[][] groupKeys) {
+    assert _setKeepMasks != null && _setPackedConstants != null;
     for (int row = 0; row < numDocs; row++) {
+      long packedRowKey = 0L;
+      for (int col = 0; col < _numGroupByExpressions; col++) {
+        packedRowKey |= ((long) packedId(col, columnIds[col][row])) << _bitShifts[col];
+      }
       int[] ids = reuseOrAllocateRow(groupKeys, row);
       for (int s = 0; s < _numSets; s++) {
-        boolean[] setContains = _setContains[s];
-        // Pack the set ordinal into the trailing slot, then each column's id into its slot; a column rolled up
-        // for this set contributes the reserved NULL id so it stays distinct from a participating real value.
-        long key = ((long) s) << _bitShifts[_numGroupByExpressions];
-        for (int col = 0; col < _numGroupByExpressions; col++) {
-          int id = setContains[col] ? packedId(col, columnIds[col][row]) : _nullPackedIds[col];
-          key |= ((long) id) << _bitShifts[col];
-        }
-        ids[s] = getGroupIdForLongKey(key);
+        ids[s] = getGroupIdForLongKey((packedRowKey & _setKeepMasks[s]) | _setPackedConstants[s]);
       }
       groupKeys[row] = ids;
     }
