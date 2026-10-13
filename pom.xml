@@ -310,7 +310,7 @@
     <google.auto-service.version>1.1.1</google.auto-service.version>
     <google.re2j.version>1.8</google.re2j.version>
     <google.cloud.opentelemetry.version>0.36.0</google.cloud.opentelemetry.version>
-    <opentelemetry.gcp.resources.version>1.60.0-alpha</opentelemetry.gcp.resources.version>
+    <opentelemetry.gcp.resources.version>1.61.0-alpha</opentelemetry.gcp.resources.version>
     <google.errorprone.version>2.50.0</google.errorprone.version>
     <google.j2objc.version>3.1</google.j2objc.version>
 
