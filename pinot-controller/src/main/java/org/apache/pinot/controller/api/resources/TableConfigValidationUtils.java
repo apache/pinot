@@ -19,17 +19,22 @@
 package org.apache.pinot.controller.api.resources;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.List;
 import javax.annotation.Nullable;
+import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
+import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentUtils;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
-import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.util.TaskConfigUtils;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.ConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableConfigValidatorRegistry;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
@@ -52,15 +57,14 @@ public final class TableConfigValidationUtils {
   /// @param resourceManager the Helix resource manager
   /// @param controllerConf  the controller configuration
   /// @param taskManager     the task manager, or null to skip task validation
-  public static void validateTableConfig(TableConfig tableConfig, Schema schema,
-      @Nullable String typesToSkip, PinotHelixResourceManager resourceManager,
-      ControllerConf controllerConf, @Nullable PinotTaskManager taskManager) {
+  public static void validateTableConfig(TableConfig tableConfig, Schema schema, @Nullable String typesToSkip,
+      PinotHelixResourceManager resourceManager, ControllerConf controllerConf,
+      @Nullable PinotTaskManager taskManager) {
     validateTableConfig(tableConfig, schema, typesToSkip, resourceManager, controllerConf, taskManager, null);
   }
 
-  public static void validateTableConfig(TableConfig tableConfig, Schema schema,
-      @Nullable String typesToSkip, PinotHelixResourceManager resourceManager,
-      ControllerConf controllerConf, @Nullable PinotTaskManager taskManager,
+  public static void validateTableConfig(TableConfig tableConfig, Schema schema, @Nullable String typesToSkip,
+      PinotHelixResourceManager resourceManager, ControllerConf controllerConf, @Nullable PinotTaskManager taskManager,
       @Nullable TableConfig existingTableConfig) {
     validateEnvironmentVariables(tableConfig);
     TableConfigUtils.validate(tableConfig, schema, typesToSkip, existingTableConfig);
@@ -94,8 +98,9 @@ public final class TableConfigValidationUtils {
         rootCause = rootCause.getCause();
       }
       String reason = rootCause.getMessage() != null ? rootCause.getMessage() : rootCause.toString();
-      throw new IllegalStateException("Failed to resolve environment variables/system properties referenced in table "
-          + "config for table: " + tableConfig.getTableName() + ", reason: " + reason, e);
+      throw new IllegalStateException(
+          "Failed to resolve environment variables/system properties referenced in table " + "config for table: "
+              + tableConfig.getTableName() + ", reason: " + reason, e);
     }
   }
 
@@ -103,8 +108,8 @@ public final class TableConfigValidationUtils {
     String rawTableName = TableNameBuilder.extractRawTableName(tableConfig.getTableName());
     if (tableConfig.getTableType() == TableType.REALTIME) {
       if (resourceManager.hasOfflineTable(rawTableName)) {
-        TableConfigUtils.verifyHybridTableConfigs(rawTableName,
-            resourceManager.getOfflineTableConfig(rawTableName), tableConfig);
+        TableConfigUtils.verifyHybridTableConfigs(rawTableName, resourceManager.getOfflineTableConfig(rawTableName),
+            tableConfig);
       }
     } else {
       if (resourceManager.hasRealtimeTable(rawTableName)) {
@@ -114,12 +119,28 @@ public final class TableConfigValidationUtils {
     }
   }
 
-  private static void validateInstanceAssignment(PinotHelixResourceManager resourceManager,
-      TableConfig tableConfig) {
-    TableRebalancer tableRebalancer = new TableRebalancer(resourceManager.getHelixZkManager(),
-        resourceManager.getQueryWorkloadManager());
+  /// Computes the instance partitions the table would get on creation, so that an instance assignment that cannot be
+  /// satisfied by the current instances is rejected before the table config is persisted.
+  private static void validateInstanceAssignment(PinotHelixResourceManager resourceManager, TableConfig tableConfig) {
+    List<InstancePartitionsType> instancePartitionsTypes;
+    if (tableConfig.getTableType() == TableType.OFFLINE) {
+      instancePartitionsTypes = List.of(InstancePartitionsType.OFFLINE);
+    } else if (InstanceAssignmentConfigUtils.shouldRelocateCompletedSegments(tableConfig)) {
+      instancePartitionsTypes = List.of(InstancePartitionsType.CONSUMING, InstancePartitionsType.COMPLETED);
+    } else {
+      instancePartitionsTypes = List.of(InstancePartitionsType.CONSUMING);
+    }
+    List<InstanceConfig> instanceConfigs = resourceManager.getAllHelixInstanceConfigs();
     try {
-      tableRebalancer.getInstancePartitionsMap(tableConfig, true, true, true);
+      for (InstancePartitionsType instancePartitionsType : instancePartitionsTypes) {
+        if (InstanceAssignmentConfigUtils.allowInstanceAssignment(tableConfig, instancePartitionsType)) {
+          InstanceAssignmentUtils.computeInstancePartitions(tableConfig, instancePartitionsType,
+              resourceManager.getPropertyStore(), instanceConfigs, null);
+        } else {
+          InstancePartitionsUtils.computeDefaultInstancePartitions(resourceManager.getHelixZkManager(), tableConfig,
+              instancePartitionsType);
+        }
+      }
     } catch (Exception e) {
       throw new RuntimeException(
           "Failed to calculate instance partitions for table: " + tableConfig.getTableName() + ", reason: "

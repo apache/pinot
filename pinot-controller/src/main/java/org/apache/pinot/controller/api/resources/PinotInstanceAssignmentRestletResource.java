@@ -57,7 +57,7 @@ import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentDriver;
+import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentUtils;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
@@ -74,15 +74,18 @@ import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
-@Api(tags = Constants.TABLE_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
-    @Authorization(value = DATABASE)})
+@Api(tags = Constants.TABLE_TAG, authorizations = {
+    @Authorization(value = SWAGGER_AUTHORIZATION_KEY),
+    @Authorization(value = DATABASE)
+})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
     @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
         key = SWAGGER_AUTHORIZATION_KEY,
         description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```"),
     @ApiKeyAuthDefinition(name = DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = DATABASE,
         description = "Database context passed through http header. If no context is provided 'default' database "
-            + "context will be considered.")}))
+            + "context will be considered.")
+}))
 @Path("/")
 public class PinotInstanceAssignmentRestletResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotInstanceAssignmentRestletResource.class);
@@ -253,39 +256,13 @@ public class PinotInstanceAssignmentRestletResource {
   /// @param instancePartitionsType type of instancePartitions
   private void assignInstancesForInstancePartitionsType(Map<String, InstancePartitions> instancePartitionsMap,
       TableConfig tableConfig, List<InstanceConfig> instanceConfigs, InstancePartitionsType instancePartitionsType) {
-    String tableNameWithType = tableConfig.getTableName();
-    if (!InstancePartitionsUtils.hasPreConfiguredInstancePartitions(tableConfig, instancePartitionsType)) {
-      InstancePartitions existingInstancePartitions =
-          InstancePartitionsUtils.fetchInstancePartitions(_resourceManager.getHelixZkManager().getHelixPropertyStore(),
-              InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType, instancePartitionsType));
-      instancePartitionsMap.put(instancePartitionsType.toString(),
-          new InstanceAssignmentDriver(tableConfig).assignInstances(instancePartitionsType, instanceConfigs,
-              existingInstancePartitions));
-    } else {
-      if (InstanceAssignmentConfigUtils.isMirrorServerSetAssignment(tableConfig, instancePartitionsType)) {
-        // fetch the existing instance partitions, if the table, this is referenced in the new instance partitions
-        // generation for minimum difference
-        InstancePartitions existingInstancePartitions = InstancePartitionsUtils.fetchInstancePartitions(
-            _resourceManager.getHelixZkManager().getHelixPropertyStore(),
-            InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType, instancePartitionsType));
-        String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-        // fetch the pre-configured instance partitions, the renaming part is irrelevant as we are not really
-        // preserving this preConfigured, but only using it as a reference to generate the new instance partitions
-        InstancePartitions preConfigured =
-            InstancePartitionsUtils.fetchInstancePartitionsWithRename(_resourceManager.getPropertyStore(),
-                tableConfig.getInstancePartitionsMap().get(instancePartitionsType),
-                instancePartitionsType.getInstancePartitionsName(rawTableName));
-        instancePartitionsMap.put(instancePartitionsType.toString(),
-            new InstanceAssignmentDriver(tableConfig).assignInstances(instancePartitionsType, instanceConfigs,
-                existingInstancePartitions, preConfigured));
-      } else {
-        String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-        instancePartitionsMap.put(instancePartitionsType.toString(),
-            InstancePartitionsUtils.fetchInstancePartitionsWithRename(_resourceManager.getPropertyStore(),
-                tableConfig.getInstancePartitionsMap().get(instancePartitionsType),
-                instancePartitionsType.getInstancePartitionsName(rawTableName)));
-      }
-    }
+    // The existing instance partitions are the reference for minimizing data movement
+    InstancePartitions existingInstancePartitions =
+        InstancePartitionsUtils.fetchInstancePartitions(_resourceManager.getPropertyStore(),
+            InstancePartitionsUtils.getInstancePartitionsName(tableConfig.getTableName(), instancePartitionsType));
+    instancePartitionsMap.put(instancePartitionsType.toString(),
+        InstanceAssignmentUtils.computeInstancePartitions(tableConfig, instancePartitionsType,
+            _resourceManager.getPropertyStore(), instanceConfigs, existingInstancePartitions));
   }
 
   private void assignInstancesForTier(Map<String, InstancePartitions> instancePartitionsMap, TableConfig tableConfig,
@@ -296,12 +273,11 @@ public class PinotInstanceAssignmentRestletResource {
         if ((tierConfig.getName().equals(tierName) || tierName == null)
             && tableConfig.getInstanceAssignmentConfigMap().get(tierConfig.getName()) != null) {
           InstancePartitions existingInstancePartitions = InstancePartitionsUtils.fetchInstancePartitions(
-              _resourceManager.getHelixZkManager().getHelixPropertyStore(),
+              _resourceManager.getPropertyStore(),
               InstancePartitionsUtils.getInstancePartitionsNameForTier(tableConfig.getTableName(),
                   tierConfig.getName()));
-
           instancePartitionsMap.put(tierConfig.getName(),
-              new InstanceAssignmentDriver(tableConfig).assignInstances(tierConfig.getName(), instanceConfigs,
+              InstanceAssignmentUtils.assignInstances(tableConfig, tierConfig.getName(), instanceConfigs,
                   existingInstancePartitions, tableConfig.getInstanceAssignmentConfigMap().get(tierConfig.getName())));
         }
       }
@@ -441,9 +417,9 @@ public class PinotInstanceAssignmentRestletResource {
       @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|CONSUMING|COMPLETED|tier name") @QueryParam("type") @Nullable String type,
       @ApiParam(value = "Old instance to be replaced", required = true) @QueryParam("oldInstanceId")
-          String oldInstanceId,
+      String oldInstanceId,
       @ApiParam(value = "New instance to replace with", required = true) @QueryParam("newInstanceId")
-          String newInstanceId, @Context HttpHeaders headers) {
+      String newInstanceId, @Context HttpHeaders headers) {
     Map<String, InstancePartitions> instancePartitionsMap = getInstancePartitions(tableName, type, headers);
     Iterator<InstancePartitions> iterator = instancePartitionsMap.values().iterator();
     while (iterator.hasNext()) {
