@@ -47,6 +47,7 @@ import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.query.QueryScanCostContext;
 import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -284,10 +285,10 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
       }
     }
 
-    /// Surfaces whether the opt-in base-aggregation plan was admitted for this grouping-set query (opted in and
-    /// the instance planner's bound proof passed). Individual segments can still fall back to per-row expansion
-    /// (e.g. the multi-value carve-out); the GROUPING_SETS_BASE_AGGREGATION server meter tracks actual use.
-    if (_queryContext.isGroupingSets()) {
+    /// For opted-in grouping-set queries, surface whether the instance planner admitted base aggregation.
+    /// Individual segments can still fall back to per-row expansion; the GROUPING_SETS_BASE_AGGREGATION server
+    /// meter tracks actual use.
+    if (shouldExplainGroupingSetsBaseAggregation()) {
       stringBuilder.append(", groupingSetsBaseAggregation:").append(_queryContext.isGroupingSetsBaseAggregation());
     }
 
@@ -312,8 +313,13 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
         .collect(Collectors.toList());
     attributeBuilder.putStringList("aggregations", aggregations);
 
-    if (_queryContext.isGroupingSets()) {
+    if (shouldExplainGroupingSetsBaseAggregation()) {
       attributeBuilder.putBool("groupingSetsBaseAggregation", _queryContext.isGroupingSetsBaseAggregation());
     }
+  }
+
+  private boolean shouldExplainGroupingSetsBaseAggregation() {
+    return _queryContext.isGroupingSets() && Boolean.parseBoolean(_queryContext.getQueryOptions().get(
+        QueryOptionKey.GROUPING_SETS_BASE_AGGREGATION));
   }
 }

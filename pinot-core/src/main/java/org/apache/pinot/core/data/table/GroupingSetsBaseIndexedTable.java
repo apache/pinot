@@ -19,6 +19,7 @@
 package org.apache.pinot.core.data.table;
 
 import java.util.concurrent.ExecutorService;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
@@ -35,13 +36,13 @@ public class GroupingSetsBaseIndexedTable extends UnboundedConcurrentIndexedTabl
   }
 
   @Override
-  protected void upsertWithoutOrderBy(Key key, Record record) {
+  protected void upsertWithoutOrderBy(Key key, @Nullable Record record, @Nullable Object result) {
     if (_full) {
-      if (!updateExistingRecordIfPresent(key, record)) {
+      if (!updateExistingRecordIfPresent(key, record, result)) {
         throw new IllegalStateException("Grouping-set base groups exceeded the planned group limit");
       }
     } else {
-      addOrUpdateRecord(key, record);
+      addOrUpdateRecord(key, record, result);
       if (_resultSize != Integer.MAX_VALUE && _lookupMap.size() >= _resultSize) {
         _full = true;
       }

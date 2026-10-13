@@ -172,7 +172,15 @@ public abstract class IndexedTable extends BaseTable {
   /// Same as [#updateExistingRecord], additionally reporting whether a record with the key existed (and was
   /// therefore merged into).
   protected boolean updateExistingRecordIfPresent(Key key, Record newRecord) {
-    return _lookupMap.computeIfPresent(key, (k, v) -> updateRecord(v, newRecord)) != null;
+    return updateExistingRecordIfPresent(key, newRecord, null);
+  }
+
+  /// Same as [#updateExistingRecord], additionally reporting whether a record with the key existed (and was
+  /// therefore merged into). A null record selects the single-result input, which may itself be null.
+  protected boolean updateExistingRecordIfPresent(Key key, @Nullable Record newRecord, @Nullable Object result) {
+    return _lookupMap.computeIfPresent(key, (k, existing) -> newRecord != null
+        ? updateRecord(existing, newRecord)
+        : updateSingleAggregationRecord(existing, result)) != null;
   }
 
   /// Merges a record only when its key is already present, reporting whether it was retained. Used when a

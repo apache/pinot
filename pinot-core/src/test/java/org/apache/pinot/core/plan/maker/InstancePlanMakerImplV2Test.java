@@ -18,10 +18,15 @@
  */
 package org.apache.pinot.core.plan.maker;
 
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
@@ -30,17 +35,26 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.TerminationException;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
@@ -150,6 +164,64 @@ public class InstancePlanMakerImplV2Test {
     assertTrue(InstancePlanMakerImplV2.fitsGroupingSetsBaseAggregationLimit(segments, queryContext));
     queryContext.setNumGroupsLimit(6);
     assertFalse(InstancePlanMakerImplV2.fitsGroupingSetsBaseAggregationLimit(segments, queryContext));
+
+    // Nullable union columns add a distinct null key: (2 + 1)^2 + (2 + 1) + 1 = 13 derived groups.
+    queryContext.setNullHandlingEnabled(true);
+    segments = List.of(segmentWithTwoColumns(1, 1), segmentWithTwoColumns(1, 1, false, "other"));
+    for (SegmentContext nullableSegment : segments) {
+      IndexSegment indexSegment = nullableSegment.getIndexSegment();
+      when(indexSegment.getDataSourceNullable("a").getNullValueVector()).thenReturn(mock(NullValueVectorReader.class));
+      when(indexSegment.getDataSourceNullable("b").getNullValueVector()).thenReturn(mock(NullValueVectorReader.class));
+    }
+    queryContext.setNumGroupsLimit(13);
+    assertTrue(InstancePlanMakerImplV2.fitsGroupingSetsBaseAggregationLimit(segments, queryContext));
+    queryContext.setNumGroupsLimit(12);
+    assertFalse(InstancePlanMakerImplV2.fitsGroupingSetsBaseAggregationLimit(segments, queryContext));
+  }
+
+  @Test
+  public void testImpossibleUnionBoundSkipsDictionaryScan() {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT a, b, COUNT(*) FROM t GROUP BY ROLLUP(a, b)");
+    queryContext.setNumGroupsLimit(6);
+    SegmentContext segmentContext = segmentWithTwoColumns(2, 2);
+    assertFalse(InstancePlanMakerImplV2.fitsGroupingSetsBaseAggregationLimit(List.of(segmentContext), queryContext));
+    IndexSegment segment = segmentContext.getIndexSegment();
+    verify(segment, never()).acquire(any());
+    verify(segment.getDataSourceNullable("a").getDictionary(), never()).getInternal(anyInt());
+  }
+
+  @Test
+  public void testUnionScanBudgetIsIndependentOfGroupLimit() {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT a, b, COUNT(*) FROM t GROUP BY ROLLUP(a, b)");
+    queryContext.setNumGroupsLimit(1_000_000);
+    SegmentContext segmentContext = segmentWithTwoColumns(4000, 1);
+    // The union proof could fit, but scanning 1.2M entries across all columns exceeds the fixed planning budget.
+    assertFalse(InstancePlanMakerImplV2.fitsGroupingSetsBaseAggregationLimit(
+        Collections.nCopies(300, segmentContext), queryContext));
+    verify(segmentContext.getIndexSegment(), never()).acquire(any());
+  }
+
+  @Test
+  public void testUnionScanReleasesDictionaryOnCancellation() {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT a, b, COUNT(*) FROM t GROUP BY ROLLUP(a, b)");
+    queryContext.setNumGroupsLimit(18_001);
+    queryContext.setEndTimeMs(Long.MAX_VALUE);
+    SegmentContext segmentContext = segmentWithTwoColumns(9000, 1);
+    IndexSegment segment = segmentContext.getIndexSegment();
+    Dictionary dictionary = segment.getDataSourceNullable("a").getDictionary();
+    try (QueryThreadContext threadContext = QueryThreadContext.openForSseTest()) {
+      doAnswer(invocation -> {
+        threadContext.getExecutionContext().terminate(QueryErrorCode.QUERY_CANCELLATION, "cancel dictionary scan");
+        return "a:1";
+      }).when(dictionary).getInternal(1);
+      assertThrows(TerminationException.class, () -> InstancePlanMakerImplV2.fitsGroupingSetsBaseAggregationLimit(
+          List.of(segmentContext, segmentContext), queryContext));
+    }
+    verify(dictionary, never()).getInternal(QueryThreadContext.CHECK_TERMINATION_AND_SAMPLE_USAGE_RECORD_MASK + 1);
+    verify(segment).release(any());
   }
 
   @Test
@@ -202,14 +274,35 @@ public class InstancePlanMakerImplV2Test {
     when(segmentContext.getIndexSegment()).thenReturn(segment);
     when(segment.getSegmentMetadata()).thenReturn(segmentMetadata);
     when(segmentMetadata.getTotalDocs()).thenReturn(10);
-    DataSource a = dataSource(aCardinality, valuePrefix + "a");
-    DataSource b = dataSource(bCardinality, valuePrefix + "b");
+    Set<String> acquiredColumns = new HashSet<>();
+    Set<UUID> prefetchedFetches = new HashSet<>();
+    doAnswer(invocation -> {
+      FetchContext fetchContext = invocation.getArgument(0);
+      prefetchedFetches.add(fetchContext.getFetchId());
+      return null;
+    }).when(segment).prefetch(any());
+    doAnswer(invocation -> {
+      FetchContext fetchContext = invocation.getArgument(0);
+      assertTrue(prefetchedFetches.contains(fetchContext.getFetchId()),
+          "prefetch must register the fetch before acquire");
+      acquiredColumns.addAll(fetchContext.getColumnToIndexList().keySet());
+      return null;
+    }).when(segment).acquire(any());
+    doAnswer(invocation -> {
+      FetchContext fetchContext = invocation.getArgument(0);
+      assertTrue(acquiredColumns.removeAll(fetchContext.getColumnToIndexList().keySet()));
+      assertTrue(prefetchedFetches.remove(fetchContext.getFetchId()));
+      return null;
+    }).when(segment).release(any());
+    DataSource a = dataSource(aCardinality, valuePrefix + "a", "a", acquiredColumns);
+    DataSource b = dataSource(bCardinality, valuePrefix + "b", "b", acquiredColumns);
     when(segment.getDataSourceNullable("a")).thenReturn(a);
     when(segment.getDataSourceNullable("b")).thenReturn(b);
     return segmentContext;
   }
 
-  private static DataSource dataSource(int cardinality, String valuePrefix) {
+  private static DataSource dataSource(int cardinality, String valuePrefix, String column,
+      Set<String> acquiredColumns) {
     DataSource dataSource = mock(DataSource.class);
     DataSourceMetadata metadata = mock(DataSourceMetadata.class);
     Dictionary dictionary = mock(Dictionary.class);
@@ -218,8 +311,10 @@ public class InstancePlanMakerImplV2Test {
     when(metadata.isSingleValue()).thenReturn(true);
     when(dataSource.getDictionary()).thenReturn(dictionary);
     when(dictionary.length()).thenReturn(cardinality);
-    when(dictionary.getInternal(anyInt())).thenAnswer(
-        invocation -> valuePrefix + ":" + invocation.getArgument(0, Integer.class));
+    when(dictionary.getInternal(anyInt())).thenAnswer(invocation -> {
+      assertTrue(acquiredColumns.contains(column), "dictionary buffers must be acquired before reading values");
+      return valuePrefix + ":" + invocation.getArgument(0, Integer.class);
+    });
     doReturn(forwardIndex).when(dataSource).getForwardIndex();
     when(forwardIndex.isDictionaryEncoded()).thenReturn(true);
     return dataSource;

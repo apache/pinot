@@ -908,8 +908,8 @@ public class CommonConstants {
         /// This bounds each server's derived output for high-cardinality unions at the cost of an approximate
         /// top-K (a group ranked below the keep on one server may still be globally in the top-K once servers
         /// merge); when it drops groups, the response is flagged as trimmed. The broker still applies the final
-        /// ORDER BY + LIMIT across all sets. Non-positive or unset (default) disables this per-set trim; the
-        /// server's global derived-group cap still applies. Ignored without an ORDER BY.
+        /// ORDER BY + LIMIT across all sets. Non-positive or unset (default) disables this per-set trim.
+        /// Ignored without an ORDER BY.
         public static final String GROUPING_SETS_MIN_SERVER_TRIM_SIZE = "groupingSetsMinServerTrimSize";
 
         // When safeTrim (ORDER BY groupKeys without HAVING clause), do sort aggregate when LIMIT is below this value
@@ -932,10 +932,11 @@ public class CommonConstants {
         /// many rows collapse into few base groups with cheap-to-merge aggregations, but can regress for
         /// expensive-to-merge intermediates (sketches), which is why it is off by default.
         ///
-        /// Base aggregation is used only when the instance planner can bound every local base group and every
-        /// requested grouping-set group within `numGroupsLimit`, and the per-segment base-group estimate does
-        /// not exceed [#GROUPING_SETS_BASE_AGGREGATION_MAX_GROUPS]. If the bound cannot be proven, the per-row
-        /// expansion path is used to preserve ordering and group-limit semantics.
+        /// Base aggregation is used only when the instance planner can prove that the base groups and the sum of
+        /// all requested grouping-set groups fit `numGroupsLimit`, using either per-segment dictionary cardinality
+        /// products or the union of dictionary values across segments. Each segment's base-group estimate must
+        /// also not exceed [#GROUPING_SETS_BASE_AGGREGATION_MAX_GROUPS]. If the bounds cannot be proven, the
+        /// per-row expansion path is used to preserve ordering and group-limit semantics.
         public static final String GROUPING_SETS_BASE_AGGREGATION = "groupingSetsBaseAggregation";
 
         /// Secondary per-segment bound on the estimated base-group count (product of the union columns'

@@ -548,6 +548,26 @@ public class GroupingSetsQueriesTest extends CustomDataQueryClusterIntegrationTe
   }
 
   @Test
+  public void testBaseAggregationExplainMarkerRequiresOptIn()
+      throws Exception {
+    setUseMultiStageQueryEngine(false);
+    String query = "SELECT " + D1 + ", COUNT(*) FROM " + getTableName() + " GROUP BY ROLLUP(" + D1 + ")";
+    String explainQuery = "SET explainAskingServers=true; EXPLAIN PLAN FOR " + query;
+
+    String defaultPlan = GroupByOptionsTest.toExplainStr(postQuery(explainQuery));
+    assertTrue(defaultPlan.contains("GROUP_BY("), defaultPlan);
+    assertFalse(defaultPlan.contains("groupingSetsBaseAggregation:"), defaultPlan);
+
+    String admittedPlan = GroupByOptionsTest.toExplainStr(
+        postQuery("SET groupingSetsBaseAggregation=true; " + explainQuery));
+    assertTrue(admittedPlan.contains("groupingSetsBaseAggregation:true"), admittedPlan);
+
+    String rejectedPlan = GroupByOptionsTest.toExplainStr(
+        postQuery("SET numGroupsLimit=1; SET groupingSetsBaseAggregation=true; " + explainQuery));
+    assertTrue(rejectedPlan.contains("groupingSetsBaseAggregation:false"), rejectedPlan);
+  }
+
+  @Test
   public void testBaseAggregationCardinalityGateFallsBackToExpansion()
       throws Exception {
     // When the estimated base-group count exceeds groupingSetsBaseAggregationMaxGroups, the engine falls back
