@@ -103,6 +103,38 @@ public class FunnelFinalResultTest {
   }
 
   @Test
+  public void testBitmapFinalExtractionAvoidsUnnecessaryCopies() {
+    RoaringBitmap firstStep = mock(RoaringBitmap.class);
+    when(firstStep.getCardinality()).thenReturn(1_000_000);
+    when(firstStep.clone()).thenThrow(new AssertionError("First-step population must not be copied"));
+    assertEquals(new BitmapMergeStrategy(1).extractFinalResult(List.of(firstStep)),
+        LongArrayList.wrap(new long[]{1_000_000}));
+    assertEquals(new BitmapMergeStrategy(3).extractFinalResult(
+        List.of(firstStep, new RoaringBitmap(), RoaringBitmap.bitmapOf(2))),
+        LongArrayList.wrap(new long[]{1_000_000, 0, 0}));
+    assertEquals(new BitmapMergeStrategy(2).extractFinalResult(List.of(new RoaringBitmap(), firstStep)),
+        LongArrayList.wrap(new long[]{0, 0}));
+    verify(firstStep, never()).clone();
+  }
+
+  @Test
+  public void testBitmapFinalExtractionPreservesStepPopulations() {
+    RoaringBitmap laterStep = mock(RoaringBitmap.class);
+    when(laterStep.isEmpty()).thenThrow(new AssertionError("Steps after an empty intersection must not be inspected"));
+    List<RoaringBitmap> steps = List.of(RoaringBitmap.bitmapOf(1, 2, 3), RoaringBitmap.bitmapOf(2, 3),
+        RoaringBitmap.bitmapOf(3, 4), RoaringBitmap.bitmapOf(5, 6), laterStep);
+    int[][] originalSteps = steps.subList(0, 4).stream().map(RoaringBitmap::toArray).toArray(int[][]::new);
+    BitmapMergeStrategy strategy = new BitmapMergeStrategy(5);
+    LongArrayList expectedCounts = LongArrayList.wrap(new long[]{3, 2, 1, 0, 0});
+    assertEquals(strategy.extractFinalResult(steps), expectedCounts);
+    assertEquals(strategy.extractFinalResult(steps), expectedCounts);
+    for (int i = 0; i < originalSteps.length; i++) {
+      assertEquals(steps.get(i).toArray(), originalSteps[i]);
+    }
+    verify(laterStep, never()).isEmpty();
+  }
+
+  @Test
   public void testSetFinalExtractionAvoidsTraversingLargeFirstStep() {
     Set<?> firstStep = mock(Set.class);
     when(firstStep.size()).thenReturn(1_000_000);
