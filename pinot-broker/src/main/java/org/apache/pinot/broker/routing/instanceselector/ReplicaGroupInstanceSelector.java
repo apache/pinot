@@ -221,7 +221,8 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       InstanceStateMaps instanceStateMaps =
           instanceStateMapsCache.canonicalize(idealStateInstanceStateMap, externalViewInstanceStateMap);
       if (instanceStateMaps._onlineInstances == null) {
-        instanceStateMaps._onlineInstances = externalViewInstanceStateMap == null ? Set.of()
+        instanceStateMaps._onlineInstances = externalViewInstanceStateMap == null
+            ? Set.of()
             : getOnlineInstances(idealStateInstanceStateMap, externalViewInstanceStateMap);
       }
       if (newSegmentCreationTimeMap.containsKey(segment)) {

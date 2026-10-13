@@ -29,7 +29,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
-import java.util.TreeSet;
 import javax.annotation.Nullable;
 import org.apache.helix.AccessOption;
 import org.apache.helix.model.ExternalView;
@@ -96,11 +95,12 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
   /// Tags the INFO logs that print the whole new-segment map on every rebuild ("Got N new segments: ..."). To drop
   /// them without code changes, add to the log4j2 config:
   /// `<MarkerFilter marker="ROUTING_NEW_SEGMENTS" onMatch="DENY" onMismatch="NEUTRAL"/>`
-  public static final Marker NEW_SEGMENTS_MARKER = MarkerFactory.getMarker("ROUTING_NEW_SEGMENTS");
+  private static final Marker NEW_SEGMENTS_MARKER = MarkerFactory.getMarker("ROUTING_NEW_SEGMENTS");
   // To prevent int overflow, reset the request id once it reaches this value
   protected static final long MAX_REQUEST_ID = 1_000_000_000;
   /// Maximum number of distinct (ideal state, external view) instance state map pairs whose candidate lists one
-  /// rebuild shares between segments. Past this bound, the remaining segments get their own lists, as if there was no
+  /// rebuild shares between segments. Past this bound, the rebuild stops caching new pairs: segments with an already
+  /// cached pair keep sharing its lists, and segments with any other pair get their own lists, as if there was no
   /// sharing. In a realtime table, all the segments of a stream partition usually have the same pair, so the number of
   /// distinct pairs is close to the number of partitions, far below this bound.
   static final int MAX_SHARED_CANDIDATE_LISTS = 4096;
@@ -281,9 +281,9 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
   }
 
   /// Returns the online instances for routing purpose.
-  static TreeSet<String> getOnlineInstances(Map<String, String> idealStateInstanceStateMap,
+  static Set<String> getOnlineInstances(Map<String, String> idealStateInstanceStateMap,
       Map<String, String> externalViewInstanceStateMap) {
-    TreeSet<String> onlineInstances = new TreeSet<>();
+    Set<String> onlineInstances = new HashSet<>();
     // Only track ONLINE/CONSUMING instances within the ideal state
     for (Map.Entry<String, String> entry : idealStateInstanceStateMap.entrySet()) {
       String instance = entry.getKey();
@@ -496,7 +496,9 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
       return candidates;
     }
     List<SegmentInstanceCandidate> enabledCandidates = new ArrayList<>(numCandidates - 1);
-    enabledCandidates.addAll(candidates.subList(0, numLeadingEnabledCandidates));
+    for (int i = 0; i < numLeadingEnabledCandidates; i++) {
+      enabledCandidates.add(candidates.get(i));
+    }
     // The candidate at numLeadingEnabledCandidates is disabled
     for (int i = numLeadingEnabledCandidates + 1; i < numCandidates; i++) {
       SegmentInstanceCandidate candidate = candidates.get(i);
@@ -661,8 +663,9 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
   /// Returns one canonical [InstanceStateMaps] per distinct pair of instance state maps, so that the segments of one
   /// rebuild with equal maps share what is derived from them.
   ///
-  /// The cache keeps at most `maxSize` pairs. Past that bound, it returns a new [InstanceStateMaps] for each call,
-  /// which makes each segment compute its own state, as if there was no sharing.
+  /// The cache keeps at most `maxSize` pairs. Past that bound, it stops caching new pairs: a pair already in the cache
+  /// still returns its canonical [InstanceStateMaps], while any other pair returns a new [InstanceStateMaps] for each
+  /// call, which makes each segment compute its own state, as if there was no sharing.
   ///
   /// Not thread safe. Only used by the rebuild thread, for the duration of one rebuild.
   static final class InstanceStateMapsCache {
