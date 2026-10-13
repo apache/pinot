@@ -99,6 +99,7 @@ import org.apache.pinot.segment.local.customobject.tdigest.SerializedTDigestInpu
 import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigestAccumulator;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
+import org.apache.pinot.segment.spi.memory.PrimitiveArrayOutput;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.locationtech.jts.geom.Geometry;
@@ -396,6 +397,9 @@ public class ObjectSerDeUtils {
     }
   };
 
+  // The list deserializers below read short lists one value at a time and longer ones in bulk; see
+  // PrimitiveArrayOutput.MIN_BULK_VALUES for the cutoff.
+
   /// Checks that `byteBuffer` holds `numValues` values of `width` bytes, before the array for them is allocated. Throws
   /// the same exceptions as reading the values one by one into a list of capacity `numValues` would.
   private static void checkRemaining(ByteBuffer byteBuffer, int numValues, int width) {
@@ -432,8 +436,14 @@ public class ObjectSerDeUtils {
       int numValues = byteBuffer.getInt();
       checkRemaining(byteBuffer, numValues, Integer.BYTES);
       int[] values = new int[numValues];
-      byteBuffer.asIntBuffer().get(values);
-      byteBuffer.position(byteBuffer.position() + numValues * Integer.BYTES);
+      if (numValues < PrimitiveArrayOutput.MIN_BULK_VALUES) {
+        for (int i = 0; i < numValues; i++) {
+          values[i] = byteBuffer.getInt();
+        }
+      } else {
+        byteBuffer.asIntBuffer().get(values);
+        byteBuffer.position(byteBuffer.position() + numValues * Integer.BYTES);
+      }
       return IntArrayList.wrap(values);
     }
   };
@@ -463,8 +473,14 @@ public class ObjectSerDeUtils {
       int numValues = byteBuffer.getInt();
       checkRemaining(byteBuffer, numValues, Long.BYTES);
       long[] values = new long[numValues];
-      byteBuffer.asLongBuffer().get(values);
-      byteBuffer.position(byteBuffer.position() + numValues * Long.BYTES);
+      if (numValues < PrimitiveArrayOutput.MIN_BULK_VALUES) {
+        for (int i = 0; i < numValues; i++) {
+          values[i] = byteBuffer.getLong();
+        }
+      } else {
+        byteBuffer.asLongBuffer().get(values);
+        byteBuffer.position(byteBuffer.position() + numValues * Long.BYTES);
+      }
       return LongArrayList.wrap(values);
     }
   };
@@ -494,8 +510,14 @@ public class ObjectSerDeUtils {
       int numValues = byteBuffer.getInt();
       checkRemaining(byteBuffer, numValues, Float.BYTES);
       float[] values = new float[numValues];
-      byteBuffer.asFloatBuffer().get(values);
-      byteBuffer.position(byteBuffer.position() + numValues * Float.BYTES);
+      if (numValues < PrimitiveArrayOutput.MIN_BULK_VALUES) {
+        for (int i = 0; i < numValues; i++) {
+          values[i] = byteBuffer.getFloat();
+        }
+      } else {
+        byteBuffer.asFloatBuffer().get(values);
+        byteBuffer.position(byteBuffer.position() + numValues * Float.BYTES);
+      }
       return FloatArrayList.wrap(values);
     }
   };
@@ -525,8 +547,14 @@ public class ObjectSerDeUtils {
       int numValues = byteBuffer.getInt();
       checkRemaining(byteBuffer, numValues, Double.BYTES);
       double[] values = new double[numValues];
-      byteBuffer.asDoubleBuffer().get(values);
-      byteBuffer.position(byteBuffer.position() + numValues * Double.BYTES);
+      if (numValues < PrimitiveArrayOutput.MIN_BULK_VALUES) {
+        for (int i = 0; i < numValues; i++) {
+          values[i] = byteBuffer.getDouble();
+        }
+      } else {
+        byteBuffer.asDoubleBuffer().get(values);
+        byteBuffer.position(byteBuffer.position() + numValues * Double.BYTES);
+      }
       return DoubleArrayList.wrap(values);
     }
   };

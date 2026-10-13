@@ -98,6 +98,9 @@ public class PercentileIntermediateResultSerDeTest {
         // Fills the exact capacity, then grows past it.
         {new DoubleArrayList(new double[]{1, 2}), sequence(1)},
         {sequence(1000), sequence(3000)},
+        // Both sides of PrimitiveArrayOutput.MIN_BULK_VALUES: read one value at a time, then in bulk.
+        {sequence(7), sequence(63)},
+        {sequence(7), sequence(64)},
         {sequence(2), new DoubleArrayList(new double[]{Double.longBitsToDouble(0x7ff8_0000_0000_0123L), -0.0})}
     };
   }

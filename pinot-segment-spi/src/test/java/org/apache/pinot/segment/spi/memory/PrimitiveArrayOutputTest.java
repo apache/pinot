@@ -179,7 +179,10 @@ public class PrimitiveArrayOutputTest {
     int[] pageSizes = {3, 7, 13, 100, PagedPinotOutputStream.PageAllocator.MIN_RECOMMENDED_PAGE_SIZE};
     // Bytes written before the values, so the values start at different offsets in a page.
     int[] prefixes = {0, 1, 5};
-    int[][] ranges = {{0, 0}, {7, 0}, {0, NUM_VALUES}, {3, NUM_VALUES - 10}, {NUM_VALUES - 1, 1}};
+    // Lengths on both sides of MIN_CHUNKED_VALUES (16) and MIN_BULK_VALUES (64), where the per-value path takes over.
+    int[][] ranges = {
+        {0, 0}, {7, 0}, {0, NUM_VALUES}, {3, NUM_VALUES - 10}, {NUM_VALUES - 1, 1}, {2, 15}, {2, 16}, {9, 63}, {9, 64}
+    };
     List<Object[]> cases = new ArrayList<>();
     for (Type type : Type.values()) {
       for (int pageSize : pageSizes) {

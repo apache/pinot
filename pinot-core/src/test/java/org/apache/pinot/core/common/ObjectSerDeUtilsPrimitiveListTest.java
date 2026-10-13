@@ -192,7 +192,7 @@ public class ObjectSerDeUtilsPrimitiveListTest {
     List<Object[]> cases = new ArrayList<>();
     for (ListType type : ListType.values()) {
       for (Layout layout : Layout.values()) {
-        for (int size : new int[]{0, 1, 1000}) {
+        for (int size : new int[]{0, 1, 63, 64, 1000}) {
           for (boolean slice : new boolean[]{false, true}) {
             cases.add(new Object[]{type, layout, size, slice});
           }

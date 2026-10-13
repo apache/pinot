@@ -215,7 +215,9 @@ public class PagedPinotOutputStream extends PinotOutputStream {
 
   /// Puts as many values as fit in the current page straight into it, through a big-endian typed view. A value that
   /// does not fit in the rest of the page (the page offset depends on everything written before, so it is not aligned
-  /// to the value width) is written with [#writeInt(int)], which splits it across the two pages.
+  /// to the value width) is written with [#writeInt(int)], which splits it across the two pages. When fewer than
+  /// [PrimitiveArrayOutput#MIN_BULK_VALUES] values go to the page, they are also written one by one, because the
+  /// typed-view copy has a fixed cost that a few values do not pay back.
   @Override
   public void writeInts(int[] values, int offset, int length)
       throws IOException {
@@ -224,7 +226,7 @@ public class PagedPinotOutputStream extends PinotOutputStream {
     int i = offset;
     while (i < end) {
       int numValues = Math.min(end - i, remainingInPage() / Integer.BYTES);
-      if (numValues == 0) {
+      if (numValues < PrimitiveArrayOutput.MIN_BULK_VALUES) {
         writeInt(values[i++]);
         continue;
       }
@@ -244,7 +246,7 @@ public class PagedPinotOutputStream extends PinotOutputStream {
     int i = offset;
     while (i < end) {
       int numValues = Math.min(end - i, remainingInPage() / Long.BYTES);
-      if (numValues == 0) {
+      if (numValues < PrimitiveArrayOutput.MIN_BULK_VALUES) {
         writeLong(values[i++]);
         continue;
       }
@@ -264,7 +266,7 @@ public class PagedPinotOutputStream extends PinotOutputStream {
     int i = offset;
     while (i < end) {
       int numValues = Math.min(end - i, remainingInPage() / Double.BYTES);
-      if (numValues == 0) {
+      if (numValues < PrimitiveArrayOutput.MIN_BULK_VALUES) {
         // Raw bits, like the typed view (and ByteBuffer#putDouble): writeDouble() would canonicalize NaN.
         writeLong(Double.doubleToRawLongBits(values[i++]));
         continue;

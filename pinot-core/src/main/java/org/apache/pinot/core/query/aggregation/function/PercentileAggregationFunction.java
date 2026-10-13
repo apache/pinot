@@ -236,8 +236,15 @@ public class PercentileAggregationFunction extends BaseSingleInputAggregationFun
     }
     // size() zero-fills the new range, so it must run before the values are copied in.
     intermediateResult.size(size + numValues);
-    buffer.asDoubleBuffer().get(intermediateResult.elements(), size, numValues);
-    buffer.position(buffer.position() + numValues * Double.BYTES);
+    double[] elements = intermediateResult.elements();
+    if (numValues < PrimitiveArrayOutput.MIN_BULK_VALUES) {
+      for (int i = size; i < size + numValues; i++) {
+        elements[i] = buffer.getDouble();
+      }
+    } else {
+      buffer.asDoubleBuffer().get(elements, size, numValues);
+      buffer.position(buffer.position() + numValues * Double.BYTES);
+    }
     return intermediateResult;
   }
 

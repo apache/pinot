@@ -37,6 +37,16 @@ public final class PrimitiveArrayOutput {
   /// Size in bytes of the scratch buffer used to encode a chunk. Small enough to be allocated in a TLAB.
   public static final int CHUNK_SIZE = 8 * 1024;
 
+  /// Below this number of values, reads and writes through a big-endian typed view (`asIntBuffer().get(int[])` and
+  /// the like) are slower than one access per value. On a little-endian CPU the bulk copy swaps the bytes in a native
+  /// call with a fixed cost of about 10-40 ns, while a single-value access compiles to an inlined byte swap. Measured
+  /// with BenchmarkPrimitiveListDeserialize and BenchmarkPrimitiveArrayOutput on aarch64 and x86_64.
+  public static final int MIN_BULK_VALUES = 64;
+
+  /// Below this number of values, the chunked writes call the [DataOutput] once per value: encoding a chunk costs a
+  /// scratch buffer and a typed-view copy, which is more than a few small writes.
+  static final int MIN_CHUNKED_VALUES = 16;
+
   private PrimitiveArrayOutput() {
   }
 
@@ -70,7 +80,10 @@ public final class PrimitiveArrayOutput {
   static void writeIntsChunked(DataOutput output, int[] values, int offset, int length)
       throws IOException {
     Objects.checkFromIndexSize(offset, length, values.length);
-    if (length == 0) {
+    if (length < MIN_CHUNKED_VALUES) {
+      for (int i = offset; i < offset + length; i++) {
+        output.writeInt(values[i]);
+      }
       return;
     }
     ByteBuffer scratch = newScratch(length, Integer.BYTES);
@@ -86,7 +99,10 @@ public final class PrimitiveArrayOutput {
   static void writeLongsChunked(DataOutput output, long[] values, int offset, int length)
       throws IOException {
     Objects.checkFromIndexSize(offset, length, values.length);
-    if (length == 0) {
+    if (length < MIN_CHUNKED_VALUES) {
+      for (int i = offset; i < offset + length; i++) {
+        output.writeLong(values[i]);
+      }
       return;
     }
     ByteBuffer scratch = newScratch(length, Long.BYTES);
@@ -102,7 +118,11 @@ public final class PrimitiveArrayOutput {
   static void writeDoublesChunked(DataOutput output, double[] values, int offset, int length)
       throws IOException {
     Objects.checkFromIndexSize(offset, length, values.length);
-    if (length == 0) {
+    if (length < MIN_CHUNKED_VALUES) {
+      for (int i = offset; i < offset + length; i++) {
+        // Raw bits, like the chunked path: writeDouble() would canonicalize NaN.
+        output.writeLong(Double.doubleToRawLongBits(values[i]));
+      }
       return;
     }
     ByteBuffer scratch = newScratch(length, Double.BYTES);

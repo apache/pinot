@@ -58,7 +58,7 @@ public class BenchmarkPrimitiveArrayOutput {
   @Param({"INT", "LONG", "DOUBLE"})
   private String _type;
 
-  @Param({"65536", "1048576"})
+  @Param({"1", "4", "16", "64", "1024", "65536", "1048576"})
   private int _size;
 
   private int[] _ints;

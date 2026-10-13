@@ -41,7 +41,8 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 
 /// Compares reading a serialized primitive array list one value at a time (`perValue`, the loop the list SerDes used
-/// before) with the bulk read of the ObjectSerDeUtils list SerDes (`bulk`), from a heap or a direct buffer.
+/// before) with the ObjectSerDeUtils list SerDes (`bulk`), from a heap or a direct buffer. The SerDes read in bulk from
+/// PrimitiveArrayOutput.MIN_BULK_VALUES values up, and one value at a time below it.
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.SECONDS)
 @Fork(3)
@@ -52,7 +53,7 @@ public class BenchmarkPrimitiveListDeserialize {
   @Param({"INT", "LONG", "DOUBLE"})
   private String _type;
 
-  @Param({"65536", "1048576"})
+  @Param({"1", "4", "16", "64", "1024", "65536", "1048576"})
   private int _size;
 
   @Param({"HEAP", "DIRECT"})
