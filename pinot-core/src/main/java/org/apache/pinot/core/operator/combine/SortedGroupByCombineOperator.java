@@ -119,6 +119,7 @@ public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator
           ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
         }
         GroupByResultsBlock resultsBlock = (GroupByResultsBlock) operator.nextBlock();
+        GroupByUtils.validateFullGroupingSetsLayout(resultsBlock, _queryContext);
         if (resultsBlock.isGroupsTrimmed()) {
           _groupsTrimmed = true;
         }

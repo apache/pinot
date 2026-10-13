@@ -43,6 +43,7 @@ import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 
 
@@ -88,6 +89,8 @@ public class QueryContext {
   private List<Pair<AggregationFunction, FilterContext>> _filteredAggregationFunctions;
   private Map<Pair<FunctionContext, FilterContext>, Integer> _filteredAggregationsIndexMap;
   private boolean _hasFilteredAggregations;
+  // Set by the instance planner after bounding all local BASE and derived grouping-set keys.
+  private boolean _groupingSetsBaseAggregationAllowed = true;
   private Set<String> _columns;
 
   // Other properties to be shared across all the segments
@@ -254,6 +257,49 @@ public class QueryContext {
   /// grouping-set query (the `$groupingId` discriminator column), 0 otherwise.
   public int getNumExtraGroupByKeyColumns() {
     return isGroupingSets() ? 1 : 0;
+  }
+
+  /// Returns whether grouping-set queries should aggregate the base grouping (union columns) once per segment
+  /// and derive the individual grouping-set records from those base groups, instead of expanding every input
+  /// row into one group per grouping set. Disabled by default (opt in with `groupingSetsBaseAggregation=true`):
+  /// the derive can be slower than expansion for expensive-to-merge intermediates (sketches). See
+  /// [CommonConstants.Broker.Request.QueryOptionKey#GROUPING_SETS_BASE_AGGREGATION].
+  ///
+  /// Even when opted in, base aggregation is disabled when:
+  /// - any aggregation function cannot merge intermediates across groups (the derive merges base groups of the
+  ///   same segment into coarser sets; e.g. SEGMENTPARTITIONEDDISTINCTCOUNT and partitioned FUNNELCOUNT keep
+  ///   per-segment-final counts and would double-count) -- see
+  ///   [AggregationFunction#canMergeIntermediatesAcrossGroups];
+  /// - a combine path other than the standard
+  ///   [org.apache.pinot.core.operator.combine.GroupByCombineOperator] would run, since only it performs the
+  ///   merge-time derive: filtered aggregations (distinct shared group-key generator), the streaming combine
+  ///   used on MSE leaf stages (`streamingGroupByFlushThreshold > 0`), and the sorted-aggregate combine
+  ///   ([#shouldSortAggregateUnderSafeTrim()]). In all these cases the segment expands per row so the emitted
+  ///   rows already carry the $groupingId discriminator.
+  /// - the instance planner cannot prove that all local base and derived groups fit within `numGroupsLimit`.
+  ///   The expansion path preserves the normal ordering and group-limit semantics in that case.
+  public boolean isGroupingSetsBaseAggregation() {
+    if (!_groupingSetsBaseAggregationAllowed || _hasFilteredAggregations || _streamingGroupByFlushThreshold > 0
+        || shouldSortAggregateUnderSafeTrim()) {
+      return false;
+    }
+    String option = _queryOptions.get(CommonConstants.Broker.Request.QueryOptionKey.GROUPING_SETS_BASE_AGGREGATION);
+    if (option == null || !Boolean.parseBoolean(option)) {
+      return false;
+    }
+    if (_aggregationFunctions != null) {
+      for (AggregationFunction aggregationFunction : _aggregationFunctions) {
+        if (!aggregationFunction.canMergeIntermediatesAcrossGroups()) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  /// Called before building segment operators; a false value makes every local segment use per-row expansion.
+  public void setGroupingSetsBaseAggregationAllowed(boolean allowed) {
+    _groupingSetsBaseAggregationAllowed = allowed;
   }
 
   /// Returns the total number of group-by key columns in the server result / reducer row layout: the union
@@ -598,6 +644,32 @@ public class QueryContext {
       return GroupByUtils.getTableCapacity(getLimit(), minGroupTrimSize);
     }
     return -1;
+  }
+
+  /// Returns the secondary per-segment base-group estimate gate. The instance planner separately requires all
+  /// local base and derived grouping-set keys to fit `numGroupsLimit`; raising this option cannot bypass that
+  /// hard bound. Defaults to `numGroupsLimit` when unset. See
+  /// [CommonConstants.Broker.Request.QueryOptionKey#GROUPING_SETS_BASE_AGGREGATION_MAX_GROUPS].
+  public int getGroupingSetsBaseAggregationMaxGroups() {
+    Integer maxGroups = QueryOptionsUtils.getGroupingSetsBaseAggregationMaxGroups(_queryOptions);
+    return maxGroups != null ? maxGroups : _numGroupsLimit;
+  }
+
+  /// Returns the effective PER-grouping-set server-side keep size for a base-aggregation grouping-set query
+  /// (`max(5 * LIMIT, groupingSetsMinServerTrimSize)`, mirroring `minServerGroupTrimSize` semantics), or -1 to
+  /// disable (no ORDER BY, or the option is unset/non-positive). When enabled, the server keeps that many groups
+  /// WITHIN each grouping set after deriving them (bucketed by the $groupingId discriminator), bounding each
+  /// server's derived output without starving low-magnitude sets. The broker still applies the final ORDER BY +
+  /// LIMIT. See [CommonConstants.Broker.Request.QueryOptionKey#GROUPING_SETS_MIN_SERVER_TRIM_SIZE].
+  public int getGroupingSetServerTrimSize() {
+    if (!isGroupingSets() || getOrderByExpressions() == null) {
+      return -1;
+    }
+    Integer minGroupTrimSize = QueryOptionsUtils.getGroupingSetsMinServerTrimSize(_queryOptions);
+    if (minGroupTrimSize == null || minGroupTrimSize <= 0) {
+      return -1;
+    }
+    return GroupByUtils.getTableCapacity(getLimit(), minGroupTrimSize);
   }
 
   private int calculateEffectiveSegmentGroupTrimSize() {

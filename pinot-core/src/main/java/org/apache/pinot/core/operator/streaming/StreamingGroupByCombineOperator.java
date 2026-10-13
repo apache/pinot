@@ -41,6 +41,7 @@ import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
+import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.query.QueryThreadContext;
 
@@ -168,6 +169,7 @@ public class StreamingGroupByCombineOperator extends BaseStreamingCombineOperato
   /// returned unchanged.
   @Override
   protected GroupByResultsBlock detachFromWorkerThreadState(GroupByResultsBlock resultsBlock) {
+    GroupByUtils.validateFullGroupingSetsLayout(resultsBlock, _queryContext);
     AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
     if (aggregationGroupByResult == null || resultsBlock.getIntermediateRecords() != null) {
       return resultsBlock;

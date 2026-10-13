@@ -287,6 +287,23 @@ public class UnboundedConcurrentIndexedTableTest {
     }
   }
 
+  @Test(dataProvider = "scalarInputs")
+  public void testGroupingSetsBaseTableRejectsNewGroupsAfterLimit(boolean scalarInput) {
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+          "SELECT COUNT(*) FROM testTable GROUP BY tv_id, weights");
+      IndexedTable table = new GroupingSetsBaseIndexedTable(newDataSchema(), queryContext, 1, 1, executor);
+      upsert(table, new Record(new Object[]{"hot", 1d, 1L}), scalarInput);
+      upsert(table, new Record(new Object[]{"hot", 1d, 1L}), scalarInput);
+      assertThrows(IllegalStateException.class,
+          () -> upsert(table, new Record(new Object[]{"other", 1d, 1L}), scalarInput));
+      assertEquals(finishAndCount(table, false), Map.of(new Key(new Object[]{"hot", 1d}), 2L));
+    } finally {
+      executor.shutdownNow();
+    }
+  }
+
   @Test
   public void testScalarInputRequiresSingleAggregation() {
     ExecutorService executor = Executors.newSingleThreadExecutor();
