@@ -2976,6 +2976,12 @@
                 <exclude>META-INF/maven/org.eclipse.jetty.websocket/**</exclude>
                 <!-- ServiceLoader entries whose implementation classes are removed above. -->
                 <exclude>META-INF/services/org.apache.hadoop.shaded.org.eclipse.jetty.**</exclude>
+                <!-- The uber-jar also bundles a relocated jline 3.9.0 (org.apache.hadoop.shaded.org.jline), used
+                     only by Hadoop's interactive CLIs; nothing else in the uber-jar references it. Its jline-*
+                     Maven metadata makes scanners flag jline-builtins / jline-remote-telnet 3.9.0 CVEs. -->
+                <exclude>org/apache/hadoop/shaded/org/jline/**</exclude>
+                <exclude>META-INF/maven/org.jline/**</exclude>
+                <exclude>META-INF/services/org.apache.hadoop.shaded.org.jline.**</exclude>
               </excludes>
             </filter>
           </filters>
