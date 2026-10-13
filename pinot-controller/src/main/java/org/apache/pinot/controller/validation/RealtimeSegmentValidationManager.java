@@ -41,6 +41,7 @@ import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTas
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.spi.config.table.DisasterRecoveryMode;
 import org.apache.pinot.spi.config.table.PauseState;
+import org.apache.pinot.spi.config.table.QuotaEnforcementMode;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.StreamConfig;
@@ -196,6 +197,16 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     // Perform storage quota checks.
     TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
     boolean isQuotaExceeded = _storageQuotaChecker.isTableStorageQuotaExceeded(tableConfig);
+    QuotaEnforcementMode enforcementMode = _storageQuotaChecker.getEnforcementMode(tableConfig);
+    if (isQuotaExceeded && enforcementMode != QuotaEnforcementMode.ENFORCED) {
+      if (enforcementMode == QuotaEnforcementMode.SHADOW) {
+        // The breach meter is already emitted by StorageQuotaChecker
+        LOGGER.warn("Storage quota exceeded for table: {}, but enforcement mode is SHADOW, not pausing consumption",
+            tableNameWithType);
+      }
+      // DISABLED or SHADOW: don't treat the breach as exceeded for pause/resume purposes
+      isQuotaExceeded = false;
+    }
     if (isQuotaExceeded == isTablePaused) {
       return !isTablePaused;
     }
