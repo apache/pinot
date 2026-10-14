@@ -258,11 +258,14 @@ public class DeleteStatement implements DataManipulationStatement {
   private final boolean _tableExists;
   private final boolean _logicalTable;
 
+  /// The parsing boundary: the options are copied and frozen once here, and the resolved statement reuses the map.
   private DeleteStatement(String tableName, CompiledPredicate predicate, @Nullable String database,
       Map<String, String> options) {
-    this(tableName, predicate._sql, predicate._expression, database, options, false, false, false);
+    this(tableName, predicate._sql, predicate._expression, database,
+        Collections.unmodifiableMap(new HashMap<>(options)), false, false, false);
   }
 
+  /// @param options immutable options of the statement, frozen by the parsing constructor
   private DeleteStatement(String tableName, String predicate, Expression predicateExpression,
       @Nullable String database, Map<String, String> options, boolean resolved, boolean tableExists,
       boolean logicalTable) {
@@ -270,7 +273,7 @@ public class DeleteStatement implements DataManipulationStatement {
     _predicate = predicate;
     _predicateExpression = predicateExpression;
     _database = database;
-    _options = Collections.unmodifiableMap(new HashMap<>(options));
+    _options = options;
     _resolved = resolved;
     _tableExists = tableExists;
     _logicalTable = logicalTable;

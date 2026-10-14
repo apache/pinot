@@ -498,7 +498,10 @@ public class PinotQueryResource {
     if (!statement.tableExists()) {
       throw QueryErrorCode.TABLE_DOES_NOT_EXIST.asException("Table does not exist: " + writtenTableName);
     }
-    LOGGER.info(deleteLogMessage(statement, sqlNodeAndOptions, httpHeaders, request));
+    if (LOGGER.isInfoEnabled()) {
+      // Formats the line and fingerprints the statement: only when the line is logged
+      LOGGER.info(deleteLogMessage(statement, sqlNodeAndOptions, httpHeaders, request));
+    }
     BrokerResponse response = _sqlQueryExecutor.executeStatement(statement, extractHeaders(httpHeaders));
     return output -> {
       try (OutputStream os = output) {

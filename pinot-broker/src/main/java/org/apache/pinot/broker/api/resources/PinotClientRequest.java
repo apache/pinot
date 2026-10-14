@@ -799,7 +799,10 @@ public class PinotClientRequest {
       return new BrokerResponseNative(QueryErrorCode.TABLE_DOES_NOT_EXIST,
           "Table does not exist: " + writtenTableName);
     }
-    LOGGER.info(deleteLogMessage(statement, sqlNodeAndOptions, requesterIdentity));
+    if (LOGGER.isInfoEnabled()) {
+      // Formats the line and may fingerprint the statement: only when the line is logged
+      LOGGER.info(deleteLogMessage(statement, sqlNodeAndOptions, requesterIdentity));
+    }
     return _sqlQueryExecutor.executeStatement(statement, headers);
   }
 

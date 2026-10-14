@@ -136,7 +136,8 @@ public class SqlQueryExecutor {
   /// @param headers headers of the original request, e.g. for minion task submission
   /// @return the response of the statement
   public BrokerResponse executeStatement(DataManipulationStatement statement, @Nullable Map<String, String> headers) {
-    BrokerResponseNative result = new BrokerResponseNative();
+    // The response of the in-process and minion paths; the executor path returns the response of its hook
+    BrokerResponseNative result;
     switch (statement.getExecutionType()) {
       case EXECUTOR:
         if (statement instanceof DeleteStatement) {
@@ -159,11 +160,13 @@ public class SqlQueryExecutor {
             return new BrokerResponseNative(QueryErrorCode.QUERY_EXECUTION, errorMessage(e));
           }
         }
+        result = new BrokerResponseNative();
         result.addException(
             new QueryProcessingException(QueryErrorCode.QUERY_EXECUTION, "Unsupported statement: " + statement));
         break;
       case MINION:
         AdhocTaskConfig taskConf = statement.generateAdhocTaskConfig();
+        result = new BrokerResponseNative();
         try {
           Map<String, String> tableToTaskIdMap = getMinionClient().executeTask(taskConf, headers);
           List<Object[]> rows = new ArrayList<>();
@@ -174,6 +177,7 @@ public class SqlQueryExecutor {
         }
         break;
       case HTTP:
+        result = new BrokerResponseNative();
         try {
           result.setResultTable(new ResultTable(statement.getResultSchema(), statement.execute()));
         } catch (Exception e) {
@@ -181,6 +185,7 @@ public class SqlQueryExecutor {
         }
         break;
       default:
+        result = new BrokerResponseNative();
         result.addException(
             new QueryProcessingException(QueryErrorCode.QUERY_EXECUTION, "Unsupported statement: " + statement));
         break;
