@@ -73,6 +73,26 @@
           ["gamma", 1]
         ],
         "ignoreLiteMode": true
+      },
+      {
+        "description": "Lookup join over an aggregation - the input of the join is an intermediate stage, so the join stage is assigned after it",
+        "sql": "SELECT /*+ joinOptions(join_strategy='lookup') */ t.dim_key, t.cnt, {dim_tbl}.name FROM (SELECT dim_key, COUNT(*) AS cnt FROM {fact_tbl} GROUP BY dim_key) t JOIN {dim_tbl} ON t.dim_key = {dim_tbl}.id",
+        "outputs": [
+          [1, 2, "alpha"],
+          [2, 1, "beta"],
+          [3, 1, "gamma"]
+        ],
+        "ignoreLiteMode": true
+      },
+      {
+        "description": "Two lookup joins over an aggregation - the upper join takes the workers of the lower one, which is assigned after the aggregation",
+        "sql": "SELECT /*+ joinOptions(join_strategy='lookup') */ t.dim_key, t.cnt, d1.name, d2.name FROM (SELECT dim_key, COUNT(*) AS cnt FROM {fact_tbl} GROUP BY dim_key) t JOIN {dim_tbl} d1 ON t.dim_key = d1.id JOIN {dim_tbl} d2 ON t.dim_key = d2.id",
+        "outputs": [
+          [1, 2, "alpha", "alpha"],
+          [2, 1, "beta", "beta"],
+          [3, 1, "gamma", "gamma"]
+        ],
+        "ignoreLiteMode": true
       }
     ]
   },
