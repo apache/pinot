@@ -23,15 +23,17 @@
 
 `pinot-yammer` is deprecated since Pinot 1.6.0. Use the existing `pinot-dropwizard` metrics backend instead.
 
-Yammer remains bundled and is still the default when no metrics factory is configured. A default change and
-removal release will be decided separately; see [#19871](https://github.com/apache/pinot/issues/19871).
+Dropwizard is the default when no metrics factory is configured. Explicit Yammer factory settings still select
+Yammer, which remains bundled. A removal release will be decided separately; see
+[#19871](https://github.com/apache/pinot/issues/19871).
 
 ## Migrate to Dropwizard
 
 1. Ensure `pinot-dropwizard` and its runtime dependencies are available to each affected service. Both metrics
    plugins ship in the standard Pinot binary distribution; custom builds, classpaths, and plugin filters may
    need to be updated.
-2. Set the applicable property in each service's configuration file:
+2. Remove explicit Yammer factory settings to use the Dropwizard default, or replace them with the applicable
+   property in each service's configuration file:
 
    ```properties
    pinot.broker.metrics.factory.className=org.apache.pinot.plugin.metrics.dropwizard.DropwizardMetricsFactory
@@ -51,5 +53,6 @@ standard Pinot metrics. Those timers are reported in milliseconds and meter rate
 Native JMX names and attributes can differ, as can sampled timer distributions. Validate custom JMX consumers,
 reporters/listeners, and explicit Yammer factory references in compound metrics configurations when migrating.
 
-To roll back while Yammer remains available, restore the previous factory setting (or remove the new setting
-if you previously relied on the Yammer default), then restart the affected services.
+To roll back while Yammer remains available, explicitly set each affected service's
+`pinot.<role>.metrics.factory.className` to `org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory`, then
+restart the affected services. Removing the setting selects the Dropwizard default.
