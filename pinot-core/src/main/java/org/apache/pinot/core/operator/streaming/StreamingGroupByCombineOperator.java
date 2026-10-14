@@ -24,7 +24,6 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.common.Operator;
@@ -126,8 +125,7 @@ public class StreamingGroupByCombineOperator extends BaseStreamingCombineOperato
     try {
       while (_numOperatorsFinished < _numOperators) {
         QueryThreadContext.checkTermination(this::getExplainName);
-        BaseResultsBlock resultsBlock =
-            _blockingQueue.poll(endTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+        BaseResultsBlock resultsBlock = pollResultsBlock(_blockingQueue, endTimeMs);
         if (resultsBlock == null) {
           throw QueryErrorCode.EXECUTION_TIMEOUT.asException("Timed out while streaming group-by results");
         }
