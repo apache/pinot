@@ -53,6 +53,21 @@ public class BrokerResponseNativeV2Test {
   }
 
   @Test
+  public void testRowLimitsMarkPartialResponse()
+      throws Exception {
+    // A join or window stops at its row limit only in overflow mode BREAK, and then returns part of its result
+    BrokerResponseNativeV2 joinResponse = new BrokerResponseNativeV2();
+    joinResponse.mergeMaxRowsInJoinReached(true);
+    assertTrue(joinResponse.isPartialResult());
+
+    BrokerResponseNativeV2 windowResponse = new BrokerResponseNativeV2();
+    assertFalse(windowResponse.isPartialResult());
+    windowResponse.mergeMaxRowsInWindowReached(true);
+    assertTrue(windowResponse.isPartialResult());
+    assertTrue(JsonUtils.objectToJsonNode(windowResponse).get("partialResult").asBoolean());
+  }
+
+  @Test
   public void testResponseMetadataSerialization()
       throws Exception {
     BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();

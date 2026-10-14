@@ -815,9 +815,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       throw new QueryException(QueryErrorCode.fromErrorCode(exception.getErrorCode()),
           "Subquery failed: " + subquery + ": " + exception.getMessage());
     }
-    // An IdSet built from part of the rows would make the query miss rows without an error. isPartialResult() does not
-    // include the window limit.
-    if (response.isPartialResult() || response.isMaxRowsInWindowReached()) {
+    // An IdSet built from part of the rows would make the query miss rows without an error
+    if (response.isPartialResult()) {
       List<String> reasons = getPartialResultReasons(response);
       throw QueryErrorCode.QUERY_EXECUTION.asException(
           "Subquery returned a partial result" + (reasons.isEmpty() ? "" : " " + reasons) + ": " + subquery);
