@@ -18,10 +18,14 @@
  */
 package org.apache.pinot.common.utils.config;
 
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import org.apache.helix.model.ClusterConfig;
+import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils.SqlOptionsMode;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils.SqlQueryOptionValidationMode;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -67,5 +71,40 @@ public class QueryOptionConfigListenerTest {
     listener.onChange(Set.of(LEGACY_SYNTAX_MODE_KEY), Map.of(LEGACY_SYNTAX_MODE_KEY, "reject"));
     listener.onChange(Set.of(LEGACY_SYNTAX_MODE_KEY), Map.of(LEGACY_SYNTAX_MODE_KEY, "bogus"));
     assertEquals(QueryOptionsUtils.getLegacyOptionSyntaxMode(), SqlOptionsMode.REJECT);
+  }
+
+  @Test
+  public void testInstanceConfigOverridesClusterConfig() {
+    PinotConfiguration brokerConfig = new PinotConfiguration(Map.of(VALIDATION_MODE_KEY, "reject"));
+    DefaultClusterConfigChangeHandler handler = new DefaultClusterConfigChangeHandler(brokerConfig);
+    handler.registerClusterConfigChangeListener(new QueryOptionConfigListener());
+
+    assertEquals(QueryOptionsUtils.getSqlQueryOptionValidationMode(), SqlQueryOptionValidationMode.REJECT);
+
+    ClusterConfig clusterConfig = new ClusterConfig("testCluster");
+    clusterConfig.getRecord().setSimpleField(VALIDATION_MODE_KEY, "warn");
+    handler.onClusterConfigChange(clusterConfig, null);
+
+    assertEquals(QueryOptionsUtils.getSqlQueryOptionValidationMode(), SqlQueryOptionValidationMode.REJECT);
+  }
+
+  @Test
+  public void testNormalizedClusterKeyUpdatesAfterRegistration() {
+    String normalizedKey = VALIDATION_MODE_KEY.toLowerCase(Locale.ROOT);
+    DefaultClusterConfigChangeHandler handler =
+        new DefaultClusterConfigChangeHandler(new PinotConfiguration(Map.of("pinot.broker.unrelated", "value")));
+
+    ClusterConfig clusterConfig = new ClusterConfig("testCluster");
+    clusterConfig.getRecord().setSimpleField(normalizedKey, "reject");
+    handler.onClusterConfigChange(clusterConfig, null);
+    handler.registerClusterConfigChangeListener(new QueryOptionConfigListener());
+    assertEquals(QueryOptionsUtils.getSqlQueryOptionValidationMode(), SqlQueryOptionValidationMode.REJECT);
+
+    clusterConfig.getRecord().setSimpleField(normalizedKey, "warn");
+    handler.onClusterConfigChange(clusterConfig, null);
+    assertEquals(QueryOptionsUtils.getSqlQueryOptionValidationMode(), SqlQueryOptionValidationMode.WARN);
+
+    handler.onClusterConfigChange(new ClusterConfig("testCluster"), null);
+    assertEquals(QueryOptionsUtils.getSqlQueryOptionValidationMode(), SqlQueryOptionValidationMode.NONE);
   }
 }

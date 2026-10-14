@@ -105,6 +105,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
   public void init(PinotConfiguration config)
       throws Exception {
     _config = new MinionConf(config.toMap());
+    _clusterConfigChangeHandler = new DefaultClusterConfigChangeHandler(_config);
     String zkAddress = _config.getZkAddress();
     String helixClusterName = _config.getHelixClusterName();
     ServiceStartableUtils.applyClusterConfig(_config, zkAddress, helixClusterName, ServiceRole.MINION);
@@ -127,7 +128,6 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     }
     _listenerConfigs = ListenerConfigUtil.buildMinionConfigs(_config);
     _tlsPort = ListenerConfigUtil.findLastTlsPort(_listenerConfigs, -1);
-    _clusterConfigChangeHandler = new DefaultClusterConfigChangeHandler();
     // Register cluster-level override for table configs
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(
         new ClusterConfigForTable.ConfigChangeListener());

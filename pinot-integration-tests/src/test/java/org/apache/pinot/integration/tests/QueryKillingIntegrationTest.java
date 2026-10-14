@@ -165,7 +165,6 @@ public class QueryKillingIntegrationTest extends BaseClusterIntegrationTest {
     serverConf.setProperty(prefix + Accounting.Keys.FACTORY_NAME, ResourceUsageAccountantFactory.class.getName());
     serverConf.setProperty(prefix + Accounting.Keys.ENABLE_THREAD_CPU_SAMPLING, true);
     serverConf.setProperty(prefix + Accounting.Keys.ENABLE_THREAD_MEMORY_SAMPLING, true);
-    serverConf.setProperty(prefix + Accounting.Keys.OOM_PROTECTION_KILLING_QUERY, true);
     serverConf.setProperty(prefix + Accounting.Keys.QUERY_KILLED_METRIC_ENABLED, true);
   }
 
@@ -191,7 +190,7 @@ public class QueryKillingIntegrationTest extends BaseClusterIntegrationTest {
     ThreadAccountant serverAccountant = _serverStarters.get(0).getServerInstance().getThreadAccountant();
     assertTrue(serverAccountant instanceof ResourceUsageAccountant);
     QueryMonitorConfig serverConfig = ((ResourceUsageAccountant) serverAccountant).getQueryMonitorConfig();
-    assertTrue(serverConfig.isOomKillQueryEnabled());
+    assertFalse(serverConfig.isOomKillQueryEnabled());
     assertTrue(serverConfig.isQueryKilledMetricEnabled());
   }
 

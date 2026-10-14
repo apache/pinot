@@ -26,11 +26,11 @@ import java.util.Set;
 import org.apache.commons.collections4.MapUtils;
 
 
-/// Interface for ZK cluster config providers. Will be registered with Helix to listen on cluster config changes and
-/// will propagate changes to all registered listeners
+/// Interface for effective config providers backed by ZK cluster configs. Implementations may apply instance config
+/// overrides before propagating changes to registered listeners.
 public interface PinotClusterConfigProvider {
-  /// Get the cluster configs
-  /// @return map of cluster configs
+  /// Get the effective configs after applying instance config overrides to the cluster configs.
+  /// @return map of effective configs
   Map<String, String> getClusterConfigs();
 
   /// Register cluster config change listener
@@ -52,10 +52,10 @@ public interface PinotClusterConfigProvider {
     return Collections.unmodifiableMap(copy);
   }
 
-  /// Calculates the set of keys that changed in ZK cluster configs between the old and new
-  /// @param oldProperties map of previously cached ZK cluster configs
-  /// @param newProperties map of newly fetched ZK cluster configs
-  /// @return set of changed (added/deleted/updated) cluster config keys
+  /// Calculates the set of keys that changed between two config views.
+  /// @param oldProperties previously cached configs
+  /// @param newProperties newly fetched or computed configs
+  /// @return set of changed (added/deleted/updated) config keys
   default Set<String> getChangedProperties(Map<String, String> oldProperties, Map<String, String> newProperties) {
     if (MapUtils.isEmpty(oldProperties)) {
       return newProperties.keySet();

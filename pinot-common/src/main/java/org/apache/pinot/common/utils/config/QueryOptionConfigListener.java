@@ -33,8 +33,8 @@ import org.slf4j.LoggerFactory;
 /// Applies the `pinot.broker.query.option.*` cluster configs to the process-wide SQL query option policies held by
 /// [QueryOptionsUtils]: [Broker#CONFIG_OF_BROKER_QUERY_OPTION_VALIDATION_MODE] and
 /// [Broker#CONFIG_OF_BROKER_QUERY_OPTION_LEGACY_SYNTAX_MODE]. Changes apply live, and a removed key restores the
-/// default; the broker instance config is not consulted. An invalid value is logged and the current mode kept, so
-/// that a typo can neither break query parsing nor the other listeners.
+/// default unless the broker instance config pins the value. An invalid value is logged and the current mode kept,
+/// so that a typo can neither break query parsing nor the other listeners.
 public class QueryOptionConfigListener implements PinotClusterConfigChangeListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryOptionConfigListener.class);
 

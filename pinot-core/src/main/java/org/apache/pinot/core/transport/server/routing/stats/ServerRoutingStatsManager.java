@@ -132,6 +132,9 @@ public class ServerRoutingStatsManager implements PinotClusterConfigChangeListen
 
   @Override
   public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
+    if (!_isEnabled) {
+      return;
+    }
     if (changedConfigs.contains(AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_METRIC_EXPORT)) {
       // A removed key restores the default. The broker config is no fallback: the cluster config present at startup
       // was folded into it, so it may still hold the value being removed

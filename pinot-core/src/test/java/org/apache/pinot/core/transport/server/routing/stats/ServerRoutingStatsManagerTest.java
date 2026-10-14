@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -367,6 +368,20 @@ public class ServerRoutingStatsManagerTest {
     String numInFlightKey = BrokerGauge.ADAPTIVE_SERVER_NUM_IN_FLIGHT_REQUESTS.getGaugeName()
         + ".server.statsCollectionDisabledServer";
     assertNull(_brokerMetrics.getGaugeValue(numInFlightKey));
+  }
+
+  @Test
+  public void testInstanceMetricExportIntervalWhenStatsCollectionDisabled() {
+    PinotConfiguration brokerConfig = new PinotConfiguration(Map.of(
+        CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS, 10000L));
+    DefaultClusterConfigChangeHandler configChangeHandler = new DefaultClusterConfigChangeHandler(brokerConfig);
+    ServerRoutingStatsManager manager = new ServerRoutingStatsManager(brokerConfig, _brokerMetrics);
+    manager.init();
+
+    assertFalse(manager.isEnabled());
+    // Registration replays instance settings even when no cluster config has changed.
+    configChangeHandler.registerClusterConfigChangeListener(manager);
+    assertFalse(manager.isEnabled());
   }
 
   @Test
