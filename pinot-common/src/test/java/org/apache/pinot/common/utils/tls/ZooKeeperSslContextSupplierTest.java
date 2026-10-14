@@ -42,13 +42,18 @@ import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLServerSocket;
 import javax.net.ssl.SSLSocket;
+import org.apache.helix.HelixManagerFactory;
+import org.apache.helix.InstanceType;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.zookeeper.common.ClientX509Util;
 import org.apache.zookeeper.common.ZKConfig;
+import org.mockito.MockedStatic;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mockStatic;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
@@ -86,11 +91,12 @@ public class ZooKeeperSslContextSupplierTest {
 
   @Test
   public void testCustomSupplierKeepsProviderOwnership() {
-    try (ClientX509Util util = new ClientX509Util()) {
+    try (ClientX509Util util = new ClientX509Util();
+        MockedStatic<HelixManagerFactory> ignored = mockStatic(HelixManagerFactory.class)) {
       System.setProperty(util.getSslHostnameVerificationEnabledProperty(), "false");
       System.setProperty(util.getSslContextSupplierClassProperty(), "custom.supplier");
       System.setProperty(util.getSslProviderProperty(), "OPENSSL");
-      ZooKeeperSslContextSupplier.initialize();
+      HelixHelper.createZkHelixManager("test-cluster", "test-instance", InstanceType.SPECTATOR, "localhost:2181");
       assertEquals(System.getProperty(util.getSslContextSupplierClassProperty()), "custom.supplier");
       assertEquals(System.getProperty(util.getSslProviderProperty()), "OPENSSL");
     }
@@ -104,15 +110,24 @@ public class ZooKeeperSslContextSupplierTest {
   @Test(dataProvider = "hostnamePolicies")
   public void testConfiguredHostnamePolicy(boolean verifyHostname, boolean fips)
       throws Exception {
-    try (ClientX509Util util = new ClientX509Util()) {
+    try (ClientX509Util util = new ClientX509Util();
+        MockedStatic<HelixManagerFactory> factory = mockStatic(HelixManagerFactory.class)) {
       System.setProperty(util.getSslHostnameVerificationEnabledProperty(), Boolean.toString(verifyHostname));
       System.setProperty(util.getFipsModeProperty(), Boolean.toString(fips));
       System.setProperty(util.getSslProviderProperty(), "JDK");
       System.setProperty(util.getSslTruststoreLocationProperty(), resourcePath("truststore.p12").toString());
       System.setProperty(util.getSslTruststorePasswdProperty(), "changeit");
       System.setProperty(util.getSslTruststoreTypeProperty(), "PKCS12");
-      ZooKeeperSslContextSupplier.initialize();
-      SslContext clientContext = util.createNettySslContextForClient(new ZKConfig());
+      AtomicReference<SslContext> context = new AtomicReference<>();
+      // Helix reads cloud config during manager construction. Capture that first client's context before returning.
+      factory.when(() -> HelixManagerFactory.getZKHelixManager("test-cluster", "test-instance", InstanceType.SPECTATOR,
+          "localhost:2181"))
+          .thenAnswer(invocation -> {
+            context.set(util.createNettySslContextForClient(new ZKConfig()));
+            return null;
+          });
+      HelixHelper.createZkHelixManager("test-cluster", "test-instance", InstanceType.SPECTATOR, "localhost:2181");
+      SslContext clientContext = context.get();
 
       KeyStore keys = KeyStore.getInstance("PKCS12");
       try (InputStream stream = Files.newInputStream(resourcePath("keystore.p12"))) {
