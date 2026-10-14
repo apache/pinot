@@ -328,11 +328,19 @@ public class ObjectSerDeUtils {
 
   /// Serializer/De-serializer for a specific type of object.
   ///
+  /// Implementations must override either the byte-array serializer or both [#getSerializedSize(Object)] and
+  /// the buffer serializer [#serialize(Object, ByteBuffer)].
+  ///
   /// @param <T> Type of the object
   public interface ObjectSerDe<T> {
 
     /// Serializes a value into a byte array.
-    byte[] serialize(T value);
+    /// Typed forwarding overrides preserve receiver specialization when invoking this default.
+    default byte[] serialize(T value) {
+      byte[] bytes = new byte[getSerializedSize(value)];
+      serialize(value, ByteBuffer.wrap(bytes));
+      return bytes;
+    }
 
     /// Returns the exact size of a representable payload, or `-1` when allocation-free sizing is unsupported.
     /// This method must not serialize the value or allocate a payload array. The value must remain unchanged between
@@ -439,9 +447,7 @@ public class ObjectSerDeUtils {
 
     @Override
     public byte[] serialize(IntArrayList intArrayList) {
-      byte[] bytes = new byte[getSerializedSize(intArrayList)];
-      serialize(intArrayList, ByteBuffer.wrap(bytes));
-      return bytes;
+      return ObjectSerDe.super.serialize(intArrayList);
     }
 
     @Override
@@ -492,9 +498,7 @@ public class ObjectSerDeUtils {
 
     @Override
     public byte[] serialize(LongArrayList longArrayList) {
-      byte[] bytes = new byte[getSerializedSize(longArrayList)];
-      serialize(longArrayList, ByteBuffer.wrap(bytes));
-      return bytes;
+      return ObjectSerDe.super.serialize(longArrayList);
     }
 
     @Override
@@ -545,9 +549,7 @@ public class ObjectSerDeUtils {
 
     @Override
     public byte[] serialize(FloatArrayList floatArrayList) {
-      byte[] bytes = new byte[getSerializedSize(floatArrayList)];
-      serialize(floatArrayList, ByteBuffer.wrap(bytes));
-      return bytes;
+      return ObjectSerDe.super.serialize(floatArrayList);
     }
 
     @Override
@@ -598,9 +600,7 @@ public class ObjectSerDeUtils {
 
     @Override
     public byte[] serialize(DoubleArrayList doubleArrayList) {
-      byte[] bytes = new byte[getSerializedSize(doubleArrayList)];
-      serialize(doubleArrayList, ByteBuffer.wrap(bytes));
-      return bytes;
+      return ObjectSerDe.super.serialize(doubleArrayList);
     }
 
     @Override
@@ -1372,9 +1372,7 @@ public class ObjectSerDeUtils {
 
     @Override
     public byte[] serialize(RoaringBitmap bitmap) {
-      byte[] bytes = new byte[getSerializedSize(bitmap)];
-      serialize(bitmap, ByteBuffer.wrap(bytes));
-      return bytes;
+      return ObjectSerDe.super.serialize(bitmap);
     }
 
     @Override
@@ -1840,9 +1838,7 @@ public class ObjectSerDeUtils {
 
     @Override
     public byte[] serialize(UltraLogLog value) {
-      byte[] bytes = new byte[getSerializedSize(value)];
-      serialize(value, ByteBuffer.wrap(bytes));
-      return bytes;
+      return ObjectSerDe.super.serialize(value);
     }
 
     @Override
