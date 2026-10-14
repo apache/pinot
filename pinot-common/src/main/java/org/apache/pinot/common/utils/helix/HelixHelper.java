@@ -33,6 +33,8 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
+import org.apache.helix.HelixManagerFactory;
+import org.apache.helix.InstanceType;
 import org.apache.helix.PropertyKey.Builder;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.HelixConfigScope;
@@ -46,6 +48,7 @@ import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.pinot.common.helix.ExtraInstanceConfig;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.common.utils.tls.ZooKeeperSslContextSupplier;
 import org.apache.pinot.common.version.PinotVersion;
 import org.apache.pinot.common.workload.WorkloadChangeListener;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -77,6 +80,14 @@ public class HelixHelper {
   private static final Random RANDOM = new Random();
 
   public static final String BROKER_RESOURCE = CommonConstants.Helix.BROKER_RESOURCE_INSTANCE;
+
+  /// Creates a ZooKeeper-backed manager with Pinot's TLS bootstrap policy applied before construction.
+  /// Callers retain responsibility for the manager's connect/disconnect lifecycle.
+  public static HelixManager createZkHelixManager(String clusterName, String instanceName, InstanceType instanceType,
+      String zkAddress) {
+    ZooKeeperSslContextSupplier.initialize();
+    return HelixManagerFactory.getZKHelixManager(clusterName, instanceName, instanceType, zkAddress);
+  }
 
   public static IdealState cloneIdealState(IdealState idealState) {
     return new IdealState(

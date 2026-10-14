@@ -27,6 +27,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.helix.zookeeper.impl.client.ZkClient;
 import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.common.utils.tls.ZooKeeperSslContextSupplier;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -56,6 +57,7 @@ public class ServiceStartableUtils {
   /// - pinot.all.\* will be replaced to role specific config, e.g. pinot.controller.\* for controllers
   public static void applyClusterConfig(PinotConfiguration instanceConfig, String zkAddress, String clusterName,
       ServiceRole serviceRole) {
+    ZooKeeperSslContextSupplier.initialize();
     int zkClientSessionConfig =
         instanceConfig.getProperty(CommonConstants.Helix.ZkClient.ZK_CLIENT_SESSION_TIMEOUT_MS_CONFIG,
             CommonConstants.Helix.ZkClient.DEFAULT_SESSION_TIMEOUT_MS);
