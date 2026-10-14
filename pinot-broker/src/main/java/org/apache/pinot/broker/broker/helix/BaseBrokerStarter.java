@@ -904,6 +904,9 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
                 new ArrayList<>(previousTags));
             znRecord.getListFields().remove(Helix.PREVIOUS_TAGS);
           }
+          // A starting broker is no longer drained. Without stashed tags this can leave the tag list empty, in which
+          // case the broker is tagged as a new broker below.
+          instanceConfig.removeTag(Helix.DRAINED_BROKER_INSTANCE);
           if (Boolean.parseBoolean(simpleFields.get(Helix.IS_SHUTDOWN_IN_PROGRESS))) {
             LOGGER.info("Clearing {} for broker instance: {}", Helix.IS_SHUTDOWN_IN_PROGRESS, _instanceId);
             simpleFields.put(Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.FALSE.toString());

@@ -261,11 +261,17 @@ public class BrokerDrainManager {
           List<String> previousTags =
               instanceConfig.getRecord().getListField(CommonConstants.Helix.PREVIOUS_TAGS);
           if (previousTags == null) {
-            instanceConfig.getRecord()
-                .setListField(CommonConstants.Helix.PREVIOUS_TAGS, new ArrayList<>(instanceConfig.getTags()));
+            List<String> tagsToRestore = new ArrayList<>(instanceConfig.getTags());
+            tagsToRestore.remove(CommonConstants.Helix.DRAINED_BROKER_INSTANCE);
+            instanceConfig.getRecord().setListField(CommonConstants.Helix.PREVIOUS_TAGS, tagsToRestore);
           }
+          // Replace the broker tags with a placeholder instead of leaving the tag list empty, so a broker binary that
+          // predates drain does not treat this instance as new and re-tag it into a tenant.
           List<String> activeTags = new ArrayList<>(instanceConfig.getTags());
           activeTags.removeIf(TagNameUtils::isBrokerTag);
+          if (!activeTags.contains(CommonConstants.Helix.DRAINED_BROKER_INSTANCE)) {
+            activeTags.add(CommonConstants.Helix.DRAINED_BROKER_INSTANCE);
+          }
           instanceConfig.getRecord()
               .setListField(InstanceConfig.InstanceConfigProperty.TAG_LIST.name(), activeTags);
           instanceConfig.getRecord()
@@ -274,8 +280,8 @@ public class BrokerDrainManager {
     if (!updated) {
       throw new IllegalStateException("Failed to mark broker instance " + _instanceId + " as shutting down");
     }
-    LOGGER.info("Marked broker instance {} with {}=true and temporarily removed its broker tags", _instanceId,
-        CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS);
+    LOGGER.info("Marked broker instance {} with {}=true and temporarily replaced its broker tags with {}", _instanceId,
+        CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, CommonConstants.Helix.DRAINED_BROKER_INSTANCE);
   }
 
   /// Returns the tables this broker was removed from, or `null` when the waiter was interrupted and the outcome of the

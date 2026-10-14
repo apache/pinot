@@ -639,6 +639,7 @@ public class PinotHelixResourceManager {
     //   - body=false + live!=true -> leave as is (no-op / cleared).
     List<String> newTags = newInstance.getTags();
     AtomicReference<List<String>> oldTagsRef = new AtomicReference<>();
+    AtomicReference<List<String>> updatedTagsRef = new AtomicReference<>();
     AtomicBoolean queriesDisabledPreserved = new AtomicBoolean();
     boolean updated = HelixHelper.updateInstanceConfig(_helixDataAccessor, instanceId, currentInstanceConfig -> {
       oldTagsRef.set(getEffectiveInstanceTags(instanceId, currentInstanceConfig));
@@ -646,6 +647,7 @@ public class PinotHelixResourceManager {
           currentInstanceConfig.getRecord().getSimpleField(CommonConstants.Helix.QUERIES_DISABLED));
       InstanceUtils.updateHelixInstanceConfig(currentInstanceConfig, newInstance);
       preserveBrokerDrainTags(instanceId, currentInstanceConfig, newTags);
+      updatedTagsRef.set(getEffectiveInstanceTags(instanceId, currentInstanceConfig));
       // If the live record had queriesDisabled=true but the request body defaulted it to false,
       // restore the operational flag so it survives a request-body-driven update.
       queriesDisabledPreserved.set(liveQueriesDisabled && !newInstance.isQueriesDisabled());
@@ -667,9 +669,9 @@ public class PinotHelixResourceManager {
     boolean shouldUpdateBrokerResource = false;
     List<String> newBrokerTags = null;
     if (InstanceTypeUtils.isBroker(instanceId) && updateBrokerResource) {
+      // Compare effective tags, so a draining broker whose drained tag view is written back is not treated as changed
       newBrokerTags =
-          newTags != null ? newTags.stream().filter(TagNameUtils::isBrokerTag).sorted().collect(Collectors.toList())
-              : List.of();
+          updatedTagsRef.get().stream().filter(TagNameUtils::isBrokerTag).sorted().collect(Collectors.toList());
       List<String> oldTags = oldTagsRef.get();
       List<String> oldBrokerTags =
           oldTags.stream().filter(TagNameUtils::isBrokerTag).sorted().collect(Collectors.toList());
@@ -726,9 +728,11 @@ public class PinotHelixResourceManager {
     InstanceConfigValidatorRegistry.validate(InstanceUtils.toInstance(instanceConfig));
 
     AtomicReference<List<String>> oldTagsRef = new AtomicReference<>();
+    AtomicReference<List<String>> updatedTagsRef = new AtomicReference<>();
     if (!HelixHelper.updateInstanceConfig(_helixDataAccessor, instanceId, currentInstanceConfig -> {
       oldTagsRef.set(getEffectiveInstanceTags(instanceId, currentInstanceConfig));
       preserveBrokerDrainTags(instanceId, currentInstanceConfig, newTags);
+      updatedTagsRef.set(getEffectiveInstanceTags(instanceId, currentInstanceConfig));
     })) {
       throw new RuntimeException("Failed to set instance config for instance: " + instanceId);
     }
@@ -737,7 +741,9 @@ public class PinotHelixResourceManager {
     boolean shouldUpdateBrokerResource = false;
     List<String> newBrokerTags = null;
     if (InstanceTypeUtils.isBroker(instanceId) && updateBrokerResource) {
-      newBrokerTags = newTags.stream().filter(TagNameUtils::isBrokerTag).sorted().collect(Collectors.toList());
+      // Compare effective tags, so a draining broker whose drained tag view is written back is not treated as changed
+      newBrokerTags =
+          updatedTagsRef.get().stream().filter(TagNameUtils::isBrokerTag).sorted().collect(Collectors.toList());
       List<String> oldTags = oldTagsRef.get();
       List<String> oldBrokerTags =
           oldTags.stream().filter(TagNameUtils::isBrokerTag).sorted().collect(Collectors.toList());
@@ -1492,15 +1498,29 @@ public class PinotHelixResourceManager {
         .map(InstanceConfig::getInstanceName).collect(Collectors.toList());
   }
 
-  /// Keeps a draining broker ineligible to mixed-version controllers while retaining requested tags for restart.
+  /// Applies the requested tags. For a draining broker, the requested tags are stashed in [Helix#PREVIOUS_TAGS] for
+  /// restart, and the active tags keep the [Helix#DRAINED_BROKER_INSTANCE] placeholder instead of broker tags, so the
+  /// broker stays ineligible to mixed-version controllers and older broker binaries.
   private static void preserveBrokerDrainTags(String instanceId, InstanceConfig instanceConfig,
       @Nullable List<String> desiredTags) {
     List<String> tags = desiredTags != null ? new ArrayList<>(desiredTags) : new ArrayList<>();
     if (InstanceTypeUtils.isBroker(instanceId) && instanceConfig.getRecord()
         .getBooleanField(Helix.IS_SHUTDOWN_IN_PROGRESS, false)) {
-      // ZNRecord retains the supplied list reference, so keep a separate copy before removing active broker tags.
-      instanceConfig.getRecord().setListField(Helix.PREVIOUS_TAGS, new ArrayList<>(tags));
+      boolean echoesDrainedTags = tags.removeIf(Helix.DRAINED_BROKER_INSTANCE::equals);
+      List<String> tagsToRestore = new ArrayList<>(tags);
+      List<String> previousTags = instanceConfig.getRecord().getListField(Helix.PREVIOUS_TAGS);
+      if (echoesDrainedTags && previousTags != null && tags.stream().noneMatch(TagNameUtils::isBrokerTag)) {
+        // The request carries the drained tag view back (e.g. a GET-modify-PUT of the instance), so it does not ask to
+        // change broker tags. Keep the stashed broker tags instead of losing them on restart.
+        for (String previousTag : previousTags) {
+          if (TagNameUtils.isBrokerTag(previousTag) && !tagsToRestore.contains(previousTag)) {
+            tagsToRestore.add(previousTag);
+          }
+        }
+      }
+      instanceConfig.getRecord().setListField(Helix.PREVIOUS_TAGS, tagsToRestore);
       tags.removeIf(TagNameUtils::isBrokerTag);
+      tags.add(Helix.DRAINED_BROKER_INSTANCE);
     }
     instanceConfig.getRecord().setListField(InstanceConfig.InstanceConfigProperty.TAG_LIST.name(), tags);
   }
