@@ -33,7 +33,9 @@ This will expose a port at 8080 to dump metrics as Prometheus format for Prometh
 
 #### Expose a scrape endpoint with Dropwizard
 
-The same Java agent publishes an HTTP `/metrics` endpoint with `pinot-dropwizard`. For a broker, configure:
+The same Java agent publishes an HTTP `/metrics` endpoint with `pinot-dropwizard`, the default when no metrics
+factory is configured. Explicit Yammer factory settings still select Yammer; remove them to use the default,
+or replace them with the applicable Dropwizard setting. For a broker:
 
 ```properties
 pinot.broker.metrics.factory.className=org.apache.pinot.plugin.metrics.dropwizard.DropwizardMetricsFactory
