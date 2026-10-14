@@ -61,6 +61,8 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryCancelledException;
+import org.apache.pinot.spi.query.QueryThreadContext;
+import org.apache.pinot.spi.query.RemoteAccessStats;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.mockito.ArgumentCaptor;
@@ -285,7 +287,10 @@ public class BloomFilterSegmentPrunerTest {
         return null;
       }).when(segment).acquire(any(FetchContext.class));
       doAnswer(invocation -> {
-        acquired.set(false);
+        // Record a remote access at the release of the acquired bloom filter, like a segment directory does
+        if (acquired.getAndSet(false)) {
+          invocation.<FetchContext>getArgument(0).getRemoteAccessStats().addRemoteAccesses(1, 10);
+        }
         return null;
       }).when(segment).release(any(FetchContext.class));
       DataSource dataSource = segment.getDataSourceNullable("column");
@@ -299,7 +304,7 @@ public class BloomFilterSegmentPrunerTest {
     query.setEnablePrefetch(enablePrefetch);
     query.setMaxExecutionThreads(4);
     ExecutorService executor = Executors.newFixedThreadPool(4);
-    try {
+    try (QueryThreadContext threadContext = QueryThreadContext.openForSseTest()) {
       List<IndexSegment> selected = useExecutor ? PRUNER.prune(segments, query, executor)
           : PRUNER.prune(segments, query);
       assertEquals(selected.size(), expected.size());
@@ -313,6 +318,10 @@ public class BloomFilterSegmentPrunerTest {
           verify(segment, never()).release(any(FetchContext.class));
         }
       }
+      // The remote accesses of the released bloom filters are reported to the query execution
+      RemoteAccessStats remoteAccessStats = threadContext.getRemoteAccessStats();
+      assertEquals(remoteAccessStats.getNumRemoteAccesses(), enablePrefetch ? numSegments : 0);
+      assertEquals(remoteAccessStats.getRemoteAccessBytes(), enablePrefetch ? 10L * numSegments : 0);
     } finally {
       executor.shutdownNow();
       assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));

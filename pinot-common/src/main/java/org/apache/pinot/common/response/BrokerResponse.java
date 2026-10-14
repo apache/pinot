@@ -229,6 +229,14 @@ public interface BrokerResponse {
   /// Returns the number of bytes read by the remote accesses (see [#getNumRemoteAccesses()]).
   long getRemoteAccessBytes();
 
+  /// Returns the number of remote accesses (see [#getNumRemoteAccesses()]) made directly, i.e. outside the buffers
+  /// fetched for the query. Each of them is a round trip to the remote storage tier for a single read, so a non-zero
+  /// value points at reads the fetch plan of the query did not cover.
+  long getNumDirectRemoteAccesses();
+
+  /// Returns the number of bytes read by the direct remote accesses (see [#getNumDirectRemoteAccesses()]).
+  long getDirectRemoteAccessBytes();
+
   /// Returns the time used to reduce the server responses into the final response in milliseconds.
   long getBrokerReduceTimeMs();
 

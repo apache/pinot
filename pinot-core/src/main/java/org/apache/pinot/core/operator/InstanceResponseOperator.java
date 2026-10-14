@@ -29,6 +29,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.spi.accounting.ThreadResourceSnapshot;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -99,16 +100,6 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
         String.valueOf(_threadMemAllocatedBytes));
     instanceResponseBlock.addMetadata(MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS.getName(),
         String.valueOf(_systemActivitiesCpuTimeNs));
-    long numRemoteAccesses = 0;
-    long remoteAccessBytes = 0;
-    for (FetchContext fetchContext : _fetchContexts) {
-      numRemoteAccesses += fetchContext.getNumRemoteAccesses();
-      remoteAccessBytes += fetchContext.getRemoteAccessBytes();
-    }
-    if (numRemoteAccesses > 0) {
-      instanceResponseBlock.addMetadata(MetadataKey.NUM_REMOTE_ACCESSES.getName(), Long.toString(numRemoteAccesses));
-      instanceResponseBlock.addMetadata(MetadataKey.REMOTE_ACCESS_BYTES.getName(), Long.toString(remoteAccessBytes));
-    }
     Integer implicitLimit = QueryOptionsUtils.getLiteModeImplicitLeafStageLimit(
         _queryContext.getQueryOptions());
     // false-positive when table has exactly implicitLimit rows
@@ -162,9 +153,12 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
     }
   }
 
+  /// Releases the fetched buffers of all the segments, and reports their remote accesses to the query execution.
   public void releaseAll() {
     for (int i = 0; i < _fetchContextSize; i++) {
-      _segmentContexts.get(i).getIndexSegment().release(_fetchContexts.get(i));
+      FetchContext fetchContext = _fetchContexts.get(i);
+      _segmentContexts.get(i).getIndexSegment().release(fetchContext);
+      QueryThreadContext.mergeRemoteAccessStats(fetchContext.getRemoteAccessStats());
     }
   }
 

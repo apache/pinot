@@ -29,9 +29,14 @@ import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.operator.combine.BaseCombineOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.FetchContext;
+import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentContext;
+import org.apache.pinot.spi.query.QueryThreadContext;
+import org.apache.pinot.spi.query.RemoteAccessStats;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -128,36 +133,30 @@ public class InstanceResponseOperatorTest {
         .containsKey(MetadataKey.LITE_MODE_LEAF_STAGE_LIMIT_REACHED.getName()));
   }
 
+  /// Releasing the fetched buffers reports the remote accesses recorded on the fetch contexts to the query execution.
   @Test
-  public void testRemoteAccessesSummedAcrossFetchContexts() {
-    SelectionResultsBlock resultsBlock = mock(SelectionResultsBlock.class);
-    when(resultsBlock.getResultsMetadata()).thenReturn(new HashMap<>());
-    QueryContext queryContext = mock(QueryContext.class);
-    when(queryContext.getQueryOptions()).thenReturn(new HashMap<>());
+  public void testReleaseReportsRemoteAccessesOfFetchContexts() {
     FetchContext fetchContext1 = new FetchContext(UUID.randomUUID(), "segment1", Set.of("col"));
-    fetchContext1.addRemoteAccesses(3, 300);
     FetchContext fetchContext2 = new FetchContext(UUID.randomUUID(), "segment2", Set.of("col"));
-    fetchContext2.addRemoteAccesses(4, 400);
-    InstanceResponseOperator operator = new InstanceResponseOperator(mock(BaseCombineOperator.class), List.of(),
-        List.of(fetchContext1, fetchContext2), queryContext);
-    InstanceResponseBlock responseBlock = operator.buildInstanceResponseBlock(resultsBlock);
-    Map<String, String> metadata = responseBlock.getResponseMetadata();
-    assertEquals(metadata.get(MetadataKey.NUM_REMOTE_ACCESSES.getName()), "7");
-    assertEquals(metadata.get(MetadataKey.REMOTE_ACCESS_BYTES.getName()), "700");
-  }
+    IndexSegment segment1 = mock(IndexSegment.class);
+    IndexSegment segment2 = mock(IndexSegment.class);
+    doAnswer(_ -> {
+      fetchContext1.getRemoteAccessStats().addRemoteAccesses(3, 300);
+      return null;
+    }).when(segment1).release(fetchContext1);
+    doAnswer(_ -> {
+      fetchContext2.getRemoteAccessStats().addRemoteAccesses(4, 400);
+      return null;
+    }).when(segment2).release(fetchContext2);
+    InstanceResponseOperator operator = new InstanceResponseOperator(mock(BaseCombineOperator.class),
+        List.of(new SegmentContext(segment1), new SegmentContext(segment2)), List.of(fetchContext1, fetchContext2),
+        mock(QueryContext.class));
 
-  @Test
-  public void testNoRemoteAccessMetadataWithoutRemoteAccesses() {
-    SelectionResultsBlock resultsBlock = mock(SelectionResultsBlock.class);
-    when(resultsBlock.getResultsMetadata()).thenReturn(new HashMap<>());
-    QueryContext queryContext = mock(QueryContext.class);
-    when(queryContext.getQueryOptions()).thenReturn(new HashMap<>());
-    FetchContext fetchContext = new FetchContext(UUID.randomUUID(), "segment", Set.of("col"));
-    InstanceResponseOperator operator = new InstanceResponseOperator(mock(BaseCombineOperator.class), List.of(),
-        List.of(fetchContext), queryContext);
-    InstanceResponseBlock responseBlock = operator.buildInstanceResponseBlock(resultsBlock);
-    Map<String, String> metadata = responseBlock.getResponseMetadata();
-    assertFalse(metadata.containsKey(MetadataKey.NUM_REMOTE_ACCESSES.getName()));
-    assertFalse(metadata.containsKey(MetadataKey.REMOTE_ACCESS_BYTES.getName()));
+    try (QueryThreadContext threadContext = QueryThreadContext.openForSseTest()) {
+      operator.releaseAll();
+      RemoteAccessStats remoteAccessStats = threadContext.getRemoteAccessStats();
+      assertEquals(remoteAccessStats.getNumRemoteAccesses(), 7);
+      assertEquals(remoteAccessStats.getRemoteAccessBytes(), 700);
+    }
   }
 }
