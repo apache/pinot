@@ -88,14 +88,14 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
       // Hash join
       // Force pre-partitioned exchange when colocated join hint is provided
       Boolean prePartitioned = PinotHintOptions.JoinHintOptions.isColocatedByJoinKeys(join);
-      // TODO: Validate if the configured distribution types are valid
       if (leftDistributionType == null) {
         leftDistributionType = inferLeftDistributionType(joinInfo, join.getJoinType());
       }
-      newLeft = createExchangeForHashJoin(leftDistributionType, joinInfo.leftKeys, left, prePartitioned);
       if (rightDistributionType == null) {
         rightDistributionType = inferRightDistributionType(joinInfo, join.getJoinType());
       }
+      validateDistributionTypes(leftDistributionType, rightDistributionType, joinInfo, join.getJoinType());
+      newLeft = createExchangeForHashJoin(leftDistributionType, joinInfo.leftKeys, left, prePartitioned);
       newRight = createExchangeForHashJoin(rightDistributionType, joinInfo.rightKeys, right, prePartitioned);
     }
 
@@ -125,6 +125,62 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
       default:
         throw new IllegalArgumentException("Unsupported distribution type: " + distributionType + " for lookup join");
     }
+  }
+
+  /// Rejects the pairs of distribution types that cannot produce the join's rows, which are otherwise silently
+  /// answered wrong. A pair is workable only if every pair of rows that could match meets on one worker, and only if
+  /// each row is emitted by one worker.
+  ///
+  /// Broadcasting a side gives every worker all of its rows, so it stands in for any partitioning of the other side.
+  /// Broadcasting both sides gives every worker all the rows of both, and each joined row is then emitted once per
+  /// worker. Broadcasting neither leaves both sides partitioned, and they only line up when both are partitioned the
+  /// same way on the join keys, which also requires the join to have keys to partition on.
+  ///
+  /// An outer join additionally emits the rows of its outer side that matched nothing, which a worker can only tell
+  /// once it holds every row of the opposite side. So the broadcast side must be the side opposite the outer one, and
+  /// a FULL join, whose two sides are both outer, cannot be answered with a broadcast side at all.
+  private static void validateDistributionTypes(PinotHintOptions.DistributionType leftDistributionType,
+      PinotHintOptions.DistributionType rightDistributionType, JoinInfo joinInfo, JoinRelType joinType) {
+    boolean leftBroadcast = leftDistributionType == PinotHintOptions.DistributionType.BROADCAST;
+    boolean rightBroadcast = rightDistributionType == PinotHintOptions.DistributionType.BROADCAST;
+    if (leftBroadcast && rightBroadcast) {
+      throw new IllegalArgumentException(
+          "Cannot broadcast both sides of the join: every worker would hold every row of both sides and emit each "
+              + "joined row, repeating the join result once per worker. Broadcast at most one side.");
+    }
+    if (leftBroadcast || rightBroadcast) {
+      switch (joinType) {
+        case LEFT:
+          Preconditions.checkArgument(rightBroadcast,
+              "LEFT join requires the right side to be the broadcast one: a worker can only tell that a left row "
+                  + "matched nothing if it holds every right row, got left: %s, right: %s", leftDistributionType,
+              rightDistributionType);
+          break;
+        case RIGHT:
+          Preconditions.checkArgument(leftBroadcast,
+              "RIGHT join requires the left side to be the broadcast one: a worker can only tell that a right row "
+                  + "matched nothing if it holds every left row, got left: %s, right: %s", leftDistributionType,
+              rightDistributionType);
+          break;
+        case FULL:
+          throw new IllegalArgumentException(
+              "FULL join cannot broadcast a side: both sides emit the rows that matched nothing, so neither side can "
+                  + "be the partitioned one. Distribute both sides by hash on the join keys.");
+        default:
+          break;
+      }
+      return;
+    }
+    Preconditions.checkArgument(!joinInfo.leftKeys.isEmpty(),
+        "Join without equi keys requires one side to be broadcast: with both sides partitioned, a pair of rows that "
+            + "could match may land on different workers, got left: %s, right: %s", leftDistributionType,
+        rightDistributionType);
+    Preconditions.checkArgument(
+        leftDistributionType == rightDistributionType
+            && leftDistributionType != PinotHintOptions.DistributionType.RANDOM,
+        "Both sides of the join must be distributed the same way on the join keys when neither side is broadcast, "
+            + "otherwise rows sharing a key land on different workers, got left: %s, right: %s", leftDistributionType,
+        rightDistributionType);
   }
 
   /// For non-equi RIGHT JOINs (no equi keys), the default RANDOM(left)+BROADCAST(right) is incorrect because each

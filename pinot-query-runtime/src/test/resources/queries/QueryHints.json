@@ -128,6 +128,52 @@
         "sql": "SET stageParallelism=2; SELECT {tbl1}.name, SUM({tbl2}.num) FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ JOIN {tbl2} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ ON {tbl1}.num = {tbl2}.num GROUP BY {tbl1}.name"
       },
       {
+        "description": "Both sides distributed at random drops rows that share a key but land on different workers",
+        "sql": "SELECT /*+ joinOptions(left_distribution_type = 'random', right_distribution_type = 'random') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} JOIN {tbl2} ON {tbl1}.num = {tbl2}.num",
+        "expectedException": ".*must be distributed the same way on the join keys.*",
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "One side hashed and the other at random drops rows that share a key",
+        "sql": "SELECT /*+ joinOptions(left_distribution_type = 'hash', right_distribution_type = 'random') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} JOIN {tbl2} ON {tbl1}.num = {tbl2}.num",
+        "expectedException": ".*must be distributed the same way on the join keys.*",
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "Broadcasting both sides repeats the join result once per worker",
+        "sql": "SELECT /*+ joinOptions(left_distribution_type = 'broadcast', right_distribution_type = 'broadcast') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} JOIN {tbl2} ON {tbl1}.num = {tbl2}.num",
+        "expectedException": ".*Cannot broadcast both sides of the join.*",
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "Join without equi keys and no broadcast side cannot bring matching rows together",
+        "sql": "SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'local') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} JOIN {tbl2} ON {tbl1}.num > {tbl2}.num",
+        "expectedException": ".*requires one side to be broadcast.*",
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "LEFT join broadcasting the left side emits left rows as unmatched on workers holding part of the right side",
+        "sql": "SELECT /*+ joinOptions(left_distribution_type = 'broadcast', right_distribution_type = 'local') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} LEFT JOIN {tbl2} ON {tbl1}.num = {tbl2}.num",
+        "expectedException": ".*LEFT join requires the right side to be the broadcast one.*",
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "RIGHT join broadcasting the right side emits right rows as unmatched on workers holding part of the left side",
+        "sql": "SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'broadcast') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} RIGHT JOIN {tbl2} ON {tbl1}.num = {tbl2}.num",
+        "expectedException": ".*RIGHT join requires the left side to be the broadcast one.*",
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "RIGHT join without equi keys broadcasting the right side emits right rows as unmatched",
+        "sql": "SELECT /*+ joinOptions(left_distribution_type = 'random', right_distribution_type = 'broadcast') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} RIGHT JOIN {tbl2} ON {tbl1}.num > {tbl2}.num",
+        "expectedException": ".*RIGHT join requires the left side to be the broadcast one.*",
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "LEFT join broadcasting the right side is the workable direction",
+        "sql": "SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'broadcast') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} LEFT JOIN {tbl2} ON {tbl1}.num = {tbl2}.num"
+      },
+      {
         "description": "Broadcast JOIN",
         "sql": "SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'broadcast') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} JOIN {tbl2} ON {tbl1}.num = {tbl2}.num"
       },
