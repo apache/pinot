@@ -1009,6 +1009,21 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     return stagePlans;
   }
 
+  @VisibleForTesting
+  static void mergeStageStats(BrokerResponseNativeV2 brokerResponse,
+      List<MultiStageQueryStats.StageStats.Closed> queryStats) {
+    for (MultiStageQueryStats.StageStats.Closed stageStats : queryStats) {
+      if (stageStats != null) { // for example pipeline breaker may not have stats
+        stageStats.forEach((type, stats) -> type.mergeInto(brokerResponse, stats));
+        if (!stageStats.isEmpty()) {
+          // The stage root's allocation covers all the operators of its op chain
+          brokerResponse.addTotalMemAllocatedBytes(
+              stageStats.getLastOperatorStats().getUnsafe("ALLOCATED_MEMORY_BYTES", 0L));
+        }
+      }
+    }
+  }
+
   private void fillOldBrokerResponseStats(BrokerResponseNativeV2 brokerResponse,
       List<MultiStageQueryStats.StageStats.Closed> queryStats, DispatchableSubPlan dispatchableSubPlan,
       @Nullable List<QueryDispatcher.QueryResult.StageCoverage> stageCoverage,
@@ -1019,16 +1034,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       MultiStageStatsTreeBuilder treeBuilder = new MultiStageStatsTreeBuilder(queryStageMap, queryStats,
           stageStatsTrees);
       brokerResponse.setStageStats(treeBuilder.jsonStatsByStage(0));
-      for (MultiStageQueryStats.StageStats.Closed stageStats : queryStats) {
-        if (stageStats != null) { // for example pipeline breaker may not have stats
-          stageStats.forEach((type, stats) -> type.mergeInto(brokerResponse, stats));
-          if (!stageStats.isEmpty()) {
-            // The stage root's allocation covers all the operators of its op chain
-            brokerResponse.addTotalMemAllocatedBytes(
-                stageStats.getLastOperatorStats().getUnsafe("ALLOCATED_MEMORY_BYTES", 0L));
-          }
-        }
-      }
+      mergeStageStats(brokerResponse, queryStats);
       // Broker-pruned segments are computed during routing in WorkerManager, not reported by servers.
       // Inject the count directly since it doesn't flow through the LeafOperator stat pipeline.
       long numSegmentsPrunedByBroker = dispatchableSubPlan.getNumSegmentsPrunedByBroker();

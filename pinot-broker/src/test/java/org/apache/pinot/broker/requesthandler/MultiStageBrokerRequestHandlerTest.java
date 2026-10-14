@@ -30,6 +30,7 @@ import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.broker.AllowAllAccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
@@ -42,6 +43,12 @@ import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.planner.physical.PinotDispatchPlanner;
 import org.apache.pinot.query.routing.WorkerManager;
+import org.apache.pinot.query.runtime.operator.BaseMailboxReceiveOperator;
+import org.apache.pinot.query.runtime.operator.LeafOperator;
+import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
+import org.apache.pinot.query.runtime.operator.MultiStageOperator;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
+import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerOperator;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
@@ -197,6 +204,36 @@ public class MultiStageBrokerRequestHandlerTest extends QueryEnvironmentTestBase
     handler.applyBrokerDefaultQueryOptions(queryOptions);
     Assert.assertEquals(queryOptions.get(QueryOptionKey.STREAMING_DISTINCT_FLUSH_THRESHOLD), "100",
         "Per-query SET must take precedence over the broker default");
+  }
+
+  @Test
+  public void testMergeStageStatsTotalMemAllocatedBytes() {
+    StatMap<BaseMailboxReceiveOperator.StatKey> rootReceive = new StatMap<>(BaseMailboxReceiveOperator.StatKey.class)
+        .merge(BaseMailboxReceiveOperator.StatKey.ALLOCATED_MEMORY_BYTES, 100_000L);
+    StatMap<BaseMailboxReceiveOperator.StatKey> breakerReceive =
+        new StatMap<>(BaseMailboxReceiveOperator.StatKey.class)
+            .merge(BaseMailboxReceiveOperator.StatKey.ALLOCATED_MEMORY_BYTES, 1L);
+    StatMap<PipelineBreakerOperator.StatKey> breaker = new StatMap<>(PipelineBreakerOperator.StatKey.class)
+        .merge(PipelineBreakerOperator.StatKey.ALLOCATED_MEMORY_BYTES, 10L);
+    StatMap<LeafOperator.StatKey> leaf = new StatMap<>(LeafOperator.StatKey.class)
+        .merge(LeafOperator.StatKey.ALLOCATED_MEMORY_BYTES, 100L)
+        .merge(LeafOperator.StatKey.THREAD_MEM_ALLOCATED_BYTES, 1_000L);
+    StatMap<MailboxSendOperator.StatKey> send = new StatMap<>(MailboxSendOperator.StatKey.class)
+        .merge(MailboxSendOperator.StatKey.ALLOCATED_MEMORY_BYTES, 10_000L);
+
+    // Stage 1 is a leaf stage with a pipeline breaker, flattened the same way in legacy and stream stats modes
+    BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
+    MultiStageBrokerRequestHandler.mergeStageStats(brokerResponse, List.of(
+        new MultiStageQueryStats.StageStats.Closed(List.of(MultiStageOperator.Type.MAILBOX_RECEIVE),
+            List.of(rootReceive)),
+        new MultiStageQueryStats.StageStats.Closed(
+            List.of(MultiStageOperator.Type.MAILBOX_RECEIVE, MultiStageOperator.Type.PIPELINE_BREAKER,
+                MultiStageOperator.Type.LEAF, MultiStageOperator.Type.MAILBOX_SEND),
+            List.of(breakerReceive, breaker, leaf, send))));
+
+    // Op chain roots (stage roots and the breaker) plus the leaf threads, but not the breaker's receive or the leaf's
+    // own op chain allocation, which their roots already include
+    assertEquals(brokerResponse.getTotalMemAllocatedBytes(), 100_000L + 10_000L + 1_000L + 10L);
   }
 
   @Test
