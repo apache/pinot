@@ -574,6 +574,8 @@ public class BaseTableDataManagerTest {
       throws Exception {
     TestSegmentReloadSemaphore reloadSemaphore = new TestSegmentReloadSemaphore(1);
     BaseTableDataManager tableDataManager = createTableManager(reloadSemaphore);
+    // Pre-capture segmentLock to keep strong reference and prevent weak-value GC eviction (Issue #19611).
+    Lock segmentLock = tableDataManager.getSegmentLock(SEGMENT_NAME);
 
     // Acquire the only permit so that reloadSegment blocks when attempting to acquire the semaphore.
     reloadSemaphore.acquire("otherSegment", tableDataManager.getLogger());
@@ -607,7 +609,6 @@ public class BaseTableDataManagerTest {
 
       // Verify exception safety:
       // 1. segmentLock must NOT be leaked (must be unlocked)
-      Lock segmentLock = tableDataManager.getSegmentLock(SEGMENT_NAME);
       assertFalse(((ReentrantLock) segmentLock).isLocked(), "Segment lock must be released when interrupted");
       assertTrue(segmentLock.tryLock(), "Segment lock should be acquirable after thread was interrupted");
       segmentLock.unlock();
