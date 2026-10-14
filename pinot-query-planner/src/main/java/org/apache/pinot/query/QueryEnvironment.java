@@ -350,10 +350,14 @@ public class QueryEnvironment {
   /// Validates the query without converting or optimizing it, which costs less than [#compile(String,
   /// SqlNodeAndOptions)]. The validation changes the parsed query.
   ///
-  /// @throws QueryException if the query does not validate
+  /// @throws QueryException if the query does not validate, e.g. because of an invalid query option
   public void validate(SqlNodeAndOptions sqlNodeAndOptions) {
     try (PlannerContext plannerContext = getPlannerContext(sqlNodeAndOptions)) {
       validate(sqlNodeAndOptions.getSqlNode(), plannerContext);
+    } catch (QueryException e) {
+      throw e;
+    } catch (RuntimeException e) {
+      throw QueryErrorCode.QUERY_VALIDATION.asException(e.getMessage(), e);
     }
   }
 

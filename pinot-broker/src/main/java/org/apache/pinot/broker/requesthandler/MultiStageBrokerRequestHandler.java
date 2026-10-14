@@ -745,17 +745,20 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
   /// Returns whether the subquery validates on its own, i.e. whether it does not refer to the query it is in.
   /// Validation does not optimize the subquery, so it is quick enough to run without a timeout.
+  ///
+  /// Any failure, e.g. from an invalid option the subquery inherits, means no: the subquery then stays in the query,
+  /// and compiling the query reports the problem.
   private boolean validatesOnItsOwn(long requestId, String subquery, Map<String, String> queryOptions,
       @Nullable HttpHeaders httpHeaders, long deadlineMs) {
     getTimeLeftMs(subquery, deadlineMs);
-    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(subquery);
-    RequestUtils.setOptions(sqlNodeAndOptions, queryOptions);
-    QueryEnvironment queryEnv = new QueryEnvironment(
-        getQueryEnvConf(httpHeaders, sqlNodeAndOptions.getOptions(), requestId), _multiClusterRoutingContext);
     try {
+      SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(subquery);
+      RequestUtils.setOptions(sqlNodeAndOptions, queryOptions);
+      QueryEnvironment queryEnv = new QueryEnvironment(
+          getQueryEnvConf(httpHeaders, sqlNodeAndOptions.getOptions(), requestId), _multiClusterRoutingContext);
       queryEnv.validate(sqlNodeAndOptions);
       return true;
-    } catch (QueryException e) {
+    } catch (RuntimeException e) {
       return false;
     }
   }
@@ -812,11 +815,12 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       throw new QueryException(QueryErrorCode.fromErrorCode(exception.getErrorCode()),
           "Subquery failed: " + subquery + ": " + exception.getMessage());
     }
-    // An IdSet built from part of the rows would make the query miss rows without an error
-    List<String> partialResultReasons = getPartialResultReasons(response);
-    if (!partialResultReasons.isEmpty()) {
+    // An IdSet built from part of the rows would make the query miss rows without an error. isPartialResult() does not
+    // include the window limit.
+    if (response.isPartialResult() || response.isMaxRowsInWindowReached()) {
+      List<String> reasons = getPartialResultReasons(response);
       throw QueryErrorCode.QUERY_EXECUTION.asException(
-          "Subquery returned a partial result " + partialResultReasons + ": " + subquery);
+          "Subquery returned a partial result" + (reasons.isEmpty() ? "" : " " + reasons) + ": " + subquery);
     }
     ResultTable resultTable = response.getResultTable();
     DataSchema dataSchema = resultTable != null ? resultTable.getDataSchema() : null;
@@ -832,7 +836,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     return rows.isEmpty() ? null : (String) rows.get(0)[0];
   }
 
-  /// Returns the reasons why the response holds a partial result without an exception, if any.
+  /// Returns the known reasons why the response holds a partial result, for the error message.
   private static List<String> getPartialResultReasons(BrokerResponse response) {
     List<String> reasons = new ArrayList<>();
     if (response.isNumGroupsLimitReached()) {

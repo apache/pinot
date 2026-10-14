@@ -230,6 +230,16 @@ public class MultiStageIdSetSubqueryTest {
     _subqueryResponses.put(SUBQUERY, partialResponse);
     assertFails(handler, sql, QueryErrorCode.QUERY_EXECUTION,
         "Subquery returned a partial result [maxRowsInWindowReached]: " + SUBQUERY);
+    // A partial result that no known flag explains, e.g. a flag added later
+    BrokerResponseNativeV2 unexplainedPartialResponse = new BrokerResponseNativeV2() {
+      @Override
+      public boolean isPartialResult() {
+        return true;
+      }
+    };
+    unexplainedPartialResponse.setResultTable(new ResultTable(stringColumn(), List.<Object[]>of(new Object[]{ID_SET})));
+    _subqueryResponses.put(SUBQUERY, unexplainedPartialResponse);
+    assertFails(handler, sql, QueryErrorCode.QUERY_EXECUTION, "Subquery returned a partial result: " + SUBQUERY);
 
     _subqueryResponses.put(SUBQUERY, response(new DataSchema(new String[]{"a", "b"},
         new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.STRING}), List.of()));
@@ -332,6 +342,14 @@ public class MultiStageIdSetSubqueryTest {
     _subqueryResponses.put(correlatedSubquery, idSetResponse(ID_SET));
     String correlatedSql = "SELECT COUNT(*) FROM a WHERE IN_ID_SET(a.col1, " + correlatedSubquery + ") = 1";
     handleRequest(handler, correlatedSql, RequestUtils.parseQuery(correlatedSql));
+    assertNoSubqueryRan();
+
+    // An option that fails the subquery's validation also fails the query, which compiles the subquery in its plan
+    _requests.clear();
+    String invalidOptionSql = "SET inferPartitionHint = 'foo'; " + sql;
+    QueryException exception = expectThrows(QueryException.class,
+        () -> handleRequest(handler, invalidOptionSql, RequestUtils.parseQuery(invalidOptionSql)));
+    assertTrue(exception.getMessage().contains("inferPartitionHint"), exception.getMessage());
     assertNoSubqueryRan();
 
     // On its own, the subquery would read table b instead of the WITH item b
