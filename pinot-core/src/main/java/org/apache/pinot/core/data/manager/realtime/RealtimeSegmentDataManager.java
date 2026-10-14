@@ -1207,7 +1207,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   @Nullable
   protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit)
       throws SegmentBuildFailureException {
-    if (_parallelSegmentConsumptionPolicy.isAllowedDuringBuild()) {
+    // Not dedup: it removes a segment's keys when the mutable segment is offloaded, which is after the replace, so
+    // nothing it owns is rewritten while the build runs. An upsert revert is rewritten at the replace the build
+    // leads to, and the next consuming segment must not already be running against the key map by then.
+    if (_parallelSegmentConsumptionPolicy.isAllowedDuringBuild() && !revertsUpsertMetadata()) {
       closeStreamConsumerAndReleaseSemaphore();
     }
     // Do not allow building segment when table data manager is already shut down
