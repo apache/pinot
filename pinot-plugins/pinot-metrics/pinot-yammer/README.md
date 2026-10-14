@@ -43,10 +43,13 @@ removal release will be decided separately; see [#19871](https://github.com/apac
 3. Restart each affected service to load the new factory. Validate the migration in a test environment before
    rolling it out to production.
 
-The backends can differ in JMX object names and attributes, exported Prometheus metric names and labels, and
-timer/histogram units and distributions. Compare the exported metrics and update scrape rules, dashboards, and
-alerts as needed. Review custom Yammer reporters/listeners and explicit Yammer factory references in compound
-metrics configurations as part of the migration.
+The Dropwizard adapter preserves Yammer's JMX object names, attributes, and configured meter/timer units for
+Pinot metrics. The bundled JMX exporter rules can be reused with the existing Prometheus metric names and
+labels. Timer distributions and percentiles can still differ because the backends use different reservoirs;
+compare metric values and alerts when validating the migration.
+
+Custom reporters/listeners that depend on Yammer classes need Dropwizard-compatible implementations. Review
+explicit Yammer factory references in compound metrics configurations as part of the migration.
 
 To roll back while Yammer remains available, restore the previous factory setting (or remove the new setting
 if you previously relied on the Yammer default), then restart the affected services.

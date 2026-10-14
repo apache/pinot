@@ -40,7 +40,7 @@ public class DropwizardMetricsFactory implements PinotMetricsFactory {
 
   @Override
   public void init(PinotConfiguration metricsConfiguration) {
-    _domainName = metricsConfiguration.getProperty(DOMAIN_PROP, DEFAULT_DOMAIN_VALUE);
+    _domainName = metricsConfiguration.getProperty(DOMAIN_PROP);
   }
 
   @Override
