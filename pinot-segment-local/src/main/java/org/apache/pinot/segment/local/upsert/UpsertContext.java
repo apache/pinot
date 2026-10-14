@@ -26,7 +26,6 @@ import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
-import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -202,11 +201,8 @@ public class UpsertContext {
   /// during segment replacement after force commit. This happens when:
   /// - Partial upsert is enabled (records need to be merged with previous values)
   /// - dropOutOfOrderRecord is enabled with NONE consistency mode (records may have been dropped)
-  /// Pauseless tables are excluded: they consume while the previous segment is still building, so the upsert
-  /// metadata cannot be kept reconcilable across replicas.
   public boolean isTableTypeInconsistentDuringConsumption() {
-    return (_dropOutOfOrderRecord || _outOfOrderRecordColumn != null || _partialUpsertHandlerSupplier != null)
-        && !PauselessConsumptionUtils.isPauselessEnabled(_tableConfig);
+    return _dropOutOfOrderRecord || _outOfOrderRecordColumn != null || _partialUpsertHandlerSupplier != null;
   }
 
   @Override
