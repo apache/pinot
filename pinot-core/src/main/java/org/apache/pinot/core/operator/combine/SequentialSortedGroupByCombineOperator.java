@@ -137,6 +137,7 @@ public class SequentialSortedGroupByCombineOperator extends BaseSingleBlockCombi
         return blockToMerge;
       }
       GroupByResultsBlock groupByResultBlockToMerge = (GroupByResultsBlock) blockToMerge;
+      GroupByUtils.validateFullGroupingSetsLayout(groupByResultBlockToMerge, _queryContext);
       if (dataSchema == null) {
         dataSchema = groupByResultBlockToMerge.getDataSchema();
       }

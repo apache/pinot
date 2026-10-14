@@ -358,7 +358,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     ThreadSafeMutableRoaringBitmap snapshot = new ThreadSafeMutableRoaringBitmap();
     snapshot.add(0);
     snapshot.add(2);
-    segment2.persistDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME, snapshot.getBytesAndCardinality());
+    segment2.persistDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME, snapshot.getBytesAndCardinality(),
+        null);
 
     upsertMetadataManager.replaceSegment(segment2, segment1);
 
@@ -2691,6 +2692,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     ConsumingSegmentConsistencyModeListener consistencyModeListener =
         ConsumingSegmentConsistencyModeListener.getInstance();
     try {
+      // Set the mode explicitly rather than relying on the default, which this test is not about.
+      consistencyModeListener.setMode(ConsumingSegmentConsistencyModeListener.Mode.RESTRICTED);
       assertFalse(upsertMetadataManager.shouldRevertMetadataOnInconsistency(mutableSegment));
       consistencyModeListener.setMode(ConsumingSegmentConsistencyModeListener.Mode.PROTECTED);
       assertTrue(upsertMetadataManager.shouldRevertMetadataOnInconsistency(mutableSegment));

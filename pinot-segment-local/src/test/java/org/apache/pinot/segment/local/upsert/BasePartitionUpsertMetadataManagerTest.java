@@ -105,6 +105,59 @@ public class BasePartitionUpsertMetadataManagerTest {
   }
 
   @Test
+  public void testPersistedSnapshotDiagnosticsRetainCaptureContext()
+      throws IOException {
+    UpsertContext context = mock(UpsertContext.class);
+    when(context.isSnapshotEnabled()).thenReturn(true);
+    TableDataManager tableDataManager = mock(TableDataManager.class);
+    when(context.getTableDataManager()).thenReturn(tableDataManager);
+    Lock segmentLock = mock(Lock.class);
+    when(tableDataManager.getSegmentLock(anyString())).thenReturn(segmentLock);
+    when(segmentLock.tryLock()).thenReturn(true);
+    DummyPartitionUpsertMetadataManager manager = new DummyPartitionUpsertMetadataManager("myTable", 0, context);
+    setDeleteRecordColumn(manager, "deleted");
+    ImmutableSegmentImpl segment = createImmutableSegment("seg", new File(TEMP_DIR, "seg"), new ArrayList<>(), null);
+    ThreadSafeMutableRoaringBitmap valid = createDocIds(1, 2, 3);
+    segment.enableUpsert(manager, valid, createDocIds(1, 3));
+    manager.trackSegment(segment);
+    manager.markSegmentAsUpdated(segment);
+    manager.addRecord(mock(MutableSegmentImpl.class), mock(RecordInfo.class));
+
+    manager.takeSnapshot("myTable__0__2__0", "100");
+    DocIdsSnapshot first = segment.loadDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
+    DocIdsSnapshot queryable = segment.loadDocIdsSnapshot(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME);
+    assertEquals(first.metadata().snapshotConsumedUpToOffset(), "100");
+    assertEquals(queryable.metadata().snapshotConsumedUpToOffset(), "100");
+    assertEquals(first.metadata().docIdsType(), DocIdsSnapshot.DocIdsType.VALID_DOC_IDS);
+    assertEquals(queryable.metadata().docIdsType(), DocIdsSnapshot.DocIdsType.QUERYABLE_DOC_IDS);
+    assertNotEquals(first.metadata().docIdsCrc(), queryable.metadata().docIdsCrc());
+    assertEquals(first.docIds(), valid.getMutableRoaringBitmap());
+
+    // An unchanged segment keeps its saved timestamp and trigger, even if a newer consumer triggers a snapshot round.
+    manager.takeSnapshot("myTable__0__3__0", "200");
+    assertEquals(segment.loadDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME).metadata(), first.metadata());
+    valid.remove(2);
+    manager.markSegmentAsUpdated(segment);
+    when(segmentLock.tryLock()).thenReturn(false);
+    manager.takeSnapshot("myTable__0__3__0", "200");
+    assertEquals(segment.loadDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME).metadata(), first.metadata());
+
+    // Retrying publishes the new bitmap and its own trigger together.
+    when(segmentLock.tryLock()).thenReturn(true);
+    manager.takeSnapshot("myTable__0__4__0", "300");
+    DocIdsSnapshot retried = segment.loadDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
+    assertEquals(retried.metadata().snapshotConsumedUpToOffset(), "300");
+    assertEquals(retried.docIds(), valid.getMutableRoaringBitmap());
+    assertNotEquals(retried.metadata().docIdsCrc(), first.metadata().docIdsCrc());
+
+    // Shutdown or explicit snapshots without a consumer must not inherit an earlier startup's offset.
+    manager.markSegmentAsUpdated(segment);
+    manager.takeSnapshot();
+    assertNull(segment.loadDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME)
+        .metadata().snapshotConsumedUpToOffset());
+  }
+
+  @Test
   public void testTakeSnapshotInOrder()
       throws IOException {
     UpsertContext upsertContext = mock(UpsertContext.class);
@@ -1189,8 +1242,9 @@ public class BasePartitionUpsertMetadataManagerTest {
     when(meta.getName()).thenReturn(segName);
     when(meta.getIndexDir()).thenReturn(segDir);
     return new ImmutableSegmentImpl(mock(SegmentDirectory.class), meta, new HashMap<>(), null) {
+      @Override
       public void persistDocIdsSnapshot(String fileName,
-          ThreadSafeMutableRoaringBitmap.CardinalityAndBytes docIdsSnapshot)
+          ThreadSafeMutableRoaringBitmap.CardinalityAndBytes docIdsSnapshot, @Nullable DocIdsSnapshot.Metadata metadata)
           throws IOException {
         onPersist.run();
         if (V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME.equals(fileName)) {
@@ -1199,7 +1253,7 @@ public class BasePartitionUpsertMetadataManagerTest {
             && queryableDocIdsSegmentsTaken != null) {
           queryableDocIdsSegmentsTaken.add(segName);
         }
-        super.persistDocIdsSnapshot(fileName, docIdsSnapshot);
+        super.persistDocIdsSnapshot(fileName, docIdsSnapshot, metadata);
       }
     };
   }

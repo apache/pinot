@@ -241,6 +241,8 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
   ColumnDataType getFinalResultColumnType();
 
   /// Extracts the final result used in the broker response from the given intermediate result.
+  /// When final results are extracted for group-by sorting, preserve the intermediate information needed for
+  /// subsequent merging and final extraction.
   ///
   /// A `null` intermediate result means nothing was aggregated, and this method decides what that means for this
   /// particular aggregation. It is the only place where that per-function answer is expressed, so it must never
@@ -266,6 +268,16 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
   /// Returns whether a star-tree index with the specified properties can be used for this aggregation function.
   default boolean canUseStarTree(Map<String, Object> functionParameters) {
     // Implementations can override this method to perform additional checks on the function parameters
+    return true;
+  }
+
+  /// Returns whether intermediate results of DIFFERENT groups may be merged together. Most functions merge
+  /// intermediates commutatively regardless of which group produced them, but some are only mergeable across
+  /// SEGMENTS for the SAME group: e.g. SEGMENTPARTITIONEDDISTINCTCOUNT and partitioned FUNNELCOUNT keep a count
+  /// that is already final within one segment and one group, so merging two groups of the same segment
+  /// double-counts entities present in both. The grouping-sets base-aggregation derive merges base groups into
+  /// coarser grouping sets and must not be used for such functions.
+  default boolean canMergeIntermediatesAcrossGroups() {
     return true;
   }
 

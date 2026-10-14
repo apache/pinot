@@ -89,6 +89,11 @@ public interface PartitionUpsertMetadataManager extends Closeable {
   /// before a new consuming segment starts consuming.
   void takeSnapshot();
 
+  /// Takes a snapshot with the triggering consumer's startup context. Older implementations may ignore the context.
+  default void takeSnapshot(String consumingSegmentName, String consumedUpToOffset) {
+    takeSnapshot();
+  }
+
   /// Returns what the last finished snapshot pass covered, or null if no pass has finished yet.
   @Nullable
   default SnapshotPass getLastSnapshotPass() {

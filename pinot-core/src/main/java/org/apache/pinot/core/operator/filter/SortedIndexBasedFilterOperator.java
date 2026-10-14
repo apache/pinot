@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.ExplainAttributeBuilder;
@@ -92,20 +93,7 @@ public class SortedIndexBasedFilterOperator extends BaseColumnFilterOperator {
           return SortedDocIdSet.create(List.of(docIdRange));
         }
       } else {
-        // Merge adjacent docIdRanges (dictIds are already sorted)
-        List<IntPair> docIdRanges = new ArrayList<>();
-        IntPair lastDocIdRange = _sortedIndexReader.getDocIds(dictIds[0]);
-        for (int i = 1; i < numDictIds; i++) {
-          IntPair docIdRange = _sortedIndexReader.getDocIds(dictIds[i]);
-          // NOTE: docIdRange has inclusive start and end.
-          if (docIdRange.getLeft() == lastDocIdRange.getRight() + 1) {
-            lastDocIdRange.setRight(docIdRange.getRight());
-          } else {
-            docIdRanges.add(lastDocIdRange);
-            lastDocIdRange = docIdRange;
-          }
-        }
-        docIdRanges.add(lastDocIdRange);
+        List<IntPair> docIdRanges = getMergedDocIdRanges(dictIds);
 
         if (exclusive) {
           // Invert the docIdRanges
@@ -130,6 +118,24 @@ public class SortedIndexBasedFilterOperator extends BaseColumnFilterOperator {
         return SortedDocIdSet.create(docIdRanges);
       }
     }
+  }
+
+  /// Returns the document id ranges of the given dictionary ids, which must be sorted, with adjacent ranges merged.
+  private List<IntPair> getMergedDocIdRanges(int[] dictIds) {
+    List<IntPair> docIdRanges = new ArrayList<>();
+    IntPair lastDocIdRange = _sortedIndexReader.getDocIds(dictIds[0]);
+    for (int i = 1; i < dictIds.length; i++) {
+      IntPair docIdRange = _sortedIndexReader.getDocIds(dictIds[i]);
+      // NOTE: docIdRange has inclusive start and end.
+      if (docIdRange.getLeft() == lastDocIdRange.getRight() + 1) {
+        lastDocIdRange.setRight(docIdRange.getRight());
+      } else {
+        docIdRanges.add(lastDocIdRange);
+        lastDocIdRange = docIdRange;
+      }
+    }
+    docIdRanges.add(lastDocIdRange);
+    return docIdRanges;
   }
 
   @Override
@@ -195,7 +201,7 @@ public class SortedIndexBasedFilterOperator extends BaseColumnFilterOperator {
 
   @Override
   public BitmapCollection getBitmaps() {
-    MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
+    MutableRoaringBitmap bitmap;
     boolean exclusive = _predicateEvaluator.isExclusive();
     if (_predicateEvaluator instanceof SortedDictionaryBasedRangePredicateEvaluator) {
       // For RANGE predicate, use start/end document id to construct a new document id range
@@ -204,7 +210,7 @@ public class SortedIndexBasedFilterOperator extends BaseColumnFilterOperator {
       int startDocId = _sortedIndexReader.getDocIds(rangePredicateEvaluator.getStartDictId()).getLeft();
       // NOTE: End dictionary id is exclusive in OfflineDictionaryBasedRangePredicateEvaluator.
       int endDocId = _sortedIndexReader.getDocIds(rangePredicateEvaluator.getEndDictId() - 1).getRight();
-      bitmap.add(startDocId, endDocId + 1L);
+      bitmap = MutableRoaringBitmap.bitmapOfRange(startDocId, endDocId + 1L);
     } else {
       int[] dictIds =
           exclusive ? _predicateEvaluator.getNonMatchingDictIds() : _predicateEvaluator.getMatchingDictIds();
@@ -213,19 +219,9 @@ public class SortedIndexBasedFilterOperator extends BaseColumnFilterOperator {
       Preconditions.checkState(numDictIds > 0);
       if (numDictIds == 1) {
         IntPair docIdRange = _sortedIndexReader.getDocIds(dictIds[0]);
-        bitmap.add(docIdRange.getLeft(), docIdRange.getRight() + 1L);
+        bitmap = MutableRoaringBitmap.bitmapOfRange(docIdRange.getLeft(), docIdRange.getRight() + 1L);
       } else {
-        IntPair lastDocIdRange = _sortedIndexReader.getDocIds(dictIds[0]);
-        for (int i = 1; i < numDictIds; i++) {
-          IntPair docIdRange = _sortedIndexReader.getDocIds(dictIds[i]);
-          if (docIdRange.getLeft() == lastDocIdRange.getRight() + 1) {
-            lastDocIdRange.setRight(docIdRange.getRight());
-          } else {
-            bitmap.add(lastDocIdRange.getLeft(), lastDocIdRange.getRight() + 1L);
-            lastDocIdRange = docIdRange;
-          }
-        }
-        bitmap.add(lastDocIdRange.getLeft(), lastDocIdRange.getRight() + 1L);
+        bitmap = RoaringBitmapUtils.fromInclusiveRanges(getMergedDocIdRanges(dictIds));
       }
     }
     return new BitmapCollection(_numDocs, exclusive, bitmap).excludingNulls(getNullBitmap());

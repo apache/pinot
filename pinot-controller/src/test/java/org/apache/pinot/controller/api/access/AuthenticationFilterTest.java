@@ -19,12 +19,22 @@
 
 package org.apache.pinot.controller.api.access;
 
+import java.io.File;
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Stream;
+import javax.ws.rs.BeanParam;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
@@ -36,6 +46,7 @@ import org.apache.pinot.controller.api.resources.PinotControllerPeriodicTaskRest
 import org.apache.pinot.controller.api.resources.PinotInstanceRestletResource;
 import org.apache.pinot.controller.api.resources.PinotQueryResource;
 import org.apache.pinot.controller.api.resources.PinotTableRestletResource;
+import org.apache.pinot.controller.api.resources.PinotTaskRestletResource;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
@@ -49,7 +60,7 @@ public class AuthenticationFilterTest {
   private final AuthenticationFilter _authFilter = new AuthenticationFilter();
 
   @Test
-  public void testExtractTableNameWithTableNameInPathParams() {
+  public void testExtractTableNameWithTableNameInPathParams() throws Exception {
     MultivaluedMap<String, String> pathParams = new MultivaluedHashMap<>();
     MultivaluedMap<String, String> queryParams = new MultivaluedHashMap<>();
     pathParams.putSingle("tableName", "A");
@@ -58,11 +69,11 @@ public class AuthenticationFilterTest {
     queryParams.putSingle("tableName", "D");
     queryParams.putSingle("tableNameWithType", "E");
     queryParams.putSingle("schemaName", "F");
-    assertEquals(AuthenticationFilter.extractTableName(pathParams, queryParams), "A");
+    assertEquals(AuthenticationFilter.extractTableName(allTableQueryParamsMethod(), pathParams, queryParams), "A");
   }
 
   @Test
-  public void testExtractTableNameWithTableNameWithTypeInPathParams() {
+  public void testExtractTableNameWithTableNameWithTypeInPathParams() throws Exception {
     MultivaluedMap<String, String> pathParams = new MultivaluedHashMap<>();
     MultivaluedMap<String, String> queryParams = new MultivaluedHashMap<>();
     pathParams.putSingle("tableNameWithType", "B");
@@ -70,52 +81,58 @@ public class AuthenticationFilterTest {
     queryParams.putSingle("tableName", "D");
     queryParams.putSingle("tableNameWithType", "E");
     queryParams.putSingle("schemaName", "F");
-    assertEquals(AuthenticationFilter.extractTableName(pathParams, queryParams), "B");
+    assertEquals(AuthenticationFilter.extractTableName(allTableQueryParamsMethod(), pathParams, queryParams), "B");
   }
 
   @Test
-  public void testExtractTableNameWithSchemaNameInPathParams() {
+  public void testExtractTableNameWithSchemaNameInPathParams() throws Exception {
     MultivaluedMap<String, String> pathParams = new MultivaluedHashMap<>();
     MultivaluedMap<String, String> queryParams = new MultivaluedHashMap<>();
     pathParams.putSingle("schemaName", "C");
     queryParams.putSingle("tableName", "D");
     queryParams.putSingle("tableNameWithType", "E");
     queryParams.putSingle("schemaName", "F");
-    assertEquals(AuthenticationFilter.extractTableName(pathParams, queryParams), "C");
+    assertEquals(AuthenticationFilter.extractTableName(allTableQueryParamsMethod(), pathParams, queryParams), "C");
   }
 
   @Test
-  public void testExtractTableNameWithTableNameInQueryParams() {
+  public void testExtractTableNameWithTableNameInQueryParams() throws Exception {
     MultivaluedMap<String, String> pathParams = new MultivaluedHashMap<>();
     MultivaluedMap<String, String> queryParams = new MultivaluedHashMap<>();
     queryParams.putSingle("tableName", "D");
     queryParams.putSingle("tableNameWithType", "E");
     queryParams.putSingle("schemaName", "F");
-    assertEquals(AuthenticationFilter.extractTableName(pathParams, queryParams), "D");
+    assertEquals(AuthenticationFilter.extractTableName(allTableQueryParamsMethod(), pathParams, queryParams), "D");
   }
 
   @Test
-  public void testExtractTableNameWithTableNameWithTypeInQueryParams() {
+  public void testExtractTableNameWithTableNameWithTypeInQueryParams() throws Exception {
     MultivaluedMap<String, String> pathParams = new MultivaluedHashMap<>();
     MultivaluedMap<String, String> queryParams = new MultivaluedHashMap<>();
     queryParams.putSingle("tableNameWithType", "E");
     queryParams.putSingle("schemaName", "F");
-    assertEquals(AuthenticationFilter.extractTableName(pathParams, queryParams), "E");
+    assertEquals(AuthenticationFilter.extractTableName(allTableQueryParamsMethod(), pathParams, queryParams), "E");
   }
 
   @Test
-  public void testExtractTableNameWithSchemaNameInQueryParams() {
+  public void testExtractTableNameWithSchemaNameInQueryParams() throws Exception {
     MultivaluedMap<String, String> pathParams = new MultivaluedHashMap<>();
     MultivaluedMap<String, String> queryParams = new MultivaluedHashMap<>();
     queryParams.putSingle("schemaName", "F");
-    assertEquals(AuthenticationFilter.extractTableName(pathParams, queryParams), "F");
+    assertEquals(AuthenticationFilter.extractTableName(allTableQueryParamsMethod(), pathParams, queryParams), "F");
   }
 
   @Test
-  public void testExtractTableNameWithEmptyParams() {
+  public void testExtractTableNameWithEmptyParams() throws Exception {
     MultivaluedMap<String, String> pathParams = new MultivaluedHashMap<>();
     MultivaluedMap<String, String> queryParams = new MultivaluedHashMap<>();
-    assertNull(AuthenticationFilter.extractTableName(pathParams, queryParams));
+    assertNull(AuthenticationFilter.extractTableName(allTableQueryParamsMethod(), pathParams, queryParams));
+  }
+
+  private static Method allTableQueryParamsMethod()
+      throws Exception {
+    return AuthenticationFilterTest.class.getMethod("methodWithAllTableQueryParams", String.class, String.class,
+        String.class);
   }
 
   @Test
@@ -124,16 +141,24 @@ public class AuthenticationFilterTest {
     MultivaluedMap<String, String> queryParams = new MultivaluedHashMap<>();
     queryParams.putSingle("tableName", "A");
 
-    Method clusterMethod = AuthenticationFilterTest.class.getMethod("methodWithClusterAuthorization");
-    assertEquals(AuthenticationFilter.extractTableName(clusterMethod, pathParams, queryParams), "A");
+    // A cluster endpoint that declares a table query parameter is table-scoped when the caller supplies it.
+    Method clusterMethodWithTableParam =
+        AuthenticationFilterTest.class.getMethod("methodWithClusterAuthorizationAndTableParam", String.class);
+    assertEquals(AuthenticationFilter.extractTableName(clusterMethodWithTableParam, pathParams, queryParams), "A");
 
     queryParams.clear();
-    assertNull(AuthenticationFilter.extractTableName(clusterMethod, pathParams, queryParams));
+    assertNull(AuthenticationFilter.extractTableName(clusterMethodWithTableParam, pathParams, queryParams));
 
     queryParams.putSingle("tableName", "A");
 
-    Method tableMethod = AuthenticationFilterTest.class.getMethod("methodWithTableAuthorization");
+    Method tableMethod = AuthenticationFilterTest.class.getMethod("methodWithTableAuthorization", String.class);
     assertEquals(AuthenticationFilter.extractTableName(tableMethod, pathParams, queryParams), "A");
+
+    // The same rule applies to the annotated branch: an @Authorize paramName the endpoint never binds is not the
+    // caller's to supply, so it resolves no table and the request stays cluster-scoped.
+    Method unboundParamMethod =
+        AuthenticationFilterTest.class.getMethod("methodWithTableAuthorizationAndUnboundParam");
+    assertNull(AuthenticationFilter.extractTableName(unboundParamMethod, pathParams, queryParams));
 
     pathParams.putSingle("materializedViewTableName", "B");
     Method customTableParamMethod =
@@ -142,6 +167,95 @@ public class AuthenticationFilterTest {
 
     pathParams.remove("materializedViewTableName");
     assertNull(AuthenticationFilter.extractTableName(customTableParamMethod, pathParams, queryParams));
+  }
+
+  /// `@BeanParam` and methods with no parameter annotations declare no query params, so `?tableName=` must not
+  /// resolve a table. That pins the fail-closed direction if someone later widens `declaredQueryParams`.
+  @Test
+  public void testBeanParamAndUnannotatedMethodsFailClosed()
+      throws Exception {
+    MultivaluedMap<String, String> pathParams = new MultivaluedHashMap<>();
+    MultivaluedMap<String, String> queryParams = new MultivaluedHashMap<>();
+    queryParams.putSingle("tableName", "A");
+
+    Method beanParamMethod = AuthenticationFilterTest.class.getMethod("methodWithBeanParam", Object.class);
+    assertNull(AuthenticationFilter.extractTableName(beanParamMethod, pathParams, queryParams));
+
+    Method tableBeanParamMethod =
+        AuthenticationFilterTest.class.getMethod("methodWithTableAuthorizationAndBeanParam", Object.class);
+    assertNull(AuthenticationFilter.extractTableName(tableBeanParamMethod, pathParams, queryParams));
+
+    Method unannotatedMethod = AuthenticationFilterTest.class.getMethod("methodWithNoParameterAnnotations");
+    assertNull(AuthenticationFilter.extractTableName(unannotatedMethod, pathParams, queryParams));
+  }
+
+  /// A caller must not be able to make a cluster endpoint look table-scoped by appending a table query parameter the
+  /// endpoint never declared. `AccessControlUtils.validatePermission` picks the table-scoped or the cluster-wide check
+  /// based on whether a table name was resolved, so an undeclared parameter honored here would let a principal scoped
+  /// to one table pass the cluster check for every cluster endpoint.
+  @Test
+  public void testUndeclaredTableQueryParamDoesNotDowngradeClusterScope() throws Exception {
+    MultivaluedMap<String, String> pathParams = new MultivaluedHashMap<>();
+    MultivaluedMap<String, String> queryParams = new MultivaluedHashMap<>();
+
+    Method clusterMethod = AuthenticationFilterTest.class.getMethod("methodWithClusterAuthorization");
+    for (String key : List.of("tableName", "tableNameWithType", "schemaName")) {
+      queryParams.clear();
+      queryParams.putSingle(key, "A");
+      assertNull(AuthenticationFilter.extractTableName(clusterMethod, pathParams, queryParams),
+          "undeclared query parameter " + key + " must not resolve a table name");
+    }
+
+    // A cluster declaration stays authoritative even when its path includes a table filter.
+    queryParams.clear();
+    pathParams.putSingle("tableName", "A");
+    assertNull(AuthenticationFilter.extractTableName(clusterMethod, pathParams, queryParams));
+  }
+
+  @Test
+  public void testExplicitClusterTableScopeUsesPathAndQueryParameters() throws Exception {
+    Method method = AuthenticationFilterTest.class.getMethod("methodWithClusterAuthorizationAndTableParam",
+        String.class);
+    MultivaluedMap<String, String> pathParams = new MultivaluedHashMap<>();
+    MultivaluedMap<String, String> queryParams = new MultivaluedHashMap<>();
+    pathParams.putSingle("tableName", "pathTable");
+    queryParams.putSingle("tableName", "queryTable");
+    assertEquals(AuthenticationFilter.extractTableName(method, pathParams, queryParams), "pathTable");
+    pathParams.clear();
+    assertEquals(AuthenticationFilter.extractTableName(method, pathParams, queryParams), "queryTable");
+    queryParams.clear();
+    assertNull(AuthenticationFilter.extractTableName(method, pathParams, queryParams));
+  }
+
+  @Test
+  public void testTaskDebugFilterDoesNotGrantTableScope() {
+    Method method = Arrays.stream(PinotTaskRestletResource.class
+        .getDeclaredMethods()).filter(candidate -> candidate.getName().equals("getTaskDebugInfo"))
+        .findFirst().orElseThrow();
+    MultivaluedMap<String, String> queryParams = new MultivaluedHashMap<>();
+    queryParams.putSingle("tableName", "ownedTable_OFFLINE");
+    assertNull(AuthenticationFilter.extractTableName(method, new MultivaluedHashMap<>(), queryParams));
+  }
+
+  @Test
+  public void testDeclaredTableQueryParamScopesRequest() throws Exception {
+    MultivaluedMap<String, String> pathParams = new MultivaluedHashMap<>();
+    MultivaluedMap<String, String> queryParams = new MultivaluedHashMap<>();
+
+    Method typedTableParamMethod = AuthenticationFilterTest.class.getMethod(
+        "methodWithClusterAuthorizationAndTypedTableParam", String.class);
+    queryParams.putSingle("tableNameWithType", "A");
+    assertEquals(AuthenticationFilter.extractTableName(typedTableParamMethod, pathParams, queryParams), "A");
+
+    // Only the declared key counts, even when an undeclared one of higher precedence is also supplied.
+    queryParams.putSingle("tableName", "B");
+    assertEquals(AuthenticationFilter.extractTableName(typedTableParamMethod, pathParams, queryParams), "A");
+
+    Method schemaParamMethod =
+        AuthenticationFilterTest.class.getMethod("methodWithClusterAuthorizationAndSchemaParam", String.class);
+    queryParams.clear();
+    queryParams.putSingle("schemaName", "C");
+    assertEquals(AuthenticationFilter.extractTableName(schemaParamMethod, pathParams, queryParams), "C");
   }
 
   @Test
@@ -179,13 +293,100 @@ public class AuthenticationFilterTest {
 
   @Test
   public void testSegmentCompletionGetEndpointsDeclareCreateAccess() {
+    MultivaluedMap<String, String> pathParams = new MultivaluedHashMap<>();
+    MultivaluedMap<String, String> queryParams = new MultivaluedHashMap<>();
+    queryParams.putSingle("tableName", "someTable");
     for (String methodName : new String[]{"extendBuildTime", "segmentConsumed", "segmentStoppedConsuming",
         "segmentCommitStart", "reduceSegmentSize"}) {
       Method method = Arrays.stream(LLCSegmentCompletionHandlers.class.getDeclaredMethods())
           .filter(candidate -> candidate.getName().equals(methodName)).findFirst().orElseThrow();
       assertEquals(_authFilter.extractAccessType(method), AccessType.CREATE);
       assertEquals(method.getAnnotation(Authorize.class).action(), Actions.Cluster.COMMIT_SEGMENT);
+      // These callbacks name no table, so they take the cluster-wide check. That is why a table-scoped server token
+      // is denied and realtime commit stalls — the consequence documented on BaseBasicAuthAccessControl.
+      assertNull(AuthenticationFilter.extractTableName(method, pathParams, queryParams),
+          methodName + " must not resolve a table name");
     }
+  }
+
+  /// Guards the assumption stated on [org.apache.pinot.core.auth.FineGrainedAuthUtils#getDeclaredQueryParams]: a
+  /// table target's parameter must be bound as a `@PathParam` or a method-level `@QueryParam`. An endpoint binding it
+  /// via `@BeanParam` or field injection would resolve no table and hard-fail with 400 for every caller, admin
+  /// included. Cluster endpoints opting into table scope must also bind their `tableScopeParam`, otherwise a typo
+  /// would silently retain cluster-wide scope and deny table-scoped callers.
+  @Test
+  public void testAuthorizeTableParamsAreBoundOnTheMethod()
+      throws Exception {
+    List<Class<?>> resourceClasses = controllerResourceClasses();
+    assertTrue(resourceClasses.size() > 20, "expected to discover the controller resource classes, found "
+        + resourceClasses.size());
+    List<String> violations = new ArrayList<>();
+    for (Class<?> resourceClass : resourceClasses) {
+      for (Method method : resourceClass.getDeclaredMethods()) {
+        Authorize authorize = method.getAnnotation(Authorize.class);
+        if (authorize == null) {
+          continue;
+        }
+        String parameterName;
+        if (authorize.targetType() == TargetType.TABLE) {
+          parameterName = authorize.paramName();
+        } else if (authorize.targetType() == TargetType.CLUSTER && !authorize.tableScopeParam().isEmpty()) {
+          parameterName = authorize.tableScopeParam();
+        } else {
+          continue;
+        }
+        if (!bindsParameter(method, parameterName)) {
+          violations.add(resourceClass.getSimpleName() + "#" + method.getName() + " declares table parameter '"
+              + parameterName + "'");
+        }
+      }
+    }
+    assertTrue(violations.isEmpty(), "@Authorize table parameters must be bound as @PathParam or @QueryParam: "
+        + violations);
+  }
+
+  /// Loads every class in the controller's `api.resources` package from the compiled output, so the guard covers
+  /// endpoints added later without anyone having to remember to list them here.
+  private static List<Class<?>> controllerResourceClasses()
+      throws Exception {
+    String packageName = PinotTableRestletResource.class.getPackageName();
+    // Resolve through URI so a build path containing spaces or other escaped characters still works.
+    Path classesRoot = Path.of(
+        PinotTableRestletResource.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+    Path packageRoot = classesRoot.resolve(packageName.replace('.', '/'));
+    List<Class<?>> classes = new ArrayList<>();
+    // Walked recursively so sub-packages such as api.resources.ddl are covered as they are added.
+    try (Stream<Path> paths = Files.walk(packageRoot)) {
+      for (Path classFile : paths.filter(Files::isRegularFile).toList()) {
+        String fileName = classFile.getFileName().toString();
+        if (!fileName.endsWith(".class") || fileName.contains("$")) {
+          continue;
+        }
+        String relative = classesRoot.relativize(classFile).toString();
+        String className = relative.substring(0, relative.length() - ".class".length())
+            .replace(File.separatorChar, '.');
+        try {
+          classes.add(Class.forName(className));
+        } catch (ClassNotFoundException | NoClassDefFoundError e) {
+          // Not loadable in the test classpath; it cannot serve requests either.
+        }
+      }
+    }
+    return classes;
+  }
+
+  private static boolean bindsParameter(Method method, String parameterName) {
+    for (Annotation[] parameterAnnotations : method.getParameterAnnotations()) {
+      for (Annotation annotation : parameterAnnotations) {
+        if (annotation instanceof PathParam pathParam && pathParam.value().equals(parameterName)) {
+          return true;
+        }
+        if (annotation instanceof QueryParam queryParam && queryParam.value().equals(parameterName)) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   @Test
@@ -248,12 +449,50 @@ public class AuthenticationFilterTest {
   public void methodWithClusterAuthorization() {
   }
 
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.EXECUTE_TASK, tableScopeParam = "tableName")
+  public void methodWithClusterAuthorizationAndTableParam(@QueryParam("tableName") String tableName) {
+  }
+
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.INGEST_FILE,
+      tableScopeParam = "tableNameWithType")
+  public void methodWithClusterAuthorizationAndTypedTableParam(
+      @QueryParam("tableNameWithType") String tableNameWithType) {
+  }
+
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_SCHEMA, tableScopeParam = "schemaName")
+  public void methodWithClusterAuthorizationAndSchemaParam(@QueryParam("schemaName") String schemaName) {
+  }
+
+  /// Stands in for an endpoint that binds every table-identifying query parameter, so the precedence rules can be
+  /// exercised independently of the declaration filter.
+  public void methodWithAllTableQueryParams(@QueryParam("tableName") String tableName,
+      @QueryParam("tableNameWithType") String tableNameWithType, @QueryParam("schemaName") String schemaName) {
+  }
+
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_TABLE_CONFIG)
-  public void methodWithTableAuthorization() {
+  public void methodWithTableAuthorization(@QueryParam("tableName") String tableName) {
+  }
+
+  /// Declares a table target whose parameter the method never binds — a misannotation the resolution must fail closed
+  /// on rather than trust the caller for.
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_TABLE_CONFIG)
+  public void methodWithTableAuthorizationAndUnboundParam() {
   }
 
   @Authorize(targetType = TargetType.TABLE, paramName = "materializedViewTableName",
       action = Actions.Table.GET_TABLE_CONFIG)
   public void methodWithCustomTableParamAuthorization() {
+  }
+
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_CLUSTER_CONFIG)
+  public void methodWithBeanParam(@BeanParam Object bean) {
+  }
+
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_TABLE_CONFIG)
+  public void methodWithTableAuthorizationAndBeanParam(@BeanParam Object bean) {
+  }
+
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_CLUSTER_CONFIG)
+  public void methodWithNoParameterAnnotations() {
   }
 }
