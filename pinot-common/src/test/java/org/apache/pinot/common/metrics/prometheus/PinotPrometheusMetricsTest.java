@@ -102,6 +102,7 @@ public abstract class PinotPrometheusMetricsTest {
   @AfterClass
   public void cleanup() {
     _httpServer.close();
+    _pinotMetricsFactory.getPinotMetricsRegistry().shutdown();
   }
 
   /// Pinot currently uses the JMX->Prom exporter to export metrics to Prometheus. Normally, this runs as an agent in

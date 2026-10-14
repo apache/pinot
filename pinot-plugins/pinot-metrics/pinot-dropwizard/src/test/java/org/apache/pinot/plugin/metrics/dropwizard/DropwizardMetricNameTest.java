@@ -20,12 +20,28 @@
 package org.apache.pinot.plugin.metrics.dropwizard;
 
 import nl.jqno.equalsverifier.EqualsVerifier;
+import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
 
 
 public class DropwizardMetricNameTest {
   @Test
+  public void testMetricClassDoesNotChangeRegistryKey() {
+    String name = "pinot.compatibilityMetric";
+    DropwizardMetricName brokerName = new DropwizardMetricName(BrokerMetrics.class, name);
+    DropwizardMetricName serverName = new DropwizardMetricName(ServerMetrics.class, name);
+    assertEquals(brokerName, serverName);
+    assertEquals(brokerName, new DropwizardMetricName(name));
+    assertEquals(brokerName.hashCode(), serverName.hashCode());
+    assertEquals(brokerName.getMetricName(), name);
+    assertEquals(brokerName.toString(), name);
+  }
+
+  @Test
   public void testEqualsContract() {
-    EqualsVerifier.forClass(DropwizardMetricName.class).verify();
+    EqualsVerifier.forClass(DropwizardMetricName.class).withIgnoredFields("_metricClass").verify();
   }
 }

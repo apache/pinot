@@ -24,13 +24,23 @@ import org.apache.pinot.spi.metrics.PinotMetricName;
 
 public final class DropwizardMetricName implements PinotMetricName {
   private final String _metricName;
+  private final Class<?> _metricClass;
 
   public DropwizardMetricName(Class<?> klass, String name) {
-    this(name);
+    _metricName = name;
+    _metricClass = klass;
   }
 
   public DropwizardMetricName(String metricName) {
-    _metricName = metricName;
+    this(null, metricName);
+  }
+
+  String getGroup() {
+    return _metricClass == null ? DropwizardMetricsFactory.DEFAULT_DOMAIN_VALUE : _metricClass.getPackage().getName();
+  }
+
+  String getType() {
+    return _metricClass == null ? null : _metricClass.getSimpleName().replaceAll("\\$$", "");
   }
 
   @Override
