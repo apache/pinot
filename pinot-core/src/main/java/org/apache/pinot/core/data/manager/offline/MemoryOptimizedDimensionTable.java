@@ -97,6 +97,9 @@ public class MemoryOptimizedDimensionTable implements DimensionTable {
 
     PinotSegmentRecordReader recordReader = _recordReaders.get(readerIdx);
     recordReader.getRecord(docId, reuse);
+    for (String column : _primaryKeyColumns) {
+      reuse.putValue(column, new ByteArray((byte[]) reuse.getValue(column)));
+    }
     return reuse;
   }
 
