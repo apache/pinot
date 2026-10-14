@@ -73,6 +73,7 @@ import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.request.context.LiteralContext;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
@@ -2241,10 +2242,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
   /// Returns the dimension tables read by the `lookup()` calls in the given query.
   ///
-  /// `lookup()` names its dimension table with a string literal argument instead of the FROM clause, so the table is
+  /// `lookup()` names its dimension table with a literal argument instead of the FROM clause, so the table is
   /// absent from the query's data source and has to be collected explicitly for the table-level access checks to see
-  /// it. The names are returned exactly as written, which is how `LookupTransformFunction` resolves them on the
-  /// server, so the authorized table is always the one actually read.
+  /// it. Literal values use the same string conversion as `LookupTransformFunction` on the server, so numeric,
+  /// boolean and folded literals authorize the table that is actually read.
   @VisibleForTesting
   static Set<String> extractLookupTableNames(PinotQuery pinotQuery) {
     Set<String> lookupTableNames = new HashSet<>();
@@ -2275,8 +2276,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     if (LOOKUP_FUNCTION.equals(functionCall.getOperator()) && !operands.isEmpty()) {
       Literal tableName = operands.get(0).getLiteral();
       // A non-literal table name is rejected by LookupTransformFunction on the server
-      if (tableName != null && tableName.isSetStringValue()) {
-        lookupTableNames.add(tableName.getStringValue());
+      if (tableName != null) {
+        lookupTableNames.add(new LiteralContext(tableName).getStringValue());
       }
     }
     // Recurse regardless, so that a lookup() nested inside another lookup()'s join value is collected too

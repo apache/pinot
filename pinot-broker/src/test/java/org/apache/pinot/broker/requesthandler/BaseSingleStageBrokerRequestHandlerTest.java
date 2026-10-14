@@ -101,6 +101,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
 
 
 public class BaseSingleStageBrokerRequestHandlerTest {
@@ -1807,6 +1808,13 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     Assert.assertEquals(extractLookupTableNames(
             "SELECT lookup('dimA', 'c', 'pk', col) FROM tbl WHERE lookup('dimB', 'c', 'pk', col) = 'x'"),
         Set.of("dimA", "dimB"));
+  }
+
+  @Test
+  public void testExtractConvertedLookupTableNames() {
+    assertEquals(extractLookupTableNames("SELECT lookup(123, 'c', 'pk', col) FROM tbl"), Set.of("123"));
+    assertEquals(extractLookupTableNames("SELECT lookup(true, 'c', 'pk', col) FROM tbl"), Set.of("true"));
+    assertEquals(extractLookupTableNames("SELECT lookup(CAST('123' AS INT), 'c', 'pk', col) FROM tbl"), Set.of("123"));
   }
 
   private static Set<String> extractLookupTableNames(String sql) {
