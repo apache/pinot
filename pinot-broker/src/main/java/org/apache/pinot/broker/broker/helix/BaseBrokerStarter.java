@@ -585,8 +585,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
               _threadAccountant, multiClusterRoutingContext, workerManager, multiClusterWorkerManager,
               _serverRoutingStatsManager);
       MultiStageBrokerRequestHandler finalHandler = multiStageBrokerRequestHandler;
-      _routingManager.setServerReenableCallback(
-          serverInstance -> finalHandler.getQueryDispatcher().resetClientConnectionBackoff(serverInstance));
+      _routingManager.setServerEnabledCallback(
+          serverInstance -> finalHandler.getQueryDispatcher().onServerEnabled(serverInstance));
       // Lets an operator turn the proto segment list encoding on and off through cluster config, without a restart.
       _clusterConfigChangeHandler.registerClusterConfigChangeListener(
           multiStageBrokerRequestHandler.getQueryDispatcher());
