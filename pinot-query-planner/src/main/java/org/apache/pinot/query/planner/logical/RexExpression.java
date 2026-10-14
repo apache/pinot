@@ -22,6 +22,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.request.context.AggregateCallBinding;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 
 
@@ -108,6 +109,8 @@ public interface RexExpression {
     private final boolean _isDistinct;
     // whether the function should ignore nulls (relevant to certain window functions like LAST_VALUE).
     private final boolean _ignoreNulls;
+    @Nullable
+    private final AggregateCallBinding _aggregationBinding;
 
     public FunctionCall(ColumnDataType dataType, String functionName, List<RexExpression> functionOperands) {
       this(dataType, functionName, functionOperands, false, false);
@@ -115,11 +118,17 @@ public interface RexExpression {
 
     public FunctionCall(ColumnDataType dataType, String functionName, List<RexExpression> functionOperands,
         boolean isDistinct, boolean ignoreNulls) {
+      this(dataType, functionName, functionOperands, isDistinct, ignoreNulls, null);
+    }
+
+    public FunctionCall(ColumnDataType dataType, String functionName, List<RexExpression> functionOperands,
+        boolean isDistinct, boolean ignoreNulls, @Nullable AggregateCallBinding aggregationBinding) {
       _dataType = dataType;
       _functionName = functionName;
       _functionOperands = functionOperands;
       _isDistinct = isDistinct;
       _ignoreNulls = ignoreNulls;
+      _aggregationBinding = aggregationBinding;
     }
 
     public ColumnDataType getDataType() {
@@ -138,6 +147,11 @@ public interface RexExpression {
       return _isDistinct;
     }
 
+    @Nullable
+    public AggregateCallBinding getAggregationBinding() {
+      return _aggregationBinding;
+    }
+
     public boolean isIgnoreNulls() {
       return _ignoreNulls;
     }
@@ -153,12 +167,13 @@ public interface RexExpression {
       FunctionCall that = (FunctionCall) o;
       return _isDistinct == that._isDistinct && _ignoreNulls == that._ignoreNulls && _dataType == that._dataType
           && Objects.equals(_functionName, that._functionName)
-          && Objects.equals(_functionOperands, that._functionOperands);
+          && Objects.equals(_functionOperands, that._functionOperands)
+          && Objects.equals(_aggregationBinding, that._aggregationBinding);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(_dataType, _functionName, _functionOperands, _isDistinct, _ignoreNulls);
+      return Objects.hash(_dataType, _functionName, _functionOperands, _isDistinct, _ignoreNulls, _aggregationBinding);
     }
   }
 }

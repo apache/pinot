@@ -175,7 +175,11 @@ public class CalciteRexExpressionParser {
     }
     List<Expression> operands = convertRexNodes(childNodes, selectList);
     ParserUtils.validateFunction(canonicalName, operands);
-    return RequestUtils.getFunctionExpression(canonicalName, operands);
+    Expression expression = RequestUtils.getFunctionExpression(canonicalName, operands);
+    if (rexCall.getAggregationBinding() != null) {
+      expression.getFunctionCall().setAggregationBinding(rexCall.getAggregationBinding().toThrift());
+    }
+    return expression;
   }
 
   /// Helper method to flatten the operands for the AND expression.

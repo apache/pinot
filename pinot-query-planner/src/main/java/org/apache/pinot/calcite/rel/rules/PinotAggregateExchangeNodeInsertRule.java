@@ -64,7 +64,9 @@ import org.apache.pinot.calcite.rel.logical.PinotLogicalAggregate;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
 import org.apache.pinot.common.function.sql.PinotSqlAggFunction;
+import org.apache.pinot.common.request.context.AggregateCallBinding;
 import org.apache.pinot.query.QueryEnvironment;
+import org.apache.pinot.query.planner.logical.BoundAggregationFunction;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -518,7 +520,8 @@ public class PinotAggregateExchangeNodeInsertRule {
           }
         }
       }
-      aggCalls.add(buildAggCall(exchange, orgAggCall, rexList, aggColumnOffset, aggType, leafReturnFinalResult));
+      aggCalls.add(buildAggCall(exchange, orgAggCall, rexList, aggColumnOffset, aggType, leafReturnFinalResult,
+          PinotRuleUtils.bindAggregateCall(orgAggCall, input)));
     }
 
     return new PinotLogicalAggregate(aggRel, exchange, finalGroupSet, aggCalls, aggType, leafReturnFinalResult,
@@ -557,7 +560,8 @@ public class PinotAggregateExchangeNodeInsertRule {
           }
         }
       }
-      aggCalls.add(buildAggCall(input, orgAggCall, rexList, aggRel.getGroupCount(), aggType, leafReturnFinalResult));
+      aggCalls.add(buildAggCall(input, orgAggCall, rexList, aggRel.getGroupCount(), aggType, leafReturnFinalResult,
+          PinotRuleUtils.bindAggregateCall(orgAggCall, input)));
     }
     return aggCalls;
   }
@@ -566,7 +570,7 @@ public class PinotAggregateExchangeNodeInsertRule {
   //   - DISTINCT is resolved here
   //   - argList is replaced with rexList
   private static AggregateCall buildAggCall(RelNode input, AggregateCall orgAggCall, List<RexNode> rexList,
-      int numGroups, AggType aggType, boolean leafReturnFinalResult) {
+      int numGroups, AggType aggType, boolean leafReturnFinalResult, @Nullable AggregateCallBinding binding) {
     SqlAggFunction orgAggFunction = orgAggCall.getAggregation();
     String functionName = orgAggFunction.getName();
     SqlKind kind = orgAggFunction.getKind();
@@ -582,8 +586,11 @@ public class PinotAggregateExchangeNodeInsertRule {
     }
     SqlReturnTypeInference returnTypeInference = null;
     RelDataType returnType = null;
-    // Override the intermediate result type inference if it is provided
-    if (aggType.isOutputIntermediateFormat()) {
+    // Bound final types take precedence over legacy final-type overrides, including server-final leaf stages.
+    if (binding != null && (!aggType.isOutputIntermediateFormat() || leafReturnFinalResult)) {
+      returnType = PinotRuleUtils.getBoundReturnType(orgAggCall, input, binding);
+      returnTypeInference = ReturnTypes.explicit(returnType);
+    } else if (aggType.isOutputIntermediateFormat()) {
       AggregationFunctionType functionType = AggregationFunctionType.getAggregationFunctionType(functionName);
       returnTypeInference = leafReturnFinalResult ? functionType.getFinalReturnTypeInference()
           : functionType.getIntermediateReturnTypeInference();
@@ -596,8 +603,10 @@ public class PinotAggregateExchangeNodeInsertRule {
     }
     SqlOperandTypeChecker operandTypeChecker =
         aggType.isInputIntermediateFormat() ? OperandTypes.ANY : orgAggFunction.getOperandTypeChecker();
-    SqlAggFunction sqlAggFunction =
-        new PinotSqlAggFunction(functionName, kind, returnTypeInference, operandTypeChecker, functionCategory);
+    SqlAggFunction sqlAggFunction = binding == null
+        ? new PinotSqlAggFunction(functionName, kind, returnTypeInference, operandTypeChecker, functionCategory)
+        : new BoundAggregationFunction(functionName, kind, returnTypeInference, operandTypeChecker, functionCategory,
+            binding);
     return AggregateCall.create(sqlAggFunction, false, orgAggCall.isApproximate(), orgAggCall.ignoreNulls(), rexList,
         List.of(), aggType.isInputIntermediateFormat() ? -1 : orgAggCall.filterArg, orgAggCall.distinctKeys,
         orgAggCall.collation, numGroups, input, returnType, null);
