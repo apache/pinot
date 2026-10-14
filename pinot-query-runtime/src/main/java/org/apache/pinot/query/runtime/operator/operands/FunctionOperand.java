@@ -35,9 +35,9 @@ import org.apache.pinot.spi.annotations.FunctionVolatility;
 import org.apache.pinot.spi.utils.PinotDataType;
 
 
-/// Evaluates scalar function calls generated from [RexExpression]s. Immutable calls on literal arguments cache their
-/// result on first use, including null. Like [LiteralOperand], cached results are shared and must not be mutated.
-/// Instances are used by one operator chain and are not thread-safe.
+/// Evaluates scalar function calls generated from [RexExpression]s. Immutable and stable calls on literal arguments
+/// cache their result on first use, including null. Like [LiteralOperand], cached results are shared and must not be
+/// mutated. Instances are scoped to one query and operator chain and are not thread-safe.
 public class FunctionOperand implements TransformOperand {
   private final ColumnDataType _resultType;
   private final QueryFunctionInvoker _functionInvoker;
@@ -110,7 +110,7 @@ public class FunctionOperand implements TransformOperand {
       _operands.add(TransformOperandFactory.getTransformOperand(operand, dataSchema));
     }
     _reusableOperandHolder = new Object[numOperands];
-    _cacheable = functionInfo.getVolatility() == FunctionVolatility.IMMUTABLE
+    _cacheable = functionInfo.getVolatility() != FunctionVolatility.VOLATILE
         && _operands.stream().allMatch(LiteralOperand.class::isInstance);
   }
 

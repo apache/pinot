@@ -71,6 +71,7 @@ public class FunctionOperandTest {
   public Object[][] cacheableFunctions() {
     return new Object[][]{
         {"operandCacheIdentity", List.of(literal(7)), 7},
+        {"operandCacheStable", List.of(literal(7)), 7},
         {"operandCacheNonFoldable", List.of(literal(7)), 7},
         {"operandCacheVarargs", List.of(literal(3), literal(4)), 7},
         {"operandCacheZeroArgs", List.of(), 7}
@@ -103,23 +104,37 @@ public class FunctionOperandTest {
     assertEquals(INVOCATIONS.get()[0], 1, "A computed null must not mean uninitialized");
   }
 
-  @DataProvider
-  public Object[][] nonCacheableFunctions() {
-    return new Object[][]{{"operandCacheStable"}, {"operandCacheVolatile"}};
-  }
-
-  @Test(dataProvider = "nonCacheableFunctions")
-  public void testNonImmutableFunctionsAreNotCached(String name) {
-    FunctionOperand operand = operand(name, ColumnDataType.INT, List.of());
-    operand.apply(List.of(1));
-    operand.apply(List.of(2));
+  @Test
+  public void testStableCacheIsolation() {
+    FunctionOperand first = operand("operandCacheStable", ColumnDataType.INT, List.of(literal(7)));
+    FunctionOperand second = operand("operandCacheStable", ColumnDataType.INT, List.of(literal(7)));
+    assertEquals(INVOCATIONS.get()[0], 0);
+    assertEquals(first.apply(List.of(1)), 7);
+    assertEquals(first.apply(List.of(2)), 7);
+    assertEquals(INVOCATIONS.get()[0], 1);
+    assertEquals(second.apply(List.of(3)), 7);
+    assertEquals(second.apply(List.of(4)), 7);
+    assertEquals(INVOCATIONS.get()[0], 2, "Each operand must evaluate its own STABLE result");
+    assertEquals(first.apply(List.of(5)), 7);
     assertEquals(INVOCATIONS.get()[0], 2);
   }
 
   @Test
-  public void testColumnArgumentIsNotCached() {
-    FunctionOperand operand = operand("operandCacheIdentity", ColumnDataType.INT,
-        List.of(new RexExpression.InputRef(0)));
+  public void testVolatileFunctionIsNotCached() {
+    FunctionOperand operand = operand("operandCacheVolatile", ColumnDataType.INT, List.of());
+    assertEquals(operand.apply(List.of(1)), 1);
+    assertEquals(operand.apply(List.of(2)), 2);
+    assertEquals(INVOCATIONS.get()[0], 2);
+  }
+
+  @DataProvider
+  public Object[][] rowDependentFunctions() {
+    return new Object[][]{{"operandCacheIdentity"}, {"operandCacheStable"}};
+  }
+
+  @Test(dataProvider = "rowDependentFunctions")
+  public void testColumnArgumentIsNotCached(String name) {
+    FunctionOperand operand = operand(name, ColumnDataType.INT, List.of(new RexExpression.InputRef(0)));
     assertEquals(operand.apply(List.of(3)), 3);
     assertEquals(operand.apply(List.of(4)), 4);
     assertEquals(INVOCATIONS.get()[0], 2);
@@ -228,9 +243,9 @@ public class FunctionOperandTest {
   }
 
   @ScalarFunction(volatility = FunctionVolatility.STABLE)
-  public static int operandCacheStable() {
+  public static int operandCacheStable(int value) {
     INVOCATIONS.get()[0]++;
-    return 7;
+    return value;
   }
 
   @ScalarFunction(volatility = FunctionVolatility.VOLATILE)
