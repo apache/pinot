@@ -46,6 +46,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationD
 import org.apache.pinot.segment.local.segment.index.converter.SegmentV1V2ToV3FormatConverter;
 import org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
 import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
@@ -80,8 +81,10 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -274,13 +277,28 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     }
   }
 
+  /// Builds a segment whose own generation applies the schema given -- including any transform config in
+  /// `_ingestionConfig`, which is how a derived column is produced on the ingestion path rather than at load.
+  private void buildSegment(SegmentVersion segmentVersion, Schema schema)
+      throws Exception {
+    buildV1Segment(schema);
+    if (segmentVersion == SegmentVersion.v3) {
+      convertV1SegmentToV3();
+    }
+  }
+
   private void buildV1Segment()
+      throws Exception {
+    buildV1Segment(_schema);
+  }
+
+  private void buildV1Segment(Schema schema)
       throws Exception {
     FileUtils.deleteQuietly(TEMP_DIR);
 
     SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGeneratorConfigWithSchema(_avroFile, TEMP_DIR, RAW_TABLE_NAME, createTableConfig(),
-            _schema);
+            schema);
     config.setInstanceType(InstanceType.SERVER);
     config.setOutDir(TEMP_DIR.getPath());
     config.setSegmentName(SEGMENT_NAME);
@@ -2713,6 +2731,10 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
       ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);
       assertNotNull(columnMetadata, column + " must still be created");
       assertEquals(columnMetadata.getCardinality(), 1, column + " must hold a single default value");
+      // Its own default value, not one derived from a sibling that was itself defaulted: whichever member of the
+      // cycle is created second can see the first through the metadata written a moment ago.
+      assertEquals(columnMetadata.getMinValue(), _newColumnsSchema1.getFieldSpecFor(column).getDefaultNullValue(),
+          column + " must hold its own default value");
     }
   }
 
@@ -2781,5 +2803,167 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     validateIndexExists(StandardIndexes.dictionary(), NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME);
     validateIndexExists(StandardIndexes.inverted(), NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME);
     validateIndexDoesNotExist(StandardIndexes.forward(), NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME);
+  }
+
+  /// A chain must give the same answer whether it is built at ingestion or at load. Ingestion evaluates every
+  /// expression before anything is converted to its stored type, so an intermediate link that loses precision on
+  /// the way to disk -- `INT newIntSVDimension = divide(column1, 2)` -- must still hand the exact quotient to
+  /// `DOUBLE newDoubleMetric = plus(newIntSVDimension, 1)`. Reading the intermediate back from its index would
+  /// quietly give the truncated value instead.
+  @Test(dataProvider = "bothV1AndV3")
+  public void testChainedDerivedColumnsMatchIngestion(SegmentVersion segmentVersion)
+      throws Exception {
+    Schema schema = copyOfSchema(_schema);
+    schema.addField(_newColumnsSchema1.getFieldSpecFor(NEW_INT_SV_DIMENSION_COLUMN_NAME));
+    schema.addField(_newColumnsSchema1.getFieldSpecFor(NEW_DOUBLE_METRIC_COLUMN_NAME));
+    List<TransformConfig> transformConfigs =
+        List.of(new TransformConfig(NEW_DOUBLE_METRIC_COLUMN_NAME, "plus(newIntSVDimension, 1)"),
+            new TransformConfig(NEW_INT_SV_DIMENSION_COLUMN_NAME, "divide(column1, 2)"));
+
+    // The ingestion path: both columns are produced while the segment is generated.
+    _ingestionConfig.setTransformConfigs(transformConfigs);
+    buildSegment(segmentVersion, schema);
+    List<Object> ingestedIntermediate = readColumnValues(NEW_INT_SV_DIMENSION_COLUMN_NAME);
+    List<Object> ingestedDerived = readColumnValues(NEW_DOUBLE_METRIC_COLUMN_NAME);
+
+    // The load path: the same two columns, built by the default column handler on a segment that has neither.
+    _ingestionConfig.setTransformConfigs(null);
+    buildSegment(segmentVersion);
+    _ingestionConfig.setTransformConfigs(transformConfigs);
+    runPreProcessor(schema);
+
+    assertEquals(readColumnValues(NEW_INT_SV_DIMENSION_COLUMN_NAME), ingestedIntermediate);
+    assertEquals(readColumnValues(NEW_DOUBLE_METRIC_COLUMN_NAME), ingestedDerived);
+
+    // Guard against the comparison passing for the wrong reason: the two paths can only differ on a row whose
+    // quotient has a fractional part, so the data has to contain at least one.
+    boolean anyTruncated = false;
+    for (int i = 0; i < ingestedDerived.size(); i++) {
+      if ((Double) ingestedDerived.get(i) != (Integer) ingestedIntermediate.get(i) + 1.0) {
+        anyTruncated = true;
+        break;
+      }
+    }
+    assertTrue(anyTruncated, "Expected at least one row whose intermediate value is truncated on the way to disk");
+  }
+
+  /// Regenerating a source's forward index can change the metadata its reader has to work from. Here the encoding
+  /// flips from dictionary to raw in the very reload that derives from the column, so the metadata captured before
+  /// the rebuild would open raw bytes with a dictionary reader.
+  ///
+  /// v3 only: a v1 reload cannot remove a forward index, so the source never reaches the shape under test.
+  @Test
+  public void testDerivedColumnFromSourceRegeneratedWithNewEncoding()
+      throws Exception {
+    buildSegment(SegmentVersion.v3);
+
+    // First reload: take the forward index away from the source, keeping its dictionary and inverted index.
+    _invertedIndexColumns.add(COLUMN1_NAME);
+    _fieldConfigMap.put(COLUMN1_NAME,
+        new FieldConfig(COLUMN1_NAME, FieldConfig.EncodingType.DICTIONARY, List.of(), null,
+            Map.of(FieldConfig.FORWARD_INDEX_DISABLED, "true")));
+    runPreProcessor(_schema);
+    validateIndexDoesNotExist(StandardIndexes.forward(), COLUMN1_NAME);
+
+    SegmentMetadataImpl beforeMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    ColumnMetadata sourceMetadata = beforeMetadata.getColumnMetadataFor(COLUMN1_NAME);
+    assertTrue(sourceMetadata.hasDictionary());
+    int sourceMin = (Integer) sourceMetadata.getMinValue();
+    int sourceMax = (Integer) sourceMetadata.getMaxValue();
+
+    // Second reload: bring the forward index back as a raw one and derive from the column at the same time.
+    _fieldConfigMap.remove(COLUMN1_NAME);
+    _invertedIndexColumns.remove(COLUMN1_NAME);
+    _noDictionaryColumns.add(COLUMN1_NAME);
+    _ingestionConfig.setTransformConfigs(
+        List.of(new TransformConfig(NEW_INT_SV_DIMENSION_COLUMN_NAME, "plus(column1, 1)")));
+    runPreProcessor(_newColumnsSchema1);
+
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    ColumnMetadata derived = segmentMetadata.getColumnMetadataFor(NEW_INT_SV_DIMENSION_COLUMN_NAME);
+    assertEquals(derived.getMinValue(), sourceMin + 1);
+    assertEquals(derived.getMaxValue(), sourceMax + 1);
+    assertEquals(derived.getCardinality(), sourceMetadata.getCardinality());
+  }
+
+  /// A source whose own action is an update, not an add. Its values are only final once that update has run, so the
+  /// chain reading it has to be ordered after it -- otherwise the pre-update value is written into the chain for
+  /// good, and no later reload puts it right.
+  @Test(dataProvider = "bothV1AndV3")
+  public void testDerivedColumnOrderedAfterUpdatedSource(SegmentVersion segmentVersion)
+      throws Exception {
+    buildSegment(segmentVersion);
+
+    // First reload: the source is added, holding the default value its schema declares.
+    Schema firstSchema = new Schema();
+    firstSchema.setSchemaName(_schema.getSchemaName());
+    firstSchema.addField(new MetricFieldSpec(NEW_INT_METRIC_COLUMN_NAME, DataType.INT, 1));
+    runPreProcessor(firstSchema);
+    assertEquals(new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(NEW_INT_METRIC_COLUMN_NAME).getMinValue(), 1);
+
+    // Second reload: the source's default changes and a two-link chain reading it is added in the same run.
+    Schema secondSchema = new Schema();
+    secondSchema.setSchemaName(_schema.getSchemaName());
+    secondSchema.addField(new MetricFieldSpec(NEW_INT_METRIC_COLUMN_NAME, DataType.INT, 2));
+    secondSchema.addField(new DimensionFieldSpec(NEW_INT_SV_DIMENSION_COLUMN_NAME, DataType.INT, true));
+    secondSchema.addField(new MetricFieldSpec(NEW_LONG_METRIC_COLUMN_NAME, DataType.LONG, 0L));
+    _ingestionConfig.setTransformConfigs(
+        List.of(new TransformConfig(NEW_LONG_METRIC_COLUMN_NAME, "plus(newIntSVDimension, 1)"),
+            new TransformConfig(NEW_INT_SV_DIMENSION_COLUMN_NAME, "plus(newIntMetric, 1)")));
+    runPreProcessor(secondSchema);
+
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    assertEquals(segmentMetadata.getColumnMetadataFor(NEW_INT_METRIC_COLUMN_NAME).getMinValue(), 2);
+    assertEquals(segmentMetadata.getColumnMetadataFor(NEW_INT_SV_DIMENSION_COLUMN_NAME).getMinValue(), 3);
+    assertEquals(segmentMetadata.getColumnMetadataFor(NEW_LONG_METRIC_COLUMN_NAME).getMinValue(), 4L);
+  }
+
+  /// A derived column reading a plain multi-value default column that is added in the same reload with its forward
+  /// index disabled. That source has a dictionary and an inverted index but no forward index, and it exists only in
+  /// the metadata properties written a moment ago -- the segment directory's own metadata does not list it yet.
+  ///
+  /// v3 only: regenerating a forward index writes the index file and then registers it under the same path on a v1
+  /// segment, so the rebuild cannot run there at all and the derived column falls back to its default value.
+  @Test
+  public void testDerivedColumnFromForwardIndexDisabledColumnAddedInSameReload()
+      throws Exception {
+    buildSegment(SegmentVersion.v3);
+
+    // A default value of its own, so a derived column that fell back to ITS default would be visibly different.
+    Schema schema = copyOfSchema(_newColumnsSchema1);
+    schema.getFieldSpecFor(NEW_STRING_MV_DIMENSION_COLUMN_NAME).setDefaultNullValue("mvDefault");
+
+    _invertedIndexColumns.add(NEW_STRING_MV_DIMENSION_COLUMN_NAME);
+    _fieldConfigMap.put(NEW_STRING_MV_DIMENSION_COLUMN_NAME,
+        new FieldConfig(NEW_STRING_MV_DIMENSION_COLUMN_NAME, FieldConfig.EncodingType.DICTIONARY, List.of(), null,
+            Map.of(FieldConfig.FORWARD_INDEX_DISABLED, "true")));
+    _ingestionConfig.setTransformConfigs(List.of(new TransformConfig(NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME,
+        "arrayElementAtString(newStringMVDimension, 1)")));
+    runPreProcessor(schema);
+
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    ColumnMetadata derived = segmentMetadata.getColumnMetadataFor(NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME);
+    assertTrue(derived.isAutoGenerated());
+    assertEquals(derived.getMinValue(), "mvDefault");
+  }
+
+  /// A deep copy, so a test can change a default value without the schema fields -- read once in the constructor --
+  /// carrying that change into every test that runs after it.
+  private static Schema copyOfSchema(Schema schema)
+      throws IOException {
+    return Schema.fromString(schema.toSingleLineJsonString());
+  }
+
+  private static List<Object> readColumnValues(String column)
+      throws Exception {
+    List<Object> values = new ArrayList<>();
+    try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader(INDEX_DIR)) {
+      GenericRow reuse = new GenericRow();
+      while (recordReader.hasNext()) {
+        reuse.clear();
+        values.add(recordReader.next(reuse).getValue(column));
+      }
+    }
+    return values;
   }
 }

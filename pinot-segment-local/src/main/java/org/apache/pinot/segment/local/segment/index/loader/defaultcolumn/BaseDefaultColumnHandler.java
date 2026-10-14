@@ -34,6 +34,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.IntFunction;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
@@ -160,6 +161,18 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
   /// derived column (chained derived columns).
   private final Map<String, ColumnMetadata> _createdColumnMetadata = new HashMap<>();
 
+  /// Values a derived column produced in this run, as the transform function returned them -- before they were
+  /// converted to the column's stored type. Another column in the same chain reads these rather than the index that
+  /// was just written, because ingestion evaluates the whole chain on the raw expression results and converts only
+  /// at the end: with `a = 1`, `INT b = divide(a, 2)` stores 0, yet `DOUBLE c = plus(b, 1)` must still see 0.5 and
+  /// store 1.5. Only kept for the columns a transform function actually reads, and dropped at the end of the run.
+  private final Map<String, Object[]> _createdColumnValues = new HashMap<>();
+
+  /// Columns that sit in a transform-function dependency cycle. No order can satisfy them, so each one is created
+  /// from its default value instead of its transform function -- every member of the cycle, not only the first one
+  /// the traversal happens to reach.
+  private final Set<String> _cyclicColumns = new HashSet<>();
+
   /// Source columns whose forward index was regenerated purely so a derived column could read them. Dropped once
   /// every default column has been created, restoring the forward-index-disabled shape the config asks for.
   private final Set<String> _tmpForwardIndexColumns = new LinkedHashSet<>();
@@ -227,6 +240,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       }
     } finally {
       removeTemporaryForwardIndexes();
+      _createdColumnValues.clear();
     }
 
     // Update the segment metadata.
@@ -428,14 +442,30 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       throws Exception {
     boolean errorOnFailure = _indexLoadingConfig.isErrorOnColumnBuildFailure();
     TransformConfig transformConfig = getTransformConfig(column);
+    if (transformConfig != null && _cyclicColumns.contains(column)) {
+      // No order satisfies a cycle, so every column in it takes the default value rather than deriving from a
+      // sibling that was itself defaulted.
+      LOGGER.warn("Assigning default value to derived column: {} because it is part of a transform function "
+          + "dependency cycle", column);
+      createDefaultValueColumnV1Indices(column);
+      recordCreatedColumnMetadata(column);
+      return true;
+    }
     if (transformConfig != null) {
       String transformFunction = transformConfig.getTransformFunction();
       FunctionEvaluator functionEvaluator = getFunctionEvaluator(column, transformFunction);
 
       // Check if all arguments can be read from the segment
       List<String> arguments = functionEvaluator.getArguments();
-      List<ColumnMetadata> argumentsMetadata = new ArrayList<>(arguments.size());
+      List<DerivedColumnArgument> argumentSources = new ArrayList<>(arguments.size());
       for (String argument : arguments) {
+        Object[] createdValues = _createdColumnValues.get(argument);
+        if (createdValues != null) {
+          // Derived earlier in this same run: use the expression results it produced, not the converted values its
+          // index now holds, so the chain matches what ingestion would have computed.
+          argumentSources.add(DerivedColumnArgument.ofValues(createdValues));
+          continue;
+        }
         ColumnMetadata columnMetadata = getColumnMetadata(argument);
         if (columnMetadata == null) {
           LOGGER.warn("Assigning default value to derived column: {} because argument: {} does not exist in the "
@@ -445,8 +475,10 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           return true;
         }
         // The values are read through the argument's forward index. When the argument has it disabled, regenerate
-        // it from the dictionary and inverted index for the duration of this run.
-        if (!materializeSourceForwardIndex(argument)) {
+        // it from the dictionary and inverted index for the duration of this run. Regeneration can change the
+        // metadata the reader needs, so take the refreshed copy it returns.
+        columnMetadata = materializeSourceForwardIndex(argument, columnMetadata);
+        if (columnMetadata == null) {
           // Regeneration needs the argument's dictionary and inverted index; without them the only way to get the
           // values back is a refresh or back-fill. This used to be an unconditional failure, so keep failing when
           // the table asks for it, and otherwise degrade the way a missing argument already does.
@@ -462,14 +494,14 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           recordCreatedColumnMetadata(column);
           return true;
         }
-        argumentsMetadata.add(columnMetadata);
+        argumentSources.add(DerivedColumnArgument.ofColumn(columnMetadata));
       }
 
       try {
         // A forward-index-disabled derived column is built with its forward index like any other; ForwardIndexHandler
         // queues DISABLE_FORWARD_INDEX for it right after this handler and drops the index in its post-update
         // cleanup, once every handler that needs it (the inverted index, above all) has read it.
-        createDerivedColumnV1Indices(column, functionEvaluator, argumentsMetadata, errorOnFailure);
+        createDerivedColumnV1Indices(column, functionEvaluator, argumentSources, errorOnFailure);
         recordCreatedColumnMetadata(column);
         return true;
       } catch (Exception e) {
@@ -580,13 +612,22 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
 
   /// Helper method to create the V1 indices (dictionary and forward index) for a column with derived values.
   private void createDerivedColumnV1Indices(String column, FunctionEvaluator functionEvaluator,
-      List<ColumnMetadata> argumentsMetadata, boolean errorOnFailure)
+      List<DerivedColumnArgument> argumentSources, boolean errorOnFailure)
       throws Exception {
-    // Initialize value readers for all arguments
-    int numArguments = argumentsMetadata.size();
+    // Initialize value readers for the arguments that are read from the segment. An argument derived earlier in this
+    // same run is served from the values it produced instead (see _createdColumnValues).
+    int numArguments = argumentSources.size();
     List<ValueReader> valueReaders = new ArrayList<>(numArguments);
-    for (ColumnMetadata argumentMetadata : argumentsMetadata) {
-      valueReaders.add(new ValueReader(argumentMetadata));
+    List<IntFunction<Object>> argumentValues = new ArrayList<>(numArguments);
+    for (DerivedColumnArgument argumentSource : argumentSources) {
+      Object[] values = argumentSource.getValues();
+      if (values != null) {
+        argumentValues.add(docId -> values[docId]);
+      } else {
+        ValueReader valueReader = new ValueReader(argumentSource.getColumnMetadata());
+        valueReaders.add(valueReader);
+        argumentValues.add(valueReader::getValue);
+      }
     }
 
     FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
@@ -608,7 +649,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       PinotDataType outputValueType = null;
       for (int i = 0; i < numDocs; i++) {
         for (int j = 0; j < numArguments; j++) {
-          inputValues[j] = valueReaders.get(j).getValue(i);
+          inputValues[j] = argumentValues.get(j).apply(i);
         }
 
         Object outputValue = null;
@@ -650,6 +691,10 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       if (nullValueVectorCreator != null) {
         nullValueVectorCreator.seal();
       }
+
+      // Take the untouched expression results aside before the switch below converts them in place to the stored
+      // type, so the rest of the chain sees what ingestion would have given it.
+      Object[] expressionValues = copyValuesForChain(column, outputValues);
 
       FieldIndexConfigs fieldIndexConfigs = _indexLoadingConfig.getFieldIndexConfig(column);
       DictionaryIndexConfig dictionaryIndexConfig =
@@ -807,6 +852,10 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             useVarLengthDictionary);
       } else {
         createDerivedColumnForwardIndexWithoutDictionary(column, fieldSpec, outputValues, statsCollector);
+      }
+      // Only once the column exists: a column that failed to be created must not feed the rest of the chain.
+      if (expressionValues != null) {
+        _createdColumnValues.put(column, expressionValues);
       }
     } finally {
       for (ValueReader valueReader : valueReaders) {
@@ -1276,14 +1325,16 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
   private Map<String, DefaultColumnAction> orderByDependencies(Map<String, DefaultColumnAction> actionMap) {
     Map<String, List<String>> dependencies = new HashMap<>();
     for (Map.Entry<String, DefaultColumnAction> entry : actionMap.entrySet()) {
-      if (entry.getValue().isAddAction()) {
+      if (!entry.getValue().isRemoveAction()) {
         List<String> arguments = derivedColumnArguments(entry.getKey());
         if (arguments != null) {
           List<String> pending = new ArrayList<>(arguments.size());
           for (String argument : arguments) {
-            // Only columns created in this run constrain the order; anything already in the segment is readable.
+            // Only columns written in this run constrain the order; anything already in its final shape is readable.
+            // An updated argument counts as much as an added one: its values are only correct once its own action has
+            // run, so reading it earlier would bake the pre-update values into the derived column for good.
             DefaultColumnAction argumentAction = actionMap.get(argument);
-            if (argumentAction != null && argumentAction.isAddAction() && !argument.equals(entry.getKey())) {
+            if (argumentAction != null && !argumentAction.isRemoveAction() && !argument.equals(entry.getKey())) {
               pending.add(argument);
             }
           }
@@ -1315,8 +1366,20 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       return;
     }
     if (!visiting.add(column)) {
+      // The cycle is the tail of the traversal from this column onwards. Every one of its members has to be recorded:
+      // emitting them in any order leaves one reading a sibling that was itself defaulted, which would silently
+      // derive a value from a default instead of taking the documented fallback.
+      List<String> cycle = new ArrayList<>();
+      boolean inCycle = false;
+      for (String visited : visiting) {
+        inCycle |= visited.equals(column);
+        if (inCycle) {
+          cycle.add(visited);
+        }
+      }
       LOGGER.warn("Derived columns form a dependency cycle: {}. They will be assigned default values instead of "
-          + "being derived; break the cycle in the transform configs.", visiting);
+          + "being derived; break the cycle in the transform configs.", cycle);
+      _cyclicColumns.addAll(cycle);
       return;
     }
     try {
@@ -1414,19 +1477,35 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     }
   }
 
+  /// A copy of the values a derived column produced, to hand to a column later in the chain (see
+  /// [#_createdColumnValues]), or null when no transform function reads this column and nothing would ever look at
+  /// the copy. The caller converts the original array in place, which is why this is taken before that happens.
+  @Nullable
+  private Object[] copyValuesForChain(String column, Object[] outputValues) {
+    if (_transformConfigsByColumn == null) {
+      buildTransformConfigIndex();
+    }
+    return _derivedColumnArgumentNames.contains(column) ? Arrays.copyOf(outputValues, outputValues.length) : null;
+  }
+
   /// Makes a forward index available for a source column that has it disabled, by regenerating it from the
   /// dictionary and inverted index. The regenerated index is temporary: [#removeTemporaryForwardIndexes] drops it
   /// once every default column is created, so the column keeps the shape its config asks for.
   ///
-  /// Returns false when regeneration is not possible -- no segment directory (the metadata-only path), or the
+  /// Returns the metadata to read the column with -- `columnMetadata` when the forward index was already there, and
+  /// a refreshed copy when it was rebuilt, since the rebuild can change the encoding and the entry count the reader
+  /// derives its offsets from.
+  ///
+  /// Returns null when regeneration is not possible -- no segment directory (the metadata-only path), or the
   /// dictionary / inverted index the rebuild needs is missing. The caller then falls back to the default value
   /// rather than failing the load.
-  private boolean materializeSourceForwardIndex(String column) {
+  @Nullable
+  private ColumnMetadata materializeSourceForwardIndex(String column, ColumnMetadata columnMetadata) {
     if (_segmentWriter.hasIndexFor(column, StandardIndexes.forward())) {
-      return true;
+      return columnMetadata;
     }
     if (_segmentDirectory == null) {
-      return false;
+      return null;
     }
     if (!_segmentWriter.hasIndexFor(column, StandardIndexes.dictionary())
         || !_segmentWriter.hasIndexFor(column, StandardIndexes.inverted())) {
@@ -1434,11 +1513,11 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           + "({}) and an inverted index ({})", column,
           _segmentWriter.hasIndexFor(column, StandardIndexes.dictionary()) ? "present" : "missing",
           _segmentWriter.hasIndexFor(column, StandardIndexes.inverted()) ? "present" : "missing");
-      return false;
+      return null;
     }
     FieldIndexConfigs fieldIndexConfigs = _indexLoadingConfig.getFieldIndexConfig(column);
     if (fieldIndexConfigs == null) {
-      return false;
+      return null;
     }
     try {
       LOGGER.info("Temporarily regenerating the forward index of forward-index-disabled column: {} so a derived "
@@ -1449,20 +1528,42 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       if (_segmentProperties != null) {
         SegmentMetadataUtils.savePropertiesConfiguration(_segmentProperties, _segmentMetadata.getIndexDir());
       }
+      // A column created earlier in this run is not in the segment directory's metadata -- it only exists in the
+      // properties just flushed -- so hand the creator the metadata we already hold instead of letting it look up
+      // one that is not there.
       new InvertedIndexAndDictionaryBasedForwardIndexCreator(_segmentDirectory, _segmentWriter, _tableConfig, column,
-          fieldIndexConfigs, true).regenerateForwardIndex();
+          fieldIndexConfigs, true, columnMetadata).regenerateForwardIndex();
       if (_segmentProperties != null) {
         _segmentProperties = SegmentMetadataUtils.getPropertiesConfiguration(_segmentMetadata);
       }
     } catch (Exception e) {
       LOGGER.warn("Failed to regenerate the forward index of column: {}", column, e);
-      return false;
+      return null;
     }
     if (!_segmentWriter.hasIndexFor(column, StandardIndexes.forward())) {
-      return false;
+      return null;
     }
     _tmpForwardIndexColumns.add(column);
-    return true;
+    return refreshColumnMetadata(column, columnMetadata);
+  }
+
+  /// Re-reads a column's metadata after its forward index was regenerated. The rebuild rewrites the properties the
+  /// readers work from -- the encoding flips when a raw index is restored, and `TOTAL_NUMBER_OF_ENTRIES` shrinks
+  /// when a disabled multi-value source held duplicates within a row -- so the copy taken beforehand would compute
+  /// the wrong offsets. Falls back to that copy when the re-read fails, which leaves the previous behaviour.
+  private ColumnMetadata refreshColumnMetadata(String column, ColumnMetadata previous) {
+    if (_segmentProperties == null) {
+      return previous;
+    }
+    try {
+      ColumnMetadata refreshed =
+          ColumnMetadataImpl.fromPropertiesConfiguration(_segmentProperties, _segmentMetadata.getTotalDocs(), column);
+      _createdColumnMetadata.computeIfPresent(column, (k, v) -> refreshed);
+      return refreshed;
+    } catch (Exception e) {
+      LOGGER.warn("Could not re-read the metadata of column: {} after regenerating its forward index", column, e);
+      return previous;
+    }
   }
 
   /// Drops the forward indexes regenerated by [#materializeSourceForwardIndex]. Mirrors
@@ -1476,6 +1577,35 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       }
     }
     _tmpForwardIndexColumns.clear();
+  }
+
+  /// Where one argument of a transform function gets its values from: a column in the segment, read through its
+  /// forward index, or the results a derived column produced earlier in this same run.
+  private static class DerivedColumnArgument {
+    private final ColumnMetadata _columnMetadata;
+    private final Object[] _values;
+
+    private DerivedColumnArgument(@Nullable ColumnMetadata columnMetadata, @Nullable Object[] values) {
+      _columnMetadata = columnMetadata;
+      _values = values;
+    }
+
+    static DerivedColumnArgument ofColumn(ColumnMetadata columnMetadata) {
+      return new DerivedColumnArgument(columnMetadata, null);
+    }
+
+    static DerivedColumnArgument ofValues(Object[] values) {
+      return new DerivedColumnArgument(null, values);
+    }
+
+    ColumnMetadata getColumnMetadata() {
+      return _columnMetadata;
+    }
+
+    @Nullable
+    Object[] getValues() {
+      return _values;
+    }
   }
 
   @SuppressWarnings("rawtypes")
