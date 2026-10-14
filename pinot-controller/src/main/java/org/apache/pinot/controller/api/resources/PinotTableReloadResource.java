@@ -77,6 +77,10 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 @Path("/")
 public class PinotTableReloadResource {
   private static final Logger LOG = LoggerFactory.getLogger(PinotTableReloadResource.class);
+  private static final String ONLY_IF_NEEDED_DESCRIPTION = "Reload only the segments whose loaded copy is out of "
+      + "date (CRC changed, tier changed, or index/schema preprocessing needed); up-to-date segments are skipped and "
+      + "counted as successful. Changes that only apply at load time still require a full reload. Ignored when "
+      + "forceDownload is true";
 
   private final PinotTableReloadService _service;
   private final PinotTableReloadStatusReporter _statusReporter;
@@ -106,9 +110,11 @@ public class PinotTableReloadResource {
       @PathParam("segmentName") @Encoded String segmentName,
       @ApiParam(value = "Force server to re-download segment from deep store", defaultValue = "false")
       @QueryParam("forceDownload") @DefaultValue("false") boolean forceDownload,
+      @ApiParam(value = ONLY_IF_NEEDED_DESCRIPTION, defaultValue = "false")
+      @QueryParam("onlyIfNeeded") @DefaultValue("false") boolean onlyIfNeeded,
       @ApiParam(value = "Target specific server instance") @QueryParam("targetInstance") @Nullable
       String targetInstance, @Context HttpHeaders headers) {
-    return _service.reloadSegment(tableName, segmentName, forceDownload, targetInstance, headers);
+    return _service.reloadSegment(tableName, segmentName, forceDownload, onlyIfNeeded, targetInstance, headers);
   }
 
   @POST
@@ -133,6 +139,8 @@ public class PinotTableReloadResource {
       String tableTypeStr,
       @ApiParam(value = "Force server to re-download segments from deep store", defaultValue = "false")
       @QueryParam("forceDownload") @DefaultValue("false") boolean forceDownload,
+      @ApiParam(value = ONLY_IF_NEEDED_DESCRIPTION, defaultValue = "false")
+      @QueryParam("onlyIfNeeded") @DefaultValue("false") boolean onlyIfNeeded,
       @ApiParam(value = "Start timestamp (inclusive) in milliseconds. Omit for an unbounded lower bound.")
       @QueryParam("startTimestamp") String startTimestampStr,
       @ApiParam(value = "End timestamp (exclusive) in milliseconds. Omit for an unbounded upper bound.")
@@ -144,7 +152,7 @@ public class PinotTableReloadResource {
       @ApiParam(value = "JSON map of instance to segment lists (overrides targetInstance)")
       @QueryParam("instanceToSegmentsMap") @Nullable String instanceToSegmentsMapInJson, @Context HttpHeaders headers)
       throws IOException {
-    return _service.reloadAllSegments(tableName, tableTypeStr, forceDownload, targetInstance,
+    return _service.reloadAllSegments(tableName, tableTypeStr, forceDownload, onlyIfNeeded, targetInstance,
         instanceToSegmentsMapInJson, startTimestampStr, endTimestampStr, excludeOverlapping, headers);
   }
 

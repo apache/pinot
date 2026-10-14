@@ -133,6 +133,17 @@ public class ServerReloadJobStatusCache implements PinotClusterConfigChangeListe
     }
   }
 
+  /// Records segments that an only-if-needed reload skipped because their loaded copy was already up to date.
+  ///
+  /// @param jobId reload job ID (UUID)
+  /// @param numSkippedSegments number of skipped segments
+  public void recordSkipped(String jobId, int numSkippedSegments) {
+    requireNonNull(jobId, "jobId cannot be null");
+    if (numSkippedSegments > 0) {
+      getOrCreate(jobId).addAndGetSkippedCount(numSkippedSegments);
+    }
+  }
+
   /// Rebuilds the cache with new configuration and migrates existing entries.
   /// This method is synchronized to prevent concurrent rebuilds.
   ///

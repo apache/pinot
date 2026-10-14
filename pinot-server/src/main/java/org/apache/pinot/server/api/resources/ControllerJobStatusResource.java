@@ -23,7 +23,6 @@ import io.swagger.annotations.ApiOperation;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.ws.rs.GET;
@@ -39,6 +38,7 @@ import org.apache.pinot.common.response.server.ServerReloadStatusResponse;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.local.utils.ReloadJobStatus;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.segment.spi.creator.name.SegmentNameUtils;
 import org.apache.pinot.server.starter.ServerInstance;
@@ -92,15 +92,21 @@ public class ControllerJobStatusResource {
         }
       }
 
+      ReloadJobStatus jobStatus = reloadJobId != null ? _serverReloadJobStatusCache.getJobStatus(reloadJobId) : null;
+      if (jobStatus != null) {
+        // Segments skipped by an only-if-needed reload keep their old load time but are up to date, so they count as
+        // successful. Cap at the total in case a skipped segment was reloaded again by a later operation.
+        successCount = (int) Math.min(successCount + jobStatus.getSkippedCount(), totalSegmentCount);
+      }
+
       ServerReloadStatusResponse response = new ServerReloadStatusResponse()
           .setTotalSegmentCount(totalSegmentCount)
           .setSuccessCount(successCount);
 
-      Optional.ofNullable(reloadJobId)
-          .map(_serverReloadJobStatusCache::getJobStatus)
-          .ifPresent(jobStatus -> response
-              .setFailureCount((long) jobStatus.getFailureCount())
-              .setSampleSegmentReloadFailures(jobStatus.getFailedSegmentDetails()));
+      if (jobStatus != null) {
+        response.setFailureCount((long) jobStatus.getFailureCount())
+            .setSampleSegmentReloadFailures(jobStatus.getFailedSegmentDetails());
+      }
 
       return JsonUtils.objectToString(response);
     } finally {

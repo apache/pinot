@@ -30,6 +30,8 @@ import org.apache.pinot.common.response.server.SegmentReloadFailureResponse;
 public class ReloadJobStatus {
   private final String _jobId;
   private final AtomicInteger _failureCount = new AtomicInteger(0);
+  // Segments an only-if-needed reload left in place because their loaded copy was already up to date
+  private final AtomicInteger _skippedCount = new AtomicInteger(0);
   private final long _createdTimeMs;
   private final List<SegmentReloadFailureResponse> _failedSegmentDetails = new ArrayList<>();
 
@@ -50,6 +52,14 @@ public class ReloadJobStatus {
     return _failureCount.incrementAndGet();
   }
 
+  public int getSkippedCount() {
+    return _skippedCount.get();
+  }
+
+  public int addAndGetSkippedCount(int delta) {
+    return _skippedCount.addAndGet(delta);
+  }
+
   public long getCreatedTimeMs() {
     return _createdTimeMs;
   }
@@ -65,6 +75,7 @@ public class ReloadJobStatus {
   @Override
   public String toString() {
     return "ReloadJobStatus{jobId='" + _jobId + "', failureCount=" + _failureCount.get()
+        + ", skippedCount=" + _skippedCount.get()
         + ", failedSegmentDetailsCount=" + _failedSegmentDetails.size()
         + ", createdTimeMs=" + _createdTimeMs + '}';
   }
