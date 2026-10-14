@@ -239,7 +239,8 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
   /// Data table and data block builders write the value with [#getSize()] and [#writeTo(DataOutput)], and do not call
   /// [#getBytes()]. A subclass can therefore write a large intermediate result straight into the destination, without
   /// building the full byte array first. Such a subclass reads the intermediate result when it is written, so it must
-  /// be written before the intermediate result changes.
+  /// be written before the intermediate result changes. A caller that keeps the object for later must take a snapshot
+  /// instead: `new SerializedIntermediateResult(serialized.getType(), serialized.getBytes())`.
   class SerializedIntermediateResult {
     private final int _type;
     private final byte[] _bytes;

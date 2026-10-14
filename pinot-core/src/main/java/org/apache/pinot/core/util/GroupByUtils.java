@@ -358,7 +358,11 @@ public final class GroupByUtils {
         Object intermediate = baseValues[numUnionColumns + i];
         if (intermediate != null
             && aggregationFunctions[i].getIntermediateResultColumnType() == ColumnDataType.OBJECT) {
-          row[i] = aggregationFunctions[i].serializeIntermediateResult(intermediate);
+          // The derive tasks read these bytes later, so take a snapshot instead of keeping a result that serializes
+          // the live intermediate result on demand.
+          SerializedIntermediateResult serializedResult =
+              aggregationFunctions[i].serializeIntermediateResult(intermediate);
+          row[i] = new SerializedIntermediateResult(serializedResult.getType(), serializedResult.getBytes());
         }
       }
       serialized[e] = row;

@@ -255,8 +255,9 @@ public class PercentileAggregationFunction extends BaseSingleInputAggregationFun
 
   /// Serializes a [DoubleArrayList] on demand, with the bytes of ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE: a
   /// big-endian int count, then the big-endian doubles. [#writeTo] writes the values in bulk straight into the
-  /// destination (see [PrimitiveArrayOutput]), so the builders never hold the full-size byte array. Not thread-safe;
-  /// the list must not change until it is written.
+  /// destination (see [PrimitiveArrayOutput]), so the builders never hold the full-size byte array; lists shorter
+  /// than [PrimitiveArrayOutput#MIN_BULK_VALUES] are written as one small array. Not thread-safe; the list must not
+  /// change until it is written.
   private static final class SerializedDoubleArrayList extends SerializedIntermediateResult {
     private final DoubleArrayList _values;
 
@@ -279,6 +280,12 @@ public class PercentileAggregationFunction extends BaseSingleInputAggregationFun
     public void writeTo(DataOutput output)
         throws IOException {
       int size = _values.size();
+      if (size < PrimitiveArrayOutput.MIN_BULK_VALUES) {
+        // One write of a small array is cheaper than a write per value, which is a synchronized call on a
+        // DataOutputStream.
+        output.write(getBytes());
+        return;
+      }
       output.writeInt(size);
       PrimitiveArrayOutput.writeDoubles(output, _values.elements(), 0, size);
     }

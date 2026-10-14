@@ -213,11 +213,11 @@ public class PagedPinotOutputStream extends PinotOutputStream {
     _written = Math.max(_written, _offsetInPage + _currentPageStartOffset);
   }
 
-  /// Puts as many values as fit in the current page straight into it, through a big-endian typed view. A value that
-  /// does not fit in the rest of the page (the page offset depends on everything written before, so it is not aligned
-  /// to the value width) is written with [#writeInt(int)], which splits it across the two pages. When fewer than
-  /// [PrimitiveArrayOutput#MIN_BULK_VALUES] values go to the page, they are also written one by one, because the
-  /// typed-view copy has a fixed cost that a few values do not pay back.
+  /// Puts as many values as fit in the current page straight into it, then updates the page offset once. When at least
+  /// [PrimitiveArrayOutput#MIN_BULK_VALUES] values go to the page, they are copied through a big-endian typed view;
+  /// fewer values are put one by one, because the typed-view copy has a fixed cost that a few values do not pay back.
+  /// A value that does not fit in the rest of the page (the page offset depends on everything written before, so it
+  /// is not aligned to the value width) is written with [#writeInt(int)], which splits it across the two pages.
   @Override
   public void writeInts(int[] values, int offset, int length)
       throws IOException {
@@ -226,11 +226,18 @@ public class PagedPinotOutputStream extends PinotOutputStream {
     int i = offset;
     while (i < end) {
       int numValues = Math.min(end - i, remainingInPage() / Integer.BYTES);
-      if (numValues < PrimitiveArrayOutput.MIN_BULK_VALUES) {
+      if (numValues == 0) {
         writeInt(values[i++]);
         continue;
       }
-      currentPageView().asIntBuffer().put(values, i, numValues);
+      if (numValues < PrimitiveArrayOutput.MIN_BULK_VALUES) {
+        int position = _offsetInPage;
+        for (int j = i; j < i + numValues; j++, position += Integer.BYTES) {
+          _currentPage.putInt(position, values[j]);
+        }
+      } else {
+        currentPageView().asIntBuffer().put(values, i, numValues);
+      }
       i += numValues;
       _offsetInPage += numValues * Integer.BYTES;
       _written = Math.max(_written, _offsetInPage + _currentPageStartOffset);
@@ -246,11 +253,18 @@ public class PagedPinotOutputStream extends PinotOutputStream {
     int i = offset;
     while (i < end) {
       int numValues = Math.min(end - i, remainingInPage() / Long.BYTES);
-      if (numValues < PrimitiveArrayOutput.MIN_BULK_VALUES) {
+      if (numValues == 0) {
         writeLong(values[i++]);
         continue;
       }
-      currentPageView().asLongBuffer().put(values, i, numValues);
+      if (numValues < PrimitiveArrayOutput.MIN_BULK_VALUES) {
+        int position = _offsetInPage;
+        for (int j = i; j < i + numValues; j++, position += Long.BYTES) {
+          _currentPage.putLong(position, values[j]);
+        }
+      } else {
+        currentPageView().asLongBuffer().put(values, i, numValues);
+      }
       i += numValues;
       _offsetInPage += numValues * Long.BYTES;
       _written = Math.max(_written, _offsetInPage + _currentPageStartOffset);
@@ -266,12 +280,19 @@ public class PagedPinotOutputStream extends PinotOutputStream {
     int i = offset;
     while (i < end) {
       int numValues = Math.min(end - i, remainingInPage() / Double.BYTES);
-      if (numValues < PrimitiveArrayOutput.MIN_BULK_VALUES) {
+      if (numValues == 0) {
         // Raw bits, like the typed view (and ByteBuffer#putDouble): writeDouble() would canonicalize NaN.
         writeLong(Double.doubleToRawLongBits(values[i++]));
         continue;
       }
-      currentPageView().asDoubleBuffer().put(values, i, numValues);
+      if (numValues < PrimitiveArrayOutput.MIN_BULK_VALUES) {
+        int position = _offsetInPage;
+        for (int j = i; j < i + numValues; j++, position += Double.BYTES) {
+          _currentPage.putLong(position, Double.doubleToRawLongBits(values[j]));
+        }
+      } else {
+        currentPageView().asDoubleBuffer().put(values, i, numValues);
+      }
       i += numValues;
       _offsetInPage += numValues * Double.BYTES;
       _written = Math.max(_written, _offsetInPage + _currentPageStartOffset);
