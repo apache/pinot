@@ -1207,9 +1207,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   @Nullable
   protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit)
       throws SegmentBuildFailureException {
-    // Not released when the replace rewrites upsert or dedup metadata: a build that fails or mismatches the
-    // committed CRC falls back to a download, which cannot hold back a semaphore already given away.
-    if (_parallelSegmentConsumptionPolicy.isAllowedDuringBuild() && !holdsConsumerSemaphoreForMetadata()) {
+    if (_parallelSegmentConsumptionPolicy.isAllowedDuringBuild()) {
       closeStreamConsumerAndReleaseSemaphore();
     }
     // Do not allow building segment when table data manager is already shut down
@@ -1790,8 +1788,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _realtimeTableDataManager.downloadAndReplaceConsumingSegment(segmentZKMetadata);
   }
 
-  /// The replace rewrites the key map, so hold the semaphore across the build and the download like
-  /// DISALLOW_ALWAYS: upsert reverts those keys, dedup removes them when the mutable segment is offloaded.
+  /// The replace rewrites the key map, so the next consuming segment must not run against it during the download:
+  /// upsert reverts those keys, dedup removes them when the mutable segment is offloaded.
   private boolean holdsConsumerSemaphoreForMetadata() {
     return revertsUpsertMetadata() || _partitionDedupMetadataManager != null;
   }
