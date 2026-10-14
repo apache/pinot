@@ -169,7 +169,10 @@ public class SelectionPlanNode implements PlanNode {
   private boolean isSorted(OrderByExpressionContext orderByExpression, boolean asc, boolean isNullHandlingEnabled) {
     switch (orderByExpression.getExpression().getType()) {
       case LITERAL: {
-        return true;
+        // LITERAL expressions (e.g. unresolved positional ORDER BY 2, or ORDER BY 1) are not backed by a data source
+        // column and therefore cannot rely on the segment's natural sort order. Returning false ensures these queries
+        // fall through to the generic SelectionOrderByOperator rather than taking the partial-order optimized path.
+        return false;
       }
       case IDENTIFIER: {
         if (!orderByExpression.isAsc() == asc) {
