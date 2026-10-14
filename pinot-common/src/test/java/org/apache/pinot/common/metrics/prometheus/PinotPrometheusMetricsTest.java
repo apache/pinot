@@ -92,6 +92,7 @@ public abstract class PinotPrometheusMetricsTest {
     _pinotMetricsFactory = getPinotMetricsFactory();
     pinotConfiguration.setProperty(CONFIG_OF_METRICS_FACTORY_CLASS_NAME,
         _pinotMetricsFactory.getClass().getCanonicalName());
+    _pinotMetricsFactory.init(pinotConfiguration);
     PinotMetricUtils.init(pinotConfiguration);
 
     _pinotMetricsFactory.makePinotJmxReporter(_pinotMetricsFactory.getPinotMetricsRegistry()).start();
@@ -102,7 +103,6 @@ public abstract class PinotPrometheusMetricsTest {
   @AfterClass
   public void cleanup() {
     _httpServer.close();
-    _pinotMetricsFactory.getPinotMetricsRegistry().shutdown();
   }
 
   /// Pinot currently uses the JMX->Prom exporter to export metrics to Prometheus. Normally, this runs as an agent in

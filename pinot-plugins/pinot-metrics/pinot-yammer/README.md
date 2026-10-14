@@ -40,16 +40,16 @@ removal release will be decided separately; see [#19871](https://github.com/apac
    pinot.minion.metrics.factory.className=org.apache.pinot.plugin.metrics.dropwizard.DropwizardMetricsFactory
    ```
 
-3. Restart each affected service to load the new factory. Validate the migration in a test environment before
+3. To publish a Prometheus scrape endpoint, enable the existing JMX exporter Java agent with the applicable
+   role configuration (`broker.yml`, `controller.yml`, `server.yml`, or `minion.yml`). See the
+   [agent startup and scrape configuration](../../../docker/images/pinot/etc/jmx_prometheus_javaagent/README.md#expose-a-scrape-endpoint-with-dropwizard).
+4. Restart each affected service to load the new factory. Validate the migration in a test environment before
    rolling it out to production.
 
-The Dropwizard adapter preserves Yammer's JMX object names, attributes, and configured meter/timer units for
-Pinot metrics. The bundled JMX exporter rules can be reused with the existing Prometheus metric names and
-labels. Timer distributions and percentiles can still differ because the backends use different reservoirs;
-compare metric values and alerts when validating the migration.
-
-Custom reporters/listeners that depend on Yammer classes need Dropwizard-compatible implementations. Review
-explicit Yammer factory references in compound metrics configurations as part of the migration.
+The role-specific exporter rules support both backends and retain the Prometheus metric names and labels for
+standard Pinot metrics. Those timers are reported in milliseconds and meter rates per second with either backend.
+Native JMX names and attributes can differ, as can sampled timer distributions. Validate custom JMX consumers,
+reporters/listeners, and explicit Yammer factory references in compound metrics configurations when migrating.
 
 To roll back while Yammer remains available, restore the previous factory setting (or remove the new setting
 if you previously relied on the Yammer default), then restart the affected services.

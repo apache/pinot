@@ -30,3 +30,45 @@ Remember that it is recommended to use service specific prometheus configuration
 in production instead of `pinot.xml`.
 
 This will expose a port at 8080 to dump metrics as Prometheus format for Prometheus scraper to fetch.
+
+#### Expose a scrape endpoint with Dropwizard
+
+The same Java agent publishes an HTTP `/metrics` endpoint with `pinot-dropwizard`. For a broker, configure:
+
+```properties
+pinot.broker.metrics.factory.className=org.apache.pinot.plugin.metrics.dropwizard.DropwizardMetricsFactory
+```
+
+Use the matching role YAML. The role-specific rules support both Yammer and native Dropwizard MBeans and
+keep the existing Prometheus metric names and labels.
+
+For a broker in the Pinot Docker image, append the agent option before starting Pinot:
+
+```sh
+export JAVA_OPTS="$JAVA_OPTS -javaagent:/opt/pinot/etc/jmx_prometheus_javaagent/jmx_prometheus_javaagent.jar=9404:/opt/pinot/etc/jmx_prometheus_javaagent/configs/broker.yml"
+bin/pinot-admin.sh StartBroker -configFileName /opt/pinot/configs/broker.conf
+```
+
+Docker images include the agent JAR and exporter configurations. For a binary installation, provide the
+[JMX exporter Java agent](https://prometheus.github.io/jmx_exporter/1.5.0/deployment/java-agent/) and the YAML
+files separately, and substitute their paths above. Use `controller.yml`, `server.yml`, or `minion.yml` for
+the corresponding service. Choose a different agent port for each process sharing a host.
+
+Publish the chosen port when using Docker, or expose it in the deployment's Kubernetes networking, so that
+Prometheus can reach the endpoint. For port 9404:
+
+```sh
+curl http://localhost:9404/metrics
+```
+
+Configure Prometheus to scrape that address:
+
+```yaml
+scrape_configs:
+  - job_name: pinot-broker
+    static_configs:
+      - targets: ["broker-host:9404"]
+```
+
+Standard Pinot timer samples remain in milliseconds and meter rates per second. Direct JMX consumers still
+see the selected backend's native MBean schema; custom metrics may require additional exporter rules.
