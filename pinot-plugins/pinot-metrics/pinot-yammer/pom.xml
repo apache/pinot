@@ -28,7 +28,8 @@
   </parent>
 
   <artifactId>pinot-yammer</artifactId>
-  <name>Pinot Yammer Metrics</name>
+  <name>Pinot Yammer Metrics (Deprecated)</name>
+  <description>Deprecated metrics backend. Use pinot-dropwizard instead.</description>
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
