@@ -270,7 +270,7 @@ public class PinotHelixResourceManager {
   private PinotLLCRealtimeSegmentManager _pinotLLCRealtimeSegmentManager;
   private TableCache _tableCache;
   private final LineageManager _lineageManager;
-  private QueryWorkloadManager _queryWorkloadManager;
+  private volatile QueryWorkloadManager _queryWorkloadManager;
   private final PageCacheWarmupControllerExecutor _pageCacheWarmupControllerExecutor;
   // Dedicated ZkClient for transactional multi-path writes (atomic ZK multi()). Lazily built on
   // first multiWriteZK call. A dedicated session is used because Helix 1.3.2 does not expose
@@ -1337,7 +1337,7 @@ public class PinotHelixResourceManager {
             .anyMatch(instanceConfig -> instanceConfig.getRecord()
                 .getBooleanField(Helix.IS_SHUTDOWN_IN_PROGRESS, false));
         if (!snapshotContainsDrainingCandidate || brokerInstancesInIdealState.equals(
-            excludeShuttingDownBrokers(brokerInstances, getAllHelixInstanceConfigs()))) {
+            excludeShuttingDownBrokers(brokerInstances, getHelixInstanceConfigs(brokerInstances)))) {
           return PinotResourceManagerResponse.success(
               "Broker resource is not rebuilt because ideal state is the same for table: " + tableNameWithType);
         }
@@ -1362,7 +1362,7 @@ public class PinotHelixResourceManager {
       // the broker concurrently, either this CAS commits first and the drain removes it afterwards, or this CAS retries
       // against the drain's newer IdealState and observes shutdownInProgress=true.
       Set<String> brokerInstancesToAssign =
-          excludeShuttingDownBrokers(brokerInstances, getAllHelixInstanceConfigs());
+          excludeShuttingDownBrokers(brokerInstances, getHelixInstanceConfigs(brokerInstances));
       Map<String, String> instanceStateMap = idealState.getInstanceStateMap(tableNameWithType);
       if (instanceStateMap == null) {
         idealState.getRecord().setMapField(tableNameWithType, new HashMap<>());
@@ -1374,6 +1374,20 @@ public class PinotHelixResourceManager {
       }
       return idealState;
     }, DEFAULT_RETRY_POLICY);
+  }
+
+  /// Reads the latest instance configs of the given instances in one batch, skipping instances that do not exist. This
+  /// avoids reading every instance config in the cluster when only a few broker candidates need to be checked.
+  private List<InstanceConfig> getHelixInstanceConfigs(Set<String> instanceIds) {
+    if (instanceIds.isEmpty()) {
+      return List.of();
+    }
+    List<PropertyKey> instanceConfigKeys = new ArrayList<>(instanceIds.size());
+    for (String instanceId : instanceIds) {
+      instanceConfigKeys.add(_keyBuilder.instanceConfig(instanceId));
+    }
+    List<InstanceConfig> instanceConfigs = _helixDataAccessor.getProperty(instanceConfigKeys, true);
+    return instanceConfigs.stream().filter(Objects::nonNull).collect(Collectors.toList());
   }
 
   private static Set<String> excludeShuttingDownBrokers(Set<String> brokerInstances,
@@ -2543,10 +2557,12 @@ public class PinotHelixResourceManager {
     // config and then failed before updating BrokerResource, retrying that same request must repair the assignment.
     LOGGER.info("Updating logical table {}: Reconciling BrokerResource for table", tableName);
     boolean brokerAssignmentChanged = updateBrokerResourceForLogicalTable(logicalTableConfig, tableName);
-    if (!brokerAssignmentChanged && _queryWorkloadManager != null) {
+    // Read once because stop() clears the field concurrently.
+    QueryWorkloadManager queryWorkloadManager = _queryWorkloadManager;
+    if (!brokerAssignmentChanged && queryWorkloadManager != null) {
       // A config update can resolve to the same broker assignment. In that case Helix does not emit an IdealState
       // change, so explicitly refresh the table's workload configuration.
-      _queryWorkloadManager.onBrokerResourceChanged(List.of(tableName), List.of());
+      queryWorkloadManager.onBrokerResourceChanged(List.of(tableName), List.of());
     }
 
     sendLogicalTableConfigRefreshMessage(logicalTableConfig.getTableName());

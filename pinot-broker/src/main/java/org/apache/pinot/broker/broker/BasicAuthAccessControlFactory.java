@@ -34,6 +34,7 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.auth.BasicAuthPrincipal;
 import org.apache.pinot.core.auth.BasicAuthPrincipalUtils;
 import org.apache.pinot.spi.auth.AuthorizationResult;
+import org.apache.pinot.spi.auth.BasicAuthorizationResultImpl;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.auth.TableRowColAccessResult;
 import org.apache.pinot.spi.auth.TableRowColAccessResultImpl;
@@ -52,6 +53,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 /// ```
 public class BasicAuthAccessControlFactory extends AccessControlFactory {
   private static final String PREFIX = "principals";
+  private static final String ADMIN_PERMISSION = "admin";
 
   private AccessControl _accessControl;
 
@@ -151,6 +153,17 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
       rlsFiltersMaybe.ifPresent(tableRowColAccessResult::setRLSFilters);
 
       return tableRowColAccessResult;
+    }
+
+    @Override
+    public AuthorizationResult authorizeAdminAccess(RequesterIdentity requesterIdentity) {
+      Optional<BasicAuthPrincipal> principalOpt = getPrincipalOpt(requesterIdentity);
+      if (!principalOpt.isPresent()) {
+        throw new NotAuthorizedException("Basic");
+      }
+      // Require an explicit grant: a principal without configured permissions has every permission for queries, but
+      // must not implicitly gain the ability to drain or stop the broker.
+      return new BasicAuthorizationResultImpl(principalOpt.get().hasExplicitPermission(ADMIN_PERMISSION));
     }
 
     private Optional<BasicAuthPrincipal> getPrincipalOpt(RequesterIdentity requesterIdentity) {

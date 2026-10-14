@@ -37,8 +37,11 @@ import org.apache.pinot.core.auth.BasicAuthPrincipal;
 import org.apache.pinot.core.auth.BasicAuthPrincipalUtils;
 import org.apache.pinot.core.auth.ZkBasicAuthPrincipal;
 import org.apache.pinot.spi.auth.AuthorizationResult;
+import org.apache.pinot.spi.auth.BasicAuthorizationResultImpl;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
+import org.apache.pinot.spi.config.user.ComponentType;
+import org.apache.pinot.spi.config.user.RoleType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
@@ -113,6 +116,15 @@ public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
         return TableAuthorizationResult.success();
       }
       return new TableAuthorizationResult(failedTables);
+    }
+
+    @Override
+    public AuthorizationResult authorizeAdminAccess(RequesterIdentity requesterIdentity) {
+      Optional<ZkBasicAuthPrincipal> principalOpt = getPrincipalAuth(requesterIdentity);
+      if (!principalOpt.isPresent()) {
+        throw new NotAuthorizedException("Basic");
+      }
+      return new BasicAuthorizationResultImpl(principalOpt.get().hasPermission(RoleType.ADMIN, ComponentType.BROKER));
     }
 
     private Optional<ZkBasicAuthPrincipal> getPrincipalAuth(RequesterIdentity requesterIdentity) {

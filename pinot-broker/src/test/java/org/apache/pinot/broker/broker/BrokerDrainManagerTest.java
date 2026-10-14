@@ -356,10 +356,13 @@ public class BrokerDrainManagerTest {
       assertFalse(drainManager.getStatus().isDrained());
       assertFalse(drainManager.getStatus().isShutdownMarkerReconciled());
       assertFalse(drainManager.getStatus().isBrokerResourceReconciled());
+      assertFalse(drainManager.shouldRetainRoutingOnRemoval(),
+          "Routing must follow BrokerResource transitions until drain starts removing the broker");
       assertAcceptingQueriesAfterFailedDrain(drainManager, drainStartedCount);
 
       BrokerDrainManager.DrainStatus retryStatus = drainManager.drain(0L, false);
       assertTrue(retryStatus.isDrained());
+      assertTrue(drainManager.shouldRetainRoutingOnRemoval());
       assertEquals(drainStartedCount.get(), 1);
       assertEquals(markerUpdateAttempts.get(), 2);
       assertTrue(instanceConfig.getRecord()
@@ -409,6 +412,8 @@ public class BrokerDrainManagerTest {
       assertFalse(drainManager.getStatus().isDrained());
       assertTrue(drainManager.getStatus().isShutdownMarkerReconciled());
       assertFalse(drainManager.getStatus().isBrokerResourceReconciled());
+      // A failed group commit did not remove the broker, so routing keeps following BrokerResource transitions
+      assertFalse(drainManager.shouldRetainRoutingOnRemoval());
       assertAcceptingQueriesAfterFailedDrain(drainManager, drainStartedCount);
       assertTrue(brokerResource.getInstanceSet(tableNameWithType).contains(INSTANCE_ID));
 
@@ -462,6 +467,8 @@ public class BrokerDrainManagerTest {
       assertFalse(drainManager.getStatus().isBrokerResourceReconciled());
       assertFalse(drainManager.getStatus().isDrained());
       assertTrue(drainManager.getStatus().isAcceptingQueries());
+      // The interrupted update may still be committed by another thread, so keep routing for queries still admitted
+      assertTrue(drainManager.shouldRetainRoutingOnRemoval());
       try (BrokerDrainManager.QueryPermit queryPermit = drainManager.tryAcquireQuery()) {
         assertNotNull(queryPermit);
       }

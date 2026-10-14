@@ -77,6 +77,7 @@ public class BrokerDrainManager {
   private boolean _startupReady;
   private volatile boolean _shutdownMarkerReconciled;
   private volatile boolean _brokerResourceReconciled;
+  private volatile boolean _brokerResourceRemovalStarted;
 
   public BrokerDrainManager(String instanceId, Supplier<HelixManager> helixManagerSupplier,
       Runnable drainStartedCallback, Runnable shutdownCallback, long defaultDrainTimeoutMs) {
@@ -165,6 +166,15 @@ public class BrokerDrainManager {
     return isDraining(queryState) && getInFlightQueries(queryState) == 0 && isCoordinationReconciled();
   }
 
+  /// Returns whether BrokerResource transitions out of ONLINE should keep this broker's routing. Drain removes the
+  /// broker from BrokerResource before the queries it already accepted finish, and some of those queries may still
+  /// need routing (e.g. a query that runs a subquery before routing its main query). If an interrupted removal leaves
+  /// its outcome unknown while query admission stays open, retaining routing also keeps the broker able to serve the
+  /// queries it still accepts.
+  public boolean shouldRetainRoutingOnRemoval() {
+    return _brokerResourceRemovalStarted || isDraining();
+  }
+
   public String getRejectMessage() {
     return "Broker " + _instanceId + " is draining and not accepting new queries";
   }
@@ -186,7 +196,23 @@ public class BrokerDrainManager {
         }
       }
       if (_enableHelixUpdates && !_brokerResourceReconciled) {
-        List<String> tablesRemovedFromBrokerResource = removeBrokerFromBrokerResource(helixManager);
+        // Set before the write so that routing is retained as soon as Helix might start removing this broker's tables.
+        _brokerResourceRemovalStarted = true;
+        List<String> tablesRemovedFromBrokerResource;
+        try {
+          tablesRemovedFromBrokerResource = removeBrokerFromBrokerResource(helixManager);
+        } catch (RuntimeException e) {
+          // The group commit failed without applying the removal, so routing can follow BrokerResource again.
+          _brokerResourceRemovalStarted = false;
+          throw e;
+        }
+        if (tablesRemovedFromBrokerResource == null) {
+          // IdealStateGroupCommit returns null when this waiter is interrupted, but another thread may still commit the
+          // queued update. Keep retaining routing, keep admission open, and let a later drain call reconcile the
+          // BrokerResource idempotently.
+          throw new IllegalStateException(
+              "Interrupted while removing broker instance " + _instanceId + " from brokerResource");
+        }
         _tablesRemovedFromBrokerResource = tablesRemovedFromBrokerResource;
         _brokerResourceReconciled = true;
       }
@@ -252,6 +278,9 @@ public class BrokerDrainManager {
         CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS);
   }
 
+  /// Returns the tables this broker was removed from, or `null` when the waiter was interrupted and the outcome of the
+  /// queued update is unknown.
+  @Nullable
   private List<String> removeBrokerFromBrokerResource(HelixManager helixManager) {
     List<String> tablesRemoved = new ArrayList<>();
     if (HelixHelper.updateIdealState(helixManager, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, idealState -> {
@@ -263,10 +292,7 @@ public class BrokerDrainManager {
       }
       return idealState;
     }) == null) {
-      // IdealStateGroupCommit returns null when this waiter is interrupted. The write outcome is ambiguous, so keep
-      // local admission open and require a later drain call to reconcile the BrokerResource idempotently.
-      throw new IllegalStateException("Interrupted while removing broker instance " + _instanceId
-          + " from brokerResource");
+      return null;
     }
     LOGGER.info("Removed broker instance {} from brokerResource for {} table(s): {}", _instanceId,
         tablesRemoved.size(), tablesRemoved);

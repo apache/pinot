@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.broker.broker.helix;
 
+import java.util.function.BooleanSupplier;
 import javax.annotation.Nullable;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.NotificationContext;
@@ -52,6 +53,7 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
   private final HelixExternalViewBasedQueryQuotaManager _queryQuotaManager;
   @Nullable
   private final MaterializedViewHandler _materializedViewHandler;
+  private final BooleanSupplier _retainRoutingOnRemoval;
 
   public BrokerResourceOnlineOfflineStateModelFactory(ZkHelixPropertyStore<ZNRecord> propertyStore,
       HelixDataAccessor helixDataAccessor, BrokerRoutingManager routingManager,
@@ -63,11 +65,22 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
       HelixDataAccessor helixDataAccessor, BrokerRoutingManager routingManager,
       HelixExternalViewBasedQueryQuotaManager queryQuotaManager,
       @Nullable MaterializedViewHandler materializedViewHandler) {
+    this(propertyStore, helixDataAccessor, routingManager, queryQuotaManager, materializedViewHandler, () -> false);
+  }
+
+  /// @param retainRoutingOnRemoval when it returns `true`, transitions out of ONLINE keep the table's routing and
+  ///                               query quota. A draining broker removes itself from BrokerResource while queries it
+  ///                               already accepted may still need routing.
+  public BrokerResourceOnlineOfflineStateModelFactory(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      HelixDataAccessor helixDataAccessor, BrokerRoutingManager routingManager,
+      HelixExternalViewBasedQueryQuotaManager queryQuotaManager,
+      @Nullable MaterializedViewHandler materializedViewHandler, BooleanSupplier retainRoutingOnRemoval) {
     _helixDataAccessor = helixDataAccessor;
     _propertyStore = propertyStore;
     _routingManager = routingManager;
     _queryQuotaManager = queryQuotaManager;
     _materializedViewHandler = materializedViewHandler;
+    _retainRoutingOnRemoval = retainRoutingOnRemoval;
   }
 
   public static String getStateModelDef() {
@@ -114,6 +127,9 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
     public void onBecomeOfflineFromOnline(Message message, NotificationContext context) {
       String physicalOrLogicalTable = message.getPartitionName();
       LOGGER.info("Processing transition from ONLINE to OFFLINE for table: {}", physicalOrLogicalTable);
+      if (shouldRetainRouting(physicalOrLogicalTable)) {
+        return;
+      }
       try {
         if (ZKMetadataProvider.isLogicalTableExists(_propertyStore, physicalOrLogicalTable)) {
           _routingManager.removeRoutingForLogicalTable(physicalOrLogicalTable);
@@ -143,6 +159,9 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
     public void onBecomeDroppedFromOnline(Message message, NotificationContext context) {
       String physicalOrLogicalTable = message.getPartitionName();
       LOGGER.info("Processing transition from ONLINE to DROPPED for table: {}", physicalOrLogicalTable);
+      if (shouldRetainRouting(physicalOrLogicalTable)) {
+        return;
+      }
       try {
         if (ZKMetadataProvider.isLogicalTableExists(_propertyStore, physicalOrLogicalTable)) {
           _routingManager.removeRoutingForLogicalTable(physicalOrLogicalTable);
@@ -158,6 +177,16 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
             physicalOrLogicalTable, e);
         throw e;
       }
+    }
+
+    private boolean shouldRetainRouting(String physicalOrLogicalTable) {
+      if (_retainRoutingOnRemoval.getAsBoolean()) {
+        // Restarting the broker clears its drain state and rebuilds all routing.
+        LOGGER.info("Retaining routing for table: {} so queries accepted before drain can finish",
+            physicalOrLogicalTable);
+        return true;
+      }
+      return false;
     }
 
     private void invalidateMaterializedViewCacheForTable(String tableNameWithType) {

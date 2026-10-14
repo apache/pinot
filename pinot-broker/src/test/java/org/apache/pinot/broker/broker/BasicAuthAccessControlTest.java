@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import javax.ws.rs.NotAuthorizedException;
 import javax.ws.rs.WebApplicationException;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.api.HttpRequesterIdentity;
@@ -39,6 +40,7 @@ import org.testng.annotations.Test;
 public class BasicAuthAccessControlTest {
   private static final String TOKEN_USER = "Basic dXNlcjpzZWNyZXQ"; // user:secret
   private static final String TOKEN_ADMIN = "Basic YWRtaW46dmVyeXNlY3JldA"; // admin:verysecret
+  private static final String TOKEN_OPERATOR = "Basic b3BlcmF0b3I6b3BzZWNyZXQ="; // operator:opsecret
 
   private static final String HEADER_AUTHORIZATION = "authorization";
 
@@ -49,9 +51,11 @@ public class BasicAuthAccessControlTest {
   @BeforeClass
   public void setup() {
     Map<String, Object> config = new HashMap<>();
-    config.put("principals", "admin,user");
+    config.put("principals", "admin,user,operator");
     config.put("principals.admin.password", "verysecret");
     config.put("principals.user.password", "secret");
+    config.put("principals.operator.password", "opsecret");
+    config.put("principals.operator.permissions", "READ,ADMIN");
     config.put("principals.user.tables", "lessImportantStuff,lesserImportantStuff,leastImportantStuff");
 
     _tableNames = new HashSet<>();
@@ -180,6 +184,24 @@ public class BasicAuthAccessControlTest {
     Set<String> tableNames = new HashSet<>();
     authorizationResult = _accessControl.authorize(identity, tableNames);
     Assert.assertTrue(authorizationResult.hasAccess());
+  }
+
+  @Test
+  public void testAdminAccessRequiresExplicitAdminPermission() {
+    // Principals without configured permissions keep full query access, but must not implicitly gain admin access
+    Assert.assertFalse(_accessControl.authorizeAdminAccess(identityWithToken(TOKEN_ADMIN)).hasAccess());
+    Assert.assertFalse(_accessControl.authorizeAdminAccess(identityWithToken(TOKEN_USER)).hasAccess());
+    Assert.assertTrue(_accessControl.authorizeAdminAccess(identityWithToken(TOKEN_OPERATOR)).hasAccess());
+    Assert.expectThrows(NotAuthorizedException.class,
+        () -> _accessControl.authorizeAdminAccess(identityWithToken("Basic dW5rbm93bjpwYXNzd29yZA")));
+  }
+
+  private static HttpRequesterIdentity identityWithToken(String token) {
+    Multimap<String, String> headers = ArrayListMultimap.create();
+    headers.put(HEADER_AUTHORIZATION, token);
+    HttpRequesterIdentity identity = new HttpRequesterIdentity();
+    identity.setHttpHeaders(headers);
+    return identity;
   }
 
   @Test

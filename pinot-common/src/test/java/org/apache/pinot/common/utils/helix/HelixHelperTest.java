@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.utils.helix;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -25,7 +26,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.helix.AccessOption;
 import org.apache.helix.BaseDataAccessor;
-import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.PropertyKey;
@@ -47,6 +47,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -143,6 +144,36 @@ public class HelixHelperTest {
   }
 
   @Test
+  public void testAtomicInstanceConfigUpdateSkipsWriteWhenUnchanged() {
+    String instanceId = "Broker_myInstance";
+    HelixDataAccessor helixDataAccessor = mock(HelixDataAccessor.class);
+    PropertyKey.Builder keyBuilder = mock(PropertyKey.Builder.class);
+    PropertyKey propertyKey = mock(PropertyKey.class);
+    when(helixDataAccessor.keyBuilder()).thenReturn(keyBuilder);
+    when(keyBuilder.instanceConfig(instanceId)).thenReturn(propertyKey);
+    InstanceConfig latestConfig = new InstanceConfig(instanceId);
+    latestConfig.addTag("tenant_BROKER");
+    List<ZNRecord> updatedRecords = new ArrayList<>();
+    doAnswer(invocation -> {
+      DataUpdater<ZNRecord> updater = invocation.getArgument(1);
+      updatedRecords.add(updater.update(new ZNRecord(latestConfig.getRecord())));
+      return true;
+    }).when(helixDataAccessor).updateProperty(any(PropertyKey.class),
+        ArgumentMatchers.<DataUpdater<ZNRecord>>any(), any(InstanceConfig.class));
+
+    // Re-adding an existing tag leaves the record unchanged, so the updater returns null and Helix skips the write
+    assertTrue(HelixHelper.updateInstanceConfig(helixDataAccessor, instanceId,
+        instanceConfig -> instanceConfig.addTag("tenant_BROKER")));
+    // Adding a tag mutates the existing tag list in place, which must still be detected as a change
+    assertTrue(HelixHelper.updateInstanceConfig(helixDataAccessor, instanceId,
+        instanceConfig -> instanceConfig.addTag("otherTenant_BROKER")));
+
+    assertEquals(updatedRecords.size(), 2);
+    assertNull(updatedRecords.get(0));
+    assertEquals(new InstanceConfig(updatedRecords.get(1)).getTags(), List.of("tenant_BROKER", "otherTenant_BROKER"));
+  }
+
+  @Test
   public void testAtomicInstanceConfigUpdateReturnsFalseForMissingInstance() {
     String instanceId = "Broker_missing";
     HelixDataAccessor helixDataAccessor = mock(HelixDataAccessor.class);
@@ -165,7 +196,6 @@ public class HelixHelperTest {
 
   @Test
   public void testUpdateBrokerResourceRefreshesBrokerTagsOnIdealStateRetry() {
-    String clusterName = "testCluster";
     String brokerId = "Broker_localhost_8099";
     String oldTenant = "oldTenant";
     String newTenant = "newTenant";
@@ -187,22 +217,24 @@ public class HelixHelperTest {
     IdealState brokerResource = new IdealState(HelixHelper.BROKER_RESOURCE);
     brokerResource.setPartitionState(oldTable, "Broker_other_8099", "ONLINE");
     brokerResource.setPartitionState(newTable, "Broker_other_8099", "ONLINE");
+    // Simulates a table created after the table configs were read, whose creation already assigned this broker
+    String tableCreatedAfterRead = "createdAfterRead_OFFLINE";
+    brokerResource.setPartitionState(tableCreatedAfterRead, brokerId, "ONLINE");
 
     HelixManager helixManager = mock(HelixManager.class);
-    HelixAdmin helixAdmin = mock(HelixAdmin.class);
     HelixDataAccessor helixDataAccessor = mock(HelixDataAccessor.class);
     PropertyKey.Builder keyBuilder = mock(PropertyKey.Builder.class);
     PropertyKey idealStateKey = mock(PropertyKey.class);
+    PropertyKey instanceConfigKey = mock(PropertyKey.class);
     @SuppressWarnings("unchecked")
     BaseDataAccessor<ZNRecord> baseDataAccessor = mock(BaseDataAccessor.class);
     @SuppressWarnings("unchecked")
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
-    when(helixManager.getClusterName()).thenReturn(clusterName);
-    when(helixManager.getClusterManagmentTool()).thenReturn(helixAdmin);
     when(helixManager.getHelixDataAccessor()).thenReturn(helixDataAccessor);
     when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
-    when(helixAdmin.getInstanceConfig(clusterName, brokerId)).thenReturn(oldInstanceConfig, newInstanceConfig);
     when(helixDataAccessor.keyBuilder()).thenReturn(keyBuilder);
+    when(keyBuilder.instanceConfig(brokerId)).thenReturn(instanceConfigKey);
+    when(helixDataAccessor.getProperty(instanceConfigKey)).thenReturn(oldInstanceConfig, newInstanceConfig);
     when(keyBuilder.idealStates(HelixHelper.BROKER_RESOURCE)).thenReturn(idealStateKey);
     when(idealStateKey.getPath()).thenReturn("/test/IDEALSTATES/BrokerResource");
     when(helixDataAccessor.getProperty(idealStateKey)).thenReturn(brokerResource);
@@ -219,19 +251,23 @@ public class HelixHelperTest {
           return true;
         });
 
-    try (MockedStatic<ZKMetadataProvider> metadataProvider = org.mockito.Mockito.mockStatic(ZKMetadataProvider.class)) {
+    try (MockedStatic<ZKMetadataProvider> metadataProvider = mockStatic(ZKMetadataProvider.class)) {
       metadataProvider.when(() -> ZKMetadataProvider.getAllTableConfigs(propertyStore))
           .thenReturn(List.of(oldTableConfig, newTableConfig));
       metadataProvider.when(() -> ZKMetadataProvider.getAllLogicalTableConfigs(propertyStore)).thenReturn(List.of());
 
       // The caller captured the old tag, but the live InstanceConfig changes before the IdealState retry.
       HelixHelper.updateBrokerResource(helixManager, brokerId, List.of(oldBrokerTag), null, null);
+
+      // Table configs are read once, outside the IdealState CAS, even though the update was retried
+      metadataProvider.verify(() -> ZKMetadataProvider.getAllTableConfigs(propertyStore), times(1));
     }
 
     IdealState persistedIdealState = new IdealState(persistedRecord.get());
     assertFalse(persistedIdealState.getInstanceSet(oldTable).contains(brokerId));
     assertTrue(persistedIdealState.getInstanceSet(newTable).contains(brokerId));
+    assertTrue(persistedIdealState.getInstanceSet(tableCreatedAfterRead).contains(brokerId));
     assertEquals(writeAttempts.get(), 2);
-    verify(helixAdmin, times(2)).getInstanceConfig(clusterName, brokerId);
+    verify(helixDataAccessor, times(2)).getProperty(instanceConfigKey);
   }
 }

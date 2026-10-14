@@ -52,5 +52,10 @@ public class AllowAllAccessControlFactory extends AccessControlFactory {
     public TableAuthorizationResult authorize(RequesterIdentity requesterIdentity, Set<String> tables) {
       return TableAuthorizationResult.success();
     }
+
+    @Override
+    public AuthorizationResult authorizeAdminAccess(RequesterIdentity requesterIdentity) {
+      return BasicAuthorizationResultImpl.success();
+    }
   }
 }

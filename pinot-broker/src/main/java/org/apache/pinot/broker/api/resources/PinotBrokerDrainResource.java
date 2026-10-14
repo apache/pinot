@@ -34,16 +34,25 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.container.AsyncResponse;
 import javax.ws.rs.container.CompletionCallback;
 import javax.ws.rs.container.Suspended;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.broker.api.HttpRequesterIdentity;
+import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.broker.BrokerDrainManager;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.spi.auth.AuthorizationResult;
+import org.glassfish.grizzly.http.server.Request;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/// Admin endpoints that drain this broker before it is stopped and report drain progress. Draining requires broker
+/// administrative access (see [org.apache.pinot.broker.api.AccessControl#authorizeAdminAccess]) because it stops
+/// query admission for the rest of the process lifetime and can optionally stop the broker.
 @Api(tags = "Broker")
 @Path("/")
 public class PinotBrokerDrainResource {
@@ -52,19 +61,24 @@ public class PinotBrokerDrainResource {
   @Inject
   private BrokerDrainManager _brokerDrainManager;
 
+  @Inject
+  private AccessControlFactory _accessControlFactory;
+
   @POST
   @Path("drain")
   @Produces(MediaType.APPLICATION_JSON)
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_INSTANCE)
   @ApiOperation(value = "Drain this broker",
       notes = "Rejects new queries, removes this broker from brokerResource, waits for accepted queries to finish, "
-          + "and optionally shuts down the broker after the HTTP response completes. The timeout defaults to "
+          + "and optionally shuts down the broker after the HTTP response completes. Requires broker administrative "
+          + "access. Draining cannot be undone without restarting the broker. The timeout defaults to "
           + "pinot.broker.delayShutdownTimeMs. Before rolling a drained broker back to a version that predates this "
           + "API, restart it once on the drain-capable version and wait for readiness so its pre-drain tags and "
           + "instance state are restored; do not roll a stopped, drained broker directly back to an older version.")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Broker drained"),
       @ApiResponse(code = 400, message = "Bad request"),
+      @ApiResponse(code = 403, message = "Broker administrative access is required"),
       @ApiResponse(code = 408, message = "Timed out waiting for in-flight queries"),
       @ApiResponse(code = 501, message = "Drain coordination is not configured"),
       @ApiResponse(code = 503, message = "Broker startup is still in progress"),
@@ -75,7 +89,9 @@ public class PinotBrokerDrainResource {
       @ApiParam(value = "Maximum time to wait for in-flight queries. -1 uses broker default.")
       @QueryParam("timeoutMs") @DefaultValue("-1") long timeoutMs,
       @ApiParam(value = "Whether to stop the broker after it drains")
-      @QueryParam("shutdown") @DefaultValue("true") boolean shutdown) {
+      @QueryParam("shutdown") @DefaultValue("false") boolean shutdown,
+      @Context Request request) {
+    authorizeAdminAccess(request);
     Response response = drain(timeoutMs, false);
     BrokerDrainManager.DrainStatus status = (BrokerDrainManager.DrainStatus) response.getEntity();
     if (shutdown && status.isDrained()) {
@@ -83,6 +99,16 @@ public class PinotBrokerDrainResource {
     }
     if (!asyncResponse.resume(response)) {
       LOGGER.warn("Broker drain response was not accepted by the asynchronous response context");
+    }
+  }
+
+  private void authorizeAdminAccess(Request request) {
+    AuthorizationResult authorizationResult =
+        _accessControlFactory.create().authorizeAdminAccess(HttpRequesterIdentity.fromRequest(request));
+    if (!authorizationResult.hasAccess()) {
+      String failureMessage = authorizationResult.getFailureMessage();
+      throw new WebApplicationException("Broker administrative access is required to drain the broker"
+          + (StringUtils.isNotBlank(failureMessage) ? ". Reason: " + failureMessage : ""), Response.Status.FORBIDDEN);
     }
   }
 

@@ -715,7 +715,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _participantHelixManager.getStateMachineEngine()
         .registerStateModelFactory(BrokerResourceOnlineOfflineStateModelFactory.getStateModelDef(),
           new BrokerResourceOnlineOfflineStateModelFactory(_propertyStore, _helixDataAccessor, _routingManager,
-          _queryQuotaManager, materializedViewHandler));
+          _queryQuotaManager, materializedViewHandler, _brokerDrainManager::shouldRetainRoutingOnRemoval));
     // Register user-define message handler factory
     _participantHelixManager.getMessagingService()
         .registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(),
