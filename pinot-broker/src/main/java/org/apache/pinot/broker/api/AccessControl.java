@@ -139,6 +139,21 @@ public interface AccessControl extends FineGrainedAccessControl {
     return new BasicAuthorizationResultImpl(false, "The access control of the broker does not allow deleting rows");
   }
 
+  /// Authorizes administrative operations that change this broker's lifecycle, such as draining it. The request has
+  /// already passed [#authorize(RequesterIdentity)]. Implementations should throw an authentication exception when the
+  /// request carries no acceptable identity, and return a result whose [AuthorizationResult#hasAccess()] is `false`
+  /// for an authenticated identity that lacks broker administrative authority.
+  ///
+  /// The default implementation denies access so that existing custom implementations do not silently grant access to
+  /// newly protected administrative operations until they implement this contract.
+  ///
+  /// @param requesterIdentity requester identity
+  /// @return authorization result for broker administrative access
+  default AuthorizationResult authorizeAdminAccess(RequesterIdentity requesterIdentity) {
+    return new BasicAuthorizationResultImpl(false,
+        "The configured access control does not grant broker administrative access");
+  }
+
   /// Returns RLS/CLS filters for a particular table. By default, there are no RLS/CLS filters on any table.
   /// @param requesterIdentity requested identity
   /// @param table Table used in the query. Table name can be with or without tableType.

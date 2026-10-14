@@ -60,5 +60,10 @@ public class AllowAllAccessControlFactory extends AccessControlFactory {
         @Nullable HttpHeaders httpHeaders, String tableName) {
       return BasicAuthorizationResultImpl.success();
     }
+
+    @Override
+    public AuthorizationResult authorizeAdminAccess(RequesterIdentity requesterIdentity) {
+      return BasicAuthorizationResultImpl.success();
+    }
   }
 }

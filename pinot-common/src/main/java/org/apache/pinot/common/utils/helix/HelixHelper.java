@@ -29,6 +29,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -41,6 +42,7 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.HelixProperty;
 import org.apache.helix.InstanceType;
+import org.apache.helix.PropertyKey;
 import org.apache.helix.PropertyKey.Builder;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.HelixConfigScope;
@@ -198,18 +200,27 @@ public class HelixHelper {
       Preconditions.checkArgument(TagNameUtils.isBrokerTag(brokerTag), "Invalid broker tag: %s", brokerTag);
     }
 
+    // Read all table configs once, outside the IdealState CAS, so retries and the shared group commit do not repeat a
+    // cluster-wide read. Only this broker's own instance config is re-read inside each attempt.
+    Map<String, Set<String>> tablesByBrokerTag = new HashMap<>();
+    Set<String> knownTables = new HashSet<>();
+    indexTablesByBrokerTag(helixManager, tablesByBrokerTag, knownTables);
+    HelixDataAccessor helixDataAccessor = helixManager.getHelixDataAccessor();
+    PropertyKey instanceConfigKey = helixDataAccessor.keyBuilder().instanceConfig(brokerId);
     updateIdealState(helixManager, BROKER_RESOURCE, idealState -> {
-      InstanceConfig instanceConfig = getInstanceConfig(helixManager, brokerId);
+      InstanceConfig instanceConfig = helixDataAccessor.getProperty(instanceConfigKey);
       boolean shutdownInProgress = instanceConfig != null && instanceConfig.getRecord()
           .getBooleanField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, false);
       // The caller's tags can become stale between its InstanceConfig write and this IdealState update. Resolve the
       // latest tags inside every CAS attempt so a delayed reconciliation cannot overwrite a newer tag assignment.
-      // Retain the supplied tags only for compatibility with callers reconciling an already-removed instance config.
+      // Use the supplied tags only when the instance config no longer exists.
       List<String> currentBrokerTags = instanceConfig != null
           ? instanceConfig.getTags().stream().filter(TagNameUtils::isBrokerTag).collect(Collectors.toList())
           : brokerTags;
-      Set<String> tablesForBrokerTag = currentBrokerTags.isEmpty()
-          ? Set.of() : getTablesForBrokerTags(helixManager, currentBrokerTags);
+      Set<String> tablesForBrokerTag = new HashSet<>();
+      for (String brokerTag : currentBrokerTags) {
+        tablesForBrokerTag.addAll(tablesByBrokerTag.getOrDefault(brokerTag, Set.of()));
+      }
       if (tablesAdded != null) {
         tablesAdded.clear();
       }
@@ -223,7 +234,9 @@ public class HelixHelper {
           if (brokerAssignment.put(brokerId, BrokerResourceStateModel.ONLINE) == null && tablesAdded != null) {
             tablesAdded.add(tableNameWithType);
           }
-        } else {
+        } else if (shutdownInProgress || knownTables.contains(tableNameWithType)) {
+          // A table created after the table configs were read already got its brokers from the table creation, so
+          // only remove this broker from tables whose broker tenant is known not to match.
           if (brokerAssignment.remove(brokerId) != null && tablesRemoved != null) {
             tablesRemoved.add(tableNameWithType);
           }
@@ -231,6 +244,23 @@ public class HelixHelper {
       }
       return idealState;
     });
+  }
+
+  private static void indexTablesByBrokerTag(HelixManager helixManager, Map<String, Set<String>> tablesByBrokerTag,
+      Set<String> knownTables) {
+    ZkHelixPropertyStore<ZNRecord> propertyStore = helixManager.getHelixPropertyStore();
+    for (TableConfig tableConfig : ZKMetadataProvider.getAllTableConfigs(propertyStore)) {
+      String tableNameWithType = tableConfig.getTableName();
+      knownTables.add(tableNameWithType);
+      tablesByBrokerTag.computeIfAbsent(TagNameUtils.getBrokerTagForTenant(tableConfig.getTenantConfig().getBroker()),
+          k -> new HashSet<>()).add(tableNameWithType);
+    }
+    for (LogicalTableConfig logicalTableConfig : ZKMetadataProvider.getAllLogicalTableConfigs(propertyStore)) {
+      String tableName = logicalTableConfig.getTableName();
+      knownTables.add(tableName);
+      tablesByBrokerTag.computeIfAbsent(TagNameUtils.getBrokerTagForTenant(logicalTableConfig.getBrokerTenant()),
+          k -> new HashSet<>()).add(tableName);
+    }
   }
 
   /// Updates broker resource ideal state for the given broker with the given broker tags. Optional `tablesAdded`
@@ -250,11 +280,18 @@ public class HelixHelper {
 
   public static void updateBrokerResource(HelixManager helixManager, String tableNameWithType,
       Map<String, String> instancesStateMap, @Nullable WorkloadChangeListener listener) {
+    HelixDataAccessor helixDataAccessor = helixManager.getHelixDataAccessor();
+    List<PropertyKey> instanceConfigKeys = new ArrayList<>(instancesStateMap.size());
+    for (String instanceId : instancesStateMap.keySet()) {
+      instanceConfigKeys.add(helixDataAccessor.keyBuilder().instanceConfig(instanceId));
+    }
     updateIdealState(helixManager, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, idealState -> {
       assert idealState != null;
       Map<String, String> eligibleInstancesStateMap = new HashMap<>(instancesStateMap);
-      for (InstanceConfig instanceConfig : getInstanceConfigs(helixManager)) {
-        if (instanceConfig.getRecord()
+      // Read only the assigned brokers' configs, after this IdealState version, so a concurrent drain is observed.
+      List<InstanceConfig> instanceConfigs = helixDataAccessor.getProperty(instanceConfigKeys, true);
+      for (InstanceConfig instanceConfig : instanceConfigs) {
+        if (instanceConfig != null && instanceConfig.getRecord()
             .getBooleanField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, false)) {
           eligibleInstancesStateMap.remove(instanceConfig.getInstanceName());
         }
@@ -653,22 +690,40 @@ public class HelixHelper {
 
   /// Atomically updates an existing instance config using the latest record from Helix. The mutator can be invoked
   /// multiple times when a concurrent write causes a version conflict, and therefore must tolerate repeated
-  /// invocation and must not perform non-idempotent side effects outside of the supplied instance config.
+  /// invocation and must not perform non-idempotent side effects outside of the supplied instance config. The write is
+  /// skipped when the mutator leaves the record unchanged, so watchers are not notified of a no-op update.
   ///
-  /// @return `true` when the existing instance config was updated, `false` when it did not exist or the update failed
+  /// @return `true` when the existing instance config was updated or already up to date, `false` when it did not
+  ///         exist or the update failed
+  /// @throws RuntimeException the exception thrown by the mutator, if any
   public static boolean updateInstanceConfig(HelixDataAccessor helixDataAccessor, String instanceId,
       Consumer<InstanceConfig> mutator) {
     AtomicBoolean instanceExists = new AtomicBoolean();
+    AtomicReference<RuntimeException> mutatorException = new AtomicReference<>();
     boolean updated = helixDataAccessor.updateProperty(helixDataAccessor.keyBuilder().instanceConfig(instanceId),
         currentRecord -> {
           instanceExists.set(currentRecord != null);
           if (currentRecord == null) {
             return null;
           }
+          // Deep copy because mutators such as InstanceConfig.addTag() modify list and map fields in place.
+          ZNRecord originalRecord =
+              (ZNRecord) ZN_RECORD_SERIALIZER.deserialize(ZN_RECORD_SERIALIZER.serialize(currentRecord));
           InstanceConfig instanceConfig = new InstanceConfig(currentRecord);
-          mutator.accept(instanceConfig);
-          return instanceConfig.getRecord();
+          try {
+            mutator.accept(instanceConfig);
+          } catch (RuntimeException e) {
+            // Helix logs and swallows updater exceptions, so keep the cause to rethrow it to the caller.
+            mutatorException.set(e);
+            throw e;
+          }
+          // Returning null for an existing record makes Helix skip the write.
+          return instanceConfig.getRecord().equals(originalRecord) ? null : instanceConfig.getRecord();
         }, new InstanceConfig(instanceId));
+    RuntimeException exception = mutatorException.get();
+    if (exception != null) {
+      throw exception;
+    }
     return updated && instanceExists.get();
   }
 

@@ -238,9 +238,7 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
         validateCostPropagationOnInstances(broker, workloadName, splitCpuBudgetNs, splitMemoryBudgetBytes);
       }
 
-      boolean restartRequired = false;
       try {
-        restartRequired = true;
         sendPostRequest(getAdminBaseUrl(drainedBroker) + "/drain?shutdown=false");
 
         JsonNode rejectedResponse = postQueryToBroker(drainedBroker, "SELECT COUNT(*) FROM " + DEFAULT_TABLE_NAME);
@@ -258,9 +256,7 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
         }, 60_000L, "Failed to remove drained broker from BrokerResource");
         waitForCostPropagationOnInstance(survivingBroker, workloadName, totalCpuBudgetNs, totalMemoryBudgetBytes);
       } finally {
-        if (restartRequired) {
-          _brokerStarters.set(0, restartBroker(brokerToDrain));
-        }
+        _brokerStarters.set(0, restartBroker(brokerToDrain));
       }
 
       TestUtils.waitForCondition(aVoid -> {
