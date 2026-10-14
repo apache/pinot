@@ -194,10 +194,11 @@ public interface PinotFS extends Closeable, Serializable {
     return false;
   }
 
-  /// Lists the files (never directories) under `fileUri` recursively, in ascending order of
-  /// [FileMetadata#getFilePath], starting strictly after `startAfter`. `startAfter` need not exist, so a caller can
-  /// skip a range of keys with one request instead of paging through it. Only stores whose listing is sorted and
-  /// can start at an arbitrary key implement this; see [#supportsListingAfter].
+  /// Lists the files (never directories) under `fileUri` recursively, in the store's key order, starting strictly
+  /// after the key `startAfter` names. That key need not exist, so a caller can skip a range of keys with one request
+  /// instead of paging through it. Only stores whose listing is sorted and can start at an arbitrary key implement
+  /// this; see [#supportsListingAfter]. Where file paths escape the key (GCS URI-escapes object names), path order
+  /// and key order can differ.
   ///
   /// @param fileUri location to list files from
   /// @param startAfter a path in the form [FileMetadata#getFilePath] returns, or null to start at the first file
