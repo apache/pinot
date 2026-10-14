@@ -19,6 +19,7 @@
 package org.apache.pinot.common.utils.tls;
 
 import io.netty.bootstrap.Bootstrap;
+import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.EventLoopGroup;
@@ -69,8 +70,8 @@ public class ZooKeeperSslContextSupplierTest {
     try (ClientX509Util util = new ClientX509Util()) {
       for (String key : new String[]{util.getSslContextSupplierClassProperty(), util.getSslProviderProperty(),
           util.getSslHostnameVerificationEnabledProperty(), util.getFipsModeProperty(),
-          util.getSslTruststoreLocationProperty(), util.getSslTruststorePasswdProperty(),
-          util.getSslTruststoreTypeProperty()}) {
+          util.getSslCipherSuitesProperty(), util.getSslTruststoreLocationProperty(),
+          util.getSslTruststorePasswdProperty(), util.getSslTruststoreTypeProperty()}) {
         _savedProperties.put(key, System.getProperty(key));
       }
       System.clearProperty(util.getSslContextSupplierClassProperty());
@@ -96,25 +97,30 @@ public class ZooKeeperSslContextSupplierTest {
       System.setProperty(util.getSslHostnameVerificationEnabledProperty(), "false");
       System.setProperty(util.getSslContextSupplierClassProperty(), "custom.supplier");
       System.setProperty(util.getSslProviderProperty(), "OPENSSL");
+      System.setProperty(util.getSslCipherSuitesProperty(), "ECDHE-RSA-AES128-GCM-SHA256");
       HelixHelper.createZkHelixManager("test-cluster", "test-instance", InstanceType.SPECTATOR, "localhost:2181");
       assertEquals(System.getProperty(util.getSslContextSupplierClassProperty()), "custom.supplier");
       assertEquals(System.getProperty(util.getSslProviderProperty()), "OPENSSL");
+      assertEquals(System.getProperty(util.getSslCipherSuitesProperty()), "ECDHE-RSA-AES128-GCM-SHA256");
     }
   }
 
   @DataProvider
   public Object[][] hostnamePolicies() {
-    return new Object[][]{{false, false}, {false, true}, {true, false}, {true, true}};
+    return new Object[][]{{false, false, "OPENSSL"}, {false, true, "OPENSSL_REFCNT"},
+        {true, false, "JDK"}, {true, true, "JDK"}};
   }
 
   @Test(dataProvider = "hostnamePolicies")
-  public void testConfiguredHostnamePolicy(boolean verifyHostname, boolean fips)
+  public void testConfiguredHostnamePolicy(boolean verifyHostname, boolean fips, String provider)
       throws Exception {
     try (ClientX509Util util = new ClientX509Util();
         MockedStatic<HelixManagerFactory> factory = mockStatic(HelixManagerFactory.class)) {
       System.setProperty(util.getSslHostnameVerificationEnabledProperty(), Boolean.toString(verifyHostname));
       System.setProperty(util.getFipsModeProperty(), Boolean.toString(fips));
-      System.setProperty(util.getSslProviderProperty(), "JDK");
+      System.setProperty(util.getSslProviderProperty(), provider);
+      System.setProperty(util.getSslCipherSuitesProperty(),
+          verifyHostname ? "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256" : "ECDHE-RSA-AES128-GCM-SHA256");
       System.setProperty(util.getSslTruststoreLocationProperty(), resourcePath("truststore.p12").toString());
       System.setProperty(util.getSslTruststorePasswdProperty(), "changeit");
       System.setProperty(util.getSslTruststoreTypeProperty(), "PKCS12");
@@ -142,6 +148,8 @@ public class ZooKeeperSslContextSupplierTest {
       try (SSLServerSocket server = (SSLServerSocket) serverContext.getServerSocketFactory().createServerSocket()) {
         server.bind(new InetSocketAddress("127.0.0.1", 0));
         server.setSoTimeout(5000);
+        int port = server.getLocalPort();
+        SslHandler ssl = clientContext.newHandler(ByteBufAllocator.DEFAULT, "127.0.0.1", port);
         Thread worker = new Thread(() -> {
           try (SSLSocket socket = (SSLSocket) server.accept()) {
             socket.setSoTimeout(5000);
@@ -153,26 +161,23 @@ public class ZooKeeperSslContextSupplierTest {
         worker.setDaemon(true);
         worker.start();
         try {
-          AtomicReference<SslHandler> handler = new AtomicReference<>();
-          int port = server.getLocalPort();
           channel = new Bootstrap().group(group).channel(NioSocketChannel.class)
               .handler(new ChannelInitializer<SocketChannel>() {
                 @Override
                 protected void initChannel(SocketChannel socket) {
-                  SslHandler ssl = clientContext.newHandler(socket.alloc(), "127.0.0.1", port);
                   ssl.setHandshakeTimeoutMillis(5000);
-                  handler.set(ssl);
                   socket.pipeline().addLast(ssl);
                 }
               }).connect("127.0.0.1", port).sync().channel();
-          assertTrue(handler.get().handshakeFuture().await(6000), "TLS handshake did not complete");
+          assertTrue(ssl.handshakeFuture().await(6000), "TLS handshake did not complete");
           if (verifyHostname) {
-            assertFalse(handler.get().handshakeFuture().isSuccess());
-            assertTrue(hasCertificateFailure(handler.get().handshakeFuture().cause()),
+            assertFalse(ssl.handshakeFuture().isSuccess());
+            assertTrue(hasCertificateFailure(ssl.handshakeFuture().cause()),
                 "Expected a certificate rejection, not a connection or timeout failure");
           } else {
-            assertTrue(handler.get().handshakeFuture().isSuccess(),
-                String.valueOf(handler.get().handshakeFuture().cause()));
+            assertTrue(ssl.handshakeFuture().isSuccess(), String.valueOf(ssl.handshakeFuture().cause()));
+            assertEquals(ssl.engine().getSession().getCipherSuite(),
+                "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256");
           }
         } finally {
           if (channel != null) {

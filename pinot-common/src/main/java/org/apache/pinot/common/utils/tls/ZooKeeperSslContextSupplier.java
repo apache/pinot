@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.utils.tls;
 
+import io.netty.handler.ssl.CipherSuiteConverter;
 import java.util.Properties;
 import java.util.function.Supplier;
 import javax.net.ssl.SSLContext;
@@ -44,6 +45,18 @@ public class ZooKeeperSslContextSupplier implements Supplier<SSLContext> {
         if (util.isServerHostnameVerificationEnabled(config)
             || config.getProperty(util.getSslContextSupplierClassProperty()) != null) {
           return;
+        }
+        // The supplied JDK context needs JSSE names for ciphers previously configured for OpenSSL.
+        String cipherSuites = config.getProperty(util.getSslCipherSuitesProperty());
+        if (cipherSuites != null) {
+          String[] ciphers = cipherSuites.split(",", -1);
+          for (int i = 0; i < ciphers.length; i++) {
+            String javaCipher = CipherSuiteConverter.toJava(ciphers[i], "TLS");
+            if (javaCipher != null) {
+              ciphers[i] = javaCipher;
+            }
+          }
+          properties.setProperty(util.getSslCipherSuitesProperty(), String.join(",", ciphers));
         }
         // ZooKeeper 3.9.6 supports supplied SSLContext instances only with its JDK provider.
         properties.setProperty(util.getSslProviderProperty(), "JDK");
