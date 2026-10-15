@@ -22,6 +22,7 @@ import java.util.List;
 import org.apache.pinot.client.admin.PinotAdminClient;
 import org.apache.pinot.client.admin.PinotAdminNotFoundException;
 import org.apache.pinot.client.admin.PinotAdminValidationException;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -174,6 +175,52 @@ public class PinotSchemaRestletResourceTest {
     // Update non-existing schema
     expectNotFoundException(
         () -> adminClient.getSchemaClient().updateSchema(newSchemaName, schema.toSingleLineJsonString()));
+  }
+
+  // Exercise legacy FieldSpec transforms still accepted in persisted schemas.
+  @SuppressWarnings("deprecation")
+  @Test
+  public void testSchemaGroovyPolicy()
+      throws Exception {
+    PinotAdminClient adminClient = TEST_INSTANCE.getOrCreateAdminClient();
+    ControllerConf controllerConf = TEST_INSTANCE.getControllerConfig();
+    boolean originalDisableGroovy = controllerConf.isDisableIngestionGroovy();
+    String schemaName = "schemaGroovyPolicy";
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(schemaName)
+        .addSingleValueDimension("source", DataType.STRING)
+        .addSingleValueDimension("groovySource", DataType.STRING)
+        .addSingleValueDimension("result", DataType.STRING).build();
+    String disabledMessage = "Groovy transform functions are disabled for schema";
+    try {
+      TEST_INSTANCE.setClusterIngestionGroovyConfig(null);
+      // Even invalid Groovy must be rejected by policy before evaluator compilation.
+      for (String prefix : List.of("Groovy", "groovy", "gRoOvY")) {
+        schema.getFieldSpecFor("result").setTransformFunction(prefix + "({ def invalid = }, source)");
+        expectValidationExceptionWithMessage(
+            () -> adminClient.getSchemaClient().validateSchema(schema.toSingleLineJsonString()), disabledMessage);
+      }
+      schema.getFieldSpecFor("result").setTransformFunction("Groovy({source.reverse()}, source)");
+      expectValidationExceptionWithMessage(
+          () -> adminClient.getSchemaClient().createSchema(schema.toSingleLineJsonString()), disabledMessage);
+
+      schema.getFieldSpecFor("result").setTransformFunction("groovySource");
+      adminClient.getSchemaClient().validateSchema(schema.toSingleLineJsonString());
+      schema.getFieldSpecFor("result").setTransformFunction("reverse(source)");
+      adminClient.getSchemaClient().createSchema(schema.toSingleLineJsonString());
+      schema.getFieldSpecFor("result").setTransformFunction("Groovy({source.reverse()}, source)");
+      expectValidationExceptionWithMessage(
+          () -> adminClient.getSchemaClient().updateSchema(schemaName, schema.toSingleLineJsonString()),
+          disabledMessage);
+
+      TEST_INSTANCE.setClusterIngestionGroovyConfig("false");
+      adminClient.getSchemaClient().validateSchema(schema.toSingleLineJsonString());
+      adminClient.getSchemaClient().updateSchema(schemaName, schema.toSingleLineJsonString());
+      adminClient.getSchemaClient().deleteSchema(schemaName);
+      adminClient.getSchemaClient().createSchema(schema.toSingleLineJsonString());
+    } finally {
+      TEST_INSTANCE.setClusterIngestionGroovyConfig(Boolean.toString(originalDisableGroovy));
+      TEST_INSTANCE.getHelixResourceManager().deleteSchema(schemaName);
+    }
   }
 
   @Test
