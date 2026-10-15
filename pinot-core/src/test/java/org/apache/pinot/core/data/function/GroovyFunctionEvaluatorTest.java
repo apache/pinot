@@ -20,12 +20,19 @@ package org.apache.pinot.core.data.function;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
+import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.common.evaluator.GroovyFunctionEvaluator;
 import org.apache.pinot.common.evaluator.GroovyStaticAnalyzerConfig;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.function.FunctionEvaluator;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 import org.testng.collections.Lists;
@@ -33,11 +40,68 @@ import org.testng.collections.Lists;
 import static org.apache.pinot.common.evaluator.GroovyStaticAnalyzerConfig.getDefaultAllowedImports;
 import static org.apache.pinot.common.evaluator.GroovyStaticAnalyzerConfig.getDefaultAllowedReceivers;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.expectThrows;
 import static org.testng.Assert.fail;
 
 
 /// Tests Groovy functions for transforming schema columns
 public class GroovyFunctionEvaluatorTest {
+  @Test
+  public void testIngestionCompilationGate() {
+    String expression = "Groovy({value + 1}, value)";
+    GroovyFunctionEvaluator evaluator = new GroovyFunctionEvaluator(expression);
+    assertEquals(evaluator.evaluate(new Object[]{1}), 2);
+    try {
+      GroovyFunctionEvaluator.setIngestionGroovyDisabled(true);
+      // Invalid scripts must be rejected by the gate before the Groovy compiler is invoked.
+      for (String script : List.of(expression, "Groovy({not valid groovy!!!})")) {
+        assertEquals(expectThrows(IllegalStateException.class, () -> new GroovyFunctionEvaluator(script)).getMessage(),
+            "Groovy ingestion compilation is disabled");
+        assertEquals(expectThrows(IllegalStateException.class,
+            () -> GroovyFunctionEvaluator.parseGroovyScript(script)).getMessage(),
+            "Groovy ingestion compilation is disabled");
+      }
+      assertEquals(evaluator.evaluate(new Object[]{2}), 3);
+
+      GroovyFunctionEvaluator.setIngestionGroovyDisabled(false);
+      GroovyFunctionEvaluator.parseGroovyScript(expression);
+      assertEquals(new GroovyFunctionEvaluator(expression).evaluate(new Object[]{3}), 4);
+    } finally {
+      GroovyFunctionEvaluator.setIngestionGroovyDisabled(false);
+    }
+  }
+
+  @Test
+  public void testImplicitMapTransformsWithIngestionGroovyDisabled() {
+    try {
+      GroovyFunctionEvaluator.setIngestionGroovyDisabled(true);
+      FunctionEvaluator keys = FunctionEvaluatorFactory.getExpressionEvaluator(
+          new DimensionFieldSpec("attributes__KEYS", DataType.STRING, false));
+      FunctionEvaluator values = FunctionEvaluatorFactory.getExpressionEvaluator(
+          new DimensionFieldSpec("attributes__VALUES", DataType.INT, false));
+      assertEquals(keys.getArguments(), List.of("attributes"));
+      assertEquals(values.getArguments(), List.of("attributes"));
+
+      Map<String, Integer> attributes = new LinkedHashMap<>();
+      attributes.put("z", 2);
+      attributes.put("a", 1);
+      GenericRow row = new GenericRow();
+      row.putValue("attributes", attributes);
+      assertEquals(keys.evaluate(row), List.of("a", "z"));
+      assertEquals(values.evaluate(new Object[]{attributes}), List.of(1, 2));
+
+      Map<String, Integer> reverseSorted = new TreeMap<>(Comparator.reverseOrder());
+      reverseSorted.putAll(attributes);
+      assertEquals(keys.evaluate(new Object[]{reverseSorted}), List.of("z", "a"));
+      assertEquals(values.evaluate(new Object[]{reverseSorted}), List.of(2, 1));
+      assertEquals(keys.evaluate(new Object[]{Map.of()}), List.of());
+      assertNull(values.evaluate(new Object[]{null}));
+    } finally {
+      GroovyFunctionEvaluator.setIngestionGroovyDisabled(false);
+    }
+  }
+
   @Test
   public void testLegalGroovyScripts()
       throws JsonProcessingException {
