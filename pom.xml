@@ -2977,6 +2977,16 @@
                 <exclude>shaded/parquet/com/fasterxml/jackson/**</exclude>
                 <exclude>META-INF/versions/**/shaded/parquet/com/fasterxml/jackson/**</exclude>
 
+                <!-- Use managed Guava for Hadoop and Curator instead of their embedded copies. -->
+                <exclude>org/apache/hadoop/thirdparty/com/google/common/**</exclude>
+                <exclude>META-INF/versions/**/org/apache/hadoop/thirdparty/com/google/common/**</exclude>
+                <exclude>org/apache/hadoop/shaded/com/google/common/**</exclude>
+                <exclude>META-INF/versions/**/org/apache/hadoop/shaded/com/google/common/**</exclude>
+                <exclude>org/apache/hadoop/shaded/org/apache/curator/shaded/com/google/common/**</exclude>
+                <exclude>META-INF/versions/**/org/apache/hadoop/shaded/org/apache/curator/shaded/com/google/common/**</exclude>
+                <exclude>org/apache/curator/shaded/com/google/common/**</exclude>
+                <exclude>META-INF/versions/**/org/apache/curator/shaded/com/google/common/**</exclude>
+
                 <!-- Azure storage uses only HTTP clients. Remove the unused Reactor Netty HTTP server
                      and its vulnerable pipelining handler (CVE-2026-47874), including already shaded inputs. -->
                 <exclude>reactor/netty/http/server/**</exclude>
@@ -2997,6 +3007,19 @@
               <artifact>org.apache.pinot:pinot-parquet</artifact>
               <excludes>
                 <exclude>META-INF/maven/com.fasterxml.jackson.core/**</exclude>
+              </excludes>
+            </filter>
+            <filter>
+              <artifact>org.apache.hadoop*:*</artifact>
+              <excludes>
+                <exclude>META-INF/maven/com.google.guava/**</exclude>
+              </excludes>
+            </filter>
+            <filter>
+              <!-- Already shaded plugins can also carry Hadoop's embedded Guava metadata. -->
+              <artifact>org.apache.pinot:*</artifact>
+              <excludes>
+                <exclude>META-INF/maven/com.google.guava/**</exclude>
               </excludes>
             </filter>
             <filter>
@@ -3029,6 +3052,22 @@
             <relocation>
               <pattern>com.fasterxml.jackson</pattern>
               <shadedPattern>${shade.prefix}.com.fasterxml.jackson</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.apache.hadoop.thirdparty.com.google.common</pattern>
+              <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.apache.hadoop.shaded.com.google.common</pattern>
+              <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.apache.hadoop.shaded.org.apache.curator.shaded.com.google.common</pattern>
+              <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.apache.curator.shaded.com.google.common</pattern>
+              <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
             </relocation>
             <relocation>
               <pattern>com.google.common</pattern>
