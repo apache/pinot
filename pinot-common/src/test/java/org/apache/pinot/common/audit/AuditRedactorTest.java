@@ -198,6 +198,17 @@ public class AuditRedactorTest {
     assertThat(AuditRedactor.redactUrlUserInfo(value)).isEqualTo(expected);
   }
 
+  @Test(timeOut = 2000)
+  public void testUrlUserInfoScanIsLinear() {
+    // A backtracking pattern took seconds on these; each is a 64 KB value a caller could send as a header.
+    String letters = "a".repeat(65536) + "@";
+    assertThat(AuditRedactor.redactUrlUserInfo(letters)).isEqualTo(letters);
+    String separators = "a://".repeat(16384) + "@";
+    assertThat(AuditRedactor.redactUrlUserInfo(separators)).endsWith("a://" + AuditRedactor.MASKED_VALUE + "@");
+    String noUserInfo = "https://host/" + "x@".repeat(32768);
+    assertThat(AuditRedactor.redactUrlUserInfo(noUserInfo)).startsWith("https://" + AuditRedactor.MASKED_VALUE + "@");
+  }
+
   @Test
   public void testValueWithoutUrlUserInfoIsKept() {
     assertThat(AuditRedactor.redactUrlUserInfo("https://host:8081/a")).isEqualTo("https://host:8081/a");

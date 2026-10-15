@@ -35,7 +35,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
@@ -133,14 +132,6 @@ final class AuditRedactor {
   /// is masked, since the key-name rules alone would see only the harmless word `value`.
   private static final Set<String> PAIR_NAME_FIELDS = Set.of("name", "key");
   private static final String PAIR_VALUE_FIELD = "value";
-
-  /// The userinfo of every URL inside a value. Group 1 is the scheme with its `://`, which may contain
-  /// colons (`jdbc:postgresql://`); group 2 runs from there to the last `@` before whitespace or the next
-  /// `://`, so a password containing `@` or `/` is masked whole, and each URL of a list is handled on its
-  /// own. A URL whose path contains `@` has its host masked as well - an over-redaction accepted for
-  /// the sake of the password cases.
-  private static final Pattern URL_USERINFO =
-      Pattern.compile("([a-z][a-z0-9+.:-]*://)((?:(?!://)\\S)*)@", Pattern.CASE_INSENSITIVE);
 
   private AuditRedactor() {
   }
@@ -346,12 +337,54 @@ final class AuditRedactor {
 
   /// Returns `value` with the userinfo of every URL in it replaced by the mask, keeping each scheme, host
   /// and path. Returns the value unchanged when it carries no userinfo.
+  ///
+  /// Each `://` preceded by a scheme character starts a URL, so a scheme may contain colons
+  /// (`jdbc:postgresql://`). Its userinfo runs to the last `@` before whitespace or the next `://`, so a
+  /// password containing `@` or `/` is masked whole, and each URL of a list is handled on its own. A URL
+  /// whose path contains `@` has its host masked as well - an over-redaction accepted for the sake of the
+  /// password cases.
+  ///
+  /// This is a single forward pass rather than a regex, so its cost stays linear in the length of the
+  /// value, which may be a query parameter or header of the caller's choosing. A backtracking pattern
+  /// doing the same job took quadratic time on a long run of letters ending in `@`.
   static String redactUrlUserInfo(String value) {
     if (value == null || value.indexOf('@') < 0) {
       return value;
     }
-    return URL_USERINFO.matcher(value)
-        .replaceAll(match -> Matcher.quoteReplacement(match.group(1) + MASKED_VALUE + "@"));
+    StringBuilder redacted = null;
+    int copied = 0;
+    int separator = value.indexOf("://");
+    while (separator >= 0) {
+      int start = separator + 3;
+      int next = value.indexOf("://", start);
+      int end = next < 0 ? value.length() : next;
+      for (int i = start; i < end; i++) {
+        if (Character.isWhitespace(value.charAt(i))) {
+          end = i;
+          break;
+        }
+      }
+      if (separator > 0 && isSchemeChar(value.charAt(separator - 1))) {
+        int at = end - 1;
+        while (at >= start && value.charAt(at) != '@') {
+          at--;
+        }
+        if (at >= start) {
+          if (redacted == null) {
+            redacted = new StringBuilder(value.length());
+          }
+          redacted.append(value, copied, start).append(MASKED_VALUE);
+          copied = at;
+        }
+      }
+      separator = next;
+    }
+    return redacted == null ? value : redacted.append(value, copied, value.length()).toString();
+  }
+
+  private static boolean isSchemeChar(char c) {
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '+' || c == '.'
+        || c == '-';
   }
 
   /// Masks, in place, every value under a sensitive key - wholesale, whether it is a scalar, an array or
