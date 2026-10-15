@@ -74,6 +74,7 @@ import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.StaleSegment;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.local.indexsegment.immutable.EmptyIndexSegment;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
@@ -1166,14 +1167,14 @@ public abstract class BaseTableDataManager implements TableDataManager {
   /// Returns whether reloading the segment would change what is loaded, i.e. whether the regular reload path would
   /// download a new copy (completed segment whose CRC differs from ZK), move it to a different tier, or preprocess it
   /// under the given index loading config. Consuming segments are never considered as needing reload, as reloading
-  /// them means force committing.
+  /// them means force committing. Segment types the check does not understand are considered as needing reload.
   protected boolean isReloadNeeded(SegmentDataManager segmentDataManager, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
     if (segmentDataManager instanceof RealtimeSegmentDataManager) {
       return false;
     }
     IndexSegment segment = segmentDataManager.getSegment();
-    if (!(segment instanceof ImmutableSegmentImpl)) {
+    if (!(segment instanceof ImmutableSegmentImpl) && !(segment instanceof EmptyIndexSegment)) {
       return true;
     }
     String segmentName = segmentDataManager.getSegmentName();
@@ -1188,7 +1189,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
     if (segmentDirectoryLoader.needsTierMigration(zkMetadata.getTier(), segmentTier)) {
       return true;
     }
-    return ((ImmutableSegmentImpl) segment).isReloadNeeded(segmentIndexLoadingConfig);
+    // An empty segment has no indexes to preprocess: reloading it loads another empty segment
+    return segment instanceof ImmutableSegmentImpl
+        && ((ImmutableSegmentImpl) segment).isReloadNeeded(segmentIndexLoadingConfig);
   }
 
   /// Whether a completed segment has to be re-downloaded because its local CRC no longer matches ZK. The completed
@@ -1837,6 +1840,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
+  /// Uses the same per-segment check as an only-if-needed reload ([#isReloadNeeded]), so this reports `true` exactly
+  /// when such a reload would reload at least one segment. A segment whose check fails is reported as needing reload,
+  /// matching how the reload treats it.
   @Override
   public boolean needReloadSegments()
       throws Exception {
@@ -1845,14 +1851,15 @@ public abstract class BaseTableDataManager implements TableDataManager {
     boolean needReload = false;
     try {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-        IndexSegment segment = segmentDataManager.getSegment();
-        if (segment instanceof ImmutableSegmentImpl) {
-          ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
-          indexLoadingConfig.setSegmentTier(immutableSegment.getTier());
-          if (immutableSegment.isReloadNeeded(indexLoadingConfig)) {
-            needReload = true;
-            break;
-          }
+        try {
+          needReload = isReloadNeeded(segmentDataManager, indexLoadingConfig);
+        } catch (Exception e) {
+          _logger.warn("Caught exception while checking whether segment: {} needs reload",
+              segmentDataManager.getSegmentName(), e);
+          needReload = true;
+        }
+        if (needReload) {
+          break;
         }
       }
     } finally {

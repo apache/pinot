@@ -745,6 +745,54 @@ public class BaseTableDataManagerTest {
   }
 
   @Test
+  public void testIsReloadNeededForEmptySegment()
+      throws Exception {
+    File indexDir = createSegment(SegmentVersion.v3, 0);
+    long crc = getCRC(indexDir);
+    BaseTableDataManager tableDataManager = spy(createTableManager());
+    ImmutableSegmentDataManager segmentDataManager = loadSegmentDataManager(indexDir);
+    assertTrue(segmentDataManager.getSegment() instanceof EmptyIndexSegment);
+    tableDataManager.registerSegment(SEGMENT_NAME, segmentDataManager);
+    SegmentZKMetadata zkMetadata = new SegmentZKMetadata(SEGMENT_NAME);
+    zkMetadata.setCrc(crc);
+    seedZKMetadata(tableDataManager, SEGMENT_NAME, zkMetadata);
+
+    // A new index does not apply to an empty segment, so a reload would not change it
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setInvertedIndexColumns(List.of(STRING_COLUMN)).build();
+    assertFalse(tableDataManager.isReloadNeeded(segmentDataManager, new IndexLoadingConfig(tableConfig, SCHEMA)));
+
+    // A changed CRC still needs a download
+    zkMetadata.setCrc(crc + 1);
+    assertTrue(tableDataManager.isReloadNeeded(segmentDataManager, new IndexLoadingConfig(tableConfig, SCHEMA)));
+  }
+
+  @Test
+  public void testNeedReloadSegmentsUsesReloadCheck()
+      throws Exception {
+    File indexDir = createSegment(SegmentVersion.v3, 5);
+    long crc = getCRC(indexDir);
+    BaseTableDataManager tableDataManager = spy(createTableManager());
+    tableDataManager.registerSegment(SEGMENT_NAME, loadSegmentDataManager(indexDir));
+    SegmentZKMetadata zkMetadata = new SegmentZKMetadata(SEGMENT_NAME);
+    zkMetadata.setCrc(crc);
+    seedZKMetadata(tableDataManager, SEGMENT_NAME, zkMetadata);
+    doAnswer(invocation -> new IndexLoadingConfig(DEFAULT_TABLE_CONFIG, SCHEMA)).when(tableDataManager)
+        .fetchIndexLoadingConfig();
+    assertFalse(tableDataManager.needReloadSegments());
+
+    // A CRC change is reported, which the preprocessing-only check used to miss
+    zkMetadata.setCrc(crc + 1);
+    assertTrue(tableDataManager.needReloadSegments());
+
+    // A segment whose check fails is reported as needing reload
+    zkMetadata.setCrc(crc);
+    assertFalse(tableDataManager.needReloadSegments());
+    doThrow(new RuntimeException("injected")).when(tableDataManager).isReloadNeeded(any(), any());
+    assertTrue(tableDataManager.needReloadSegments());
+  }
+
+  @Test
   public void testSelectSegmentsNeedingReloadKeepsSegmentsThatCannotBeChecked()
       throws Exception {
     BaseTableDataManager tableDataManager = spy(createTableManager());
