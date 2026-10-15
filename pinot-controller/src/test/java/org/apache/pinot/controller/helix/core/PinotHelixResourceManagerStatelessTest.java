@@ -31,7 +31,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.controller.dataproviders.ResourceControllerDataProvider;
 import org.apache.helix.controller.rebalancer.strategy.CrushEdRebalanceStrategy;
@@ -754,127 +753,6 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     assertEquals(_helixResourceManager.getAllBrokerTenantNames(), Set.of(BROKER_TENANT_NAME));
 
     resetBrokerTags();
-  }
-
-  @Test
-  public void testDrainingBrokerUsesPreviousTagsForTenantMembership() {
-    untagBrokers();
-    Tenant brokerTenant = new Tenant(TenantRole.BROKER, BROKER_TENANT_NAME, 1, 0, 0);
-    assertTrue(_helixResourceManager.createBrokerTenant(brokerTenant).isSuccessful());
-    String brokerTag = TagNameUtils.getBrokerTagForTenant(BROKER_TENANT_NAME);
-    String drainingBroker =
-        _helixResourceManager.getAllInstancesForBrokerTenant(BROKER_TENANT_NAME).iterator().next();
-    markBrokerDraining(drainingBroker);
-
-    try {
-      // Updating a draining broker must change its logical tags without restoring active broker tags. This also
-      // directly guards against aliasing PREVIOUS_TAGS to the list from which active broker tags are removed.
-      assertTrue(_helixResourceManager.updateInstanceTags(drainingBroker, brokerTag, false).isSuccessful());
-      InstanceConfig drainingConfig = _helixResourceManager.getHelixInstanceConfig(drainingBroker);
-      assertNotNull(drainingConfig);
-      List<String> activeTags = drainingConfig.getTags();
-      List<String> previousTags = drainingConfig.getRecord().getListField(Helix.PREVIOUS_TAGS);
-      assertNotSame(activeTags, previousTags);
-      assertFalse(activeTags.contains(brokerTag));
-      assertEquals(previousTags, List.of(brokerTag));
-
-      assertEquals(_helixResourceManager.getAllInstancesForBrokerTenant(BROKER_TENANT_NAME), Set.of(drainingBroker));
-      assertEquals(_helixResourceManager.getAllInstancesConfigsForBrokerTenant(BROKER_TENANT_NAME).stream()
-          .map(InstanceConfig::getInstanceName).collect(Collectors.toSet()), Set.of(drainingBroker));
-      assertTrue(_helixResourceManager.getAllBrokerTenantNames().contains(BROKER_TENANT_NAME));
-
-      int untaggedBrokers = _helixResourceManager.getOnlineUnTaggedBrokerInstanceList().size();
-      assertTrue(_helixResourceManager.updateBrokerTenant(brokerTenant).isSuccessful());
-      assertEquals(_helixResourceManager.getOnlineUnTaggedBrokerInstanceList().size(), untaggedBrokers);
-
-      assertTrue(_helixResourceManager.isBrokerTenantDeletable(BROKER_TENANT_NAME));
-      assertTrue(_helixResourceManager.deleteBrokerTenantFor(BROKER_TENANT_NAME).isSuccessful());
-      drainingConfig = _helixResourceManager.getHelixInstanceConfig(drainingBroker);
-      assertNotNull(drainingConfig);
-      assertFalse(drainingConfig.getTags().stream().anyMatch(TagNameUtils::isBrokerTag));
-      assertEquals(drainingConfig.getRecord().getListField(Helix.PREVIOUS_TAGS),
-          List.of(Helix.UNTAGGED_BROKER_INSTANCE));
-      assertTrue(_helixResourceManager.getAllInstancesForBrokerTenant(BROKER_TENANT_NAME).isEmpty());
-      assertTrue(_helixResourceManager.getAllInstancesConfigsForBrokerTenant(BROKER_TENANT_NAME).isEmpty());
-      assertFalse(_helixResourceManager.getAllBrokerTenantNames().contains(BROKER_TENANT_NAME));
-    } finally {
-      clearBrokerDraining(drainingBroker);
-      resetBrokerTags();
-    }
-  }
-
-  @Test
-  public void testDrainingBrokerKeepsStashedTagsWhenDrainedTagViewIsWrittenBack() {
-    untagBrokers();
-    Tenant brokerTenant = new Tenant(TenantRole.BROKER, BROKER_TENANT_NAME, 1, 0, 0);
-    assertTrue(_helixResourceManager.createBrokerTenant(brokerTenant).isSuccessful());
-    String brokerTag = TagNameUtils.getBrokerTagForTenant(BROKER_TENANT_NAME);
-    String drainingBroker =
-        _helixResourceManager.getAllInstancesForBrokerTenant(BROKER_TENANT_NAME).iterator().next();
-    markBrokerDraining(drainingBroker);
-
-    try {
-      // A GET-modify-PUT of the whole instance carries the drained tag view back without asking to change broker tags
-      InstanceConfig drainingConfig = _helixResourceManager.getHelixInstanceConfig(drainingBroker);
-      assertNotNull(drainingConfig);
-      Instance drainedView = InstanceUtils.toInstance(drainingConfig);
-      assertEquals(drainedView.getTags(), List.of(Helix.DRAINED_BROKER_INSTANCE));
-      PinotResourceManagerResponse response = _helixResourceManager.updateInstance(drainingBroker, drainedView, true);
-      assertTrue(response.isSuccessful());
-      assertEquals(response.getMessage(), "Updated instance: " + drainingBroker);
-      assertDrainedWithStashedTags(drainingBroker, List.of(brokerTag));
-
-      // Writing the drained tag view back through the tag API must not drop the stashed broker tags either
-      assertTrue(_helixResourceManager.updateInstanceTags(drainingBroker, Helix.DRAINED_BROKER_INSTANCE, true)
-          .isSuccessful());
-      assertDrainedWithStashedTags(drainingBroker, List.of(brokerTag));
-      assertEquals(_helixResourceManager.getAllInstancesForBrokerTenant(BROKER_TENANT_NAME), Set.of(drainingBroker));
-
-      // Requesting broker tags explicitly still replaces the stashed tags
-      String otherBrokerTag = TagNameUtils.getBrokerTagForTenant("otherTenant");
-      assertTrue(_helixResourceManager.updateInstanceTags(drainingBroker,
-          Helix.DRAINED_BROKER_INSTANCE + "," + otherBrokerTag, false).isSuccessful());
-      assertDrainedWithStashedTags(drainingBroker, List.of(otherBrokerTag));
-    } finally {
-      clearBrokerDraining(drainingBroker);
-      // The broker may have been moved to another tenant above, so untag it explicitly before resetting the tenant
-      _helixResourceManager.updateInstanceTags(drainingBroker, Helix.UNTAGGED_BROKER_INSTANCE, false);
-      resetBrokerTags();
-    }
-  }
-
-  /// Writes the drained state that BrokerDrainManager leaves on a broker instance config.
-  private void markBrokerDraining(String broker) {
-    assertTrue(HelixHelper.updateInstanceConfig(_helixDataAccessor, broker, instanceConfig -> {
-      List<String> previousTags = new ArrayList<>(instanceConfig.getTags());
-      instanceConfig.getRecord().setListField(Helix.PREVIOUS_TAGS, previousTags);
-      List<String> activeTags = new ArrayList<>(previousTags);
-      activeTags.removeIf(TagNameUtils::isBrokerTag);
-      activeTags.add(Helix.DRAINED_BROKER_INSTANCE);
-      instanceConfig.getRecord().setListField(InstanceConfig.InstanceConfigProperty.TAG_LIST.name(), activeTags);
-      instanceConfig.getRecord().setBooleanField(Helix.IS_SHUTDOWN_IN_PROGRESS, true);
-    }));
-  }
-
-  /// Restores the pre-drain tags the way a restarting broker does.
-  private void clearBrokerDraining(String broker) {
-    assertTrue(HelixHelper.updateInstanceConfig(_helixDataAccessor, broker, instanceConfig -> {
-      List<String> previousTags = instanceConfig.getRecord().getListField(Helix.PREVIOUS_TAGS);
-      if (previousTags != null) {
-        instanceConfig.getRecord().setListField(InstanceConfig.InstanceConfigProperty.TAG_LIST.name(),
-            new ArrayList<>(previousTags));
-        instanceConfig.getRecord().getListFields().remove(Helix.PREVIOUS_TAGS);
-      }
-      instanceConfig.removeTag(Helix.DRAINED_BROKER_INSTANCE);
-      instanceConfig.getRecord().setBooleanField(Helix.IS_SHUTDOWN_IN_PROGRESS, false);
-    }));
-  }
-
-  private void assertDrainedWithStashedTags(String broker, List<String> expectedStashedTags) {
-    InstanceConfig instanceConfig = _helixResourceManager.getHelixInstanceConfig(broker);
-    assertNotNull(instanceConfig);
-    assertEquals(instanceConfig.getTags(), List.of(Helix.DRAINED_BROKER_INSTANCE));
-    assertEquals(instanceConfig.getRecord().getListField(Helix.PREVIOUS_TAGS), expectedStashedTags);
   }
 
   @Test

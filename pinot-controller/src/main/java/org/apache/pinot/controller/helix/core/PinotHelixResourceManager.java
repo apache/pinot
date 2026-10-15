@@ -639,15 +639,12 @@ public class PinotHelixResourceManager {
     //   - body=false + live!=true -> leave as is (no-op / cleared).
     List<String> newTags = newInstance.getTags();
     AtomicReference<List<String>> oldTagsRef = new AtomicReference<>();
-    AtomicReference<List<String>> updatedTagsRef = new AtomicReference<>();
     AtomicBoolean queriesDisabledPreserved = new AtomicBoolean();
     boolean updated = HelixHelper.updateInstanceConfig(_helixDataAccessor, instanceId, currentInstanceConfig -> {
-      oldTagsRef.set(getEffectiveInstanceTags(instanceId, currentInstanceConfig));
+      oldTagsRef.set(new ArrayList<>(currentInstanceConfig.getTags()));
       boolean liveQueriesDisabled = Boolean.parseBoolean(
           currentInstanceConfig.getRecord().getSimpleField(CommonConstants.Helix.QUERIES_DISABLED));
       InstanceUtils.updateHelixInstanceConfig(currentInstanceConfig, newInstance);
-      preserveBrokerDrainTags(instanceId, currentInstanceConfig, newTags);
-      updatedTagsRef.set(getEffectiveInstanceTags(instanceId, currentInstanceConfig));
       // If the live record had queriesDisabled=true but the request body defaulted it to false,
       // restore the operational flag so it survives a request-body-driven update.
       queriesDisabledPreserved.set(liveQueriesDisabled && !newInstance.isQueriesDisabled());
@@ -669,9 +666,9 @@ public class PinotHelixResourceManager {
     boolean shouldUpdateBrokerResource = false;
     List<String> newBrokerTags = null;
     if (InstanceTypeUtils.isBroker(instanceId) && updateBrokerResource) {
-      // Compare effective tags, so a draining broker whose drained tag view is written back is not treated as changed
       newBrokerTags =
-          updatedTagsRef.get().stream().filter(TagNameUtils::isBrokerTag).sorted().collect(Collectors.toList());
+          newTags != null ? newTags.stream().filter(TagNameUtils::isBrokerTag).sorted().collect(Collectors.toList())
+              : List.of();
       List<String> oldTags = oldTagsRef.get();
       List<String> oldBrokerTags =
           oldTags.stream().filter(TagNameUtils::isBrokerTag).sorted().collect(Collectors.toList());
@@ -728,11 +725,10 @@ public class PinotHelixResourceManager {
     InstanceConfigValidatorRegistry.validate(InstanceUtils.toInstance(instanceConfig));
 
     AtomicReference<List<String>> oldTagsRef = new AtomicReference<>();
-    AtomicReference<List<String>> updatedTagsRef = new AtomicReference<>();
     if (!HelixHelper.updateInstanceConfig(_helixDataAccessor, instanceId, currentInstanceConfig -> {
-      oldTagsRef.set(getEffectiveInstanceTags(instanceId, currentInstanceConfig));
-      preserveBrokerDrainTags(instanceId, currentInstanceConfig, newTags);
-      updatedTagsRef.set(getEffectiveInstanceTags(instanceId, currentInstanceConfig));
+      oldTagsRef.set(new ArrayList<>(currentInstanceConfig.getTags()));
+      currentInstanceConfig.getRecord()
+          .setListField(InstanceConfig.InstanceConfigProperty.TAG_LIST.name(), new ArrayList<>(newTags));
     })) {
       throw new RuntimeException("Failed to set instance config for instance: " + instanceId);
     }
@@ -741,9 +737,7 @@ public class PinotHelixResourceManager {
     boolean shouldUpdateBrokerResource = false;
     List<String> newBrokerTags = null;
     if (InstanceTypeUtils.isBroker(instanceId) && updateBrokerResource) {
-      // Compare effective tags, so a draining broker whose drained tag view is written back is not treated as changed
-      newBrokerTags =
-          updatedTagsRef.get().stream().filter(TagNameUtils::isBrokerTag).sorted().collect(Collectors.toList());
+      newBrokerTags = newTags.stream().filter(TagNameUtils::isBrokerTag).sorted().collect(Collectors.toList());
       List<String> oldTags = oldTagsRef.get();
       List<String> oldBrokerTags =
           oldTags.stream().filter(TagNameUtils::isBrokerTag).sorted().collect(Collectors.toList());
@@ -1268,8 +1262,7 @@ public class PinotHelixResourceManager {
 
   public PinotResourceManagerResponse updateBrokerTenant(Tenant tenant) {
     String brokerTenantTag = TagNameUtils.getBrokerTagForTenant(tenant.getTenantName());
-    List<String> instancesInClusterWithTag =
-        getInstancesWithEffectiveBrokerTag(getAllHelixInstanceConfigs(), brokerTenantTag);
+    List<String> instancesInClusterWithTag = HelixHelper.getInstancesWithTag(_helixZkManager, brokerTenantTag);
     if (instancesInClusterWithTag.size() > tenant.getNumberOfInstances()) {
       return scaleDownBroker(tenant, brokerTenantTag, instancesInClusterWithTag);
     }
@@ -1459,70 +1452,11 @@ public class PinotHelixResourceManager {
       throw new NotFoundException("Failed to find instance config for instance: " + instanceName);
     }
     if (!HelixHelper.updateInstanceConfig(_helixDataAccessor, instanceName, currentInstanceConfig -> {
-      List<String> newTags = getEffectiveInstanceTags(instanceName, currentInstanceConfig);
-      newTags.remove(oldTag);
-      if (!newTags.contains(newTag)) {
-        newTags.add(newTag);
-      }
-      preserveBrokerDrainTags(instanceName, currentInstanceConfig, newTags);
+      currentInstanceConfig.removeTag(oldTag);
+      currentInstanceConfig.addTag(newTag);
     })) {
       throw new RuntimeException("Failed to set instance config for instance: " + instanceName);
     }
-  }
-
-  private static List<String> getEffectiveInstanceTags(String instanceId, InstanceConfig instanceConfig) {
-    if (InstanceTypeUtils.isBroker(instanceId) && instanceConfig.getRecord()
-        .getBooleanField(Helix.IS_SHUTDOWN_IN_PROGRESS, false)) {
-      List<String> previousTags = instanceConfig.getRecord().getListField(Helix.PREVIOUS_TAGS);
-      if (previousTags != null) {
-        return new ArrayList<>(previousTags);
-      }
-    }
-    return new ArrayList<>(instanceConfig.getTags());
-  }
-
-  private static List<InstanceConfig> getInstanceConfigsWithEffectiveBrokerTag(
-      List<InstanceConfig> instanceConfigs, String brokerTag) {
-    List<InstanceConfig> matchingInstanceConfigs = new ArrayList<>();
-    for (InstanceConfig instanceConfig : instanceConfigs) {
-      if (getEffectiveInstanceTags(instanceConfig.getInstanceName(), instanceConfig).contains(brokerTag)) {
-        matchingInstanceConfigs.add(instanceConfig);
-      }
-    }
-    return matchingInstanceConfigs;
-  }
-
-  private static List<String> getInstancesWithEffectiveBrokerTag(List<InstanceConfig> instanceConfigs,
-      String brokerTag) {
-    return getInstanceConfigsWithEffectiveBrokerTag(instanceConfigs, brokerTag).stream()
-        .map(InstanceConfig::getInstanceName).collect(Collectors.toList());
-  }
-
-  /// Applies the requested tags. For a draining broker, the requested tags are stashed in [Helix#PREVIOUS_TAGS] for
-  /// restart, and the active tags keep the [Helix#DRAINED_BROKER_INSTANCE] placeholder instead of broker tags, so the
-  /// broker stays ineligible to mixed-version controllers and older broker binaries.
-  private static void preserveBrokerDrainTags(String instanceId, InstanceConfig instanceConfig,
-      @Nullable List<String> desiredTags) {
-    List<String> tags = desiredTags != null ? new ArrayList<>(desiredTags) : new ArrayList<>();
-    if (InstanceTypeUtils.isBroker(instanceId) && instanceConfig.getRecord()
-        .getBooleanField(Helix.IS_SHUTDOWN_IN_PROGRESS, false)) {
-      boolean echoesDrainedTags = tags.removeIf(Helix.DRAINED_BROKER_INSTANCE::equals);
-      List<String> tagsToRestore = new ArrayList<>(tags);
-      List<String> previousTags = instanceConfig.getRecord().getListField(Helix.PREVIOUS_TAGS);
-      if (echoesDrainedTags && previousTags != null && tags.stream().noneMatch(TagNameUtils::isBrokerTag)) {
-        // The request carries the drained tag view back (e.g. a GET-modify-PUT of the instance), so it does not ask to
-        // change broker tags. Keep the stashed broker tags instead of losing them on restart.
-        for (String previousTag : previousTags) {
-          if (TagNameUtils.isBrokerTag(previousTag) && !tagsToRestore.contains(previousTag)) {
-            tagsToRestore.add(previousTag);
-          }
-        }
-      }
-      instanceConfig.getRecord().setListField(Helix.PREVIOUS_TAGS, tagsToRestore);
-      tags.removeIf(TagNameUtils::isBrokerTag);
-      tags.add(Helix.DRAINED_BROKER_INSTANCE);
-    }
-    instanceConfig.getRecord().setListField(InstanceConfig.InstanceConfigProperty.TAG_LIST.name(), tags);
   }
 
   public PinotResourceManagerResponse updateServerTenant(Tenant serverTenant) {
@@ -1627,8 +1561,7 @@ public class PinotHelixResourceManager {
 
   public boolean isBrokerTenantDeletable(String tenantName) {
     String brokerTag = TagNameUtils.getBrokerTagForTenant(tenantName);
-    Set<String> taggedInstances =
-        new HashSet<>(getInstancesWithEffectiveBrokerTag(getAllHelixInstanceConfigs(), brokerTag));
+    Set<String> taggedInstances = new HashSet<>(HelixHelper.getInstancesWithTag(_helixZkManager, brokerTag));
     String brokerName = Helix.BROKER_RESOURCE_INSTANCE;
     IdealState brokerIdealState = _helixAdmin.getResourceIdealState(_helixClusterName, brokerName);
     if (brokerIdealState == null) {
@@ -1672,7 +1605,7 @@ public class PinotHelixResourceManager {
     Set<String> tenantSet = new HashSet<>();
     List<InstanceConfig> instanceConfigs = getAllHelixInstanceConfigs();
     for (InstanceConfig instanceConfig : instanceConfigs) {
-      for (String tag : getEffectiveInstanceTags(instanceConfig.getInstanceName(), instanceConfig)) {
+      for (String tag : instanceConfig.getTags()) {
         if (TagNameUtils.isBrokerTag(tag)) {
           tenantSet.add(TagNameUtils.getTenantFromTag(tag));
         }
@@ -1778,8 +1711,7 @@ public class PinotHelixResourceManager {
 
   public PinotResourceManagerResponse deleteBrokerTenantFor(String tenantName) {
     String brokerTag = TagNameUtils.getBrokerTagForTenant(tenantName);
-    List<String> instancesInClusterWithTag =
-        getInstancesWithEffectiveBrokerTag(getAllHelixInstanceConfigs(), brokerTag);
+    List<String> instancesInClusterWithTag = HelixHelper.getInstancesWithTag(_helixZkManager, brokerTag);
     for (String instance : instancesInClusterWithTag) {
       retagInstance(instance, brokerTag, Helix.UNTAGGED_BROKER_INSTANCE);
     }
@@ -1804,8 +1736,7 @@ public class PinotHelixResourceManager {
   /// TODO: refactor code to use this method over [#getAllInstancesForBrokerTenant(String)] if applicable to reuse
   /// instance configs in order to reduce ZK accesses
   public Set<String> getAllInstancesForBrokerTenant(List<InstanceConfig> instanceConfigs, String tenantName) {
-    return new HashSet<>(getInstancesWithEffectiveBrokerTag(instanceConfigs,
-        TagNameUtils.getBrokerTagForTenant(tenantName)));
+    return HelixHelper.getBrokerInstancesForTenant(instanceConfigs, tenantName);
   }
 
   public Set<String> getAllInstancesForBrokerTenant(String tenantName) {
@@ -1813,8 +1744,7 @@ public class PinotHelixResourceManager {
   }
 
   public Set<InstanceConfig> getAllInstancesConfigsForBrokerTenant(String tenantName) {
-    return new HashSet<>(getInstanceConfigsWithEffectiveBrokerTag(getAllHelixInstanceConfigs(),
-        TagNameUtils.getBrokerTagForTenant(tenantName)));
+    return HelixHelper.getBrokerInstanceConfigsForTenant(HelixHelper.getInstanceConfigs(_helixZkManager), tenantName);
   }
 
   /*
@@ -2613,7 +2543,7 @@ public class PinotHelixResourceManager {
   private boolean updateBrokerResourceForTable(String tableName, String brokerTag) {
     Map<String, String> brokerAssignmentBefore = getBrokerAssignment(tableName);
     List<InstanceConfig> instanceConfigs = getAllHelixInstanceConfigs();
-    Set<String> brokerInstances = new HashSet<>(getInstancesWithEffectiveBrokerTag(instanceConfigs, brokerTag));
+    Set<String> brokerInstances = new HashSet<>(HelixHelper.getInstancesWithTag(instanceConfigs, brokerTag));
     rebuildBrokerResource(tableName, brokerInstances);
     return !Objects.equals(brokerAssignmentBefore, getBrokerAssignment(tableName));
   }

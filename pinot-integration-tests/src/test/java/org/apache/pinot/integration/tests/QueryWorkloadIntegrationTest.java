@@ -60,7 +60,6 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
@@ -241,11 +240,10 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
 
       try {
         sendPostRequest(getAdminBaseUrl(drainedBroker) + "/drain?shutdown=false");
-        // Drain swaps the broker tags for a placeholder so older broker binaries do not re-tag the instance
+        // Drain marks the instance config and leaves its tags, so the broker stays a tenant member
         InstanceConfig drainedConfig = _helixAdmin.getInstanceConfig(getHelixClusterName(), drainedBroker);
-        assertTrue(drainedConfig.getTags().contains(CommonConstants.Helix.DRAINED_BROKER_INSTANCE));
-        assertFalse(drainedConfig.getTags().stream().anyMatch(TagNameUtils::isBrokerTag));
-        assertNotNull(drainedConfig.getRecord().getListField(CommonConstants.Helix.PREVIOUS_TAGS));
+        assertTrue(drainedConfig.getRecord().getBooleanField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, false));
+        assertTrue(drainedConfig.getTags().stream().anyMatch(TagNameUtils::isBrokerTag));
 
         JsonNode rejectedResponse = postQueryToBroker(drainedBroker, "SELECT COUNT(*) FROM " + DEFAULT_TABLE_NAME);
         JsonNode exceptions = rejectedResponse.path("exceptions");
@@ -273,9 +271,8 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
         }
       }, 60_000L, "Failed to restore restarted broker to BrokerResource");
       InstanceConfig restartedConfig = _helixAdmin.getInstanceConfig(getHelixClusterName(), drainedBroker);
-      assertFalse(restartedConfig.getTags().contains(CommonConstants.Helix.DRAINED_BROKER_INSTANCE));
+      assertFalse(restartedConfig.getRecord().getBooleanField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, false));
       assertTrue(restartedConfig.getTags().stream().anyMatch(TagNameUtils::isBrokerTag));
-      assertNull(restartedConfig.getRecord().getListField(CommonConstants.Helix.PREVIOUS_TAGS));
       TestUtils.waitForCondition(aVoid -> {
         try {
           JsonNode queryResponse =

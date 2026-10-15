@@ -28,8 +28,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.helix.HelixManager;
-import org.apache.helix.model.InstanceConfig;
-import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
@@ -256,32 +254,15 @@ public class BrokerDrainManager {
   }
 
   private void markShutdownInProgress(HelixManager helixManager) {
+    // The broker keeps its tags, so tenant membership is unchanged. Controllers skip brokers with this marker when they
+    // (re)build brokerResource, and the broker clears the marker when it starts again.
     boolean updated = HelixHelper.updateInstanceConfig(helixManager.getHelixDataAccessor(), _instanceId,
-        instanceConfig -> {
-          List<String> previousTags =
-              instanceConfig.getRecord().getListField(CommonConstants.Helix.PREVIOUS_TAGS);
-          if (previousTags == null) {
-            List<String> tagsToRestore = new ArrayList<>(instanceConfig.getTags());
-            tagsToRestore.remove(CommonConstants.Helix.DRAINED_BROKER_INSTANCE);
-            instanceConfig.getRecord().setListField(CommonConstants.Helix.PREVIOUS_TAGS, tagsToRestore);
-          }
-          // Replace the broker tags with a placeholder instead of leaving the tag list empty, so a broker binary that
-          // predates drain does not treat this instance as new and re-tag it into a tenant.
-          List<String> activeTags = new ArrayList<>(instanceConfig.getTags());
-          activeTags.removeIf(TagNameUtils::isBrokerTag);
-          if (!activeTags.contains(CommonConstants.Helix.DRAINED_BROKER_INSTANCE)) {
-            activeTags.add(CommonConstants.Helix.DRAINED_BROKER_INSTANCE);
-          }
-          instanceConfig.getRecord()
-              .setListField(InstanceConfig.InstanceConfigProperty.TAG_LIST.name(), activeTags);
-          instanceConfig.getRecord()
-              .setSimpleField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.TRUE.toString());
-        });
+        instanceConfig -> instanceConfig.getRecord()
+            .setSimpleField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.TRUE.toString()));
     if (!updated) {
       throw new IllegalStateException("Failed to mark broker instance " + _instanceId + " as shutting down");
     }
-    LOGGER.info("Marked broker instance {} with {}=true and temporarily replaced its broker tags with {}", _instanceId,
-        CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, CommonConstants.Helix.DRAINED_BROKER_INSTANCE);
+    LOGGER.info("Marked broker instance {} with {}=true", _instanceId, CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS);
   }
 
   /// Returns the tables this broker was removed from, or `null` when the waiter was interrupted and the outcome of the

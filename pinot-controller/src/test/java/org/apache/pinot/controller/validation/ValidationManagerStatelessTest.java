@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.validation;
 
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -174,12 +173,7 @@ public class ValidationManagerStatelessTest extends ControllerTest {
 
     InstanceConfig drainingBrokerConfig = _helixResourceManager.getHelixInstanceConfig(drainingBroker);
     Assert.assertNotNull(drainingBrokerConfig);
-    List<String> previousTags = new ArrayList<>(drainingBrokerConfig.getTags());
-    drainingBrokerConfig.getRecord().setListField(Helix.PREVIOUS_TAGS, previousTags);
-    List<String> activeTags = new ArrayList<>(previousTags);
-    activeTags.removeIf(TagNameUtils::isBrokerTag);
-    drainingBrokerConfig.getRecord()
-        .setListField(InstanceConfig.InstanceConfigProperty.TAG_LIST.name(), activeTags);
+    // Drain keeps the tags, so the broker remains a tenant member while it is excluded from brokerResource
     drainingBrokerConfig.getRecord().setBooleanField(Helix.IS_SHUTDOWN_IN_PROGRESS, true);
     HelixHelper.updateInstanceConfig(_helixManager, drainingBrokerConfig);
     Assert.assertEquals(
@@ -219,7 +213,7 @@ public class ValidationManagerStatelessTest extends ControllerTest {
       Assert.assertEquals(idealState.getInstanceSet(offlineTableName), expectedBrokerInstances);
       Assert.assertEquals(idealState.getInstanceSet(logicalTableName), expectedBrokerInstances);
 
-      restoreDrainingBrokerTags(drainingBrokerConfig);
+      drainingBrokerConfig.getRecord().setBooleanField(Helix.IS_SHUTDOWN_IN_PROGRESS, false);
       HelixHelper.updateInstanceConfig(_helixManager, drainingBrokerConfig);
       // A snapshot captured while the broker was draining must not trigger an early return after the live marker is
       // cleared. The IdealState CAS must re-read live configs and restore the broker to both assignments.
@@ -233,7 +227,7 @@ public class ValidationManagerStatelessTest extends ControllerTest {
     } finally {
       InstanceConfig latestDrainingBrokerConfig = _helixResourceManager.getHelixInstanceConfig(drainingBroker);
       if (latestDrainingBrokerConfig != null) {
-        restoreDrainingBrokerTags(latestDrainingBrokerConfig);
+        latestDrainingBrokerConfig.getRecord().setBooleanField(Helix.IS_SHUTDOWN_IN_PROGRESS, false);
         HelixHelper.updateInstanceConfig(_helixManager, latestDrainingBrokerConfig);
         // The direct update above removes the draining broker from every matching table partition. Restore those
         // pre-existing partitions as part of test cleanup, not only the tables created by this test.
@@ -253,16 +247,6 @@ public class ValidationManagerStatelessTest extends ControllerTest {
         deleteSchema(rawTableName);
       }
     }
-  }
-
-  private static void restoreDrainingBrokerTags(InstanceConfig instanceConfig) {
-    List<String> previousTags = instanceConfig.getRecord().getListField(Helix.PREVIOUS_TAGS);
-    if (previousTags != null) {
-      instanceConfig.getRecord().setListField(InstanceConfig.InstanceConfigProperty.TAG_LIST.name(),
-          new ArrayList<>(previousTags));
-      instanceConfig.getRecord().getListFields().remove(Helix.PREVIOUS_TAGS);
-    }
-    instanceConfig.getRecord().setBooleanField(Helix.IS_SHUTDOWN_IN_PROGRESS, false);
   }
 
   @AfterClass
