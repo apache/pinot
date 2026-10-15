@@ -2,7 +2,6 @@
   "tableName": "userAttributes",
   "tableType": "OFFLINE",
   "segmentsConfig": {
-    "segmentPushType": "APPEND",
     "replication": 2
   },
   "tenants": {
@@ -39,6 +38,11 @@
   },
   "routing": {
     "instanceSelectorType": "multiStageReplicaGroup"
+  },
+  "ingestionConfig": {
+    "batchIngestionConfig": {
+      "segmentIngestionType": "APPEND"
+    }
   },
   "metadata": {
     "customConfigs": {

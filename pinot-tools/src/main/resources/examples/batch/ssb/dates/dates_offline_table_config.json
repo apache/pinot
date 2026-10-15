@@ -4,13 +4,15 @@
   "tenants": {
   },
   "segmentsConfig": {
-    "segmentPushType": "REFRESH",
     "replication": "1"
   },
   "tableIndexConfig": {
     "loadMode": "MMAP"
   },
   "ingestionConfig": {
+    "batchIngestionConfig": {
+      "segmentIngestionType": "REFRESH"
+    },
     "transformConfigs": [
     ]
   },

@@ -4,7 +4,6 @@
   "tenants": {
   },
   "segmentsConfig": {
-    "segmentPushType": "REFRESH",
     "replication": "1"
   },
   "tableIndexConfig": {
@@ -15,6 +14,9 @@
     ]
   },
   "ingestionConfig": {
+    "batchIngestionConfig": {
+      "segmentIngestionType": "REFRESH"
+    },
     "transformConfigs": [
     ]
   },

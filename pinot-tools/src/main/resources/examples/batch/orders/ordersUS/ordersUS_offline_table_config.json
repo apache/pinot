@@ -2,7 +2,6 @@
   "tableName": "ordersUS",
   "tableType": "OFFLINE",
   "segmentsConfig": {
-    "segmentPushType": "APPEND",
     "replication": "1"
   },
   "tenants": {
@@ -13,6 +12,11 @@
       "region",
       "status"
     ]
+  },
+  "ingestionConfig": {
+    "batchIngestionConfig": {
+      "segmentIngestionType": "APPEND"
+    }
   },
   "metadata": {
     "customConfigs": {

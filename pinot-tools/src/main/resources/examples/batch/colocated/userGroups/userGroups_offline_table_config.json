@@ -2,12 +2,7 @@
   "tableName": "userGroups",
   "tableType": "OFFLINE",
   "segmentsConfig": {
-    "segmentPushType": "APPEND",
-    "replication": "2",
-    "replicaGroupStrategyConfig": {
-      "partitionColumn": "userUUID",
-      "numInstancesPerPartition": 2
-    }
+    "replication": "2"
   },
   "tenants": {
     "broker": "DefaultTenant",
@@ -30,8 +25,18 @@
   "instancePartitionsMap": {
     "OFFLINE": "userAttributes_OFFLINE"
   },
+  "segmentAssignmentConfigMap": {
+    "OFFLINE": {
+      "segmentAssignmentStrategy": "replicaGroup"
+    }
+  },
   "routing": {
     "instanceSelectorType": "multiStageReplicaGroup"
+  },
+  "ingestionConfig": {
+    "batchIngestionConfig": {
+      "segmentIngestionType": "APPEND"
+    }
   },
   "metadata": {
     "customConfigs": {

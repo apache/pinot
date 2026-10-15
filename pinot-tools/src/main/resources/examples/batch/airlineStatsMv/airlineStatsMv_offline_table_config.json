@@ -5,12 +5,16 @@
   "segmentsConfig": {
     "timeColumnName": "tsMs",
     "timeType": "MILLISECONDS",
-    "segmentPushType": "APPEND",
     "replication": "1"
   },
   "tenants": {},
   "tableIndexConfig": {
     "loadMode": "MMAP"
+  },
+  "ingestionConfig": {
+    "batchIngestionConfig": {
+      "segmentIngestionType": "APPEND"
+    }
   },
   "metadata": {
     "customConfigs": {}

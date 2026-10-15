@@ -2,8 +2,7 @@
   "tableName": "compressionStats",
   "tableType": "OFFLINE",
   "segmentsConfig": {
-    "replication": "2",
-    "segmentPushType": "APPEND"
+    "replication": "2"
   },
   "tenants": {},
   "fieldConfigList": [
@@ -19,6 +18,11 @@
     "noDictionaryColumns": [
       "message"
     ]
+  },
+  "ingestionConfig": {
+    "batchIngestionConfig": {
+      "segmentIngestionType": "APPEND"
+    }
   },
   "metadata": {
     "customConfigs": {}

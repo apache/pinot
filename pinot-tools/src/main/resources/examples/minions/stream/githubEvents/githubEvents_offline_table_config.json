@@ -3,12 +3,14 @@
   "tableType": "OFFLINE",
   "segmentsConfig": {
     "timeColumnName": "created_at_timestamp",
-    "segmentPushType": "APPEND",
     "replication": "1"
   },
   "tenants": {
   },
   "ingestionConfig": {
+    "batchIngestionConfig": {
+      "segmentIngestionType": "APPEND"
+    },
     "transformConfigs": [
       {
         "columnName": "created_at_timestamp",
