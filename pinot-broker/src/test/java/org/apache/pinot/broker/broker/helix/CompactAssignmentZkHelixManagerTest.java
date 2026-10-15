@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.broker.broker.helix;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.CountDownLatch;
@@ -28,10 +26,8 @@ import org.apache.helix.AccessOption;
 import org.apache.helix.BaseDataAccessor;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
-import org.apache.helix.InstanceType;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.manager.zk.ZKHelixAdmin;
-import org.apache.helix.manager.zk.ZKHelixManager;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.zookeeper.api.client.RealmAwareZkClient;
@@ -63,9 +59,9 @@ import static org.testng.Assert.assertTrue;
 /// [org.apache.pinot.common.utils.helix.CompactZNRecordSerializer] on the client that Helix creates in `connect()`, for
 /// table ideal states and external views only.
 ///
-/// This test fails when a Helix upgrade changes how [ZKHelixManager] creates its ZooKeeper client or its serializer,
-/// for example by renaming the protected `_zkclient` field (compile error) or by creating the client outside of
-/// `connect()` (the records read through the manager would no longer be compact).
+/// This test fails when a Helix upgrade changes how [org.apache.helix.manager.zk.ZKHelixManager] creates its ZooKeeper
+/// client or its serializer, for example by renaming the protected `_zkclient` field (compile error) or by creating the
+/// client outside of `connect()` (the records read through the manager would no longer be compact).
 public class CompactAssignmentZkHelixManagerTest {
   private static final String CLUSTER_NAME = "CompactAssignmentZkHelixManagerTest";
   private static final String TABLE_NAME = "myTable_OFFLINE";
@@ -112,14 +108,6 @@ public class CompactAssignmentZkHelixManagerTest {
   }
 
   @Test
-  public void testZkClientFieldIsProtected()
-      throws NoSuchFieldException {
-    Field field = ZKHelixManager.class.getDeclaredField("_zkclient");
-    assertTrue(Modifier.isProtected(field.getModifiers()));
-    assertEquals(field.getType(), RealmAwareZkClient.class);
-  }
-
-  @Test
   public void testFactoryHonorsFlag() {
     String zkUrl = _zookeeperInstance.getZkUrl();
     HelixManager defaultManager =
@@ -137,8 +125,7 @@ public class CompactAssignmentZkHelixManagerTest {
   public void testReadsThroughManagerAreCompact()
       throws Exception {
     CompactAssignmentZkHelixManager manager =
-        new CompactAssignmentZkHelixManager(CLUSTER_NAME, "Broker_localhost_2", InstanceType.SPECTATOR,
-            _zookeeperInstance.getZkUrl());
+        new CompactAssignmentZkHelixManager(CLUSTER_NAME, "Broker_localhost_2", _zookeeperInstance.getZkUrl());
     manager.connect();
     try {
       assertReads(manager);
@@ -155,13 +142,12 @@ public class CompactAssignmentZkHelixManagerTest {
   public void testSerializerSurvivesSessionExpiry()
       throws Exception {
     CompactAssignmentZkHelixManager manager =
-        new CompactAssignmentZkHelixManager(CLUSTER_NAME, "Broker_localhost_3", InstanceType.SPECTATOR,
-            _zookeeperInstance.getZkUrl());
+        new CompactAssignmentZkHelixManager(CLUSTER_NAME, "Broker_localhost_3", _zookeeperInstance.getZkUrl());
     manager.connect();
     try {
       assertReads(manager);
       RealmAwareZkClient zkClient = manager.getZkClient();
-      PathBasedZkSerializer serializer = manager.getInstalledZkSerializer();
+      PathBasedZkSerializer serializer = manager.getZkClient().getZkSerializer();
       long oldSessionId = ((ZkClient) zkClient).getSessionId();
       expireSession((ZkClient) zkClient);
       TestUtils.waitForCondition(aVoid -> {
@@ -170,7 +156,7 @@ public class CompactAssignmentZkHelixManagerTest {
       }, 30_000L, "Failed to get a new ZooKeeper session");
       // Helix keeps the client (and so the serializer) across a session expiry
       assertSame(manager.getZkClient(), zkClient);
-      assertSame(manager.getInstalledZkSerializer(), serializer);
+      assertSame(manager.getZkClient().getZkSerializer(), serializer);
       assertReads(manager);
     } finally {
       manager.disconnect();
@@ -196,7 +182,7 @@ public class CompactAssignmentZkHelixManagerTest {
   }
 
   private static void assertReads(CompactAssignmentZkHelixManager manager) {
-    assertNotNull(manager.getInstalledZkSerializer());
+    assertNotNull(manager.getZkClient().getZkSerializer());
     BaseDataAccessor<ZNRecord> accessor = manager.getHelixDataAccessor().getBaseDataAccessor();
     PropertyKey.Builder keyBuilder = new PropertyKey.Builder(CLUSTER_NAME);
 

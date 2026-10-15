@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
 import javax.annotation.Nullable;
+import org.apache.helix.HelixDefinedState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.helix.zookeeper.util.GZipCompressionUtil;
@@ -94,10 +95,11 @@ public class CompactZNRecordSerializer implements ZkSerializer {
   private static final int INITIAL_STATE_MAP_TABLE_CAPACITY = 16;
   private static final int INITIAL_INSTANCE_CAPACITY = 8;
 
-  /// The states a segment replica can have. The constants are string literals, so they are already interned.
+  /// The states a segment replica can have. The constants are string literals or enum constant names, so they are
+  /// already interned.
   private static final String[] KNOWN_STATES = {
       SegmentStateModel.ONLINE, SegmentStateModel.CONSUMING, SegmentStateModel.OFFLINE, SegmentStateModel.ERROR,
-      "DROPPED"
+      HelixDefinedState.DROPPED.name()
   };
 
   private final ZNRecordSerializer _delegate;
@@ -135,16 +137,12 @@ public class CompactZNRecordSerializer implements ZkSerializer {
     }
   }
 
-  /// Parses the given znode content, gzip-compressed or plain, with the compact parser. Throws on malformed input;
-  /// [#deserialize] then falls back. [#deserialize] only passes gzip-compressed content; tests and benchmarks also
-  /// call it with plain content.
+  /// Parses the given gzip-compressed znode content with the compact parser. The content must be gzip-compressed;
+  /// [#deserialize] sends plain content to [ZNRecordSerializer] before calling this method. Throws on malformed input;
+  /// [#deserialize] then falls back.
   static ZNRecord deserializeCompact(byte[] bytes)
       throws IOException {
-    if (!GZipCompressionUtil.isCompressed(bytes)) {
-      try (JsonParser parser = JSON_FACTORY.createParser(bytes)) {
-        return new Reader(parser).readRecord();
-      }
-    }
+    assert GZipCompressionUtil.isCompressed(bytes);
     GZIPInputStream gzipInputStream = new GZIPInputStream(new ByteArrayInputStream(bytes), GZIP_BUFFER_SIZE);
     try (JsonParser parser = JSON_FACTORY.createParser(gzipInputStream)) {
       ZNRecord record = new Reader(parser).readRecord();
@@ -415,8 +413,6 @@ public class CompactZNRecordSerializer implements ZkSerializer {
         hash = 31 * hash + keys[i].hashCode();
         hash = 31 * hash + (values[i] == null ? 0 : values[i].hashCode());
       }
-      // Avoid 0, which marks an empty slot
-      hash = hash == 0 ? 1 : hash;
       int mask = _maps.length - 1;
       int slot = mix(hash) & mask;
       while (_maps[slot] != null) {

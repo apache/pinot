@@ -194,10 +194,10 @@ public class ImmutableSortedArrayMapTest {
   }
 
   @Test
-  public void testTreeMapCopyIsLinear() {
+  public void testTreeMapCopyCompatibility() {
     // TreeMap takes the buildFromSorted path for a SortedMap with the same (natural) comparator, so the copy made by
-    // HelixProperty does not compare keys. This test checks the result, the comparator() == null check enables the
-    // fast path.
+    // HelixProperty does not compare keys; comparator() returning null enables that path. This test checks only the
+    // content and the order of the copy.
     ImmutableSortedArrayMap<String> map = ImmutableSortedArrayMap.copyOf(unsortedSample());
     TreeMap<String, String> copy = new TreeMap<>();
     copy.putAll(map);

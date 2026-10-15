@@ -133,7 +133,7 @@ public class CompactAssignmentRoutingManagerTest {
         HelixManagerFactory.getZKHelixManager(CLUSTER_NAME, "Broker_default_8099", InstanceType.SPECTATOR, zkUrl);
     _defaultHelixManager.connect();
     _compactHelixManager =
-        new CompactAssignmentZkHelixManager(CLUSTER_NAME, "Broker_compact_8099", InstanceType.SPECTATOR, zkUrl);
+        new CompactAssignmentZkHelixManager(CLUSTER_NAME, "Broker_compact_8099", zkUrl);
     _compactHelixManager.connect();
     _propertyStore = _defaultHelixManager.getHelixPropertyStore();
 
@@ -331,8 +331,9 @@ public class CompactAssignmentRoutingManagerTest {
     assertEquals(allAfterChange.get("unavailable"), List.of());
   }
 
-  /// The compact manager reads compact records and the routing manager wraps them without a copy; the default
-  /// manager reads regular records.
+  /// Checks the raw reads of the data accessors: the compact manager reads compact records and the default manager
+  /// reads regular records. The wrapping of compact records without a copy is checked in
+  /// `HelixHelperTest#testToIdealStateAndExternalViewShareCompactRecord`, not here.
   private void assertReadsAreCompact() {
     PropertyKey.Builder keyBuilder = new PropertyKey.Builder(CLUSTER_NAME);
     for (String table : List.of(OFFLINE_TABLE_NAME, REALTIME_TABLE_NAME)) {

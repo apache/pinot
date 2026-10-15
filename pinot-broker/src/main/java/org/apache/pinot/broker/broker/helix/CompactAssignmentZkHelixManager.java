@@ -62,9 +62,8 @@ import org.slf4j.LoggerFactory;
 public class CompactAssignmentZkHelixManager extends ZKHelixManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(CompactAssignmentZkHelixManager.class);
 
-  public CompactAssignmentZkHelixManager(String clusterName, String instanceName, InstanceType instanceType,
-      String zkAddress) {
-    super(clusterName, instanceName, instanceType, zkAddress);
+  public CompactAssignmentZkHelixManager(String clusterName, String instanceName, String zkAddress) {
+    super(clusterName, instanceName, InstanceType.SPECTATOR, zkAddress);
   }
 
   /// Creates the spectator Helix manager for the broker. Returns a [CompactAssignmentZkHelixManager] when
@@ -74,7 +73,7 @@ public class CompactAssignmentZkHelixManager extends ZKHelixManager {
     if (brokerConf.getProperty(Broker.CONFIG_OF_ROUTING_COMPACT_ASSIGNMENT_READER_ENABLED,
         Broker.DEFAULT_ROUTING_COMPACT_ASSIGNMENT_READER_ENABLED)) {
       LOGGER.info("Using the compact ideal state and external view reader for cluster: {}", clusterName);
-      return new CompactAssignmentZkHelixManager(clusterName, instanceId, InstanceType.SPECTATOR, zkServers);
+      return new CompactAssignmentZkHelixManager(clusterName, instanceId, zkServers);
     }
     return HelixManagerFactory.getZKHelixManager(clusterName, instanceId, InstanceType.SPECTATOR, zkServers);
   }
@@ -87,17 +86,10 @@ public class CompactAssignmentZkHelixManager extends ZKHelixManager {
   }
 
   /// Replaces the serializer of the ZooKeeper client created by [#connect].
-  @VisibleForTesting
-  void installCompactSerializer() {
+  private void installCompactSerializer() {
     RealmAwareZkClient zkClient = _zkclient;
     Preconditions.checkState(zkClient != null, "ZooKeeper client is not created for cluster: %s", getClusterName());
     zkClient.setZkSerializer(createPathBasedSerializer(getClusterName()));
-  }
-
-  /// Returns the serializer of the ZooKeeper client, for tests.
-  @VisibleForTesting
-  PathBasedZkSerializer getInstalledZkSerializer() {
-    return _zkclient.getZkSerializer();
   }
 
   /// Returns the ZooKeeper client created by [#connect], for tests.
@@ -108,8 +100,7 @@ public class CompactAssignmentZkHelixManager extends ZKHelixManager {
 
   /// Returns a serializer that reads the table ideal states and external views of the given cluster with
   /// [CompactZNRecordSerializer], and everything else (including the broker resource) with [ZNRecordSerializer].
-  @VisibleForTesting
-  static PathBasedZkSerializer createPathBasedSerializer(String clusterName) {
+  private static PathBasedZkSerializer createPathBasedSerializer(String clusterName) {
     ZNRecordSerializer defaultSerializer = new ZNRecordSerializer();
     CompactZNRecordSerializer compactSerializer = new CompactZNRecordSerializer(defaultSerializer);
     PropertyKey.Builder keyBuilder = new PropertyKey.Builder(clusterName);

@@ -46,7 +46,17 @@ import javax.annotation.Nullable;
 /// [java.util.TreeMap] with the same content, and [#keySet], [#entrySet] and [#values] are [AbstractSet] and
 /// [AbstractCollection] views with the standard `equals` and `hashCode`. [#comparator] returns `null`, so
 /// `new TreeMap<>(map)` and `TreeMap.putAll` copy it in linear time. Keys are never `null`; values can be `null`.
-/// Every mutator throws [UnsupportedOperationException].
+///
+/// The values must be immutable too (in practice they are strings or other instances of this class). [#hashCode]
+/// is cached, so a value that changes after the map is built makes the cached hash code stale.
+///
+/// The map cannot change, but it differs from an unmodifiable [java.util.TreeMap] in two ways:
+/// - [#subMap], [#headMap] and [#tailMap] return copies without the range bounds of a view. A key outside the range
+///   of the original call is accepted by a further range call: `subMap("b", "d").headMap("z")` returns the entries in
+///   `["b", "d")`, where a [java.util.TreeMap] view throws [IllegalArgumentException].
+/// - Every mutator that would change the map throws [UnsupportedOperationException]. Some mutators inherited by the
+///   views from [AbstractCollection] and [AbstractSet] return normally when they have nothing to change, for example
+///   `keySet().addAll(List.of())`, `keySet().removeAll(List.of())` or `values().removeIf(v -> false)`.
 ///
 /// Thread-safety: the map is immutable and safe to share between threads once published. The cached hash codes and
 /// views are computed lazily with benign races: every thread computes the same value.
@@ -77,8 +87,9 @@ public final class ImmutableSortedArrayMap<V> extends AbstractMap<String, V> imp
     return (ImmutableSortedArrayMap<V>) EMPTY;
   }
 
-  /// Returns an immutable sorted copy of the given map. Keys must be non-null.
-  public static <V> ImmutableSortedArrayMap<V> copyOf(Map<String, ? extends V> map) {
+  /// Returns an immutable sorted copy of the given map. Keys must be non-null, and values must be immutable (see the
+  /// class documentation).
+  static <V> ImmutableSortedArrayMap<V> copyOf(Map<String, ? extends V> map) {
     if (map instanceof ImmutableSortedArrayMap) {
       @SuppressWarnings("unchecked")
       ImmutableSortedArrayMap<V> immutableMap = (ImmutableSortedArrayMap<V>) map;
@@ -268,8 +279,8 @@ public final class ImmutableSortedArrayMap<V> extends AbstractMap<String, V> imp
     return range(lowerBound(Objects.requireNonNull(fromKey)), _keys.length);
   }
 
-  /// Returns the entries in `[from, to)`. The result is a copy, which is indistinguishable from a view because
-  /// neither map can change.
+  /// Returns the entries in `[from, to)`. The result is a copy, not a view: it has the same content as a view
+  /// because neither map can change, but it does not keep the range bounds (see the class documentation).
   private SortedMap<String, V> range(int from, int to) {
     if (from == 0 && to == _keys.length) {
       return this;
@@ -334,13 +345,8 @@ public final class ImmutableSortedArrayMap<V> extends AbstractMap<String, V> imp
     return hashCode;
   }
 
-  // Mutators. AbstractMap already throws for put; the remaining ones are overridden so that no default method
-  // reaches a mutable code path.
-
-  @Override
-  public V put(String key, V value) {
-    throw new UnsupportedOperationException();
-  }
+  // Mutators. AbstractMap already throws for put; the remaining ones are overridden so that they throw even when
+  // they have nothing to change, and so that no default method runs a callback or reaches a mutable code path.
 
   @Override
   public V remove(Object key) {
@@ -471,11 +477,6 @@ public final class ImmutableSortedArrayMap<V> extends AbstractMap<String, V> imp
     }
 
     @Override
-    public boolean add(String s) {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
     public boolean remove(Object o) {
       throw new UnsupportedOperationException();
     }
@@ -505,11 +506,6 @@ public final class ImmutableSortedArrayMap<V> extends AbstractMap<String, V> imp
     @Override
     public boolean contains(Object o) {
       return containsValue(o);
-    }
-
-    @Override
-    public boolean add(V v) {
-      throw new UnsupportedOperationException();
     }
 
     @Override
@@ -551,22 +547,6 @@ public final class ImmutableSortedArrayMap<V> extends AbstractMap<String, V> imp
       }
       int index = indexOf((String) key);
       return index >= 0 && Objects.equals(_values[index], entry.getValue());
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      return super.equals(o);
-    }
-
-    /// Same as [AbstractSet#hashCode], which sums the entry hash codes, but cached by the map.
-    @Override
-    public int hashCode() {
-      return ImmutableSortedArrayMap.this.hashCode();
-    }
-
-    @Override
-    public boolean add(Map.Entry<String, V> entry) {
-      throw new UnsupportedOperationException();
     }
 
     @Override

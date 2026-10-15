@@ -28,7 +28,6 @@ import java.util.Map;
 import java.util.Random;
 import java.util.SortedMap;
 import java.util.TreeMap;
-import org.apache.helix.HelixProperty;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -73,9 +72,13 @@ public class CompactZNRecordSerializerTest {
   private static ZNRecord assertSameAsDefault(byte[] bytes)
       throws IOException {
     ZNRecord expected = (ZNRecord) DEFAULT_SERIALIZER.deserialize(bytes);
-    // Call the compact parser directly so that a parse failure cannot hide behind the fallback
-    ZNRecord actual = CompactZNRecordSerializer.deserializeCompact(bytes);
+    // Call the compact parser directly so that a parse failure cannot hide behind the fallback. It only takes
+    // gzip-compressed content.
+    byte[] compressed = GZipCompressionUtil.isCompressed(bytes) ? bytes : GZipCompressionUtil.compress(bytes);
+    ZNRecord actual = CompactZNRecordSerializer.deserializeCompact(compressed);
+    // The public deserializer returns the same record for both, plain content through the default deserializer
     assertEquals(COMPACT_SERIALIZER.deserialize(bytes), actual);
+    assertEquals(COMPACT_SERIALIZER.deserialize(compressed), actual);
     assertNotNull(expected);
     assertNotNull(actual);
     assertEquals(actual.getId(), expected.getId());
@@ -93,7 +96,7 @@ public class CompactZNRecordSerializerTest {
     return actual;
   }
 
-  private static ZNRecord sampleIdealState() {
+  static ZNRecord sampleIdealState() {
     ZNRecord record = new ZNRecord("myTable_REALTIME");
     record.setSimpleField("IDEAL_STATE_MODE", "CUSTOMIZED");
     record.setSimpleField("REBALANCE_MODE", "CUSTOMIZED");
@@ -148,6 +151,20 @@ public class CompactZNRecordSerializerTest {
     assertSameAsDefault(GZipCompressionUtil.compress(bytes));
     // Only the id
     assertSameAsDefault("{\"id\":\"only\"}".getBytes(StandardCharsets.UTF_8));
+  }
+
+  @Test(dataProvider = "compression")
+  public void testRoundTripEmptyRawPayload(boolean compressed)
+      throws IOException {
+    // A present but empty payload (base64 of zero bytes) reads back as an empty array, not as null
+    ZNRecord record = new ZNRecord("emptyPayload");
+    record.setRawPayload(new byte[0]);
+    byte[] bytes = bytes(record, compressed);
+    String json = new String(DEFAULT_SERIALIZER.serialize(record), StandardCharsets.UTF_8);
+    assertTrue(json.replace(" ", "").contains("\"rawPayload\":\"\""), json);
+    ZNRecord actual = assertSameAsDefault(bytes);
+    assertNotNull(actual.getRawPayload());
+    assertEquals(actual.getRawPayload().length, 0);
   }
 
   @Test
@@ -267,6 +284,26 @@ public class CompactZNRecordSerializerTest {
   }
 
   @Test
+  public void testUnsupportedInputFallsBackToValidRecord()
+      throws IOException {
+    // The default deserializer reads a byte array written as a JSON array of numbers; the compact parser only reads
+    // base64 text. The compact parser fails, and the fallback returns the record of the default deserializer.
+    byte[] bytes = GZipCompressionUtil.compress(
+        "{\"id\":\"x\",\"mapFields\":{\"s\":{\"a\":\"ONLINE\"}},\"rawPayload\":[1,2,3]}"
+            .getBytes(StandardCharsets.UTF_8));
+    assertThrows(IOException.class, () -> CompactZNRecordSerializer.deserializeCompact(bytes));
+    ZNRecord expected = (ZNRecord) DEFAULT_SERIALIZER.deserialize(bytes);
+    assertNotNull(expected);
+    assertEquals(expected.getRawPayload(), new byte[]{1, 2, 3});
+    ZNRecord actual = (ZNRecord) COMPACT_SERIALIZER.deserialize(bytes);
+    assertNotNull(actual);
+    assertEquals(actual, expected);
+    assertEquals(actual.getMapFields(), expected.getMapFields());
+    assertEquals(actual.getRawPayload(), expected.getRawPayload());
+    assertFalse(HelixHelper.isCompact(actual));
+  }
+
+  @Test
   public void testCorruptGzipTrailerFallsBack()
       throws IOException {
     byte[] bytes = bytes(sampleIdealState(), true);
@@ -315,97 +352,9 @@ public class CompactZNRecordSerializerTest {
     byte[] expected = DEFAULT_SERIALIZER.serialize(record);
     assertEquals(COMPACT_SERIALIZER.serialize(record), expected);
     // A compact record serializes to the same bytes as an equal record from the default deserializer
-    ZNRecord compact = CompactZNRecordSerializer.deserializeCompact(expected);
+    ZNRecord compact = CompactZNRecordSerializer.deserializeCompact(GZipCompressionUtil.compress(expected));
     ZNRecord standard = (ZNRecord) DEFAULT_SERIALIZER.deserialize(expected);
     assertTrue(HelixHelper.isCompact(compact));
     assertEquals(DEFAULT_SERIALIZER.deserialize(COMPACT_SERIALIZER.serialize(compact)), standard);
-  }
-
-  @Test(dataProvider = "compression")
-  public void testToIdealStateAndExternalViewShareCompactRecord(boolean compressed)
-      throws IOException {
-    ZNRecord written = sampleIdealState();
-    written.setSimpleField("HELIX_ENABLED", "false");
-    written.setRawPayload(new byte[]{1, 2, 3});
-    byte[] bytes = bytes(written, compressed);
-
-    for (boolean externalView : new boolean[]{false, true}) {
-      ZNRecord compact = CompactZNRecordSerializer.deserializeCompact(bytes);
-      setScalars(compact);
-      assertTrue(HelixHelper.isCompact(compact));
-      ZNRecord copied = (ZNRecord) DEFAULT_SERIALIZER.deserialize(bytes);
-      setScalars(copied);
-      assertFalse(HelixHelper.isCompact(copied));
-      HelixProperty expected = externalView ? new ExternalView(copied) : new IdealState(copied);
-
-      HelixProperty actual = externalView ? HelixHelper.toExternalView(compact)
-          : HelixHelper.toIdealState(compact);
-      assertTrue(externalView ? actual instanceof ExternalView : actual instanceof IdealState);
-      ZNRecord record = actual.getRecord();
-      // No copy: the maps and the payload are the ones of the parsed record
-      assertSame(record.getMapFields(), compact.getMapFields());
-      assertSame(record.getSimpleFields(), compact.getSimpleFields());
-      assertSame(record.getListFields(), compact.getListFields());
-      assertSame(record.getRawPayload(), compact.getRawPayload());
-      // Same content, scalar fields and stat as the copying constructor
-      assertEquals(actual.getId(), expected.getId());
-      assertEquals(record, expected.getRecord());
-      assertEquals(record.getSimpleFields(), expected.getRecord().getSimpleFields());
-      assertEquals(record.getListFields(), expected.getRecord().getListFields());
-      assertEquals(record.getMapFields(), expected.getRecord().getMapFields());
-      assertEquals(record.getRawPayload(), expected.getRecord().getRawPayload());
-      assertEquals(record.getVersion(), 17);
-      assertEquals(record.getCreationTime(), 1000L);
-      assertEquals(record.getModifiedTime(), 2000L);
-      assertEquals(record.getEphemeralOwner(), 3000L);
-      assertEquals(actual.getStat(), expected.getStat());
-      assertEquals(actual.getStat().getVersion(), 17);
-      assertEquals(actual.getBucketSize(), expected.getBucketSize());
-      if (externalView) {
-        assertEquals(((ExternalView) actual).getPartitionSet(), ((ExternalView) expected).getPartitionSet());
-        assertSame(((ExternalView) actual).getStateMap("myTable__0__0__20240101T0000Z"),
-            compact.getMapField("myTable__0__0__20240101T0000Z"));
-      } else {
-        IdealState idealState = (IdealState) actual;
-        assertFalse(idealState.isEnabled());
-        assertEquals(idealState.isEnabled(), ((IdealState) expected).isEnabled());
-        assertEquals(idealState.getRebalanceMode(), IdealState.RebalanceMode.CUSTOMIZED);
-        assertEquals(idealState.getPartitionSet(), ((IdealState) expected).getPartitionSet());
-        assertEquals(idealState.getRecord().getSimpleField(CommonConstants.IdealState.HYBRID_TABLE_TIME_BOUNDARY),
-            "1700000000000");
-      }
-      // The shared outer map stays immutable
-      assertThrows(UnsupportedOperationException.class, () -> record.getMapFields().remove("myTable__empty"));
-    }
-  }
-
-  @Test
-  public void testToIdealStateAndExternalViewCopyDefaultRecord() {
-    byte[] bytes = DEFAULT_SERIALIZER.serialize(sampleIdealState());
-    for (boolean externalView : new boolean[]{false, true}) {
-      // A record from the default deserializer (or from the fallback) goes through the copying constructor
-      ZNRecord standard = (ZNRecord) DEFAULT_SERIALIZER.deserialize(bytes);
-      assertNotNull(standard);
-      setScalars(standard);
-      assertFalse(HelixHelper.isCompact(standard));
-      HelixProperty actual = externalView ? HelixHelper.toExternalView(standard)
-          : HelixHelper.toIdealState(standard);
-      HelixProperty expected = externalView ? new ExternalView(standard) : new IdealState(standard);
-      assertNotSame(actual.getRecord(), standard);
-      assertNotSame(actual.getRecord().getMapFields(), standard.getMapFields());
-      assertTrue(actual.getRecord().getMapFields() instanceof TreeMap);
-      assertEquals(actual.getRecord(), expected.getRecord());
-      assertEquals(actual.getStat(), expected.getStat());
-      // The copy is mutable, as today
-      actual.getRecord().getMapFields().remove("myTable__empty");
-      assertTrue(standard.getMapFields().containsKey("myTable__empty"));
-    }
-  }
-
-  private static void setScalars(ZNRecord record) {
-    record.setVersion(17);
-    record.setCreationTime(1000L);
-    record.setModifiedTime(2000L);
-    record.setEphemeralOwner(3000L);
   }
 }
