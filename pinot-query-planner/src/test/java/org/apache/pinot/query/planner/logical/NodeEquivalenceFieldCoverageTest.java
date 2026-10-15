@@ -59,20 +59,21 @@ import static org.testng.Assert.assertTrue;
 /// permissive.
 ///
 /// This test cannot check that a comparison is *correct*, only that no field is added without a decision: [#FIELDS]
-/// must list every field that the decision reads, so a new field fails this test until someone either makes
-/// `NodeEquivalence` compare it or records it in [#NOT_COMPARED] with a reason. Proving each comparison behaves
-/// correctly needs a value per field and a node built around it, which is what `EquivalentStagesFinderTest` does
-/// case by case.
+/// must list every field that the decision reads, so a new field fails this test until someone either makes the
+/// check compare it or records it in [#NOT_COMPARED] with a reason. For a plan node the comparison lives in
+/// `NodeEquivalence`. For a value type it lives in that type's `equals()`, which is where `ignoreNulls` was missed.
+/// Proving each comparison behaves correctly needs a value per field and a node built around it, which is what
+/// `EquivalentStagesFinderTest` does case by case.
 public class NodeEquivalenceFieldCoverageTest {
 
   /// Every declared instance field that the equivalence decision reads.
   ///
   /// The scope is every type owned by this module that the decision reaches: the plan nodes themselves, and the value
-  /// types they hold that are compared through `equals`. It stops at the module edge, so `DataSchema` and
-  /// `RelFieldCollation` are out of scope.
+  /// types they hold that override `equals`. It stops at the module edge, so `DataSchema` and `RelFieldCollation` are
+  /// out of scope.
   ///
-  /// When this test fails, make `NodeEquivalence` compare the new field (or record it in [#NOT_COMPARED] with the
-  /// reason it is safe to ignore), then list the field here.
+  /// When this test fails, make the check compare the new field, then list the field here. The failure message says
+  /// where the comparison lives: `NodeEquivalence` for a plan node, or the type's own `equals()` for a value type.
   private static final Map<Class<?>, List<String>> FIELDS = Map.ofEntries(
       Map.entry(BasePlanNode.class, List.of("_stageId", "_dataSchema", "_nodeHint", "_inputs")),
       Map.entry(PlanNode.NodeHint.class, List.of("_hintOptions")),
@@ -85,8 +86,6 @@ public class NodeEquivalenceFieldCoverageTest {
       // fields stay in scope until that method goes away.
       Map.entry(EnrichedJoinNode.class, List.of("_filterProjectRexes", "_joinResultSchema", "_projectResultSchema",
           "_fetch", "_offset")),
-      Map.entry(EnrichedJoinNode.FilterProjectRex.class, List.of("_type", "_filter", "_projectAndResultSchema")),
-      Map.entry(EnrichedJoinNode.FilterProjectRex.ProjectAndResultSchema.class, List.of("_project", "_schema")),
       Map.entry(MailboxReceiveNode.class, List.of("_senderStageId", "_exchangeType", "_distributionType", "_keys",
           "_collations", "_sort", "_sortedOnSender", "_sender")),
       Map.entry(MailboxSendNode.class, List.of("_receiverStages", "_exchangeType", "_distributionType", "_keys",
@@ -120,8 +119,9 @@ public class NodeEquivalenceFieldCoverageTest {
           "_receiverStages", "Who reads a stage does not change what the stage computes",
           "_sort", "Sending side sort is not implemented (see the TODO in MailboxSendOperator), and a difference "
               + "visible to a receiver is already compared in visitMailboxReceive",
-          "_hashFunction", "One hash function is threaded through a whole v1 plan, so two send nodes in the same "
-              + "plan always agree on it"),
+          "_hashFunction", "Spooling runs only on the v1 planner, which threads one hash function through the "
+              + "whole plan. The v2 physical optimizer sets one per exchange, so enabling spools there needs this "
+              + "compared"),
       EnrichedJoinNode.class, Map.of(
           "_joinResultSchema", "Only PlanNodeDeserializer builds an EnrichedJoinNode, so the broker side planner "
               + "that runs this check never sees one",
@@ -132,9 +132,16 @@ public class NodeEquivalenceFieldCoverageTest {
   /// before spooling runs, and explained nodes only exist once a plan is rendered.
   private static final Set<Class<?>> NOT_VISITED = Set.of(ExchangeNode.class, ExplainedNode.class);
 
-  /// A new node type must either be registered in [#FIELDS] or declared out of scope in [#NOT_VISITED].
+  /// Value types without an `equals()`, so they are compared by identity. That is conservative: two different
+  /// objects never match, so these types can stop spooling but never merge different stages. Their fields do not
+  /// matter until they gain an `equals()`.
+  private static final Set<Class<?>> IDENTITY_COMPARED =
+      Set.of(EnrichedJoinNode.FilterProjectRex.class, EnrichedJoinNode.FilterProjectRex.ProjectAndResultSchema.class);
+
+  /// A new node type must either be registered in [#FIELDS] or declared out of scope in [#NOT_VISITED]. A new
+  /// `RexExpression` implementation nested in that interface must be registered in [#FIELDS].
   @Test
-  public void everyVisitedNodeTypeIsRegistered() {
+  public void everyNodeAndExpressionTypeIsRegistered() {
     for (Method method : PlanNodeVisitor.class.getDeclaredMethods()) {
       if (!method.getName().startsWith("visit")) {
         continue;
@@ -144,10 +151,17 @@ public class NodeEquivalenceFieldCoverageTest {
           nodeType.getSimpleName() + " is visited by NodeEquivalence but is not registered in FIELDS. Add its declared "
               + "fields there, or add it to NOT_VISITED if the equivalence check rejects it.");
     }
+    for (Class<?> type : RexExpression.class.getDeclaredClasses()) {
+      if (RexExpression.class.isAssignableFrom(type)) {
+        assertTrue(FIELDS.containsKey(type), type.getSimpleName() + " is a RexExpression that is not registered in "
+            + "FIELDS. Make sure its equals() and hashCode() compare every field, then add its fields there.");
+      }
+    }
   }
 
   @Test
   public void registeredFieldsMatchDeclaredFields() {
+    assertTrue(FIELDS.keySet().containsAll(NOT_COMPARED.keySet()), "NOT_COMPARED has entries for types not in FIELDS");
     for (Map.Entry<Class<?>, List<String>> entry : FIELDS.entrySet()) {
       Class<?> type = entry.getKey();
       Set<String> declared = new TreeSet<>();
@@ -157,12 +171,24 @@ public class NodeEquivalenceFieldCoverageTest {
           declared.add(field.getName());
         }
       }
+      String fix = PlanNode.class.isAssignableFrom(type)
+          ? "make NodeEquivalence compare it (or record it in NOT_COMPARED with a reason)"
+          : "make " + type.getSimpleName() + ".equals() and hashCode() compare it";
       assertEquals(declared, new TreeSet<>(entry.getValue()),
-          type.getSimpleName() + " declares different fields than this test expects. For every added field, make "
-              + "NodeEquivalence compare it (or record it in NOT_COMPARED with a reason), then update FIELDS.");
+          type.getSimpleName() + " declares different fields than this test expects. For every added field, " + fix
+              + ", then update FIELDS.");
       Set<String> excluded = NOT_COMPARED.getOrDefault(type, Map.of()).keySet();
       assertTrue(declared.containsAll(excluded),
           type.getSimpleName() + " has NOT_COMPARED entries for fields it no longer declares: " + excluded);
+    }
+  }
+
+  @Test
+  public void identityComparedTypesDoNotOverrideEquals()
+      throws NoSuchMethodException {
+    for (Class<?> type : IDENTITY_COMPARED) {
+      assertEquals(type.getMethod("equals", Object.class).getDeclaringClass(), Object.class,
+          type.getSimpleName() + " now overrides equals(), so its fields decide equivalence. Move it to FIELDS.");
     }
   }
 }
