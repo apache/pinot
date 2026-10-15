@@ -178,10 +178,7 @@ public class AuditRequestProcessor {
       }
 
       if (config.isCaptureRequestPayload() && requestContext.hasEntity()) {
-        CapturedBody requestBody = readRequestBody(requestContext, config.getMaxPayloadSize());
-        if (requestBody != null && StringUtils.isNotBlank(requestBody.getText())) {
-          payload.setBody(AuditRedactor.redactBody(requestBody));
-        }
+        payload.setBody(AuditRedactor.redactBody(readRequestBody(requestContext, config.getMaxPayloadSize())));
       }
 
       if (payload.getQueryParameters() == null && payload.getBody() == null && payload.getHeaders() == null) {
@@ -227,7 +224,8 @@ public class AuditRequestProcessor {
   /// @return the captured body, or null if there is none
   @VisibleForTesting
   CapturedBody readRequestBody(ContainerRequestContext requestContext, int maxPayloadSize) {
-    if (!requestContext.hasEntity()) {
+    // With no room to capture anything, the stream is left alone, and nothing is reported as truncated.
+    if (!requestContext.hasEntity() || maxPayloadSize <= 0) {
       return null;
     }
 

@@ -636,6 +636,17 @@ public class AuditRequestProcessorTest {
   }
 
   @Test
+  public void testReadRequestBodyWithZeroCapCapturesNothing() {
+    when(_requestContext.hasEntity()).thenReturn(true);
+    when(_requestContext.getEntityStream()).thenReturn(
+        new ByteArrayInputStream("body".getBytes(StandardCharsets.UTF_8)));
+
+    assertThat(_processor.readRequestBody(_requestContext, 0)).isNull();
+    // The stream is left untouched, rather than read one byte past a cap of zero and reported as truncated.
+    verify(_requestContext, times(0)).setEntityStream(any());
+  }
+
+  @Test
   public void testReadRequestBodyOverCapLeavesWholeBodyForDownstream()
       throws IOException {
     // Reading one byte past the cap must not invalidate the mark, or the resource method loses the body.

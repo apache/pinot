@@ -65,8 +65,12 @@ public class AuditRedactorTest {
         {"Proxy-Authorization"}, {"X-Auth-Token"}, {"X-Startree-Token"},
         // Dotted words, as in Hadoop-style property names.
         {"api.key.value"}, {"private.key.pem"}, {"encryption.key.material"}, {"signing.key"},
-        // A credential-bearing prefix is not exempted by a structural last segment.
+        // A credential-bearing prefix is not exempted by a structural last segment or an auth-mode suffix.
         {"secret.sortKey"}, {"auth.partitionKey"}, {"stream.confluent.secret.joinKey"},
+        {"my.secret.credentials.source"}, {"kafka.sasl.password.credentials.provider"},
+        // Short password names, Azure connection strings, session ids and SAS signatures.
+        {"dbPass"}, {"ssl.keypass"}, {"storepass"}, {"connectionString"}, {"azure.storage.connection.string"},
+        {"sessionId"}, {"JSESSIONID"}, {"sig"}, {"x-ms-sig"},
         // Generic.
         {"password"}, {"PASSWORD"}, {"myPassword"}, {"passwd"}, {"pwd"}, {"credentials"}, {"apiKey"},
         {"api_key"}, {"keytab"}, {"token"}, {"authorization"}, {"signature"}, {"keyPath"}
@@ -77,7 +81,7 @@ public class AuditRedactorTest {
   public Object[][] benignKeys() {
     return new Object[][]{
         {"tableName"}, {"primaryKeyColumns"}, {"partitionKey"}, {"sortedColumn"}, {"user"}, {"username"},
-        {"principal"}, {"endpoint"}, {"region"}, {"bucketName"}, {"roleArn"},
+        {"principal"}, {"endpoint"}, {"region"}, {"bucketName"}, {"roleArn"}, {"design"}, {"bypassCache"},
         // Structural names that merely end in "key".
         {"primaryKey"}, {"sortKey"}, {"joinKey"}, {"groupByKey"}, {"dimensionKey"}, {"metricKey"},
         {"timeColumnKey"}, {"schemaRegistryKey"}, {"segment.partitionKey"},
@@ -127,6 +131,25 @@ public class AuditRedactorTest {
   public void testRedactsTopLevelArray() {
     String redacted = complete("[{\"password\":\"" + SECRET + "\"}]");
     assertThat(redacted).doesNotContain(SECRET);
+  }
+
+  @Test
+  public void testMasksValueOfSensitiveNameValuePair() {
+    String redacted = complete("{\"props\":[{\"key\":\"fs.s3a.secret.key\",\"value\":\"" + SECRET + "\"},"
+        + "{\"value\":\"" + SECRET + "\",\"name\":\"password\"},{\"name\":\"region\",\"value\":\"us-east-1\"}]}");
+
+    assertThat(redacted).doesNotContain(SECRET);
+    // The name of the setting stays readable, and so does the value of a pair that is not sensitive.
+    assertThat(redacted).contains("\"name\":\"password\"", "\"value\":\"us-east-1\"");
+  }
+
+  @Test
+  public void testTruncatedBodyMasksValueOfSensitiveNameValuePair() {
+    String redacted = truncated("[{\"name\":\"password\",\"value\":\"" + SECRET + "\"},{\"key\":\"accessKey\","
+        + "\"value\":\"" + SECRET + "\"},{\"name\":\"region\",\"value\":\"us");
+
+    assertThat(redacted).isEqualTo("[{\"name\":\"password\",\"value\":\"*****\"},"
+        + "{\"key\":\"*****\",\"value\":\"*****\"},{\"name\":\"region\"}]" + AuditRequestProcessor.TRUNCATION_MARKER);
   }
 
   @Test
