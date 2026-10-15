@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.audit;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -62,6 +63,10 @@ public class AuditRedactorTest {
         {"sasToken"}, {"proxyPassword"},
         // Headers that carry a credential.
         {"Proxy-Authorization"}, {"X-Auth-Token"}, {"X-Startree-Token"},
+        // Dotted words, as in Hadoop-style property names.
+        {"api.key.value"}, {"private.key.pem"}, {"encryption.key.material"}, {"signing.key"},
+        // A credential-bearing prefix is not exempted by a structural last segment.
+        {"secret.sortKey"}, {"auth.partitionKey"}, {"stream.confluent.secret.joinKey"},
         // Generic.
         {"password"}, {"PASSWORD"}, {"myPassword"}, {"passwd"}, {"pwd"}, {"credentials"}, {"apiKey"},
         {"api_key"}, {"keytab"}, {"token"}, {"authorization"}, {"signature"}, {"keyPath"}
@@ -84,13 +89,13 @@ public class AuditRedactorTest {
   @Test(dataProvider = "sensitiveKeys")
   public void testSensitiveKeysAreRedacted(String key) {
     assertThat(AuditRedactor.isSensitiveKey(key)).as(key).isTrue();
-    assertThat(AuditRedactor.redactBody(String.format("{\"%s\":\"%s\"}", key, SECRET))).doesNotContain(SECRET);
+    assertThat(complete(String.format("{\"%s\":\"%s\"}", key, SECRET))).doesNotContain(SECRET);
   }
 
   @Test(dataProvider = "benignKeys")
   public void testBenignKeysAreKept(String key) {
     assertThat(AuditRedactor.isSensitiveKey(key)).as(key).isFalse();
-    assertThat(AuditRedactor.redactBody(String.format("{\"%s\":\"visible\"}", key))).contains("visible");
+    assertThat(complete(String.format("{\"%s\":\"visible\"}", key))).contains("visible");
   }
 
   @Test
@@ -98,7 +103,7 @@ public class AuditRedactorTest {
     String body = "{\"connection\":{\"type\":\"CUSTOM_BATCH\",\"params\":{\"input.fs.prop.secretKey\":\"" + SECRET
         + "\",\"input.fs.prop.accessKey\":\"" + SECRET + "\",\"input.fs.className\":\"S3PinotFS\"}}}";
 
-    String redacted = AuditRedactor.redactBody(body);
+    String redacted = complete(body);
 
     assertThat(redacted).doesNotContain(SECRET);
     assertThat(redacted).contains(AuditRedactor.MASKED_VALUE);
@@ -112,7 +117,7 @@ public class AuditRedactorTest {
     String body = "{\"ingestionConfig\":{\"streamIngestionConfig\":{\"streamConfigMaps\":"
         + "[{\"streamType\":\"kafka\",\"sasl.jaas.config\":\"" + SECRET + "\"}]}}}";
 
-    String redacted = AuditRedactor.redactBody(body);
+    String redacted = complete(body);
 
     assertThat(redacted).doesNotContain(SECRET);
     assertThat(redacted).contains("kafka");
@@ -120,13 +125,13 @@ public class AuditRedactorTest {
 
   @Test
   public void testRedactsTopLevelArray() {
-    String redacted = AuditRedactor.redactBody("[{\"password\":\"" + SECRET + "\"}]");
+    String redacted = complete("[{\"password\":\"" + SECRET + "\"}]");
     assertThat(redacted).doesNotContain(SECRET);
   }
 
   @Test
   public void testSensitiveKeyMasksWholeSubtree() {
-    String redacted = AuditRedactor.redactBody(
+    String redacted = complete(
         "{\"credentials\":{\"user\":\"svc\",\"value\":\"" + SECRET + "\"},\"region\":\"us-east-1\"}");
 
     assertThat(redacted).doesNotContain(SECRET).doesNotContain("svc");
@@ -135,7 +140,7 @@ public class AuditRedactorTest {
 
   @Test
   public void testStripsUrlUserInfoUnderBenignKey() {
-    String redacted = AuditRedactor.redactBody(
+    String redacted = complete(
         "{\"schema.registry.url\":\"https://svc:" + SECRET + "@registry.example.com:8081/path\"}");
 
     assertThat(redacted).doesNotContain(SECRET).doesNotContain("svc:");
@@ -144,16 +149,44 @@ public class AuditRedactorTest {
 
   @Test
   public void testStripsUrlUserInfoInsideArrays() {
-    String redacted = AuditRedactor.redactBody("{\"urls\":[\"s3://AKIA:" + SECRET + "@bucket/key\"]}");
+    String redacted = complete("{\"urls\":[\"s3://AKIA:" + SECRET + "@bucket/key\"]}");
 
     assertThat(redacted).doesNotContain(SECRET);
     assertThat(redacted).contains("@bucket/key");
   }
 
+  @DataProvider(name = "urlsWithUserInfo")
+  public Object[][] urlsWithUserInfo() {
+    String mask = AuditRedactor.MASKED_VALUE;
+    return new Object[][]{
+        // A password containing '@' or '/' is masked whole.
+        {"https://svc:p@ss@registry:8081", "https://" + mask + "@registry:8081"},
+        {"https://svc:pa/ss@host/path", "https://" + mask + "@host/path"},
+        // A scheme with a colon, as in JDBC URLs.
+        {"jdbc:postgresql://u:pw@db:5432/x", "jdbc:postgresql://" + mask + "@db:5432/x"},
+        // Every URL of a list, and a URL that is not the whole value.
+        {"https://u1:p1@h1,https://u2:p2@h2", "https://" + mask + "@h1,https://" + mask + "@h2"},
+        {"--uri https://u:p@h --region x", "--uri https://" + mask + "@h --region x"}
+    };
+  }
+
+  @Test(dataProvider = "urlsWithUserInfo")
+  public void testStripsUrlUserInfo(String value, String expected) {
+    assertThat(AuditRedactor.redactUrlUserInfo(value)).isEqualTo(expected);
+  }
+
   @Test
-  public void testUrlWithoutUserInfoIsKept() {
-    assertThat(AuditRedactor.redactUrlUserInfo("https://host:8081/a@b")).isEqualTo("https://host:8081/a@b");
+  public void testValueWithoutUrlUserInfoIsKept() {
+    assertThat(AuditRedactor.redactUrlUserInfo("https://host:8081/a")).isEqualTo("https://host:8081/a");
     assertThat(AuditRedactor.redactUrlUserInfo("user@example.com")).isEqualTo("user@example.com");
+  }
+
+  @Test
+  public void testUrlWithAtSignInPathMasksTheHostToo() {
+    // Deliberate over-redaction: the userinfo match runs to the last '@', so that '@' and '/' in passwords
+    // are covered, and a path containing '@' is indistinguishable from that.
+    assertThat(AuditRedactor.redactUrlUserInfo("https://host:8081/a@b"))
+        .isEqualTo("https://" + AuditRedactor.MASKED_VALUE + "@b");
   }
 
   @Test
@@ -161,16 +194,16 @@ public class AuditRedactorTest {
     // A bare value has no key to judge it by, so it could be a credential on its own.
     String body = "\"" + SECRET + "\"";
 
-    assertThat(AuditRedactor.redactBody(body)).isEqualTo("[redacted: unparseable payload, " + body.length()
+    assertThat(complete(body)).isEqualTo("[redacted: unparseable payload, " + body.length()
         + " bytes]");
-    assertThat(AuditRedactor.redactBody("12345")).isEqualTo("[redacted: unparseable payload, 5 bytes]");
+    assertThat(complete("12345")).isEqualTo("[redacted: unparseable payload, 5 bytes]");
   }
 
   @Test
   public void testUnparseableBodyRecordedBySizeOnly() {
     String body = "accessKey=" + SECRET + "&region=us-west-2";
 
-    String redacted = AuditRedactor.redactBody(body);
+    String redacted = complete(body);
 
     assertThat(redacted).doesNotContain(SECRET);
     assertThat(redacted).doesNotContain("us-west-2");
@@ -178,26 +211,47 @@ public class AuditRedactorTest {
   }
 
   @Test
-  public void testTruncatedMidValueReportedAsTruncated() {
-    String body = "{\"password\":\"" + SECRET + AuditRequestProcessor.TRUNCATION_MARKER;
+  public void testTruncatedBodyKeepsRedactedPrefix() {
+    String body = "{\"tableName\":\"t\",\"streamConfigs\":{\"sasl.jaas.config\":\"" + SECRET
+        + "\",\"url\":\"https://svc:" + SECRET + "@registry:8081\",\"stream.kafka.topic.name\":\"to";
 
-    String redacted = AuditRedactor.redactBody(body);
-
-    assertThat(redacted).doesNotContain(SECRET);
-    assertThat(redacted).isEqualTo(String.format("[redacted: payload truncated at %d captured bytes, not parseable]",
-        body.length() - AuditRequestProcessor.TRUNCATION_MARKER.length()));
+    // The cut falls inside the topic name, which is dropped; the objects it left open are closed.
+    assertThat(truncated(body)).isEqualTo("{\"tableName\":\"t\",\"streamConfigs\":{\"sasl.jaas.config\":\"*****\","
+        + "\"url\":\"https://*****@registry:8081\"}}" + AuditRequestProcessor.TRUNCATION_MARKER);
   }
 
   @Test
-  public void testTruncationAfterCompleteValueIsNotSilentlyErased() {
-    // ObjectReader.readTree stops at the first value and drops the rest, so a naive parse would record
-    // {"a":1} as a complete body and discard the truncation indicator entirely.
-    String body = "{\"a\":1}" + AuditRequestProcessor.TRUNCATION_MARKER;
+  public void testTruncatedInsideSensitiveValueKeepsTheMask() {
+    // The key is complete, so it is masked even though its value never arrived in full.
+    assertThat(truncated("{\"a\":1,\"password\":\"" + SECRET.substring(0, 5)))
+        .isEqualTo("{\"a\":1,\"password\":\"*****\"}" + AuditRequestProcessor.TRUNCATION_MARKER);
+    assertThat(truncated("{\"credentials\":{\"user\":\"svc\",\"value\":\"" + SECRET.substring(0, 5)))
+        .isEqualTo("{\"credentials\":\"*****\"}" + AuditRequestProcessor.TRUNCATION_MARKER);
+  }
 
-    String redacted = AuditRedactor.redactBody(body);
+  @Test
+  public void testTruncatedValueIsDroppedNotShortened() {
+    // A number cut short would otherwise be recorded as a different, complete number.
+    assertThat(truncated("{\"a\":1,\"b\":12")).isEqualTo("{\"a\":1}" + AuditRequestProcessor.TRUNCATION_MARKER);
+    // A complete value just before the cut is kept.
+    assertThat(truncated("[\"x\",12,tru")).isEqualTo("[\"x\",12]" + AuditRequestProcessor.TRUNCATION_MARKER);
+    // A key cut short is dropped together with its value.
+    assertThat(truncated("{\"a\":1,\"passw")).isEqualTo("{\"a\":1}" + AuditRequestProcessor.TRUNCATION_MARKER);
+  }
 
-    assertThat(redacted).startsWith("[redacted: payload truncated at");
-    assertThat(redacted).doesNotContain("\"a\"");
+  @Test
+  public void testTruncatedAfterCompleteValueKeepsTheMarker() {
+    assertThat(truncated("{\"a\":1}")).isEqualTo("{\"a\":1}" + AuditRequestProcessor.TRUNCATION_MARKER);
+  }
+
+  @Test
+  public void testTruncatedNonJsonRecordedBySizeOnly() {
+    String body = "accessKey=" + SECRET + "&region=us";
+
+    assertThat(truncated(body)).isEqualTo(
+        "[redacted: payload truncated at " + body.length() + " captured bytes, not parseable]");
+    // A bare scalar has no key to judge it by, truncated or not.
+    assertThat(truncated("\"" + SECRET)).startsWith("[redacted: payload truncated at");
   }
 
   @Test
@@ -205,7 +259,7 @@ public class AuditRedactorTest {
     // Trailing content would otherwise be dropped, hiding the second document and its secret.
     String body = "{\"a\":1}{\"password\":\"" + SECRET + "\"}";
 
-    String redacted = AuditRedactor.redactBody(body);
+    String redacted = complete(body);
 
     assertThat(redacted).doesNotContain(SECRET);
     assertThat(redacted).isEqualTo("[redacted: unparseable payload, " + body.length() + " bytes]");
@@ -214,15 +268,22 @@ public class AuditRedactorTest {
   @Test
   public void testSizeIsCountedInBytesNotCharacters() {
     String body = "🔑=secret";
-    assertThat(AuditRedactor.redactBody(body)).isEqualTo("[redacted: unparseable payload, 11 bytes]");
+    assertThat(complete(body)).isEqualTo("[redacted: unparseable payload, 11 bytes]");
   }
 
   @Test
   public void testNullEmptyAndBlankBody() {
     assertThat(AuditRedactor.redactBody(null)).isNull();
-    assertThat(AuditRedactor.redactBody("")).isNull();
+    assertThat(complete("")).isNull();
     // Whitespace parses to a MissingNode, which would otherwise serialize to the literal string "null".
-    assertThat(AuditRedactor.redactBody("   ")).isNull();
+    assertThat(complete("   ")).isNull();
+  }
+
+  @Test
+  public void testSizeIsTheCapturedByteCount() {
+    // The size comes from the capture, not from re-encoding a text whose last character may have been split.
+    assertThat(AuditRedactor.redactBody(new AuditRequestProcessor.CapturedBody("abc\uFFFD", 5, false)))
+        .isEqualTo("[redacted: unparseable payload, 5 bytes]");
   }
 
   @Test
@@ -268,5 +329,15 @@ public class AuditRedactorTest {
   public void testRedactNullAndEmptyMap() {
     assertThat(AuditRedactor.redact(null)).isNull();
     assertThat(AuditRedactor.redact(new HashMap<>())).isEmpty();
+  }
+
+  private static String complete(String body) {
+    return AuditRedactor.redactBody(body == null ? null
+        : new AuditRequestProcessor.CapturedBody(body, body.getBytes(StandardCharsets.UTF_8).length, false));
+  }
+
+  private static String truncated(String body) {
+    return AuditRedactor.redactBody(
+        new AuditRequestProcessor.CapturedBody(body, body.getBytes(StandardCharsets.UTF_8).length, true));
   }
 }

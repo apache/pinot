@@ -18,13 +18,16 @@
  */
 package org.apache.pinot.common.audit;
 
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.TextNode;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
+import java.io.StringWriter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -33,7 +36,6 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
@@ -47,24 +49,27 @@ import org.slf4j.LoggerFactory;
 /// pipeline whose operators are not entitled to the credentials a caller happens to send. Anything that
 /// leaves this class must therefore be assumed to be readable by more people than the request itself was.
 ///
-/// Three rules follow from that, and all are deliberate:
+/// The rules that follow from that are deliberate:
 ///
 ///   - **Redaction is unconditional.** There is no configuration that turns it off, because every
 ///     configuration that turns it off is a credential leak.
-///   - **A body that cannot be parsed is reported by size only.** Secrets can only be located inside a
-///     structure that is understood; in an opaque payload they cannot be found, so nothing of it is kept.
-///   - **A body is parsed only if it is one complete JSON object or array with nothing after it.** See
-///     [#parseWholeValue(String)]. A bare scalar has no key to judge it by, so it is reported by size.
+///   - **Secrets are only located inside JSON that is understood.** A complete body is parsed only if it is
+///     one JSON object or array with nothing after it (see [#parseWholeValue(String)]); anything else,
+///     a bare scalar included, has no key to judge it by and is reported by size only.
+///   - **A body cut at the capture cap keeps its redacted prefix.** It is read token by token, so
+///     everything before the cut is masked exactly as in a complete body, and only the value the cut
+///     falls inside is dropped (see [#redactTruncatedPrefix(String)]).
 ///
 /// Key matching errs towards over-redaction: masking a harmless `tokenUri` costs an audit reader
 /// nothing, while missing one `accessKey` is the bug this class exists to prevent.
 ///
-/// ## Known residual gap
+/// ## Known residual gaps
 ///
 /// Values are inspected only for URL userinfo (`scheme://user:password@host`), which is stripped. Any
 /// other credential embedded in the *value* of an innocuously named key is not caught - a JDBC URL with a
-/// `password=` query parameter, say, or a presigned URL whose signature sits inside the value. Callers
-/// must not read this class as a guarantee that a captured payload is free of credentials.
+/// `password=` query parameter, a presigned URL whose signature sits inside the value, or JSON serialized
+/// into a string, whose nested keys are not inspected. Callers must not read this class as a guarantee
+/// that a captured payload is free of credentials.
 ///
 /// This class is stateless and thread-safe.
 final class AuditRedactor {
@@ -73,27 +78,32 @@ final class AuditRedactor {
 
   private static final Logger LOG = LoggerFactory.getLogger(AuditRedactor.class);
 
-  /// Key patterns whose values are credential material. Applied case-insensitively against the full key,
-  /// so dotted keys such as `input.fs.prop.accessKey` are matched by their suffix.
+  private static final JsonFactory JSON_FACTORY = JsonUtils.DEFAULT_READER.getFactory();
+
+  /// Separator allowed between the words of a key name, so that `accessKey`, `access_key`, `access-key`
+  /// and the Hadoop-style `access.key` are treated alike.
+  private static final String SEP = "[\\s._-]*";
+
+  /// Key patterns whose values are credential material, matched against the whole lowercased key, so
+  /// dotted keys such as `input.fs.prop.accessKey` are matched by their suffix. A match is final: no
+  /// exemption overrides it, so a benign suffix cannot hide a credential-bearing prefix.
   ///
   /// This is a superset of [org.apache.pinot.spi.utils.Obfuscator]'s defaults, which anchor on a suffix
-  /// and so miss the AWS `accessKey` / `accessKeyId` pair that motivated this class. Notable entries:
-  ///
-  ///   - `auth` is matched broadly rather than as `authorization`, to cover Confluent's
-  ///     `basic.auth.user.info` - a literal `user:password` pair present in every schema-registry-backed
-  ///     realtime table.
-  ///   - Any key ending in `key` is sensitive (`fs.s3a.access.key`, `gcpKey`, `jsonKey`,
-  ///     `stream.confluent.key`), as is a key naming a key's id, path, file or content (`sseKmsKeyId`,
-  ///     `gcpKeyPath`, `keyFile`, `keyContentBase64`). Structural names that merely end in `key` are
-  ///     exempted through [#SAFE_KEY_NAMES].
-  private static final List<Pattern> SENSITIVE_KEY_PATTERNS =
-      Stream.of(".*secret.*", ".*password.*", ".*passwd.*", ".*pwd$", ".*passphrase.*", ".*credential.*",
-              ".*creds.*", ".*key$", ".*key[\\s._-]*(id|path|file|content).*", ".*access[\\s._-]*key.*",
-              ".*api[\\s_-]*key.*", ".*private[\\s_-]*key.*", ".*encryption[\\s_-]*key.*",
-              ".*signing[\\s_-]*key.*", ".*keytab.*", ".*token.*", ".*auth.*", ".*jaas.*config.*", ".*signature.*",
-              ".*cookie.*", ".*keystore.*", ".*truststore.*", ".*user[\\s._-]*info$")
-          .map(pattern -> Pattern.compile("(?i)" + pattern))
-          .collect(Collectors.toList());
+  /// and so miss the AWS `accessKey` / `accessKeyId` pair that motivated this class. `auth` is matched
+  /// broadly rather than as `authorization`, to cover Confluent's `basic.auth.user.info` - a literal
+  /// `user:password` pair present in every schema-registry-backed realtime table. A key naming a key's
+  /// id, path, file or content (`sseKmsKeyId`, `gcpKeyPath`, `keyFile`, `keyContentBase64`) is sensitive.
+  private static final Pattern SENSITIVE_KEY = Pattern.compile(String.join("|", ".*secret.*", ".*password.*",
+      ".*passwd.*", ".*pwd", ".*passphrase.*", ".*credential.*", ".*creds.*",
+      ".*key" + SEP + "(id|path|file|content).*", ".*access" + SEP + "key.*", ".*api" + SEP + "key.*",
+      ".*private" + SEP + "key.*", ".*encryption" + SEP + "key.*",
+      ".*signing" + SEP + "key.*", ".*keytab.*", ".*token.*", ".*auth.*", ".*jaas.*config.*", ".*signature.*",
+      ".*cookie.*", ".*keystore.*", ".*truststore.*", ".*user" + SEP + "info"));
+
+  /// Any key ending in `key` is also sensitive (`fs.s3a.access.key`, `gcpKey`, `jsonKey`,
+  /// `stream.confluent.key`), except the structural names in [#SAFE_KEY_NAMES]. Kept apart from
+  /// [#SENSITIVE_KEY] so that those exemptions apply to this rule alone.
+  private static final Pattern ENDS_IN_KEY = Pattern.compile(".*key");
 
   /// Names that end in `key` without being a credential. Compared, lowercased, against both the full key
   /// and its last dotted segment.
@@ -107,55 +117,163 @@ final class AuditRedactor {
   private static final Set<String> SAFE_KEY_SUFFIXES =
       Set.of(".credentials.source", ".credentials.provider", ".credentials.providers");
 
-  /// A URL carrying credentials in its userinfo component. Group 1 is the scheme, group 2 the userinfo
-  /// and group 3 the host onwards, which is kept for diagnostics.
-  private static final Pattern URL_WITH_USERINFO =
-      Pattern.compile("^([a-zA-Z][a-zA-Z0-9+.-]*://)([^/@\\s]+)@(.*)$", Pattern.DOTALL);
+  /// The userinfo of every URL inside a value. Group 1 is the scheme with its `://`, which may contain
+  /// colons (`jdbc:postgresql://`); group 2 runs from there to the last `@` before whitespace or the next
+  /// `://`, so a password containing `@` or `/` is masked whole, and each URL of a list is handled on its
+  /// own. A URL whose path contains `@` has its host masked as well - an over-redaction accepted for
+  /// the sake of the password cases.
+  private static final Pattern URL_USERINFO =
+      Pattern.compile("([a-z][a-z0-9+.:-]*://)((?:(?!://)\\S)*)@", Pattern.CASE_INSENSITIVE);
 
   private AuditRedactor() {
   }
 
-  /// Returns the request body with every credential-bearing value masked, or a size-only placeholder when
-  /// the body is not one complete, parseable JSON value.
+  /// Returns the captured request body with every credential-bearing value masked. A complete body that is
+  /// not one parseable JSON object or array is reported by size only. A truncated body keeps its redacted
+  /// JSON prefix, followed by [AuditRequestProcessor#TRUNCATION_MARKER], or is reported by size if no JSON
+  /// object or array begins it.
   ///
-  /// @param body the raw captured body, possibly null or blank
+  /// @param body the captured body, possibly null
   /// @return the redacted body, or null if there was nothing to record
-  static String redactBody(String body) {
-    if (StringUtils.isBlank(body)) {
+  static String redactBody(AuditRequestProcessor.CapturedBody body) {
+    if (body == null || StringUtils.isBlank(body.getText())) {
       return null;
     }
-    boolean truncated = body.endsWith(AuditRequestProcessor.TRUNCATION_MARKER);
     try {
-      JsonNode parsed = parseWholeValue(body);
-      if (parsed != null && parsed.isContainerNode()) {
-        return JsonUtils.objectToString(redactNode(parsed));
+      if (body.isTruncated()) {
+        String prefix = redactTruncatedPrefix(body.getText());
+        if (prefix != null) {
+          return prefix + AuditRequestProcessor.TRUNCATION_MARKER;
+        }
+      } else {
+        JsonNode parsed = parseWholeValue(body.getText());
+        if (parsed != null && parsed.isContainerNode()) {
+          return JsonUtils.objectToString(redactNode(parsed));
+        }
       }
     } catch (Exception e) {
       // Never log the exception itself. Jackson embeds the offending token in its message, so a body
       // that is a bare credential would write that credential into the log this class protects.
       LOG.debug("Audit payload is not parseable JSON ({}); recording size only", e.getClass().getSimpleName());
     }
-    return unparseableMarker(body, truncated);
+    return body.isTruncated()
+        ? String.format("[redacted: payload truncated at %d captured bytes, not parseable]", body.getCapturedBytes())
+        : String.format("[redacted: unparseable payload, %d bytes]", body.getCapturedBytes());
   }
 
   /// Parses `body` only if it is a single complete JSON value with nothing following it.
   ///
   /// [com.fasterxml.jackson.databind.ObjectReader#readTree(String)] stops at the first value and
   /// silently discards whatever follows, because `FAIL_ON_TRAILING_TOKENS` is off by default. Relying on
-  /// it would record a concatenated or truncated payload as a well-formed body with the remainder - and
-  /// the truncation indicator itself - quietly dropped, leaving a reader unable to tell the record is
-  /// incomplete. Reading through an explicit parser and then demanding the stream be exhausted rejects
-  /// both cases, so they fall to the size-only path instead.
+  /// it would record a concatenated payload as a well-formed body with the remainder quietly dropped.
+  /// Reading through an explicit parser and then demanding the stream be exhausted rejects that, so it
+  /// falls to the size-only path instead.
   ///
   /// @return the parsed value, or null if the body is empty or carries trailing content
   private static JsonNode parseWholeValue(String body)
       throws IOException {
-    try (JsonParser parser = JsonUtils.DEFAULT_READER.createParser(body)) {
+    try (JsonParser parser = JSON_FACTORY.createParser(body)) {
       JsonNode node = JsonUtils.DEFAULT_READER.readTree(parser);
       if (node == null || node.isMissingNode() || parser.nextToken() != null) {
         return null;
       }
       return node;
+    }
+  }
+
+  /// Returns the redacted JSON that precedes the cut in a truncated body, with the objects and arrays the
+  /// cut left open closed again, or null if the body does not begin with a JSON object or array.
+  ///
+  /// The prefix is copied token by token rather than parsed as a tree, which a truncated body can never
+  /// be. A sensitive key is masked as soon as its name is complete, whether or not its value made it in
+  /// before the cut. Any other name is written only together with its value, and the value the cut falls
+  /// inside is dropped rather than recorded as if it were complete: a string or literal missing its end
+  /// fails to parse, and a number that runs up to the cut may be missing digits, so it is dropped too.
+  private static String redactTruncatedPrefix(String text)
+      throws IOException {
+    StringWriter out = new StringWriter();
+    // The generator is closed first, and closing it writes the end of every object and array still open.
+    try (JsonParser parser = JSON_FACTORY.createParser(text);
+        JsonGenerator generator = JSON_FACTORY.createGenerator(out)) {
+      JsonToken first = parser.nextToken();
+      if (first != JsonToken.START_OBJECT && first != JsonToken.START_ARRAY) {
+        return null;
+      }
+      try {
+        copyRedacted(parser, generator, first, text.length());
+      } catch (IOException e) {
+        // Expected: the cut leaves the last token incomplete, and everything before it is already written.
+      }
+    }
+    return out.toString();
+  }
+
+  private static void copyRedacted(JsonParser parser, JsonGenerator generator, JsonToken first, int textLength)
+      throws IOException {
+    String pendingName = null;
+    JsonToken token = first;
+    while (token != null) {
+      switch (token) {
+        case FIELD_NAME:
+          String name = parser.currentName();
+          if (isSensitiveKey(name)) {
+            generator.writeStringField(name, MASKED_VALUE);
+            JsonToken value = parser.nextToken();
+            if (value != null && value.isStructStart()) {
+              parser.skipChildren();
+            }
+          } else {
+            pendingName = name;
+          }
+          token = parser.nextToken();
+          break;
+        case START_OBJECT:
+        case START_ARRAY:
+          if (pendingName != null) {
+            generator.writeFieldName(pendingName);
+            pendingName = null;
+          }
+          generator.copyCurrentEvent(parser);
+          token = parser.nextToken();
+          break;
+        case END_OBJECT:
+        case END_ARRAY:
+          generator.copyCurrentEvent(parser);
+          token = parser.nextToken();
+          break;
+        default:
+          if (token.isNumeric() && parser.currentLocation().getCharOffset() >= textLength) {
+            return;
+          }
+          String text = token == JsonToken.VALUE_STRING ? redactUrlUserInfo(parser.getText()) : parser.getText();
+          if (pendingName != null) {
+            generator.writeFieldName(pendingName);
+            pendingName = null;
+          }
+          writeScalar(generator, token, text);
+          token = parser.nextToken();
+          break;
+      }
+    }
+  }
+
+  private static void writeScalar(JsonGenerator generator, JsonToken scalar, String text)
+      throws IOException {
+    switch (scalar) {
+      case VALUE_NUMBER_INT:
+      case VALUE_NUMBER_FLOAT:
+        generator.writeNumber(text);
+        break;
+      case VALUE_TRUE:
+      case VALUE_FALSE:
+        generator.writeBoolean(scalar == JsonToken.VALUE_TRUE);
+        break;
+      case VALUE_NULL:
+        generator.writeNull();
+        break;
+      default:
+        generator.writeString(text);
+        break;
     }
   }
 
@@ -178,21 +296,22 @@ final class AuditRedactor {
     if (SAFE_KEY_SUFFIXES.stream().anyMatch(lowerKey::endsWith)) {
       return false;
     }
-    String lastSegment = lowerKey.substring(lowerKey.lastIndexOf('.') + 1);
-    if (SAFE_KEY_NAMES.contains(lowerKey) || SAFE_KEY_NAMES.contains(lastSegment)) {
-      return false;
+    if (SENSITIVE_KEY.matcher(lowerKey).matches()) {
+      return true;
     }
-    return SENSITIVE_KEY_PATTERNS.stream().anyMatch(pattern -> pattern.matcher(lowerKey).matches());
+    String lastSegment = lowerKey.substring(lowerKey.lastIndexOf('.') + 1);
+    return ENDS_IN_KEY.matcher(lowerKey).matches() && !SAFE_KEY_NAMES.contains(lowerKey)
+        && !SAFE_KEY_NAMES.contains(lastSegment);
   }
 
-  /// Returns `value` with any credential in its URL userinfo replaced by the mask, keeping the scheme,
-  /// host and path. Returns the value unchanged when it carries no userinfo.
+  /// Returns `value` with the userinfo of every URL in it replaced by the mask, keeping each scheme, host
+  /// and path. Returns the value unchanged when it carries no userinfo.
   static String redactUrlUserInfo(String value) {
     if (value == null || value.indexOf('@') < 0) {
       return value;
     }
-    Matcher matcher = URL_WITH_USERINFO.matcher(value);
-    return matcher.matches() ? matcher.group(1) + MASKED_VALUE + "@" + matcher.group(3) : value;
+    return URL_USERINFO.matcher(value)
+        .replaceAll(match -> Matcher.quoteReplacement(match.group(1) + MASKED_VALUE + "@"));
   }
 
   /// Masks, in place, every value under a sensitive key - wholesale, whether it is a scalar, an array or
@@ -223,15 +342,5 @@ final class AuditRedactor {
           .collect(Collectors.toList());
     }
     return value;
-  }
-
-  private static String unparseableMarker(String body, boolean truncated) {
-    int capturedBytes = body.getBytes(StandardCharsets.UTF_8).length;
-    if (truncated) {
-      // Capture stopped at the configured cap, so the payload's real size is unknown - do not imply one.
-      return String.format("[redacted: payload truncated at %d captured bytes, not parseable]",
-          capturedBytes - AuditRequestProcessor.TRUNCATION_MARKER.length());
-    }
-    return String.format("[redacted: unparseable payload, %d bytes]", capturedBytes);
   }
 }

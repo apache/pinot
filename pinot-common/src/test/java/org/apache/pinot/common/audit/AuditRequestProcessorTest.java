@@ -375,9 +375,10 @@ public class AuditRequestProcessorTest {
     when(_requestContext.hasEntity()).thenReturn(true);
     when(_requestContext.getEntityStream()).thenReturn(originalStream);
 
-    String result = _processor.readRequestBody(_requestContext, 100);
+    AuditRequestProcessor.CapturedBody result = _processor.readRequestBody(_requestContext, 100);
 
-    assertThat(result).isEqualTo(testData);
+    assertThat(result.getText()).isEqualTo(testData);
+    assertThat(result.isTruncated()).isFalse();
 
     ArgumentCaptor<InputStream> streamCaptor = ArgumentCaptor.forClass(InputStream.class);
     verify(_requestContext).setEntityStream(streamCaptor.capture());
@@ -399,9 +400,11 @@ public class AuditRequestProcessorTest {
     when(_requestContext.getEntityStream()).thenReturn(originalStream);
 
     int maxSize = 10;
-    String result = _processor.readRequestBody(_requestContext, maxSize);
+    AuditRequestProcessor.CapturedBody result = _processor.readRequestBody(_requestContext, maxSize);
 
-    assertThat(result).isEqualTo("This is a " + AuditRequestProcessor.TRUNCATION_MARKER);
+    assertThat(result.getText()).isEqualTo("This is a ");
+    assertThat(result.getCapturedBytes()).isEqualTo(maxSize);
+    assertThat(result.isTruncated()).isTrue();
 
     // Verify stream is still set for downstream
     verify(_requestContext).setEntityStream(any(InputStream.class));
@@ -416,9 +419,10 @@ public class AuditRequestProcessorTest {
     when(_requestContext.hasEntity()).thenReturn(true);
     when(_requestContext.getEntityStream()).thenReturn(originalStream);
 
-    String result = _processor.readRequestBody(_requestContext, 100);
+    AuditRequestProcessor.CapturedBody result = _processor.readRequestBody(_requestContext, 100);
 
-    assertThat(result).isEqualTo(testData);
+    assertThat(result.getText()).isEqualTo(testData);
+    assertThat(result.isTruncated()).isFalse();
     verify(_requestContext).setEntityStream(any(InputStream.class));
   }
 
@@ -426,7 +430,7 @@ public class AuditRequestProcessorTest {
   public void testReadRequestBodyNoEntity() {
     when(_requestContext.hasEntity()).thenReturn(false);
 
-    String result = _processor.readRequestBody(_requestContext, 100);
+    AuditRequestProcessor.CapturedBody result = _processor.readRequestBody(_requestContext, 100);
 
     assertThat(result).isNull();
     verify(_requestContext, times(0)).getEntityStream();
@@ -437,7 +441,7 @@ public class AuditRequestProcessorTest {
     when(_requestContext.hasEntity()).thenReturn(true);
     when(_requestContext.getEntityStream()).thenReturn(null);
 
-    String result = _processor.readRequestBody(_requestContext, 100);
+    AuditRequestProcessor.CapturedBody result = _processor.readRequestBody(_requestContext, 100);
 
     assertThat(result).isNull();
     verify(_requestContext, times(0)).setEntityStream(any());
@@ -450,7 +454,7 @@ public class AuditRequestProcessorTest {
     when(_requestContext.hasEntity()).thenReturn(true);
     when(_requestContext.getEntityStream()).thenReturn(emptyStream);
 
-    String result = _processor.readRequestBody(_requestContext, 100);
+    AuditRequestProcessor.CapturedBody result = _processor.readRequestBody(_requestContext, 100);
 
     assertThat(result).isNull();
     verify(_requestContext).setEntityStream(any(InputStream.class));
@@ -465,7 +469,7 @@ public class AuditRequestProcessorTest {
     when(_requestContext.hasEntity()).thenReturn(true);
     when(_requestContext.getEntityStream()).thenReturn(failingStream);
 
-    String result = _processor.readRequestBody(_requestContext, 100);
+    AuditRequestProcessor.CapturedBody result = _processor.readRequestBody(_requestContext, 100);
 
     assertThat(result).isNull();
     // BufferedInputStream wrapper should be set even if read fails
@@ -480,9 +484,11 @@ public class AuditRequestProcessorTest {
     when(_requestContext.hasEntity()).thenReturn(true);
     when(_requestContext.getEntityStream()).thenReturn(stream);
 
-    String result = _processor.readRequestBody(_requestContext, 10);
+    AuditRequestProcessor.CapturedBody result = _processor.readRequestBody(_requestContext, 10);
 
-    assertThat(result).isEqualTo(exactData + AuditRequestProcessor.TRUNCATION_MARKER);
+    assertThat(result.getText()).isEqualTo(exactData);
+    // A body that ends exactly at the cap was captured whole, so it is not truncated.
+    assertThat(result.isTruncated()).isFalse();
     verify(_requestContext).setEntityStream(any(InputStream.class));
   }
 
@@ -494,9 +500,10 @@ public class AuditRequestProcessorTest {
     when(_requestContext.hasEntity()).thenReturn(true);
     when(_requestContext.getEntityStream()).thenReturn(stream);
 
-    String result = _processor.readRequestBody(_requestContext, 10);
+    AuditRequestProcessor.CapturedBody result = _processor.readRequestBody(_requestContext, 10);
 
-    assertThat(result).isEqualTo(data); // No truncation marker
+    assertThat(result.getText()).isEqualTo(data);
+    assertThat(result.isTruncated()).isFalse();
     verify(_requestContext).setEntityStream(any(InputStream.class));
   }
 
@@ -508,9 +515,9 @@ public class AuditRequestProcessorTest {
     when(_requestContext.hasEntity()).thenReturn(true);
     when(_requestContext.getEntityStream()).thenReturn(stream);
 
-    String result = _processor.readRequestBody(_requestContext, 100);
+    AuditRequestProcessor.CapturedBody result = _processor.readRequestBody(_requestContext, 100);
 
-    assertThat(result).isEqualTo(utf8Data);
+    assertThat(result.getText()).isEqualTo(utf8Data);
     verify(_requestContext).setEntityStream(any(InputStream.class));
   }
 
@@ -524,11 +531,13 @@ public class AuditRequestProcessorTest {
     when(_requestContext.getEntityStream()).thenReturn(stream);
 
     // Truncate at 8 bytes (will cut in middle of "世")
-    String result = _processor.readRequestBody(_requestContext, 8);
+    AuditRequestProcessor.CapturedBody result = _processor.readRequestBody(_requestContext, 8);
 
     // The result should handle the truncation gracefully
-    assertThat(result).isNotNull();
-    assertThat(result).endsWith(AuditRequestProcessor.TRUNCATION_MARKER);
+    assertThat(result.getText()).startsWith("Hello ");
+    assertThat(result.isTruncated()).isTrue();
+    // The size is the bytes captured, not the re-encoded length of a text whose last character was split.
+    assertThat(result.getCapturedBytes()).isEqualTo(8);
     verify(_requestContext).setEntityStream(any(InputStream.class));
   }
 
@@ -543,11 +552,12 @@ public class AuditRequestProcessorTest {
     when(_requestContext.getEntityStream()).thenReturn(stream);
 
     int maxSize = 1000;
-    String result = _processor.readRequestBody(_requestContext, maxSize);
+    AuditRequestProcessor.CapturedBody result = _processor.readRequestBody(_requestContext, maxSize);
 
-    assertThat(result).hasSize(maxSize + AuditRequestProcessor.TRUNCATION_MARKER.length());
-    assertThat(result).startsWith("AAAAAAAAAA");
-    assertThat(result).endsWith(AuditRequestProcessor.TRUNCATION_MARKER);
+    assertThat(result.getText()).hasSize(maxSize);
+    assertThat(result.getText()).startsWith("AAAAAAAAAA");
+    assertThat(result.getCapturedBytes()).isEqualTo(maxSize);
+    assertThat(result.isTruncated()).isTrue();
     verify(_requestContext).setEntityStream(any(InputStream.class));
   }
 
@@ -560,9 +570,9 @@ public class AuditRequestProcessorTest {
     when(_requestContext.hasEntity()).thenReturn(true);
     when(_requestContext.getEntityStream()).thenReturn(stream);
 
-    String result = _processor.readRequestBody(_requestContext, 1000);
+    AuditRequestProcessor.CapturedBody result = _processor.readRequestBody(_requestContext, 1000);
 
-    assertThat(result).isEqualTo(jsonPayload);
+    assertThat(result.getText()).isEqualTo(jsonPayload);
 
     // Verify the stream can still be read downstream
     ArgumentCaptor<InputStream> streamCaptor = ArgumentCaptor.forClass(InputStream.class);
@@ -592,11 +602,11 @@ public class AuditRequestProcessorTest {
     when(_requestContext.getEntityStream()).thenReturn(stream);
 
     int maxSize = 50;
-    String result = _processor.readRequestBody(_requestContext, maxSize);
+    AuditRequestProcessor.CapturedBody result = _processor.readRequestBody(_requestContext, maxSize);
 
-    assertThat(result).hasSize(maxSize + AuditRequestProcessor.TRUNCATION_MARKER.length());
-    assertThat(result).startsWith("{\"users\":[{\"id\":0");
-    assertThat(result).endsWith(AuditRequestProcessor.TRUNCATION_MARKER);
+    assertThat(result.getText()).hasSize(maxSize);
+    assertThat(result.getText()).startsWith("{\"users\":[{\"id\":0");
+    assertThat(result.isTruncated()).isTrue();
 
     // Even though truncated, it should still be valid for downstream
     verify(_requestContext).setEntityStream(any(InputStream.class));
@@ -612,9 +622,9 @@ public class AuditRequestProcessorTest {
     when(_requestContext.hasEntity()).thenReturn(true);
     when(_requestContext.getEntityStream()).thenReturn(stream);
 
-    String result = _processor.readRequestBody(_requestContext, 1000);
+    AuditRequestProcessor.CapturedBody result = _processor.readRequestBody(_requestContext, 1000);
 
-    assertThat(result).isEqualTo(nestedJson);
+    assertThat(result.getText()).isEqualTo(nestedJson);
 
     // Verify stream preservation
     ArgumentCaptor<InputStream> streamCaptor = ArgumentCaptor.forClass(InputStream.class);
@@ -623,6 +633,23 @@ public class AuditRequestProcessorTest {
     InputStream capturedStream = streamCaptor.getValue();
     byte[] readBytes = ByteStreams.toByteArray(capturedStream);
     assertThat(new String(readBytes, StandardCharsets.UTF_8)).isEqualTo(nestedJson);
+  }
+
+  @Test
+  public void testReadRequestBodyOverCapLeavesWholeBodyForDownstream()
+      throws IOException {
+    // Reading one byte past the cap must not invalidate the mark, or the resource method loses the body.
+    String body = "0123456789-the-rest-of-the-body";
+    when(_requestContext.hasEntity()).thenReturn(true);
+    when(_requestContext.getEntityStream()).thenReturn(new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8)));
+
+    AuditRequestProcessor.CapturedBody result = _processor.readRequestBody(_requestContext, 10);
+
+    assertThat(result.getText()).isEqualTo("0123456789");
+    assertThat(result.isTruncated()).isTrue();
+    ArgumentCaptor<InputStream> streamCaptor = ArgumentCaptor.forClass(InputStream.class);
+    verify(_requestContext).setEntityStream(streamCaptor.capture());
+    assertThat(new String(ByteStreams.toByteArray(streamCaptor.getValue()), StandardCharsets.UTF_8)).isEqualTo(body);
   }
 
   // Redaction tests: nothing captured from the caller may carry credential material.
@@ -733,6 +760,30 @@ public class AuditRequestProcessorTest {
     assertThat(result).isNotNull();
     assertThat(result.getRequest().getBody()).isEqualTo(
         "[redacted: unparseable payload, " + body.length() + " bytes]");
+  }
+
+  @Test
+  public void testTruncatedBodyKeepsRedactedPrefix() {
+    _defaultConfig.setCaptureRequestPayload(true);
+    _defaultConfig.setMaxPayloadSize(120);
+    String body = "{\"tableName\":\"myTable\",\"tableType\":\"REALTIME\",\"streamConfigs\":{\"sasl.jaas.config\":\""
+        + AWS_SECRET + "\",\"stream.kafka.topic.name\":\"" + "x".repeat(200) + "\"}}";
+
+    when(_requestContext.getUriInfo()).thenReturn(_uriInfo);
+    when(_uriInfo.getQueryParameters()).thenReturn(new MultivaluedHashMap<>());
+    when(_uriInfo.getPath()).thenReturn("/tables");
+    when(_requestContext.getMethod()).thenReturn("POST");
+    when(_requestContext.getHeaders()).thenReturn(new MultivaluedHashMap<>());
+    when(_requestContext.hasEntity()).thenReturn(true);
+    when(_requestContext.getEntityStream()).thenReturn(
+        new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8)));
+
+    AuditEvent result = _processor.processRequest(_requestContext, "10.0.0.1");
+
+    // The cut falls inside the topic name, which is dropped; everything before it is kept, redacted.
+    assertThat(result.getRequest().getBody()).isEqualTo("{\"tableName\":\"myTable\",\"tableType\":\"REALTIME\","
+        + "\"streamConfigs\":{\"sasl.jaas.config\":\"" + AuditRedactor.MASKED_VALUE + "\"}}"
+        + AuditRequestProcessor.TRUNCATION_MARKER);
   }
 
   private static byte[] readFully(InputStream stream) {
