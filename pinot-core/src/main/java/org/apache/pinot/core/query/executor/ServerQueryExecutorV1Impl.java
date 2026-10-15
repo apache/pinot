@@ -98,6 +98,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   public static final String ENABLE_PREFETCH = "enable.prefetch";
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerQueryExecutorV1Impl.class);
+  // Listed in DeleteStatement.CROSS_TABLE_FUNCTIONS: a DELETE predicate must not call this function
   private static final String IN_PARTITIONED_SUBQUERY = "inPartitionedSubquery";
 
   private InstanceDataManager _instanceDataManager;

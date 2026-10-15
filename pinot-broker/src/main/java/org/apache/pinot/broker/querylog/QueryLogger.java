@@ -26,6 +26,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.broker.requesthandler.BaseSingleStageBrokerRequestHandler.ServerStats;
 import org.apache.pinot.common.response.BrokerResponse;
+import org.apache.pinot.common.utils.LoggerUtils;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.trace.QueryFingerprint;
@@ -208,27 +209,25 @@ public class QueryLogger {
   }
 
   public String redactQuery(String query, @Nullable QueryFingerprint queryFingerprint) {
-    switch (_sqlRedactionMode) {
+    return redactQuery(query, _sqlRedactionMode, queryFingerprint);
+  }
+
+  /// Redacts the query as the redaction mode says: `FULL` replaces it with a fixed marker, `LITERAL_VALUES` logs the
+  /// fingerprint, or a fixed marker when no fingerprint could be generated, and `NONE` logs the query escaped on a
+  /// single line (see [LoggerUtils#toSingleLine(String)], which the broker and the controller share, so that their
+  /// query log lines decode the same way). Callers that log SQL outside this logger (e.g. a DML statement) apply the
+  /// mode of the query log with this method rather than building a logger of their own.
+  public static String redactQuery(String query, SqlRedactionMode sqlRedactionMode,
+      @Nullable QueryFingerprint queryFingerprint) {
+    switch (sqlRedactionMode) {
       case FULL:
         return FULLY_REDACTED;
       case LITERAL_VALUES:
         return queryFingerprint != null ? queryFingerprint.getFingerprint() : FINGERPRINT_FAILED_QUERY_REDACTED;
       case NONE:
       default:
-        return toSingleLine(query);
+        return LoggerUtils.toSingleLine(query);
     }
-  }
-
-  /// Escapes backslashes, CR and LF as `\\`, `\r` and `\n` so the query occupies a single log line.
-  /// A line ending can terminate a `--` or `//` comment, so replacing it with a space changes SQL semantics.
-  /// Escaping existing backslashes distinguishes literal escape sequences from encoded line endings.
-  /// Decode these three escape sequences in a single pass before replaying untruncated logged SQL.
-  @Nullable
-  private static String toSingleLine(@Nullable String query) {
-    if (query == null || (query.indexOf('\\') < 0 && query.indexOf('\n') < 0 && query.indexOf('\r') < 0)) {
-      return query;
-    }
-    return query.replace("\\", "\\\\").replace("\r", "\\r").replace("\n", "\\n");
   }
 
   private boolean shouldForceLog(@Nullable QueryLogParams params) {
