@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.operator;
 
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
@@ -145,6 +146,16 @@ public class MultistageAggregationExecutor {
   private void processMerge(MseBlock.Data block) {
     for (int i = 0; i < _aggFunctions.length; i++) {
       AggregationFunction aggFunction = _aggFunctions[i];
+      DataBlock serializedResults = AggregateOperator.getSerializedIntermediateResults(aggFunction, block);
+      if (serializedResults != null) {
+        int colId = AggregateOperator.getIntermediateResultColId(aggFunction);
+        int numRows = serializedResults.getNumberOfRows();
+        for (int rowId = 0; rowId < numRows; rowId++) {
+          _mergeResultHolder[i] = AggregationFunctionUtils.mergeSerialized(aggFunction, _mergeResultHolder[i],
+              serializedResults.getCustomObject(rowId, colId));
+        }
+        continue;
+      }
       Object[] intermediateResults = AggregateOperator.getIntermediateResults(aggFunction, block);
       for (Object intermediateResult : intermediateResults) {
         _mergeResultHolder[i] =
