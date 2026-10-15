@@ -25,6 +25,7 @@ import java.util.function.IntConsumer;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.automaton.Automaton;
 import org.apache.lucene.util.automaton.CharacterRunAutomaton;
+import org.apache.lucene.util.automaton.Operations;
 import org.apache.lucene.util.automaton.RegExp;
 import org.apache.lucene.util.automaton.Transition;
 import org.apache.lucene.util.fst.FST;
@@ -44,10 +45,13 @@ public class RegexpMatcherCaseInsensitive {
   private final FST<BytesRef> _ifst;
   private final Automaton _automaton;
 
+  @SuppressWarnings("deprecation") // Preserve the complement syntax supported by existing FST queries.
   public RegexpMatcherCaseInsensitive(String regexQuery, FST<BytesRef> ifst) {
     _ifst = ifst;
     // For case-insensitive FSTs, convert regex to lowercase since we only store lowercase keys
-    _automaton = (new RegExp(regexQuery.toLowerCase())).toAutomaton();
+    _automaton = Operations.determinize(
+        new RegExp(regexQuery.toLowerCase(), RegExp.ALL | RegExp.DEPRECATED_COMPLEMENT).toAutomaton(),
+        Operations.DEFAULT_DETERMINIZE_WORK_LIMIT);
   }
 
   /// Runs case-insensitive matching of the given regexp query on the FST, emitting the values (dict ids) of each
