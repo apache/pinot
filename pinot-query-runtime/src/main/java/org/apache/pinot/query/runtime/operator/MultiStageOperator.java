@@ -422,7 +422,8 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
         @SuppressWarnings("unchecked")
         StatMap<LeafOperator.StatKey> stats = (StatMap<LeafOperator.StatKey>) map;
         response.mergeMaxRowsInOperator(stats.getLong(LeafOperator.StatKey.EMITTED_ROWS));
-        // The single-stage threads of the leaf are not covered by the stage root's allocation
+        // The single-stage threads of the leaf are not covered by the stage root's allocation, which
+        // MultiStageBrokerRequestHandler#mergeStageStats adds
         response.addTotalMemAllocatedBytes(stats.getLong(LeafOperator.StatKey.THREAD_MEM_ALLOCATED_BYTES));
 
         StatMap<BrokerResponseNativeV2.StatKey> brokerStats = new StatMap<>(BrokerResponseNativeV2.StatKey.class);
@@ -497,7 +498,8 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
         @SuppressWarnings("unchecked")
         StatMap<PipelineBreakerOperator.StatKey> stats = (StatMap<PipelineBreakerOperator.StatKey>) map;
         response.mergeMaxRowsInOperator(stats.getLong(PipelineBreakerOperator.StatKey.EMITTED_ROWS));
-        // Pipeline breakers run in their own op chain, so they are not covered by the stage root's allocation
+        // Pipeline breakers run in their own op chain, so they are not covered by the stage root's allocation, which
+        // MultiStageBrokerRequestHandler#mergeStageStats adds
         response.addTotalMemAllocatedBytes(stats.getLong(PipelineBreakerOperator.StatKey.ALLOCATED_MEMORY_BYTES));
       }
     },

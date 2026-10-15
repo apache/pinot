@@ -1016,7 +1016,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       if (stageStats != null) { // for example pipeline breaker may not have stats
         stageStats.forEach((type, stats) -> type.mergeInto(brokerResponse, stats));
         if (!stageStats.isEmpty()) {
-          // The stage root's allocation covers all the operators of its op chain
+          // The stage root's allocation covers all the operators of its op chain. It is read by name because stage
+          // roots have different stat key types. Leaf threads and pipeline breakers are added in
+          // MultiStageOperator.Type#mergeInto.
           brokerResponse.addTotalMemAllocatedBytes(
               stageStats.getLastOperatorStats().getUnsafe("ALLOCATED_MEMORY_BYTES", 0L));
         }
