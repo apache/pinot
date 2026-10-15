@@ -1996,7 +1996,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
     // second argument in the groovy function is groovy script
     String script = operands.get(1).getLiteral().getStringValue();
-    GroovyFunctionEvaluator.parseGroovyScript(String.format("groovy({%s})", script));
+    GroovyFunctionEvaluator.parseGroovyScriptForQuery(String.format("groovy({%s})", script));
   }
 
   /// Rewrites potential expensive functions to their approximation counterparts.
