@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -32,6 +33,8 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
+import org.apache.helix.HelixManagerFactory;
+import org.apache.helix.InstanceType;
 import org.apache.helix.PropertyKey.Builder;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.HelixConfigScope;
@@ -45,6 +48,7 @@ import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.pinot.common.helix.ExtraInstanceConfig;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.common.utils.tls.ZooKeeperSslContextSupplier;
 import org.apache.pinot.common.version.PinotVersion;
 import org.apache.pinot.common.workload.WorkloadChangeListener;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -73,8 +77,17 @@ public class HelixHelper {
 
   private static final String ONLINE = "ONLINE";
   private static final String OFFLINE = "OFFLINE";
+  private static final Random RANDOM = new Random();
 
   public static final String BROKER_RESOURCE = CommonConstants.Helix.BROKER_RESOURCE_INSTANCE;
+
+  /// Creates a ZooKeeper-backed manager with Pinot's TLS bootstrap policy applied before construction.
+  /// Callers retain responsibility for the manager's connect/disconnect lifecycle.
+  public static HelixManager createZkHelixManager(String clusterName, String instanceName, InstanceType instanceType,
+      String zkAddress) {
+    ZooKeeperSslContextSupplier.initialize();
+    return HelixManagerFactory.getZKHelixManager(clusterName, instanceName, instanceType, zkAddress);
+  }
 
   public static IdealState cloneIdealState(IdealState idealState) {
     return new IdealState(
@@ -649,5 +662,55 @@ public class HelixHelper {
       return true;
     }
     return false;
+  }
+
+  /// Gets a random live controller's base URL by discovering controller instances from Helix.
+  /// This distributes load across all available controllers instead of always hitting the lead controller.
+  /// Shared by callers that need to reach any controller for a read-only request (e.g. query workload budget
+  /// fetch and page-cache warmup query fetch).
+  ///
+  /// @param helixManager the Helix manager to use for discovery
+  /// @return a controller base URL (scheme://host:port), or {@code null} if none is available
+  @Nullable
+  public static String getControllerUrl(HelixManager helixManager) {
+    try {
+      HelixDataAccessor helixDataAccessor = helixManager.getHelixDataAccessor();
+      Builder keyBuilder = helixDataAccessor.keyBuilder();
+
+      // Get all live instances first (this is a single ZK call)
+      List<String> liveInstances = helixDataAccessor.getChildNames(keyBuilder.liveInstances());
+      if (liveInstances == null || liveInstances.isEmpty()) {
+        LOGGER.warn("No live instances found in Helix");
+        return null;
+      }
+
+      // Filter for live controller instances only
+      List<String> liveControllerInstances = new ArrayList<>();
+      for (String instanceName : liveInstances) {
+        if (InstanceTypeUtils.isController(instanceName)) {
+          liveControllerInstances.add(instanceName);
+        }
+      }
+
+      if (liveControllerInstances.isEmpty()) {
+        LOGGER.warn("No live controller instances found in Helix");
+        return null;
+      }
+
+      String selectedInstance = liveControllerInstances.get(RANDOM.nextInt(liveControllerInstances.size()));
+      ExtraInstanceConfig extraInstanceConfig = new ExtraInstanceConfig(
+          helixDataAccessor.getProperty(keyBuilder.instanceConfig(selectedInstance)));
+      String baseUrl = extraInstanceConfig.getComponentUrl();
+      if (baseUrl == null) {
+        LOGGER.warn("Unable to extract the base URL from controller instance config: {}", selectedInstance);
+        return null;
+      }
+      LOGGER.info("Dynamically discovered controller URL from Helix (randomly selected from {} controllers): {}",
+          liveControllerInstances.size(), baseUrl);
+      return baseUrl;
+    } catch (Exception e) {
+      LOGGER.warn("Failed to dynamically discover controller URL from Helix", e);
+      return null;
+    }
   }
 }

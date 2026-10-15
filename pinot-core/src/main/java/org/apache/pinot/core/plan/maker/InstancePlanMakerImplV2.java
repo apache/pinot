@@ -21,8 +21,11 @@ package org.apache.pinot.core.plan.maker;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
@@ -53,9 +56,16 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
+import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
+import org.apache.pinot.spi.utils.CommonConstants.Server.AndRestrictionPushdownMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -100,6 +110,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   public static final int DEFAULT_GROUPBY_TRIM_THRESHOLD = Server.DEFAULT_QUERY_EXECUTOR_GROUPBY_TRIM_THRESHOLD;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(InstancePlanMakerImplV2.class);
+  // Cap planning work independently of the query's configurable group limit.
+  private static final int MAX_GROUPING_SETS_DICTIONARY_SCAN_ENTRIES = 1 << 20;
 
   private final FetchPlanner _fetchPlanner = FetchPlannerRegistry.getPlanner();
   private int _maxExecutionThreads = Server.DEFAULT_QUERY_EXECUTOR_MAX_EXECUTION_THREADS;
@@ -114,6 +126,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   private int _minSegmentGroupTrimSize = Server.DEFAULT_QUERY_EXECUTOR_MIN_SEGMENT_GROUP_TRIM_SIZE;
   private int _minServerGroupTrimSize = Server.DEFAULT_QUERY_EXECUTOR_MIN_SERVER_GROUP_TRIM_SIZE;
   private int _groupByTrimThreshold = Server.DEFAULT_QUERY_EXECUTOR_GROUPBY_TRIM_THRESHOLD;
+  private AndRestrictionPushdownMode _andRestrictionPushdownMode =
+      Server.DEFAULT_QUERY_EXECUTOR_AND_RESTRICTION_PUSHDOWN_MODE;
 
   @Override
   public void init(PinotConfiguration queryExecutorConfig) {
@@ -142,6 +156,9 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         Server.DEFAULT_QUERY_EXECUTOR_MIN_SERVER_GROUP_TRIM_SIZE);
     _groupByTrimThreshold = queryExecutorConfig.getProperty(Server.GROUPBY_TRIM_THRESHOLD,
         Server.DEFAULT_QUERY_EXECUTOR_GROUPBY_TRIM_THRESHOLD);
+    _andRestrictionPushdownMode = QueryOptionsUtils.parseAndRestrictionPushdownMode(
+        Server.AND_RESTRICTION_PUSHDOWN_MODE, queryExecutorConfig.getProperty(Server.AND_RESTRICTION_PUSHDOWN_MODE,
+            Server.DEFAULT_QUERY_EXECUTOR_AND_RESTRICTION_PUSHDOWN_MODE.name()));
     Preconditions.checkState(_groupByTrimThreshold > 0,
         "Invalid configurable: groupByTrimThreshold: %d must be positive", _groupByTrimThreshold);
     LOGGER.info("Initialized plan maker with maxExecutionThreads: {}, defaultExecutionThreads: {}, "
@@ -205,6 +222,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   public Plan makeInstancePlan(List<SegmentContext> segmentContexts, QueryContext queryContext,
       ExecutorService executorService) {
     applyQueryOptions(queryContext);
+    boundGroupingSetsBaseAggregation(segmentContexts, queryContext);
 
     int numSegments = segmentContexts.size();
     List<PlanNode> planNodes = new ArrayList<>(numSegments);
@@ -231,6 +249,35 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         new InstanceResponsePlanNode(combinePlanNode, segmentContexts, fetchContexts, queryContext));
   }
 
+  /// Resolves [AndRestrictionPushdownMode] for a query.
+  ///
+  /// The push-down materializes the filter result instead of streaming it, so under AUTO it is only applied to a
+  /// query that is going to read every matching document anyway. That is exactly the aggregation and group-by
+  /// queries:
+  ///
+  /// - a selection query without ORDER BY stops as soon as it has LIMIT rows;
+  /// - a DISTINCT query without ORDER BY stops the same way, in `DistinctOperator#getNextBlock`;
+  /// - whether a selection query *with* ORDER BY can stop early is decided per segment, because
+  ///   [org.apache.pinot.core.plan.SelectionPlanNode] picks `SelectionPartiallyOrderedBy*` from the segment's sorted
+  ///   column, so it cannot be ruled out here and is excluded conservatively;
+  /// - LIMIT 0 reads nothing at all.
+  ///
+  /// Use ALWAYS to push down on a workload known not to terminate early.
+  private static boolean isAndRestrictionPushdownEnabled(AndRestrictionPushdownMode mode, QueryContext queryContext) {
+    switch (mode) {
+      case ALWAYS:
+        return true;
+      case NEVER:
+        return false;
+      case AUTO:
+        // NOTE: DISTINCT is modelled as an aggregation function, so it has to be excluded explicitly
+        return queryContext.getLimit() > 0 && QueryContextUtils.isAggregationQuery(queryContext)
+            && !QueryContextUtils.isDistinctQuery(queryContext);
+      default:
+        throw new IllegalStateException("Unsupported AND restriction push-down mode: " + mode);
+    }
+  }
+
   @VisibleForTesting
   void applyQueryOptions(QueryContext queryContext) {
     Map<String, String> queryOptions = queryContext.getQueryOptions();
@@ -247,6 +294,12 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
 
     // Set skipScanFilterReorder
     queryContext.setSkipScanFilterReorder(QueryOptionsUtils.isSkipScanFilterReorder(queryOptions));
+
+    // Set andRestrictionPushdown, letting the query option override the server default
+    AndRestrictionPushdownMode andRestrictionPushdownMode =
+        QueryOptionsUtils.getAndRestrictionPushdownMode(queryOptions);
+    queryContext.setAndRestrictionPushdownEnabled(isAndRestrictionPushdownEnabled(
+        andRestrictionPushdownMode != null ? andRestrictionPushdownMode : _andRestrictionPushdownMode, queryContext));
 
     queryContext.setSkipIndexes(QueryOptionsUtils.getSkipIndexes(queryOptions));
 
@@ -375,6 +428,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   public Plan makeStreamingInstancePlan(List<SegmentContext> segmentContexts, QueryContext queryContext,
       ExecutorService executorService, ResultsBlockStreamer streamer) {
     applyQueryOptions(queryContext);
+    boundGroupingSetsBaseAggregation(segmentContexts, queryContext);
 
     int numSegments = segmentContexts.size();
     List<PlanNode> planNodes = new ArrayList<>(numSegments);
@@ -420,6 +474,187 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   protected CombinePlanNode createCombinePlanNode(List<PlanNode> planNodes, QueryContext queryContext,
       ExecutorService executorService, @Nullable ResultsBlockStreamer streamer) {
     return new CombinePlanNode(planNodes, queryContext, executorService, streamer);
+  }
+
+  /// Only emit BASE records when every local BASE key and every derived grouping-set key can fit the combine
+  /// table. Summing each segment's dictionary product is conservative even when keys overlap across segments.
+  /// Unknown, raw, transformed and multi-value columns use the per-row expansion path, and so does any mutable
+  /// segment: a consuming segment keeps indexing between planning and execution, so a bound computed from its
+  /// current dictionaries can be stale by the time the combine runs. This also makes a larger
+  /// `groupingSetsBaseAggregationMaxGroups` option unable to bypass the actual `numGroupsLimit` memory guard.
+  @VisibleForTesting
+  static void boundGroupingSetsBaseAggregation(List<SegmentContext> segmentContexts, QueryContext queryContext) {
+    if (queryContext.isGroupingSetsBaseAggregation()) {
+      queryContext.setGroupingSetsBaseAggregationAllowed(
+          fitsGroupingSetsBaseAggregationLimit(segmentContexts, queryContext));
+    }
+  }
+
+  @VisibleForTesting
+  static boolean fitsGroupingSetsBaseAggregationLimit(List<SegmentContext> segmentContexts,
+      QueryContext queryContext) {
+    List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
+    List<int[]> groupingSets = queryContext.getGroupingSets();
+    int limit = queryContext.getNumGroupsLimit();
+    if (groupByExpressions == null || groupingSets == null || limit <= 0) {
+      return false;
+    }
+    int numColumns = groupByExpressions.size();
+    for (int[] groupingSet : groupingSets) {
+      for (int columnIndex : groupingSet) {
+        if (columnIndex < 0 || columnIndex >= numColumns) {
+          return false;
+        }
+      }
+    }
+
+    // Collect every nonempty segment's dictionaries once; each eligibility rule must hold for all of them.
+    List<Dictionary[]> segmentDictionaries = new ArrayList<>();
+    List<long[]> segmentCardinalities = new ArrayList<>();
+    List<IndexSegment> segments = new ArrayList<>();
+    boolean[] columnMayBeNull = new boolean[numColumns];
+    for (SegmentContext segmentContext : segmentContexts) {
+      IndexSegment segment = segmentContext.getIndexSegment();
+      if (segment instanceof MutableSegment) {
+        // Mutable dictionaries grow until FilterPlanNode.run() snapshots the doc count, so neither this bound
+        // nor the zero-doc skip below holds at execution time.
+        return false;
+      }
+      if (segment.getSegmentMetadata().getTotalDocs() == 0) {
+        continue;
+      }
+      Dictionary[] dictionaries = new Dictionary[numColumns];
+      long[] cardinalities = new long[numColumns];
+      for (int i = 0; i < numColumns; i++) {
+        ExpressionContext expression = groupByExpressions.get(i);
+        if (expression.getType() != ExpressionContext.Type.IDENTIFIER) {
+          return false;
+        }
+        DataSource dataSource = segment.getDataSourceNullable(expression.getIdentifier());
+        if (dataSource == null || !dataSource.getDataSourceMetadata().isSingleValue()) {
+          return false;
+        }
+        Dictionary dictionary = dataSource.getDictionary();
+        ForwardIndexReader<?> forwardIndex = dataSource.getForwardIndex();
+        if (dictionary == null || forwardIndex == null || !forwardIndex.isDictionaryEncoded()) {
+          return false;
+        }
+        long cardinality = dictionary.length();
+        if (queryContext.isNullHandlingEnabled() && dataSource.getNullValueVector() != null) {
+          cardinality++;
+          columnMayBeNull[i] = true;
+        }
+        if (cardinality == 0) {
+          return false;
+        }
+        dictionaries[i] = dictionary;
+        cardinalities[i] = cardinality;
+      }
+      segmentDictionaries.add(dictionaries);
+      segmentCardinalities.add(cardinalities);
+      segments.add(segment);
+    }
+
+    // Cheap proof first: sum each segment's dictionary-cardinality products without reading any values. This
+    // multiple-counts keys shared across segments, so when it fails, fall through to the tighter (but costlier)
+    // proof over the per-column UNION of dictionary values.
+    if (fitsBySegmentCardinalityProducts(segmentCardinalities, groupingSets, limit)) {
+      return true;
+    }
+    long[] maxCardinalities = new long[numColumns];
+    long totalEntries = 0;
+    for (int segmentIndex = 0; segmentIndex < segments.size(); segmentIndex++) {
+      for (int i = 0; i < numColumns; i++) {
+        maxCardinalities[i] = Math.max(maxCardinalities[i], segmentCardinalities.get(segmentIndex)[i]);
+        totalEntries += segmentDictionaries.get(segmentIndex)[i].length();
+      }
+    }
+    // Each union contains at least the largest segment dictionary. Reject impossible proofs and excessive scan
+    // work before acquiring buffers or reading values.
+    return totalEntries <= MAX_GROUPING_SETS_DICTIONARY_SCAN_ENTRIES
+        && fitsBySegmentCardinalityProducts(List.of(maxCardinalities), groupingSets, limit)
+        && fitsByColumnUnionCardinalities(segments, segmentDictionaries, columnMayBeNull, groupByExpressions,
+            groupingSets, maxCardinalities, limit, queryContext.getEndTimeMs());
+  }
+
+  /// Sums each segment's per-column dictionary-cardinality product, for the BASE grouping and for every derived
+  /// set, against separate `numGroupsLimit` budgets (the base table and the derived table are each capped at the
+  /// limit). Conservative when segments share key values, since the same key is counted once per segment.
+  private static boolean fitsBySegmentCardinalityProducts(List<long[]> segmentCardinalities,
+      List<int[]> groupingSets, int limit) {
+    long remainingBase = limit;
+    long remainingDerived = limit;
+    for (long[] cardinalities : segmentCardinalities) {
+      long baseGroups = 1;
+      for (long cardinality : cardinalities) {
+        if (baseGroups > remainingBase / cardinality) {
+          return false;
+        }
+        baseGroups *= cardinality;
+      }
+      if (baseGroups > remainingBase) {
+        return false;
+      }
+      remainingBase -= baseGroups;
+
+      for (int[] groupingSet : groupingSets) {
+        long derivedGroups = 1;
+        for (int columnIndex : groupingSet) {
+          if (derivedGroups > remainingDerived / cardinalities[columnIndex]) {
+            return false;
+          }
+          derivedGroups *= cardinalities[columnIndex];
+        }
+        // An empty grouping set (the grand total) skips the loop above, so re-check the final product.
+        if (derivedGroups > remainingDerived) {
+          return false;
+        }
+        remainingDerived -= derivedGroups;
+      }
+    }
+    return true;
+  }
+
+  /// Bounds the groups by the per-column UNION of dictionary values across segments: every BASE key is a
+  /// combination of per-column union values, so the product of union cardinalities bounds the base groups (and
+  /// each set's product bounds that set) WITHOUT counting keys shared across segments once per segment. Reading
+  /// dictionary values is bounded, cancellable plan-time work. Acquire only the dictionary being scanned, and
+  /// release it even when the proof fails or the query is terminated. Unscanned columns retain their maximum
+  /// segment cardinality as a lower bound, allowing early rejection after each column.
+  private static boolean fitsByColumnUnionCardinalities(List<IndexSegment> segments,
+      List<Dictionary[]> segmentDictionaries, boolean[] columnMayBeNull, List<ExpressionContext> groupByExpressions,
+      List<int[]> groupingSets, long[] unionCardinalities, int limit, long deadlineMs) {
+    for (int i = 0; i < unionCardinalities.length; i++) {
+      Set<Object> union = new HashSet<>();
+      for (int segmentIndex = 0; segmentIndex < segments.size(); segmentIndex++) {
+        QueryThreadContext.checkTerminationAndSampleUsage("grouping-set dictionary union", deadlineMs);
+        IndexSegment segment = segments.get(segmentIndex);
+        Dictionary dictionary = segmentDictionaries.get(segmentIndex)[i];
+        FetchContext fetchContext = new FetchContext(UUID.randomUUID(), segment.getSegmentName(),
+            Map.of(groupByExpressions.get(i).getIdentifier(), List.of(StandardIndexes.dictionary())));
+        try {
+          segment.prefetch(fetchContext);
+          segment.acquire(fetchContext);
+          int length = dictionary.length();
+          for (int dictId = 0; dictId < length; dictId++) {
+            QueryThreadContext.checkTerminationAndSampleUsagePeriodically(dictId, "grouping-set dictionary union",
+                deadlineMs);
+            // getInternal: BYTES values come back as ByteArray, which supports value-based hashing.
+            union.add(dictionary.getInternal(dictId));
+            if (union.size() + (columnMayBeNull[i] ? 1L : 0L) > limit) {
+              return false;
+            }
+          }
+        } finally {
+          segment.release(fetchContext);
+        }
+      }
+      unionCardinalities[i] = union.size() + (columnMayBeNull[i] ? 1 : 0);
+      if (!fitsBySegmentCardinalityProducts(List.of(unionCardinalities), groupingSets, limit)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /// In-place rewrite QueryContext based on the information from local IndexSegment.

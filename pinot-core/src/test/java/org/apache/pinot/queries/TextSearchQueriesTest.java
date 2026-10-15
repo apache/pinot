@@ -1984,6 +1984,24 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     testInterSegmentAggregationQueryHelper(query, 4);
   }
 
+  /// `count(*)` with only a TEXT_MATCH filter is routed by [org.apache.pinot.core.plan.AggregationPlanNode]
+  /// to [org.apache.pinot.core.operator.query.FastFilteredCountOperator], which asks the filter for a count
+  /// instead of materializing matching doc ids.
+  ///
+  /// Named explicitly because [TextSearchMultiColIndexQueriesTest] extends this class and so runs it against
+  /// a multi-column text index, exercising the column-aware
+  /// [org.apache.pinot.segment.spi.index.reader.MultiColumnTextIndexReader#getNumMatchingDocs] path. That
+  /// coverage was previously only incidental, inside a broader test.
+  @Test
+  public void testCountStarWithTextMatchIsServedByTheFilterCount() {
+    // Same predicates and expected counts as testInterSegment, kept here as a standalone count-only case.
+    testInterSegmentAggregationQueryHelper("SELECT count(*) FROM MyTable WHERE "
+        + "TEXT_MATCH(SKILLS_TEXT_COL, '\"Machine learning\" AND \"Tensor flow\"')", 12);
+    // A shape Lucene cannot count from index metadata, so it exercises the collecting branch.
+    testInterSegmentAggregationQueryHelper("SELECT count(*) FROM MyTable WHERE "
+        + "TEXT_MATCH(SKILLS_TEXT_COL, '(\"distributed systems\" AND apache) OR (Java AND C++)')", 36);
+  }
+
   private void testInterSegmentAggregationQueryHelper(String query, long expectedCount) {
     DataSchema expectedDataSchema = new DataSchema(new String[]{"count(*)"}, new ColumnDataType[]{ColumnDataType.LONG});
     List<Object[]> expectedRows = List.<Object[]>of(new Object[]{expectedCount});

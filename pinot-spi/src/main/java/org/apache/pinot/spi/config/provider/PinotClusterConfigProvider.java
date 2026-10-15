@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.spi.config.provider;
 
+import com.google.common.collect.Maps;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -35,6 +37,20 @@ public interface PinotClusterConfigProvider {
   /// @param clusterConfigChangeListener change listener to be registered to obtain cluster config changes
   /// @return returns 'true' if the registration was successful
   boolean registerClusterConfigChangeListener(PinotClusterConfigChangeListener clusterConfigChangeListener);
+
+  /// Copies the ZK cluster configs without the null-valued entries. The cluster config update API stores a JSON
+  /// `null` as a null value, which carries no information for a `String` config, so the key is treated as absent.
+  /// @param clusterConfigs map of ZK cluster configs
+  /// @return immutable copy of the cluster configs without the null-valued entries
+  default Map<String, String> copyWithoutNullValues(Map<String, String> clusterConfigs) {
+    Map<String, String> copy = Maps.newHashMapWithExpectedSize(clusterConfigs.size());
+    for (Map.Entry<String, String> entry : clusterConfigs.entrySet()) {
+      if (entry.getValue() != null) {
+        copy.put(entry.getKey(), entry.getValue());
+      }
+    }
+    return Collections.unmodifiableMap(copy);
+  }
 
   /// Calculates the set of keys that changed in ZK cluster configs between the old and new
   /// @param oldProperties map of previously cached ZK cluster configs

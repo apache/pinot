@@ -18,7 +18,16 @@
  */
 package org.apache.pinot.core.query.aggregation.function.funnel;
 
+import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
+import it.unimi.dsi.fastutil.doubles.DoubleSet;
+import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
+import it.unimi.dsi.fastutil.floats.FloatSet;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import it.unimi.dsi.fastutil.longs.LongSet;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -41,12 +50,49 @@ class SetMergeStrategy implements MergeStrategy<List<Set>> {
   @Override
   public LongArrayList extractFinalResult(List<Set> stepsSets) {
     long[] result = new long[_numSteps];
-    result[0] = stepsSets.get(0).size();
+    Set<?> intersection = stepsSets.get(0);
+    result[0] = intersection.size();
     for (int i = 1; i < _numSteps; i++) {
-      // intersect this step with previous step
-      stepsSets.get(i).retainAll(stepsSets.get(i - 1));
-      result[i] = stepsSets.get(i).size();
+      Set<?> step = stepsSets.get(i);
+      if (intersection.isEmpty() || step.isEmpty()) {
+        break;
+      }
+      // Preserve the intermediate sets and copy only the smaller population.
+      if (i == 1 || intersection.size() > step.size()) {
+        intersection = intersection.size() <= step.size()
+            ? intersect(intersection, step)
+            : intersect(step, intersection);
+      } else {
+        intersection.retainAll(step);
+      }
+      result[i] = intersection.size();
     }
     return LongArrayList.wrap(result);
+  }
+
+  private static Set<?> intersect(Set<?> smaller, Set<?> larger) {
+    if (smaller instanceof IntSet intSet && larger instanceof IntSet otherIntSet) {
+      IntSet intersection = new IntOpenHashSet(intSet);
+      intersection.retainAll(otherIntSet);
+      return intersection;
+    }
+    if (smaller instanceof LongSet longSet && larger instanceof LongSet otherLongSet) {
+      LongSet intersection = new LongOpenHashSet(longSet);
+      intersection.retainAll(otherLongSet);
+      return intersection;
+    }
+    if (smaller instanceof FloatSet floatSet && larger instanceof FloatSet otherFloatSet) {
+      FloatSet intersection = new FloatOpenHashSet(floatSet);
+      intersection.retainAll(otherFloatSet);
+      return intersection;
+    }
+    if (smaller instanceof DoubleSet doubleSet && larger instanceof DoubleSet otherDoubleSet) {
+      DoubleSet intersection = new DoubleOpenHashSet(doubleSet);
+      intersection.retainAll(otherDoubleSet);
+      return intersection;
+    }
+    Set<?> intersection = new HashSet<>(smaller);
+    intersection.retainAll(larger);
+    return intersection;
   }
 }

@@ -91,6 +91,7 @@ import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.config.table.ingestion.EnrichmentConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy;
 import org.apache.pinot.spi.config.table.ingestion.SchemaConformingTransformerConfig;
 import org.apache.pinot.spi.config.table.ingestion.SourceFieldConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
@@ -108,6 +109,7 @@ import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.AssignmentStrategy;
+import org.apache.pinot.spi.utils.ConsumingSegmentConsistencyModeListener;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
@@ -299,6 +301,7 @@ public final class TableConfigUtils {
   /// Validates retention config. Checks for following things:
   /// - Valid segmentPushType
   /// - Valid retentionTimeUnit
+  /// - Positive retentionSize in bytes, when configured
   private static void validateRetentionConfig(TableConfig tableConfig) {
     SegmentsValidationAndRetentionConfig segmentsConfig = tableConfig.getValidationConfig();
     String tableName = tableConfig.getTableName();
@@ -324,6 +327,17 @@ public final class TableConfigUtils {
       } catch (Exception e) {
         throw new IllegalStateException(
             String.format("Table: %s, invalid retention time unit: %s", tableName, retentionTimeUnitString));
+      }
+    }
+
+    String retentionSize = segmentsConfig.getRetentionSize();
+    if (retentionSize != null) {
+      try {
+        Preconditions.checkArgument(DataSizeUtils.toBytes(retentionSize) > 0, "Retention size must be positive");
+      } catch (IllegalArgumentException e) {
+        throw new IllegalStateException(
+            String.format("Table: %s, invalid retention size: %s; must be a positive size in bytes", tableName,
+                retentionSize), e);
       }
     }
 
@@ -1211,6 +1225,7 @@ public final class TableConfigUtils {
 
       validateTTLForUpsertConfig(tableConfig, schema);
       validatePartialUpsertStrategies(tableConfig, schema);
+      validateConsumptionDuringUpsertRevert(tableConfig);
       Preconditions.checkState(
           !(PinotMd5Mode.isPinotMd5Disabled() && upsertConfig.getHashFunction() == HashFunction.MD5),
           "Upsert hash function MD5 is disabled via '%s=true'", CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED);
@@ -1223,6 +1238,35 @@ public final class TableConfigUtils {
           !(PinotMd5Mode.isPinotMd5Disabled() && dedupConfig.getHashFunction() == HashFunction.MD5),
           "Dedup hash function MD5 is disabled via '%s=true'", CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED);
     }
+  }
+
+  /// Rejects consuming the next segment during a download on tables that revert upsert metadata in PROTECTED mode,
+  /// because the next segment's snapshot would run before the revert and miss the rows it restores.
+  @VisibleForTesting
+  static void validateConsumptionDuringUpsertRevert(TableConfig tableConfig) {
+    if (tableConfig.getTableType() != TableType.REALTIME || !isTableTypeInconsistentDuringConsumption(tableConfig)
+        || ConsumingSegmentConsistencyModeListener.getInstance().getConsistencyMode()
+        != ConsumingSegmentConsistencyModeListener.Mode.PROTECTED) {
+      return;
+    }
+    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+    StreamIngestionConfig streamIngestionConfig =
+        ingestionConfig != null ? ingestionConfig.getStreamIngestionConfig() : null;
+    ParallelSegmentConsumptionPolicy policy =
+        streamIngestionConfig != null ? streamIngestionConfig.getParallelSegmentConsumptionPolicy() : null;
+    boolean pauseless = streamIngestionConfig != null && streamIngestionConfig.isPauselessConsumptionEnabled();
+    // ALLOW_ALWAYS and ALLOW_DURING_DOWNLOAD_ONLY both allow it, and so does the deprecated flag when no policy is set.
+    // ALLOW_DURING_BUILD_ONLY allows it too, because a local build that fails or mismatches the committed CRC falls
+    // back to a download after the semaphore is released. Pauseless tables consume during build by design and skip
+    // the CRC check, so they keep it.
+    boolean consumesDuringDownload = policy != null
+        ? policy.isAllowedDuringDownload() || (policy.isAllowedDuringBuild() && !pauseless)
+        : tableConfig.getUpsertConfig().isAllowPartialUpsertConsumptionDuringCommit();
+    Preconditions.checkState(!consumesDuringDownload,
+        "%s lets the next segment consume during a segment download, but tables with partial upsert, "
+            + "dropOutOfOrderRecord or outOfOrderRecordColumn revert upsert metadata in PROTECTED consistency mode. "
+            + "Set parallelSegmentConsumptionPolicy to DISALLOW_ALWAYS",
+        policy != null ? "parallelSegmentConsumptionPolicy " + policy : "allowPartialUpsertConsumptionDuringCommit");
   }
 
   /// Checks if a data type is valid for time-based comparison operations (upsert/dedup).
@@ -2000,11 +2044,14 @@ public final class TableConfigUtils {
       Set<AggregationFunctionColumnPair> functionColumnPairsSet = new HashSet<>();
       Set<AggregationFunctionColumnPair> storedTypes = new HashSet<>();
       Set<String> aggregatedColumns = new HashSet<>();
+      // A null-aware star-tree stores COUNT per column rather than collapsing every COUNT to COUNT(*), so the column
+      // of a COUNT pair has to be kept and validated against the schema
+      boolean nullHandlingEnabled = starTreeIndexConfig.isNullHandlingEnabled();
       if (functionColumnPairs != null) {
         for (String functionColumnPair : functionColumnPairs) {
           AggregationFunctionColumnPair columnPair;
           try {
-            columnPair = AggregationFunctionColumnPair.fromColumnName(functionColumnPair);
+            columnPair = AggregationFunctionColumnPair.fromColumnName(functionColumnPair, nullHandlingEnabled);
           } catch (Exception e) {
             throw new IllegalStateException("Invalid StarTreeIndex config: " + functionColumnPair + ". Must be"
                 + "in the form <Aggregation function>__<Column name>");
@@ -2032,7 +2079,7 @@ public final class TableConfigUtils {
         for (StarTreeAggregationConfig aggregationConfig : aggregationConfigs) {
           AggregationFunctionColumnPair columnPair;
           try {
-            columnPair = AggregationFunctionColumnPair.fromAggregationConfig(aggregationConfig);
+            columnPair = AggregationFunctionColumnPair.fromAggregationConfig(aggregationConfig, nullHandlingEnabled);
           } catch (Exception e) {
             throw new IllegalStateException("Invalid StarTreeIndex config: " + aggregationConfig);
           }

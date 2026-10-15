@@ -18,48 +18,73 @@
  */
 package org.apache.pinot.segment.local.segment.index.openstruct;
 
+import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.index.datasource.BaseDataSource;
 import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
 import org.apache.pinot.segment.local.segment.index.datasource.NullDataSource;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
+import org.apache.pinot.segment.spi.index.IndexService;
+import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /// Per-key [DataSource] accessor for sealed OPEN_STRUCT segments. Dense keys get materialized DataSources; sparse keys
 /// get virtual [SparseKeyDataSource]s backed by the shared blob parser; keys absent from the segment (no sparse blob,
 /// or not listed in the sparse manifest) resolve to an all-null [NullDataSource].
 public class ImmutableOpenStructDataSource extends BaseDataSource implements OpenStructDataSource {
+  /// Looked up by id rather than referenced: the composite JSON index ships as a plugin and is absent from most
+  /// deployments, so this resolves to nothing unless one registered it.
+  private static final String COMPOSITE_JSON_INDEX_ID = "composite_json_index";
+
   private final ComplexFieldSpec _fieldSpec;
   private final Map<String, DataSource> _perKeyDataSources;
   @Nullable
   private final DataSource _sparseDataSource;
   @Nullable
   private final Set<String> _sparseKeys;
+  /// Sparse keys whose values are collections, mapped to the longest value each one holds. Read from the parent
+  /// column's metadata, where the segment build records it for exactly the keys whose shape is not visible in a
+  /// column of their own.
+  @Nullable
+  private final Map<String, Integer> _sparseMultiValueKeys;
+  /// Sparse keys mapped to the type the segment build resolved for them, read from the parent column's metadata
+  /// for the same reason as the shape above: the blob is JSON and carries no type of its own.
+  @Nullable
+  private final Map<String, FieldSpec.DataType> _sparseKeyTypes;
   @Nullable
   private final OpenStructSparseBlobReader _sparseBlobReader;
   private final ConcurrentHashMap<String, DataSource> _sparseKeyDataSourceCache;
 
   public ImmutableOpenStructDataSource(ComplexFieldSpec fieldSpec, Map<String, DataSource> perKeyDataSources,
       @Nullable DataSource sparseDataSource, DataSourceMetadata dataSourceMetadata,
-      ColumnIndexContainer indexContainer, @Nullable List<String> sparseKeys) {
+      ColumnIndexContainer indexContainer, @Nullable List<String> sparseKeys,
+      @Nullable Map<String, Integer> sparseMultiValueKeys,
+      @Nullable Map<String, FieldSpec.DataType> sparseKeyTypes) {
     super(dataSourceMetadata, indexContainer);
     _fieldSpec = fieldSpec;
     _perKeyDataSources = perKeyDataSources;
     _sparseDataSource = sparseDataSource;
     _sparseKeys = sparseKeys != null ? Set.copyOf(sparseKeys) : null;
+    _sparseMultiValueKeys = sparseMultiValueKeys != null ? Map.copyOf(sparseMultiValueKeys) : null;
+    _sparseKeyTypes = sparseKeyTypes != null ? Map.copyOf(sparseKeyTypes) : null;
     if (sparseDataSource != null) {
       ForwardIndexReader<?> blobFwd = sparseDataSource.getForwardIndex();
       _sparseBlobReader = blobFwd != null
@@ -80,10 +105,12 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
   /// Callers must use [#getDataSource(String)] for per-key access; whole-struct projection
   /// (`SELECT open_struct_col`) is handled by the query layer, not the storage layer.
   public ImmutableOpenStructDataSource(ComplexFieldSpec fieldSpec, Map<String, DataSource> perKeyDataSources,
-      @Nullable DataSource sparseDataSource, int numDocs, @Nullable List<String> sparseKeys) {
+      @Nullable DataSource sparseDataSource, int numDocs, @Nullable List<String> sparseKeys,
+      @Nullable Map<String, Integer> sparseMultiValueKeys,
+      @Nullable Map<String, FieldSpec.DataType> sparseKeyTypes) {
     this(fieldSpec, perKeyDataSources, sparseDataSource,
         new ImmutableOpenStructDataSourceMetadata(fieldSpec, numDocs),
-        new ColumnIndexContainer.FromMap.Builder().build(), sparseKeys);
+        new ColumnIndexContainer.FromMap.Builder().build(), sparseKeys, sparseMultiValueKeys, sparseKeyTypes);
   }
 
   @Override
@@ -102,7 +129,39 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
       return new NullDataSource(getValueFieldSpec(key), getDataSourceMetadata().getNumDocs());
     }
     return _sparseKeyDataSourceCache.computeIfAbsent(key,
-        k -> new SparseKeyDataSource(getValueFieldSpec(k), _sparseBlobReader));
+        k -> new SparseKeyDataSource(getValueFieldSpec(k), _sparseBlobReader, maxNumValues(k)));
+  }
+
+  /// Field spec for a key's values, with an undeclared sparse key's shape and type taken from the segment's
+  /// sparse manifests. Which tier a key lands on is a tuning decision, so it must not decide either: without
+  /// this, the same rows would report `INT` on a segment that materialized the key and `STRING` on one that put
+  /// it in the blob -- and `STRING[]` versus a scalar `STRING` holding `["a","b"]` for shape -- so a query
+  /// fanning out over both would see two types for one column.
+  ///
+  /// A segment built before the manifests existed lists nothing, and an unlisted key falls back to the
+  /// single-value STRING every sparse key used to read as.
+  @Override
+  public FieldSpec getValueFieldSpec(String key) {
+    FieldSpec childFieldSpec = _fieldSpec.getChildFieldSpec(key);
+    if (childFieldSpec != null) {
+      return childFieldSpec;
+    }
+    boolean singleValue = _sparseMultiValueKeys == null || !_sparseMultiValueKeys.containsKey(key);
+    FieldSpec.DataType dataType = _sparseKeyTypes != null
+        ? _sparseKeyTypes.getOrDefault(key, FieldSpec.DataType.STRING)
+        : FieldSpec.DataType.STRING;
+    return new DimensionFieldSpec(key, dataType, singleValue);
+  }
+
+  /// Longest value a multi-value sparse key holds, which is what the readers over it size their buffers from.
+  /// Zero for a single-value key, as [DataSourceMetadata#getMaxNumValuesPerMVEntry()] reports for one.
+  private int maxNumValues(String key) {
+    FieldSpec valueFieldSpec = getValueFieldSpec(key);
+    if (valueFieldSpec.isSingleValueField()) {
+      return 0;
+    }
+    // A declared multi-value key has no manifest entry when every one of its values was a scalar.
+    return _sparseMultiValueKeys != null ? _sparseMultiValueKeys.getOrDefault(key, 1) : 1;
   }
 
   @Override
@@ -137,7 +196,138 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
   @Override
   @Nullable
   public JsonIndexReader getSparseJsonIndex() {
-    return _sparseDataSource != null ? _sparseDataSource.getJsonIndex() : null;
+    if (_sparseDataSource == null) {
+      return null;
+    }
+    JsonIndexReader jsonIndex = _sparseDataSource.getJsonIndex();
+    if (jsonIndex != null) {
+      return jsonIndex;
+    }
+    // A composite JSON index reads as a [JsonIndexReader] and answers the same predicates, so a sparse key is
+    // served by whichever of the two the blob was given. This is the fallback an ordinary column already gets in
+    // [org.apache.pinot.core.operator.filter.MapFilterOperator]; without it here the index is built on the blob and
+    // then never consulted, and the key falls back to a full scan that silently costs what the index was for.
+    Optional<IndexType<?, ?, ?>> compositeIndex = IndexService.getInstance().getOptional(COMPOSITE_JSON_INDEX_ID);
+    return compositeIndex.map(indexType -> (JsonIndexReader) _sparseDataSource.getIndex(indexType)).orElse(null);
+  }
+
+  @Nullable
+  @Override
+  public Map<String, Object> getMapValue(int docId) {
+    try (MapValueReader reader = openMapValueReader()) {
+      return reader.getMapValue(docId);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to close OPEN_STRUCT map value reader", e);
+    }
+  }
+
+  @Override
+  public MapValueReader openMapValueReader() {
+    return new CachingMapValueReader();
+  }
+
+  /// Caches one [PinotSegmentColumnReader] per key for the life of the reader, instead of
+  /// constructing one per call the way an unscoped [#getMapValue(int)] would. For a raw,
+  /// chunk-compressed column (e.g. the sparse blob), a fresh reader per doc means a fresh
+  /// decompression buffer and, depending on access order, redundant re-decompression of the same
+  /// chunk; reusing the reader across a sequential scan lets it carry its decoded-chunk state
+  /// forward. Not thread-safe — for one single-threaded scan only, per
+  /// [OpenStructDataSource#openMapValueReader()].
+  private final class CachingMapValueReader implements MapValueReader {
+    private final Map<String, PinotSegmentColumnReader> _readers = new HashMap<>();
+    // Kept out of _readers: a child key that happens to match the parent field name would otherwise share the
+    // same map entry as the sparse blob reader, silently shadowing it.
+    @Nullable
+    private final PinotSegmentColumnReader _sparseReader;
+
+    CachingMapValueReader() {
+      _sparseReader = _sparseDataSource != null ? createReader(_fieldSpec.getName(), _sparseDataSource) : null;
+    }
+
+    @SuppressWarnings("unchecked")
+    @Nullable
+    @Override
+    public Map<String, Object> getMapValue(int docId) {
+      Map<String, Object> result = null;
+
+      for (Map.Entry<String, DataSource> entry : _perKeyDataSources.entrySet()) {
+        Object value = readValue(entry.getKey(), entry.getValue(), docId);
+        if (value != null) {
+          if (result == null) {
+            result = new HashMap<>();
+          }
+          result.put(entry.getKey(), value);
+        }
+      }
+
+      if (_sparseReader != null) {
+        Object sparseValue = readValue(_sparseReader, docId);
+        if (sparseValue instanceof String json && !json.isEmpty()) {
+          try {
+            Map<String, Object> sparseMap = JsonUtils.stringToObject(json, Map.class);
+            if (result == null) {
+              result = new HashMap<>();
+            }
+            result.putAll(sparseMap);
+          } catch (IOException e) {
+            throw new RuntimeException("Failed to parse sparse JSON at docId " + docId, e);
+          }
+        }
+      }
+
+      return result;
+    }
+
+    @Nullable
+    private Object readValue(String key, DataSource dataSource, int docId) {
+      return readValue(_readers.computeIfAbsent(key, k -> createReader(k, dataSource)), docId);
+    }
+
+    @Nullable
+    private Object readValue(@Nullable PinotSegmentColumnReader reader, int docId) {
+      return reader == null ? null : reader.isNull(docId) ? null : reader.getValue(docId);
+    }
+
+    @Nullable
+    private PinotSegmentColumnReader createReader(String key, DataSource dataSource) {
+      ForwardIndexReader<?> fwdReader = dataSource.getForwardIndex();
+      if (fwdReader == null) {
+        return null;
+      }
+      return new PinotSegmentColumnReader(key, fwdReader, dataSource.getDictionary(),
+          dataSource.getNullValueVector(), 0);
+    }
+
+    @Override
+    public void close()
+        throws IOException {
+      IOException firstException = null;
+      for (PinotSegmentColumnReader reader : _readers.values()) {
+        firstException = closeQuietly(reader, firstException);
+      }
+      if (_sparseReader != null) {
+        firstException = closeQuietly(_sparseReader, firstException);
+      }
+      if (firstException != null) {
+        throw firstException;
+      }
+    }
+
+    // Closes every reader even when an earlier one throws, instead of leaking the rest; extra failures are
+    // attached as suppressed on the first exception, mirroring try-with-resources semantics.
+    @Nullable
+    private static IOException closeQuietly(PinotSegmentColumnReader reader, @Nullable IOException firstException) {
+      try {
+        reader.close();
+        return firstException;
+      } catch (IOException e) {
+        if (firstException == null) {
+          return e;
+        }
+        firstException.addSuppressed(e);
+        return firstException;
+      }
+    }
   }
 
   private static class ImmutableOpenStructDataSourceMetadata implements DataSourceMetadata {

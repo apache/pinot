@@ -24,6 +24,8 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotSame;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertThrows;
 
 
@@ -32,6 +34,16 @@ public class ServerInstanceTest {
   public void equalsVerifier() {
     EqualsVerifier.configure().forClass(ServerInstance.class).withOnlyTheseFields("_instanceId")
         .withNonnullFields("_instanceId").verify();
+  }
+
+  @Test
+  public void testInstanceIdInterned() {
+    // Build the id at runtime so that the config holds a copy that is not already in the string pool
+    String instanceId = String.join("_", "Server", "myhost", "1234");
+    assertNotSame(instanceId, "Server_myhost_1234");
+    ServerInstance serverInstance = new ServerInstance(new InstanceConfig(new ZNRecord(instanceId)));
+    assertSame(serverInstance.getInstanceId(), "Server_myhost_1234");
+    assertSame(new ServerInstance("myhost", 1234).getInstanceId(), "Server_myhost_1234");
   }
 
   @Test

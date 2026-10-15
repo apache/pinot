@@ -112,6 +112,11 @@ public class StarTreeIndexSeparator implements Closeable {
           destIndexFile = new File(starTreeOutputDir, key._column + suffix);
           writeIndexToFile(destIndexFile, indexMap.get(key));
           break;
+        case NULL_VALUE_VECTOR:
+          destIndexFile =
+              new File(starTreeOutputDir, key._column + V1Constants.Indexes.NULLVALUE_VECTOR_FILE_EXTENSION);
+          writeIndexToFile(destIndexFile, indexMap.get(key));
+          break;
         default:
       }
     }

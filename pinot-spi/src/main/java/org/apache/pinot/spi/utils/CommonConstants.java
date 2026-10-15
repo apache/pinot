@@ -339,6 +339,10 @@ public class CommonConstants {
   }
 
   public static class Broker {
+    /// Minimum candidate segments for preparing a partition-pruning predicate. A negative value disables preparation.
+    public static final String CONFIG_OF_PARTITION_PRUNING_PREPARATION_THRESHOLD =
+        "pinot.broker.partition.pruning.preparation.threshold";
+    public static final int DEFAULT_PARTITION_PRUNING_PREPARATION_THRESHOLD = 32;
     public static final String ROUTING_TABLE_CONFIG_PREFIX = "pinot.broker.routing.table";
     public static final String ACCESS_CONTROL_CONFIG_PREFIX = "pinot.broker.access.control";
     /// Namespace for service credentials used by the broker when invoking Server admin APIs.
@@ -384,14 +388,23 @@ public class CommonConstants {
     public static final String DEFAULT_BROKER_QUERY_LOG_SQL_REDACTION = "none";
     public static final String CONFIG_OF_BROKER_QUERY_ENABLE_NULL_HANDLING = "pinot.broker.query.enable.null.handling";
     /// How query option keys supplied through SQL `SET` / `OPTION(...)` on DQL queries are validated.
-    /// Broker config key: `pinot.broker.query.option.validationMode`.
-    /// One of `QueryOptionsUtils.SqlQueryOptionValidationMode`: `NONE` (default, unknown keys are
-    /// preserved silently, as they always have been), `WARN` (preserved, logged once per distinct
-    /// unknown key) or `REJECT` (query fails). Plugins can allowlist their own keys for `REJECT` via
+    /// Cluster config key: `pinot.broker.query.option.validationMode`, applied live and not read from the broker
+    /// instance config. One of `QueryOptionsUtils.SqlQueryOptionValidationMode`: `NONE` (default, unknown keys are
+    /// preserved silently, as they always have been), `WARN` (preserved, logged once per distinct unknown key) or
+    /// `REJECT` (query fails). Plugins can allowlist their own keys for `REJECT` via
     /// `QueryOptionsUtils.registerSqlQueryOptionKey`.
     public static final String CONFIG_OF_BROKER_QUERY_OPTION_VALIDATION_MODE =
         "pinot.broker.query.option.validationMode";
     public static final String DEFAULT_BROKER_QUERY_OPTION_VALIDATION_MODE = "NONE";
+    /// How the legacy PQL-style `OPTION(key=value)` query option suffix is handled.
+    /// Cluster config key: `pinot.broker.query.option.legacySyntaxMode`, applied live and not read from the broker
+    /// instance config. One of `QueryOptionsUtils.SqlOptionsMode`: `ALLOW` (default) applies the options as always,
+    /// `IGNORE` strips the suffix and drops its options, except that a DELETE statement using the suffix fails since
+    /// its options configure it. `REJECT` fails the statement with an error pointing at `SET`. Applies to every
+    /// statement type, since `SET` covers them all.
+    public static final String CONFIG_OF_BROKER_QUERY_OPTION_LEGACY_SYNTAX_MODE =
+        "pinot.broker.query.option.legacySyntaxMode";
+    public static final String DEFAULT_BROKER_QUERY_OPTION_LEGACY_SYNTAX_MODE = "ALLOW";
     /// When true, the broker initializes the materialized view metadata cache and query rewrite
     /// engine.  When false (default), MV rewrite is disabled regardless of per-MV
     /// `rewriteEnabled` setting.
@@ -541,10 +554,34 @@ public class CommonConstants {
     public static final String DISABLE_GROOVY = "pinot.broker.disable.query.groovy";
     public static final boolean DEFAULT_DISABLE_GROOVY = true;
 
-    // Rewrite potential expensive functions to their approximation counterparts
-    // - DISTINCT_COUNT -> DISTINCT_COUNT_SMART_HLL
-    // - PERCENTILE -> PERCENTILE_SMART_TDIGEST
+    /// Rewrite potential expensive functions to their approximation counterparts, in both query engines:
+    /// - DISTINCT_COUNT and COUNT(DISTINCT) -> DISTINCT_COUNT_SMART_HLL
+    /// - PERCENTILE -> PERCENTILE_SMART_TDIGEST
+    ///
+    /// The rewritten functions stay exact until an accumulator exceeds their conversion threshold, so this bounds
+    /// server memory without changing the answer for low-cardinality inputs.
+    ///
+    /// Settable in the broker conf, read once at startup, or in the Helix cluster config, which wins and which
+    /// brokers pick up without a restart. Both are defaults: the `useApproximateFunction` query option overrides
+    /// them, and so does `QueryConfig.useApproximateFunction`, though only in the single-stage engine, because a
+    /// multi-stage query can span tables and so resolves the setting before it knows the table set.
     public static final String USE_APPROXIMATE_FUNCTION = "pinot.broker.use.approximate.function";
+    public static final boolean DEFAULT_USE_APPROXIMATE_FUNCTION = false;
+
+    /// Parameters passed verbatim as the trailing argument of the calls the rewrite produces, for example
+    /// `threshold=10000;log2m=12;dictThreshold=10000` and `threshold=1000;compression=100`. Empty means no argument
+    /// is added, so the aggregation function defaults apply. The two functions reject each other's parameter names,
+    /// hence one key each.
+    ///
+    /// Before conversion a group holds up to `threshold` values; after it, a sketch whose registers are allocated
+    /// eagerly, around 2.7 KB at `log2m=12`. A low threshold therefore trades raw values for sketches and can raise
+    /// group-by memory rather than lower it, so size `threshold` together with `log2m` or `compression` and with
+    /// `pinot.server.query.executor.num.groups.limit` rather than in isolation.
+    public static final String APPROXIMATE_FUNCTION_DISTINCT_COUNT_PARAMS =
+        "pinot.broker.approximate.function.distinct.count.params";
+    public static final String APPROXIMATE_FUNCTION_PERCENTILE_PARAMS =
+        "pinot.broker.approximate.function.percentile.params";
+    public static final String DEFAULT_APPROXIMATE_FUNCTION_PARAMS = "";
 
     public static final String CONTROLLER_URL = "pinot.broker.controller.url";
 
@@ -635,6 +672,21 @@ public class CommonConstants {
     /// whose results are already in hand. Applies only to the `SubmitWithStream` stats path.
     public static final String CONFIG_OF_STREAM_STATS_DRAIN_MS = "pinot.broker.mse.stream.stats.drain.ms";
     public static final long DEFAULT_STREAM_STATS_DRAIN_MS = 50L;
+
+    /// Whether a multi-stage query ships its leaf-stage segment lists as native protobuf fields of the worker
+    /// metadata, which skips a JSON encode per leaf-stage worker on the broker and a JSON parse per worker on the
+    /// server, instead of the legacy JSON string custom property.
+    ///
+    /// Ships disabled, and must stay disabled until every server the broker dispatches to runs a version that
+    /// understands the proto fields, including the servers of remote clusters when multi-cluster routing is used: an
+    /// older server finds no segments under them, concludes the worker is not a leaf-stage worker and fails the leaf
+    /// stage. Turn it on once the rolling upgrade has finished.
+    ///
+    /// Read from cluster config as well as from the static broker config, cluster config winning and taking effect on
+    /// the next query, so it can be turned on, and off again, without restarting the brokers. Anything in cluster
+    /// config other than `true` — the key cleared, or a value that is not a boolean — disables it.
+    public static final String CONFIG_OF_MSE_ENABLE_PROTO_SEGMENT_LIST = "pinot.broker.mse.enable.proto.segment.list";
+    public static final boolean DEFAULT_MSE_ENABLE_PROTO_SEGMENT_LIST = false;
 
     public static final String CONFIG_OF_USE_FIXED_REPLICA = "pinot.broker.use.fixed.replica";
     public static final boolean DEFAULT_USE_FIXED_REPLICA = false;
@@ -751,6 +803,26 @@ public class CommonConstants {
     // TODO: Change this default to something very high, as this _optimnization_ is usually not beneficial.
     public static final int DEFAULT_SORT_EXCHANGE_COPY_THRESHOLD = 10_000;
 
+    /// Config for the smallest IN list that the multi-stage planner hides from Calcite's optimizer.
+    ///
+    /// Calcite keeps an IN list as one `SEARCH` call over a sorted range set. Many planner rules and metadata
+    /// handlers rebuild that range set every time they touch the predicate, so planning time grows with the list size
+    /// times the number of touches. IN lists (and `OR` chains of equalities in a filter) with at least this many values
+    /// are sealed into an opaque predicate during optimization and restored afterwards.
+    ///
+    /// Predicates in the same filter or join condition still fold into the list first, as without sealing. Sealed lists
+    /// lose Calcite's value-level reasoning across plan nodes: a predicate that a rule moves next to a sealed list on
+    /// the same column is not merged into it. Null checks keep their meaning: without null handling, Calcite cannot see
+    /// into Pinot's `IS NULL` and `IS NOT NULL` operators, and with null handling the servers apply SQL null semantics.
+    ///
+    /// A value of 0 or less disables sealing. Planning outside the broker's multi-stage request handler (for example
+    /// for the controller `/sql` endpoint) does not read this broker config and uses the default. The query option
+    /// works everywhere.
+    public static final String CONFIG_OF_SEALED_IN_LIST_THRESHOLD = "pinot.broker.multistage.sealed.in.list.threshold";
+    /// Same as the default of Calcite's `SqlToRelConverter.Config#getInSubQueryThreshold()`: the size from which
+    /// Calcite itself stops treating an IN list as a scalar predicate.
+    public static final int DEFAULT_SEALED_IN_LIST_THRESHOLD = 20;
+
     public static class Request {
       public static final String SQL = "sql";
       public static final String SQL_V1 = "sqlV1";
@@ -762,6 +834,9 @@ public class CommonConstants {
 
       public static class QueryOptionKey {
         public static final String TIMEOUT_MS = "timeoutMs";
+        /// Per-query override of [CommonConstants.Broker#USE_APPROXIMATE_FUNCTION], outranking both the table config
+        /// and the cluster or broker default. `false` forces exact results, `true` opts one expensive query in.
+        public static final String USE_APPROXIMATE_FUNCTION = "useApproximateFunction";
         /// Broker-internal marker set on the rewritten server-side PinotQuery after a FULL_REWRITE
         /// materialized-view rewrite. Read by BrokerReduceService to distinguish MV-rewritten
         /// queries from gapfill / future federated paths without relying on a brittle structural
@@ -826,6 +901,18 @@ public class CommonConstants {
         public static final String MIN_BROKER_GROUP_TRIM_SIZE = "minBrokerGroupTrimSize";
         public static final String MSE_MIN_GROUP_TRIM_SIZE = "mseMinGroupTrimSize";
 
+        /// For GROUP BY GROUPING SETS / ROLLUP / CUBE using base aggregation (see
+        /// [#GROUPING_SETS_BASE_AGGREGATION]) WITH an ORDER BY: after deriving the grouping sets on the server,
+        /// keep `max(5 * LIMIT, this value)` groups WITHIN each grouping set (a per-set top-K bucketed by the
+        /// $groupingId discriminator, so a global top-K can never starve a low-magnitude set such as the grand
+        /// total). Like [#MIN_SERVER_GROUP_TRIM_SIZE], the value is a MINIMUM per-set keep, not an exact cap.
+        /// This bounds each server's derived output for high-cardinality unions at the cost of an approximate
+        /// top-K (a group ranked below the keep on one server may still be globally in the top-K once servers
+        /// merge); when it drops groups, the response is flagged as trimmed. The broker still applies the final
+        /// ORDER BY + LIMIT across all sets. Non-positive or unset (default) disables this per-set trim.
+        /// Ignored without an ORDER BY.
+        public static final String GROUPING_SETS_MIN_SERVER_TRIM_SIZE = "groupingSetsMinServerTrimSize";
+
         // When safeTrim (ORDER BY groupKeys without HAVING clause), do sort aggregate when LIMIT is below this value
         public static final String SORT_AGGREGATE_LIMIT_THRESHOLD = "sortAggregateLimitThreshold";
 
@@ -837,6 +924,27 @@ public class CommonConstants {
         /// This will help in getting accurate and correct result for queries
         /// with group by and limit but  without order by
         public static final String ACCURATE_GROUP_BY_WITHOUT_ORDER_BY = "accurateGroupByWithoutOrderBy";
+
+        /// For GROUP BY GROUPING SETS / ROLLUP / CUBE: when enabled (OPT-IN, default off), each segment
+        /// aggregates only the base grouping (the union of all grouping-set columns) using the regular group-by
+        /// path and emits the base groups; the combine phase merges them and derives the individual grouping
+        /// sets in parallel. This replaces expanding every input row into one group per grouping set, moving the
+        /// per-set fan-out from O(rows) to O(base groups) and onto the multi-threaded combine. It can help when
+        /// many rows collapse into few base groups with cheap-to-merge aggregations, but can regress for
+        /// expensive-to-merge intermediates (sketches), which is why it is off by default.
+        ///
+        /// Base aggregation is used only when the instance planner can prove that the base groups and the sum of
+        /// all requested grouping-set groups fit `numGroupsLimit`, using either per-segment dictionary cardinality
+        /// products or the union of dictionary values across segments. Each segment's base-group estimate must
+        /// also not exceed [#GROUPING_SETS_BASE_AGGREGATION_MAX_GROUPS]. If the bounds cannot be proven, the
+        /// per-row expansion path is used to preserve ordering and group-limit semantics.
+        public static final String GROUPING_SETS_BASE_AGGREGATION = "groupingSetsBaseAggregation";
+
+        /// Secondary per-segment bound on the estimated base-group count (product of the union columns'
+        /// dictionary cardinalities) for [#GROUPING_SETS_BASE_AGGREGATION]. Defaults to `numGroupsLimit`.
+        /// Raising this value cannot bypass the instance planner's hard `numGroupsLimit` bound on all local
+        /// base and derived groups. Ignored when base aggregation is disabled.
+        public static final String GROUPING_SETS_BASE_AGGREGATION_MAX_GROUPS = "groupingSetsBaseAggregationMaxGroups";
 
         /// Number of threads used in the final reduce.
         /// This is useful for expensive aggregation functions. E.g. Funnel queries are considered as expensive
@@ -875,6 +983,14 @@ public class CommonConstants {
         public static final String USE_FIXED_REPLICA = "useFixedReplica";
         public static final String EXPLAIN_PLAN_VERBOSE = "explainPlanVerbose";
         public static final String USE_MULTISTAGE_ENGINE = "useMultistageEngine";
+        /// How query options embedded in the SQL text (`SET` statements and the legacy `OPTION(...)` suffix) are
+        /// handled for this request, one of `QueryOptionsUtils.SqlOptionsMode`: `ALLOW` (default) merges them with
+        /// precedence over the request options, as always; `IGNORE` drops them so that only the request options
+        /// apply, except that a DELETE statement carrying any fails, since its options configure it; `REJECT` fails
+        /// the query when it carries any. Only honored from the request payload
+        /// (`queryOptions`, gRPC metadata), never from the SQL itself, so a gateway that sets request options on
+        /// behalf of its users can guarantee the query text cannot override them.
+        public static final String SQL_OPTIONS_MODE = "sqlOptionsMode";
         public static final String INFER_PARTITION_HINT = "inferPartitionHint";
         public static final String ENABLE_NULL_HANDLING = "enableNullHandling";
         public static final String APPLICATION_NAME = "applicationName";
@@ -918,6 +1034,9 @@ public class CommonConstants {
 
         // Reorder scan based predicates based on cardinality and number of selected values
         public static final String AND_SCAN_REORDERING = "AndScanReordering";
+
+        // Per-query override of Server.AndRestrictionPushdownMode: ALWAYS, NEVER or AUTO
+        public static final String AND_RESTRICTION_PUSHDOWN_MODE = "andRestrictionPushdownMode";
         public static final String SKIP_INDEXES = "skipIndexes";
 
         // Query option key used to trace rule productions
@@ -951,6 +1070,10 @@ public class CommonConstants {
         public static final String IN_PREDICATE_LOOKUP_ALGORITHM = "inPredicateLookupAlgorithm";
         /// Query-level override for `inpredicate.threshold`. Negative means always prune.
         public static final String IN_PREDICATE_PRUNING_THRESHOLD = "inPredicatePruningThreshold";
+
+        /// Query-level override for the minimum candidate segments needed to prepare the partition-pruning predicate.
+        /// A negative value disables preparation, but does not disable partition pruning itself.
+        public static final String PARTITION_PRUNING_PREPARATION_THRESHOLD = "partitionPruningPreparationThreshold";
 
         // When evaluating REGEXP_LIKE predicate on a dictionary encoded column:
         // - If dictionary size is smaller than this threshold, scan the dictionary to get the matching dictionary ids
@@ -1091,6 +1214,9 @@ public class CommonConstants {
         /// Option to customize the value of [Broker#CONFIG_OF_SORT_EXCHANGE_COPY_THRESHOLD]
         public static final String SORT_EXCHANGE_COPY_THRESHOLD = "sortExchangeCopyThreshold";
 
+        /// Option to customize the value of [Broker#CONFIG_OF_SEALED_IN_LIST_THRESHOLD]
+        public static final String SEALED_IN_LIST_THRESHOLD = "sealedInListThreshold";
+
         // Vector search query options
 
         /// Number of inverted-list probes for IVF-based vector indexes. Higher values improve recall
@@ -1157,6 +1283,8 @@ public class CommonConstants {
       public static final String AGGREGATE_UNION_TRANSPOSE = "AggregateUnionTranspose";
       public static final String AGGREGATE_REDUCE_FUNCTIONS = "AggregateReduceFunctions";
       public static final String AGGREGATE_FUNCTION_REWRITE = "AggregateFunctionRewrite";
+      /// Inert unless [CommonConstants.Broker#USE_APPROXIMATE_FUNCTION] is on; name it here to switch it off entirely.
+      public static final String APPROXIMATE_AGGREGATE_REWRITE = "ApproximateAggregateRewrite";
       public static final String AGGREGATE_CASE_TO_FILTER = "AggregateCaseToFilter";
       public static final String PROJECT_FILTER_TRANSPOSE = "ProjectFilterTranspose";
       public static final String PROJECT_MERGE = "ProjectMerge";
@@ -1470,6 +1598,28 @@ public class CommonConstants {
         QUERY_EXECUTOR_CONFIG_PREFIX + ".heap.usage.throttle.monitorIntervalMs";
     public static final long DEFAULT_HEAP_USAGE_THROTTLE_MONITOR_INTERVAL_MS = 1_000L;
 
+    /// Controls whether an AND pushes the document ids matched by its index-based children into its composite
+    /// (AND/OR/NOT) children, so that a scan-based predicate nested inside an OR is only evaluated on the documents
+    /// that can still match the AND. See [issue 19339](https://github.com/apache/pinot/issues/19339).
+    public static final String AND_RESTRICTION_PUSHDOWN_MODE = "and.restriction.pushdown.mode";
+    public static final String CONFIG_OF_QUERY_EXECUTOR_AND_RESTRICTION_PUSHDOWN_MODE =
+        QUERY_EXECUTOR_CONFIG_PREFIX + "." + AND_RESTRICTION_PUSHDOWN_MODE;
+    /// Defaults to NEVER: the push-down is a new filter execution path and is opt-in until it has soaked.
+    public static final AndRestrictionPushdownMode DEFAULT_QUERY_EXECUTOR_AND_RESTRICTION_PUSHDOWN_MODE =
+        AndRestrictionPushdownMode.NEVER;
+
+    /// How aggressively an AND pushes the document ids it has matched so far into its composite children.
+    public enum AndRestrictionPushdownMode {
+      /// Always push the restriction down.
+      ALWAYS,
+      /// Never push the restriction down, keeping the behavior Pinot had before the push-down existed.
+      NEVER,
+      /// Push the restriction down unless the query can stop before reading every matching document. The push-down
+      /// materializes the filter result, so applying it to a query that stops at its LIMIT makes it do the full
+      /// filter work instead of only enough to fill the result.
+      AUTO
+    }
+
     // Group-by query related configs
     public static final String NUM_GROUPS_LIMIT = "num.groups.limit";
     public static final String CONFIG_OF_QUERY_EXECUTOR_NUM_GROUPS_LIMIT =
@@ -1672,6 +1822,18 @@ public class CommonConstants {
         "ingestion.oom.protection.gcIntervalMs";
     public static final long DEFAULT_SERVER_INGESTION_OOM_PROTECTION_GC_INTERVAL_MS = 30_000L;
 
+    /// Max time a pauseless segment re-ingestion job (server API `POST /reingestSegment/{segmentName}`) waits for
+    /// consumption to reach the segment end offset before failing. Read when each job starts consuming.
+    ///
+    /// Can also be set via cluster config, which is applied without a restart and takes precedence over the server
+    /// config, so that operators can change the timeout of all servers at runtime. Notes on the cluster config:
+    /// - Only this exact key is applied without a restart, e.g. not a `pinot.all.` prefixed or differently cased key.
+    /// - When it is removed or invalid, the server config is used, which includes the cluster configs copied into it at
+    ///   server startup. So to change the timeout, set a new valid value instead of removing it.
+    public static final String CONFIG_OF_REINGESTION_CONSUMPTION_TIMEOUT_MS =
+        "pinot.server.reingestion.consumption.timeoutMs";
+    public static final long DEFAULT_REINGESTION_CONSUMPTION_TIMEOUT_MS = 1_800_000L; // 30 minutes
+
     public static final String CONFIG_OF_MMAP_DEFAULT_ADVICE = "pinot.server.mmap.advice.default";
     public static final String PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY = "pinot.server.segment.fetcher";
 
@@ -1732,6 +1894,14 @@ public class CommonConstants {
     public static final String CONFIG_OF_MESSAGES_COUNT_REFRESH_INTERVAL_SECONDS =
         "pinot.server.messagesCount.refreshIntervalSeconds";
     public static final int DEFAULT_MESSAGES_COUNT_REFRESH_INTERVAL_SECONDS = 30;
+    // Max PageCache Warmup duration
+    public static final String MAX_PAGECACHE_WARMUP_DURATION_MS = "pinot.server.max.pagecache.warmup.duration.ms";
+    public static final int DEFAULT_MAX_PAGECACHE_WARMUP_DURATION_MS = 180_000;
+    // Fraction of per‑replica QPS that page‑cache warm‑up runs at during a segment refresh.
+    // Example: quota=100QPS, replicas=2 ⇒ per‑replica=50QPS; at rate=0.2, warm‑up runs at 10QPS.
+    public static final String MAX_PAGECACHE_REFRESH_WARMUP_QPS_RATE =
+        "pinot.server.max.pagecache.refresh.warmup.qps.rate";
+    public static final double DEFAULT_MAX_PAGECACHE_REFRESH_WARMUP_QPS_RATE = 0.2;
 
     public static class SegmentCompletionProtocol {
       public static final String PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER = "pinot.server.segment.uploader";
@@ -1846,6 +2016,9 @@ public class CommonConstants {
     public static final String CONTROLLER_SERVICE_AUTO_DISCOVERY = "pinot.controller.service.auto.discovery";
     public static final String CONFIG_OF_LOGGER_ROOT_DIR = "pinot.controller.logger.root.dir";
     public static final String PREFIX_OF_PINOT_CONTROLLER_SEGMENT_COMPLETION = "pinot.controller.segment.completion";
+    // Page Cache Warmup queries data directory
+    public static final String PAGE_CACHE_WARMUP_QUERIES_DATA_DIR =
+        "pinot.controller.page.cache.warmup.queries.dataDir";
   }
 
   public static class Minion {
@@ -2862,6 +3035,20 @@ public class CommonConstants {
     public static final String KEY_OF_QUERY_SERVER_PERMIT_KEEP_ALIVE_WITHOUT_CALLS =
         "pinot.query.multistage.query.server.permit.keep.alive.without.calls";
     public static final boolean DEFAULT_OF_QUERY_SERVER_PERMIT_KEEP_ALIVE_WITHOUT_CALLS = false;
+
+    /// Maximum size, in bytes, of a gRPC message the MSE [org.apache.pinot.query.service.server.QueryServer] accepts.
+    /// Must be positive. A message carries the stage plans a broker dispatches to the server, literals included, so
+    /// queries with large literals (e.g. an `IN_ID_SET` IdSet of millions of ids) can need more than the default.
+    public static final String KEY_OF_QUERY_SERVER_MAX_INBOUND_MESSAGE_SIZE_BYTES =
+        "pinot.query.multistage.query.server.max.inbound.message.size.bytes";
+    public static final int DEFAULT_OF_QUERY_SERVER_MAX_INBOUND_MESSAGE_SIZE_BYTES = 64 * 1024 * 1024;
+
+    /// Maximum size, in bytes, of a gRPC message the broker dispatch channels accept from the MSE query servers, such
+    /// as query stats, or the plans the servers return for `EXPLAIN`, which carry the query's literals. Must be
+    /// positive. See [#KEY_OF_QUERY_SERVER_MAX_INBOUND_MESSAGE_SIZE_BYTES] for the messages the servers accept.
+    public static final String KEY_OF_DISPATCH_CHANNEL_MAX_INBOUND_MESSAGE_SIZE_BYTES =
+        "pinot.query.multistage.dispatch.channel.max.inbound.message.size.bytes";
+    public static final int DEFAULT_OF_DISPATCH_CHANNEL_MAX_INBOUND_MESSAGE_SIZE_BYTES = 64 * 1024 * 1024;
   }
 
   public static class NullValuePlaceHolder {
@@ -2909,6 +3096,8 @@ public class CommonConstants {
         "pinot.forward.index.default.target.max.chunk.size";
     public static final String CONFIG_OF_DEFAULT_TARGET_DOCS_PER_CHUNK =
         "pinot.forward.index.default.target.docs.per.chunk";
+    public static final String CONFIG_OF_DEFAULT_COMPRESSION_CODEC =
+        "pinot.forward.index.default.compression.codec";
   }
 
   public static class FieldSpecConfigs {
@@ -2949,5 +3138,13 @@ public class CommonConstants {
     /// - PROTECTED: Force commit is enabled with metadata reversion on inconsistencies
     /// - UNSAFE: Force commit is enabled without metadata reversion (Can lead to inconsistencies)
     public static final String CONSUMING_SEGMENT_CONSISTENCY_MODE = "pinot.server.consuming.segment.consistency.mode";
+
+    /// Cluster config key to control whether the protobuf decoder falls back to the last successfully fetched
+    /// (and resolved) descriptor when the remote descriptor fetch fails, so a transient DNS / object-store outage
+    /// does not permanently fail the CONSUMING transition. Enabled by default; set to 'false' to fail fast
+    /// instead. Dynamically updatable without a server restart; a table-level decoder prop
+    /// ('descriptorFileFallbackEnabled') overrides this cluster-wide value.
+    public static final String PROTOBUF_DESCRIPTOR_FALLBACK_ENABLED =
+        "pinot.server.protobuf.descriptor.fallback.enabled";
   }
 }

@@ -23,6 +23,8 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertSame;
 
 
 public class BitmapCollectionTest {
@@ -223,6 +225,95 @@ public class BitmapCollectionTest {
         new BitmapCollection(numDocs, rightInverted, split(right))), expected);
     assertEquals(new BitmapCollection(numDocs, leftInverted, split(left)).orCardinality(
         new BitmapCollection(numDocs, rightInverted, split(right))), expected);
+  }
+
+  @Test
+  public void testExcludingNulls() {
+    int numDocs = 10;
+    ImmutableRoaringBitmap docIds = ImmutableRoaringBitmap.bitmapOf(0, 5);
+    ImmutableRoaringBitmap nullBitmap = ImmutableRoaringBitmap.bitmapOf(5, 7);
+
+    BitmapCollection bitmaps = new BitmapCollection(numDocs, false, docIds).excludingNulls(nullBitmap);
+    assertSame(bitmaps.getNullBitmap(), nullBitmap);
+    assertEquals(bitmaps.getCardinality(), 1);
+    assertEquals(bitmaps.reduce().toArray(), new int[]{0});
+
+    // NOT of UNKNOWN is UNKNOWN: the inversion is the complement of the union minus the null documents
+    bitmaps.invert();
+    assertSame(bitmaps.getNullBitmap(), nullBitmap);
+    assertEquals(bitmaps.getCardinality(), 7);
+    assertEquals(bitmaps.reduce().toArray(), new int[]{1, 2, 3, 4, 6, 8, 9});
+
+    BitmapCollection splitBitmaps = new BitmapCollection(numDocs, true, split(docIds)).excludingNulls(nullBitmap);
+    assertEquals(splitBitmaps.getCardinality(), 7);
+    assertEquals(splitBitmaps.reduce().toArray(), new int[]{1, 2, 3, 4, 6, 8, 9});
+  }
+
+  @Test
+  public void testExcludingNoNulls() {
+    BitmapCollection bitmaps = new BitmapCollection(10, false, ImmutableRoaringBitmap.bitmapOf(0, 5));
+    assertSame(bitmaps.excludingNulls(null), bitmaps);
+    assertSame(bitmaps.excludingNulls(ImmutableRoaringBitmap.bitmapOf()), bitmaps);
+    assertNull(bitmaps.getNullBitmap());
+    assertEquals(bitmaps.getCardinality(), 2);
+    assertEquals(bitmaps.invert().getCardinality(), 8);
+  }
+
+  @Test
+  public void testAndOrCardinalityWithNulls() {
+    int numDocs = 10;
+    // True on {0, 1}
+    BitmapCollection left = new BitmapCollection(numDocs, false, ImmutableRoaringBitmap.bitmapOf(0, 1, 5))
+        .excludingNulls(ImmutableRoaringBitmap.bitmapOf(5, 7));
+    // True on {0, 4, 5, 6, 7, 8, 9}
+    BitmapCollection right = new BitmapCollection(numDocs, true, ImmutableRoaringBitmap.bitmapOf(1, 2))
+        .excludingNulls(ImmutableRoaringBitmap.bitmapOf(3));
+    // True on {1, 5, 9}
+    BitmapCollection plain = new BitmapCollection(numDocs, false, ImmutableRoaringBitmap.bitmapOf(1, 5, 9));
+
+    assertEquals(left.andCardinality(right), 1);
+    assertEquals(left.orCardinality(right), 8);
+    assertEquals(left.andCardinality(plain), 1);
+    assertEquals(plain.andCardinality(left), 1);
+    assertEquals(left.orCardinality(plain), 4);
+    assertEquals(plain.orCardinality(left), 4);
+  }
+
+  /// Checks the cardinalities against the materialized true documents over every combination of inversion and null
+  /// bitmaps on either side, with nulls inside and outside the unions and shared between the sides.
+  @Test
+  public void testCardinalitiesMatchMaterializedTrues() {
+    int numDocs = 12;
+    ImmutableRoaringBitmap leftDocIds = ImmutableRoaringBitmap.bitmapOf(0, 1, 5, 6, 9);
+    ImmutableRoaringBitmap rightDocIds = ImmutableRoaringBitmap.bitmapOf(1, 2, 6, 10);
+    ImmutableRoaringBitmap[] nullBitmaps = {
+        null, ImmutableRoaringBitmap.bitmapOf(1, 5, 7), ImmutableRoaringBitmap.bitmapOf(2, 7, 9, 11)
+    };
+    for (boolean leftInverted : new boolean[]{false, true}) {
+      for (boolean rightInverted : new boolean[]{false, true}) {
+        for (ImmutableRoaringBitmap leftNulls : nullBitmaps) {
+          for (ImmutableRoaringBitmap rightNulls : nullBitmaps) {
+            BitmapCollection left =
+                new BitmapCollection(numDocs, leftInverted, split(leftDocIds)).excludingNulls(leftNulls);
+            BitmapCollection right =
+                new BitmapCollection(numDocs, rightInverted, rightDocIds).excludingNulls(rightNulls);
+            ImmutableRoaringBitmap leftTrues = left.reduce();
+            ImmutableRoaringBitmap rightTrues = right.reduce();
+            String description = String.format("leftInverted=%s rightInverted=%s leftNulls=%s rightNulls=%s",
+                leftInverted, rightInverted, leftNulls, rightNulls);
+
+            assertEquals(left.getCardinality(), leftTrues.getCardinality(), description);
+            assertEquals(right.getCardinality(), rightTrues.getCardinality(), description);
+            int andCardinality = ImmutableRoaringBitmap.andCardinality(leftTrues, rightTrues);
+            assertEquals(left.andCardinality(right), andCardinality, description);
+            assertEquals(right.andCardinality(left), andCardinality, description);
+            int orCardinality = ImmutableRoaringBitmap.orCardinality(leftTrues, rightTrues);
+            assertEquals(left.orCardinality(right), orCardinality, description);
+            assertEquals(right.orCardinality(left), orCardinality, description);
+          }
+        }
+      }
+    }
   }
 
   private ImmutableRoaringBitmap[] split(ImmutableRoaringBitmap bitmap) {

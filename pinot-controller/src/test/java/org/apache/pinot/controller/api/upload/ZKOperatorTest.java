@@ -158,8 +158,8 @@ public class ZKOperatorTest {
 
     SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
     when(segmentMetadata.getName()).thenReturn(segmentName);
-    when(segmentMetadata.getCrc()).thenReturn("12345");
-    when(segmentMetadata.getDataCrc()).thenReturn("432");
+    when(segmentMetadata.getCrc()).thenReturn(12345L);
+    when(segmentMetadata.getDataCrc()).thenReturn(432L);
     when(segmentMetadata.getIndexCreationTime()).thenReturn(123L);
     HttpHeaders httpHeaders = mock(HttpHeaders.class);
 
@@ -200,8 +200,8 @@ public class ZKOperatorTest {
 
     SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
     when(segmentMetadata.getName()).thenReturn(SEGMENT_NAME);
-    when(segmentMetadata.getCrc()).thenReturn("12345");
-    when(segmentMetadata.getDataCrc()).thenReturn("432");
+    when(segmentMetadata.getCrc()).thenReturn(12345L);
+    when(segmentMetadata.getDataCrc()).thenReturn(432L);
     when(segmentMetadata.getIndexCreationTime()).thenReturn(123L);
     HttpHeaders httpHeaders = mock(HttpHeaders.class);
 
@@ -305,7 +305,7 @@ public class ZKOperatorTest {
     assertEquals(segmentZKMetadata.getSizeInBytes(), 10);
 
     // Refresh the segment with a different segment (different CRC)
-    when(segmentMetadata.getCrc()).thenReturn("23456");
+    when(segmentMetadata.getCrc()).thenReturn(23456L);
     when(segmentMetadata.getIndexCreationTime()).thenReturn(789L);
     // Add a tiny sleep to guarantee that refresh time is different from the previous round
     Thread.sleep(10);
@@ -332,8 +332,8 @@ public class ZKOperatorTest {
 
     SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
     when(segmentMetadata.getName()).thenReturn(SEGMENT_NAME);
-    when(segmentMetadata.getCrc()).thenReturn("12345");
-    when(segmentMetadata.getDataCrc()).thenReturn("432");
+    when(segmentMetadata.getCrc()).thenReturn(12345L);
+    when(segmentMetadata.getDataCrc()).thenReturn(432L);
     zkOperator.completeSegmentOperations(REALTIME_TABLE_CONFIG, segmentMetadata, FileUploadType.SEGMENT, null, null,
         "downloadUrl", "downloadUrl", null, 10, true, true, mock(HttpHeaders.class));
 
@@ -345,7 +345,7 @@ public class ZKOperatorTest {
 
     // Uploading a segment with LLC segment name but without start/end offset should fail
     when(segmentMetadata.getName()).thenReturn(LLC_SEGMENT_NAME);
-    when(segmentMetadata.getCrc()).thenReturn("23456");
+    when(segmentMetadata.getCrc()).thenReturn(23456L);
     try {
       zkOperator.completeSegmentOperations(REALTIME_TABLE_CONFIG, segmentMetadata, FileUploadType.SEGMENT, null, null,
           "downloadUrl", "downloadUrl", null, 10, true, true, mock(HttpHeaders.class));
@@ -368,7 +368,7 @@ public class ZKOperatorTest {
     assertEquals(segmentZKMetadata.getEndOffset(), "1234");
 
     // Refreshing a segment with LLC segment name but without start/end offset should success
-    when(segmentMetadata.getCrc()).thenReturn("34567");
+    when(segmentMetadata.getCrc()).thenReturn(34567L);
     when(segmentMetadata.getStartOffset()).thenReturn(null);
     when(segmentMetadata.getEndOffset()).thenReturn(null);
     zkOperator.completeSegmentOperations(REALTIME_TABLE_CONFIG, segmentMetadata, FileUploadType.SEGMENT, null, null,
@@ -381,7 +381,7 @@ public class ZKOperatorTest {
     assertEquals(segmentZKMetadata.getEndOffset(), "1234");
 
     // Refreshing a segment with LLC segment name and start/end offset should override the offsets
-    when(segmentMetadata.getCrc()).thenReturn("45678");
+    when(segmentMetadata.getCrc()).thenReturn(45678L);
     when(segmentMetadata.getStartOffset()).thenReturn("1234");
     when(segmentMetadata.getEndOffset()).thenReturn("2345");
     zkOperator.completeSegmentOperations(REALTIME_TABLE_CONFIG, segmentMetadata, FileUploadType.SEGMENT, null, null,

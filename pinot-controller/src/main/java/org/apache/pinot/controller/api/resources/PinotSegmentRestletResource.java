@@ -358,7 +358,8 @@ public class PinotSegmentRestletResource {
   /// thus effective in resetting segments or consumers in error states.
   @POST
   @Path("segments/{tableNameWithType}/{segmentName}/reset")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.RESET_SEGMENT)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.RESET_SEGMENT,
+      tableScopeParam = "tableNameWithType")
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(
@@ -395,7 +396,8 @@ public class PinotSegmentRestletResource {
   /// thus effective in resetting segments or consumers in error states.
   @POST
   @Path("segments/{tableNameWithType}/reset")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.RESET_SEGMENT)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.RESET_SEGMENT,
+      tableScopeParam = "tableNameWithType")
   @Produces(MediaType.APPLICATION_JSON)
   @Authenticate(AccessType.UPDATE)
   @ApiOperation(
@@ -925,7 +927,8 @@ public class PinotSegmentRestletResource {
 
   @POST
   @Path("/segments/{tableNameWithType}/updateZKTimeInterval")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_TIME_INTERVAL)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_TIME_INTERVAL,
+      tableScopeParam = "tableNameWithType")
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Update the start and end time of the segments based on latest schema",

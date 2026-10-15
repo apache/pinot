@@ -35,6 +35,7 @@ import org.apache.pinot.core.operator.blocks.results.MetadataResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.exception.QueryErrorCode;
@@ -51,6 +52,14 @@ import org.slf4j.LoggerFactory;
 /// - 1. Sort all the segments by the column min/max value
 /// - 2. Keep processing segments until we get enough documents to fulfill the LIMIT and OFFSET requirement
 /// - 3. Skip processing the segments that cannot add values to the final result
+///
+/// With null handling enabled, the column min/max value cannot bound the null rows: a null is stored as the column's
+/// default null value, and the metadata has no null semantics. Null rows are handled as follows:
+/// - When nulls sort first (the default for descending order, or explicit `NULLS FIRST`), a segment that may hold null
+///   rows (it has a null value vector) is treated like a segment without min/max value: it is processed before the
+///   other segments and never skipped. Segments without a null value vector are skipped as usual.
+/// - When nulls sort last, null rows cannot beat a non-null boundary value, so segment skipping applies as usual.
+/// - A null row value is never used as the boundary value; the previous boundary value is kept instead.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class MinMaxValueBasedSelectionOrderByCombineOperator
     extends BaseSingleBlockCombineOperator<SelectionResultsBlock> {
@@ -81,10 +90,13 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator
     OrderByExpressionContext firstOrderByExpression = orderByExpressions.get(0);
     assert firstOrderByExpression.getExpression().getType() == ExpressionContext.Type.IDENTIFIER;
     String firstOrderByColumn = firstOrderByExpression.getExpression().getIdentifier();
+    // isNullsLast() is false for DESC even when null handling is disabled, so the null handling check is required
+    boolean nullsRankFirst = queryContext.isNullHandlingEnabled() && !firstOrderByExpression.isNullsLast();
 
     _minMaxValueContexts = new ArrayList<>(_numOperators);
     for (Operator<BaseResultsBlock> operator : _operators) {
-      _minMaxValueContexts.add(new MinMaxValueContext(operator, firstOrderByColumn, queryContext.getSchema()));
+      _minMaxValueContexts.add(
+          new MinMaxValueContext(operator, firstOrderByColumn, queryContext.getSchema(), nullsRankFirst));
     }
     if (firstOrderByExpression.isAsc()) {
       // For ascending order, sort on column min value in ascending order
@@ -210,9 +222,11 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator
       List<Object[]> rows = resultsBlock.getRows();
       assert rows != null;
       int numRows = rows.size();
-      if (numRows >= _numRowsToKeep) {
-        // Segment result has enough rows, update the boundary value
-        Comparable segmentBoundaryValue = (Comparable) rows.get(numRows - 1)[0];
+      // Update the boundary value if the segment result has enough rows
+      // NOTE: A null row value cannot be compared with the segment min/max value, so it is never used as the boundary
+      //       value. The previous boundary value is kept, which is still valid.
+      Comparable segmentBoundaryValue = numRows >= _numRowsToKeep ? (Comparable) rows.get(numRows - 1)[0] : null;
+      if (segmentBoundaryValue != null) {
         if (boundaryValue == null) {
           boundaryValue = segmentBoundaryValue;
         } else {
@@ -273,9 +287,14 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator
       numBlocksMerged++;
 
       // Update the boundary value if enough rows are collected
+      // NOTE: A null row value is never used as the boundary value; the previous one is kept. A null global boundary
+      //       would only fall back to the thread boundary, so this preserves segment skipping across threads.
       List<Object[]> rows = mergedBlock.getRows();
       if (rows.size() == _numRowsToKeep) {
-        _globalBoundaryValue.set((Comparable) rows.get(_numRowsToKeep - 1)[0]);
+        Comparable boundaryValue = (Comparable) rows.get(_numRowsToKeep - 1)[0];
+        if (boundaryValue != null) {
+          _globalBoundaryValue.set(boundaryValue);
+        }
       }
     }
     return mergedBlock;
@@ -303,12 +322,22 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator
     final Comparable _minValue;
     final Comparable _maxValue;
 
-    MinMaxValueContext(Operator<BaseResultsBlock> operator, String column, Schema schema) {
+    MinMaxValueContext(Operator<BaseResultsBlock> operator, String column, Schema schema,
+        boolean nullsRankFirst) {
       _operator = operator;
-      DataSourceMetadata dataSourceMetadata =
-          operator.getIndexSegment().getDataSource(column, schema).getDataSourceMetadata();
-      _minValue = dataSourceMetadata.getMinValue();
-      _maxValue = dataSourceMetadata.getMaxValue();
+      DataSource dataSource = operator.getIndexSegment().getDataSource(column, schema);
+      // When nulls sort first, min/max value cannot bound a segment that may hold null rows. Leave them unset so that
+      // the segment is processed first and never skipped.
+      // NOTE: Immutable segments only have a null value vector when they contain nulls. Mutable segments always have
+      //       one when null handling is enabled for the column, so they are conservatively never skipped.
+      if (nullsRankFirst && dataSource.getNullValueVector() != null) {
+        _minValue = null;
+        _maxValue = null;
+      } else {
+        DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
+        _minValue = dataSourceMetadata.getMinValue();
+        _maxValue = dataSourceMetadata.getMaxValue();
+      }
     }
   }
 }

@@ -23,11 +23,14 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
+import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImplTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.ImmutableSegment;
@@ -65,6 +68,15 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
   private static final TableConfig TABLE_CONFIG_WITH_INVERTED_INDEX_COLUMN =
       new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
           .setInvertedIndexColumns(List.of(COLUMN1))
+          .build();
+  private static final TableConfig TABLE_CONFIG_WITH_RANGE_INDEX_COLUMN =
+      new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+          .setRangeIndexColumns(List.of(COLUMN1))
+          .build();
+  private static final TableConfig TABLE_CONFIG_WITH_RAW_RANGE_INDEX_COLUMN =
+      new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+          .setNoDictionaryColumns(List.of(COLUMN1))
+          .setRangeIndexColumns(List.of(COLUMN1))
           .build();
   private static final int NUM_OF_SEGMENT_COPIES = 4;
   private static final Map<String, String> QUERY_OPTIONS = Map.of("enableNullHandling", "true");
@@ -190,6 +202,204 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     assertEquals(rows.get(0), new Object[]{2, (long) 2 * NUM_OF_SEGMENT_COPIES});
     assertEquals(rows.get(1), new Object[]{1, (long) NUM_OF_SEGMENT_COPIES});
     assertEquals(rows.get(2), new Object[]{null, (long) 3 * NUM_OF_SEGMENT_COPIES});
+  }
+
+  /// A predicate that no real value fails is true for every non-null row and UNKNOWN for a null one, so it selects
+  /// the non-null rows and its negation selects nothing. A column with a null therefore has no predicate that is
+  /// always true or always false for the query, whatever the evaluator concludes over the dictionary's values.
+  @Test
+  public void testPredicateOverEveryRealValueExcludesNulls()
+      throws Exception {
+    initializeRows();
+    insertRow(1);
+    insertRow(null);
+    insertRow(2);
+    Schema schema = schemaBuilder().addSingleValueDimension(COLUMN1, DataType.INT).build();
+    setUpSegments(TABLE_CONFIG, schema);
+
+    assertEquals(getRows(String.format("SELECT COUNT(*) FROM testTable WHERE %s <> 99999", COLUMN1)).get(0)[0],
+        (long) 2 * NUM_OF_SEGMENT_COPIES);
+    assertEquals(getRows(String.format("SELECT COUNT(*) FROM testTable WHERE NOT (%s <> 99999)", COLUMN1)).get(0)[0],
+        0L, "NOT of UNKNOWN is UNKNOWN, so the null row must not be selected");
+  }
+
+  /// The mirror image: a predicate that no real value satisfies selects nothing, and its negation selects the non-null
+  /// rows only, rather than every row.
+  @Test
+  public void testPredicateOverNoRealValueExcludesNullsWhenNegated()
+      throws Exception {
+    initializeRows();
+    insertRow(1);
+    insertRow(null);
+    insertRow(2);
+    Schema schema = schemaBuilder().addSingleValueDimension(COLUMN1, DataType.INT).build();
+    setUpSegments(TABLE_CONFIG, schema);
+
+    assertEquals(getRows(String.format("SELECT COUNT(*) FROM testTable WHERE %s = 99999", COLUMN1)).get(0)[0], 0L);
+    assertEquals(getRows(String.format("SELECT COUNT(*) FROM testTable WHERE NOT (%s = 99999)", COLUMN1)).get(0)[0],
+        (long) 2 * NUM_OF_SEGMENT_COPIES, "The null row is UNKNOWN under the negation too, and must stay out");
+  }
+
+  @DataProvider(name = "IndexedTableConfigs")
+  public static Object[][] getIndexedTableConfigs() {
+    return new Object[][]{{TABLE_CONFIG_WITH_INVERTED_INDEX_COLUMN}, {TABLE_CONFIG_WITH_SORTED_COLUMN}};
+  }
+
+  /// A lone `COUNT(*)` takes its count straight from the index, so an index-based filter has to leave the null rows
+  /// out of that count too: when the predicate is exclusive, when it matches the default value a null row is stored
+  /// under, and when it is negated.
+  @Test(dataProvider = "IndexedTableConfigs")
+  public void testFastFilteredCountExcludesNulls(TableConfig tableConfig)
+      throws Exception {
+    initializeRows();
+    insertRow(null);
+    insertRow(1);
+    insertRow(2);
+    Schema schema = schemaBuilder().addSingleValueDimension(COLUMN1, DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+
+    assertEquals(getRows(String.format("SELECT COUNT(*) FROM testTable WHERE %s <> 1", COLUMN1)).get(0)[0],
+        (long) NUM_OF_SEGMENT_COPIES);
+    assertEquals(getRows(String.format("SELECT COUNT(*) FROM testTable WHERE %s = %d", COLUMN1,
+        FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT)).get(0)[0], 0L);
+    assertEquals(getRows(String.format("SELECT COUNT(*) FROM testTable WHERE NOT (%s = 1)", COLUMN1)).get(0)[0],
+        (long) NUM_OF_SEGMENT_COPIES);
+    assertEquals(getRows(String.format("SELECT COUNT(*) FROM testTable WHERE %s IN (1, 2)", COLUMN1)).get(0)[0],
+        (long) 2 * NUM_OF_SEGMENT_COPIES);
+    assertEquals(getRows(String.format("SELECT COUNT(*) FROM testTable WHERE %s < 5", COLUMN1)).get(0)[0],
+        (long) 2 * NUM_OF_SEGMENT_COPIES);
+    assertEquals(getRows(String.format("SELECT COUNT(*) FROM testTable WHERE NOT (%s > 1)", COLUMN1)).get(0)[0],
+        (long) NUM_OF_SEGMENT_COPIES);
+  }
+
+  /// Both range index configurations crossed with every numeric type, with the values 1 and 2 of that type.
+  @DataProvider(name = "RangeIndexedTableConfigsAndNumericTypes")
+  public static Object[][] getRangeIndexedTableConfigsAndNumericTypes() {
+    TableConfig[] tableConfigs = {TABLE_CONFIG_WITH_RANGE_INDEX_COLUMN, TABLE_CONFIG_WITH_RAW_RANGE_INDEX_COLUMN};
+    Object[][] typedValues = {
+        {DataType.INT, 1, 2}, {DataType.LONG, 1L, 2L}, {DataType.FLOAT, 1f, 2f}, {DataType.DOUBLE, 1d, 2d}
+    };
+    List<Object[]> cases = new ArrayList<>();
+    for (TableConfig tableConfig : tableConfigs) {
+      for (Object[] typed : typedValues) {
+        cases.add(new Object[]{tableConfig, typed[0], typed[1], typed[2]});
+      }
+    }
+    return cases.toArray(new Object[0][]);
+  }
+
+  /// The range index stores the null row under the default value like any other, so a range that covers the default
+  /// would count it, whether the index is over dictionary ids or raw values. Every numeric type's default null value
+  /// lies below 1, so `< 5` covers it and `> 1` does not.
+  @Test(dataProvider = "RangeIndexedTableConfigsAndNumericTypes")
+  public void testFastFilteredCountExcludesNullsWithRangeIndex(TableConfig tableConfig, DataType dataType,
+      Object value1, Object value2)
+      throws Exception {
+    initializeRows();
+    insertRow(null);
+    insertRow(value1);
+    insertRow(value2);
+    Schema schema = schemaBuilder().addSingleValueDimension(COLUMN1, dataType).build();
+    setUpSegments(tableConfig, schema);
+
+    assertEquals(getRows(String.format("SELECT COUNT(*) FROM testTable WHERE %s < 5", COLUMN1)).get(0)[0],
+        (long) 2 * NUM_OF_SEGMENT_COPIES);
+    assertEquals(getRows(String.format("SELECT COUNT(*) FROM testTable WHERE %s > 1", COLUMN1)).get(0)[0],
+        (long) NUM_OF_SEGMENT_COPIES);
+    assertEquals(getRows(String.format("SELECT COUNT(*) FROM testTable WHERE NOT (%s > 1)", COLUMN1)).get(0)[0],
+        (long) NUM_OF_SEGMENT_COPIES);
+  }
+
+  /// `IS NULL` and `IS NOT NULL` are two-valued even on an expression that is null there: the null makes them true or
+  /// false, never UNKNOWN, so a boolean tree above them must not treat the null rows as UNKNOWN.
+  @Test
+  public void testIsNullPredicatesOnExpressionsAreTwoValued()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(null, 1);
+    insertRowWithTwoColumns(1, 1);
+    insertRowWithTwoColumns(2, 2);
+    Schema schema = schemaBuilder()
+        .addSingleValueDimension(COLUMN1, DataType.INT)
+        .addSingleValueDimension(COLUMN2, DataType.INT)
+        .build();
+    setUpSegments(TABLE_CONFIG, schema);
+
+    // The null row makes the IS NOT NULL false, so the conjunction is false there and its negation selects the row
+    assertEquals(getRows(String.format("SELECT COUNT(*) FROM testTable WHERE NOT (add(%s, 0) IS NOT NULL AND %s = 1)",
+        COLUMN1, COLUMN2)).get(0)[0], (long) 2 * NUM_OF_SEGMENT_COPIES);
+    // Likewise through a disjunction whose other branch is false on the null row
+    assertEquals(getRows(String.format("SELECT COUNT(*) FROM testTable WHERE NOT (add(%s, 0) IS NOT NULL OR %s = 2)",
+        COLUMN1, COLUMN2)).get(0)[0], (long) NUM_OF_SEGMENT_COPIES);
+  }
+
+  /// A multi-value column's null row is stored as a single default value, and its posting lists overlap across values,
+  /// so the count is taken over their union.
+  @Test
+  public void testFastFilteredCountExcludesNullsOnMultiValueColumn()
+      throws Exception {
+    initializeRows();
+    insertRow(new Object[]{1, 2});
+    insertRow(null);
+    insertRow(new Object[]{2, 3});
+    Schema schema = schemaBuilder().addMultiValueDimension(COLUMN1, DataType.INT).build();
+    setUpSegments(TABLE_CONFIG_WITH_INVERTED_INDEX_COLUMN, schema);
+
+    assertEquals(getRows(String.format("SELECT COUNT(*) FROM testTable WHERE %s <> 1", COLUMN1)).get(0)[0],
+        (long) NUM_OF_SEGMENT_COPIES);
+    assertEquals(getRows(String.format("SELECT COUNT(*) FROM testTable WHERE %s = %d", COLUMN1,
+        FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT)).get(0)[0], 0L);
+    assertEquals(getRows(String.format("SELECT COUNT(*) FROM testTable WHERE %s IN (2, 3)", COLUMN1)).get(0)[0],
+        (long) 2 * NUM_OF_SEGMENT_COPIES);
+    assertEquals(getRows(String.format("SELECT COUNT(*) FROM testTable WHERE NOT (%s = 2)", COLUMN1)).get(0)[0], 0L);
+  }
+
+  /// A consuming segment reports its null rows through a vector that grows with ingestion and hands out a copy on each
+  /// read. The filter takes that copy once, and the index-based count has to leave those rows out as on a sealed
+  /// segment.
+  @Test
+  public void testFastFilteredCountExcludesNullsOnMutableSegment()
+      throws Exception {
+    Schema schema = schemaBuilder().addSingleValueDimension(COLUMN1, DataType.INT).build();
+    MutableSegmentImpl mutableSegment =
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Set.of(), Set.of(), Set.of(COLUMN1), false, true);
+    for (Integer value : new Integer[]{null, 1, 2}) {
+      GenericRow row = new GenericRow();
+      if (value != null) {
+        row.putValue(COLUMN1, value);
+      } else {
+        row.putDefaultNullValue(COLUMN1, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT);
+      }
+      mutableSegment.index(row, null);
+    }
+    _indexSegment = mutableSegment;
+    _indexSegments = List.of(mutableSegment, mutableSegment);
+
+    assertEquals(getRows(String.format("SELECT COUNT(*) FROM testTable WHERE %s <> 1", COLUMN1)).get(0)[0],
+        (long) NUM_OF_SEGMENT_COPIES);
+    assertEquals(getRows(String.format("SELECT COUNT(*) FROM testTable WHERE %s = %d", COLUMN1,
+        FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT)).get(0)[0], 0L);
+    assertEquals(getRows(String.format("SELECT COUNT(*) FROM testTable WHERE NOT (%s = 1)", COLUMN1)).get(0)[0],
+        (long) NUM_OF_SEGMENT_COPIES);
+  }
+
+  /// The index-based distinct takes the filter's bitmap as its set of rows, so the null row has to be gone from the
+  /// bitmap already, or it would surface as a distinct `null`.
+  @Test(dataProvider = "IndexedTableConfigs")
+  public void testIndexBasedDistinctExcludesNulls(TableConfig tableConfig)
+      throws Exception {
+    initializeRows();
+    insertRow(null);
+    insertRow(1);
+    insertRow(2);
+    Schema schema = schemaBuilder().addSingleValueDimension(COLUMN1, DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    Map<String, String> queryOptions = Map.of("enableNullHandling", "true", "useIndexBasedDistinctOperator", "true");
+
+    List<Object[]> rows =
+        getRows(String.format("SELECT DISTINCT %s FROM testTable WHERE %s <> 1", COLUMN1, COLUMN1), queryOptions);
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0)[0], 2);
   }
 
   /// A row holding the column's default null value must not join the null group.

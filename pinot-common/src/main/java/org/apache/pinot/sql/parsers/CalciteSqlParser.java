@@ -21,7 +21,6 @@ package org.apache.pinot.sql.parsers;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
-import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -38,6 +37,7 @@ import org.apache.calcite.avatica.util.Casing;
 import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlCall;
 import org.apache.calcite.sql.SqlDataTypeSpec;
+import org.apache.calcite.sql.SqlDelete;
 import org.apache.calcite.sql.SqlExplain;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlJoin;
@@ -68,9 +68,11 @@ import org.apache.pinot.common.request.JoinType;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.context.GroupingSets;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils.SqlOptionsMode;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.sql.FilterKind;
+import org.apache.pinot.sql.parsers.parser.GrowingCharStream;
 import org.apache.pinot.sql.parsers.parser.SqlInsertFromFile;
 import org.apache.pinot.sql.parsers.parser.SqlParserImpl;
 import org.apache.pinot.sql.parsers.parser.SqlPinotCreateMaterializedView;
@@ -121,16 +123,46 @@ public class CalciteSqlParser {
     sql = ParserUtils.sanitizeSql(sql);
 
     // extract and remove OPTIONS string
-    List<String> options = extractOptionsFromSql(sql);
-    if (!options.isEmpty()) {
-      sql = removeOptionsFromSql(sql);
+    SqlOptionsMode legacyOptionSyntaxMode = QueryOptionsUtils.getLegacyOptionSyntaxMode();
+    List<String> options = List.of();
+    // Where the suffix dropped in IGNORE mode sits in the original statement, kept only to fail a DELETE (its options
+    // configure it) without materializing the option text for the statements that discard it
+    String originalSql = sql;
+    int ignoredOptionsStart = -1;
+    int ignoredOptionsEnd = -1;
+    if (legacyOptionSyntaxMode == SqlOptionsMode.IGNORE) {
+      // IGNORE differs from the other modes: the options are never applied, so a single regex pass both detects and
+      // strips the suffix, which is anchored to the end of the statement and so matches at most once, and the common
+      // no-suffix path pays for one scan without materializing an option list
+      Matcher matcher = OPTIONS_REGEX_PATTEN.matcher(sql);
+      if (matcher.find()) {
+        ignoredOptionsStart = matcher.start(1);
+        ignoredOptionsEnd = matcher.end(1);
+        sql = sql.substring(0, matcher.start());
+      }
+    } else {
+      options = extractOptionsFromSql(sql);
+      if (!options.isEmpty()) {
+        if (legacyOptionSyntaxMode == SqlOptionsMode.REJECT) {
+          throw new SqlCompilationException("Legacy OPTION(...) query options are not allowed on this cluster, use "
+              + "'SET <key> = <value>;' statements instead: " + options);
+        }
+        sql = removeOptionsFromSql(sql);
+      }
     }
 
-    try (StringReader inStream = new StringReader(sql)) {
-      SqlParserImpl sqlParser = newSqlParser(inStream);
+    try {
+      SqlParserImpl sqlParser = newSqlParser(sql);
       SqlNodeList sqlNodeList = sqlParser.parseSqlStmtList();
+      sqlNodeList = (SqlNodeList) PostgreSqlCastRewriter.rewrite(sqlNodeList);
       // Extract OPTION statements from sql.
       SqlNodeAndOptions sqlNodeAndOptions = extractSqlNodeAndOptions(sqlNodeList);
+      // Dropping a DELETE option (e.g. dryRun) would change its effect
+      if (ignoredOptionsStart >= 0 && sqlNodeAndOptions.getSqlNode() instanceof SqlDelete) {
+        throw new SqlCompilationException("Legacy OPTION(...) options are ignored on this cluster, use "
+            + "'SET <key> = <value>;' statements to configure DELETE: OPTION("
+            + originalSql.substring(ignoredOptionsStart, ignoredOptionsEnd) + ")");
+      }
       // add legacy OPTIONS keyword-based options
       if (!options.isEmpty()) {
         Map<String, String> optionMap = extractOptionsMap(options);
@@ -153,8 +185,12 @@ public class CalciteSqlParser {
     SqlNode statementNode = null;
     Map<String, String> options = new HashMap<>();
     for (SqlNode sqlNode : sqlNodeList) {
-      if (sqlNode instanceof SqlInsertFromFile) {
-        // extract insert statement (execution statement)
+      if (sqlNode instanceof SqlExplain && ((SqlExplain) sqlNode).getExplicandum() instanceof SqlDelete) {
+        // Otherwise classified as a query, which fails later with a cast error when the DELETE is compiled
+        throw new SqlCompilationException("EXPLAIN is not supported for DELETE");
+      }
+      if (sqlNode instanceof SqlInsertFromFile || sqlNode instanceof SqlDelete) {
+        // extract DML statement (execution statement)
         if (sqlType == null) {
           sqlType = PinotSqlType.DML;
           statementNode = sqlNode;
@@ -236,6 +272,7 @@ public class CalciteSqlParser {
       throws SqlCompilationException {
     boolean hasGroupByClause = pinotQuery.getGroupByList() != null;
     Set<Expression> groupByExprs = hasGroupByClause ? new HashSet<>(pinotQuery.getGroupByList()) : null;
+    validateHavingClause(pinotQuery, hasGroupByClause, groupByExprs);
     int aggregateExprCount = 0;
     for (Expression selectExpression : pinotQuery.getSelectList()) {
       if (isAggregateExpression(selectExpression)) {
@@ -288,6 +325,114 @@ public class CalciteSqlParser {
         }
       }
     }
+  }
+
+  /// Rejects a HAVING clause that the single-stage engine would otherwise drop.
+  ///
+  /// HAVING is evaluated only while reducing a GROUP BY aggregation. Applied to any other shape the predicate used to
+  /// be discarded silently, so the query answered as if the clause were absent.
+  ///
+  /// A HAVING clause imposes grouping semantics: without a GROUP BY the whole table becomes a single group. Every
+  /// expression in HAVING, and in the SELECT list of a query with no GROUP BY, must therefore be an aggregation, a
+  /// literal, or functionally dependent on the GROUP BY columns -- the rule the multi-stage engine applies through
+  /// Calcite ("Expression 'x' is not being grouped").
+  ///
+  /// A GROUP BY carrying no aggregation anywhere is rejected on top of that rule. The engine has no grouping operator
+  /// for such a query: [org.apache.pinot.sql.parsers.rewriter.NonAggregationGroupByToDistinctQueryRewriter] turns it
+  /// into a DISTINCT, which has no reduce step that can evaluate a HAVING filter. Moving the predicate into WHERE
+  /// would be equivalent for a single-valued grouping column, but not for a multi-valued one -- GROUP BY builds one
+  /// group per value while WHERE keeps whole rows -- and the rewriter has no schema to tell them apart. The
+  /// multi-stage engine does support this shape.
+  private static void validateHavingClause(PinotQuery pinotQuery, boolean hasGroupByClause,
+      @Nullable Set<Expression> groupByExprs)
+      throws SqlCompilationException {
+    Expression havingExpression = pinotQuery.getHavingExpression();
+    if (havingExpression == null) {
+      return;
+    }
+    Set<Expression> groupedExprs = hasGroupByClause ? groupByExprs : Set.of();
+    Expression ungrouped = findUngroupedReference(havingExpression, groupedExprs);
+    if (ungrouped != null) {
+      throw new SqlCompilationException("'" + RequestUtils.prettyPrint(ungrouped) + "' in HAVING clause must "
+          + (hasGroupByClause ? "be inside an aggregate or functionally dependent on the columns used in GROUP BY "
+              + "clause." : "be inside an aggregate: with no GROUP BY clause the whole table is a single group."));
+    }
+    if (!hasGroupByClause) {
+      for (Expression selectExpression : pinotQuery.getSelectList()) {
+        Expression ungroupedSelect = findUngroupedReference(selectExpression, groupedExprs);
+        if (ungroupedSelect != null) {
+          throw new SqlCompilationException("'" + RequestUtils.prettyPrint(ungroupedSelect) + "' must be inside an "
+              + "aggregate: with a HAVING clause and no GROUP BY clause the whole table is a single group.");
+        }
+      }
+      return;
+    }
+    if (!hasAggregation(pinotQuery)) {
+      throw new SqlCompilationException("HAVING is not supported on a GROUP BY query without an aggregation in the "
+          + "single-stage query engine. Move the predicate to the WHERE clause, or use the multi-stage query engine.");
+    }
+  }
+
+  /// Returns the first identifier the engine cannot resolve once rows have been grouped: one that is neither a
+  /// grouping column nor an argument of an aggregation. Returns `null` when every reference is resolvable.
+  ///
+  /// This deliberately differs from [#expressionOutsideGroupByList], which accepts an expression as soon as it
+  /// *contains* an aggregation anywhere. That is too permissive for HAVING: `HAVING COUNT(*) > amount` contains
+  /// COUNT(*), but `amount` still has no single value per group, and the reducer fails on it at run time with a
+  /// message naming the GROUP BY clause the user did not write.
+  @Nullable
+  private static Expression findUngroupedReference(Expression expr, Set<Expression> groupByExprs) {
+    if (expr.getType() == ExpressionType.LITERAL || groupByExprs.contains(expr)) {
+      return null;
+    }
+    Function function = expr.getFunctionCall();
+    if (function == null) {
+      // An identifier that is not a grouping column.
+      return expr;
+    }
+    if (AggregationFunctionType.isAggregationFunction(function.getOperator())) {
+      // Arguments are aggregated away, so they do not have to be grouping columns.
+      return null;
+    }
+    if (function.getOperator().equalsIgnoreCase(SqlKind.FILTER.lowerName)) {
+      // A filtered aggregation, COUNT(*) FILTER (WHERE ...). The engine resolves it like any other aggregation, and
+      // its predicate is evaluated per row while aggregating, so it may reference columns that are not grouped.
+      return null;
+    }
+    List<Expression> operands = function.getOperands();
+    if (operands == null) {
+      return null;
+    }
+    // For an alias only the aliased value matters; the alias itself is not a column reference.
+    List<Expression> toCheck = function.getOperator().equals("as") ? operands.subList(0, 1) : operands;
+    for (Expression operand : toCheck) {
+      Expression ungrouped = findUngroupedReference(operand, groupByExprs);
+      if (ungrouped != null) {
+        return ungrouped;
+      }
+    }
+    return null;
+  }
+
+  /// Returns `true` if an aggregation appears anywhere the engine would compute one: the SELECT list, the HAVING
+  /// clause or the ORDER-BY list.
+  private static boolean hasAggregation(PinotQuery pinotQuery) {
+    for (Expression selectExpression : pinotQuery.getSelectList()) {
+      if (isAggregateExpression(selectExpression)) {
+        return true;
+      }
+    }
+    if (pinotQuery.getHavingExpression() != null && isAggregateExpression(pinotQuery.getHavingExpression())) {
+      return true;
+    }
+    if (pinotQuery.getOrderByList() != null) {
+      for (Expression orderByExpression : pinotQuery.getOrderByList()) {
+        if (isAggregateExpression(orderByExpression)) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   /// Recursively rejects GROUPING() / GROUPING_ID() calls with more than
@@ -546,18 +691,32 @@ public class CalciteSqlParser {
   /// @throws SqlCompilationException if String is not a valid expression.
   public static Expression compileToExpression(String expression) {
     SqlNode sqlNode;
-    try (StringReader inStream = new StringReader(expression)) {
-      SqlParserImpl sqlParser = newSqlParser(inStream);
+    try {
+      SqlParserImpl sqlParser = newSqlParser(expression);
       sqlNode = sqlParser.parseSqlExpressionEof();
     } catch (Throwable e) {
       throw new SqlCompilationException("Caught exception while parsing expression: " + expression, e);
     }
+    // Outside the try: the rewriter already throws SqlCompilationException, and wrapping it would drop its message.
+    sqlNode = PostgreSqlCastRewriter.rewrite(sqlNode);
     return toExpression(sqlNode);
   }
 
+  /// Compiles an expression that is already parsed, e.g. the condition of a parsed statement, into [Expression].
+  ///
+  /// The node is normalized like the String expression of [#compileToExpression(String)] (PostgreSQL `::` casts are
+  /// rewritten in place, see `PostgreSqlCastRewriter`), so both overloads compile the same SQL into the same
+  /// [Expression]. The rewrite is idempotent, so a node from [#compileToSqlNodeAndOptions] is left unchanged.
+  ///
+  /// @throws SqlCompilationException if the node is not a supported expression.
+  public static Expression compileToExpression(SqlNode sqlNode) {
+    return toExpression(PostgreSqlCastRewriter.rewrite(sqlNode));
+  }
+
   @VisibleForTesting
-  static SqlParserImpl newSqlParser(StringReader inStream) {
-    SqlParserImpl sqlParser = new SqlParserImpl(inStream);
+  static SqlParserImpl newSqlParser(String sql) {
+    // Reads long tokens, e.g. a multi-MB IdSet literal, in linear time
+    SqlParserImpl sqlParser = GrowingCharStream.newParser(sql);
     sqlParser.switchTo(SqlAbstractParserImpl.LexicalState.DQID);
     // TODO: convert to MySQL conformance once we retired most of the un-tested BABEL tokens
     sqlParser.setConformance(SqlConformanceEnum.BABEL);
@@ -624,6 +783,16 @@ public class CalciteSqlParser {
     SqlNode havingNode = selectNode.getHaving();
     if (havingNode != null) {
       pinotQuery.setHavingExpression(toExpression(havingNode));
+    }
+    // QUALIFY
+    // QUALIFY filters rows after the window functions of the SELECT list are evaluated, the way HAVING filters them
+    // after aggregation. The single-stage engine has no window functions, and PinotQuery has no field to carry the
+    // predicate, so it must be rejected rather than left unread: an unread QUALIFY is a silently wrong answer.
+    if (selectNode.getQualify() != null) {
+      throw new SqlCompilationException("QUALIFY is not supported by the single-stage query engine. Use the "
+          + "multi-stage query engine to filter on the result of a window function. If the predicate does not "
+          + "reference a window function, rewrite it as a WHERE clause (to filter on columns) or as a HAVING clause "
+          + "(to filter on aggregates of a GROUP BY query).");
     }
     // ORDER-BY
     SqlNodeList orderByNodeList = selectNode.getOrderList();

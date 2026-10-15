@@ -21,20 +21,25 @@ package org.apache.pinot.common.utils.config;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.WindowOverFlowMode;
+import org.apache.pinot.spi.utils.CommonConstants.Server.AndRestrictionPushdownMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,6 +58,19 @@ public class QueryOptionsUtils {
     /// Unknown keys are preserved, but logged once per distinct key with a typo suggestion.
     WARN,
     /// Unknown keys fail the query with a typo suggestion.
+    REJECT
+  }
+
+  /// How query options embedded in the SQL text are handled, as opposed to options passed through the request
+  /// payload. Shared by the brokers' legacy `OPTION(...)` syntax policy
+  /// ([CommonConstants.Broker#CONFIG_OF_BROKER_QUERY_OPTION_LEGACY_SYNTAX_MODE]) and the per-request
+  /// [QueryOptionKey#SQL_OPTIONS_MODE].
+  public enum SqlOptionsMode {
+    /// The options are applied. Default.
+    ALLOW,
+    /// The options are dropped, except that a DELETE statement carrying any fails, since its options configure it.
+    IGNORE,
+    /// The statement fails.
     REJECT
   }
 
@@ -83,6 +101,7 @@ public class QueryOptionsUtils {
 
   private static volatile SqlQueryOptionValidationMode _sqlQueryOptionValidationMode =
       SqlQueryOptionValidationMode.NONE;
+  private static volatile SqlOptionsMode _legacyOptionSyntaxMode = SqlOptionsMode.ALLOW;
 
   static {
     // this is a bit hacky, but lots of the code depends directly on usage of
@@ -140,11 +159,35 @@ public class QueryOptionsUtils {
     return _sqlQueryOptionValidationMode;
   }
 
-  /// Sets the validation mode applied to SQL-supplied query option keys. Called once per process at
-  /// broker startup from [CommonConstants.Broker#CONFIG_OF_BROKER_QUERY_OPTION_VALIDATION_MODE], and
-  /// by tests to restore [SqlQueryOptionValidationMode#NONE].
+  /// Sets the validation mode applied to SQL-supplied query option keys, see
+  /// [CommonConstants.Broker#CONFIG_OF_BROKER_QUERY_OPTION_VALIDATION_MODE].
   public static void setSqlQueryOptionValidationMode(SqlQueryOptionValidationMode mode) {
     _sqlQueryOptionValidationMode = mode;
+  }
+
+  public static SqlOptionsMode getLegacyOptionSyntaxMode() {
+    return _legacyOptionSyntaxMode;
+  }
+
+  /// Sets how the legacy `OPTION(...)` query option suffix is handled, see
+  /// [CommonConstants.Broker#CONFIG_OF_BROKER_QUERY_OPTION_LEGACY_SYNTAX_MODE].
+  public static void setLegacyOptionSyntaxMode(SqlOptionsMode mode) {
+    _legacyOptionSyntaxMode = mode;
+  }
+
+  /// Returns the per-request [QueryOptionKey#SQL_OPTIONS_MODE], `ALLOW` when absent. Fails with
+  /// [QueryErrorCode#QUERY_VALIDATION] when the value is not a [SqlOptionsMode].
+  public static SqlOptionsMode getSqlOptionsMode(Map<String, String> queryOptions) {
+    String mode = queryOptions.get(QueryOptionKey.SQL_OPTIONS_MODE);
+    if (mode == null) {
+      return SqlOptionsMode.ALLOW;
+    }
+    try {
+      return SqlOptionsMode.valueOf(mode.trim().toUpperCase(Locale.ROOT));
+    } catch (IllegalArgumentException e) {
+      throw QueryErrorCode.QUERY_VALIDATION.asException("Invalid value '" + mode + "' for query option '"
+          + QueryOptionKey.SQL_OPTIONS_MODE + "', must be one of " + Arrays.toString(SqlOptionsMode.values()));
+    }
   }
 
   /// Registers an option key that [#validateSqlQueryOptions] accepts in addition to the keys
@@ -300,6 +343,26 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.AND_SCAN_REORDERING));
   }
 
+  /// Per-query override of [AndRestrictionPushdownMode], or `null` when the query does not set one, in which case
+  /// the server default applies.
+  @Nullable
+  public static AndRestrictionPushdownMode getAndRestrictionPushdownMode(Map<String, String> queryOptions) {
+    String mode = queryOptions.get(QueryOptionKey.AND_RESTRICTION_PUSHDOWN_MODE);
+    return mode != null ? parseAndRestrictionPushdownMode(QueryOptionKey.AND_RESTRICTION_PUSHDOWN_MODE, mode) : null;
+  }
+
+  /// Parses an [AndRestrictionPushdownMode], naming the offending key and the legal values on failure. The option
+  /// reads like a toggle, so `true`/`false` is a likely mistake and the message has to say so.
+  public static AndRestrictionPushdownMode parseAndRestrictionPushdownMode(String key, String value) {
+    try {
+      return AndRestrictionPushdownMode.valueOf(value.toUpperCase(Locale.ROOT));
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException(
+          String.format("Invalid value for %s: '%s'. Expected one of: %s (this option is a mode, not a boolean toggle)",
+              key, value, Arrays.toString(AndRestrictionPushdownMode.values())));
+    }
+  }
+
   public static boolean isSkipUpsert(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SKIP_UPSERT));
   }
@@ -309,6 +372,14 @@ public class QueryOptionsUtils {
   public static Integer getInPredicatePruningThreshold(Map<String, String> queryOptions) {
     return uncheckedParseInt(QueryOptionKey.IN_PREDICATE_PRUNING_THRESHOLD,
         queryOptions.get(QueryOptionKey.IN_PREDICATE_PRUNING_THRESHOLD));
+  }
+
+  /// Query-level override for the minimum candidate segments needed to prepare the partition-pruning predicate.
+  /// A negative value disables preparation.
+  @Nullable
+  public static Integer getPartitionPruningPreparationThreshold(@Nullable Map<String, String> queryOptions) {
+    return queryOptions != null ? uncheckedParseInt(QueryOptionKey.PARTITION_PRUNING_PREPARATION_THRESHOLD,
+        queryOptions.get(QueryOptionKey.PARTITION_PRUNING_PREPARATION_THRESHOLD)) : null;
   }
 
   /// Returns whether materialized-view rewrite is allowed for this query. Defaults to `true`
@@ -401,12 +472,12 @@ public class QueryOptionsUtils {
         throw new RuntimeException("Invalid format for " + QueryOptionKey.SKIP_INDEXES
             + ". Example of valid format: SET skipIndexes='col1=inverted,range&col2=inverted'");
       }
-      String columnName = conf[0];
+      String columnName = conf[0].trim();
       String[] indexTypes = StringUtils.split(conf[1], ',');
 
       for (String indexType : indexTypes) {
         skipIndexes.computeIfAbsent(columnName, k -> new HashSet<>())
-            .add(FieldConfig.IndexType.valueOf(indexType.toUpperCase()));
+            .add(FieldConfig.IndexType.valueOf(indexType.trim().toUpperCase(Locale.ROOT)));
       }
     }
 
@@ -415,26 +486,31 @@ public class QueryOptionsUtils {
 
   public static Set<String> getSkipPlannerRules(Map<String, String> queryOptions) {
     // Example config:  skipPlannerRules='FilterIntoJoin,FilterAggregateTranspose'
-    String skipPlannerRulesStr = queryOptions.get(QueryOptionKey.SKIP_PLANNER_RULES);
-    if (skipPlannerRulesStr == null) {
-      return Set.of();
-    }
-
-    String[] skippedRules = StringUtils.split(skipPlannerRulesStr, ',');
-
-    return new HashSet<>(List.of(skippedRules));
+    return parsePlannerRules(queryOptions.get(QueryOptionKey.SKIP_PLANNER_RULES));
   }
 
   public static Set<String> getUsePlannerRules(Map<String, String> queryOptions) {
     // Example config:  usePlannerRules='SortJoinTranspose, AggregateJoinTransposeExtended'
-    String usePlannerRulesStr = queryOptions.get(QueryOptionKey.USE_PLANNER_RULES);
-    if (usePlannerRulesStr == null) {
+    return parsePlannerRules(queryOptions.get(QueryOptionKey.USE_PLANNER_RULES));
+  }
+
+  /// Parses a comma-separated list of planner rule names. Each name is trimmed, and empty names are dropped.
+  private static Set<String> parsePlannerRules(@Nullable String plannerRules) {
+    if (plannerRules == null) {
       return Set.of();
     }
+    return Arrays.stream(StringUtils.split(plannerRules, ','))
+        .map(String::trim)
+        .filter(ruleName -> !ruleName.isEmpty())
+        .collect(Collectors.toSet());
+  }
 
-    String[] useRules = StringUtils.split(usePlannerRulesStr, ',');
-
-    return new HashSet<>(List.of(useRules));
+  /// Returns the per-query override of the approximate-function rewrite, or `null` if the query does not set one, in
+  /// which case the table config and then the cluster/broker default decide.
+  @Nullable
+  public static Boolean isUseApproximateFunction(Map<String, String> queryOptions) {
+    return checkedParseBooleanNullable(QueryOptionKey.USE_APPROXIMATE_FUNCTION,
+        queryOptions.get(QueryOptionKey.USE_APPROXIMATE_FUNCTION));
   }
 
   @Nullable
@@ -507,6 +583,22 @@ public class QueryOptionsUtils {
     String minServerGroupTrimSizeString = queryOptions.get(QueryOptionKey.MIN_SERVER_GROUP_TRIM_SIZE);
     // NOTE: Non-positive value means turning off the segment level trim
     return uncheckedParseInt(QueryOptionKey.MIN_SERVER_GROUP_TRIM_SIZE, minServerGroupTrimSizeString);
+  }
+
+  /// Maximum estimated base-group count for which grouping-set base aggregation is used; `null` lets the
+  /// caller fall back to its default (`numGroupsLimit`). Must be a positive integer when set.
+  @Nullable
+  public static Integer getGroupingSetsBaseAggregationMaxGroups(Map<String, String> queryOptions) {
+    String value = queryOptions.get(QueryOptionKey.GROUPING_SETS_BASE_AGGREGATION_MAX_GROUPS);
+    return checkedParseIntPositive(QueryOptionKey.GROUPING_SETS_BASE_AGGREGATION_MAX_GROUPS, value);
+  }
+
+  @Nullable
+  public static Integer getGroupingSetsMinServerTrimSize(Map<String, String> queryOptions) {
+    String groupingSetsMinServerTrimSizeString =
+        queryOptions.get(QueryOptionKey.GROUPING_SETS_MIN_SERVER_TRIM_SIZE);
+    // NOTE: Non-positive value means turning off the per-set server trim for grouping-set base aggregation
+    return uncheckedParseInt(QueryOptionKey.GROUPING_SETS_MIN_SERVER_TRIM_SIZE, groupingSetsMinServerTrimSizeString);
   }
 
   @Nullable
@@ -987,5 +1079,13 @@ public class QueryOptionsUtils {
       }
     }
     return i;
+  }
+
+  /// Returns the [QueryOptionKey#SEALED_IN_LIST_THRESHOLD] option, or `defaultValue` when the option is not set.
+  public static int getSealedInListThreshold(Map<String, String> options, int defaultValue) {
+    String threshold = options.get(QueryOptionKey.SEALED_IN_LIST_THRESHOLD);
+    Integer value =
+        uncheckedParseInt(QueryOptionKey.SEALED_IN_LIST_THRESHOLD, threshold != null ? threshold.trim() : null);
+    return value != null ? value : defaultValue;
   }
 }

@@ -32,13 +32,13 @@ public class SegmentDirectoryLoaderContext {
   private final String _instanceId;
   private final String _tableDataDir;
   private final String _segmentName;
-  private final String _segmentCrc;
+  private final long _segmentCrc;
   private final String _segmentTier;
   private final Map<String, Map<String, String>> _instanceTierConfigs;
   private final Map<String, String> _segmentCustomConfigs;
 
   private SegmentDirectoryLoaderContext(ReadMode readMode, TableConfig tableConfig, Schema schema, String instanceId,
-      String tableDataDir, String segmentName, String segmentCrc, String segmentTier,
+      String tableDataDir, String segmentName, long segmentCrc, String segmentTier,
       Map<String, Map<String, String>> instanceTierConfigs, Map<String, String> segmentCustomConfigs) {
     _readMode = readMode;
     _tableConfig = tableConfig;
@@ -76,7 +76,8 @@ public class SegmentDirectoryLoaderContext {
     return _segmentName;
   }
 
-  public String getSegmentCrc() {
+  /// Returns the CRC of the segment being loaded, or `Long.MIN_VALUE` when the caller did not supply one.
+  public long getSegmentCrc() {
     return _segmentCrc;
   }
 
@@ -99,7 +100,7 @@ public class SegmentDirectoryLoaderContext {
     private String _instanceId;
     private String _tableDataDir;
     private String _segmentName;
-    private String _segmentCrc;
+    private long _segmentCrc = Long.MIN_VALUE;
     private String _segmentTier;
     private Map<String, Map<String, String>> _instanceTierConfigs;
     private Map<String, String> _segmentCustomConfigs;
@@ -134,7 +135,7 @@ public class SegmentDirectoryLoaderContext {
       return this;
     }
 
-    public Builder setSegmentCrc(String segmentCrc) {
+    public Builder setSegmentCrc(long segmentCrc) {
       _segmentCrc = segmentCrc;
       return this;
     }

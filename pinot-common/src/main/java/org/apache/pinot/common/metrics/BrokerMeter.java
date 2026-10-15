@@ -42,6 +42,11 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   ///
   /// At this moment this counter does not include queries executed in multi-stage mode.
   public static final BrokerMeter QUERIES = create("QUERIES", "queries", false);
+
+  /// Queries in which the broker rewrote at least one exact aggregation into its approximate counterpart, because
+  /// `pinot.broker.use.approximate.function` was on. The results of those queries are approximate.
+  public static final BrokerMeter APPROXIMATE_FUNCTION_OVERRIDES =
+      create("APPROXIMATE_FUNCTION_OVERRIDES", "queries", false);
   /// Number of single-stage queries that have been started.
   ///
   /// Unlike [#QUERIES], this metric is global and not attached to a particular table.
@@ -195,6 +200,21 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   // Track the case where selected server is missing in RoutingManager
   public static final BrokerMeter SERVER_MISSING_FOR_ROUTING = create(
       "SERVER_MISSING_FOR_ROUTING", "badResponses", false);
+
+  /// Number of times the broker updated the routing of a table after a change to its ideal state or external view.
+  /// Failed updates are counted in [#ROUTING_TABLE_UPDATE_FAILURE] instead.
+  ///
+  /// This metric is not global and is attached to a particular table.
+  public static final BrokerMeter ROUTING_TABLE_UPDATE_SUCCESS =
+      create("ROUTING_TABLE_UPDATE_SUCCESS", "updates", false);
+
+  /// Number of times the broker failed to update the routing of a table after a change to its ideal state or external
+  /// view. The broker retries the update on the next change. Failed updates are not counted in
+  /// [#ROUTING_TABLE_UPDATE_SUCCESS].
+  ///
+  /// This metric is not global and is attached to a particular table.
+  public static final BrokerMeter ROUTING_TABLE_UPDATE_FAILURE =
+      create("ROUTING_TABLE_UPDATE_FAILURE", "failures", false);
 
   // Netty connection metrics
   public static final BrokerMeter NETTY_CONNECTION_REQUESTS_SENT = create(

@@ -44,8 +44,9 @@ import org.roaringbitmap.RoaringBitmap;
 /// The `DistinctCountSmartHLLPlusAggregationFunction` calculates the number of distinct values for a given
 /// expression (both single-valued and multi-valued are supported).
 ///
-/// For aggregation-only queries, the distinct values are stored in a Set initially. Once the number of distinct values
-/// exceeds a threshold, the Set will be converted into a HyperLogLogPlus, and approximate result will be returned.
+/// The distinct values are stored in a Set initially. Once the number of distinct values exceeds a threshold, the
+/// Set will be converted into a HyperLogLogPlus, and approximate result will be returned. The threshold is applied per
+/// accumulator, which means per group for a group-by query.
 ///
 /// The function takes an optional second argument for parameters:
 /// - threshold: Threshold of the number of distinct values to trigger the conversion, 100_000 by default. Non-positive
@@ -371,6 +372,20 @@ public class DistinctCountSmartHLLPlusAggregationFunction extends BaseDistinctCo
       hllPlus.offer(dictionary.get(iterator.next()));
     }
     return hllPlus;
+  }
+
+  @Override
+  protected void addSetToSketch(Object sketch, Set valueSet, DataType storedType) {
+    HyperLogLogPlus hllPlus = (HyperLogLogPlus) sketch;
+    if (storedType == DataType.BYTES) {
+      for (Object value : valueSet) {
+        hllPlus.offer(((ByteArray) value).getBytes());
+      }
+    } else {
+      for (Object value : valueSet) {
+        hllPlus.offer(value);
+      }
+    }
   }
 
   @Override

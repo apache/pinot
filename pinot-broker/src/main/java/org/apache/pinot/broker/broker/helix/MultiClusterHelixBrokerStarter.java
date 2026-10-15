@@ -230,6 +230,7 @@ public class MultiClusterHelixBrokerStarter extends BaseBrokerStarter {
         RemoteClusterBrokerRoutingManager routingManager =
             new RemoteClusterBrokerRoutingManager(clusterName, _brokerMetrics, _serverRoutingStatsManager, _brokerConf);
         routingManager.init(entry.getValue());
+        _clusterConfigChangeHandler.registerClusterConfigChangeListener(routingManager);
         _remoteRoutingManagers.put(clusterName, routingManager);
       } catch (Exception e) {
         LOGGER.error("[multi-cluster] Failed to initialize routing manager for cluster '{}'", clusterName, e);

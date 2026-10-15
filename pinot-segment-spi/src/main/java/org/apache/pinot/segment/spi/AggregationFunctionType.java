@@ -90,9 +90,11 @@ public enum AggregationFunctionType {
   DISTINCTCOUNTRAWHLL("distinctCountRawHLL", ReturnTypes.VARCHAR,
       OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.INTEGER), i -> i == 1), SqlTypeName.OTHER),
   DISTINCTCOUNTSMARTHLL("distinctCountSmartHLL", ReturnTypes.BIGINT,
-      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), i -> i == 1), SqlTypeName.OTHER),
+      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), i -> i == 1), SqlTypeName.OTHER,
+      SqlTypeName.INTEGER),
   DISTINCTCOUNTSMARTHLLPLUS("distinctCountSmartHLLPlus", ReturnTypes.BIGINT,
-      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), i -> i == 1), SqlTypeName.OTHER),
+      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), i -> i == 1), SqlTypeName.OTHER,
+      SqlTypeName.INTEGER),
   @Deprecated FASTHLL("fastHLL"),
   DISTINCTCOUNTHLLPLUS("distinctCountHLLPlus", ReturnTypes.BIGINT,
       OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.INTEGER), i -> i == 1), SqlTypeName.OTHER),
@@ -103,7 +105,8 @@ public enum AggregationFunctionType {
   DISTINCTCOUNTRAWULL("distinctCountRawULL", ReturnTypes.VARCHAR,
       OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.INTEGER), i -> i == 1), SqlTypeName.OTHER),
   DISTINCTCOUNTSMARTULL("distinctCountSmartULL", ReturnTypes.BIGINT,
-      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), i -> i == 1), SqlTypeName.OTHER),
+      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), i -> i == 1), SqlTypeName.OTHER,
+      SqlTypeName.INTEGER),
   DISTINCTCOUNTTHETASKETCH("distinctCountThetaSketch", ReturnTypes.BIGINT, OperandTypes.ONE_OR_MORE, SqlTypeName.OTHER),
   DISTINCTCOUNTRAWTHETASKETCH("distinctCountRawThetaSketch", ReturnTypes.VARCHAR, OperandTypes.ONE_OR_MORE,
       SqlTypeName.OTHER),
@@ -129,9 +132,12 @@ public enum AggregationFunctionType {
   PERCENTILERAWTDIGEST("percentileRawTDigest", ReturnTypes.VARCHAR,
       OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.NUMERIC, SqlTypeFamily.INTEGER), i -> i == 2),
       SqlTypeName.OTHER),
+  // The final return type is redundant with the standard return type above, and is declared because
+  // PinotApproximateAggregateRewriteRule pins the rewritten call to PERCENTILE's type, which is ARG0. Without it a
+  // leaf that returns the final result is typed from that pinned type and truncates on a non-DOUBLE column.
   PERCENTILESMARTTDIGEST("percentileSmartTDigest", ReturnTypes.DOUBLE,
       OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.NUMERIC, SqlTypeFamily.CHARACTER), i -> i == 2),
-      SqlTypeName.OTHER),
+      SqlTypeName.OTHER, SqlTypeName.DOUBLE),
   PERCENTILEKLL("percentileKLL", ReturnTypes.DOUBLE,
       OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.NUMERIC, SqlTypeFamily.INTEGER), i -> i == 2),
       SqlTypeName.OTHER),
@@ -371,6 +377,13 @@ public enum AggregationFunctionType {
   public static AggregationFunctionType getAggregationFunctionType(String functionName) {
     String normalizedFunctionName = getNormalizedAggregationFunctionName(functionName);
     if (normalizedFunctionName.regionMatches(false, 0, "PERCENTILE", 0, 10)) {
+      // A canonical name wins over the numeric-suffix spellings below. Without this, names that are canonical but
+      // are not one of those spellings, such as PERCENTILESMARTTDIGEST, would fall through and be rejected.
+      try {
+        return AggregationFunctionType.valueOf(normalizedFunctionName);
+      } catch (IllegalArgumentException ignored) {
+        // Not a canonical name, so try the numeric-suffix spellings.
+      }
       // This style of aggregation functions is not supported in the multistage engine
       String remainingFunctionName = normalizedFunctionName.substring(10).toUpperCase();
       if (remainingFunctionName.isEmpty() || remainingFunctionName.matches("\\d+")) {
@@ -400,7 +413,7 @@ public enum AggregationFunctionType {
       } else if (remainingFunctionName.equals("KLLMV") || remainingFunctionName.matches("KLL\\d+MV")) {
         return PERCENTILEKLLMV;
       } else if (remainingFunctionName.equals("RAWKLLMV") || remainingFunctionName.matches("RAWKLL\\d+MV")) {
-        return PERCENTILEKLLMV;
+        return PERCENTILERAWKLLMV;
       } else {
         throw new IllegalArgumentException("Invalid aggregation function name: " + functionName);
       }
