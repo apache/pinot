@@ -77,88 +77,62 @@ final class DeltaCodecDefinition extends BaseDeltaCodecDefinition<DeltaCodecDefi
   }
 
   @Override
-  protected ByteBuffer encodeInt(ByteBuffer src, int count) {
-    ByteBuffer out = ByteBuffer.allocateDirect(count * Integer.BYTES);
-    if (count == 0) {
-      out.flip();
-      return out;
-    }
-    int prev = src.getInt();
-    out.putInt(prev);
+  protected void encodeIntInto(ByteBuffer src, int count, ByteBuffer dst) {
+    int srcOffset = src.position();
+    int dstOffset = dst.position();
+    int prev = src.getInt(srcOffset);
+    dst.putInt(dstOffset, prev);
     for (int i = 1; i < count; i++) {
-      int cur = src.getInt();
-      out.putInt(cur - prev);
+      int cur = src.getInt(srcOffset + i * Integer.BYTES);
+      dst.putInt(dstOffset + i * Integer.BYTES, cur - prev);
       prev = cur;
     }
-    out.flip();
-    return out;
+    src.position(srcOffset + count * Integer.BYTES);
+    dst.position(dstOffset + count * Integer.BYTES);
   }
 
   @Override
-  protected ByteBuffer encodeLong(ByteBuffer src, int count) {
-    ByteBuffer out = ByteBuffer.allocateDirect(count * Long.BYTES);
-    if (count == 0) {
-      out.flip();
-      return out;
-    }
-    long prev = src.getLong();
-    out.putLong(prev);
+  protected void encodeLongInto(ByteBuffer src, int count, ByteBuffer dst) {
+    int srcOffset = src.position();
+    int dstOffset = dst.position();
+    long prev = src.getLong(srcOffset);
+    dst.putLong(dstOffset, prev);
     for (int i = 1; i < count; i++) {
-      long cur = src.getLong();
-      out.putLong(cur - prev);
+      long cur = src.getLong(srcOffset + i * Long.BYTES);
+      dst.putLong(dstOffset + i * Long.BYTES, cur - prev);
       prev = cur;
     }
-    out.flip();
-    return out;
-  }
-
-  @Override
-  protected ByteBuffer decodeInt(ByteBuffer src, int count) {
-    ByteBuffer out = ByteBuffer.allocateDirect(count * Integer.BYTES);
-    int prev = src.getInt();
-    out.putInt(prev);
-    for (int i = 1; i < count; i++) {
-      int delta = src.getInt();
-      prev += delta;
-      out.putInt(prev);
-    }
-    out.flip();
-    return out;
-  }
-
-  @Override
-  protected ByteBuffer decodeLong(ByteBuffer src, int count) {
-    ByteBuffer out = ByteBuffer.allocateDirect(count * Long.BYTES);
-    long prev = src.getLong();
-    out.putLong(prev);
-    for (int i = 1; i < count; i++) {
-      long delta = src.getLong();
-      prev += delta;
-      out.putLong(prev);
-    }
-    out.flip();
-    return out;
+    src.position(srcOffset + count * Long.BYTES);
+    dst.position(dstOffset + count * Long.BYTES);
   }
 
   @Override
   protected void decodeIntInto(ByteBuffer src, int count, ByteBuffer dst) {
-    int prev = src.getInt();
-    dst.putInt(prev);
+    int srcOffset = src.position();
+    int dstOffset = dst.position();
+    int prev = src.getInt(srcOffset);
+    dst.putInt(dstOffset, prev);
     for (int i = 1; i < count; i++) {
-      int delta = src.getInt();
+      int delta = src.getInt(srcOffset + i * Integer.BYTES);
       prev += delta;
-      dst.putInt(prev);
+      dst.putInt(dstOffset + i * Integer.BYTES, prev);
     }
+    src.position(srcOffset + count * Integer.BYTES);
+    dst.position(dstOffset + count * Integer.BYTES);
   }
 
   @Override
   protected void decodeLongInto(ByteBuffer src, int count, ByteBuffer dst) {
-    long prev = src.getLong();
-    dst.putLong(prev);
+    int srcOffset = src.position();
+    int dstOffset = dst.position();
+    long prev = src.getLong(srcOffset);
+    dst.putLong(dstOffset, prev);
     for (int i = 1; i < count; i++) {
-      long delta = src.getLong();
+      long delta = src.getLong(srcOffset + i * Long.BYTES);
       prev += delta;
-      dst.putLong(prev);
+      dst.putLong(dstOffset + i * Long.BYTES, prev);
     }
+    src.position(srcOffset + count * Long.BYTES);
+    dst.position(dstOffset + count * Long.BYTES);
   }
 }

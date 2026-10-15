@@ -50,6 +50,7 @@ import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.PlannerRuleNames;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
 import org.apache.pinot.spi.utils.NetUtils;
@@ -167,16 +168,110 @@ public class MultiStageBrokerRequestHandlerTest extends QueryEnvironmentTestBase
         "No option should be injected when the broker default is unset");
   }
 
+  @Test
+  public void testApplyBrokerDefaultQueryOptionsInjectsStreamingDistinctFlushThreshold()
+      throws Exception {
+    MultiStageBrokerRequestHandler handler = newHandlerWithStreamingDistinctFlushThreshold("5000");
+
+    Map<String, String> queryOptions = new HashMap<>();
+    handler.applyBrokerDefaultQueryOptions(queryOptions);
+    Assert.assertEquals(queryOptions.get(QueryOptionKey.STREAMING_DISTINCT_FLUSH_THRESHOLD), "5000",
+        "Broker default should be injected when query option is absent");
+    Assert.assertFalse(queryOptions.containsKey(QueryOptionKey.STREAMING_GROUP_BY_FLUSH_THRESHOLD),
+        "The distinct default must not also enable streaming group-by");
+  }
+
+  @Test
+  public void testApplyBrokerDefaultQueryOptionsStreamingDistinctPerQueryOverrideWins()
+      throws Exception {
+    MultiStageBrokerRequestHandler handler = newHandlerWithStreamingDistinctFlushThreshold("5000");
+
+    Map<String, String> queryOptions = new HashMap<>();
+    queryOptions.put(QueryOptionKey.STREAMING_DISTINCT_FLUSH_THRESHOLD, "0");
+    handler.applyBrokerDefaultQueryOptions(queryOptions);
+    Assert.assertEquals(queryOptions.get(QueryOptionKey.STREAMING_DISTINCT_FLUSH_THRESHOLD), "0",
+        "Per-query SET = 0 must override the broker default");
+
+    queryOptions.clear();
+    queryOptions.put(QueryOptionKey.STREAMING_DISTINCT_FLUSH_THRESHOLD, "100");
+    handler.applyBrokerDefaultQueryOptions(queryOptions);
+    Assert.assertEquals(queryOptions.get(QueryOptionKey.STREAMING_DISTINCT_FLUSH_THRESHOLD), "100",
+        "Per-query SET must take precedence over the broker default");
+  }
+
+  @Test
+  public void testApplyBrokerDefaultQueryOptionsNoStreamingDistinctInjectionWhenConfigUnset()
+      throws Exception {
+    MultiStageBrokerRequestHandler handler = newHandlerWithStreamingDistinctFlushThreshold(null);
+
+    Map<String, String> queryOptions = new HashMap<>();
+    handler.applyBrokerDefaultQueryOptions(queryOptions);
+    Assert.assertFalse(queryOptions.containsKey(QueryOptionKey.STREAMING_DISTINCT_FLUSH_THRESHOLD),
+        "No option should be injected when the broker default is unset");
+  }
+
+  @Test
+  public void testDispatchMaxInboundMessageSizeFromConfig()
+      throws Exception {
+    assertEquals(newHandler(new PinotConfiguration()).getQueryDispatcher().getDispatchMaxInboundMessageSizeBytes(),
+        MultiStageQueryRunner.DEFAULT_OF_DISPATCH_CHANNEL_MAX_INBOUND_MESSAGE_SIZE_BYTES);
+    PinotConfiguration config = new PinotConfiguration();
+    config.setProperty(MultiStageQueryRunner.KEY_OF_DISPATCH_CHANNEL_MAX_INBOUND_MESSAGE_SIZE_BYTES, "12345678");
+    assertEquals(newHandler(config).getQueryDispatcher().getDispatchMaxInboundMessageSizeBytes(), 12_345_678);
+  }
+
+  @Test
+  public void testDefaultDisabledPlannerRulesFromClusterConfig() {
+    // ServiceStartableUtils.applyClusterConfig applies cluster configs with setProperty, which doesn't split lists
+    PinotConfiguration config = new PinotConfiguration();
+    config.setProperty(CommonConstants.Broker.CONFIG_OF_BROKER_MSE_PLANNER_DISABLED_RULES,
+        "SortJoinCopy, AggregateUnionAggregate,");
+    assertEquals(MultiStageBrokerRequestHandler.getDefaultDisabledPlannerRules(config),
+        Set.of(PlannerRuleNames.SORT_JOIN_COPY, PlannerRuleNames.AGGREGATE_UNION_AGGREGATE));
+  }
+
+  @Test
+  public void testDefaultDisabledPlannerRulesUnsetOrEmpty() {
+    assertEquals(MultiStageBrokerRequestHandler.getDefaultDisabledPlannerRules(new PinotConfiguration()),
+        CommonConstants.Broker.DEFAULT_DISABLED_RULES);
+
+    // An empty value disables no rules instead of falling back to the defaults
+    PinotConfiguration config = new PinotConfiguration();
+    config.setProperty(CommonConstants.Broker.CONFIG_OF_BROKER_MSE_PLANNER_DISABLED_RULES, "");
+    assertEquals(MultiStageBrokerRequestHandler.getDefaultDisabledPlannerRules(config), Set.of());
+  }
+
   private static MultiStageBrokerRequestHandler newHandlerWithStreamingGroupByFlushThreshold(
       @Nullable String streamingGroupByFlushThreshold)
       throws Exception {
+    return newHandlerWithFlushThresholds(streamingGroupByFlushThreshold, null);
+  }
+
+  private static MultiStageBrokerRequestHandler newHandlerWithStreamingDistinctFlushThreshold(
+      @Nullable String streamingDistinctFlushThreshold)
+      throws Exception {
+    return newHandlerWithFlushThresholds(null, streamingDistinctFlushThreshold);
+  }
+
+  private static MultiStageBrokerRequestHandler newHandlerWithFlushThresholds(
+      @Nullable String streamingGroupByFlushThreshold, @Nullable String streamingDistinctFlushThreshold)
+      throws Exception {
     PinotConfiguration config = new PinotConfiguration();
-    config.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, "localhost");
-    config.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, Integer.toString(NetUtils.findOpenPort()));
     if (streamingGroupByFlushThreshold != null) {
       config.setProperty(CommonConstants.Broker.CONFIG_OF_MSE_STREAMING_GROUP_BY_FLUSH_THRESHOLD,
           streamingGroupByFlushThreshold);
     }
+    if (streamingDistinctFlushThreshold != null) {
+      config.setProperty(CommonConstants.Broker.CONFIG_OF_MSE_STREAMING_DISTINCT_FLUSH_THRESHOLD,
+          streamingDistinctFlushThreshold);
+    }
+    return newHandler(config);
+  }
+
+  private static MultiStageBrokerRequestHandler newHandler(PinotConfiguration config)
+      throws Exception {
+    config.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, "localhost");
+    config.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, Integer.toString(NetUtils.findOpenPort()));
     BrokerQueryEventListenerFactory.init(config);
     BrokerMetrics.register(mock(BrokerMetrics.class));
 

@@ -110,28 +110,28 @@ final class T64CodecDefinition implements ChunkCodecHandler<T64CodecDefinition.O
   }
 
   @Override
-  public boolean requiresDirectDstBuffer() {
+  public boolean requiresDirectDecodeDstBuffer() {
     return false;
   }
 
   @Override
-  public int maxEncodedSize(Options options, int inputSize) {
+  public int maxEncodedSize(Options options, CodecContext ctx, int inputSize) {
     // The on-disk size is 5-byte frame header + per-block (baseline + bitWidth + packed).
     // A partial last block still writes a full `elementSize * BLOCK_SIZE` packed-payload of
     // bit-packed slots (zero-filled at the tail), so payload size scales with **block count**,
     // not with input value count.
     //
-    // Element size isn't knowable from inputSize alone (the SPI passes only byte count), so we
-    // use the LONG worst case (elementSize = Long.BYTES) which is a valid upper bound for both
-    // INT and LONG inputs. Block count is bounded above using the smaller element size,
-    // Integer.BYTES, since inputSize / (Integer.BYTES * BLOCK_SIZE) ≥ inputSize / (Long.BYTES *
-    // BLOCK_SIZE) for any element size in {Integer.BYTES, Long.BYTES}.
     if (inputSize < 0) {
       throw new IllegalArgumentException("T64 inputSize must be non-negative: " + inputSize);
     }
-    long approxBlocks = ((long) inputSize + BLOCK_SIZE * Integer.BYTES - 1)
-        / (BLOCK_SIZE * Integer.BYTES);
-    long bound = 1L + Integer.BYTES + approxBlocks * (Long.BYTES + 1L + Long.BYTES * BLOCK_SIZE);
+    DataType dataType = ctx.getDataType();
+    if (dataType != DataType.INT && dataType != DataType.LONG) {
+      throw new IllegalArgumentException("T64 does not support stored type: " + dataType);
+    }
+    int elementSize = dataType.size();
+    long approxBlocks = ((long) inputSize + BLOCK_SIZE * elementSize - 1)
+        / (BLOCK_SIZE * elementSize);
+    long bound = 1L + Integer.BYTES + approxBlocks * (elementSize + 1L + (long) elementSize * BLOCK_SIZE);
     if (bound > Integer.MAX_VALUE) {
       throw new IllegalArgumentException("T64 maximum encoded size exceeds Integer.MAX_VALUE: " + bound);
     }
@@ -139,7 +139,9 @@ final class T64CodecDefinition implements ChunkCodecHandler<T64CodecDefinition.O
   }
 
   @Override
-  public ByteBuffer encode(Options options, CodecContext ctx, ByteBuffer src) {
+  public void encode(Options options, CodecContext ctx, ByteBuffer src, ByteBuffer dst) {
+    src.order(ByteOrder.BIG_ENDIAN);
+    dst.clear();
     int remaining = src.remaining();
     DataType dt = ctx.getDataType();
     if (dt != DataType.INT && dt != DataType.LONG) {
@@ -153,12 +155,15 @@ final class T64CodecDefinition implements ChunkCodecHandler<T64CodecDefinition.O
     int count = remaining / elementSize;
     boolean isLong = dt == DataType.LONG;
 
-    // Worst-case allocation upper bound — see maxEncodedSize.
+    // Worst-case output-size upper bound — see maxEncodedSize.
     int numBlocks = (count + BLOCK_SIZE - 1) / BLOCK_SIZE;
     int worstCase = 1 + Integer.BYTES + numBlocks * (elementSize + 1 + elementSize * BLOCK_SIZE);
-    ByteBuffer out = ByteBuffer.allocateDirect(worstCase);
-    out.put((byte) (isLong ? 1 : 0));
-    out.putInt(count);
+    if (worstCase > dst.capacity()) {
+      throw new IllegalArgumentException(
+          "T64: encoded size bound " + worstCase + " exceeds dst capacity " + dst.capacity());
+    }
+    dst.put((byte) (isLong ? 1 : 0));
+    dst.putInt(count);
 
     // Reusable per-encode scratch buffer for packed-bytes; sized for the worst case
     // `elementSize * BLOCK_SIZE` bytes (when bitWidth == elementBits) so it never needs to grow.
@@ -198,45 +203,26 @@ final class T64CodecDefinition implements ChunkCodecHandler<T64CodecDefinition.O
 
       // Baseline + bitWidth header.
       if (isLong) {
-        out.putLong(min);
+        dst.putLong(min);
       } else {
-        out.putInt((int) min);
+        dst.putInt((int) min);
       }
-      out.put((byte) bitWidth);
+      dst.put((byte) bitWidth);
 
       if (bitWidth == 0) {
         continue; // all values equal min; no packed bytes
       }
 
       // Pack BLOCK_SIZE values; missing tail slots get zero (i.e. baseline).
-      packBits(blockValues, blockCount, min, bitWidth, out, packedBuf);
+      packBits(blockValues, blockCount, min, bitWidth, dst, packedBuf);
     }
 
-    out.flip();
-    return out;
+    dst.flip();
   }
 
   @Override
-  public ByteBuffer decode(Options options, CodecContext ctx, ByteBuffer src) {
-    src = src.duplicate().order(ByteOrder.BIG_ENDIAN);
-    byte flag = src.get();
-    int count = src.getInt();
-    validateHeader(flag, count, ctx);
-    if (count == 0) {
-      ensureFullyConsumed(src);
-      return ByteBuffer.allocateDirect(0);
-    }
-    boolean isLong = flag == 1;
-    int elementSize = isLong ? Long.BYTES : Integer.BYTES;
-    ByteBuffer out = ByteBuffer.allocateDirect(decodedSize(count, elementSize));
-    decodeBlocks(src, count, isLong, out);
-    out.flip();
-    return out;
-  }
-
-  @Override
-  public void decodeInto(Options options, CodecContext ctx, ByteBuffer src, ByteBuffer dst) {
-    src = src.duplicate().order(ByteOrder.BIG_ENDIAN);
+  public void decode(Options options, CodecContext ctx, ByteBuffer src, ByteBuffer dst) {
+    src.order(ByteOrder.BIG_ENDIAN);
     dst.clear();
     byte flag = src.get();
     int count = src.getInt();
@@ -310,9 +296,7 @@ final class T64CodecDefinition implements ChunkCodecHandler<T64CodecDefinition.O
   /// Decode one or more T64 blocks until `count` values have been read, appending the
   /// resulting INT/LONG values to `dst`.
   private static void decodeBlocks(ByteBuffer src, int count, boolean isLong, ByteBuffer dst) {
-    // Reusable per-decode scratch buffer; sized for the worst case (bitWidth = elementBits).
     int elementSize = isLong ? Long.BYTES : Integer.BYTES;
-    byte[] packedBuf = new byte[elementSize * BLOCK_SIZE];
     int remainingValues = count;
     while (remainingValues > 0) {
       long baseline = isLong ? src.getLong() : src.getInt();
@@ -337,44 +321,50 @@ final class T64CodecDefinition implements ChunkCodecHandler<T64CodecDefinition.O
         }
       } else {
         int packedBytes = (bitWidth * BLOCK_SIZE + 7) / 8;
-        src.get(packedBuf, 0, packedBytes);
-        long bitCursor = 0;
-        if (isLong) {
-          for (int i = 0; i < blockCount; i++) {
-            long v = readBits(packedBuf, bitCursor, bitWidth) + baseline;
-            dst.putLong(v);
-            bitCursor += bitWidth;
-          }
-        } else {
-          for (int i = 0; i < blockCount; i++) {
-            int v = (int) (readBits(packedBuf, bitCursor, bitWidth) + baseline);
-            dst.putInt(v);
-            bitCursor += bitWidth;
-          }
+        if (packedBytes > src.remaining()) {
+          throw new IllegalStateException(
+              "T64: packed block requires " + packedBytes + " bytes but only " + src.remaining()
+                  + " remain. Segment may be corrupt.");
         }
-        // The encoder reserves fixed-width slots for the missing tail of a partial block and
-        // writes them as zero. Reject non-canonical non-zero tail slots rather than silently
-        // accepting alternate bytes for the same value sequence.
-        for (int i = blockCount; i < BLOCK_SIZE; i++) {
-          if (readBits(packedBuf, bitCursor, bitWidth) != 0) {
+        int packedOffset = src.position();
+        long bitCursor = 0;
+        int loadedWordIndex = -1;
+        long loadedWord = 0;
+        long valueMask = bitWidth == Long.SIZE ? -1L : (1L << bitWidth) - 1L;
+        for (int i = 0; i < BLOCK_SIZE; i++) {
+          int wordIndex = (int) (bitCursor >>> 6);
+          int bitInWord = (int) (bitCursor & 63);
+          if (loadedWordIndex != wordIndex) {
+            loadedWord = Long.reverseBytes(src.getLong(packedOffset + wordIndex * Long.BYTES));
+            loadedWordIndex = wordIndex;
+          }
+          long value = loadedWord >>> bitInWord;
+          if (bitInWord != 0 && bitWidth > Long.SIZE - bitInWord) {
+            loadedWordIndex++;
+            loadedWord = Long.reverseBytes(src.getLong(packedOffset + loadedWordIndex * Long.BYTES));
+            value |= loadedWord << (Long.SIZE - bitInWord);
+          }
+          value &= valueMask;
+          if (i < blockCount) {
+            if (isLong) {
+              dst.putLong(value + baseline);
+            } else {
+              dst.putInt((int) (value + baseline));
+            }
+          } else if (value != 0) {
+            // The encoder reserves fixed-width slots for the missing tail of a partial block and
+            // writes them as zero. Reject non-canonical non-zero tail slots rather than silently
+            // accepting alternate bytes for the same value sequence.
             throw new IllegalStateException(
                 "T64: non-zero padding slot in final block. Segment may be corrupt.");
           }
           bitCursor += bitWidth;
         }
+        src.position(packedOffset + packedBytes);
       }
       remainingValues -= blockCount;
     }
     ensureFullyConsumed(src);
-  }
-
-  private static int decodedSize(int count, int elementSize) {
-    long decodedSize = (long) count * elementSize;
-    if (decodedSize > Integer.MAX_VALUE) {
-      throw new IllegalStateException(
-          "T64: decoded size " + decodedSize + " exceeds Integer.MAX_VALUE. Segment may be corrupt.");
-    }
-    return (int) decodedSize;
   }
 
   private static void ensureFullyConsumed(ByteBuffer src) {
@@ -407,28 +397,5 @@ final class T64CodecDefinition implements ChunkCodecHandler<T64CodecDefinition.O
       valueShift += take;
       bitsRemaining -= take;
     }
-  }
-
-  /// Read `bitWidth` bits from `buf` starting at `bitOffset`.
-  private static long readBits(byte[] buf, long bitOffset, int bitWidth) {
-    long byteIndex = bitOffset >>> 3;
-    int bitInByte = (int) (bitOffset & 7);
-    long out = 0L;
-    int shift = 0;
-    int bitsRemaining = bitWidth;
-    int idx = (int) byteIndex;
-    while (bitsRemaining > 0) {
-      long b = ((long) buf[idx]) & 0xFFL;
-      int available = 8 - bitInByte;
-      int take = Math.min(available, bitsRemaining);
-      // `take` is in [1..8] (bounded by `available`), so a byte-sized mask always suffices.
-      long mask = (1L << take) - 1L;
-      out |= ((b >>> bitInByte) & mask) << shift;
-      shift += take;
-      bitsRemaining -= take;
-      idx++;
-      bitInByte = 0;
-    }
-    return out;
   }
 }

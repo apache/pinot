@@ -16,7 +16,7 @@
 # specific language governing permissions and limitations
 # under the License.
 name: quickstart
-description: Launch a local Pinot quickstart cluster (batch, hybrid, streaming, upsert, etc.) with the right script, building the binary distribution first if needed.
+description: Start and verify a local Pinot quickstart using the modes supported by the current checkout.
 ---
 
 # /quickstart

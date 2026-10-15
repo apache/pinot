@@ -1,6 +1,6 @@
 ---
 name: review-correctness-nulls
-description: Review Apache Pinot diffs for correctness issues — null handling, type dispatch, numeric precision (INT/LONG/BIG_DECIMAL), exhaustive switch coverage for DataType / IndexType, resource leaks in close/destroy paths, off-by-one errors in row iteration, and silent wrong-result risks. Trigger keywords — null, Nullable, Optional, getStoredType, DataType switch, IndexType switch, close, destroy, realtime persist, precision, BigDecimal, isNullable, null vector.
+description: Review Apache Pinot correctness when null handling, numeric types, dispatch, or resource lifecycles change.
 domain: kb/code-review-principles.md#5-correctness--safety
 triggers:
   - diff touches null-vector / null-bitmap / null-enabled code paths

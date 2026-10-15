@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.broker.requesthandler;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sun.net.httpserver.HttpServer;
 import java.net.InetSocketAddress;
 import java.util.HashMap;
@@ -31,6 +32,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import javax.annotation.Nullable;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.broker.api.AccessControl;
@@ -46,6 +48,7 @@ import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.core.routing.TableRouteInfo;
@@ -73,11 +76,15 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.LoggerConstants;
 import org.apache.pinot.spi.trace.RequestContext;
+import org.apache.pinot.spi.trace.RequestScope;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Query.Range;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
@@ -546,6 +553,60 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     List<Expression> operands = filterFunc.getOperands();
     Assert.assertEquals(operands.get(0).getIdentifier().getName(), column);
     Assert.assertEquals(operands.get(1).getLiteral().getStringValue(), expectedRange);
+  }
+
+  @Test
+  public void testRejectedSqlOptionsInSubqueryPreserveErrorCode()
+      throws Exception {
+    BaseSingleStageBrokerRequestHandler handler = createHybridHandlerWithTimeBoundary(new AtomicReference<>());
+
+    BrokerResponseNative response = handleRequest(handler, "SELECT * FROM myTable WHERE IN_SUBQUERY(created_15min, "
+        + "'SET timeoutMs = ''1''; SELECT ID_SET(created_15min) FROM myTable') = 1", "sqlOptionsMode=reject");
+    assertSingleException(response, QueryErrorCode.QUERY_VALIDATION, "Query options are not allowed in the SQL");
+  }
+
+  @Test
+  public void testRejectedSqlOptionsInNestedSubqueryPreserveErrorCode()
+      throws Exception {
+    BaseSingleStageBrokerRequestHandler handler = createHybridHandlerWithTimeBoundary(new AtomicReference<>());
+
+    // The SET sits two IN_SUBQUERY levels down, so the rejection has to survive the inner subquery's response
+    BrokerResponseNative response = handleRequest(handler,
+        "SELECT * FROM myTable WHERE IN_SUBQUERY(created_15min, 'SELECT ID_SET(created_15min) FROM myTable WHERE "
+            + "IN_SUBQUERY(created_15min, ''SET timeoutMs = 1; SELECT ID_SET(created_15min) FROM myTable'') "
+            + "= 1') = 1", "sqlOptionsMode=reject");
+    assertSingleException(response, QueryErrorCode.QUERY_VALIDATION, "Query options are not allowed in the SQL");
+  }
+
+  @Test
+  public void testSubqueryParseFailurePreservesErrorCode()
+      throws Exception {
+    BaseSingleStageBrokerRequestHandler handler = createHybridHandlerWithTimeBoundary(new AtomicReference<>());
+
+    BrokerResponseNative response = handleRequest(handler,
+        "SELECT * FROM myTable WHERE IN_SUBQUERY(created_15min, 'SELECT ID_SET(created_15min) FROM') = 1", null);
+    assertSingleException(response, QueryErrorCode.SQL_PARSING, "Failed to parse subquery");
+  }
+
+  private static BrokerResponseNative handleRequest(BaseSingleStageBrokerRequestHandler handler, String sql,
+      @Nullable String queryOptions)
+      throws Exception {
+    ObjectNode request = JsonUtils.newObjectNode().put(Broker.Request.SQL, sql);
+    if (queryOptions != null) {
+      request.put(Broker.Request.QUERY_OPTIONS, queryOptions);
+    }
+    try (RequestScope requestContext = Tracing.getTracer().createRequestScope()) {
+      requestContext.setRequestArrivalTimeMillis(System.currentTimeMillis());
+      return (BrokerResponseNative) handler.handleRequest(request, null, null, requestContext, null);
+    }
+  }
+
+  private static void assertSingleException(BrokerResponseNative response, QueryErrorCode errorCode,
+      String messagePart) {
+    Assert.assertEquals(response.getExceptions().size(), 1, response.toString());
+    QueryProcessingException exception = response.getExceptions().get(0);
+    Assert.assertEquals(exception.getErrorCode(), errorCode.getId());
+    Assert.assertTrue(exception.getMessage().contains(messagePart), exception.getMessage());
   }
 
   @Test

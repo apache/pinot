@@ -40,10 +40,10 @@ import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 import org.apache.pinot.core.util.GroupByUtils;
-import org.apache.pinot.core.util.MemoizedClassAssociation;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 
 
@@ -80,13 +80,17 @@ public class QueryContext {
   private final Map<ExpressionContext, ExpressionContext> _expressionOverrideHints;
   private final ExplainMode _explain;
 
-  private final Function<Class<?>, Map<?, ?>> _sharedValues = MemoizedClassAssociation.of(ConcurrentHashMap::new);
+  // Values that the segments of the query share, by value type. The query context owns the map, so the values can be
+  // collected with it. A ClassValue would keep each value in its type's cache until later queries clear it.
+  private final ConcurrentHashMap<Class<?>, ConcurrentHashMap<?, ?>> _sharedValues = new ConcurrentHashMap<>();
 
   // Pre-calculate the aggregation functions and columns for the query so that it can be shared across all the segments
   private AggregationFunction[] _aggregationFunctions;
   private List<Pair<AggregationFunction, FilterContext>> _filteredAggregationFunctions;
   private Map<Pair<FunctionContext, FilterContext>, Integer> _filteredAggregationsIndexMap;
   private boolean _hasFilteredAggregations;
+  // Set by the instance planner after bounding all local BASE and derived grouping-set keys.
+  private boolean _groupingSetsBaseAggregationAllowed = true;
   private Set<String> _columns;
 
   // Other properties to be shared across all the segments
@@ -102,6 +106,9 @@ public class QueryContext {
   private boolean _skipStarTree;
   // Whether to skip reordering scan filters for the query
   private boolean _skipScanFilterReorder;
+  // Whether an AND may push the document ids it has matched into its composite (AND/OR/NOT) children.
+  // Resolved from the query option and the server default by InstancePlanMakerImplV2#applyQueryOptions.
+  private boolean _andRestrictionPushdownEnabled;
   // Maximum number of threads used to execute the query
   private int _maxExecutionThreads = Server.DEFAULT_QUERY_EXECUTOR_MAX_EXECUTION_THREADS;
   // The following properties apply to group-by queries
@@ -133,6 +140,8 @@ public class QueryContext {
   private int _effectiveSegmentGroupTrimSize;
   // Flush threshold for streaming group-by (0 = disabled)
   private int _streamingGroupByFlushThreshold;
+  // Flush threshold for streaming distinct (0 = disabled)
+  private int _streamingDistinctFlushThreshold;
   // Whether null handling is enabled
   private boolean _nullHandlingEnabled;
   // Whether server returns the final result
@@ -250,6 +259,49 @@ public class QueryContext {
     return isGroupingSets() ? 1 : 0;
   }
 
+  /// Returns whether grouping-set queries should aggregate the base grouping (union columns) once per segment
+  /// and derive the individual grouping-set records from those base groups, instead of expanding every input
+  /// row into one group per grouping set. Disabled by default (opt in with `groupingSetsBaseAggregation=true`):
+  /// the derive can be slower than expansion for expensive-to-merge intermediates (sketches). See
+  /// [CommonConstants.Broker.Request.QueryOptionKey#GROUPING_SETS_BASE_AGGREGATION].
+  ///
+  /// Even when opted in, base aggregation is disabled when:
+  /// - any aggregation function cannot merge intermediates across groups (the derive merges base groups of the
+  ///   same segment into coarser sets; e.g. SEGMENTPARTITIONEDDISTINCTCOUNT and partitioned FUNNELCOUNT keep
+  ///   per-segment-final counts and would double-count) -- see
+  ///   [AggregationFunction#canMergeIntermediatesAcrossGroups];
+  /// - a combine path other than the standard
+  ///   [org.apache.pinot.core.operator.combine.GroupByCombineOperator] would run, since only it performs the
+  ///   merge-time derive: filtered aggregations (distinct shared group-key generator), the streaming combine
+  ///   used on MSE leaf stages (`streamingGroupByFlushThreshold > 0`), and the sorted-aggregate combine
+  ///   ([#shouldSortAggregateUnderSafeTrim()]). In all these cases the segment expands per row so the emitted
+  ///   rows already carry the $groupingId discriminator.
+  /// - the instance planner cannot prove that all local base and derived groups fit within `numGroupsLimit`.
+  ///   The expansion path preserves the normal ordering and group-limit semantics in that case.
+  public boolean isGroupingSetsBaseAggregation() {
+    if (!_groupingSetsBaseAggregationAllowed || _hasFilteredAggregations || _streamingGroupByFlushThreshold > 0
+        || shouldSortAggregateUnderSafeTrim()) {
+      return false;
+    }
+    String option = _queryOptions.get(CommonConstants.Broker.Request.QueryOptionKey.GROUPING_SETS_BASE_AGGREGATION);
+    if (option == null || !Boolean.parseBoolean(option)) {
+      return false;
+    }
+    if (_aggregationFunctions != null) {
+      for (AggregationFunction aggregationFunction : _aggregationFunctions) {
+        if (!aggregationFunction.canMergeIntermediatesAcrossGroups()) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  /// Called before building segment operators; a false value makes every local segment use per-row expansion.
+  public void setGroupingSetsBaseAggregationAllowed(boolean allowed) {
+    _groupingSetsBaseAggregationAllowed = allowed;
+  }
+
   /// Returns the total number of group-by key columns in the server result / reducer row layout: the union
   /// group-by columns plus any synthetic key columns ([#getNumExtraGroupByKeyColumns()]).
   public int getNumGroupByKeyColumns() {
@@ -338,7 +390,8 @@ public class QueryContext {
     return _filteredAggregationsIndexMap;
   }
 
-  /// Returns the filtered aggregation expressions for the query.
+  /// Returns whether any aggregation in the query carries a FILTER clause, no matter whether it is referenced in the
+  /// SELECT list, the HAVING clause or the ORDER-BY clause.
   public boolean hasFilteredAggregations() {
     return _hasFilteredAggregations;
   }
@@ -394,6 +447,17 @@ public class QueryContext {
 
   public void setSkipScanFilterReorder(boolean skipScanFilterReorder) {
     _skipScanFilterReorder = skipScanFilterReorder;
+  }
+
+  /// Whether an AND may hand the document ids matched by its index-based children to its composite (AND/OR/NOT)
+  /// children, so that a scan-based predicate nested inside an OR is only evaluated on the documents that can still
+  /// match. See [org.apache.pinot.spi.utils.CommonConstants.Server.AndRestrictionPushdownMode].
+  public boolean isAndRestrictionPushdownEnabled() {
+    return _andRestrictionPushdownEnabled;
+  }
+
+  public void setAndRestrictionPushdownEnabled(boolean andRestrictionPushdownEnabled) {
+    _andRestrictionPushdownEnabled = andRestrictionPushdownEnabled;
   }
 
   public int getMaxExecutionThreads() {
@@ -498,6 +562,14 @@ public class QueryContext {
     _streamingGroupByFlushThreshold = streamingGroupByFlushThreshold;
   }
 
+  public int getStreamingDistinctFlushThreshold() {
+    return _streamingDistinctFlushThreshold;
+  }
+
+  public void setStreamingDistinctFlushThreshold(int streamingDistinctFlushThreshold) {
+    _streamingDistinctFlushThreshold = streamingDistinctFlushThreshold;
+  }
+
   public boolean isNullHandlingEnabled() {
     return _nullHandlingEnabled;
   }
@@ -549,7 +621,8 @@ public class QueryContext {
   /// @param <V> the value type
   /// @return the shared value
   public <K, V> V getOrComputeSharedValue(Class<V> type, K key, Function<K, V> mapper) {
-    return ((ConcurrentHashMap<K, V>) _sharedValues.apply(type)).computeIfAbsent(key, mapper);
+    return ((ConcurrentHashMap<K, V>) _sharedValues.computeIfAbsent(type, k -> new ConcurrentHashMap<>()))
+        .computeIfAbsent(key, mapper);
   }
 
   public int getEffectiveSegmentGroupTrimSize() {
@@ -571,6 +644,32 @@ public class QueryContext {
       return GroupByUtils.getTableCapacity(getLimit(), minGroupTrimSize);
     }
     return -1;
+  }
+
+  /// Returns the secondary per-segment base-group estimate gate. The instance planner separately requires all
+  /// local base and derived grouping-set keys to fit `numGroupsLimit`; raising this option cannot bypass that
+  /// hard bound. Defaults to `numGroupsLimit` when unset. See
+  /// [CommonConstants.Broker.Request.QueryOptionKey#GROUPING_SETS_BASE_AGGREGATION_MAX_GROUPS].
+  public int getGroupingSetsBaseAggregationMaxGroups() {
+    Integer maxGroups = QueryOptionsUtils.getGroupingSetsBaseAggregationMaxGroups(_queryOptions);
+    return maxGroups != null ? maxGroups : _numGroupsLimit;
+  }
+
+  /// Returns the effective PER-grouping-set server-side keep size for a base-aggregation grouping-set query
+  /// (`max(5 * LIMIT, groupingSetsMinServerTrimSize)`, mirroring `minServerGroupTrimSize` semantics), or -1 to
+  /// disable (no ORDER BY, or the option is unset/non-positive). When enabled, the server keeps that many groups
+  /// WITHIN each grouping set after deriving them (bucketed by the $groupingId discriminator), bounding each
+  /// server's derived output without starving low-magnitude sets. The broker still applies the final ORDER BY +
+  /// LIMIT. See [CommonConstants.Broker.Request.QueryOptionKey#GROUPING_SETS_MIN_SERVER_TRIM_SIZE].
+  public int getGroupingSetServerTrimSize() {
+    if (!isGroupingSets() || getOrderByExpressions() == null) {
+      return -1;
+    }
+    Integer minGroupTrimSize = QueryOptionsUtils.getGroupingSetsMinServerTrimSize(_queryOptions);
+    if (minGroupTrimSize == null || minGroupTrimSize <= 0) {
+      return -1;
+    }
+    return GroupByUtils.getTableCapacity(getLimit(), minGroupTrimSize);
   }
 
   private int calculateEffectiveSegmentGroupTrimSize() {
@@ -800,9 +899,6 @@ public class QueryContext {
       for (Pair<FunctionContext, FilterContext> pair : filteredAggregations) {
         FunctionContext aggregation = pair.getLeft();
         FilterContext filter = pair.getRight();
-        if (filter != null) {
-          queryContext._hasFilteredAggregations = true;
-        }
         int functionIndex = filteredAggregationFunctions.size();
         AggregationFunction aggregationFunction =
             AggregationFunctionFactory.getAggregationFunction(aggregation, queryContext._nullHandlingEnabled);
@@ -836,7 +932,15 @@ public class QueryContext {
         int numAggregations = filteredAggregationFunctions.size();
         AggregationFunction[] aggregationFunctions = new AggregationFunction[numAggregations];
         for (int i = 0; i < numAggregations; i++) {
-          aggregationFunctions[i] = filteredAggregationFunctions.get(i).getLeft();
+          Pair<AggregationFunction, FilterContext> pair = filteredAggregationFunctions.get(i);
+          aggregationFunctions[i] = pair.getLeft();
+          // NOTE: Compute the flag over all the collected aggregations (SELECT, HAVING and ORDER-BY) instead of only
+          //       the SELECT ones. A FILTER clause on an aggregation that is referenced only in HAVING or ORDER-BY
+          //       must still be honored, else the plan nodes pick the non-filtered operator and silently evaluate the
+          //       aggregation over the main filter alone.
+          if (pair.getRight() != null) {
+            queryContext._hasFilteredAggregations = true;
+          }
         }
         queryContext._aggregationFunctions = aggregationFunctions;
         queryContext._filteredAggregationFunctions = filteredAggregationFunctions;

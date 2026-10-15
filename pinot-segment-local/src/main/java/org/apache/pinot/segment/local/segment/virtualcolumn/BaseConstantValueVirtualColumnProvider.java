@@ -166,6 +166,8 @@ public abstract class BaseConstantValueVirtualColumnProvider implements VirtualC
     checkValue(context, value);
     ColumnMetadataImpl.Builder builder = new ColumnMetadataImpl.Builder().setFieldSpec(fieldSpec)
         .setTotalDocs(context.getTotalDocCount())
+        // Every document holds exactly one value, also for a multi-value field (a single-element entry)
+        .setTotalNumberOfEntries(context.getTotalDocCount())
         .setCardinality(1)
         .setHasDictionary(true);
     if (fieldSpec.isSingleValueField()) {

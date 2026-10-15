@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.realtime.impl.forward;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,7 +28,6 @@ import org.apache.pinot.segment.local.io.writer.impl.FixedByteSingleValueMultiCo
 import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -93,8 +93,6 @@ import org.slf4j.LoggerFactory;
 public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
   private static final Logger LOGGER = LoggerFactory.getLogger(FixedByteMVMutableForwardIndex.class);
 
-  /// number of columns is 1, column size is variable but less than \_maxNumberOfMultiValuesPerRow
-
   private static final int SIZE_OF_INT = 4;
   private static final int NUM_COLS_IN_HEADER = 3;
 
@@ -109,16 +107,17 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
   private final List<FixedByteSingleValueMultiColReader> _headerReaders = new CopyOnWriteArrayList<>();
   private final List<FixedByteSingleValueMultiColWriter> _dataWriters = new ArrayList<>();
   private final List<FixedByteSingleValueMultiColReader> _dataReaders = new CopyOnWriteArrayList<>();
-  private final int _headerSize;
-  private final int _incrementalCapacity;
-  private final int _columnSizeInBytes;
-  private final int _maxNumberOfMultiValuesPerRow;
-  private final int _rowCountPerChunk;
+
+  private final int _maxNumMultiValues;
+  private final int _numRowsPerChunk;
+  private final int _valueSizeInBytes;
   private final PinotDataBufferMemoryManager _memoryManager;
   private final String _context;
   private final boolean _isDictionaryEncoded;
-  private final FieldSpec.DataType _storedType;
-  private final FieldSpec.DataType _dataType;
+  private final DataType _storedType;
+  private final DataType _dataType;
+  private final int _headerSize;
+  private final int _incrementalCapacity;
 
   private FixedByteSingleValueMultiColWriter _curHeaderWriter;
   private FixedByteSingleValueMultiColWriter _currentDataWriter;
@@ -127,33 +126,30 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
   private int _prevRowLength = 0;  // Number of values in the column for the last row added.
   private int _numValues = 0;
 
-  public FixedByteMVMutableForwardIndex(int maxNumberOfMultiValuesPerRow, int avgMultiValueCount, int rowCountPerChunk,
-      int columnSizeInBytes, PinotDataBufferMemoryManager memoryManager, String context, boolean isDictionaryEncoded,
-      FieldSpec.DataType storedType) {
-    this(maxNumberOfMultiValuesPerRow, avgMultiValueCount, rowCountPerChunk, columnSizeInBytes, memoryManager, context,
+  public FixedByteMVMutableForwardIndex(int maxNumMultiValues, int avgNumMultiValues, int numRowsPerChunk,
+      int valueSizeInBytes, PinotDataBufferMemoryManager memoryManager, String context, boolean isDictionaryEncoded,
+      DataType storedType) {
+    this(maxNumMultiValues, avgNumMultiValues, numRowsPerChunk, valueSizeInBytes, memoryManager, context,
         isDictionaryEncoded, storedType, storedType);
   }
 
-  public FixedByteMVMutableForwardIndex(int maxNumberOfMultiValuesPerRow, int avgMultiValueCount, int rowCountPerChunk,
-      int columnSizeInBytes, PinotDataBufferMemoryManager memoryManager, String context, boolean isDictionaryEncoded,
-      FieldSpec.DataType storedType, FieldSpec.DataType dataType) {
+  public FixedByteMVMutableForwardIndex(int maxNumMultiValues, int avgNumMultiValues, int numRowsPerChunk,
+      int valueSizeInBytes, PinotDataBufferMemoryManager memoryManager, String context, boolean isDictionaryEncoded,
+      DataType storedType, DataType dataType) {
+    _maxNumMultiValues = maxNumMultiValues;
+    _numRowsPerChunk = numRowsPerChunk;
+    _valueSizeInBytes = valueSizeInBytes;
     _memoryManager = memoryManager;
     _context = context;
-    int initialCapacity = Math.max(maxNumberOfMultiValuesPerRow, rowCountPerChunk * avgMultiValueCount);
-    int incrementalCapacity =
-        Math.max(maxNumberOfMultiValuesPerRow, (int) (initialCapacity * 1.0f * INCREMENT_PERCENTAGE / 100));
-    _columnSizeInBytes = columnSizeInBytes;
-    _maxNumberOfMultiValuesPerRow = maxNumberOfMultiValuesPerRow;
-    _headerSize = rowCountPerChunk * SIZE_OF_INT * NUM_COLS_IN_HEADER;
-    _rowCountPerChunk = rowCountPerChunk;
-    addHeaderBuffer();
-    //at least create space for million entries, which for INT translates into 4mb buffer
-    _incrementalCapacity = incrementalCapacity;
-    addDataBuffer(initialCapacity);
-    //init(_rowCountPerChunk, _columnSizeInBytes, _maxNumberOfMultiValuesPerRow, initialCapacity, _incrementalCapacity);
     _isDictionaryEncoded = isDictionaryEncoded;
     _storedType = storedType;
     _dataType = dataType;
+
+    _headerSize = numRowsPerChunk * SIZE_OF_INT * NUM_COLS_IN_HEADER;
+    addHeaderBuffer();
+    int initialCapacity = Math.max(maxNumMultiValues, numRowsPerChunk * avgNumMultiValues);
+    addDataBuffer(initialCapacity);
+    _incrementalCapacity = Math.max(maxNumMultiValues, (int) ((double) initialCapacity * INCREMENT_PERCENTAGE / 100));
   }
 
   private void addHeaderBuffer() {
@@ -164,21 +160,21 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
     _curHeaderWriter =
         new FixedByteSingleValueMultiColWriter(headerBuffer, 3, new int[]{SIZE_OF_INT, SIZE_OF_INT, SIZE_OF_INT});
     _headerWriters.add(_curHeaderWriter);
-    _headerReaders.add(new FixedByteSingleValueMultiColReader(headerBuffer, _rowCountPerChunk,
+    _headerReaders.add(new FixedByteSingleValueMultiColReader(headerBuffer, _numRowsPerChunk,
         new int[]{SIZE_OF_INT, SIZE_OF_INT, SIZE_OF_INT}));
   }
 
-  /// This method automatically computes the space needed based on the \_columnSizeInBytes
+  /// This method automatically computes the space needed based on the \_valueSizeInBytes
   /// @param rowCapacity Additional capacity to be added in terms of number of rows
   private void addDataBuffer(int rowCapacity) {
     try {
-      long size = (long) rowCapacity * (long) _columnSizeInBytes;
+      long size = (long) rowCapacity * (long) _valueSizeInBytes;
       LOGGER.info("Allocating data buffer of size {} for column {}", size, _context);
       // NOTE: PinotDataBuffer is tracked in PinotDataBufferMemoryManager. No need to track and close inside the class.
       PinotDataBuffer dataBuffer = _memoryManager.allocate(size, _context);
-      _currentDataWriter = new FixedByteSingleValueMultiColWriter(dataBuffer, 1, new int[]{_columnSizeInBytes});
+      _currentDataWriter = new FixedByteSingleValueMultiColWriter(dataBuffer, 1, new int[]{_valueSizeInBytes});
       _dataWriters.add(_currentDataWriter);
-      _dataReaders.add(new FixedByteSingleValueMultiColReader(dataBuffer, rowCapacity, new int[]{_columnSizeInBytes}));
+      _dataReaders.add(new FixedByteSingleValueMultiColReader(dataBuffer, rowCapacity, new int[]{_valueSizeInBytes}));
       //update the capacity
       _currentCapacity = rowCapacity;
     } catch (Exception e) {
@@ -188,7 +184,7 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
   }
 
   private void writeIntoHeader(int row, int dataWriterIndex, int startIndex, int length) {
-    if (row >= _headerWriters.size() * _rowCountPerChunk) {
+    if (row >= _headerWriters.size() * _numRowsPerChunk) {
       addHeaderBuffer();
     }
     _curHeaderWriter.setInt(getRowInCurrentHeader(row), 0, dataWriterIndex);
@@ -196,18 +192,19 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
     _curHeaderWriter.setInt(getRowInCurrentHeader(row), 2, length);
   }
 
-  // TODO Use powers of two for _rowCountPerChunk to optimize computation for the
+  // TODO Use powers of two for _numRowsPerChunk to optimize computation for the
   // methods below. Or, assert that the input values to the class are powers of two. TBD.
   private FixedByteSingleValueMultiColReader getCurrentReader(int row) {
-    return _headerReaders.get(row / _rowCountPerChunk);
+    return _headerReaders.get(row / _numRowsPerChunk);
   }
 
   private int getRowInCurrentHeader(int row) {
-    return row % _rowCountPerChunk;
+    return row % _numRowsPerChunk;
   }
 
   private int updateHeader(int row, int numValues) {
-    assert (numValues <= _maxNumberOfMultiValuesPerRow);
+    Preconditions.checkArgument(numValues <= _maxNumMultiValues,
+        "Row %s has %s multi-values, exceeding the maximum of %s", row, numValues, _maxNumMultiValues);
     _numValues += numValues;
     int newStartIndex = _prevRowStartIndex + _prevRowLength;
     if (newStartIndex + numValues > _currentCapacity) {
@@ -220,12 +217,6 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
     _prevRowStartIndex = newStartIndex;
     _prevRowLength = numValues;
     return newStartIndex;
-  }
-
-  public int getMaxChunkCapacity() {
-    // The incremental capacity will be >= the initial capacity and (the way the code is currently written) will be
-    // the largest the buffer could ever get.
-    return _incrementalCapacity;
   }
 
   @Override
@@ -245,12 +236,12 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
 
   @Override
   public int getLengthOfShortestElement() {
-    return _columnSizeInBytes;
+    return _valueSizeInBytes;
   }
 
   @Override
   public int getLengthOfLongestElement() {
-    return _columnSizeInBytes;
+    return _valueSizeInBytes;
   }
 
   @Override
@@ -465,9 +456,9 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
     int newStartIndex = updateHeader(docId, values.length);
     for (int i = 0; i < values.length; i++) {
       byte[] value = values[i];
-      if (value.length != _columnSizeInBytes) {
+      if (value.length != _valueSizeInBytes) {
         throw new IllegalArgumentException(
-            "Expected fixed-width bytes value of length: " + _columnSizeInBytes + ", got: " + value.length);
+            "Expected fixed-width bytes value of length: " + _valueSizeInBytes + ", got: " + value.length);
       }
       _currentDataWriter.setBytes(newStartIndex + i, 0, value);
     }

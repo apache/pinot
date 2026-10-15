@@ -85,6 +85,7 @@ import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryScanCostContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
+import org.apache.pinot.spi.query.RemoteAccessStats;
 import org.apache.pinot.spi.trace.Tracer;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants.Accounting.ScanKillingMode;
@@ -98,6 +99,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   public static final String ENABLE_PREFETCH = "enable.prefetch";
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerQueryExecutorV1Impl.class);
+  // Listed in DeleteStatement.CROSS_TABLE_FUNCTIONS: a DELETE predicate must not call this function
   private static final String IN_PARTITIONED_SUBQUERY = "inPartitionedSubquery";
 
   private InstanceDataManager _instanceDataManager;
@@ -159,6 +161,44 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
   @Override
   public InstanceResponseBlock execute(ServerQueryRequest queryRequest, ExecutorService executorService,
+      @Nullable ResultsBlockStreamer streamer, @Nullable PlanMaker planMakerOverride) {
+    QueryThreadContext threadContext = QueryThreadContext.getIfAvailable();
+    // NOTE: In production code, threadContext should never be null. It might be null in tests when QueryThreadContext
+    //       is not set up.
+    if (threadContext == null) {
+      return executeWithTrace(queryRequest, executorService, streamer, planMakerOverride);
+    }
+    // Collect the remote accesses of this execution from this thread and the ones it spawns, and report them in the
+    // response metadata. The stats are replaced per execution because the ones of the thread context are shared by
+    // every execution spawned from it, e.g. the two of a hybrid table.
+    RemoteAccessStats remoteAccessStats = new RemoteAccessStats();
+    threadContext.setRemoteAccessStats(remoteAccessStats);
+    InstanceResponseBlock instanceResponse =
+        executeWithTrace(queryRequest, executorService, streamer, planMakerOverride);
+    addRemoteAccessStats(instanceResponse, remoteAccessStats);
+    return instanceResponse;
+  }
+
+  /// Adds the remote access stats to the response metadata, each pair of keys only when its count is not zero.
+  private static void addRemoteAccessStats(InstanceResponseBlock instanceResponse,
+      RemoteAccessStats remoteAccessStats) {
+    long numRemoteAccesses = remoteAccessStats.getNumRemoteAccesses();
+    if (numRemoteAccesses == 0) {
+      return;
+    }
+    instanceResponse.addMetadata(MetadataKey.NUM_REMOTE_ACCESSES.getName(), Long.toString(numRemoteAccesses));
+    instanceResponse.addMetadata(MetadataKey.REMOTE_ACCESS_BYTES.getName(),
+        Long.toString(remoteAccessStats.getRemoteAccessBytes()));
+    long numDirectRemoteAccesses = remoteAccessStats.getNumDirectRemoteAccesses();
+    if (numDirectRemoteAccesses > 0) {
+      instanceResponse.addMetadata(MetadataKey.NUM_DIRECT_REMOTE_ACCESSES.getName(),
+          Long.toString(numDirectRemoteAccesses));
+      instanceResponse.addMetadata(MetadataKey.DIRECT_REMOTE_ACCESS_BYTES.getName(),
+          Long.toString(remoteAccessStats.getDirectRemoteAccessBytes()));
+    }
+  }
+
+  private InstanceResponseBlock executeWithTrace(ServerQueryRequest queryRequest, ExecutorService executorService,
       @Nullable ResultsBlockStreamer streamer, @Nullable PlanMaker planMakerOverride) {
     if (!queryRequest.isEnableTrace()) {
       return executeInternal(queryRequest, executorService, streamer, planMakerOverride);

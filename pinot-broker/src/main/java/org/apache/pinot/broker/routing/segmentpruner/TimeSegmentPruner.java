@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.broker.routing.segmentpruner;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -61,8 +62,16 @@ public class TimeSegmentPruner implements SegmentPruner {
   private final String _timeColumn;
   private final DateTimeFormatSpec _timeFormatSpec;
 
+  /// Rebuilt under the lock on this pruner and read by [#prune(BrokerRequest, Set)] without locking. Each tree is
+  /// immutable, so a query always sees a complete tree.
   private volatile IntervalTree<String> _intervalTree;
+  /// Guarded by the lock on this pruner, except in [#init], which runs before the pruner is used.
   private final Map<String, Interval> _intervalMap = new HashMap<>();
+  /// True while [#_intervalTree] may lag [#_intervalMap]: set before the map is updated and cleared once the tree
+  /// matches it again. If an update throws part way (e.g. with an OutOfMemoryError), the next update rebuilds the tree
+  /// even when it changes nothing, instead of skipping the rebuild and leaving segments missing from the tree. Guarded
+  /// by the lock on this pruner.
+  private boolean _intervalTreeStale;
 
   public TimeSegmentPruner(TableConfig tableConfig, DateTimeFieldSpec timeFieldSpec) {
     _tableNameWithType = tableConfig.getTableName();
@@ -107,20 +116,41 @@ public class TimeSegmentPruner implements SegmentPruner {
       Set<String> onlineSegments, List<String> pulledSegments, List<ZNRecord> znRecords) {
     // NOTE: We don't update all the segment ZK metadata for every external view change, but only the new added/removed
     //       ones. The refreshed segment ZK metadata change won't be picked up.
+    boolean treeWasStale = _intervalTreeStale;
+    _intervalTreeStale = true;
+    int numSegmentsBefore = _intervalMap.size();
     for (int idx = 0; idx < pulledSegments.size(); idx++) {
       String segment = pulledSegments.get(idx);
       ZNRecord zNrecord = znRecords.get(idx);
       _intervalMap.computeIfAbsent(segment, k -> extractIntervalFromSegmentZKMetaZNRecord(k, zNrecord));
     }
-    _intervalMap.keySet().retainAll(onlineSegments);
-    _intervalTree = new IntervalTree<>(_intervalMap);
+    // Only insertions can change the size because computeIfAbsent never replaces an existing interval. An external
+    // view change that adds and removes no segment (e.g. a replica changing state) leaves the tree correct as is.
+    boolean segmentsChanged = _intervalMap.size() != numSegmentsBefore;
+    segmentsChanged |= _intervalMap.keySet().retainAll(onlineSegments);
+    if (segmentsChanged || treeWasStale) {
+      _intervalTree = new IntervalTree<>(_intervalMap);
+    }
+    _intervalTreeStale = false;
   }
 
   @Override
   public synchronized void refreshSegment(String segment, @Nullable ZNRecord znRecord) {
     Interval interval = extractIntervalFromSegmentZKMetaZNRecord(segment, znRecord);
-    _intervalMap.put(segment, interval);
-    _intervalTree = new IntervalTree<>(_intervalMap);
+    boolean treeWasStale = _intervalTreeStale;
+    _intervalTreeStale = true;
+    Interval previousInterval = _intervalMap.put(segment, interval);
+    // A segment is commonly refreshed onto the time interval it already has (e.g. an OFFLINE segment replaced with a
+    // new build of the same time range), which leaves the tree correct as is
+    if (treeWasStale || !interval.equals(previousInterval)) {
+      _intervalTree = new IntervalTree<>(_intervalMap);
+    }
+    _intervalTreeStale = false;
+  }
+
+  @VisibleForTesting
+  IntervalTree<String> getIntervalTree() {
+    return _intervalTree;
   }
 
   /// NOTE: Pruning is done by searching \_intervalTree based on request time interval and check if the results

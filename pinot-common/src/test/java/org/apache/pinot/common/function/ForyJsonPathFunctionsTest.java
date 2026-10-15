@@ -148,6 +148,33 @@ public class ForyJsonPathFunctionsTest {
     assertNull(extract("{\"v\":1,\"v\":null}", "$.v"));
   }
 
+  @DataProvider(name = "skippedStrings")
+  public Object[][] skippedStrings() {
+    return new Object[][]{
+        {"x".repeat(65536)},
+        {"café".repeat(4096)},
+        {"中文😀".repeat(4096)},
+        {"\\u0061\\n\\\"\\\\\\uD83D\\uDE00".repeat(4096)}
+    };
+  }
+
+  @Test(dataProvider = "skippedStrings")
+  public void testStreamingSkippedStrings(String value) {
+    assertEquals(extract("{\"ignored\":\"" + value + "\",\"v\":7}", "$.v"), 7L);
+    assertEquals(extract("{\"v\":1,\"ignored\":{\"items\":[\"" + value + "\"]},\"v\":7}", "$.v"), 7L);
+    assertEquals(extract("[\"" + value + "\",7,\"" + value + "\"]", "$[1]"), 7L);
+  }
+
+  @Test
+  public void testStreamingRejectsMalformedSkippedStrings() {
+    String prefix = "x".repeat(64);
+    for (String suffix : List.of("\\q", "\\uD800", "\\uDC00", "\\u123", "\u0001")) {
+      String json = "{\"v\":7,\"ignored\":\"" + prefix + suffix + "\"}";
+      assertThrows(RuntimeException.class, () -> extract(json, "$.v"));
+      assertEquals(extract("{\"ignored\":\"ok\",\"v\":8}", "$.v"), 8L);
+    }
+  }
+
   @Test
   public void testStreamingExtractorReturnsNullForUnresolvedPaths() {
     assertNull(extract("{\"a\":{\"v\":1}}", "$.missing"));

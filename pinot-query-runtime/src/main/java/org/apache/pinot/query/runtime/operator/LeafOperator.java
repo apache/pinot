@@ -77,7 +77,7 @@ import org.slf4j.LoggerFactory;
 /// The data schema of the result expected from leaf stage might be different from the one returned from single-stage
 /// engine, thus the leaf stage operator needs to convert the data types of the result to conform with the expected
 /// data schema.
-public class LeafOperator extends MultiStageOperator {
+public class LeafOperator extends MultiStageOperator implements ExplainableOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(LeafOperator.class);
   private static final String EXPLAIN_NAME = "LEAF";
   private static final ErrorMseBlock CANCELLED_BLOCK =
@@ -230,6 +230,7 @@ public class LeafOperator extends MultiStageOperator {
         terminateException.getMessage()) : errorBlock;
   }
 
+  @Override
   public ExplainedNode explain() {
     if (_executionFuture == null) {
       _executionFuture = startExecution();
@@ -320,14 +321,17 @@ public class LeafOperator extends MultiStageOperator {
     cancelSseTasks();
   }
 
+  /// Stops the single-stage tasks feeding this operator and drains the blocks they have already queued. Routed
+  /// through the release hook rather than through separate `close()`/`cancel()` overrides so that it runs on every
+  /// termination path by construction, and so a failure here cannot abort the rest of the teardown.
   @Override
-  public void cancel(Throwable e) {
+  protected void releaseBuffers() {
     cancelSseTasks();
   }
 
   @Override
-  public void close() {
-    cancelSseTasks();
+  protected boolean hasBufferedState() {
+    return !_blockingQueue.isEmpty();
   }
 
   @VisibleForTesting
@@ -431,6 +435,18 @@ public class LeafOperator extends MultiStageOperator {
           break;
         case NUM_SEGMENTS_PRUNED_BY_VALUE:
           _statMap.merge(StatKey.NUM_SEGMENTS_PRUNED_BY_VALUE, Integer.parseInt(entry.getValue()));
+          break;
+        case NUM_REMOTE_ACCESSES:
+          _statMap.merge(StatKey.NUM_REMOTE_ACCESSES, Long.parseLong(entry.getValue()));
+          break;
+        case REMOTE_ACCESS_BYTES:
+          _statMap.merge(StatKey.REMOTE_ACCESS_BYTES, Long.parseLong(entry.getValue()));
+          break;
+        case NUM_DIRECT_REMOTE_ACCESSES:
+          _statMap.merge(StatKey.NUM_DIRECT_REMOTE_ACCESSES, Long.parseLong(entry.getValue()));
+          break;
+        case DIRECT_REMOTE_ACCESS_BYTES:
+          _statMap.merge(StatKey.DIRECT_REMOTE_ACCESS_BYTES, Long.parseLong(entry.getValue()));
           break;
         case EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS:
           LOGGER.debug("Skipping empty filter segments: {}", entry.getValue());
@@ -794,7 +810,15 @@ public class LeafOperator extends MultiStageOperator {
     /// given something to read, which is the common case. A worker with no segment was given no work at all, which
     /// is different from a worker that read segments and produced nothing: compare this against the `parallelism`
     /// the stats tree renders on this node, and against what the operators above it report.
-    NON_ACTIVE_WORKERS(StatMap.Type.INT, null);
+    NON_ACTIVE_WORKERS(StatMap.Type.INT, null),
+    /// Number of remote accesses (local cache misses) made to read segment data from a remote storage tier.
+    NUM_REMOTE_ACCESSES(StatMap.Type.LONG),
+    /// Number of bytes read by the remote accesses.
+    REMOTE_ACCESS_BYTES(StatMap.Type.LONG),
+    /// Number of remote accesses made directly, i.e. outside the buffers fetched for the query.
+    NUM_DIRECT_REMOTE_ACCESSES(StatMap.Type.LONG),
+    /// Number of bytes read by the direct remote accesses.
+    DIRECT_REMOTE_ACCESS_BYTES(StatMap.Type.LONG);
     // IMPORTANT: When adding new StatKeys, make sure to either create the same key in BrokerResponseNativeV2.StatKey or
     //  call the constructor that accepts a String as last argument and set it to null.
     //  Otherwise the constructor will fail with an IllegalArgumentException which will not be caught and will

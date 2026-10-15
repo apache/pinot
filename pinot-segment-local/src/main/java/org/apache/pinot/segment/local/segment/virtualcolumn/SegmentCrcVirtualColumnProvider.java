@@ -24,26 +24,15 @@ import org.apache.pinot.segment.spi.SegmentMetadata;
 
 /// Virtual column provider for `$crc`, the CRC of the segment.
 ///
-/// The CRC is exposed as a LONG, matching how it is stored everywhere else in Pinot ([SegmentMetadata#getCrc()]
-/// renders the same `long` as a String). It reads as NULL for CONSUMING segments, which have no CRC until they are
-/// committed. Grouping by `$segmentName` and `$crc` is a convenient way to detect replicas of a segment that have
-/// diverged.
+/// The CRC is exposed as a LONG, matching how it is stored everywhere else in Pinot. It reads as NULL for CONSUMING
+/// segments, which have no CRC until they are committed. Grouping by `$segmentName` and `$crc` is a convenient way to
+/// detect replicas of a segment that have diverged.
 public class SegmentCrcVirtualColumnProvider extends BaseSegmentMetadataVirtualColumnProvider {
   @Nullable
   @Override
   protected Object extractValue(SegmentMetadata segmentMetadata) {
-    String crc = segmentMetadata.getCrc();
-    if (crc == null) {
-      return null;
-    }
-    long crcValue;
-    try {
-      crcValue = Long.parseLong(crc);
-    } catch (NumberFormatException e) {
-      // The CRC is always rendered from a long, but never fail a segment load over an unreadable one
-      return null;
-    }
-    // SegmentMetadataImpl renders an unset CRC as Long.MIN_VALUE
-    return crcValue != Long.MIN_VALUE ? crcValue : null;
+    // SegmentMetadataImpl reports an unset CRC as Long.MIN_VALUE
+    long crc = segmentMetadata.getCrc();
+    return crc != Long.MIN_VALUE ? crc : null;
   }
 }

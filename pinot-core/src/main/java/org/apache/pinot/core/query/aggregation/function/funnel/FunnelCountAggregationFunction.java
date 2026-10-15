@@ -203,4 +203,9 @@ public class FunnelCountAggregationFunction<A, I> implements AggregationFunction
     }
     return stringBuilder.append(')').toString();
   }
+
+  @Override
+  public boolean canMergeIntermediatesAcrossGroups() {
+    return _mergeStrategy.isMergeableAcrossGroups();
+  }
 }

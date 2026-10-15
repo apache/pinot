@@ -68,7 +68,7 @@ jobs:
         distribution: [ "temurin" ]
     name: Pinot Java 11 Client Compatibility (built on JDK ${{ matrix.build-java }}-${{ matrix.distribution }})
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
       # Installed first so that the build JDK below ends up as JAVA_HOME. setup-java also exports
       # JAVA_HOME_11_<arch>, which the script falls back on if this step's output is unavailable.
       - name: Set up Java 11 (verification runtime)

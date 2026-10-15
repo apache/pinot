@@ -22,9 +22,12 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.codec.CodecSpecParser;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
@@ -37,10 +40,16 @@ import org.apache.pinot.spi.utils.DataSizeUtils;
 
 
 public class ForwardIndexConfig extends IndexConfig {
+  // TODO: Make the maximum number of multi-values configurable, and also enforce it when creating the immutable forward
+  //       index, which currently accepts any number of values per entry.
+  /// Default maximum number of values in a single multi-value entry of the mutable forward index.
+  public static final int DEFAULT_MAX_NUM_MULTI_VALUES = 1000;
+
   private static int _defaultRawIndexWriterVersion = 4;
   private static String _defaultTargetMaxChunkSize = "1MB";
   private static int _defaultTargetMaxChunkSizeBytes = 1024 * 1024;
   private static int _defaultTargetDocsPerChunk = 1000;
+  private static volatile ChunkCompressionType _defaultCompressionType = ChunkCompressionType.LZ4;
 
   public static int getDefaultRawWriterVersion() {
     return _defaultRawIndexWriterVersion;
@@ -69,6 +78,87 @@ public class ForwardIndexConfig extends IndexConfig {
 
   public static void setDefaultTargetDocsPerChunk(int defaultTargetDocsPerChunk) {
     _defaultTargetDocsPerChunk = defaultTargetDocsPerChunk;
+  }
+
+  /// The chunk compression type for a raw column whose table config does not name one. Defaults to LZ4.
+  ///
+  /// This is the raw value: the exemption that keeps metrics uncompressed is applied by the caller, in
+  /// `ForwardIndexType` (pinot-segment-local), so a caller resolving a default for a specific column must
+  /// go through that rather than reading this directly.
+  ///
+  /// `volatile` because it is written by a starter thread and read by segment-build threads, and the
+  /// thread-start happens-before does not cover every launch path: `startBootstrapServicesInParallel`
+  /// initialises roles on sibling threads, and the PinotServiceManager REST endpoint adds a role to a JVM
+  /// that is already serving. A stale read here silently changes what gets written to disk.
+  public static ChunkCompressionType getDefaultCompressionType() {
+    return _defaultCompressionType;
+  }
+
+  /// Sets the default compression type from the codec vocabulary a table config uses.
+  ///
+  /// The codec must be applicable to a raw forward index, because this default is applied in
+  /// `ForwardIndexCreatorFactory` after table config validation has run: a codec the table config path
+  /// would have rejected has nothing left to catch it, and `DELTA` / `DELTADELTA` in particular throw on
+  /// any chunk whose size is not a multiple of 4 bytes.
+  ///
+  /// `GZIP` is rejected as well, despite being applicable to a raw index. Its decompressor keeps a single
+  /// mutable `Inflater`, and a chunk reader shares one decompressor across all of a column's reader
+  /// contexts, so concurrent queries on a GZIP column already race. Naming it per column is an existing,
+  /// opt-in exposure; making it the default would put every raw non-metric column on that path.
+  public static void setDefaultCompressionCodec(CompressionCodec codec) {
+    Preconditions.checkArgument(codec != null, "Compression codec must not be null");
+    Preconditions.checkArgument(codec.isApplicableToRawIndex(),
+        "Compression codec: %s is not applicable to raw forward indexes", codec);
+    Preconditions.checkArgument(codec != CompressionCodec.GZIP,
+        "Compression codec: GZIP cannot be a default because its decompressor is not thread-safe; it can "
+            + "still be set on an individual column");
+    ChunkCompressionType compressionType = toChunkCompressionType(codec);
+    // Unreachable today -- the only codec mapping to null is MV_ENTRY_DICT, which the applicability check
+    // above already rejects -- but kept so a future raw-applicable codec without a chunk type cannot leave
+    // the default null and NPE in ChunkCompressorFactory instead.
+    Preconditions.checkArgument(compressionType != null, "Compression codec: %s has no chunk compression type", codec);
+    _defaultCompressionType = compressionType;
+  }
+
+  /// The codecs [#setDefaultCompressionCodec] accepts. Exposed so callers can name them when reporting a
+  /// rejection, instead of restating the rule and letting the two drift.
+  public static List<CompressionCodec> getAcceptableDefaultCompressionCodecs() {
+    return Arrays.stream(CompressionCodec.values())
+        .filter(c -> c.isApplicableToRawIndex() && c != CompressionCodec.GZIP).collect(Collectors.toList());
+  }
+
+  /// The chunk compression type a [CompressionCodec] maps to, or `null` when the codec names a
+  /// dictionary-id format rather than a chunk codec. This is the one authoritative mapping; note it is
+  /// deliberately not name-based, since the CLP family maps onto `PASS_THROUGH`.
+  ///
+  /// Private on purpose: it maps codecs that [#setDefaultCompressionCodec] exists to reject, so exposing it
+  /// would offer a way around those guards.
+  @Nullable
+  private static ChunkCompressionType toChunkCompressionType(CompressionCodec codec) {
+    switch (codec) {
+      case PASS_THROUGH:
+      case CLP:
+      case CLPV2:
+      case CLPV2_ZSTD:
+      case CLPV2_LZ4:
+        return ChunkCompressionType.PASS_THROUGH;
+      case SNAPPY:
+        return ChunkCompressionType.SNAPPY;
+      case ZSTANDARD:
+        return ChunkCompressionType.ZSTANDARD;
+      case LZ4:
+        return ChunkCompressionType.LZ4;
+      case GZIP:
+        return ChunkCompressionType.GZIP;
+      case DELTA:
+        return ChunkCompressionType.DELTA;
+      case DELTADELTA:
+        return ChunkCompressionType.DELTADELTA;
+      case MV_ENTRY_DICT:
+        return null;
+      default:
+        throw new IllegalStateException("Unsupported compression codec: " + codec);
+    }
   }
 
   public static ForwardIndexConfig getDefault(EncodingType encodingType) {
@@ -130,46 +220,9 @@ public class ForwardIndexConfig extends IndexConfig {
     _targetDocsPerChunk = targetDocsPerChunk == null ? _defaultTargetDocsPerChunk : targetDocsPerChunk;
     _configs = configs != null ? configs : new HashMap<>();
     if (_compressionCodec != null) {
-      switch (_compressionCodec) {
-        case PASS_THROUGH:
-        case CLP:
-        case CLPV2:
-        case CLPV2_ZSTD:
-        case CLPV2_LZ4:
-          _chunkCompressionType = ChunkCompressionType.PASS_THROUGH;
-          _dictIdCompressionType = null;
-          break;
-        case SNAPPY:
-          _chunkCompressionType = ChunkCompressionType.SNAPPY;
-          _dictIdCompressionType = null;
-          break;
-        case ZSTANDARD:
-          _chunkCompressionType = ChunkCompressionType.ZSTANDARD;
-          _dictIdCompressionType = null;
-          break;
-        case LZ4:
-          _chunkCompressionType = ChunkCompressionType.LZ4;
-          _dictIdCompressionType = null;
-          break;
-        case GZIP:
-          _chunkCompressionType = ChunkCompressionType.GZIP;
-          _dictIdCompressionType = null;
-          break;
-        case DELTA:
-          _chunkCompressionType = ChunkCompressionType.DELTA;
-          _dictIdCompressionType = null;
-          break;
-        case DELTADELTA:
-          _chunkCompressionType = ChunkCompressionType.DELTADELTA;
-          _dictIdCompressionType = null;
-          break;
-        case MV_ENTRY_DICT:
-          _dictIdCompressionType = DictIdCompressionType.MV_ENTRY_DICT;
-          _chunkCompressionType = null;
-          break;
-        default:
-          throw new IllegalStateException("Unsupported compression codec: " + _compressionCodec);
-      }
+      _chunkCompressionType = toChunkCompressionType(_compressionCodec);
+      _dictIdCompressionType =
+          _compressionCodec == CompressionCodec.MV_ENTRY_DICT ? DictIdCompressionType.MV_ENTRY_DICT : null;
     } else {
       _dictIdCompressionType = null;
       _chunkCompressionType = null;
@@ -220,6 +273,12 @@ public class ForwardIndexConfig extends IndexConfig {
   }
 
   /// Returns the structurally normalized codec specification, or `null` for the legacy compression path.
+  ///
+  /// Any non-null specification selects the V7 on-disk format, which honors `targetDocsPerChunk` but not
+  /// `rawIndexWriterVersion`, `deriveNumDocsPerChunk` or `targetMaxChunkSize`. Before enabling it, upgrade every
+  /// component that may build or read segments. Before rolling those components back, remove the specification and
+  /// regenerate or re-push affected segments so the deep-store copy is in a legacy format; a reload alone only
+  /// rewrites the server-local copy and a later re-download would bring back an unreadable V7 index.
   @Nullable
   public String getCodecSpec() {
     return _codecSpec;

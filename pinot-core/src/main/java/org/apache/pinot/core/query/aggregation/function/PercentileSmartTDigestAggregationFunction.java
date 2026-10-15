@@ -19,9 +19,7 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import com.google.common.base.Preconditions;
-import com.tdunning.math.stats.TDigest;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
-import it.unimi.dsi.fastutil.doubles.DoubleListIterator;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +34,8 @@ import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigestAccumulator;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -43,9 +43,9 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 /// The `PercentileSmartTDigestAggregationFunction` calculates the percentile of the values for a given
 /// expression (both single-valued and multi-valued are supported).
 ///
-/// For aggregation-only queries, the values are stored in a [DoubleArrayList] initially. Once the number of
-/// values exceeds a threshold, the list will be converted into a [TDigest], and approximate result will be
-/// returned.
+/// The values are stored in a [DoubleArrayList] initially. Once the number of values exceeds a threshold, the list
+/// will be converted into a [TDigest], and approximate result will be returned. The threshold is applied per
+/// accumulator, which means per group for a group-by query.
 ///
 /// The function takes an optional third argument for parameters:
 /// - threshold: Threshold of the number of values to trigger the conversion, 100_000 by default. Non-positive value
@@ -172,7 +172,7 @@ public class PercentileSmartTDigestAggregationFunction extends BaseSingleInputAg
     } else {
       double[][] doubleValues = blockValSet.getDoubleValuesMV();
       forEachNotNull(length, blockValSet, (from, toEx) -> {
-        for (int i = 0; i < length; i++) {
+        for (int i = from; i < toEx; i++) {
           valueList.addElements(valueList.size(), doubleValues[i]);
         }
       }
@@ -184,12 +184,7 @@ public class PercentileSmartTDigestAggregationFunction extends BaseSingleInputAg
   }
 
   private TDigest convertValueListToTDigest(DoubleArrayList valueList) {
-    TDigest tDigest = new PercentileTDigestAccumulator(_compression);
-    DoubleListIterator iterator = valueList.iterator();
-    while (iterator.hasNext()) {
-      tDigest.add(iterator.nextDouble());
-    }
-    return tDigest;
+    return mergeIntoAccumulator(new TDigestAccumulator(_compression), valueList);
   }
 
   @Override
@@ -201,28 +196,17 @@ public class PercentileSmartTDigestAggregationFunction extends BaseSingleInputAg
       double[] doubleValues = blockValSet.getDoubleValuesSV();
       forEachNotNull(length, blockValSet, (from, to) -> {
         for (int i = from; i < to; i++) {
-          DoubleArrayList valueList = getValueList(groupByResultHolder, groupKeyArray[i]);
-          valueList.add(doubleValues[i]);
+          addValueForGroup(groupByResultHolder, groupKeyArray[i], doubleValues[i], _threshold);
         }
       });
     } else {
       double[][] doubleValues = blockValSet.getDoubleValuesMV();
       forEachNotNull(length, blockValSet, (from, to) -> {
         for (int i = from; i < to; i++) {
-          DoubleArrayList valueList = getValueList(groupByResultHolder, groupKeyArray[i]);
-          valueList.addElements(valueList.size(), doubleValues[i]);
+          addValuesForGroup(groupByResultHolder, groupKeyArray[i], doubleValues[i], _threshold);
         }
       });
     }
-  }
-
-  private static DoubleArrayList getValueList(GroupByResultHolder groupByResultHolder, int groupKey) {
-    DoubleArrayList valueList = groupByResultHolder.getResult(groupKey);
-    if (valueList == null) {
-      valueList = new DoubleArrayList();
-      groupByResultHolder.setValueForKey(groupKey, valueList);
-    }
-    return valueList;
   }
 
   @Override
@@ -235,7 +219,7 @@ public class PercentileSmartTDigestAggregationFunction extends BaseSingleInputAg
       forEachNotNull(length, blockValSet, (from, to) -> {
         for (int i = from; i < to; i++) {
           for (int groupKey : groupKeysArray[i]) {
-            getValueList(groupByResultHolder, groupKey).add(doubleValues[i]);
+            addValueForGroup(groupByResultHolder, groupKey, doubleValues[i], _threshold);
           }
         }
       });
@@ -244,12 +228,54 @@ public class PercentileSmartTDigestAggregationFunction extends BaseSingleInputAg
       forEachNotNull(length, blockValSet, (from, to) -> {
         for (int i = from; i < to; i++) {
           for (int groupKey : groupKeysArray[i]) {
-            DoubleArrayList valueList = getValueList(groupByResultHolder, groupKey);
-            valueList.addElements(valueList.size(), doubleValues[i]);
+            addValuesForGroup(groupByResultHolder, groupKey, doubleValues[i], _threshold);
           }
         }
       });
     }
+  }
+
+  /// Adds one value into the accumulator of the given group, converting it once it holds more values than the
+  /// threshold. The accumulator is a [DoubleArrayList] until then and a [TDigest] after. Without this the per-group
+  /// lists grow for the whole segment: it is the group-by counterpart of the check in [#aggregateIntoValueList].
+  private void addValueForGroup(GroupByResultHolder groupByResultHolder, int groupKey, double value, int threshold) {
+    Object result = groupByResultHolder.getResult(groupKey);
+    if (result instanceof TDigest) {
+      ((TDigest) result).add(value);
+      return;
+    }
+    DoubleArrayList valueList = getOrCreateValueList(groupByResultHolder, groupKey, (DoubleArrayList) result);
+    valueList.add(value);
+    if (valueList.size() > threshold) {
+      groupByResultHolder.setValueForKey(groupKey, convertValueListToTDigest(valueList));
+    }
+  }
+
+  /// As [#addValueForGroup], for every value of a multi-valued entry.
+  private void addValuesForGroup(GroupByResultHolder groupByResultHolder, int groupKey, double[] values,
+      int threshold) {
+    Object result = groupByResultHolder.getResult(groupKey);
+    if (result instanceof TDigest) {
+      TDigest tDigest = (TDigest) result;
+      for (double value : values) {
+        tDigest.add(value);
+      }
+      return;
+    }
+    DoubleArrayList valueList = getOrCreateValueList(groupByResultHolder, groupKey, (DoubleArrayList) result);
+    valueList.addElements(valueList.size(), values);
+    if (valueList.size() > threshold) {
+      groupByResultHolder.setValueForKey(groupKey, convertValueListToTDigest(valueList));
+    }
+  }
+
+  private static DoubleArrayList getOrCreateValueList(GroupByResultHolder groupByResultHolder, int groupKey,
+      @Nullable DoubleArrayList valueList) {
+    if (valueList == null) {
+      valueList = new DoubleArrayList();
+      groupByResultHolder.setValueForKey(groupKey, valueList);
+    }
+    return valueList;
   }
 
   @Override
@@ -264,11 +290,11 @@ public class PercentileSmartTDigestAggregationFunction extends BaseSingleInputAg
 
   @Override
   public Object merge(Object intermediateResult1, Object intermediateResult2) {
-    if (intermediateResult1 instanceof PercentileTDigestAccumulator) {
-      return mergeIntoAccumulator((PercentileTDigestAccumulator) intermediateResult1, intermediateResult2);
+    if (intermediateResult1 instanceof TDigestAccumulator) {
+      return mergeIntoAccumulator((TDigestAccumulator) intermediateResult1, intermediateResult2);
     }
-    if (intermediateResult2 instanceof PercentileTDigestAccumulator) {
-      return mergeIntoAccumulator((PercentileTDigestAccumulator) intermediateResult2, intermediateResult1);
+    if (intermediateResult2 instanceof TDigestAccumulator) {
+      return mergeIntoAccumulator((TDigestAccumulator) intermediateResult2, intermediateResult1);
     }
     DoubleArrayList valueList1 = (DoubleArrayList) intermediateResult1;
     DoubleArrayList valueList2 = (DoubleArrayList) intermediateResult2;
@@ -276,15 +302,18 @@ public class PercentileSmartTDigestAggregationFunction extends BaseSingleInputAg
     return valueList1.size() > _threshold ? convertValueListToTDigest(valueList1) : valueList1;
   }
 
-  private static PercentileTDigestAccumulator mergeIntoAccumulator(PercentileTDigestAccumulator accumulator,
+  private static TDigestAccumulator mergeIntoAccumulator(TDigestAccumulator accumulator,
       Object intermediateResult) {
     if (intermediateResult instanceof TDigest) {
       accumulator.add((TDigest) intermediateResult);
     } else {
       DoubleArrayList valueList = (DoubleArrayList) intermediateResult;
-      DoubleListIterator iterator = valueList.iterator();
-      while (iterator.hasNext()) {
-        accumulator.add(iterator.nextDouble());
+      int size = valueList.size();
+      if (size > 0) {
+        // Keep the last value pending as scalar adds did: bulk add flushes immediately when its buffer fills,
+        // which can introduce an extra working-compression pass before the final public-compression pass.
+        accumulator.add(valueList.elements(), 0, size - 1);
+        accumulator.add(valueList.getDouble(size - 1));
       }
     }
     return accumulator;
@@ -308,11 +337,6 @@ public class PercentileSmartTDigestAggregationFunction extends BaseSingleInputAg
 
   @Override
   public Object deserializeIntermediateResult(CustomObject customObject) {
-    if (customObject.getType() == ObjectSerDeUtils.ObjectType.TDigest.getValue()) {
-      // Generic TDigest deserialization returns a plain MergingDigest. Keep this function's TDigest intermediates as
-      // accumulators so subsequent merges retain the capacity-preserving serialization path.
-      return PercentileTDigestAccumulator.forSerializedTDigest(customObject.getBuffer());
-    }
     return ObjectSerDeUtils.deserialize(customObject);
   }
 
@@ -334,8 +358,8 @@ public class PercentileSmartTDigestAggregationFunction extends BaseSingleInputAg
       TDigest tDigest = (TDigest) intermediateResult;
       // An empty digest holds the same state as the empty value list below, so the two branches must answer alike:
       // which one a query lands in depends only on whether the accumulator crossed the conversion threshold.
-      if (_nullHandlingEnabled && tDigest.size() == 0L) {
-        return null;
+      if (tDigest.isEmpty()) {
+        return _nullHandlingEnabled ? null : DEFAULT_FINAL_RESULT;
       }
       return tDigest.quantile(_percentile / 100.0);
     } else {
@@ -373,7 +397,7 @@ public class PercentileSmartTDigestAggregationFunction extends BaseSingleInputAg
     int _compression = DEFAULT_COMPRESSION;
 
     Parameters(String parametersString) {
-      StringUtils.deleteWhitespace(parametersString);
+      parametersString = StringUtils.deleteWhitespace(parametersString);
       String[] keyValuePairs = StringUtils.split(parametersString, PARAMETER_DELIMITER);
       for (String keyValuePair : keyValuePairs) {
         String[] keyAndValue = StringUtils.split(keyValuePair, PARAMETER_KEY_VALUE_SEPARATOR);

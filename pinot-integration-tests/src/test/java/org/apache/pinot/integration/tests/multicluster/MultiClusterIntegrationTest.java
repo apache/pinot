@@ -33,6 +33,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
+
 /// Integration tests for multi-cluster routing and federation.
 /// Tests federation with different table names across clusters and various query modes.
 public class MultiClusterIntegrationTest extends BaseMultiClusterIntegrationTest {
@@ -65,7 +66,8 @@ public class MultiClusterIntegrationTest extends BaseMultiClusterIntegrationTest
   }
 
   @Test
-  public void testMultiClusterBrokerStartsAndIsQueryable() throws Exception {
+  public void testMultiClusterBrokerStartsAndIsQueryable()
+      throws Exception {
     LOGGER.info("Testing that multi-cluster broker starts successfully and is queryable");
 
     // Verify both clusters' brokers are running (MultiClusterHelixBrokerStarter)
@@ -100,16 +102,17 @@ public class MultiClusterIntegrationTest extends BaseMultiClusterIntegrationTest
   }
 
   @BeforeGroups("query")
-  public void setupTablesForQueryTests() throws Exception {
+  public void setupTablesForQueryTests()
+      throws Exception {
     dropLogicalTableIfExists(getLogicalTableName(), _cluster1._controllerBaseApiUrl);
     dropLogicalTableIfExists(getLogicalTableName(), _cluster2._controllerBaseApiUrl);
     dropLogicalTableIfExists(getLogicalTableName2(), _cluster1._controllerBaseApiUrl);
     dropLogicalTableIfExists(getLogicalTableName2(), _cluster2._controllerBaseApiUrl);
     setupPhysicalTables();
-    createLogicalTableOnBothClusters(getLogicalTableName(),
-        getPhysicalTable1InCluster1(), getPhysicalTable1InCluster2());
-    createLogicalTableOnBothClusters(getLogicalTableName2(),
-        getPhysicalTable2InCluster1(), getPhysicalTable2InCluster2());
+    createLogicalTableOnBothClusters(getLogicalTableName(), getPhysicalTable1InCluster1(),
+        getPhysicalTable1InCluster2());
+    createLogicalTableOnBothClusters(getLogicalTableName2(), getPhysicalTable2InCluster1(),
+        getPhysicalTable2InCluster2());
     cleanSegmentDirs();
     loadDataIntoCluster(createAvroData(TABLE_SIZE_CLUSTER_1, 1), getPhysicalTable1InCluster1(), _cluster1);
     loadDataIntoCluster(createAvroData(TABLE_SIZE_CLUSTER_2, 2), getPhysicalTable1InCluster2(), _cluster2);
@@ -149,7 +152,8 @@ public class MultiClusterIntegrationTest extends BaseMultiClusterIntegrationTest
 
   @Test(dataProvider = "queryModesWithoutMultiClusterOption", groups = "query")
   public void testQueriesWithoutMultiClusterOptions(String testName, String queryOptions, boolean isJoinQuery,
-      int brokerPort) throws Exception {
+      int brokerPort)
+      throws Exception {
     LOGGER.info("Running {} on broker port {} (expecting NO federation)", testName, brokerPort);
 
     // When enableMultiClusterRouting is NOT set, only local cluster data should be returned
@@ -171,8 +175,7 @@ public class MultiClusterIntegrationTest extends BaseMultiClusterIntegrationTest
 
       for (JsonNode row : rows) {
         int count = row.get(1).asInt();
-        assertTrue(count == 1,
-            "Expected local-only join count of 1, but got " + count + " for row: " + row);
+        assertEquals(count, 1, "Expected local-only join count of 1, but got " + count + " for row: " + row);
       }
     }
 
@@ -187,7 +190,7 @@ public class MultiClusterIntegrationTest extends BaseMultiClusterIntegrationTest
     // Verify no federation-related exceptions
     JsonNode resultJson = JsonMapper.builder().build().readTree(countResult);
     JsonNode exceptions = resultJson.get("exceptions");
-    if (exceptions != null && exceptions.size() > 0) {
+    if (exceptions != null && !exceptions.isEmpty()) {
       for (JsonNode ex : exceptions) {
         String message = ex.get("message").asText();
         assertTrue(!message.contains("multicluster") && !message.contains("federation"),
@@ -208,7 +211,7 @@ public class MultiClusterIntegrationTest extends BaseMultiClusterIntegrationTest
 
   @DataProvider(name = "queryModesWithoutMultiClusterOption")
   public Object[][] queryModesWithoutMultiClusterOption() {
-    int normalBroker = _cluster1._brokerPort;
+    int normalBroker = _cluster1._brokerStarter.getPort();
 
     String noOpts = "";
     String onlyMseOpts = "SET useMultistageEngine=true; ";
@@ -229,7 +232,7 @@ public class MultiClusterIntegrationTest extends BaseMultiClusterIntegrationTest
 
   @DataProvider(name = "physicalTableQueryModes")
   public Object[][] physicalTableQueryModes() {
-    int normalBroker = _cluster1._brokerPort;
+    int normalBroker = _cluster1._brokerStarter.getPort();
 
     String withMultiClusterOpts = "SET enableMultiClusterRouting=true; ";
     String withMultiClusterMseOpts = "SET enableMultiClusterRouting=true; SET useMultistageEngine=true; ";
@@ -248,8 +251,8 @@ public class MultiClusterIntegrationTest extends BaseMultiClusterIntegrationTest
 
   @DataProvider(name = "queryModes")
   public Object[][] queryModes() {
-    int normalBroker = _cluster1._brokerPort;
-    int unavailableBroker = _brokerWithUnavailableCluster._brokerPort;
+    int normalBroker = _cluster1._brokerStarter.getPort();
+    int unavailableBroker = _brokerWithUnavailableCluster.getPort();
 
     String sseOpts = "SET enableMultiClusterRouting=true; ";
     String mseOpts = sseOpts + "SET useMultistageEngine=true; ";
@@ -270,7 +273,8 @@ public class MultiClusterIntegrationTest extends BaseMultiClusterIntegrationTest
 
   /// Setup physical tables based on configuration. By default, creates different table names
   /// in each cluster. Subclasses can override to create same-named tables.
-  protected void setupPhysicalTables() throws Exception {
+  protected void setupPhysicalTables()
+      throws Exception {
     // Cluster 1 tables
     dropTableAndSchemaIfExists(getPhysicalTable1InCluster1(), _cluster1._controllerBaseApiUrl);
     dropTableAndSchemaIfExists(getPhysicalTable2InCluster1(), _cluster1._controllerBaseApiUrl);
@@ -285,7 +289,8 @@ public class MultiClusterIntegrationTest extends BaseMultiClusterIntegrationTest
   }
 
   protected void createLogicalTableOnBothClusters(String logicalTableName,
-      String cluster1PhysicalTable, String cluster2PhysicalTable) throws IOException {
+      String cluster1PhysicalTable, String cluster2PhysicalTable)
+      throws IOException {
     // Automatically detect if same-named tables: if so, both must be marked as multi-cluster (true)
     // If different names: local table is false, remote table is true
     boolean areSameNamedTables = cluster1PhysicalTable.equals(cluster2PhysicalTable);
@@ -319,9 +324,9 @@ public class MultiClusterIntegrationTest extends BaseMultiClusterIntegrationTest
       );
     }
 
-    createLogicalTable(SCHEMA_FILE, cluster1PhysicalTableConfigMap, DEFAULT_TENANT,
-        _cluster1._controllerBaseApiUrl, logicalTableName, cluster1PhysicalTable + "_OFFLINE", null);
-    createLogicalTable(SCHEMA_FILE, cluster2PhysicalTableConfigMap, DEFAULT_TENANT,
-        _cluster2._controllerBaseApiUrl, logicalTableName, cluster2PhysicalTable + "_OFFLINE", null);
+    createLogicalTable(SCHEMA_FILE, cluster1PhysicalTableConfigMap, DEFAULT_TENANT, _cluster1._controllerBaseApiUrl,
+        logicalTableName, cluster1PhysicalTable + "_OFFLINE", null);
+    createLogicalTable(SCHEMA_FILE, cluster2PhysicalTableConfigMap, DEFAULT_TENANT, _cluster2._controllerBaseApiUrl,
+        logicalTableName, cluster2PhysicalTable + "_OFFLINE", null);
   }
 }

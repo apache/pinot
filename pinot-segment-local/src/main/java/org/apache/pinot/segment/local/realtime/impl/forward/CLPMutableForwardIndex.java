@@ -27,7 +27,7 @@ import java.io.IOException;
 import org.apache.pinot.segment.local.realtime.impl.dictionary.StringOffHeapMutableDictionary;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.CLPStatsProvider;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
-import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
+import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.mutable.MutableDictionary;
 import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
@@ -71,10 +71,10 @@ public class CLPMutableForwardIndex implements MutableForwardIndex {
     _logTypeFwdIndex =
         new FixedByteSVMutableForwardIndex(true, DataType.INT, capacity, memoryManager, columnName + "_logType.fwd");
     _dictVarsFwdIndex =
-        new FixedByteMVMutableForwardIndex(ForwardIndexType.MAX_MULTI_VALUES_PER_ROW, 20, capacity, Integer.BYTES,
+        new FixedByteMVMutableForwardIndex(ForwardIndexConfig.DEFAULT_MAX_NUM_MULTI_VALUES, 20, capacity, Integer.BYTES,
             memoryManager, columnName + "_dictVars.fwd", true, DataType.INT);
     _encodedVarsFwdIndex =
-        new FixedByteMVMutableForwardIndex(ForwardIndexType.MAX_MULTI_VALUES_PER_ROW, 20, capacity, Long.BYTES,
+        new FixedByteMVMutableForwardIndex(ForwardIndexConfig.DEFAULT_MAX_NUM_MULTI_VALUES, 20, capacity, Long.BYTES,
             memoryManager, columnName + "_encodedVars.fwd", true, DataType.LONG);
     _clpMessageDecoder = new MessageDecoder(BuiltInVariableHandlingRuleVersions.VariablesSchemaV2,
         BuiltInVariableHandlingRuleVersions.VariableEncodingMethodsV1);

@@ -320,6 +320,18 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
   }
 
   @Test
+  public void testEnableTwoRulesSeparatedByCommaAndSpace() {
+    // The space after the comma must not stop the second rule from matching
+    String query = "EXPLAIN PLAN FOR SELECT col1 FROM a ORDER BY col1";
+    String explain = explainQueryWithRuleEnabled(query,
+        PlannerRuleNames.SORT_JOIN_TRANSPOSE + ", " + PlannerRuleNames.SORT_PROJECT_TRANSPOSE);
+    int sortIdx = explain.indexOf("LogicalSort");
+    int projectIdx = explain.indexOf("LogicalProject");
+    assertTrue(projectIdx >= 0 && sortIdx > projectIdx,
+        "With SortProjectTranspose enabled, Project must be above Sort. Plan:\n" + explain);
+  }
+
+  @Test
   public void testAggregateJoinTransposeExtendedDisabledByDefault() {
     // test aggregate function pushdown is disabled by default
     String query = "EXPLAIN PLAN FOR \n"
@@ -390,7 +402,7 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
         "Execution Plan\n"
             + "LogicalSort(sort0=[$0], dir0=[ASC])\n"
             + "  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], "
-            + "isSortOnSender=[false], isSortOnReceiver=[true])\n"
+            + "isSortOnSender=[false], isSortOnReceiver=[false])\n"
             + "    LogicalJoin(condition=[=($0, $1)], joinType=[left])\n"
             + "      PinotLogicalExchange(distribution=[hash[0]])\n"
             + "        LogicalProject(col1=[$0])\n"
@@ -416,12 +428,12 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
         "Execution Plan\n"
             + "LogicalSort(sort0=[$0], dir0=[ASC])\n"
             + "  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], "
-            + "isSortOnSender=[false], isSortOnReceiver=[true])\n"
+            + "isSortOnSender=[false], isSortOnReceiver=[false])\n"
             + "    LogicalJoin(condition=[=($0, $1)], joinType=[left])\n"
             + "      PinotLogicalExchange(distribution=[hash[0]])\n"
             + "        LogicalSort(sort0=[$0], dir0=[ASC])\n"
             + "          PinotLogicalSortExchange(distribution=[hash], collation=[[0]], "
-            + "isSortOnSender=[false], isSortOnReceiver=[true])\n"
+            + "isSortOnSender=[false], isSortOnReceiver=[false])\n"
             + "            LogicalProject(col1=[$0])\n"
             + "              PinotLogicalTableScan(table=[[default, a]])\n"
             + "      PinotLogicalExchange(distribution=[hash[0]])\n"
@@ -445,7 +457,7 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
         "Execution Plan\n"
             + "LogicalSort(sort0=[$0], dir0=[ASC])\n"
             + "  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], "
-            + "isSortOnSender=[false], isSortOnReceiver=[true])\n"
+            + "isSortOnSender=[false], isSortOnReceiver=[false])\n"
             + "    LogicalJoin(condition=[=($0, $1)], joinType=[inner])\n"
             + "      PinotLogicalExchange(distribution=[hash[0]])\n"
             + "        LogicalProject(col1=[$0])\n"
@@ -471,12 +483,12 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
         "Execution Plan\n"
             + "LogicalSort(sort0=[$0], dir0=[ASC])\n"
             + "  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], "
-            + "isSortOnSender=[false], isSortOnReceiver=[true])\n"
+            + "isSortOnSender=[false], isSortOnReceiver=[false])\n"
             + "    LogicalJoin(condition=[=($0, $1)], joinType=[inner])\n"
             + "      PinotLogicalExchange(distribution=[hash[0]])\n"
             + "        LogicalSort(sort0=[$0], dir0=[ASC])\n"
             + "          PinotLogicalSortExchange(distribution=[hash], collation=[[0]], "
-            + "isSortOnSender=[false], isSortOnReceiver=[true])\n"
+            + "isSortOnSender=[false], isSortOnReceiver=[false])\n"
             + "            LogicalProject(col1=[$0])\n"
             + "              PinotLogicalTableScan(table=[[default, a]])\n"
             + "      PinotLogicalExchange(distribution=[hash[0]])\n"

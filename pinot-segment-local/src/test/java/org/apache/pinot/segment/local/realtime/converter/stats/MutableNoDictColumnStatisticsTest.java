@@ -722,6 +722,153 @@ public class MutableNoDictColumnStatisticsTest {
     assertEquals(stats.getMaxRowLengthInBytes(), 5);
   }
 
+  // ======== Computed min/max when the mutable segment does not track it (ingestion-aggregated columns) ========
+
+  @DataProvider(name = "computedMinMaxTypes")
+  public Object[][] computedMinMaxTypes() {
+    // {type, unsorted forward-index values, expectedMin, expectedMax}. Only INT/LONG are recovered — those are the
+    // only types whose BitSliced range index reads the value domain.
+    return new Object[][]{
+        {DataType.INT, new Comparable[]{20, 10, 30}, 10, 30},
+        {DataType.LONG, new Comparable[]{200L, 100L, 300L}, 100L, 300L}
+    };
+  }
+
+  @Test(dataProvider = "computedMinMaxTypes")
+  public void testComputesMinMaxWhenMetadataNull(DataType type, Comparable[] values, Comparable expectedMin,
+      Comparable expectedMax) {
+    // Ingestion-aggregated no-dictionary metric columns skip min/max tracking, so the mutable metadata reports null.
+    // The statistics must recover the value domain by scanning the sealed forward index.
+    int numDocs = values.length;
+    FieldSpec fieldSpec = new DimensionFieldSpec("col", type, true);
+
+    DataSourceMetadata metadata = mockMetadata(fieldSpec, numDocs);
+    when(metadata.getMinValue()).thenReturn(null);
+    when(metadata.getMaxValue()).thenReturn(null);
+
+    MutableForwardIndex forwardIndex = mock(MutableForwardIndex.class);
+    when(forwardIndex.isSingleValue()).thenReturn(true);
+    stubForwardIndexReads(forwardIndex, type, values);
+
+    MutableNoDictColumnStatistics stats =
+        new MutableNoDictColumnStatistics(mockNoDictDataSource(metadata, forwardIndex), null, false);
+
+    assertEquals(stats.getMinValue(), expectedMin);
+    assertEquals(stats.getMaxValue(), expectedMax);
+  }
+
+  @DataProvider(name = "unrecoveredMinMaxTypes")
+  public Object[][] unrecoveredMinMaxTypes() {
+    return new Object[][]{{DataType.FLOAT}, {DataType.DOUBLE}};
+  }
+
+  @Test(dataProvider = "unrecoveredMinMaxTypes")
+  public void testMinMaxNotRecoveredForFloatingPointWhenMetadataNull(DataType type) {
+    // FLOAT/DOUBLE range indexes use the full floating-point ordinal domain and never read min/max, so the scan is
+    // intentionally skipped for them: min/max stay null (unchanged behavior) and no forward-index read is expected.
+    FieldSpec fieldSpec = new DimensionFieldSpec("col", type, true);
+    DataSourceMetadata metadata = mockMetadata(fieldSpec, 3);
+    when(metadata.getMinValue()).thenReturn(null);
+    when(metadata.getMaxValue()).thenReturn(null);
+
+    MutableForwardIndex forwardIndex = mock(MutableForwardIndex.class);
+    when(forwardIndex.isSingleValue()).thenReturn(true);
+
+    MutableNoDictColumnStatistics stats =
+        new MutableNoDictColumnStatistics(mockNoDictDataSource(metadata, forwardIndex), null, false);
+
+    assertNull(stats.getMinValue());
+    assertNull(stats.getMaxValue());
+  }
+
+  @Test
+  public void testMinMaxNullForMultiValueWhenMetadataNull() {
+    // Multi-value columns have no scalar min/max; when metadata reports null there is nothing to recover.
+    FieldSpec fieldSpec = new DimensionFieldSpec("col", DataType.INT, false);
+    DataSourceMetadata metadata = mockMetadata(fieldSpec, 3);
+    when(metadata.getMinValue()).thenReturn(null);
+    when(metadata.getMaxValue()).thenReturn(null);
+
+    MutableForwardIndex forwardIndex = mock(MutableForwardIndex.class);
+    when(forwardIndex.isSingleValue()).thenReturn(false);
+
+    MutableNoDictColumnStatistics stats =
+        new MutableNoDictColumnStatistics(mockNoDictDataSource(metadata, forwardIndex), null, false);
+
+    assertNull(stats.getMinValue());
+    assertNull(stats.getMaxValue());
+  }
+
+  @Test
+  public void testComputedMinMaxAndIsSortedShareOneScan() {
+    // Recovering an untracked value domain must not cost a second pass: the recovery scan walks the same docs in the
+    // same order computeSorted() would, so it answers both. A segment commit still reads such a column exactly once.
+    int numDocs = 3;
+    FieldSpec fieldSpec = new DimensionFieldSpec("col", DataType.INT, true);
+    Comparable[] values = fixedWidthValues(DataType.INT);
+
+    DataSourceMetadata metadata = mockMetadata(fieldSpec, numDocs);
+
+    MutableForwardIndex forwardIndex = mock(MutableForwardIndex.class);
+    when(forwardIndex.isSingleValue()).thenReturn(true);
+    stubForwardIndexReads(forwardIndex, DataType.INT, values);
+
+    MutableNoDictColumnStatistics stats =
+        new MutableNoDictColumnStatistics(mockNoDictDataSource(metadata, forwardIndex), null, false);
+
+    assertEquals(stats.getMinValue(), 10);
+    assertEquals(stats.getMaxValue(), 30);
+    assertTrue(stats.isSorted());
+    verify(forwardIndex, times(numDocs)).getInt(anyInt());
+  }
+
+  @Test
+  public void testComputedMinMaxReportsUnsortedInOneScan() {
+    // Same single pass, but the values are not non-decreasing: the recovered domain is still correct and sortedness
+    // comes back false without a second scan.
+    Comparable[] values = new Comparable[]{20, 10, 30};
+    int numDocs = values.length;
+    FieldSpec fieldSpec = new DimensionFieldSpec("col", DataType.INT, true);
+
+    DataSourceMetadata metadata = mockMetadata(fieldSpec, numDocs);
+
+    MutableForwardIndex forwardIndex = mock(MutableForwardIndex.class);
+    when(forwardIndex.isSingleValue()).thenReturn(true);
+    stubForwardIndexReads(forwardIndex, DataType.INT, values);
+
+    MutableNoDictColumnStatistics stats =
+        new MutableNoDictColumnStatistics(mockNoDictDataSource(metadata, forwardIndex), null, false);
+
+    assertFalse(stats.isSorted());
+    assertEquals(stats.getMinValue(), 10);
+    assertEquals(stats.getMaxValue(), 30);
+    verify(forwardIndex, times(numDocs)).getInt(anyInt());
+  }
+
+  @Test
+  public void testComputedMinMaxHonoursSortedDocIdOrder() {
+    // With an explicit sort order the recovery scan must walk docs in that order, so sortedness is judged on the
+    // sorted view while min/max stay order-independent.
+    Comparable[] values = new Comparable[]{30, 10, 20};
+    int numDocs = values.length;
+    FieldSpec fieldSpec = new DimensionFieldSpec("col", DataType.INT, true);
+
+    DataSourceMetadata metadata = mockMetadata(fieldSpec, numDocs);
+
+    MutableForwardIndex forwardIndex = mock(MutableForwardIndex.class);
+    when(forwardIndex.isSingleValue()).thenReturn(true);
+    stubForwardIndexReads(forwardIndex, DataType.INT, values);
+
+    // Read in the order 10, 20, 30 -> sorted, even though the raw docId order is not.
+    MutableNoDictColumnStatistics stats =
+        new MutableNoDictColumnStatistics(mockNoDictDataSource(metadata, forwardIndex), new int[]{1, 2, 0}, false);
+
+    assertEquals(stats.getMinValue(), 10);
+    assertEquals(stats.getMaxValue(), 30);
+    assertTrue(stats.isSorted());
+    verify(forwardIndex, times(numDocs)).getInt(anyInt());
+  }
+
   // ======== Helpers ========
 
   private static DataSourceMetadata mockMetadata(FieldSpec fieldSpec, int numDocs) {

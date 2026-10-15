@@ -16,7 +16,7 @@
 # specific language governing permissions and limitations
 # under the License.
 name: flaky-analyze
-description: Pull recent GitHub Actions failures for a Pinot test class and analyze whether they share a root cause. Uses the gh CLI. Surfaces stack traces, failure patterns, and a candidate hypothesis — does not auto-fix.
+description: Investigate intermittent Pinot test failures in GitHub Actions and report evidence and likely causes.
 ---
 
 # /flaky-analyze

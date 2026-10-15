@@ -25,7 +25,6 @@ import com.dynatrace.hash4j.distinctcount.UltraLogLog;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.primitives.Longs;
-import com.tdunning.math.stats.TDigest;
 import it.unimi.dsi.fastutil.doubles.Double2LongMap;
 import it.unimi.dsi.fastutil.doubles.Double2LongOpenHashMap;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
@@ -57,6 +56,7 @@ import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.io.IOException;
 import java.lang.foreign.MemorySegment;
 import java.math.BigDecimal;
+import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 import java.util.ArrayList;
@@ -95,8 +95,11 @@ import org.apache.pinot.segment.local.customobject.StringLongPair;
 import org.apache.pinot.segment.local.customobject.ThetaSketchAccumulator;
 import org.apache.pinot.segment.local.customobject.TupleIntSketchAccumulator;
 import org.apache.pinot.segment.local.customobject.VarianceTuple;
+import org.apache.pinot.segment.local.customobject.tdigest.SerializedTDigestInput;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigestAccumulator;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
-import org.apache.pinot.segment.local.utils.TDigestUtils;
+import org.apache.pinot.segment.spi.memory.PrimitiveArrayOutput;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.locationtech.jts.geom.Geometry;
@@ -394,6 +397,20 @@ public class ObjectSerDeUtils {
     }
   };
 
+  // The list deserializers below read short lists one value at a time and longer ones in bulk; see
+  // PrimitiveArrayOutput.MIN_BULK_VALUES for the cutoff.
+
+  /// Checks that `byteBuffer` holds `numValues` values of `width` bytes, before the array for them is allocated. Throws
+  /// the same exceptions as reading the values one by one into a list of capacity `numValues` would.
+  private static void checkRemaining(ByteBuffer byteBuffer, int numValues, int width) {
+    if (numValues < 0) {
+      throw new IllegalArgumentException("Initial capacity (" + numValues + ") is negative");
+    }
+    if (numValues > byteBuffer.remaining() / width) {
+      throw new BufferUnderflowException();
+    }
+  }
+
   public static final ObjectSerDe<IntArrayList> INT_ARRAY_LIST_SER_DE = new ObjectSerDe<IntArrayList>() {
 
     @Override
@@ -417,11 +434,17 @@ public class ObjectSerDeUtils {
     @Override
     public IntArrayList deserialize(ByteBuffer byteBuffer) {
       int numValues = byteBuffer.getInt();
-      IntArrayList intArrayList = new IntArrayList(numValues);
-      for (int i = 0; i < numValues; i++) {
-        intArrayList.add(byteBuffer.getInt());
+      checkRemaining(byteBuffer, numValues, Integer.BYTES);
+      int[] values = new int[numValues];
+      if (numValues < PrimitiveArrayOutput.MIN_BULK_VALUES) {
+        for (int i = 0; i < numValues; i++) {
+          values[i] = byteBuffer.getInt();
+        }
+      } else {
+        byteBuffer.asIntBuffer().get(values);
+        byteBuffer.position(byteBuffer.position() + numValues * Integer.BYTES);
       }
-      return intArrayList;
+      return IntArrayList.wrap(values);
     }
   };
 
@@ -448,11 +471,17 @@ public class ObjectSerDeUtils {
     @Override
     public LongArrayList deserialize(ByteBuffer byteBuffer) {
       int numValues = byteBuffer.getInt();
-      LongArrayList longArrayList = new LongArrayList(numValues);
-      for (int i = 0; i < numValues; i++) {
-        longArrayList.add(byteBuffer.getLong());
+      checkRemaining(byteBuffer, numValues, Long.BYTES);
+      long[] values = new long[numValues];
+      if (numValues < PrimitiveArrayOutput.MIN_BULK_VALUES) {
+        for (int i = 0; i < numValues; i++) {
+          values[i] = byteBuffer.getLong();
+        }
+      } else {
+        byteBuffer.asLongBuffer().get(values);
+        byteBuffer.position(byteBuffer.position() + numValues * Long.BYTES);
       }
-      return longArrayList;
+      return LongArrayList.wrap(values);
     }
   };
 
@@ -479,11 +508,17 @@ public class ObjectSerDeUtils {
     @Override
     public FloatArrayList deserialize(ByteBuffer byteBuffer) {
       int numValues = byteBuffer.getInt();
-      FloatArrayList floatArrayList = new FloatArrayList(numValues);
-      for (int i = 0; i < numValues; i++) {
-        floatArrayList.add(byteBuffer.getFloat());
+      checkRemaining(byteBuffer, numValues, Float.BYTES);
+      float[] values = new float[numValues];
+      if (numValues < PrimitiveArrayOutput.MIN_BULK_VALUES) {
+        for (int i = 0; i < numValues; i++) {
+          values[i] = byteBuffer.getFloat();
+        }
+      } else {
+        byteBuffer.asFloatBuffer().get(values);
+        byteBuffer.position(byteBuffer.position() + numValues * Float.BYTES);
       }
-      return floatArrayList;
+      return FloatArrayList.wrap(values);
     }
   };
 
@@ -510,11 +545,17 @@ public class ObjectSerDeUtils {
     @Override
     public DoubleArrayList deserialize(ByteBuffer byteBuffer) {
       int numValues = byteBuffer.getInt();
-      DoubleArrayList doubleArrayList = new DoubleArrayList(numValues);
-      for (int i = 0; i < numValues; i++) {
-        doubleArrayList.add(byteBuffer.getDouble());
+      checkRemaining(byteBuffer, numValues, Double.BYTES);
+      double[] values = new double[numValues];
+      if (numValues < PrimitiveArrayOutput.MIN_BULK_VALUES) {
+        for (int i = 0; i < numValues; i++) {
+          values[i] = byteBuffer.getDouble();
+        }
+      } else {
+        byteBuffer.asDoubleBuffer().get(values);
+        byteBuffer.position(byteBuffer.position() + numValues * Double.BYTES);
       }
-      return doubleArrayList;
+      return DoubleArrayList.wrap(values);
     }
   };
 
@@ -1108,21 +1149,26 @@ public class ObjectSerDeUtils {
     }
   };
 
+  // Type-10 intermediate results use reduction compression; stored sketches use the native legacy fromBytes factory.
   public static final ObjectSerDe<TDigest> TDIGEST_SER_DE = new ObjectSerDe<TDigest>() {
 
     @Override
     public byte[] serialize(TDigest tDigest) {
-      return TDigestUtils.serialize(tDigest);
+      return tDigest.serialize();
     }
 
     @Override
     public TDigest deserialize(byte[] bytes) {
-      return TDigestUtils.deserialize(bytes);
+      return deserialize(ByteBuffer.wrap(bytes));
     }
 
     @Override
     public TDigest deserialize(ByteBuffer byteBuffer) {
-      return TDigestUtils.deserialize(byteBuffer);
+      SerializedTDigestInput input = new SerializedTDigestInput();
+      input.reset(byteBuffer);
+      TDigestAccumulator accumulator = TDigestAccumulator.forReduction(input.getCompression());
+      accumulator.addSerializedTDigest(input);
+      return accumulator;
     }
   };
 

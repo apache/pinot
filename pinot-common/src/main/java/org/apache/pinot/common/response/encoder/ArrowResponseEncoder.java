@@ -46,12 +46,13 @@ import org.apache.arrow.vector.types.pojo.FieldType;
 import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.arrow.vector.util.JsonStringArrayList;
 import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.utils.ArrowAllocators;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.spi.utils.MapUtils;
 
 
 public class ArrowResponseEncoder implements ResponseEncoder {
-  private static final RootAllocator ALLOCATOR = new RootAllocator(Long.MAX_VALUE);
+  private static final RootAllocator ALLOCATOR = ArrowAllocators.newRootAllocator(Long.MAX_VALUE);
 
   @Override
   public byte[] encodeResultTable(ResultTable resultTable, int startRow, int length)
@@ -69,8 +70,26 @@ public class ArrowResponseEncoder implements ResponseEncoder {
 
   private VectorSchemaRoot createVectorSchemaRoot(ResultTable resultTable, DataSchema schema, int startRow,
       int length) {
-    List<Field> fields = new ArrayList<>();
     List<FieldVector> vectors = new ArrayList<>();
+    try {
+      return createVectorSchemaRoot(resultTable, schema, startRow, length, vectors);
+    } catch (RuntimeException | Error e) {
+      for (FieldVector vector : vectors) {
+        try {
+          vector.close();
+        } catch (RuntimeException | Error closeFailure) {
+          if (closeFailure != e) {
+            e.addSuppressed(closeFailure);
+          }
+        }
+      }
+      throw e;
+    }
+  }
+
+  private VectorSchemaRoot createVectorSchemaRoot(ResultTable resultTable, DataSchema schema, int startRow,
+      int length, List<FieldVector> vectors) {
+    List<Field> fields = new ArrayList<>();
     int numColumns = schema.getColumnNames().length; // assuming getter returns String[]
 
     // Create an Arrow Field and vector for each column based on its type.
@@ -196,8 +215,8 @@ public class ArrowResponseEncoder implements ResponseEncoder {
           throw new UnsupportedOperationException("Unsupported column type: " + colType);
       }
       fields.add(field);
-      vector.allocateNew();
       vectors.add(vector);
+      vector.allocateNew();
     }
 
     // Determine the actual end row.
@@ -238,7 +257,8 @@ public class ArrowResponseEncoder implements ResponseEncoder {
             case BYTES:
             case UUID:
             case OBJECT:
-              byte[] bytes = ((String) value).getBytes(StandardCharsets.UTF_8);
+              // The broker renders every other type in this group to a String; OBJECT values arrive as-is
+              byte[] bytes = value.toString().getBytes(StandardCharsets.UTF_8);
               ((VarCharVector) vector).setSafe(rowIndex, bytes);
               break;
             case MAP:

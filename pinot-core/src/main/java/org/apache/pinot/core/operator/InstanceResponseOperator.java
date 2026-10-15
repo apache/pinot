@@ -29,6 +29,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.spi.accounting.ThreadResourceSnapshot;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -152,9 +153,12 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
     }
   }
 
+  /// Releases the fetched buffers of all the segments, and reports their remote accesses to the query execution.
   public void releaseAll() {
     for (int i = 0; i < _fetchContextSize; i++) {
-      _segmentContexts.get(i).getIndexSegment().release(_fetchContexts.get(i));
+      FetchContext fetchContext = _fetchContexts.get(i);
+      _segmentContexts.get(i).getIndexSegment().release(fetchContext);
+      QueryThreadContext.mergeRemoteAccessStats(fetchContext.getRemoteAccessStats());
     }
   }
 

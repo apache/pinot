@@ -41,6 +41,8 @@ import org.roaringbitmap.RoaringBitmap;
 
 
 public class IntDistinctTable extends DistinctTable {
+  private static final String MERGE_SCOPE = "IntDistinctTable#mergeDistinctTable";
+
   protected final IntOpenHashSet _valueSet;
   protected final OrderByExpressionContext _orderByExpression;
 
@@ -136,14 +138,17 @@ public class IntDistinctTable extends DistinctTable {
     if (intDistinctTable._hasNull) {
       addNull();
     }
+    int numValuesMerged = 0;
     IntIterator intIterator = intDistinctTable._valueSet.iterator();
     if (hasLimit()) {
       if (hasOrderBy()) {
         while (intIterator.hasNext()) {
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numValuesMerged++, MERGE_SCOPE);
           addWithOrderBy(intIterator.nextInt());
         }
       } else {
         while (intIterator.hasNext()) {
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numValuesMerged++, MERGE_SCOPE);
           if (addWithoutOrderBy(intIterator.nextInt())) {
             return;
           }
@@ -152,6 +157,7 @@ public class IntDistinctTable extends DistinctTable {
     } else {
       // NOTE: Do not use _valueSet.addAll() to avoid unnecessary resize when most values are common.
       while (intIterator.hasNext()) {
+        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numValuesMerged++, MERGE_SCOPE);
         addUnbounded(intIterator.nextInt());
       }
     }

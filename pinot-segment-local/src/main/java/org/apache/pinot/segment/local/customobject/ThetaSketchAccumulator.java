@@ -52,24 +52,12 @@ public class ThetaSketchAccumulator extends CustomObjectAccumulator<ThetaSketch>
   }
 
   @Override
-  public ThetaSketch getResult() {
-    return unionAll();
-  }
-
-  private ThetaSketch unionAll() {
+  protected void flush() {
+    if (_accumulator == null || _accumulator.isEmpty()) {
+      return;
+    }
     if (_union == null) {
       _union = _setOperationBuilder.buildUnion();
-    }
-    // Return the default update "gadget" sketch as a compact sketch
-    if (isEmpty()) {
-      return _union.getResult(false, null);
-    }
-    // Corner-case: the parameters are not strictly respected when there is a single sketch.
-    // This single sketch might have been the result of a previously accumulated union and
-    // would already have the parameters set.  The sketch is returned as-is without adjusting
-    // nominal entries which requires an additional union operation.
-    if (getNumInputs() == 1) {
-      return _accumulator.get(0);
     }
 
     // Performance optimization: ensure that the minimum Theta is used for "early stop".
@@ -86,7 +74,25 @@ public class ThetaSketchAccumulator extends CustomObjectAccumulator<ThetaSketch>
       _union.union(accumulatedSketch);
     }
     _accumulator.clear();
+  }
 
+  @Override
+  public ThetaSketch getResult() {
+    if (_union == null) {
+      _union = _setOperationBuilder.buildUnion();
+    }
+    // Return the default update "gadget" sketch as a compact sketch
+    if (isEmpty()) {
+      return _union.getResult(false, null);
+    }
+    // Corner-case: the parameters are not strictly respected when there is a single sketch.
+    // This single sketch might have been the result of a previously accumulated union and
+    // would already have the parameters set.  The sketch is returned as-is without adjusting
+    // nominal entries which requires an additional union operation.
+    if (getNumInputs() == 1 && _accumulator != null && _accumulator.size() == 1) {
+      return _accumulator.get(0);
+    }
+    flush();
     return _union.getResult(false, null);
   }
 }

@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.spi.query.RemoteAccessStats;
 
 
 /// The context for fetching buffers of a segment during query.
@@ -31,6 +32,7 @@ public class FetchContext {
   private final UUID _fetchId;
   private final String _segmentName;
   private final Map<String, List<IndexType<?, ?, ?>>> _columnToIndexList;
+  private final RemoteAccessStats _remoteAccessStats = new RemoteAccessStats();
 
   /// Create a new FetchRequest for this segment, to fetch all buffers of the given columns
   /// @param fetchId unique fetch id
@@ -74,5 +76,12 @@ public class FetchContext {
 
   public boolean isEmpty() {
     return _columnToIndexList.isEmpty();
+  }
+
+  /// Returns the remote accesses (local cache misses) performed to serve this fetch and the bytes they read. A segment
+  /// directory backed by a remote storage tier records them, typically when the fetched buffers are released, and the
+  /// owner of the fetch reports them to the query execution afterwards, so that they end up in the query stats.
+  public RemoteAccessStats getRemoteAccessStats() {
+    return _remoteAccessStats;
   }
 }

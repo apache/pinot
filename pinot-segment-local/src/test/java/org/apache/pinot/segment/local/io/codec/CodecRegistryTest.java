@@ -114,30 +114,24 @@ public class CodecRegistryTest {
     }
 
     @Override
-    public ByteBuffer encode(CodecOptions options, CodecContext ctx, ByteBuffer src)
+    public void encode(CodecOptions options, CodecContext ctx, ByteBuffer src, ByteBuffer dst)
         throws IOException {
       throw new UnsupportedOperationException();
     }
 
     @Override
-    public ByteBuffer decode(CodecOptions options, CodecContext ctx, ByteBuffer src)
+    public void decode(CodecOptions options, CodecContext ctx, ByteBuffer src, ByteBuffer dst)
         throws IOException {
       throw new UnsupportedOperationException();
     }
 
     @Override
-    public void decodeInto(CodecOptions options, CodecContext ctx, ByteBuffer src, ByteBuffer dst)
-        throws IOException {
+    public int maxEncodedSize(CodecOptions options, CodecContext ctx, int inputSize) {
       throw new UnsupportedOperationException();
     }
 
     @Override
-    public int maxEncodedSize(CodecOptions options, int inputSize) {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public boolean requiresDirectDstBuffer() {
+    public boolean requiresDirectDecodeDstBuffer() {
       return false;
     }
   }

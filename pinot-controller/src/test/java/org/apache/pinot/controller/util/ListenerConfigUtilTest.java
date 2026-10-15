@@ -19,12 +19,14 @@
 package org.apache.pinot.controller.util;
 
 import java.util.List;
+import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.core.transport.HttpServerThreadPoolConfig;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.Assert;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
@@ -152,6 +154,42 @@ public class ListenerConfigUtilTest {
 
     assertHttpListener(httpListener, "0.0.0.0", 9000);
     assertHttpsListener(httpsListener, "0.0.0.0", 9443);
+  }
+
+  /// Asserts that protocol names are trimmed and empty names are skipped. Cluster configs are applied with
+  /// `setProperty`, which keeps the raw value, so a value like `http, https` is not split or trimmed by the config.
+  @Test(dataProvider = "accessProtocolsWithSpaces")
+  public void testAccessProtocolsWithSpaces(String accessProtocols) {
+    ControllerConf controllerConf = new ControllerConf();
+
+    controllerConf.setProperty("controller.access.protocols", accessProtocols);
+    controllerConf.setProperty("controller.access.protocols.http.port", "9000");
+
+    configureHttpsProperties(controllerConf, 9443);
+
+    List<ListenerConfig> listenerConfigs = ListenerConfigUtil.buildControllerConfigs(controllerConf);
+
+    Assert.assertEquals(listenerConfigs.size(), 2);
+
+    assertHttpListener(getListener("http", listenerConfigs), "0.0.0.0", 9000);
+    assertHttpsListener(getListener("https", listenerConfigs), "0.0.0.0", 9443);
+  }
+
+  @DataProvider
+  public Object[][] accessProtocolsWithSpaces() {
+    return new Object[][]{{"http, https"}, {" http , https "}, {"http, ,https,"}};
+  }
+
+  /// Asserts that no listener is generated when the protocols value is blank or has only empty names.
+  @Test
+  public void testBlankAccessProtocols() {
+    for (String accessProtocols : List.of("", "  ", " , ")) {
+      PinotConfiguration config = new PinotConfiguration();
+      config.setProperty("controller.access.protocols", accessProtocols);
+
+      Assert.assertEquals(ListenerConfigUtil.buildListenerConfigs(config, "controller", new TlsConfig()), List.of(),
+          "Protocols: '" + accessProtocols + "'");
+    }
   }
 
   /// Asserts that a single listener configuration is generated with a secured TLS port.

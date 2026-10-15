@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.filter;
 
 import org.apache.pinot.segment.spi.index.creator.VectorBackendType;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -27,6 +28,33 @@ import static org.testng.Assert.assertTrue;
 
 /// Tests for [VectorSearchStrategy] adaptive planner.
 public class VectorSearchStrategyTest {
+
+  @DataProvider(name = "strategyCases")
+  public Object[][] strategyCases() {
+    return new Object[][]{
+        {100000, 100000, false, false, false, VectorBackendType.HNSW, VectorSearchParams.DEFAULT},
+        {100, 100, true, true, false, VectorBackendType.HNSW, VectorSearchParams.DEFAULT},
+        {100000, 100000, true, true, false, VectorBackendType.HNSW, VectorSearchParams.DEFAULT},
+        {100000, 50, true, true, false, VectorBackendType.HNSW, VectorSearchParams.DEFAULT},
+        {1000000, 5000, true, true, false, VectorBackendType.HNSW, VectorSearchParams.DEFAULT},
+        {1000000, 5000, true, false, false, VectorBackendType.IVF_FLAT, VectorSearchParams.DEFAULT},
+        {100000, 50000, true, true, false, VectorBackendType.HNSW, VectorSearchParams.DEFAULT},
+        {1000000, 5000, true, true, true, VectorBackendType.HNSW, VectorSearchParams.DEFAULT},
+        {100000, 5000, true, true, false, VectorBackendType.HNSW, VectorSearchParams.DEFAULT},
+        {100000, 15000, true, true, false, VectorBackendType.HNSW, VectorSearchParams.DEFAULT}
+    };
+  }
+
+  @Test(dataProvider = "strategyCases")
+  public void testModeOnlyDecisionMatchesDetailedDecision(int numDocs, int estimatedFilteredDocs,
+      boolean hasVectorIndex, boolean indexSupportsPreFilter, boolean isMutableSegment,
+      VectorBackendType backendType, VectorSearchParams searchParams) {
+    assertEquals(
+        VectorSearchStrategy.decideMode(numDocs, estimatedFilteredDocs, hasVectorIndex, indexSupportsPreFilter,
+            isMutableSegment, backendType, searchParams),
+        VectorSearchStrategy.decide(numDocs, estimatedFilteredDocs, hasVectorIndex, indexSupportsPreFilter,
+            isMutableSegment, backendType, searchParams).getMode());
+  }
 
   @Test
   public void testNoVectorIndex() {

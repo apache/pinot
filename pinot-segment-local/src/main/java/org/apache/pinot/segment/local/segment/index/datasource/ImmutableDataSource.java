@@ -34,87 +34,74 @@ public class ImmutableDataSource extends BaseDataSource {
     super(new ImmutableDataSourceMetadata(columnMetadata), columnIndexContainer);
   }
 
+  /// Exposes the segment's [ColumnMetadata] through the [DataSourceMetadata] view by delegating every accessor.
+  /// Holding a single reference instead of copying the ten fields the view exposes keeps this object at one
+  /// reference per column, which matters for wide segments where every loaded column retains one. The delegation
+  /// is observationally equivalent to a snapshot because every [ColumnMetadata] handed to an immutable data source
+  /// is itself immutable once built.
   private static class ImmutableDataSourceMetadata implements DataSourceMetadata {
-    final FieldSpec _fieldSpec;
-    final boolean _sorted;
-    final int _numDocs;
-    final int _numValues;
-    final int _maxNumValuesPerMVEntry;
-    final int _cardinality;
-    final Comparable _minValue;
-    final Comparable _maxValue;
-    final PartitionFunction _partitionFunction;
-    final Set<Integer> _partitions;
+    final ColumnMetadata _columnMetadata;
 
     ImmutableDataSourceMetadata(ColumnMetadata columnMetadata) {
-      _fieldSpec = columnMetadata.getFieldSpec();
-      _sorted = columnMetadata.isSorted();
-      _numDocs = columnMetadata.getTotalDocs();
-      _numValues = columnMetadata.getTotalNumberOfEntries();
-      if (_fieldSpec.isSingleValueField()) {
-        _maxNumValuesPerMVEntry = -1;
-      } else {
-        _maxNumValuesPerMVEntry = columnMetadata.getMaxNumberOfMultiValues();
-      }
-      _minValue = columnMetadata.getMinValue();
-      _maxValue = columnMetadata.getMaxValue();
-      _partitionFunction = columnMetadata.getPartitionFunction();
-      _partitions = columnMetadata.getPartitions();
-      _cardinality = columnMetadata.getCardinality();
+      _columnMetadata = columnMetadata;
     }
 
     @Override
     public FieldSpec getFieldSpec() {
-      return _fieldSpec;
+      return _columnMetadata.getFieldSpec();
     }
 
     @Override
     public boolean isSorted() {
-      return _sorted;
+      return _columnMetadata.isSorted();
     }
 
     @Override
     public int getNumDocs() {
-      return _numDocs;
+      return _columnMetadata.getTotalDocs();
     }
 
     @Override
     public int getNumValues() {
-      return _numValues;
+      return _columnMetadata.getTotalNumberOfEntries();
     }
 
     @Override
     public int getMaxNumValuesPerMVEntry() {
-      return _maxNumValuesPerMVEntry;
+      // DataSourceMetadata reports -1 for single-value columns, whereas ColumnMetadata reports 0
+      return _columnMetadata.getFieldSpec().isSingleValueField() ? -1 : _columnMetadata.getMaxNumberOfMultiValues();
     }
 
     @Nullable
     @Override
     public Comparable getMinValue() {
-      return _minValue;
+      return _columnMetadata.getMinValue();
     }
 
     @Nullable
     @Override
     public Comparable getMaxValue() {
-      return _maxValue;
+      return _columnMetadata.getMaxValue();
     }
 
     @Nullable
     @Override
     public PartitionFunction getPartitionFunction() {
-      return _partitionFunction;
+      return _columnMetadata.getPartitionFunction();
     }
 
     @Nullable
     @Override
     public Set<Integer> getPartitions() {
-      return _partitions;
+      return _columnMetadata.getPartitions();
     }
 
     @Override
     public int getCardinality() {
-      return _cardinality;
+      return _columnMetadata.getCardinality();
     }
+
+    // getMaxRowLengthInBytes() is deliberately not delegated: DataSourceMetadata defines it as -1 for immutable
+    // columns, while ColumnMetadata computes the serialized row length.
   }
 }

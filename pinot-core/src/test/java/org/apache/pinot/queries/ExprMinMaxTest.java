@@ -58,7 +58,8 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
-/// Queries test for exprmin/exprmax functions.
+/// Queries test for exprmin/exprmax functions. BaseQueriesTest queries two segments on each of two servers, so
+/// each qualifying source row occurs four times. Tied extrema must retain all four copies after serialized merging.
 public class ExprMinMaxTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "ExprMinMaxTest");
   private static final String RAW_TABLE_NAME = "testTable";
@@ -217,7 +218,7 @@ public class ExprMinMaxTest extends BaseQueriesTest {
 
     assertEquals(rows.get(0)[0], 999L);
     assertEquals(rows.get(1)[0], 999L);
-    assertEquals(rows.size(), 2);
+    assertEquals(rows.size(), 4);
 
     // Inter segment data type test
     query = "SELECT expr_max(longColumn, intColumn), expr_max(floatColumn, intColumn), "
@@ -244,7 +245,7 @@ public class ExprMinMaxTest extends BaseQueriesTest {
     assertEquals(resultTable.getDataSchema().getColumnName(9), "exprmax(mvDoubleColumn,bigDecimalColumn)");
     assertEquals(resultTable.getDataSchema().getColumnName(10), "exprmax(jsonColumn,bigDecimalColumn)");
 
-    assertEquals(rows.size(), 2);
+    assertEquals(rows.size(), 4);
     assertEquals(rows.get(0)[0], 999L);
     assertEquals(rows.get(1)[0], 999L);
     assertEquals(rows.get(0)[1], 999.5F);
@@ -275,8 +276,8 @@ public class ExprMinMaxTest extends BaseQueriesTest {
     resultTable = brokerResponse.getResultTable();
     rows = resultTable.getRows();
 
-    assertEquals(rows.size(), 2000);
-    for (int i = 0; i < 2000; i++) {
+    assertEquals(rows.size(), 4000);
+    for (int i = 0; i < 4000; i++) {
       assertEquals(rows.get(i)[0], 1);
     }
 
@@ -289,27 +290,14 @@ public class ExprMinMaxTest extends BaseQueriesTest {
     resultTable = brokerResponse.getResultTable();
     rows = resultTable.getRows();
 
-    assertEquals(rows.size(), 4);
+    assertEquals(rows.size(), 8);
 
-    assertEquals(rows.get(0)[0], 7996000D);
-    assertEquals(rows.get(0)[1], 8D);
-    assertEquals(rows.get(0)[2], "a11");
-    assertEquals(rows.get(0)[3], 8D);
-
-    assertEquals(rows.get(1)[0], 7996000D);
-    assertEquals(rows.get(1)[1], 18D);
-    assertEquals(rows.get(1)[2], "a11");
-    assertEquals(rows.get(1)[3], 8D);
-
-    assertEquals(rows.get(2)[0], 7996000D);
-    assertEquals(rows.get(2)[1], 8D);
-    assertEquals(rows.get(2)[2], "a11");
-    assertNull(rows.get(2)[3]);
-
-    assertEquals(rows.get(3)[0], 7996000D);
-    assertEquals(rows.get(3)[1], 18D);
-    assertEquals(rows.get(3)[2], "a11");
-    assertNull(rows.get(3)[3]);
+    for (int i = 0; i < 8; i++) {
+      assertEquals(rows.get(i)[0], 7996000D);
+      assertEquals(rows.get(i)[1], i % 2 == 0 ? 8D : 18D);
+      assertEquals(rows.get(i)[2], "a11");
+      assertEquals(rows.get(i)[3], i < 4 ? 8D : null);
+    }
 
     // Test transformation function inside exprmax/exprmin, for both projection and measuring
     // the max of 3000x-x^2 is 2250000, which is the max of 3000x-x^2
@@ -323,22 +311,14 @@ public class ExprMinMaxTest extends BaseQueriesTest {
     resultTable = brokerResponse.getResultTable();
     rows = resultTable.getRows();
 
-    assertEquals(rows.size(), 4);
+    assertEquals(rows.size(), 8);
 
-    assertEquals(rows.get(0)[0], 7996000D);
-    assertEquals(rows.get(0)[1], 1500D);
-    assertEquals(rows.get(0)[2], 2250000D);
-    assertEquals(rows.get(0)[3], "bb11");
-    assertEquals(rows.get(1)[0], 7996000D);
-    assertEquals(rows.get(1)[1], 1500D);
-    assertEquals(rows.get(1)[2], 2250000D);
-    assertEquals(rows.get(1)[3], "bb11");
-    assertEquals(rows.get(2)[0], 7996000D);
-    assertNull(rows.get(2)[1]);
-    assertEquals(rows.get(2)[3], "bb11");
-    assertEquals(rows.get(3)[0], 7996000D);
-    assertNull(rows.get(3)[1]);
-    assertEquals(rows.get(3)[3], "bb11");
+    for (int i = 0; i < 8; i++) {
+      assertEquals(rows.get(i)[0], 7996000D);
+      assertEquals(rows.get(i)[1], i < 4 ? 1500D : null);
+      assertEquals(rows.get(i)[2], i < 4 ? 2250000D : null);
+      assertEquals(rows.get(i)[3], "bb11");
+    }
 
     // Inter segment mix aggregation function with CASE statement
     query = "SELECT exprmin(stringColumn, CASE WHEN stringColumn = 'a33' THEN 'b' WHEN stringColumn = 'a22' THEN 'a' "
@@ -350,9 +330,9 @@ public class ExprMinMaxTest extends BaseQueriesTest {
     resultTable = brokerResponse.getResultTable();
     rows = resultTable.getRows();
 
-    assertEquals(rows.size(), 4);
+    assertEquals(rows.size(), 8);
 
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 8; i++) {
       assertEquals(rows.get(i)[0], "a22");
       assertEquals(rows.get(i)[1], "a");
     }
@@ -363,7 +343,7 @@ public class ExprMinMaxTest extends BaseQueriesTest {
     brokerResponse = getBrokerResponse(query);
     resultTable = brokerResponse.getResultTable();
     rows = resultTable.getRows();
-    assertEquals(rows.size(), 2);
+    assertEquals(rows.size(), 4);
     assertEquals(rows.get(0)[0], "30");
     assertEquals(rows.get(1)[0], "30");
 
@@ -373,7 +353,7 @@ public class ExprMinMaxTest extends BaseQueriesTest {
     brokerResponse = getBrokerResponse(query);
     resultTable = brokerResponse.getResultTable();
     rows = resultTable.getRows();
-    assertEquals(rows.size(), 2);
+    assertEquals(rows.size(), 4);
     String[] expectedMvBytes = {"30", "31", "32"};
     assertEquals(rows.get(0)[0], expectedMvBytes);
     assertEquals(rows.get(1)[0], expectedMvBytes);
@@ -389,7 +369,7 @@ public class ExprMinMaxTest extends BaseQueriesTest {
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
 
-    assertEquals(rows.size(), 4);
+    assertEquals(rows.size(), 8);
 
     assertEquals(rows.get(0)[0], 0);
     assertEquals(rows.get(1)[0], 1200);
@@ -404,7 +384,7 @@ public class ExprMinMaxTest extends BaseQueriesTest {
     resultTable = brokerResponse.getResultTable();
     rows = resultTable.getRows();
 
-    assertEquals(rows.size(), 2);
+    assertEquals(rows.size(), 4);
 
     assertEquals(rows.get(0)[0], 0);
     assertEquals(rows.get(1)[0], 0);
@@ -418,7 +398,7 @@ public class ExprMinMaxTest extends BaseQueriesTest {
     resultTable = brokerResponse.getResultTable();
     rows = resultTable.getRows();
 
-    assertEquals(rows.size(), 2);
+    assertEquals(rows.size(), 4);
 
     assertEquals(rows.get(0)[0], 1200);
     assertEquals(rows.get(1)[0], 1200);
@@ -453,10 +433,10 @@ public class ExprMinMaxTest extends BaseQueriesTest {
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
 
-    assertEquals(rows.size(), 10);
+    assertEquals(rows.size(), 20);
 
-    for (int i = 0; i < 10; i++) {
-      int group = ((i + 2) / 2) % 5;
+    for (int i = 0; i < 20; i++) {
+      int group = (i / 4 + 1) % 5;
       assertEquals(rows.get(i)[0], group);
       assertEquals(rows.get(i)[1], 995L + group);
     }
@@ -470,19 +450,18 @@ public class ExprMinMaxTest extends BaseQueriesTest {
     resultTable = brokerResponse.getResultTable();
     rows = resultTable.getRows();
 
-    assertEquals(rows.size(), 24);
+    assertEquals(rows.size(), 48);
 
-    for (int i = 0; i < 22; i++) {
-      double group = Math.pow(2, i / 2);
+    for (int i = 0; i < 44; i++) {
+      double group = Math.pow(2, i / 4);
       assertEquals(rows.get(i)[0], (int) group);
       assertEquals(rows.get(i)[1], group - 1);
     }
 
-    assertEquals(rows.get(22)[0], 2048);
-    assertEquals(rows.get(22)[1], 1999D);
-
-    assertEquals(rows.get(23)[0], 2048);
-    assertEquals(rows.get(23)[1], 1999D);
+    for (int i = 44; i < 48; i++) {
+      assertEquals(rows.get(i)[0], 2048);
+      assertEquals(rows.get(i)[1], 1999D);
+    }
 
     // MV inter segment group by
     query = "SELECT groupByMVIntColumn, expr_min(doubleColumn, intColumn) FROM testTable GROUP BY groupByMVIntColumn";
@@ -491,19 +470,18 @@ public class ExprMinMaxTest extends BaseQueriesTest {
     resultTable = brokerResponse.getResultTable();
     rows = resultTable.getRows();
 
-    assertEquals(rows.size(), 20);
+    assertEquals(rows.size(), 40);
 
-    for (int i = 0; i < 18; i++) {
-      int group = i / 2 + 1;
+    for (int i = 0; i < 36; i++) {
+      int group = i / 4 + 1;
       assertEquals(rows.get(i)[0], group);
       assertEquals(rows.get(i)[1], (double) group - 1);
     }
 
-    assertEquals(rows.get(18)[0], 0);
-    assertEquals(rows.get(18)[1], 0D);
-
-    assertEquals(rows.get(19)[0], 0);
-    assertEquals(rows.get(19)[1], 0D);
+    for (int i = 36; i < 40; i++) {
+      assertEquals(rows.get(i)[0], 0);
+      assertEquals(rows.get(i)[1], 0D);
+    }
 
     // MV inter segment group by with projection on MV column
     query = "SELECT groupByMVIntColumn, expr_min(mvIntColumn, intColumn), "
@@ -512,18 +490,20 @@ public class ExprMinMaxTest extends BaseQueriesTest {
     brokerResponse = getBrokerResponse(query);
     resultTable = brokerResponse.getResultTable();
     rows = resultTable.getRows();
-    assertEquals(rows.size(), 20);
+    assertEquals(rows.size(), 40);
 
-    for (int i = 0; i < 18; i++) {
-      int group = i / 2 + 1;
+    for (int i = 0; i < 36; i++) {
+      int group = i / 4 + 1;
       assertEquals(rows.get(i)[0], group);
       assertEquals(rows.get(i)[1], new Object[]{group - 1, group, group + 1});
       assertEquals(rows.get(i)[2], new Object[]{"a199" + group, "a199" + group + 1, "a199" + group + 2});
     }
 
-    assertEquals(rows.get(18)[0], 0);
-    assertEquals(rows.get(18)[1], new Object[]{0, 1, 2});
-    assertEquals(rows.get(18)[2], new Object[]{"a1999", "a19991", "a19992"});
+    for (int i = 36; i < 40; i++) {
+      assertEquals(rows.get(i)[0], 0);
+      assertEquals(rows.get(i)[1], new Object[]{0, 1, 2});
+      assertEquals(rows.get(i)[2], new Object[]{"a1999", "a19991", "a19992"});
+    }
   }
 
   @Test
@@ -538,10 +518,10 @@ public class ExprMinMaxTest extends BaseQueriesTest {
     BrokerResponse brokerResponse = getBrokerResponse(query);
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
-    assertEquals(rows.size(), 14);
-    assertEquals(rows.get(4)[0], "a33");
-    assertEquals(rows.get(4)[1], new Object[]{20, 21, 22});
-    assertEquals(rows.get(4)[2], new Object[]{27});
+    assertEquals(rows.size(), 28);
+    assertEquals(rows.get(8)[0], "a33");
+    assertEquals(rows.get(8)[1], new Object[]{20, 21, 22});
+    assertEquals(rows.get(8)[2], new Object[]{27});
 
     //  TODO: The following query works because whenever we find an empty array in the result, we use null
     //        (see exprminMaxProjectionValSetWrapper). Ideally, we should be able to serialize empty array.
@@ -554,10 +534,10 @@ public class ExprMinMaxTest extends BaseQueriesTest {
     brokerResponse = getBrokerResponse(query);
     resultTable = brokerResponse.getResultTable();
     rows = resultTable.getRows();
-    assertEquals(rows.size(), 20);
-    assertEquals(rows.get(8)[0], "a33");
-    assertEquals(rows.get(8)[1], new Object[]{20, 21, 22});
-    assertEquals(rows.get(8)[2], new Object[]{});
+    assertEquals(rows.size(), 40);
+    assertEquals(rows.get(16)[0], "a33");
+    assertEquals(rows.get(16)[1], new Object[]{20, 21, 22});
+    assertNull(rows.get(16)[2]);
   }
 
   @Test

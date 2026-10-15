@@ -126,7 +126,7 @@ public class ServerConf {
   /// Returns a list of transform function names as defined in the config
   /// @return List of transform functions
   public List<String> getTransformFunctions() {
-    return _serverConf.getProperty(CONFIG_OF_TRANSFORM_FUNCTIONS, List.of());
+    return _serverConf.getCommaSeparatedList(CONFIG_OF_TRANSFORM_FUNCTIONS, List.of());
   }
 
   public boolean emitTableLevelMetrics() {
@@ -134,7 +134,7 @@ public class ServerConf {
   }
 
   public Collection<String> getAllowedTablesForEmittingMetrics() {
-    return _serverConf.getProperty(CONFIG_OF_ALLOWED_TABLES_FOR_EMITTING_METRICS, List.of());
+    return _serverConf.getCommaSeparatedList(CONFIG_OF_ALLOWED_TABLES_FOR_EMITTING_METRICS, List.of());
   }
 
   public String getMetricsPrefix() {

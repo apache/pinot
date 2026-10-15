@@ -24,6 +24,8 @@ import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -853,5 +855,45 @@ public class FieldSpecTest {
     newSpec.setMetadata(Map.of("2", "person"));
 
     assertThat(newSpec.isBackwardCompatibleWith(oldSpec)).isTrue();
+  }
+
+  @Test
+  public void testComplexFieldSpecEqualsAndHashCode() {
+    Map<String, FieldSpec> children = new LinkedHashMap<>();
+    children.put("a", new DimensionFieldSpec("a", INT, true));
+    children.put("b", new DimensionFieldSpec("b", STRING, true));
+    ComplexFieldSpec first = new ComplexFieldSpec("nested", MAP, true, children);
+    Map<String, FieldSpec> reversed = new LinkedHashMap<>();
+    reversed.put("b", new DimensionFieldSpec("b", STRING, true));
+    reversed.put("a", new DimensionFieldSpec("a", INT, true));
+    ComplexFieldSpec second = new ComplexFieldSpec("nested", MAP, true, reversed);
+    assertThat(first).isEqualTo(first).isEqualTo(second).isNotEqualTo(null)
+        .isNotEqualTo(new DimensionFieldSpec("nested", STRING, true));
+    assertThat(second).isEqualTo(first);
+    assertThat(first.hashCode()).isEqualTo(second.hashCode());
+    assertThat(new HashSet<>(List.of(first))).contains(second);
+
+    second.setDescription("different parent");
+    assertThat(first).isNotEqualTo(second);
+    second.setDescription(null);
+    second.getChildFieldSpecs().remove("b");
+    assertThat(first).isNotEqualTo(second);
+    second.getChildFieldSpecs().put("b", new DimensionFieldSpec("b", LONG, true));
+    assertThat(first).isNotEqualTo(second);
+  }
+
+  @Test
+  public void testComplexFieldSpecEqualityIncludesNestedChildren() {
+    DimensionFieldSpec firstLeaf = new DimensionFieldSpec("value", INT, true, -1);
+    DimensionFieldSpec secondLeaf = new DimensionFieldSpec("value", INT, true, -1);
+    ComplexFieldSpec first = new ComplexFieldSpec("root", MAP, true,
+        Map.of("nested", new ComplexFieldSpec("nested", MAP, true, Map.of("value", firstLeaf))));
+    ComplexFieldSpec second = new ComplexFieldSpec("root", MAP, true,
+        Map.of("nested", new ComplexFieldSpec("nested", MAP, true, Map.of("value", secondLeaf))));
+    assertThat(first).isEqualTo(second);
+    assertThat(first.hashCode()).isEqualTo(second.hashCode());
+    secondLeaf.setDefaultNullValue(-2);
+    assertThat(first).isNotEqualTo(second);
+    assertThat(first.hashCode()).isNotEqualTo(second.hashCode());
   }
 }

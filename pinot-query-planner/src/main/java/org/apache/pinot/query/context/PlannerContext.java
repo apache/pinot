@@ -34,6 +34,8 @@ import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.sql.SqlExplainFormat;
 import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.tools.FrameworkConfig;
+import org.apache.pinot.calcite.rex.SearchSealer;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.planner.logical.LogicalPlanner;
 import org.apache.pinot.query.validate.Validator;
@@ -61,6 +63,11 @@ public class PlannerContext implements AutoCloseable, Context {
   private final SqlExplainFormat _sqlExplainFormat;
   @Nullable
   private final PhysicalPlannerContext _physicalPlannerContext;
+  private final SearchSealer _searchSealer;
+  /// Set by the approximate aggregation rewrite rule when it rewrites at least one aggregation, so that the broker
+  /// can report on the response that the results are approximate. Written during planning, which is single threaded
+  /// for a query, and read after planning completes.
+  private boolean _approximateFunctionApplied;
 
   public PlannerContext(FrameworkConfig config, Prepare.CatalogReader catalogReader, RelDataTypeFactory typeFactory,
       HepProgram optProgram, HepProgram traitProgram, Map<String, String> options, QueryEnvironment.Config envConfig,
@@ -75,6 +82,7 @@ public class PlannerContext implements AutoCloseable, Context {
     _plannerOutput = new HashMap<>();
     _sqlExplainFormat = sqlExplainFormat;
     _physicalPlannerContext = physicalPlannerContext;
+    _searchSealer = createSearchSealer(options, envConfig);
   }
 
   /// Test factory: creates a minimal [PlannerContext] without going through
@@ -97,6 +105,12 @@ public class PlannerContext implements AutoCloseable, Context {
     _plannerOutput = new HashMap<>();
     _sqlExplainFormat = null;
     _physicalPlannerContext = null;
+    _searchSealer = createSearchSealer(options, envConfig);
+  }
+
+  private static SearchSealer createSearchSealer(Map<String, String> options, QueryEnvironment.Config envConfig) {
+    return new SearchSealer(
+        QueryOptionsUtils.getSealedInListThreshold(options, envConfig.defaultSealedInListThreshold()));
   }
 
   public PlannerImpl getPlanner() {
@@ -121,6 +135,16 @@ public class PlannerContext implements AutoCloseable, Context {
 
   public QueryEnvironment.Config getEnvConfig() {
     return _envConfig;
+  }
+
+  /// Records that an exact aggregation was rewritten into its approximate counterpart.
+  public void setApproximateFunctionApplied() {
+    _approximateFunctionApplied = true;
+  }
+
+  /// Returns whether any exact aggregation was rewritten into its approximate counterpart while planning this query.
+  public boolean isApproximateFunctionApplied() {
+    return _approximateFunctionApplied;
   }
 
   /// Unwraps this context. Returns `this` when asked for [PlannerContext] or
@@ -156,6 +180,11 @@ public class PlannerContext implements AutoCloseable, Context {
   @Nullable
   public PhysicalPlannerContext getPhysicalPlannerContext() {
     return _physicalPlannerContext;
+  }
+
+  /// Returns the query's [SearchSealer], which hides large IN lists from Calcite during optimization.
+  public SearchSealer getSearchSealer() {
+    return _searchSealer;
   }
 
   public boolean isUsePhysicalOptimizer() {

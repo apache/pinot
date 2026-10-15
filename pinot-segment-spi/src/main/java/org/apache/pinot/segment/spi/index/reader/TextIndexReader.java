@@ -43,6 +43,24 @@ public interface TextIndexReader extends IndexReader {
     return getDocIds(searchQuery);
   }
 
+  /// Returns the number of documents matching the given search query, without materializing the matching
+  /// document ids.
+  ///
+  /// A `count(*)` with a text-match filter only needs the size of the match set, not its contents. Building a
+  /// full bitmap of matching doc ids first is wasted work that grows with the number of matches, which on a
+  /// high-frequency term over a large segment is most of the query cost. Implementations backed by an inverted
+  /// index can usually read the count from index metadata instead.
+  ///
+  /// The default implementation falls back to materializing the doc ids, so an implementation that cannot do
+  /// better keeps its current behaviour.
+  ///
+  /// @param searchQuery The search query string
+  /// @param optionsString Options string in format "key1=value1,key2=value2", can be null
+  /// @return the number of matching documents
+  default int getNumMatchingDocs(String searchQuery, @Nullable String optionsString) {
+    return getDocIds(searchQuery, optionsString).getCardinality();
+  }
+
   /// Marker method that allows to differentiate between single-column and multi-column text index reader .
   default boolean isMultiColumn() {
     return false;

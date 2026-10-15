@@ -35,6 +35,7 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.ExactVectorScanFilterOperator;
+import org.apache.pinot.core.operator.filter.VectorSimilarityFilterOperator;
 import org.apache.pinot.core.operator.filter.predicate.BaseDictIdBasedRegexpLikePredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -388,6 +389,133 @@ public class FilterPlanNodeTest {
     Assert.assertTrue(explain.contains("fallbackReason:mutable_vector_index_not_filter_aware"), explain);
     Assert.assertTrue(explain.contains("requiredDocIdFilterApplied:true"), explain);
     Assert.assertTrue(explain.contains("requiredDocIdFilterCardinality:2"), explain);
+  }
+
+  @Test
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  public void testMutableSparseRequiredScopeSelectsExactScan() {
+    int numDocs = 100_000;
+    float[] queryVector = {1.0f, 0.0f};
+    FilterAwareVectorIndexReader vectorReader = mock(FilterAwareVectorIndexReader.class);
+    when(vectorReader.supportsPreFilter()).thenReturn(true);
+    ForwardIndexReader forwardIndexReader = mock(ForwardIndexReader.class);
+    ForwardIndexReaderContext context = mock(ForwardIndexReaderContext.class);
+    when(forwardIndexReader.createContext()).thenReturn(context);
+    when(forwardIndexReader.getFloatMV(Mockito.anyInt(), any())).thenAnswer(invocation -> {
+      int docId = invocation.getArgument(0);
+      if (docId == 50_003) {
+        return new float[]{1.0f, 0.0f};
+      }
+      if (docId == 99_991) {
+        return new float[]{0.9f, 0.0f};
+      }
+      return new float[]{0.0f, 1.0f};
+    });
+    DataSource dataSource = mock(DataSource.class);
+    when(dataSource.getVectorIndex()).thenReturn(vectorReader);
+    Mockito.doReturn(forwardIndexReader).when(dataSource).getForwardIndex();
+    IndexSegment segment = mock(IndexSegment.class);
+    SegmentMetadata metadata = mock(SegmentMetadata.class);
+    when(metadata.getTotalDocs()).thenReturn(numDocs);
+    when(metadata.isMutableSegment()).thenReturn(true);
+    when(segment.getSegmentMetadata()).thenReturn(metadata);
+    when(segment.getDataSource("embedding", null)).thenReturn(dataSource);
+    QueryContext queryContext = mock(QueryContext.class);
+    when(queryContext.getFilter()).thenReturn(FilterContext.forPredicate(new VectorSimilarityPredicate(
+        ExpressionContext.forIdentifier("embedding"), queryVector, 2)));
+    SegmentContext segmentContext = new SegmentContext(segment);
+    segmentContext.setDocIdsSnapshot(bitmapOf(17, 50_003, 99_991));
+
+    BaseFilterOperator operator = new FilterPlanNode(segmentContext, queryContext).run();
+    Assert.assertEquals(getFilteredDocIds(operator), bitmapOf(50_003, 99_991));
+    verify(vectorReader, never()).getDocIds(any(float[].class), Mockito.anyInt());
+    verify(vectorReader, never()).getDocIds(any(float[].class), Mockito.anyInt(),
+        any(ImmutableRoaringBitmap.class));
+    verify(forwardIndexReader).getFloatMV(eq(17), any());
+    verify(forwardIndexReader).getFloatMV(eq(50_003), any());
+    verify(forwardIndexReader).getFloatMV(eq(99_991), any());
+    verify(forwardIndexReader, never()).getFloatMV(eq(0), any());
+    ExactVectorScanFilterOperator exactScan = findOperator(operator, ExactVectorScanFilterOperator.class);
+    Assert.assertNotNull(exactScan);
+    String explain = exactScan.toExplainString();
+    Assert.assertTrue(explain.contains("fallbackReason:required_doc_ids_strategy_exact_scan"), explain);
+    Assert.assertTrue(explain.contains("requiredDocIdFilterCardinality:3"), explain);
+  }
+
+  @Test
+  public void testMutableHighCardinalityRequiredScopeUsesPreFilterInsteadOfPostFilter() {
+    int numDocs = 10_000;
+    float[] queryVector = {1.0f, 0.0f};
+    FilterAwareVectorIndexReader vectorReader = mock(FilterAwareVectorIndexReader.class);
+    when(vectorReader.supportsPreFilter()).thenReturn(true);
+    when(vectorReader.getDocIds(eq(queryVector), eq(2), any(ImmutableRoaringBitmap.class)))
+        .thenReturn(bitmapOf(4_998, 4_999));
+    ForwardIndexReader<?> forwardIndexReader = mock(ForwardIndexReader.class);
+    DataSource dataSource = mock(DataSource.class);
+    when(dataSource.getVectorIndex()).thenReturn(vectorReader);
+    Mockito.doReturn(forwardIndexReader).when(dataSource).getForwardIndex();
+    IndexSegment segment = mock(IndexSegment.class);
+    SegmentMetadata metadata = mock(SegmentMetadata.class);
+    when(metadata.getTotalDocs()).thenReturn(numDocs);
+    when(metadata.isMutableSegment()).thenReturn(true);
+    when(segment.getSegmentMetadata()).thenReturn(metadata);
+    when(segment.getDataSource("embedding", null)).thenReturn(dataSource);
+    QueryContext queryContext = mock(QueryContext.class);
+    when(queryContext.getFilter()).thenReturn(FilterContext.forPredicate(new VectorSimilarityPredicate(
+        ExpressionContext.forIdentifier("embedding"), queryVector, 2)));
+    MutableRoaringBitmap requiredDocIds = new MutableRoaringBitmap();
+    requiredDocIds.add(0L, 5_000L);
+    SegmentContext segmentContext = new SegmentContext(segment);
+    segmentContext.setDocIdsSnapshot(requiredDocIds);
+
+    BaseFilterOperator operator = new FilterPlanNode(segmentContext, queryContext).run();
+    Assert.assertEquals(getFilteredDocIds(operator), bitmapOf(4_998, 4_999));
+    ArgumentCaptor<ImmutableRoaringBitmap> requiredScope =
+        ArgumentCaptor.forClass(ImmutableRoaringBitmap.class);
+    verify(vectorReader).getDocIds(eq(queryVector), eq(2), requiredScope.capture());
+    Assert.assertEquals(requiredScope.getValue().getCardinality(), 5_000);
+    Assert.assertTrue(requiredScope.getValue().contains(4_999));
+    verify(vectorReader, never()).getDocIds(queryVector, 2);
+    verifyNoInteractions(forwardIndexReader);
+    Assert.assertNull(findOperator(operator, ExactVectorScanFilterOperator.class));
+    VectorSimilarityFilterOperator filteredAnn = findOperator(operator, VectorSimilarityFilterOperator.class);
+    Assert.assertNotNull(filteredAnn);
+    Assert.assertTrue(filteredAnn.toExplainString().contains("searchMode:FILTER_THEN_ANN"));
+  }
+
+  @Test
+  public void testMutableSparseRequiredScopeWithoutForwardIndexRetainsPreFilter() {
+    int numDocs = 100_000;
+    float[] queryVector = {1.0f, 0.0f};
+    FilterAwareVectorIndexReader vectorReader = mock(FilterAwareVectorIndexReader.class);
+    when(vectorReader.supportsPreFilter()).thenReturn(true);
+    when(vectorReader.getDocIds(eq(queryVector), eq(1), any(ImmutableRoaringBitmap.class)))
+        .thenReturn(bitmapOf(50_003));
+    DataSource dataSource = mock(DataSource.class);
+    when(dataSource.getVectorIndex()).thenReturn(vectorReader);
+    IndexSegment segment = mock(IndexSegment.class);
+    SegmentMetadata metadata = mock(SegmentMetadata.class);
+    when(metadata.getTotalDocs()).thenReturn(numDocs);
+    when(metadata.isMutableSegment()).thenReturn(true);
+    when(segment.getSegmentMetadata()).thenReturn(metadata);
+    when(segment.getDataSource("embedding", null)).thenReturn(dataSource);
+    QueryContext queryContext = mock(QueryContext.class);
+    when(queryContext.getFilter()).thenReturn(FilterContext.forPredicate(new VectorSimilarityPredicate(
+        ExpressionContext.forIdentifier("embedding"), queryVector, 1)));
+    SegmentContext segmentContext = new SegmentContext(segment);
+    segmentContext.setDocIdsSnapshot(bitmapOf(17, 50_003, 99_991));
+
+    BaseFilterOperator operator = new FilterPlanNode(segmentContext, queryContext).run();
+    Assert.assertEquals(getFilteredDocIds(operator), bitmapOf(50_003));
+    ArgumentCaptor<ImmutableRoaringBitmap> requiredScope =
+        ArgumentCaptor.forClass(ImmutableRoaringBitmap.class);
+    verify(vectorReader).getDocIds(eq(queryVector), eq(1), requiredScope.capture());
+    Assert.assertEquals(requiredScope.getValue(), bitmapOf(17, 50_003, 99_991));
+    verify(vectorReader, never()).getDocIds(queryVector, 1);
+    Assert.assertNull(findOperator(operator, ExactVectorScanFilterOperator.class));
+    VectorSimilarityFilterOperator filteredAnn = findOperator(operator, VectorSimilarityFilterOperator.class);
+    Assert.assertNotNull(filteredAnn);
+    Assert.assertTrue(filteredAnn.toExplainString().contains("searchMode:FILTER_THEN_ANN"));
   }
 
   @Test(expectedExceptions = IllegalStateException.class,

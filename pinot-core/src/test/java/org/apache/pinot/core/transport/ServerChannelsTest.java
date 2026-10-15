@@ -44,8 +44,11 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertSame;
+import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.assertTrue;
 
 
 public class ServerChannelsTest {
@@ -196,5 +199,97 @@ public class ServerChannelsTest {
     verify(mockChannel, never()).close();
 
     serverChannels.shutDown();
+  }
+
+  /// The load-bearing guarantee for clusters that do not use the single-stage engine: pre-connect must
+  /// not make `hasChannel()` true. `retryUnhealthyServer` reads it to decide whether the single-stage
+  /// transport has any opinion on a server's health, and answers `UNKNOWN` when it does not. If opening a
+  /// channel ahead of traffic flipped it, an MSE-only cluster would start voting servers `UNHEALTHY` on
+  /// Netty reachability -- and that vote short-circuits the retrier loop before gRPC is ever consulted.
+  @Test
+  public void testSuccessfulPreConnectLeavesHasChannelFalse()
+      throws Exception {
+    HttpServer dummyServer = HttpServer.create();
+    dummyServer.bind(new InetSocketAddress("localhost", 0), 0);
+    dummyServer.start();
+    ServerChannels serverChannels =
+        new ServerChannels(mock(QueryRouter.class), null, null, ThreadAccountantUtils.getNoOpAccountant());
+    try {
+      ServerRoutingInstance instance =
+          new ServerRoutingInstance("localhost", dummyServer.getAddress().getPort(), TableType.OFFLINE);
+      serverChannels.preConnect(instance, 5_000L);
+      assertFalse(serverChannels.hasChannel(instance),
+          "Pre-connect must not make the server look query-carrying to the failure detector");
+    } finally {
+      serverChannels.shutDown();
+      dummyServer.stop(0);
+    }
+  }
+
+  /// ... and a failed pre-connect must not either, so an unreachable server is not voted on.
+  @Test
+  public void testFailedPreConnectLeavesHasChannelFalse() {
+    ServerChannels serverChannels =
+        new ServerChannels(mock(QueryRouter.class), null, null, ThreadAccountantUtils.getNoOpAccountant());
+    // Port 1 on localhost: nothing listens, so the connect is refused rather than timing out.
+    ServerRoutingInstance unreachable = new ServerRoutingInstance("localhost", 1, TableType.OFFLINE);
+    try {
+      assertThrows(Exception.class, () -> serverChannels.preConnect(unreachable, 5_000L));
+      assertFalse(serverChannels.hasChannel(unreachable));
+    } finally {
+      serverChannels.shutDown();
+    }
+  }
+
+  /// Sending a query is what makes a server query-carrying -- unchanged from before pre-connect existed,
+  /// including when the connect itself fails.
+  @Test
+  public void testSendRequestMakesHasChannelTrue() {
+    ServerChannels serverChannels =
+        new ServerChannels(mock(QueryRouter.class), null, null, ThreadAccountantUtils.getNoOpAccountant());
+    ServerRoutingInstance unreachable = new ServerRoutingInstance("localhost", 1, TableType.OFFLINE);
+    try {
+      InstanceRequest instanceRequest = new InstanceRequest();
+      instanceRequest.setRequestId(1L);
+      instanceRequest.setQuery(new BrokerRequest());
+      assertFalse(serverChannels.hasChannel(unreachable));
+      assertThrows(Exception.class, () -> serverChannels.sendRequest("t", mock(AsyncQueryResponse.class), unreachable,
+          instanceRequest, 5_000L));
+      assertTrue(serverChannels.hasChannel(unreachable));
+    } finally {
+      serverChannels.shutDown();
+    }
+  }
+
+  /// The point of pre-connect: the first query reuses the warm channel rather than opening a second one,
+  /// and only then does the server become query-carrying.
+  @Test
+  public void testFirstQueryReusesThePreConnectedChannel()
+      throws Exception {
+    HttpServer dummyServer = HttpServer.create();
+    dummyServer.bind(new InetSocketAddress("localhost", 0), 0);
+    dummyServer.start();
+    ServerChannels serverChannels =
+        new ServerChannels(mock(QueryRouter.class), null, null, ThreadAccountantUtils.getNoOpAccountant());
+    try {
+      ServerRoutingInstance instance =
+          new ServerRoutingInstance("localhost", dummyServer.getAddress().getPort(), TableType.OFFLINE);
+      serverChannels.preConnect(instance, 5_000L);
+      ServerChannels.ServerChannel preConnected = serverChannels.getOrCreateServerChannel(instance);
+      Channel warmChannel = preConnected._channel;
+      assertNotNull(warmChannel);
+
+      InstanceRequest instanceRequest = new InstanceRequest();
+      instanceRequest.setRequestId(1L);
+      instanceRequest.setQuery(new BrokerRequest());
+      serverChannels.sendRequest("t", mock(AsyncQueryResponse.class), instance, instanceRequest, 5_000L);
+
+      assertSame(serverChannels.getOrCreateServerChannel(instance), preConnected);
+      assertSame(preConnected._channel, warmChannel, "The query must reuse the pre-connected channel");
+      assertTrue(serverChannels.hasChannel(instance));
+    } finally {
+      serverChannels.shutDown();
+      dummyServer.stop(0);
+    }
   }
 }

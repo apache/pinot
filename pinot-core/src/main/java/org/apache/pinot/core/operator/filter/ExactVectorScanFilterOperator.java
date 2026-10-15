@@ -107,7 +107,7 @@ public class ExactVectorScanFilterOperator extends BaseFilterOperator {
     if (_matches == null) {
       _matches = computeExactTopK();
     }
-    return new BitmapDocIdSet(_matches, _numDocs);
+    return BitmapDocIdSet.create(_matches, _numDocs);
   }
 
   @Override

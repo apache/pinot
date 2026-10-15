@@ -143,6 +143,32 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     }
   }
 
+  @Test
+  public void testPostgreSqlByteaLiteralTypeInference() {
+    RelDataType rowType = _queryEnvironment.compile(
+            "SELECT '\\x0102'::bytea, ARRAY['\\x00'::bytea, CAST('\\x0102' AS BYTEA)] FROM a")
+        .getRelRoot().validatedRowType;
+    assertEquals(rowType.getFieldList().get(0).getType().getSqlTypeName(), SqlTypeName.BINARY);
+    RelDataType arrayType = rowType.getFieldList().get(1).getType();
+    assertEquals(arrayType.getSqlTypeName(), SqlTypeName.ARRAY);
+    assertEquals(arrayType.getComponentType().getSqlTypeName(), SqlTypeName.VARBINARY);
+  }
+
+  /// A bytea constant must not change which plan EXPLAIN returns. Rewriting it used to rebuild the statement node, so
+  /// `EXPLAIN IMPLEMENTATION PLAN` lost its physical-plan marker and silently returned the logical plan instead.
+  @Test
+  public void testPostgreSqlByteaLiteralKeepsPhysicalExplain() {
+    long requestId = RANDOM_REQUEST_ID_GEN.nextLong();
+    String expected =
+        _queryEnvironment.explainQuery("EXPLAIN IMPLEMENTATION PLAN FOR SELECT col1, X'01' FROM a", requestId);
+    assertTrue(expected.contains("MAIL_RECEIVE"), expected);
+    for (String bytea : List.of("'\\x01'::bytea", "CAST('\\x01' AS BYTEA)")) {
+      String explain = _queryEnvironment.explainQuery(
+          "EXPLAIN IMPLEMENTATION PLAN FOR SELECT col1, " + bytea + " FROM a", requestId);
+      assertEquals(explain, expected, bytea);
+    }
+  }
+
   /// `jsonPath` must resolve to a literal, but the operand type checker deliberately does not demand a literal
   /// `SqlNode` in that position: operand checking runs before `PinotEvaluateLiteralRule` folds constant
   /// expressions, so an argument such as `CONCAT('$.', 'foo')` folds to a literal and plans and executes
@@ -1749,5 +1775,68 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     assertFalse(explain.contains("EnrichedJoin"),
         "usePlannerRules=JoinToEnrichedJoin must be a no-op, got:\n" + explain);
     assertTrue(explain.contains("LogicalJoin"), "expected an ordinary LogicalJoin, got:\n" + explain);
+  }
+
+  /// `generateArray` on literal arguments must not fold into an array literal. The array would be serialized into the
+  /// plan of every worker, while the workers only need the three arguments to generate it themselves.
+  @Test
+  public void testGenerateArrayIsNotFolded() {
+    String explain = _queryEnvironment.explainQuery(
+        "EXPLAIN PLAN FOR SELECT grid.ts FROM UNNEST(generateArray(0, 6, 2)) AS grid(ts)",
+        RANDOM_REQUEST_ID_GEN.nextLong());
+    assertTrue(explain.contains("GENERATEARRAY(0, 6, 2)"), "expected an unfolded generateArray call, got:\n" + explain);
+    assertFalse(explain.contains("ARRAY(0, 2, 4, 6)"), "expected no folded array literal, got:\n" + explain);
+  }
+
+  /// Folding a scalar function returning a primitive array used to fail in
+  /// [org.apache.pinot.calcite.rel.rules.PinotEvaluateLiteralRule], which read the elements by casting to `Object[]`
+  /// -- a cast a `long[]` cannot satisfy.
+  @Test
+  public void testPrimitiveArrayFunctionFoldsIntoAnArrayLiteral() {
+    String explain = _queryEnvironment.explainQuery(
+        "EXPLAIN PLAN FOR SELECT grid.ts FROM UNNEST(generateLongArray(0, 6, 2)) AS grid(ts)",
+        RANDOM_REQUEST_ID_GEN.nextLong());
+    assertTrue(explain.contains("ARRAY(0:BIGINT, 2:BIGINT, 4:BIGINT, 6:BIGINT)"),
+        "expected a folded array literal, got:\n" + explain);
+  }
+
+  /// The element type is the widest of the argument types, so a time grid in epoch millis stays a LONG sequence
+  /// instead of overflowing an INT, and a fractional increment makes the whole sequence DOUBLE.
+  @Test
+  public void testGenerateArrayElementTypeFollowsItsArguments() {
+    assertEquals(generateArrayElementType("0, 6, 2"), SqlTypeName.INTEGER);
+    assertEquals(generateArrayElementType("0, 6"), SqlTypeName.INTEGER);
+    assertEquals(generateArrayElementType("1633078800000, 1633080600000, 1800000"), SqlTypeName.BIGINT);
+    assertEquals(generateArrayElementType("0, 1633080600000, 1800000"), SqlTypeName.BIGINT);
+    assertEquals(generateArrayElementType("CAST(0 AS FLOAT), CAST(1 AS FLOAT), CAST(0.5 AS FLOAT)"),
+        SqlTypeName.REAL);
+    assertEquals(generateArrayElementType("0, 1, 0.5"), SqlTypeName.DOUBLE);
+    // The plan converts these decimals to INT, LONG and DOUBLE, so execution picks those element types.
+    assertEquals(generateArrayElementType("CAST(0 AS DECIMAL(10, 0)), 4"), SqlTypeName.INTEGER);
+    assertEquals(generateArrayElementType("CAST(0 AS DECIMAL(12, 0)), 4"), SqlTypeName.BIGINT);
+    assertEquals(generateArrayElementType("CAST(0 AS DECIMAL(5, 2)), 4"), SqlTypeName.DOUBLE);
+  }
+
+  /// The function returns null when an argument is null. If the inferred type did not allow null, Calcite would drop
+  /// the fallback of a `COALESCE` that follows the call.
+  @Test
+  public void testGenerateArrayTypeAllowsNullWhenAnArgumentDoes() {
+    assertTrue(generateArrayType("CAST(NULL AS INTEGER), 4").isNullable());
+    assertFalse(generateArrayType("0, 4").isNullable());
+    String explain = _queryEnvironment.explainQuery("EXPLAIN PLAN FOR SELECT g.x FROM "
+        + "UNNEST(COALESCE(generateArray(CAST(NULL AS INTEGER), 4), ARRAY[7])) AS g(x)",
+        RANDOM_REQUEST_ID_GEN.nextLong());
+    assertTrue(explain.contains("ARRAY(7)"), "expected the COALESCE fallback, got:\n" + explain);
+  }
+
+  private SqlTypeName generateArrayElementType(String arguments) {
+    String query = "SELECT grid.ts FROM UNNEST(generateArray(" + arguments + ")) AS grid(ts)";
+    return _queryEnvironment.compile(query).getRelRoot().validatedRowType.getFieldList().get(0).getType()
+        .getSqlTypeName();
+  }
+
+  private RelDataType generateArrayType(String arguments) {
+    String query = "SELECT generateArray(" + arguments + ") AS grid FROM a";
+    return _queryEnvironment.compile(query).getRelRoot().validatedRowType.getFieldList().get(0).getType();
   }
 }

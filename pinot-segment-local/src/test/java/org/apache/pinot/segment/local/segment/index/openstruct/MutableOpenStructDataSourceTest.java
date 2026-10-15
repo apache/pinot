@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.index.openstruct;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
+import org.apache.pinot.segment.local.segment.index.datasource.NullDataSource;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
@@ -36,12 +37,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertSame;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 public class MutableOpenStructDataSourceTest {
@@ -83,8 +79,26 @@ public class MutableOpenStructDataSourceTest {
     try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME", spec(),
         OpenStructIndexConfig.DEFAULT, _mm, 100)) {
       MutableOpenStructDataSource ds = new MutableOpenStructDataSource(spec(), idx, 0);
-      assertNull(ds.getDataSource("missing"));
+      assertTrue(ds.getDataSource("missing") instanceof NullDataSource);
       assertFalse(ds.isMaterialized("missing"));
+    }
+  }
+
+  /// A key absent from the consuming segment is described by its declared child field spec, including a custom
+  /// default null value.
+  @Test
+  public void testAbsentDeclaredKeyReadsDeclaredDefault()
+      throws Exception {
+    ComplexFieldSpec spec = new ComplexFieldSpec("metrics", DataType.OPEN_STRUCT, true,
+        Map.of("score", new DimensionFieldSpec("score", DataType.STRING, true, "N/A")));
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME", spec,
+        OpenStructIndexConfig.DEFAULT, _mm, 100)) {
+      MutableOpenStructDataSource ds = new MutableOpenStructDataSource(spec, idx, 3);
+      DataSource scoreDs = ds.getDataSource("score");
+      assertTrue(scoreDs instanceof NullDataSource);
+      assertEquals(scoreDs.getDataSourceMetadata().getDataType(), DataType.STRING);
+      assertEquals(scoreDs.getDataSourceMetadata().getNumDocs(), 3);
+      assertEquals(scoreDs.getDictionary().get(0), "N/A");
     }
   }
 
@@ -155,9 +169,9 @@ public class MutableOpenStructDataSourceTest {
     try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME", spec(),
         OpenStructIndexConfig.DEFAULT, _mm, 100)) {
       MutableOpenStructDataSource ds = new MutableOpenStructDataSource(spec(), idx, 1);
-      assertNull(ds.getDataSource("clicks"));
+      assertTrue(ds.getDataSource("clicks") instanceof NullDataSource);
       idx.index(0, Map.of("clicks", 5L));
-      assertNotNull(ds.getDataSource("clicks"));
+      assertFalse(ds.getDataSource("clicks") instanceof NullDataSource);
     }
   }
 
@@ -320,19 +334,36 @@ public class MutableOpenStructDataSourceTest {
     }
   }
 
-  /// Pins the sealed splitter's default-resolution rule (OpenStructColumnSplitter#writeDenseKeyColumn,
-  /// ~line 280): absent-doc defaults come from a throwaway generic DimensionFieldSpec(key, storedType,
-  /// true), not from the real child spec's own default. If `allocateKeyColumn` reverted to preferring
-  /// `childSpec.getDefaultNullValue()`, this test would fail because dictId 0 would hold 0L instead of
-  /// Long.MIN_VALUE.
+  /// Pins the sealed splitter's default-resolution rule (OpenStructColumnSplitter#materializedFieldSpec): a
+  /// declared child's absent-doc default is the one it declares, not the stored type's generic one. The two tiers
+  /// have to agree, because a document without the key must resolve to the same value either side of seal() -- and
+  /// to the same value OpenStructDataSource#getValueFieldSpec resolves for a key absent from the segment entirely.
+  ///
+  /// This used to assert the opposite, back when both tiers derived the default from a throwaway
+  /// DimensionFieldSpec(key, storedType, true) and the declaration was honored for coercion and then discarded.
+  /// See https://github.com/apache/pinot/issues/19466
   @Test
-  public void testAllocationUsesGenericDefaultNotChildSpecCustomDefault()
+  public void testAllocationUsesDeclaredDefault()
       throws Exception {
     Map<String, FieldSpec> children = new HashMap<>();
     children.put("clicks", new DimensionFieldSpec("clicks", DataType.LONG, true, 0L));
     ComplexFieldSpec specWithCustomDefault =
         new ComplexFieldSpec("metrics", DataType.OPEN_STRUCT, true, children);
     try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME", specWithCustomDefault,
+        OpenStructIndexConfig.DEFAULT, _mm, 100)) {
+      idx.index(0, Map.of("clicks", 5L));
+      MutableKeyColumn col = idx.getKeyColumn("clicks");
+      assertNotNull(col);
+      assertEquals(col.getDictionary().get(0), 0L, "the declared default, not the LONG generic default");
+    }
+  }
+
+  /// An undeclared key has no declaration to take a default from, so it keeps the stored type's generic one.
+  @Test
+  public void testAllocationUsesGenericDefaultForUndeclaredKey()
+      throws Exception {
+    ComplexFieldSpec noChildren = new ComplexFieldSpec("metrics", DataType.OPEN_STRUCT, true, new HashMap<>());
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME", noChildren,
         OpenStructIndexConfig.DEFAULT, _mm, 100)) {
       idx.index(0, Map.of("clicks", 5L));
       MutableKeyColumn col = idx.getKeyColumn("clicks");

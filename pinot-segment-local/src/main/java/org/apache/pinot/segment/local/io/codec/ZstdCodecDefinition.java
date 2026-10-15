@@ -132,72 +132,40 @@ final class ZstdCodecDefinition implements ChunkCodecHandler<ZstdCodecDefinition
   }
 
   @Override
-  public ByteBuffer encode(Options options, CodecContext ctx, ByteBuffer src) throws IOException {
+  public void encode(Options options, CodecContext ctx, ByteBuffer src, ByteBuffer dst) throws IOException {
+    if (!dst.isDirect()) {
+      throw new IllegalArgumentException("Zstd encode requires a direct destination buffer");
+    }
+    dst.clear();
     ByteBuffer directSrc = CodecBufferUtils.toDirectBuffer(src);
-    ByteBuffer out = null;
-    boolean succeeded = false;
     try {
       long bound = Zstd.compressBound(directSrc.remaining());
       if (bound > Integer.MAX_VALUE) {
         throw new IOException("Zstd compressBound " + bound + " exceeds Integer.MAX_VALUE for input of "
             + directSrc.remaining() + " bytes");
       }
-      out = ByteBuffer.allocateDirect((int) bound);
-      long result = Zstd.compress(out, directSrc, options.getLevel());
+      if (bound > dst.capacity()) {
+        throw new IllegalArgumentException(
+            "Zstd: encoded size bound " + bound + " exceeds dst capacity " + dst.capacity());
+      }
+      long result = Zstd.compress(dst, directSrc, options.getLevel());
       if (Zstd.isError(result)) {
         throw new IOException("Zstd compression failed: " + Zstd.getErrorName(result));
       }
-      out.flip();
-      succeeded = true;
-      return out;
+      dst.position(0);
+      dst.limit((int) result);
     } finally {
       CodecBufferUtils.cleanDirectCopy(src, directSrc);
-      if (!succeeded) {
-        CodecBufferUtils.cleanQuietly(out);
-      }
     }
   }
 
   @Override
-  public ByteBuffer decode(Options options, CodecContext ctx, ByteBuffer src) throws IOException {
-    ByteBuffer directSrc = CodecBufferUtils.toDirectBuffer(src);
-    ByteBuffer out = null;
-    boolean succeeded = false;
-    try {
-      long decompressedSize = Zstd.getFrameContentSize(directSrc);
-      // Zstd uses negative sentinel values for an unknown or invalid content size. Zero is a known,
-      // valid content size for an empty frame and must be allowed through to decompression.
-      if (decompressedSize < 0) {
-        throw new IOException("Zstd: cannot determine decompressed size from frame header");
-      }
-      out = ByteBuffer.allocateDirect(
-          CodecBufferUtils.checkDeclaredDecompressedSize(decompressedSize, "Zstd", "frame header"));
-      long result = Zstd.decompress(out, directSrc);
-      if (Zstd.isError(result)) {
-        throw new IOException("Zstd decompression failed: " + Zstd.getErrorName(result));
-      }
-      if (result != decompressedSize) {
-        throw new IOException("Zstd decoded " + result + " bytes but frame declared " + decompressedSize
-            + ". Segment may be corrupt.");
-      }
-      out.flip();
-      succeeded = true;
-      return out;
-    } finally {
-      CodecBufferUtils.cleanDirectCopy(src, directSrc);
-      if (!succeeded) {
-        CodecBufferUtils.cleanQuietly(out);
-      }
-    }
-  }
-
-  @Override
-  public void decodeInto(Options options, CodecContext ctx, ByteBuffer src, ByteBuffer dst) throws IOException {
+  public void decode(Options options, CodecContext ctx, ByteBuffer src, ByteBuffer dst) throws IOException {
     dst.clear();
     ByteBuffer directSrc = CodecBufferUtils.toDirectBuffer(src);
     try {
       long declaredDecompressedSize = Zstd.getFrameContentSize(directSrc);
-      // As in decode(), zero is a valid known size; only Zstd's negative sentinel values are errors.
+      // Zero is a valid known size; only Zstd's negative sentinel values are errors.
       if (declaredDecompressedSize < 0) {
         throw new IOException("Zstd: cannot determine decompressed size from frame header");
       }
@@ -222,7 +190,7 @@ final class ZstdCodecDefinition implements ChunkCodecHandler<ZstdCodecDefinition
   }
 
   @Override
-  public int maxEncodedSize(Options options, int inputSize) {
+  public int maxEncodedSize(Options options, CodecContext ctx, int inputSize) {
     long bound = Zstd.compressBound(inputSize);
     if (bound > Integer.MAX_VALUE) {
       throw new IllegalArgumentException(
@@ -232,7 +200,7 @@ final class ZstdCodecDefinition implements ChunkCodecHandler<ZstdCodecDefinition
   }
 
   @Override
-  public boolean requiresDirectDstBuffer() {
+  public boolean requiresDirectDecodeDstBuffer() {
     return true;
   }
 }

@@ -36,7 +36,7 @@ public abstract class BinarySetOperator extends SetOperator {
 
   protected final MultiStageOperator _leftChildOperator;
   protected final MultiStageOperator _rightChildOperator;
-  protected final Multiset<Record> _rightRowSet;
+  protected Multiset<Record> _rightRowSet;
   private MseBlock.Eos _eos;
   private boolean _isRightChildOperatorProcessed;
 
@@ -105,6 +105,7 @@ public abstract class BinarySetOperator extends SetOperator {
         return mseBlock;
       } else if (mseBlock.isError()) {
         _eos = (MseBlock.Eos) mseBlock;
+        releaseBuffers();
         return _eos;
       } else if (mseBlock.isSuccess()) {
         // If it's a regular EOS block, we continue to process the left child operator.
@@ -115,10 +116,26 @@ public abstract class BinarySetOperator extends SetOperator {
     MseBlock mseBlock = processLeftOperator();
     if (mseBlock.isEos()) {
       _eos = (MseBlock.Eos) mseBlock;
+      releaseBuffers();
       return _eos;
     } else {
       return mseBlock;
     }
+  }
+
+  /// Replaces `_rightRowSet` with a fresh, empty multiset rather than clearing it: `HashMultiset.clear()` walks every
+  /// entry and still leaves the backing table at the capacity it grew to, which for a wide INTERSECT / EXCEPT is the
+  /// bulk of what we are trying to release. Safe to swap because [#handleRowMatched(Object[])] is only reached from
+  /// [#processLeftOperator()], which [#getNextBlock()] stops calling once `_eos` is set — and `_eos` is set before
+  /// every release.
+  @Override
+  protected void releaseBuffers() {
+    _rightRowSet = HashMultiset.create();
+  }
+
+  @Override
+  protected boolean hasBufferedState() {
+    return !_rightRowSet.isEmpty();
   }
 
   /// Returns true if the row matches the criteria defined by the set operation.

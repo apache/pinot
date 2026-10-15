@@ -25,6 +25,7 @@ import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
+import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,6 +71,10 @@ public class RepeatOperator extends MultiStageOperator {
   /// Rows of the input block currently being expanded, or null when the next input block must be pulled.
   @Nullable
   private List<Object[]> _currentRows;
+  /// Set once the input is exhausted (or the operator is terminated), and returned from every later call. Without
+  /// it, a null [#_currentRows] would send us back to a spent — after [#releaseBuffers()], closed — input.
+  @Nullable
+  private MseBlock.Eos _eosBlock;
   /// The grouping set (ordinal) the next getNextBlock() call will expand the current input block for.
   private int _currentSet;
 
@@ -124,9 +129,13 @@ public class RepeatOperator extends MultiStageOperator {
 
   @Override
   protected MseBlock getNextBlock() {
+    if (_eosBlock != null) {
+      return _eosBlock;
+    }
     if (_currentRows == null) {
       MseBlock block = _input.nextBlock();
       if (block.isEos()) {
+        _eosBlock = (MseBlock.Eos) block;
         return block;
       }
       _currentRows = ((MseBlock.Data) block).asRowHeap().getRows();
@@ -164,6 +173,23 @@ public class RepeatOperator extends MultiStageOperator {
   @Override
   public StatMap<StatKey> copyStatMaps() {
     return new StatMap<>(_statMap);
+  }
+
+  /// Drops the input block being expanded. The rows belong to that block, not to this operator, and the emitted rows
+  /// are freshly allocated, so dropping the reference is enough — clearing would corrupt a block another operator may
+  /// still be holding. Marks the operator finished at the same time, because a null [#_currentRows] otherwise means
+  /// "pull the next input block".
+  @Override
+  protected void releaseBuffers() {
+    _currentRows = null;
+    if (_eosBlock == null) {
+      _eosBlock = SuccessMseBlock.INSTANCE;
+    }
+  }
+
+  @Override
+  protected boolean hasBufferedState() {
+    return _currentRows != null;
   }
 
   public enum StatKey implements StatMap.Key {

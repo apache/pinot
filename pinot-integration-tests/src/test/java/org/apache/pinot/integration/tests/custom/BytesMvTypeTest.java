@@ -188,17 +188,19 @@ public class BytesMvTypeTest extends CustomDataQueryClusterIntegrationTest {
   public void testBytesArrayLiteral(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    String arrayLiteral = "ARRAY[X'07', X'0708', X'07090A']";
-    for (boolean withFrom : new boolean[]{true, false}) {
-      String query = withFrom ? String.format("SELECT %s FROM %s WHERE %s = 7 LIMIT 1", arrayLiteral,
-          getTableName(), ID_COLUMN) : "SELECT " + arrayLiteral;
-      JsonNode result = postQuery(query).get("resultTable");
-      assertEquals(result.get("dataSchema").get("columnDataTypes").get(0).asText(), "BYTES_ARRAY");
-      JsonNode values = result.get("rows").get(0).get(0);
-      assertEquals(values.size(), MV_LENGTH);
-      assertEquals(values.get(0).asText(), "07");
-      assertEquals(values.get(1).asText(), "0708");
-      assertEquals(values.get(2).asText(), "07090a");
+    for (String arrayLiteral : List.of("ARRAY[X'07', X'0708', X'07090A']",
+        "ARRAY['\\x07'::bytea, '\\x0708'::bytea, '\\x07090A'::bytea]")) {
+      for (boolean withFrom : new boolean[]{true, false}) {
+        String query = withFrom ? String.format("SELECT %s FROM %s WHERE %s = 7 LIMIT 1", arrayLiteral,
+            getTableName(), ID_COLUMN) : "SELECT " + arrayLiteral;
+        JsonNode result = postQuery(query).get("resultTable");
+        assertEquals(result.get("dataSchema").get("columnDataTypes").get(0).asText(), "BYTES_ARRAY");
+        JsonNode values = result.get("rows").get(0).get(0);
+        assertEquals(values.size(), MV_LENGTH);
+        assertEquals(values.get(0).asText(), "07");
+        assertEquals(values.get(1).asText(), "0708");
+        assertEquals(values.get(2).asText(), "07090a");
+      }
     }
   }
 
@@ -219,15 +221,18 @@ public class BytesMvTypeTest extends CustomDataQueryClusterIntegrationTest {
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     for (String mvCol : MV_COLUMNS) {
-      String positiveQuery = String.format(
-          "SELECT COUNT(*) FROM %s WHERE ARRAYS_OVERLAP(%s, ARRAY[X'07'])", getTableName(), mvCol);
-      JsonNode rows = postQuery(positiveQuery).get("resultTable").get("rows");
-      assertEquals(rows.get(0).get(0).asLong(), 1L);
+      for (String[] literals : List.of(new String[]{"X'07'", "X'FF'"},
+          new String[]{"'\\x07'::bytea", "'\\xFF'::bytea"})) {
+        String positiveQuery = String.format(
+            "SELECT COUNT(*) FROM %s WHERE ARRAYS_OVERLAP(%s, ARRAY[%s])", getTableName(), mvCol, literals[0]);
+        JsonNode rows = postQuery(positiveQuery).get("resultTable").get("rows");
+        assertEquals(rows.get(0).get(0).asLong(), 1L);
 
-      String negativeQuery = String.format(
-          "SELECT COUNT(*) FROM %s WHERE ARRAYS_OVERLAP(%s, ARRAY[X'FF'])", getTableName(), mvCol);
-      rows = postQuery(negativeQuery).get("resultTable").get("rows");
-      assertEquals(rows.get(0).get(0).asLong(), 0L);
+        String negativeQuery = String.format(
+            "SELECT COUNT(*) FROM %s WHERE ARRAYS_OVERLAP(%s, ARRAY[%s])", getTableName(), mvCol, literals[1]);
+        rows = postQuery(negativeQuery).get("resultTable").get("rows");
+        assertEquals(rows.get(0).get(0).asLong(), 0L);
+      }
     }
   }
 
@@ -235,11 +240,14 @@ public class BytesMvTypeTest extends CustomDataQueryClusterIntegrationTest {
   public void testArraysOverlapWithLiterals(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    JsonNode result = postQuery(
-        "SELECT ARRAYS_OVERLAP(ARRAY[X'00', X'0102'], ARRAY[X'03', X'0102'])").get("resultTable");
-    assertTrue(result.get("rows").get(0).get(0).asBoolean());
+    for (String overlapping : List.of("ARRAYS_OVERLAP(ARRAY[X'00', X'0102'], ARRAY[X'03', X'0102'])",
+        "ARRAYS_OVERLAP(ARRAY[CAST('\\x00' AS BYTEA), CAST('\\x0102' AS BYTEA)], "
+            + "ARRAY['\\x03'::bytea, '\\x0102'::bytea])")) {
+      JsonNode result = postQuery("SELECT " + overlapping).get("resultTable");
+      assertTrue(result.get("rows").get(0).get(0).asBoolean());
+    }
 
-    result = postQuery(
+    JsonNode result = postQuery(
         "SELECT ARRAYS_OVERLAP(ARRAY[X'00', X'0102'], ARRAY[X'03', X'04'])").get("resultTable");
     assertFalse(result.get("rows").get(0).get(0).asBoolean());
   }

@@ -26,6 +26,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.HnswVectorIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.vector.HnswVectorIndexReader;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
@@ -109,6 +110,36 @@ public class HnswVectorIndexCreatorTest {
     }
   }
 
+  /// A null bitmap must not fall through to an unfiltered search, which would return doc ids outside the filter.
+  /// The reader rejects it with its contract message rather than a bare NullPointerException from inside Lucene.
+  @Test
+  public void testFilteredReaderRejectsNullBitmap()
+      throws IOException {
+    try (HnswVectorIndexReader reader = new HnswVectorIndexReader("foo", INDEX_DIR, 4, _config)) {
+      float[] queryVector = {5.0F, 42.0F, 54.33333F, 42.24F, 1001.045F};
+      NullPointerException thrown = Assert.expectThrows(NullPointerException.class,
+          () -> reader.getDocIds(queryVector, 2, (ImmutableRoaringBitmap) null));
+      Assert.assertNotNull(thrown.getMessage(), "The rejection must carry the pre-filter contract message");
+      Assert.assertTrue(thrown.getMessage().contains("must not be null"),
+          "Expected the pre-filter contract message, got: " + thrown.getMessage());
+    }
+  }
+
+  /// An empty filter admits nothing, so the search is skipped entirely. Asserting only that the result is empty
+  /// would not discriminate -- Lucene returns no hits for a zero-match filter anyway. Disabling the bounded queue
+  /// without an efSearch makes runtime-control validation throw when a query is actually built, so reaching an
+  /// empty result here proves the short-circuit ran before query construction.
+  @Test
+  public void testFilteredReaderShortCircuitsEmptyBitmapBeforeBuildingQuery()
+      throws IOException {
+    try (HnswVectorIndexReader reader = new HnswVectorIndexReader("foo", INDEX_DIR, 4, _config)) {
+      float[] queryVector = {5.0F, 42.0F, 54.33333F, 42.24F, 1001.045F};
+      reader.setUseBoundedQueue(false);
+      Assert.assertTrue(reader.getDocIds(queryVector, 2, new MutableRoaringBitmap()).isEmpty(),
+          "An empty filter must short-circuit before query construction");
+    }
+  }
+
   @Test
   public void testEfSearchChangesRuntimeSearchBehavior()
       throws IOException {
@@ -144,6 +175,8 @@ public class HnswVectorIndexCreatorTest {
       Assert.assertEquals(debugInfo.get("effectiveEfSearch"), 6);
       Assert.assertEquals(debugInfo.get("effectiveHnswUseRelativeDistance"), Boolean.FALSE);
       Assert.assertEquals(debugInfo.get("effectiveHnswUseBoundedQueue"), Boolean.FALSE);
+      Assert.assertEquals(debugInfo.get("supportsPreFilter"), reader.supportsPreFilter(),
+          "Debug info must report the reader's actual pre-filter capability, not a hardcoded literal");
     }
   }
 }

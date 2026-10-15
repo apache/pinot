@@ -46,11 +46,21 @@ public class CpcSketchAccumulator extends CustomObjectAccumulator<CpcSketch> {
   }
 
   @Override
-  public CpcSketch getResult() {
-    return unionAll();
+  protected void flush() {
+    if (_accumulator == null || _accumulator.isEmpty()) {
+      return;
+    }
+    if (_union == null) {
+      _union = new CpcUnion(_lgNominalEntries);
+    }
+    for (CpcSketch accumulatedSketch : _accumulator) {
+      _union.update(accumulatedSketch);
+    }
+    _accumulator.clear();
   }
 
-  private CpcSketch unionAll() {
+  @Override
+  public CpcSketch getResult() {
     if (_union == null) {
       _union = new CpcUnion(_lgNominalEntries);
     }
@@ -62,14 +72,10 @@ public class CpcSketchAccumulator extends CustomObjectAccumulator<CpcSketch> {
     // This single sketch might have been the result of a previously accumulated union and
     // would already have the parameters set.  The sketch is returned as-is without adjusting
     // nominal entries which requires an additional union operation.
-    if (getNumInputs() == 1) {
+    if (getNumInputs() == 1 && _accumulator != null && _accumulator.size() == 1) {
       return _accumulator.get(0);
     }
-
-    for (CpcSketch accumulatedSketch : _accumulator) {
-      _union.update(accumulatedSketch);
-    }
-
+    flush();
     return _union.getResult();
   }
 }

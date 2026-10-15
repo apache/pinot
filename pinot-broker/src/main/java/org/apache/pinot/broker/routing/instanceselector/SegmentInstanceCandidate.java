@@ -70,6 +70,6 @@ public class SegmentInstanceCandidate {
   @Override
   public String toString() {
     return "SegmentInstanceCandidate{" + "_instance='" + _instance + '\'' + ", _online=" + _online + ", _pool=" + _pool
-        + '}';
+        + ", _idealStateReplicaId=" + _idealStateReplicaId + '}';
   }
 }

@@ -19,12 +19,16 @@
 package org.apache.pinot.core.operator.combine;
 
 import java.util.List;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.Phaser;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
@@ -59,6 +63,14 @@ import org.slf4j.LoggerFactory;
 @SuppressWarnings({"rawtypes"})
 public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends BaseOperator<BaseResultsBlock> {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseCombineOperator.class);
+
+  /// Interval at which the main thread wakes up while waiting for the worker tasks, to check whether the query is
+  /// terminated.
+  ///
+  /// The main thread is not registered for cancellation, so terminating the query does not interrupt its wait. Also, a
+  /// worker task cancelled before it starts never runs, so it never signals completion. Without this check, the main
+  /// thread of a terminated query waits until the query deadline and keeps the merged results reachable.
+  private static final long TERMINATION_CHECK_INTERVAL_MS = 100L;
 
   protected final ResultsBlockMerger<T> _resultsBlockMerger;
   protected final List<Operator> _operators;
@@ -254,6 +266,49 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
     _phaser.awaitAdvance(_phaser.arriveAndDeregister());
   }
 
+  /// Waits for the next results block in the queue until the end time.
+  ///
+  /// Returns `null` when the end time is reached without a results block. Throws the [TerminationException] when the
+  /// query is terminated while waiting.
+  @Nullable
+  protected BaseResultsBlock pollResultsBlock(BlockingQueue<BaseResultsBlock> blockingQueue, long endTimeMs)
+      throws InterruptedException {
+    while (true) {
+      throwIfTerminated();
+      long waitTimeMs = endTimeMs - System.currentTimeMillis();
+      BaseResultsBlock resultsBlock =
+          blockingQueue.poll(Math.min(waitTimeMs, TERMINATION_CHECK_INTERVAL_MS), TimeUnit.MILLISECONDS);
+      if (resultsBlock != null || waitTimeMs <= TERMINATION_CHECK_INTERVAL_MS) {
+        return resultsBlock;
+      }
+    }
+  }
+
+  /// Waits for the latch to reach zero until the end time.
+  ///
+  /// Returns `false` when the end time is reached before the latch reaches zero. Throws the [TerminationException]
+  /// when the query is terminated while waiting.
+  protected boolean awaitLatch(CountDownLatch latch, long endTimeMs)
+      throws InterruptedException {
+    while (true) {
+      throwIfTerminated();
+      long waitTimeMs = endTimeMs - System.currentTimeMillis();
+      if (latch.await(Math.min(waitTimeMs, TERMINATION_CHECK_INTERVAL_MS), TimeUnit.MILLISECONDS)) {
+        return true;
+      }
+      if (waitTimeMs <= TERMINATION_CHECK_INTERVAL_MS) {
+        return false;
+      }
+    }
+  }
+
+  private static void throwIfTerminated() {
+    TerminationException terminateException = QueryThreadContext.getTerminateException();
+    if (terminateException != null) {
+      throw terminateException;
+    }
+  }
+
   protected ExceptionResultsBlock getTimeoutResultsBlock(int numBlocksMerged) {
     String logMsg = "Timed out while polling results block, numBlocksMerged: " + numBlocksMerged + " (query: "
         + _queryContext + ")";
@@ -286,13 +341,7 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
             + " on segment " + operator.getIndexSegment().getSegmentName()
         : "Caught exception while doing operator: " + operator.getClass();
 
-    QueryErrorCode errorCode;
-    if (e instanceof QueryException) {
-      QueryException queryException = (QueryException) e;
-      errorCode = queryException.getErrorCode();
-    } else {
-      errorCode = QueryErrorCode.QUERY_EXECUTION;
-    }
+    QueryErrorCode errorCode = QueryErrorCode.fromThrowable(e, QueryErrorCode.QUERY_EXECUTION);
     // TODO: Only include exception message if it is a QueryException. Otherwise, it might expose sensitive information
     throw errorCode.asException(errorMessage + ": " + e.getMessage(), e);
   }

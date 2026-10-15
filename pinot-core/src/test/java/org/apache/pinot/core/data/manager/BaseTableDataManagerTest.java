@@ -30,16 +30,27 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.fetcher.BaseSegmentFetcher;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
+import org.apache.pinot.common.utils.helix.FakePropertyStore;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.offline.OfflineTableDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
@@ -57,13 +68,17 @@ import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
+import org.apache.pinot.spi.config.table.TimestampConfig;
+import org.apache.pinot.spi.config.table.TimestampIndexGranularity;
 import org.apache.pinot.spi.crypt.PinotCrypter;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -75,12 +90,17 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.apache.pinot.util.TestUtils;
+import org.slf4j.Logger;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -88,6 +108,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
@@ -122,10 +143,23 @@ public class BaseTableDataManagerTest {
       new SegmentOperationsThrottler(2, 4, true),
       new SegmentOperationsThrottler(2, 4, true));
 
+  private ServerMetrics _previousServerMetrics;
+
+  /// Registers the mock the tests verify against. [ServerMetrics#register] only swaps in against the NOOP default,
+  /// so the instance an earlier test class in the same JVM registered is cleared first, and restored in [#tearDown]
+  /// for the test classes that run afterwards.
   @BeforeClass
   public void setUp()
       throws Exception {
+    _previousServerMetrics = ServerMetrics.get();
+    ServerMetrics.deregister();
     ServerMetrics.register(mock(ServerMetrics.class));
+  }
+
+  @AfterClass(alwaysRun = true)
+  public void tearDown() {
+    ServerMetrics.deregister();
+    ServerMetrics.register(_previousServerMetrics);
   }
 
   @BeforeMethod
@@ -155,6 +189,100 @@ public class BaseTableDataManagerTest {
   }
 
   @Test
+  @SuppressWarnings("deprecation")
+  public void testOnlineSegmentLoadedDuringShutdownIsDestroyed()
+      throws Exception {
+    BaseTableDataManager table = spy(createTableManager());
+    ServerMetrics metrics = table._serverMetrics;
+    clearInvocations(metrics);
+    ImmutableSegment segment = mock(ImmutableSegment.class);
+    when(segment.getSegmentName()).thenReturn(SEGMENT_NAME);
+    CountDownLatch loading = new CountDownLatch(1);
+    CountDownLatch finishLoading = new CountDownLatch(1);
+    doAnswer(invocation -> {
+      loading.countDown();
+      assertTrue(finishLoading.await(10, TimeUnit.SECONDS));
+      table.addSegment(segment, null);
+      return null;
+    }).when(table).doAddOnlineSegment(SEGMENT_NAME);
+    FutureTask<Void> addition = new FutureTask<>(() -> {
+      table.addOnlineSegment(SEGMENT_NAME);
+      return null;
+    });
+    Thread additionThread = new Thread(addition, "load-online-segment");
+    try {
+      additionThread.start();
+      assertTrue(loading.await(10, TimeUnit.SECONDS));
+      table.shutDown();
+      finishLoading.countDown();
+      ExecutionException failure = expectThrows(ExecutionException.class, () -> addition.get(10, TimeUnit.SECONDS));
+      assertTrue(failure.getCause() instanceof IllegalStateException);
+      assertEquals(table.getNumSegments(), 0);
+      verify(segment).destroy();
+      verify(metrics, never()).addValueToTableGauge(eq(OFFLINE_TABLE_NAME), eq(ServerGauge.SEGMENT_COUNT), anyLong());
+      verify(metrics, never()).addValueToTableGauge(eq(OFFLINE_TABLE_NAME), eq(ServerGauge.DOCUMENT_COUNT), anyLong());
+    } finally {
+      finishLoading.countDown();
+      additionThread.join(10000);
+    }
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  public void testShutdownWaitsForImmutableSegmentRegistration()
+      throws Exception {
+    BaseTableDataManager table = spy(createTableManager());
+    ServerMetrics metrics = table._serverMetrics;
+    clearInvocations(metrics);
+    ImmutableSegment segment = mock(ImmutableSegment.class);
+    when(segment.getSegmentName()).thenReturn(SEGMENT_NAME);
+    SegmentMetadata metadata = mock(SegmentMetadata.class);
+    when(metadata.getTotalDocs()).thenReturn(5);
+    when(segment.getSegmentMetadata()).thenReturn(metadata);
+    CountDownLatch registering = new CountDownLatch(1);
+    CountDownLatch finishRegistration = new CountDownLatch(1);
+    doAnswer(invocation -> {
+      registering.countDown();
+      assertTrue(finishRegistration.await(10, TimeUnit.SECONDS));
+      return invocation.callRealMethod();
+    }).when(table).registerSegment(eq(SEGMENT_NAME), any());
+    FutureTask<Void> addition = new FutureTask<>(() -> {
+      table.addSegment(segment, null);
+      return null;
+    });
+    FutureTask<Void> shutdown = new FutureTask<>(() -> {
+      table.shutDown();
+      return null;
+    });
+    Thread additionThread = new Thread(addition, "register-immutable-segment");
+    Thread shutdownThread = new Thread(shutdown, "shutdown-immutable-table");
+    try {
+      additionThread.start();
+      assertTrue(registering.await(10, TimeUnit.SECONDS));
+      shutdownThread.start();
+      TestUtils.waitForCondition(ignored -> shutdown.isDone() || (table.isShutDown()
+          && (shutdownThread.getState() == Thread.State.WAITING
+          || shutdownThread.getState() == Thread.State.TIMED_WAITING)), 10, 10000,
+          "Shutdown did not wait for the admitted segment");
+      assertFalse(shutdown.isDone(), "Shutdown must wait for the admitted segment to finish registration");
+      verify(segment, never()).destroy();
+      finishRegistration.countDown();
+      addition.get(10, TimeUnit.SECONDS);
+      shutdown.get(10, TimeUnit.SECONDS);
+      assertEquals(table.getNumSegments(), 0);
+      verify(segment).destroy();
+      verify(metrics).addValueToTableGauge(OFFLINE_TABLE_NAME, ServerGauge.SEGMENT_COUNT, 1L);
+      verify(metrics).addValueToTableGauge(OFFLINE_TABLE_NAME, ServerGauge.SEGMENT_COUNT, -1L);
+      verify(metrics).addValueToTableGauge(OFFLINE_TABLE_NAME, ServerGauge.DOCUMENT_COUNT, 5L);
+      verify(metrics).addValueToTableGauge(OFFLINE_TABLE_NAME, ServerGauge.DOCUMENT_COUNT, -5L);
+    } finally {
+      finishRegistration.countDown();
+      additionThread.join(10000);
+      shutdownThread.join(10000);
+    }
+  }
+
+  @Test
   public void testReloadSegmentNewData()
       throws Exception {
     SegmentZKMetadata zkMetadata = createRawSegment(SegmentVersion.v3, 5);
@@ -162,7 +290,7 @@ public class BaseTableDataManagerTest {
     // Mock the case where segment is loaded but its CRC is different from
     // the one in zk, thus raw segment is downloaded and loaded.
     SegmentMetadata localMetadata = mock(SegmentMetadata.class);
-    when(localMetadata.getCrc()).thenReturn("0");
+    when(localMetadata.getCrc()).thenReturn(0L);
 
     BaseTableDataManager tableDataManager = spy(createTableManager());
     tableDataManager.registerSegment(SEGMENT_NAME, createImmutableSegmentDataManager(SEGMENT_NAME, localMetadata));
@@ -185,7 +313,7 @@ public class BaseTableDataManagerTest {
     // Mock the case where segment is loaded but its CRC is different from
     // the one in zk, thus raw segment is downloaded and loaded.
     SegmentMetadata localMetadata = mock(SegmentMetadata.class);
-    when(localMetadata.getCrc()).thenReturn("0");
+    when(localMetadata.getCrc()).thenReturn(0L);
 
     // No dataDir for coolTier, thus stay on default tier.
     BaseTableDataManager tableDataManager = spy(createTableManager());
@@ -222,7 +350,7 @@ public class BaseTableDataManagerTest {
     SegmentZKMetadata zkMetadata = mock(SegmentZKMetadata.class);
     when(zkMetadata.getCrc()).thenReturn(crc);
     SegmentMetadata localMetadata = mock(SegmentMetadata.class);
-    when(localMetadata.getCrc()).thenReturn(Long.toString(crc));
+    when(localMetadata.getCrc()).thenReturn(crc);
 
     BaseTableDataManager tableDataManager = spy(createTableManager());
     tableDataManager.registerSegment(SEGMENT_NAME, createImmutableSegmentDataManager(SEGMENT_NAME, localMetadata));
@@ -253,7 +381,7 @@ public class BaseTableDataManagerTest {
     when(zkMetadata.getCrc()).thenReturn(crc);
     when(zkMetadata.getTier()).thenReturn(TIER_NAME);
     SegmentMetadata localMetadata = mock(SegmentMetadata.class);
-    when(localMetadata.getCrc()).thenReturn(Long.toString(crc));
+    when(localMetadata.getCrc()).thenReturn(crc);
 
     // No dataDir for coolTier, thus stay on default tier.
     BaseTableDataManager tableDataManager = spy(createTableManager());
@@ -279,6 +407,28 @@ public class BaseTableDataManagerTest {
     assertEquals(new SegmentMetadataImpl(tierDataDir).getTotalDocs(), 5);
   }
 
+  /// Regression test for https://github.com/apache/pinot/issues/18164: the table-level config passed into reload is
+  /// shared by all segments, so reloading one segment must not set its tier on the shared config.
+  @Test
+  public void testReloadSegmentFromDefaultTierDoesNotMutateSharedIndexLoadingConfig()
+      throws Exception {
+    // The current tier is null while the target tier is coolTier, exercising both tier mutations in the reload path.
+    SegmentZKMetadata zkMetadata = createRawSegment(SegmentVersion.v3, 5);
+    zkMetadata.setTier(TIER_NAME);
+    SegmentMetadata localMetadata = mock(SegmentMetadata.class);
+    when(localMetadata.getCrc()).thenReturn(0L);
+
+    ImmutableSegmentDataManager segmentDataManager = createImmutableSegmentDataManager(SEGMENT_NAME, localMetadata);
+    BaseTableDataManager tableDataManager = spy(createTableManager());
+    tableDataManager.registerSegment(SEGMENT_NAME, segmentDataManager);
+    seedZKMetadata(tableDataManager, SEGMENT_NAME, zkMetadata);
+
+    IndexLoadingConfig sharedConfig = new IndexLoadingConfig(DEFAULT_TABLE_CONFIG, SCHEMA);
+    tableDataManager.reloadSegment(segmentDataManager, sharedConfig, true);
+    assertNull(sharedConfig.getSegmentTier());
+    assertNull(sharedConfig.getTableDataDir());
+  }
+
   @Test
   public void testReloadSegmentConvertVersion()
       throws Exception {
@@ -289,7 +439,7 @@ public class BaseTableDataManagerTest {
     SegmentZKMetadata zkMetadata = mock(SegmentZKMetadata.class);
     when(zkMetadata.getCrc()).thenReturn(crc);
     SegmentMetadata localMetadata = mock(SegmentMetadata.class);
-    when(localMetadata.getCrc()).thenReturn(Long.toString(crc));
+    when(localMetadata.getCrc()).thenReturn(crc);
 
     // Require to use v3 format.
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
@@ -319,7 +469,7 @@ public class BaseTableDataManagerTest {
     SegmentZKMetadata zkMetadata = mock(SegmentZKMetadata.class);
     when(zkMetadata.getCrc()).thenReturn(crc);
     SegmentMetadata localMetadata = mock(SegmentMetadata.class);
-    when(localMetadata.getCrc()).thenReturn(Long.toString(crc));
+    when(localMetadata.getCrc()).thenReturn(crc);
 
     // Require to add indices.
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
@@ -346,7 +496,7 @@ public class BaseTableDataManagerTest {
         makeRawSegment(indexDir, new File(TEMP_DIR, SEGMENT_NAME + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION),
             false);
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
-    assertEquals(Long.parseLong(segmentMetadata.getCrc()), zkMetadata.getCrc());
+    assertEquals(segmentMetadata.getCrc(), zkMetadata.getCrc());
 
     // Same CRC but force to download.
     BaseTableDataManager tableDataManager = spy(createTableManager());
@@ -366,8 +516,115 @@ public class BaseTableDataManagerTest {
     tableDataManager.reloadSegment(SEGMENT_NAME, true, null);
     assertTrue(indexDir.exists());
     segmentMetadata = new SegmentMetadataImpl(indexDir);
-    assertEquals(Long.parseLong(segmentMetadata.getCrc()), zkMetadata.getCrc());
+    assertEquals(segmentMetadata.getCrc(), zkMetadata.getCrc());
     assertEquals(segmentMetadata.getTotalDocs(), 5);
+  }
+
+  @Test
+  public void testReloadSegmentAcquiresSegmentLockBeforeSemaphore()
+      throws Exception {
+    TestSegmentReloadSemaphore reloadSemaphore = new TestSegmentReloadSemaphore(1);
+    BaseTableDataManager tableDataManager = createTableManager(reloadSemaphore);
+
+    Lock segmentLock = tableDataManager.getSegmentLock(SEGMENT_NAME);
+    segmentLock.lock();
+    ExecutorService executor = Executors.newCachedThreadPool();
+    Thread reloadThread = new Thread(() -> {
+      try {
+        tableDataManager.reloadSegment(SEGMENT_NAME, new IndexLoadingConfig(), mock(SegmentZKMetadata.class),
+            mock(SegmentMetadata.class), false);
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, "test-reload-thread");
+
+    try {
+      reloadThread.start();
+      TestUtils.waitForCondition(aVoid -> ((ReentrantLock) segmentLock).hasQueuedThread(reloadThread), 10, 5000,
+          "Reload thread did not wait on segment lock");
+
+      // Verify lock acquisition ordering:
+      // In refresh (doReplaceSegment), segmentLock is acquired first, then the reload semaphore.
+      // To avoid AB-BA deadlock between refresh and reload on the same segment, reloadSegment must also acquire
+      // segmentLock before acquiring the reload semaphore.
+      // Under unpatched code (the bug), reloadSegment acquires the semaphore before waiting on segmentLock,
+      // exhausting permits (availablePermits == 0) and deadlocking any concurrent refresh.
+      // Under patched code, reloadSegment blocks on segmentLock first, leaving the semaphore available (1 permit).
+      assertEquals(reloadSemaphore.availablePermits(), 1,
+          "Reload thread must not acquire the reload semaphore before acquiring segment lock");
+
+      // Verify that another operation (simulating refresh holding segmentLock) can acquire the semaphore
+      // without deadlocking.
+      Future<Boolean> refreshSemaphoreAcquire = executor.submit(() -> {
+        reloadSemaphore.acquire(SEGMENT_NAME, tableDataManager.getLogger());
+        reloadSemaphore.release();
+        return true;
+      });
+      assertTrue(refreshSemaphoreAcquire.get(2, TimeUnit.SECONDS),
+          "Thread holding segment lock must be able to acquire reload semaphore without deadlocking");
+    } finally {
+      segmentLock.unlock();
+      reloadThread.join(5000);
+      executor.shutdownNow();
+    }
+  }
+
+  @Test
+  public void testReloadSegmentInterruptedDuringSemaphoreAcquire()
+      throws Exception {
+    TestSegmentReloadSemaphore reloadSemaphore = new TestSegmentReloadSemaphore(1);
+    BaseTableDataManager tableDataManager = createTableManager(reloadSemaphore);
+    // Pre-capture segmentLock to keep strong reference and prevent weak-value GC eviction (Issue #19611).
+    Lock segmentLock = tableDataManager.getSegmentLock(SEGMENT_NAME);
+
+    // Acquire the only permit so that reloadSegment blocks when attempting to acquire the semaphore.
+    reloadSemaphore.acquire("otherSegment", tableDataManager.getLogger());
+    assertEquals(reloadSemaphore.availablePermits(), 0);
+
+    AtomicBoolean caughtInterruptedException = new AtomicBoolean(false);
+    Thread reloadThread = new Thread(() -> {
+      try {
+        tableDataManager.reloadSegment(SEGMENT_NAME, new IndexLoadingConfig(), mock(SegmentZKMetadata.class),
+            mock(SegmentMetadata.class), false);
+      } catch (InterruptedException e) {
+        caughtInterruptedException.set(true);
+      } catch (Exception e) {
+        if (e.getCause() instanceof InterruptedException) {
+          caughtInterruptedException.set(true);
+        }
+      }
+    }, "test-reload-interrupted-thread");
+
+    try {
+      reloadThread.start();
+      // Wait until reloadThread is blocked waiting to acquire the semaphore.
+      TestUtils.waitForCondition(
+          aVoid -> reloadThread.getState() == Thread.State.WAITING && reloadSemaphore.isAcquireAttempted(), 10, 5000,
+          "Reload thread did not wait on reload semaphore");
+
+      // Interrupt reloadThread while it is waiting in acquire()
+      reloadThread.interrupt();
+      reloadThread.join(5000);
+      assertTrue(caughtInterruptedException.get(), "Reload thread should have caught InterruptedException");
+
+      // Verify exception safety:
+      // 1. segmentLock must NOT be leaked (must be unlocked)
+      assertFalse(((ReentrantLock) segmentLock).isLocked(), "Segment lock must be released when interrupted");
+      assertTrue(segmentLock.tryLock(), "Segment lock should be acquirable after thread was interrupted");
+      segmentLock.unlock();
+
+      // 2. No semaphore permit must be leaked: release the permit held by the test, and verify 1 permit remains
+      reloadSemaphore.release();
+      assertEquals(reloadSemaphore.availablePermits(), 1, "Semaphore permit count must remain balanced");
+    } finally {
+      if (reloadThread.isAlive()) {
+        reloadThread.interrupt();
+        reloadThread.join(5000);
+      }
+      if (reloadSemaphore.availablePermits() == 0) {
+        reloadSemaphore.release();
+      }
+    }
   }
 
   @Test
@@ -836,6 +1093,31 @@ public class BaseTableDataManagerTest {
     }
   }
 
+  // Regression for the same-name table recreation race on the ONLINE path: after shutdown, a stale download must not
+  // replace the segment data directory, which a recreated same-name table may already own.
+  @Test
+  public void testMoveSegmentRejectedAfterShutdown()
+      throws IOException {
+    BaseTableDataManager tableDataManager = createTableManager();
+    File tempRootDir = tableDataManager.getTmpSegmentDataDir("test-move-after-shutdown");
+
+    File tempTar = new File(tempRootDir, SEGMENT_NAME + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
+    File tempInputDir = new File(tempRootDir, "input");
+    FileUtils.write(new File(tempInputDir, "tmp.txt"), "this is in segment dir", StandardCharsets.UTF_8);
+    TarCompressionUtils.createCompressedTarFile(tempInputDir, tempTar);
+    FileUtils.deleteQuietly(tempInputDir);
+
+    File segmentDir = tableDataManager.getSegmentDataDir(SEGMENT_NAME);
+    File marker = new File(segmentDir, "marker");
+    FileUtils.write(marker, "recreated owner's data", StandardCharsets.UTF_8);
+
+    tableDataManager.shutDown();
+    expectThrows(IllegalStateException.class,
+        () -> tableDataManager.untarAndMoveSegment(SEGMENT_NAME, tempTar, tempRootDir));
+    assertEquals(FileUtils.readFileToString(marker, StandardCharsets.UTF_8), "recreated owner's data",
+        "Stale download must not replace the segment data directory after shutdown");
+  }
+
   @Test
   public void testReplaceSegmentIfCrcMismatchWhenFlagDisabledSegmentCrcMismatchShouldDownload()
       throws Exception {
@@ -847,7 +1129,7 @@ public class BaseTableDataManagerTest {
 
     ImmutableSegmentDataManager segmentDataManager = createImmutableSegmentDataManager(SEGMENT_NAME, 1024L);
     SegmentMetadata segmentMetadata = segmentDataManager.getSegment().getSegmentMetadata();
-    when(segmentMetadata.getDataCrc()).thenReturn("99999");
+    when(segmentMetadata.getDataCrc()).thenReturn(99999L);
 
     BaseTableDataManager tableDataManager = createTableManager();
     File dataDir = tableDataManager.getSegmentDataDir(SEGMENT_NAME);
@@ -871,7 +1153,7 @@ public class BaseTableDataManagerTest {
 
     ImmutableSegmentDataManager segmentDataManager = createImmutableSegmentDataManager(SEGMENT_NAME, segmentCrc);
     SegmentMetadata segmentMetadata = segmentDataManager.getSegment().getSegmentMetadata();
-    when(segmentMetadata.getDataCrc()).thenReturn("11111");
+    when(segmentMetadata.getDataCrc()).thenReturn(11111L);
 
     BaseTableDataManager tableDataManager = createTableManager();
     File dataDir = tableDataManager.getSegmentDataDir(SEGMENT_NAME);
@@ -893,7 +1175,7 @@ public class BaseTableDataManagerTest {
 
     ImmutableSegmentDataManager segmentDataManager = createImmutableSegmentDataManager(SEGMENT_NAME, 1024L);
     SegmentMetadata segmentMetadata = segmentDataManager.getSegment().getSegmentMetadata();
-    when(segmentMetadata.getDataCrc()).thenReturn("99999");
+    when(segmentMetadata.getDataCrc()).thenReturn(99999L);
 
     BaseTableDataManager tableDataManager = createTableManager();
     File dataDir = tableDataManager.getSegmentDataDir(SEGMENT_NAME);
@@ -1069,6 +1351,127 @@ public class BaseTableDataManagerTest {
     verify(segmentDirectory, times(1)).onSegmentAdded();
   }
 
+  @Test
+  public void testGetCachedIndexLoadingConfigReusesSchemaAndRefreshes() {
+    TableConfig table = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema original = createSchemaReuseSchema();
+    BaseTableDataManager manager = createSchemaReuseManager(table, original);
+    IndexLoadingConfig first = manager.getCachedIndexLoadingConfig();
+    IndexLoadingConfig second = manager.getCachedIndexLoadingConfig();
+    assertSame(first.getSchema(), original);
+    assertSame(second.getSchema(), original);
+    assertSame(first.getTableConfig(), second.getTableConfig());
+    assertSame(first, second);
+    verifyNoInteractions(manager._propertyStore);
+
+    Schema changed = createSchemaReuseSchema();
+    changed.getFieldSpecFor("id").setDefaultNullValue(-2);
+    ZKMetadataProvider.setSchema(manager._propertyStore, changed);
+    // Explicit refreshes still fetch the latest schema even without a separate refresh message.
+    Schema refreshed = manager.fetchIndexLoadingConfig().getSchema();
+    assertNotSame(refreshed, original);
+    assertEquals(refreshed.getFieldSpecFor("id").getDefaultNullValue(), -2);
+    assertEquals(original.getFieldSpecFor("id").getDefaultNullValue(), -1);
+    assertSame(manager.getCachedTableConfigAndSchema().getRight(), refreshed);
+    assertSame(manager.getCachedIndexLoadingConfig().getSchema(), refreshed);
+
+    manager.updateCachedTableConfigAndSchema(table, changed);
+    assertSame(manager.getCachedIndexLoadingConfig().getSchema(), changed);
+    TableConfig indexedTable = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setInvertedIndexColumns(List.of("id")).build();
+    manager.updateCachedTableConfigAndSchema(indexedTable, changed);
+    IndexLoadingConfig indexed = manager.getCachedIndexLoadingConfig();
+    assertTrue(indexed.getFieldIndexConfig("id").getConfig(StandardIndexes.inverted()).isEnabled());
+    assertFalse(first.getFieldIndexConfig("id").getConfig(StandardIndexes.inverted()).isEnabled());
+    assertSame(indexed.getFieldIndexConfig("id"), manager.getCachedIndexLoadingConfig().getFieldIndexConfig("id"));
+  }
+
+  @Test
+  public void testGetCachedIndexLoadingConfigDerivesSegmentTier() {
+    TableConfig table = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = createSchemaReuseSchema();
+    BaseTableDataManager manager = createSchemaReuseManager(table, schema);
+    IndexLoadingConfig shared = manager.getCachedIndexLoadingConfig();
+    IndexLoadingConfig tierConfig = shared.withSegmentTier("cold");
+    assertNotSame(tierConfig, shared);
+    assertEquals(tierConfig.getSegmentTier(), "cold");
+    assertNull(shared.getSegmentTier());
+    assertSame(manager.getCachedIndexLoadingConfig(), shared);
+    assertSame(shared.withSegmentTier(null), shared);
+    verifyNoInteractions(manager._propertyStore);
+  }
+
+  @Test
+  public void testGetCachedIndexLoadingConfigNormalizesTimestampBeforeReuse() {
+    BaseTableDataManager manager =
+        createSchemaReuseManager(createTimestampTable(TimestampIndexGranularity.DAY), createSchemaReuseSchema());
+    Schema first = manager.getCachedIndexLoadingConfig().getSchema();
+    IndexLoadingConfig second = manager.getCachedIndexLoadingConfig();
+    assertSame(second.getSchema(), first);
+    assertTrue(first.hasColumn("$ts$DAY"));
+    assertTrue(second.getFieldIndexConfigByColName().get("$ts$DAY").getConfig(StandardIndexes.range()).isEnabled());
+    assertEquals(second.getTableConfig().getIndexingConfig().getRangeIndexColumns(), List.of("$ts$DAY"));
+    assertEquals(second.getTableConfig().getIngestionConfig().getTransformConfigs().size(), 1);
+
+    ZKMetadataProvider.setTableConfig(manager._propertyStore, createTimestampTable(TimestampIndexGranularity.HOUR));
+    manager.onTableConfigOrSchemaRefresh();
+    Schema changed = manager.getCachedIndexLoadingConfig().getSchema();
+    assertNotSame(changed, first);
+    assertTrue(changed.hasColumn("$ts$HOUR"));
+    assertFalse(changed.hasColumn("$ts$DAY"));
+    assertFalse(first.hasColumn("$ts$HOUR"));
+  }
+
+  @Test
+  public void testGetCachedIndexLoadingConfigConcurrentlyReusesCachedSchema()
+      throws Exception {
+    BaseTableDataManager manager =
+        createSchemaReuseManager(createTimestampTable(TimestampIndexGranularity.DAY), createSchemaReuseSchema());
+    IndexLoadingConfig shared = manager.getCachedIndexLoadingConfig();
+    ExecutorService executor = Executors.newFixedThreadPool(8);
+    CountDownLatch start = new CountDownLatch(1);
+    try {
+      List<Future<IndexLoadingConfig>> results = new ArrayList<>();
+      for (int i = 0; i < 32; i++) {
+        results.add(executor.submit(() -> {
+          assertTrue(start.await(10, TimeUnit.SECONDS));
+          return manager.getCachedIndexLoadingConfig();
+        }));
+      }
+      start.countDown();
+      for (Future<IndexLoadingConfig> result : results) {
+        assertSame(result.get(10, TimeUnit.SECONDS), shared);
+      }
+      verifyNoInteractions(manager._propertyStore);
+    } finally {
+      start.countDown();
+      executor.shutdownNow();
+    }
+  }
+
+  private static BaseTableDataManager createSchemaReuseManager(TableConfig table, Schema schema) {
+    BaseTableDataManager manager = new OfflineTableDataManager();
+    manager._propertyStore = new FakePropertyStore();
+    manager._tableNameWithType = OFFLINE_TABLE_NAME;
+    ZKMetadataProvider.setTableConfig(manager._propertyStore, table);
+    ZKMetadataProvider.setSchema(manager._propertyStore, schema);
+    manager.updateCachedTableConfigAndSchema(table, schema);
+    manager._propertyStore = spy(manager._propertyStore);
+    return manager;
+  }
+
+  private static Schema createSchemaReuseSchema() {
+    return new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
+        .addSingleValueDimension("id", DataType.INT, -1)
+        .addDateTime("ts", DataType.TIMESTAMP, "TIMESTAMP", "1:MILLISECONDS").build();
+  }
+
+  private static TableConfig createTimestampTable(TimestampIndexGranularity granularity) {
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setFieldConfigList(List.of(new FieldConfig.Builder("ts")
+            .withTimestampConfig(new TimestampConfig(List.of(granularity))).build())).build();
+  }
+
   protected BaseTableDataManager createTableManager() {
     return createTableManager(createDefaultInstanceDataManagerConfig());
   }
@@ -1081,6 +1484,14 @@ public class BaseTableDataManagerTest {
     BaseTableDataManager tableDataManager = newTableDataManager();
     tableDataManager.init(instanceDataManagerConfig, createHelixManagerMock(), new SegmentLocks(), DEFAULT_TABLE_CONFIG,
         SCHEMA, new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(), null, null,
+        SEGMENT_OPERATIONS_THROTTLER, false, mock(ServerReloadJobStatusCache.class));
+    return tableDataManager;
+  }
+
+  protected BaseTableDataManager createTableManager(SegmentReloadSemaphore segmentReloadSemaphore) {
+    BaseTableDataManager tableDataManager = newTableDataManager();
+    tableDataManager.init(createDefaultInstanceDataManagerConfig(), createHelixManagerMock(), new SegmentLocks(),
+        DEFAULT_TABLE_CONFIG, SCHEMA, segmentReloadSemaphore, Executors.newSingleThreadExecutor(), null, null,
         SEGMENT_OPERATIONS_THROTTLER, false, mock(ServerReloadJobStatusCache.class));
     return tableDataManager;
   }
@@ -1182,7 +1593,7 @@ public class BaseTableDataManagerTest {
 
   protected ImmutableSegmentDataManager createImmutableSegmentDataManager(String segmentName, long crc) {
     SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
-    when(segmentMetadata.getCrc()).thenReturn(Long.toString(crc));
+    when(segmentMetadata.getCrc()).thenReturn(crc);
     return createImmutableSegmentDataManager(segmentName, segmentMetadata);
   }
 
@@ -1201,5 +1612,37 @@ public class BaseTableDataManagerTest {
     File indexMapFile =
         new File(new File(indexDir, SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME), V1Constants.INDEX_MAP_FILE_NAME);
     return FileUtils.readFileToString(indexMapFile, StandardCharsets.UTF_8).contains(columnName + ".inverted_index");
+  }
+
+  private static class TestSegmentReloadSemaphore extends SegmentReloadSemaphore {
+    private final AtomicInteger _availablePermits;
+    private final AtomicBoolean _acquireAttempted = new AtomicBoolean(false);
+
+    public TestSegmentReloadSemaphore(int permits) {
+      super(permits);
+      _availablePermits = new AtomicInteger(permits);
+    }
+
+    @Override
+    public void acquire(String segmentName, Logger logger)
+        throws InterruptedException {
+      _acquireAttempted.set(true);
+      super.acquire(segmentName, logger);
+      _availablePermits.decrementAndGet();
+    }
+
+    @Override
+    public void release() {
+      _availablePermits.incrementAndGet();
+      super.release();
+    }
+
+    public int availablePermits() {
+      return _availablePermits.get();
+    }
+
+    public boolean isAcquireAttempted() {
+      return _acquireAttempted.get();
+    }
   }
 }

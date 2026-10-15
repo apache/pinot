@@ -1,6 +1,6 @@
 ---
 name: review-performance
-description: Review Apache Pinot diffs for performance regressions in hot paths — per-row allocations, autoboxing, virtual dispatch in tight loops, large synchronized sections on the query path, unnecessary ByteBuffer copies, string concat in loops, and missing fast-paths for common types. Trigger keywords — TransformOperator, FilterOperator, ForwardIndexReader, segment scan, per-row, query hot path, allocation, autoboxing, JMH, benchmark.
+description: Review Apache Pinot performance when hot paths change or a PR makes benchmark or efficiency claims.
 domain: kb/code-review-principles.md#4-performance--efficiency
 triggers:
   - diff touches pinot-query-runtime/**/operator/**, pinot-core/**/operator/**, transform/aggregation function

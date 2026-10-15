@@ -179,11 +179,8 @@ abstract class BaseStarTreeV2Test<R, A> {
                 _valueAggregator.getAggregationType().getName(), null, getCompressionCodec(),
                 true, getIndexVersion(), null, null)), MAX_LEAF_RECORDS);
     File indexDir = new File(TEMP_DIR, SEGMENT_NAME);
-    // Randomly build star-tree using on-heap or off-heap mode
-    MultipleTreesBuilder.BuildMode buildMode =
-        RANDOM.nextBoolean() ? MultipleTreesBuilder.BuildMode.ON_HEAP : MultipleTreesBuilder.BuildMode.OFF_HEAP;
     try (MultipleTreesBuilder builder = new MultipleTreesBuilder(List.of(starTreeIndexConfig), false,
-        indexDir, buildMode)) {
+        indexDir, getBuildMode())) {
       builder.build();
     }
 
@@ -249,7 +246,7 @@ abstract class BaseStarTreeV2Test<R, A> {
     filterPlanNode.run();
     Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap =
         StarTreeUtils.extractPredicateEvaluatorsMap(_indexSegment, queryContext.getFilter(),
-            filterPlanNode.getPredicateEvaluators());
+            filterPlanNode.getPredicateEvaluators(), queryContext.isNullHandlingEnabled());
     assertNull(predicateEvaluatorsMap);
   }
 
@@ -281,7 +278,7 @@ abstract class BaseStarTreeV2Test<R, A> {
     filterPlanNode.run();
     Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap =
         StarTreeUtils.extractPredicateEvaluatorsMap(_indexSegment, queryContext.getFilter(),
-            filterPlanNode.getPredicateEvaluators());
+            filterPlanNode.getPredicateEvaluators(), queryContext.isNullHandlingEnabled());
     assertNotNull(predicateEvaluatorsMap);
 
     // Extract values with star-tree
@@ -492,6 +489,12 @@ abstract class BaseStarTreeV2Test<R, A> {
     CompressionCodec[] compressionCodecs = CompressionCodec.values();
     CompressionCodec compressionCodec = compressionCodecs[RANDOM.nextInt(compressionCodecs.length)];
     return compressionCodec.isApplicableToRawIndex() ? compressionCodec : null;
+  }
+
+  /// Star-tree build mode. Randomized by default so both builders are exercised over time; tests that need a
+  /// specific builder override this.
+  MultipleTreesBuilder.BuildMode getBuildMode() {
+    return RANDOM.nextBoolean() ? MultipleTreesBuilder.BuildMode.ON_HEAP : MultipleTreesBuilder.BuildMode.OFF_HEAP;
   }
 
   /// Can be overridden to force the index version.

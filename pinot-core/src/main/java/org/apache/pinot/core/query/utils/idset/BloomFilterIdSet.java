@@ -18,14 +18,14 @@
  */
 package org.apache.pinot.core.query.utils.idset;
 
-import com.google.common.base.Preconditions;
 import com.google.common.hash.BloomFilter;
 import com.google.common.hash.Funnel;
 import com.google.common.hash.Funnels;
-import java.io.ByteArrayInputStream;
+import java.io.BufferedInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.List;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -36,12 +36,16 @@ public class BloomFilterIdSet implements IdSet {
 
   private enum FunnelType {
     // DO NOT change the ids as the ser/de relies on them
-    INT((byte) 0), LONG((byte) 1), STRING((byte) 2), BYTES((byte) 3);
+    INT((byte) 0, DataType.INT, DataType.FLOAT), LONG((byte) 1, DataType.LONG, DataType.DOUBLE),
+    STRING((byte) 2, DataType.STRING), BYTES((byte) 3, DataType.BYTES);
 
     private final byte _id;
+    // Stored types whose values hash through this funnel: FLOAT and DOUBLE values hash as their raw bits
+    private final List<DataType> _valueTypes;
 
-    FunnelType(byte id) {
+    FunnelType(byte id, DataType... valueTypes) {
       _id = id;
+      _valueTypes = List.of(valueTypes);
     }
 
     public byte getId() {
@@ -91,6 +95,12 @@ public class BloomFilterIdSet implements IdSet {
 
   BloomFilter getBloomFilter() {
     return _bloomFilter;
+  }
+
+  /// Returns the stored types whose values can be looked up in this IdSet. The serialized form records only the
+  /// funnel, so an IdSet built from INT values also accepts FLOAT values (and LONG also accepts DOUBLE).
+  List<DataType> getValueTypes() {
+    return _funnelType._valueTypes;
   }
 
   @Override
@@ -174,13 +184,11 @@ public class BloomFilterIdSet implements IdSet {
     return byteArrayOutputStream.toByteArray();
   }
 
-  /// Deserializes the BloomFilterIdSet from a ByteBuffer.
+  /// Deserializes the BloomFilterIdSet from a ByteBuffer, which may be read-only or direct.
   ///
   /// NOTE: The ByteBuffer does not include the IdSet.Type byte.
   static BloomFilterIdSet fromByteBuffer(ByteBuffer byteBuffer)
       throws IOException {
-    Preconditions.checkArgument(byteBuffer.hasArray(),
-        "Cannot deserialize BloomFilter from ByteBuffer not backed by an accessible byte array");
     // Count the IdSet.Type byte
     int serializedSizeInBytes = 1 + byteBuffer.remaining();
     byte funnelTypeId = byteBuffer.get();
@@ -204,12 +212,11 @@ public class BloomFilterIdSet implements IdSet {
         funnel = Funnels.byteArrayFunnel();
         break;
       default:
-        throw new IllegalStateException();
+        throw new IllegalStateException("Unsupported BloomFilter funnel type id: " + funnelTypeId);
     }
     // NOTE: No need to close the stream.
-    BloomFilter bloomFilter = BloomFilter.readFrom(
-        new ByteArrayInputStream(byteBuffer.array(), byteBuffer.arrayOffset() + byteBuffer.position(),
-            byteBuffer.remaining()), funnel);
+    // Guava reads the filter 8 bytes at a time, which the Pinot buffer stream copies byte by byte, so buffer the reads.
+    BloomFilter bloomFilter = BloomFilter.readFrom(new BufferedInputStream(IdSets.toInputStream(byteBuffer)), funnel);
     return new BloomFilterIdSet(funnelType, bloomFilter, serializedSizeInBytes);
   }
 

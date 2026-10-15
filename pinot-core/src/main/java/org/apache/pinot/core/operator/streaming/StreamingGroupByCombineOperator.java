@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.core.operator.streaming;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.common.Operator;
@@ -40,6 +40,7 @@ import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
+import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.query.QueryThreadContext;
 
@@ -55,6 +56,10 @@ import org.apache.pinot.spi.query.QueryThreadContext;
 ///
 /// - Hash exchange routes the same group key to the same FINAL worker
 /// - AggregationFunction.merge() is associative
+///
+/// That FINAL stage is a precondition, not an implementation detail: a flushed block carries only a partial
+/// aggregate, and one group key can span several flush windows. Leaves that must return final results are rejected
+/// below; finalizing each flush instead would not make them correct, only silent.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class StreamingGroupByCombineOperator extends BaseStreamingCombineOperator<GroupByResultsBlock> {
   private static final String EXPLAIN_NAME = "STREAMING_COMBINE_GROUP_BY";
@@ -74,6 +79,9 @@ public class StreamingGroupByCombineOperator extends BaseStreamingCombineOperato
   public StreamingGroupByCombineOperator(List<Operator> operators, QueryContext queryContext,
       ExecutorService executorService, int flushThreshold) {
     super(null, operators, overrideMaxExecutionThreads(queryContext, operators.size()), executorService);
+    Preconditions.checkState(
+        !queryContext.isServerReturnFinalResult() && !queryContext.isServerReturnFinalResultKeyUnpartitioned(),
+        "Streaming group-by combine requires a leaf that emits INTERMEDIATE results");
     _flushThreshold = flushThreshold;
 
     AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
@@ -117,8 +125,7 @@ public class StreamingGroupByCombineOperator extends BaseStreamingCombineOperato
     try {
       while (_numOperatorsFinished < _numOperators) {
         QueryThreadContext.checkTermination(this::getExplainName);
-        BaseResultsBlock resultsBlock =
-            _blockingQueue.poll(endTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+        BaseResultsBlock resultsBlock = pollResultsBlock(_blockingQueue, endTimeMs);
         if (resultsBlock == null) {
           throw QueryErrorCode.EXECUTION_TIMEOUT.asException("Timed out while streaming group-by results");
         }
@@ -160,6 +167,7 @@ public class StreamingGroupByCombineOperator extends BaseStreamingCombineOperato
   /// returned unchanged.
   @Override
   protected GroupByResultsBlock detachFromWorkerThreadState(GroupByResultsBlock resultsBlock) {
+    GroupByUtils.validateFullGroupingSetsLayout(resultsBlock, _queryContext);
     AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
     if (aggregationGroupByResult == null || resultsBlock.getIntermediateRecords() != null) {
       return resultsBlock;

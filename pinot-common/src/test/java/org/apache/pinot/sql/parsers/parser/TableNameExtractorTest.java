@@ -269,6 +269,20 @@ public class TableNameExtractorTest {
     assertTrue(Arrays.asList(tableNames).contains("orders"), "Should contain orders table");
   }
 
+  @Test
+  public void testResolveTableNameWithQualifySubquery() {
+    // QUALIFY is legal for the multi-stage engine, which is what this extractor runs on, so a table referenced only
+    // from inside it must still be found.
+    String qualifySubqueryQuery = "SELECT u.id, ROW_NUMBER() OVER (PARTITION BY u.id) AS rn FROM users u "
+        + "QUALIFY rn <= (SELECT COUNT(*) FROM orders o WHERE o.user_id = u.id)";
+    String[] tableNames = TableNameExtractor.resolveTableName(qualifySubqueryQuery);
+
+    assertNotNull(tableNames, "Table names should not be null");
+    assertEquals(tableNames.length, 2, "Should resolve two tables");
+    assertTrue(Arrays.asList(tableNames).contains("users"), "Should contain users table");
+    assertTrue(Arrays.asList(tableNames).contains("orders"), "Should contain orders table from QUALIFY subquery");
+  }
+
   @Test(expectedExceptions = RuntimeException.class)
   public void testResolveTableNameWithInvalidQuery() {
     String[] tableNames = TableNameExtractor.resolveTableName("INVALID SQL QUERY");

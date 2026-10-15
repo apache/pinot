@@ -28,7 +28,6 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.function.BiConsumer;
 import javax.annotation.Nullable;
-import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -110,8 +109,10 @@ public class ServerPlanRequestUtils {
     PinotQuery pinotQuery = serverContext.getPinotQuery();
     pinotQuery.setExplain(explain);
 
-    if (MapUtils.isNotEmpty(rowFilters)) {
-      pinotQuery.setQueryOptions(rowFilters);
+    if (rowFilters != null) {
+      // Merge, never replace: the plan visitor may already have stamped SERVER_RETURN_FINAL_RESULT[_KEY_UNPARTITIONED]
+      // here, and updateQueryOptions() below does not restore them.
+      rowFilters.forEach(pinotQuery::putToQueryOptions);
     }
 
     List<InstanceRequest> instanceRequests;

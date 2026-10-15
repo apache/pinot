@@ -34,6 +34,7 @@ import org.apache.pinot.core.operator.combine.SelectionOnlyCombineOperator;
 import org.apache.pinot.core.operator.combine.SelectionOrderByCombineOperator;
 import org.apache.pinot.core.operator.combine.SequentialSortedGroupByCombineOperator;
 import org.apache.pinot.core.operator.combine.SortedGroupByCombineOperator;
+import org.apache.pinot.core.operator.streaming.StreamingDistinctCombineOperator;
 import org.apache.pinot.core.operator.streaming.StreamingGroupByCombineOperator;
 import org.apache.pinot.core.operator.streaming.StreamingSelectionOnlyCombineOperator;
 import org.apache.pinot.core.query.executor.ResultsBlockStreamer;
@@ -55,10 +56,10 @@ public class CombinePlanNode implements PlanNode {
   // Try to schedule 10 plans for each thread, or evenly distribute plans to all MAX_NUM_THREADS_PER_QUERY threads
   private static final int TARGET_NUM_PLANS_PER_THREAD = 10;
 
-  private final List<PlanNode> _planNodes;
-  private final QueryContext _queryContext;
-  private final ExecutorService _executorService;
-  private final ResultsBlockStreamer _streamer;
+  protected final List<PlanNode> _planNodes;
+  protected final QueryContext _queryContext;
+  protected final ExecutorService _executorService;
+  protected final ResultsBlockStreamer _streamer;
 
   /// Constructor for the class.
   ///
@@ -128,47 +129,113 @@ public class CombinePlanNode implements PlanNode {
     if (_streamer != null) {
       if (QueryContextUtils.isSelectionOnlyQuery(_queryContext) && _queryContext.getLimit() != 0) {
         // Use streaming operator only for non-empty selection-only query
-        return new StreamingSelectionOnlyCombineOperator(operators, _queryContext, _executorService);
+        return createStreamingSelectionOnlyCombineOperator(operators);
       }
-      int flushThreshold = _queryContext.getStreamingGroupByFlushThreshold();
-      if (flushThreshold > 0 && QueryContextUtils.isAggregationQuery(_queryContext)
-          && _queryContext.getGroupByExpressions() != null) {
-        // Use streaming group-by operator for MSE leaf stages with flush threshold
-        return new StreamingGroupByCombineOperator(operators, _queryContext, _executorService, flushThreshold);
+      // Streaming flushes partial results, so it needs an aggregation above to merge them back together.
+      // Leaves that must return final results are excluded, see StreamingGroupByCombineOperator.
+      boolean leafReturnsFinalResult =
+          _queryContext.isServerReturnFinalResult() || _queryContext.isServerReturnFinalResultKeyUnpartitioned();
+      int groupByFlushThreshold = _queryContext.getStreamingGroupByFlushThreshold();
+      if (groupByFlushThreshold > 0
+          && QueryContextUtils.isAggregationQuery(_queryContext)
+          && _queryContext.getGroupByExpressions() != null
+          && !leafReturnsFinalResult) {
+        return createStreamingGroupByCombineOperator(operators);
+      }
+      int distinctFlushThreshold = _queryContext.getStreamingDistinctFlushThreshold();
+      if (distinctFlushThreshold > 0 && QueryContextUtils.isDistinctQuery(_queryContext)
+          // With ORDER BY, the DistinctTable keeps a bounded top-LIMIT heap instead of accumulating every value, so
+          // it is already memory-bounded and streaming would only ship more rows.
+          && _queryContext.getOrderByExpressions() == null
+          // NOTE: The planner pushes LIMIT (plus OFFSET) into the leaf aggregate for any distinct query that has
+          // one -- see PinotAggregateExchangeNodeInsertRule#isGroupTrimmingEnabled, which is unconditionally on for
+          // aggregates with no aggregate calls. So the leaf table is normally bounded at LIMIT already, and this
+          // feature is for the case where that LIMIT is far larger than the memory we want to spend.
+          //
+          // This branch DOES give up the cross-segment early exit: DistinctResultsBlockMerger#isQuerySatisfied can
+          // only fire once the accumulated table reaches LIMIT, and flushing empties it well before that, so every
+          // segment gets scanned. That is the deliberate trade -- a lower memory ceiling for more scan work. When
+          // LIMIT is at or below the threshold there is no memory to save, so the short-circuit wins instead.
+          && _queryContext.getLimit() > distinctFlushThreshold
+          && !leafReturnsFinalResult) {
+        return createStreamingDistinctCombineOperator(operators);
       }
     }
     if (QueryContextUtils.isAggregationQuery(_queryContext)) {
       if (_queryContext.getGroupByExpressions() == null) {
         // Aggregation only
-        return new AggregationCombineOperator(operators, _queryContext, _executorService);
+        return createAggregationCombineOperator(operators);
       } else {
-        // Sorted aggregation group-by, when safeTrim and limit is not too large
-        if (_queryContext.shouldSortAggregateUnderSafeTrim()) {
-          if (operators.size() < _queryContext.getSortAggregateSequentialCombineNumSegmentsThreshold()) {
-            return new SequentialSortedGroupByCombineOperator(operators, _queryContext, _executorService);
-          }
-          return new SortedGroupByCombineOperator(operators, _queryContext, _executorService);
-        }
-        // Aggregation group-by
-        return new GroupByCombineOperator(operators, _queryContext, _executorService);
+        return createGroupByCombineOperator(operators);
       }
     } else if (QueryContextUtils.isSelectionQuery(_queryContext)) {
-      if (_queryContext.getLimit() == 0 || _queryContext.getOrderByExpressions() == null) {
-        // Selection only
-        return new SelectionOnlyCombineOperator(operators, _queryContext, _executorService);
-      } else {
-        // Selection order-by
-        List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
-        assert orderByExpressions != null;
-        if (orderByExpressions.get(0).getExpression().getType() == ExpressionContext.Type.IDENTIFIER) {
-          return new MinMaxValueBasedSelectionOrderByCombineOperator(operators, _queryContext, _executorService);
-        } else {
-          return new SelectionOrderByCombineOperator(operators, _queryContext, _executorService);
-        }
-      }
+      return createSelectionCombineOperator(operators);
     } else {
       assert QueryContextUtils.isDistinctQuery(_queryContext);
-      return new DistinctCombineOperator(operators, _queryContext, _executorService);
+      return createDistinctCombineOperator(operators);
     }
+  }
+
+  /// Returns the combine operator for a selection query, with or without ORDER BY.
+  protected BaseCombineOperator createSelectionCombineOperator(List<Operator> operators) {
+    if (_queryContext.getLimit() == 0 || _queryContext.getOrderByExpressions() == null) {
+      // Selection only
+      return new SelectionOnlyCombineOperator(operators, _queryContext, _executorService);
+    }
+    // Selection order-by
+    List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
+    assert orderByExpressions != null;
+    if (orderByExpressions.get(0).getExpression().getType() == ExpressionContext.Type.IDENTIFIER) {
+      return new MinMaxValueBasedSelectionOrderByCombineOperator(operators, _queryContext, _executorService);
+    }
+    return new SelectionOrderByCombineOperator(operators, _queryContext, _executorService);
+  }
+
+  /// Returns the combine operator for an aggregation query with no GROUP BY.
+  protected BaseCombineOperator createAggregationCombineOperator(List<Operator> operators) {
+    return new AggregationCombineOperator(operators, _queryContext, _executorService);
+  }
+
+  /// Returns the combine operator for an aggregation query with GROUP BY.
+  ///
+  /// Covers the sorted variants as well as the general one. An implementation that substitutes only the
+  /// general operator must still delegate the `shouldSortAggregateUnderSafeTrim()` branch to `super`,
+  /// since those operators carry the safe-trim semantics the query was planned with.
+  protected BaseCombineOperator createGroupByCombineOperator(List<Operator> operators) {
+    // Sorted aggregation group-by, when safeTrim and limit is not too large
+    if (_queryContext.shouldSortAggregateUnderSafeTrim()) {
+      if (operators.size() < _queryContext.getSortAggregateSequentialCombineNumSegmentsThreshold()) {
+        return new SequentialSortedGroupByCombineOperator(operators, _queryContext, _executorService);
+      }
+      return new SortedGroupByCombineOperator(operators, _queryContext, _executorService);
+    }
+    // Aggregation group-by
+    return new GroupByCombineOperator(operators, _queryContext, _executorService);
+  }
+
+  /// Returns the combine operator for a distinct query.
+  protected BaseCombineOperator createDistinctCombineOperator(List<Operator> operators) {
+    return new DistinctCombineOperator(operators, _queryContext, _executorService);
+  }
+
+  /// Returns the streaming combine operator for a selection-only query.
+  protected BaseCombineOperator createStreamingSelectionOnlyCombineOperator(List<Operator> operators) {
+    return new StreamingSelectionOnlyCombineOperator(operators, _queryContext, _executorService);
+  }
+
+  /// Returns the streaming combine operator for a group-by query. This is a different path from
+  /// [#createGroupByCombineOperator()]: it flushes partial results and relies on an aggregation above to
+  /// merge them, so an implementation substituting one is not obliged to substitute the other.
+  protected BaseCombineOperator createStreamingGroupByCombineOperator(List<Operator> operators) {
+    return new StreamingGroupByCombineOperator(operators, _queryContext, _executorService,
+        _queryContext.getStreamingGroupByFlushThreshold());
+  }
+
+  /// Returns the streaming combine operator for a distinct query. See
+  /// [#createStreamingGroupByCombineOperator()] for why this is separate from
+  /// [#createDistinctCombineOperator()].
+  protected BaseCombineOperator createStreamingDistinctCombineOperator(List<Operator> operators) {
+    return new StreamingDistinctCombineOperator(operators, _queryContext, _executorService,
+        _queryContext.getStreamingDistinctFlushThreshold());
   }
 }

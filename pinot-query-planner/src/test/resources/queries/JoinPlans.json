@@ -7,7 +7,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalSort(sort0=[$0], dir0=[ASC])",
-          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalProject(col1=[$0], ts=[$1], col3=[$3])",
           "\n      LogicalJoin(condition=[=($0, $2)], joinType=[inner])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
@@ -25,7 +25,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalSort(sort0=[$0], dir0=[ASC])",
-          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalProject(value1=[$0], ts1=[$1], col3=[$3])",
           "\n      LogicalJoin(condition=[=($0, $2)], joinType=[inner])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
@@ -58,6 +58,20 @@
           "\nLogicalJoin(condition=[=($0, $10)], joinType=[inner])",
           "\n  PinotLogicalExchange(distribution=[hash[0]])",
           "\n    LogicalFilter(condition=[>=($2, 0)])",
+          "\n      PinotLogicalTableScan(table=[[default, a]])",
+          "\n  PinotLogicalExchange(distribution=[hash[1]])",
+          "\n    PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Inner join with an IN_ID_SET filter on one table, which is pushed into the leaf stage",
+        "sql": "EXPLAIN PLAN FOR SELECT * FROM a JOIN b ON a.col1 = b.col2 WHERE IN_ID_SET(a.col3, 'ATowAAABAAAAAAACABAAAAACAAQABgA=') = 1",
+        "output": [
+          "Execution Plan",
+          "\nLogicalJoin(condition=[=($0, $10)], joinType=[inner])",
+          "\n  PinotLogicalExchange(distribution=[hash[0]])",
+          "\n    LogicalFilter(condition=[INIDSET($2, _UTF-8'ATowAAABAAAAAAACABAAAAACAAQABgA=')])",
           "\n      PinotLogicalTableScan(table=[[default, a]])",
           "\n  PinotLogicalExchange(distribution=[hash[1]])",
           "\n    PinotLogicalTableScan(table=[[default, b]])",
