@@ -210,11 +210,11 @@ public class ObfuscatorTest {
   public void testMasksCredentialsWithoutAGenericSuffix() {
     // Each of these is a credential whose key does not end in "secret", "password" or "token".
     List<String> keys = List.of("accessKey", "accessKeyId", "input.fs.prop.accessKey", "fs.s3a.access.key",
-        "awsAccessKey", "restAccessKeyId", "storageSecretAccessKey", "sasl.jaas.config",
+        "fs.s3a.secret.key", "secret.key", "api.key", "awsAccessKey", "restAccessKeyId", "storageSecretAccessKey",
+        "fs.azure.account.key", "storageAccountKey", "sasl.jaas.config",
         "stream.kafka.decoder.prop.basic.auth.user.info", "userInfo", "privateKey", "private_key_id",
-        "sql.snowflake.privateKey", "sql.bigquery.jsonKey", "fs.gs.auth.service.account.json.keyfile",
-        "delta.ingestion.table.gcs.keyFile", "delta.ingestion.table.gcs.keyContentBase64", "credentials",
-        "gcs.credential", "passwd", "ssl.key.passphrase");
+        "sql.snowflake.privateKey", "sql.bigquery.jsonKey", "delta.ingestion.table.gcs.keyContentBase64",
+        "credentials", "gcs.credential", "passwd", "ssl.key.passphrase");
     Map<String, Object> configs = new HashMap<>();
     keys.forEach(key -> configs.put(key, SECRET));
     configs.put("value", VALUE);
@@ -230,7 +230,9 @@ public class ObfuscatorTest {
     // Names that only mention a credential word, which an operator reads to debug authentication.
     List<String> keys = List.of("pinot.broker.auth.provider.class", "fs.s3a.aws.credentials.provider",
         "stream.kafka.decoder.prop.basic.auth.credentials.source", "primaryKeyColumns", "partitionKey",
-        "accessKeyRotationDays", "tokenUri", "jaas.login.module", "sortedColumn");
+        "accessKeyRotationDays", "tokenUri", "jaas.login.module", "sortedColumn",
+        // Key file locations are paths, not secrets.
+        "sslKeyFile", "publicKeyFile", "fs.gs.auth.service.account.json.keyfile");
     Map<String, Object> configs = new HashMap<>();
     keys.forEach(key -> configs.put(key, VALUE));
 
