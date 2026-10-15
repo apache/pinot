@@ -145,7 +145,7 @@ public final class TableConfigUtils {
       ImmutableSet.of(RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
           RoutingConfig.MULTI_STAGE_REPLICA_GROUP_SELECTOR_TYPE);
 
-  private static boolean _disableGroovy;
+  private static volatile boolean _disableGroovy;
 
   private static boolean _enforcePoolBasedAssignment;
 

@@ -28,10 +28,14 @@ import org.apache.pinot.common.auth.BasicAuthTokenUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.spi.config.TableConfigs;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.user.ComponentType;
 import org.apache.pinot.spi.config.user.RoleType;
 import org.apache.pinot.spi.config.user.UserConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -111,6 +115,7 @@ public class ControllerClusterBasicAuthAuthorizationTest extends ControllerTest 
 
       assertClusterScope(tableReadHeaders, tableAdminHeaders);
       assertTableScope(tableReadHeaders, tableUpdateHeaders, authHeaders("unknown", "incorrect"));
+      assertSchemaValidationAuthorizesBeforeCompiling(tableAdminHeaders);
 
       String configKey = "pinot.controller.auth.test." + configKeySuffix;
       String zkPath = "/controller-auth-test-" + configKeySuffix;
@@ -158,6 +163,24 @@ public class ControllerClusterBasicAuthAuthorizationTest extends ControllerTest 
         stopController();
       }
       stopZk();
+    }
+  }
+
+  // An invalid legacy transform distinguishes authorization failures from evaluator compilation failures.
+  @SuppressWarnings("deprecation")
+  private void assertSchemaValidationAuthorizesBeforeCompiling(Map<String, String> headers)
+      throws IOException {
+    Schema schema = createDummySchema(DISALLOWED_TABLE);
+    schema.getFieldSpecFor("dimA").setTransformFunction("Groovy({ def invalid = }, dimB)");
+    String schemaJson = schema.toSingleLineJsonString();
+    assertHttpError(403, () -> sendPostRequest(_controllerBaseApiUrl + "/schemas/validate", schemaJson, headers));
+    assertEquals(sendMultipartPostRequest(_controllerBaseApiUrl + "/schemas/validate", schemaJson, headers)
+        .getStatusCode(), 403);
+
+    String tableConfigsJson = new TableConfigs(DISALLOWED_TABLE, schema,
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(DISALLOWED_TABLE).build(), null).toJsonString();
+    for (String path : List.of("/tableConfigs", "/tableConfigs/validate", "/tableConfigs/tune")) {
+      assertHttpError(403, () -> sendPostRequest(_controllerBaseApiUrl + path, tableConfigsJson, headers));
     }
   }
 

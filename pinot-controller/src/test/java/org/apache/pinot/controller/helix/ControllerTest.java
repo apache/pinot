@@ -306,8 +306,6 @@ public class ControllerTest {
     properties.put(ControllerConf.DATA_DIR, DEFAULT_DATA_DIR);
     properties.put(ControllerConf.LOCAL_TEMP_DIR, DEFAULT_LOCAL_TEMP_DIR);
     properties.put(ControllerConf.CONFIG_OF_PAGE_CACHE_WARMUP_QUERIES_DATA_DIR, DEFAULT_DATA_DIR);
-    // Enable groovy on the controller
-    properties.put(ControllerConf.DISABLE_GROOVY, false);
     properties.put(ControllerConf.CONSOLE_SWAGGER_ENABLE, false);
     properties.put(CommonConstants.CONFIG_OF_TIMEZONE, "UTC");
     properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, true);
@@ -321,7 +319,14 @@ public class ControllerTest {
 
   /// Can be overridden to use a different implementation.
   public BaseControllerStarter createControllerStarter() {
-    return new ControllerStarter();
+    return new ControllerStarter() {
+      @Override
+      protected Map<String, String> getDefaultClusterConfigs() {
+        Map<String, String> configs = super.getDefaultClusterConfigs();
+        configs.put(ControllerConf.DISABLE_GROOVY, "false");
+        return configs;
+      }
+    };
   }
 
   public void startController()
@@ -1551,6 +1556,20 @@ public class ControllerTest {
 
   public ControllerConf getControllerConfig() {
     return _controllerConfig;
+  }
+
+  public void setClusterIngestionGroovyConfig(@Nullable String value) {
+    ConfigAccessor configAccessor = _helixManager.getConfigAccessor();
+    ClusterConfig clusterConfig = configAccessor.getClusterConfig(getHelixClusterName());
+    if (value == null) {
+      clusterConfig.getRecord().getSimpleFields().remove(ControllerConf.DISABLE_GROOVY);
+    } else {
+      clusterConfig.getRecord().setSimpleField(ControllerConf.DISABLE_GROOVY, value);
+    }
+    configAccessor.setClusterConfig(getHelixClusterName(), clusterConfig);
+    boolean disabled = CommonConstants.Groovy.isIngestionGroovyDisabled(value);
+    TestUtils.waitForCondition(aVoid -> _controllerConfig.isDisableIngestionGroovy() == disabled, 10_000L,
+        "Controller did not apply the cluster ingestion Groovy policy");
   }
 
   /// Do not override this method as the configuration is shared across all default TestNG group.
