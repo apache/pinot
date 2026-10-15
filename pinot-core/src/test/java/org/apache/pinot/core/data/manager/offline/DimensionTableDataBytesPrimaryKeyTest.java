@@ -66,6 +66,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -172,51 +173,15 @@ public class DimensionTableDataBytesPrimaryKeyTest {
     return tableDataManager;
   }
 
-  @Test
-  public void testLookupForFastLookupDimensionTable()
-      throws Exception {
-    TableConfig tableConfig = getTableConfig(false);
-    Schema schema = getSchema();
-    DimensionTableDataManager tableDataManager = makeTableDataManager(tableConfig, schema);
-
-    // try fetching data BEFORE loading segment
-    byte[] rawBytes = BytesUtils.toBytes("550e8400e29b41d4a716446655440000"); // from hex string
-    byte[] contentHashBytes = BytesUtils.toBytes("5eb63bbbe01eeed093cb22bb8f5acdc3");
-    ByteArray keyValue = new ByteArray(rawBytes);
-    PrimaryKey key = new PrimaryKey(new Object[]{keyValue});
-    assertFalse(tableDataManager.containsKey(key));
-    assertNull(tableDataManager.lookupRow(key));
-    assertNull(tableDataManager.lookupValue(key, "assetId"));
-    assertNull(tableDataManager.lookupValue(key, "assetName"));
-    assertNull(tableDataManager.lookupValue(key, "contentHash"));
-    assertNull(tableDataManager.lookupValues(key, new String[]{"assetId", "assetName", "contentHash"}));
-
-    tableDataManager.addSegment(ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),
-        SEGMENT_OPERATIONS_THROTTLER));
-
-    // Confirm table is loaded and available for lookup
-    assertTrue(tableDataManager.containsKey(key));
-    GenericRow row = tableDataManager.lookupRow(key);
-    assertNotNull(row);
-    assertEquals(row.getFieldToValueMap().size(), 3);
-    assertEquals(row.getValue("assetId"), keyValue);
-    assertEquals(row.getValue("assetName"), "logo-final-v2.svg");
-    assertEquals(row.getValue("contentHash"), contentHashBytes);
-    assertEquals(tableDataManager.lookupValue(key, "assetId"), keyValue);
-    assertEquals(tableDataManager.lookupValue(key, "assetName"), "logo-final-v2.svg");
-    assertEquals(tableDataManager.lookupValue(key, "contentHash"), contentHashBytes);
-    Object[] values = tableDataManager.lookupValues(key, new String[]{"assetId", "assetName", "contentHash"});
-    assertNotNull(values);
-    assertEquals(values.length, 3);
-    assertEquals(values[0], keyValue);
-    assertEquals(values[1], "logo-final-v2.svg");
-    assertEquals(values[2], contentHashBytes);
+  @DataProvider(name = "preloadModes")
+  public Object[][] providePreloadModes() {
+    return new Object[][]{{false}, {true}};
   }
 
-  @Test
-  public void testLookupForMemoryOptimizedDimensionTable()
+  @Test(dataProvider = "preloadModes")
+  public void testLookup(boolean disablePreload)
       throws Exception {
-    TableConfig tableConfig = getTableConfig(true);
+    TableConfig tableConfig = getTableConfig(disablePreload);
     Schema schema = getSchema();
     DimensionTableDataManager tableDataManager = makeTableDataManager(tableConfig, schema);
 

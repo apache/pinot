@@ -169,13 +169,7 @@ public class PinotSegmentRecordReader implements RecordReader {
   ///                         skipping other column-level secondary indexes
   public void init(File indexDir, @Nullable Set<String> fieldsToRead, @Nullable List<String> sortOrder,
       boolean skipDefaultNullValues, boolean forwardIndexOnly) {
-    IndexSegment indexSegment;
-    try {
-      indexSegment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap, forwardIndexOnly);
-    } catch (Exception e) {
-      throw new RuntimeException("Caught exception while loading the segment from: " + indexDir, e);
-    }
-    init(indexSegment, true, fieldsToRead, null, sortOrder, skipDefaultNullValues, null);
+    init(indexDir, fieldsToRead, sortOrder, skipDefaultNullValues, forwardIndexOnly, null);
   }
 
   /// Initializes the record reader from a segment.
@@ -425,7 +419,7 @@ public class PinotSegmentRecordReader implements RecordReader {
     if (_primaryKeyIndexes != null) {
       return _primaryKeyIndexes;
     }
-    _primaryKeyIndexes = getIndexesForColumns(new ArrayList<>(_primaryKeyColumns));
+    _primaryKeyIndexes = getIndexesForColumns(_primaryKeyColumns);
     return _primaryKeyIndexes;
   }
 }
