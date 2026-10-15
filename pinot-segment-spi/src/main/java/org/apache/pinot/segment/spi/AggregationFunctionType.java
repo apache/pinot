@@ -541,9 +541,13 @@ public enum AggregationFunctionType {
           // Arrays of CHAR and BINARY values are STRING and BYTES arrays, like arrays of VARCHAR and VARBINARY values
           return valueTypeName.getFamily() != dataType.getSqlTypeName().getFamily();
         case DECIMAL:
-          // The planner gives DECIMAL types different Pinot types by precision and scale
-          return dataType.getSqlTypeName() != SqlTypeName.DECIMAL || valueType.getPrecision() != dataType.getPrecision()
-              || valueType.getScale() != dataType.getScale();
+          if (dataType.getSqlTypeName() != SqlTypeName.DECIMAL) {
+            return true;
+          }
+          // The multi-stage engine converts the BIG_DECIMAL values of ARRAY_AGG to the array type of the plan. It can
+          // do this for the array type of every DECIMAL value, except DECIMAL(p, 0) with p <= 18, whose array type is
+          // an INT or LONG array (see RelToPlanNodeConverter.resolveDecimal()).
+          return valueType.getScale() == 0 && valueType.getPrecision() <= 18;
         default:
           return valueTypeName != dataType.getSqlTypeName();
       }
