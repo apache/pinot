@@ -42,17 +42,20 @@ Yammer, which remains bundled. A removal release will be decided separately; see
    pinot.minion.metrics.factory.className=org.apache.pinot.plugin.metrics.dropwizard.DropwizardMetricsFactory
    ```
 
-3. To publish a Prometheus scrape endpoint, enable the existing JMX exporter Java agent with the applicable
-   role configuration (`broker.yml`, `controller.yml`, `server.yml`, or `minion.yml`). See the
+3. To publish a Prometheus scrape endpoint, enable the existing JMX exporter Java agent with
+   `configs-dropwizard/<role>.yml`, where `<role>` is `broker`, `controller`, `server`, or `minion`.
+   If the agent is already enabled, change its YAML path from `configs/<role>.yml` when switching from Yammer.
+   See the
    [agent startup and scrape configuration](../../../docker/images/pinot/etc/jmx_prometheus_javaagent/README.md#expose-a-scrape-endpoint-with-dropwizard).
-4. Restart each affected service to load the new factory. Validate the migration in a test environment before
-   rolling it out to production.
+4. Restart each affected service to load the new factory and exporter configuration. Validate the migration in
+   a test environment before rolling it out to production.
 
-The role-specific exporter rules support both backends and retain the Prometheus metric names and labels for
-standard Pinot metrics. Those timers are reported in milliseconds and meter rates per second with either backend.
+The backend-specific role configurations retain the Prometheus metric names and labels for standard Pinot metrics.
+Those timers are reported in milliseconds and meter rates per second with either backend.
 Native JMX names and attributes can differ, as can sampled timer distributions. Validate custom JMX consumers,
 reporters/listeners, and explicit Yammer factory references in compound metrics configurations when migrating.
 
 To roll back while Yammer remains available, explicitly set each affected service's
-`pinot.<role>.metrics.factory.className` to `org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory`, then
-restart the affected services. Removing the setting selects the Dropwizard default.
+`pinot.<role>.metrics.factory.className` to `org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory`.
+If using the Java agent, also switch its YAML path back to `configs/<role>.yml`. Restart the affected services
+after updating the settings. Removing the factory setting selects the Dropwizard default.

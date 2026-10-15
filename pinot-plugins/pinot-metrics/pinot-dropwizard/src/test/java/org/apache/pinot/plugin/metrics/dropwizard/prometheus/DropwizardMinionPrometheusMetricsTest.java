@@ -33,6 +33,6 @@ public class DropwizardMinionPrometheusMetricsTest extends MinionPrometheusMetri
 
   @Override
   protected String getConfigFile() {
-    return "../../../docker/images/pinot/etc/jmx_prometheus_javaagent/configs/minion.yml";
+    return "../../../docker/images/pinot/etc/jmx_prometheus_javaagent/configs-dropwizard/minion.yml";
   }
 }
