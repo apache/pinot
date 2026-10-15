@@ -33,6 +33,6 @@ public class DropwizardBrokerPrometheusMetricsTest extends BrokerPrometheusMetri
 
   @Override
   protected String getConfigFile() {
-    return "../../../docker/images/pinot/etc/jmx_prometheus_javaagent/configs/broker.yml";
+    return "../../../docker/images/pinot/etc/jmx_prometheus_javaagent/configs-dropwizard/broker.yml";
   }
 }

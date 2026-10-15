@@ -33,6 +33,6 @@ public class DropwizardControllerPrometheusMetricsTest extends ControllerPrometh
 
   @Override
   protected String getConfigFile() {
-    return "../../../docker/images/pinot/etc/jmx_prometheus_javaagent/configs/controller.yml";
+    return "../../../docker/images/pinot/etc/jmx_prometheus_javaagent/configs-dropwizard/controller.yml";
   }
 }
