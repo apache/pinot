@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.ByteOrder;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -32,6 +33,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99.HnswV
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.segment.store.VectorIndexUtils;
+import org.apache.pinot.segment.local.utils.LuceneIndexCompatibilityUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
@@ -81,6 +83,11 @@ public class VectorIndexHandler extends BaseIndexHandler {
       }
       VectorIndexConfig desiredConfig = _vectorConfigs.get(column);
       VectorBackendType desiredBackend = desiredConfig.resolveBackendType();
+      if (desiredBackend == VectorBackendType.HNSW && needsHnswRecovery(segmentReader, column)) {
+        LOGGER.info("Need to rebuild incompatible or interrupted HNSW index for segment: {}, column: {}", segmentName,
+            column);
+        return true;
+      }
       VectorBackendType existingBackend = VectorIndexUtils.detectVectorIndexBackend(indexDir, column);
       // Both detectVectorIndexBackend and the consolidated sniff report the STORAGE format
       // (IVF_ON_DISK payloads/files register as IVF_FLAT), so compare against the desired
@@ -134,6 +141,84 @@ public class VectorIndexHandler extends BaseIndexHandler {
       }
     }
     return false;
+  }
+
+  /// Checks recovery sources before other handlers can reconstruct a missing forward index. A multi-value forward
+  /// index regenerated from dictionary/inverted indexes does not retain vector coordinate order or duplicates.
+  public void validateRecoverySources(SegmentDirectory.Reader segmentReader)
+      throws IOException {
+    Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.vector());
+    for (Map.Entry<String, VectorIndexConfig> entry : _vectorConfigs.entrySet()) {
+      String column = entry.getKey();
+      if (entry.getValue().resolveBackendType() == VectorBackendType.HNSW
+          && (hasHnswRecoveryMarker(column) || existingColumns.contains(column)
+          && isIncompatibleHnswIndex(segmentReader, column))) {
+        requireVectorRecoverySource(segmentReader, column);
+      }
+    }
+  }
+
+  private boolean needsHnswRecovery(SegmentDirectory.Reader segmentReader, String column)
+      throws IOException {
+    // An interrupted creator can leave a readable but incomplete Lucene commit, or no commit at all.
+    return hasHnswRecoveryMarker(column) || isIncompatibleHnswIndex(segmentReader, column);
+  }
+
+  private boolean hasHnswRecoveryMarker(String column) {
+    File segmentDirectory = SegmentDirectoryPaths.segmentDirectoryFor(
+        _segmentDirectory.getSegmentMetadata().getIndexDir(), _segmentDirectory.getSegmentMetadata().getVersion());
+    return new File(segmentDirectory,
+        column + VectorIndexUtils.getIndexFileExtension(VectorBackendType.HNSW, false) + ".inprogress").exists()
+        || new File(segmentDirectory,
+        column + VectorIndexUtils.getIndexFileExtension(VectorBackendType.HNSW, true) + ".inprogress").exists();
+  }
+
+  private static void requireVectorRecoverySource(SegmentDirectory.Reader segmentReader, String column)
+      throws IOException {
+    if (!segmentReader.hasIndexFor(column, StandardIndexes.forward())) {
+      throw new IOException("Cannot rebuild incompatible or interrupted HNSW index for column: " + column
+          + " without the original forward index. Vector coordinate order cannot be recovered from dictionary and "
+          + "inverted indexes; refresh the segment from source data.");
+    }
+  }
+
+  private boolean isIncompatibleHnswIndex(SegmentDirectory.Reader segmentReader, String column)
+      throws IOException {
+    File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
+    VectorBackendType existingBackend = VectorIndexUtils.detectVectorIndexBackend(indexDir, column);
+    if (existingBackend != null && existingBackend != VectorBackendType.HNSW) {
+      return false;
+    }
+    File indexFile = SegmentDirectoryPaths.findVectorIndexIndexFile(indexDir, column, VectorBackendType.HNSW);
+    if (indexFile != null) {
+      if (indexFile.isDirectory()) {
+        if (LuceneIndexCompatibilityUtils.isIncompatible(indexFile)) {
+          return true;
+        }
+        // Absorption prefers a combined sibling over the legacy directory when both survived a previous load.
+        File combinedFile = new File(indexFile.getParentFile(),
+            column + VectorIndexUtils.getIndexFileExtension(VectorBackendType.HNSW, true));
+        if (combinedFile.exists() && isIncompatibleCombinedHnsw(combinedFile, column)) {
+          return true;
+        }
+      } else if (isIncompatibleCombinedHnsw(indexFile, column)) {
+        return true;
+      }
+    }
+    if (_segmentDirectory.getSegmentMetadata().getVersion() == SegmentVersion.v3
+        && VectorIndexUtils.detectConsolidatedVectorBackend(segmentReader, column) == VectorBackendType.HNSW) {
+      PinotDataBuffer buffer = VectorIndexUtils.getConsolidatedVectorEntry(segmentReader, column);
+      return buffer != null && LuceneIndexCompatibilityUtils.isIncompatible(buffer, column);
+    }
+    return false;
+  }
+
+  private static boolean isIncompatibleCombinedHnsw(File indexFile, String column)
+      throws IOException {
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapFile(indexFile, true, 0, indexFile.length(),
+        ByteOrder.LITTLE_ENDIAN, "HNSW compatibility: " + column)) {
+      return LuceneIndexCompatibilityUtils.isIncompatible(buffer, column);
+    }
   }
 
   /// Returns the consolidated payload's backend when it drifts from the desired backend's storage
@@ -494,6 +579,15 @@ public class VectorIndexHandler extends BaseIndexHandler {
       }
       VectorIndexConfig desiredConfig = _vectorConfigs.get(column);
       VectorBackendType desiredBackend = desiredConfig.resolveBackendType();
+      // Check before the storage migrations below: neither absorption nor extraction makes Lucene formats readable.
+      if (desiredBackend == VectorBackendType.HNSW && needsHnswRecovery(segmentWriter, column)) {
+        requireVectorRecoverySource(segmentWriter, column);
+        LOGGER.info("Rebuilding incompatible or interrupted HNSW index for segment: {}, column: {}", segmentName,
+            column);
+        segmentWriter.removeIndex(column, StandardIndexes.vector());
+        columnsToAddIdx.add(column);
+        continue;
+      }
       VectorBackendType existingBackend = VectorIndexUtils.detectVectorIndexBackend(indexDir, column);
       // Storage-format comparison — see the twin check in needUpdateIndices.
       if (existingBackend != null && existingBackend != VectorIndexUtils.storageFormatOf(desiredBackend)) {
@@ -591,6 +685,9 @@ public class VectorIndexHandler extends BaseIndexHandler {
     String columnName = columnMetadata.getColumnName();
     VectorIndexConfig config = _fieldIndexConfigs.get(columnName).getConfig(StandardIndexes.vector());
     VectorBackendType backendType = config.resolveBackendType();
+    if (backendType == VectorBackendType.HNSW && hasHnswRecoveryMarker(columnName)) {
+      requireVectorRecoverySource(segmentWriter, columnName);
+    }
     // Resolve the on-disk extension (or directory name) that the creator writes to. When
     // storeInSegmentFile=true the creator produces the combined-form directly; when false it writes
     // the legacy form (a Lucene directory for HNSW, a flat file for IVF). The .inprogress marker

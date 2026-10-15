@@ -39,6 +39,8 @@ import org.apache.pinot.segment.local.segment.index.loader.defaultcolumn.Default
 import org.apache.pinot.segment.local.segment.index.loader.defaultcolumn.DefaultColumnHandlerFactory;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.LegacyRawValueInvertedIndexCleanup;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.MultiColumnTextIndexHandler;
+import org.apache.pinot.segment.local.segment.index.loader.invertedindex.TextIndexHandler;
+import org.apache.pinot.segment.local.segment.index.loader.invertedindex.VectorIndexHandler;
 import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils;
 import org.apache.pinot.segment.local.startree.v2.builder.MultipleTreesBuilder;
 import org.apache.pinot.segment.local.startree.v2.builder.StarTreeV2BuilderConfig;
@@ -154,6 +156,16 @@ public class SegmentPreProcessor implements AutoCloseable {
     removeInvertedIndexTempFiles(indexDir);
 
     try (SegmentDirectory.Writer segmentWriter = _segmentDirectory.createWriter()) {
+      // Recovery must use retained forward values. Other handlers can reconstruct multi-value forward indexes from
+      // dictionary/inverted indexes, losing ordering and duplicates, or drop the original source altogether.
+      Map<String, FieldIndexConfigs> recoveryConfigs = _indexLoadingConfig.getFieldIndexConfigByColName();
+      new TextIndexHandler(_segmentDirectory, recoveryConfigs, _tableConfig, _schema)
+          .validateRecoverySources(segmentWriter);
+      new VectorIndexHandler(_segmentDirectory, recoveryConfigs, _tableConfig, _schema)
+          .validateRecoverySources(segmentWriter);
+      new MultiColumnTextIndexHandler(_segmentDirectory, _indexLoadingConfig,
+          _indexLoadingConfig.getMultiColTextIndexConfig()).validateRecoverySources(segmentWriter);
+
       // Backward-compat shim: invalidate any legacy raw-value embedded-dictionary inverted indexes left over from
       // PR #17060 (reverted by PR #18410) so the standard handlers can rebuild them in the dict-id format. Must
       // run before any handler that may try to read the inverted-index buffer. Safe to delete after Pinot 1.7;
@@ -308,7 +320,7 @@ public class SegmentPreProcessor implements AutoCloseable {
       }
 
       // Check if there is need to create/modify/remove multi-col text index
-      if (needProcessMultiColumnTextIndex()) {
+      if (needProcessMultiColumnTextIndex(segmentReader)) {
         LOGGER.info("Found multi-column text index needs updates in segment: {}", segmentName);
         return true;
       }
@@ -358,10 +370,9 @@ public class SegmentPreProcessor implements AutoCloseable {
     return !starTreeBuilderConfigs.isEmpty();
   }
 
-  private boolean needProcessMultiColumnTextIndex() {
-    MultiColumnTextIndexConfig newConfig = _indexLoadingConfig.getMultiColTextIndexConfig();
-    MultiColumnTextMetadata oldConfig = _segmentDirectory.getSegmentMetadata().getMultiColumnTextMetadata();
-    return MultiColumnTextIndexHandler.shouldModifyMultiColTextIndex(newConfig, oldConfig);
+  private boolean needProcessMultiColumnTextIndex(SegmentDirectory.Reader segmentReader) {
+    return new MultiColumnTextIndexHandler(_segmentDirectory, _indexLoadingConfig,
+        _indexLoadingConfig.getMultiColTextIndexConfig()).needUpdateIndices(segmentReader);
   }
 
   private boolean processMultiColTextIndex(File indexDir, SegmentDirectory.Writer segmentWriter,
@@ -378,7 +389,7 @@ public class SegmentPreProcessor implements AutoCloseable {
       if (newConfig == null) {
         remove = true;
       } else {
-        if (MultiColumnTextIndexHandler.shouldModifyMultiColTextIndex(newConfig, oldConfig)) {
+        if (needProcessMultiColumnTextIndex(segmentWriter)) {
           LOGGER.info("Change detected in multi-column text index for segment: {}", segmentName);
         } else {
           create = false;
@@ -398,13 +409,14 @@ public class SegmentPreProcessor implements AutoCloseable {
         LOGGER.info("Removing multi-column text index from segment: {}", segmentName);
         removeMultiColumnTextIndex(indexDir);
       } else if (create) {
+        MultiColumnTextIndexHandler handler =
+            new MultiColumnTextIndexHandler(_segmentDirectory, _indexLoadingConfig, newConfig);
+        handler.validateRecoverySources(segmentWriter);
         if (oldConfig != null) {
           // Drop existing multi-column text index before creating a new one
           // TODO: check if it's possible to only add/remove select columns
           removeMultiColumnTextIndex(indexDir);
         }
-        MultiColumnTextIndexHandler handler =
-            new MultiColumnTextIndexHandler(_segmentDirectory, _indexLoadingConfig, newConfig);
         handler.updateIndices(segmentWriter);
         handler.postUpdateIndicesCleanup(segmentWriter);
       }
