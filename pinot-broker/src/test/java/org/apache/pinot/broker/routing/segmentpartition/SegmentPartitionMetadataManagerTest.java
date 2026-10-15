@@ -39,16 +39,19 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.core.routing.TablePartitionReplicatedServersInfo;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE;
 import static org.testng.Assert.*;
 
 
 public class SegmentPartitionMetadataManagerTest extends ControllerTest {
   private static final String OFFLINE_TABLE_NAME = "testTable_OFFLINE";
+  private static final String REALTIME_TABLE_NAME = "testTable_REALTIME";
   private static final String PARTITION_COLUMN = "memberId";
   private static final String PARTITION_COLUMN_FUNC = "Murmur";
   private static final int NUM_PARTITIONS = 2;
@@ -286,6 +289,47 @@ public class SegmentPartitionMetadataManagerTest extends ControllerTest {
     assertEqualsNoOrder(partitionInfoMap[1]._segments.toArray(), new String[]{segment1, segment2});
     assertFalse(tablePartitionReplicatedServersInfo.getSegmentsWithInvalidPartition().isEmpty());
     assertEquals(tablePartitionReplicatedServersInfo.getSegmentsWithInvalidPartition().get(0), segmentInvalid);
+  }
+
+  /// Regression test: a segment that is still CONSUMING (not yet committed) already has valid partition metadata
+  /// written by the controller at segment creation time, and that metadata must be picked up as soon as the
+  /// segment is discovered -- not deferred until the segment commits. Before this fix, `SegmentZkMetadataFetcher`
+  /// skipped fetching still-consuming segments entirely on `onAssignmentChange`, so `SegmentPartitionMetadataManager`
+  /// never received the segment's info and fell back to `INVALID_PARTITION_ID`.
+  @Test
+  public void testPartitionMetadataAvailableWhileSegmentStillConsuming() {
+    ExternalView externalView = new ExternalView(REALTIME_TABLE_NAME);
+    Map<String, Map<String, String>> segmentAssignment = externalView.getRecord().getMapFields();
+    Set<String> onlineSegments = new HashSet<>();
+    IdealState idealState = new IdealState(REALTIME_TABLE_NAME);
+
+    SegmentPartitionMetadataManager partitionMetadataManager =
+        new SegmentPartitionMetadataManager(REALTIME_TABLE_NAME, PARTITION_COLUMN, PARTITION_COLUMN_FUNC,
+            NUM_PARTITIONS, TimeUnit.MINUTES.toMillis(5));
+    SegmentZkMetadataFetcher segmentZkMetadataFetcher =
+        new SegmentZkMetadataFetcher(REALTIME_TABLE_NAME, _propertyStore);
+    segmentZkMetadataFetcher.register(partitionMetadataManager);
+    segmentZkMetadataFetcher.init(idealState, externalView, onlineSegments);
+
+    // Segment is CONSUMING but already carries valid partition metadata (written at segment creation time)
+    String consumingSegment = "consumingSegment";
+    onlineSegments.add(consumingSegment);
+    segmentAssignment.put(consumingSegment, Map.of(SERVER_0, CONSUMING));
+    SegmentZKMetadata consumingSegmentZKMetadata = new SegmentZKMetadata(consumingSegment);
+    consumingSegmentZKMetadata.setPartitionMetadata(new SegmentPartitionMetadata(Map.of(PARTITION_COLUMN,
+        new ColumnPartitionMetadata(PARTITION_COLUMN_FUNC, NUM_PARTITIONS, Set.of(0), null))));
+    consumingSegmentZKMetadata.setStatus(Status.IN_PROGRESS);
+    ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, REALTIME_TABLE_NAME, consumingSegmentZKMetadata);
+    segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, onlineSegments);
+
+    // Partition info should reflect the real partition ID, not INVALID_PARTITION_ID
+    TablePartitionReplicatedServersInfo tablePartitionReplicatedServersInfo =
+        partitionMetadataManager.getTablePartitionReplicatedServersInfo();
+    TablePartitionReplicatedServersInfo.PartitionInfo[] partitionInfoMap =
+        tablePartitionReplicatedServersInfo.getPartitionInfoMap();
+    assertEquals(partitionInfoMap[0]._fullyReplicatedServers, Set.of(SERVER_0));
+    assertEquals(partitionInfoMap[0]._segments, Set.of(consumingSegment));
+    assertTrue(tablePartitionReplicatedServersInfo.getSegmentsWithInvalidPartition().isEmpty());
   }
 
   /// A partition whose only segments are new ones without all replicas available holds data that no single server can
