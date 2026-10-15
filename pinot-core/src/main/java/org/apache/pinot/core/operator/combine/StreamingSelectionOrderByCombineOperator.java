@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.combine;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -96,7 +97,8 @@ import org.slf4j.LoggerFactory;
 /// own reads; min/max pruning bounds the number of simultaneously-active (acquired) segments to the merge frontier.
 /// The rows handed out by the child operators are already deep-copied to heap `Object[]` (via
 /// `RowBasedBlockValueFetcher`), so they remain valid after the segment is released. Any cursors still
-/// acquired when the merge ends early (LIMIT reached) or errors out are released via [#releaseAllCursors()].
+/// acquired when the merge ends early are released by [#finish()] (LIMIT reached, before the final data block is
+/// returned) or [#releaseAllCursors()] (error or stop).
 ///
 /// **Streaming paths only.** This operator is installed only where a
 /// [org.apache.pinot.core.query.executor.ResultsBlockStreamer] is present (the
@@ -144,7 +146,7 @@ public class StreamingSelectionOrderByCombineOperator extends BaseStreamingCombi
   /// Deduplicated MERGE_RESPONSE errors for segment blocks dropped on schema mismatch; null until the first mismatch
   @Nullable
   private Set<String> _dataSchemaMismatchErrors;
-  /// Subset of the above not yet attached to an emitted block; drained on each attach
+  /// Subset of the above not yet attached to the terminal block; drained on attach
   @Nullable
   private List<String> _unreportedDataSchemaMismatchErrors;
 
@@ -305,7 +307,7 @@ public class StreamingSelectionOrderByCombineOperator extends BaseStreamingCombi
   protected BaseResultsBlock getNextBlock() {
     if (_done) {
       // Streaming mode: terminal metadata block after the last data block. Idempotent if called again.
-      return attachExecutionStats(new MetadataResultsBlock());
+      return attachDataSchemaMismatchErrors(attachExecutionStats(new MetadataResultsBlock()));
     }
     try {
       long endTimeMs = _queryContext.getEndTimeMs();
@@ -343,6 +345,12 @@ public class StreamingSelectionOrderByCombineOperator extends BaseStreamingCombi
         }
         _outputRows.add(leader.currentHead());
         _numRowsEmitted++;
+        if (_numRowsEmitted >= _numRowsToKeep) {
+          // Done: advancing could pull the leader's next block, which on the run path scans a whole run for nothing.
+          // Leaving through the loop exit also releases every segment before the final data block is returned, even
+          // when this row fills the block: the caller sends that block downstream next, which can block.
+          break;
+        }
         leader.advance();
         if (leader.currentHead() == null) {
           leader = null;
@@ -356,7 +364,8 @@ public class StreamingSelectionOrderByCombineOperator extends BaseStreamingCombi
           return flushDataBlock();
         }
       }
-      // Merge complete; the leader goes back so finish() sees a consistent heap.
+      // Merge complete (limit reached or every cursor drained); the leader goes back so finish() sees a consistent
+      // heap.
       if (leader != null) {
         _priorityQueue.offer(leader);
       }
@@ -444,10 +453,26 @@ public class StreamingSelectionOrderByCombineOperator extends BaseStreamingCombi
     return _asc ? cmp > 0 : cmp < 0;
   }
 
-  /// Marks the merge done and releases any segments still held by un-drained cursors (e.g. when LIMIT is reached).
+  /// Marks the merge done, releases any segments still held by un-drained cursors (e.g. when LIMIT is reached), and
+  /// drops their buffered rows. The output rows are already in [#_outputRows], and the final data block can wait on a
+  /// downstream send, so up to a block of rows per active cursor would otherwise stay reachable for nothing.
   private void finish() {
     _done = true;
-    releaseAllCursors();
+    for (SegmentCursor cursor : _sortedCursors) {
+      cursor.exhaust();
+    }
+    _priorityQueue.clear();
+  }
+
+  @VisibleForTesting
+  int getNumCursorsHoldingRows() {
+    int numCursors = 0;
+    for (SegmentCursor cursor : _sortedCursors) {
+      if (cursor._rows != null) {
+        numCursors++;
+      }
+    }
+    return numCursors;
   }
 
   private void releaseAllCursors() {
@@ -457,16 +482,14 @@ public class StreamingSelectionOrderByCombineOperator extends BaseStreamingCombi
   }
 
   /// Returns the accumulated output rows as a sorted [SelectionResultsBlock] and resets the output buffer. The
-  /// block carries the comparator so the broker-side n-way reduce stays correct. Execution stats are not attached
-  /// here: they go on the terminal metadata block.
+  /// block carries the comparator so the broker-side n-way reduce stays correct. Execution stats and schema-mismatch
+  /// errors are not attached here: they go on the terminal metadata block.
   private BaseResultsBlock flushDataBlock() {
     List<Object[]> rows = _outputRows;
     _outputRows = newOutputList();
     // Rows only reach the output buffer through pullBlock(), which captures the schema before accepting any of them.
     assert _dataSchema != null;
-    SelectionResultsBlock block = new SelectionResultsBlock(_dataSchema, rows, _comparator, _queryContext);
-    attachDataSchemaMismatchErrors(block);
-    return block;
+    return new SelectionResultsBlock(_dataSchema, rows, _comparator, _queryContext);
   }
 
   /// Records that a segment's block was dropped because its schema disagreed with the merge schema. Deduplicated by
@@ -486,8 +509,10 @@ public class StreamingSelectionOrderByCombineOperator extends BaseStreamingCombi
     }
   }
 
-  /// Attaches mismatch errors recorded since the last emitted block. In streaming mode blocks are emitted many times,
-  /// so errors are drained rather than re-attached, and the terminal block picks up any recorded after the last flush.
+  /// Attaches the recorded mismatch errors to the terminal metadata block. Data blocks must not carry them: the
+  /// streaming instance response operator only streams a data block's rows and builds the server response from the
+  /// terminal block, and that response is where MSE and the gRPC streaming path read errors. Drained so a repeated
+  /// terminal call does not report them twice.
   private <T extends BaseResultsBlock> T attachDataSchemaMismatchErrors(T block) {
     if (_unreportedDataSchemaMismatchErrors != null && !_unreportedDataSchemaMismatchErrors.isEmpty()) {
       for (String errorMessage : _unreportedDataSchemaMismatchErrors) {

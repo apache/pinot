@@ -37,6 +37,7 @@ import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
+import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.plan.ProjectPlanNode;
 import org.apache.pinot.core.plan.SelectionPlanNode;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -283,6 +284,33 @@ public class StreamingSelectionOrderByOperatorTest {
     assertParity(_dupSegment, "SELECT valCol FROM testTable ORDER BY sortedCol, tailCol", false, 1);
   }
 
+  /// The run heap holds up to `limit + offset` slots (capped at 10,000), and without prefetch every segment's leaf is
+  /// built before frontier pruning decides which ones run. So it must not exist until a run is actually read: never
+  /// on the no-tail path, and only after the first block on the tail path.
+  @Test
+  public void testRunHeapIsAllocatedOnlyWhenARunIsRead() {
+    StreamingSelectionOrderByOperator noTail =
+        assertParity(_segment, "SELECT sortedCol FROM testTable ORDER BY sortedCol LIMIT 10000", false, 1);
+    assertFalse(noTail.isRunHeapAllocated(), "The no-tail path never reads a run");
+
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT sortedCol, tailCol FROM testTable ORDER BY sortedCol, tailCol");
+    queryContext.setSortedSelectionMergeMode(SortedSelectionMergeMode.ON);
+    Operator<SelectionResultsBlock> operator =
+        new SelectionPlanNode(new SegmentContext(_dupSegment), queryContext).run();
+    assertTrue(operator instanceof StreamingSelectionOrderByOperator,
+        "Expected the streaming operator to be built, got: " + operator.getClass().getSimpleName());
+    StreamingSelectionOrderByOperator tail = (StreamingSelectionOrderByOperator) operator;
+    assertFalse(tail.isRunHeapAllocated(), "A leaf that has not been pulled must not hold a run heap");
+    assertNotNull(tail.nextBlock());
+    assertTrue(tail.isRunHeapAllocated());
+    // An exhausted leaf can stay referenced until the query ends, so it drops its scan state.
+    while (tail.nextBlock() != null) {
+      assertTrue(tail.isRunHeapAllocated());
+    }
+    assertFalse(tail.isRunHeapAllocated(), "An exhausted leaf must not keep its run heap");
+  }
+
   @Test
   public void testLimitOffsetNoTail() {
     // Server retains limit + offset rows; the broker applies the offset later.
@@ -313,6 +341,67 @@ public class StreamingSelectionOrderByOperatorTest {
     StreamingSelectionOrderByOperator operator = assertParity(_multiRunSegment,
         "SELECT sortedCol, tailCol FROM testTable ORDER BY sortedCol, tailCol LIMIT 10600", false, 2);
     assertEquals(operator.getExecutionStatistics().getNumDocsScanned(), NUM_MULTI_RUN_RECORDS);
+  }
+
+  /// Runs end where any column of the sorted prefix changes, not only the first. In `_largeSegment` the first order-by
+  /// column is constant but `valCol` is also physically sorted (unique and increasing), so `ORDER BY sortedCol, valCol,
+  /// tailCol` has a two-column sorted prefix and every row is its own run. Delimiting runs by the first column alone
+  /// would make the whole segment one run and scan all of it even for `LIMIT 1`.
+  @Test
+  public void testRunsAreDelimitedByTheWholeSortedPrefix() {
+    assertTrue(_largeSegment.getDataSource(VAL_COL, SCHEMA).getDataSourceMetadata().isSorted(),
+        "Fixture precondition: valCol must be physically sorted");
+    String query = "SELECT sortedCol, valCol, tailCol FROM testTable ORDER BY sortedCol, valCol, tailCol LIMIT 1";
+    StreamingSelectionOrderByOperator operator = assertParity(_largeSegment, query, false, 1);
+    assertEquals(operator.getExecutionStatistics().getNumDocsScanned(), DocIdSetPlanNode.MAX_DOC_PER_CALL,
+        "LIMIT 1 must stop after the first project block");
+
+    assertEquals(drainBlocks(_largeSegment, query.replace("LIMIT 1", "LIMIT 3")).size(), 3);
+    // Two-phase: nullableCol is fetched in the second pass for each one-row run.
+    assertParity(_largeSegment,
+        "SELECT nullableCol FROM testTable ORDER BY sortedCol, valCol, tailCol LIMIT 3", false, 3);
+    // DESC with a reverse scan: the prefix is still two columns, read from the end of the segment.
+    StreamingSelectionOrderByOperator descOperator = assertParity(_largeSegment, "SET allowReverseOrder=true; "
+        + "SELECT sortedCol, valCol, tailCol FROM testTable ORDER BY sortedCol DESC, valCol DESC, tailCol DESC LIMIT 3",
+        false, 3);
+    assertEquals(descOperator.getExecutionStatistics().getNumDocsScanned(), DocIdSetPlanNode.MAX_DOC_PER_CALL);
+  }
+
+  /// A later run that can contribute fewer rows than `limit + offset`: run 0 (10,500 rows) leaves room for one row of
+  /// run 1 (1,000 rows), whose smallest tail is scanned last, so the run heap has to replace its root to find it. The
+  /// heap is bounded by the remaining budget, so the emitted block holds exactly the rows it returns and does not keep
+  /// the rest of the run reachable through a trimmed view.
+  @Test
+  public void testRunHeapIsBoundedByTheRemainingBudget() {
+    String query = "SELECT sortedCol, tailCol FROM testTable ORDER BY sortedCol, tailCol LIMIT 10501";
+    assertParity(_multiRunSegment, query, false, 2);
+    assertParity(_multiRunSegment, "SELECT sortedCol, tailCol FROM testTable ORDER BY sortedCol, tailCol "
+        + "LIMIT 1 OFFSET 10500", false, 2);
+    // Null handling with a null in the tail: three runs of three rows, LIMIT 4 leaves room for one row of run 1.
+    assertParity(_nullTailSegment, "SELECT sortedCol, tailCol FROM testTable ORDER BY sortedCol, tailCol LIMIT 4",
+        true, 2);
+
+    List<SelectionResultsBlock> blocks = drainBlocks(_multiRunSegment, query);
+    assertEquals(blocks.size(), 2);
+    List<Object[]> lastRun = blocks.get(1).getRows();
+    assertEquals(lastRun.size(), 1);
+    assertEquals(lastRun.get(0), new Object[]{1, 0});
+    assertEquals(lastRun.getClass(), ArrayList.class,
+        "A run trimmed to the remaining budget must not keep its discarded rows reachable");
+  }
+
+  private static List<SelectionResultsBlock> drainBlocks(IndexSegment segment, @Language("sql") String query) {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+    queryContext.setSortedSelectionMergeMode(SortedSelectionMergeMode.ON);
+    Operator<SelectionResultsBlock> operator = new SelectionPlanNode(new SegmentContext(segment), queryContext).run();
+    assertTrue(operator instanceof StreamingSelectionOrderByOperator,
+        "Expected the streaming operator to be built, got: " + operator.getClass().getSimpleName());
+    List<SelectionResultsBlock> blocks = new ArrayList<>();
+    SelectionResultsBlock block;
+    while ((block = operator.nextBlock()) != null) {
+      blocks.add(block);
+    }
+    return blocks;
   }
 
   @Test
