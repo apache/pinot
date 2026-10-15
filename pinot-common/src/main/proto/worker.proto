@@ -120,6 +120,10 @@ message MailboxInfo {
   string hostname = 1;
   int32 port = 2;
   repeated int32 workerId = 3;
+  // Hash of the instance id of the receiver at hostname:port (see QueryServerInstance#hashInstanceId), 0 if unknown.
+  // Only set in the lists of receivers. A sender passes it on with each stream, so that an instance that the stream
+  // reaches through a stale connection can reject it. A hash, not the id, to keep plans small.
+  fixed64 instanceIdHash = 4;
 }
 
 message Properties {

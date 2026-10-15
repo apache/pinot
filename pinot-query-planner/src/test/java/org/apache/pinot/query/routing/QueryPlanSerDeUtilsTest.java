@@ -216,6 +216,30 @@ public class QueryPlanSerDeUtilsTest {
         "{\"OFFLINE\":[\"seg_0\",\"seg-1.tar.gz\",\"s\u00ebg_2\"]}");
   }
 
+  /// The mailbox information of a receiver carries the hash of its instance id, and that of a sender, or of a plan
+  /// from an older broker, decodes as unknown (0).
+  @Test
+  public void testMailboxInfoInstanceIdHashRoundTrip()
+      throws Exception {
+    QueryServerInstance server = new QueryServerInstance("Server_host1_8098", "host1", 8100, 8101);
+    MailboxInfos mailboxInfos = new MailboxInfos(
+        List.of(MailboxInfo.ofReceivers(server, List.of(0, 1)), MailboxInfo.ofSenders(server, List.of(2))));
+    WorkerMetadata workerMetadata = new WorkerMetadata(0, Map.of(1, mailboxInfos), new HashMap<>());
+
+    Worker.WorkerMetadata proto = toProto(workerMetadata, false);
+    Worker.MailboxInfos protoMailboxInfos = Worker.MailboxInfos.parseFrom(proto.getMailboxInfosMap().get(1));
+    assertEquals(protoMailboxInfos.getMailboxInfo(0).getInstanceIdHash(), server.getInstanceIdHash());
+    assertEquals(protoMailboxInfos.getMailboxInfo(1).getInstanceIdHash(), 0L);
+
+    List<MailboxInfo> decoded =
+        QueryPlanSerDeUtils.fromProtoWorkerMetadata(proto).getMailboxInfosMap().get(1).getMailboxInfos();
+    assertEquals(decoded.get(0).getHostname(), "host1");
+    assertEquals(decoded.get(0).getPort(), 8101);
+    assertEquals(decoded.get(0).getWorkerIds(), List.of(0, 1));
+    assertEquals(decoded.get(0).getInstanceIdHash(), QueryServerInstance.hashInstanceId("Server_host1_8098"));
+    assertEquals(decoded.get(1).getInstanceIdHash(), 0L);
+  }
+
   private static WorkerMetadata leafWorker(@Nullable Map<String, List<String>> tableSegmentsMap,
       @Nullable Map<String, List<String>> logicalTableSegmentsMap) {
     MailboxInfos mailboxInfos = new MailboxInfos(new MailboxInfo("localhost", 1234, List.of(0, 1)));

@@ -164,12 +164,12 @@ public class ChannelManager {
   /// server at that address goes away, gRPC resolves once, right then, and keeps that answer until the next failure.
   /// If DNS still had the old IP address at that moment (a terminating pod stays in DNS for a while), the channel
   /// later reconnects to the old address, and when another server took that address over and listens on the same
-  /// port, the connection succeeds and is never questioned again. Call this when the address can be stale, for example
-  /// when the server at the address has restarted.
+  /// port, the connection succeeds and is never questioned again. Call this when the address is known to be stale or
+  /// suspect: the receiver rejected a stream as meant for someone else, or the server at the address has restarted.
   ///
   /// Moving the channel to IDLE, rather than replacing it, keeps the channel object that concurrent senders may
-  /// already hold valid. The refreshes are limited to one a second, because each refresh drops the connection that the
-  /// previous one opened.
+  /// already hold valid. The refreshes are limited to one a second, because a stale connection usually fails many
+  /// streams at once, and each refresh drops the connection that the previous one opened.
   public boolean refreshChannel(String hostname, int port) {
     Pair<String, Integer> key = Pair.of(hostname, port);
     ManagedChannel channel = _channelMap.get(key);
