@@ -1048,6 +1048,11 @@ public class CommonConstants {
 
         public static final String ALLOW_REVERSE_ORDER = "allowReverseOrder";
         public static final boolean DEFAULT_ALLOW_REVERSE_ORDER = false;
+        /// Selection with an order-by prefix on a sorted column: project only the order-by expressions during the
+        /// scan and fetch the remaining output expressions for the rows that survive the limit. Disabling it
+        /// restores reading every selected column for the whole match set.
+        public static final String LATE_MATERIALIZE_SORTED_ORDER_BY = "lateMaterializeSortedOrderBy";
+        public static final boolean DEFAULT_LATE_MATERIALIZE_SORTED_ORDER_BY = true;
 
         public static final String MULTI_STAGE_LEAF_LIMIT = "multiStageLeafLimit";
 
