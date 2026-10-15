@@ -73,6 +73,7 @@ import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.ServiceStatus.Status;
 import org.apache.pinot.common.utils.TarCompressionUtils;
+import org.apache.pinot.common.utils.config.IngestionGroovyConfigListener;
 import org.apache.pinot.common.utils.config.QueryWorkloadConfigUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
@@ -197,6 +198,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
       throws Exception {
     // Make a clone so that changes to the config won't propagate to the caller
     _serverConf = serverConf.clone();
+    _clusterConfigChangeHandler = new DefaultClusterConfigChangeHandler();
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(new IngestionGroovyConfigListener());
     _zkAddress = _serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER);
     _helixClusterName = _serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME);
     ServiceStartableUtils.applyClusterConfig(_serverConf, _zkAddress, _helixClusterName, ServiceRole.SERVER);
@@ -272,8 +275,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
           + DataTableBuilderFactory.DEFAULT_VERSION);
     }
     DataTableBuilderFactory.setDataTableVersion(dataTableVersion);
-
-    _clusterConfigChangeHandler = new DefaultClusterConfigChangeHandler();
 
     // Register configuration change listener for dynamic max clause count updates
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(
@@ -831,7 +832,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
     try {
       _helixManager.addClusterfigChangeListener(_clusterConfigChangeHandler);
     } catch (Exception e) {
-      LOGGER.error("Failed to register DefaultClusterConfigChangeHandler as the Helix ClusterConfigChangeListener", e);
+      IngestionGroovyConfigListener.applyClusterConfig(Map.of());
+      throw new IllegalStateException("Failed to subscribe to the cluster ingestion Groovy policy", e);
     }
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(_segmentOperationsThrottlerSet);
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(keepPipelineBreakerStatsPredicate);
