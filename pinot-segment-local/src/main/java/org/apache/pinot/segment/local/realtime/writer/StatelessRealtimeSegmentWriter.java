@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.realtime.writer;
 
 import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.Closeable;
 import java.io.File;
 import java.time.Duration;
@@ -114,6 +115,8 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
   private final TransformPipeline _transformPipeline;
   private volatile boolean _isSuccess = false;
   private volatile Throwable _consumptionException;
+  // Set by stopConsumption() to end the consumption at the next batch, even if the stream ignores the interrupt
+  private volatile boolean _shouldStop;
 
   public StatelessRealtimeSegmentWriter(SegmentZKMetadata segmentZKMetadata, IndexLoadingConfig indexLoadingConfig,
       @Nullable Semaphore segBuildSemaphore)
@@ -259,6 +262,14 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
         _logger.info("Created new consumer thread {} for {}", _consumerThread, this);
         _currentOffset = _startOffset;
         while (_currentOffset.compareTo(_endOffset) < 0) {
+          if (_shouldStop) {
+            _consumptionException = new IllegalStateException(
+                "Consumption stopped at offset: " + _currentOffset + " before reaching end offset: " + _endOffset);
+            _logger.info("Stopped consumption at offset: {} before reaching end offset: {}", _currentOffset,
+                _endOffset);
+            return;
+          }
+
           // Fetch messages
           MessageBatch messageBatch = _consumer.fetchMessages(_currentOffset, _fetchTimeoutMs);
 
@@ -306,13 +317,11 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
   }
 
   public void stopConsumption() {
+    _shouldStop = true;
     if (_consumerThread.isAlive()) {
       _consumerThread.interrupt();
-      try {
-        _consumerThread.join();
-      } catch (InterruptedException e) {
-        _logger.warn("Interrupted while waiting for consumer thread to finish");
-      }
+      // Wait even if interrupted, so that the segment is not destroyed while the consumer thread is still indexing
+      Uninterruptibles.joinUninterruptibly(_consumerThread);
     }
   }
 
@@ -324,6 +333,7 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
     return _isSuccess;
   }
 
+  @Nullable
   public Throwable getConsumptionException() {
     return _consumptionException;
   }
