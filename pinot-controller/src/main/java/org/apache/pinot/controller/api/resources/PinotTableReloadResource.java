@@ -79,8 +79,7 @@ public class PinotTableReloadResource {
   private static final Logger LOG = LoggerFactory.getLogger(PinotTableReloadResource.class);
   private static final String ONLY_IF_NEEDED_DESCRIPTION = "Reload only the segments whose loaded copy is out of "
       + "date (CRC changed, tier changed, or index/schema preprocessing needed); up-to-date segments are skipped and "
-      + "counted as successful. Changes that only apply at load time still require a full reload. Ignored when "
-      + "forceDownload is true";
+      + "counted as successful. Ignored when forceDownload is true";
 
   private final PinotTableReloadService _service;
   private final PinotTableReloadStatusReporter _statusReporter;
