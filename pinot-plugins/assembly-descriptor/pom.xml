@@ -45,6 +45,9 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-invoker-plugin</artifactId>
         <configuration>
+          <!-- The IT build resolves the Pinot artifacts from this isolated repo, which invoker:install populates from
+               the reactor build (this module plus the extra artifacts below; all of them are reactor upstreams of this
+               module, so a parallel build finishes them before this module starts). -->
           <localRepositoryPath>${project.build.directory}/it-repo</localRepositoryPath>
           <extraArtifacts>
             <artifact>org.apache.pinot:pinot-spi:${project.version}:jar</artifact>
@@ -53,12 +56,23 @@
                  resolve pinot-spi's parent chain during the simple-assembly build. -->
             <artifact>org.apache.pinot:pinot-bom:${project.version}:pom</artifact>
           </extraArtifacts>
+          <properties>
+            <!-- Everything else the IT build needs (Maven plugins and third-party dependencies, ~500 files) is read
+                 from the outer build's local repository instead of being downloaded from Central into the fresh
+                 it-repo on every run, where any transient download error fails the IT. The tail is read-only and is
+                 only consulted for artifacts missing from it-repo (Maven 3.9+; older versions ignore the property). -->
+            <maven.repo.local.tail>${settings.localRepository}</maven.repo.local.tail>
+          </properties>
           <projectsDirectory>src/it/projects</projectsDirectory>
           <cloneProjectsTo>${project.build.directory}/it</cloneProjectsTo>
           <postBuildHookScript>verify</postBuildHookScript>
           <filterProperties> <!-- for @property@ in pom.xml -->
             <commons-lang3.version>${commons-lang3.version}</commons-lang3.version>
+            <version.maven-assembly-plugin>${version.maven-assembly-plugin}</version.maven-assembly-plugin>
             <version.maven-compiler-plugin>${version.maven-compiler-plugin}</version.maven-compiler-plugin>
+            <version.maven-jar-plugin>${version.maven-jar-plugin}</version.maven-jar-plugin>
+            <version.maven-resources-plugin>${version.maven-resources-plugin}</version.maven-resources-plugin>
+            <version.maven-surefire-plugin>${version.maven-surefire-plugin}</version.maven-surefire-plugin>
             <maven.compiler.release>${maven.compiler.release}</maven.compiler.release>
             <pinot.version>${project.version}</pinot.version>
           </filterProperties>
