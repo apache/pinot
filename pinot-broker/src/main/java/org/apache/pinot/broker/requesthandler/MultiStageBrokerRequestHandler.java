@@ -215,7 +215,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     int dispatchMaxInboundMessageSizeBytes = config.getProperty(
         CommonConstants.MultiStageQueryRunner.KEY_OF_DISPATCH_CHANNEL_MAX_INBOUND_MESSAGE_SIZE_BYTES,
         CommonConstants.MultiStageQueryRunner.DEFAULT_OF_DISPATCH_CHANNEL_MAX_INBOUND_MESSAGE_SIZE_BYTES);
-    _mailboxService = new MailboxService(hostname, port, InstanceType.BROKER, config, tlsConfig);
+    _mailboxService = new MailboxService(hostname, port, InstanceType.BROKER, config, tlsConfig, null, brokerId);
     _queryDispatcher =
         new QueryDispatcher(_mailboxService, failureDetector, tlsConfig, isQueryCancellationEnabled(), cancelTimeout,
             dispatchKeepAliveTimeMs, dispatchKeepAliveTimeoutMs, dispatchKeepAliveWithoutCalls, _streamStatsDefault,

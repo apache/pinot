@@ -25,6 +25,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiFunction;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.query.planner.plannode.DefaultPostOrderTraversalVisitor;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
@@ -63,8 +64,10 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
           //       number of workers, otherwise each sender fans out to the parallel receivers on its OWN server.
           if (numSenders == 0) {
             // A fully pruned sender stage has nothing to wire, and the parallelism below would divide by zero.
-            connectWorkers(receiverStageId, receiverServerMap, senderMailboxesMap, numSenders);
-            connectWorkers(senderStageId, senderServerMap, receiverMailboxesMap, numReceivers);
+            connectWorkers(receiverStageId, receiverServerMap, senderMailboxesMap, numSenders,
+                MailboxInfo::ofReceivers);
+            connectWorkers(senderStageId, senderServerMap, receiverMailboxesMap, numReceivers,
+                MailboxInfo::ofSenders);
           } else if (numSenders == numReceivers) {
             computeDirectExchange(senderMailboxesMap, receiverMailboxesMap, senderStageId, receiverStageId,
                 senderServerMap, receiverServerMap, numSenders, 1, senderMetadata, receiverMetadata);
@@ -85,8 +88,10 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
                   senderServerMap, receiverServerMap, numSenders, numReceivers / numSenders, senderMetadata,
                   receiverMetadata);
             } else {
-              connectWorkers(receiverStageId, receiverServerMap, senderMailboxesMap, numSenders);
-              connectWorkers(senderStageId, senderServerMap, receiverMailboxesMap, numReceivers);
+              connectWorkers(receiverStageId, receiverServerMap, senderMailboxesMap, numSenders,
+                  MailboxInfo::ofReceivers);
+              connectWorkers(senderStageId, senderServerMap, receiverMailboxesMap, numReceivers,
+                  MailboxInfo::ofSenders);
             }
           }
         } else if (senderMetadata.isPrePartitioned() && isDirectExchangeCompatible(senderMetadata, receiverMetadata)) {
@@ -99,8 +104,8 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
         } else {
           // For other exchange types, send the data to all the instances in the receiver fragment
           // TODO: Add support for more exchange types
-          connectWorkers(receiverStageId, receiverServerMap, senderMailboxesMap, numSenders);
-          connectWorkers(senderStageId, senderServerMap, receiverMailboxesMap, numReceivers);
+          connectWorkers(receiverStageId, receiverServerMap, senderMailboxesMap, numSenders, MailboxInfo::ofReceivers);
+          connectWorkers(senderStageId, senderServerMap, receiverMailboxesMap, numReceivers, MailboxInfo::ofSenders);
         }
       }
     }
@@ -142,8 +147,7 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
         MailboxInfos receiverMailboxInfos;
         if (senderServer.equals(receiverServer)) {
           // Co-located: share one local mailbox, exchanged in-process with no network hop.
-          MailboxInfos sharedMailboxInfos = new SharedMailboxInfos(
-              new MailboxInfo(senderServer.getHostname(), senderServer.getQueryMailboxPort(), workerIds));
+          MailboxInfos sharedMailboxInfos = new SharedMailboxInfos(MailboxInfo.ofReceivers(senderServer, workerIds));
           senderMailboxInfos = sharedMailboxInfos;
           receiverMailboxInfos = sharedMailboxInfos;
         } else {
@@ -154,10 +158,8 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
           //   keep this exchange local even during a rolling restart, falling back to a cross-server send only for
           //   partitions that genuinely cannot be co-located. See PinotJoinToDynamicBroadcastRule and WorkerManager's
           //   leaf worker assignment.
-          senderMailboxInfos = new MailboxInfos(
-              new MailboxInfo(senderServer.getHostname(), senderServer.getQueryMailboxPort(), workerIds));
-          receiverMailboxInfos = new MailboxInfos(
-              new MailboxInfo(receiverServer.getHostname(), receiverServer.getQueryMailboxPort(), workerIds));
+          senderMailboxInfos = new MailboxInfos(MailboxInfo.ofSenders(senderServer, workerIds));
+          receiverMailboxInfos = new MailboxInfos(MailboxInfo.ofReceivers(receiverServer, workerIds));
         }
         senderMailboxesMap.computeIfAbsent(workerId, k -> new HashMap<>())
             .put(receiverStageId, receiverMailboxInfos);
@@ -221,10 +223,9 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
       int parallelism) {
     List<Integer> receiverWorkerIds = new ArrayList<>(parallelism);
     senderMailboxesMap.computeIfAbsent(senderWorkerId, k -> new HashMap<>())
-        .put(receiverStageId, new MailboxInfos(
-            new MailboxInfo(receiverServer.getHostname(), receiverServer.getQueryMailboxPort(), receiverWorkerIds)));
-    MailboxInfos senderMailboxInfos = new SharedMailboxInfos(
-        new MailboxInfo(senderServer.getHostname(), senderServer.getQueryMailboxPort(), List.of(senderWorkerId)));
+        .put(receiverStageId, new MailboxInfos(MailboxInfo.ofReceivers(receiverServer, receiverWorkerIds)));
+    MailboxInfos senderMailboxInfos =
+        new SharedMailboxInfos(MailboxInfo.ofSenders(senderServer, List.of(senderWorkerId)));
     for (int i = 0; i < parallelism; i++) {
       receiverWorkerIds.add(receiverWorkerId);
       receiverMailboxesMap.computeIfAbsent(receiverWorkerId, k -> new HashMap<>())
@@ -263,7 +264,8 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
   /// operator resolve this stage and its receive operator return end-of-stream at once, so do not short-circuit it
   /// away.
   private void connectWorkers(int stageId, Map<Integer, QueryServerInstance> serverMap,
-      Map<Integer, Map<Integer, MailboxInfos>> mailboxesMap, int numWorkers) {
+      Map<Integer, Map<Integer, MailboxInfos>> mailboxesMap, int numWorkers,
+      BiFunction<QueryServerInstance, List<Integer>, MailboxInfo> mailboxInfoFactory) {
     Map<QueryServerInstance, List<Integer>> serverToWorkerIdsMap = new HashMap<>();
     int numSourceWorkers = serverMap.size();
     for (int workerId = 0; workerId < numSourceWorkers; workerId++) {
@@ -273,7 +275,7 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
     for (Map.Entry<QueryServerInstance, List<Integer>> entry : serverToWorkerIdsMap.entrySet()) {
       QueryServerInstance server = entry.getKey();
       List<Integer> workerIds = entry.getValue();
-      mailboxInfoList.add(new MailboxInfo(server.getHostname(), server.getQueryMailboxPort(), workerIds));
+      mailboxInfoList.add(mailboxInfoFactory.apply(server, workerIds));
     }
     // Sort by first workerId to ensure deterministic ordering.
     // This is critical for hash-distributed exchanges where (hash % numMailboxes) is used as an index to choose the

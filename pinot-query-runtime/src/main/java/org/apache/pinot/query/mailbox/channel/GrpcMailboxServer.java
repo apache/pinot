@@ -42,6 +42,8 @@ import org.apache.pinot.common.proto.PinotMailboxGrpc;
 import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.query.access.AuthorizationInterceptor;
 import org.apache.pinot.query.access.QueryAccessControlFactory;
+import org.apache.pinot.query.grpc.ReceiverIdentity;
+import org.apache.pinot.query.grpc.ReceiverIdentityInterceptor;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -135,8 +137,15 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
           PlatformDependent::usedDirectMemory);
     }
 
+    // Interceptors run in the reverse order they are added: authorization first, then the receiver identity check,
+    // which closes a stream meant for another instance before any receiving mailbox is created for it.
     NettyServerBuilder builder = NettyServerBuilder
         .forPort(port).intercept(new MailboxServerInterceptor());
+    ReceiverIdentity receiverIdentity = mailboxService.getReceiverIdentity();
+    if (receiverIdentity != null) {
+      builder.intercept(new ReceiverIdentityInterceptor(receiverIdentity, ChannelUtils.MAILBOX_ID_METADATA_KEY,
+          mailboxService::recordMisroutedRequestRejected));
+    }
     if (accessControlFactory != null) {
       builder.intercept(new AuthorizationInterceptor(accessControlFactory));
     }

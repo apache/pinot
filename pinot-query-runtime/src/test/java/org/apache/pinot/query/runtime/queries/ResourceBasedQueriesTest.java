@@ -226,8 +226,9 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     Map<String, Object> reducerConfig = new HashMap<>();
     reducerConfig.put(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, _reducerHostname);
     reducerConfig.put(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, _reducerPort);
-    _mailboxService =
-        new MailboxService(_reducerHostname, _reducerPort, InstanceType.BROKER, new PinotConfiguration(reducerConfig));
+    // The broker id of the test planner, so that the reducer checks that every stream it receives is meant for it
+    _mailboxService = new MailboxService(_reducerHostname, _reducerPort, InstanceType.BROKER,
+        new PinotConfiguration(reducerConfig), null, null, "Broker_localhost");
     _mailboxService.start();
 
     QueryServerEnclosure server1 = new QueryServerEnclosure(factory1);

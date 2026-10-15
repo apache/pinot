@@ -207,6 +207,12 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   MULTI_STAGE_SUBMISSION_STARTED_TASKS("tasks", true),
   /// Number of tasks completed by the MSE query submission executor
   MULTI_STAGE_SUBMISSION_COMPLETED_TASKS("tasks", true),
+  /// Number of MSE requests (mailbox streams and stage plans) this server rejected because they were addressed to
+  /// another instance and reached this one through a stale connection of the sender.
+  MULTI_STAGE_MISROUTED_REQUESTS_REJECTED("requests", true),
+  /// Number of mailbox streams this server sent that the receiving instance rejected as addressed to another
+  /// instance. Each one makes this server reset its connection to that address, at most once a second.
+  MULTI_STAGE_MISROUTED_REQUESTS_REJECTED_BY_PEER("requests", true),
 
   // predownload metrics
   PREDOWNLOAD_SEGMENT_DOWNLOAD_COUNT("predownloadSegmentCount", true),
