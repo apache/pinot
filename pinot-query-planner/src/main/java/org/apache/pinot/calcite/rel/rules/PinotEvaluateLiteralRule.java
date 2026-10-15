@@ -364,6 +364,8 @@ public class PinotEvaluateLiteralRule {
   /// interval, and milliseconds for a day-time interval (like Calcite, fractions of a millisecond are dropped).
   private static BigDecimal toIntervalValue(BigDecimal value, RelDataType intervalType) {
     if (SqlTypeName.YEAR_INTERVAL_TYPES.contains(intervalType.getSqlTypeName())) {
+      // Intentionally stricter than Calcite, which truncates to whole months (INTERVAL '1' MONTH / 2 is 0 months):
+      // reject the query instead of silently dropping a fraction of a month
       Preconditions.checkArgument(value.stripTrailingZeros().scale() <= 0,
           "Year-month interval must be a whole number of months, got: %s", value);
     }
@@ -432,6 +434,9 @@ public class PinotEvaluateLiteralRule {
     // Other functions with an interval result, e.g. ABS(INTERVAL '-1' MONTH). Interval arithmetic is evaluated exactly
     // in evaluateIntervalArithmetic().
     if (SqlTypeUtil.isInterval(relDataType)) {
+      if (resultValue instanceof BigDecimal) {
+        return toIntervalValue((BigDecimal) resultValue, relDataType);
+      }
       double value = ((Number) resultValue).doubleValue();
       Preconditions.checkArgument(Double.isFinite(value), "Invalid interval value: %s", value);
       return toIntervalValue(BigDecimal.valueOf(value), relDataType);

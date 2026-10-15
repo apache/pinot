@@ -414,6 +414,26 @@
         ]
       },
       {
+        "description": "null timestamp plus month interval",
+        "sql": "EXPLAIN PLAN FOR SELECT fromDateTime(CAST(NULL AS VARCHAR), 'yyyy-MM-dd') + INTERVAL '1' MONTH FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[null:TIMESTAMP(3)])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "timestamp plus null month interval",
+        "sql": "EXPLAIN PLAN FOR SELECT TIMESTAMP '2019-01-01 00:00:00' + INTERVAL '1' MONTH * toEpochDays(fromDateTime(CAST(NULL AS VARCHAR), 'yyyy-MM-dd')) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[null:TIMESTAMP(0)])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
         "description": "timestamp plus day interval",
         "sql": "EXPLAIN PLAN FOR SELECT TIMESTAMP '2019-01-01 00:00:00' + INTERVAL '1' DAY FROM a",
         "output": [
