@@ -27,7 +27,8 @@ public class PushJobSpec implements Serializable {
   /// number of attempts for push job, default is 1, which means no retry.
   private int _pushAttempts = 1;
 
-  /// push job parallelism, default is 1.
+  /// Push job parallelism, default is 1. Standalone batch METADATA push divides segments into at most this many
+  /// balanced concurrent batches. Consistent pushes retain one batch; distributed callers keep their own concurrency.
   private int _pushParallelism = 1;
 
   /// retry wait Ms, default to 1 second.
@@ -38,7 +39,8 @@ public class PushJobSpec implements Serializable {
   private boolean _copyToDeepStoreForMetadataPush;
 
   /// Applicable for METADATA push type.
-  /// If true, multiple segment metadata files are uploaded to the controller in a single call.
+  /// If true, multiple segment metadata files are uploaded together. Standalone non-consistent push uses at most
+  /// pushParallelism disjoint batches; other callers retain a single call per invocation.
   private boolean _batchSegmentUpload;
 
   /// Applicable for METADATA push type.
