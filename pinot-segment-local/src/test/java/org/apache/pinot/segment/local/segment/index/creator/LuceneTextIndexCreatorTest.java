@@ -48,6 +48,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class LuceneTextIndexCreatorTest {
@@ -252,15 +253,46 @@ public class LuceneTextIndexCreatorTest {
       // 5d. End-to-end read
       try (LuceneTextIndexReader reader = new LuceneTextIndexReader(column, segmentIndexDir,
           numMutableDocs, config)) {
-        int[] matched = reader.getDocIds("doc").toArray();
-        for (int docId : matched) {
-          assertTrue(docId >= 0 && docId < numMutableDocs,
-              "Returned Pinot docId " + docId + " must be within [0, " + numMutableDocs + ")");
-        }
+        assertEquals(reader.getDocIds("doc", null).toArray(), new int[]{0, 1, 2});
       }
     } finally {
       FileUtils.deleteDirectory(scratch);
     }
+  }
+
+  @Test
+  public void testConvertMutableSegmentRejectsMissingStoredDocId()
+      throws IOException {
+    String column = "foo";
+    String segmentName = "missingDocId";
+    File consumerDir = new File(INDEX_DIR, "consumerDir");
+    File mutableIndexDir = new File(new File(consumerDir, segmentName),
+        column + V1Constants.Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION);
+    FileUtils.forceMkdir(mutableIndexDir);
+    try (Directory directory = FSDirectory.open(mutableIndexDir.toPath());
+        IndexWriter writer = new IndexWriter(directory, new IndexWriterConfig(new StandardAnalyzer()))) {
+      writer.addDocument(buildDoc(0));
+      Document corruptDocument = buildDoc(1);
+      corruptDocument.removeField(LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME);
+      writer.addDocument(corruptDocument);
+      writer.commit();
+    }
+
+    File segmentIndexDir = new File(new File(INDEX_DIR, "tmp-" + segmentName + "-1"), segmentName);
+    FileUtils.forceMkdir(segmentIndexDir);
+    TextIndexConfig config = new TextIndexConfigBuilder().withReuseMutableIndex(true).build();
+    RuntimeException exception = expectThrows(RuntimeException.class, () -> {
+      try (LuceneTextIndexCreator creator =
+          new LuceneTextIndexCreator(column, segmentIndexDir, true, true, consumerDir, null, config)) {
+        // Conversion must reject the legacy index before a reader can consume its mapping.
+      }
+    });
+    Throwable rootCause = exception;
+    while (rootCause.getCause() != null) {
+      rootCause = rootCause.getCause();
+    }
+    assertTrue(rootCause instanceof IOException);
+    assertEquals(rootCause.getMessage(), "Missing Pinot document id for Lucene document: 1");
   }
 
   private static void writeLuceneDocs(File indexDir, int startDocId, int count, boolean multiSegment)
