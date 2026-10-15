@@ -206,6 +206,39 @@ public class ObfuscatorTest {
     Assert.assertFalse(output.contains(SECRET));
   }
 
+  @Test
+  public void testMasksCredentialsWithoutAGenericSuffix() {
+    // Each of these is a credential whose key does not end in "secret", "password" or "token".
+    List<String> keys = List.of("accessKey", "accessKeyId", "input.fs.prop.accessKey", "fs.s3a.access.key",
+        "awsAccessKey", "restAccessKeyId", "storageSecretAccessKey", "sasl.jaas.config",
+        "stream.kafka.decoder.prop.basic.auth.user.info", "userInfo", "privateKey", "private_key_id",
+        "sql.snowflake.privateKey", "sql.bigquery.jsonKey", "fs.gs.auth.service.account.json.keyfile",
+        "delta.ingestion.table.gcs.keyFile", "delta.ingestion.table.gcs.keyContentBase64", "credentials",
+        "gcs.credential", "passwd", "ssl.key.passphrase");
+    Map<String, Object> configs = new HashMap<>();
+    keys.forEach(key -> configs.put(key, SECRET));
+    configs.put("value", VALUE);
+
+    JsonNode output = _obfuscator.toJson(configs);
+
+    keys.forEach(key -> Assert.assertEquals(output.get(key).asText(), "*****", key));
+    Assert.assertEquals(output.get("value").asText(), VALUE);
+  }
+
+  @Test
+  public void testKeepsStructuralNames() {
+    // Names that only mention a credential word, which an operator reads to debug authentication.
+    List<String> keys = List.of("pinot.broker.auth.provider.class", "fs.s3a.aws.credentials.provider",
+        "stream.kafka.decoder.prop.basic.auth.credentials.source", "primaryKeyColumns", "partitionKey",
+        "accessKeyRotationDays", "tokenUri", "jaas.login.module", "sortedColumn");
+    Map<String, Object> configs = new HashMap<>();
+    keys.forEach(key -> configs.put(key, VALUE));
+
+    JsonNode output = _obfuscator.toJson(configs);
+
+    keys.forEach(key -> Assert.assertEquals(output.get(key).asText(), VALUE, key));
+  }
+
   private static Map<String, Object> createEntry(String key, String value) {
     Map<String, Object> map = new HashMap<>();
     map.put(key, value);

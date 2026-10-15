@@ -37,7 +37,7 @@ import java.util.stream.Stream;
 /// ```
 /// {
 ///   "type": "sample object",
-///   "nestedCredentials": {
+///   "connection": {
 ///     "user": "admin",
 ///     "password": "verysecret"
 ///   }
@@ -49,7 +49,7 @@ import java.util.stream.Stream;
 /// ```
 /// {
 ///   "type": "sample object",
-///   "nestedCredentials": {
+///   "connection": {
 ///     "user": "admin",
 ///     "password": "*****"
 ///   }
@@ -58,16 +58,25 @@ import java.util.stream.Stream;
 public final class Obfuscator {
 
   private static final String DEFAULT_MASKED_VALUE = "*****";
+  /// Suffix-anchored, so that a key is masked for what it ends in and a structural name such as
+  /// `pinot.broker.auth.provider.class` stays readable. Beyond the generic credential words, this covers
+  /// credentials whose key does not end in one: the AWS `accessKey` / `accessKeyId` pair (as in
+  /// `input.fs.prop.accessKey` and `fs.s3a.access.key`), Kafka's `sasl.jaas.config`, Confluent's
+  /// `basic.auth.user.info` (a literal `user:password`), and GCP service-account key material.
   private static final List<Pattern> DEFAULT_PATTERNS =
       Stream.of("(?i).*secret$", "(?i).*secret[\\s_-]*key$", "(?i).*api[\\s_-]*key$", "(?i).*password$",
-              "(?i).*keytab$", "(?i).*token$")
+              "(?i).*passwd$", "(?i).*passphrase$", "(?i).*keytab$", "(?i).*token$", "(?i).*credentials?$",
+              "(?i).*access[\\s._-]*key([\\s._-]*id)?$", "(?i).*private[\\s._-]*key([\\s._-]*id)?$",
+              "(?i).*jaas[\\s._-]*config$", "(?i).*user[\\s._-]*info$", "(?i).*json[\\s._-]*key$",
+              "(?i).*key[\\s._-]*file$", "(?i).*key[\\s._-]*content([\\s._-]*base64)?$")
           .map(Pattern::compile).collect(Collectors.toList());
   public static final Obfuscator DEFAULT = new Obfuscator();
 
   private final String _maskedValue;
   private final List<Pattern> _patterns;
 
-  /// Obfuscator with default behavior matching (ignore case) "secret", "password", and "token" suffixes. Masks any
+  /// Obfuscator with default behavior matching (ignore case) credential suffixes such as "secret", "password",
+  /// "token" and "accessKey" - see [#DEFAULT_PATTERNS]. Masks any
   /// values with '\*\*\*\*\*'
   public Obfuscator() {
     this(DEFAULT_MASKED_VALUE, DEFAULT_PATTERNS);
