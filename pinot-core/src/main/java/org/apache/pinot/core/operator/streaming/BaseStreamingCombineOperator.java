@@ -76,8 +76,7 @@ public abstract class BaseStreamingCombineOperator<T extends BaseResultsBlock> e
     try {
       while (!_querySatisfied && _numOperatorsFinished < _numOperators) {
         QueryThreadContext.checkTermination(this::getExplainName);
-        BaseResultsBlock resultsBlock =
-            _blockingQueue.poll(endTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+        BaseResultsBlock resultsBlock = pollResultsBlock(_blockingQueue, endTimeMs);
         if (resultsBlock == null) {
           // Query times out, skip streaming the remaining results blocks
           throw QueryErrorCode.EXECUTION_TIMEOUT.asException("Timed out while polling results block");

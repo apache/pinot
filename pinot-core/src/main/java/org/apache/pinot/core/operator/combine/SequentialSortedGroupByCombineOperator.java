@@ -21,7 +21,6 @@ package org.apache.pinot.core.operator.combine;
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.Record;
@@ -127,7 +126,7 @@ public class SequentialSortedGroupByCombineOperator extends BaseSingleBlockCombi
       if (waitTimeMs <= 0) {
         return getTimeoutResultsBlock(numBlocksMerged);
       }
-      BaseResultsBlock blockToMerge = _blockingQueue.poll(waitTimeMs, TimeUnit.MILLISECONDS);
+      BaseResultsBlock blockToMerge = pollResultsBlock(_blockingQueue, endTimeMs);
       if (blockToMerge == null) {
         return getTimeoutResultsBlock(numBlocksMerged);
       }
