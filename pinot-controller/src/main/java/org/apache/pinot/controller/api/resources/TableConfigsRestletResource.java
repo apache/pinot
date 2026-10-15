@@ -213,6 +213,14 @@ public class TableConfigsRestletResource {
           Response.Status.BAD_REQUEST);
     }
 
+    // Authorize before validation can compile schema or table transform functions.
+    String endpointUrl = request.getRequestURL().toString();
+    AccessControl accessControl = _accessControlFactory.create();
+    AccessControlUtils.validatePermission(rawTableName, AccessType.CREATE, httpHeaders, endpointUrl, accessControl);
+    if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, rawTableName, Actions.Table.CREATE_TABLE)) {
+      throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
+    }
+
     validateConfig(tableConfigs, databaseName, typesToSkip);
     tableConfigs.setTableName(rawTableName);
 
@@ -221,15 +229,6 @@ public class TableConfigsRestletResource {
     Schema schema = tableConfigs.getSchema();
 
     try {
-      // validate permission
-      String endpointUrl = request.getRequestURL().toString();
-      AccessControl accessControl = _accessControlFactory.create();
-      AccessControlUtils.validatePermission(rawTableName, AccessType.CREATE, httpHeaders, endpointUrl,
-          accessControl);
-      if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, rawTableName, Actions.Table.CREATE_TABLE)) {
-        throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
-      }
-
       if (offlineTableConfig != null) {
         applyTuning(offlineTableConfig, schema);
         if (!ignoreActiveTasks) {
@@ -494,8 +493,17 @@ public class TableConfigsRestletResource {
     }
     String databaseName = DatabaseUtils.extractDatabaseFromHttpHeaders(httpHeaders);
     TableConfigs tableConfigs = tableConfigsAndUnrecognizedProps.getLeft();
-    validateConfig(tableConfigs, databaseName, typesToSkip);
     String rawTableName = DatabaseUtils.translateTableName(tableConfigs.getTableName(), databaseName);
+
+    // Authorize before validation can compile schema or table transform functions.
+    String endpointUrl = request.getRequestURL().toString();
+    AccessControl accessControl = _accessControlFactory.create();
+    AccessControlUtils.validatePermission(rawTableName, AccessType.READ, httpHeaders, endpointUrl, accessControl);
+    if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, rawTableName, Actions.Table.VALIDATE_TABLE_CONFIGS)) {
+      throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
+    }
+
+    validateConfig(tableConfigs, databaseName, typesToSkip);
     tableConfigs.setTableName(rawTableName);
 
     // Cluster-aware validations are exclusive to the validate/tune pre-flight endpoints so that users get fail-fast
@@ -519,13 +527,6 @@ public class TableConfigsRestletResource {
           String.format("Invalid TableConfigs: %s. %s", rawTableName, e.getMessage()), Response.Status.BAD_REQUEST, e);
     }
 
-    // validate permission
-    String endpointUrl = request.getRequestURL().toString();
-    AccessControl accessControl = _accessControlFactory.create();
-    AccessControlUtils.validatePermission(rawTableName, AccessType.READ, httpHeaders, endpointUrl, accessControl);
-    if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, rawTableName, Actions.Table.VALIDATE_TABLE_CONFIGS)) {
-      throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
-    }
     return tableConfigsAndUnrecognizedProps;
   }
 
@@ -565,6 +566,7 @@ public class TableConfigsRestletResource {
 
       Preconditions.checkState(rawTableName.equals(schemaName),
           "'tableName': %s must be equal to 'schemaName' from 'schema': %s", rawTableName, schema.getSchemaName());
+      TableConfigValidationUtils.validateSchemaGroovy(schema, _controllerConf);
       SchemaUtils.validateIngestionTransformVolatility(schema, _pinotHelixResourceManager.getSchema(schemaName));
       SchemaUtils.validate(schema);
       if (offlineTableConfig != null) {
