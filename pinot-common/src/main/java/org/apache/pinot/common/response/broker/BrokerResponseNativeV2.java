@@ -47,9 +47,9 @@ import org.apache.pinot.common.response.ProcessingException;
     "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried",
     "numConsumingSegmentsProcessed", "numConsumingSegmentsMatched", "minConsumingFreshnessTimeMs",
     "numSegmentsPrunedByBroker", "numSegmentsPrunedByServer", "numSegmentsPrunedInvalid", "numSegmentsPrunedByLimit",
-    "numSegmentsPrunedByValue", "numRemoteAccesses", "remoteAccessBytes", "brokerReduceTimeMs",
-    "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs", "offlineSystemActivitiesCpuTimeNs",
-    "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
+    "numSegmentsPrunedByValue", "numRemoteAccesses", "remoteAccessBytes", "numDirectRemoteAccesses",
+    "directRemoteAccessBytes", "brokerReduceTimeMs", "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs",
+    "offlineSystemActivitiesCpuTimeNs", "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
     "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs", "realtimeTotalCpuTimeNs",
     "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tablesQueried",
     "offlineThreadMemAllocatedBytes", "realtimeThreadMemAllocatedBytes", "offlineResponseSerMemAllocatedBytes",
@@ -409,14 +409,28 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
     return _brokerStats.getLong(StatKey.NUM_SEGMENTS_PRUNED_BY_VALUE);
   }
 
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
   @Override
   public long getNumRemoteAccesses() {
     return _brokerStats.getLong(StatKey.NUM_REMOTE_ACCESSES);
   }
 
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
   @Override
   public long getRemoteAccessBytes() {
     return _brokerStats.getLong(StatKey.REMOTE_ACCESS_BYTES);
+  }
+
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+  @Override
+  public long getNumDirectRemoteAccesses() {
+    return _brokerStats.getLong(StatKey.NUM_DIRECT_REMOTE_ACCESSES);
+  }
+
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+  @Override
+  public long getDirectRemoteAccessBytes() {
+    return _brokerStats.getLong(StatKey.DIRECT_REMOTE_ACCESS_BYTES);
   }
 
   @Override
@@ -582,7 +596,9 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
     EARLY_TERMINATION_REASONS(StatMap.Type.STRING_SET),
     LITE_MODE_LEAF_STAGE_LIMIT_REACHED(StatMap.Type.BOOLEAN),
     NUM_REMOTE_ACCESSES(StatMap.Type.LONG),
-    REMOTE_ACCESS_BYTES(StatMap.Type.LONG);
+    REMOTE_ACCESS_BYTES(StatMap.Type.LONG),
+    NUM_DIRECT_REMOTE_ACCESSES(StatMap.Type.LONG),
+    DIRECT_REMOTE_ACCESS_BYTES(StatMap.Type.LONG);
 
     private final StatMap.Type _type;
 
