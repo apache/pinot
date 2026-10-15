@@ -3013,6 +3013,7 @@
               <artifact>org.apache.hadoop*:*</artifact>
               <excludes>
                 <exclude>META-INF/maven/com.google.guava/**</exclude>
+                <exclude>META-INF/versions/**/module-info.class</exclude>
               </excludes>
             </filter>
             <filter>
