@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.nio.ByteOrder;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -33,8 +34,11 @@ import org.apache.lucene.document.Document;
 import org.apache.lucene.document.DocumentStoredFieldVisitor;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.FieldInfo;
+import org.apache.lucene.index.IndexCommit;
+import org.apache.lucene.index.IndexFormatTooOldException;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexableField;
+import org.apache.lucene.index.SegmentInfos;
 import org.apache.lucene.index.StoredFields;
 import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.queryparser.classic.QueryParserBase;
@@ -84,12 +88,66 @@ public class LuceneTextIndexReader implements TextIndexReader {
   /// parsed query only when these are equal. Computed once; immutable, with structural equality.
   private final ParseConfig _parseConfig;
 
+  /// Retains support for immutable Lucene 8 text indexes through Lucene's backward codecs.
+  /// The default reader only accepts indexes created with the current or previous major version.
+  static DirectoryReader openIndexReader(Directory directory)
+      throws IOException {
+    try {
+      return DirectoryReader.open(directory);
+    } catch (IndexFormatTooOldException e) {
+      SegmentInfos segmentInfos = SegmentInfos.readLatestCommit(directory, 8);
+      IndexCommit commit = new IndexCommit() {
+        @Override
+        public String getSegmentsFileName() {
+          return segmentInfos.getSegmentsFileName();
+        }
+
+        @Override
+        public Collection<String> getFileNames()
+            throws IOException {
+          return segmentInfos.files(true);
+        }
+
+        @Override
+        public Directory getDirectory() {
+          return directory;
+        }
+
+        @Override
+        public void delete() {
+          throw new UnsupportedOperationException("Cannot delete an immutable text index commit");
+        }
+
+        @Override
+        public boolean isDeleted() {
+          return false;
+        }
+
+        @Override
+        public int getSegmentCount() {
+          return segmentInfos.size();
+        }
+
+        @Override
+        public long getGeneration() {
+          return segmentInfos.getGeneration();
+        }
+
+        @Override
+        public Map<String, String> getUserData() {
+          return segmentInfos.getUserData();
+        }
+      };
+      return DirectoryReader.open(commit, 8, null);
+    }
+  }
+
   public LuceneTextIndexReader(String column, File indexDir, int numDocs, TextIndexConfig config) {
     _column = column;
     try {
       File indexFile = getTextIndexFile(indexDir);
       _indexDirectory = FSDirectory.open(indexFile.toPath());
-      _indexReader = DirectoryReader.open(_indexDirectory);
+      _indexReader = openIndexReader(_indexDirectory);
       _indexSearcher = new IndexSearcher(_indexReader);
       _numDocs = numDocs;
       if (!config.isEnableQueryCache()) {
@@ -161,7 +219,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
 
       // Initialize from components
       _indexDirectory = indexDirectory;
-      _indexReader = DirectoryReader.open(_indexDirectory);
+      _indexReader = openIndexReader(_indexDirectory);
       _indexSearcher = new IndexSearcher(_indexReader);
       _numDocs = numDocs;
 
@@ -537,8 +595,9 @@ public class LuceneTextIndexReader implements TextIndexReader {
             return new DefaultDocIdTranslator(buffer);
           }
         } else {
+          StoredFields storedFields = indexSearcher.storedFields();
           for (int i = 0; i < numDocs; i++) {
-            Document document = indexSearcher.doc(i);
+            Document document = storedFields.document(i);
             IndexableField field = document.getField(LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME);
             int pinotDocId = Integer.parseInt(field.stringValue());
             buffer.putInt(i * Integer.BYTES, pinotDocId);
@@ -618,8 +677,9 @@ public class LuceneTextIndexReader implements TextIndexReader {
           return new DefaultDocIdTranslator(buffer);
         }
       } else {
+        StoredFields storedFields = _indexSearcher.storedFields();
         for (int i = 0; i < numDocs; i++) {
-          Document document = _indexSearcher.doc(i);
+          Document document = storedFields.document(i);
           IndexableField field = document.getField(LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME);
           int pinotDocId = Integer.parseInt(field.stringValue());
           buffer.putInt(i * Integer.BYTES, pinotDocId);
