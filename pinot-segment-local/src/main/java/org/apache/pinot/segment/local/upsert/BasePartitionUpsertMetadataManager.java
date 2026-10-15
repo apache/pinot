@@ -1260,6 +1260,13 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     return new File(_tableIndexDir, V1Constants.TTL_WATERMARK_TABLE_PARTITION + _partitionId);
   }
 
+  /// Returns the TTL watermark last persisted to disk, as computed by getWatermarkToPersist(). The validDocIds
+  /// snapshots on disk are up to date for all the segments out of TTL against it, while they can be stale for the
+  /// segments out of TTL only against the watermark in memory.
+  protected double getPersistedWatermark() {
+    return _persistedWatermark;
+  }
+
   @VisibleForTesting
   double getWatermark() {
     return _largestSeenComparisonValue.get();

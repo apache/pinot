@@ -296,8 +296,10 @@ public class UpsertSnapshotRestartTest {
   }
 
   private static double persistedWatermark(ConcurrentMapPartitionUpsertMetadataManager manager) {
-    return WatermarkUtils.loadWatermark(manager.getWatermarkFile(), BasePartitionUpsertMetadataManager
+    double watermark = WatermarkUtils.loadWatermark(manager.getWatermarkFile(), BasePartitionUpsertMetadataManager
         .TTL_WATERMARK_NOT_SET);
+    assertEquals(manager.getPersistedWatermark(), watermark, "persisted watermark in memory and on disk differ");
+    return watermark;
   }
 
   private static void close(ConcurrentMapPartitionUpsertMetadataManager manager, ImmutableSegmentImpl... segments)
@@ -315,6 +317,8 @@ public class UpsertSnapshotRestartTest {
   private String restart(boolean preload, boolean addSegBFirst)
       throws Exception {
     ConcurrentMapPartitionUpsertMetadataManager manager = newManager();
+    // The persisted watermark is loaded from the watermark file on restart
+    persistedWatermark(manager);
     ImmutableSegmentImpl segA = load("segA");
     ImmutableSegmentImpl segB = load("segB");
     List<ImmutableSegmentImpl> segments = addSegBFirst ? List.of(segB, segA) : List.of(segA, segB);
