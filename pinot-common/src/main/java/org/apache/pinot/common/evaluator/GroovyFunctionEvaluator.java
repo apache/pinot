@@ -60,6 +60,7 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
   private static final String SCRIPT_GROUP_NAME = "script";
   private static final String ARGUMENTS_SEPARATOR = ",";
   private static GroovyStaticAnalyzerConfig _groovyStaticAnalyzerConfig;
+  private static volatile boolean _ingestionGroovyDisabled;
 
   private final List<String> _arguments;
   private final int _numArguments;
@@ -69,6 +70,17 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
   private static CompilerConfiguration _compilerConfiguration = new CompilerConfiguration();
 
   public GroovyFunctionEvaluator(String closure) {
+    this(closure, false);
+  }
+
+  /// Creates a query evaluator without applying the ingestion policy. The caller enforces query admission;
+  /// the configured Groovy static analysis still applies.
+  public static GroovyFunctionEvaluator forQuery(String closure) {
+    return new GroovyFunctionEvaluator(closure, true);
+  }
+
+  private GroovyFunctionEvaluator(String closure, boolean forQuery) {
+    Preconditions.checkState(forQuery || !_ingestionGroovyDisabled, "Groovy ingestion compilation is disabled");
     _expression = closure;
     Matcher matcher = GROOVY_FUNCTION_PATTERN.matcher(closure);
     Preconditions.checkState(matcher.matches(), "Invalid transform expression: %s", closure);
@@ -93,9 +105,25 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
     return GROOVY_EXPRESSION_PREFIX;
   }
 
-  /// This method is used to parse the Groovy script and check if the script is valid.
+  /// Controls new ingestion evaluator and validation-script compilation in this JVM. Existing evaluators and query
+  /// evaluators are unaffected. Ingestion Groovy remains enabled until a service configures its policy.
+  public static void setIngestionGroovyDisabled(boolean disabled) {
+    _ingestionGroovyDisabled = disabled;
+  }
+
+  /// Parses an ingestion Groovy script and checks if it is valid.
   /// @param script Groovy script to be parsed.
   public static void parseGroovyScript(String script) {
+    Preconditions.checkState(!_ingestionGroovyDisabled, "Groovy ingestion compilation is disabled");
+    parseScript(script);
+  }
+
+  /// Parses a query script under the configured static-analysis controls without applying the ingestion policy.
+  public static void parseGroovyScriptForQuery(String script) {
+    parseScript(script);
+  }
+
+  private static void parseScript(String script) {
     Matcher matcher = GROOVY_FUNCTION_PATTERN.matcher(script);
     Preconditions.checkState(matcher.matches(), "Invalid transform expression: %s", script);
     String scriptText = matcher.group(SCRIPT_GROUP_NAME);
