@@ -33,7 +33,8 @@ import org.slf4j.LoggerFactory;
 /// The limit is checked once, synchronously, when the task is submitted. A task that passes that check is always
 /// run. The running counter is incremented when the task starts and decremented when it finishes, so the number of
 /// running tasks can exceed the limit by the number of tasks that were accepted but had not started yet when a new
-/// task was checked. On a cached thread pool this window is negligible.
+/// task was checked. The overshoot is negligible only when accepted tasks start promptly, as on a cached thread pool.
+/// On a fixed thread pool, accepted tasks can wait in the queue, so the overshoot can be as large as that backlog.
 ///
 /// The limit is deliberately not re-checked when the task starts. A task that is accepted and then rejected at start
 /// time never runs and never completes its future. Callers that discard the future (for example a scheduler that
