@@ -375,7 +375,8 @@ public class OpChainSchedulerService {
         synchronized (_lock) {
           _thread = null;
         }
-        // Clear an interrupt that came after the op chain stopped checking for it
+        // _thread is null, so interruptTask() can no longer interrupt this thread. Clear an interrupt that it sent
+        // earlier, after the op chain stopped checking for interrupts.
         Thread.interrupted();
         set(null);
       }

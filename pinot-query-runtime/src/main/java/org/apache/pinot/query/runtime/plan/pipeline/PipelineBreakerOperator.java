@@ -106,6 +106,8 @@ public class PipelineBreakerOperator extends MultiStageOperator {
   @Override
   public void cancel(Throwable e) {
     if (_errorBlock == null) {
+      // Not only an Exception: the scheduler also cancels an op chain that failed with an Error, e.g. an
+      // OutOfMemoryError while the pipeline breaker collects its results
       _errorBlock = ErrorMseBlock.fromException(e instanceof Exception ? (Exception) e : new RuntimeException(e));
     }
     super.cancel(e);
