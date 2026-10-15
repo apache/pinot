@@ -29,12 +29,12 @@ import java.util.Map;
 import java.util.Properties;
 import javax.annotation.Nullable;
 import org.apache.lucene.analysis.Analyzer;
-import org.apache.lucene.document.Document;
 import org.apache.lucene.document.DocumentStoredFieldVisitor;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.FieldInfo;
 import org.apache.lucene.index.IndexReader;
-import org.apache.lucene.index.IndexableField;
+import org.apache.lucene.index.MultiDocValues;
+import org.apache.lucene.index.NumericDocValues;
 import org.apache.lucene.index.StoredFields;
 import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.queryparser.classic.QueryParserBase;
@@ -395,33 +395,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
 
         if (config.getDocIdTranslatorMode() == DocIdTranslatorMode.TryOptimize) {
           LOGGER.debug("Creating lucene to pinot doc id mapping.");
-          boolean allIdsAreEqual = true;
-
-          class DocIdVisitor extends DocumentStoredFieldVisitor {
-            int _pinotDocId;
-
-            @Override
-            public Status needsField(FieldInfo fieldInfo) {
-              // assume doc id is the only stored document
-              assert LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME.equals(fieldInfo.name);
-              return Status.YES;
-            }
-
-            @Override
-            public void intField(FieldInfo fieldInfo, int value) {
-              _pinotDocId = value;
-            }
-          }
-
-          DocIdVisitor visitor = new DocIdVisitor();
-          StoredFields storedFields = indexSearcher.storedFields();
-
-          for (int i = 0; i < numDocs; i++) {
-            storedFields.document(i, visitor);
-            int pinotDocId = visitor._pinotDocId;
-            allIdsAreEqual &= (i == pinotDocId);
-            buffer.putInt(i * Integer.BYTES, pinotDocId);
-          }
+          boolean allIdsAreEqual = fillDocIdMapping(indexSearcher, buffer, numDocs);
 
           if (allIdsAreEqual) {
             LOGGER.debug("Lucene doc ids are equal to Pinot's. Deleting mapping and updating index settings.");
@@ -447,12 +421,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
             return new DefaultDocIdTranslator(buffer);
           }
         } else {
-          for (int i = 0; i < numDocs; i++) {
-            Document document = indexSearcher.doc(i);
-            IndexableField field = document.getField(LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME);
-            int pinotDocId = Integer.parseInt(field.stringValue());
-            buffer.putInt(i * Integer.BYTES, pinotDocId);
-          }
+          fillDocIdMapping(indexSearcher, buffer, numDocs);
           return new DefaultDocIdTranslator(buffer);
         }
       }
@@ -491,33 +460,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
     try {
       if (config.getDocIdTranslatorMode() == DocIdTranslatorMode.TryOptimize) {
         LOGGER.debug("Creating lucene to pinot doc id mapping.");
-        boolean allIdsAreEqual = true;
-
-        class DocIdVisitor extends DocumentStoredFieldVisitor {
-          int _pinotDocId;
-
-          @Override
-          public Status needsField(FieldInfo fieldInfo) {
-            // assume doc id is the only stored document
-            assert LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME.equals(fieldInfo.name);
-            return Status.YES;
-          }
-
-          @Override
-          public void intField(FieldInfo fieldInfo, int value) {
-            _pinotDocId = value;
-          }
-        }
-
-        DocIdVisitor visitor = new DocIdVisitor();
-        StoredFields storedFields = _indexSearcher.storedFields();
-
-        for (int i = 0; i < numDocs; i++) {
-          storedFields.document(i, visitor);
-          int pinotDocId = visitor._pinotDocId;
-          allIdsAreEqual &= (i == pinotDocId);
-          buffer.putInt(i * Integer.BYTES, pinotDocId);
-        }
+        boolean allIdsAreEqual = fillDocIdMapping(_indexSearcher, buffer, numDocs);
 
         if (allIdsAreEqual) {
           LOGGER.debug("Lucene doc ids are equal to Pinot's. Using no-op translator.");
@@ -528,12 +471,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
           return new DefaultDocIdTranslator(buffer);
         }
       } else {
-        for (int i = 0; i < numDocs; i++) {
-          Document document = _indexSearcher.doc(i);
-          IndexableField field = document.getField(LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME);
-          int pinotDocId = Integer.parseInt(field.stringValue());
-          buffer.putInt(i * Integer.BYTES, pinotDocId);
-        }
+        fillDocIdMapping(_indexSearcher, buffer, numDocs);
         return new DefaultDocIdTranslator(buffer);
       }
     } catch (Exception e) {
@@ -541,5 +479,54 @@ public class LuceneTextIndexReader implements TextIndexReader {
       throw new RuntimeException("Caught exception while creating doc id translator for text index column: " + _column,
           e);
     }
+  }
+
+  /// Reads the actual Pinot ids after Lucene merges and sorting. Doc values avoid stored-field decompression;
+  /// indexes created by older writers, including individual older leaves, retain the stored-field fallback.
+  @VisibleForTesting
+  static boolean fillDocIdMapping(IndexSearcher indexSearcher, PinotDataBuffer buffer, int numDocs)
+      throws IOException {
+    NumericDocValues docIds = MultiDocValues.getNumericValues(indexSearcher.getIndexReader(),
+        LuceneTextIndexCreator.PINOT_DOC_ID_DOC_VALUES_FIELD_NAME);
+    class DocIdVisitor extends DocumentStoredFieldVisitor {
+      int _pinotDocId;
+
+      @Override
+      public Status needsField(FieldInfo fieldInfo) {
+        return LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME.equals(fieldInfo.name) ? Status.YES : Status.NO;
+      }
+
+      @Override
+      public void intField(FieldInfo fieldInfo, int value) {
+        _pinotDocId = value;
+      }
+
+      @Override
+      public void stringField(FieldInfo fieldInfo, String value) {
+        _pinotDocId = Integer.parseInt(value);
+      }
+    }
+    DocIdVisitor visitor = new DocIdVisitor();
+    StoredFields storedFields = null;
+    boolean allIdsAreEqual = true;
+    for (int i = 0; i < numDocs; i++) {
+      int pinotDocId;
+      if (docIds != null && docIds.advanceExact(i)) {
+        pinotDocId = Math.toIntExact(docIds.longValue());
+      } else {
+        if (storedFields == null) {
+          storedFields = indexSearcher.storedFields();
+        }
+        visitor._pinotDocId = Integer.MIN_VALUE;
+        storedFields.document(i, visitor);
+        pinotDocId = visitor._pinotDocId;
+        if (pinotDocId == Integer.MIN_VALUE) {
+          throw new IOException("Missing Pinot document id for Lucene document: " + i);
+        }
+      }
+      allIdsAreEqual &= i == pinotDocId;
+      buffer.putInt((long) i * Integer.BYTES, pinotDocId);
+    }
+    return allIdsAreEqual;
   }
 }
