@@ -26,6 +26,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.Operator;
@@ -158,6 +159,7 @@ public class CombineTerminationTest {
     queryContext.setEndTimeMs(System.currentTimeMillis() + QUERY_TIMEOUT_MS);
     QueryExecutionContext executionContext = QueryExecutionContext.forSseTest();
     CountDownLatch combineStarted = new CountDownLatch(1);
+    AtomicReference<Thread> combineThread = new AtomicReference<>();
 
     // Run the combine operator like the query scheduler does: on a thread with its own query context, and with a
     // context aware executor that registers the worker tasks for cancellation
@@ -167,6 +169,7 @@ public class CombineTerminationTest {
         ExecutorService executorService = QueryThreadContext.contextAwareExecutorService(_workerPool);
         BaseCombineOperator<?> combineOperator = factory.apply(new CombineArgs(operators, queryContext,
             executorService));
+        combineThread.set(Thread.currentThread());
         combineStarted.countDown();
         if (combineOperator instanceof BaseStreamingCombineOperator) {
           ((BaseStreamingCombineOperator<?>) combineOperator).start();
@@ -175,9 +178,11 @@ public class CombineTerminationTest {
       }
     });
     assertTrue(combineStarted.await(MAX_RETURN_TIME_MS, TimeUnit.MILLISECONDS));
-    // Wait until the combine operator has submitted its tasks, so that termination cancels them while they are queued
-    TestUtils.waitForCondition(aVoid -> !_workerPool.getQueue().isEmpty(), MAX_RETURN_TIME_MS,
-        "Combine operator did not submit its tasks");
+    // Wait until the combine operator has submitted its tasks and its thread waits for the results, so that
+    // termination cancels the tasks while they are queued and the wait loop must observe the termination
+    TestUtils.waitForCondition(
+        aVoid -> !_workerPool.getQueue().isEmpty() && combineThread.get().getState() == Thread.State.TIMED_WAITING,
+        MAX_RETURN_TIME_MS, "Combine operator did not wait for its tasks");
 
     long terminateTimeMs = System.currentTimeMillis();
     assertTrue(executionContext.terminate(QueryErrorCode.QUERY_CANCELLATION, "terminated for test"));
