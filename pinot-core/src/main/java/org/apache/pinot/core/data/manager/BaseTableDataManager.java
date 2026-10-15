@@ -724,7 +724,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     if (segmentDataManager != null) {
       IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
       if (onlyIfNeeded && !forceDownload && !checkReloadNeeded(segmentDataManager, indexLoadingConfig)) {
-        _logger.info("Skipping reload for segment: {} as it is already up to date", segmentName);
+        _logger.info("Skipped segment: {} with onlyIfNeeded as it is already up to date", segmentName);
         if (reloadJobId != null) {
           _reloadJobStatusCache.recordSkipped(reloadJobId, List.of(segmentName));
         }
@@ -745,11 +745,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
     List<SegmentDataManager> segmentDataManagers = new ArrayList<>(_segmentDataManagerMap.values());
     if (!segmentDataManagers.isEmpty()) {
       IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
-      if (onlyIfNeeded && !forceDownload) {
-        segmentDataManagers = selectSegmentsNeedingReload(segmentDataManagers, indexLoadingConfig, reloadJobId);
-      }
-      if (!segmentDataManagers.isEmpty()) {
-        reloadSegments(segmentDataManagers, indexLoadingConfig, forceDownload, reloadJobId);
+      List<SegmentDataManager> segmentsToReload = onlyIfNeeded && !forceDownload
+          ? selectSegmentsNeedingReload(segmentDataManagers, indexLoadingConfig, reloadJobId) : segmentDataManagers;
+      if (!segmentsToReload.isEmpty()) {
+        reloadSegments(segmentsToReload, indexLoadingConfig, forceDownload, reloadJobId);
       }
     }
     _logger.info("Reloaded all {} segments with forceDownload: {}, onlyIfNeeded: {}", segmentDataManagers.size(),
@@ -784,10 +783,11 @@ public abstract class BaseTableDataManager implements TableDataManager {
       }
     }
     if (missingSegments.isEmpty()) {
-      _logger.info("Reloaded segments: {} with forceDownload: {}", segmentNames, forceDownload);
+      _logger.info("Reloaded {} segments with forceDownload: {}, onlyIfNeeded: {}", segmentNames.size(), forceDownload,
+          onlyIfNeeded);
     } else {
-      _logger.warn("Reloaded {}/{} segments: {} with forceDownload: {}, missing segments: {}",
-          segmentDataManagers.size(), segmentNames.size(), segmentNames, forceDownload, missingSegments);
+      _logger.warn("Reloaded {}/{} segments with forceDownload: {}, onlyIfNeeded: {}, missing segments: {}",
+          segmentDataManagers.size(), segmentNames.size(), forceDownload, onlyIfNeeded, missingSegments);
     }
   }
 
@@ -1141,9 +1141,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
       }
     }
     if (!skippedSegments.isEmpty()) {
-      _logger.info("Skipping reload for {}/{} segments that are already up to date", skippedSegments.size(),
-          segmentDataManagers.size());
-      _logger.debug("Skipped reload for up-to-date segments: {}", skippedSegments);
+      _logger.info("Skipping reload for {}/{} segments with onlyIfNeeded as they are already up to date",
+          skippedSegments.size(), segmentDataManagers.size());
       if (reloadJobId != null) {
         _reloadJobStatusCache.recordSkipped(reloadJobId, skippedSegments);
       }
