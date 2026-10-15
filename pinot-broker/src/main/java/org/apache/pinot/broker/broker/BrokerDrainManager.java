@@ -372,7 +372,7 @@ public class BrokerDrainManager {
     int inFlightQueries = getInFlightQueries(queryState);
     long drainStartTimeMs = draining ? _drainStartTimeMs : -1L;
     long drainDurationMs = drainStartTimeMs >= 0 ? Math.max(0L, System.currentTimeMillis() - drainStartTimeMs) : 0L;
-    return new DrainStatus(_instanceId, draining, !draining, inFlightQueries, drainStartTimeMs, drainDurationMs,
+    return new DrainStatus(_instanceId, draining, inFlightQueries, drainStartTimeMs, drainDurationMs,
         draining && inFlightQueries == 0 && isCoordinationReconciled(), _shutdownMarkerReconciled,
         _brokerResourceReconciled, _shutdownTriggered.get(), _tablesRemovedFromBrokerResource, message);
   }
@@ -426,7 +426,6 @@ public class BrokerDrainManager {
   public static final class DrainStatus {
     private final String _instanceId;
     private final boolean _draining;
-    private final boolean _acceptingQueries;
     private final int _inFlightQueries;
     private final long _drainStartTimeMs;
     private final long _drainDurationMs;
@@ -437,13 +436,11 @@ public class BrokerDrainManager {
     private final List<String> _tablesRemovedFromBrokerResource;
     private final String _message;
 
-    private DrainStatus(String instanceId, boolean draining, boolean acceptingQueries, int inFlightQueries,
-        long drainStartTimeMs, long drainDurationMs, boolean drained, boolean shutdownMarkerReconciled,
+    private DrainStatus(String instanceId, boolean draining, int inFlightQueries, long drainStartTimeMs, long drainDurationMs, boolean drained, boolean shutdownMarkerReconciled,
         boolean brokerResourceReconciled, boolean shutdownTriggered, List<String> tablesRemovedFromBrokerResource,
         String message) {
       _instanceId = instanceId;
       _draining = draining;
-      _acceptingQueries = acceptingQueries;
       _inFlightQueries = inFlightQueries;
       _drainStartTimeMs = drainStartTimeMs;
       _drainDurationMs = drainDurationMs;
@@ -461,10 +458,6 @@ public class BrokerDrainManager {
 
     public boolean isDraining() {
       return _draining;
-    }
-
-    public boolean isAcceptingQueries() {
-      return _acceptingQueries;
     }
 
     public int getInFlightQueries() {

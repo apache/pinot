@@ -234,7 +234,7 @@ public class BrokerDrainManagerTest {
 
     assertTrue(status.isDraining());
     assertTrue(status.isDrained());
-    assertFalse(status.isAcceptingQueries());
+    assertTrue(status.isDraining());
   }
 
   @Test
@@ -505,7 +505,7 @@ public class BrokerDrainManagerTest {
       assertTrue(drainManager.getStatus().isShutdownMarkerReconciled());
       assertFalse(drainManager.getStatus().isBrokerResourceReconciled());
       assertFalse(drainManager.getStatus().isDrained());
-      assertTrue(drainManager.getStatus().isAcceptingQueries());
+      assertFalse(drainManager.getStatus().isDraining());
       // The interrupted update may still be committed by another thread, so keep routing for queries still admitted
       assertTrue(drainManager.shouldRetainRoutingOnRemoval());
       try (BrokerDrainManager.QueryPermit queryPermit = drainManager.tryAcquireQuery()) {
@@ -570,7 +570,7 @@ public class BrokerDrainManagerTest {
       AtomicInteger drainStartedCount) {
     BrokerDrainManager.DrainStatus status = drainManager.getStatus();
     assertFalse(status.isDraining());
-    assertTrue(status.isAcceptingQueries());
+    assertFalse(status.isDraining());
     assertEquals(status.getDrainStartTimeMs(), -1L);
     assertEquals(drainStartedCount.get(), 0);
     try (BrokerDrainManager.QueryPermit queryPermit = drainManager.tryAcquireQuery()) {

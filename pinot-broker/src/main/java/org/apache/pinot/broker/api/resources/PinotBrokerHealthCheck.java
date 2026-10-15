@@ -109,11 +109,6 @@ public class PinotBrokerHealthCheck {
     throw new WebApplicationException(errMessage, response);
   }
 
-  /// Preserves the programmatic health-check API for callers that do not use JAX-RS parameter injection.
-  public String getBrokerHealth() {
-    return getBrokerHealth(null);
-  }
-
   @GET
   @Produces(MediaType.TEXT_PLAIN)
   @Path("uptime")

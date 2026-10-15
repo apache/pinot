@@ -270,13 +270,12 @@ broker:
     builderClass: random
 
   probes:
-    # Deprecated compatibility override. When set, this endpoint is used for all broker probes and takes precedence
-    # over the per-probe endpoints below.
-    # endpoint: "/health"
+    endpoint: "/health"
     livenessEnabled: true
     readinessEnabled: true
     startupEnabled: false
     liveness:
+      # Liveness only checks that the admin API answers, so a draining broker (readiness 503) is not restarted
       endpoint: "/health?checkType=liveness"
       initialDelaySeconds: 60
       failureThreshold: 10

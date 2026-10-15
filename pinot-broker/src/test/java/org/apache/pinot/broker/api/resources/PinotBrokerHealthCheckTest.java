@@ -56,7 +56,7 @@ public class PinotBrokerHealthCheckTest {
     setField(healthCheck, "_brokerMetrics", Mockito.mock(BrokerMetrics.class));
     setField(healthCheck, "_brokerDrainManager", drainManager);
 
-    assertEquals(healthCheck.getBrokerHealth(), "OK");
+    assertEquals(healthCheck.getBrokerHealth(null), "OK");
     drainManager.drain(0L, false);
 
     WebApplicationException readinessFailure =

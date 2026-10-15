@@ -158,7 +158,7 @@ public class PinotBrokerDrainResourceTest {
     assertEquals(exception.getMessage(),
         "Broker administrative access is required to drain the broker. Reason: not admin");
     assertFalse(drainManager.isDraining());
-    assertTrue(drainManager.getStatus().isAcceptingQueries());
+    assertFalse(drainManager.getStatus().isDraining());
     verify(asyncResponse, never()).resume(any(Response.class));
   }
 
