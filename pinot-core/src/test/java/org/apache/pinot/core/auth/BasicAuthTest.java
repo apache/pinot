@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.annotations.Test;
 
@@ -96,6 +97,74 @@ public class BasicAuthTest {
     assertFalse(excluded.hasTable("myTable"));
     assertTrue(excluded.hasTable("otherTable"));
     assertFalse(excluded.hasUnrestrictedTableAccess());
+  }
+
+  @Test
+  public void testNoExcludeTables() {
+    // A principal without exclusions grants raw and typed names alike, through the allow-list and without one
+    BasicAuthPrincipal unrestricted = new BasicAuthPrincipal("name", "token", Set.of(), Set.of(), Set.of("read"));
+    assertTrue(unrestricted.hasTable("t"));
+    assertTrue(unrestricted.hasTable("t_OFFLINE"));
+    assertTrue(unrestricted.hasTable("t_REALTIME"));
+    assertTrue(unrestricted.hasUnrestrictedTableAccess());
+
+    BasicAuthPrincipal allowListed =
+        new BasicAuthPrincipal("name", "token", Set.of("t", "t_OFFLINE"), Set.of(), Set.of("read"));
+    assertTrue(allowListed.hasTable("t"));
+    assertTrue(allowListed.hasTable("t_OFFLINE"));
+    assertFalse(allowListed.hasTable("t_REALTIME"));
+    assertFalse(allowListed.hasTable("other"));
+  }
+
+  @Test
+  public void testExcludeTablesAlsoMatchTheRawName() {
+    // excludeTables lists raw names: a type suffix must not bypass an excluded table
+    BasicAuthPrincipal principal = new BasicAuthPrincipal("name", "token", Set.of(), Set.of("t"), Set.of("read"));
+    assertFalse(principal.hasTable("t"));
+    assertFalse(principal.hasTable("t_OFFLINE"));
+    assertFalse(principal.hasTable("t_REALTIME"));
+    assertTrue(principal.hasTable("other"));
+    assertTrue(principal.hasTable("other_OFFLINE"));
+
+    // excludeTables is documented as raw names: an entry written with a type suffix is a misconfiguration that the
+    // principal does not widen. It matches only that spelling as given, so the raw name and the other type stay
+    // accessible.
+    BasicAuthPrincipal typedExclusion =
+        new BasicAuthPrincipal("name", "token", Set.of(), Set.of("t_OFFLINE"), Set.of("read"));
+    assertFalse(typedExclusion.hasTable("t_OFFLINE"));
+    assertTrue(typedExclusion.hasTable("t"));
+    assertTrue(typedExclusion.hasTable("t_REALTIME"));
+  }
+
+  @Test
+  public void testAuthorizeDeleteRows() {
+    BasicAuthPrincipal principal =
+        new BasicAuthPrincipal("alice", "token", Set.of("myTable"), Set.of(), Set.of("read", "delete"));
+
+    AuthorizationResult noPrincipal = BasicAuthPrincipalUtils.authorizeDeleteRows(null, "myTable", true);
+    assertFalse(noPrincipal.hasAccess());
+    assertEquals(noPrincipal.getFailureMessage(), "Missing or invalid credentials");
+
+    AuthorizationResult noTable = BasicAuthPrincipalUtils.authorizeDeleteRows(principal, "myTable_OFFLINE", false);
+    assertFalse(noTable.hasAccess());
+    assertEquals(noTable.getFailureMessage(), "Principal: alice does not have access to table: myTable_OFFLINE");
+
+    // The DELETE permission must be granted explicitly: a principal without a permission list, which hasPermission
+    // grants everything, may not delete rows
+    BasicAuthPrincipal noPermissionList =
+        new BasicAuthPrincipal("bob", "token", Set.of("myTable"), Set.of(), Set.of());
+    assertTrue(noPermissionList.hasPermission("delete"));
+    AuthorizationResult noPermission = BasicAuthPrincipalUtils.authorizeDeleteRows(noPermissionList, "myTable", true);
+    assertFalse(noPermission.hasAccess());
+    assertEquals(noPermission.getFailureMessage(), "Principal: bob is not granted the DELETE permission");
+    BasicAuthPrincipal readOnly =
+        new BasicAuthPrincipal("carol", "token", Set.of("myTable"), Set.of(), Set.of("read"));
+    assertEquals(BasicAuthPrincipalUtils.authorizeDeleteRows(readOnly, "myTable", true).getFailureMessage(),
+        "Principal: carol is not granted the DELETE permission");
+
+    AuthorizationResult granted = BasicAuthPrincipalUtils.authorizeDeleteRows(principal, "myTable", true);
+    assertTrue(granted.hasAccess());
+    assertEquals(granted.getFailureMessage(), "");
   }
 
   @Test

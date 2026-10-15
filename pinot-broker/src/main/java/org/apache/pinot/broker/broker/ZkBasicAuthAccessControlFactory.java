@@ -24,7 +24,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import javax.ws.rs.NotAuthorizedException;
+import javax.ws.rs.core.HttpHeaders;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -52,6 +54,10 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 /// number of tables/password etc.) or add/delete user without restarting your Pinot clusters,
 /// and these changes happen immediately.
 /// Users Configuration store in Helix Zookeeper and encrypted user password via Bcrypt Encryption Algorithm.
+///
+/// Users query the tables they have access to, matched by raw table name. Deleting rows with a SQL `DELETE` also
+/// requires the `DELETE` permission, granted explicitly: unlike on the controller, where a user without permissions
+/// has them all, a user without permissions does not delete rows through the broker.
 public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
 
   private AccessControl _accessControl;
@@ -125,6 +131,15 @@ public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
         throw new NotAuthorizedException("Basic");
       }
       return new BasicAuthorizationResultImpl(principalOpt.get().hasPermission(RoleType.ADMIN, ComponentType.BROKER));
+    }
+
+    @Override
+    public AuthorizationResult authorizeDeleteRows(RequesterIdentity requesterIdentity,
+        @Nullable HttpHeaders httpHeaders, String tableName) {
+      ZkBasicAuthPrincipal principal = getPrincipalAuth(requesterIdentity).orElse(null);
+      // The table is matched by raw name, as for queries
+      return BasicAuthPrincipalUtils.authorizeDeleteRows(principal, tableName,
+          principal != null && principal.hasTable(TableNameBuilder.extractRawTableName(tableName)));
     }
 
     private Optional<ZkBasicAuthPrincipal> getPrincipalAuth(RequesterIdentity requesterIdentity) {

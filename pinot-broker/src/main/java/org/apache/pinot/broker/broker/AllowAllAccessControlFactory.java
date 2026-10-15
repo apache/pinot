@@ -19,6 +19,8 @@
 package org.apache.pinot.broker.broker;
 
 import java.util.Set;
+import javax.annotation.Nullable;
+import javax.ws.rs.core.HttpHeaders;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.spi.auth.AuthorizationResult;
@@ -55,6 +57,12 @@ public class AllowAllAccessControlFactory extends AccessControlFactory {
 
     @Override
     public AuthorizationResult authorizeAdminAccess(RequesterIdentity requesterIdentity) {
+      return BasicAuthorizationResultImpl.success();
+    }
+
+    @Override
+    public AuthorizationResult authorizeDeleteRows(RequesterIdentity requesterIdentity,
+        @Nullable HttpHeaders httpHeaders, String tableName) {
       return BasicAuthorizationResultImpl.success();
     }
   }

@@ -43,6 +43,9 @@ import org.roaringbitmap.RoaringBitmap;
 /// For each docId, the function returns `1` if the IdSet contains the value of the expression, {code 0} if not.
 ///
 /// E.g. `SELECT COUNT(*) FROM myTable WHERE IN_ID_SET(col, '<base64 encoded IdSet>') = 1)`
+///
+/// inSubquery and inPartitionedSubquery, which are rewritten to this function, are listed in
+/// DeleteStatement.CROSS_TABLE_FUNCTIONS: a DELETE predicate must not call them.
 public class InIdSetTransformFunction extends BaseTransformFunction {
   private TransformFunction _transformFunction;
   private IdSet _idSet;

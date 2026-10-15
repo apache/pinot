@@ -39,11 +39,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Named;
@@ -65,11 +67,17 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
+import org.apache.calcite.sql.SqlDelete;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
+import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.api.HttpRequesterIdentity;
+import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.broker.BrokerAdminApiApplication;
 import org.apache.pinot.broker.broker.BrokerDrainManager;
+import org.apache.pinot.broker.querylog.QueryLogger;
+import org.apache.pinot.broker.querylog.QueryLogger.SqlRedactionMode;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
@@ -78,6 +86,7 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.mapper.TimeSeriesResponseMapper;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.LoggerUtils;
 import org.apache.pinot.common.utils.request.QueryFingerprintUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.auth.Actions;
@@ -88,6 +97,9 @@ import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
+import org.apache.pinot.spi.auth.AuthorizationResult;
+import org.apache.pinot.spi.auth.BasicAuthorizationResultImpl;
+import org.apache.pinot.spi.auth.TableRowColAccessResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
@@ -99,10 +111,14 @@ import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.PinotSqlType;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
+import org.apache.pinot.sql.parsers.dml.DataManipulationStatementParser;
+import org.apache.pinot.sql.parsers.dml.DeleteStatement;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 import org.glassfish.jersey.server.ManagedAsync;
+import org.jvnet.hk2.annotations.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -142,6 +158,13 @@ public class PinotClientRequest {
 
   @Inject
   private HttpClientConnectionManager _httpConnMgr;
+
+  @Inject
+  private AccessControlFactory _accessControlFactory;
+
+  @Inject
+  @Optional
+  private TableCache _tableCache;
 
   @Inject
   @Named(BrokerAdminApiApplication.BROKER_INSTANCE_ID)
@@ -711,7 +734,14 @@ public class PinotClientRequest {
     if (forceUseMultiStage) {
       sqlNodeAndOptions.setExtraOptions(Map.of(Request.QueryOptionKey.USE_MULTISTAGE_ENGINE, "true"));
     }
+    PinotSqlType sqlType = sqlNodeAndOptions.getSqlType();
     if (getCursor) {
+      // A cursor pages the rows of a query: a DML statement returns none, so it is rejected before the cursor options
+      // are set on it and the cursor metric is counted, rather than executed with options it does not support
+      if (sqlType != PinotSqlType.DQL) {
+        return new BrokerResponseNative(QueryErrorCode.SQL_PARSING,
+            "Unsupported SQL type - " + sqlType + ", cursors only support DQL.");
+      }
       if (numRows == 0) {
         numRows = _brokerConf.getProperty(CommonConstants.CursorConfigs.CURSOR_FETCH_ROWS,
             CommonConstants.CursorConfigs.DEFAULT_CURSOR_FETCH_ROWS);
@@ -721,7 +751,6 @@ public class PinotClientRequest {
               Integer.toString(numRows)));
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.CURSOR_QUERIES_GLOBAL, 1);
     }
-    PinotSqlType sqlType = sqlNodeAndOptions.getSqlType();
     if (onlyDql && sqlType != PinotSqlType.DQL) {
       return new BrokerResponseNative(QueryErrorCode.SQL_PARSING,
           "Unsupported SQL type - " + sqlType + ", this API only supports DQL.");
@@ -755,7 +784,13 @@ public class PinotClientRequest {
           Map<String, String> headers = new HashMap<>();
           httpRequesterIdentity.getHttpHeaders().entries()
               .forEach(entry -> headers.put(entry.getKey(), entry.getValue()));
+          if (sqlNodeAndOptions.getSqlNode() instanceof SqlDelete) {
+            return executeDelete(sqlNodeAndOptions, headers, httpRequesterIdentity, httpHeaders);
+          }
           return _sqlQueryExecutor.executeDMLStatement(sqlNodeAndOptions, headers);
+        } catch (WebApplicationException e) {
+          // Expected rejections, e.g. a DELETE denied with HTTP 403, are not logged as errors
+          throw e;
         } catch (Exception e) {
           LOGGER.error("Error handling DML request:\n{}", sqlRequestJson, e);
           throw e;
@@ -765,6 +800,253 @@ public class PinotClientRequest {
       default:
         return new BrokerResponseNative(QueryErrorCode.SQL_PARSING, "Unsupported SQL type - " + sqlType);
     }
+  }
+
+  /// Executes a `DELETE` once the caller is authorized to delete rows from its table.
+  ///
+  /// The first-step access control runs first, as for queries, followed by the table check without a table, so that
+  /// an access control that only authenticates the caller in that check rejects an unauthenticated caller before the
+  /// table is looked up. The table is then resolved with the database of the request and in the case it is defined
+  /// with, the caller is authorized to delete rows from it (see [#authorizeDelete]), and the executor deletes rows
+  /// from that exact table. A logical table fails with [QueryErrorCode#QUERY_VALIDATION], and a table the table cache
+  /// does not know with [QueryErrorCode#TABLE_DOES_NOT_EXIST], as a query does, but only once the caller is
+  /// authorized for it, and every message names the table as the caller wrote it (see [#deleteAccessDenied] for the
+  /// reason of a denial), so that neither the existence of a table nor its name as defined is leaked to a caller who
+  /// is not authorized for it.
+  private BrokerResponse executeDelete(SqlNodeAndOptions sqlNodeAndOptions, Map<String, String> headers,
+      HttpRequesterIdentity requesterIdentity, @Nullable HttpHeaders httpHeaders) {
+    AccessControl accessControl = _accessControlFactory.create();
+    // The first-step access control runs before the table is looked up, as for queries
+    AuthorizationResult authorizationResult = accessControl.authorize(requesterIdentity);
+    if (!authorizationResult.hasAccess()) {
+      throw deleteAccessDenied(null, null, authorizationResult);
+    }
+    // Access controls that authenticate the caller in their table check rather than in the first step (e.g. the
+    // ZooKeeper basic auth) reject an unauthenticated caller here, before the table is looked up
+    authorizationResult = authorizeTables(accessControl, requesterIdentity, Set.of());
+    if (!authorizationResult.hasAccess()) {
+      throw deleteAccessDenied(null, null, authorizationResult);
+    }
+    if (_tableCache == null) {
+      return new BrokerResponseNative(QueryErrorCode.QUERY_VALIDATION,
+          "DELETE is not supported by this broker: no table cache was configured");
+    }
+    DeleteStatement parsed;
+    DeleteStatement statement;
+    try {
+      String databaseHeader = httpHeaders != null ? httpHeaders.getHeaderString(CommonConstants.DATABASE) : null;
+      parsed = (DeleteStatement) DataManipulationStatementParser.parse(sqlNodeAndOptions);
+      statement = parsed.resolveTableName(databaseHeader, _tableCache);
+    } catch (QueryException e) {
+      // e.g. an invalid statement, or a database header that does not match the statement
+      return new BrokerResponseNative(e.getErrorCode(), e.getMessage());
+    }
+    // The caller is authorized for the table as resolved, but the messages name it as written
+    String writtenTableName = parsed.getTableName();
+    authorizeDelete(accessControl, statement.getTableName(), writtenTableName, requesterIdentity, httpHeaders);
+    if (statement.isLogicalTable()) {
+      return new BrokerResponseNative(QueryErrorCode.QUERY_VALIDATION,
+          "DELETE does not support logical tables: " + writtenTableName);
+    }
+    if (!statement.tableExists()) {
+      return new BrokerResponseNative(QueryErrorCode.TABLE_DOES_NOT_EXIST,
+          "Table does not exist: " + writtenTableName);
+    }
+    if (LOGGER.isInfoEnabled()) {
+      // Formats the line and may fingerprint the statement: only when the line is logged
+      LOGGER.info(deleteLogMessage(statement, sqlNodeAndOptions, requesterIdentity));
+    }
+    return _sqlQueryExecutor.executeStatement(statement, headers);
+  }
+
+  /// Formats the log line of a `DELETE` the executor is about to run. The predicate is redacted with the SQL
+  /// redaction mode of the query log (`pinot.broker.query.log.sqlRedaction`), as the queries are, since its literals
+  /// are the very values a privacy-driven delete removes: the `literal_values` mode logs the fingerprint of the
+  /// statement (`DELETE FROM t WHERE c = ?`), which keeps its shape as the fingerprint of a query does, in place of
+  /// the predicate. The client is only logged when the query log logs client IPs
+  /// (`pinot.broker.request.client.ip.logging`), since it comes from request headers the caller controls. The option
+  /// keys and the client are kept on a single line, as the query log keeps the predicate, so that a line ending in
+  /// the statement or in a header cannot forge a log record.
+  ///
+  /// @param sqlNodeAndOptions parsed statement, which the `literal_values` mode fingerprints
+  @VisibleForTesting
+  String deleteLogMessage(DeleteStatement statement, SqlNodeAndOptions sqlNodeAndOptions,
+      HttpRequesterIdentity requesterIdentity) {
+    SqlRedactionMode sqlRedactionMode = SqlRedactionMode.fromString(
+        _brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_QUERY_LOG_SQL_REDACTION,
+            CommonConstants.Broker.DEFAULT_BROKER_QUERY_LOG_SQL_REDACTION));
+    QueryFingerprint fingerprint = null;
+    if (sqlRedactionMode == SqlRedactionMode.LITERAL_VALUES) {
+      try {
+        fingerprint = QueryFingerprintUtils.generateFingerprint(sqlNodeAndOptions);
+      } catch (Exception e) {
+        // Logged as the query log logs a query it could not fingerprint
+        LOGGER.warn("Failed to generate the fingerprint of a DELETE on table: {}", statement.getTableName(), e);
+      }
+    }
+    String predicate = QueryLogger.redactQuery(statement.getPredicate(), sqlRedactionMode, fingerprint);
+    String options = LoggerUtils.toSingleLine(statement.getOptions().keySet().toString());
+    String client = _brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_REQUEST_CLIENT_IP_LOGGING,
+        CommonConstants.Broker.DEFAULT_BROKER_REQUEST_CLIENT_IP_LOGGING)
+        ? LoggerUtils.toSingleLine(requesterIdentity.getClientIp()) : CommonConstants.UNKNOWN;
+    return "Executing DELETE on table: " + statement.getTableName() + ", predicate: " + predicate + ", options: "
+        + options + ", client: " + client;
+  }
+
+  /// Authorizes the caller, who passed the first-step access control, to delete rows from the table.
+  ///
+  /// The checks run in this order, and the first one that denies answers HTTP 403:
+  /// 1. [AccessControl#authorize(RequesterIdentity, Set)] with the table as its only element, since the WHERE clause
+  ///    reads it. [AccessControl#authorize(RequesterIdentity, BrokerRequest)] is not called, since a `DELETE` is not a
+  ///    broker request: table restrictions that an access control only applies in that overload are not consulted,
+  ///    and must be applied again in [AccessControl#authorizeDeleteRows].
+  /// 2. The fine-grained [Actions.Table#QUERY] action on the table name, as for a query.
+  /// 3. The fine-grained [Actions.Table#DELETE_ROWS] action on the table name, then on its raw name when the name has
+  ///    a type suffix, which the controller checks, so that a type suffix cannot bypass a rule on the raw name.
+  /// 4. [AccessControl#authorizeDeleteRows], which denies by default: the fine-grained checks allow every action by
+  ///    default, so they cannot tell an access control written before `DELETE` existed from one that allows it.
+  /// 5. No row-level security filter applies to the table (see [AccessControl#getRowColFilters], when the broker
+  ///    enables row-level security), since it would not restrict the rows the statement deletes.
+  ///
+  /// @param tableName table as resolved, which the checks authorize
+  /// @param writtenTableName table as the caller wrote it, which a denial names
+  /// @throws WebApplicationException with status 403 if the caller is not authorized
+  private void authorizeDelete(AccessControl accessControl, String tableName, String writtenTableName,
+      HttpRequesterIdentity requesterIdentity, @Nullable HttpHeaders httpHeaders) {
+    checkDeleteAccess(authorizeTables(accessControl, requesterIdentity, Set.of(tableName)), tableName,
+        writtenTableName);
+    checkDeleteAccess(accessControl.authorize(httpHeaders, TargetType.TABLE, tableName, Actions.Table.QUERY),
+        tableName, writtenTableName);
+    checkDeleteAccess(accessControl.authorize(httpHeaders, TargetType.TABLE, tableName, Actions.Table.DELETE_ROWS),
+        tableName, writtenTableName);
+    // The raw name of a table literally named like a type suffix (e.g. "_OFFLINE") is empty: no rule can be
+    // configured on it, so the fine-grained check is not run on an empty target, which the access control may not
+    // expect. The caller still has to pass the checks on the name as given and authorizeDeleteRows below
+    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+    if (!rawTableName.isEmpty() && !rawTableName.equals(tableName)) {
+      checkDeleteAccess(
+          accessControl.authorize(httpHeaders, TargetType.TABLE, rawTableName, Actions.Table.DELETE_ROWS), tableName,
+          writtenTableName);
+    }
+    checkDeleteAccess(accessControl.authorizeDeleteRows(requesterIdentity, httpHeaders, tableName), tableName,
+        writtenTableName);
+    if (hasRowFilters(accessControl, requesterIdentity, tableName)) {
+      throw deleteAccessDenied(tableName, writtenTableName, new BasicAuthorizationResultImpl(false,
+          "Row-level security applies to the table, and would not restrict the rows the statement deletes"));
+    }
+  }
+
+  /// Throws the HTTP 403 error of a `DELETE` if the check denied it.
+  private void checkDeleteAccess(AuthorizationResult authorizationResult, String tableName, String writtenTableName) {
+    if (!authorizationResult.hasAccess()) {
+      throw deleteAccessDenied(tableName, writtenTableName, authorizationResult);
+    }
+  }
+
+  /// Runs the table check of the access control, denying the `DELETE` when the access control cannot run it: an
+  /// access control written for single-stage queries only, which overrides
+  /// [AccessControl#hasAccess(RequesterIdentity, BrokerRequest)] but not the table check, throws
+  /// [UnsupportedOperationException] from the default table check (see
+  /// [AccessControl#hasAccess(RequesterIdentity, Set)]). A `DELETE` is not a broker request, so it cannot be
+  /// authorized by such an access control, and is denied rather than failed as an uncaught error.
+  private static AuthorizationResult authorizeTables(AccessControl accessControl, RequesterIdentity requesterIdentity,
+      Set<String> tables) {
+    try {
+      return accessControl.authorize(requesterIdentity, tables);
+    } catch (UnsupportedOperationException e) {
+      LOGGER.warn("The access control {} cannot authorize a DELETE: it implements the broker-request check only",
+          accessControl.getClass().getName(), e);
+      return new BasicAuthorizationResultImpl(false,
+          "The access control of the broker cannot authorize a DELETE: it implements the broker-request check only");
+    }
+  }
+
+  /// Records a `DELETE` denied by the access control (metric, and a log line once the table is known) and returns its
+  /// HTTP 403 error to throw. The error only names the table once the caller passed the first-step access control,
+  /// and names it as the caller wrote it rather than as resolved, so that a caller who is not authorized for the
+  /// table does not learn its name as defined (e.g. its case, which `enable.case.insensitive` resolves).
+  ///
+  /// The reason of the access control is only sent to the caller when it does not mention the table, since the
+  /// access control echoes the name it authorized, which is the resolved one (e.g. the basic auth: "Authorization
+  /// Failed for tables: [MyTable]"). Rewriting the resolved name in the reason would not do: it would only apply
+  /// when the table cache resolved the name, i.e. when the table exists, so the reason would read differently for a
+  /// table that does not exist. The rule applies whether or not the resolved name differs from the written one, so
+  /// that the message is the same for a table that exists and for one that does not. The log line keeps the full
+  /// reason and the resolved name for the operator.
+  private WebApplicationException deleteAccessDenied(@Nullable String tableName, @Nullable String writtenTableName,
+      AuthorizationResult authorizationResult) {
+    _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
+    String reason = authorizationResult.getFailureMessage();
+    String message;
+    if (tableName != null) {
+      // The name, which is the one written when the table cache does not know it, and the reason come from the
+      // request and from the access control: escaped as the predicate of the log line of a DELETE is, so that they
+      // cannot forge a log record
+      LOGGER.info("Access denied to delete rows from table: {}, reason: {}", LoggerUtils.toSingleLine(tableName),
+          LoggerUtils.toSingleLine(reason));
+      if (reason != null && (mentionsTable(reason, tableName) || mentionsTable(reason, writtenTableName))) {
+        reason = null;
+      }
+      message = "Permission denied to delete rows from table: " + writtenTableName;
+    } else {
+      message = "Permission denied to delete rows";
+    }
+    if (reason != null && !reason.isBlank()) {
+      message += ". Reason: " + reason;
+    }
+    return new WebApplicationException(message, Response.Status.FORBIDDEN);
+  }
+
+  /// Whether the reason of a denial mentions the table name, or its raw name (the fine-grained check of the right to
+  /// delete rows also runs on the raw name), as a whole word, ignoring case, since `enable.case.insensitive` resolves
+  /// it. The name is matched where it is neither preceded nor followed by a letter, a digit or an underscore, so that
+  /// a name that is part of a word of the reason does not suppress it: the default reason "does not allow deleting
+  /// rows" is kept for a table named `row`. A table literally named like a word of the reason (e.g. `rows`) still
+  /// suppresses it, which only costs its caller the explanation: the log line keeps the reason. The raw name of a
+  /// table literally named like a type suffix (e.g. `_OFFLINE`) is empty, and is not looked for: an empty word is
+  /// found in nearly every reason (between two punctuation characters, e.g. in "Principal: x is not granted ...").
+  private static boolean mentionsTable(String reason, @Nullable String tableName) {
+    if (tableName == null) {
+      return false;
+    }
+    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+    return containsWord(reason, tableName) || (!rawTableName.isEmpty() && !rawTableName.equals(tableName)
+        && containsWord(reason, rawTableName));
+  }
+
+  /// Whether the text contains the word, ignoring case, where it is neither preceded nor followed by a letter, a
+  /// digit or an underscore. An empty word is never contained, since the pattern of an empty word would match at
+  /// any boundary of the text. Only runs when a `DELETE` is denied, so the pattern is compiled per call.
+  private static boolean containsWord(String text, String word) {
+    if (word.isEmpty()) {
+      return false;
+    }
+    return Pattern.compile("(?<![\\p{Alnum}_])" + Pattern.quote(word) + "(?![\\p{Alnum}_])",
+        Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE).matcher(text).find();
+  }
+
+  /// Returns whether row-level security filters apply to the table for the caller, when the broker enables row-level
+  /// security. The filters of the table name as given are checked first, since the caller is authorized for it and
+  /// every access control answers for it, then those of its raw name, where filters are usually configured, when it
+  /// differs and the caller is authorized for it: an access control may refuse to answer for a table the caller
+  /// cannot access, e.g. a basic auth principal whose `tables` list the name with its type only.
+  private boolean hasRowFilters(AccessControl accessControl, RequesterIdentity requesterIdentity, String tableName) {
+    if (!_brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH,
+        CommonConstants.Broker.DEFAULT_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH)) {
+      return false;
+    }
+    if (hasRowFilters(accessControl.getRowColFilters(requesterIdentity, tableName))) {
+      return true;
+    }
+    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+    return !rawTableName.equals(tableName)
+        && accessControl.authorize(requesterIdentity, Set.of(rawTableName)).hasAccess()
+        && hasRowFilters(accessControl.getRowColFilters(requesterIdentity, rawTableName));
+  }
+
+  private static boolean hasRowFilters(TableRowColAccessResult rowColFilters) {
+    List<String> rowFilters = rowColFilters.getRLSFilters().orElse(null);
+    return rowFilters != null && !rowFilters.isEmpty();
   }
 
   @VisibleForTesting

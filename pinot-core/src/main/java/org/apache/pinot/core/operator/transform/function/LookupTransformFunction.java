@@ -62,6 +62,8 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 ///
 /// Above example joins the dimension table 'baseballTeams' into regular table 'baseballStats' on 'teamID' key.
 /// Lookup function returns the value of the column 'teamName'.
+///
+/// Listed in DeleteStatement.CROSS_TABLE_FUNCTIONS: a DELETE predicate must not call this function.
 public class LookupTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "lookUp";
 

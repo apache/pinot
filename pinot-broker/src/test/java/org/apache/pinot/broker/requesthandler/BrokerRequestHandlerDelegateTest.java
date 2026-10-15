@@ -23,22 +23,29 @@ import org.apache.pinot.broker.broker.BrokerDrainManager;
 import org.apache.pinot.common.cursors.AbstractResponseStore;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.DefaultRequestContext;
 import org.apache.pinot.spi.trace.RequestContext;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.mockito.Mockito;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 
 
+/// Tests that [BrokerRequestHandlerDelegate] applies the broker drain admission gate, and answers a DML statement with
+/// an error rather than handing it to a query engine: the gRPC and custom request containers reach the delegate
+/// without the authorization of the REST endpoint, which is the only path a `DELETE` is authorized and executed on.
 public class BrokerRequestHandlerDelegateTest {
   @Test
   public void testRejectsSqlQueryWhenBrokerIsDraining()
@@ -118,6 +125,25 @@ public class BrokerRequestHandlerDelegateTest {
       transportPermit.close();
     }
     assertEquals(drainManager.getStatus().getInFlightQueries(), 0);
+  }
+
+  @Test
+  public void testDeleteDoesNotReachTheQueryEngines()
+      throws Exception {
+    BaseSingleStageBrokerRequestHandler singleStageHandler = mock(BaseSingleStageBrokerRequestHandler.class);
+    BrokerRequestHandlerDelegate delegate = new BrokerRequestHandlerDelegate(singleStageHandler, null, null, null);
+
+    // gRPC and custom containers bypass the REST authorization path.
+    RequestContext requestContext = new DefaultRequestContext();
+    BrokerResponse response = delegate.handleRequest(
+        JsonUtils.newObjectNode().put(Request.SQL, "DELETE FROM myTable WHERE col1 = 'a'"), null, null, requestContext,
+        null);
+    assertEquals(response.getExceptions().size(), 1);
+    QueryProcessingException exception = response.getExceptions().get(0);
+    assertEquals(exception.getErrorCode(), QueryErrorCode.SQL_PARSING.getId());
+    assertTrue(exception.getMessage().contains("broker SQL endpoint"), exception.getMessage());
+    assertEquals(requestContext.getErrorCode(), QueryErrorCode.SQL_PARSING.getId());
+    verify(singleStageHandler, never()).handleRequest(any(), any(), any(), any(), any());
   }
 
   private static JsonNode sqlRequest(String sql)

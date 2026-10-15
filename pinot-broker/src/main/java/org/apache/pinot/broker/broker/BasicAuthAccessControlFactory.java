@@ -27,7 +27,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import javax.ws.rs.NotAuthorizedException;
+import javax.ws.rs.core.HttpHeaders;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.common.auth.BasicAuthTokenUtils;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -50,7 +52,13 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 /// pinot.broker.access.control.principals.admin123.password=verysecret
 /// pinot.broker.access.control.principals.user456.password=kindasecret
 /// pinot.broker.access.control.principals.user456.tables=stuff,lessImportantStuff
+/// pinot.broker.access.control.principals.user456.permissions=read,delete
 /// ```
+///
+/// Principals query the tables they have access to. Deleting rows with a SQL `DELETE` also requires the `delete`
+/// permission, granted explicitly: unlike on the controller, where a principal without permissions has them all, a
+/// principal without permissions (or with `*`) does not delete rows, since the broker did not check the permissions
+/// of its principals before.
 public class BasicAuthAccessControlFactory extends AccessControlFactory {
   private static final String PREFIX = "principals";
   private static final String ADMIN_PERMISSION = "admin";
@@ -133,6 +141,17 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
         return TableAuthorizationResult.success();
       }
       return new TableAuthorizationResult(failedTables);
+    }
+
+    @Override
+    public AuthorizationResult authorizeDeleteRows(RequesterIdentity requesterIdentity,
+        @Nullable HttpHeaders httpHeaders, String tableName) {
+      BasicAuthPrincipal principal = getPrincipalOpt(requesterIdentity).orElse(null);
+      // The table is matched by the name as given, as for queries: `tables` lists the name as given, and `hasTable`
+      // checks `excludeTables`, which lists raw names, on the raw name too, so that a type suffix cannot bypass an
+      // excluded table
+      return BasicAuthPrincipalUtils.authorizeDeleteRows(principal, tableName,
+          principal != null && principal.hasTable(tableName));
     }
 
     @Override

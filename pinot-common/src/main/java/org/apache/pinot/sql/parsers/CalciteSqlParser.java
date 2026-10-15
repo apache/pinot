@@ -37,6 +37,7 @@ import org.apache.calcite.avatica.util.Casing;
 import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlCall;
 import org.apache.calcite.sql.SqlDataTypeSpec;
+import org.apache.calcite.sql.SqlDelete;
 import org.apache.calcite.sql.SqlExplain;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlJoin;
@@ -122,10 +123,23 @@ public class CalciteSqlParser {
     sql = ParserUtils.sanitizeSql(sql);
 
     // extract and remove OPTIONS string
-    List<String> options = List.of();
     SqlOptionsMode legacyOptionSyntaxMode = QueryOptionsUtils.getLegacyOptionSyntaxMode();
+    List<String> options = List.of();
+    // Where the suffix dropped in IGNORE mode sits in the original statement, kept only to fail a DELETE (its options
+    // configure it) without materializing the option text for the statements that discard it
+    String originalSql = sql;
+    int ignoredOptionsStart = -1;
+    int ignoredOptionsEnd = -1;
     if (legacyOptionSyntaxMode == SqlOptionsMode.IGNORE) {
-      sql = removeOptionsFromSql(sql);
+      // IGNORE differs from the other modes: the options are never applied, so a single regex pass both detects and
+      // strips the suffix, which is anchored to the end of the statement and so matches at most once, and the common
+      // no-suffix path pays for one scan without materializing an option list
+      Matcher matcher = OPTIONS_REGEX_PATTEN.matcher(sql);
+      if (matcher.find()) {
+        ignoredOptionsStart = matcher.start(1);
+        ignoredOptionsEnd = matcher.end(1);
+        sql = sql.substring(0, matcher.start());
+      }
     } else {
       options = extractOptionsFromSql(sql);
       if (!options.isEmpty()) {
@@ -143,6 +157,12 @@ public class CalciteSqlParser {
       sqlNodeList = (SqlNodeList) PostgreSqlCastRewriter.rewrite(sqlNodeList);
       // Extract OPTION statements from sql.
       SqlNodeAndOptions sqlNodeAndOptions = extractSqlNodeAndOptions(sqlNodeList);
+      // Dropping a DELETE option (e.g. dryRun) would change its effect
+      if (ignoredOptionsStart >= 0 && sqlNodeAndOptions.getSqlNode() instanceof SqlDelete) {
+        throw new SqlCompilationException("Legacy OPTION(...) options are ignored on this cluster, use "
+            + "'SET <key> = <value>;' statements to configure DELETE: OPTION("
+            + originalSql.substring(ignoredOptionsStart, ignoredOptionsEnd) + ")");
+      }
       // add legacy OPTIONS keyword-based options
       if (!options.isEmpty()) {
         Map<String, String> optionMap = extractOptionsMap(options);
@@ -165,8 +185,12 @@ public class CalciteSqlParser {
     SqlNode statementNode = null;
     Map<String, String> options = new HashMap<>();
     for (SqlNode sqlNode : sqlNodeList) {
-      if (sqlNode instanceof SqlInsertFromFile) {
-        // extract insert statement (execution statement)
+      if (sqlNode instanceof SqlExplain && ((SqlExplain) sqlNode).getExplicandum() instanceof SqlDelete) {
+        // Otherwise classified as a query, which fails later with a cast error when the DELETE is compiled
+        throw new SqlCompilationException("EXPLAIN is not supported for DELETE");
+      }
+      if (sqlNode instanceof SqlInsertFromFile || sqlNode instanceof SqlDelete) {
+        // extract DML statement (execution statement)
         if (sqlType == null) {
           sqlType = PinotSqlType.DML;
           statementNode = sqlNode;
@@ -676,6 +700,17 @@ public class CalciteSqlParser {
     // Outside the try: the rewriter already throws SqlCompilationException, and wrapping it would drop its message.
     sqlNode = PostgreSqlCastRewriter.rewrite(sqlNode);
     return toExpression(sqlNode);
+  }
+
+  /// Compiles an expression that is already parsed, e.g. the condition of a parsed statement, into [Expression].
+  ///
+  /// The node is normalized like the String expression of [#compileToExpression(String)] (PostgreSQL `::` casts are
+  /// rewritten in place, see `PostgreSqlCastRewriter`), so both overloads compile the same SQL into the same
+  /// [Expression]. The rewrite is idempotent, so a node from [#compileToSqlNodeAndOptions] is left unchanged.
+  ///
+  /// @throws SqlCompilationException if the node is not a supported expression.
+  public static Expression compileToExpression(SqlNode sqlNode) {
+    return toExpression(PostgreSqlCastRewriter.rewrite(sqlNode));
   }
 
   @VisibleForTesting
