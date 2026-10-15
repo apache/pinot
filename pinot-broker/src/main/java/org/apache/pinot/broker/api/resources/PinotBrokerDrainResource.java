@@ -72,9 +72,9 @@ public class PinotBrokerDrainResource {
       notes = "Rejects new queries, removes this broker from brokerResource, waits for accepted queries to finish, "
           + "and optionally shuts down the broker after the HTTP response completes. Requires broker administrative "
           + "access. Draining cannot be undone without restarting the broker. The timeout defaults to "
-          + "pinot.broker.delayShutdownTimeMs. Before rolling a drained broker back to a version that predates this "
-          + "API, restart it once on the drain-capable version and wait for readiness so its pre-drain tags and "
-          + "instance state are restored; do not roll a stopped, drained broker directly back to an older version.")
+          + "pinot.broker.delayShutdownTimeMs. A drained broker keeps shutdownInProgress=true in its instance config "
+          + "until it restarts on a drain-capable version, so restart it once on this version before rolling it back "
+          + "to a version that predates this API.")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Broker drained"),
       @ApiResponse(code = 400, message = "Bad request"),

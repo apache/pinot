@@ -178,9 +178,7 @@ public class PinotHelixResourceManagerConfigValidationTest {
     InstanceConfig persistedConfig = new InstanceConfig(persistedRecord.get());
     assertEquals(persistedConfig.getHostName(), "updated-host");
     assertEquals(persistedConfig.getPort(), "4321");
-    assertEquals(persistedConfig.getTags(), List.of(CommonConstants.Helix.DRAINED_BROKER_INSTANCE));
-    assertEquals(persistedConfig.getRecord().getListField(CommonConstants.Helix.PREVIOUS_TAGS),
-        List.of("OtherTenant_BROKER"));
+    assertEquals(persistedConfig.getTags(), List.of("OtherTenant_BROKER"));
     assertTrue(persistedConfig.getRecord()
         .getBooleanField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, false));
     verify(_helixDataAccessor, never()).setProperty(any(PropertyKey.class), any(InstanceConfig.class));
@@ -203,9 +201,7 @@ public class PinotHelixResourceManagerConfigValidationTest {
     assertTrue(_resourceManager.updateInstanceTags(instanceId, "OtherTenant_BROKER", false).isSuccessful());
 
     InstanceConfig persistedConfig = new InstanceConfig(persistedRecord.get());
-    assertEquals(persistedConfig.getTags(), List.of(CommonConstants.Helix.DRAINED_BROKER_INSTANCE));
-    assertEquals(persistedConfig.getRecord().getListField(CommonConstants.Helix.PREVIOUS_TAGS),
-        List.of("OtherTenant_BROKER"));
+    assertEquals(persistedConfig.getTags(), List.of("OtherTenant_BROKER"));
     assertTrue(persistedConfig.getRecord()
         .getBooleanField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, false));
     verify(_helixDataAccessor, never()).setProperty(any(PropertyKey.class), any(InstanceConfig.class));

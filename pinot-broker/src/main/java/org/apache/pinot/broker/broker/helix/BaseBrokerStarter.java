@@ -46,7 +46,6 @@ import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
 import org.apache.helix.SystemPropertyKeys;
 import org.apache.helix.model.IdealState;
-import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.Message;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.constant.ZkSystemPropertyKeys;
@@ -897,16 +896,6 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
           }
           HelixHelper.removeDisabledPartitions(instanceConfig);
 
-          List<String> previousTags = znRecord.getListField(Helix.PREVIOUS_TAGS);
-          if (previousTags != null) {
-            LOGGER.info("Restoring pre-drain tags for broker instance: {}", _instanceId);
-            znRecord.setListField(InstanceConfig.InstanceConfigProperty.TAG_LIST.name(),
-                new ArrayList<>(previousTags));
-            znRecord.getListFields().remove(Helix.PREVIOUS_TAGS);
-          }
-          // A starting broker is no longer drained. Without stashed tags this can leave the tag list empty, in which
-          // case the broker is tagged as a new broker below.
-          instanceConfig.removeTag(Helix.DRAINED_BROKER_INSTANCE);
           if (Boolean.parseBoolean(simpleFields.get(Helix.IS_SHUTDOWN_IN_PROGRESS))) {
             LOGGER.info("Clearing {} for broker instance: {}", Helix.IS_SHUTDOWN_IN_PROGRESS, _instanceId);
             simpleFields.put(Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.FALSE.toString());

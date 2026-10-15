@@ -35,7 +35,6 @@ import org.apache.pinot.broker.broker.BrokerDrainManager;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.mockito.MockedStatic;
 import org.testng.annotations.Test;
@@ -84,12 +83,10 @@ public class BaseBrokerStarterTest {
     HelixDataAccessor helixDataAccessor = mock(HelixDataAccessor.class);
     HelixManager helixManager = mock(HelixManager.class);
     when(helixManager.getHelixDataAccessor()).thenReturn(helixDataAccessor);
-    // Drained state written by BrokerDrainManager
+    // Drained state written by BrokerDrainManager: the tags are untouched, only the marker is set
     InstanceConfig instanceConfig = new InstanceConfig(INSTANCE_ID);
+    instanceConfig.addTag(TagNameUtils.getBrokerTagForTenant(null));
     instanceConfig.addTag("customTag");
-    instanceConfig.addTag(Helix.DRAINED_BROKER_INSTANCE);
-    instanceConfig.getRecord().setListField(Helix.PREVIOUS_TAGS,
-        List.of(TagNameUtils.getBrokerTagForTenant(null), "customTag"));
     instanceConfig.getRecord().setBooleanField(Helix.IS_SHUTDOWN_IN_PROGRESS, true);
 
     PinotConfiguration brokerConf = new PinotConfiguration();
@@ -120,7 +117,6 @@ public class BaseBrokerStarterTest {
             assertFalse(instanceConfig.getRecord().getBooleanField(Helix.IS_SHUTDOWN_IN_PROGRESS, false),
                 "Broker must be eligible before brokerResource reconciliation");
             assertEquals(instanceConfig.getTags(), List.of(TagNameUtils.getBrokerTagForTenant(null), "customTag"));
-            assertFalse(instanceConfig.getRecord().getListFields().containsKey(Helix.PREVIOUS_TAGS));
             if (reconcileAttempts.getAndIncrement() == 0) {
               throw new IllegalStateException("injected brokerResource update failure");
             }
@@ -140,45 +136,6 @@ public class BaseBrokerStarterTest {
       assertEquals(reconcileAttempts.get(), 2);
       helixHelper.verify(() -> HelixHelper.updateBrokerResource(eq(helixManager), eq(INSTANCE_ID),
           eq(List.of(TagNameUtils.getBrokerTagForTenant(null))), anyList(), isNull()), times(2));
-    }
-  }
-
-  @Test
-  public void testDrainPlaceholderWithoutStashedTagsIsTaggedAsNewBroker() {
-    HelixDataAccessor helixDataAccessor = mock(HelixDataAccessor.class);
-    HelixManager helixManager = mock(HelixManager.class);
-    when(helixManager.getHelixDataAccessor()).thenReturn(helixDataAccessor);
-    InstanceConfig instanceConfig = new InstanceConfig(INSTANCE_ID);
-    instanceConfig.addTag(Helix.DRAINED_BROKER_INSTANCE);
-    instanceConfig.getRecord().setBooleanField(Helix.IS_SHUTDOWN_IN_PROGRESS, true);
-
-    String configuredBrokerTag = TagNameUtils.getBrokerTagForTenant("configuredTenant");
-    PinotConfiguration brokerConf = new PinotConfiguration();
-    brokerConf.setProperty(Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED, false);
-    brokerConf.setProperty(Broker.CONFIG_OF_BROKER_INSTANCE_TAGS, configuredBrokerTag);
-    HelixBrokerStarter brokerStarter = new HelixBrokerStarter();
-    brokerStarter._brokerConf = brokerConf;
-    brokerStarter._participantHelixManager = helixManager;
-    brokerStarter._instanceId = INSTANCE_ID;
-    brokerStarter._hostname = "localhost";
-    brokerStarter._port = 1234;
-    brokerStarter._tlsPort = -1;
-
-    try (MockedStatic<HelixHelper> helixHelper = mockStatic(HelixHelper.class)) {
-      helixHelper.when(() -> HelixHelper.updateInstanceConfig(eq(helixDataAccessor), eq(INSTANCE_ID),
-          any())).thenAnswer(invocation -> {
-            Consumer<InstanceConfig> updater = invocation.getArgument(2);
-            updater.accept(instanceConfig);
-            return true;
-          });
-
-      brokerStarter.updateInstanceConfigAndBrokerResourceIfNeeded();
-
-      // The placeholder alone must not keep the broker out of every tenant after the drain state is cleared
-      assertEquals(instanceConfig.getTags(), List.of(configuredBrokerTag));
-      assertFalse(instanceConfig.getRecord().getBooleanField(Helix.IS_SHUTDOWN_IN_PROGRESS, false));
-      helixHelper.verify(() -> HelixHelper.updateBrokerResource(eq(helixManager), eq(INSTANCE_ID),
-          eq(List.of(configuredBrokerTag)), anyList(), isNull()));
     }
   }
 

@@ -292,9 +292,8 @@ public class BrokerDrainManagerTest {
       assertEquals(helixManagerLookups.get(), 1);
       assertTrue(instanceConfig.getRecord()
           .getBooleanField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, false));
-      assertEquals(instanceConfig.getTags(), List.of("customTag", CommonConstants.Helix.DRAINED_BROKER_INSTANCE));
-      assertEquals(instanceConfig.getRecord().getListField(CommonConstants.Helix.PREVIOUS_TAGS),
-          List.of(TagNameUtils.getBrokerTagForTenant("tenant"), "customTag"));
+      // Drain only sets the marker; the tags, and so the tenant membership, are unchanged
+      assertEquals(instanceConfig.getTags(), List.of(TagNameUtils.getBrokerTagForTenant("tenant"), "customTag"));
       helixHelper.verify(() -> HelixHelper.updateIdealState(Mockito.same(helixManager),
           Mockito.eq(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE),
           Mockito.<Function<IdealState, IdealState>>any()));
@@ -303,45 +302,6 @@ public class BrokerDrainManagerTest {
       executor.shutdownNow();
       assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS));
     }
-  }
-
-  @Test
-  public void testDrainReplacesBrokerTagsWithPlaceholder()
-      throws Exception {
-    HelixDataAccessor helixDataAccessor = Mockito.mock(HelixDataAccessor.class);
-    HelixManager helixManager = Mockito.mock(HelixManager.class);
-    Mockito.when(helixManager.isConnected()).thenReturn(true);
-    Mockito.when(helixManager.getHelixDataAccessor()).thenReturn(helixDataAccessor);
-    String brokerTag = TagNameUtils.getBrokerTagForTenant("tenant");
-    InstanceConfig instanceConfig = new InstanceConfig(INSTANCE_ID);
-    instanceConfig.addTag(brokerTag);
-    BrokerDrainManager drainManager = new BrokerDrainManager(INSTANCE_ID, () -> helixManager, () -> {
-    }, () -> {
-    }, 10_000L);
-    drainManager.markStartupReady();
-
-    try (MockedStatic<HelixHelper> helixHelper = Mockito.mockStatic(HelixHelper.class)) {
-      // Apply the mutator twice, as Helix does when a concurrent write makes the first CAS attempt fail
-      helixHelper.when(() -> HelixHelper.updateInstanceConfig(Mockito.same(helixDataAccessor),
-          Mockito.eq(INSTANCE_ID), Mockito.<Consumer<InstanceConfig>>any())).thenAnswer(invocation -> {
-            Consumer<InstanceConfig> updater = invocation.getArgument(2);
-            updater.accept(instanceConfig);
-            updater.accept(instanceConfig);
-            return true;
-          });
-      helixHelper.when(() -> HelixHelper.updateIdealState(Mockito.same(helixManager),
-          Mockito.eq(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE),
-          Mockito.<Function<IdealState, IdealState>>any())).thenReturn(Mockito.mock(IdealState.class));
-
-      assertTrue(drainManager.drain(0L, false).isDrained());
-    }
-
-    // A broker binary that predates drain treats an instance with no tags as new and re-tags it into a tenant, so the
-    // drained instance must keep a non-broker placeholder tag instead of an empty tag list.
-    assertEquals(instanceConfig.getTags(), List.of(CommonConstants.Helix.DRAINED_BROKER_INSTANCE));
-    assertFalse(instanceConfig.getTags().stream().anyMatch(TagNameUtils::isBrokerTag));
-    assertEquals(instanceConfig.getRecord().getListField(CommonConstants.Helix.PREVIOUS_TAGS), List.of(brokerTag));
-    assertTrue(instanceConfig.getRecord().getBooleanField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, false));
   }
 
   @Test

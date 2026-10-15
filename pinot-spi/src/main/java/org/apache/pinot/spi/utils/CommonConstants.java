@@ -159,9 +159,6 @@ public class CommonConstants {
     public static final String UNTAGGED_SERVER_INSTANCE = "server_untagged";
     public static final String UNTAGGED_MINION_INSTANCE = "minion_untagged";
     public static final String DRAINED_MINION_INSTANCE = "minion_drained";
-    // Replaces the broker tags of a draining broker (the original tags are kept in PREVIOUS_TAGS). Keeping the tag list
-    // non-empty stops a broker binary that predates drain from treating the instance as new and re-tagging it.
-    public static final String DRAINED_BROKER_INSTANCE = "broker_drained";
 
     public static final String PREVIOUS_TAGS = "previousTags";
 
