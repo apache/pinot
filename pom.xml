@@ -2977,7 +2977,7 @@
                 <exclude>shaded/parquet/com/fasterxml/jackson/**</exclude>
                 <exclude>META-INF/versions/**/shaded/parquet/com/fasterxml/jackson/**</exclude>
 
-                <!-- Use managed Guava for Hadoop and Curator instead of their embedded copies. -->
+                <!-- Use managed Guava for Hadoop, Curator and Iceberg instead of their embedded copies. -->
                 <exclude>org/apache/hadoop/thirdparty/com/google/common/**</exclude>
                 <exclude>META-INF/versions/**/org/apache/hadoop/thirdparty/com/google/common/**</exclude>
                 <exclude>org/apache/hadoop/shaded/com/google/common/**</exclude>
@@ -2986,6 +2986,8 @@
                 <exclude>META-INF/versions/**/org/apache/hadoop/shaded/org/apache/curator/shaded/com/google/common/**</exclude>
                 <exclude>org/apache/curator/shaded/com/google/common/**</exclude>
                 <exclude>META-INF/versions/**/org/apache/curator/shaded/com/google/common/**</exclude>
+                <exclude>org/apache/iceberg/relocated/com/google/common/**</exclude>
+                <exclude>META-INF/versions/**/org/apache/iceberg/relocated/com/google/common/**</exclude>
 
                 <!-- Azure storage uses only HTTP clients. Remove the unused Reactor Netty HTTP server
                      and its vulnerable pipelining handler (CVE-2026-47874), including already shaded inputs. -->
@@ -3017,7 +3019,14 @@
               </excludes>
             </filter>
             <filter>
-              <!-- Already shaded plugins can also carry Hadoop's embedded Guava metadata. -->
+              <artifact>org.apache.iceberg:iceberg-bundled-guava</artifact>
+              <excludes>
+                <exclude>META-INF/maven/com.google.guava/**</exclude>
+                <exclude>META-INF/versions/**/module-info.class</exclude>
+              </excludes>
+            </filter>
+            <filter>
+              <!-- Already shaded plugins can also carry embedded Guava metadata. -->
               <artifact>org.apache.pinot:*</artifact>
               <excludes>
                 <exclude>META-INF/maven/com.google.guava/**</exclude>
@@ -3068,6 +3077,10 @@
             </relocation>
             <relocation>
               <pattern>org.apache.curator.shaded.com.google.common</pattern>
+              <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.apache.iceberg.relocated.com.google.common</pattern>
               <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
             </relocation>
             <relocation>
