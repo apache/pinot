@@ -436,9 +436,9 @@ public class BrokerDrainManager {
     private final List<String> _tablesRemovedFromBrokerResource;
     private final String _message;
 
-    private DrainStatus(String instanceId, boolean draining, int inFlightQueries, long drainStartTimeMs, long drainDurationMs, boolean drained, boolean shutdownMarkerReconciled,
-        boolean brokerResourceReconciled, boolean shutdownTriggered, List<String> tablesRemovedFromBrokerResource,
-        String message) {
+    private DrainStatus(String instanceId, boolean draining, int inFlightQueries, long drainStartTimeMs,
+        long drainDurationMs, boolean drained, boolean shutdownMarkerReconciled, boolean brokerResourceReconciled,
+        boolean shutdownTriggered, List<String> tablesRemovedFromBrokerResource, String message) {
       _instanceId = instanceId;
       _draining = draining;
       _inFlightQueries = inFlightQueries;
