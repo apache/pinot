@@ -243,7 +243,8 @@ public class ReingestionResource {
       return;
     }
     SegmentZKMetadata segmentZKMetadata = tableDataManager.fetchZKMetadataNullable(segmentName);
-    if (segmentZKMetadata == null || segmentZKMetadata.getStatus() != Status.COMMITTING
+    if (segmentZKMetadata == null
+        || segmentZKMetadata.getStatus() != Status.COMMITTING
         || segmentZKMetadata.getDownloadUrl() != null) {
       LOGGER.info("Skipping re-ingestion of segment: {} because it was deleted or no longer needs repair", segmentName);
       return;
