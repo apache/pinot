@@ -250,7 +250,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
         continue;
       }
       QuotaEnforcementMode mode = _enforcementModeOverrideMap.getOrDefault(entityName, QuotaEnforcementMode.ENFORCED);
-      if (result == null || mode.ordinal() > result.ordinal()) {
+      if (result == null || mode.isStricterThan(result)) {
         result = mode;
       }
     }
@@ -735,6 +735,11 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
   }
 
   @VisibleForTesting
+  public int getEnforcementModeOverrideMapSize() {
+    return _enforcementModeOverrideMap.size();
+  }
+
+  @VisibleForTesting
   public Map<String, QueryQuotaEntity> getDatabaseRateLimiterMap() {
     return _databaseRateLimiterMap;
   }
@@ -747,6 +752,8 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
   @VisibleForTesting
   public void cleanUpRateLimiterMap() {
     _rateLimiterMap.clear();
+    _enforcementModeOverrideMap.clear();
+    _lastKnownBrokerResourceVersion.set(-1);
   }
 
   /// Process query quota change when number of online brokers has changed.
@@ -779,6 +786,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
       if (stateMap == null) {
         LOGGER.info("No broker resource for Table {}. Removing its rate limit.", physicalOrLogicalTableName);
         it.remove();
+        _enforcementModeOverrideMap.remove(physicalOrLogicalTableName);
         continue;
       }
       int otherOnlineBrokerCount = 0;
@@ -800,6 +808,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
         LOGGER.info("Table {} has been deleted from property store. Removing its rate limit.",
             physicalOrLogicalTableName);
         it.remove();
+        _enforcementModeOverrideMap.remove(physicalOrLogicalTableName);
         continue;
       }
 
@@ -817,6 +826,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
           LOGGER.info("No query quota config or the config is invalid for Table {}. Removing its rate limit.",
               physicalOrLogicalTableName);
           it.remove();
+          _enforcementModeOverrideMap.remove(physicalOrLogicalTableName);
           continue;
         }
         overallRate = quotaConfig.getMaxQPS();

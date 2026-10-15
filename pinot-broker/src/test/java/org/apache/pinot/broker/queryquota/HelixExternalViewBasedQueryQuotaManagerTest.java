@@ -648,6 +648,25 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     Assert.assertEquals(queryQuotaMode(OFFLINE_TABLE_NAME), QuotaEnforcementMode.ENFORCED);
   }
 
+  @Test
+  public void testEnforcementModeOverrideIsRemovedWithRateLimiter()
+      throws Exception {
+    ExternalView brokerResource = generateBrokerResource(REALTIME_TABLE_NAME);
+    QuotaConfig quotaConfig = new QuotaConfig(null, TABLE_MAX_QPS_STR, null, QuotaEnforcementMode.SHADOW);
+    TableConfig tableConfig = generateDefaultTableConfig(REALTIME_TABLE_NAME);
+    tableConfig.setQuotaConfig(quotaConfig);
+    ZKMetadataProvider.setTableConfig(_testPropertyStore, tableConfig);
+    _queryQuotaManager.initOrUpdateTableQueryQuota(tableConfig, brokerResource);
+    Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 1);
+    Assert.assertEquals(_queryQuotaManager.getEnforcementModeOverrideMapSize(), 1);
+
+    // Table config deleted from the property store: the rate limiter and its override must both go away
+    ZKMetadataProvider.removeResourceConfigFromPropertyStore(_testPropertyStore, REALTIME_TABLE_NAME);
+    _queryQuotaManager.processQueryRateLimitingExternalViewChange(brokerResource);
+    Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 0);
+    Assert.assertEquals(_queryQuotaManager.getEnforcementModeOverrideMapSize(), 0);
+  }
+
   private QuotaEnforcementMode queryQuotaMode(String tableName) {
     return _queryQuotaManager.getQueryQuotaEnforcementMode(tableName);
   }
