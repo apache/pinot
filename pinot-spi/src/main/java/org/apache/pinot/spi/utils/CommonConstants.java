@@ -399,8 +399,9 @@ public class CommonConstants {
     /// How the legacy PQL-style `OPTION(key=value)` query option suffix is handled.
     /// Cluster config key: `pinot.broker.query.option.legacySyntaxMode`, applied live and not read from the broker
     /// instance config. One of `QueryOptionsUtils.SqlOptionsMode`: `ALLOW` (default) applies the options as always,
-    /// `IGNORE` strips the suffix and drops its options, `REJECT` fails the statement with an error pointing at
-    /// `SET`. Applies to every statement type, since `SET` covers them all.
+    /// `IGNORE` strips the suffix and drops its options, except that a DELETE statement using the suffix fails since
+    /// its options configure it. `REJECT` fails the statement with an error pointing at `SET`. Applies to every
+    /// statement type, since `SET` covers them all.
     public static final String CONFIG_OF_BROKER_QUERY_OPTION_LEGACY_SYNTAX_MODE =
         "pinot.broker.query.option.legacySyntaxMode";
     public static final String DEFAULT_BROKER_QUERY_OPTION_LEGACY_SYNTAX_MODE = "ALLOW";
@@ -609,6 +610,14 @@ public class CommonConstants {
         "pinot.broker.routing.assignment.change.process.parallelism";
     public static final int DEFAULT_ROUTING_ASSIGNMENT_CHANGE_PROCESS_PARALLELISM =
         Runtime.getRuntime().availableProcessors();
+
+    /// When enabled, the broker's spectator Helix managers read table ideal states and external views with a
+    /// compact streaming deserializer. It decompresses and parses the znode in one pass, interns instance and
+    /// segment names, and shares identical instance-state maps. The broker resource keeps the default Helix
+    /// deserializer. Takes effect on broker start.
+    public static final String CONFIG_OF_ROUTING_COMPACT_ASSIGNMENT_READER_ENABLED =
+        "pinot.broker.routing.compact.assignment.reader.enabled";
+    public static final boolean DEFAULT_ROUTING_COMPACT_ASSIGNMENT_READER_ENABLED = false;
 
     // When enabled, the broker will set a query option to ignore SERVER_SEGMENT_MISSING errors from servers.
     // This is useful to tolerate short windows where routing has not yet reflected recently deleted segments.
@@ -985,7 +994,8 @@ public class CommonConstants {
         /// How query options embedded in the SQL text (`SET` statements and the legacy `OPTION(...)` suffix) are
         /// handled for this request, one of `QueryOptionsUtils.SqlOptionsMode`: `ALLOW` (default) merges them with
         /// precedence over the request options, as always; `IGNORE` drops them so that only the request options
-        /// apply; `REJECT` fails the query when it carries any. Only honored from the request payload
+        /// apply, except that a DELETE statement carrying any fails, since its options configure it; `REJECT` fails
+        /// the query when it carries any. Only honored from the request payload
         /// (`queryOptions`, gRPC metadata), never from the SQL itself, so a gateway that sets request options on
         /// behalf of its users can guarantee the query text cannot override them.
         public static final String SQL_OPTIONS_MODE = "sqlOptionsMode";
@@ -1819,6 +1829,18 @@ public class CommonConstants {
     public static final String CONFIG_OF_SERVER_INGESTION_OOM_PROTECTION_GC_INTERVAL_MS =
         "ingestion.oom.protection.gcIntervalMs";
     public static final long DEFAULT_SERVER_INGESTION_OOM_PROTECTION_GC_INTERVAL_MS = 30_000L;
+
+    /// Max time a pauseless segment re-ingestion job (server API `POST /reingestSegment/{segmentName}`) waits for
+    /// consumption to reach the segment end offset before failing. Read when each job starts consuming.
+    ///
+    /// Can also be set via cluster config, which is applied without a restart and takes precedence over the server
+    /// config, so that operators can change the timeout of all servers at runtime. Notes on the cluster config:
+    /// - Only this exact key is applied without a restart, e.g. not a `pinot.all.` prefixed or differently cased key.
+    /// - When it is removed or invalid, the server config is used, which includes the cluster configs copied into it at
+    ///   server startup. So to change the timeout, set a new valid value instead of removing it.
+    public static final String CONFIG_OF_REINGESTION_CONSUMPTION_TIMEOUT_MS =
+        "pinot.server.reingestion.consumption.timeoutMs";
+    public static final long DEFAULT_REINGESTION_CONSUMPTION_TIMEOUT_MS = 1_800_000L; // 30 minutes
 
     public static final String CONFIG_OF_MMAP_DEFAULT_ADVICE = "pinot.server.mmap.advice.default";
     public static final String PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY = "pinot.server.segment.fetcher";

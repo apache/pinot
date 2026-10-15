@@ -20,6 +20,7 @@ package org.apache.pinot.tools;
 
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.pinot.common.utils.tls.ZooKeeperSslContextSupplier;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.tools.filesystem.PinotFSBenchmarkRunner;
 import org.apache.pinot.tools.perf.PerfBenchmarkRunner;
@@ -34,6 +35,7 @@ public class PinotToolLauncher {
   private static final Map<String, Command> SUBCOMMAND_MAP = new HashMap<>();
 
   static {
+    ZooKeeperSslContextSupplier.initialize();
     SUBCOMMAND_MAP.put("UpdateSegmentState", new UpdateSegmentState());
     SUBCOMMAND_MAP.put("AutoAddInvertedIndex", new AutoAddInvertedIndexTool());
     SUBCOMMAND_MAP.put("ValidateTableRetention", new ValidateTableRetention());

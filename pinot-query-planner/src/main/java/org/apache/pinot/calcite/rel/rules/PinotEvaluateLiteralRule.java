@@ -19,6 +19,7 @@
 package org.apache.pinot.calcite.rel.rules;
 
 import com.google.common.base.Preconditions;
+import java.lang.reflect.Array;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.ArrayList;
@@ -230,17 +231,13 @@ public class PinotEvaluateLiteralRule {
     }
     try {
       if (rexNodeType instanceof ArraySqlType) {
-        List<Object> resultValues = new ArrayList<>();
-
-        // SQL FLOAT and DOUBLE literals are represented as Java double
-        if (resultValue instanceof double[]) {
-          for (double value: (double[]) resultValue) {
-            resultValues.add(convertResultValue(value, rexNodeType.getComponentType()));
-          }
-        } else {
-          for (Object value : (Object[]) resultValue) {
-            resultValues.add(convertResultValue(value, rexNodeType.getComponentType()));
-          }
+        // Scalar functions may return a primitive array (e.g. generateArray returns long[]), which cannot be cast to
+        // Object[]. Read the elements reflectively instead, which boxes them the same way either kind of array does.
+        int length = Array.getLength(resultValue);
+        RelDataType componentType = rexNodeType.getComponentType();
+        List<Object> resultValues = new ArrayList<>(length);
+        for (int i = 0; i < length; i++) {
+          resultValues.add(convertResultValue(Array.get(resultValue, i), componentType));
         }
         return rexBuilder.makeLiteral(resultValues, rexNodeType, false);
       }

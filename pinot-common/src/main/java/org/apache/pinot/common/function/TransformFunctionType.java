@@ -180,7 +180,11 @@ public enum TransformFunctionType {
   // multi-stage planner also uses this operator for the inIdSet scalar function. This operator is deterministic and
   // the scalar function's is not, so this one lets the planner push IN_ID_SET below joins (see IdSetFunctions).
   IN_ID_SET("inIdSet", ReturnTypes.BOOLEAN_NULLABLE, OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER)),
+  // Reads another table: a DELETE predicate rejects it, see DeleteStatement#CROSS_TABLE_FUNCTIONS, which lists the
+  // functions by hand and must gain any new function that reads another table
   LOOKUP("lookUp"),
+  // Runs a script: a DELETE predicate rejects it, see DeleteStatement#SCRIPT_FUNCTIONS, which must gain any new
+  // script function
   GROOVY("groovy"),
   SCALAR("scalar"),
 

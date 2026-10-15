@@ -32,11 +32,13 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
+import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -48,6 +50,8 @@ import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.timeseries.TimeSeriesOperatorUtils;
+import org.apache.pinot.core.plan.Plan;
+import org.apache.pinot.core.plan.maker.PlanMaker;
 import org.apache.pinot.core.query.aggregation.function.TimeSeriesAggregationFunction;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -85,6 +89,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -224,6 +229,84 @@ public class QueryExecutorTest {
     InstanceResponseBlock instanceResponse = execute(instanceRequest);
     assertTrue(instanceResponse.getResultsBlock() instanceof AggregationResultsBlock);
     assertEquals(((AggregationResultsBlock) instanceResponse.getResultsBlock()).getResults().get(0), 0.0);
+  }
+
+  @Test
+  public void testNoRemoteAccessStatsWithoutRemoteAccesses() {
+    String query = "SELECT COUNT(*) FROM " + OFFLINE_TABLE_NAME;
+    InstanceRequest instanceRequest = new InstanceRequest(0L, CalciteSqlCompiler.compileToBrokerRequest(query));
+    instanceRequest.setSearchSegments(_segmentNames);
+    Map<String, String> responseMetadata = execute(instanceRequest).getResponseMetadata();
+    assertFalse(responseMetadata.containsKey(MetadataKey.NUM_REMOTE_ACCESSES.getName()));
+    assertFalse(responseMetadata.containsKey(MetadataKey.REMOTE_ACCESS_BYTES.getName()));
+    assertFalse(responseMetadata.containsKey(MetadataKey.NUM_DIRECT_REMOTE_ACCESSES.getName()));
+    assertFalse(responseMetadata.containsKey(MetadataKey.DIRECT_REMOTE_ACCESS_BYTES.getName()));
+  }
+
+  /// The remote accesses reported while the plan executes, from the query thread and the ones it spawns, are reported
+  /// in the response metadata, with the direct ones counted in the totals and reported on their own.
+  @Test
+  public void testRemoteAccessStatsReportedForTheExecution()
+      throws Exception {
+    String query = "SELECT COUNT(*) FROM " + OFFLINE_TABLE_NAME;
+    InstanceRequest instanceRequest = new InstanceRequest(0L, CalciteSqlCompiler.compileToBrokerRequest(query));
+    instanceRequest.setSearchSegments(_segmentNames);
+    ServerQueryRequest queryRequest =
+        new ServerQueryRequest(instanceRequest, ServerMetrics.get(), System.currentTimeMillis());
+    Plan plan = mock(Plan.class);
+    when(plan.execute()).thenAnswer(_ -> {
+      QueryThreadContext.addRemoteAccesses(1, 10);
+      QUERY_RUNNERS.submit(() -> QueryThreadContext.addDirectRemoteAccesses(2, 20)).get();
+      return new InstanceResponseBlock();
+    });
+    PlanMaker planMaker = mock(PlanMaker.class);
+    when(planMaker.makeInstancePlan(any(), any(), any())).thenReturn(plan);
+    try (QueryThreadContext ignore = QueryThreadContext.openForSseTest()) {
+      Map<String, String> responseMetadata =
+          _queryExecutor.execute(queryRequest, QUERY_RUNNERS, null, planMaker).getResponseMetadata();
+      assertEquals(responseMetadata.get(MetadataKey.NUM_REMOTE_ACCESSES.getName()), "3");
+      assertEquals(responseMetadata.get(MetadataKey.REMOTE_ACCESS_BYTES.getName()), "30");
+      assertEquals(responseMetadata.get(MetadataKey.NUM_DIRECT_REMOTE_ACCESSES.getName()), "2");
+      assertEquals(responseMetadata.get(MetadataKey.DIRECT_REMOTE_ACCESS_BYTES.getName()), "20");
+    }
+  }
+
+  /// Executions spawned from one thread context, like the two of a hybrid table, each report their own remote
+  /// accesses.
+  @Test
+  public void testExecutionsSpawnedFromOneThreadContextReportTheirOwnRemoteAccesses()
+      throws Exception {
+    String query = "SELECT COUNT(*) FROM " + OFFLINE_TABLE_NAME;
+    InstanceRequest instanceRequest = new InstanceRequest(0L, CalciteSqlCompiler.compileToBrokerRequest(query));
+    instanceRequest.setSearchSegments(_segmentNames);
+    Plan plan = mock(Plan.class);
+    when(plan.execute()).thenAnswer(_ -> {
+      QueryThreadContext.addRemoteAccesses(1, 10);
+      return new InstanceResponseBlock();
+    });
+    PlanMaker planMaker = mock(PlanMaker.class);
+    when(planMaker.makeInstancePlan(any(), any(), any())).thenReturn(plan);
+    ExecutorService executor = QueryThreadContext.contextAwareExecutorService(Executors.newFixedThreadPool(2));
+    try (QueryThreadContext ignore = QueryThreadContext.openForSseTest()) {
+      List<Future<Map<String, String>>> futures = new ArrayList<>();
+      for (int i = 0; i < 2; i++) {
+        futures.add(executor.submit(() -> {
+          ServerQueryRequest queryRequest =
+              new ServerQueryRequest(instanceRequest, ServerMetrics.get(), System.currentTimeMillis());
+          return _queryExecutor.execute(queryRequest, QUERY_RUNNERS, null, planMaker).getResponseMetadata();
+        }));
+      }
+      for (Future<Map<String, String>> future : futures) {
+        Map<String, String> responseMetadata = future.get();
+        assertEquals(responseMetadata.get(MetadataKey.NUM_REMOTE_ACCESSES.getName()), "1");
+        assertEquals(responseMetadata.get(MetadataKey.REMOTE_ACCESS_BYTES.getName()), "10");
+        // Reported only when a direct remote access happened
+        assertFalse(responseMetadata.containsKey(MetadataKey.NUM_DIRECT_REMOTE_ACCESSES.getName()));
+        assertFalse(responseMetadata.containsKey(MetadataKey.DIRECT_REMOTE_ACCESS_BYTES.getName()));
+      }
+    } finally {
+      executor.shutdownNow();
+    }
   }
 
   @Test

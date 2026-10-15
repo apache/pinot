@@ -21,7 +21,6 @@ package org.apache.pinot.core.operator.streaming;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeUnit;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock.EarlyTerminationReason;
@@ -132,8 +131,7 @@ public class StreamingDistinctCombineOperator extends BaseStreamingCombineOperat
     try {
       while (!_querySatisfied && _numOperatorsFinished < _numOperators) {
         QueryThreadContext.checkTermination(this::getExplainName);
-        BaseResultsBlock resultsBlock =
-            _blockingQueue.poll(endTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+        BaseResultsBlock resultsBlock = pollResultsBlock(_blockingQueue, endTimeMs);
         if (resultsBlock == null) {
           throw QueryErrorCode.EXECUTION_TIMEOUT.asException("Timed out while streaming distinct results");
         }

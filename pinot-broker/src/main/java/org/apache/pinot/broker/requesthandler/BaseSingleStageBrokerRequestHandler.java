@@ -146,6 +146,7 @@ import org.slf4j.LoggerFactory;
 @ThreadSafe
 public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseSingleStageBrokerRequestHandler.class);
+  // Listed in DeleteStatement.CROSS_TABLE_FUNCTIONS: a DELETE predicate must not call this function
   private static final String IN_SUBQUERY = "insubquery";
   private static final String IN_ID_SET = "inidset";
   private static final Expression FALSE = RequestUtils.getLiteralExpression(false);

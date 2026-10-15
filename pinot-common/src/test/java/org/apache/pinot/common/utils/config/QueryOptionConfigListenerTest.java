@@ -62,6 +62,24 @@ public class QueryOptionConfigListenerTest {
   }
 
   @Test
+  public void testLegacySyntaxModeOnlyIgnoresTheValidationMode() {
+    // The controller's listener: the REJECT validation mode checks the option keys against a per-JVM allowlist that
+    // broker plugins only fill in the broker, which validates every query the controller forwards
+    QueryOptionConfigListener listener = QueryOptionConfigListener.legacySyntaxModeOnly();
+
+    listener.onChange(Set.of(VALIDATION_MODE_KEY, LEGACY_SYNTAX_MODE_KEY),
+        Map.of(VALIDATION_MODE_KEY, "reject", LEGACY_SYNTAX_MODE_KEY, "ignore"));
+    assertEquals(QueryOptionsUtils.getSqlQueryOptionValidationMode(), SqlQueryOptionValidationMode.NONE);
+    assertEquals(QueryOptionsUtils.getLegacyOptionSyntaxMode(), SqlOptionsMode.IGNORE);
+
+    // Removing the legacy syntax mode key restores its default, the validation mode is still untouched
+    QueryOptionsUtils.setSqlQueryOptionValidationMode(SqlQueryOptionValidationMode.WARN);
+    listener.onChange(Set.of(VALIDATION_MODE_KEY, LEGACY_SYNTAX_MODE_KEY), Map.of());
+    assertEquals(QueryOptionsUtils.getSqlQueryOptionValidationMode(), SqlQueryOptionValidationMode.WARN);
+    assertEquals(QueryOptionsUtils.getLegacyOptionSyntaxMode(), SqlOptionsMode.ALLOW);
+  }
+
+  @Test
   public void testInvalidValueKeepsCurrentMode() {
     QueryOptionConfigListener listener = new QueryOptionConfigListener();
     listener.onChange(Set.of(LEGACY_SYNTAX_MODE_KEY), Map.of(LEGACY_SYNTAX_MODE_KEY, "reject"));

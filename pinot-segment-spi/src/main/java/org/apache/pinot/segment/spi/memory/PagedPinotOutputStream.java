@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -210,6 +211,99 @@ public class PagedPinotOutputStream extends PinotOutputStream {
       }
     }
     _written = Math.max(_written, _offsetInPage + _currentPageStartOffset);
+  }
+
+  /// Puts as many values as fit in the current page straight into it, then updates the page offset once. When at least
+  /// [PrimitiveArrayOutput#MIN_BULK_VALUES] values go to the page, they are copied through a big-endian typed view;
+  /// fewer values are put one by one, because the typed-view copy has a fixed cost that a few values do not pay back.
+  /// A value that does not fit in the rest of the page (the page offset depends on everything written before, so it
+  /// is not aligned to the value width) is written with [#writeInt(int)], which splits it across the two pages.
+  @Override
+  public void writeInts(int[] values, int offset, int length)
+      throws IOException {
+    Objects.checkFromIndexSize(offset, length, values.length);
+    int end = offset + length;
+    int i = offset;
+    while (i < end) {
+      int numValues = Math.min(end - i, remainingInPage() / Integer.BYTES);
+      if (numValues == 0) {
+        writeInt(values[i++]);
+        continue;
+      }
+      if (numValues < PrimitiveArrayOutput.MIN_BULK_VALUES) {
+        int position = _offsetInPage;
+        for (int j = i; j < i + numValues; j++, position += Integer.BYTES) {
+          _currentPage.putInt(position, values[j]);
+        }
+      } else {
+        currentPageView().asIntBuffer().put(values, i, numValues);
+      }
+      i += numValues;
+      _offsetInPage += numValues * Integer.BYTES;
+      _written = Math.max(_written, _offsetInPage + _currentPageStartOffset);
+    }
+  }
+
+  /// Same as [#writeInts(int[], int, int)], for longs.
+  @Override
+  public void writeLongs(long[] values, int offset, int length)
+      throws IOException {
+    Objects.checkFromIndexSize(offset, length, values.length);
+    int end = offset + length;
+    int i = offset;
+    while (i < end) {
+      int numValues = Math.min(end - i, remainingInPage() / Long.BYTES);
+      if (numValues == 0) {
+        writeLong(values[i++]);
+        continue;
+      }
+      if (numValues < PrimitiveArrayOutput.MIN_BULK_VALUES) {
+        int position = _offsetInPage;
+        for (int j = i; j < i + numValues; j++, position += Long.BYTES) {
+          _currentPage.putLong(position, values[j]);
+        }
+      } else {
+        currentPageView().asLongBuffer().put(values, i, numValues);
+      }
+      i += numValues;
+      _offsetInPage += numValues * Long.BYTES;
+      _written = Math.max(_written, _offsetInPage + _currentPageStartOffset);
+    }
+  }
+
+  /// Same as [#writeInts(int[], int, int)], for doubles.
+  @Override
+  public void writeDoubles(double[] values, int offset, int length)
+      throws IOException {
+    Objects.checkFromIndexSize(offset, length, values.length);
+    int end = offset + length;
+    int i = offset;
+    while (i < end) {
+      int numValues = Math.min(end - i, remainingInPage() / Double.BYTES);
+      if (numValues == 0) {
+        // Raw bits, like the typed view (and ByteBuffer#putDouble): writeDouble() would canonicalize NaN.
+        writeLong(Double.doubleToRawLongBits(values[i++]));
+        continue;
+      }
+      if (numValues < PrimitiveArrayOutput.MIN_BULK_VALUES) {
+        int position = _offsetInPage;
+        for (int j = i; j < i + numValues; j++, position += Double.BYTES) {
+          _currentPage.putLong(position, Double.doubleToRawLongBits(values[j]));
+        }
+      } else {
+        currentPageView().asDoubleBuffer().put(values, i, numValues);
+      }
+      i += numValues;
+      _offsetInPage += numValues * Double.BYTES;
+      _written = Math.max(_written, _offsetInPage + _currentPageStartOffset);
+    }
+  }
+
+  /// Returns a big-endian view of the current page that starts at the current offset. The page itself is not changed.
+  private ByteBuffer currentPageView() {
+    ByteBuffer view = _currentPage.duplicate();
+    view.position(_offsetInPage);
+    return view.order(ByteOrder.BIG_ENDIAN);
   }
 
   @Override

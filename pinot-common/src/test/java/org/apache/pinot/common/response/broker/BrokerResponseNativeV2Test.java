@@ -52,6 +52,51 @@ public class BrokerResponseNativeV2Test {
     assertTrue(brokerResponse.isPartialResult());
   }
 
+  /// The remote access stats are serialized only when a remote access happened, and the direct ones only when a direct
+  /// remote access happened.
+  @Test
+  public void testRemoteAccessStatsSerializedOnlyWhenNonZero() {
+    BrokerResponseNativeV2 response = new BrokerResponseNativeV2();
+    JsonNode json = JsonUtils.objectToJsonNode(response);
+    assertFalse(json.has("numRemoteAccesses"));
+    assertFalse(json.has("remoteAccessBytes"));
+    assertFalse(json.has("numDirectRemoteAccesses"));
+    assertFalse(json.has("directRemoteAccessBytes"));
+
+    StatMap<BrokerResponseNativeV2.StatKey> stats = new StatMap<>(BrokerResponseNativeV2.StatKey.class);
+    stats.merge(BrokerResponseNativeV2.StatKey.NUM_REMOTE_ACCESSES, 7L);
+    stats.merge(BrokerResponseNativeV2.StatKey.REMOTE_ACCESS_BYTES, 700L);
+    response.addBrokerStats(stats);
+    json = JsonUtils.objectToJsonNode(response);
+    assertEquals(json.get("numRemoteAccesses").asLong(), 7L);
+    assertEquals(json.get("remoteAccessBytes").asLong(), 700L);
+    assertFalse(json.has("numDirectRemoteAccesses"));
+    assertFalse(json.has("directRemoteAccessBytes"));
+
+    stats = new StatMap<>(BrokerResponseNativeV2.StatKey.class);
+    stats.merge(BrokerResponseNativeV2.StatKey.NUM_DIRECT_REMOTE_ACCESSES, 2L);
+    stats.merge(BrokerResponseNativeV2.StatKey.DIRECT_REMOTE_ACCESS_BYTES, 20L);
+    response.addBrokerStats(stats);
+    json = JsonUtils.objectToJsonNode(response);
+    assertEquals(json.get("numDirectRemoteAccesses").asLong(), 2L);
+    assertEquals(json.get("directRemoteAccessBytes").asLong(), 20L);
+  }
+
+  @Test
+  public void testRowLimitsMarkPartialResponse()
+      throws Exception {
+    // A join or window stops at its row limit only in overflow mode BREAK, and then returns part of its result
+    BrokerResponseNativeV2 joinResponse = new BrokerResponseNativeV2();
+    joinResponse.mergeMaxRowsInJoinReached(true);
+    assertTrue(joinResponse.isPartialResult());
+
+    BrokerResponseNativeV2 windowResponse = new BrokerResponseNativeV2();
+    assertFalse(windowResponse.isPartialResult());
+    windowResponse.mergeMaxRowsInWindowReached(true);
+    assertTrue(windowResponse.isPartialResult());
+    assertTrue(JsonUtils.objectToJsonNode(windowResponse).get("partialResult").asBoolean());
+  }
+
   @Test
   public void testResponseMetadataSerialization()
       throws Exception {
