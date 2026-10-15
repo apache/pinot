@@ -23,6 +23,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -48,6 +49,7 @@ import org.apache.pinot.common.utils.ClientSSLContextGenerator;
 import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
+import org.apache.pinot.common.utils.config.IngestionGroovyConfigListener;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.tls.PinotInsecureMode;
@@ -105,6 +107,8 @@ public abstract class BaseMinionStarter implements ServiceStartable {
   public void init(PinotConfiguration config)
       throws Exception {
     _config = new MinionConf(config.toMap());
+    _clusterConfigChangeHandler = new DefaultClusterConfigChangeHandler();
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(new IngestionGroovyConfigListener());
     String zkAddress = _config.getZkAddress();
     String helixClusterName = _config.getHelixClusterName();
     ServiceStartableUtils.applyClusterConfig(_config, zkAddress, helixClusterName, ServiceRole.MINION);
@@ -127,7 +131,6 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     }
     _listenerConfigs = ListenerConfigUtil.buildMinionConfigs(_config);
     _tlsPort = ListenerConfigUtil.findLastTlsPort(_listenerConfigs, -1);
-    _clusterConfigChangeHandler = new DefaultClusterConfigChangeHandler();
     // Register cluster-level override for table configs
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(
         new ClusterConfigForTable.ConfigChangeListener());
@@ -309,7 +312,8 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     try {
       _helixManager.addClusterfigChangeListener(_clusterConfigChangeHandler);
     } catch (Exception e) {
-      LOGGER.error("Failed to register DefaultClusterConfigChangeHandler as the Helix ClusterConfigChangeListener", e);
+      IngestionGroovyConfigListener.applyClusterConfig(Map.of());
+      throw new IllegalStateException("Failed to subscribe to the cluster ingestion Groovy policy", e);
     }
     LOGGER.info("Starting minion admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
     _minionAdminApplication = createMinionAdminApp();
