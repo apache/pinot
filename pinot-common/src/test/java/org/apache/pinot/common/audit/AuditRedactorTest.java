@@ -37,7 +37,7 @@ public class AuditRedactorTest {
   @DataProvider(name = "sensitiveKeys")
   public Object[][] sensitiveKeys() {
     return new Object[][]{
-        // The keys observed leaking in STC-6446.
+        // Batch-ingestion S3 credentials, as sent in a connection's params.
         {"input.fs.prop.secretKey"}, {"input.fs.prop.accessKey"},
         // AWS / S3.
         {"accessKey"}, {"accessKeyId"}, {"secretKey"}, {"aws.secret.access.key"}, {"sessionToken"},

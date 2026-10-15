@@ -625,7 +625,7 @@ public class AuditRequestProcessorTest {
     assertThat(new String(readBytes, StandardCharsets.UTF_8)).isEqualTo(nestedJson);
   }
 
-  // Redaction tests (STC-6446): nothing captured from the caller may carry credential material.
+  // Redaction tests: nothing captured from the caller may carry credential material.
 
   private static final String AWS_SECRET = "wJalrXUtnFEMI-K7MDENG-bPxRfiCYEXAMPLEKEY";
 
