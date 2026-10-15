@@ -183,12 +183,32 @@ the segment's original forward-index values and existing table configuration; no
 Compatible indexes are reused, and subsequent loads do not rebuild the recovered indexes again. Interrupted builds
 restart from the retained source values before the segment is loaded.
 
-Install this recovery release on the intended rollback target before upgrading Lucene. After a downgrade, loading
-segments containing newer Lucene indexes rebuilds those indexes with the older writer. Retain the original forward
+Install the Lucene 9.12 recovery release on the intended rollback target before upgrading Lucene. After a downgrade,
+loading a segment containing newer Lucene indexes rebuilds them with the older writer. Retain the original forward
 indexes: dictionary/inverted-index reconstruction can lose multi-value ordering and duplicate values. When original
 values are unavailable, recovery fails before replacing the incompatible index; restore a compatible segment or
 refresh it from retained source data. Rebuilding adds CPU/I/O and segment-loading time. Existing preprocessing
 opt-outs remain in effect. Corruption and ordinary I/O errors fail loading instead of triggering format recovery.
+
+### Upgrading Lucene indexes
+
+This version uses Lucene 10.0.0. Existing Lucene 8 text indexes and Lucene 9.12 text and HNSW indexes remain readable.
+New text and HNSW indexes use Lucene 10; FST and IFST indexes retain their existing file format.
+
+First deploy the Lucene 9.12 recovery release to every server that may receive these segments, then upgrade to this
+version. Downgrading to that recovery release automatically rebuilds Lucene 10 indexes during normal segment loading,
+using the original forward indexes and unchanged table configuration. Plan capacity for the additional rebuilding
+work and validate representative segments before production rollout. Unpatched Lucene 9.12 releases still reject
+Lucene 10 indexes, so they are not supported rollback targets.
+
+Automatic recovery requires preprocessing. Pause minion tasks and tools that disable preprocessing until their input
+segments match their running Lucene version; those paths can still reject newer indexes.
+
+Lucene 10 also removes complement syntax (`~`) from the default regular-expression syntax used by `TEXT_MATCH` query
+parsers. Review affected queries; for example, use a negated character class for a single-character exclusion, or express
+whole-term exclusion with a Boolean query. Pinot's FST and IFST `REGEXP_LIKE` matching retains complement support.
+See the [Lucene migration guide](https://lucene.apache.org/core/10_0_0/MIGRATE.html) for analyzer and query changes.
+
 
 ## Deploying Pinot to Kubernetes
 Please refer to [Running Pinot on Kubernetes](https://docs.pinot.apache.org/basics/getting-started/kubernetes-quickstart) in our project documentation. Pinot also provides Kubernetes integrations with the interactive query engine, [Trino](https://docs.pinot.apache.org/integrations/trino), and the data visualization tool, [Apache Superset](helm/superset.yaml).

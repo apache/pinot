@@ -30,7 +30,6 @@ import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.miscellaneous.PerFieldAnalyzerWrapper;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.DocumentStoredFieldVisitor;
-import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.FieldInfo;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexableField;
@@ -178,7 +177,7 @@ public class MultiColumnLuceneTextIndexReader implements MultiColumnTextIndexRea
     try {
       File indexFile = getTextIndexFile(indexDir);
       _indexDirectory = FSDirectory.open(indexFile.toPath());
-      _indexReader = DirectoryReader.open(_indexDirectory);
+      _indexReader = LuceneTextIndexReader.openIndexReader(_indexDirectory);
       _indexSearcher = new IndexSearcher(_indexReader);
       if (!config.isEnableQueryCache()) {
         // Disable Lucene query result cache. While it helps a lot with performance for
@@ -519,8 +518,9 @@ public class MultiColumnLuceneTextIndexReader implements MultiColumnTextIndexRea
             return new DefaultDocIdTranslator(buffer);
           }
         } else {
+          StoredFields storedFields = indexSearcher.storedFields();
           for (int i = 0; i < numDocs; i++) {
-            Document document = indexSearcher.storedFields().document(i);
+            Document document = storedFields.document(i);
             IndexableField field = document.getField(LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME);
             int pinotDocId = Integer.parseInt(field.stringValue());
             buffer.putInt(i * Integer.BYTES, pinotDocId);

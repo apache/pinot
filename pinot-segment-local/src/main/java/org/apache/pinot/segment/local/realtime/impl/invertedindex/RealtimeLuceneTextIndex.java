@@ -26,6 +26,7 @@ import javax.annotation.Nullable;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.IndexWriter;
+import org.apache.lucene.index.StoredFields;
 import org.apache.lucene.queryparser.classic.QueryParserBase;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
@@ -254,9 +255,10 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
     IntIterator luceneDocIDIterator = luceneDocIds.getIntIterator();
     MutableRoaringBitmap actualDocIDs = new MutableRoaringBitmap();
     try {
+      StoredFields storedFields = indexSearcher.storedFields();
       while (luceneDocIDIterator.hasNext()) {
         int luceneDocId = luceneDocIDIterator.next();
-        Document document = indexSearcher.doc(luceneDocId);
+        Document document = storedFields.document(luceneDocId);
         int pinotDocId = Integer.parseInt(document.get(LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME));
         actualDocIDs.add(pinotDocId);
       }
