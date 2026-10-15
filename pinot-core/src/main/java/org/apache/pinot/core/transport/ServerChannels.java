@@ -24,6 +24,7 @@ import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.buffer.PooledByteBufAllocatorMetric;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
@@ -169,6 +170,19 @@ public class ServerChannels {
     _serverToChannelMap.computeIfAbsent(serverRoutingInstance, ServerChannel::new).connect();
   }
 
+  /// Closes the channel to the server, if one is open, so that the next request to it connects afresh.
+  ///
+  /// The broker uses this after a server fails to answer a ping. The channel may be half-open -- nothing closes it
+  /// when the peer's node disappears without sending a FIN or an RST -- and requests written into it are never read.
+  /// Closing it also ends whatever is still in flight to that server right away (see [DataTableHandler]), rather than
+  /// leaving those queries to wait out their own timeouts against a server that is not going to answer.
+  void closeChannel(ServerRoutingInstance serverRoutingInstance) {
+    ServerChannel serverChannel = _serverToChannelMap.get(serverRoutingInstance);
+    if (serverChannel != null) {
+      serverChannel.closeChannel();
+    }
+  }
+
   /// Opens a channel ahead of query traffic, awaiting the TLS handshake so that neither the connect nor
   /// the handshake lands on the first query's critical path. Both waits are bounded by `timeoutMs`.
   ///
@@ -195,7 +209,7 @@ public class ServerChannels {
     final Bootstrap _bootstrap;
     // lock to protect channel as requests must be written into channel sequentially
     final ReentrantLock _channelLock = new ReentrantLock();
-    Channel _channel;
+    volatile Channel _channel;
     // Set once a query has been sent, or attempted, through this channel; startup pre-connect leaves it
     // false. Read by hasChannel(), which the failure detector uses to decide whether the single-stage
     // transport has any opinion on this server's health. Volatile: written on a query thread, read on the
@@ -254,7 +268,7 @@ public class ServerChannels {
         throws InterruptedException, TimeoutException {
       if (_channelLock.tryLock(timeoutMs, TimeUnit.MILLISECONDS)) {
         try {
-          connectWithoutLocking();
+          connectWithoutLocking(timeoutMs);
           sendRequestWithoutLocking(rawTableName, asyncQueryResponse, serverRoutingInstance, requestBytes);
         } finally {
           _channelLock.unlock();
@@ -264,20 +278,29 @@ public class ServerChannels {
       }
     }
 
-    /// Lazy query path: opens the TCP connection only. Any TLS handshake is left to proceed
-    /// asynchronously so the channel lock is released as soon as the socket is up, keeping the first
-    /// query's critical section short. Startup pre-connect uses [#preConnectWithoutLocking(long)]
-    /// instead, which additionally pays the handshake.
-    void connectWithoutLocking()
-        throws InterruptedException {
+    /// Lazy query path: opens the TCP connection only, waiting at most `timeoutMs`. Any TLS handshake is left to
+    /// proceed asynchronously so the channel lock is released as soon as the socket is up, keeping the first query's
+    /// critical section short. Startup pre-connect uses [#preConnectWithoutLocking(long)] instead, which additionally
+    /// pays the handshake.
+    ///
+    /// Without the bound, a connect to a host that silently drops packets -- the very host the failure detector pings
+    /// -- blocks for Netty's 30 s default, however long the caller can actually wait.
+    void connectWithoutLocking(long timeoutMs)
+        throws InterruptedException, TimeoutException {
       if (_channel == null || !_channel.isActive()) {
         long startTime = System.currentTimeMillis();
-        _channel = _bootstrap.connect().sync().channel();
+        ChannelFuture connectFuture = _bootstrap.connect();
+        if (!connectFuture.await(timeoutMs, TimeUnit.MILLISECONDS)) {
+          connectFuture.channel().close();
+          throw new TimeoutException("Timed out connecting to server: " + _serverRoutingInstance);
+        }
+        // Completed by now: returns the channel, or rethrows the connect failure as sync() always did.
+        _channel = connectFuture.sync().channel();
         recordConnectTime(System.currentTimeMillis() - startTime);
       }
     }
 
-    /// Like [#connectWithoutLocking()] but additionally waits out the TLS handshake, and bounds both
+    /// Like [#connectWithoutLocking(long)] but additionally waits out the TLS handshake, and bounds both
     /// waits by `timeoutMs`.
     ///
     /// Used only by startup pre-connect ([#preConnect(long)]), never by the lazy query path or by the
@@ -383,7 +406,8 @@ public class ServerChannels {
         throws InterruptedException, TimeoutException {
       if (_channelLock.tryLock(TRY_CONNECT_CHANNEL_LOCK_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
         try {
-          connectWithoutLocking();
+          // The connect gets as long as the lock wait.
+          connectWithoutLocking(TRY_CONNECT_CHANNEL_LOCK_TIMEOUT_MS);
         } finally {
           _channelLock.unlock();
         }
