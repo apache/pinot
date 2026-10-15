@@ -41,6 +41,10 @@
       <groupId>org.apache.pulsar</groupId>
       <artifactId>pulsar-client-all</artifactId>
     </dependency>
+    <dependency>
+      <groupId>com.google.guava</groupId>
+      <artifactId>guava</artifactId>
+    </dependency>
     <!-- Pulsar declares these with runtime scope, which takes precedence over the provided scope inherited through
          pinot-spi and removes them from the compile classpath -->
     <dependency>
