@@ -81,10 +81,12 @@ public abstract class BaseSparkSegmentMetadataPushJobRunner implements Ingestion
 
     List<String> segmentsToPush = new ArrayList<>();
     for (String file : files) {
-      if (file.endsWith(Constants.TAR_GZ_FILE_EXT)) {
+      if (Constants.isSegmentTarFile(file)) {
         segmentsToPush.add(file);
       }
     }
+
+    SegmentPushUtils.validateUniqueSegmentNames(segmentsToPush);
 
     int pushParallelism = _spec.getPushJobSpec().getPushParallelism();
     if (pushParallelism < 1) {

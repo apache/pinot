@@ -293,7 +293,8 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
 
           // Tar segment directory to compress file
           File localSegmentDir = new File(localOutputTempDir, segmentName);
-          String segmentTarFileName = URIUtils.encode(segmentName + Constants.TAR_GZ_FILE_EXT);
+          String segmentTarFileName = URIUtils.encode(
+              segmentName + Constants.SEGMENT_TAR_FILE_EXTENSIONS.get(_spec.getSegmentTarCompressionCodec()));
           File localSegmentTarFile = new File(localOutputTempDir, segmentTarFileName);
           LOGGER.info("Tarring segment from: {} to: {}", localSegmentDir, localSegmentTarFile);
           TarCompressionUtils.createCompressedTarFile(localSegmentDir, localSegmentTarFile);

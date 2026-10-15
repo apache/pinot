@@ -82,16 +82,20 @@ public class HadoopSegmentUriPushJobRunner implements IngestionJobRunner, Serial
     } catch (IOException e) {
       throw new RuntimeException("Unable to list all files under outputDirURI - '" + outputDirURI + "'");
     }
+    List<String> segmentTarPaths = new ArrayList<>();
     List<String> segmentUris = new ArrayList<>();
     for (String file : files) {
       URI uri = URI.create(file);
-      if (uri.getPath().endsWith(Constants.TAR_GZ_FILE_EXT)) {
+      if (Constants.isSegmentTarFile(uri.getPath())) {
+        segmentTarPaths.add(file);
         URI updatedURI = SegmentPushUtils
             .generateSegmentTarURI(outputDirURI, uri, _spec.getPushJobSpec().getSegmentUriPrefix(),
                 _spec.getPushJobSpec().getSegmentUriSuffix());
         segmentUris.add(updatedURI.toString());
       }
     }
+    SegmentPushUtils.validateUniqueSegmentNames(segmentTarPaths);
+
     // Push from driver
     try {
       SegmentPushUtils.sendSegmentUris(_spec, segmentUris);
