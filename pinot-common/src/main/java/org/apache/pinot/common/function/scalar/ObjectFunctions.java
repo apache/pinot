@@ -59,6 +59,8 @@ public class ObjectFunctions {
     return !isDistinctFrom(obj1, obj2);
   }
 
+  /// Covers the number types that scalar functions get for INT, LONG, FLOAT, DOUBLE and BIG_DECIMAL values. Other
+  /// numbers (e.g. `Short` or `BigInteger`) are not compared by value, but with [Objects#deepEquals].
   private static boolean isNumber(Object obj) {
     return obj instanceof Integer || obj instanceof Long || obj instanceof Float || obj instanceof Double
         || obj instanceof BigDecimal;
@@ -78,7 +80,8 @@ public class ObjectFunctions {
   ///   - An integer and a floating point number are compared exactly.
   ///   - When either number is a `BigDecimal`, both are compared as `BigDecimal`, which ignores the scale (`1.5`
   ///     equals `1.50`). A floating point number is converted with [BigDecimal#valueOf(double)], so `0.1` equals the
-  ///     `BigDecimal` `0.1`. NaN and infinity do not equal any `BigDecimal`.
+  ///     `BigDecimal` `0.1`. NaN and infinity do not equal any `BigDecimal`. `BigDecimal` has no negative zero, so
+  ///     `-0.0` equals the `BigDecimal` `0`, the same as in the leaf stage, but does not equal `0.0` or `0`.
   private static boolean numberEquals(Number number1, Number number2) {
     if (number1 instanceof BigDecimal || number2 instanceof BigDecimal) {
       BigDecimal value1 = toBigDecimal(number1);
