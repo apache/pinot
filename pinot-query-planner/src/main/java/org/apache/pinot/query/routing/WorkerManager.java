@@ -492,7 +492,8 @@ public class WorkerManager {
     } else {
       metadata.setPartitionFunction(DEFAULT_SHUFFLE_PARTITION_FUNCTION);
     }
-    // Fake a segments map so that the worker can be correctly identified as leaf stage
+    // Fake a segments map so that the worker can be correctly identified as leaf stage. The OFFLINE key with no
+    // segments is only a placeholder: the join reads the dimension table from memory, not from segments.
     Map<String, List<String>> segmentsMap = Map.of(TableType.OFFLINE.name(), List.of());
     Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap =
         Maps.newHashMapWithExpectedSize(workerIdToServerInstanceMap.size());
@@ -855,7 +856,9 @@ public class WorkerManager {
 
   /// Returns the instances to assign to replicated leaf stage children when there is no local exchange peer. By
   /// default, uses the same candidates as the intermediate stage. Also returns the instances to assign to a lookup join
-  /// stage over an intermediate input, which are by default the workers of that input.
+  /// stage over an intermediate input, which are by default the workers of that input. Return that list unchanged, in
+  /// the same order, to keep the exchange local and the input's partitioning. Any other list makes the exchange
+  /// redistribute the rows.
   ///
   /// Subclasses can override to use different instances for replicated leaf stages (e.g., when intermediate stages
   /// run on non-server instances that cannot scan segments).
