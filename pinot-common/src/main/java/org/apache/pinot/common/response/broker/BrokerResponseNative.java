@@ -49,8 +49,9 @@ import org.apache.pinot.spi.utils.JsonUtils;
     "numConsumingSegmentsQueried", "numConsumingSegmentsProcessed", "numConsumingSegmentsMatched",
     "minConsumingFreshnessTimeMs", "numSegmentsPrunedByBroker", "numSegmentsPrunedByServer",
     "numSegmentsPrunedInvalid", "numSegmentsPrunedByLimit", "numSegmentsPrunedByValue", "numRemoteAccesses",
-    "remoteAccessBytes", "brokerReduceTimeMs", "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs",
-    "offlineSystemActivitiesCpuTimeNs", "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
+    "remoteAccessBytes", "numDirectRemoteAccesses", "directRemoteAccessBytes", "brokerReduceTimeMs",
+    "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs", "offlineSystemActivitiesCpuTimeNs",
+    "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
     "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs", "realtimeTotalCpuTimeNs",
     "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tablesQueried",
     "offlineThreadMemAllocatedBytes", "realtimeThreadMemAllocatedBytes", "offlineResponseSerMemAllocatedBytes",
@@ -101,6 +102,8 @@ public class BrokerResponseNative implements BrokerResponse {
   private long _numSegmentsPrunedByValue = 0L;
   private long _numRemoteAccesses = 0L;
   private long _remoteAccessBytes = 0L;
+  private long _numDirectRemoteAccesses = 0L;
+  private long _directRemoteAccessBytes = 0L;
   private long _brokerReduceTimeMs = 0L;
   private long _offlineThreadCpuTimeNs = 0L;
   private long _realtimeThreadCpuTimeNs = 0L;
@@ -480,6 +483,7 @@ public class BrokerResponseNative implements BrokerResponse {
     _numSegmentsPrunedByValue = numSegmentsPrunedByValue;
   }
 
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
   @Override
   public long getNumRemoteAccesses() {
     return _numRemoteAccesses;
@@ -489,6 +493,7 @@ public class BrokerResponseNative implements BrokerResponse {
     _numRemoteAccesses = numRemoteAccesses;
   }
 
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
   @Override
   public long getRemoteAccessBytes() {
     return _remoteAccessBytes;
@@ -496,6 +501,26 @@ public class BrokerResponseNative implements BrokerResponse {
 
   public void setRemoteAccessBytes(long remoteAccessBytes) {
     _remoteAccessBytes = remoteAccessBytes;
+  }
+
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+  @Override
+  public long getNumDirectRemoteAccesses() {
+    return _numDirectRemoteAccesses;
+  }
+
+  public void setNumDirectRemoteAccesses(long numDirectRemoteAccesses) {
+    _numDirectRemoteAccesses = numDirectRemoteAccesses;
+  }
+
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+  @Override
+  public long getDirectRemoteAccessBytes() {
+    return _directRemoteAccessBytes;
+  }
+
+  public void setDirectRemoteAccessBytes(long directRemoteAccessBytes) {
+    _directRemoteAccessBytes = directRemoteAccessBytes;
   }
 
   @Override

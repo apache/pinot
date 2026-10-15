@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.common.utils.helix;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -28,15 +30,20 @@ import org.apache.helix.AccessOption;
 import org.apache.helix.BaseDataAccessor;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
+import org.apache.helix.HelixProperty;
 import org.apache.helix.PropertyKey;
+import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
+import org.apache.helix.zookeeper.util.GZipCompressionUtil;
 import org.apache.helix.zookeeper.zkclient.DataUpdater;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.mockito.ArgumentMatchers;
 import org.mockito.MockedStatic;
@@ -53,11 +60,16 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNotSame;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertSame;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
 public class HelixHelperTest {
+  private static final ZNRecordSerializer DEFAULT_SERIALIZER = new ZNRecordSerializer();
 
   @Test
   public void testUpdateHostName() {
@@ -269,5 +281,94 @@ public class HelixHelperTest {
     assertTrue(persistedIdealState.getInstanceSet(tableCreatedAfterRead).contains(brokerId));
     assertEquals(writeAttempts.get(), 2);
     verify(helixDataAccessor, times(2)).getProperty(instanceConfigKey);
+  }
+
+  @Test
+  public void testToIdealStateAndExternalViewShareCompactRecord()
+      throws IOException {
+    ZNRecord written = CompactZNRecordSerializerTest.sampleIdealState();
+    written.setSimpleField("HELIX_ENABLED", "false");
+    written.setRawPayload(new byte[]{1, 2, 3});
+    // The compact parser only takes gzip-compressed content
+    byte[] bytes = GZipCompressionUtil.compress(DEFAULT_SERIALIZER.serialize(written));
+
+    for (boolean externalView : new boolean[]{false, true}) {
+      ZNRecord compact = CompactZNRecordSerializer.deserializeCompact(bytes);
+      setScalars(compact);
+      assertTrue(HelixHelper.isCompact(compact));
+      ZNRecord copied = (ZNRecord) DEFAULT_SERIALIZER.deserialize(bytes);
+      setScalars(copied);
+      assertFalse(HelixHelper.isCompact(copied));
+      HelixProperty expected = externalView ? new ExternalView(copied) : new IdealState(copied);
+
+      HelixProperty actual = externalView ? HelixHelper.toExternalView(compact)
+          : HelixHelper.toIdealState(compact);
+      assertTrue(externalView ? actual instanceof ExternalView : actual instanceof IdealState);
+      ZNRecord record = actual.getRecord();
+      // No copy: the maps and the payload are the ones of the parsed record
+      assertSame(record.getMapFields(), compact.getMapFields());
+      assertSame(record.getSimpleFields(), compact.getSimpleFields());
+      assertSame(record.getListFields(), compact.getListFields());
+      assertSame(record.getRawPayload(), compact.getRawPayload());
+      // Same content, scalar fields and stat as the copying constructor
+      assertEquals(actual.getId(), expected.getId());
+      assertEquals(record, expected.getRecord());
+      assertEquals(record.getSimpleFields(), expected.getRecord().getSimpleFields());
+      assertEquals(record.getListFields(), expected.getRecord().getListFields());
+      assertEquals(record.getMapFields(), expected.getRecord().getMapFields());
+      assertEquals(record.getRawPayload(), expected.getRecord().getRawPayload());
+      assertEquals(record.getVersion(), 17);
+      assertEquals(record.getCreationTime(), 1000L);
+      assertEquals(record.getModifiedTime(), 2000L);
+      assertEquals(record.getEphemeralOwner(), 3000L);
+      assertEquals(actual.getStat(), expected.getStat());
+      assertEquals(actual.getStat().getVersion(), 17);
+      assertEquals(actual.getBucketSize(), expected.getBucketSize());
+      if (externalView) {
+        assertEquals(((ExternalView) actual).getPartitionSet(), ((ExternalView) expected).getPartitionSet());
+        assertSame(((ExternalView) actual).getStateMap("myTable__0__0__20240101T0000Z"),
+            compact.getMapField("myTable__0__0__20240101T0000Z"));
+      } else {
+        IdealState idealState = (IdealState) actual;
+        assertFalse(idealState.isEnabled());
+        assertEquals(idealState.isEnabled(), ((IdealState) expected).isEnabled());
+        assertEquals(idealState.getRebalanceMode(), IdealState.RebalanceMode.CUSTOMIZED);
+        assertEquals(idealState.getPartitionSet(), ((IdealState) expected).getPartitionSet());
+        assertEquals(idealState.getRecord().getSimpleField(CommonConstants.IdealState.HYBRID_TABLE_TIME_BOUNDARY),
+            "1700000000000");
+      }
+      // The shared outer map stays immutable
+      assertThrows(UnsupportedOperationException.class, () -> record.getMapFields().remove("myTable__empty"));
+    }
+  }
+
+  @Test
+  public void testToIdealStateAndExternalViewCopyDefaultRecord() {
+    byte[] bytes = DEFAULT_SERIALIZER.serialize(CompactZNRecordSerializerTest.sampleIdealState());
+    for (boolean externalView : new boolean[]{false, true}) {
+      // A record from the default deserializer (or from the fallback) goes through the copying constructor
+      ZNRecord standard = (ZNRecord) DEFAULT_SERIALIZER.deserialize(bytes);
+      assertNotNull(standard);
+      setScalars(standard);
+      assertFalse(HelixHelper.isCompact(standard));
+      HelixProperty actual = externalView ? HelixHelper.toExternalView(standard)
+          : HelixHelper.toIdealState(standard);
+      HelixProperty expected = externalView ? new ExternalView(standard) : new IdealState(standard);
+      assertNotSame(actual.getRecord(), standard);
+      assertNotSame(actual.getRecord().getMapFields(), standard.getMapFields());
+      assertTrue(actual.getRecord().getMapFields() instanceof TreeMap);
+      assertEquals(actual.getRecord(), expected.getRecord());
+      assertEquals(actual.getStat(), expected.getStat());
+      // The copy is mutable, as today
+      actual.getRecord().getMapFields().remove("myTable__empty");
+      assertTrue(standard.getMapFields().containsKey("myTable__empty"));
+    }
+  }
+
+  private static void setScalars(ZNRecord record) {
+    record.setVersion(17);
+    record.setCreationTime(1000L);
+    record.setModifiedTime(2000L);
+    record.setEphemeralOwner(3000L);
   }
 }

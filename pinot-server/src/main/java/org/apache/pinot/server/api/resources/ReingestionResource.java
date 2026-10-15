@@ -20,7 +20,8 @@ package org.apache.pinot.server.api.resources;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.base.Function;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.math.LongMath;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
@@ -38,10 +39,14 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BooleanSupplier;
 import javax.annotation.Nullable;
+import javax.annotation.PreDestroy;
 import javax.inject.Inject;
+import javax.inject.Singleton;
 import javax.ws.rs.Encoded;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -79,12 +84,13 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
         description = "Database context passed through http header. If no context is provided 'default' database "
             + "context will be considered.")}))
 @Path("/")
+@Singleton
 public class ReingestionResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(ReingestionResource.class);
 
   // TODO: Make them configurable
-  private static final int MAX_PARALLEL_REINGESTIONS = Math.max(Runtime.getRuntime().availableProcessors() / 2, 1);
-  public static final long CONSUMPTION_END_TIMEOUT_MS = Duration.ofMinutes(30).toMillis();
+  @VisibleForTesting
+  static final int MAX_PARALLEL_REINGESTIONS = Math.max(Runtime.getRuntime().availableProcessors() / 2, 1);
   public static final long CHECK_INTERVAL_MS = Duration.ofSeconds(5).toMillis();
 
   // Tracks if a particular segment is currently being re-ingested
@@ -92,13 +98,16 @@ public class ReingestionResource {
 
   // Executor for asynchronous re-ingestion
   private final ExecutorService _reingestionExecutor = Executors.newFixedThreadPool(MAX_PARALLEL_REINGESTIONS,
-      new ThreadFactoryBuilder().setNameFormat("reingestion-worker-%d").build());
+      new ThreadFactoryBuilder().setNameFormat("reingestion-worker-%d").setDaemon(true).build());
 
   // Keep track of jobs by jobId => job info
   private final ConcurrentHashMap<String, ReingestionJob> _runningJobs = new ConcurrentHashMap<>();
 
   @Inject
   private ServerInstance _serverInstance;
+
+  @Inject
+  private ReingestionConsumptionTimeout _consumptionTimeout;
 
   /// Simple data class to hold job details.
   public static class ReingestionJob {
@@ -130,9 +139,10 @@ public class ReingestionResource {
   @GET
   @Path("/reingestSegment/jobs")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation("Get all running re-ingestion jobs along with job IDs")
+  @ApiOperation("Get all running re-ingestion jobs, including the ones waiting for a re-ingestion thread, along with "
+      + "job IDs")
   public Response getAllRunningReingestionJobs() {
-    // Filter only the jobs still marked as running
+    // Filter only the jobs still marked as running, including the ones waiting for a re-ingestion thread
     List<ReingestionJob> runningJobs = new ArrayList<>(_runningJobs.values());
     return Response.ok(runningJobs).build();
   }
@@ -202,23 +212,41 @@ public class ReingestionResource {
     String jobId = UUID.randomUUID().toString();
     ReingestionJob job = new ReingestionJob(jobId, segmentName);
 
+    // Track the job before submitting it, so that it is listed while waiting for a re-ingestion thread
+    _runningJobs.put(jobId, job);
+
     // Kick off the actual work asynchronously
-    _reingestionExecutor.submit(() -> {
-      try {
-        _runningJobs.put(jobId, job);
-        doReingestSegment(realtimeTableName, segmentZKMetadata, indexLoadingConfig,
-            tableDataManager.getSegmentBuildSemaphore());
-      } catch (Exception e) {
-        LOGGER.error("Error during async re-ingestion for job {} (segment={})", jobId, segmentName, e);
-        _serverInstance.getServerMetrics()
-            .addMeteredTableValue(realtimeTableName, ServerMeter.SEGMENT_REINGESTION_FAILURE, 1);
-      } finally {
-        _runningJobs.remove(jobId);
-        _reingestingSegments.remove(segmentName);
-      }
-    });
+    try {
+      _reingestionExecutor.submit(() -> {
+        try {
+          doReingestSegment(realtimeTableName, segmentZKMetadata, indexLoadingConfig,
+              tableDataManager.getSegmentBuildSemaphore());
+        } catch (Exception e) {
+          LOGGER.error("Error during async re-ingestion for job {} (segment={})", jobId, segmentName, e);
+          _serverInstance.getServerMetrics()
+              .addMeteredTableValue(realtimeTableName, ServerMeter.SEGMENT_REINGESTION_FAILURE, 1);
+        } finally {
+          _runningJobs.remove(jobId);
+          _reingestingSegments.remove(segmentName);
+        }
+      });
+    } catch (RejectedExecutionException e) {
+      // The executor is shut down when the admin API stops
+      _runningJobs.remove(jobId);
+      _reingestingSegments.remove(segmentName);
+      throw new WebApplicationException("Server is shutting down, cannot re-ingest segment: " + segmentName,
+          Response.Status.SERVICE_UNAVAILABLE);
+    }
 
     return Response.ok(job).build();
+  }
+
+  /// Stops the re-ingestion jobs when the admin API stops. Running jobs are interrupted, and fail and clean up their
+  /// segment. Jobs waiting for a re-ingestion thread are dropped.
+  @PreDestroy
+  public void shutDown() {
+    int numDroppedJobs = _reingestionExecutor.shutdownNow().size();
+    LOGGER.info("Stopped re-ingestion executor, dropped {} jobs waiting for a re-ingestion thread", numDroppedJobs);
   }
 
   /// The actual re-ingestion logic, moved into a separate method for clarity.
@@ -229,8 +257,13 @@ public class ReingestionResource {
     String segmentName = segmentZKMetadata.getSegmentName();
     try (StatelessRealtimeSegmentWriter writer = new StatelessRealtimeSegmentWriter(segmentZKMetadata,
         indexLoadingConfig, segmentBuildSemaphore)) {
+      // Read when the consumption starts, so that a job waiting for a re-ingestion thread uses the latest timeout
+      long consumptionTimeoutMs = _consumptionTimeout.getTimeoutMs();
+      LOGGER.info("Starting consumption to re-ingest segment: {} with timeout: {}ms", segmentName,
+          consumptionTimeoutMs);
       writer.startConsumption();
-      waitForCondition((Void) -> writer.isDoneConsuming(), CHECK_INTERVAL_MS, CONSUMPTION_END_TIMEOUT_MS, 0);
+      waitForCondition(writer::isDoneConsuming, "consumption of segment: " + segmentName, CHECK_INTERVAL_MS,
+          consumptionTimeoutMs);
       writer.stopConsumption();
 
       if (!writer.isSuccess()) {
@@ -247,32 +280,31 @@ public class ReingestionResource {
     }
   }
 
-  private void waitForCondition(
-      Function<Void, Boolean> condition, long checkIntervalMs, long timeoutMs, long gracePeriodMs) {
-    long endTime = System.currentTimeMillis() + timeoutMs;
+  @VisibleForTesting
+  static void waitForCondition(BooleanSupplier condition, String description, long checkIntervalMs, long timeoutMs) {
+    // Saturate to avoid overflow, since the timeout is configurable
+    long endTime = LongMath.saturatedAdd(System.currentTimeMillis(), timeoutMs);
 
-    // Adding grace period before starting the condition checks
-    if (gracePeriodMs > 0) {
-      LOGGER.info("Waiting for a grace period of {} ms before starting condition checks", gracePeriodMs);
+    while (true) {
       try {
-        Thread.sleep(gracePeriodMs);
-      } catch (InterruptedException e) {
-        throw new RuntimeException("Interrupted during grace period wait", e);
-      }
-    }
-
-    while (System.currentTimeMillis() < endTime) {
-      try {
-        if (Boolean.TRUE.equals(condition.apply(null))) {
-          LOGGER.info("Condition satisfied: {}", condition);
+        if (condition.getAsBoolean()) {
+          LOGGER.info("Finished waiting for {}", description);
           return;
         }
-        Thread.sleep(checkIntervalMs);
+        long remainingMs = endTime - System.currentTimeMillis();
+        if (remainingMs <= 0) {
+          break;
+        }
+        // Do not sleep past the deadline, so that the condition is checked once more at the deadline before timing out
+        Thread.sleep(Math.min(checkIntervalMs, remainingMs));
+      } catch (InterruptedException e) {
+        // Do not restore the interrupt flag, since the interrupt is preserved as the cause of the converted exception
+        throw new RuntimeException("Interrupted while waiting for " + description, e);
       } catch (Exception e) {
-        throw new RuntimeException("Caught exception while checking the condition", e);
+        throw new RuntimeException("Caught exception while waiting for " + description, e);
       }
     }
 
-    throw new RuntimeException("Timeout waiting for condition: " + condition);
+    throw new RuntimeException("Timed out after " + timeoutMs + "ms waiting for " + description);
   }
 }

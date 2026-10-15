@@ -442,6 +442,12 @@ public class LeafOperator extends MultiStageOperator implements ExplainableOpera
         case REMOTE_ACCESS_BYTES:
           _statMap.merge(StatKey.REMOTE_ACCESS_BYTES, Long.parseLong(entry.getValue()));
           break;
+        case NUM_DIRECT_REMOTE_ACCESSES:
+          _statMap.merge(StatKey.NUM_DIRECT_REMOTE_ACCESSES, Long.parseLong(entry.getValue()));
+          break;
+        case DIRECT_REMOTE_ACCESS_BYTES:
+          _statMap.merge(StatKey.DIRECT_REMOTE_ACCESS_BYTES, Long.parseLong(entry.getValue()));
+          break;
         case EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS:
           LOGGER.debug("Skipping empty filter segments: {}", entry.getValue());
           break;
@@ -808,7 +814,11 @@ public class LeafOperator extends MultiStageOperator implements ExplainableOpera
     /// Number of remote accesses (local cache misses) made to read segment data from a remote storage tier.
     NUM_REMOTE_ACCESSES(StatMap.Type.LONG),
     /// Number of bytes read by the remote accesses.
-    REMOTE_ACCESS_BYTES(StatMap.Type.LONG);
+    REMOTE_ACCESS_BYTES(StatMap.Type.LONG),
+    /// Number of remote accesses made directly, i.e. outside the buffers fetched for the query.
+    NUM_DIRECT_REMOTE_ACCESSES(StatMap.Type.LONG),
+    /// Number of bytes read by the direct remote accesses.
+    DIRECT_REMOTE_ACCESS_BYTES(StatMap.Type.LONG);
     // IMPORTANT: When adding new StatKeys, make sure to either create the same key in BrokerResponseNativeV2.StatKey or
     //  call the constructor that accepts a String as last argument and set it to null.
     //  Otherwise the constructor will fail with an IllegalArgumentException which will not be caught and will

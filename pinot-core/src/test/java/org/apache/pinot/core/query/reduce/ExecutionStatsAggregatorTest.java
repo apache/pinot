@@ -172,9 +172,13 @@ public class ExecutionStatsAggregatorTest {
     DataTable table1 = emptyServerTable();
     table1.getMetadata().put(MetadataKey.NUM_REMOTE_ACCESSES.getName(), "3");
     table1.getMetadata().put(MetadataKey.REMOTE_ACCESS_BYTES.getName(), "300");
+    table1.getMetadata().put(MetadataKey.NUM_DIRECT_REMOTE_ACCESSES.getName(), "1");
+    table1.getMetadata().put(MetadataKey.DIRECT_REMOTE_ACCESS_BYTES.getName(), "10");
     DataTable table2 = emptyServerTable();
     table2.getMetadata().put(MetadataKey.NUM_REMOTE_ACCESSES.getName(), "4");
     table2.getMetadata().put(MetadataKey.REMOTE_ACCESS_BYTES.getName(), "400");
+    table2.getMetadata().put(MetadataKey.NUM_DIRECT_REMOTE_ACCESSES.getName(), "2");
+    table2.getMetadata().put(MetadataKey.DIRECT_REMOTE_ACCESS_BYTES.getName(), "20");
     ExecutionStatsAggregator aggregator = new ExecutionStatsAggregator(false);
     aggregator.aggregate(SERVER, table1);
     aggregator.aggregate(SERVER, table2);
@@ -183,10 +187,14 @@ public class ExecutionStatsAggregatorTest {
     aggregator.setStats("testTable", response, mock(BrokerMetrics.class));
     assertEquals(response.getNumRemoteAccesses(), 7L);
     assertEquals(response.getRemoteAccessBytes(), 700L);
+    assertEquals(response.getNumDirectRemoteAccesses(), 3L);
+    assertEquals(response.getDirectRemoteAccessBytes(), 30L);
 
     DataTable merged = emptyServerTable();
     aggregator.setStatsOnMergedDataTable(merged);
     assertEquals(merged.getMetadata().get(MetadataKey.NUM_REMOTE_ACCESSES.getName()), "7");
     assertEquals(merged.getMetadata().get(MetadataKey.REMOTE_ACCESS_BYTES.getName()), "700");
+    assertEquals(merged.getMetadata().get(MetadataKey.NUM_DIRECT_REMOTE_ACCESSES.getName()), "3");
+    assertEquals(merged.getMetadata().get(MetadataKey.DIRECT_REMOTE_ACCESS_BYTES.getName()), "30");
   }
 }
