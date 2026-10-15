@@ -72,6 +72,7 @@ public class ParquetRecordReaderConfig implements RecordReaderConfig {
   public void setUseParquetNativeDirectReader(boolean useParquetNativeDirectReader) {
     _useParquetNativeDirectReader = useParquetNativeDirectReader;
   }
+
   public boolean useColumnMajorSegmentBuilder() {
     return _useColumnMajorSegmentBuilder;
   }
