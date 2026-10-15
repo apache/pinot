@@ -29,6 +29,7 @@ import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.CharArraySet;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
+import org.apache.lucene.document.NumericDocValuesField;
 import org.apache.lucene.document.StoredField;
 import org.apache.lucene.document.TextField;
 import org.apache.lucene.index.DirectoryReader;
@@ -36,6 +37,8 @@ import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.LogByteSizeMergePolicy;
+import org.apache.lucene.index.MultiDocValues;
+import org.apache.lucene.index.NumericDocValues;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
@@ -58,6 +61,7 @@ import org.slf4j.LoggerFactory;
 public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
   private static final Logger LOGGER = LoggerFactory.getLogger(LuceneTextIndexCreator.class);
   public static final String LUCENE_INDEX_DOC_ID_COLUMN_NAME = "DocID";
+  public static final String PINOT_DOC_ID_DOC_VALUES_FIELD_NAME = "PinotDocID";
 
   private final String _textColumn;
   private final boolean _commitOnClose;
@@ -264,21 +268,19 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
     try (PinotDataBuffer buffer = PinotDataBuffer.mapFile(docIdMappingFile, /* readOnly */ false, 0, length,
         ByteOrder.LITTLE_ENDIAN, desc)) {
       try {
-        // If immutableToMutableIdMap is null, then docIds should not change between the mutable and immutable segments.
-        // Therefore, the mapping file can be built without doing an additional docId conversion
-        if (mutableToImmutableDocIdMap == null) {
-          for (int i = 0; i < numDocs; i++) {
+        NumericDocValues docIds = MultiDocValues.getNumericValues(indexReader, PINOT_DOC_ID_DOC_VALUES_FIELD_NAME);
+        for (int i = 0; i < numDocs; i++) {
+          int pinotDocId;
+          if (docIds != null && docIds.advanceExact(i)) {
+            pinotDocId = Math.toIntExact(docIds.longValue());
+          } else {
+            // Older mutable indexes contain only the stored field. Mixed-version leaves can also lack doc values.
             Document document = indexSearcher.storedFields().document(i);
-            int pinotDocId = Integer.parseInt(document.get(LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME));
-            buffer.putInt(i * Integer.BYTES, pinotDocId);
+            pinotDocId = Integer.parseInt(document.get(LUCENE_INDEX_DOC_ID_COLUMN_NAME));
           }
-        } else {
-          for (int i = 0; i < numDocs; i++) {
-            Document document = indexSearcher.storedFields().document(i);
-            int mutableDocId = Integer.parseInt(document.get(LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME));
-            int immutableDocId = mutableToImmutableDocIdMap[mutableDocId];
-            buffer.putInt(i * Integer.BYTES, immutableDocId);
-          }
+          // Conversion can reorder Pinot rows independently of Lucene's own document order.
+          buffer.putInt(i * Integer.BYTES,
+              mutableToImmutableDocIdMap == null ? pinotDocId : mutableToImmutableDocIdMap[pinotDocId]);
         }
       } catch (Exception e) {
         throw new RuntimeException(
@@ -298,7 +300,7 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
     // text index on SV column
     Document docToIndex = new Document();
     docToIndex.add(new TextField(_textColumn, document, Field.Store.NO));
-    docToIndex.add(new StoredField(LUCENE_INDEX_DOC_ID_COLUMN_NAME, _nextDocId++));
+    addDocIdFields(docToIndex);
     try {
       _indexWriter.addDocument(docToIndex);
     } catch (Exception e) {
@@ -321,13 +323,23 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
     for (int i = 0; i < length; i++) {
       docToIndex.add(new TextField(_textColumn, documents[i], Field.Store.NO));
     }
-    docToIndex.add(new StoredField(LUCENE_INDEX_DOC_ID_COLUMN_NAME, _nextDocId++));
+    addDocIdFields(docToIndex);
 
     try {
       _indexWriter.addDocument(docToIndex);
     } catch (Exception e) {
       throw new RuntimeException(
           "Caught exception while adding a new document to the Lucene index for column: " + _textColumn, e);
+    }
+  }
+
+  private void addDocIdFields(Document document) {
+    int docId = _nextDocId++;
+    // Keep the stored field for older readers. Immutable indexes add doc values to avoid decompressing every stored
+    // document on segment load and retain the actual Pinot id when Lucene flushes or merges reorder documents.
+    document.add(new StoredField(LUCENE_INDEX_DOC_ID_COLUMN_NAME, docId));
+    if (_commitOnClose) {
+      document.add(new NumericDocValuesField(PINOT_DOC_ID_DOC_VALUES_FIELD_NAME, docId));
     }
   }
 
