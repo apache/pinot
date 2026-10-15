@@ -723,8 +723,11 @@ public abstract class BaseTableDataManager implements TableDataManager {
     SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
     if (segmentDataManager != null) {
       IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
-      if (onlyIfNeeded && !forceDownload && selectSegmentsNeedingReload(List.of(segmentDataManager),
-          indexLoadingConfig, reloadJobId).isEmpty()) {
+      if (onlyIfNeeded && !forceDownload && !checkReloadNeeded(segmentDataManager, indexLoadingConfig)) {
+        _logger.info("Skipping reload for segment: {} as it is already up to date", segmentName);
+        if (reloadJobId != null) {
+          _reloadJobStatusCache.recordSkipped(reloadJobId, List.of(segmentName));
+        }
         return;
       }
       reloadSegment(segmentDataManager, indexLoadingConfig, forceDownload);
@@ -1123,24 +1126,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
     for (int i = 0; i < segmentDataManagers.size(); i++) {
       int index = i;
       SegmentDataManager segmentDataManager = segmentDataManagers.get(i);
-      futures[i] = CompletableFuture.runAsync(() -> {
-        String segmentName = segmentDataManager.getSegmentName();
-        // Hold a reference so the segment cannot be destroyed while its directory is inspected. If it is already
-        // being destroyed it was replaced or offloaded concurrently; keep it so the regular reload path handles it.
-        if (!segmentDataManager.increaseReferenceCount()) {
-          needReload[index] = true;
-          return;
-        }
-        try {
-          needReload[index] = isReloadNeeded(segmentDataManager, indexLoadingConfig);
-        } catch (Exception e) {
-          _logger.warn("Caught exception while checking whether segment: {} needs reload, reloading it", segmentName,
-              e);
-          needReload[index] = true;
-        } finally {
-          releaseSegment(segmentDataManager);
-        }
-      }, _segmentReloadExecutor);
+      futures[i] = CompletableFuture.runAsync(
+          () -> needReload[index] = checkReloadNeeded(segmentDataManager, indexLoadingConfig), _segmentReloadExecutor);
     }
     CompletableFuture.allOf(futures).get();
 
@@ -1162,6 +1149,25 @@ public abstract class BaseTableDataManager implements TableDataManager {
       }
     }
     return segmentsToReload;
+  }
+
+  /// Runs [#isReloadNeeded] while holding a reference, so the segment cannot be destroyed while it is inspected.
+  /// Returns `true` (i.e. reload as usual) when the segment is already being destroyed, as it was replaced or offloaded
+  /// concurrently and the regular reload path handles that, or when the check fails, so an error never turns into a
+  /// silently skipped reload.
+  private boolean checkReloadNeeded(SegmentDataManager segmentDataManager, IndexLoadingConfig indexLoadingConfig) {
+    if (!segmentDataManager.increaseReferenceCount()) {
+      return true;
+    }
+    try {
+      return isReloadNeeded(segmentDataManager, indexLoadingConfig);
+    } catch (Exception e) {
+      _logger.warn("Caught exception while checking whether segment: {} needs reload, reloading it",
+          segmentDataManager.getSegmentName(), e);
+      return true;
+    } finally {
+      releaseSegment(segmentDataManager);
+    }
   }
 
   /// Returns whether reloading the segment would change what is loaded, i.e. whether the regular reload path would
