@@ -549,6 +549,8 @@ public class SegmentPushUtils implements Serializable {
       Map<String, File> segmentUriToMetadataFileMap, List<Header> headers, List<NameValuePair> parameters,
       int parallelism)
       throws Exception {
+    validateMetadataUris(segmentUriToMetadataFileMap.keySet());
+    validateMetadataControllers(spec);
     Map<String, File> segmentMetadataFileMap = new HashMap<>();
     List<String> segmentURIs = new ArrayList<>();
     for (Map.Entry<String, File> entry : segmentUriToMetadataFileMap.entrySet()) {
@@ -565,7 +567,6 @@ public class SegmentPushUtils implements Serializable {
       Map<String, File> segmentMetadataFileMap, List<Header> headers, List<NameValuePair> parameters, int parallelism)
       throws Exception {
     List<MetadataBatch> batches = partitionMetadataBatches(segmentURIs, segmentMetadataFileMap, parallelism);
-    validateMetadataControllers(spec);
     if (batches.isEmpty()) {
       return;
     }
@@ -601,7 +602,6 @@ public class SegmentPushUtils implements Serializable {
       String name = pairs.get(i);
       SegmentNameUtils.validatePartialOrFullSegmentName(name);
       String uri = pairs.get(i + 1);
-      validateMetadataUris(List.of(uri));
       Preconditions.checkArgument(urisByName.putIfAbsent(name, uri) == null,
           "Multiple metadata files for segment: %s", name);
       File metadata = metadataFiles.get(name);

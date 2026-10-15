@@ -84,6 +84,7 @@ import org.testng.annotations.Test;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -730,7 +731,7 @@ public class SegmentPushUtilsTest {
   }
 
   @Test(timeOut = 10000)
-  public void testParallelMetadataPushRejectsDuplicateNamesBeforeHttp()
+  public void testParallelMetadataPushRejectsInvalidInputBeforeHttp()
       throws Exception {
     AtomicInteger requests = new AtomicInteger();
     ExecutorService serverExecutor = Executors.newSingleThreadExecutor();
@@ -750,6 +751,23 @@ public class SegmentPushUtilsTest {
           "file:///second/segment.tar.gz", duplicate);
       assertThrows(IllegalArgumentException.class,
           () -> SegmentPushUtils.sendSegmentsUriAndMetadata(spec, metadataFiles, List.of(), List.of(), 2));
+
+      PinotFS fileSystem = mock(PinotFS.class);
+      Map<String, String> invalidUris = Map.of("file:///invalid uri/segment.tar.gz", "segment.tar.gz");
+      assertThrows(IllegalArgumentException.class,
+          () -> SegmentPushUtils.sendSegmentsUriAndMetadata(spec, fileSystem, invalidUris, List.of(), List.of()));
+      assertThrows(IllegalArgumentException.class,
+          () -> SegmentPushUtils.sendSegmentsUriAndMetadata(spec,
+              Map.of("file:///invalid uri/segment.tar.gz", metadata), List.of(), List.of()));
+
+      spec.getPinotClusterSpecs()[0].setControllerURI("file:///invalid-controller");
+      assertThrows(IllegalArgumentException.class,
+          () -> SegmentPushUtils.sendSegmentsUriAndMetadata(spec, fileSystem,
+              Map.of(TEST_SEGMENT_URI, "segment.tar.gz"), List.of(), List.of()));
+      assertThrows(IllegalArgumentException.class,
+          () -> SegmentPushUtils.sendSegmentsUriAndMetadata(spec, Map.of(TEST_SEGMENT_URI, metadata), List.of(),
+              List.of()));
+      verifyNoInteractions(fileSystem);
       assertEquals(requests.get(), 0);
       assertTrue(metadata.isFile());
       assertTrue(duplicate.isFile());
