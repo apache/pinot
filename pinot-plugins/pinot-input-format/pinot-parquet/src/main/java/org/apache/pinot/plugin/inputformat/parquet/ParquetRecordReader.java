@@ -23,6 +23,8 @@ import java.io.IOException;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.hadoop.fs.Path;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.ColumnReaderFactory;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
@@ -60,6 +62,13 @@ public class ParquetRecordReader implements RecordReader {
     _internalParquetRecordReader.init(parquetFile, fieldsToRead, recordReaderConfig);
   }
 
+  @Nullable
+  @Override
+  public ColumnReaderFactory tryCreateColumnReaderFactory(Schema targetSchema)
+      throws IOException {
+    return _internalParquetRecordReader.tryCreateColumnReaderFactory(targetSchema);
+  }
+
   @Override
   public boolean hasNext() {
     return _internalParquetRecordReader.hasNext();
@@ -75,6 +84,12 @@ public class ParquetRecordReader implements RecordReader {
   public void rewind()
       throws IOException {
     _internalParquetRecordReader.rewind();
+  }
+
+  @Override
+  public boolean rewind(@Nullable Set<String> fieldsToRead)
+      throws IOException {
+    return _internalParquetRecordReader.rewind(fieldsToRead);
   }
 
   @Override

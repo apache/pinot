@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.data.Schema;
 
 
 /// The `RecordReader` interface is used to read records from various file formats into [GenericRow]s.
@@ -51,6 +52,19 @@ public interface RecordReader extends Closeable, Serializable {
   /// @throws IOException If an I/O error occurs
   void init(File dataFile, @Nullable Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException;
+
+  /// Returns an independent, uninitialized column reader factory when explicitly enabled and supported, or null.
+  /// The factory must expose every physical target field as a non-null single value with the same raw logical value
+  /// this reader would return, before ingestion transformations. Unsupported schemas must return null without changing
+  /// this reader's position. I/O and corruption errors must propagate instead of being treated as unsupported input.
+  ///
+  /// The caller initializes the returned factory exactly once and owns its closure. The factory must not retain this
+  /// reader or its open input resources, so this reader can be closed before column reading starts.
+  @Nullable
+  default ColumnReaderFactory tryCreateColumnReaderFactory(Schema targetSchema)
+      throws IOException {
+    return null;
+  }
 
   /// Return `true` if more records remain to be read.
   ///
@@ -107,4 +121,12 @@ public interface RecordReader extends Closeable, Serializable {
   /// Rewind the reader to start reading from the first record again.
   void rewind()
       throws IOException;
+
+  /// Rewinds with a temporary restriction on the fields initialized by [#init(File, Set, RecordReaderConfig)].
+  /// A null or empty set imposes no additional restriction. A successful call starts at the first record; [#rewind()]
+  /// restores the original field selection. Returns false without changing reader state if projection is unsupported.
+  default boolean rewind(@Nullable Set<String> fieldsToRead)
+      throws IOException {
+    return false;
+  }
 }

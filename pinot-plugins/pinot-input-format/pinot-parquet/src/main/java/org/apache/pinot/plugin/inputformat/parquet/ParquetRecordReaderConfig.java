@@ -22,7 +22,7 @@ import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 
 
 /// Config for [ParquetRecordReader] (and the underlying [ParquetAvroRecordReader] / [ParquetNativeRecordReader]).
-/// Three settings, all default `false`:
+/// Settings all default to `false`:
 /// - `useParquetAvroRecordReader` — force the parquet-avro reader.
 /// - `useParquetNativeRecordReader` — force the native parquet reader. When neither flag is set, the dispatcher
 ///   auto-detects via the file's `avro.schema` metadata (Avro reader if present, native otherwise).
@@ -30,10 +30,16 @@ import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 ///   surfacing the raw underlying integer in the column's declared unit instead of the contract Java type.
 ///   DECIMAL and UUID always convert. See [ParquetAvroRecordExtractor] / [ParquetNativeRecordExtractor] for
 ///   the per-type matrix.
+/// - `useParquetNativeDirectReader` — when using the native reader, materialize supported schemas directly into
+///   Pinot rows, avoiding intermediate Parquet Group objects. Unsupported schemas retain the normal native reader.
+/// - `useColumnMajorSegmentBuilder` — offer independent column readers for supported required fields when the
+///   native direct reader is selected. The segment builder also checks its configuration before selecting them.
 public class ParquetRecordReaderConfig implements RecordReaderConfig {
   private boolean _useParquetAvroRecordReader;
   private boolean _useParquetNativeRecordReader;
   private boolean _extractRawTimeValues;
+  private boolean _useParquetNativeDirectReader;
+  private boolean _useColumnMajorSegmentBuilder;
 
   public boolean useParquetAvroRecordReader() {
     return _useParquetAvroRecordReader;
@@ -57,5 +63,20 @@ public class ParquetRecordReaderConfig implements RecordReaderConfig {
 
   public void setExtractRawTimeValues(boolean extractRawTimeValues) {
     _extractRawTimeValues = extractRawTimeValues;
+  }
+
+  public boolean useParquetNativeDirectReader() {
+    return _useParquetNativeDirectReader;
+  }
+
+  public void setUseParquetNativeDirectReader(boolean useParquetNativeDirectReader) {
+    _useParquetNativeDirectReader = useParquetNativeDirectReader;
+  }
+  public boolean useColumnMajorSegmentBuilder() {
+    return _useColumnMajorSegmentBuilder;
+  }
+
+  public void setUseColumnMajorSegmentBuilder(boolean useColumnMajorSegmentBuilder) {
+    _useColumnMajorSegmentBuilder = useColumnMajorSegmentBuilder;
   }
 }
