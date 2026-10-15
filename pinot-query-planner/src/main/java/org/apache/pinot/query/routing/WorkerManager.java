@@ -423,36 +423,84 @@ public class WorkerManager {
       assignWorkersToNonRootFragment(child, context, leafOnly, visitedFragmentIds);
     }
     Map<Integer, DispatchablePlanMetadata> metadataMap = context.getDispatchablePlanMetadataMap();
-    DispatchablePlanMetadata metadata = metadataMap.get(fragment.getFragmentId());
-    boolean isLeaf = isLeafPlan(metadata);
-    if (leafOnly != isLeaf) {
+    if (leafOnly != isAssignedInLeafPass(fragment, metadataMap)) {
       return;
     }
-    if (isLeaf) {
+    if (isLeafPlan(metadataMap.get(fragment.getFragmentId()))) {
       // TODO: Revisit this logic and see if we can generalize this
       // For LOOKUP join, join is leaf stage because there is no exchange added to the right side of the join. When we
       // find a single local exchange child in the leaf stage, assign workers based on the local exchange child.
       if (isLookupJoin(children)) {
-        DispatchablePlanMetadata childMetadata = metadataMap.get(children.get(0).getFragmentId());
-        Map<Integer, QueryServerInstance> workerIdToServerInstanceMap = assignWorkersForLocalExchange(childMetadata);
-        metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
-        metadata.setPartitionFunction(childMetadata.getPartitionFunction());
-        // The worker map comes from the child, so the worker ids stand for the same partition classes as the child's.
-        metadata.setPartitionClassIds(childMetadata.getPartitionClassIds());
-        // Fake a segments map so that the worker can be correctly identified as leaf stage
-        Map<String, List<String>> segmentsMap = Map.of(TableType.OFFLINE.name(), List.of());
-        Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap =
-            Maps.newHashMapWithExpectedSize(workerIdToServerInstanceMap.size());
-        for (Integer workerId : workerIdToServerInstanceMap.keySet()) {
-          workerIdToSegmentsMap.put(workerId, segmentsMap);
-        }
-        metadata.setWorkerIdToSegmentsMap(workerIdToSegmentsMap);
+        assignWorkersToLookupJoinFragment(fragment, context, leafOnly);
       } else {
         assignWorkersToLeafFragment(fragment, context);
       }
     } else {
       assignWorkersToIntermediateFragment(fragment, context);
     }
+  }
+
+  /// Returns whether the leaf pass assigns the workers of the given fragment. A lookup join fragment scans the
+  /// dimension table, so it is a leaf fragment. But it takes its workers from its input, so when the input is assigned
+  /// in the intermediate pass (e.g. an aggregation below the join), the lookup join fragment is assigned in that pass
+  /// too.
+  private static boolean isAssignedInLeafPass(PlanFragment fragment,
+      Map<Integer, DispatchablePlanMetadata> metadataMap) {
+    if (!isLeafPlan(metadataMap.get(fragment.getFragmentId()))) {
+      return false;
+    }
+    List<PlanFragment> children = fragment.getChildren();
+    return !isLookupJoin(children) || isAssignedInLeafPass(children.get(0), metadataMap);
+  }
+
+  /// Assigns the workers of a lookup join fragment from the workers of its input, and fakes an empty segments map so
+  /// that the workers are identified as leaf stage workers. The join probes the dimension table in memory, so it must
+  /// run on servers, which hold the dimension table. A leaf input runs on servers, so the join takes the same workers.
+  /// An intermediate input can run on instances that cannot scan segments (see
+  /// [#getCandidateServersForReplicatedLeaf]), so then the instances come from that hook.
+  ///
+  /// @param isInputLeaf whether the input of the join is assigned in the leaf pass
+  private void assignWorkersToLookupJoinFragment(PlanFragment fragment, DispatchablePlanContext context,
+      boolean isInputLeaf) {
+    Map<Integer, DispatchablePlanMetadata> metadataMap = context.getDispatchablePlanMetadataMap();
+    DispatchablePlanMetadata metadata = metadataMap.get(fragment.getFragmentId());
+    DispatchablePlanMetadata childMetadata = metadataMap.get(fragment.getChildren().get(0).getFragmentId());
+    Map<Integer, QueryServerInstance> workerIdToServerInstanceMap = assignWorkersForLocalExchange(childMetadata);
+    boolean inheritPartitioning = true;
+    if (!isInputLeaf) {
+      int numInputWorkers = workerIdToServerInstanceMap.size();
+      List<QueryServerInstance> inputWorkers = new ArrayList<>(numInputWorkers);
+      for (int workerId = 0; workerId < numInputWorkers; workerId++) {
+        inputWorkers.add(workerIdToServerInstanceMap.get(workerId));
+      }
+      List<QueryServerInstance> workers = getCandidateServersForReplicatedLeaf(context, inputWorkers);
+      if (!workers.equals(inputWorkers)) {
+        // The workers differ from the input's, so the exchange redistributes the rows and the worker ids no longer
+        // stand for the input's partition classes.
+        workerIdToServerInstanceMap = Maps.newHashMapWithExpectedSize(workers.size());
+        for (int workerId = 0; workerId < workers.size(); workerId++) {
+          workerIdToServerInstanceMap.put(workerId, workers.get(workerId));
+        }
+        inheritPartitioning = false;
+      }
+    }
+    metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
+    if (inheritPartitioning) {
+      metadata.setPartitionFunction(childMetadata.getPartitionFunction());
+      // The worker map comes from the child, so the worker ids stand for the same partition classes as the child's.
+      metadata.setPartitionClassIds(childMetadata.getPartitionClassIds());
+    } else {
+      metadata.setPartitionFunction(DEFAULT_SHUFFLE_PARTITION_FUNCTION);
+    }
+    // Fake a segments map so that the worker can be correctly identified as leaf stage. The OFFLINE key with no
+    // segments is only a placeholder: the join reads the dimension table from memory, not from segments.
+    Map<String, List<String>> segmentsMap = Map.of(TableType.OFFLINE.name(), List.of());
+    Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap =
+        Maps.newHashMapWithExpectedSize(workerIdToServerInstanceMap.size());
+    for (Integer workerId : workerIdToServerInstanceMap.keySet()) {
+      workerIdToSegmentsMap.put(workerId, segmentsMap);
+    }
+    metadata.setWorkerIdToSegmentsMap(workerIdToSegmentsMap);
   }
 
   static boolean isLookupJoin(List<PlanFragment> children) {
@@ -807,7 +855,10 @@ public class WorkerManager {
   }
 
   /// Returns the instances to assign to replicated leaf stage children when there is no local exchange peer. By
-  /// default, uses the same candidates as the intermediate stage.
+  /// default, uses the same candidates as the intermediate stage. Also returns the instances to assign to a lookup join
+  /// stage over an intermediate input, which are by default the workers of that input. Return that list unchanged, in
+  /// the same order, to keep the exchange local and the input's partitioning. Any other list makes the exchange
+  /// redistribute the rows.
   ///
   /// Subclasses can override to use different instances for replicated leaf stages (e.g., when intermediate stages
   /// run on non-server instances that cannot scan segments).
