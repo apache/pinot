@@ -39,6 +39,7 @@ import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.LogByteSizeMergePolicy;
 import org.apache.lucene.index.MultiDocValues;
 import org.apache.lucene.index.NumericDocValues;
+import org.apache.lucene.index.StoredFields;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
@@ -241,7 +242,7 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
         indexWriter.commit();
         buildMappingFile(segmentIndexDir, _textColumn, destDirectory, mutableToImmutableDocIdMap);
       } catch (Exception e) {
-        throw new RuntimeException("Failed to build the mapping file during segment conversion: " + e);
+        throw new RuntimeException("Failed to build the mapping file during segment conversion", e);
       }
     } catch (IOException e) {
       throw new RuntimeException("Failed to convert the mutable lucene index: " + e);
@@ -269,14 +270,21 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
         ByteOrder.LITTLE_ENDIAN, desc)) {
       try {
         NumericDocValues docIds = MultiDocValues.getNumericValues(indexReader, PINOT_DOC_ID_DOC_VALUES_FIELD_NAME);
+        StoredFields storedFields = null;
         for (int i = 0; i < numDocs; i++) {
           int pinotDocId;
           if (docIds != null && docIds.advanceExact(i)) {
             pinotDocId = Math.toIntExact(docIds.longValue());
           } else {
             // Older mutable indexes contain only the stored field. Mixed-version leaves can also lack doc values.
-            Document document = indexSearcher.storedFields().document(i);
-            pinotDocId = Integer.parseInt(document.get(LUCENE_INDEX_DOC_ID_COLUMN_NAME));
+            if (storedFields == null) {
+              storedFields = indexSearcher.storedFields();
+            }
+            String storedDocId = storedFields.document(i).get(LUCENE_INDEX_DOC_ID_COLUMN_NAME);
+            if (storedDocId == null) {
+              throw new IOException("Missing Pinot document id for Lucene document: " + i);
+            }
+            pinotDocId = Integer.parseInt(storedDocId);
           }
           // Conversion can reorder Pinot rows independently of Lucene's own document order.
           buffer.putInt(i * Integer.BYTES,
