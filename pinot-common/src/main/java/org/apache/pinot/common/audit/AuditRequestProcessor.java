@@ -47,8 +47,9 @@ import org.slf4j.LoggerFactory;
 ///
 /// Everything captured from the caller - query parameters, allow-listed headers and the request
 /// body - passes through [AuditRedactor] before it reaches the [AuditEvent], so that credentials
-/// sent to an audited endpoint are not written to the audit log. That step is unconditional and
-/// has no corresponding configuration key.
+/// sent to an audited endpoint are masked rather than written to the audit log. That step is
+/// unconditional and has no corresponding configuration key. It matches on key names, so it is a
+/// strong default rather than a guarantee - see the residual gap noted on [AuditRedactor].
 @Singleton
 public class AuditRequestProcessor {
 
