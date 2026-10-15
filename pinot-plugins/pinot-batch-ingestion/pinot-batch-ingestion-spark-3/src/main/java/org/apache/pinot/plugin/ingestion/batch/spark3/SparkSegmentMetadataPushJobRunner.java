@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.plugin.ingestion.batch.spark3;
 
-import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
@@ -107,6 +106,7 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
 
     // Collect files to process
     List<String> segmentsToPush = getSegmentsToPush(outputDirFS, outputDirURI);
+    SegmentPushUtils.validateUniqueSegmentNames(segmentsToPush);
 
     // Ensure tableConfigURI is set if missing
     setupTableConfigURI();
@@ -239,7 +239,7 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
 
   private List<String> getSegmentsToPush(PinotFS outputDirFS, URI outputDirURI) {
     String[] files = listFiles(outputDirFS, outputDirURI);
-    return Arrays.stream(files).filter(file -> file.endsWith(Constants.TAR_GZ_FILE_EXT)).collect(Collectors.toList());
+    return Arrays.stream(files).filter(file -> Constants.isSegmentTarFile(file)).collect(Collectors.toList());
   }
 
   private void setupFileSystems() {
@@ -306,13 +306,10 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
   ///                                tarPaths (values), or both may be used depending on upload mode.
   public List<String> getSegmentsToReplace(Map<String, String> segmentsUriToTarPathMap) {
     Collection<String> tarFilePaths = segmentsUriToTarPathMap.values();
+    SegmentPushUtils.validateUniqueSegmentNames(tarFilePaths);
     List<String> segmentNames = new ArrayList<>(tarFilePaths.size());
     for (String tarFilePath : tarFilePaths) {
-      File tarFile = new File(tarFilePath);
-      String fileName = tarFile.getName();
-      Preconditions.checkArgument(fileName.endsWith(Constants.TAR_GZ_FILE_EXT));
-      String segmentName = fileName.substring(0, fileName.length() - Constants.TAR_GZ_FILE_EXT.length());
-      segmentNames.add(segmentName);
+      segmentNames.add(SegmentPushUtils.getSegmentNameFromTarFile(tarFilePath));
     }
     return segmentNames;
   }
