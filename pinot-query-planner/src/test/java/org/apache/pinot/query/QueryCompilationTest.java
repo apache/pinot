@@ -1785,11 +1785,32 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     assertEquals(generateArrayElementType("CAST(0 AS FLOAT), CAST(1 AS FLOAT), CAST(0.5 AS FLOAT)"),
         SqlTypeName.REAL);
     assertEquals(generateArrayElementType("0, 1, 0.5"), SqlTypeName.DOUBLE);
+    // The plan converts these decimals to INT, LONG and DOUBLE, so execution picks those element types.
+    assertEquals(generateArrayElementType("CAST(0 AS DECIMAL(10, 0)), 4"), SqlTypeName.INTEGER);
+    assertEquals(generateArrayElementType("CAST(0 AS DECIMAL(12, 0)), 4"), SqlTypeName.BIGINT);
+    assertEquals(generateArrayElementType("CAST(0 AS DECIMAL(5, 2)), 4"), SqlTypeName.DOUBLE);
+  }
+
+  /// The function returns null when an argument is null. If the inferred type did not allow null, Calcite would drop
+  /// the fallback of a `COALESCE` that follows the call.
+  @Test
+  public void testGenerateArrayTypeAllowsNullWhenAnArgumentDoes() {
+    assertTrue(generateArrayType("CAST(NULL AS INTEGER), 4").isNullable());
+    assertFalse(generateArrayType("0, 4").isNullable());
+    String explain = _queryEnvironment.explainQuery("EXPLAIN PLAN FOR SELECT g.x FROM "
+        + "UNNEST(COALESCE(generateArray(CAST(NULL AS INTEGER), 4), ARRAY[7])) AS g(x)",
+        RANDOM_REQUEST_ID_GEN.nextLong());
+    assertTrue(explain.contains("ARRAY(7)"), "expected the COALESCE fallback, got:\n" + explain);
   }
 
   private SqlTypeName generateArrayElementType(String arguments) {
     String query = "SELECT grid.ts FROM UNNEST(generateArray(" + arguments + ")) AS grid(ts)";
     return _queryEnvironment.compile(query).getRelRoot().validatedRowType.getFieldList().get(0).getType()
         .getSqlTypeName();
+  }
+
+  private RelDataType generateArrayType(String arguments) {
+    String query = "SELECT generateArray(" + arguments + ") AS grid FROM a";
+    return _queryEnvironment.compile(query).getRelRoot().validatedRowType.getFieldList().get(0).getType();
   }
 }

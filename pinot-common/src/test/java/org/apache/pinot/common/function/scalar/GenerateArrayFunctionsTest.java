@@ -111,6 +111,19 @@ public class GenerateArrayFunctionsTest {
   }
 
   @Test
+  public void testInfiniteIncrementRejected() {
+    // The first element is start + 0 * inc, which is NaN for an infinite increment.
+    assertThrows(IllegalArgumentException.class,
+        () -> ArrayFunctions.generateDoubleArray(0, 1, Double.POSITIVE_INFINITY));
+    assertThrows(IllegalArgumentException.class,
+        () -> ArrayFunctions.generateDoubleArray(1, 0, Double.NEGATIVE_INFINITY));
+    assertThrows(IllegalArgumentException.class,
+        () -> ArrayFunctions.generateFloatArray(0f, 1f, Float.POSITIVE_INFINITY));
+    assertThrows(IllegalArgumentException.class,
+        () -> ArrayFunctions.generateFloatArray(1f, 0f, Float.NEGATIVE_INFINITY));
+  }
+
+  @Test
   public void testIntAndFloatSequences() {
     assertEquals(ArrayFunctions.generateIntArray(0, 10, 5), new int[]{0, 5, 10});
     assertEquals(ArrayFunctions.generateFloatArray(0f, 1f, 0.5f), new float[]{0f, 0.5f, 1f});

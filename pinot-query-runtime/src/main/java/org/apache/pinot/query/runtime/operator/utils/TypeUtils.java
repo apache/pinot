@@ -23,6 +23,7 @@ import it.unimi.dsi.fastutil.floats.FloatArrayList;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import java.lang.reflect.Array;
 import java.math.BigDecimal;
 import org.apache.pinot.common.utils.ArrayListUtils;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -59,12 +60,18 @@ public class TypeUtils {
           // For ArrayAggregationFunction
           return ArrayListUtils.toIntArray((IntArrayList) value);
         }
+        if (isOtherNumericArray(value, int[].class)) {
+          return convertNumericArray(value, storedType);
+        }
         assert value instanceof int[];
         return value;
       case LONG_ARRAY:
         if (value instanceof LongArrayList) {
           // For FunnelCountAggregationFunction and ArrayAggregationFunction
           return ArrayListUtils.toLongArray((LongArrayList) value);
+        }
+        if (isOtherNumericArray(value, long[].class)) {
+          return convertNumericArray(value, storedType);
         }
         assert value instanceof long[];
         return value;
@@ -82,6 +89,9 @@ public class TypeUtils {
             floatArray[i] = (float) doubleArray[i];
           }
           return floatArray;
+        }
+        if (isOtherNumericArray(value, float[].class)) {
+          return convertNumericArray(value, storedType);
         }
         assert value instanceof float[];
         return value;
@@ -111,6 +121,9 @@ public class TypeUtils {
           }
           return doubleArray;
         }
+        if (isOtherNumericArray(value, double[].class)) {
+          return convertNumericArray(value, storedType);
+        }
         assert value instanceof double[];
         return value;
       case BIG_DECIMAL_ARRAY:
@@ -137,6 +150,47 @@ public class TypeUtils {
       // TODO: Add more conversions
       default:
         return value;
+    }
+  }
+
+  /// Returns whether the value is a primitive numeric array with an element type other than the expected one.
+  private static boolean isOtherNumericArray(Object value, Class<?> expectedClass) {
+    return value.getClass() != expectedClass && (value instanceof int[] || value instanceof long[]
+        || value instanceof float[] || value instanceof double[]);
+  }
+
+  /// Converts the elements of a primitive numeric array the way [#convert] converts a single value. The single-stage
+  /// engine can compute another element type than the one the multi-stage planner inferred. For example, its `plus`
+  /// returns DOUBLE, so `generateArray(intCol, intCol + 1)` generates a `double[]` where the plan has an INT_ARRAY.
+  private static Object convertNumericArray(Object value, ColumnDataType storedType) {
+    int length = Array.getLength(value);
+    switch (storedType) {
+      case INT_ARRAY:
+        int[] intArray = new int[length];
+        for (int i = 0; i < length; i++) {
+          intArray[i] = ((Number) Array.get(value, i)).intValue();
+        }
+        return intArray;
+      case LONG_ARRAY:
+        long[] longArray = new long[length];
+        for (int i = 0; i < length; i++) {
+          longArray[i] = ((Number) Array.get(value, i)).longValue();
+        }
+        return longArray;
+      case FLOAT_ARRAY:
+        float[] floatArray = new float[length];
+        for (int i = 0; i < length; i++) {
+          floatArray[i] = ((Number) Array.get(value, i)).floatValue();
+        }
+        return floatArray;
+      case DOUBLE_ARRAY:
+        double[] doubleArray = new double[length];
+        for (int i = 0; i < length; i++) {
+          doubleArray[i] = ((Number) Array.get(value, i)).doubleValue();
+        }
+        return doubleArray;
+      default:
+        throw new IllegalStateException("Not a numeric array type: " + storedType);
     }
   }
 

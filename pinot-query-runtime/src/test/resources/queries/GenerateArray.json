@@ -208,50 +208,64 @@
         ],
         "ignoreLiteMode": true,
         "ignoreV2Optimizer": true
-      }
-    ]
-  },
-  "generate_array_unusable_arguments": {
-    "tables": {
-      "sparse": {
-        "schema": [
-          {
-            "name": "eventTs",
-            "type": "LONG"
-          },
-          {
-            "name": "series",
-            "type": "STRING"
-          },
-          {
-            "name": "val",
-            "type": "INT"
-          }
-        ],
-        "inputs": [
+      },
+      {
+        "description": "column arguments generate one array per row in the leaf stage",
+        "sql": "SELECT val, generateArray(val, val + 2) FROM {sparse} WHERE series = 'a' ORDER BY val",
+        "keepOutputRowOrder": true,
+        "outputs": [
           [
-            0,
-            "a",
-            10
+            10,
+            [
+              10,
+              11,
+              12
+            ]
           ],
           [
-            3,
-            "a",
-            40
-          ],
-          [
-            0,
-            "b",
-            100
+            40,
+            [
+              40,
+              41,
+              42
+            ]
           ]
-        ]
-      }
-    },
-    "queries": [
+        ],
+        "ignoreLiteMode": true,
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "a scale zero DECIMAL argument generates the INT sequence the plan converts it to",
+        "sql": "SELECT generateArray(CAST(0 AS DECIMAL(10, 0)), 2) FROM {sparse} WHERE series = 'b'",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          [
+            [
+              0,
+              1,
+              2
+            ]
+          ]
+        ],
+        "ignoreLiteMode": true,
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "a null argument yields null, so COALESCE keeps its fallback",
+        "sql": "SELECT g.x FROM UNNEST(COALESCE(generateArray(CAST(NULL AS INTEGER), 4), ARRAY[7])) AS g(x)",
+        "outputs": [
+          [
+            7
+          ]
+        ],
+        "ignoreLiteMode": true,
+        "ignoreV2Optimizer": true
+      },
       {
         "description": "a zero increment is rejected instead of dividing by zero",
         "sql": "SELECT grid.bucket FROM {sparse} CROSS JOIN UNNEST(generateArray(0, 4, 0)) AS grid(bucket)",
         "expectedException": ".*Increment must not be zero.*",
+        "outputs": [],
         "ignoreLiteMode": true,
         "ignoreV2Optimizer": true
       },
@@ -259,6 +273,7 @@
         "description": "a sequence too long to materialize is rejected",
         "sql": "SELECT grid.bucket FROM {sparse} CROSS JOIN UNNEST(generateArray(0, 1000000)) AS grid(bucket)",
         "expectedException": ".*exceeds the maximum of 100000.*",
+        "outputs": [],
         "ignoreLiteMode": true,
         "ignoreV2Optimizer": true
       }

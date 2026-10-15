@@ -73,6 +73,32 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
   }
 
   @Test
+  public void testGenerateArrayOnColumnsTransformFunction() {
+    // GenerateArrayTransformFunction takes only literals, so a call on columns must use the scalar function.
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("generateArray(%s, %s, 1)", INT_SV_COLUMN, INT_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.INT);
+    int[][] expectedIntValues = new int[NUM_ROWS][];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedIntValues[i] = new int[]{_intSVValues[i]};
+    }
+    testTransformFunctionMV(transformFunction, expectedIntValues);
+
+    expression =
+        RequestContextUtils.getExpression(String.format("generateArray(%s, %s)", LONG_SV_COLUMN, LONG_SV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.LONG);
+    long[][] expectedLongValues = new long[NUM_ROWS][];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedLongValues[i] = new long[]{_longSVValues[i]};
+    }
+    testTransformFunctionMV(transformFunction, expectedLongValues);
+  }
+
+  @Test
   public void testStringUpperTransformFunction() {
     ExpressionContext expression =
         RequestContextUtils.getExpression(String.format("UPPER(%s)", STRING_ALPHANUM_SV_COLUMN));

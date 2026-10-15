@@ -28,7 +28,6 @@ import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.sql.SqlOperatorBinding;
 import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.SqlTypeFamily;
-import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.PinotScalarFunction;
 import org.apache.pinot.common.function.scalar.ArrayFunctions;
@@ -57,8 +56,6 @@ public class GenerateArrayScalarFunction implements PinotScalarFunction {
   /// single fractional or wide argument decides the whole sequence.
   private static final List<ColumnDataType> ELEMENT_TYPES =
       List.of(ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.FLOAT, ColumnDataType.DOUBLE);
-  private static final List<SqlTypeName> ELEMENT_TYPE_NAMES =
-      List.of(SqlTypeName.INTEGER, SqlTypeName.BIGINT, SqlTypeName.REAL, SqlTypeName.DOUBLE);
 
   /// Element type to the [ArrayFunctions] method generating it, by argument count.
   private static final Map<ColumnDataType, Map<Integer, FunctionInfo>> FUNCTION_INFO_MAP =
@@ -140,12 +137,53 @@ public class GenerateArrayScalarFunction implements PinotScalarFunction {
   }
 
   private static RelDataType inferReturnType(SqlOperatorBinding binding) {
-    int width = 0;
-    for (RelDataType operandType : binding.collectOperandTypes()) {
-      width = Math.max(width, width(operandType.getSqlTypeName()));
+    List<RelDataType> operandTypes = binding.collectOperandTypes();
+    ColumnDataType[] argumentTypes = new ColumnDataType[operandTypes.size()];
+    boolean nullable = false;
+    for (int i = 0; i < argumentTypes.length; i++) {
+      RelDataType operandType = operandTypes.get(i);
+      argumentTypes[i] = toArgumentType(operandType);
+      nullable |= operandType.isNullable();
     }
+    ColumnDataType elementType = getElementType(argumentTypes);
+    assert elementType != null : "The operand type checker accepts only numeric operands";
     RelDataTypeFactory typeFactory = binding.getTypeFactory();
-    return typeFactory.createArrayType(typeFactory.createSqlType(ELEMENT_TYPE_NAMES.get(width)), -1);
+    RelDataType arrayType = typeFactory.createArrayType(elementType.toType(typeFactory), -1);
+    // The function returns null when any argument is null. Calcite must know it, or it can drop the fallbacks of a
+    // COALESCE that follow this call.
+    return typeFactory.createTypeWithNullability(arrayType, nullable);
+  }
+
+  /// The type an operand of this type has at execution time. It must match the numeric cases of
+  /// `RelToPlanNodeConverter.convertToColumnDataType`, which converts the operands for execution, so that the
+  /// planner infers the same element type that [#getFunctionInfo(ColumnDataType[])] picks at execution time. That
+  /// converter is in `pinot-query-planner`, which this module cannot depend on.
+  private static ColumnDataType toArgumentType(RelDataType operandType) {
+    switch (operandType.getSqlTypeName()) {
+      case TINYINT:
+      case SMALLINT:
+      case INTEGER:
+      case UTINYINT:
+      case USMALLINT:
+        return ColumnDataType.INT;
+      case BIGINT:
+      case UINTEGER:
+        return ColumnDataType.LONG;
+      case DECIMAL:
+        if (operandType.getScale() == 0 && operandType.getPrecision() <= 10) {
+          return ColumnDataType.INT;
+        }
+        if (operandType.getScale() == 0 && operandType.getPrecision() <= 38) {
+          return ColumnDataType.LONG;
+        }
+        return ColumnDataType.DOUBLE;
+      case REAL:
+      case FLOAT:
+        return ColumnDataType.FLOAT;
+      default:
+        // DOUBLE. The converter rejects UBIGINT, so its element type does not matter.
+        return ColumnDataType.DOUBLE;
+    }
   }
 
   /// Index into [#ELEMENT_TYPES] of the narrowest sequence this argument type can be generated as, or `-1` if no
@@ -163,25 +201,6 @@ public class GenerateArrayScalarFunction implements PinotScalarFunction {
         return 3;
       default:
         return -1;
-    }
-  }
-
-  /// Index into [#ELEMENT_TYPE_NAMES], the planning side counterpart of [#width(ColumnDataType)]. The operand type
-  /// checker has already rejected non numeric arguments, so everything else is an approximate or decimal type.
-  private static int width(SqlTypeName typeName) {
-    switch (typeName) {
-      case TINYINT:
-      case SMALLINT:
-      case INTEGER:
-        return 0;
-      case BIGINT:
-        return 1;
-      case REAL:
-      case FLOAT:
-        // Pinot reads both as its 4 byte FLOAT type.
-        return 2;
-      default:
-        return 3;
     }
   }
 }

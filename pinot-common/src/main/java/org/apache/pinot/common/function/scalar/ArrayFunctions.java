@@ -472,7 +472,9 @@ public class ArrayFunctions {
   }
 
   private static void checkFloatingPointArguments(double start, double end, double inc) {
-    Preconditions.checkArgument(inc != 0 && !Double.isNaN(inc), "Increment must not be zero or NaN, got: %s", inc);
+    // An infinite increment would turn the first element, start + 0 * inc, into NaN.
+    Preconditions.checkArgument(inc != 0 && Double.isFinite(inc), "Increment must be finite and not zero, got: %s",
+        inc);
     Preconditions.checkArgument(Double.isFinite(start) && Double.isFinite(end),
         "Range from %s to %s must be finite", start, end);
     checkIncrementLeadsToEnd((int) Math.signum(end - start), (int) Math.signum(inc), start, end, inc);
