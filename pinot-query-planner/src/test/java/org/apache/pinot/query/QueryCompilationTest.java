@@ -47,6 +47,11 @@ import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Ignore;
 import org.testng.annotations.Test;
@@ -1687,6 +1692,35 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
       }
     }
     return false;
+  }
+
+  @Test
+  public void testCompilesInSubquery() {
+    // The broker runs the subquery before it compiles the query, but the paths that only compile queries accept
+    // IN_SUBQUERY too. They see the tables outside the subquery only.
+    try (QueryEnvironment.CompiledQuery compiledQuery = _queryEnvironment.compile(
+        "SELECT COUNT(*) FROM a WHERE IN_SUBQUERY(col1, 'SELECT IDSET(col1) FROM b') = 1")) {
+      assertEquals(compiledQuery.getTableNames(), Set.of("a"));
+    }
+    assertTrue(_queryEnvironment.canCompileQuery(
+        "SELECT inSubquery(col3, 'SELECT IDSET(col3) FROM b') FROM a WHERE INSUBQUERY(col2, 'SELECT 1') = 0"));
+  }
+
+  @Test
+  public void testValidate() {
+    _queryEnvironment.validate(CalciteSqlParser.compileToSqlNodeAndOptions("SELECT col1 FROM a WHERE col3 > 1"));
+
+    // A correlated subquery does not validate on its own
+    expectThrows(QueryException.class, () -> _queryEnvironment.validate(
+        CalciteSqlParser.compileToSqlNodeAndOptions("SELECT IDSET(b.col1) FROM b WHERE b.col2 = a.col2")));
+
+    // An invalid option fails before the validation starts, but is reported the same way
+    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions("SELECT col1 FROM a");
+    sqlNodeAndOptions.getOptions().put(QueryOptionKey.INFER_PARTITION_HINT, "foo");
+    QueryException exception =
+        expectThrows(QueryException.class, () -> _queryEnvironment.validate(sqlNodeAndOptions));
+    assertEquals(exception.getErrorCode(), QueryErrorCode.QUERY_VALIDATION);
+    assertTrue(exception.getMessage().contains(QueryOptionKey.INFER_PARTITION_HINT), exception.getMessage());
   }
 
   @DataProvider(name = "testQueryExceptionDataProvider")

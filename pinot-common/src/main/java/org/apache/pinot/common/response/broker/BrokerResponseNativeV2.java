@@ -124,7 +124,7 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   @Override
   public boolean isPartialResult() {
     return getExceptionsSize() > 0 || isNumGroupsLimitReached() || !getEarlyTerminationReasons().isEmpty()
-        || isMaxRowsInJoinReached() || isMseLiteLeafStageLimitReached();
+        || isMaxRowsInJoinReached() || isMaxRowsInWindowReached() || isMseLiteLeafStageLimitReached();
   }
 
   @Override
