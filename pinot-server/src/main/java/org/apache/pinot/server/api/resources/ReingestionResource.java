@@ -40,10 +40,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
-import javax.annotation.Nullable;
 import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -66,6 +63,7 @@ import org.apache.pinot.segment.local.realtime.writer.StatelessRealtimeSegmentWr
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.server.starter.ServerInstance;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -93,14 +91,11 @@ public class ReingestionResource {
   static final int MAX_PARALLEL_REINGESTIONS = Math.max(Runtime.getRuntime().availableProcessors() / 2, 1);
   public static final long CHECK_INTERVAL_MS = Duration.ofSeconds(5).toMillis();
 
-  // Tracks if a particular segment is currently being re-ingested
-  private final ConcurrentHashMap<String, AtomicBoolean> _reingestingSegments = new ConcurrentHashMap<>();
-
   // Executor for asynchronous re-ingestion
   private final ExecutorService _reingestionExecutor = Executors.newFixedThreadPool(MAX_PARALLEL_REINGESTIONS,
       new ThreadFactoryBuilder().setNameFormat("reingestion-worker-%d").setDaemon(true).build());
 
-  // Keep track of jobs by jobId => job info
+  // Tracks queued and running jobs by segment name, also preventing duplicate repairs
   private final ConcurrentHashMap<String, ReingestionJob> _runningJobs = new ConcurrentHashMap<>();
 
   @Inject
@@ -142,7 +137,6 @@ public class ReingestionResource {
   @ApiOperation("Get all running re-ingestion jobs, including the ones waiting for a re-ingestion thread, along with "
       + "job IDs")
   public Response getAllRunningReingestionJobs() {
-    // Filter only the jobs still marked as running, including the ones waiting for a re-ingestion thread
     List<ReingestionJob> runningJobs = new ArrayList<>(_runningJobs.values());
     return Response.ok(runningJobs).build();
   }
@@ -198,42 +192,31 @@ public class ReingestionResource {
           Response.Status.INTERNAL_SERVER_ERROR);
     }
 
-    IndexLoadingConfig indexLoadingConfig = tableDataManager.fetchIndexLoadingConfig();
-
-    // Check if this segment is already being re-ingested
-    AtomicBoolean isIngesting = _reingestingSegments.computeIfAbsent(segmentName, k -> new AtomicBoolean(false));
-    if (!isIngesting.compareAndSet(false, true)) {
+    String jobId = UUID.randomUUID().toString();
+    ReingestionJob job = new ReingestionJob(jobId, segmentName);
+    // Track the job before submitting it, so queued jobs are listed and duplicate requests are rejected
+    if (_runningJobs.putIfAbsent(segmentName, job) != null) {
       return Response.status(Response.Status.CONFLICT)
           .entity("Re-ingestion for segment: " + segmentName + " is already in progress.")
           .build();
     }
 
-    // Generate a jobId for tracking
-    String jobId = UUID.randomUUID().toString();
-    ReingestionJob job = new ReingestionJob(jobId, segmentName);
-
-    // Track the job before submitting it, so that it is listed while waiting for a re-ingestion thread
-    _runningJobs.put(jobId, job);
-
     // Kick off the actual work asynchronously
     try {
       _reingestionExecutor.submit(() -> {
         try {
-          doReingestSegment(realtimeTableName, segmentZKMetadata, indexLoadingConfig,
-              tableDataManager.getSegmentBuildSemaphore());
+          doReingestSegment(realtimeTableName, segmentName);
         } catch (Exception e) {
           LOGGER.error("Error during async re-ingestion for job {} (segment={})", jobId, segmentName, e);
           _serverInstance.getServerMetrics()
               .addMeteredTableValue(realtimeTableName, ServerMeter.SEGMENT_REINGESTION_FAILURE, 1);
         } finally {
-          _runningJobs.remove(jobId);
-          _reingestingSegments.remove(segmentName);
+          _runningJobs.remove(segmentName, job);
         }
       });
     } catch (RejectedExecutionException e) {
       // The executor is shut down when the admin API stops
-      _runningJobs.remove(jobId);
-      _reingestingSegments.remove(segmentName);
+      _runningJobs.remove(segmentName, job);
       throw new WebApplicationException("Server is shutting down, cannot re-ingest segment: " + segmentName,
           Response.Status.SERVICE_UNAVAILABLE);
     }
@@ -249,14 +232,25 @@ public class ReingestionResource {
     LOGGER.info("Stopped re-ingestion executor, dropped {} jobs waiting for a re-ingestion thread", numDroppedJobs);
   }
 
-  /// The actual re-ingestion logic, moved into a separate method for clarity.
-  /// This is essentially the old synchronous logic you had in reingestSegment.
-  private void doReingestSegment(String realtimeTableName, SegmentZKMetadata segmentZKMetadata,
-      IndexLoadingConfig indexLoadingConfig, @Nullable Semaphore segmentBuildSemaphore)
+  private void doReingestSegment(String realtimeTableName, String segmentName)
       throws Exception {
-    String segmentName = segmentZKMetadata.getSegmentName();
+    // The table or segment may have been removed or repaired on another replica while this job was queued.
+    RealtimeTableDataManager tableDataManager =
+        (RealtimeTableDataManager) _serverInstance.getInstanceDataManager().getTableDataManager(realtimeTableName);
+    if (tableDataManager == null || tableDataManager.isShutDown()) {
+      LOGGER.info("Skipping re-ingestion of segment: {} because table: {} is no longer available", segmentName,
+          realtimeTableName);
+      return;
+    }
+    SegmentZKMetadata segmentZKMetadata = tableDataManager.fetchZKMetadataNullable(segmentName);
+    if (segmentZKMetadata == null || segmentZKMetadata.getStatus() != Status.COMMITTING
+        || segmentZKMetadata.getDownloadUrl() != null) {
+      LOGGER.info("Skipping re-ingestion of segment: {} because it was deleted or no longer needs repair", segmentName);
+      return;
+    }
+    IndexLoadingConfig indexLoadingConfig = tableDataManager.fetchIndexLoadingConfig();
     try (StatelessRealtimeSegmentWriter writer = new StatelessRealtimeSegmentWriter(segmentZKMetadata,
-        indexLoadingConfig, segmentBuildSemaphore)) {
+        indexLoadingConfig, tableDataManager.getSegmentBuildSemaphore())) {
       // Read when the consumption starts, so that a job waiting for a re-ingestion thread uses the latest timeout
       long consumptionTimeoutMs = _consumptionTimeout.getTimeoutMs();
       LOGGER.info("Starting consumption to re-ingest segment: {} with timeout: {}ms", segmentName,

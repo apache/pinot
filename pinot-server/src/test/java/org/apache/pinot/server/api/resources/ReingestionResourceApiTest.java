@@ -23,19 +23,26 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import javax.annotation.Nullable;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.server.api.BaseResourceTest;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.mockito.stubbing.Answer;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.server.api.resources.ReingestionResource.MAX_PARALLEL_REINGESTIONS;
+import static org.apache.pinot.server.api.resources.ReingestionResource.waitForCondition;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 
@@ -46,13 +53,6 @@ public class ReingestionResourceApiTest extends BaseResourceTest {
   private static final String REINGESTION_REALTIME_TABLE_NAME = REINGESTION_RAW_TABLE_NAME + "_REALTIME";
   // Makes the segment names unique across tests, since a segment is held until its previous job finishes
   private static final AtomicInteger SEQUENCE_NUMBER = new AtomicInteger();
-
-  @Test
-  public void testResourceDependenciesAreInjected() {
-    // Any request to the resource fails if one of its injected dependencies is not bound
-    Response response = _webTarget.path("/reingestSegment/jobs").request().get(Response.class);
-    assertThat(response.getStatus()).isEqualTo(Response.Status.OK.getStatusCode());
-  }
 
   @Test
   public void testRunningReingestionIsTrackedAcrossRequests()
@@ -102,6 +102,64 @@ public class ReingestionResourceApiTest extends BaseResourceTest {
     }
   }
 
+  @DataProvider
+  public Object[][] staleSegmentMetadata() {
+    return new Object[][]{{Status.DONE, null}, {null, null}, {Status.IN_PROGRESS, null},
+        {Status.COMMITTING, "http://deep-store/segment"}};
+  }
+
+  @Test(dataProvider = "staleSegmentMetadata")
+  public void testQueuedReingestionSkipsStaleSegment(@Nullable Status status, @Nullable String downloadUrl)
+      throws Exception {
+    waitForCondition(() -> getJobs().equals("[]"), "previous re-ingestions to finish", 10, 10_000);
+    CountDownLatch jobsStarted = new CountDownLatch(MAX_PARALLEL_REINGESTIONS);
+    CountDownLatch releaseJobs = new CountDownLatch(1);
+    addTableDataManager(invocation -> {
+      jobsStarted.countDown();
+      releaseJobs.await();
+      throw new IllegalStateException("Finish blocker without building a segment");
+    });
+
+    String targetRawTableName = "queuedReingestionTable";
+    String targetTableName = targetRawTableName + "_REALTIME";
+    String targetSegmentName = segmentName(targetRawTableName, 0);
+    AtomicReference<SegmentZKMetadata> metadata = new AtomicReference<>(segmentMetadata(targetSegmentName));
+    RealtimeTableDataManager targetTableDataManager = mock(RealtimeTableDataManager.class);
+    when(targetTableDataManager.fetchZKMetadata(targetSegmentName)).thenAnswer(invocation -> metadata.get());
+    when(targetTableDataManager.fetchZKMetadataNullable(targetSegmentName)).thenAnswer(invocation -> metadata.get());
+    _tableDataManagerMap.put(targetTableName, targetTableDataManager);
+
+    try {
+      for (int partitionId = 0; partitionId < MAX_PARALLEL_REINGESTIONS; partitionId++) {
+        assertThat(postReingestion(segmentName(partitionId))).isEqualTo(Response.Status.OK.getStatusCode());
+      }
+      assertThat(jobsStarted.await(10, TimeUnit.SECONDS)).isTrue();
+      assertThat(postReingestion(targetSegmentName)).isEqualTo(Response.Status.OK.getStatusCode());
+      assertThat(getJobs()).contains(targetSegmentName);
+
+      // Replace the metadata while the job is queued, as when another replica repairs it or it is deleted.
+      SegmentZKMetadata updatedMetadata = null;
+      if (status != null) {
+        updatedMetadata = segmentMetadata(targetSegmentName);
+        updatedMetadata.setStatus(status);
+        updatedMetadata.setDownloadUrl(downloadUrl);
+      }
+      metadata.set(updatedMetadata);
+      releaseJobs.countDown();
+      waitForCondition(() -> !getJobs().contains(targetSegmentName), "queued re-ingestion to be removed", 10, 10_000);
+
+      verify(targetTableDataManager).fetchZKMetadataNullable(targetSegmentName);
+      verify(targetTableDataManager, never()).fetchIndexLoadingConfig();
+      verify(targetTableDataManager, never()).getSegmentBuildSemaphore();
+      verify(_serverInstance.getServerMetrics(), never())
+          .addMeteredTableValue(targetTableName, ServerMeter.SEGMENT_REINGESTION_FAILURE, 1);
+    } finally {
+      releaseJobs.countDown();
+      _tableDataManagerMap.remove(REINGESTION_REALTIME_TABLE_NAME);
+      _tableDataManagerMap.remove(targetTableName);
+    }
+  }
+
   // Runs after the other tests since it stops the admin API
   @Test(priority = 1)
   public void testRunningReingestionIsStoppedOnShutdown()
@@ -128,19 +186,29 @@ public class ReingestionResourceApiTest extends BaseResourceTest {
   /// fetched on the re-ingestion thread with the given answer.
   private void addTableDataManager(Answer<Semaphore> segmentBuildSemaphoreAnswer) {
     RealtimeTableDataManager tableDataManager = mock(RealtimeTableDataManager.class);
-    when(tableDataManager.fetchZKMetadata(anyString())).thenAnswer(invocation -> {
-      SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata((String) invocation.getArgument(0));
-      segmentZKMetadata.setStartOffset("0");
-      segmentZKMetadata.setEndOffset("100");
-      return segmentZKMetadata;
-    });
+    when(tableDataManager.fetchZKMetadata(anyString()))
+        .thenAnswer(invocation -> segmentMetadata(invocation.getArgument(0)));
+    when(tableDataManager.fetchZKMetadataNullable(anyString()))
+        .thenAnswer(invocation -> segmentMetadata(invocation.getArgument(0)));
     when(tableDataManager.getSegmentBuildSemaphore()).thenAnswer(segmentBuildSemaphoreAnswer);
     _tableDataManagerMap.put(REINGESTION_REALTIME_TABLE_NAME, tableDataManager);
   }
 
   private static String segmentName(int partitionId) {
-    return new LLCSegmentName(REINGESTION_RAW_TABLE_NAME, partitionId, SEQUENCE_NUMBER.getAndIncrement(),
+    return segmentName(REINGESTION_RAW_TABLE_NAME, partitionId);
+  }
+
+  private static String segmentName(String rawTableName, int partitionId) {
+    return new LLCSegmentName(rawTableName, partitionId, SEQUENCE_NUMBER.getAndIncrement(),
         System.currentTimeMillis()).getSegmentName();
+  }
+
+  private static SegmentZKMetadata segmentMetadata(String segmentName) {
+    SegmentZKMetadata metadata = new SegmentZKMetadata(segmentName);
+    metadata.setStatus(Status.COMMITTING);
+    metadata.setStartOffset("0");
+    metadata.setEndOffset("100");
+    return metadata;
   }
 
   private int postReingestion(String segmentName) {
