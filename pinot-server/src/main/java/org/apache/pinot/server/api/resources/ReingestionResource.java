@@ -237,16 +237,28 @@ public class ReingestionResource {
     // The table or segment may have been removed or repaired on another replica while this job was queued.
     RealtimeTableDataManager tableDataManager =
         (RealtimeTableDataManager) _serverInstance.getInstanceDataManager().getTableDataManager(realtimeTableName);
-    if (tableDataManager == null || tableDataManager.isShutDown()) {
-      LOGGER.info("Skipping re-ingestion of segment: {} because table: {} is no longer available", segmentName,
+    if (tableDataManager == null) {
+      LOGGER.warn("Skipping re-ingestion of segment: {} because table: {} is no longer available", segmentName,
+          realtimeTableName);
+      return;
+    }
+    if (tableDataManager.isShutDown()) {
+      LOGGER.warn("Skipping re-ingestion of segment: {} because table: {} is shut down", segmentName,
           realtimeTableName);
       return;
     }
     SegmentZKMetadata segmentZKMetadata = tableDataManager.fetchZKMetadataNullable(segmentName);
-    if (segmentZKMetadata == null
-        || segmentZKMetadata.getStatus() != Status.COMMITTING
-        || segmentZKMetadata.getDownloadUrl() != null) {
-      LOGGER.info("Skipping re-ingestion of segment: {} because it was deleted or no longer needs repair", segmentName);
+    if (segmentZKMetadata == null) {
+      LOGGER.warn("Skipping re-ingestion of segment: {} because its metadata no longer exists", segmentName);
+      return;
+    }
+    if (segmentZKMetadata.getStatus() != Status.COMMITTING) {
+      LOGGER.warn("Skipping re-ingestion of segment: {} because its status is {} (expected COMMITTING)", segmentName,
+          segmentZKMetadata.getStatus());
+      return;
+    }
+    if (segmentZKMetadata.getDownloadUrl() != null) {
+      LOGGER.warn("Skipping re-ingestion of segment: {} because its download URL is already present", segmentName);
       return;
     }
     IndexLoadingConfig indexLoadingConfig = tableDataManager.fetchIndexLoadingConfig();

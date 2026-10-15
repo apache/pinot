@@ -42,6 +42,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -53,6 +54,11 @@ public class ReingestionResourceApiTest extends BaseResourceTest {
   private static final String REINGESTION_REALTIME_TABLE_NAME = REINGESTION_RAW_TABLE_NAME + "_REALTIME";
   // Makes the segment names unique across tests, since a segment is held until its previous job finishes
   private static final AtomicInteger SEQUENCE_NUMBER = new AtomicInteger();
+
+  /// Table availability when a queued re-ingestion starts.
+  private enum TableState {
+    AVAILABLE, REMOVED, SHUT_DOWN
+  }
 
   @Test
   public void testRunningReingestionIsTrackedAcrossRequests()
@@ -103,13 +109,20 @@ public class ReingestionResourceApiTest extends BaseResourceTest {
   }
 
   @DataProvider
-  public Object[][] staleSegmentMetadata() {
-    return new Object[][]{{Status.DONE, null}, {null, null}, {Status.IN_PROGRESS, null},
-        {Status.COMMITTING, "http://deep-store/segment"}};
+  public Object[][] staleQueuedReingestions() {
+    return new Object[][]{
+        {TableState.AVAILABLE, Status.DONE, null},
+        {TableState.AVAILABLE, null, null},
+        {TableState.AVAILABLE, Status.IN_PROGRESS, null},
+        {TableState.AVAILABLE, Status.COMMITTING, "http://deep-store/segment"},
+        {TableState.REMOVED, Status.COMMITTING, null},
+        {TableState.SHUT_DOWN, Status.COMMITTING, null}
+    };
   }
 
-  @Test(dataProvider = "staleSegmentMetadata")
-  public void testQueuedReingestionSkipsStaleSegment(@Nullable Status status, @Nullable String downloadUrl)
+  @Test(dataProvider = "staleQueuedReingestions")
+  public void testQueuedReingestionSkipsObsoleteJob(TableState tableState, @Nullable Status status,
+      @Nullable String downloadUrl)
       throws Exception {
     waitForCondition(() -> getJobs().equals("[]"), "previous re-ingestions to finish", 10, 10_000);
     CountDownLatch jobsStarted = new CountDownLatch(MAX_PARALLEL_REINGESTIONS);
@@ -137,7 +150,7 @@ public class ReingestionResourceApiTest extends BaseResourceTest {
       assertThat(postReingestion(targetSegmentName)).isEqualTo(Response.Status.OK.getStatusCode());
       assertThat(getJobs()).contains(targetSegmentName);
 
-      // Replace the metadata while the job is queued, as when another replica repairs it or it is deleted.
+      // Change the metadata or table availability while the job is queued.
       SegmentZKMetadata updatedMetadata = null;
       if (status != null) {
         updatedMetadata = segmentMetadata(targetSegmentName);
@@ -145,10 +158,17 @@ public class ReingestionResourceApiTest extends BaseResourceTest {
         updatedMetadata.setDownloadUrl(downloadUrl);
       }
       metadata.set(updatedMetadata);
+      if (tableState == TableState.REMOVED) {
+        _tableDataManagerMap.remove(targetTableName);
+      } else if (tableState == TableState.SHUT_DOWN) {
+        when(targetTableDataManager.isShutDown()).thenReturn(true);
+      }
       releaseJobs.countDown();
       waitForCondition(() -> !getJobs().contains(targetSegmentName), "queued re-ingestion to be removed", 10, 10_000);
 
-      verify(targetTableDataManager).fetchZKMetadataNullable(targetSegmentName);
+      verify(targetTableDataManager).fetchZKMetadata(targetSegmentName);
+      verify(targetTableDataManager, tableState == TableState.AVAILABLE ? times(1) : never())
+          .fetchZKMetadataNullable(targetSegmentName);
       verify(targetTableDataManager, never()).fetchIndexLoadingConfig();
       verify(targetTableDataManager, never()).getSegmentBuildSemaphore();
       verify(_serverInstance.getServerMetrics(), never())
