@@ -237,6 +237,7 @@ public class SegmentGenerationJobSpec implements Serializable {
   }
 
   /// Selects the archive codec for standalone, Spark, and Hadoop segment generation jobs.
+  /// Generation accepts `gzip` and `zstd`; archive discovery also consumes existing LZ4 archives.
   public void setSegmentTarCompressionCodec(String segmentTarCompressionCodec) {
     Preconditions.checkArgument("gzip".equals(segmentTarCompressionCodec) || "zstd".equals(segmentTarCompressionCodec),
         "Unsupported segmentTarCompressionCodec: %s; supported codecs: gzip, zstd", segmentTarCompressionCodec);
