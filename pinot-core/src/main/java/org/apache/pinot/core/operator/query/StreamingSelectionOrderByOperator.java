@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.query;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.CaseFormat;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -77,9 +78,10 @@ import org.roaringbitmap.RoaringBitmap;
 ///   (trimmed to the remaining `limit + offset` budget).
 /// - **Tail to sort** (`numSortedExpressions < numOrderByExpressions`, e.g.
 ///   `ORDER BY sorted, other`):
-///   each call reads forward until the first order-by value changes (a primary-value "run"), retains the run's top
-///   `limit + offset` rows by the full comparator, and emits them sorted. This bounds the in-memory run buffer to
-///   `limit + offset` rows even when the first order-by column is near-constant (very low cardinality).
+///   each call reads forward until a value of the sorted prefix changes (a "run": rows that tie on every sorted
+///   order-by column), retains the run's top rows by the unsorted tail, as many as the remaining `limit + offset`
+///   budget allows, and emits them sorted. This bounds the in-memory run buffer to `limit + offset` rows even when
+///   the sorted prefix is near-constant (very low cardinality).
 ///
 /// Like [SelectionOrderByOperator] it preserves the two-phase projection optimization: when there are output
 /// expressions that are not order-by expressions, the forward scan only fetches the order-by expressions plus the
@@ -110,11 +112,12 @@ public class StreamingSelectionOrderByOperator extends BaseOperator<SelectionRes
   private final List<ExpressionContext> _phase1Expressions;
   private final int _numPhase1Columns;
   private final Comparator<Object[]> _comparator;
-  /// Compares only the first order-by column; used to detect primary-value run boundaries
-  private final Comparator<Object[]> _primaryComparator;
-  /// Pre-allocated run heap (cleared and reused each nextRun() call to avoid per-run allocation)
+  /// Compares the sorted prefix of the order-by; used to detect run boundaries. Null without a tail to sort.
+  @Nullable
+  private final Comparator<Object[]> _sortedPrefixComparator;
+  /// Orders the run heap by the unsorted suffix, reversed; null without a tail to sort
+  @Nullable
   private final Comparator<Object[]> _reversedComparator;
-  private final PriorityQueue<Object[]> _runHeap;
 
   // Pre-computed invariants for the two-phase fetch (null when single-phase)
   private final List<ExpressionContext> _nonOrderByExpressions;
@@ -123,12 +126,19 @@ public class StreamingSelectionOrderByOperator extends BaseOperator<SelectionRes
 
   /// Lazily built and cached; for two-phase it requires the transform operator's result column contexts
   private DataSchema _dataSchema;
+  /// Run heap, allocated on the first [#nextRun()] and then cleared and reused for every run. Not allocated in the
+  /// constructor: it starts with `min(limit + offset, 10,000)` slots, and without prefetch every segment's leaf is
+  /// built before the combine decides which of them to pull.
+  private PriorityQueue<Object[]> _runHeap;
   /// Source column contexts for the phase-2 expressions; built only on the zero-match schema path (null otherwise)
   private Map<String, ColumnContext> _phase2ColumnContextMap;
 
   // Forward-scan cursor state (used by the tail-to-sort mode)
   private ValueBlock _currentBlock;
   private RowBasedBlockValueFetcher _currentFetcher;
+  /// Copy of the current block's doc ids, owned by this operator. The block's own array is a scratch buffer that the
+  /// doc-id-set operators share across every segment on the thread, and the streaming combine pulls other segments on
+  /// this thread between two [#nextRun()] calls, so it may be overwritten before the rest of the block is read.
   private int[] _currentDocIds;
   private RoaringBitmap[] _currentNullBitmaps;
   private int _currentNumDocs;
@@ -167,13 +177,19 @@ public class StreamingSelectionOrderByOperator extends BaseOperator<SelectionRes
     _tailToSort = numSortedExpressions < _numOrderByExpressions;
     _comparator =
         OrderByComparatorFactory.getComparator(_orderByExpressions, _orderByColumnContexts, _nullHandlingEnabled);
-    // The first order-by column is the physically sorted column, so it never contains nulls on this path; comparing
-    // only index 0 is enough to detect when one primary-value run ends and the next begins.
-    _primaryComparator =
-        OrderByComparatorFactory.getComparator(_orderByExpressions, _orderByColumnContexts, _nullHandlingEnabled, 0, 1);
-    _reversedComparator = _comparator.reversed();
-    _runHeap = new PriorityQueue<>(
-        Math.min(_numRowsToKeep, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY), _reversedComparator);
+    if (_tailToSort) {
+      // Every column of the sorted prefix is physically sorted in the scan order (and, with null handling, has no
+      // nulls), so a run ends as soon as any of them changes. Rows within a run tie on the whole prefix, so the run
+      // heap only needs to compare the unsorted suffix.
+      assert numSortedExpressions > 0 : "The streaming operator requires a sorted first order-by column";
+      _sortedPrefixComparator = OrderByComparatorFactory.getComparator(_orderByExpressions, _orderByColumnContexts,
+          _nullHandlingEnabled, 0, numSortedExpressions);
+      _reversedComparator = OrderByComparatorFactory.getComparator(_orderByExpressions, _orderByColumnContexts,
+          _nullHandlingEnabled, numSortedExpressions, _numOrderByExpressions).reversed();
+    } else {
+      _sortedPrefixComparator = null;
+      _reversedComparator = null;
+    }
 
     if (_twoPhase) {
       _phase1Expressions = new ArrayList<>(_numOrderByExpressions);
@@ -209,6 +225,7 @@ public class StreamingSelectionOrderByOperator extends BaseOperator<SelectionRes
     List<Object[]> rows = _tailToSort ? nextRun() : nextSortedRows();
     if (rows == null || rows.isEmpty()) {
       _exhausted = true;
+      releaseScanState();
       if (_emittedAnyBlock) {
         return null;
       }
@@ -228,6 +245,19 @@ public class StreamingSelectionOrderByOperator extends BaseOperator<SelectionRes
     // Single-phase builds the schema in the constructor; two-phase builds it during fetchNonOrderByColumns above.
     assert _dataSchema != null;
     return new SelectionResultsBlock(_dataSchema, rows, _comparator, _queryContext);
+  }
+
+  /// Drops the forward-scan state once the leaf is exhausted. The streaming combine keeps a drained cursor's operator
+  /// until the query ends, so without this an exhausted leaf would keep its run heap and doc-id copy reachable for the
+  /// rest of the query. The current block's values live in the projection operator's cache, which this leaf still
+  /// references, so they are not freed here.
+  private void releaseScanState() {
+    _currentBlock = null;
+    _currentFetcher = null;
+    _currentDocIds = null;
+    _currentNullBitmaps = null;
+    _pendingRow = null;
+    _runHeap = null;
   }
 
   /// No-tail-to-sort mode: the project operator already returns rows in final order, so emit the next project block,
@@ -272,9 +302,13 @@ public class StreamingSelectionOrderByOperator extends BaseOperator<SelectionRes
     return rows;
   }
 
-  /// Tail-to-sort mode: read forward until the first order-by value changes, retain the run's top
-  /// `limit + offset` rows by the full comparator, and return them sorted. Returns `null` when
-  /// exhausted.
+  /// Tail-to-sort mode: read forward until a value of the sorted prefix changes, retain the run's top `remaining` rows
+  /// by the unsorted tail, and return them sorted. Returns `null` when exhausted.
+  ///
+  /// A segment never contributes more than `limit + offset` rows to the global result, and they are a prefix of its
+  /// local sorted order, so a run may only add the smallest `remaining` of its rows. Bounding the heap by `remaining`
+  /// keeps exactly those, and no more than will be emitted is sorted or kept reachable. The whole run is still scanned:
+  /// the tail is not sorted within a run, so any unread row could still displace one in the heap.
   @Nullable
   private List<Object[]> nextRun() {
     int remaining = _numRowsToKeep - _numRowsEmitted;
@@ -288,14 +322,20 @@ public class StreamingSelectionOrderByOperator extends BaseOperator<SelectionRes
       }
     }
     PriorityQueue<Object[]> runHeap = _runHeap;
-    runHeap.clear();
+    if (runHeap == null) {
+      runHeap = new PriorityQueue<>(
+          Math.min(_numRowsToKeep, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY), _reversedComparator);
+      _runHeap = runHeap;
+    } else {
+      runHeap.clear();
+    }
     Object[] runFirstRow = _pendingRow;
-    SelectionOperatorUtils.addToPriorityQueue(_pendingRow, runHeap, _numRowsToKeep);
+    SelectionOperatorUtils.addToPriorityQueue(_pendingRow, runHeap, remaining);
     _pendingRow = null;
     Object[] row;
     while ((row = nextRow()) != null) {
-      if (_primaryComparator.compare(row, runFirstRow) == 0) {
-        SelectionOperatorUtils.addToPriorityQueue(row, runHeap, _numRowsToKeep);
+      if (_sortedPrefixComparator.compare(row, runFirstRow) == 0) {
+        SelectionOperatorUtils.addToPriorityQueue(row, runHeap, remaining);
       } else {
         // Run boundary: this row starts the next run, keep it for the next call.
         _pendingRow = row;
@@ -303,12 +343,7 @@ public class StreamingSelectionOrderByOperator extends BaseOperator<SelectionRes
       }
     }
     List<Object[]> rows = drainAscending(runHeap);
-    // A segment never contributes more than 'limit + offset' rows to the global result, and they are a prefix of its
-    // local sorted order, so cap the total emitted across runs at the remaining budget (the rows are ascending, keep
-    // the smallest 'remaining').
-    if (rows.size() > remaining) {
-      rows = rows.subList(0, remaining);
-    }
+    assert rows.size() <= remaining;
     _numRowsEmitted += rows.size();
     return rows;
   }
@@ -334,7 +369,12 @@ public class StreamingSelectionOrderByOperator extends BaseOperator<SelectionRes
       }
       _currentFetcher = new RowBasedBlockValueFetcher(blockValSets);
       _currentNumDocs = _currentBlock.getNumDocs();
-      _currentDocIds = _twoPhase ? _currentBlock.getDocIds() : null;
+      if (_twoPhase) {
+        if (_currentDocIds == null || _currentDocIds.length < _currentNumDocs) {
+          _currentDocIds = new int[_currentNumDocs];
+        }
+        System.arraycopy(_currentBlock.getDocIds(), 0, _currentDocIds, 0, _currentNumDocs);
+      }
       if (_nullHandlingEnabled) {
         _currentNullBitmaps = new RoaringBitmap[_numPhase1Columns];
         for (int i = 0; i < _numPhase1Columns; i++) {
@@ -511,6 +551,11 @@ public class StreamingSelectionOrderByOperator extends BaseOperator<SelectionRes
           DataSchema.ColumnDataType.fromDataType(columnContext.getDataType(), columnContext.isSingleValue());
     }
     return new DataSchema(columnNames, columnDataTypes);
+  }
+
+  @VisibleForTesting
+  boolean isRunHeapAllocated() {
+    return _runHeap != null;
   }
 
   @Override

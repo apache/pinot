@@ -31,19 +31,25 @@ import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.proto.Plan.ExplainNode.AttributeValue;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
+import org.apache.pinot.core.operator.InstanceResponseOperator;
+import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.MetadataResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.operator.query.StreamingSelectionOrderByOperator;
+import org.apache.pinot.core.operator.streaming.StreamingInstanceResponseOperator;
 import org.apache.pinot.core.plan.CombinePlanNode;
 import org.apache.pinot.core.plan.ExplainInfo;
+import org.apache.pinot.core.plan.InstanceResponsePlanNode;
+import org.apache.pinot.core.plan.Plan;
 import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.plan.SelectionPlanNode;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
@@ -62,6 +68,8 @@ import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.spi.accounting.ThreadResourceSnapshot;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -74,6 +82,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Server.SortedSelectionMergeMod
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.intellij.lang.annotations.Language;
+import org.testng.SkipException;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -174,6 +183,12 @@ public class StreamingSelectionOrderByCombineOperatorTest {
   /// is not an ASC bound; the metadata max is the highest non-null, which a DESC top-5 over the high range would prune
   /// if the flag were ignored.
   private IndexSegment _nullBearingMidSegment;
+  /// Two segments with identical `sortedCol` values where a filter on `nullableCol = 0` keeps the even documents of
+  /// one and the odd documents of the other; see [#buildParityFilteredRecords].
+  private List<IndexSegment> _parityFilteredSegments;
+  /// Sorted like [#_sortedSegments] but built with `valCol` as LONG, the shape a segment takes after a reload that
+  /// changed the column's type.
+  private IndexSegment _retypedSortedSegment;
 
   @BeforeClass
   public void setUp()
@@ -232,6 +247,23 @@ public class StreamingSelectionOrderByCombineOperatorTest {
     }
     _nullBearingMidSegment = buildSegment(SORTED_TABLE_CONFIG, "nullBearingMid_0",
         buildNullBearingDisjointRecords(1), true);
+
+    _parityFilteredSegments = new ArrayList<>(2);
+    _parityFilteredSegments.add(
+        buildSegment(SORTED_TABLE_CONFIG, "parityEven_0", buildParityFilteredRecords("even", 0), false));
+    _parityFilteredSegments.add(
+        buildSegment(SORTED_TABLE_CONFIG, "parityOdd_0", buildParityFilteredRecords("odd", 1), false));
+
+    Schema retypedSchema = new Schema.SchemaBuilder()
+        .addSingleValueDimension(SORTED_COL, FieldSpec.DataType.INT)
+        .addSingleValueDimension(TAIL_COL, FieldSpec.DataType.INT)
+        .addSingleValueDimension(VAL_COL, FieldSpec.DataType.LONG)
+        .addSingleValueDimension(NULLABLE_COL, FieldSpec.DataType.INT)
+        .addSingleValueDimension(LONG_COL, FieldSpec.DataType.LONG)
+        .addSingleValueDimension(STR_COL, FieldSpec.DataType.STRING)
+        .build();
+    _retypedSortedSegment = buildSegment(SORTED_TABLE_CONFIG, retypedSchema, "retypedSorted_0",
+        buildOverlappingSortedRecords(NUM_SEGMENTS), false);
   }
 
   /// Leading order-by values `0, 1000, 2000, ...`: gaps wide enough for another segment's entire range to sit between
@@ -306,6 +338,27 @@ public class StreamingSelectionOrderByCombineOperatorTest {
       GenericRow record = records.get(i);
       record.putValue(SORTED_COL, null);
       record.addNullValueField(SORTED_COL);
+    }
+    return records;
+  }
+
+  /// Row `i` has `sortedCol = i`, and `nullableCol = 0` exactly when `i % 2 == matchingParity`, so under
+  /// `WHERE nullableCol = 0` the two segments built from this match disjoint document ids: matching row `k` is document
+  /// `2k` in one and `2k + 1` in the other. `tailCol` descends, so it is not physically sorted and each child takes the
+  /// run path; every run is one row, so a run ends in the middle of its project block. `strCol` is a function of the
+  /// document, which lets a test check that a row's non-order-by values came from the same document as its order-by
+  /// values.
+  private static List<GenericRow> buildParityFilteredRecords(String tag, int matchingParity) {
+    List<GenericRow> records = new ArrayList<>(NUM_RECORDS_PER_SEGMENT);
+    for (int i = 0; i < NUM_RECORDS_PER_SEGMENT; i++) {
+      GenericRow record = new GenericRow();
+      record.putValue(SORTED_COL, i);
+      record.putValue(TAIL_COL, NUM_RECORDS_PER_SEGMENT - i);
+      record.putValue(VAL_COL, i);
+      record.putValue(NULLABLE_COL, i % 2 == matchingParity ? 0 : 1);
+      record.putValue(LONG_COL, 10_000_000_000L + i);
+      record.putValue(STR_COL, tag + "_" + i);
+      records.add(record);
     }
     return records;
   }
@@ -385,7 +438,13 @@ public class StreamingSelectionOrderByCombineOperatorTest {
   private static IndexSegment buildSegment(TableConfig tableConfig, String segmentName, List<GenericRow> records,
       boolean nullHandling)
       throws Exception {
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, SCHEMA);
+    return buildSegment(tableConfig, SCHEMA, segmentName, records, nullHandling);
+  }
+
+  private static IndexSegment buildSegment(TableConfig tableConfig, Schema schema, String segmentName,
+      List<GenericRow> records, boolean nullHandling)
+      throws Exception {
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
     segmentGeneratorConfig.setSegmentName(segmentName);
     segmentGeneratorConfig.setDefaultNullHandlingEnabled(nullHandling);
@@ -446,6 +505,38 @@ public class StreamingSelectionOrderByCombineOperatorTest {
     assertParity(_sortedSegments,
         "SET allowReverseOrder=false; SELECT sortedCol, valCol FROM testTable ORDER BY sortedCol DESC, valCol DESC "
             + "LIMIT 50", false);
+  }
+
+  /// Each leaf keeps the doc ids of its current project block across `nextRun()` calls, and the merge pulls every leaf
+  /// on one thread. The doc-id-set operators fill one buffer per thread, so the leaf has to own a copy: otherwise the
+  /// other segment's next block overwrites the ids before the first leaf has read its remaining rows, and phase two
+  /// fetches `strCol` from the wrong document. The filter makes the two segments' doc ids differ at every position,
+  /// which unfiltered same-shape segments never do.
+  @Test
+  public void testTwoPhaseFetchesNonOrderByColumnsFromTheRowsDocument() {
+    assertTwoPhaseRowsAreConsistent(
+        "SELECT sortedCol, tailCol, strCol FROM testTable WHERE nullableCol = 0 ORDER BY sortedCol, tailCol LIMIT 100");
+  }
+
+  /// DESC counterpart of [#testTwoPhaseFetchesNonOrderByColumnsFromTheRowsDocument]: the reverse doc-id-set operator
+  /// has its own per-thread buffer.
+  @Test
+  public void testTwoPhaseFetchesNonOrderByColumnsFromTheRowsDocumentDesc() {
+    assertTwoPhaseRowsAreConsistent("SET allowReverseOrder=true; SELECT sortedCol, tailCol, strCol FROM testTable "
+        + "WHERE nullableCol = 0 ORDER BY sortedCol DESC, tailCol LIMIT 100");
+  }
+
+  private void assertTwoPhaseRowsAreConsistent(@Language("sql") String query) {
+    Result result = run(_parityFilteredSegments, query, true, false, true, 3);
+    assertEquals(result._combineOperator.getClass(), StreamingSelectionOrderByCombineOperator.class);
+    assertEquals(result._rows.size(), NUM_RECORDS_PER_SEGMENT, "Every row of both segments matches exactly once");
+    for (Object[] row : result._rows) {
+      int sortedValue = (Integer) row[0];
+      String expectedStr = (sortedValue % 2 == 0 ? "even_" : "odd_") + sortedValue;
+      assertEquals(row[2], expectedStr, "strCol must come from the document of sortedCol " + sortedValue);
+      assertEquals(row[1], NUM_RECORDS_PER_SEGMENT - sortedValue);
+    }
+    assertParity(_parityFilteredSegments, query, false);
   }
 
   @Test
@@ -985,6 +1076,49 @@ public class StreamingSelectionOrderByCombineOperatorTest {
     assertEveryAcquireReleased(children);
   }
 
+  /// The cursor that supplies the last row the query needs must not be advanced: advancing a drained streaming cursor
+  /// pulls its segment's next block, which on the run path scans a whole run that can never be emitted. The leaf's
+  /// own budget does not stop it, because the last row's segment has emitted fewer than `limit + offset` rows itself.
+  /// One row per block, so a cursor that supplied `r` rows needs exactly `r` blocks: the first on activation, one per
+  /// advance after each row except the last.
+  @Test
+  public void testLimitReachedDoesNotPullAnotherBlock() {
+    QueryContext queryContext = hintedContext(String.format(ONE_ROW_PER_BLOCK_QUERY, 60));
+    queryContext.setSortedSelectionMergeBlockSize(1000);
+    List<InstrumentedSegmentOperator> children = instrument(_sortedSegments, queryContext);
+    List<Object[]> rows = rowsOf(drain(combineOver(children, queryContext)));
+    assertEquals(rows.size(), 60);
+
+    int valColIndex = 2;
+    int lastSegment = (Integer) rows.get(rows.size() - 1)[valColIndex] / 1_000_000;
+    long rowsFromLastSegment =
+        rows.stream().filter(row -> (Integer) row[valColIndex] / 1_000_000 == lastSegment).count();
+    assertTrue(rowsFromLastSegment < 60, "The last row's segment must not have exhausted its own budget");
+    assertEquals(children.get(lastSegment)._numBlocks, rowsFromLastSegment,
+        "Segment " + lastSegment + " pulled a block after the limit was reached");
+  }
+
+  /// When the row that reaches the limit also fills the output block, the segments must be released before that final
+  /// data block is returned: the caller sends it downstream next, which can block on backpressure, and nothing else
+  /// would release them until the following call.
+  @Test
+  public void testLimitReachedOnAFullBlockReleasesSegmentsBeforeReturningIt() {
+    QueryContext queryContext =
+        hintedContext("SELECT sortedCol, valCol FROM testTable ORDER BY sortedCol, valCol LIMIT 60");
+    queryContext.setSortedSelectionMergeBlockSize(60);
+    List<InstrumentedSegmentOperator> children = instrument(_sortedSegments, queryContext);
+    StreamingSelectionOrderByCombineOperator combine = combineOver(children, queryContext);
+
+    BaseResultsBlock block = combine.nextBlock();
+    assertTrue(block instanceof SelectionResultsBlock, "Expected the final data block, got: " + block.getClass());
+    assertEquals(((SelectionResultsBlock) block).getRows().size(), 60);
+    assertEquals(numAcquired(children), 2, "Two segments overlap the first 60 rows, else the test is vacuous");
+    assertEveryAcquireReleased(children);
+    // Neither segment was drained, so both cursors still had a block of rows; the output already holds what it needs.
+    assertEquals(combine.getNumCursorsHoldingRows(), 0, "A finished merge must not keep its cursors' rows");
+    assertTrue(combine.nextBlock() instanceof MetadataResultsBlock);
+  }
+
   @Test
   public void testStopReleasesSegmentsHeldMidMerge() {
     QueryContext queryContext =
@@ -1089,16 +1223,40 @@ public class StreamingSelectionOrderByCombineOperatorTest {
     }
     assertEveryAcquireReleased(children);
 
-    // The same mismatch in two segments produces one message, attached to one block rather than re-attached to every
-    // block streamed after it.
-    List<QueryErrorMessage> errors = new ArrayList<>();
-    for (BaseResultsBlock block : blocks) {
-      if (block.getErrorMessages() != null) {
-        errors.addAll(block.getErrorMessages());
-      }
+    // The same mismatch in two segments produces one message, attached only to the terminal metadata block; see
+    // testSchemaMismatchErrorReachesTheInstanceResponse for why data blocks must not carry it.
+    for (BaseResultsBlock block : blocks.subList(0, blocks.size() - 1)) {
+      assertTrue(block.getErrorMessages() == null || block.getErrorMessages().isEmpty(),
+          "A data block carried errors: " + block.getErrorMessages());
     }
+    List<QueryErrorMessage> errors = blocks.get(blocks.size() - 1).getErrorMessages();
+    assertNotNull(errors);
     assertEquals(errors.size(), 1, "Expected exactly one mismatch error, got: " + errors);
     assertEquals(errors.get(0).getErrCode(), QueryErrorCode.MERGE_RESPONSE);
+  }
+
+  /// The schema-mismatch error has to reach the server's response, not just a combine block. The streaming instance
+  /// response operator only streams a data block's rows and builds the response from the terminal block, and both MSE
+  /// (`LeafOperator`) and the gRPC streamer read errors only from that response. An error attached to a data block is
+  /// dropped there, and the missing segment's rows look like a successful query.
+  @Test
+  public void testSchemaMismatchErrorReachesTheInstanceResponse() {
+    QueryContext queryContext = hintedContext(String.format(ONE_ROW_PER_BLOCK_QUERY, 100000));
+    queryContext.setSortedSelectionMergeBlockSize(7);
+    List<InstrumentedSegmentOperator> children = instrument(_sortedSegments, queryContext);
+    // Diverges early, so data blocks are still streamed after the mismatch is recorded.
+    children.get(1)._interceptor =
+        (blockNumber, block) -> blockNumber == 11 ? withMismatchedSchema((SelectionResultsBlock) block) : block;
+
+    List<BaseResultsBlock> streamed = new ArrayList<>();
+    StreamingInstanceResponseOperator responseOperator =
+        new StreamingInstanceResponseOperator(combineOver(children, queryContext), List.of(), List.of(),
+            streamed::add, queryContext);
+    InstanceResponseBlock response = responseOperator.nextBlock();
+
+    assertFalse(streamed.isEmpty(), "Expected the merge to stream data blocks");
+    assertEquals(response.getExceptions().keySet(), Set.of(QueryErrorCode.MERGE_RESPONSE.getId()),
+        "The mismatch must be reported in the instance response, got: " + response.getExceptions());
   }
 
   /// Returns `block` with its last column retyped from INT to LONG, the shape a newly reloaded segment takes when a
@@ -1544,15 +1702,193 @@ public class StreamingSelectionOrderByCombineOperatorTest {
         false);
   }
 
-  /// Runs the streaming instance plan for its side effect on `queryContext`: resolving AUTO from segment
-  /// metadata. The plan itself is discarded; the gate tests assert on the resolved mode and on the operator that
-  /// [#planCombineOperator] then selects.
-  private static void makeStreamingInstancePlan(List<IndexSegment> segments, QueryContext queryContext) {
+  /// The full streaming instance plan, end to end: the plan maker pairs the streaming combine with streaming leaves,
+  /// the streamer receives the merged rows, and the instance response built from the terminal block carries the
+  /// execution stats. The rows match the blocking instance plan; docs scanned matches the combine driven by hand.
+  ///
+  /// These tests start at the plan maker, not the server query executor or the MSE leaf, so they do not cover query
+  /// option parsing or the query thread context. Thread CPU and allocation stats are not asserted here.
+  @Test
+  public void testStreamingInstancePlanResponse() {
+    String query = "SELECT sortedCol, valCol FROM testTable ORDER BY sortedCol, valCol LIMIT 50";
+    StreamingPlanRun streaming = runStreamingInstancePlan(_sortedSegments, hintedContext(query));
+
+    Operator<?> combine = streaming._responseOperator.getChildOperators().get(0);
+    assertTrue(combine instanceof StreamingSelectionOrderByCombineOperator,
+        "Expected the streaming combine, got: " + combine.getClass().getSimpleName());
+    for (Operator<?> child : (List<Operator<?>>) (List<?>) combine.getChildOperators()) {
+      assertTrue(child instanceof StreamingSelectionOrderByOperator,
+          "Expected a streaming leaf, got: " + child.getClass().getSimpleName());
+    }
+
+    InstanceResponseBlock baseline = runInstancePlan(_sortedSegments, modeContext(query, SortedSelectionMergeMode.OFF));
+    assertResponseRowsEqual(streaming, baseline);
+
+    InstanceResponseBlock response = streaming._response;
+    assertTrue(response.getExceptions().isEmpty(), "Unexpected errors: " + response.getExceptions());
+    Map<String, String> metadata = response.getResponseMetadata();
+    Map<String, String> baselineMetadata = baseline.getResponseMetadata();
+    for (MetadataKey key : List.of(MetadataKey.TOTAL_DOCS, MetadataKey.NUM_SEGMENTS_PROCESSED,
+        MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED)) {
+      assertEquals(metadata.get(key.getName()), baselineMetadata.get(key.getName()), key.getName());
+    }
+    assertEquals(metadata.get(MetadataKey.TOTAL_DOCS.getName()),
+        Integer.toString(NUM_SEGMENTS * NUM_RECORDS_PER_SEGMENT));
+    Result handDriven = run(_sortedSegments, query, true, false, true, 0);
+    assertEquals(metadata.get(MetadataKey.NUM_DOCS_SCANNED.getName()), Long.toString(handDriven._numDocsScanned));
+    assertEquals(metadata.get(MetadataKey.NUM_SEGMENTS_MATCHED.getName()),
+        Integer.toString(handDriven._numSegmentsMatched));
+    assertTrue(handDriven._numDocsScanned
+            < Long.parseLong(baselineMetadata.get(MetadataKey.NUM_DOCS_SCANNED.getName())),
+        "The streaming merge should stop before scanning every matching document");
+  }
+
+  /// AUTO that resolves to OFF keeps the MinMax combine inside the streaming instance plan. That combine returns one
+  /// block, which the response operator streams through its single-block branch.
+  @Test
+  public void testStreamingInstancePlanFallsBackWhenAutoResolvesOff() {
+    String query = "SELECT sortedCol, valCol FROM testTable ORDER BY sortedCol, valCol LIMIT 50";
+    QueryContext queryContext = modeContext(query, SortedSelectionMergeMode.AUTO);
+    StreamingPlanRun streaming = runStreamingInstancePlan(_unsortedSegments, queryContext);
+    assertEquals(queryContext.getSortedSelectionMergeMode(), SortedSelectionMergeMode.OFF);
+
+    Operator<?> combine = streaming._responseOperator.getChildOperators().get(0);
+    assertTrue(combine instanceof MinMaxValueBasedSelectionOrderByCombineOperator,
+        "Expected the MinMax combine, got: " + combine.getClass().getSimpleName());
+
+    InstanceResponseBlock baseline =
+        runInstancePlan(_unsortedSegments, modeContext(query, SortedSelectionMergeMode.OFF));
+    assertResponseRowsEqual(streaming, baseline);
+    assertTrue(streaming._response.getExceptions().isEmpty(),
+        "Unexpected errors: " + streaming._response.getExceptions());
+    // Every unsorted segment covers the whole value range, so neither combine can skip one.
+    String allDocs = Integer.toString(NUM_SEGMENTS * NUM_RECORDS_PER_SEGMENT);
+    assertEquals(streaming._response.getResponseMetadata().get(MetadataKey.NUM_DOCS_SCANNED.getName()), allDocs);
+    assertEquals(baseline.getResponseMetadata().get(MetadataKey.NUM_DOCS_SCANNED.getName()), allDocs);
+  }
+
+  /// A segment whose column type differs from the others (as after a reload that changed the type) reaches the
+  /// instance response as a merge error through the real plan, not only through a hand-built combine.
+  @Test
+  public void testStreamingInstancePlanReportsASchemaMismatch() {
+    List<IndexSegment> segments = new ArrayList<>(_sortedSegments);
+    segments.add(_retypedSortedSegment);
+    StreamingPlanRun streaming = runStreamingInstancePlan(segments,
+        hintedContext("SELECT sortedCol, valCol FROM testTable ORDER BY sortedCol, valCol LIMIT 100000"));
+
+    assertTrue(
+        streaming._responseOperator.getChildOperators().get(0) instanceof StreamingSelectionOrderByCombineOperator);
+    // The retyped segment's range is the highest, so it is activated last and only its rows are dropped.
+    assertEquals(rowsOf(streaming._streamed).size(), NUM_SEGMENTS * NUM_RECORDS_PER_SEGMENT,
+        "Expected every row of the other segments and none of the retyped one");
+    assertEquals(streaming._response.getExceptions().keySet(), Set.of(QueryErrorCode.MERGE_RESPONSE.getId()),
+        "The mismatch must be reported in the instance response, got: " + streaming._response.getExceptions());
+    assertEquals(streaming._response.getResponseMetadata().get(MetadataKey.TOTAL_DOCS.getName()),
+        Integer.toString(segments.size() * NUM_RECORDS_PER_SEGMENT), "Execution stats must ride along with the error");
+  }
+
+  /// The streaming merge scans segments on the thread that drives the instance response, one data block per pull.
+  /// The response must report the CPU time and allocations of every pull, not only of the final one that returns the
+  /// cheap terminal block, or MSE stage stats and server metrics see almost none of the query's work. Each child block
+  /// allocates a known amount on that thread, so the reported totals have a floor.
+  @Test
+  public void testStreamingResponseReportsTheConsumerThreadUsageOfEveryBlock() {
+    boolean cpuMeasurementEnabled = ThreadResourceUsageProvider.isThreadCpuTimeMeasurementEnabled();
+    boolean memoryMeasurementEnabled = ThreadResourceUsageProvider.isThreadMemoryMeasurementEnabled();
+    ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(true);
+    ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
+    try {
+      if (!ThreadResourceUsageProvider.isThreadCpuTimeMeasurementEnabled()
+          || !ThreadResourceUsageProvider.isThreadMemoryMeasurementEnabled()) {
+        throw new SkipException("This JVM cannot measure thread CPU time and allocated bytes");
+      }
+      QueryContext queryContext = hintedContext(String.format(ONE_ROW_PER_BLOCK_QUERY, 100000));
+      queryContext.setSortedSelectionMergeBlockSize(7);
+      List<InstrumentedSegmentOperator> children = instrument(_sortedSegments, queryContext);
+      int allocationSize = 8 << 10;
+      int[] numAllocations = new int[1];
+      long[] interceptorCpuTimeNs = new long[1];
+      for (InstrumentedSegmentOperator child : children) {
+        child._interceptor = (blockNumber, block) -> {
+          ThreadResourceSnapshot snapshot = new ThreadResourceSnapshot();
+          _allocationSink = new byte[allocationSize];
+          numAllocations[0]++;
+          interceptorCpuTimeNs[0] += snapshot.getCpuTimeNs();
+          return block;
+        };
+      }
+
+      List<BaseResultsBlock> streamed = new ArrayList<>();
+      InstanceResponseBlock response =
+          new StreamingInstanceResponseOperator(combineOver(children, queryContext), List.of(), List.of(),
+              streamed::add, queryContext).nextBlock();
+
+      assertTrue(streamed.size() > 1, "Expected several streamed blocks, got: " + streamed.size());
+      Map<String, String> metadata = response.getResponseMetadata();
+      long allocatedBytes = Long.parseLong(metadata.get(MetadataKey.THREAD_MEM_ALLOCATED_BYTES.getName()));
+      long expectedMinAllocatedBytes = (long) numAllocations[0] * allocationSize;
+      assertTrue(allocatedBytes >= expectedMinAllocatedBytes,
+          "Reported " + allocatedBytes + " allocated bytes, but the merge allocated at least "
+              + expectedMinAllocatedBytes);
+      long cpuTimeNs = Long.parseLong(metadata.get(MetadataKey.THREAD_CPU_TIME_NS.getName()));
+      assertTrue(cpuTimeNs >= interceptorCpuTimeNs[0],
+          "Reported " + cpuTimeNs + "ns of CPU, but the merge spent at least " + interceptorCpuTimeNs[0] + "ns");
+    } finally {
+      ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(cpuMeasurementEnabled);
+      ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(memoryMeasurementEnabled);
+    }
+  }
+
+  /// Keeps the test's allocations observable so they cannot be optimized away.
+  private static volatile byte[] _allocationSink;
+
+  private static void assertResponseRowsEqual(StreamingPlanRun streaming, InstanceResponseBlock baseline) {
+    List<Object[]> streamedRows = rowsOf(streaming._streamed);
+    List<Object[]> baselineRows = baseline.getRows();
+    assertNotNull(baselineRows);
+    assertEquals(streamedRows.size(), baselineRows.size());
+    for (int i = 0; i < baselineRows.size(); i++) {
+      assertEquals(streamedRows.get(i), baselineRows.get(i), "Row " + i);
+    }
+  }
+
+  /// Builds and runs the streaming instance plan for `queryContext` over `segments`, capturing every block sent to
+  /// the streamer.
+  private static StreamingPlanRun runStreamingInstancePlan(List<IndexSegment> segments, QueryContext queryContext) {
+    StreamingPlanRun run = new StreamingPlanRun();
+    Plan plan = PLAN_MAKER.makeStreamingInstancePlan(segmentContexts(segments), queryContext, EXECUTOR,
+        block -> run._streamed.add(block));
+    run._responseOperator = ((InstanceResponsePlanNode) plan.getPlanNode()).run();
+    run._response = run._responseOperator.nextBlock();
+    return run;
+  }
+
+  /// Builds and runs the blocking instance plan for `queryContext` over `segments`.
+  private static InstanceResponseBlock runInstancePlan(List<IndexSegment> segments, QueryContext queryContext) {
+    Plan plan = PLAN_MAKER.makeInstancePlan(segmentContexts(segments), queryContext, EXECUTOR);
+    return ((InstanceResponsePlanNode) plan.getPlanNode()).run().nextBlock();
+  }
+
+  private static List<SegmentContext> segmentContexts(List<IndexSegment> segments) {
     List<SegmentContext> segmentContexts = new ArrayList<>(segments.size());
     for (IndexSegment segment : segments) {
       segmentContexts.add(new SegmentContext(segment));
     }
-    PLAN_MAKER.makeStreamingInstancePlan(segmentContexts, queryContext, EXECUTOR, block -> {
+    return segmentContexts;
+  }
+
+  /// Captured output of one streaming instance plan run.
+  private static class StreamingPlanRun {
+    private final List<BaseResultsBlock> _streamed = new ArrayList<>();
+    private InstanceResponseOperator _responseOperator;
+    private InstanceResponseBlock _response;
+  }
+
+  /// Runs the streaming instance plan for its side effect on `queryContext`: resolving AUTO from segment
+  /// metadata. The plan itself is discarded; the gate tests assert on the resolved mode and on the operator that
+  /// [#planCombineOperator] then selects.
+  private static void makeStreamingInstancePlan(List<IndexSegment> segments, QueryContext queryContext) {
+    PLAN_MAKER.makeStreamingInstancePlan(segmentContexts(segments), queryContext, EXECUTOR, block -> {
     });
   }
 
@@ -1678,12 +2014,13 @@ public class StreamingSelectionOrderByCombineOperatorTest {
     EXECUTOR.shutdownNow();
     for (List<IndexSegment> segments : List.of(_sortedSegments, _disjointSegments, _mixedSegments, _lowCardSegments,
         _interleavedSegments, _tiedSegments, _nullBearingSortedSegments, _unsortedSegments,
-        _nonNullDisjointSegments)) {
+        _nonNullDisjointSegments, _parityFilteredSegments)) {
       for (IndexSegment segment : segments) {
         segment.destroy();
       }
     }
     _nullBearingMidSegment.destroy();
+    _retypedSortedSegment.destroy();
     FileUtils.deleteDirectory(TEMP_DIR);
   }
 
