@@ -1196,13 +1196,17 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   /// disk. If such segment were out of TTL after a restart, it would be added with the stale snapshot, or with all
   /// docs treated as valid when there is no snapshot, which shows up as duplicate rows on this replica only. So cap
   /// the persisted watermark to keep such segments within TTL, and get them added with the regular flow after restart.
-  /// The watermark in memory is not changed.
+  /// The watermark in memory is not changed, and primary keys are still expired against it, so a segment that keeps
+  /// missing its snapshot doesn't keep the expired primary keys in memory.
   private double getWatermarkToPersist() {
     double watermark = _largestSeenComparisonValue.get();
     if (_metadataTTL <= 0) {
       return watermark;
     }
     double cappedWatermark = watermark;
+    // Unlike taking the snapshots above, reading the max comparison value doesn't need the segmentLock or the check
+    // against _trackedSegments: it comes from the segment metadata, which can still be read after the segment is
+    // destroyed, and a segment removed in the meantime can only cap the watermark lower than needed.
     for (ImmutableSegmentImpl segment : _updatedSegmentsSinceLastSnapshot) {
       double maxComparisonValue = getMaxComparisonValue(segment);
       double maxWatermark = maxComparisonValue + _metadataTTL;

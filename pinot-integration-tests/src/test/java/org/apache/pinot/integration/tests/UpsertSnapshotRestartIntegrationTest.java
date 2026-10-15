@@ -28,8 +28,12 @@ import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.client.ResultSet;
+import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
+import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
+import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager.SnapshotPass;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -40,16 +44,18 @@ import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 
 
 /// Restarts the server of a full upsert table with metadata TTL, snapshot and preload enabled, consuming from Kafka.
-/// Holding the segmentLock of the first segment while the next segments are committed makes the snapshot passes skip
-/// it, like a segment reload holding the lock does, so its snapshot on disk is stale or missing while it is out of TTL.
+/// Holding the segmentLock of the first segment while the next segment is committed makes the snapshot pass skip it,
+/// like a segment reload holding the lock does, so its snapshot on disk is stale or missing while it is out of TTL.
 /// The restarted server must still return exactly one row per primary key, i.e. the segment must not be added as out
 /// of TTL with the stale snapshot, or with all docs valid when there is no snapshot.
 public class UpsertSnapshotRestartIntegrationTest extends BaseClusterIntegrationTestSet {
@@ -204,6 +210,36 @@ public class UpsertSnapshotRestartIntegrationTest extends BaseClusterIntegration
     return dups.getRowCount();
   }
 
+  /// Returns the last finished snapshot pass of the only partition. A snapshot pass runs when a consuming segment
+  /// starts, except the first one, which starts before any record is consumed.
+  @Nullable
+  private SnapshotPass lastSnapshotPass(String realtimeTable) {
+    return tdm(realtimeTable).getTableUpsertMetadataManager().getOrCreatePartitionManager(0).getLastSnapshotPass();
+  }
+
+  /// Waits for a snapshot pass to finish after the given one, or for the first one if null.
+  private SnapshotPass waitForNextSnapshotPass(String realtimeTable, @Nullable SnapshotPass previousPass) {
+    TestUtils.waitForCondition(aVoid -> {
+      SnapshotPass pass = lastSnapshotPass(realtimeTable);
+      return pass != null && pass != previousPass;
+    }, 500L, WAIT_MS, "expected a snapshot pass to finish for " + realtimeTable);
+    return lastSnapshotPass(realtimeTable);
+  }
+
+  /// Returns whether the validDocIds snapshot of the segment on disk matches its validDocIds in memory.
+  private boolean isSnapshotUpToDate(String realtimeTable, String segmentName) {
+    RealtimeTableDataManager tableDataManager = tdm(realtimeTable);
+    SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
+    assertNotNull(segmentDataManager, "segment " + segmentName + " not found");
+    try {
+      ImmutableSegmentImpl segment = (ImmutableSegmentImpl) segmentDataManager.getSegment();
+      MutableRoaringBitmap snapshot = segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
+      return snapshot != null && snapshot.equals(segment.getValidDocIds().getMutableRoaringBitmap());
+    } finally {
+      tableDataManager.releaseSegment(segmentDataManager);
+    }
+  }
+
   private String summary(String table)
       throws Exception {
     return "count(*)=" + countStar(table) + ", pks with >1 rows=" + duplicatePkCount(table);
@@ -248,6 +284,8 @@ public class UpsertSnapshotRestartIntegrationTest extends BaseClusterIntegration
     waitForRowCount(table, NUM_KEYS);
     waitForLlcSegments(rtTable, 2);
     String seg0Name = sortedLlcSegmentNames(rtTable).get(0);
+    // The first snapshot pass runs when the second consuming segment starts
+    SnapshotPass firstPass = waitForNextSnapshotPass(rtTable, null);
 
     Lock lock = holdLock ? tdm(rtTable).getSegmentLock(seg0Name) : null;
     if (lock != null) {
@@ -255,9 +293,9 @@ public class UpsertSnapshotRestartIntegrationTest extends BaseClusterIntegration
     }
     try {
       pushCsvIntoKafka(rows(PHASE2_BASE_TS), topic, 0);
-      waitForRowCount(table, NUM_KEYS);
-      waitForLlcSegments(rtTable, 3);
-      Thread.sleep(10_000L);
+      // The next snapshot pass runs when the third consuming segment starts, i.e. after the rows of phase 2 replaced
+      // all the rows of seg0. Hold the lock until the pass finishes, so that it skips seg0.
+      waitForNextSnapshotPass(rtTable, firstPass);
     } finally {
       if (lock != null) {
         lock.unlock();
@@ -269,18 +307,24 @@ public class UpsertSnapshotRestartIntegrationTest extends BaseClusterIntegration
         FileUtils.forceDelete(snapshot);
       }
     }
+    // Make sure the restart below exercises a stale or missing snapshot of seg0 when holding the lock, and an
+    // up-to-date one otherwise
+    assertEquals(isSnapshotUpToDate(rtTable, seg0Name), !holdLock,
+        name + ": unexpected state of the validDocIds snapshot of " + seg0Name + " before restart");
     assertEquals(countStar(table), (long) NUM_KEYS, "pre-restart count");
 
     _serverStarters.set(0, restartServer(_serverStarters.get(0)));
+    // A segment is routed to only after its state transition, which adds it to the upsert metadata, so the result is
+    // final as soon as all the segments are queried without exception
     TestUtils.waitForCondition(aVoid -> {
       try {
-        return getPinotConnection().execute("SELECT COUNT(*) FROM " + table).getExecutionStats()
-            .getNumSegmentsQueried() >= 3;
+        ResultSetGroup resultSetGroup = getPinotConnection().execute("SELECT COUNT(*) FROM " + table);
+        return resultSetGroup.getExceptions().isEmpty() && resultSetGroup.getExecutionStats().getNumSegmentsQueried()
+            >= 3;
       } catch (Exception e) {
         return false;
       }
     }, 1000L, WAIT_MS, "segments back online after restart");
-    Thread.sleep(5_000L);
     String afterRestart = summary(table);
 
     assertEquals(countStar(table), (long) NUM_KEYS,
@@ -297,7 +341,6 @@ public class UpsertSnapshotRestartIntegrationTest extends BaseClusterIntegration
           return false;
         }
       }, 1000L, WAIT_MS, "reload job finished");
-      Thread.sleep(3_000L);
       String afterReload = summary(table);
       assertEquals(countStar(table), (long) NUM_KEYS, "reload should keep one row per PK, got " + afterReload);
       assertEquals(duplicatePkCount(table), 0, "duplicate PKs after reload, got " + afterReload);
