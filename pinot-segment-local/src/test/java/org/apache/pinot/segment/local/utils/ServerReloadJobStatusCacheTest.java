@@ -283,15 +283,19 @@ public class ServerReloadJobStatusCacheTest {
   public void testRecordSkippedAccumulates() {
     ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache("testServer");
 
-    cache.recordSkipped("job-skip", 0);
+    cache.recordSkipped("job-skip", List.of());
     assertThat(cache.getJobStatus("job-skip")).isNull();
 
-    cache.recordSkipped("job-skip", 3);
-    cache.recordSkipped("job-skip", 2);
-    cache.recordFailure("job-skip", "segment_1", new IOException("Test error"));
+    cache.recordSkipped("job-skip", List.of("segment_1", "segment_2"));
+    cache.recordSkipped("job-skip", List.of("segment_2", "segment_3"));
+    cache.recordFailure("job-skip", "segment_4", new IOException("Test error"));
     ReloadJobStatus status = cache.getJobStatus("job-skip");
     assertThat(status).isNotNull();
-    assertThat(status.getSkippedCount()).isEqualTo(5);
+    assertThat(status.hasSkippedSegments()).isTrue();
+    assertThat(status.isSkipped("segment_1")).isTrue();
+    assertThat(status.isSkipped("segment_2")).isTrue();
+    assertThat(status.isSkipped("segment_3")).isTrue();
+    assertThat(status.isSkipped("segment_4")).isFalse();
     assertThat(status.getFailureCount()).isEqualTo(1);
   }
 

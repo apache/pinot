@@ -1157,7 +1157,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
           segmentDataManagers.size());
       _logger.debug("Skipped reload for up-to-date segments: {}", skippedSegments);
       if (reloadJobId != null) {
-        _reloadJobStatusCache.recordSkipped(reloadJobId, skippedSegments.size());
+        _reloadJobStatusCache.recordSkipped(reloadJobId, skippedSegments);
       }
     }
     return segmentsToReload;

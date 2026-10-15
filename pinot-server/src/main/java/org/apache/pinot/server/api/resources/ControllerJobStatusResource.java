@@ -85,18 +85,17 @@ public class ControllerJobStatusResource {
       totalSegmentCount = targetSegments.size();
     }
     try {
+      ReloadJobStatus jobStatus = reloadJobId != null ? _serverReloadJobStatusCache.getJobStatus(reloadJobId) : null;
+      // Segments skipped by an only-if-needed reload keep their old load time but are up to date, so they count as
+      // successful. Checking by name counts each segment once, even if it was reloaded again after being skipped, and
+      // leaves out skipped segments that have since been dropped.
+      boolean hasSkippedSegments = jobStatus != null && jobStatus.hasSkippedSegments();
       int successCount = 0;
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-        if (segmentDataManager.getLoadTimeMs() >= reloadJobSubmissionTimestamp) {
+        if (segmentDataManager.getLoadTimeMs() >= reloadJobSubmissionTimestamp
+            || (hasSkippedSegments && jobStatus.isSkipped(segmentDataManager.getSegmentName()))) {
           successCount++;
         }
-      }
-
-      ReloadJobStatus jobStatus = reloadJobId != null ? _serverReloadJobStatusCache.getJobStatus(reloadJobId) : null;
-      if (jobStatus != null) {
-        // Segments skipped by an only-if-needed reload keep their old load time but are up to date, so they count as
-        // successful. Cap at the total in case a skipped segment was reloaded again by a later operation.
-        successCount = (int) Math.min(successCount + jobStatus.getSkippedCount(), totalSegmentCount);
       }
 
       ServerReloadStatusResponse response = new ServerReloadStatusResponse()

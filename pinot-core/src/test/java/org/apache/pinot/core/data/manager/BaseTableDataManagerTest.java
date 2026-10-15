@@ -101,7 +101,6 @@ import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.clearInvocations;
@@ -650,11 +649,11 @@ public class BaseTableDataManagerTest {
     assertSame(tableDataManager.getSegmentDataManager(SEGMENT_NAME), segmentDataManager);
     verify(tableDataManager, never()).reloadSegment(any(SegmentDataManager.class), any(IndexLoadingConfig.class),
         anyBoolean());
-    verify(tableDataManager._reloadJobStatusCache).recordSkipped("job", 1);
+    verify(tableDataManager._reloadJobStatusCache).recordSkipped("job", List.of(SEGMENT_NAME));
 
     tableDataManager.reloadSegment(SEGMENT_NAME, false, true, "job2");
     assertSame(tableDataManager.getSegmentDataManager(SEGMENT_NAME), segmentDataManager);
-    verify(tableDataManager._reloadJobStatusCache).recordSkipped("job2", 1);
+    verify(tableDataManager._reloadJobStatusCache).recordSkipped("job2", List.of(SEGMENT_NAME));
 
     // Without onlyIfNeeded the same segment goes through the regular reload path. Use the single-segment API, which
     // reloads synchronously in every implementation (batch reloads may complete asynchronously in subclasses).
@@ -683,7 +682,7 @@ public class BaseTableDataManagerTest {
     tableDataManager.reloadSegment(SEGMENT_NAME, false, true, "job");
     assertNotSame(tableDataManager.getSegmentDataManager(SEGMENT_NAME), segmentDataManager);
     assertTrue(hasInvertedIndex(indexDir, STRING_COLUMN));
-    verify(tableDataManager._reloadJobStatusCache, never()).recordSkipped(any(), anyInt());
+    verify(tableDataManager._reloadJobStatusCache, never()).recordSkipped(any(), any());
   }
 
   @Test
@@ -704,7 +703,7 @@ public class BaseTableDataManagerTest {
 
     tableDataManager.reloadSegment(SEGMENT_NAME, true, true, "job");
     assertNotSame(tableDataManager.getSegmentDataManager(SEGMENT_NAME), segmentDataManager);
-    verify(tableDataManager._reloadJobStatusCache, never()).recordSkipped(any(), anyInt());
+    verify(tableDataManager._reloadJobStatusCache, never()).recordSkipped(any(), any());
   }
 
   @Test
@@ -769,7 +768,7 @@ public class BaseTableDataManagerTest {
         List.of(failingCheck, destroyed, upToDate), indexLoadingConfig, "job");
     assertEquals(selected, List.of(failingCheck, destroyed));
     verify(tableDataManager, never()).isReloadNeeded(eq(destroyed), any());
-    verify(tableDataManager._reloadJobStatusCache).recordSkipped("job", 1);
+    verify(tableDataManager._reloadJobStatusCache).recordSkipped("job", List.of("upToDate"));
   }
 
   @Test
