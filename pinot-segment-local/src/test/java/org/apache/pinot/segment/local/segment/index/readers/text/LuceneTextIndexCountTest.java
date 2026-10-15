@@ -280,7 +280,7 @@ public class LuceneTextIndexCountTest {
       assertTrue(indexReader.leaves().size() > 1, "fixture is not multi-leaf");
       IndexSearcher searcher = new IndexSearcher(indexReader);
       try (LuceneTextIndexReader reader = new LuceneTextIndexReader(COLUMN, INDEX_DIR, DOCS.length, Map.of())) {
-        Query parsed = reader.buildQuery(query, options);
+        Query parsed = reader.parseQuery(query, options);
         assertEquals(LuceneTextIndexUtils.countWithoutMaterializing(searcher, parsed), searcher.count(parsed),
             "multi-leaf count disagreed with IndexSearcher#count for query: " + query);
       }

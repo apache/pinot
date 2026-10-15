@@ -41,6 +41,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.reader.QueryScopedCache;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -64,7 +65,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Server;
 /// - We can also add some helper variables or methods in the context classes which can be shared for all segments to
 ///   reduce the repetitive work for each segment.
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class QueryContext {
+public class QueryContext implements QueryScopedCache {
   private final String _tableName;
   private final QueryContext _subquery;
   private final List<ExpressionContext> _selectExpressions;
@@ -620,6 +621,11 @@ public class QueryContext {
   /// @param <K> the key type
   /// @param <V> the value type
   /// @return the shared value
+  @Override
+  public <K, V> V getOrCompute(Class<V> type, K key, Function<K, V> mapper) {
+    return getOrComputeSharedValue(type, key, mapper);
+  }
+
   public <K, V> V getOrComputeSharedValue(Class<V> type, K key, Function<K, V> mapper) {
     return ((ConcurrentHashMap<K, V>) _sharedValues.computeIfAbsent(type, k -> new ConcurrentHashMap<>()))
         .computeIfAbsent(key, mapper);

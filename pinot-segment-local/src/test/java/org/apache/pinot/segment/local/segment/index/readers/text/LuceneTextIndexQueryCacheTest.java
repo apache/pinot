@@ -20,13 +20,23 @@ package org.apache.pinot.segment.local.segment.index.readers.text;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.search.Query;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
+import org.apache.pinot.segment.spi.index.reader.QueryScopedCache;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -38,10 +48,7 @@ import static org.testng.Assert.assertNotSame;
 import static org.testng.Assert.assertSame;
 
 
-/// Covers the parsed-query cache in [LuceneTextIndexReader].
-///
-/// The cache is static, so the column name is deliberately unique to this class: a key that collided with
-/// another test class's column would make these assertions depend on test ordering.
+/// Covers the query-scoped reuse of parsed queries in [LuceneTextIndexReader].
 public class LuceneTextIndexQueryCacheTest {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(),
       LuceneTextIndexQueryCacheTest.class.getSimpleName() + "-" + UUID.randomUUID());
@@ -54,6 +61,27 @@ public class LuceneTextIndexQueryCacheTest {
       "connection refused by payment service",
       "order confirmation email sent to carol"
   };
+
+  /// Stands in for `QueryContext`, which lives in pinot-core and is not visible here. It uses the same
+  /// `computeIfAbsent` contract, and counts how many times a key is actually computed so a test can
+  /// assert that a parse happened once rather than once per caller.
+  private static final class CountingCache implements QueryScopedCache {
+    private final ConcurrentHashMap<Object, Object> _values = new ConcurrentHashMap<>();
+    private final AtomicInteger _computeCount = new AtomicInteger();
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public <K, V> V getOrCompute(Class<V> type, K key, Function<K, V> mapper) {
+      return (V) _values.computeIfAbsent(key, k -> {
+        _computeCount.incrementAndGet();
+        return mapper.apply((K) k);
+      });
+    }
+
+    int computeCount() {
+      return _computeCount.get();
+    }
+  }
 
   @BeforeClass
   public void setUp()
@@ -70,55 +98,122 @@ public class LuceneTextIndexQueryCacheTest {
   }
 
   @AfterClass
-  public void tearDown()
-      throws IOException {
+  public void tearDown() {
     FileUtils.deleteQuietly(TEMP_DIR);
   }
 
-  private static TextIndexConfig config(boolean useAndForMultiTerm) {
-    return (TextIndexConfig) new TextIndexConfigBuilder().withProperties(
-        Map.of(FieldConfig.TEXT_INDEX_USE_AND_FOR_MULTI_TERM_QUERIES, String.valueOf(useAndForMultiTerm))).build();
+  private static TextIndexConfig configWithProperties(Map<String, String> properties) {
+    return (TextIndexConfig) new TextIndexConfigBuilder().withProperties(properties).build();
+  }
+
+  private static TextIndexConfig configWithStopWords(List<String> stopWordsInclude) {
+    TextIndexConfig.AbstractBuilder builder = new TextIndexConfigBuilder();
+    builder.withStopWordsInclude(stopWordsInclude);
+    return (TextIndexConfig) builder.build();
+  }
+
+  private LuceneTextIndexReader reader(TextIndexConfig config) {
+    return new LuceneTextIndexReader(COLUMN, INDEX_DIR, DOCS.length, config);
   }
 
   @Test
-  public void testRepeatedParseReturnsTheCachedInstance()
+  public void testParseIsSharedWithinOneQuery()
       throws Exception {
-    try (LuceneTextIndexReader reader = new LuceneTextIndexReader(COLUMN, INDEX_DIR, DOCS.length, config(false))) {
-      Query first = reader.buildQuery("order", null);
-      Query second = reader.buildQuery("order", null);
-      assertSame(second, first, "a repeated parse should be served from the cache");
-      assertNotSame(reader.parseQuery("order", null), first, "parseQuery must bypass the cache");
-      assertEquals(reader.parseQuery("order", null), first, "the cached query must equal a fresh parse");
+    CountingCache cache = new CountingCache();
+    try (LuceneTextIndexReader first = reader(configWithProperties(Map.of()));
+        LuceneTextIndexReader second = reader(configWithProperties(Map.of()))) {
+      Query a = first.buildQuery("order", null, cache);
+      Query b = second.buildQuery("order", null, cache);
+      assertSame(b, a, "equivalent readers in one query should share the parsed query");
+      assertEquals(cache.computeCount(), 1, "the query should have been parsed exactly once");
+      assertNotSame(first.parseQuery("order", null), a, "parseQuery must bypass the cache");
     }
   }
 
-  /// Regression test: the cache is process-wide, so two tables that share a column name but parse
-  /// differently must not share an entry. Keying on the column name alone would hand the second
-  /// reader the first one's query and silently return the wrong rows.
   @Test
-  public void testConfigDifferenceIsNotSharedAcrossReaders()
+  public void testNoCacheMeansNoSharing()
       throws Exception {
-    try (LuceneTextIndexReader orReader = new LuceneTextIndexReader(COLUMN, INDEX_DIR, DOCS.length, config(false));
-        LuceneTextIndexReader andReader = new LuceneTextIndexReader(COLUMN, INDEX_DIR, DOCS.length, config(true))) {
-      Query asOr = orReader.buildQuery("failed order", null);
-      Query asAnd = andReader.buildQuery("failed order", null);
-      assertNotEquals(asAnd, asOr, "OR and AND multi-term configs must not share a cache entry");
-      assertEquals(asOr, orReader.parseQuery("failed order", null));
-      assertEquals(asAnd, andReader.parseQuery("failed order", null));
+    try (LuceneTextIndexReader reader = reader(configWithProperties(Map.of()))) {
+      Query a = reader.buildQuery("order", null, null);
+      Query b = reader.buildQuery("order", null, null);
+      assertNotSame(b, a);
+      assertEquals(b, a);
+      assertEquals(reader.getNumMatchingDocs("order", null, null), 2);
+    }
+  }
 
-      // and the difference must still be visible in the answer
-      assertEquals(orReader.getNumMatchingDocs("failed order", null), 3);
-      assertEquals(andReader.getNumMatchingDocs("failed order", null), 1);
+  /// Regression test for a flattened cache key. `["failed", "order"]` and `["failed, order"]` are
+  /// different stop-word sets -- the first makes `failed` a stop word, the second does not -- yet both
+  /// render as `[failed, order]`. A key built from rendered text would let the second configuration
+  /// reuse the first's empty query and silently lose matches.
+  @Test
+  public void testStopWordListsThatRenderIdenticallyDoNotCollide()
+      throws Exception {
+    CountingCache cache = new CountingCache();
+    try (LuceneTextIndexReader twoStopWords = reader(configWithStopWords(List.of("failed", "order")));
+        LuceneTextIndexReader oneStopWord = reader(configWithStopWords(List.of("failed, order")))) {
+      Query withFailedAsStopWord = twoStopWords.buildQuery("failed", null, cache);
+      Query withFailedAsTerm = oneStopWord.buildQuery("failed", null, cache);
+      assertNotEquals(withFailedAsTerm, withFailedAsStopWord,
+          "configurations whose stop-word lists only render the same must not share a cache entry");
+      assertEquals(cache.computeCount(), 2, "each configuration must be parsed on its own");
+      assertEquals(withFailedAsStopWord, twoStopWords.parseQuery("failed", null));
+      assertEquals(withFailedAsTerm, oneStopWord.parseQuery("failed", null));
+    }
+  }
+
+  @Test
+  public void testMultiTermConfigDoesNotCollide()
+      throws Exception {
+    CountingCache cache = new CountingCache();
+    try (LuceneTextIndexReader orReader = reader(
+        configWithProperties(Map.of(FieldConfig.TEXT_INDEX_USE_AND_FOR_MULTI_TERM_QUERIES, "false")));
+        LuceneTextIndexReader andReader = reader(
+            configWithProperties(Map.of(FieldConfig.TEXT_INDEX_USE_AND_FOR_MULTI_TERM_QUERIES, "true")))) {
+      assertNotEquals(andReader.buildQuery("failed order", null, cache),
+          orReader.buildQuery("failed order", null, cache));
+      assertEquals(orReader.getNumMatchingDocs("failed order", null, cache), 3);
+      assertEquals(andReader.getNumMatchingDocs("failed order", null, cache), 1);
     }
   }
 
   @Test
   public void testOptionsStringIsPartOfTheKey()
       throws Exception {
-    try (LuceneTextIndexReader reader = new LuceneTextIndexReader(COLUMN, INDEX_DIR, DOCS.length, config(false))) {
-      Query withoutOptions = reader.buildQuery("failed order", null);
-      Query withOptions = reader.buildQuery("failed order", "parser=MATCH,operator=AND");
-      assertNotEquals(withOptions, withoutOptions, "different options must not share a cache entry");
+    CountingCache cache = new CountingCache();
+    try (LuceneTextIndexReader reader = reader(configWithProperties(Map.of()))) {
+      assertNotEquals(reader.buildQuery("failed order", "parser=MATCH,operator=AND", cache),
+          reader.buildQuery("failed order", null, cache));
+      assertEquals(cache.computeCount(), 2);
+    }
+  }
+
+  /// A cold query hit by every segment thread at once must still be parsed once, not once per thread.
+  @Test
+  public void testConcurrentMissesParseOnce()
+      throws Exception {
+    int threads = 16;
+    CountingCache cache = new CountingCache();
+    ExecutorService executor = Executors.newFixedThreadPool(threads);
+    try {
+      CountDownLatch start = new CountDownLatch(1);
+      Future<Query>[] futures = new Future[threads];
+      for (int i = 0; i < threads; i++) {
+        futures[i] = executor.submit(() -> {
+          try (LuceneTextIndexReader reader = reader(configWithProperties(Map.of()))) {
+            start.await();
+            return reader.buildQuery("connection", null, cache);
+          }
+        });
+      }
+      start.countDown();
+      Query first = futures[0].get(60, TimeUnit.SECONDS);
+      for (Future<Query> future : futures) {
+        assertSame(future.get(60, TimeUnit.SECONDS), first, "all threads should observe one parsed query");
+      }
+      assertEquals(cache.computeCount(), 1, "a cold key must be parsed once, not once per thread");
+    } finally {
+      executor.shutdownNow();
     }
   }
 }

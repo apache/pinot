@@ -61,6 +61,23 @@ public interface TextIndexReader extends IndexReader {
     return getDocIds(searchQuery, optionsString).getCardinality();
   }
 
+  /// Returns the matching document ids, reusing a query-scoped parse when the implementation supports it.
+  ///
+  /// Parsing a search string depends only on the string and the column's index configuration, so every
+  /// segment of one request would otherwise repeat identical work. Implementations that parse should
+  /// derive their cache key from the search string, the options and the configuration that affects
+  /// parsing. A `null` cache means "do not share", and must behave exactly like the two-argument form.
+  default MutableRoaringBitmap getDocIds(String searchQuery, @Nullable String optionsString,
+      @Nullable QueryScopedCache queryScopedCache) {
+    return getDocIds(searchQuery, optionsString);
+  }
+
+  /// Counting counterpart of [#getDocIds(String, String, QueryScopedCache)].
+  default int getNumMatchingDocs(String searchQuery, @Nullable String optionsString,
+      @Nullable QueryScopedCache queryScopedCache) {
+    return getNumMatchingDocs(searchQuery, optionsString);
+  }
+
   /// Marker method that allows to differentiate between single-column and multi-column text index reader .
   default boolean isMultiColumn() {
     return false;

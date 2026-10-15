@@ -19,8 +19,6 @@
 package org.apache.pinot.segment.local.segment.index.readers.text;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
@@ -52,6 +50,7 @@ import org.apache.pinot.segment.local.utils.LuceneTextIndexUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.TextIndexConfig.DocIdTranslatorMode;
+import org.apache.pinot.segment.spi.index.reader.QueryScopedCache;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
@@ -81,26 +80,9 @@ public class LuceneTextIndexReader implements TextIndexReader {
   private final String _queryParserClass;
   private Constructor<QueryParserBase> _queryParserClassConstructor;
   private boolean _enablePrefixSuffixMatchingInPhraseQueries = false;
-  /// Identifies every piece of configuration that changes how a search string parses, so that two
-  /// readers share a cached query only when they would have parsed it identically. Computed once.
-  private final String _queryCacheScope;
-
-  /// Parsed queries, shared by every segment reader in this process.
-  ///
-  /// A text query is parsed and analyzed independently inside each segment's reader, so a table with
-  /// N segments parses the same string N times per query. On a 250-segment table that is a
-  /// measurable share of a selective query's cost, and it is pure duplicate work: the parse depends
-  /// only on the search string and the column's text-index configuration, never on segment contents.
-  ///
-  /// Sharing the resulting [Query] across readers is safe because Lucene queries are immutable and
-  /// [Query#rewrite] does not mutate them -- a multi-term query is still expanded per segment
-  /// against that segment's own term dictionary.
-  ///
-  /// Bounded: the keys include user-supplied search strings, whose cardinality is unbounded on an
-  /// ad-hoc search workload. An eviction only costs a re-parse.
-  private static final int QUERY_CACHE_MAX_SIZE = 5000;
-  private static final Cache<String, Query> QUERY_CACHE =
-      CacheBuilder.newBuilder().maximumSize(QUERY_CACHE_MAX_SIZE).build();
+  /// Everything about this column that changes how a search string parses. Two readers may share a
+  /// parsed query only when these are equal. Computed once; immutable, with structural equality.
+  private final ParseConfig _parseConfig;
 
   public LuceneTextIndexReader(String column, File indexDir, int numDocs, TextIndexConfig config) {
     _column = column;
@@ -134,7 +116,8 @@ public class LuceneTextIndexReader implements TextIndexReader {
       _queryParserClass = config.getLuceneQueryParserClass();
       _queryParserClassConstructor =
           TextIndexUtils.getQueryParserWithStringAndAnalyzerTypeConstructor(_queryParserClass);
-      _queryCacheScope = buildQueryCacheScope(_column, config);
+      // after the properties-file override above, so it reflects the configuration actually in force
+      _parseConfig = buildParseConfig(_column, config);
       LOGGER.info("Successfully read lucene index for {} from {}", _column, indexDir);
     } catch (Exception e) {
       LOGGER.error("Failed to instantiate Lucene text index reader for column {}, exception {}", column,
@@ -206,7 +189,8 @@ public class LuceneTextIndexReader implements TextIndexReader {
       _queryParserClass = config.getLuceneQueryParserClass();
       _queryParserClassConstructor =
           TextIndexUtils.getQueryParserWithStringAndAnalyzerTypeConstructor(_queryParserClass);
-      _queryCacheScope = buildQueryCacheScope(_column, config);
+      // after the properties-file override above, so it reflects the configuration actually in force
+      _parseConfig = buildParseConfig(_column, config);
 
       LOGGER.info("Successfully read lucene index for {} from buffer", _column);
     } catch (Exception e) {
@@ -249,10 +233,16 @@ public class LuceneTextIndexReader implements TextIndexReader {
 
   @Override
   public MutableRoaringBitmap getDocIds(String searchQuery, @Nullable String optionsString) {
+    return getDocIds(searchQuery, optionsString, null);
+  }
+
+  @Override
+  public MutableRoaringBitmap getDocIds(String searchQuery, @Nullable String optionsString,
+      @Nullable QueryScopedCache queryScopedCache) {
     MutableRoaringBitmap docIds = new MutableRoaringBitmap();
     Collector docIDCollector = new LuceneDocIdCollector(docIds, _docIdTranslator);
     try {
-      _indexSearcher.search(buildQuery(searchQuery, optionsString), docIDCollector);
+      _indexSearcher.search(buildQuery(searchQuery, optionsString, queryScopedCache), docIDCollector);
       return docIds;
     } catch (QueryException e) {
       throw e;
@@ -267,18 +257,42 @@ public class LuceneTextIndexReader implements TextIndexReader {
     }
   }
 
-  /// Builds the cache scope: every setting that can change how a search string parses.
-  ///
-  /// The parsed-query cache is process-wide, so the scope must distinguish two tables that happen to
-  /// use the same column name but a different analyzer, parser or multi-term/phrase behaviour --
-  /// otherwise one table would silently answer with the other's parsed query.
-  private static String buildQueryCacheScope(String column, TextIndexConfig config) {
-    return String.join("\u0001", column, String.valueOf(config.getLuceneAnalyzerClass()),
-        String.valueOf(config.getLuceneAnalyzerClassArgs()), String.valueOf(config.getLuceneAnalyzerClassArgTypes()),
-        String.valueOf(config.getStopWordsInclude()), String.valueOf(config.getStopWordsExclude()),
-        String.valueOf(config.isCaseSensitive()), String.valueOf(config.getLuceneQueryParserClass()),
-        String.valueOf(config.isUseANDForMultiTermQueries()),
-        String.valueOf(config.isEnablePrefixSuffixMatchingInPhraseQueries()));
+  /// Identifies a parsing configuration. A record so that equality is structural: comparing the
+  /// rendered text of these lists instead would conflate `["failed", "order"]` with
+  /// `["failed, order"]`, which are different stop-word sets that parse the same string differently.
+  private record ParseConfig(String column, String analyzerClass, List<String> analyzerArgs,
+                             List<String> analyzerArgTypes, List<String> stopWordsInclude,
+                             List<String> stopWordsExclude, boolean caseSensitive, String queryParserClass,
+                             boolean useANDForMultiTermQueries, boolean prefixSuffixMatchingInPhraseQueries) {
+    private ParseConfig {
+      analyzerArgs = copy(analyzerArgs);
+      analyzerArgTypes = copy(analyzerArgTypes);
+      stopWordsInclude = copy(stopWordsInclude);
+      stopWordsExclude = copy(stopWordsExclude);
+    }
+
+    private static List<String> copy(@Nullable List<String> values) {
+      return values == null ? List.of() : List.copyOf(values);
+    }
+  }
+
+  /// Cache key for one parsed query: the configuration plus the request-supplied text.
+  private record ParsedQueryKey(ParseConfig parseConfig, String searchQuery, @Nullable String optionsString) {
+  }
+
+  /// Carries a checked parse failure out of the cache's mapper so the original exception, and in
+  /// particular a [QueryException]'s error code, survives instead of being wrapped.
+  private static final class ParseFailure extends RuntimeException {
+    ParseFailure(Exception cause) {
+      super(cause);
+    }
+  }
+
+  private static ParseConfig buildParseConfig(String column, TextIndexConfig config) {
+    return new ParseConfig(column, config.getLuceneAnalyzerClass(), config.getLuceneAnalyzerClassArgs(),
+        config.getLuceneAnalyzerClassArgTypes(), config.getStopWordsInclude(), config.getStopWordsExclude(),
+        config.isCaseSensitive(), config.getLuceneQueryParserClass(), config.isUseANDForMultiTermQueries(),
+        config.isEnablePrefixSuffixMatchingInPhraseQueries());
   }
 
   /// Parses a search string into a Lucene query, applying the configured parser and options.
@@ -307,6 +321,12 @@ public class LuceneTextIndexReader implements TextIndexReader {
 
   @Override
   public int getNumMatchingDocs(String searchQuery, @Nullable String optionsString) {
+    return getNumMatchingDocs(searchQuery, optionsString, null);
+  }
+
+  @Override
+  public int getNumMatchingDocs(String searchQuery, @Nullable String optionsString,
+      @Nullable QueryScopedCache queryScopedCache) {
     try {
       // A Lucene index larger than the segment means the doc-id mapping is broken -- a state getDocIds
       // surfaces as an IndexOutOfBoundsException from the translator. Counting does not consult the
@@ -315,10 +335,10 @@ public class LuceneTextIndexReader implements TextIndexReader {
       // `context.docBase + doc`, which is maxDoc() space, and with deletions numDocs() < maxDoc() would let a
       // broken index slip through. Fall back so that it keeps failing loudly.
       if (_indexReader.maxDoc() > _numDocs) {
-        return getDocIds(searchQuery, optionsString).getCardinality();
+        return getDocIds(searchQuery, optionsString, queryScopedCache).getCardinality();
       }
       return LuceneTextIndexUtils.countWithoutMaterializing(_indexSearcher,
-          buildQuery(searchQuery, optionsString));
+          buildQuery(searchQuery, optionsString, queryScopedCache));
     } catch (QueryException e) {
       // A timeout or accountant kill arrives as a QueryException; wrapping it would erase its error code,
       // since only QueryException keeps its code through BaseSingleBlockCombineOperator.
@@ -335,22 +355,36 @@ public class LuceneTextIndexReader implements TextIndexReader {
   /// Both [#getDocIds(String, String)] and [#getNumMatchingDocs] go through this method, so a `count(*)` and
   /// the filter it counts cannot interpret the same query differently. Keep it that way: any new entry point
   /// that parses a search string itself reintroduces that divergence.
-  /// Returns a cached instance when one is present. Callers must treat the result as shared and
-  /// immutable, which Lucene queries are.
+  /// Returns the parsed query, reusing the one already parsed for this request when a cache is given.
+  ///
+  /// Every segment of a request parses the same string against the same configuration, so without a
+  /// cache the work is repeated once per segment. The cache computes a key at most once, so a cold
+  /// query parses once for the whole request rather than racing across segment threads.
+  ///
+  /// The returned query may be shared: Lucene queries are immutable and [Query#rewrite] does not
+  /// mutate them, so a multi-term query is still expanded per segment against that segment's own
+  /// term dictionary.
   @VisibleForTesting
-  Query buildQuery(String searchQuery, @Nullable String optionsString)
+  Query buildQuery(String searchQuery, @Nullable String optionsString, @Nullable QueryScopedCache queryScopedCache)
       throws Exception {
-    String cacheKey = _queryCacheScope + '\u0001' + searchQuery + '\u0001' + optionsString;
-    Query cached = QUERY_CACHE.getIfPresent(cacheKey);
-    if (cached != null) {
-      return cached;
+    if (queryScopedCache == null) {
+      return parseQuery(searchQuery, optionsString);
     }
-    Query query = parseQuery(searchQuery, optionsString);
-    QUERY_CACHE.put(cacheKey, query);
-    return query;
+    ParsedQueryKey key = new ParsedQueryKey(_parseConfig, searchQuery, optionsString);
+    try {
+      return queryScopedCache.getOrCompute(Query.class, key, k -> {
+        try {
+          return parseQuery(k.searchQuery(), k.optionsString());
+        } catch (Exception e) {
+          throw new ParseFailure(e);
+        }
+      });
+    } catch (ParseFailure e) {
+      throw (Exception) e.getCause();
+    }
   }
 
-  /// Parses unconditionally, bypassing the cache.
+  /// Parses unconditionally, bypassing any cache.
   @VisibleForTesting
   Query parseQuery(String searchQuery, @Nullable String optionsString)
       throws Exception {
