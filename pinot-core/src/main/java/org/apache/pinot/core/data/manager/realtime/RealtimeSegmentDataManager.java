@@ -1775,19 +1775,13 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     boolean holdsConsumerSemaphore = holdsConsumerSemaphoreForMetadata();
     boolean allowedDuringDownload =
         _parallelSegmentConsumptionPolicy.isAllowedDuringDownload() && !holdsConsumerSemaphore;
-    if (holdsConsumerSemaphore) {
-      if (releasedDuringBuild) {
-        // Already released elsewhere, so holding it now buys nothing. This is the case that can drop rows.
-        _segmentLogger.error("Next consuming segment can run during download while this replace rewrites upsert or "
-            + "dedup metadata. Its rows can be dropped against keys this replace removes. Use DISALLOW_ALWAYS");
-        if (revertsUpsertMetadata()) {
-          _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.UPSERT_REVERT_WITH_CONSUMPTION_DURING_DOWNLOAD,
-              1L);
-        }
-      } else if (_parallelSegmentConsumptionPolicy.isAllowedDuringDownload()) {
-        // Held against the policy. Nothing at risk, but the table asks for something it does not get.
-        _segmentLogger.warn("Holding the consumer semaphore through this replace although the policy is {}. Set "
-            + "DISALLOW_ALWAYS to make this explicit.", _parallelSegmentConsumptionPolicy);
+    if (holdsConsumerSemaphore && (releasedDuringBuild
+        || _parallelSegmentConsumptionPolicy.isAllowedDuringDownload())) {
+      _segmentLogger.warn("Policy {} would let the next consuming segment run while this replace rewrites upsert or "
+          + "dedup metadata. Use DISALLOW_ALWAYS", _parallelSegmentConsumptionPolicy);
+      // Only when the semaphore was already released: the rows are actually at risk then.
+      if (releasedDuringBuild && revertsUpsertMetadata()) {
+        _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.UPSERT_REVERT_WITH_CONSUMPTION_DURING_DOWNLOAD, 1L);
       }
     }
     if (allowedDuringDownload) {
