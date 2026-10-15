@@ -21,14 +21,18 @@ package org.apache.pinot.calcite.rel.rules;
 import com.google.common.base.Preconditions;
 import java.lang.reflect.Array;
 import java.math.BigDecimal;
+import java.math.MathContext;
+import java.math.RoundingMode;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.GregorianCalendar;
 import java.util.List;
 import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.calcite.avatica.util.ByteString;
+import org.apache.calcite.avatica.util.DateTimeUtils;
 import org.apache.calcite.avatica.util.TimeUnitRange;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
@@ -43,11 +47,14 @@ import org.apache.calcite.rex.RexShuttle;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.type.ArraySqlType;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.calcite.sql.type.SqlTypeUtil;
 import org.apache.calcite.tools.RelBuilderFactory;
+import org.apache.calcite.util.DateString;
 import org.apache.calcite.util.NlsString;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.QueryFunctionInvoker;
+import org.apache.pinot.common.function.scalar.DateTimeFunctions;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
 import org.apache.pinot.spi.utils.TimestampUtils;
@@ -171,6 +178,12 @@ public class PinotEvaluateLiteralRule {
       arguments[i] = getLiteralValue(rexLiteral);
     }
 
+    if (isDatetimeIntervalArithmetic(rexCall)) {
+      return evaluateDatetimeIntervalArithmetic(rexCall, rexBuilder);
+    }
+    if (isIntervalArithmetic(rexCall)) {
+      return evaluateIntervalArithmetic(rexCall, rexBuilder);
+    }
     if (rexCall.getKind() == SqlKind.CAST) {
       // Handle separately because the CAST operator only has one operand (the value to be cast) and the type to be cast
       // to is determined by the operator's return type. Pinot's CAST function implementation requires two arguments:
@@ -248,6 +261,114 @@ public class PinotEvaluateLiteralRule {
     }
   }
 
+  /// Returns whether the call is `datetime + interval` (Calcite's `DATETIME_PLUS`) or `datetime - interval`
+  /// (`MINUS_DATE`) with a `TIMESTAMP` or `DATE` result. Calcite puts the interval second for both.
+  private static boolean isDatetimeIntervalArithmetic(RexCall rexCall) {
+    SqlKind kind = rexCall.getKind();
+    SqlTypeName resultType = rexCall.getType().getSqlTypeName();
+    List<RexNode> operands = rexCall.getOperands();
+    return (kind == SqlKind.PLUS || kind == SqlKind.MINUS) && (resultType == SqlTypeName.TIMESTAMP
+        || resultType == SqlTypeName.DATE) && operands.size() == 2 && SqlTypeUtil.isInterval(operands.get(1).getType());
+  }
+
+  /// Evaluates `datetime + interval` or `datetime - interval` with the same semantics as Calcite. It cannot use Pinot's
+  /// `plus` / `minus` functions, because Calcite stores a day-time interval as milliseconds but a year-month interval
+  /// as months: they would add `INTERVAL '1' MONTH` as 1 millisecond. Months are added with the same calendar
+  /// arithmetic as `TIMESTAMPADD(MONTH, ...)`, so `2019-01-31 + INTERVAL '1' MONTH` is `2019-02-28`. Like Calcite, only
+  /// the whole days of a day-time interval are added to a `DATE`.
+  private static RexNode evaluateDatetimeIntervalArithmetic(RexCall rexCall, RexBuilder rexBuilder) {
+    RexLiteral datetime = (RexLiteral) rexCall.getOperands().get(0);
+    RexLiteral interval = (RexLiteral) rexCall.getOperands().get(1);
+    RelDataType resultType = rexCall.getType();
+    if (datetime.isNull() || interval.isNull()) {
+      return rexBuilder.makeNullLiteral(resultType);
+    }
+    Object resultValue;
+    try {
+      long millis = Objects.requireNonNull(datetime.getValueAs(Calendar.class)).getTimeInMillis();
+      // Number of months for a year-month interval, number of milliseconds for a day-time interval
+      long intervalValue = Objects.requireNonNull(interval.getValueAs(BigDecimal.class)).longValueExact();
+      if (rexCall.getKind() == SqlKind.MINUS) {
+        intervalValue = Math.negateExact(intervalValue);
+      }
+      boolean isDate = resultType.getSqlTypeName() == SqlTypeName.DATE;
+      long resultMillis;
+      if (SqlTypeName.YEAR_INTERVAL_TYPES.contains(interval.getType().getSqlTypeName())) {
+        resultMillis = DateTimeFunctions.timestampAdd("MONTH", intervalValue, millis);
+      } else {
+        if (isDate) {
+          intervalValue = intervalValue / DateTimeUtils.MILLIS_PER_DAY * DateTimeUtils.MILLIS_PER_DAY;
+        }
+        resultMillis = Math.addExact(millis, intervalValue);
+      }
+      resultValue = isDate ? DateString.fromDaysSinceEpoch(
+          Math.toIntExact(Math.floorDiv(resultMillis, DateTimeUtils.MILLIS_PER_DAY))) : resultMillis;
+    } catch (Exception e) {
+      throw new SqlCompilationException(
+          "Caught exception while evaluating: " + rexCall + ": " + e.getMessage(), e);
+    }
+    return rexBuilder.makeLiteral(resultValue, resultType, false);
+  }
+
+  /// Returns whether the call is `+`, `-`, `*` or `/` with an interval result and only interval or numeric operands,
+  /// e.g. `INTERVAL '1' MONTH * 2`.
+  private static boolean isIntervalArithmetic(RexCall rexCall) {
+    SqlKind kind = rexCall.getKind();
+    List<RexNode> operands = rexCall.getOperands();
+    return (kind == SqlKind.PLUS || kind == SqlKind.MINUS || kind == SqlKind.TIMES || kind == SqlKind.DIVIDE)
+        && SqlTypeUtil.isInterval(rexCall.getType()) && operands.size() == 2 && operands.stream()
+        .allMatch(operand -> SqlTypeUtil.isInterval(operand.getType()) || SqlTypeUtil.isNumeric(operand.getType()));
+  }
+
+  /// Evaluates interval arithmetic exactly. Pinot's `times` / `divide` functions compute in DOUBLE, so
+  /// `INTERVAL '100' MONTH * 0.29` would be 28.999999999999996 months instead of 29, and `INTERVAL '1' DAY * 0.7` would
+  /// be 1 millisecond short.
+  private static RexNode evaluateIntervalArithmetic(RexCall rexCall, RexBuilder rexBuilder) {
+    RexLiteral left = (RexLiteral) rexCall.getOperands().get(0);
+    RexLiteral right = (RexLiteral) rexCall.getOperands().get(1);
+    RelDataType resultType = rexCall.getType();
+    if (left.isNull() || right.isNull()) {
+      return rexBuilder.makeNullLiteral(resultType);
+    }
+    BigDecimal resultValue;
+    try {
+      // An interval literal holds its number of months or milliseconds
+      BigDecimal leftValue = Objects.requireNonNull(left.getValueAs(BigDecimal.class));
+      BigDecimal rightValue = Objects.requireNonNull(right.getValueAs(BigDecimal.class));
+      switch (rexCall.getKind()) {
+        case PLUS:
+          resultValue = leftValue.add(rightValue);
+          break;
+        case MINUS:
+          resultValue = leftValue.subtract(rightValue);
+          break;
+        case TIMES:
+          resultValue = leftValue.multiply(rightValue);
+          break;
+        default:
+          resultValue = leftValue.divide(rightValue, MathContext.DECIMAL128);
+          break;
+      }
+      resultValue = toIntervalValue(resultValue, resultType);
+    } catch (Exception e) {
+      throw new SqlCompilationException(
+          "Caught exception while evaluating: " + rexCall + ": " + e.getMessage(), e);
+    }
+    return rexBuilder.makeLiteral(resultValue, resultType, false);
+  }
+
+  /// Converts a number to the value that Calcite stores for an interval: a whole number of months for a year-month
+  /// interval, and milliseconds for a day-time interval (like Calcite, fractions of a millisecond are dropped).
+  private static BigDecimal toIntervalValue(BigDecimal value, RelDataType intervalType) {
+    if (SqlTypeName.YEAR_INTERVAL_TYPES.contains(intervalType.getSqlTypeName())) {
+      // Intentionally stricter than Calcite, which truncates to whole months (INTERVAL '1' MONTH / 2 is 0 months):
+      // reject the query instead of silently dropping a fraction of a month
+      Preconditions.checkArgument(value.stripTrailingZeros().scale() <= 0,
+          "Year-month interval must be a whole number of months, got: %s", value);
+    }
+    return value.setScale(0, RoundingMode.DOWN);
+  }
+
   private static RelDataType convertDecimalType(RelDataType relDataType, RexBuilder rexBuilder) {
     Preconditions.checkArgument(relDataType.getSqlTypeName() == SqlTypeName.DECIMAL);
     return RelToPlanNodeConverter.convertToColumnDataType(relDataType).toType(rexBuilder.getTypeFactory());
@@ -306,6 +427,16 @@ public class PinotEvaluateLiteralRule {
     }
     if (relDataType.getSqlTypeName() == SqlTypeName.DECIMAL) {
       return new BigDecimal(resultValue.toString());
+    }
+    // Other functions with an interval result, e.g. ABS(INTERVAL '-1' MONTH). Interval arithmetic is evaluated exactly
+    // in evaluateIntervalArithmetic().
+    if (SqlTypeUtil.isInterval(relDataType)) {
+      if (resultValue instanceof BigDecimal) {
+        return toIntervalValue((BigDecimal) resultValue, relDataType);
+      }
+      double value = ((Number) resultValue).doubleValue();
+      Preconditions.checkArgument(Double.isFinite(value), "Invalid interval value: %s", value);
+      return toIntervalValue(BigDecimal.valueOf(value), relDataType);
     }
     // Use double for FLOAT / DOUBLE literals
     if (relDataType.getSqlTypeName() == SqlTypeName.FLOAT || relDataType.getSqlTypeName() == SqlTypeName.DOUBLE
