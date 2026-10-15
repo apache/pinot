@@ -987,12 +987,29 @@ public class RealtimeSegmentDataManagerTest {
         ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY, serverMetrics)) {
       Semaphore semaphore = _partitionGroupIdToConsumerCoordinatorMap.get(PARTITION_GROUP_ID).getSemaphore();
       Assert.assertTrue(semaphore.tryAcquire());
+      // The policy would release, but the replace reverts upsert metadata, so the guard keeps the permit.
       segmentDataManager._releaseSemaphoreOnBuild = true;
+      Assert.assertFalse(segmentDataManager.shouldReleaseSemaphoreBeforeBuild());
       runGoOnlineForCrcGuard(segmentDataManager, crcMetadata(finalOffsetValue, 12345L), false, finalOffsetValue);
       Assert.assertTrue(segmentDataManager._downloadAndReplaceCalled);
-      Assert.assertEquals(semaphore.availablePermits(), 1);
-      verify(serverMetrics).addMeteredTableValue(anyString(),
-          eq(ServerMeter.UPSERT_REVERT_WITH_CONSUMPTION_DURING_DOWNLOAD), eq(1L));
+      Assert.assertEquals(semaphore.availablePermits(), 0);
+      verify(serverMetrics, never()).addMeteredTableValue(anyString(),
+          eq(ServerMeter.UPSERT_REVERT_WITH_CONSUMPTION_DURING_DOWNLOAD), anyLong());
+    }
+
+    // ALLOW_DURING_DOWNLOAD_ONLY: releasedDuringBuild is never true here, so only the override path can report it.
+    _partitionGroupIdToConsumerCoordinatorMap.remove(PARTITION_GROUP_ID);
+    serverMetrics = spy(new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()));
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManagerForUpsertRevert(
+        ParallelSegmentConsumptionPolicy.ALLOW_DURING_DOWNLOAD_ONLY, serverMetrics)) {
+      Semaphore semaphore = _partitionGroupIdToConsumerCoordinatorMap.get(PARTITION_GROUP_ID).getSemaphore();
+      Assert.assertTrue(semaphore.tryAcquire());
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
+      Assert.assertFalse(segmentDataManager.shouldReleaseSemaphoreBeforeBuild());
+      segmentDataManager.downloadSegmentAndReplace(crcMetadata(finalOffsetValue, 12345L));
+      Assert.assertEquals(semaphore.availablePermits(), 0);
+      verify(serverMetrics, never()).addMeteredTableValue(anyString(),
+          eq(ServerMeter.UPSERT_REVERT_WITH_CONSUMPTION_DURING_DOWNLOAD), anyLong());
     }
 
     // ALLOW_DURING_BUILD_ONLY without a local build: the download still holds the semaphore, so nothing is flagged.
@@ -1891,7 +1908,8 @@ public class RealtimeSegmentDataManagerTest {
     protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit) {
       terminateLoopIfNecessary();
       _buildSegmentCalled = true;
-      if (_releaseSemaphoreOnBuild) {
+      // Through the real predicate, so the guard is exercised rather than bypassed.
+      if (_releaseSemaphoreOnBuild && shouldReleaseSemaphoreBeforeBuild()) {
         closeStreamConsumerAndReleaseSemaphore();
       }
       if (_failSegmentBuild) {

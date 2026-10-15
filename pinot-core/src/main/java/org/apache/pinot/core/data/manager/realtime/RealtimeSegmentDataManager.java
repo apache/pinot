@@ -1207,10 +1207,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   @Nullable
   protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit)
       throws SegmentBuildFailureException {
-    // Not dedup: it removes a segment's keys when the mutable segment is offloaded, which is after the replace, so
-    // nothing it owns is rewritten while the build runs. An upsert revert is rewritten at the replace the build
-    // leads to, and the next consuming segment must not already be running against the key map by then.
-    if (_parallelSegmentConsumptionPolicy.isAllowedDuringBuild() && !revertsUpsertMetadata()) {
+    // Dedup shares this window but is left out: holding through every dedup build costs more than it buys.
+    if (shouldReleaseSemaphoreBeforeBuild()) {
       closeStreamConsumerAndReleaseSemaphore();
     }
     // Do not allow building segment when table data manager is already shut down
@@ -1778,12 +1776,17 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     boolean allowedDuringDownload =
         _parallelSegmentConsumptionPolicy.isAllowedDuringDownload() && !holdsConsumerSemaphore;
     if (releasedDuringBuild && holdsConsumerSemaphore) {
-      // The build holds the semaphore for these tables, so reaching this means it was released on another path.
+      // Already released elsewhere, so holding it now buys nothing. This is the case that can drop rows.
       _segmentLogger.error("Next consuming segment can run during download while this replace rewrites upsert or "
           + "dedup metadata. Its rows can be dropped against keys this replace removes. Use DISALLOW_ALWAYS");
       if (revertsUpsertMetadata()) {
         _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.UPSERT_REVERT_WITH_CONSUMPTION_DURING_DOWNLOAD, 1L);
       }
+    } else if (_parallelSegmentConsumptionPolicy.isAllowedDuringDownload() && holdsConsumerSemaphore) {
+      // Nothing at risk, but the table is misconfigured; the branch above cannot report it for this policy.
+      _segmentLogger.warn("Holding the consumer semaphore through this replace although the policy is {}: the replace "
+              + "rewrites upsert or dedup metadata. Set DISALLOW_ALWAYS to make this explicit.",
+          _parallelSegmentConsumptionPolicy);
     }
     if (allowedDuringDownload) {
       closeStreamConsumerAndReleaseSemaphore();
@@ -1791,8 +1794,13 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _realtimeTableDataManager.downloadAndReplaceConsumingSegment(segmentZKMetadata);
   }
 
-  /// The replace rewrites the key map, so the next consuming segment must not run against it during the download:
-  /// upsert reverts those keys, dedup removes them when the mutable segment is offloaded.
+  /// Upsert reverts the keys at the replace; dedup re-points them to the new immutable segment.
+  /// Extracted to be testable: the test double replaces [#buildSegmentInternal] wholesale.
+  @VisibleForTesting
+  boolean shouldReleaseSemaphoreBeforeBuild() {
+    return _parallelSegmentConsumptionPolicy.isAllowedDuringBuild() && !revertsUpsertMetadata();
+  }
+
   private boolean holdsConsumerSemaphoreForMetadata() {
     return revertsUpsertMetadata() || _partitionDedupMetadataManager != null;
   }
