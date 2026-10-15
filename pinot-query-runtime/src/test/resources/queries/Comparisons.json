@@ -541,5 +541,73 @@
       { "sql": "SELECT a BETWEEN 'a' AND 'c' FROM {tbl}" },
       { "sql" : "SELECT 'c' BETWEEN 'a' AND 'b' FROM {tbl}"}
     ]
+  },
+  "distinct_from_function_mixed_numeric_types": {
+    "tables": {
+      "tbl": {
+        "schema": [
+          {"name": "intCol", "type": "INT"},
+          {"name": "longCol", "type": "LONG"},
+          {"name": "floatCol", "type": "FLOAT"},
+          {"name": "doubleCol", "type": "DOUBLE"},
+          {"name": "bigDecimalCol", "type": "BIG_DECIMAL"}
+        ],
+        "inputs": [
+          [5, 5, 5.0, 5.0, "5"],
+          [5, 6, 5.5, 5.5, "5.5"],
+          [0, 0, 0.0, 0.0, "0"],
+          [-2, 2, 1.1, 1.1, "1.1"],
+          [2147483647, 2147483647, -1.5, -1.5, "-1.5"]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "The GROUP BY subquery moves the call above the leaf stage, where it runs the scalar function",
+        "sql": "SELECT t.intCol, isDistinctFrom(t.intCol, CAST(5 AS BIGINT)), isNotDistinctFrom(t.intCol, CAST(5 AS BIGINT)) FROM (SELECT intCol FROM {tbl} GROUP BY intCol) t",
+        "h2Sql": "SELECT t.intCol, t.intCol IS DISTINCT FROM CAST(5 AS BIGINT), t.intCol IS NOT DISTINCT FROM CAST(5 AS BIGINT) FROM (SELECT intCol FROM {tbl} GROUP BY intCol) t"
+      },
+      {
+        "description": "Numbers of different types are compared by value",
+        "sql": "SELECT t.intCol, isDistinctFrom(t.intCol, t.longCol), isDistinctFrom(t.intCol, t.floatCol), isDistinctFrom(t.intCol, t.doubleCol), isDistinctFrom(t.intCol, t.bigDecimalCol), isDistinctFrom(t.longCol, t.doubleCol), isDistinctFrom(t.floatCol, t.doubleCol), isDistinctFrom(t.doubleCol, t.bigDecimalCol), isNotDistinctFrom(t.longCol, t.floatCol) FROM (SELECT intCol, longCol, floatCol, doubleCol, bigDecimalCol FROM {tbl} GROUP BY intCol, longCol, floatCol, doubleCol, bigDecimalCol) t",
+        "h2Sql": "SELECT t.intCol, t.intCol IS DISTINCT FROM t.longCol, t.intCol IS DISTINCT FROM t.floatCol, t.intCol IS DISTINCT FROM t.doubleCol, t.intCol IS DISTINCT FROM t.bigDecimalCol, t.longCol IS DISTINCT FROM t.doubleCol, t.floatCol IS DISTINCT FROM t.doubleCol, t.doubleCol IS DISTINCT FROM t.bigDecimalCol, t.longCol IS NOT DISTINCT FROM t.floatCol FROM (SELECT intCol, longCol, floatCol, doubleCol, bigDecimalCol FROM {tbl} GROUP BY intCol, longCol, floatCol, doubleCol, bigDecimalCol) t"
+      },
+      {
+        "description": "NaN is not distinct from NaN, and is distinct from any BIG_DECIMAL",
+        "sql": "SELECT t.doubleCol, isDistinctFrom(SQRT(t.doubleCol), CAST(SQRT(t.doubleCol) AS REAL)), isDistinctFrom(SQRT(t.doubleCol), t.bigDecimalCol) FROM (SELECT intCol, longCol, floatCol, doubleCol, bigDecimalCol FROM {tbl} GROUP BY intCol, longCol, floatCol, doubleCol, bigDecimalCol) t",
+        "h2Sql": "SELECT t.doubleCol, SQRT(t.doubleCol) IS DISTINCT FROM CAST(SQRT(t.doubleCol) AS REAL), SQRT(t.doubleCol) IS DISTINCT FROM t.bigDecimalCol FROM (SELECT intCol, longCol, floatCol, doubleCol, bigDecimalCol FROM {tbl} GROUP BY intCol, longCol, floatCol, doubleCol, bigDecimalCol) t"
+      },
+      {
+        "description": "BIG_DECIMAL values with different scales are not distinct",
+        "sql": "SELECT t.bigDecimalCol, isDistinctFrom(t.bigDecimalCol, CAST(1.1 AS DECIMAL(38, 2))), isNotDistinctFrom(t.bigDecimalCol, CAST(-1.5 AS DECIMAL(38, 3))) FROM (SELECT intCol, longCol, floatCol, doubleCol, bigDecimalCol FROM {tbl} GROUP BY intCol, longCol, floatCol, doubleCol, bigDecimalCol) t",
+        "h2Sql": "SELECT t.bigDecimalCol, t.bigDecimalCol IS DISTINCT FROM CAST(1.1 AS DECIMAL(38, 2)), t.bigDecimalCol IS NOT DISTINCT FROM CAST(-1.5 AS DECIMAL(38, 3)) FROM (SELECT intCol, longCol, floatCol, doubleCol, bigDecimalCol FROM {tbl} GROUP BY intCol, longCol, floatCol, doubleCol, bigDecimalCol) t"
+      },
+      {
+        "description": "All-literal calls are folded during planning",
+        "sql": "SELECT isDistinctFrom(5, CAST(5 AS BIGINT)), isDistinctFrom(5, 5.0), isDistinctFrom(1.5, 1.50), isNotDistinctFrom(CAST(5 AS BIGINT), 5.0) FROM {tbl}",
+        "h2Sql": "SELECT 5 IS DISTINCT FROM CAST(5 AS BIGINT), 5 IS DISTINCT FROM 5.0, 1.5 IS DISTINCT FROM 1.50, CAST(5 AS BIGINT) IS NOT DISTINCT FROM 5.0 FROM {tbl}"
+      }
+    ]
+  },
+  "distinct_from_function_bytes": {
+    "tables": {
+      "tbl": {
+        "schema": [
+          {"name": "bytesCol1", "type": "BYTES"},
+          {"name": "bytesCol2", "type": "BYTES"}
+        ],
+        "inputs": [
+          ["deadbeef", "deadbeef"],
+          ["00", "01"]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "BYTES values are compared by content above the leaf stage",
+        "sql": "SELECT isDistinctFrom(t.bytesCol1, t.bytesCol2), isNotDistinctFrom(t.bytesCol1, t.bytesCol2) FROM (SELECT bytesCol1, bytesCol2 FROM {tbl} GROUP BY bytesCol1, bytesCol2) t",
+        "h2Sql": "SELECT t.bytesCol1 IS DISTINCT FROM t.bytesCol2, t.bytesCol1 IS NOT DISTINCT FROM t.bytesCol2 FROM (SELECT bytesCol1, bytesCol2 FROM {tbl} GROUP BY bytesCol1, bytesCol2) t"
+      }
+    ]
   }
 }
