@@ -2977,6 +2977,21 @@
                 <exclude>shaded/parquet/com/fasterxml/jackson/**</exclude>
                 <exclude>META-INF/versions/**/shaded/parquet/com/fasterxml/jackson/**</exclude>
 
+                <!-- Keep Hadoop's shaded JAX-RS providers while using managed Jackson core and databind. -->
+                <exclude>org/apache/hadoop/shaded/com/fasterxml/jackson/core/**</exclude>
+                <exclude>META-INF/versions/**/org/apache/hadoop/shaded/com/fasterxml/jackson/core/**</exclude>
+                <exclude>org/apache/hadoop/shaded/com/fasterxml/jackson/databind/**</exclude>
+                <exclude>META-INF/versions/**/org/apache/hadoop/shaded/com/fasterxml/jackson/databind/**</exclude>
+                <exclude>org/apache/hadoop/shaded/com/fasterxml/jackson/annotation/**</exclude>
+                <exclude>META-INF/versions/**/org/apache/hadoop/shaded/com/fasterxml/jackson/annotation/**</exclude>
+                <exclude>com/facebook/presto/jdbc/internal/jackson/**</exclude>
+                <exclude>META-INF/versions/**/com/facebook/presto/jdbc/internal/jackson/**</exclude>
+                <exclude>software/amazon/awssdk/thirdparty/jackson/core/**</exclude>
+                <exclude>META-INF/versions/**/software/amazon/awssdk/thirdparty/jackson/core/**</exclude>
+                <!-- Presto's canonical Jackson Joda module must see canonical Joda-Time values. -->
+                <exclude>com/facebook/presto/jdbc/internal/joda/time/**</exclude>
+                <exclude>META-INF/versions/**/com/facebook/presto/jdbc/internal/joda/time/**</exclude>
+
                 <!-- Use managed Guava instead of copies embedded in dependencies. -->
                 <exclude>org/apache/hadoop/thirdparty/com/google/common/**</exclude>
                 <exclude>META-INF/versions/**/org/apache/hadoop/thirdparty/com/google/common/**</exclude>
@@ -3021,6 +3036,7 @@
               <artifact>org.apache.hadoop*:*</artifact>
               <excludes>
                 <exclude>META-INF/maven/com.google.guava/**</exclude>
+                <exclude>META-INF/maven/com.fasterxml.jackson.core/**</exclude>
                 <exclude>META-INF/versions/**/module-info.class</exclude>
               </excludes>
             </filter>
@@ -3061,6 +3077,30 @@
             </filter>
           </filters>
           <relocations>
+            <relocation>
+              <pattern>org.apache.hadoop.shaded.com.fasterxml.jackson.core</pattern>
+              <shadedPattern>${shade.prefix}.com.fasterxml.jackson.core</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.apache.hadoop.shaded.com.fasterxml.jackson.databind</pattern>
+              <shadedPattern>${shade.prefix}.com.fasterxml.jackson.databind</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.apache.hadoop.shaded.com.fasterxml.jackson.annotation</pattern>
+              <shadedPattern>${shade.prefix}.com.fasterxml.jackson.annotation</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>com.facebook.presto.jdbc.internal.jackson</pattern>
+              <shadedPattern>${shade.prefix}.com.fasterxml.jackson</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>software.amazon.awssdk.thirdparty.jackson.core</pattern>
+              <shadedPattern>${shade.prefix}.com.fasterxml.jackson.core</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>com.facebook.presto.jdbc.internal.joda.time</pattern>
+              <shadedPattern>org.joda.time</shadedPattern>
+            </relocation>
             <relocation>
               <pattern>shaded.parquet.com.fasterxml.jackson</pattern>
               <shadedPattern>${shade.prefix}.com.fasterxml.jackson</shadedPattern>
