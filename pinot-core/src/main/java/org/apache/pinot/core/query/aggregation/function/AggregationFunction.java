@@ -267,6 +267,9 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
 
     /// Returns the number of bytes [#writeTo(DataOutput)] writes, which is the length of [#getBytes()].
     public int getSize() {
+      if (_bytes == null) {
+        throw new IllegalStateException(getClass().getName() + " serializes on demand and must override getSize()");
+      }
       return _bytes.length;
     }
 

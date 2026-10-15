@@ -36,6 +36,7 @@ import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.common.datablock.DataBlockBuilder;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
+import org.apache.pinot.segment.spi.memory.PagedPinotOutputStream;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -134,9 +135,11 @@ public class PercentileIntermediateResultSerDeTest {
     // A NaN with a payload must keep its raw bits, like ByteBuffer.putDouble in the byte array serializer.
     DoubleArrayList specialValues = new DoubleArrayList(
         new double[]{Double.NaN, Double.longBitsToDouble(0x7ff8_0000_0000_0123L), -0.0, Double.NEGATIVE_INFINITY});
-    // Both sides of PrimitiveArrayOutput.MIN_BULK_VALUES: one small array, then the values in bulk.
+    // On a DataOutputStream, 1023 values are the most that fit in one PrimitiveArrayOutput.CHUNK_SIZE chunk (written
+    // as one small array), and 1024 go through the chunked path. On a PagedPinotOutputStream, both sides of
+    // PrimitiveArrayOutput.MIN_BULK_VALUES (63 and 64) switch from per-value puts to the bulk view.
     for (DoubleArrayList values : List.of(sequence(0), sequence(1), sequence(63), sequence(64), sequence(1000),
-        specialValues)) {
+        sequence(1023), sequence(1024), sequence(5000), specialValues)) {
       AggregationFunction.SerializedIntermediateResult expected =
           _byteArrayFunction.serializeIntermediateResult(values);
       AggregationFunction.SerializedIntermediateResult actual = _function.serializeIntermediateResult(values);
@@ -147,6 +150,12 @@ public class PercentileIntermediateResultSerDeTest {
       ByteArrayOutputStream written = new ByteArrayOutputStream();
       actual.writeTo(new DataOutputStream(written));
       assertEquals(written.toByteArray(), expected.getBytes());
+      // Small pages, so the bulk path also splits values across page boundaries.
+      try (PagedPinotOutputStream paged =
+          new PagedPinotOutputStream(new PagedPinotOutputStream.HeapPageAllocator(100))) {
+        actual.writeTo(paged);
+        assertEquals(concat(List.of(paged.getPages())), expected.getBytes());
+      }
     }
   }
 

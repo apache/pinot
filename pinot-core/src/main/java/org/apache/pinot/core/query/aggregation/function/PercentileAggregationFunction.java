@@ -36,6 +36,7 @@ import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.memory.PinotOutputStream;
 import org.apache.pinot.segment.spi.memory.PrimitiveArrayOutput;
 
 
@@ -229,16 +230,18 @@ public class PercentileAggregationFunction extends BaseSingleInputAggregationFun
       throw new BufferUnderflowException();
     }
     int size = intermediateResult.size();
+    int newSize = Math.addExact(size, numValues);
     int capacity = intermediateResult.elements().length;
-    if (size + numValues > capacity) {
-      intermediateResult.ensureCapacity(
-          (int) Math.min(Math.max((long) size + numValues, (long) capacity + (capacity >> 1)), Integer.MAX_VALUE - 8));
+    if (newSize > capacity) {
+      // Grow by half like addAll(), capped below the maximum array size, but never below the size set next.
+      int grownCapacity = (int) Math.min((long) capacity + (capacity >> 1), Integer.MAX_VALUE - 8);
+      intermediateResult.ensureCapacity(Math.max(newSize, grownCapacity));
     }
     // size() zero-fills the new range, so it must run before the values are copied in.
-    intermediateResult.size(size + numValues);
+    intermediateResult.size(newSize);
     double[] elements = intermediateResult.elements();
     if (numValues < PrimitiveArrayOutput.MIN_BULK_VALUES) {
-      for (int i = size; i < size + numValues; i++) {
+      for (int i = size; i < newSize; i++) {
         elements[i] = buffer.getDouble();
       }
     } else {
@@ -255,9 +258,9 @@ public class PercentileAggregationFunction extends BaseSingleInputAggregationFun
 
   /// Serializes a [DoubleArrayList] on demand, with the bytes of ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE: a
   /// big-endian int count, then the big-endian doubles. [#writeTo] writes the values in bulk straight into the
-  /// destination (see [PrimitiveArrayOutput]), so the builders never hold the full-size byte array; lists shorter
-  /// than [PrimitiveArrayOutput#MIN_BULK_VALUES] are written as one small array. Not thread-safe; the list must not
-  /// change until it is written.
+  /// destination (see [PrimitiveArrayOutput]), so the builders never hold the full-size byte array. On any other
+  /// [DataOutput] than a [PinotOutputStream], a list that fits in one [PrimitiveArrayOutput#CHUNK_SIZE] chunk is
+  /// written as one small array. Not thread-safe; the list must not change until it is written.
   private static final class SerializedDoubleArrayList extends SerializedIntermediateResult {
     private final DoubleArrayList _values;
 
@@ -280,9 +283,11 @@ public class PercentileAggregationFunction extends BaseSingleInputAggregationFun
     public void writeTo(DataOutput output)
         throws IOException {
       int size = _values.size();
-      if (size < PrimitiveArrayOutput.MIN_BULK_VALUES) {
-        // One write of a small array is cheaper than a write per value, which is a synchronized call on a
-        // DataOutputStream.
+      if (!(output instanceof PinotOutputStream)
+          && Integer.BYTES + (long) size * Double.BYTES <= PrimitiveArrayOutput.CHUNK_SIZE) {
+        // The chunked path saves no memory while the list fits in one chunk, and one write of a small array is
+        // cheaper than chunk encoding or a write per value (a synchronized call on a DataOutputStream). A
+        // PinotOutputStream writes the values straight into its pages, at any size.
         output.write(getBytes());
         return;
       }
