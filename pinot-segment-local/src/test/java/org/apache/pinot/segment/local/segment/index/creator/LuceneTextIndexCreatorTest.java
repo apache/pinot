@@ -31,6 +31,8 @@ import org.apache.lucene.document.TextField;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.index.MultiDocValues;
+import org.apache.lucene.index.NumericDocValues;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
@@ -38,10 +40,14 @@ import org.apache.pinot.segment.local.segment.index.readers.text.LuceneTextIndex
 import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
-import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 
 public class LuceneTextIndexCreatorTest {
@@ -77,9 +83,9 @@ public class LuceneTextIndexCreatorTest {
     // Use TextIndex reader to validate that reads work
     try (LuceneTextIndexReader reader = new LuceneTextIndexReader("foo", INDEX_DIR, 5, new HashMap<>())) {
       int[] matchedDocIds = reader.getDocIds("clean").toArray();
-      Assert.assertEquals(matchedDocIds.length, 2);
-      Assert.assertEquals(matchedDocIds[0], 0);
-      Assert.assertEquals(matchedDocIds[1], 4);
+      assertEquals(matchedDocIds.length, 2);
+      assertEquals(matchedDocIds[0], 0);
+      assertEquals(matchedDocIds[1], 4);
     }
   }
 
@@ -89,8 +95,8 @@ public class LuceneTextIndexCreatorTest {
     // Use TextIndex reader to validate that reads work
     try (LuceneTextIndexReader reader = new LuceneTextIndexReader("foo", INDEX_DIR, 5, new HashMap<>())) {
       int[] matchedDocIds = reader.getDocIds("hold").toArray();
-      Assert.assertEquals(matchedDocIds.length, 1);
-      Assert.assertEquals(matchedDocIds[0], 3);
+      assertEquals(matchedDocIds.length, 1);
+      assertEquals(matchedDocIds[0], 3);
     }
   }
 
@@ -100,8 +106,8 @@ public class LuceneTextIndexCreatorTest {
     // Use TextIndex reader to validate that reads work
     try (LuceneTextIndexReader reader = new LuceneTextIndexReader("foo", INDEX_DIR, 5, new HashMap<>())) {
       int[] matchedDocIds = reader.getDocIds("retain").toArray();
-      Assert.assertEquals(matchedDocIds.length, 1);
-      Assert.assertEquals(matchedDocIds[0], 1);
+      assertEquals(matchedDocIds.length, 1);
+      assertEquals(matchedDocIds[0], 1);
     }
   }
 
@@ -111,9 +117,67 @@ public class LuceneTextIndexCreatorTest {
     // Use TextIndex reader to validate that reads work
     try (LuceneTextIndexReader reader = new LuceneTextIndexReader("foo", INDEX_DIR, 5, new HashMap<>())) {
       int[] matchedDocIds = reader.getDocIds("retain|keep").toArray();
-      Assert.assertEquals(matchedDocIds.length, 2);
-      Assert.assertEquals(matchedDocIds[0], 1);
-      Assert.assertEquals(matchedDocIds[1], 2);
+      assertEquals(matchedDocIds.length, 2);
+      assertEquals(matchedDocIds[0], 1);
+      assertEquals(matchedDocIds[1], 2);
+    }
+  }
+
+  @Test
+  public void testDocValuesRetainStoredIdsForSingleAndMultiValueDocuments()
+      throws IOException {
+    String column = "values";
+    TextIndexConfig config = new TextIndexConfigBuilder().build();
+    try (LuceneTextIndexCreator creator =
+        new LuceneTextIndexCreator(column, INDEX_DIR, true, false, null, null, config)) {
+      creator.add("");
+      creator.add(new String[]{"alpha", "beta"}, 2);
+      creator.add(new String[0], 0);
+      creator.add("gamma");
+      creator.seal();
+    }
+
+    File indexDir = new File(INDEX_DIR, column + V1Constants.Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION);
+    try (Directory directory = FSDirectory.open(indexDir.toPath());
+        DirectoryReader reader = DirectoryReader.open(directory)) {
+      NumericDocValues ids =
+          MultiDocValues.getNumericValues(reader, LuceneTextIndexCreator.PINOT_DOC_ID_DOC_VALUES_FIELD_NAME);
+      assertNull(MultiDocValues.getNumericValues(reader, LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME));
+      assertEquals(reader.maxDoc(), 4);
+      for (int i = 0; i < reader.maxDoc(); i++) {
+        assertTrue(ids.advanceExact(i));
+        // The retained stored field is precisely what an older Pinot reader consults.
+        assertEquals(ids.longValue(),
+            Long.parseLong(reader.storedFields().document(i)
+                .get(LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME)));
+      }
+    }
+    try (LuceneTextIndexReader reader = new LuceneTextIndexReader(column, INDEX_DIR, 4, config)) {
+      assertEquals(reader.getDocIds("alpha", null).toArray(), new int[]{1});
+      assertEquals(reader.getDocIds("gamma", null).toArray(), new int[]{3});
+      assertEquals(reader.getDocIds("*:* ", null).toArray(), new int[]{0, 1, 2, 3});
+    }
+  }
+
+  @Test
+  public void testMutableIndexRetainsStoredFieldFallback()
+      throws IOException {
+    String column = "mutableValues";
+    TextIndexConfig config = new TextIndexConfigBuilder().build();
+    try (LuceneTextIndexCreator creator =
+        new LuceneTextIndexCreator(column, INDEX_DIR, false, false, null, null, config)) {
+      creator.add("alpha");
+      creator.add(new String[0], 0);
+      creator.getIndexWriter().commit();
+      try (DirectoryReader reader = DirectoryReader.open(creator.getIndexWriter())) {
+        assertNull(MultiDocValues.getNumericValues(reader, LuceneTextIndexCreator.PINOT_DOC_ID_DOC_VALUES_FIELD_NAME));
+        assertEquals(reader.storedFields().document(0)
+            .get(LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME), "0");
+      }
+      try (LuceneTextIndexReader reader = new LuceneTextIndexReader(column, INDEX_DIR, 2, config)) {
+        assertEquals(reader.getDocIds("alpha", null).toArray(), new int[]{0});
+        assertEquals(reader.getDocIds("*:* ", null).toArray(), new int[]{0, 1});
+      }
     }
   }
 
@@ -163,7 +227,7 @@ public class LuceneTextIndexCreatorTest {
       }
 
       // 5a. Dest wipe: sentinel must be gone.
-      Assert.assertFalse(staleSentinel.exists(),
+      assertFalse(staleSentinel.exists(),
           "Stale file at v1 destination must be removed before conversion to "
               + "avoid CREATE_OR_APPEND picking up leftovers from a prior attempt");
 
@@ -172,7 +236,7 @@ public class LuceneTextIndexCreatorTest {
       //     numStaleDocs instead.
       try (Directory destDir = FSDirectory.open(destIndexDir.toPath());
           DirectoryReader reader = DirectoryReader.open(destDir)) {
-        Assert.assertEquals(reader.numDocs(), numMutableDocs,
+        assertEquals(reader.numDocs(), numMutableDocs,
             "Converted Lucene index must contain exactly the mutable input's document count, not "
                 + "stale leftovers from a prior attempt");
       }
@@ -181,8 +245,8 @@ public class LuceneTextIndexCreatorTest {
       //     segment's numDocs at read time - a mismatch here is what produced AIOOB in production.
       File mappingFile = new File(segmentIndexDir,
           column + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
-      Assert.assertTrue(mappingFile.exists(), "DocId mapping file should be built during conversion");
-      Assert.assertEquals(mappingFile.length(), (long) Integer.BYTES * numMutableDocs,
+      assertTrue(mappingFile.exists(), "DocId mapping file should be built during conversion");
+      assertEquals(mappingFile.length(), (long) Integer.BYTES * numMutableDocs,
           "DocId mapping file must be sized for the segment's numDocs only");
 
       // 5d. End-to-end read
@@ -190,7 +254,7 @@ public class LuceneTextIndexCreatorTest {
           numMutableDocs, config)) {
         int[] matched = reader.getDocIds("doc").toArray();
         for (int docId : matched) {
-          Assert.assertTrue(docId >= 0 && docId < numMutableDocs,
+          assertTrue(docId >= 0 && docId < numMutableDocs,
               "Returned Pinot docId " + docId + " must be within [0, " + numMutableDocs + ")");
         }
       }
