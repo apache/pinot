@@ -188,7 +188,7 @@ segments containing newer Lucene indexes rebuilds those indexes with the older w
 indexes: dictionary/inverted-index reconstruction can lose multi-value ordering and duplicate values. When original
 values are unavailable, recovery fails before replacing the incompatible index; restore a compatible segment or
 refresh it from retained source data. Rebuilding adds CPU/I/O and segment-loading time. Existing preprocessing
-opt-outs remain in effect, and corruption or ordinary I/O errors are not treated as format incompatibility.
+opt-outs remain in effect. Corruption and ordinary I/O errors fail loading instead of triggering format recovery.
 
 ## Deploying Pinot to Kubernetes
 Please refer to [Running Pinot on Kubernetes](https://docs.pinot.apache.org/basics/getting-started/kubernetes-quickstart) in our project documentation. Pinot also provides Kubernetes integrations with the interactive query engine, [Trino](https://docs.pinot.apache.org/integrations/trino), and the data visualization tool, [Apache Superset](helm/superset.yaml).

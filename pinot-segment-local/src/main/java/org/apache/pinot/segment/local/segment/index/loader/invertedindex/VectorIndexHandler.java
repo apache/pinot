@@ -734,7 +734,7 @@ public class VectorIndexHandler extends BaseIndexHandler {
     }
 
     // Delete the marker file.
-    FileUtils.deleteQuietly(inProgress);
+    FileUtils.forceDelete(inProgress);
 
     LOGGER.info("Created Vector index for segment: {}, column: {}", segmentName, columnName);
   }
