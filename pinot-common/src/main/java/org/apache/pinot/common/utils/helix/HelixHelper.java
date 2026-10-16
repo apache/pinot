@@ -47,7 +47,6 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.pinot.common.helix.ExtraInstanceConfig;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.utils.config.TagNameUtils;
@@ -119,8 +118,9 @@ public class HelixHelper {
   }
 
   /// Returns whether the given record came from the compact parser of [CompactZNRecordSerializer], that is, its map
-  /// fields are an [ImmutableSortedArrayMap]. A record from [ZNRecordSerializer] returns false, including the records
-  /// that the compact serializer delegates to it (plain znodes and the fallback).
+  /// fields are an [ImmutableSortedArrayMap]. A record from
+  /// [ZNRecordSerializer][org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer] returns false, including
+  /// the records that the compact serializer delegates to it (plain znodes and the fallback).
   public static boolean isCompact(ZNRecord record) {
     return record.getMapFields() instanceof ImmutableSortedArrayMap;
   }

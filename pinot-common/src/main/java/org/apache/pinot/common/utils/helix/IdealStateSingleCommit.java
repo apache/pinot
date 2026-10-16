@@ -62,7 +62,7 @@ public class IdealStateSingleCommit {
           // Make a copy of the idealState above to pass it to the updater
           // NOTE: new IdealState(idealState.getRecord()) does not work because it's shallow copy for map fields and
           // list fields
-          IdealState idealStateCopy = cloneIdealState(idealState);
+          IdealState idealStateCopy = HelixHelper.cloneIdealState(idealState);
 
           IdealState updatedIdealState;
           try {
@@ -146,9 +146,5 @@ public class IdealStateSingleCommit {
 
   private static class IdealStateWrapper {
     IdealState _idealState;
-  }
-
-  public static IdealState cloneIdealState(IdealState idealState) {
-    return HelixHelper.cloneIdealState(idealState);
   }
 }
