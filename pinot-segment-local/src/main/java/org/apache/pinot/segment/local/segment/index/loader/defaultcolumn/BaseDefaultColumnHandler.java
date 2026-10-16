@@ -24,8 +24,10 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -646,6 +648,10 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       Object[] inputValues = new Object[numArguments];
       int numDocs = _segmentMetadata.getTotalDocs();
       Object[] outputValues = new Object[numDocs];
+      // The expression results as the rest of the chain has to see them: nulls still null, values not yet converted
+      // to the stored type. Ingestion evaluates every expression before either of those happens, so a column reading
+      // this one has to be handed this array rather than what the index ends up holding. Null when nothing reads it.
+      Object[] expressionValues = newChainValues(column, numDocs);
       PinotDataType outputValueType = null;
       for (int i = 0; i < numDocs; i++) {
         for (int j = 0; j < numArguments; j++) {
@@ -667,6 +673,10 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           } else {
             throw e;
           }
+        }
+
+        if (expressionValues != null) {
+          expressionValues[i] = outputValue;
         }
 
         if (outputValue == null) {
@@ -691,10 +701,6 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       if (nullValueVectorCreator != null) {
         nullValueVectorCreator.seal();
       }
-
-      // Take the untouched expression results aside before the switch below converts them in place to the stored
-      // type, so the rest of the chain sees what ingestion would have given it.
-      Object[] expressionValues = copyValuesForChain(column, outputValues);
 
       FieldIndexConfigs fieldIndexConfigs = _indexLoadingConfig.getFieldIndexConfig(column);
       DictionaryIndexConfig dictionaryIndexConfig =
@@ -1348,10 +1354,11 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       return actionMap;
     }
 
+    markCyclicColumns(dependencies);
+
     Map<String, DefaultColumnAction> ordered = new LinkedHashMap<>(actionMap.size());
-    Set<String> visiting = new LinkedHashSet<>();
     for (String column : actionMap.keySet()) {
-      visitForOrdering(column, actionMap, dependencies, visiting, ordered);
+      visitForOrdering(column, actionMap, dependencies, ordered);
     }
     // Columns dropped by a cycle still have to be created; they land last and take the default-value path.
     for (Map.Entry<String, DefaultColumnAction> entry : actionMap.entrySet()) {
@@ -1361,37 +1368,79 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
   }
 
   private void visitForOrdering(String column, Map<String, DefaultColumnAction> actionMap,
-      Map<String, List<String>> dependencies, Set<String> visiting, Map<String, DefaultColumnAction> ordered) {
-    if (ordered.containsKey(column)) {
+      Map<String, List<String>> dependencies, Map<String, DefaultColumnAction> ordered) {
+    // A column on a cycle is left out here and appended at the end, so that anything reading it is created first and
+    // takes the fallback on a missing argument instead of deriving a value from a sibling's default. Skipping those
+    // columns is also what bounds this traversal: every edge that closes a cycle leads into one of them.
+    if (ordered.containsKey(column) || _cyclicColumns.contains(column) || !actionMap.containsKey(column)) {
       return;
     }
-    if (!visiting.add(column)) {
-      // The cycle is the tail of the traversal from this column onwards. Every one of its members has to be recorded:
-      // emitting them in any order leaves one reading a sibling that was itself defaulted, which would silently
-      // derive a value from a default instead of taking the documented fallback.
-      List<String> cycle = new ArrayList<>();
-      boolean inCycle = false;
-      for (String visited : visiting) {
-        inCycle |= visited.equals(column);
-        if (inCycle) {
-          cycle.add(visited);
-        }
-      }
-      LOGGER.warn("Derived columns form a dependency cycle: {}. They will be assigned default values instead of "
-          + "being derived; break the cycle in the transform configs.", cycle);
-      _cyclicColumns.addAll(cycle);
-      return;
+    for (String dependency : dependencies.getOrDefault(column, List.of())) {
+      visitForOrdering(dependency, actionMap, dependencies, ordered);
     }
-    try {
-      for (String dependency : dependencies.getOrDefault(column, List.of())) {
-        visitForOrdering(dependency, actionMap, dependencies, visiting, ordered);
+    // A dependency stuck in a cycle is absent from `ordered`; emitting this column anyway is safe because the
+    // missing argument makes it take the default-value path.
+    ordered.put(column, actionMap.get(column));
+  }
+
+  /// Records every column that sits on a dependency cycle, so that each of them takes its own default value instead
+  /// of deriving from a sibling that was itself defaulted.
+  ///
+  /// Cycle membership is a strongly connected component of the dependency graph, not just the path on which a
+  /// depth-first search happens to find a back edge. With `a = plus(b, c)`, `b = plus(a, 1)` and `c = plus(b, 1)`
+  /// the first back edge only closes over `a` and `b`, yet `c` reaches itself through `b` and `a` just the same, so
+  /// all three are cyclic. Tarjan's algorithm names the whole component in one pass.
+  private void markCyclicColumns(Map<String, List<String>> dependencies) {
+    SccState state = new SccState();
+    for (String column : dependencies.keySet()) {
+      if (!state._index.containsKey(column)) {
+        strongConnect(column, dependencies, state);
       }
-      // A dependency stuck in a cycle is absent from `ordered`; emitting this column anyway is safe because the
-      // missing argument makes it take the default-value path.
-      ordered.put(column, actionMap.get(column));
-    } finally {
-      visiting.remove(column);
     }
+  }
+
+  private void strongConnect(String column, Map<String, List<String>> dependencies, SccState state) {
+    int index = state._nextIndex++;
+    state._index.put(column, index);
+    state._lowLink.put(column, index);
+    state._stack.push(column);
+    state._onStack.add(column);
+
+    for (String dependency : dependencies.getOrDefault(column, List.of())) {
+      Integer dependencyIndex = state._index.get(dependency);
+      if (dependencyIndex == null) {
+        strongConnect(dependency, dependencies, state);
+        state._lowLink.put(column, Math.min(state._lowLink.get(column), state._lowLink.get(dependency)));
+      } else if (state._onStack.contains(dependency)) {
+        state._lowLink.put(column, Math.min(state._lowLink.get(column), dependencyIndex));
+      }
+    }
+
+    if (state._lowLink.get(column) == index) {
+      List<String> component = new ArrayList<>();
+      String member;
+      do {
+        member = state._stack.pop();
+        state._onStack.remove(member);
+        component.add(member);
+      } while (!member.equals(column));
+      // A component of one is a plain column: a self-reference never gets an edge in the first place, since a
+      // transform reading the column it produces is reading the pre-reload values and is left alone.
+      if (component.size() > 1) {
+        LOGGER.warn("Derived columns form a dependency cycle: {}. They will be assigned default values instead of "
+            + "being derived; break the cycle in the transform configs.", component);
+        _cyclicColumns.addAll(component);
+      }
+    }
+  }
+
+  /// The bookkeeping of one run of Tarjan's algorithm over the dependency graph (see [#markCyclicColumns]).
+  private static class SccState {
+    final Map<String, Integer> _index = new HashMap<>();
+    final Map<String, Integer> _lowLink = new HashMap<>();
+    final Deque<String> _stack = new ArrayDeque<>();
+    final Set<String> _onStack = new HashSet<>();
+    int _nextIndex;
   }
 
   /// The arguments of the transform function that derives this column, or null when the column is not derived.
@@ -1477,15 +1526,15 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     }
   }
 
-  /// A copy of the values a derived column produced, to hand to a column later in the chain (see
-  /// [#_createdColumnValues]), or null when no transform function reads this column and nothing would ever look at
-  /// the copy. The caller converts the original array in place, which is why this is taken before that happens.
+  /// An array to collect the raw expression results of a derived column in, to hand to a column later in the chain
+  /// (see [#_createdColumnValues]), or null when no transform function reads this column and nothing would ever look
+  /// at them.
   @Nullable
-  private Object[] copyValuesForChain(String column, Object[] outputValues) {
+  private Object[] newChainValues(String column, int numDocs) {
     if (_transformConfigsByColumn == null) {
       buildTransformConfigIndex();
     }
-    return _derivedColumnArgumentNames.contains(column) ? Arrays.copyOf(outputValues, outputValues.length) : null;
+    return _derivedColumnArgumentNames.contains(column) ? new Object[numDocs] : null;
   }
 
   /// Makes a forward index available for a source column that has it disabled, by regenerating it from the
@@ -1558,7 +1607,10 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     try {
       ColumnMetadata refreshed =
           ColumnMetadataImpl.fromPropertiesConfiguration(_segmentProperties, _segmentMetadata.getTotalDocs(), column);
-      _createdColumnMetadata.computeIfPresent(column, (k, v) -> refreshed);
+      // Every later read of this column has to get the refreshed copy, not just the caller holding it now: a
+      // transform as plain as `plus(source, source)` reads the column twice, and the second read finds the
+      // regenerated forward index already in place and so never comes back through here.
+      _createdColumnMetadata.put(column, refreshed);
       return refreshed;
     } catch (Exception e) {
       LOGGER.warn("Could not re-read the metadata of column: {} after regenerating its forward index", column, e);
