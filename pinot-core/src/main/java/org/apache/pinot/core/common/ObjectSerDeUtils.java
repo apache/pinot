@@ -56,9 +56,12 @@ import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.io.IOException;
 import java.lang.foreign.MemorySegment;
 import java.math.BigDecimal;
+import java.nio.BufferOverflowException;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.IntBuffer;
+import java.nio.ReadOnlyBufferException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -325,11 +328,36 @@ public class ObjectSerDeUtils {
 
   /// Serializer/De-serializer for a specific type of object.
   ///
+  /// Implementations must override either the byte-array serializer or both [#getSerializedSize(Object)] and
+  /// the buffer serializer [#serialize(Object, ByteBuffer)]. This contract is enforced by convention; the serializer
+  /// defaults delegate to each other.
+  ///
   /// @param <T> Type of the object
   public interface ObjectSerDe<T> {
 
     /// Serializes a value into a byte array.
-    byte[] serialize(T value);
+    /// Typed forwarding overrides preserve receiver specialization when invoking this default.
+    default byte[] serialize(T value) {
+      byte[] bytes = new byte[getSerializedSize(value)];
+      serialize(value, ByteBuffer.wrap(bytes));
+      return bytes;
+    }
+
+    /// Returns the exact size of a representable payload, or `-1` when allocation-free sizing is unsupported.
+    /// This method must not serialize the value or allocate a payload array. The value must remain unchanged between
+    /// sizing and serialization. The destination must have at least this many bytes remaining.
+    default int getSerializedSize(T value) {
+      return -1;
+    }
+
+    /// Writes the canonical payload at the destination's current position and advances it by the payload size.
+    /// Supports heap and direct buffers, preserves the destination's limit and byte order, and does not retain the
+    /// buffer. Direct-writing overrides must not mutate the value. A read-only destination or insufficient remaining
+    /// space fails before any write. The default implementation preserves the legacy serializer behavior and
+    /// serializes once into a temporary array; codecs can override it for direct writes.
+    default void serialize(T value, ByteBuffer destination) {
+      destination.put(serialize(value));
+    }
 
     /// De-serializes a value from a byte array.
     T deserialize(byte[] bytes);
@@ -414,16 +442,30 @@ public class ObjectSerDeUtils {
   public static final ObjectSerDe<IntArrayList> INT_ARRAY_LIST_SER_DE = new ObjectSerDe<IntArrayList>() {
 
     @Override
+    public int getSerializedSize(IntArrayList intArrayList) {
+      return Math.addExact(Integer.BYTES, Math.multiplyExact(intArrayList.size(), Integer.BYTES));
+    }
+
+    @Override
     public byte[] serialize(IntArrayList intArrayList) {
-      int size = intArrayList.size();
-      byte[] bytes = new byte[Integer.BYTES + size * Integer.BYTES];
-      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-      byteBuffer.putInt(size);
-      int[] values = intArrayList.elements();
-      for (int i = 0; i < size; i++) {
-        byteBuffer.putInt(values[i]);
+      return ObjectSerDe.super.serialize(intArrayList);
+    }
+
+    @Override
+    public void serialize(IntArrayList intArrayList, ByteBuffer destination) {
+      checkSerializationBuffer(destination, getSerializedSize(intArrayList));
+      ByteOrder originalOrder = destination.order();
+      destination.order(ByteOrder.BIG_ENDIAN);
+      try {
+        int size = intArrayList.size();
+        destination.putInt(size);
+        int[] values = intArrayList.elements();
+        for (int i = 0; i < size; i++) {
+          destination.putInt(values[i]);
+        }
+      } finally {
+        destination.order(originalOrder);
       }
-      return bytes;
     }
 
     @Override
@@ -451,16 +493,30 @@ public class ObjectSerDeUtils {
   public static final ObjectSerDe<LongArrayList> LONG_ARRAY_LIST_SER_DE = new ObjectSerDe<LongArrayList>() {
 
     @Override
+    public int getSerializedSize(LongArrayList longArrayList) {
+      return Math.addExact(Integer.BYTES, Math.multiplyExact(longArrayList.size(), Long.BYTES));
+    }
+
+    @Override
     public byte[] serialize(LongArrayList longArrayList) {
-      int size = longArrayList.size();
-      byte[] bytes = new byte[Integer.BYTES + size * Long.BYTES];
-      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-      byteBuffer.putInt(size);
-      long[] values = longArrayList.elements();
-      for (int i = 0; i < size; i++) {
-        byteBuffer.putLong(values[i]);
+      return ObjectSerDe.super.serialize(longArrayList);
+    }
+
+    @Override
+    public void serialize(LongArrayList longArrayList, ByteBuffer destination) {
+      checkSerializationBuffer(destination, getSerializedSize(longArrayList));
+      ByteOrder originalOrder = destination.order();
+      destination.order(ByteOrder.BIG_ENDIAN);
+      try {
+        int size = longArrayList.size();
+        destination.putInt(size);
+        long[] values = longArrayList.elements();
+        for (int i = 0; i < size; i++) {
+          destination.putLong(values[i]);
+        }
+      } finally {
+        destination.order(originalOrder);
       }
-      return bytes;
     }
 
     @Override
@@ -488,16 +544,30 @@ public class ObjectSerDeUtils {
   public static final ObjectSerDe<FloatArrayList> FLOAT_ARRAY_LIST_SER_DE = new ObjectSerDe<FloatArrayList>() {
 
     @Override
+    public int getSerializedSize(FloatArrayList floatArrayList) {
+      return Math.addExact(Integer.BYTES, Math.multiplyExact(floatArrayList.size(), Float.BYTES));
+    }
+
+    @Override
     public byte[] serialize(FloatArrayList floatArrayList) {
-      int size = floatArrayList.size();
-      byte[] bytes = new byte[Integer.BYTES + size * Float.BYTES];
-      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-      byteBuffer.putInt(size);
-      float[] values = floatArrayList.elements();
-      for (int i = 0; i < size; i++) {
-        byteBuffer.putFloat(values[i]);
+      return ObjectSerDe.super.serialize(floatArrayList);
+    }
+
+    @Override
+    public void serialize(FloatArrayList floatArrayList, ByteBuffer destination) {
+      checkSerializationBuffer(destination, getSerializedSize(floatArrayList));
+      ByteOrder originalOrder = destination.order();
+      destination.order(ByteOrder.BIG_ENDIAN);
+      try {
+        int size = floatArrayList.size();
+        destination.putInt(size);
+        float[] values = floatArrayList.elements();
+        for (int i = 0; i < size; i++) {
+          destination.putInt(Float.floatToRawIntBits(values[i]));
+        }
+      } finally {
+        destination.order(originalOrder);
       }
-      return bytes;
     }
 
     @Override
@@ -525,16 +595,30 @@ public class ObjectSerDeUtils {
   public static final ObjectSerDe<DoubleArrayList> DOUBLE_ARRAY_LIST_SER_DE = new ObjectSerDe<DoubleArrayList>() {
 
     @Override
+    public int getSerializedSize(DoubleArrayList doubleArrayList) {
+      return Math.addExact(Integer.BYTES, Math.multiplyExact(doubleArrayList.size(), Double.BYTES));
+    }
+
+    @Override
     public byte[] serialize(DoubleArrayList doubleArrayList) {
-      int size = doubleArrayList.size();
-      byte[] bytes = new byte[Integer.BYTES + size * Double.BYTES];
-      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-      byteBuffer.putInt(size);
-      double[] values = doubleArrayList.elements();
-      for (int i = 0; i < size; i++) {
-        byteBuffer.putDouble(values[i]);
+      return ObjectSerDe.super.serialize(doubleArrayList);
+    }
+
+    @Override
+    public void serialize(DoubleArrayList doubleArrayList, ByteBuffer destination) {
+      checkSerializationBuffer(destination, getSerializedSize(doubleArrayList));
+      ByteOrder originalOrder = destination.order();
+      destination.order(ByteOrder.BIG_ENDIAN);
+      try {
+        int size = doubleArrayList.size();
+        destination.putInt(size);
+        double[] values = doubleArrayList.elements();
+        for (int i = 0; i < size; i++) {
+          destination.putLong(Double.doubleToRawLongBits(values[i]));
+        }
+      } finally {
+        destination.order(originalOrder);
       }
-      return bytes;
     }
 
     @Override
@@ -1281,8 +1365,29 @@ public class ObjectSerDeUtils {
   public static final ObjectSerDe<RoaringBitmap> ROARING_BITMAP_SER_DE = new ObjectSerDe<RoaringBitmap>() {
 
     @Override
+    public int getSerializedSize(RoaringBitmap bitmap) {
+      int size = bitmap.serializedSizeInBytes();
+      Preconditions.checkArgument(size >= 0, "Serialized bitmap exceeds the maximum buffer size");
+      return size;
+    }
+
+    @Override
     public byte[] serialize(RoaringBitmap bitmap) {
-      return RoaringBitmapUtils.serialize(bitmap);
+      return ObjectSerDe.super.serialize(bitmap);
+    }
+
+    @Override
+    public void serialize(RoaringBitmap bitmap, ByteBuffer destination) {
+      // Recompute the size to validate standalone writes; mutable bitmaps cannot safely cache it across calls.
+      checkSerializationBuffer(destination, getSerializedSize(bitmap));
+      ByteOrder originalOrder = destination.order();
+      // Roaring uses little-endian wire bytes; restore the caller's byte order after writing.
+      destination.order(ByteOrder.LITTLE_ENDIAN);
+      try {
+        RoaringBitmapUtils.serialize(bitmap, destination);
+      } finally {
+        destination.order(originalOrder);
+      }
     }
 
     @Override
@@ -1730,11 +1835,20 @@ public class ObjectSerDeUtils {
   public static final ObjectSerDe<UltraLogLog> ULTRA_LOG_LOG_OBJECT_SER_DE = new ObjectSerDe<UltraLogLog>() {
 
     @Override
+    public int getSerializedSize(UltraLogLog value) {
+      return Math.addExact(1, value.getState().length);
+    }
+
+    @Override
     public byte[] serialize(UltraLogLog value) {
-      ByteBuffer buff = ByteBuffer.wrap(new byte[(1 << value.getP()) + 1]);
-      buff.put((byte) value.getP());
-      buff.put(value.getState());
-      return buff.array();
+      return ObjectSerDe.super.serialize(value);
+    }
+
+    @Override
+    public void serialize(UltraLogLog value, ByteBuffer destination) {
+      checkSerializationBuffer(destination, getSerializedSize(value));
+      destination.put((byte) value.getP());
+      destination.put(value.getState());
     }
 
     @Override
@@ -1982,6 +2096,29 @@ public class ObjectSerDeUtils {
   @Deprecated
   public static byte[] serialize(Object value, int objectTypeValue) {
     return SER_DES[objectTypeValue].serialize(value);
+  }
+
+  /// Returns the codec's exact size for a representable payload, or `-1` if allocation-free sizing is unavailable.
+  /// Intended for callers writing OBJECT payloads into an existing transport buffer, such as an Arrow vector.
+  /// A result of `-1` selects the legacy byte-array fallback. The value must remain unchanged until serialization ends.
+  public static int getSerializedSize(Object value, int objectTypeValue) {
+    return SER_DES[objectTypeValue].getSerializedSize(value);
+  }
+
+  /// Writes the payload through its type's codec, advancing the destination position and preserving its byte order.
+  /// The destination must have sufficient remaining space; its limit does not need to match the payload size.
+  /// The codec uses a temporary payload array when it does not support direct serialization.
+  public static void serialize(Object value, int objectTypeValue, ByteBuffer destination) {
+    SER_DES[objectTypeValue].serialize(value, destination);
+  }
+
+  private static void checkSerializationBuffer(ByteBuffer destination, int size) {
+    if (destination.isReadOnly()) {
+      throw new ReadOnlyBufferException();
+    }
+    if (destination.remaining() < size) {
+      throw new BufferOverflowException();
+    }
   }
 
   public static <T> T deserialize(CustomObject customObject) {
