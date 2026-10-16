@@ -2441,7 +2441,8 @@ public class InstanceSelectorTest {
     return new Object[][]{
         {REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false}, {STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false},
         {BALANCED_INSTANCE_SELECTOR, false},
-        // An upsert table makes the replica-group selector apply the strict replica-group rules
+        // An upsert table makes the replica-group selector apply the strict replica-group rules. The strict
+        // replica-group selector needs no upsert case, because it applies these rules for every table.
         {REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, true}
     };
   }

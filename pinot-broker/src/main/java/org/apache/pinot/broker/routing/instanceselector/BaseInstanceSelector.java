@@ -651,7 +651,7 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
       }
       InstanceStateMaps that = (InstanceStateMaps) o;
       // NOTE: Map.equals() ignores the iteration order, so maps with the same entries in a different order share one
-      //       canonical instance. This is correct because every candidate list is built in the order of
+      //       canonical InstanceStateMaps. This is correct because every candidate list is built in the order of
       //       sortByKeyIfNeeded(), which does not depend on the iteration order of the maps.
       return _hashCode == that._hashCode && _idealStateInstanceStateMap.equals(that._idealStateInstanceStateMap)
           && Objects.equals(_externalViewInstanceStateMap, that._externalViewInstanceStateMap);
