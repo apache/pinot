@@ -22,6 +22,7 @@ import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.ByteOrder;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.datatable.DataTableImplV4;
@@ -47,17 +48,17 @@ public class DataTableBuilderV4 extends BaseDataTableBuilder {
   public void setColumn(int colId, ByteArray value)
       throws IOException {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
-    _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
+    _currentRowDataByteBuffer.putInt(variableSizeDataOffset());
     byte[] bytes = value.getBytes();
     _currentRowDataByteBuffer.putInt(bytes.length);
-    _variableSizeDataByteArrayOutputStream.write(bytes);
+    _variableSizeDataOutputStream.write(bytes);
   }
 
   @Override
   public void setColumn(int colId, String[] values)
       throws IOException {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
-    _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
+    _currentRowDataByteBuffer.putInt(variableSizeDataOffset());
     _currentRowDataByteBuffer.putInt(values.length);
     for (String value : values) {
       int dictId = _dictionary.computeIntIfAbsent(value, k -> _dictionary.size());
@@ -70,14 +71,16 @@ public class DataTableBuilderV4 extends BaseDataTableBuilder {
     try {
       writeNullBitmaps();
     } catch (IOException e) {
-      // Both buffers are in-memory byte arrays, so this cannot happen.
+      // Both buffers are in-memory heap pages, so this cannot happen.
       throw new UncheckedIOException(e);
     }
     String[] reverseDictionary = new String[_dictionary.size()];
     for (Object2IntMap.Entry<String> entry : _dictionary.object2IntEntrySet()) {
       reverseDictionary[entry.getIntValue()] = entry.getKey();
     }
+    // The table views the written pages directly. Pages are heap memory, so nothing has to be released.
     return new DataTableImplV4(_numRows, _dataSchema, reverseDictionary,
-        _fixedSizeDataByteArrayOutputStream.toByteArray(), _variableSizeDataByteArrayOutputStream.toByteArray());
+        _fixedSizeDataOutputStream.asBuffer(ByteOrder.BIG_ENDIAN, false),
+        _variableSizeDataOutputStream.asBuffer(ByteOrder.BIG_ENDIAN, false));
   }
 }
