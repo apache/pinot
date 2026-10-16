@@ -24,6 +24,7 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -40,31 +41,63 @@ public class AnyValueGroupByRecomputationTest {
   private static final int NUM_DOCS = 1000;
 
   @Test
-  public void testGroupByReadsNonDictionaryValuesOncePerBlock() {
-    ExpressionContext expression = ExpressionContext.forIdentifier("jsonExtractResult");
-    AnyValueAggregationFunction function = new AnyValueAggregationFunction(List.of(expression), false);
-
+  public void testGroupByReadsNonDictionaryStringValuesOncePerBlock() {
     String[] values = new String[NUM_DOCS];
-    int[] groupKeys = new int[NUM_DOCS];
     for (int i = 0; i < NUM_DOCS; i++) {
       values[i] = "zone-" + (i % 3);
-      groupKeys[i] = i;
     }
-    BlockValSet valueSet = mock(BlockValSet.class);
-    when(valueSet.getValueType()).thenReturn(DataType.STRING);
-    when(valueSet.isDictionaryEncoded()).thenReturn(false);
-    when(valueSet.isSingleValue()).thenReturn(true);
+    BlockValSet valueSet = mockNonDictionaryValueSet(DataType.STRING);
     when(valueSet.getStringValuesSV()).thenReturn(values);
 
-    GroupByResultHolder holder = function.createGroupByResultHolder(NUM_DOCS, NUM_DOCS);
-    function.aggregateGroupBySV(NUM_DOCS, groupKeys, holder, Map.of(expression, valueSet));
+    GroupByResultHolder holder = aggregateGroupBy(valueSet);
 
-    long numCalls = mockingDetails(valueSet).getInvocations().stream()
-        .filter(invocation -> invocation.getMethod().getName().equals("getStringValuesSV"))
-        .count();
-    assertEquals(numCalls, 1, "getStringValuesSV() must be called once per block, not once per row");
+    assertEquals(countCalls(valueSet, "getStringValuesSV"), 1,
+        "getStringValuesSV() must be called once per block, not once per row");
     for (int i = 0; i < NUM_DOCS; i++) {
       assertEquals(holder.<String>getResult(i), values[i]);
     }
+  }
+
+  @Test
+  public void testGroupByReadsNonDictionaryBytesValuesOncePerBlock() {
+    byte[][] values = new byte[NUM_DOCS][];
+    for (int i = 0; i < NUM_DOCS; i++) {
+      values[i] = new byte[]{(byte) i, (byte) (i >> 8)};
+    }
+    BlockValSet valueSet = mockNonDictionaryValueSet(DataType.BYTES);
+    when(valueSet.getBytesValuesSV()).thenReturn(values);
+
+    GroupByResultHolder holder = aggregateGroupBy(valueSet);
+
+    assertEquals(countCalls(valueSet, "getBytesValuesSV"), 1,
+        "getBytesValuesSV() must be called once per block, not once per row");
+    for (int i = 0; i < NUM_DOCS; i++) {
+      assertEquals(holder.<ByteArray>getResult(i), new ByteArray(values[i]));
+    }
+  }
+
+  private static BlockValSet mockNonDictionaryValueSet(DataType dataType) {
+    BlockValSet valueSet = mock(BlockValSet.class);
+    when(valueSet.getValueType()).thenReturn(dataType);
+    when(valueSet.isDictionaryEncoded()).thenReturn(false);
+    return valueSet;
+  }
+
+  private static GroupByResultHolder aggregateGroupBy(BlockValSet valueSet) {
+    ExpressionContext expression = ExpressionContext.forIdentifier("transformResult");
+    AnyValueAggregationFunction function = new AnyValueAggregationFunction(List.of(expression), false);
+    int[] groupKeys = new int[NUM_DOCS];
+    for (int i = 0; i < NUM_DOCS; i++) {
+      groupKeys[i] = i;
+    }
+    GroupByResultHolder holder = function.createGroupByResultHolder(NUM_DOCS, NUM_DOCS);
+    function.aggregateGroupBySV(NUM_DOCS, groupKeys, holder, Map.of(expression, valueSet));
+    return holder;
+  }
+
+  private static long countCalls(BlockValSet valueSet, String methodName) {
+    return mockingDetails(valueSet).getInvocations().stream()
+        .filter(invocation -> invocation.getMethod().getName().equals(methodName))
+        .count();
   }
 }
