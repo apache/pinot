@@ -23,8 +23,6 @@ on:
     branches:
       - master
   pull_request:
-    branches:
-      - master
     paths:
       - "**/pom.xml"
       - "**/package.json"
