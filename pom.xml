@@ -31,7 +31,7 @@
 
   <groupId>org.apache.pinot</groupId>
   <artifactId>pinot</artifactId>
-  <version>1.6.0-SNAPSHOT</version>
+  <version>1.6.0</version>
   <packaging>pom</packaging>
   <name>Pinot</name>
   <description>A realtime distributed OLAP datastore</description>
@@ -106,7 +106,7 @@
 
   <scm>
     <developerConnection>scm:git:git@github.com:apache/pinot.git</developerConnection>
-    <tag>HEAD</tag>
+    <tag>release-1.6.0-rc0</tag>
   </scm>
 
   <!-- Apache project inception year for generating correct NOTICE file for jar bundle. -->
@@ -168,7 +168,7 @@
       unit-test script sets this to -${surefire.forkNumber} so parallel forks each write a
       distinct jacoco-<n>.exec instead of appending to one shared file.
     -->
-    <jacoco.exec.suffix></jacoco.exec.suffix>
+    <jacoco.exec.suffix />
 
     <!-- Checkstyle violation prop.-->
     <checkstyle.violation.severity>warning</checkstyle.violation.severity>
