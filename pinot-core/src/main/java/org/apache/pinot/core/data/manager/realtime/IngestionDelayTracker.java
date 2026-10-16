@@ -40,6 +40,7 @@ import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
@@ -500,12 +501,30 @@ public class IngestionDelayTracker {
       if (!partitionsHostedByThisServer.contains(partitionId)) {
         // Partition is not hosted in this server anymore, stop tracking it
         removePartitionId(partitionId);
+        removeConsumingGauge(partitionId);
       }
     }
 
     ConcurrentHashMap<Integer, Boolean> newMap = new ConcurrentHashMap<>();
     partitionsHostedByThisServer.forEach(p -> newMap.put(p, true));
     _partitionsHostedByThisServer = newMap;
+  }
+
+  /// Removes the LLC_PARTITION_CONSUMING gauge of a partition this server no longer consumes (e.g. an ended Kinesis
+  /// shard), so that it does not stay at 0 forever. The gauge is keyed by client id, not by partition id.
+  private void removeConsumingGauge(int partitionId) {
+    try {
+      TableConfig tableConfig = _realTimeTableDataManager.getCachedTableConfigAndSchema().getLeft();
+      StreamConfig streamConfig = IngestionConfigUtils.getStreamConfigFromPinotPartitionId(
+          IngestionConfigUtils.getStreamConfigs(tableConfig), partitionId);
+      String clientId = RealtimeSegmentDataManager.getClientId(_tableNameWithType, streamConfig.getTopicName(),
+          IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(tableConfig, partitionId),
+          _realTimeTableDataManager.getInstanceDataManagerConfig());
+      _serverMetrics.removeTableGauge(clientId, ServerGauge.LLC_PARTITION_CONSUMING);
+    } catch (Exception e) {
+      LOGGER.warn("Failed to remove consuming gauge for partition: {} of table: {}", partitionId, _tableNameWithType,
+          e);
+    }
   }
 
   /// This function is invoked when a segment goes from CONSUMING to ONLINE, so we can assert whether the partition of
