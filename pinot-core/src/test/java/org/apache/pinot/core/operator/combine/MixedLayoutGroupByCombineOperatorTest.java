@@ -25,9 +25,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.Key;
@@ -120,6 +122,65 @@ public class MixedLayoutGroupByCombineOperatorTest {
     assertEquals(result.get("a|0"), 6.0);
     assertEquals(result.get("b|0"), 2.0);
     assertEquals(result.get("null|1"), 10.0);
+  }
+
+  @Test
+  public void testMixedLayoutsDetachFullRecordsBeforeClosingTable() {
+    QueryContext queryContext = queryContext();
+    DataSchema fullSchema = fullLayoutBlock(queryContext).getDataSchema();
+    AtomicInteger closeCount = new AtomicInteger();
+    /// Concurrent table whose column-addressable records are valid only until the combine closes it.
+    class CloseableFullLayoutTable extends ConcurrentIndexedTable implements AutoCloseable {
+      CloseableFullLayoutTable(ExecutorService executorService) {
+        super(fullSchema, false, queryContext, Integer.MAX_VALUE, Integer.MAX_VALUE, Integer.MAX_VALUE, 2,
+            executorService);
+      }
+
+      @Override
+      public boolean upsert(Key key, Record record) {
+        return super.upsert(key, new Record(record.getValues().clone()) {
+          @Override
+          public Object[] getValues() {
+            throw new UnsupportedOperationException("Read individual columns from table-owned records");
+          }
+
+          @Override
+          public Object getValue(int index) {
+            assertEquals(closeCount.get(), 0, "Table-owned record read after close");
+            return super.getValue(index);
+          }
+        });
+      }
+
+      @Override
+      public void close() {
+        closeCount.incrementAndGet();
+        _lookupMap.clear();
+      }
+    }
+    CloseableFullLayoutTable fullTable = new CloseableFullLayoutTable(_executorService);
+    List<IntermediateRecord> fullRecords = List.of(
+        IntermediateRecord.withoutOrderByValues(new Key(new Object[]{"c", 0}),
+            new Record(new Object[]{"c", 0, 5.0})),
+        IntermediateRecord.withoutOrderByValues(new Key(new Object[]{null, 1}),
+            new Record(new Object[]{null, 1, 7.0})));
+    GroupByCombineOperator combineOperator = new GroupByCombineOperator(List.of(
+        mockOperator(baseLayoutBlock(queryContext)),
+        mockOperator(new GroupByResultsBlock(fullSchema, fullRecords, queryContext))), queryContext,
+        _executorService) {
+      @Override
+      protected IndexedTable createIndexedTable(GroupByResultsBlock resultsBlock) {
+        return fullTable;
+      }
+    };
+
+    GroupByResultsBlock mergedBlock = (GroupByResultsBlock) combineOperator.nextBlock();
+    assertEquals(closeCount.get(), 1);
+    Map<String, Double> result = new HashMap<>();
+    for (Object[] values : mergedBlock.getRows()) {
+      result.put(values[0] + "|" + values[1], ((Number) values[2]).doubleValue());
+    }
+    assertEquals(result, Map.of("a|0", 1.0, "b|0", 2.0, "c|0", 5.0, "null|1", 10.0));
   }
 
   @Test
