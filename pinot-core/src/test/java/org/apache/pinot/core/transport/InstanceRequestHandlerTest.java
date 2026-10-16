@@ -186,7 +186,8 @@ public class InstanceRequestHandlerTest {
     Map<Integer, String> exceptions = dataTable.getExceptions();
     assertEquals(exceptions.size(), 1);
     String message = exceptions.get(QueryErrorCode.QUERY_EXECUTION.getId());
-    assertTrue(message.contains("EXPRMIN"), message);
+    // Thrown by AggregationFunctionFactory for an EXPR_MIN that the broker did not rewrite
+    assertTrue(message.contains("Aggregation function: EXPRMIN is only supported in selection without alias"), message);
   }
 
   private QueryScheduler createQueryScheduler(PinotConfiguration config, CountDownLatch queryFinishLatch) {

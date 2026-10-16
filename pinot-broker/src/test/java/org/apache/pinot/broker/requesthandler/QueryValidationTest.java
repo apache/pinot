@@ -30,6 +30,7 @@ import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.rewriter.ExprMinMaxRewriter;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 import org.testng.Assert;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertTrue;
@@ -171,6 +172,13 @@ public class QueryValidationTest {
         () -> BaseSingleStageBrokerRequestHandler.validateRequest(pinotQuery, 10));
   }
 
+  /// Restores the default query and result rewriters, which the EXPR_MIN/EXPR_MAX tests change.
+  @AfterMethod
+  public void resetRewriters() {
+    QueryRewriterFactory.init(null);
+    ResultRewriterFactory.init(null);
+  }
+
   @Test
   public void testExprMinMaxWithoutRewriters() {
     testUnsupportedQuery("SELECT EXPR_MIN(a, b) FROM testTable",
@@ -181,30 +189,30 @@ public class QueryValidationTest {
 
   @Test
   public void testExprMinMaxWithRewriters() {
-    try {
-      enableExprMinMaxQueryRewriter();
-      ResultRewriterFactory.init(ParentAggregationResultRewriter.class.getName());
-      validQuery("SELECT EXPR_MIN(a, b), EXPR_MAX(c, b, d), COUNT(*) FROM testTable");
-      testUnsupportedQuery("SELECT COUNT(*), EXPR_MIN(a, b) AS minA FROM testTable",
-          "EXPR_MIN is only supported as a top-level expression in the select list, without an alias");
-      testUnsupportedQuery("SELECT EXPR_MAX(a, b) + 1 FROM testTable",
-          "EXPR_MAX is only supported as a top-level expression in the select list, without an alias");
-    } finally {
-      QueryRewriterFactory.init(null);
-      ResultRewriterFactory.init(null);
-    }
+    enableExprMinMaxQueryRewriter();
+    ResultRewriterFactory.init(ParentAggregationResultRewriter.class.getName());
+    validQuery("SELECT EXPR_MIN(a, b), EXPR_MAX(c, b, d), COUNT(*) FROM testTable");
+    testUnsupportedExprMinMaxPosition("SELECT COUNT(*), EXPR_MIN(a, b) AS minA FROM testTable", "EXPR_MIN");
+    testUnsupportedExprMinMaxPosition("SELECT EXPR_MAX(a, b) + 1 FROM testTable", "EXPR_MAX");
+    testUnsupportedExprMinMaxPosition("SELECT COUNT(*) FROM testTable WHERE EXPR_MIN(a, b) > 1", "EXPR_MIN");
+    testUnsupportedExprMinMaxPosition("SELECT c, COUNT(*) FROM testTable GROUP BY c HAVING EXPR_MAX(a, b) > 1",
+        "EXPR_MAX");
+    testUnsupportedExprMinMaxPosition("SELECT c, COUNT(*) FROM testTable GROUP BY c ORDER BY EXPR_MIN(a, b)",
+        "EXPR_MIN");
   }
 
   @Test
   public void testExprMinMaxWithoutResultRewriter() {
-    try {
-      enableExprMinMaxQueryRewriter();
-      testUnsupportedQuery("SELECT EXPR_MIN(a, b) FROM testTable",
-          "EXPR_MIN and EXPR_MAX require the result rewriter '" + ParentAggregationResultRewriter.class.getName()
-              + "'. To enable it, add it to 'pinot.broker.result.rewriter.class.names'");
-    } finally {
-      QueryRewriterFactory.init(null);
-    }
+    enableExprMinMaxQueryRewriter();
+    testUnsupportedQuery("SELECT EXPR_MIN(a, b) FROM testTable",
+        "EXPR_MIN and EXPR_MAX require the result rewriter '" + ParentAggregationResultRewriter.class.getName()
+            + "'. To enable it, add it to 'pinot.broker.result.rewriter.class.names'");
+  }
+
+  private void testUnsupportedExprMinMaxPosition(String query, String functionName) {
+    testUnsupportedQuery(query, functionName + " is only supported as a top-level expression in the select list, "
+        + "without an alias. It is not supported in other expressions or in the WHERE, GROUP BY, HAVING or ORDER BY "
+        + "clauses");
   }
 
   private static void enableExprMinMaxQueryRewriter() {

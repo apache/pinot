@@ -2500,10 +2500,11 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
                 + ParentAggregationResultRewriter.class.getName() + "' to '"
                 + Broker.CONFIG_OF_BROKER_RESULT_REWRITER_CLASS_NAMES + "'");
       }
-      // The rewriter only handles the top-level expressions of the select list, so the function is nested in another
-      // expression or has an alias.
-      throw new BadQueryRequestException(
-          functionName + " is only supported as a top-level expression in the select list, without an alias");
+      // The rewriter only handles the top-level expressions of the select list, so the function has an alias, is nested
+      // in another expression, or is in another clause.
+      throw new BadQueryRequestException(functionName + " is only supported as a top-level expression in the select "
+          + "list, without an alias. It is not supported in other expressions or in the WHERE, GROUP BY, HAVING or "
+          + "ORDER BY clauses");
     }
     if (findFunction(pinotQuery, CHILD_EXPR_MIN_MAX_FUNCTIONS) != null) {
       boolean resultRewriterEnabled = ResultRewriterFactory.getResultRewriter().stream()
