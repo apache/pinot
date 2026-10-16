@@ -23,6 +23,7 @@ import java.util.List;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 
 
@@ -32,6 +33,7 @@ public class TransformOperandFactory {
   private static final String IS_NOT_DISTINCT_FROM =
       FunctionRegistry.canonicalize(TransformFunctionType.IS_NOT_DISTINCT_FROM.getName());
   private static final String CAST = FunctionRegistry.canonicalize(TransformFunctionType.CAST.getName());
+  private static final String IN_ID_SET = FunctionRegistry.canonicalize(TransformFunctionType.IN_ID_SET.getName());
 
   private TransformOperandFactory() {
   }
@@ -68,6 +70,10 @@ public class TransformOperandFactory {
             "Raw VARIANT values do not support comparison; extract a typed path with variantGet first");
       }
       return new FunctionOperand(functionCall, dataSchema);
+    }
+    if (canonicalName.equals(IN_ID_SET) && numOperands >= 1) {
+      Preconditions.checkArgument(getResultType(operands.get(0), dataSchema) != ColumnDataType.VARIANT,
+          "Raw VARIANT values do not support IN; extract a typed path with variantGet first");
     }
     if (canonicalName.equals(CAST) && numOperands >= 1) {
       // Casting the raw envelope would leak encoding bytes as STRING/JSON/BYTES and bypass the opacity contract.
