@@ -18,13 +18,16 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.function.IntFunction;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -40,47 +43,100 @@ import static org.testng.Assert.assertEquals;
 public class AnyValueGroupByRecomputationTest {
   private static final int NUM_DOCS = 1000;
 
-  @Test
-  public void testGroupByReadsNonDictionaryStringValuesOncePerBlock() {
-    String[] values = new String[NUM_DOCS];
-    for (int i = 0; i < NUM_DOCS; i++) {
-      values[i] = "zone-" + (i % 3);
-    }
-    BlockValSet valueSet = mockNonDictionaryValueSet(DataType.STRING);
-    when(valueSet.getStringValuesSV()).thenReturn(values);
-
-    GroupByResultHolder holder = aggregateGroupBy(valueSet);
-
-    assertEquals(countCalls(valueSet, "getStringValuesSV"), 1,
-        "getStringValuesSV() must be called once per block, not once per row");
-    for (int i = 0; i < NUM_DOCS; i++) {
-      assertEquals(holder.<String>getResult(i), values[i]);
-    }
+  @DataProvider(name = "storedTypes")
+  public Object[][] storedTypes() {
+    return new Object[][]{
+        {DataType.INT, "getIntValuesSV"},
+        {DataType.LONG, "getLongValuesSV"},
+        {DataType.FLOAT, "getFloatValuesSV"},
+        {DataType.DOUBLE, "getDoubleValuesSV"},
+        {DataType.BIG_DECIMAL, "getBigDecimalValuesSV"},
+        {DataType.STRING, "getStringValuesSV"},
+        {DataType.BYTES, "getBytesValuesSV"}
+    };
   }
 
-  @Test
-  public void testGroupByReadsNonDictionaryBytesValuesOncePerBlock() {
-    byte[][] values = new byte[NUM_DOCS][];
-    for (int i = 0; i < NUM_DOCS; i++) {
-      values[i] = new byte[]{(byte) i, (byte) (i >> 8)};
-    }
-    BlockValSet valueSet = mockNonDictionaryValueSet(DataType.BYTES);
-    when(valueSet.getBytesValuesSV()).thenReturn(values);
-
-    GroupByResultHolder holder = aggregateGroupBy(valueSet);
-
-    assertEquals(countCalls(valueSet, "getBytesValuesSV"), 1,
-        "getBytesValuesSV() must be called once per block, not once per row");
-    for (int i = 0; i < NUM_DOCS; i++) {
-      assertEquals(holder.<ByteArray>getResult(i), new ByteArray(values[i]));
-    }
-  }
-
-  private static BlockValSet mockNonDictionaryValueSet(DataType dataType) {
+  @Test(dataProvider = "storedTypes")
+  public void testGroupByReadsNonDictionaryValuesOncePerBlock(DataType storedType, String valuesMethod) {
     BlockValSet valueSet = mock(BlockValSet.class);
-    when(valueSet.getValueType()).thenReturn(dataType);
+    when(valueSet.getValueType()).thenReturn(storedType);
     when(valueSet.isDictionaryEncoded()).thenReturn(false);
-    return valueSet;
+    IntFunction<Object> expectedValue = stubValues(valueSet, storedType);
+
+    GroupByResultHolder holder = aggregateGroupBy(valueSet);
+
+    long numCalls = mockingDetails(valueSet).getInvocations().stream()
+        .filter(invocation -> invocation.getMethod().getName().equals(valuesMethod))
+        .count();
+    assertEquals(numCalls, 1, valuesMethod + "() must be called once per block, not once per row");
+    for (int i = 0; i < NUM_DOCS; i++) {
+      assertEquals(holder.<Object>getResult(i), expectedValue.apply(i));
+    }
+  }
+
+  /// Stubs the values getter for the stored type and returns the value that ANY_VALUE must keep for each group.
+  private static IntFunction<Object> stubValues(BlockValSet valueSet, DataType storedType) {
+    switch (storedType) {
+      case INT: {
+        int[] values = new int[NUM_DOCS];
+        for (int i = 0; i < NUM_DOCS; i++) {
+          values[i] = i;
+        }
+        when(valueSet.getIntValuesSV()).thenReturn(values);
+        return i -> values[i];
+      }
+      case LONG: {
+        long[] values = new long[NUM_DOCS];
+        for (int i = 0; i < NUM_DOCS; i++) {
+          values[i] = i * 10L;
+        }
+        when(valueSet.getLongValuesSV()).thenReturn(values);
+        return i -> values[i];
+      }
+      case FLOAT: {
+        float[] values = new float[NUM_DOCS];
+        for (int i = 0; i < NUM_DOCS; i++) {
+          values[i] = i + 0.5f;
+        }
+        when(valueSet.getFloatValuesSV()).thenReturn(values);
+        return i -> values[i];
+      }
+      case DOUBLE: {
+        double[] values = new double[NUM_DOCS];
+        for (int i = 0; i < NUM_DOCS; i++) {
+          values[i] = i + 0.25;
+        }
+        when(valueSet.getDoubleValuesSV()).thenReturn(values);
+        return i -> values[i];
+      }
+      case BIG_DECIMAL: {
+        BigDecimal[] values = new BigDecimal[NUM_DOCS];
+        for (int i = 0; i < NUM_DOCS; i++) {
+          values[i] = BigDecimal.valueOf(i, 2);
+        }
+        when(valueSet.getBigDecimalValuesSV()).thenReturn(values);
+        return i -> values[i];
+      }
+      case STRING: {
+        String[] values = new String[NUM_DOCS];
+        for (int i = 0; i < NUM_DOCS; i++) {
+          values[i] = "zone-" + (i % 3);
+        }
+        when(valueSet.getStringValuesSV()).thenReturn(values);
+        return i -> values[i];
+      }
+      case BYTES: {
+        byte[][] values = new byte[NUM_DOCS][];
+        for (int i = 0; i < NUM_DOCS; i++) {
+          values[i] = new byte[]{(byte) i, (byte) (i >> 8)};
+        }
+        when(valueSet.getBytesValuesSV()).thenReturn(values);
+        // ANY_VALUE wraps BYTES values in ByteArray.
+        return i -> new ByteArray(values[i]);
+      }
+      default:
+        throw new IllegalArgumentException("Unsupported stored type: " + storedType);
+    }
   }
 
   private static GroupByResultHolder aggregateGroupBy(BlockValSet valueSet) {
@@ -93,11 +149,5 @@ public class AnyValueGroupByRecomputationTest {
     GroupByResultHolder holder = function.createGroupByResultHolder(NUM_DOCS, NUM_DOCS);
     function.aggregateGroupBySV(NUM_DOCS, groupKeys, holder, Map.of(expression, valueSet));
     return holder;
-  }
-
-  private static long countCalls(BlockValSet valueSet, String methodName) {
-    return mockingDetails(valueSet).getInvocations().stream()
-        .filter(invocation -> invocation.getMethod().getName().equals(methodName))
-        .count();
   }
 }
