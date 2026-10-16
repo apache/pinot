@@ -266,7 +266,8 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       InstanceStateMaps instanceStateMaps = entry.getValue();
       Map<String, String> idealStateInstanceStateMap = idealStateAssignment.get(segment);
       // The candidates only depend on the instance state maps: the unavailable instances are a function of the
-      // instances in the ideal state, and they are final once computed above
+      // instances in the ideal state, and they are final once computed above. Segments that share one
+      // InstanceStateMaps have equal ideal state maps, thus the same instances and the same unavailable instances.
       List<SegmentInstanceCandidate> candidates = instanceStateMaps._oldSegmentCandidates;
       if (candidates == null) {
         Set<String> onlineInstances = instanceStateMaps._onlineInstances;
