@@ -397,15 +397,20 @@ public class RexExpressionUtils {
       if (leftOperand instanceof RexLiteral) {
         return evaluateLiteralIn((RexLiteral) leftOperand, sarg.rangeSet.asRanges(), sarg.nullAs);
       }
-      RexExpression inExpr = new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.IN.name(),
-          toSearchFunctionOperands(leftOperand, sarg.rangeSet.asRanges(), dataType));
+      RexExpression inExpr = dataType == ColumnDataType.BIG_DECIMAL
+          ? convertPoints(SqlKind.OR, SqlKind.EQUALS, leftOperand, sarg.rangeSet.asRanges(), dataType)
+          : new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.IN.name(),
+              toSearchFunctionOperands(leftOperand, sarg.rangeSet.asRanges(), dataType));
       return addNullCheckIfRequired(leftOperand, sarg.nullAs, inExpr);
     } else if (sarg.isComplementedPoints()) {
       if (leftOperand instanceof RexLiteral) {
         return evaluateLiteralNotIn((RexLiteral) leftOperand, sarg.rangeSet.complement().asRanges(), sarg.nullAs);
       }
-      RexExpression notInExpr = new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.NOT_IN.name(),
-          toSearchFunctionOperands(leftOperand, sarg.rangeSet.complement().asRanges(), dataType));
+      Set<Range> points = sarg.rangeSet.complement().asRanges();
+      RexExpression notInExpr = dataType == ColumnDataType.BIG_DECIMAL
+          ? convertPoints(SqlKind.AND, SqlKind.NOT_EQUALS, leftOperand, points, dataType)
+          : new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.NOT_IN.name(),
+              toSearchFunctionOperands(leftOperand, points, dataType));
       return addNullCheckIfRequired(leftOperand, sarg.nullAs, notInExpr);
     } else {
       if (leftOperand instanceof RexLiteral) {
@@ -430,8 +435,7 @@ public class RexExpressionUtils {
   ///   result is `AND(NOT_IN(x, <list>), x > 0)`.
   /// - When both forms apply, the one with fewer values is used.
   ///
-  /// `BIG_DECIMAL` ranges always become comparisons: an intermediate stage of an older server matches `IN` values with
-  /// `equals`, which depends on the scale of the value.
+  /// `BIG_DECIMAL` ranges always become comparisons, like single `BIG_DECIMAL` values (see [#convertPoints]).
   private static RexExpression convertRanges(ColumnDataType dataType, RexNode leftOperand, RangeSet rangeSet) {
     Set<Range> ranges = rangeSet.asRanges();
     if (dataType == ColumnDataType.BIG_DECIMAL) {
@@ -470,6 +474,21 @@ public class RexExpressionUtils {
       return combine(SqlKind.AND, terms);
     }
     return convertRangesToOr(dataType, leftOperand, ranges);
+  }
+
+  /// Converts single values to one comparison each, e.g. `OR(x = 1, x = 2)` for `x IN (1, 2)` and
+  /// `AND(x <> 1, x <> 2)` for `x NOT IN (1, 2)`. Used for `BIG_DECIMAL` values: an intermediate stage of an older
+  /// server matches `IN` values with `equals`, which depends on the scale of the value (1.0 does not equal 1), and a
+  /// comparison does not.
+  private static RexExpression convertPoints(SqlKind combineKind, SqlKind comparisonKind, RexNode leftOperand,
+      Set<Range> points, ColumnDataType dataType) {
+    RexExpression convertedLeftOperand = fromRexNode(leftOperand);
+    List<RexExpression> terms = new ArrayList<>(points.size());
+    for (Range point : points) {
+      terms.add(new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, comparisonKind.name(),
+          List.of(convertedLeftOperand, fromRexLiteralValue(dataType, point.lowerEndpoint()))));
+    }
+    return combine(combineKind, terms);
   }
 
   private static RexExpression combine(SqlKind kind, List<RexExpression> terms) {

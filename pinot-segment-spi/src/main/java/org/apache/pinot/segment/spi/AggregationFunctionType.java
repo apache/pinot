@@ -486,7 +486,8 @@ public enum AggregationFunctionType {
       RelDataTypeFactory typeFactory = callBinding.getTypeFactory();
       RelDataType dataType = toRelDataType(dataTypeName, typeFactory);
       RelDataType valueType = callBinding.getOperandType(0);
-      // Keep multi-value columns, for which the return type inference uses the type of the elements
+      // Keep multi-value columns, for which the return type inference uses the type of the elements. If the validation
+      // checks the call again, the value already has the data type, so needsCast() prevents a second cast.
       if (dataType == null || valueType.getComponentType() != null || !needsCast(valueType, dataType)) {
         return true;
       }
