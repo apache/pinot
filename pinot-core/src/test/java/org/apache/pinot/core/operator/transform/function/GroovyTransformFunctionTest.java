@@ -25,9 +25,11 @@ import java.util.Arrays;
 import java.util.IntSummaryStatistics;
 import java.util.List;
 import java.util.stream.IntStream;
+import org.apache.pinot.common.evaluator.GroovyFunctionEvaluator;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
@@ -36,6 +38,22 @@ import org.testng.annotations.Test;
 
 /// Tests the GROOVY transform function
 public class GroovyTransformFunctionTest extends BaseTransformFunctionTest {
+
+  @Test
+  public void testQueryGroovyWithIngestionDisabled() {
+    GroovyFunctionEvaluator.setIngestionGroovyDisabled(true);
+    try {
+      int[] constantValues = new int[NUM_ROWS];
+      Arrays.fill(constantValues, 1);
+      testGroovyTransformFunctions("groovy('{\"returnType\":\"INT\", \"isSingleValue\":true}', '1')",
+          DataType.INT, true, constantValues);
+      testGroovyTransformFunctions(String.format(
+          "groovy('{\"returnType\":\"INT\", \"isSingleValue\":true}', 'arg0', %s)", INT_SV_COLUMN),
+          DataType.INT, true, _intSVValues);
+    } finally {
+      GroovyFunctionEvaluator.setIngestionGroovyDisabled(false);
+    }
+  }
 
   @DataProvider(name = "groovyFunctionDataProvider")
   public Object[][] groovyFunctionDataProvider() {
