@@ -290,7 +290,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
   public void testSelectionOrderBySingleSortedColumnDescDidOrder() {
     String orderBy = " ORDER BY column5 DESC";
     BaseOperator<SelectionResultsBlock> selectionOrderByOperator = getOperator(
-        "SET allowReverseOrder = false; " + SELECTION_QUERY + orderBy);
+        "SET allowReverseOrder = false; SET lateMaterializeSortedOrderBy = true; " + SELECTION_QUERY + orderBy);
     assertTrue(selectionOrderByOperator instanceof SelectionPartiallyOrderedByDescOperation, "Expected: "
         + SelectionPartiallyOrderedByLinearOperator.class + ", found: " + selectionOrderByOperator.getClass());
     SelectionResultsBlock resultsBlock = selectionOrderByOperator.nextBlock();
@@ -310,6 +310,17 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     Object[] lastRow = selectionResult.get(9);
     assertEquals(lastRow.length, 3);
     assertEquals(lastRow[0], "gFuH");
+  }
+
+  /// The optimization is opt-in, so the same query without the option must still read every selected column
+  /// for the whole match set. Pins the default; delete or invert this when the default flips.
+  @Test
+  public void testSelectionOrderBySingleSortedColumnDescIsEagerByDefault() {
+    BaseOperator<SelectionResultsBlock> operator =
+        getOperator("SET allowReverseOrder = false; " + SELECTION_QUERY + " ORDER BY column5 DESC");
+    operator.nextBlock();
+    // 30000 docs * 3 selected columns, as before late materialisation existed.
+    assertEquals(operator.getExecutionStatistics().getNumEntriesScannedPostFilter(), 90000L);
   }
 
   @Test

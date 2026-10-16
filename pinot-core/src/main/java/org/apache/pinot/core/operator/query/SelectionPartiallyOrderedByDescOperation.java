@@ -68,7 +68,7 @@ public class SelectionPartiallyOrderedByDescOperation extends LinearSelectionOrd
     // the same DataBlockCache, so they may be ephemeral and being overridden by the next block.
     // The only alternative we have right now is to retrieve the last LIMIT elements from each block
 
-    BlockValSet[] blockValSets = newBlockValSets();
+    BlockValSet[] blockValSets = new BlockValSet[getNumProjectedExpressions()];
     List<Object[]> localBestRows = new ArrayList<>();
     ValueBlock valueBlock;
     while ((valueBlock = _projectOperator.nextBlock()) != null) {
