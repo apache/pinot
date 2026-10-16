@@ -22,10 +22,12 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -50,7 +52,6 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.pinot.common.helix.ExtraInstanceConfig;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.utils.config.TagNameUtils;
@@ -78,7 +79,6 @@ public class HelixHelper {
       RetryPolicies.randomDelayRetryPolicy(20, 100L, 200L);
 
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixHelper.class);
-  private static final ZNRecordSerializer ZN_RECORD_SERIALIZER = new ZNRecordSerializer();
   private static final IdealStateGroupCommit IDEAL_STATE_GROUP_COMMIT = new IdealStateGroupCommit();
 
   private static final String ONLINE = "ONLINE";
@@ -95,14 +95,41 @@ public class HelixHelper {
     return HelixManagerFactory.getZKHelixManager(clusterName, instanceName, instanceType, zkAddress);
   }
 
+  /// Returns a deep copy of the IdealState with the same content as cloning it through a serialization round trip of
+  /// its ZNRecord: id, simple fields, map fields, list fields and raw payload, with the same container types and
+  /// iteration order. Like the round trip, the ZK stat fields (e.g. version) are not copied. Unlike the round trip, the
+  /// serializer's write policies (list field bound, size limit) are not applied; they still apply when the IdealState
+  /// is written.
+  ///
+  /// Copying the fields directly avoids serializing (and compressing) the whole ZNRecord and parsing it back, which
+  /// takes seconds for an IdealState with hundreds of thousands of segments and widens the window for version
+  /// conflicts when updating it.
   public static IdealState cloneIdealState(IdealState idealState) {
-    return new IdealState(
-        (ZNRecord) ZN_RECORD_SERIALIZER.deserialize(ZN_RECORD_SERIALIZER.serialize(idealState.getRecord())));
+    ZNRecord record = idealState.getRecord();
+    IdealState copy = new IdealState(record.getId());
+    copyRecordFields(record, copy.getRecord());
+    return copy;
+  }
+
+  /// Deep-copies the simple, map, list and raw payload fields of `from` into `to`, without serializing the record.
+  private static void copyRecordFields(ZNRecord from, ZNRecord to) {
+    to.setSimpleFields(new TreeMap<>(from.getSimpleFields()));
+    TreeMap<String, Map<String, String>> mapFields = new TreeMap<>(from.getMapFields());
+    mapFields.replaceAll((key, value) -> value != null ? new LinkedHashMap<>(value) : null);
+    to.setMapFields(mapFields);
+    TreeMap<String, List<String>> listFields = new TreeMap<>(from.getListFields());
+    listFields.replaceAll((key, value) -> value != null ? new ArrayList<>(value) : null);
+    to.setListFields(listFields);
+    byte[] rawPayload = from.getRawPayload();
+    if (rawPayload != null) {
+      to.setRawPayload(rawPayload.clone());
+    }
   }
 
   /// Returns whether the given record came from the compact parser of [CompactZNRecordSerializer], that is, its map
-  /// fields are an [ImmutableSortedArrayMap]. A record from [ZNRecordSerializer] returns false, including the records
-  /// that the compact serializer delegates to it (plain znodes and the fallback).
+  /// fields are an [ImmutableSortedArrayMap]. A record from
+  /// [ZNRecordSerializer][org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer] returns false, including
+  /// the records that the compact serializer delegates to it (plain znodes and the fallback).
   public static boolean isCompact(ZNRecord record) {
     return record.getMapFields() instanceof ImmutableSortedArrayMap;
   }
@@ -684,8 +711,8 @@ public class HelixHelper {
             return null;
           }
           // Deep copy because mutators such as InstanceConfig.addTag() modify list and map fields in place.
-          ZNRecord originalRecord =
-              (ZNRecord) ZN_RECORD_SERIALIZER.deserialize(ZN_RECORD_SERIALIZER.serialize(currentRecord));
+          ZNRecord originalRecord = new ZNRecord(currentRecord.getId());
+          copyRecordFields(currentRecord, originalRecord);
           InstanceConfig instanceConfig = new InstanceConfig(currentRecord);
           try {
             mutator.accept(instanceConfig);

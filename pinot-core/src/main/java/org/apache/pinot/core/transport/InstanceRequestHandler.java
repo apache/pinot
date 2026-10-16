@@ -43,6 +43,7 @@ import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
 import org.apache.pinot.common.metrics.ServerTimer;
+import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
@@ -123,20 +124,31 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     _serverMetrics.addMeteredGlobalValue(ServerMeter.NETTY_CONNECTION_BYTES_RECEIVED, requestSize);
     byte[] requestBytes = new byte[requestSize];
     msg.readBytes(requestBytes);
-    ServerQueryRequest queryRequest;
+    InstanceRequest instanceRequest = new InstanceRequest();
     try {
-      InstanceRequest instanceRequest = new InstanceRequest();
       THREAD_LOCAL_T_DESERIALIZER.get().deserialize(instanceRequest, requestBytes);
-      queryRequest = new ServerQueryRequest(instanceRequest, _serverMetrics, queryArrivalTimeMs);
-      _serverMetrics.addMeteredTableValue(queryRequest.getTableNameWithType(), ServerMeter.QUERIES_ON_TABLE, 1);
-      queryRequest.getTimerContext().startNewPhaseTimer(ServerQueryPhase.REQUEST_DESERIALIZATION, queryArrivalTimeMs)
-          .stopAndRecord();
     } catch (Exception e) {
       // Do not send error response because request id is unknown.
       LOGGER.error("Failed to deserialize instance request: {}", BytesUtils.toHexString(requestBytes), e);
       _serverMetrics.addMeteredGlobalValue(ServerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS, 1);
       return;
     }
+    ServerQueryRequest queryRequest;
+    try {
+      queryRequest = new ServerQueryRequest(instanceRequest, _serverMetrics, queryArrivalTimeMs);
+    } catch (Exception e) {
+      // The request id is known, so reply with the error. Without a response, the broker waits until the query times
+      // out and reports the server as not responded, which hides the actual error (e.g. an unsupported function).
+      long requestId = instanceRequest.getRequestId();
+      String tableNameWithType = getTableNameWithType(instanceRequest);
+      LOGGER.error("Failed to compile query request: {} on table: {}", requestId, tableNameWithType, e);
+      sendErrorResponse(ctx, requestId, tableNameWithType, queryArrivalTimeMs,
+          DataTableBuilderFactory.getEmptyDataTable(), e);
+      return;
+    }
+    _serverMetrics.addMeteredTableValue(queryRequest.getTableNameWithType(), ServerMeter.QUERIES_ON_TABLE, 1);
+    queryRequest.getTimerContext().startNewPhaseTimer(ServerQueryPhase.REQUEST_DESERIALIZATION, queryArrivalTimeMs)
+        .stopAndRecord();
     try {
       submitQuery(queryRequest, ctx, queryArrivalTimeMs);
     } catch (Exception e) {
@@ -256,6 +268,18 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
   public Set<String> getRunningQueryIds() {
     Preconditions.checkState(_executionContexts != null, "Query cancellation is not enabled on server");
     return new HashSet<>(_executionContexts.keySet());
+  }
+
+  /// Returns the table name of a deserialized request that could not be compiled, or `null` if the request does not
+  /// carry one.
+  @Nullable
+  private static String getTableNameWithType(InstanceRequest instanceRequest) {
+    BrokerRequest brokerRequest = instanceRequest.getQuery();
+    if (brokerRequest == null || brokerRequest.getPinotQuery() == null
+        || brokerRequest.getPinotQuery().getDataSource() == null) {
+      return null;
+    }
+    return brokerRequest.getPinotQuery().getDataSource().getTableName();
   }
 
   /// Send an exception back to broker as response to the query request.

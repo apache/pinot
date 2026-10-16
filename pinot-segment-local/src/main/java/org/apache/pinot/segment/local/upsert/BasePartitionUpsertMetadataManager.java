@@ -131,6 +131,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   // Used to maintain the largestSeenComparisonValue to avoid handling out-of-ttl segments/records.
   // If upsertTTL enabled, we will keep track of largestSeenComparisonValue to compute expired segments.
   protected final AtomicDouble _largestSeenComparisonValue;
+  // The TTL watermark last persisted to disk. A segment out of TTL against it has an up-to-date snapshot on disk, see
+  // getWatermarkToPersist().
+  private volatile double _persistedWatermark;
 
   // The following variables are always accessed within synchronized block
   private boolean _stopped;
@@ -202,6 +205,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _largestSeenComparisonValue = new AtomicDouble(TTL_WATERMARK_NOT_SET);
       WatermarkUtils.deleteWatermark(getWatermarkFile());
     }
+    _persistedWatermark = _largestSeenComparisonValue.get();
   }
 
   @Override
@@ -346,6 +350,14 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         && maxComparisonValue < _largestSeenComparisonValue.get() - _metadataTTL;
   }
 
+  /// Returns whether the segment can be handled as out of TTL when it's added or preloaded, i.e. with its validDocIds
+  /// snapshot taken as is. Besides the watermark in memory, the segment must also be out of TTL against the persisted
+  /// watermark, which is capped to keep any segment with a stale or missing snapshot within TTL. The watermark in
+  /// memory alone is not enough, e.g. on server restart it's bumped by the newer segments loaded earlier.
+  protected boolean canSkipSegmentOutOfTTL(double maxComparisonValue) {
+    return isOutOfMetadataTTL(maxComparisonValue) && maxComparisonValue < _persistedWatermark - _metadataTTL;
+  }
+
   protected boolean isOutOfMetadataTTL(IndexSegment segment) {
     if (_metadataTTL > 0) {
       double maxComparisonValue = getMaxComparisonValue(segment);
@@ -390,7 +402,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     // watermark stays unchanged - the segment's rows are not in the map, so recording their max would misrepresent
     // what we have observed and let the sweep expire other keys against a phantom watermark.
     double maxComparisonValue = isTTLEnabled() ? getMaxComparisonValue(segment) : TTL_WATERMARK_NOT_SET;
-    if (isTTLEnabled() && isOutOfMetadataTTL(maxComparisonValue) && skipAddSegmentOutOfTTL(segment)) {
+    if (isTTLEnabled() && canSkipSegmentOutOfTTL(maxComparisonValue) && skipAddSegmentOutOfTTL(segment)) {
       updateLargestSeenComparisonValue(maxComparisonValue);
       return;
     }
@@ -474,7 +486,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
     // Bump watermark after rows are added; see doAddSegment.
     double maxComparisonValue = isTTLEnabled() ? getMaxComparisonValue(segment) : TTL_WATERMARK_NOT_SET;
-    if (isTTLEnabled() && isOutOfMetadataTTL(maxComparisonValue)
+    if (isTTLEnabled() && canSkipSegmentOutOfTTL(maxComparisonValue)
         && skipPreloadSegmentOutOfTTL(segment, validDocIds)) {
       updateLargestSeenComparisonValue(maxComparisonValue);
       return;
@@ -1167,7 +1179,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     // updated validDocIds bitmaps. If the TTL watermark is persisted first, segments out of TTL may get loaded with
     // stale bitmaps or even no bitmap snapshots to use.
     if (isTTLEnabled()) {
-      WatermarkUtils.persistWatermark(_largestSeenComparisonValue.get(), getWatermarkFile());
+      double watermark = getWatermarkToPersist();
+      WatermarkUtils.persistWatermark(watermark, getWatermarkFile());
+      _persistedWatermark = watermark;
     }
     updateSnapshotMetrics(numImmutableSegments, numPrimaryKeysInSnapshot, numQueryableDocIdsInSnapshot,
         numTrackedSegments, numConsumingSegments, numUnchangedSegments);
@@ -1175,6 +1189,38 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
             + "(out of {} total segments, {} are consuming segments) in {} ms", numImmutableSegments,
         numPrimaryKeysInSnapshot, numQueryableDocIdsInSnapshot, numTrackedSegments,
         numConsumingSegments, System.currentTimeMillis() - startTimeMs);
+  }
+
+  /// Returns the TTL watermark to persist after taking snapshots. A segment still tracked as updated after the snapshot
+  /// pass, e.g. skipped on segmentLock contention or added while the pass ran, has a stale snapshot or no snapshot on
+  /// disk. If such segment were out of TTL after a restart, it would be added with the stale snapshot, or with all
+  /// docs treated as valid when there is no snapshot, which shows up as duplicate rows on this replica only. So cap
+  /// the persisted watermark to keep such segments within TTL, and get them added with the regular flow after restart.
+  /// The watermark in memory is not changed, and primary keys are still expired against it, so a segment that keeps
+  /// missing its snapshot doesn't keep the expired primary keys in memory.
+  private double getWatermarkToPersist() {
+    double watermark = _largestSeenComparisonValue.get();
+    if (_metadataTTL <= 0) {
+      return watermark;
+    }
+    double cappedWatermark = watermark;
+    // Unlike taking the snapshots above, reading the max comparison value doesn't need the segmentLock or the check
+    // against _trackedSegments: it comes from the segment metadata, which can still be read after the segment is
+    // destroyed, and a segment removed in the meantime can only cap the watermark lower than needed.
+    for (ImmutableSegmentImpl segment : _updatedSegmentsSinceLastSnapshot) {
+      double maxComparisonValue = getMaxComparisonValue(segment);
+      double maxWatermark = maxComparisonValue + _metadataTTL;
+      // Make sure the segment is not out of TTL as checked by isOutOfMetadataTTL(), regardless of rounding
+      while (maxComparisonValue < maxWatermark - _metadataTTL) {
+        maxWatermark = Math.nextDown(maxWatermark);
+      }
+      cappedWatermark = Math.min(cappedWatermark, maxWatermark);
+    }
+    if (cappedWatermark < watermark) {
+      _logger.warn("Capped TTL watermark to persist from: {} to: {} because some segments missed taking snapshot",
+          watermark, cappedWatermark);
+    }
+    return cappedWatermark;
   }
 
   private void updateSnapshotMetrics(int numImmutableSegments, long numPrimaryKeysInSnapshot,
@@ -1214,14 +1260,23 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     return new File(_tableIndexDir, V1Constants.TTL_WATERMARK_TABLE_PARTITION + _partitionId);
   }
 
+  /// Returns the TTL watermark last persisted to disk, as computed by getWatermarkToPersist(). The validDocIds
+  /// snapshots on disk are up to date for all the segments out of TTL against it, while they can be stale for the
+  /// segments out of TTL only against the watermark in memory.
+  protected double getPersistedWatermark() {
+    return _persistedWatermark;
+  }
+
   @VisibleForTesting
   double getWatermark() {
     return _largestSeenComparisonValue.get();
   }
 
+  /// Sets the watermark as if it was loaded from the persisted watermark file.
   @VisibleForTesting
   void setWatermark(double watermark) {
     _largestSeenComparisonValue.set(watermark);
+    _persistedWatermark = watermark;
   }
 
   @Override

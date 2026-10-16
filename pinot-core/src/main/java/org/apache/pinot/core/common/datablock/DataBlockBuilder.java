@@ -149,6 +149,7 @@ public class DataBlockBuilder {
               fixedSize.putInt(dictId);
               break;
             case BYTES:
+              value = value instanceof ByteArray ? value : new ByteArray((byte[]) value);
               setColumn(fixedSize, varSize, (ByteArray) value);
               break;
             case MAP:
@@ -705,11 +706,10 @@ public class DataBlockBuilder {
       AggregationFunction.SerializedIntermediateResult value)
       throws IOException {
     writeVarOffsetInFixed(fixedSize, varSize);
-    int type = value.getType();
-    byte[] bytes = value.getBytes();
-    fixedSize.putInt(bytes.length);
-    varSize.writeInt(type);
-    varSize.write(bytes);
+    fixedSize.putInt(value.getSize());
+    varSize.writeInt(value.getType());
+    // Writes straight into the pages, so a large intermediate result never needs a full-size byte array.
+    value.writeTo(varSize);
   }
 
   private static void setNull(ByteBuffer fixedSize, PagedPinotOutputStream varSize)
@@ -722,7 +722,8 @@ public class DataBlockBuilder {
   /// Iterate using two loops.
   /// The outer loop will iterate over a maximum of configurable step rows and check for the interruption flag,
   /// calling the inner loop to process the rows without checking the interruption flag.
-  static void interruptableLoop(int start, int max, int step, InnerLoop loop) throws IOException {
+  static void interruptableLoop(int start, int max, int step, InnerLoop loop)
+      throws IOException {
     for (int i = start; i < max; i += step) {
       if (Thread.currentThread().isInterrupted()) {
         throw new RuntimeException("Thread interrupted while processing rows. Rows processed so far: " + i);
@@ -733,6 +734,7 @@ public class DataBlockBuilder {
   }
 
   private interface InnerLoop {
-    void run(int from, int to) throws IOException;
+    void run(int from, int to)
+        throws IOException;
   }
 }

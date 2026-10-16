@@ -24,7 +24,6 @@ import java.util.Map;
 import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -54,7 +53,9 @@ import static org.testng.Assert.assertTrue;
 /// decrements the per-request counter never fired, and the exception was swallowed by the `FutureTask` created by
 /// `AbstractExecutorService.submit`, so nothing was logged either.
 ///
-/// Now the limit is checked only once, on submit. A task that passes that check always runs.
+/// Now the limit is checked only once, on submit. A task that passes that check always runs. The scheduler also hands
+/// op chains to the executor with `execute()` now, not `submit()`, so an exception from the executor is no longer
+/// swallowed by a `FutureTask` either: the test runs the queued task directly, and such an exception fails it.
 public class HardLimitExecutorOpChainRegressionTest {
 
   /// Executor that queues tasks instead of running them so the test controls when each one starts.
@@ -139,11 +140,9 @@ public class HardLimitExecutorOpChainRegressionTest {
     threadA.start();
     assertTrue(aStarted.await(10, TimeUnit.SECONDS), "A did not start");
 
-    // Start B: it passed the submit-time check, so it must run even though A pushed the counter to the limit.
-    Runnable taskB = deferred._queued.get(1);
-    taskB.run();
-    assertTrue(taskB instanceof Future, "AbstractExecutorService.submit wraps the task in a FutureTask");
-    ((Future<?>) taskB).get(10, TimeUnit.SECONDS);
+    // Start B: it passed the submit-time check, so it must run even though A pushed the counter to the limit. It runs
+    // on this thread, so an exception from the executor would fail the test here.
+    deferred._queued.get(1).run();
     verify(operatorB).nextBlock();
     verify(operatorB).close();
 

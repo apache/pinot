@@ -83,6 +83,12 @@ public class PostAggregationFunctionTest {
     assertTrue((Boolean) function.invoke(new Object[]{"a", null}));
     assertTrue((Boolean) function.invoke(new Object[]{"a", "b"}));
 
+    // isDistinctFrom compares numbers of different types by value, e.g. isDistinctFrom(MAX(intCol), 5)
+    function = new PostAggregationFunction("isDistinctFrom",
+        new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.LONG});
+    assertFalse((Boolean) function.invoke(new Object[]{5.0, 5L}));
+    assertTrue((Boolean) function.invoke(new Object[]{5.5, 5L}));
+
     // isNotDistinctFrom
     function = new PostAggregationFunction("isNotDistinctFrom",
         new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.STRING});

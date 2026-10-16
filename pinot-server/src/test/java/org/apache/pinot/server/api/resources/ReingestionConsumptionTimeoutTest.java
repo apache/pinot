@@ -44,18 +44,6 @@ public class ReingestionConsumptionTimeoutTest {
     assertThat(createTimeout(EMPTY_SERVER_CONF, Map.of()).getTimeoutMs()).isEqualTo(DEFAULT_TIMEOUT_MS);
   }
 
-  @Test
-  public void testServerConfig() {
-    assertThat(createTimeout(SERVER_CONF, Map.of()).getTimeoutMs()).isEqualTo(3_600_000L);
-  }
-
-  @Test
-  public void testClusterConfigOverridesServerConfig() {
-    Map<String, String> clusterConfigs = Map.of(CONFIG_OF_REINGESTION_CONSUMPTION_TIMEOUT_MS, "7200000");
-    assertThat(createTimeout(SERVER_CONF, clusterConfigs).getTimeoutMs()).isEqualTo(7_200_000L);
-    assertThat(createTimeout(EMPTY_SERVER_CONF, clusterConfigs).getTimeoutMs()).isEqualTo(7_200_000L);
-  }
-
   @DataProvider
   public Object[][] validTimeouts() {
     return new Object[][]{{"1", 1L}, {" 7200000 ", 7_200_000L}, {String.valueOf(Long.MAX_VALUE), Long.MAX_VALUE}};
@@ -66,6 +54,7 @@ public class ReingestionConsumptionTimeoutTest {
     Map<String, String> configs = Map.of(CONFIG_OF_REINGESTION_CONSUMPTION_TIMEOUT_MS, timeout);
     assertThat(createTimeout(new PinotConfiguration(configs), Map.of()).getTimeoutMs()).isEqualTo(expectedTimeoutMs);
     assertThat(createTimeout(SERVER_CONF, configs).getTimeoutMs()).isEqualTo(expectedTimeoutMs);
+    assertThat(createTimeout(EMPTY_SERVER_CONF, configs).getTimeoutMs()).isEqualTo(expectedTimeoutMs);
   }
 
   @DataProvider

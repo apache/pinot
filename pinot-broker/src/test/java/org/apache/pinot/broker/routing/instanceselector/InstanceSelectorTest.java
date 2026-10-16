@@ -2436,8 +2436,20 @@ public class InstanceSelectorTest {
   /// rebuild. Checks that the sharing does not change any routing outcome, by comparing a selector that shares with
   /// one that builds a list per segment, and that the candidates keep the sorted instance order when the instance
   /// state maps are not in sorted order.
-  @Test(dataProvider = "selectorType")
-  public void testSharedCandidateListsMatchPerSegmentLists(String selectorType) {
+  @DataProvider(name = "sharedCandidateListsCases")
+  public Object[][] getSharedCandidateListsCases() {
+    return new Object[][]{
+        {REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false}, {STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false},
+        {BALANCED_INSTANCE_SELECTOR, false},
+        // An upsert table makes the replica-group selector apply the strict replica-group rules. The strict
+        // replica-group selector needs no upsert case, because it applies these rules for every table.
+        {REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, true}
+    };
+  }
+
+  @Test(dataProvider = "sharedCandidateListsCases")
+  public void testSharedCandidateListsMatchPerSegmentLists(String selectorType, boolean upsert) {
+    when(_tableConfig.isUpsertEnabled()).thenReturn(upsert);
     // Partition 0: the ideal state lists the instances out of order. One of its old segments has a replica OFFLINE in
     // the external view.
     // Partition 1: one of its instances is disabled.
@@ -2509,7 +2521,7 @@ public class InstanceSelectorTest {
 
     // Candidates are in sorted instance order, with the replica id of the sorted ideal state, whatever the order of
     // the instance state maps
-    boolean strict = selectorType.equals(STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE);
+    boolean strict = selectorType.equals(STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE) || upsert;
     // Strict replica-group takes instance_b out of service for the whole partition, because it is OFFLINE for p0_3
     assertEquals(describe(sharedStates.getCandidates("p0_0")),
         strict ? List.of("instance_a/0/true", "instance_c/2/true")

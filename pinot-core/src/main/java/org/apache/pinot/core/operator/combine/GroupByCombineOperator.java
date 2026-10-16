@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.common.Operator;
@@ -259,8 +258,9 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
   @Override
   public BaseResultsBlock mergeResults()
       throws Exception {
-    long timeoutMs = _queryContext.getEndTimeMs() - System.currentTimeMillis();
-    boolean opCompleted = _operatorLatch.await(timeoutMs, TimeUnit.MILLISECONDS);
+    long endTimeMs = _queryContext.getEndTimeMs();
+    long timeoutMs = endTimeMs - System.currentTimeMillis();
+    boolean opCompleted = awaitLatch(_operatorLatch, endTimeMs);
     if (!opCompleted) {
       // If this happens, the broker side should already timed out, just log the error and return
       String userError = "Timed out while combining group-by order-by results after " + timeoutMs + "ms";

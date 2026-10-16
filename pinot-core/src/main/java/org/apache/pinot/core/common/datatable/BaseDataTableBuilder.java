@@ -222,11 +222,9 @@ public abstract class BaseDataTableBuilder implements DataTableBuilder {
       throws IOException {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
     _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
-    int type = value.getType();
-    byte[] bytes = value.getBytes();
-    _currentRowDataByteBuffer.putInt(bytes.length);
-    _variableSizeDataOutputStream.writeInt(type);
-    _variableSizeDataByteArrayOutputStream.write(bytes);
+    _currentRowDataByteBuffer.putInt(value.getSize());
+    _variableSizeDataOutputStream.writeInt(value.getType());
+    value.writeTo(_variableSizeDataOutputStream);
   }
 
   @Override
