@@ -92,6 +92,13 @@ jobs:
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             ${{ runner.os }}-maven-
+      - name: Use repository Maven wrapper
+        run: |
+          mkdir -p "$RUNNER_TEMP/pinot-maven-bin"
+          printf '#!/bin/sh\nexec "$GITHUB_WORKSPACE/mvnw" "$@"\n' > "$RUNNER_TEMP/pinot-maven-bin/mvn"
+          chmod +x "$RUNNER_TEMP/pinot-maven-bin/mvn"
+          echo "$RUNNER_TEMP/pinot-maven-bin" >> "$GITHUB_PATH"
+          ./mvnw --version
       - name: Verify the Java 11 clients on a Java 11 JVM
         timeout-minutes: 40
         env:
