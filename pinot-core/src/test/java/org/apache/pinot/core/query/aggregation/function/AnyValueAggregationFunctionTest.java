@@ -22,6 +22,7 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -448,18 +449,40 @@ public class AnyValueAggregationFunctionTest extends AbstractAggregationFunction
     assertEquals(function.getIntermediateResultColumnType(), ColumnDataType.LONG);
   }
 
-  @Test
-  void testGroupByReadsValuesOncePerBlock() {
-    AnyValueAggregationFunction function = createFunction("LONG");
+  @DataProvider(name = "nonDictionaryValues")
+  Object[][] nonDictionaryValues() {
+    return new Object[][]{
+        {DataType.INT, (Function<BlockValSet, Object>) BlockValSet::getIntValuesSV,
+            new int[]{1, 2, 3}, List.of(1, 2)},
+        {DataType.LONG, (Function<BlockValSet, Object>) BlockValSet::getLongValuesSV,
+            new long[]{1L, 2L, 3L}, List.of(1L, 2L)},
+        {DataType.FLOAT, (Function<BlockValSet, Object>) BlockValSet::getFloatValuesSV,
+            new float[]{1.5f, 2.5f, 3.5f}, List.of(1.5f, 2.5f)},
+        {DataType.DOUBLE, (Function<BlockValSet, Object>) BlockValSet::getDoubleValuesSV,
+            new double[]{1.25, 2.25, 3.25}, List.of(1.25, 2.25)},
+        {DataType.BIG_DECIMAL, (Function<BlockValSet, Object>) BlockValSet::getBigDecimalValuesSV,
+            new BigDecimal[]{new BigDecimal("1.01"), new BigDecimal("2.02"), new BigDecimal("3.03")},
+            List.of(new BigDecimal("1.01"), new BigDecimal("2.02"))},
+        {DataType.STRING, (Function<BlockValSet, Object>) BlockValSet::getStringValuesSV,
+            new String[]{"zone-1", "zone-2", "zone-3"}, List.of("zone-1", "zone-2")},
+        {DataType.BYTES, (Function<BlockValSet, Object>) BlockValSet::getBytesValuesSV,
+            new byte[][]{{1}, {2}, {3}}, List.of(new ByteArray(new byte[]{1}), new ByteArray(new byte[]{2}))}
+    };
+  }
+
+  @Test(dataProvider = "nonDictionaryValues")
+  void testGroupByReadsValuesOncePerBlock(DataType storedType, Function<BlockValSet, Object> valuesGetter,
+                                        Object values, List<?> expectedValues) {
+    AnyValueAggregationFunction function = new AnyValueAggregationFunction(List.of(EXPRESSION), false);
     BlockValSet valueSet = mock(BlockValSet.class);
-    when(valueSet.getValueType()).thenReturn(DataType.LONG);
-    when(valueSet.getLongValuesSV()).thenReturn(new long[]{1L, 2L, 3L});
+    when(valueSet.getValueType()).thenReturn(storedType);
+    when(valuesGetter.apply(valueSet)).thenReturn(values);
     GroupByResultHolder holder = function.createGroupByResultHolder(2, 2);
     function.aggregateGroupBySV(3, new int[]{0, 1, 0}, holder, Map.of(EXPRESSION, valueSet));
-    assertEquals(function.extractGroupByResult(holder, 0), 1L);
-    assertEquals(function.extractGroupByResult(holder, 1), 2L);
+    assertEquals(function.extractGroupByResult(holder, 0), expectedValues.get(0));
+    assertEquals(function.extractGroupByResult(holder, 1), expectedValues.get(1));
     // Some block value sets build the value array on each call
-    verify(valueSet, times(1)).getLongValuesSV();
+    valuesGetter.apply(verify(valueSet, times(1)));
   }
 
   @Test
