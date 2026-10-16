@@ -51,18 +51,19 @@ import org.apache.pinot.core.auth.TargetType;
 import org.glassfish.grizzly.http.server.Request;
 
 
-/// A container filter class responsible for automatic authentication of REST endpoints. Any rest endpoints annotated
-/// with [Authenticate] annotation, will go through authentication.
+/// A container filter class responsible for automatic authentication and authorization of REST endpoints. Any REST
+/// endpoint annotated with [Authenticate] or [Authorize] will go through the filter.
 @javax.ws.rs.ext.Provider
 public class AuthenticationFilter implements ContainerRequestFilter {
   private static final Set<String> UNPROTECTED_PATHS =
       new HashSet<>(Arrays.asList("", "help", "auth/info", "auth/verify", "auth/verify/v2", "health"));
   private static final String KEY_TABLE_NAME = "tableName";
   private static final String KEY_TABLE_NAME_WITH_TYPE = "tableNameWithType";
+  private static final String KEY_MATERIALIZED_VIEW_TABLE_NAME = "materializedViewTableName";
   private static final String KEY_SCHEMA_NAME = "schemaName";
   /// Parameter names that identify the table an endpoint acts on, in the order they are consulted.
   private static final List<String> TABLE_NAME_KEYS =
-      List.of(KEY_TABLE_NAME, KEY_TABLE_NAME_WITH_TYPE, KEY_SCHEMA_NAME);
+      List.of(KEY_TABLE_NAME, KEY_TABLE_NAME_WITH_TYPE, KEY_MATERIALIZED_VIEW_TABLE_NAME, KEY_SCHEMA_NAME);
 
   @Inject
   Provider<Request> _requestProvider;
@@ -91,8 +92,9 @@ public class AuthenticationFilter implements ContainerRequestFilter {
       return;
     }
 
-    // check if authentication is required implicitly
-    if (accessControl.protectAnnotatedOnly() && !endpointMethod.isAnnotationPresent(Authenticate.class)) {
+    // check if authentication or authorization is required implicitly
+    if (accessControl.protectAnnotatedOnly() && !endpointMethod.isAnnotationPresent(Authenticate.class)
+        && !endpointMethod.isAnnotationPresent(Authorize.class)) {
       return;
     }
 
@@ -104,11 +106,11 @@ public class AuthenticationFilter implements ContainerRequestFilter {
     // Note that table name is extracted from "path parameters" or "query parameters" if it's defined as one of the
     // followings:
     //     - "tableName",
-    //     - "tableNameWithType", or
-    //     - "schemaName"
-    // A declared table target can identify a custom parameter name. For cluster-targeted annotations, retain the
-    // parameter-name heuristics because several legacy table-scoped endpoints use cluster actions for fine-grained
-    // authorization. If table name is not available, it means the endpoint is not a table-level endpoint.
+    //     - "tableNameWithType",
+    //     - "schemaName", or
+    //     - "materializedViewTableName"
+    // A declared table target can identify a custom parameter name. Cluster-targeted annotations must explicitly
+    // declare a tableScopeParam to identify a table. If table name is not available, the endpoint is cluster-wide.
     String tableName = extractTableName(endpointMethod, uriInfo.getPathParameters(), uriInfo.getQueryParameters());
     if (tableName != null) {
       if (StringUtils.isBlank(tableName)) {
