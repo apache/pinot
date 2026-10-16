@@ -26,6 +26,7 @@ import org.apache.pinot.tools.QuickStartBase;
 import org.apache.pinot.tools.Quickstart;
 import org.apache.pinot.tools.RealtimeQuickStart;
 import org.apache.pinot.tools.RealtimeQuickStartWithMinion;
+import org.apache.pinot.tools.VariantQuickStart;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -72,6 +73,12 @@ public class QuickStartTest {
 
     assertEquals(quickStartClassFor("MULTI_CLUSTER"), MultiClusterQuickstart.class);
     assertEquals(quickStartClassFor("MULTICLUSTER"), MultiClusterQuickstart.class);
+
+    assertEquals(quickStartClassFor("VARIANT"), VariantQuickStart.class);
+    assertEquals(quickStartClassFor("OFFLINE_VARIANT"), VariantQuickStart.class);
+    assertEquals(quickStartClassFor("OFFLINE-VARIANT"), VariantQuickStart.class);
+    assertEquals(quickStartClassFor("BATCH_VARIANT"), VariantQuickStart.class);
+    assertEquals(quickStartClassFor("BATCH-VARIANT"), VariantQuickStart.class);
   }
 
   /// The batch-side quickstarts that only differed by their sample queries were merged into [Quickstart]; their types

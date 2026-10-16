@@ -34,6 +34,7 @@ import org.apache.parquet.avro.AvroReadSupport;
 import org.apache.parquet.avro.AvroSchemaConverter;
 import org.apache.parquet.hadoop.ParquetFileReader;
 import org.apache.parquet.hadoop.ParquetReader;
+import org.apache.parquet.hadoop.metadata.FileMetaData;
 import org.apache.parquet.hadoop.util.HadoopInputFile;
 import org.apache.parquet.io.InputFile;
 import org.apache.parquet.schema.LogicalTypeAnnotation;
@@ -82,13 +83,28 @@ public class ParquetUtils {
     }
   }
 
-  public static boolean hasAvroSchemaInFileMetadata(Path path)
+  /// Returns the physical Parquet schema for the given file path.
+  public static MessageType getParquetSchema(Path path)
+      throws IOException {
+    return getParquetFileMetadata(path).getSchema();
+  }
+
+  /// Returns the immutable footer metadata for the given Parquet file path.
+  public static FileMetaData getParquetFileMetadata(Path path)
       throws IOException {
     InputFile inputFile = HadoopInputFile.fromPath(path, getParquetHadoopConfiguration());
     try (ParquetFileReader reader = ParquetFileReader.open(inputFile)) {
-      Map<String, String> metaData = reader.getFileMetaData().getKeyValueMetaData();
-      return metaData.containsKey(AVRO_SCHEMA_METADATA_KEY) || metaData.containsKey(OLD_AVRO_SCHEMA_METADATA_KEY);
+      return reader.getFileMetaData();
     }
+  }
+
+  public static boolean hasAvroSchemaInFileMetadata(Path path)
+      throws IOException {
+    return hasAvroSchemaInFileMetadata(getParquetFileMetadata(path).getKeyValueMetaData());
+  }
+
+  static boolean hasAvroSchemaInFileMetadata(Map<String, String> metadata) {
+    return metadata.containsKey(AVRO_SCHEMA_METADATA_KEY) || metadata.containsKey(OLD_AVRO_SCHEMA_METADATA_KEY);
   }
 
   public static Configuration getParquetHadoopConfiguration() {

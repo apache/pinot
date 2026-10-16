@@ -22,6 +22,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.jayway.jsonpath.Configuration;
 import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.Option;
@@ -215,6 +216,10 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
               + "INT_ARRAY/LONG_ARRAY/FLOAT_ARRAY/DOUBLE_ARRAY/BIG_DECIMAL_ARRAY/BOOLEAN_ARRAY/TIMESTAMP_ARRAY/"
               + "STRING_ARRAY", resultsType, _functionName));
     }
+    // VARIANT resolves through valueOf but is not a supported target: the extracted bytes would be labelled VARIANT
+    // without ever being validated as an envelope.
+    Preconditions.checkArgument(_dataType != DataType.VARIANT,
+        "Unsupported results type: %s for %s function", resultsType, _functionName);
     _storedType = _dataType.getStoredType();
     if (arguments.size() == 4) {
       LiteralTransformFunction literalTransformFun = (LiteralTransformFunction) arguments.get(3);

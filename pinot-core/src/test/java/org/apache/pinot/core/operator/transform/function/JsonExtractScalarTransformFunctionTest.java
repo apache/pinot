@@ -51,6 +51,9 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
+
 
 public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctionTest {
   private static final String[] JSON_EXTRACT_SCALAR_FUNCTIONS = {
@@ -1073,5 +1076,16 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
         // Cast STRING-result to LONG triggers the base-class cross-type path: STRING → parseLong.
         .whenQuery("SELECT CAST(jsonExtractScalar(json, '$.v', 'STRING') AS LONG) FROM testTable")
         .thenResultIs(new Object[]{42L}, new Object[]{42L});
+  }
+
+  /// VARIANT resolves through DataType.valueOf but must not be accepted as a results type: the extracted bytes
+  /// would be labelled VARIANT without ever being validated as an envelope.
+  @Test
+  public void testVariantResultsTypeRejected() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression("jsonExtractScalar(json,'$.stringSV','VARIANT')");
+    BadQueryRequestException exception = expectThrows(BadQueryRequestException.class,
+        () -> TransformFunctionFactory.get(expression, _dataSourceMap));
+    assertTrue(exception.getMessage().contains("Unsupported results type"), exception.getMessage());
   }
 }
