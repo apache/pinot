@@ -32,8 +32,6 @@ on:
       - "licenses-binary/**"
       - "**.md"
   pull_request:
-    branches:
-      - master
     paths-ignore:
       - "contrib/**"
       - "docs/**"
