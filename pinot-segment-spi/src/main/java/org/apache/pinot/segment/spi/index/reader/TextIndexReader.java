@@ -43,6 +43,19 @@ public interface TextIndexReader extends IndexReader {
     return getDocIds(searchQuery);
   }
 
+  /// Returns the matching document ids, reusing a query-scoped parse when the implementation supports it.
+  ///
+  /// Parsing a search string depends only on the string and the column's index configuration, so every
+  /// segment of one request would otherwise repeat identical work. Implementations that parse should
+  /// derive their cache key from the search string, the options and the configuration that affects
+  /// parsing. A `null` cache means "do not share", and must behave exactly like the two-argument form.
+  ///
+  /// Only the *parsed query* is shared. Doc ids are per-segment and must never be cached across readers.
+  default MutableRoaringBitmap getDocIds(String searchQuery, @Nullable String optionsString,
+      @Nullable QueryScopedCache queryScopedCache) {
+    return getDocIds(searchQuery, optionsString);
+  }
+
   /// Returns the number of documents matching the given search query, without materializing the matching
   /// document ids.
   ///
@@ -61,26 +74,8 @@ public interface TextIndexReader extends IndexReader {
     return getDocIds(searchQuery, optionsString).getCardinality();
   }
 
-  /// Returns the matching document ids, reusing a query-scoped parse when the implementation supports it.
-  ///
-  /// Parsing a search string depends only on the string and the column's index configuration, so every
-  /// segment of one request would otherwise repeat identical work. Implementations that parse should
-  /// derive their cache key from the search string, the options and the configuration that affects
-  /// parsing. A `null` cache means "do not share", and must behave exactly like the two-argument form.
-  ///
-  /// Only the *parsed query* is shared. Doc ids are per-segment and must never be cached across
-  /// readers, which is why this is a distinct name rather than a `getDocIds` overload. The distinct
-  /// name is also required for overload resolution: [MultiColumnTextIndexReader] declares
-  /// `getDocIds(String column, String searchQuery, String optionsString)`, so a three-argument
-  /// `getDocIds` overload ending in a cache would make the documented `getDocIds(column, query, null)`
-  /// call ambiguous.
-  default MutableRoaringBitmap getDocIdsWithParseCache(String searchQuery, @Nullable String optionsString,
-      @Nullable QueryScopedCache queryScopedCache) {
-    return getDocIds(searchQuery, optionsString);
-  }
-
-  /// Counting counterpart of [#getDocIdsWithParseCache(String, String, QueryScopedCache)].
-  default int getNumMatchingDocsWithParseCache(String searchQuery, @Nullable String optionsString,
+  /// Counting counterpart of [#getDocIds(String, String, QueryScopedCache)].
+  default int getNumMatchingDocs(String searchQuery, @Nullable String optionsString,
       @Nullable QueryScopedCache queryScopedCache) {
     return getNumMatchingDocs(searchQuery, optionsString);
   }

@@ -78,14 +78,7 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
 
   @Override
   protected BlockDocIdSet getTrues() {
-    if (_textIndexReader.isMultiColumn()) {
-      return BitmapDocIdSet.create(
-          ((MultiColumnTextIndexReader) _textIndexReader).getDocIds(_column, _predicate.getValue(),
-              _predicate.getOptions()), _numDocs);
-    } else {
-      return BitmapDocIdSet.create(_textIndexReader.getDocIdsWithParseCache(_predicate.getValue(),
-          _predicate.getOptions(), _queryScopedCache), _numDocs);
-    }
+    return BitmapDocIdSet.create(getMatchingDocIds(), _numDocs);
   }
 
   @Override
@@ -101,7 +94,7 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
     } else {
       // Ask the index for the size of the match set rather than for the match set itself: building a bitmap of
       // every matching doc just to read its cardinality is the dominant cost of a count over a frequent term.
-      return _textIndexReader.getNumMatchingDocsWithParseCache(_predicate.getValue(), _predicate.getOptions(),
+      return _textIndexReader.getNumMatchingDocs(_predicate.getValue(), _predicate.getOptions(),
           _queryScopedCache);
     }
   }
@@ -113,13 +106,16 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
 
   @Override
   public BitmapCollection getBitmaps() {
-    ImmutableRoaringBitmap bitmap = _textIndexReader.isMultiColumn()
-        ? ((MultiColumnTextIndexReader) _textIndexReader).getDocIds(_column, _predicate.getValue(),
-        _predicate.getOptions())
-        : _textIndexReader.getDocIdsWithParseCache(_predicate.getValue(), _predicate.getOptions(), _queryScopedCache);
-
+    ImmutableRoaringBitmap bitmap = getMatchingDocIds();
     record(bitmap);
     return new BitmapCollection(_numDocs, false, bitmap);
+  }
+
+  private ImmutableRoaringBitmap getMatchingDocIds() {
+    return _textIndexReader.isMultiColumn()
+        ? ((MultiColumnTextIndexReader) _textIndexReader).getDocIds(_column, _predicate.getValue(),
+            _predicate.getOptions())
+        : _textIndexReader.getDocIds(_predicate.getValue(), _predicate.getOptions(), _queryScopedCache);
   }
 
   @Override

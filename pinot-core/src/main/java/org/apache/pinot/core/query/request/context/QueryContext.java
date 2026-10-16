@@ -613,14 +613,6 @@ public class QueryContext implements QueryScopedCache {
     return _sortAggregateSequentialCombineNumSegmentsThreshold;
   }
 
-  /// Gets or computes a value of type `V` associated with a key of type `K` so that it can be shared
-  /// within the scope of a query.
-  /// @param type the type of the value produced, guarantees type pollution is impossible.
-  /// @param key the key used to determine if the value has already been computed.
-  /// @param mapper A function to apply the first time a key is encountered to construct the value.
-  /// @param <K> the key type
-  /// @param <V> the value type
-  /// @return the shared value
   @Override
   public <K, V> V getOrComputeSharedValue(Class<V> type, K key, Function<K, V> mapper) {
     return ((ConcurrentHashMap<K, V>) _sharedValues.computeIfAbsent(type, k -> new ConcurrentHashMap<>()))
