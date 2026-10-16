@@ -75,7 +75,12 @@ NEW_COMMIT_HASH=$(commitHash HEAD)
 if [ ! -z "${NEW_COMMIT}" ]; then
   NEW_COMMIT_HASH=$(commitHash "${NEW_COMMIT}")
 fi
-OLD_COMMIT_HASH=$(commitHash "${OLD_COMMIT}")
+OLD_COMMIT_HASH=$(commitHash "${OLD_COMMIT}") || OLD_COMMIT_HASH=""
+# A pinned rollback baseline may be an unmerged PR commit, absent from master and tags.
+if [ -z "${OLD_COMMIT_HASH}" ]; then
+  git fetch origin "${OLD_COMMIT}" || exit 1
+  OLD_COMMIT_HASH=$(commitHash FETCH_HEAD)
+fi
 if [ -z "${OLD_COMMIT_HASH}" ]; then
   echo "Failed to get commit hash for commit: \"${OLD_COMMIT}\""
   exit 1
