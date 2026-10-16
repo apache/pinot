@@ -78,7 +78,8 @@ public class DataTableBuilderV4 extends BaseDataTableBuilder {
     for (Object2IntMap.Entry<String> entry : _dictionary.object2IntEntrySet()) {
       reverseDictionary[entry.getIntValue()] = entry.getKey();
     }
-    // The table views the written pages directly. Pages are heap memory, so nothing has to be released.
+    // The table views the written pages directly. Pages are heap memory, so nothing has to be released. The views
+    // end at the bytes written so far, and the builder only appends, so later writes do not change this table.
     return new DataTableImplV4(_numRows, _dataSchema, reverseDictionary,
         _fixedSizeDataOutputStream.asBuffer(ByteOrder.BIG_ENDIAN, false),
         _variableSizeDataOutputStream.asBuffer(ByteOrder.BIG_ENDIAN, false));

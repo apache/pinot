@@ -48,9 +48,6 @@ import org.roaringbitmap.RoaringBitmap;
 /// identical to one produced before null bitmaps existed. Readers detect the section by buffer length and cannot
 /// distinguish "no section because no nulls" from "no section because the writer never emitted one" -- both mean the
 /// same thing.
-///
-/// The built table reads the builder's pages without copying them. Do not add rows to the builder after `build()`,
-/// because the new bytes would become visible to, or overwrite bytes of, the table that was already built.
 public abstract class BaseDataTableBuilder implements DataTableBuilder {
   /// Column types whose null value is already representable in-band, and which therefore need no bitmap entry:
   /// - `OBJECT` and `UNKNOWN` are read back via `DataTable.getCustomObject`, which returns `null` for the
@@ -98,8 +95,8 @@ public abstract class BaseDataTableBuilder implements DataTableBuilder {
     _nullBitmaps = new RoaringBitmap[dataSchema.size()];
   }
 
-  /// Returns the offset of the next byte in the variable size section. The wire format stores it as an int, so this
-  /// fails instead of wrapping around when the section exceeds 2 GB.
+  /// Returns the offset of the next byte in the variable size section. The wire format stores it as an int. The
+  /// section had the same 2 GB limit when it was a `ByteArrayOutputStream`, which failed with an `OutOfMemoryError`.
   protected int variableSizeDataOffset() {
     return Math.toIntExact(_variableSizeDataOutputStream.getCurrentOffset());
   }
