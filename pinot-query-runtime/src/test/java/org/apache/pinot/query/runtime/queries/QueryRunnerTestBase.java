@@ -591,6 +591,10 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       public boolean _replicated;
       @JsonProperty("isDimTable")
       public boolean _isDimTable;
+      @JsonProperty("isActualDimTableNeeded")
+      public boolean _isActualDimTableNeeded;
+      @JsonProperty("disablePreload")
+      public boolean _disablePreload; // Help diff between FastLookup and MemOpt DimData table
       @JsonProperty("primaryKeyColumns")
       public List<String> _primaryKeyColumns;
     }
