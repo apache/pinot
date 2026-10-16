@@ -148,26 +148,28 @@ public class ObjectSerDeUtilsTest {
     assertEquals(ObjectSerDeUtils.serialize(value, typeId), expected);
     for (boolean direct : new boolean[]{false, true}) {
       for (ByteOrder order : new ByteOrder[]{ByteOrder.BIG_ENDIAN, ByteOrder.LITTLE_ENDIAN}) {
-        ByteBuffer destination = direct ? ByteBuffer.allocateDirect(expected.length + 10)
-            : ByteBuffer.allocate(expected.length + 10);
-        while (destination.hasRemaining()) {
-          destination.put((byte) 0x5a);
-        }
-        destination.position(5).limit(5 + expected.length);
-        destination.order(order);
-        ObjectSerDeUtils.serialize(value, typeId, destination);
-        assertEquals(destination.position(), 5 + expected.length);
-        assertEquals(destination.limit(), 5 + expected.length);
-        assertSame(destination.order(), order);
-        destination.clear();
-        for (int i = 0; i < 5; i++) {
-          assertEquals(destination.get(), (byte) 0x5a);
-        }
-        byte[] actual = new byte[expected.length];
-        destination.get(actual);
-        assertEquals(actual, expected);
-        while (destination.hasRemaining()) {
-          assertEquals(destination.get(), (byte) 0x5a);
+        for (int extraRemaining : new int[]{0, 5}) {
+          ByteBuffer destination = direct ? ByteBuffer.allocateDirect(expected.length + 10)
+              : ByteBuffer.allocate(expected.length + 10);
+          while (destination.hasRemaining()) {
+            destination.put((byte) 0x5a);
+          }
+          destination.position(5).limit(5 + expected.length + extraRemaining);
+          destination.order(order);
+          ObjectSerDeUtils.serialize(value, typeId, destination);
+          assertEquals(destination.position(), 5 + expected.length);
+          assertEquals(destination.limit(), 5 + expected.length + extraRemaining);
+          assertSame(destination.order(), order);
+          destination.clear();
+          for (int i = 0; i < 5; i++) {
+            assertEquals(destination.get(), (byte) 0x5a);
+          }
+          byte[] actual = new byte[expected.length];
+          destination.get(actual);
+          assertEquals(actual, expected);
+          while (destination.hasRemaining()) {
+            assertEquals(destination.get(), (byte) 0x5a);
+          }
         }
       }
     }

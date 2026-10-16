@@ -329,7 +329,8 @@ public class ObjectSerDeUtils {
   /// Serializer/De-serializer for a specific type of object.
   ///
   /// Implementations must override either the byte-array serializer or both [#getSerializedSize(Object)] and
-  /// the buffer serializer [#serialize(Object, ByteBuffer)].
+  /// the buffer serializer [#serialize(Object, ByteBuffer)]. This contract is enforced by convention; the serializer
+  /// defaults delegate to each other.
   ///
   /// @param <T> Type of the object
   public interface ObjectSerDe<T> {
@@ -344,7 +345,7 @@ public class ObjectSerDeUtils {
 
     /// Returns the exact size of a representable payload, or `-1` when allocation-free sizing is unsupported.
     /// This method must not serialize the value or allocate a payload array. The value must remain unchanged between
-    /// sizing and serialization. The destination must be bounded to this size when serializing.
+    /// sizing and serialization. The destination must have at least this many bytes remaining.
     default int getSerializedSize(T value) {
       return -1;
     }
@@ -1377,8 +1378,10 @@ public class ObjectSerDeUtils {
 
     @Override
     public void serialize(RoaringBitmap bitmap, ByteBuffer destination) {
+      // Recompute the size to validate standalone writes; mutable bitmaps cannot safely cache it across calls.
       checkSerializationBuffer(destination, getSerializedSize(bitmap));
       ByteOrder originalOrder = destination.order();
+      // Roaring uses little-endian wire bytes; restore the caller's byte order after writing.
       destination.order(ByteOrder.LITTLE_ENDIAN);
       try {
         RoaringBitmapUtils.serialize(bitmap, destination);
@@ -2096,12 +2099,14 @@ public class ObjectSerDeUtils {
   }
 
   /// Returns the codec's exact size for a representable payload, or `-1` if allocation-free sizing is unavailable.
-  /// The value must remain unchanged until it has been serialized.
+  /// Intended for callers writing OBJECT payloads into an existing transport buffer, such as an Arrow vector.
+  /// A result of `-1` selects the legacy byte-array fallback. The value must remain unchanged until serialization ends.
   public static int getSerializedSize(Object value, int objectTypeValue) {
     return SER_DES[objectTypeValue].getSerializedSize(value);
   }
 
   /// Writes the payload through its type's codec, advancing the destination position and preserving its byte order.
+  /// The destination must have sufficient remaining space; its limit does not need to match the payload size.
   /// The codec uses a temporary payload array when it does not support direct serialization.
   public static void serialize(Object value, int objectTypeValue, ByteBuffer destination) {
     SER_DES[objectTypeValue].serialize(value, destination);
