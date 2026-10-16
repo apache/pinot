@@ -36,8 +36,11 @@ import org.apache.lucene.search.Query;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
+import org.apache.pinot.segment.spi.index.reader.MultiColumnTextIndexReader;
 import org.apache.pinot.segment.spi.index.reader.QueryScopedCache;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -138,7 +141,7 @@ public class LuceneTextIndexQueryCacheTest {
       Query b = reader.buildQuery("order", null, null);
       assertNotSame(b, a);
       assertEquals(b, a);
-      assertEquals(reader.getNumMatchingDocs("order", null, null), 2);
+      assertEquals(reader.getNumMatchingDocsWithParseCache("order", null, null), 2);
     }
   }
 
@@ -172,8 +175,8 @@ public class LuceneTextIndexQueryCacheTest {
             configWithProperties(Map.of(FieldConfig.TEXT_INDEX_USE_AND_FOR_MULTI_TERM_QUERIES, "true")))) {
       assertNotEquals(andReader.buildQuery("failed order", null, cache),
           orReader.buildQuery("failed order", null, cache));
-      assertEquals(orReader.getNumMatchingDocs("failed order", null, cache), 3);
-      assertEquals(andReader.getNumMatchingDocs("failed order", null, cache), 1);
+      assertEquals(orReader.getNumMatchingDocsWithParseCache("failed order", null, cache), 3);
+      assertEquals(andReader.getNumMatchingDocsWithParseCache("failed order", null, cache), 1);
     }
   }
 
@@ -215,5 +218,41 @@ public class LuceneTextIndexQueryCacheTest {
     } finally {
       executor.shutdownNow();
     }
+  }
+
+  /// Guards overload resolution for [MultiColumnTextIndexReader].
+  ///
+  /// The parse-cache methods deliberately do not overload `getDocIds`/`getNumMatchingDocs`. A
+  /// three-argument overload ending in a cache would make the documented null-options calls below
+  /// ambiguous, because `null` matches both `String optionsString` and the cache parameter. This
+  /// test asserts nothing at runtime -- it fails at compile time if that ambiguity is reintroduced.
+  @Test
+  public void testMultiColumnNullOptionsCallsRemainUnambiguous() {
+    MultiColumnTextIndexReader reader = multiColumnReaderReturning(new MutableRoaringBitmap());
+    assertEquals(reader.getDocIds("body", "error", null).getCardinality(), 0);
+    assertEquals(reader.getNumMatchingDocs("body", "error", null), 0);
+  }
+
+  private static MultiColumnTextIndexReader multiColumnReaderReturning(MutableRoaringBitmap docIds) {
+    return new MultiColumnTextIndexReader() {
+      @Override
+      public MutableRoaringBitmap getDocIds(String column, String searchQuery, String optionsString) {
+        return docIds;
+      }
+
+      @Override
+      public MutableRoaringBitmap getDocIds(String searchQuery) {
+        return docIds;
+      }
+
+      @Override
+      public ImmutableRoaringBitmap getDictIds(String searchQuery) {
+        throw new UnsupportedOperationException();
+      }
+
+      @Override
+      public void close() {
+      }
+    };
   }
 }

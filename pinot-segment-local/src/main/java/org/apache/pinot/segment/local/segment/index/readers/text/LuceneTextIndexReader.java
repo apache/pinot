@@ -233,11 +233,11 @@ public class LuceneTextIndexReader implements TextIndexReader {
 
   @Override
   public MutableRoaringBitmap getDocIds(String searchQuery, @Nullable String optionsString) {
-    return getDocIds(searchQuery, optionsString, null);
+    return getDocIdsWithParseCache(searchQuery, optionsString, null);
   }
 
   @Override
-  public MutableRoaringBitmap getDocIds(String searchQuery, @Nullable String optionsString,
+  public MutableRoaringBitmap getDocIdsWithParseCache(String searchQuery, @Nullable String optionsString,
       @Nullable QueryScopedCache queryScopedCache) {
     MutableRoaringBitmap docIds = new MutableRoaringBitmap();
     Collector docIDCollector = new LuceneDocIdCollector(docIds, _docIdTranslator);
@@ -321,11 +321,11 @@ public class LuceneTextIndexReader implements TextIndexReader {
 
   @Override
   public int getNumMatchingDocs(String searchQuery, @Nullable String optionsString) {
-    return getNumMatchingDocs(searchQuery, optionsString, null);
+    return getNumMatchingDocsWithParseCache(searchQuery, optionsString, null);
   }
 
   @Override
-  public int getNumMatchingDocs(String searchQuery, @Nullable String optionsString,
+  public int getNumMatchingDocsWithParseCache(String searchQuery, @Nullable String optionsString,
       @Nullable QueryScopedCache queryScopedCache) {
     try {
       // A Lucene index larger than the segment means the doc-id mapping is broken -- a state getDocIds
@@ -335,7 +335,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
       // `context.docBase + doc`, which is maxDoc() space, and with deletions numDocs() < maxDoc() would let a
       // broken index slip through. Fall back so that it keeps failing loudly.
       if (_indexReader.maxDoc() > _numDocs) {
-        return getDocIds(searchQuery, optionsString, queryScopedCache).getCardinality();
+        return getDocIdsWithParseCache(searchQuery, optionsString, queryScopedCache).getCardinality();
       }
       return LuceneTextIndexUtils.countWithoutMaterializing(_indexSearcher,
           buildQuery(searchQuery, optionsString, queryScopedCache));
