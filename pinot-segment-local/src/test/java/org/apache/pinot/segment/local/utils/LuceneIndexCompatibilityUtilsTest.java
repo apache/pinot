@@ -21,8 +21,6 @@ package org.apache.pinot.segment.local.utils;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.index.CorruptIndexException;
 import org.apache.lucene.index.IndexNotFoundException;
@@ -46,17 +44,8 @@ public class LuceneIndexCompatibilityUtilsTest {
   @BeforeMethod
   public void setUp()
       throws IOException {
-    _fixtures = Files.createTempDirectory("lucene-compatibility").toFile();
-    // Generated with Lucene 10.0.0 (text/multi) and Pinot f9cd6821's HnswCodec (hnsw).
-    // created9 variants set the creation major to 9, with Lucene912 and Lucene100 codecs respectively.
-    try (ZipInputStream zip = new ZipInputStream(getClass().getResourceAsStream("/data/lucene10-rollback.zip"))) {
-      ZipEntry entry;
-      while ((entry = zip.getNextEntry()) != null) {
-        File output = new File(_fixtures, entry.getName());
-        FileUtils.forceMkdirParent(output);
-        Files.copy(zip, output.toPath());
-      }
-    }
+    _fixtures = LuceneIndexTestUtils.extractLucene10Fixtures(
+        Files.createTempDirectory("lucene-compatibility").toFile());
   }
 
   @AfterMethod

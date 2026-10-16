@@ -20,14 +20,11 @@ package org.apache.pinot.segment.local.segment.index.loader.invertedindex;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -40,6 +37,7 @@ import org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
 import org.apache.pinot.segment.local.utils.LuceneIndexCompatibilityUtils;
+import org.apache.pinot.segment.local.utils.LuceneIndexTestUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -267,20 +265,8 @@ public class HnswIndexRollbackTest implements PinotBuffersAfterClassCheckRule {
 
   private static void installNewerIndex(File tempDir, File segmentDir, SegmentVersion version, String layout)
       throws Exception {
-    File fixture = new File(tempDir, "lucene10-hnsw");
-    FileUtils.forceMkdir(fixture);
-    try (InputStream input = HnswIndexRollbackTest.class.getResourceAsStream("/data/lucene10-rollback.zip")) {
-      assertNotNull(input);
-      try (ZipInputStream zip = new ZipInputStream(input)) {
-        ZipEntry entry;
-        while ((entry = zip.getNextEntry()) != null) {
-          if (!entry.isDirectory() && entry.getName().startsWith("hnsw/")) {
-            String fileName = entry.getName().substring("hnsw/".length());
-            Files.copy(zip, new File(fixture, fileName).toPath());
-          }
-        }
-      }
-    }
+    File fixtures = LuceneIndexTestUtils.extractLucene10Fixtures(new File(tempDir, "lucene10-hnsw"));
+    File fixture = new File(fixtures, "hnsw");
     assertTrue(LuceneIndexCompatibilityUtils.isIncompatible(fixture));
     File storageDir = SegmentDirectoryPaths.segmentDirectoryFor(segmentDir, version);
     try (SegmentDirectory directory = new SegmentLocalFSDirectory(segmentDir, ReadMode.mmap);

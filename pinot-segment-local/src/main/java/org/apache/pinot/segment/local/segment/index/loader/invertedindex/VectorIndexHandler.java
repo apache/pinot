@@ -147,12 +147,10 @@ public class VectorIndexHandler extends BaseIndexHandler {
   /// index regenerated from dictionary/inverted indexes does not retain vector coordinate order or duplicates.
   public void validateRecoverySources(SegmentDirectory.Reader segmentReader)
       throws IOException {
-    Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.vector());
     for (Map.Entry<String, VectorIndexConfig> entry : _vectorConfigs.entrySet()) {
       String column = entry.getKey();
       if (entry.getValue().resolveBackendType() == VectorBackendType.HNSW
-          && (hasHnswRecoveryMarker(column) || existingColumns.contains(column)
-          && isIncompatibleHnswIndex(segmentReader, column))) {
+          && needsHnswRecovery(segmentReader, column)) {
         requireVectorRecoverySource(segmentReader, column);
       }
     }

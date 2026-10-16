@@ -120,11 +120,21 @@ public class MultiColumnTextIndexHandler extends BaseIndexHandler {
     }
   }
 
-  /// Verify all original source columns before removing an incompatible shared text index.
+  /// Verify existing source columns before other handlers can replace their original forward values.
+  /// Newly added default columns are checked with all other sources immediately before recovery.
   public void validateRecoverySources(SegmentDirectory.Reader segmentReader)
+      throws IOException {
+    validateRecoverySources(segmentReader, true);
+  }
+
+  private void validateRecoverySources(SegmentDirectory.Reader segmentReader, boolean existingColumnsOnly)
       throws IOException {
     if (_textIndexConfig != null && (isBuildInProgress() || isIncompatible())) {
       for (String column : _textIndexConfig.getColumns()) {
+        // DefaultColumnHandler creates newly added columns after the early source validation.
+        if (existingColumnsOnly && _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column) == null) {
+          continue;
+        }
         if (!segmentReader.hasIndexFor(column, StandardIndexes.forward())
             || _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward()).isDisabled()) {
           throw new IllegalStateException("Cannot rebuild multi-column Lucene text index for column: " + column
@@ -143,9 +153,6 @@ public class MultiColumnTextIndexHandler extends BaseIndexHandler {
   }
 
   private boolean isBuildInProgress() {
-    if (_textIndexConfig == null) {
-      return false;
-    }
     File marker = getBuildMarker();
     if (marker == null) {
       return false;
@@ -155,7 +162,7 @@ public class MultiColumnTextIndexHandler extends BaseIndexHandler {
     if (marker.exists()) {
       return true;
     }
-    return _segmentDirectory.getSegmentMetadata().getMultiColumnTextMetadata() == null
+    return _textIndexConfig != null && _segmentDirectory.getSegmentMetadata().getMultiColumnTextMetadata() == null
         && SegmentDirectoryPaths.findTextIndexIndexFile(_segmentDirectory.getSegmentMetadata().getIndexDir(),
             MultiColumnTextIndexConstants.INDEX_DIR_NAME) != null;
   }
@@ -220,22 +227,48 @@ public class MultiColumnTextIndexHandler extends BaseIndexHandler {
   @Override
   public void updateIndices(SegmentDirectory.Writer segmentWriter)
       throws Exception {
-    validateRecoverySources(segmentWriter);
+    validateRecoverySources(segmentWriter, false);
     File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
     File segmentDirectory = SegmentDirectoryPaths.segmentDirectoryFor(indexDir,
         _segmentDirectory.getSegmentMetadata().getVersion());
 
-    TableConfigUtils.checkForDuplicates(_textIndexConfig.getColumns());
-
-    BooleanList columnsSV = new BooleanArrayList(_textIndexConfig.getColumns().size());
-    for (String column : _textIndexConfig.getColumns()) {
-      ColumnMetadata metadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
-      validate(metadata.getFieldSpec().getDataType(), column);
-      columnsSV.add(metadata.isSingleValue());
+    BooleanList columnsSV = new BooleanArrayList();
+    if (_textIndexConfig != null) {
+      TableConfigUtils.checkForDuplicates(_textIndexConfig.getColumns());
+      for (String column : _textIndexConfig.getColumns()) {
+        ColumnMetadata metadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+        validate(metadata.getFieldSpec().getDataType(), column);
+        columnsSV.add(metadata.isSingleValue());
+      }
     }
 
     File marker = getBuildMarker();
     FileUtils.touch(marker);
+    removeMultiColumnTextIndex(indexDir, segmentDirectory);
+
+    if (_textIndexConfig != null) {
+      try (MultiColumnLuceneTextIndexCreator creator =
+          new MultiColumnLuceneTextIndexCreator(_textIndexConfig.getColumns(), columnsSV, segmentDirectory, true, false,
+              null, null, _textIndexConfig)) {
+        createMultiColumnTextIndex(segmentWriter, creator);
+        creator.seal();
+
+        // Write the metadata for multi-column text index
+        PropertiesConfiguration metadataProperties = SegmentMetadataUtils.getPropertiesConfiguration(indexDir);
+        MultiColumnTextMetadata.writeMetadata(metadataProperties, MultiColumnTextMetadata.VERSION_1,
+            _textIndexConfig.getColumns(), _textIndexConfig.getProperties(), _textIndexConfig.getPerColumnProperties());
+        SegmentMetadataUtils.savePropertiesConfiguration(metadataProperties, indexDir);
+      }
+    }
+    FileUtils.forceDelete(marker);
+  }
+
+  private void removeMultiColumnTextIndex(File indexDir, File segmentDirectory)
+      throws Exception {
+    PropertiesConfiguration metadataProperties = SegmentMetadataUtils.getPropertiesConfiguration(indexDir);
+    metadataProperties.subset(MultiColumnTextIndexConstants.MetadataKey.ROOT_SUBSET).clear();
+    SegmentMetadataUtils.savePropertiesConfiguration(metadataProperties, indexDir);
+
     File existing =
         SegmentDirectoryPaths.findTextIndexIndexFile(indexDir, MultiColumnTextIndexConstants.INDEX_DIR_NAME);
     if (existing != null) {
@@ -245,20 +278,6 @@ public class MultiColumnTextIndexHandler extends BaseIndexHandler {
     if (mapping.exists()) {
       FileUtils.forceDelete(mapping);
     }
-
-    try (MultiColumnLuceneTextIndexCreator creator =
-        new MultiColumnLuceneTextIndexCreator(_textIndexConfig.getColumns(), columnsSV, segmentDirectory, true, false,
-            null, null, _textIndexConfig)) {
-      createMultiColumnTextIndex(segmentWriter, creator);
-      creator.seal();
-
-      // Write the metadata for multi-column text index
-      PropertiesConfiguration metadataProperties = SegmentMetadataUtils.getPropertiesConfiguration(indexDir);
-      MultiColumnTextMetadata.writeMetadata(metadataProperties, MultiColumnTextMetadata.VERSION_1,
-          _textIndexConfig.getColumns(), _textIndexConfig.getProperties(), _textIndexConfig.getPerColumnProperties());
-      SegmentMetadataUtils.savePropertiesConfiguration(metadataProperties, indexDir);
-    }
-    FileUtils.forceDelete(marker);
   }
 
   private void createMultiColumnTextIndex(SegmentDirectory.Writer segmentWriter,

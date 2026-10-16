@@ -19,13 +19,10 @@
 package org.apache.pinot.segment.local.segment.index.loader.invertedindex;
 
 import java.io.File;
-import java.io.InputStream;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
@@ -48,6 +45,7 @@ import org.apache.pinot.segment.local.segment.index.readers.text.MultiColumnLuce
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
 import org.apache.pinot.segment.local.utils.LuceneIndexCompatibilityUtils;
+import org.apache.pinot.segment.local.utils.LuceneIndexTestUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -73,6 +71,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
@@ -86,19 +85,7 @@ public class TextIndexRollbackRecoveryTest implements PinotBuffersAfterClassChec
   public void setUp()
       throws Exception {
     _tempDir = Files.createTempDirectory("text-rollback").toFile();
-    _fixtures = new File(_tempDir, "fixtures");
-    try (InputStream resource = getClass().getClassLoader().getResourceAsStream("data/lucene10-rollback.zip");
-        ZipInputStream zip = new ZipInputStream(resource)) {
-      ZipEntry entry;
-      while ((entry = zip.getNextEntry()) != null) {
-        File output = new File(_fixtures, entry.getName());
-        assertTrue(output.toPath().normalize().startsWith(_fixtures.toPath()));
-        if (!entry.isDirectory()) {
-          FileUtils.forceMkdirParent(output);
-          Files.copy(zip, output.toPath());
-        }
-      }
-    }
+    _fixtures = LuceneIndexTestUtils.extractLucene10Fixtures(new File(_tempDir, "fixtures"));
   }
 
   @AfterMethod
@@ -170,8 +157,64 @@ public class TextIndexRollbackRecoveryTest implements PinotBuffersAfterClassChec
     ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDir, loadingConfig, true);
     try {
       MultiColumnLuceneTextIndexReader reader = (MultiColumnLuceneTextIndexReader) segment.getMultiColumnTextIndex();
-      assertEquals(reader.getDocIds("text", "hello", null).toArray(), new int[]{0});
-      assertEquals(reader.getDocIds("other", "beta", null).toArray(), new int[]{1});
+      assertEquals(reader.getDocIds("text", "hello", (String) null).toArray(), new int[]{0});
+      assertEquals(reader.getDocIds("other", "beta", (String) null).toArray(), new int[]{1});
+    } finally {
+      segment.destroy();
+    }
+    assertStableReload(segmentDir, loadingConfig);
+  }
+
+  @Test(dataProvider = "multiColumnVersions")
+  public void testMultiColumnRollbackWithNewDefaultColumn(SegmentVersion version)
+      throws Exception {
+    Schema schema = schema(false);
+    TableConfig tableConfig = tableConfig(true, false, false);
+    File segmentDir = buildSegment(tableConfig, schema, version, false);
+    installLucene10(segmentDir, version, true, false);
+
+    Schema updatedSchema = new Schema.SchemaBuilder().setSchemaName("rollback")
+        .addSingleValueDimension("text", DataType.STRING).addSingleValueDimension("other", DataType.STRING)
+        .addSingleValueDimension("added", DataType.STRING, "defaultvalue").build();
+    tableConfig.getIndexingConfig().setMultiColumnTextIndexConfig(
+        new MultiColumnTextIndexConfig(List.of("text", "other", "added"), Map.of(), Map.of()));
+    IndexLoadingConfig loadingConfig = new IndexLoadingConfig(tableConfig, updatedSchema);
+    ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDir, loadingConfig, true);
+    try {
+      MultiColumnLuceneTextIndexReader reader = (MultiColumnLuceneTextIndexReader) segment.getMultiColumnTextIndex();
+      assertEquals(reader.getDocIds("text", "hello", (String) null).toArray(), new int[]{0});
+      assertEquals(reader.getDocIds("other", "beta", (String) null).toArray(), new int[]{1});
+      assertEquals(reader.getDocIds("added", "defaultvalue", (String) null).toArray(), new int[]{0, 1});
+    } finally {
+      segment.destroy();
+    }
+    assertStableReload(segmentDir, loadingConfig);
+  }
+
+  @Test(dataProvider = "multiColumnVersions")
+  public void testInterruptedMultiColumnRemoval(SegmentVersion version)
+      throws Exception {
+    Schema schema = schema(false);
+    TableConfig tableConfig = tableConfig(true, false, false);
+    File segmentDir = buildSegment(tableConfig, schema, version, false);
+    File indexDir = SegmentDirectoryPaths.segmentDirectoryFor(segmentDir, version);
+    File luceneDir = SegmentDirectoryPaths.findTextIndexIndexFile(segmentDir,
+        MultiColumnTextIndexConstants.INDEX_DIR_NAME);
+    // A failed removal has cleared metadata, but the marker and index files remain.
+    PropertiesConfiguration properties = SegmentMetadataUtils.getPropertiesConfiguration(segmentDir);
+    properties.subset(MultiColumnTextIndexConstants.MetadataKey.ROOT_SUBSET).clear();
+    SegmentMetadataUtils.savePropertiesConfiguration(properties, segmentDir);
+    File marker = new File(segmentDir, MultiColumnTextIndexConstants.INDEX_DIR_NAME + ".text.inprogress");
+    FileUtils.touch(marker);
+    tableConfig.getIndexingConfig().setMultiColumnTextIndexConfig(null);
+
+    IndexLoadingConfig loadingConfig = new IndexLoadingConfig(tableConfig, schema);
+    ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDir, loadingConfig, true);
+    try {
+      assertNull(segment.getMultiColumnTextIndex());
+      assertFalse(luceneDir.exists());
+      assertFalse(new File(indexDir, MultiColumnTextIndexConstants.DOCID_MAPPING_FILE_NAME).exists());
+      assertFalse(marker.exists());
     } finally {
       segment.destroy();
     }
@@ -226,9 +269,9 @@ public class TextIndexRollbackRecoveryTest implements PinotBuffersAfterClassChec
     try {
       if (multiColumn) {
         MultiColumnLuceneTextIndexReader reader = (MultiColumnLuceneTextIndexReader) segment.getMultiColumnTextIndex();
-        assertEquals(reader.getDocIds("text", "hello", null).toArray(), new int[]{0});
-        assertEquals(reader.getDocIds("text", "other", null).toArray(), new int[]{1});
-        assertTrue(reader.getDocIds("text", "partial", null).isEmpty());
+        assertEquals(reader.getDocIds("text", "hello", (String) null).toArray(), new int[]{0});
+        assertEquals(reader.getDocIds("text", "other", (String) null).toArray(), new int[]{1});
+        assertTrue(reader.getDocIds("text", "partial", (String) null).isEmpty());
       } else {
         assertEquals(segment.getDataSource("text").getTextIndex().getDocIds("hello", null).toArray(), new int[]{0});
         assertEquals(segment.getDataSource("text").getTextIndex().getDocIds("other", null).toArray(), new int[]{1});
