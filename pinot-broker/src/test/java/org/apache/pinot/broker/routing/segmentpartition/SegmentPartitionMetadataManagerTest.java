@@ -348,6 +348,26 @@ public class SegmentPartitionMetadataManagerTest extends ControllerTest {
     assertEqualsNoOrder(partitionInfoMap[0]._segments.toArray(), new String[]{oldSegment, placedElsewhere});
     assertTrue(partitionInfoMap[0]._fullyReplicatedServers.isEmpty(),
         "no server holds every segment of the partition, and the info must say so rather than hide a segment");
+
+    // A new segment of partition 1 mid-reassignment: the ideal state moved it to server0 and server1, while the
+    // external view still lists the server it is leaving next to server1. Two online servers match the two assigned,
+    // yet assigned server0 is still down, so the segment is still coming up and must stay deferred.
+    String oldSegment1 = "oldSegment1";
+    onlineSegments.add(oldSegment1);
+    idealAssignment.put(oldSegment1, Map.of(SERVER_0, ONLINE, SERVER_1, ONLINE));
+    segmentAssignment.put(oldSegment1, Map.of(SERVER_0, ONLINE, SERVER_1, ONLINE));
+    setSegmentZKMetadata(oldSegment1, PARTITION_COLUMN_FUNC, NUM_PARTITIONS, 1, 0L);
+    String midReassignment = "midReassignmentSegment";
+    onlineSegments.add(midReassignment);
+    idealAssignment.put(midReassignment, Map.of(SERVER_0, ONLINE, SERVER_1, ONLINE));
+    segmentAssignment.put(midReassignment, Map.of(SERVER_1, ONLINE, "leavingServer", ONLINE));
+    setSegmentZKMetadata(midReassignment, PARTITION_COLUMN_FUNC, NUM_PARTITIONS, 1, System.currentTimeMillis());
+    segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, onlineSegments);
+
+    partitionInfoMap = partitionMetadataManager.getTablePartitionReplicatedServersInfo().getPartitionInfoMap();
+    assertEquals(partitionInfoMap[1]._segments, List.of(oldSegment1),
+        "an assigned replica is still down, so the segment is not ready even though the replica counts match");
+    assertEquals(partitionInfoMap[1]._fullyReplicatedServers, Set.of(SERVER_0, SERVER_1));
   }
 
   /// A partition whose only segments are new ones without all replicas available holds data that no single server can
