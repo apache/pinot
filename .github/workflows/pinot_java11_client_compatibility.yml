@@ -20,6 +20,7 @@
 name: Pinot Java 11 Client Compatibility
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - master

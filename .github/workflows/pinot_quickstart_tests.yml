@@ -20,6 +20,7 @@
 name: Pinot Quickstart Tests
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - master
