@@ -622,10 +622,6 @@ public class QueryContext implements QueryScopedCache {
   /// @param <V> the value type
   /// @return the shared value
   @Override
-  public <K, V> V getOrCompute(Class<V> type, K key, Function<K, V> mapper) {
-    return getOrComputeSharedValue(type, key, mapper);
-  }
-
   public <K, V> V getOrComputeSharedValue(Class<V> type, K key, Function<K, V> mapper) {
     return ((ConcurrentHashMap<K, V>) _sharedValues.computeIfAbsent(type, k -> new ConcurrentHashMap<>()))
         .computeIfAbsent(key, mapper);

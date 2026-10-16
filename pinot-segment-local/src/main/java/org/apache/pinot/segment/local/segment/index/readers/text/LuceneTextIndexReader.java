@@ -299,7 +299,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
   ///
   /// Shared by the doc-id and the count paths so that a `count(*)` and the filter it counts can never
   /// interpret the same query differently.
-  private Query buildQuery(String searchQuery)
+  private Query parseQueryWithoutOptions(String searchQuery)
       throws Exception {
     // Lucene query parsers are generally stateful and a new instance must be created per query.
     QueryParserBase parser = _queryParserClassConstructor.newInstance(_column, _analyzer);
@@ -350,16 +350,18 @@ public class LuceneTextIndexReader implements TextIndexReader {
     }
   }
 
-  /// Parses a search string into a Lucene query, honouring the options string when one is given.
+  /// Parses a search string into a Lucene query, honouring the options string when one is given, and
+  /// reusing the query already parsed for this request when a cache is given.
   ///
   /// Both [#getDocIds(String, String)] and [#getNumMatchingDocs] go through this method, so a `count(*)` and
   /// the filter it counts cannot interpret the same query differently. Keep it that way: any new entry point
   /// that parses a search string itself reintroduces that divergence.
-  /// Returns the parsed query, reusing the one already parsed for this request when a cache is given.
   ///
   /// Every segment of a request parses the same string against the same configuration, so without a
-  /// cache the work is repeated once per segment. The cache computes a key at most once, so a cold
-  /// query parses once for the whole request rather than racing across segment threads.
+  /// cache the work is repeated once per segment. With a cache the string is parsed once per effective
+  /// parsing configuration rather than once per segment: one request can span segments whose text
+  /// indexes are configured differently, and those keep their own entries. A parse that throws caches
+  /// nothing, so the next segment retries and fails the same way.
   ///
   /// The returned query may be shared: Lucene queries are immutable and [Query#rewrite] does not
   /// mutate them, so a multi-term query is still expanded per segment against that segment's own
@@ -372,7 +374,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
     }
     ParsedQueryKey key = new ParsedQueryKey(_parseConfig, searchQuery, optionsString);
     try {
-      return queryScopedCache.getOrCompute(Query.class, key, k -> {
+      return queryScopedCache.getOrComputeSharedValue(Query.class, key, k -> {
         try {
           return parseQuery(k.searchQuery(), k.optionsString());
         } catch (Exception e) {
@@ -392,7 +394,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
       LuceneTextIndexUtils.LuceneTextIndexOptions options = LuceneTextIndexUtils.createOptions(optionsString);
       return LuceneTextIndexUtils.createQueryParserWithOptions(searchQuery, options, _column, _analyzer);
     }
-    return buildQuery(searchQuery);
+    return parseQueryWithoutOptions(searchQuery);
   }
 
   /// Whether `optionsString` selects the options-driven parser, i.e. it is non-blank and parses to at least

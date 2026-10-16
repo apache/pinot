@@ -28,14 +28,20 @@ import java.util.function.Function;
 /// per-query state themselves; the caller owns the cache and passes it in.
 ///
 /// This interface exists so that segment-level code can use a query-scoped cache without depending
-/// on the query engine. Implementations must compute a given key at most once and be safe for
-/// concurrent use, because the segments of one request are processed in parallel.
+/// on the query engine. Implementations must be safe for concurrent use, because the segments of
+/// one request are processed in parallel.
 public interface QueryScopedCache {
 
   /// Returns the value for `key`, computing it with `mapper` if it is not already present.
   ///
+  /// Computation is atomic per `(type, key)`: concurrent callers that miss the same key block until
+  /// one `mapper` completes, and all of them observe that single result. A `mapper` that throws or
+  /// returns `null` leaves nothing cached, so a later call for the same key runs it again. These are
+  /// the semantics of [java.util.concurrent.ConcurrentHashMap#computeIfAbsent]; implementations
+  /// backed by it satisfy this contract.
+  ///
   /// @param type the type of the value, which keeps unrelated callers from colliding on equal keys
   /// @param key the key identifying the value; must be immutable with structural equality
   /// @param mapper computes the value the first time the key is seen
-  <K, V> V getOrCompute(Class<V> type, K key, Function<K, V> mapper);
+  <K, V> V getOrComputeSharedValue(Class<V> type, K key, Function<K, V> mapper);
 }

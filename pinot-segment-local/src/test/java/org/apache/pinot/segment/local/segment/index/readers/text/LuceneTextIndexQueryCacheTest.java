@@ -49,6 +49,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertNotSame;
 import static org.testng.Assert.assertSame;
+import static org.testng.Assert.assertTrue;
 
 
 /// Covers the query-scoped reuse of parsed queries in [LuceneTextIndexReader].
@@ -74,7 +75,7 @@ public class LuceneTextIndexQueryCacheTest {
 
     @SuppressWarnings("unchecked")
     @Override
-    public <K, V> V getOrCompute(Class<V> type, K key, Function<K, V> mapper) {
+    public <K, V> V getOrComputeSharedValue(Class<V> type, K key, Function<K, V> mapper) {
       return (V) _values.computeIfAbsent(key, k -> {
         _computeCount.incrementAndGet();
         return mapper.apply((K) k);
@@ -199,16 +200,23 @@ public class LuceneTextIndexQueryCacheTest {
     CountingCache cache = new CountingCache();
     ExecutorService executor = Executors.newFixedThreadPool(threads);
     try {
+      // Opening a reader is far more expensive than the parse under test. Releasing the start gate
+      // straight after submission would let an early worker reach the cache while others were still
+      // in their constructor, so the test could pass without ever racing. Gate on readiness instead,
+      // so every worker is one call away from the cache when the gate opens.
+      CountDownLatch ready = new CountDownLatch(threads);
       CountDownLatch start = new CountDownLatch(1);
       Future<Query>[] futures = new Future[threads];
       for (int i = 0; i < threads; i++) {
         futures[i] = executor.submit(() -> {
           try (LuceneTextIndexReader reader = reader(configWithProperties(Map.of()))) {
+            ready.countDown();
             start.await();
             return reader.buildQuery("connection", null, cache);
           }
         });
       }
+      assertTrue(ready.await(60, TimeUnit.SECONDS), "all workers should open their readers");
       start.countDown();
       Query first = futures[0].get(60, TimeUnit.SECONDS);
       for (Future<Query> future : futures) {
