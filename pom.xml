@@ -2895,6 +2895,7 @@
         <artifactId>buildnumber-maven-plugin</artifactId>
         <configuration>
           <skip>${pinot.skip.buildnumber}</skip>
+          <revisionOnScmFailure>UNKNOWN</revisionOnScmFailure>
         </configuration>
         <executions>
           <execution>
