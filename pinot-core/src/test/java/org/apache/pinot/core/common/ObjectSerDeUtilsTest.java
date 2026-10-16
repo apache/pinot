@@ -144,7 +144,8 @@ public class ObjectSerDeUtilsTest {
   public void testSerializeIntoBuffer(Object value, ObjectType type, byte[] expected) {
     int typeId = type.getValue();
     Object inputState = copyInputState(value);
-    assertEquals(ObjectSerDeUtils.getSerializedSize(value, typeId), expected.length);
+    int expectedSize = value instanceof RoaringBitmap bitmap && bitmap.hasRunCompression() ? -1 : expected.length;
+    assertEquals(ObjectSerDeUtils.getSerializedSize(value, typeId), expectedSize);
     assertEquals(ObjectSerDeUtils.serialize(value, typeId), expected);
     for (boolean direct : new boolean[]{false, true}) {
       for (ByteOrder order : new ByteOrder[]{ByteOrder.BIG_ENDIAN, ByteOrder.LITTLE_ENDIAN}) {
@@ -176,8 +177,29 @@ public class ObjectSerDeUtilsTest {
     Object decoded = ObjectSerDeUtils.deserialize(expected, type);
     assertEquals(ObjectSerDeUtils.serialize(decoded, typeId), expected);
     assertEquals(copyInputState(value), inputState);
-    assertEquals(ObjectSerDeUtils.getSerializedSize(value, typeId), expected.length);
+    assertEquals(ObjectSerDeUtils.getSerializedSize(value, typeId), expectedSize);
     assertEquals(ObjectSerDeUtils.serialize(value, typeId), expected);
+  }
+
+  @Test
+  public void testRunCompressedBitmapRejectsIncompletePayload() {
+    for (boolean changeLimit : new boolean[]{false, true}) {
+      RoaringBitmap bitmap = new RoaringBitmap() {
+        @Override
+        public void serialize(ByteBuffer destination) {
+          if (changeLimit) {
+            destination.limit(destination.limit() - 1);
+          } else {
+            destination.put((byte) 0);
+          }
+        }
+      };
+      bitmap.add(100L, 10000L);
+      bitmap.runOptimize();
+      assertTrue(bitmap.hasRunCompression());
+      assertEquals(ObjectSerDeUtils.getSerializedSize(bitmap, ObjectType.RoaringBitmap.getValue()), -1);
+      assertThrows(IllegalStateException.class, () -> ObjectSerDeUtils.serialize(bitmap));
+    }
   }
 
   @Test(dataProvider = "directSerializationValues")

@@ -343,7 +343,8 @@ public class ObjectSerDeUtils {
       return bytes;
     }
 
-    /// Returns the exact size of a representable payload, or `-1` when allocation-free sizing is unsupported.
+    /// Returns the exact payload size for direct serialization, or `-1` when the codec prefers its byte-array
+    /// serializer.
     /// This method must not serialize the value or allocate a payload array. The value must remain unchanged between
     /// sizing and serialization. The destination must have at least this many bytes remaining.
     default int getSerializedSize(T value) {
@@ -1366,6 +1367,10 @@ public class ObjectSerDeUtils {
 
     @Override
     public int getSerializedSize(RoaringBitmap bitmap) {
+      // Run containers allocate typed views when writing directly, so the heap serializer is cheaper.
+      if (bitmap.hasRunCompression()) {
+        return -1;
+      }
       int size = bitmap.serializedSizeInBytes();
       Preconditions.checkArgument(size >= 0, "Serialized bitmap exceeds the maximum buffer size");
       return size;
@@ -1373,13 +1378,22 @@ public class ObjectSerDeUtils {
 
     @Override
     public byte[] serialize(RoaringBitmap bitmap) {
-      return ObjectSerDe.super.serialize(bitmap);
+      int size = bitmap.serializedSizeInBytes();
+      Preconditions.checkArgument(size >= 0, "Serialized bitmap exceeds the maximum buffer size");
+      byte[] bytes = new byte[size];
+      ByteBuffer destination = ByteBuffer.wrap(bytes);
+      RoaringBitmapUtils.serialize(bitmap, destination);
+      Preconditions.checkState(destination.position() == size && destination.limit() == size,
+          "Serialized bitmap size does not match expected payload size");
+      return bytes;
     }
 
     @Override
     public void serialize(RoaringBitmap bitmap, ByteBuffer destination) {
       // Recompute the size to validate standalone writes; mutable bitmaps cannot safely cache it across calls.
-      checkSerializationBuffer(destination, getSerializedSize(bitmap));
+      int size = bitmap.serializedSizeInBytes();
+      Preconditions.checkArgument(size >= 0, "Serialized bitmap exceeds the maximum buffer size");
+      checkSerializationBuffer(destination, size);
       ByteOrder originalOrder = destination.order();
       // Roaring uses little-endian wire bytes; restore the caller's byte order after writing.
       destination.order(ByteOrder.LITTLE_ENDIAN);
@@ -2098,7 +2112,8 @@ public class ObjectSerDeUtils {
     return SER_DES[objectTypeValue].serialize(value);
   }
 
-  /// Returns the codec's exact size for a representable payload, or `-1` if allocation-free sizing is unavailable.
+  /// Returns the codec's exact payload size for direct serialization, or `-1` when it prefers its byte-array
+  /// serializer.
   /// Intended for callers writing OBJECT payloads into an existing transport buffer, such as an Arrow vector.
   /// A result of `-1` selects the legacy byte-array fallback. The value must remain unchanged until serialization ends.
   public static int getSerializedSize(Object value, int objectTypeValue) {
