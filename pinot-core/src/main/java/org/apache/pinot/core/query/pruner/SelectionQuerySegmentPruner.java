@@ -170,7 +170,7 @@ public class SelectionQuerySegmentPruner implements SegmentPruner {
       return segments;
     }
 
-    int remainingDocs = query.getLimit() + query.getOffset();
+    int remainingDocs = query.getLimitPlusOffset();
     if (firstOrderByExpression.isAsc()) {
       // For ascending order, sort on column max value in ascending order
       try {

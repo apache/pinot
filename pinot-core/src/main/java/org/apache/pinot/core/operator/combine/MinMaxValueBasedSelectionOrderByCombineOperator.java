@@ -80,7 +80,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator
       ExecutorService executorService) {
     super(null, operators, queryContext, executorService);
     _endOperatorId = new AtomicInteger(_numOperators);
-    _numRowsToKeep = queryContext.getLimit() + queryContext.getOffset();
+    _numRowsToKeep = queryContext.getLimitPlusOffset();
 
     List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
     assert orderByExpressions != null;

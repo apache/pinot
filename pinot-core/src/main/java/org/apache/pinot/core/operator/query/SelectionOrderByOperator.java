@@ -103,7 +103,7 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
       _orderByColumnContexts[i] = _projectOperator.getResultColumnContext(expression);
     }
 
-    _numRowsToKeep = queryContext.getOffset() + queryContext.getLimit();
+    _numRowsToKeep = queryContext.getLimitPlusOffset();
     _comparator =
         OrderByComparatorFactory.getComparator(_orderByExpressions, _orderByColumnContexts, _nullHandlingEnabled);
     _rows = new PriorityQueue<>(Math.min(_numRowsToKeep, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
