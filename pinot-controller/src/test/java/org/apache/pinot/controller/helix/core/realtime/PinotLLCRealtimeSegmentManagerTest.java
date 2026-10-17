@@ -88,6 +88,7 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.LongMsgOffsetFactory;
 import org.apache.pinot.spi.stream.OffsetCriteria;
@@ -1268,6 +1269,87 @@ public class PinotLLCRealtimeSegmentManagerTest {
     assertFalse(segmentFile.exists());
     assertFalse(extraSegmentFile.exists());
     assertTrue(otherSegmentFile.exists());
+  }
+
+  private CommittingSegmentDescriptor commitSegmentWithMetadataTar(String segmentName, File segmentFile,
+      File tableDir, String metadataTarLocation)
+      throws Exception {
+    FileUtils.write(segmentFile, "temporary file contents");
+    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager();
+    CommittingSegmentDescriptor descriptor = new CommittingSegmentDescriptor(segmentName,
+        PARTITION_OFFSET.toString(), 0, SCHEME + tableDir + "/" + segmentFile.getName());
+    descriptor.setMetadataTarLocation(metadataTarLocation);
+    segmentManager.commitSegmentFile(REALTIME_TABLE_NAME, descriptor);
+    return descriptor;
+  }
+
+  @Test
+  public void testCommitSegmentFileMovesMetadataTar()
+      throws Exception {
+    PinotFSFactory.init(new PinotConfiguration());
+    File tableDir = new File(TEMP_DIR, RAW_TABLE_NAME);
+    String segmentName = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+    File segmentFile = new File(tableDir, SegmentCompletionUtils.generateTmpSegmentFileName(segmentName));
+    File metadataTmp = new File(tableDir,
+        SegmentCompletionUtils.generateTmpSegmentFileName(segmentName + Constants.METADATA_TAR_GZ_FILE_EXT));
+    FileUtils.write(metadataTmp, "metadata tar contents");
+
+    File finalSidecar = new File(tableDir, segmentName + Constants.METADATA_TAR_GZ_FILE_EXT);
+    try {
+      commitSegmentWithMetadataTar(segmentName, segmentFile, tableDir, SCHEME + metadataTmp.getPath());
+
+      assertFalse(metadataTmp.exists());
+      assertTrue(finalSidecar.exists());
+      Assert.assertEquals(FileUtils.readFileToString(finalSidecar, "UTF-8"), "metadata tar contents");
+    } finally {
+      // Tests share the table dir; do not leak files into other tests
+      FileUtils.deleteQuietly(metadataTmp);
+      FileUtils.deleteQuietly(finalSidecar);
+    }
+  }
+
+  @Test
+  public void testCommitSegmentFileDeletesStaleMetadataTarTmpFiles()
+      throws Exception {
+    PinotFSFactory.init(new PinotConfiguration());
+    File tableDir = new File(TEMP_DIR, RAW_TABLE_NAME);
+    String segmentName = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+    String otherSegmentName = new LLCSegmentName(RAW_TABLE_NAME, 1, 0, CURRENT_TIME_MS).getSegmentName();
+    File segmentFile = new File(tableDir, SegmentCompletionUtils.generateTmpSegmentFileName(segmentName));
+    File staleTmp = new File(tableDir,
+        SegmentCompletionUtils.generateTmpSegmentFileName(segmentName + Constants.METADATA_TAR_GZ_FILE_EXT));
+    File otherTmp = new File(tableDir,
+        SegmentCompletionUtils.generateTmpSegmentFileName(otherSegmentName + Constants.METADATA_TAR_GZ_FILE_EXT));
+    FileUtils.write(staleTmp, "stale contents");
+    FileUtils.write(otherTmp, "other segment contents");
+
+    try {
+      commitSegmentWithMetadataTar(segmentName, segmentFile, tableDir, null);
+
+      assertFalse(staleTmp.exists());
+      assertTrue(otherTmp.exists());
+    } finally {
+      FileUtils.deleteQuietly(staleTmp);
+      FileUtils.deleteQuietly(otherTmp);
+    }
+  }
+
+  @Test
+  public void testCommitSegmentFileSucceedsWhenMetadataTarIsMissing()
+      throws Exception {
+    PinotFSFactory.init(new PinotConfiguration());
+    File tableDir = new File(TEMP_DIR, RAW_TABLE_NAME);
+    String segmentName = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+    File segmentFile = new File(tableDir, SegmentCompletionUtils.generateTmpSegmentFileName(segmentName));
+    String missingTmp = SCHEME + tableDir + "/"
+        + SegmentCompletionUtils.generateTmpSegmentFileName(segmentName + Constants.METADATA_TAR_GZ_FILE_EXT);
+
+    CommittingSegmentDescriptor descriptor =
+        commitSegmentWithMetadataTar(segmentName, segmentFile, tableDir, missingTmp);
+
+    Assert.assertEquals(descriptor.getSegmentLocation(),
+        URIUtils.getUri(tableDir.toString(), URIUtils.encode(segmentName)).toString());
+    assertFalse(new File(tableDir, segmentName + Constants.METADATA_TAR_GZ_FILE_EXT).exists());
   }
 
   @Test

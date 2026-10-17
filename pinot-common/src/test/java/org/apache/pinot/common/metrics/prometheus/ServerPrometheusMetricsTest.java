@@ -46,7 +46,8 @@ public abstract class ServerPrometheusMetricsTest extends PinotPrometheusMetrics
 
   private static final List<ServerMeter> METERS_ACCEPTING_RAW_TABLE_NAMES =
       List.of(ServerMeter.SEGMENT_UPLOAD_FAILURE, ServerMeter.SEGMENT_UPLOAD_SUCCESS,
-          ServerMeter.SEGMENT_UPLOAD_TIMEOUT);
+          ServerMeter.SEGMENT_UPLOAD_TIMEOUT, ServerMeter.METADATA_TAR_UPLOAD_FAILURE,
+          ServerMeter.METADATA_TAR_UPLOAD_SUCCESS, ServerMeter.METADATA_TAR_UPLOAD_TIMEOUT);
 
   //gauges that accept clientId
   private static final List<ServerGauge> GAUGES_ACCEPTING_CLIENT_ID =
