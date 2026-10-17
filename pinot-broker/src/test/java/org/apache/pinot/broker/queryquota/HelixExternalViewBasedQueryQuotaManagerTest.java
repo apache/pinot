@@ -40,6 +40,7 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.spi.config.DatabaseConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
+import org.apache.pinot.spi.config.table.QuotaEnforcementMode;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -595,6 +596,123 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     // For the 1st version we don't check the number of online brokers.
     // Thus the expected size now is 1. It'll be 0 when we bring dynamic rate back.
     Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 1);
+  }
+
+  @Test
+  public void testQueryQuotaEnforcementModeOverrideTracksTableConfig()
+      throws Exception {
+    ExternalView brokerResource = generateBrokerResource(OFFLINE_TABLE_NAME);
+    Assert.assertEquals(queryQuotaMode(OFFLINE_TABLE_NAME), QuotaEnforcementMode.ENFORCED);
+
+    // Override set together with a QPS quota
+    QuotaConfig quotaConfig = new QuotaConfig(null, TABLE_MAX_QPS_STR, null, QuotaEnforcementMode.SHADOW);
+    TableConfig tableConfig = generateDefaultTableConfig(OFFLINE_TABLE_NAME);
+    tableConfig.setQuotaConfig(quotaConfig);
+    ZKMetadataProvider.setTableConfig(_testPropertyStore, tableConfig);
+    _queryQuotaManager.initOrUpdateTableQueryQuota(tableConfig, brokerResource);
+    Assert.assertEquals(queryQuotaMode(OFFLINE_TABLE_NAME),
+        QuotaEnforcementMode.SHADOW);
+    // The quota itself is still tracked in SHADOW mode so that breaches can be detected
+    Assert.assertEquals(_queryQuotaManager.getTableQueryQuota(OFFLINE_TABLE_NAME), TABLE_MAX_QPS);
+
+    // Changing the override is picked up on the next table config update
+    quotaConfig = new QuotaConfig(null, TABLE_MAX_QPS_STR, null, QuotaEnforcementMode.DISABLED);
+    tableConfig.setQuotaConfig(quotaConfig);
+    ZKMetadataProvider.setTableConfig(_testPropertyStore, tableConfig);
+    _queryQuotaManager.initOrUpdateTableQueryQuota(tableConfig, brokerResource);
+    Assert.assertEquals(queryQuotaMode(OFFLINE_TABLE_NAME),
+        QuotaEnforcementMode.DISABLED);
+
+    // Override without any QPS quota is still tracked
+    quotaConfig = new QuotaConfig("6G", null, null, QuotaEnforcementMode.SHADOW);
+    tableConfig.setQuotaConfig(quotaConfig);
+    ZKMetadataProvider.setTableConfig(_testPropertyStore, tableConfig);
+    _queryQuotaManager.initOrUpdateTableQueryQuota(tableConfig, brokerResource);
+    Assert.assertEquals(queryQuotaMode(OFFLINE_TABLE_NAME),
+        QuotaEnforcementMode.SHADOW);
+
+    // Removing the mode reverts to the default (null, i.e. ENFORCED)
+    tableConfig.setQuotaConfig(new QuotaConfig(null, TABLE_MAX_QPS_STR));
+    ZKMetadataProvider.setTableConfig(_testPropertyStore, tableConfig);
+    _queryQuotaManager.initOrUpdateTableQueryQuota(tableConfig, brokerResource);
+    Assert.assertEquals(queryQuotaMode(OFFLINE_TABLE_NAME), QuotaEnforcementMode.ENFORCED);
+
+    // Dropping the table clears the override
+    quotaConfig = new QuotaConfig(null, TABLE_MAX_QPS_STR, null, QuotaEnforcementMode.SHADOW);
+    tableConfig.setQuotaConfig(quotaConfig);
+    ZKMetadataProvider.setTableConfig(_testPropertyStore, tableConfig);
+    _queryQuotaManager.initOrUpdateTableQueryQuota(tableConfig, brokerResource);
+    Assert.assertEquals(queryQuotaMode(OFFLINE_TABLE_NAME),
+        QuotaEnforcementMode.SHADOW);
+    _queryQuotaManager.dropTableQueryQuota(OFFLINE_TABLE_NAME);
+    Assert.assertEquals(queryQuotaMode(OFFLINE_TABLE_NAME), QuotaEnforcementMode.ENFORCED);
+  }
+
+  @Test
+  public void testEnforcementModeOverrideIsRemovedWithRateLimiter()
+      throws Exception {
+    ExternalView brokerResource = generateBrokerResource(REALTIME_TABLE_NAME);
+    QuotaConfig quotaConfig = new QuotaConfig(null, TABLE_MAX_QPS_STR, null, QuotaEnforcementMode.SHADOW);
+    TableConfig tableConfig = generateDefaultTableConfig(REALTIME_TABLE_NAME);
+    tableConfig.setQuotaConfig(quotaConfig);
+    ZKMetadataProvider.setTableConfig(_testPropertyStore, tableConfig);
+    _queryQuotaManager.initOrUpdateTableQueryQuota(tableConfig, brokerResource);
+    Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 1);
+    Assert.assertEquals(_queryQuotaManager.getEnforcementModeOverrideMapSize(), 1);
+
+    // Table config deleted from the property store: the rate limiter and its override must both go away
+    ZKMetadataProvider.removeResourceConfigFromPropertyStore(_testPropertyStore, REALTIME_TABLE_NAME);
+    _queryQuotaManager.processQueryRateLimitingExternalViewChange(brokerResource);
+    Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 0);
+    Assert.assertEquals(_queryQuotaManager.getEnforcementModeOverrideMapSize(), 0);
+  }
+
+  private QuotaEnforcementMode queryQuotaMode(String tableName) {
+    return _queryQuotaManager.getQueryQuotaEnforcementMode(tableName);
+  }
+
+  private TableConfig tableConfigWithQueryQuotaMode(TableType tableType, QuotaEnforcementMode mode) {
+    QuotaConfig quotaConfig = new QuotaConfig(null, TABLE_MAX_QPS_STR, null, mode);
+    TableConfig tableConfig = new TableConfigBuilder(tableType).setTableName(RAW_TABLE_NAME).setQuotaConfig(quotaConfig)
+        .setRetentionTimeUnit("DAYS").setRetentionTimeValue("1").setSegmentPushType("APPEND")
+        .setBrokerTenant("testBroker").setServerTenant("testServer").build();
+    ZKMetadataProvider.setTableConfig(_testPropertyStore, tableConfig);
+    return tableConfig;
+  }
+
+  @Test
+  public void testQueryQuotaEnforcementModeForNameWithoutTypeSuffix()
+      throws Exception {
+    // Queries usually reference the raw table name, which acquire() resolves to both the OFFLINE and REALTIME table
+    ExternalView brokerResource = generateBrokerResource(OFFLINE_TABLE_NAME);
+    brokerResource.setState(REALTIME_TABLE_NAME, BROKER_INSTANCE_ID, "ONLINE");
+
+    // Only the OFFLINE table exists: its override applies to the raw name
+    TableConfig offline = tableConfigWithQueryQuotaMode(TableType.OFFLINE, QuotaEnforcementMode.SHADOW);
+    _queryQuotaManager.initOrUpdateTableQueryQuota(offline, brokerResource);
+    Assert.assertEquals(queryQuotaMode(RAW_TABLE_NAME), QuotaEnforcementMode.SHADOW);
+    Assert.assertEquals(queryQuotaMode(OFFLINE_TABLE_NAME), QuotaEnforcementMode.SHADOW);
+
+    // Hybrid table where only OFFLINE opted into SHADOW: acquire() cannot tell which side was breached, so the raw
+    // name stays ENFORCED (the strictest) rather than letting a breach on the REALTIME side through
+    TableConfig realtime = tableConfigWithQueryQuotaMode(TableType.REALTIME, null);
+    _queryQuotaManager.initOrUpdateTableQueryQuota(realtime, brokerResource);
+    Assert.assertEquals(queryQuotaMode(RAW_TABLE_NAME), QuotaEnforcementMode.ENFORCED);
+    Assert.assertEquals(queryQuotaMode(OFFLINE_TABLE_NAME), QuotaEnforcementMode.SHADOW);
+    Assert.assertEquals(queryQuotaMode(REALTIME_TABLE_NAME), QuotaEnforcementMode.ENFORCED);
+
+    // Both sides in SHADOW: the raw name is SHADOW
+    realtime = tableConfigWithQueryQuotaMode(TableType.REALTIME, QuotaEnforcementMode.SHADOW);
+    _queryQuotaManager.initOrUpdateTableQueryQuota(realtime, brokerResource);
+    Assert.assertEquals(queryQuotaMode(RAW_TABLE_NAME), QuotaEnforcementMode.SHADOW);
+
+    // SHADOW is stricter than DISABLED
+    realtime = tableConfigWithQueryQuotaMode(TableType.REALTIME, QuotaEnforcementMode.DISABLED);
+    _queryQuotaManager.initOrUpdateTableQueryQuota(realtime, brokerResource);
+    Assert.assertEquals(queryQuotaMode(RAW_TABLE_NAME), QuotaEnforcementMode.SHADOW);
+
+    // Unknown tables default to ENFORCED
+    Assert.assertEquals(queryQuotaMode("unknownTable"), QuotaEnforcementMode.ENFORCED);
   }
 
   private TableConfig generateDefaultTableConfig(String tableName) {
