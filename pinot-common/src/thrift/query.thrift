@@ -106,4 +106,11 @@ struct Identifier {
 struct Function {
   1: required string operator;
   2: optional list<Expression> operands;
+  // Resolved logical types, independent of SQL operands and intermediate accumulator types.
+  3: optional AggregationFunctionBinding aggregationBinding;
+}
+
+struct AggregationFunctionBinding {
+  1: required list<string> argumentTypes;
+  2: required string resultType;
 }

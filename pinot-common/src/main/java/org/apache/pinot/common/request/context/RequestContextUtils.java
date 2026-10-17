@@ -80,15 +80,18 @@ public class RequestContextUtils {
     FunctionContext.Type functionType =
         AggregationFunctionType.isAggregationFunction(functionName) ? FunctionContext.Type.AGGREGATION
             : FunctionContext.Type.TRANSFORM;
+    AggregateCallBinding binding = thriftFunction.isSetAggregationBinding()
+        ? AggregateCallBinding.fromThrift(thriftFunction.getAggregationBinding())
+        : null;
     List<Expression> operands = thriftFunction.getOperands();
     if (operands != null) {
       List<ExpressionContext> arguments = new ArrayList<>(operands.size());
       for (Expression operand : operands) {
         arguments.add(getExpression(operand));
       }
-      return new FunctionContext(functionType, functionName, arguments);
+      return new FunctionContext(functionType, functionName, arguments, binding);
     } else {
-      return new FunctionContext(functionType, functionName, List.of());
+      return new FunctionContext(functionType, functionName, List.of(), binding);
     }
   }
 
