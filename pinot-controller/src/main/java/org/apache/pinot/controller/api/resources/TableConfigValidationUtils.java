@@ -24,6 +24,7 @@ import javax.annotation.Nullable;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
+import org.apache.pinot.common.evaluator.GroovyFunctionEvaluator;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentUtils;
@@ -35,6 +36,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableConfigValidatorRegistry;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
@@ -47,6 +49,23 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 public final class TableConfigValidationUtils {
 
   private TableConfigValidationUtils() {
+  }
+
+  /// Rejects legacy FieldSpec Groovy transforms before schema validation can compile them.
+  @SuppressWarnings("deprecation") // FieldSpec transforms remain supported in stored schemas.
+  static void validateSchemaGroovy(Schema schema, ControllerConf controllerConf) {
+    if (controllerConf.isDisableIngestionGroovy()) {
+      String groovyPrefix = GroovyFunctionEvaluator.getGroovyExpressionPrefix() + "(";
+      for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+        String transformFunction = fieldSpec.getTransformFunction();
+        if (transformFunction != null
+            && transformFunction.regionMatches(true, 0, groovyPrefix, 0, groovyPrefix.length())) {
+          throw new IllegalStateException(
+              "Groovy transform functions are disabled for schema. Found '" + transformFunction + "' for column '"
+                  + fieldSpec.getName() + "'. Set " + ControllerConf.DISABLE_GROOVY + "=false to enable them");
+        }
+      }
+    }
   }
 
   /// Validates a table config against the given schema and controller configuration.
