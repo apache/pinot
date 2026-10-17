@@ -54,7 +54,7 @@
     Maven 3 rejects a cycle where the BOM also inherits from that same root pom.
     The independent Apache parent supplies release deployment and signing configuration.
   -->
-  <version>1.6.0-SNAPSHOT</version>
+  <version>1.7.0-SNAPSHOT</version>
   <name>Pinot BOM</name>
   <description>Bill of materials for Apache Pinot modules</description>
   <url>https://pinot.apache.org/</url>
