@@ -3197,15 +3197,22 @@ public class PinotHelixResourceManager {
 
   public Map<String, Integer> reloadSegments(String tableNameWithType, boolean forceDownload,
       Map<String, List<String>> instanceToSegmentsMap, String reloadJobId) {
-    LOGGER.info("Sending reload messages for table: {} with forceDownload: {}, and instanceToSegmentsMap: {}",
-        tableNameWithType, forceDownload, instanceToSegmentsMap);
+    return reloadSegments(tableNameWithType, forceDownload, false, instanceToSegmentsMap, reloadJobId);
+  }
+
+  /// Sends reload messages for the given segments to their target instances. When `onlyIfNeeded` is true, servers
+  /// reload only the segments whose loaded copy is out of date and skip the rest.
+  public Map<String, Integer> reloadSegments(String tableNameWithType, boolean forceDownload, boolean onlyIfNeeded,
+      Map<String, List<String>> instanceToSegmentsMap, String reloadJobId) {
+    LOGGER.info("Sending reload messages for table: {} with forceDownload: {}, onlyIfNeeded: {}, and "
+        + "instanceToSegmentsMap: {}", tableNameWithType, forceDownload, onlyIfNeeded, instanceToSegmentsMap);
 
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
     Map<String, Integer> instanceMsgInfoMap = new HashMap<>();
     for (Map.Entry<String, List<String>> entry : instanceToSegmentsMap.entrySet()) {
       String targetInstance = entry.getKey();
       SegmentReloadMessage message =
-          new SegmentReloadMessage(tableNameWithType, entry.getValue(), forceDownload, reloadJobId);
+          new SegmentReloadMessage(tableNameWithType, entry.getValue(), forceDownload, onlyIfNeeded, reloadJobId);
       int numMessagesSent =
           MessagingServiceUtils.send(messagingService, message, tableNameWithType, null, targetInstance);
       if (numMessagesSent > 0) {
@@ -3221,11 +3228,19 @@ public class PinotHelixResourceManager {
 
   public Pair<Integer, String> reloadAllSegments(String tableNameWithType, boolean forceDownload,
       @Nullable String targetInstance) {
-    LOGGER.info("Sending reload message for table: {} with forceDownload: {}, and target: {}", tableNameWithType,
-        forceDownload, targetInstance == null ? "every instance" : targetInstance);
+    return reloadAllSegments(tableNameWithType, forceDownload, false, targetInstance);
+  }
+
+  /// Sends a reload message for all segments of the table. When `onlyIfNeeded` is true, servers reload only the
+  /// segments whose loaded copy is out of date and skip the rest.
+  public Pair<Integer, String> reloadAllSegments(String tableNameWithType, boolean forceDownload,
+      boolean onlyIfNeeded, @Nullable String targetInstance) {
+    LOGGER.info("Sending reload message for table: {} with forceDownload: {}, onlyIfNeeded: {}, and target: {}",
+        tableNameWithType, forceDownload, onlyIfNeeded, targetInstance == null ? "every instance" : targetInstance);
 
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
-    SegmentReloadMessage message = new SegmentReloadMessage(tableNameWithType, forceDownload);
+    SegmentReloadMessage message =
+        new SegmentReloadMessage(tableNameWithType, null, forceDownload, onlyIfNeeded, null);
     int numMessagesSent =
         MessagingServiceUtils.send(messagingService, message, tableNameWithType, null, targetInstance);
     if (numMessagesSent > 0) {
@@ -3239,11 +3254,20 @@ public class PinotHelixResourceManager {
 
   public Pair<Integer, String> reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload,
       @Nullable String targetInstance) {
-    LOGGER.info("Sending reload message for segment: {} in table: {} with forceDownload: {}, and target: {}",
-        segmentName, tableNameWithType, forceDownload, targetInstance == null ? "every instance" : targetInstance);
+    return reloadSegment(tableNameWithType, segmentName, forceDownload, false, targetInstance);
+  }
+
+  /// Sends a reload message for a single segment. When `onlyIfNeeded` is true, servers skip the reload if the loaded
+  /// copy is already up to date.
+  public Pair<Integer, String> reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload,
+      boolean onlyIfNeeded, @Nullable String targetInstance) {
+    LOGGER.info("Sending reload message for segment: {} in table: {} with forceDownload: {}, onlyIfNeeded: {}, and "
+            + "target: {}", segmentName, tableNameWithType, forceDownload, onlyIfNeeded,
+        targetInstance == null ? "every instance" : targetInstance);
 
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
-    SegmentReloadMessage message = new SegmentReloadMessage(tableNameWithType, List.of(segmentName), forceDownload);
+    SegmentReloadMessage message =
+        new SegmentReloadMessage(tableNameWithType, List.of(segmentName), forceDownload, onlyIfNeeded, null);
     int numMessagesSent =
         MessagingServiceUtils.send(messagingService, message, tableNameWithType, segmentName, targetInstance);
     if (numMessagesSent > 0) {
