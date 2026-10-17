@@ -90,7 +90,15 @@ public class MmapMemory implements Memory {
   @Override
   public void flush() {
     MSyncFlag mode = MSyncFlag.MS_SYNC;
-    PosixAPI.posix().msync(_address, _size, mode);
+    PosixAPI posix = PosixAPI.posix();
+    long pageSize = Unsafer.UNSAFE.pageSize();
+    long pageOffset = _address % pageSize;
+    long pageAlignedAddress = _address - pageOffset;
+    int ret = posix.msync(pageAlignedAddress, _size + pageOffset, mode);
+    if (ret != 0) {
+      throw new RuntimeException("msync failed for address: " + _address + ", size: " + _size + ": "
+          + posix.lastErrorStr());
+    }
   }
 
   @Override
