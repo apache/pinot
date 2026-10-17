@@ -35,7 +35,7 @@ import org.apache.lucene.codecs.perfield.PerFieldPostingsFormat;
 /// Extend the Lucene 10.0 index format.
 /// The major change here is to allow custom: @link{org.apache.lucene.codecs.KnnVectorsFormat}
 ///
-/// @see org.apache.lucene.codecs.lucene99 package documentation for file format details.
+/// @see org.apache.lucene.codecs.lucene100 package documentation for file format details.
 public class HnswCodec extends FilterCodec {
 
   private final PostingsFormat _defaultPostingsFormat;
