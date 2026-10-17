@@ -2607,4 +2607,126 @@ public class InstanceSelectorTest {
     }
     return descriptions;
   }
+
+  @Test
+  public void testReplicaGroupInstanceSetHashCollisions() {
+    Set<String> first = Set.of("Server_1", "Server_4");
+    Set<String> second = Set.of("Server_2", "Server_3");
+
+    // Different instance sets collide with the original Set hash.
+    assertEquals(first.hashCode(), second.hashCode());
+
+    ReplicaGroupInstanceSelector.InstanceSetKey firstKey =
+        new ReplicaGroupInstanceSelector.InstanceSetKey(first);
+    ReplicaGroupInstanceSelector.InstanceSetKey secondKey =
+        new ReplicaGroupInstanceSelector.InstanceSetKey(second);
+
+    // The new key must distinguish the two instance groups.
+    assertTrue(!firstKey.equals(secondKey));
+    assertTrue(firstKey.hashCode() != secondKey.hashCode());
+
+    Map<ReplicaGroupInstanceSelector.InstanceSetKey, String> groups =
+        new HashMap<>();
+    groups.put(firstKey, "first");
+    groups.put(secondKey, "second");
+
+    assertEquals(groups.size(), 2);
+    assertEquals(groups.get(
+        new ReplicaGroupInstanceSelector.InstanceSetKey(first)), "first");
+    assertEquals(groups.get(
+        new ReplicaGroupInstanceSelector.InstanceSetKey(second)), "second");
+  }
+
+  @Test
+  public void testStrictReplicaGroupHashCollisionPreservesRouting() {
+    String[] groupA = {"Server_1", "Server_4"};
+    String[] groupB = {"Server_2", "Server_3"};
+
+    // These different instance groups have the same original Set hash.
+    assertEquals(Set.of(groupA[0], groupA[1]).hashCode(),
+        Set.of(groupB[0], groupB[1]).hashCode());
+
+    Map<String, Map<String, String>> idealStateMaps = new LinkedHashMap<>();
+    idealStateMaps.put("a_failed", instanceStateMap(groupA, ONLINE, ONLINE));
+    idealStateMaps.put("a_healthy", instanceStateMap(groupA, ONLINE, ONLINE));
+    idealStateMaps.put("b_healthy", instanceStateMap(groupB, ONLINE, ONLINE));
+
+    Map<String, Map<String, String>> externalViewMaps = new LinkedHashMap<>();
+    externalViewMaps.put("a_failed", instanceStateMap(groupA, OFFLINE, ONLINE));
+    externalViewMaps.put("a_healthy", instanceStateMap(groupA, ONLINE, ONLINE));
+    externalViewMaps.put("b_healthy", instanceStateMap(groupB, ONLINE, ONLINE));
+
+    Set<String> onlineSegments = new HashSet<>(idealStateMaps.keySet());
+
+    BaseInstanceSelector selector = (BaseInstanceSelector) createTestInstanceSelector(
+        STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
+        Set.of("Server_1", "Server_2", "Server_3", "Server_4"),
+        createInsertionOrderedIdealState(idealStateMaps),
+        createInsertionOrderedExternalView(externalViewMaps),
+        onlineSegments);
+
+    // A failure removes Server_1 from both segments in group A.
+    assertEquals(describe(selector._segmentStates.getCandidates("a_failed")),
+        List.of("Server_4/1/true"));
+    assertEquals(describe(selector._segmentStates.getCandidates("a_healthy")),
+        List.of("Server_4/1/true"));
+
+    // Group B must remain unaffected, despite the hash collision.
+    assertEquals(describe(selector._segmentStates.getCandidates("b_healthy")),
+        List.of("Server_2/0/true", "Server_3/1/true"));
+
+    // Restore Server_1 and verify recovery.
+    externalViewMaps.put("a_failed", instanceStateMap(groupA, ONLINE, ONLINE));
+    selector.onAssignmentChange(
+        createInsertionOrderedIdealState(idealStateMaps),
+        createInsertionOrderedExternalView(externalViewMaps),
+        onlineSegments);
+
+    assertEquals(describe(selector._segmentStates.getCandidates("a_healthy")),
+        List.of("Server_1/0/true", "Server_4/1/true"));
+    assertEquals(describe(selector._segmentStates.getCandidates("b_healthy")),
+        List.of("Server_2/0/true", "Server_3/1/true"));
+  }
+
+  @Test
+  public void testReplicaGroupInstanceSetHashDistribution() {
+    List<String> servers = new ArrayList<>();
+    for (int i = 0; i < 200; i++) {
+      servers.add("Server_pinot-server-" + i
+          + ".pinot-server-headless.ns.svc.cluster.local_8098");
+    }
+
+    Set<Integer> originalHashes = new HashSet<>();
+    Set<Integer> improvedHashes = new HashSet<>();
+
+    int groups = 0;
+    outer:
+    for (int i = 0; i < servers.size() - 2; i++) {
+      for (int j = i + 1; j < servers.size() - 1; j++) {
+        for (int k = j + 1; k < servers.size(); k++) {
+          Set<String> instances =
+              Set.of(servers.get(i), servers.get(j), servers.get(k));
+
+          originalHashes.add(instances.hashCode());
+          improvedHashes.add(
+              new ReplicaGroupInstanceSelector.InstanceSetKey(instances)
+                  .hashCode());
+
+          if (++groups == 100_000) {
+            break outer;
+          }
+        }
+      }
+    }
+
+    assertEquals(groups, 100_000);
+
+    // The original set hashing produces substantial collisions.
+    assertTrue(originalHashes.size() < 5_000);
+
+    // The ordered, mixed hashing should retain most distinct groups.
+    assertTrue(improvedHashes.size() >= 99_000);
+
+    assertTrue(improvedHashes.size() > originalHashes.size() * 20);
+  }
 }
