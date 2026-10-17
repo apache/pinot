@@ -20,9 +20,12 @@ package org.apache.pinot.segment.local.segment.index.readers.text;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.Map;
-import org.testng.Assert;
+import org.apache.commons.io.FileUtils;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
 
 
 public class LuceneTextIndexCompatibleTest {
@@ -30,10 +33,16 @@ public class LuceneTextIndexCompatibleTest {
   @Test
   public void testLucene80IndexReader()
       throws IOException {
-    File indexPath =
+    File fixturePath =
         new File(LuceneTextIndexCompatibleTest.class.getClassLoader().getResource("data/lucene_80_index").getPath());
-    try (LuceneTextIndexReader lucene80Index = new LuceneTextIndexReader("Text", indexPath, 1000, Map.of())) {
-      Assert.assertNotNull(lucene80Index);
+    File indexPath = Files.createTempDirectory("lucene80-compatibility").toFile();
+    try {
+      FileUtils.copyDirectory(fixturePath, indexPath);
+      try (LuceneTextIndexReader reader = new LuceneTextIndexReader("Text", indexPath, 1000, Map.of())) {
+        assertEquals(reader.getDocIds("1", null).getCardinality(), 35);
+      }
+    } finally {
+      FileUtils.deleteDirectory(indexPath);
     }
   }
 }
