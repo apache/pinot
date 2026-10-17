@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.spi.ingestion.batch.spec;
 
+import java.util.Map;
+
 public class Constants {
   private Constants() {
   }
@@ -25,4 +27,14 @@ public class Constants {
   /// By default Pinot segments are compressed in 'tar.gz' format then pushed to controller.
   public static final String TAR_GZ_FILE_EXT = ".tar.gz";
   public static final String METADATA_TAR_GZ_FILE_EXT = ".metadata.tar.gz";
+
+  /// Archive extensions understood by segment upload and metadata extraction, including existing LZ4 archives.
+  public static final Map<String, String> SEGMENT_TAR_FILE_EXTENSIONS =
+      Map.of("gzip", TAR_GZ_FILE_EXT, "lz4", ".tar.lz4", "zstd", ".tar.zst");
+
+  /// Returns whether a path names a supported segment archive, excluding the gzip metadata sidecars.
+  public static boolean isSegmentTarFile(String fileName) {
+    return !fileName.endsWith(METADATA_TAR_GZ_FILE_EXT)
+        && SEGMENT_TAR_FILE_EXTENSIONS.values().stream().anyMatch(fileName::endsWith);
+  }
 }

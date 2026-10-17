@@ -58,6 +58,19 @@ For getting started guides, deployment recipes, tutorials, and more, please visi
 
 <img src="https://pinot.apache.org/static/images/hero_diagram.svg" align="center" alt="Apache Pinot"/>
 
+Batch ingestion jobs can opt into Zstandard segment archives in standalone, Spark, and Hadoop runners:
+
+```yaml
+segmentTarCompressionCodec: zstd
+```
+
+The default remains `gzip`; metadata sidecars remain `.metadata.tar.gz`. Use a clean output directory when switching codecs.
+
+Upgrade notes: pushes now reject duplicate logical segment names, including archives in different recursively listed
+subdirectories or with different compression codecs. Remove stale archives or narrow the push file pattern before pushing.
+Before opting into `zstd`, ensure every controller, server, minion, and external tool that consumes these archives supports
+`.tar.zst`. `TarCompressionUtils` already detects Zstandard on the current base; check older deployments before opting in.
+
 ## Features
 
 Pinot was originally built at LinkedIn to power rich interactive real-time analytic applications such as [Who Viewed Profile](https://www.linkedin.com/me/profile-views/urn:li:wvmp:summary/),  [Company Analytics](https://www.linkedin.com/company/linkedin/insights/),  [Talent Insights](https://business.linkedin.com/talent-solutions/talent-insights), and many more. [UberEats Restaurant Manager](https://eng.uber.com/restaurant-manager/) is another example of a customer facing Analytics App. At LinkedIn, Pinot powers 50+ user-facing products, ingesting millions of events per second and serving 100k+ queries per second at millisecond latency.
