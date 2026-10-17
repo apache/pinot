@@ -263,6 +263,7 @@
     <kafka3.version>3.9.2</kafka3.version>
     <kafka4.version>4.2.0</kafka4.version>
     <confluent.version>8.2.0</confluent.version>
+    <wire.version>6.4.5</wire.version>
     <pulsar.version>5.0.0</pulsar.version>
     <flink.version>2.3.0</flink.version>
 
@@ -1737,6 +1738,17 @@
         <groupId>io.confluent</groupId>
         <artifactId>kafka-json-schema-serializer</artifactId>
         <version>${confluent.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>com.squareup.wire</groupId>
+        <artifactId>wire-schema-jvm</artifactId>
+        <version>${wire.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.squareup.wire</groupId>
+        <artifactId>wire-runtime-jvm</artifactId>
+        <version>${wire.version}</version>
       </dependency>
 
       <!-- pulsar bom -->
