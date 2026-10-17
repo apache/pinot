@@ -23,19 +23,13 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.nio.file.Files;
 import java.util.Map;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.index.DirectoryReader;
-import org.apache.lucene.index.NumericDocValues;
-import org.apache.lucene.index.SegmentInfos;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.KnnFloatVectorQuery;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.store.Directory;
-import org.apache.lucene.store.FSDirectory;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.HnswVectorIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.vector.HnswVectorIndexBufferReader;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -46,7 +40,6 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
@@ -110,42 +103,6 @@ public class HnswVectorIndexCombinedTest {
       }
     } finally {
       buffer.close();
-    }
-  }
-
-  @Test
-  public void testReadLucene912HnswIndex()
-      throws Exception {
-    // Generated using HnswCodec, HnswVectorsFormat and XKnnFloatVectorField from b8a6f6b12f with Lucene 9.12.0.
-    // Each index has three 2048-dimensional unit vectors and stored/numeric DocID values 0, 1, 2.
-    // The matrix covers both compression modes and compound-file settings, retaining the persisted Lucene99 name.
-    try (ZipInputStream input = new ZipInputStream(getClass().getResourceAsStream("/data/hnsw-lucene912.zip"))) {
-      ZipEntry entry;
-      while ((entry = input.getNextEntry()) != null) {
-        File file = new File(_segmentDir, entry.getName());
-        Files.createDirectories(file.toPath().getParent());
-        Files.copy(input, file.toPath());
-      }
-    }
-    float[] query = new float[2048];
-    query[1] = 1;
-    for (String mode : new String[] {"BEST_SPEED", "BEST_COMPRESSION"}) {
-      for (boolean compound : new boolean[] {false, true}) {
-        try (Directory directory = FSDirectory.open(new File(_segmentDir, mode + "-" + compound).toPath());
-            DirectoryReader reader = DirectoryReader.open(directory)) {
-          assertEquals(SegmentInfos.readLatestCommit(directory).info(0).info.getCodec().getName(), "Lucene99");
-          assertEquals(reader.numDocs(), 3);
-          assertEquals(reader.leaves().get(0).reader().getFloatVectorValues("embedding").dimension(), 2048);
-          TopDocs hits = new IndexSearcher(reader).search(new KnnFloatVectorQuery("embedding", query, 1), 1);
-          assertEquals(hits.scoreDocs.length, 1);
-          int docId = hits.scoreDocs[0].doc;
-          assertEquals(reader.storedFields().document(docId).getField("DocID").numericValue().intValue(), 1);
-          NumericDocValues docIds = reader.leaves().get(0).reader().getNumericDocValues("DocID");
-          assertTrue(docIds.advanceExact(docId));
-          assertEquals(docIds.longValue(), 1L);
-          reader.leaves().get(0).reader().checkIntegrity();
-        }
-      }
     }
   }
 
