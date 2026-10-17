@@ -48,46 +48,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  compatibility-baselines:
-    if: github.repository == 'apache/pinot'
-    runs-on: ubuntu-latest
-    outputs:
-      sha: ${{ steps.baseline.outputs.sha }}
-      runtime_commits: ${{ steps.baseline.outputs.runtime_commits }}
-    steps:
-      - uses: actions/checkout@v7.0.1
-        with:
-          fetch-depth: 2
-      - name: Select compatibility baselines
-        id: baseline
-        env:
-          PUSH_BEFORE_SHA: ${{ github.event.before }}
-        run: |
-          if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
-            # Compare against the base snapshot actually included in the tested merge.
-            BASELINE=$(git rev-parse HEAD^1)
-          else
-            # A push can contain multiple commits, so compare the entire pushed range.
-            BASELINE="$PUSH_BEFORE_SHA"
-          fi
-          if [[ -z "$BASELINE" || "$BASELINE" == "0000000000000000000000000000000000000000" ]]; then
-            echo "::error::No previous commit is available for the compatibility baseline"
-            exit 1
-          fi
-          echo "Comparing baseline $BASELINE against $(git rev-parse HEAD)"
-          echo "sha=$BASELINE" >> "$GITHUB_OUTPUT"
-          # Merged #19900 is the minimum Lucene 9.12 rollback target for Lucene 10 writers.
-          # Unpatched releases (including 1.5.0) cannot read the newly generated Lucene indexes.
-          RECOVERY_BASELINE_SHA=a45ebf01379257591c27c900c3525612a3c49b92
-          RUNTIME_BASELINES=$(python3 -c \
-            'import json, sys; print(json.dumps(list(dict.fromkeys(sys.argv[1:]))))' \
-            "$RECOVERY_BASELINE_SHA" "$BASELINE")
-          echo "runtime_commits=$RUNTIME_BASELINES" >> "$GITHUB_OUTPUT"
-          echo "Runtime upgrade/rollback baselines: $RUNTIME_BASELINES" >> "$GITHUB_STEP_SUMMARY"
-          echo "Unpatched Lucene 9.12 releases are unsupported rollback targets; using recovery from #19900." \
-            >> "$GITHUB_STEP_SUMMARY"
   binary-compat-check:
-    needs: compatibility-baselines
     if: github.repository == 'apache/pinot'
     runs-on: ubuntu-latest
     name: Pinot Binary Compatibility Check
@@ -95,6 +56,24 @@ jobs:
       - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 2
+      - name: Select binary compatibility baseline
+        id: binary-baseline
+        env:
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+            # Compare against the master snapshot actually included in the tested merge.
+            BASELINE=$(git rev-parse HEAD^1)
+          else
+            # A push can contain multiple commits, so compare the entire pushed range.
+            BASELINE="$PUSH_BEFORE_SHA"
+          fi
+          if [[ -z "$BASELINE" || "$BASELINE" == "0000000000000000000000000000000000000000" ]]; then
+            echo "::error::No previous commit is available for the binary compatibility baseline"
+            exit 1
+          fi
+          echo "Comparing baseline $BASELINE against $(git rev-parse HEAD)"
+          echo "sha=$BASELINE" >> "$GITHUB_OUTPUT"
       - name: Set up JDK 25
         uses: actions/setup-java@v6
         with:
@@ -180,7 +159,7 @@ jobs:
       - name: Checkout binary compatibility baseline
         uses: actions/checkout@v7.0.1
         with:
-          ref: ${{ needs.compatibility-baselines.outputs.sha }}
+          ref: ${{ steps.binary-baseline.outputs.sha }}
           path: master-head
       # Build the same modules at the selected baseline to produce the old JARs
       - name: Build SPI at baseline
@@ -212,7 +191,6 @@ jobs:
               --ignore-missing-classes
           done
   compatibility-verifier:
-    needs: compatibility-baselines
     if: github.repository == 'apache/pinot'
     runs-on: ubuntu-latest
     strategy:
@@ -220,7 +198,8 @@ jobs:
       fail-fast: false
       matrix:
         test_suite: [ "compatibility-verifier/sample-test-suite" ]
-        old_commit: ${{ fromJSON(needs.compatibility-baselines.outputs.runtime_commits) }}
+        # Lucene 10 requires the index recovery support merged into master in #19900.
+        old_commit: [ "master" ]
     name: Pinot Compatibility Regression Testing against ${{ matrix.old_commit }} on ${{ matrix.test_suite }}
     steps:
       - uses: actions/checkout@v7.0.1
@@ -270,7 +249,6 @@ jobs:
         run: |
           .github/workflows/scripts/.pinot_compatibility_verifier.sh
   multi-stage-compatibility-verifier:
-    needs: compatibility-baselines
     if: github.repository == 'apache/pinot'
     runs-on: ubuntu-latest
     strategy:
@@ -278,7 +256,8 @@ jobs:
       fail-fast: false
       matrix:
         test_suite: [ "compatibility-verifier/multi-stage-query-engine-test-suite" ]
-        old_commit: ${{ fromJSON(needs.compatibility-baselines.outputs.runtime_commits) }}
+        # Lucene 10 requires the index recovery support merged into master in #19900.
+        old_commit: [ "master" ]
     name: Pinot Multi-Stage Query Engine Compatibility Regression Testing against ${{ matrix.old_commit }} on ${{ matrix.test_suite }}
     steps:
       - uses: actions/checkout@v7.0.1

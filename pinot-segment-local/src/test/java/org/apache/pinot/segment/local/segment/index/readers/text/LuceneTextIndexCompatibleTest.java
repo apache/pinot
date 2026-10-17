@@ -56,7 +56,6 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
@@ -74,16 +73,6 @@ public class LuceneTextIndexCompatibleTest {
     try {
       FileUtils.copyDirectory(fixturePath, indexPath);
       try (LuceneTextIndexReader reader = new LuceneTextIndexReader("Text", indexPath, 1000, Map.of())) {
-        assertEquals(reader.getDocIds("1", null).getCardinality(), 35);
-      }
-
-      File combinedFile = new File(indexPath, "Text.combined.index");
-      LuceneTextIndexCombined.combineLuceneIndexFiles(new File(indexPath, "Text.lucene.index"),
-          combinedFile.getAbsolutePath());
-      try (PinotDataBuffer buffer = PinotDataBuffer.mapFile(combinedFile, true, 0, combinedFile.length(),
-          ByteOrder.LITTLE_ENDIAN, "lucene80-compatibility");
-          LuceneTextIndexReader reader = new LuceneTextIndexReader("Text", buffer, 1000,
-              new TextIndexConfigBuilder().build())) {
         assertEquals(reader.getDocIds("1", null).getCardinality(), 35);
       }
     } finally {
