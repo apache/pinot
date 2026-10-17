@@ -154,19 +154,25 @@
       {
         "description": "LEFT join broadcasting the left side emits left rows as unmatched on workers holding part of the right side",
         "sql": "SELECT /*+ joinOptions(left_distribution_type = 'broadcast', right_distribution_type = 'local') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} LEFT JOIN {tbl2} ON {tbl1}.num = {tbl2}.num",
-        "expectedException": ".*LEFT join requires the right side to be the broadcast one.*",
+        "expectedException": ".*LEFT join requires every right row on each worker.*",
         "ignoreV2Optimizer": true
       },
       {
         "description": "RIGHT join broadcasting the right side emits right rows as unmatched on workers holding part of the left side",
         "sql": "SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'broadcast') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} RIGHT JOIN {tbl2} ON {tbl1}.num = {tbl2}.num",
-        "expectedException": ".*RIGHT join requires the left side to be the broadcast one.*",
+        "expectedException": ".*RIGHT join requires every left row on each worker.*",
         "ignoreV2Optimizer": true
       },
       {
         "description": "RIGHT join without equi keys broadcasting the right side emits right rows as unmatched",
         "sql": "SELECT /*+ joinOptions(left_distribution_type = 'random', right_distribution_type = 'broadcast') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} RIGHT JOIN {tbl2} ON {tbl1}.num > {tbl2}.num",
-        "expectedException": ".*RIGHT join requires the left side to be the broadcast one.*",
+        "expectedException": ".*RIGHT join requires every left row on each worker.*",
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "SEMI join broadcasting the left side emits a left row once per worker holding a match",
+        "sql": "SELECT /*+ joinOptions(join_strategy = 'hash', left_distribution_type = 'broadcast', right_distribution_type = 'local') */ {tbl1}.num, {tbl1}.name FROM {tbl1} WHERE {tbl1}.num IN (SELECT {tbl2}.num FROM {tbl2})",
+        "expectedException": ".*SEMI join requires every right row on each worker.*",
         "ignoreV2Optimizer": true
       },
       {
@@ -766,6 +772,18 @@
     {
       "description": "Local replicated JOIN with partition hint and parallelism",
       "sql": "SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'local') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4', partition_parallelism='2') */ JOIN {tbl2} /*+ tableOptions(is_replicated='true') */ ON {tbl1}.num = {tbl2}.num"
+    },
+    {
+      "description": "Local JOIN without equi keys against a replicated table: every worker holds the whole right table",
+      "sql": "SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'local') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} JOIN {tbl2} /*+ tableOptions(is_replicated='true') */ ON {tbl1}.num > {tbl2}.num"
+    },
+    {
+      "description": "Local LEFT JOIN without equi keys against a replicated table",
+      "sql": "SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'local') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} LEFT JOIN {tbl2} /*+ tableOptions(is_replicated='true') */ ON {tbl1}.num > {tbl2}.num"
+    },
+    {
+      "description": "Hash on the left and local on a replicated right table",
+      "sql": "SELECT /*+ joinOptions(right_distribution_type = 'local') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} JOIN {tbl2} /*+ tableOptions(is_replicated='true') */ ON {tbl1}.num = {tbl2}.num"
     },
     {
       "description": "Window PARTITION BY the table's partition column with is_partitioned_by_window_keys hint forces a pre-partitioned (direct) exchange; tbl1 is partitioned by num so results stay correct",
