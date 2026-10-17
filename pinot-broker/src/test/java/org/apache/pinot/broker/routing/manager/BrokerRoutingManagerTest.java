@@ -54,6 +54,7 @@ import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.core.routing.RoutingTable;
@@ -89,6 +90,7 @@ import static org.testng.Assert.*;
 
 public class BrokerRoutingManagerTest {
   private static final String SERVER_INSTANCE_ID = "Server_localhost_8000";
+  private static final String OTHER_SERVER_INSTANCE_ID = "Server_localhost_8001";
   private static final String SERVER_HOST = "localhost";
   private static final int SERVER_PORT = 8000;
   private static final String INSTANCE_CONFIGS_PATH = "/CONFIGS/PARTICIPANT";
@@ -360,6 +362,54 @@ public class BrokerRoutingManagerTest {
   }
 
   @Test
+  public void testFailOpenSelectionBecomesOrdinaryRoutingTable()
+      throws Exception {
+    enableTestServer();
+    BrokerRequest brokerRequest = mock(BrokerRequest.class);
+    SegmentSelector segmentSelector = mock(SegmentSelector.class);
+    when(segmentSelector.select(brokerRequest)).thenReturn(Set.of("segment0"));
+    InstanceSelector instanceSelector = mock(InstanceSelector.class);
+    when(instanceSelector.select(brokerRequest, List.of("segment0"), 7L)).thenReturn(
+        new InstanceSelector.SelectionResult(
+            new InstanceSelector.InstanceMapping(Map.of("segment0", SERVER_INSTANCE_ID), Map.of()), List.of(), 0));
+    putRoutingEntry(TEST_TABLE,
+        createRoutingEntry(TEST_TABLE, null, null, Map.of(), segmentSelector, instanceSelector));
+
+    RoutingTable routingTable = _routingManager.getRoutingTable(brokerRequest, TEST_TABLE, 7L);
+
+    assertEquals(routingTable.getUnavailableSegments(), List.of());
+    assertEquals(routingTable.getServerInstanceToSegmentsMap().size(), 1);
+    assertEquals(routingTable.getServerInstanceToSegmentsMap().values().iterator().next().getSegments(),
+        List.of("segment0"));
+  }
+
+  @Test
+  public void testSamplerFailOpenSelectionBecomesOrdinaryRoutingTable()
+      throws Exception {
+    enableTestServer();
+    BrokerRequest brokerRequest = mock(BrokerRequest.class);
+    PinotQuery pinotQuery = mock(PinotQuery.class);
+    when(brokerRequest.isSetPinotQuery()).thenReturn(true);
+    when(brokerRequest.getPinotQuery()).thenReturn(pinotQuery);
+    when(pinotQuery.getQueryOptions()).thenReturn(Map.of("sampler", "failOpenSampler"));
+    SegmentSelector samplerSegmentSelector = mock(SegmentSelector.class);
+    when(samplerSegmentSelector.select(brokerRequest)).thenReturn(Set.of("sampledSegment"));
+    InstanceSelector samplerInstanceSelector = mock(InstanceSelector.class);
+    when(samplerInstanceSelector.select(brokerRequest, List.of("sampledSegment"), 9L)).thenReturn(
+        new InstanceSelector.SelectionResult(
+            new InstanceSelector.InstanceMapping(Map.of("sampledSegment", SERVER_INSTANCE_ID), Map.of()), List.of(),
+            0));
+    Object samplerInfo = createSamplerInfo(samplerSegmentSelector, samplerInstanceSelector);
+    putRoutingEntry(TEST_TABLE, createRoutingEntry(TEST_TABLE, null, null, Map.of("failopensampler", samplerInfo)));
+
+    RoutingTable routingTable = _routingManager.getRoutingTable(brokerRequest, TEST_TABLE, 9L);
+
+    assertEquals(routingTable.getUnavailableSegments(), List.of());
+    assertEquals(routingTable.getServerInstanceToSegmentsMap().values().iterator().next().getSegments(),
+        List.of("sampledSegment"));
+  }
+
+  @Test
   public void testGetPrunedSegmentsIsExactlySelectedMinusSurvivors()
       throws Exception {
     SegmentSelector segmentSelector = selectorOf("seg1", "seg2", "seg3", "seg4");
@@ -510,6 +560,14 @@ public class BrokerRoutingManagerTest {
       throws Exception {
     return createRoutingEntry(tableNameWithType, mock(SegmentSelector.class), List.of(), instanceSelector,
         timeBoundaryManager, partitionMetadataManager, samplerInfos, disabled);
+  }
+
+  private static Object createRoutingEntry(String tableNameWithType, TimeBoundaryManager timeBoundaryManager,
+      SegmentPartitionMetadataManager partitionMetadataManager, Map<String, ?> samplerInfos,
+      SegmentSelector segmentSelector, InstanceSelector instanceSelector)
+      throws Exception {
+    return createRoutingEntry(tableNameWithType, segmentSelector, List.of(), instanceSelector, timeBoundaryManager,
+        partitionMetadataManager, samplerInfos, false);
   }
 
   private static Object createRoutingEntry(String tableNameWithType, SegmentSelector segmentSelector,
@@ -753,7 +811,7 @@ public class BrokerRoutingManagerTest {
     _routingManager.excludeServerFromRouting(SERVER_INSTANCE_ID);
 
     // The sampler's selector is driven by the change like any other...
-    verify(samplerInstanceSelector).onInstancesChange(any(), any());
+    verify(samplerInstanceSelector).onInstancesChange(any(), any(), any());
     // ...but is never a source of the table's gauges
     verify(samplerInstanceSelector, never()).getReplicaHealth();
     verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.PERCENT_OF_REPLICAS, 100);
@@ -814,7 +872,7 @@ public class BrokerRoutingManagerTest {
     when(instanceSelector.getReplicaHealth()).thenReturn(new TableReplicaHealth(0, 3, 3));
     InstanceSelector samplerInstanceSelector = mock(InstanceSelector.class);
     doThrow(new RuntimeException("simulated instance selector failure")).when(samplerInstanceSelector)
-        .onInstancesChange(any(), any());
+        .onInstancesChange(any(), any(), any());
     putRoutingEntry(TEST_TABLE,
         createRoutingEntry(TEST_TABLE, null, null, Map.of("sampler", createSamplerInfo(samplerInstanceSelector)),
             instanceSelector, false));
@@ -824,6 +882,15 @@ public class BrokerRoutingManagerTest {
     verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.PERCENT_OF_REPLICAS, 0);
     verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.SEGMENTS_AT_MIN_PERCENT_OF_REPLICAS, 3);
     verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.UNAVAILABLE_SEGMENTS, 3);
+  }
+
+  private static Object createSamplerInfo(SegmentSelector segmentSelector, InstanceSelector instanceSelector)
+      throws Exception {
+    Class<?> samplerInfoClass = Class.forName(BaseBrokerRoutingManager.class.getName() + "$SamplerInfo");
+    Constructor<?> constructor =
+        samplerInfoClass.getDeclaredConstructor(TableSampler.class, SegmentSelector.class, InstanceSelector.class);
+    constructor.setAccessible(true);
+    return constructor.newInstance(mock(TableSampler.class), segmentSelector, instanceSelector);
   }
 
   @SuppressWarnings({"rawtypes", "unchecked"})
@@ -887,6 +954,27 @@ public class BrokerRoutingManagerTest {
     assertEquals(_routingManager.getPartitionPruningPreparationThreshold(),
         DEFAULT_PARTITION_PRUNING_PREPARATION_THRESHOLD);
     verify(_routingManager, never()).buildRouting(TEST_TABLE);
+  }
+
+  @Test
+  public void testInstanceConfigChangePreservesExcludedServerAdministrativeMembership()
+      throws Exception {
+    InstanceSelector instanceSelector = mock(InstanceSelector.class);
+    putRoutingEntry(TEST_TABLE, createRoutingEntry(TEST_TABLE, null, null, Map.of(), mock(SegmentSelector.class),
+        instanceSelector));
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT), anyInt(), anyInt()))
+        .thenReturn(List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID)));
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    _routingManager.excludeServerFromRouting(SERVER_INSTANCE_ID);
+    clearInvocations(instanceSelector);
+
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT), anyInt(), anyInt()))
+        .thenReturn(List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID),
+            createEnabledServerZNRecord(OTHER_SERVER_INSTANCE_ID)));
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+
+    verify(instanceSelector).onInstancesChange(Set.of(OTHER_SERVER_INSTANCE_ID),
+        Set.of(SERVER_INSTANCE_ID, OTHER_SERVER_INSTANCE_ID), List.of(OTHER_SERVER_INSTANCE_ID));
   }
 
   /// Creates a ZNRecord representing an enabled server instance.

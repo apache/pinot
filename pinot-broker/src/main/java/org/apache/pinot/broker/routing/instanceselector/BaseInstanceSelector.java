@@ -35,8 +35,11 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.broker.routing.FailOpenPolicy;
 import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelector;
 import org.apache.pinot.broker.routing.adaptiveserverselector.PriorityPoolInstanceSelector;
+import org.apache.pinot.common.failuredetector.FailureDetector;
+import org.apache.pinot.common.failuredetector.NoOpFailureDetector;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.BrokerMeter;
@@ -44,6 +47,7 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.SegmentUtils;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
@@ -117,6 +121,8 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
   protected long _newSegmentExpirationTimeInSeconds;
   protected boolean _emitSinglePoolSegmentsMetric;
   protected int _tableNameHashForFixedReplicaRouting;
+  protected FailOpenPolicy _failOpenPolicy = FailOpenPolicy.disabled();
+  protected FailureDetector _failureDetector = new NoOpFailureDetector();
 
   // These 3 variables are the cached states to help accelerate the change processing
   protected Set<String> _enabledInstances;
@@ -141,6 +147,10 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
   // Only read by the rebuild thread. Not final so that tests can disable or bound the sharing.
   @VisibleForTesting
   int _maxSharedCandidateLists = MAX_SHARED_CANDIDATE_LISTS;
+  // Instances not administratively disabled, including ones currently excluded from _enabledInstances by failure
+  // detection. Used as the candidate pool for fail-open routing so we don't fail open onto a server an operator
+  // has intentionally taken down, while still allowing fail-open onto servers only flagged unhealthy.
+  protected Set<String> _failOpenEligibleInstances;
 
   @Override
   public void init(TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore,
@@ -170,10 +180,17 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
     }
     _enabledInstances = enabledInstances;
     _enabledServerStore = enabledServerMap;
+    _failOpenEligibleInstances = Set.copyOf(enabledServerMap.keySet());
     Map<String, Long> newSegmentCreationTimeMap =
         getNewSegmentCreationTimeMapFromZK(idealState, externalView, onlineSegments);
     updateSegmentMaps(idealState, externalView, onlineSegments, newSegmentCreationTimeMap);
     refreshSegmentStates();
+  }
+
+  @Override
+  public void setFailOpenRouting(FailOpenPolicy failOpenPolicy, FailureDetector failureDetector) {
+    _failOpenPolicy = failOpenPolicy;
+    _failureDetector = failureDetector;
   }
 
   /// Returns how well the table's segments are currently replicated across the instances this selector
@@ -414,10 +431,12 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
         new HashMap<>(HashUtil.getHashMapCapacity(_oldSegmentCandidatesMap.size() + _newSegmentStateMap.size()));
     Set<String> servingInstances = new HashSet<>();
     Set<String> unavailableSegments = new HashSet<>();
+    Set<String> segmentsWithoutCandidates = new HashSet<>();
     int minPercentOfReplicas = TableReplicaHealth.FULLY_REPLICATED_PERCENT;
     // Segments seen at exactly minPercentOfReplicas so far. Reset whenever a lower percentage displaces the
     // minimum, so that the pair published below always describes the same population.
     int numSegmentsAtMinPercentOfReplicas = 0;
+    Map<String, List<SegmentInstanceCandidate>> failOpenCandidatesMap = new HashMap<>();
 
     for (Map.Entry<String, List<SegmentInstanceCandidate>> entry : _oldSegmentCandidatesMap.entrySet()) {
       String segment = entry.getKey();
@@ -439,13 +458,23 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
         instanceCandidatesMap.put(segment, enabledCandidates);
       } else {
         List<String> candidateInstances = new ArrayList<>(candidates.size());
+        List<SegmentInstanceCandidate> failOpenCandidates = new ArrayList<>(candidates.size());
         for (SegmentInstanceCandidate candidate : candidates) {
-          candidateInstances.add(candidate.getInstance());
+          String instanceId = candidate.getInstance();
+          candidateInstances.add(instanceId);
+          if (_failOpenEligibleInstances.contains(instanceId)) {
+            failOpenCandidates.add(candidate);
+          }
         }
         LOGGER.warn("Failed to find servers hosting old segment: {} for table: {} "
                 + "(all candidate instances: {} are disabled, counting segment as unavailable)", segment,
             _tableNameWithType, candidateInstances);
         unavailableSegments.add(segment);
+        if (failOpenCandidates.isEmpty()) {
+          segmentsWithoutCandidates.add(segment);
+        } else {
+          failOpenCandidatesMap.put(segment, failOpenCandidates);
+        }
         _brokerMetrics.addMeteredTableValue(_tableNameWithType, BrokerMeter.NO_SERVING_HOST_FOR_SEGMENT, 1);
       }
     }
@@ -470,7 +499,22 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
       }
     }
 
-    _segmentStates = new SegmentStates(instanceCandidatesMap, servingInstances, unavailableSegments);
+    SegmentStates previousSegmentStates = _segmentStates;
+    Set<String> previousUnavailableSegments =
+        previousSegmentStates != null ? previousSegmentStates.getUnavailableSegments() : Set.of();
+    Set<String> previousSegmentsWithoutCandidates =
+        previousSegmentStates != null ? previousSegmentStates.getSegmentsWithoutCandidates() : Set.of();
+    for (String segment : unavailableSegments) {
+      boolean wasAlreadyUnavailableWithCandidates =
+          previousUnavailableSegments.contains(segment) && !previousSegmentsWithoutCandidates.contains(segment);
+      if (!segmentsWithoutCandidates.contains(segment) && !wasAlreadyUnavailableWithCandidates) {
+        _brokerMetrics.addMeteredTableValue(_tableNameWithType, BrokerMeter.FAIL_OPEN_ELIGIBLE_SEGMENTS, 1);
+      }
+    }
+
+    _segmentStates =
+        new SegmentStates(instanceCandidatesMap, servingInstances, unavailableSegments, segmentsWithoutCandidates,
+            failOpenCandidatesMap);
     _replicaHealth = new TableReplicaHealth(minPercentOfReplicas, numSegmentsAtMinPercentOfReplicas,
         unavailableSegments.size());
   }
@@ -518,6 +562,13 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
   public void onInstancesChange(Set<String> enabledInstances, List<String> changedInstances) {
     _enabledInstances = enabledInstances;
     refreshSegmentStates();
+  }
+
+  @Override
+  public void onInstancesChange(Set<String> routableInstances, Set<String> failOpenEligibleInstances,
+      List<String> changedInstances) {
+    _failOpenEligibleInstances = failOpenEligibleInstances;
+    onInstancesChange(routableInstances, changedInstances);
   }
 
   /// {@inheritDoc}
@@ -575,20 +626,104 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
     // Copy the volatile reference so that the segment-to-instance map and unavailable segments have a consistent view
     // of the state.
     SegmentStates segmentStates = _segmentStates;
-    InstanceMapping mapping = select(segments, requestIdInt, segmentStates, queryOptions);
     Set<String> unavailableSegments = segmentStates.getUnavailableSegments();
+    Set<String> segmentsWithoutCandidates = segmentStates.getSegmentsWithoutCandidates();
+    // TODO: Remove the multi-stage query gate when fail-open routing is supported by MSE.
+    boolean failOpenEnabled =
+        _failOpenPolicy.isEnabled() && !QueryOptionsUtils.isUseMultistageEngine(queryOptions);
+    InstanceMapping mapping = select(segments, requestIdInt, segmentStates, queryOptions);
 
     if (unavailableSegments.isEmpty()) {
       return new SelectionResult(mapping, List.of(), 0);
     } else {
       List<String> unavailableSegmentsForRequest = new ArrayList<>();
+      boolean failOpenEligible = false;
       for (String segment : segments) {
         if (unavailableSegments.contains(segment)) {
           unavailableSegmentsForRequest.add(segment);
+          failOpenEligible |= !segmentsWithoutCandidates.contains(segment);
         }
+      }
+      if (failOpenEligible) {
+        _brokerMetrics.addMeteredGlobalValue(BrokerMeter.FAIL_OPEN_ELIGIBLE_REQUESTS, 1);
+      }
+      if (!failOpenEligible || !failOpenEnabled) {
+        return new SelectionResult(mapping, unavailableSegmentsForRequest, 0);
+      }
+
+      SelectionResult failOpenResult = selectFailOpen(requestIdInt, segmentStates, queryOptions, mapping,
+          unavailableSegmentsForRequest);
+      if (failOpenResult != null) {
+        recordFailOpenPoolMetrics(failOpenResult, unavailableSegmentsForRequest, queryOptions);
+        return failOpenResult;
       }
       return new SelectionResult(mapping, unavailableSegmentsForRequest, 0);
     }
+  }
+
+  /// Attempts to replace unavailable segments with eligible fail-open candidates.
+  ///
+  /// @return a complete fail-open selection, or `null` when an unavailable segment has no eligible candidate
+  @Nullable
+  private SelectionResult selectFailOpen(int requestId, SegmentStates segmentStates, Map<String, String> queryOptions,
+      InstanceMapping normalMapping, List<String> unavailableSegmentsForRequest) {
+    Set<String> unhealthyServers = new HashSet<>(_failureDetector.getUnhealthyServers());
+    Map<String, List<SegmentInstanceCandidate>> candidatesMap = new HashMap<>();
+    for (String segment : unavailableSegmentsForRequest) {
+      List<SegmentInstanceCandidate> failOpenCandidates = segmentStates.getFailOpenCandidates(segment);
+      if (failOpenCandidates == null) {
+        return null;
+      }
+      List<SegmentInstanceCandidate> eligibleCandidates = new ArrayList<>();
+      for (SegmentInstanceCandidate candidate : failOpenCandidates) {
+        String instanceId = candidate.getInstance();
+        if (unhealthyServers.contains(instanceId)) {
+          eligibleCandidates.add(candidate);
+        }
+      }
+      if (eligibleCandidates.isEmpty()) {
+        return null;
+      }
+      candidatesMap.put(segment, eligibleCandidates);
+    }
+
+    SegmentStates failOpenStates = new SegmentStates(candidatesMap, segmentStates.getServingInstances(), Set.of(),
+        Set.of());
+    InstanceMapping failOpenMapping =
+        selectForFailOpen(unavailableSegmentsForRequest, requestId, failOpenStates, queryOptions);
+    if (!failOpenMapping.segmentToInstanceMap().keySet().containsAll(unavailableSegmentsForRequest)) {
+      return null;
+    }
+    Map<String, String> selected = new HashMap<>(normalMapping.segmentToInstanceMap());
+    selected.putAll(failOpenMapping.segmentToInstanceMap());
+    Map<String, String> optional = new HashMap<>(normalMapping.optionalSegmentToInstanceMap());
+    optional.putAll(failOpenMapping.optionalSegmentToInstanceMap());
+    // Keep recovery owned by the failure detector. Async query responses need epoch-aware ordering before they can
+    // safely update server health because an older success must not overwrite a newer failure.
+    return new SelectionResult(new InstanceMapping(selected, optional), List.of(), 0);
+  }
+
+  private void recordFailOpenPoolMetrics(SelectionResult selectionResult, List<String> failOpenSegments,
+      Map<String, String> queryOptions) {
+    Map<Integer, Integer> poolToSegmentCount = new HashMap<>();
+    Map<String, String> selectedSegments = selectionResult.getSegmentToInstanceMap();
+    for (String segment : failOpenSegments) {
+      // selectFailOpen() only returns a non-null result when every fail-open segment resolves through the "real"
+      // (non-optional) map, so instanceId is always present here.
+      String instanceId = selectedSegments.get(segment);
+      poolToSegmentCount.merge(getPool(instanceId), 1, Integer::sum);
+    }
+    for (Map.Entry<Integer, Integer> entry : poolToSegmentCount.entrySet()) {
+      _brokerMetrics.addMeteredValue(BrokerMeter.POOL_SEG_QUERIES, entry.getValue(),
+          BrokerMetrics.getTagForPreferredPool(queryOptions), String.valueOf(entry.getKey()));
+    }
+  }
+
+  /// Selects against query-local fail-open candidates. Built-in selectors override this to bypass sticky or adaptive
+  /// preferences while retaining their normal coverage guarantees.
+  protected InstanceMapping selectForFailOpen(List<String> unavailableSegments, int requestId,
+      SegmentStates failOpenSegmentStates, Map<String, String> queryOptions) {
+    return select(unavailableSegments, requestId, failOpenSegmentStates, queryOptions);
   }
 
   @Override
