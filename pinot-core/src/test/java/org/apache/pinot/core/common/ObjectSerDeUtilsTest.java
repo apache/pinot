@@ -115,6 +115,18 @@ public class ObjectSerDeUtilsTest {
     RoaringBitmap runBitmap = new RoaringBitmap();
     runBitmap.add(100L, 10000L);
     runBitmap.runOptimize();
+    RoaringBitmap multiContainerRunBitmap = new RoaringBitmap();
+    for (int i = 0; i < 8; i++) {
+      long start = (long) i << 16;
+      multiContainerRunBitmap.add(start, start + 32000);
+    }
+    multiContainerRunBitmap.runOptimize();
+    RoaringBitmap mixedBitmap = new RoaringBitmap();
+    mixedBitmap.add(0L, 32000L);
+    for (int i = 0; i < 32768; i++) {
+      mixedBitmap.add((1 << 16) + 2 * i);
+    }
+    mixedBitmap.runOptimize();
     return new Object[][]{
         {new IntArrayList(), ObjectType.IntArrayList, HexFormat.of().parseHex("00000000")},
         {IntArrayList.wrap(new int[]{Integer.MIN_VALUE, Integer.MAX_VALUE, 0, 99}, 3), ObjectType.IntArrayList,
@@ -136,7 +148,9 @@ public class ObjectSerDeUtilsTest {
         {new RoaringBitmap(), ObjectType.RoaringBitmap, HexFormat.of().parseHex("3a30000000000000")},
         {RoaringBitmap.bitmapOf(1, 3), ObjectType.RoaringBitmap,
             HexFormat.of().parseHex("3a30000001000000000001001000000001000300")},
-        {runBitmap, ObjectType.RoaringBitmap, RoaringBitmapUtils.serialize(runBitmap)}
+        {runBitmap, ObjectType.RoaringBitmap, RoaringBitmapUtils.serialize(runBitmap)},
+        {multiContainerRunBitmap, ObjectType.RoaringBitmap, RoaringBitmapUtils.serialize(multiContainerRunBitmap)},
+        {mixedBitmap, ObjectType.RoaringBitmap, RoaringBitmapUtils.serialize(mixedBitmap)}
     };
   }
 
@@ -144,8 +158,7 @@ public class ObjectSerDeUtilsTest {
   public void testSerializeIntoBuffer(Object value, ObjectType type, byte[] expected) {
     int typeId = type.getValue();
     Object inputState = copyInputState(value);
-    int expectedSize = value instanceof RoaringBitmap bitmap && bitmap.hasRunCompression() ? -1 : expected.length;
-    assertEquals(ObjectSerDeUtils.getSerializedSize(value, typeId), expectedSize);
+    assertEquals(ObjectSerDeUtils.getSerializedSize(value, typeId), expected.length);
     assertEquals(ObjectSerDeUtils.serialize(value, typeId), expected);
     for (boolean direct : new boolean[]{false, true}) {
       for (ByteOrder order : new ByteOrder[]{ByteOrder.BIG_ENDIAN, ByteOrder.LITTLE_ENDIAN}) {
@@ -177,7 +190,7 @@ public class ObjectSerDeUtilsTest {
     Object decoded = ObjectSerDeUtils.deserialize(expected, type);
     assertEquals(ObjectSerDeUtils.serialize(decoded, typeId), expected);
     assertEquals(copyInputState(value), inputState);
-    assertEquals(ObjectSerDeUtils.getSerializedSize(value, typeId), expectedSize);
+    assertEquals(ObjectSerDeUtils.getSerializedSize(value, typeId), expected.length);
     assertEquals(ObjectSerDeUtils.serialize(value, typeId), expected);
   }
 
@@ -197,7 +210,8 @@ public class ObjectSerDeUtilsTest {
       bitmap.add(100L, 10000L);
       bitmap.runOptimize();
       assertTrue(bitmap.hasRunCompression());
-      assertEquals(ObjectSerDeUtils.getSerializedSize(bitmap, ObjectType.RoaringBitmap.getValue()), -1);
+      assertEquals(ObjectSerDeUtils.getSerializedSize(bitmap, ObjectType.RoaringBitmap.getValue()),
+          bitmap.serializedSizeInBytes());
       assertThrows(IllegalStateException.class, () -> ObjectSerDeUtils.serialize(bitmap));
     }
   }
