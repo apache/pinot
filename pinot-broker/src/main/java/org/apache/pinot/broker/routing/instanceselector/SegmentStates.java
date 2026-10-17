@@ -38,12 +38,22 @@ public class SegmentStates {
   private final Map<String, List<SegmentInstanceCandidate>> _instanceCandidatesMap;
   private final Set<String> _servingInstances;
   private final Set<String> _unavailableSegments;
+  private final Set<String> _segmentsWithoutCandidates;
 
+  /// Treats every unavailable segment as having no instance candidates, so none of them count as fail-open eligible.
+  /// This is the conservative default for callers that do not track candidates separately (e.g. tests). Production
+  /// routing in [BaseInstanceSelector] uses the 4-arg constructor to pass the actual set.
   public SegmentStates(Map<String, List<SegmentInstanceCandidate>> instanceCandidatesMap, Set<String> servingInstances,
       Set<String> unavailableSegments) {
+    this(instanceCandidatesMap, servingInstances, unavailableSegments, unavailableSegments);
+  }
+
+  SegmentStates(Map<String, List<SegmentInstanceCandidate>> instanceCandidatesMap, Set<String> servingInstances,
+      Set<String> unavailableSegments, Set<String> segmentsWithoutCandidates) {
     _instanceCandidatesMap = instanceCandidatesMap;
     _servingInstances = servingInstances;
     _unavailableSegments = unavailableSegments;
+    _segmentsWithoutCandidates = segmentsWithoutCandidates;
   }
 
   @Nullable
@@ -57,5 +67,9 @@ public class SegmentStates {
 
   public Set<String> getUnavailableSegments() {
     return _unavailableSegments;
+  }
+
+  Set<String> getSegmentsWithoutCandidates() {
+    return _segmentsWithoutCandidates;
   }
 }

@@ -216,6 +216,20 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   public static final BrokerMeter ROUTING_TABLE_UPDATE_FAILURE =
       create("ROUTING_TABLE_UPDATE_FAILURE", "failures", false);
 
+  /// Number of queries that touched a segment eligible for fail-open routing (unavailable, but with candidate servers
+  /// that are all disabled). Counted once per query per physical table.
+  ///
+  /// This metric is global.
+  public static final BrokerMeter FAIL_OPEN_ELIGIBLE_REQUESTS =
+      create("FAIL_OPEN_ELIGIBLE_REQUESTS", "failOpenEligibleRequests", true);
+
+  /// Number of times a segment became eligible for fail-open routing. Counted once when the segment enters the state,
+  /// not on every routing refresh.
+  ///
+  /// This metric is attached to a particular table.
+  public static final BrokerMeter FAIL_OPEN_ELIGIBLE_SEGMENTS =
+      create("FAIL_OPEN_ELIGIBLE_SEGMENTS", "failOpenEligibleSegments", false);
+
   // Netty connection metrics
   public static final BrokerMeter NETTY_CONNECTION_REQUESTS_SENT = create(
       "NETTY_CONNECTION_REQUESTS_SENT", "nettyConnection", true);
