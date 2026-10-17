@@ -114,6 +114,21 @@ public interface AccessControl extends FineGrainedAccessControl {
   }
 
 
+  /// Authorizes administrative operations that change this broker's lifecycle, such as draining it. The request has
+  /// already passed [#authorize(RequesterIdentity)]. Implementations should throw an authentication exception when the
+  /// request carries no acceptable identity, and return a result whose [AuthorizationResult#hasAccess()] is `false`
+  /// for an authenticated identity that lacks broker administrative authority.
+  ///
+  /// The default implementation denies access so that existing custom implementations do not silently grant access to
+  /// newly protected administrative operations until they implement this contract.
+  ///
+  /// @param requesterIdentity requester identity
+  /// @return authorization result for broker administrative access
+  default AuthorizationResult authorizeAdminAccess(RequesterIdentity requesterIdentity) {
+    return new BasicAuthorizationResultImpl(false,
+        "The configured access control does not grant broker administrative access");
+  }
+
   /// Verifies that the requester can delete rows from the table with a SQL `DELETE` statement. The broker calls it
   /// once the requester passed, in this order: [#authorize(RequesterIdentity)], [#authorize(RequesterIdentity, Set)]
   /// with the table as its only element (the WHERE clause of the statement reads it), the fine-grained

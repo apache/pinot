@@ -102,7 +102,7 @@ spec:
           successThreshold: {{ .Values.broker.probes.liveness.successThreshold | default .Values.probes.successThreshold }}
           timeoutSeconds: {{ .Values.broker.probes.liveness.timeoutSeconds | default .Values.probes.timeoutSeconds }}
           httpGet:
-            path: {{ .Values.broker.probes.endpoint }}
+            path: {{ .Values.broker.probes.liveness.endpoint | default .Values.broker.probes.endpoint }}
             port: {{ .Values.broker.service.port }}
         {{- end }}
         {{- if .Values.broker.probes.readinessEnabled }}
@@ -113,7 +113,7 @@ spec:
           successThreshold: {{ .Values.broker.probes.readiness.successThreshold | default .Values.probes.successThreshold }}
           timeoutSeconds: {{ .Values.broker.probes.readiness.timeoutSeconds | default .Values.probes.timeoutSeconds }}
           httpGet:
-            path: {{ .Values.broker.probes.endpoint }}
+            path: {{ .Values.broker.probes.readiness.endpoint | default .Values.broker.probes.endpoint }}
             port: {{ .Values.broker.service.port }}
         {{- end }}
         {{- if .Values.broker.probes.startupEnabled }}
@@ -124,7 +124,7 @@ spec:
           successThreshold: {{ .Values.broker.probes.startup.successThreshold | default .Values.probes.successThreshold }}
           timeoutSeconds: {{ .Values.broker.probes.startup.timeoutSeconds | default .Values.probes.timeoutSeconds }}
           httpGet:
-            path: {{ .Values.broker.probes.endpoint }}
+            path: {{ .Values.broker.probes.startup.endpoint | default .Values.broker.probes.endpoint }}
             port: {{ .Values.broker.service.port }}
         {{- end }}
         resources:

@@ -275,6 +275,8 @@ broker:
     readinessEnabled: true
     startupEnabled: false
     liveness:
+      # Liveness only checks that the admin API answers, so a draining broker (readiness 503) is not restarted
+      endpoint: "/health?checkType=liveness"
       initialDelaySeconds: 60
       failureThreshold: 10
       timeoutSeconds: 10
@@ -282,6 +284,7 @@ broker:
       periodSeconds: 10
 
     readiness:
+      endpoint: "/health"
       initialDelaySeconds: 60
       failureThreshold: 10
       timeoutSeconds: 10
@@ -289,6 +292,7 @@ broker:
       periodSeconds: 10
 
     startup:
+      endpoint: "/health"
       initialDelaySeconds: 60
       failureThreshold: 10
       timeoutSeconds: 10

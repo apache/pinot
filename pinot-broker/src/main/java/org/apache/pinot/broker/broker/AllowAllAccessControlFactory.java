@@ -56,6 +56,11 @@ public class AllowAllAccessControlFactory extends AccessControlFactory {
     }
 
     @Override
+    public AuthorizationResult authorizeAdminAccess(RequesterIdentity requesterIdentity) {
+      return BasicAuthorizationResultImpl.success();
+    }
+
+    @Override
     public AuthorizationResult authorizeDeleteRows(RequesterIdentity requesterIdentity,
         @Nullable HttpHeaders httpHeaders, String tableName) {
       return BasicAuthorizationResultImpl.success();

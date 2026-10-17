@@ -61,6 +61,7 @@ import org.apache.pinot.controller.api.resources.InstanceInfo;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
+import org.apache.pinot.controller.workload.QueryWorkloadManager;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.instance.Instance;
@@ -103,6 +104,7 @@ import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
@@ -157,6 +159,31 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     Tenant brokerTenant = new Tenant(TenantRole.BROKER, BROKER_TENANT_NAME, NUM_BROKER_INSTANCES, 0, 0);
     _helixResourceManager.createBrokerTenant(brokerTenant);
     assertEquals(_helixResourceManager.getOnlineUnTaggedBrokerInstanceList().size(), 0);
+  }
+
+  @Test
+  public void testShutdownBrokerExcludedFromScaleUpCandidates() {
+    untagBrokers();
+    List<String> candidates = _helixResourceManager.getOnlineUnTaggedBrokerInstanceList();
+    assertEquals(candidates.size(), NUM_BROKER_INSTANCES);
+    String drainingBroker = candidates.get(0);
+    assertTrue(HelixHelper.updateInstanceConfig(_helixDataAccessor, drainingBroker,
+        instanceConfig -> instanceConfig.getRecord().setBooleanField(Helix.IS_SHUTDOWN_IN_PROGRESS, true)));
+
+    try {
+      candidates = _helixResourceManager.getOnlineUnTaggedBrokerInstanceList();
+      assertEquals(candidates.size(), NUM_BROKER_INSTANCES - 1);
+      assertFalse(candidates.contains(drainingBroker));
+
+      Tenant tenant = new Tenant(TenantRole.BROKER, "scaleUpCandidateTenant", NUM_BROKER_INSTANCES, 0, 0);
+      assertFalse(_helixResourceManager.updateBrokerTenant(tenant).isSuccessful());
+      assertTrue(_helixResourceManager.getHelixInstanceConfig(drainingBroker)
+          .containsTag(Helix.UNTAGGED_BROKER_INSTANCE));
+    } finally {
+      assertTrue(HelixHelper.updateInstanceConfig(_helixDataAccessor, drainingBroker,
+          instanceConfig -> instanceConfig.getRecord().setBooleanField(Helix.IS_SHUTDOWN_IN_PROGRESS, false)));
+      resetBrokerTags();
+    }
   }
 
   private void untagServers() {
@@ -369,6 +396,43 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     IdealState brokerResource = HelixHelper.getBrokerIdealStates(_helixAdmin, _clusterName);
     assertTrue(brokerResource.getPartitionSet().contains(logicalTableName));
     checkBrokerResourceForPartition(logicalTableName, taggedBrokers);
+
+    // Give the same brokers a second tenant tag, then move the logical table to that tenant. The committed broker
+    // assignment is unchanged, so the IdealState listener has no event to observe and the resource manager must
+    // directly trigger exactly one workload refresh.
+    String alternateBrokerTenantName = "alternateBrokerTenant";
+    String alternateBrokerTag = TagNameUtils.getBrokerTagForTenant(alternateBrokerTenantName);
+    for (String broker : taggedBrokers) {
+      assertTrue(_helixResourceManager.updateInstanceTags(broker, brokerTag + "," + alternateBrokerTag, false)
+          .isSuccessful());
+    }
+    int brokerResourceVersion = brokerResource.getRecord().getVersion();
+    QueryWorkloadManager originalQueryWorkloadManager = _helixResourceManager.getQueryWorkloadManager();
+    QueryWorkloadManager queryWorkloadManager = mock(QueryWorkloadManager.class);
+    _helixResourceManager.setQueryWorkloadManager(queryWorkloadManager);
+    try {
+      logicalTableConfig.setBrokerTenant(alternateBrokerTenantName);
+      _helixResourceManager.updateLogicalTableConfig(logicalTableConfig);
+      verify(queryWorkloadManager).onBrokerResourceChanged(List.of(logicalTableName), List.of());
+      brokerResource = HelixHelper.getBrokerIdealStates(_helixAdmin, _clusterName);
+      assertEquals(brokerResource.getRecord().getVersion(), brokerResourceVersion);
+      checkBrokerResourceForPartition(logicalTableName, taggedBrokers);
+
+      // Retrying the exact same config still reconciles BrokerResource and refreshes workloads. This recovers a
+      // prior attempt that committed the config but failed before the BrokerResource write.
+      clearInvocations(queryWorkloadManager);
+      _helixResourceManager.updateLogicalTableConfig(logicalTableConfig);
+      verify(queryWorkloadManager).onBrokerResourceChanged(List.of(logicalTableName), List.of());
+      brokerResource = HelixHelper.getBrokerIdealStates(_helixAdmin, _clusterName);
+      assertEquals(brokerResource.getRecord().getVersion(), brokerResourceVersion);
+      checkBrokerResourceForPartition(logicalTableName, taggedBrokers);
+    } finally {
+      _helixResourceManager.setQueryWorkloadManager(originalQueryWorkloadManager);
+    }
+
+    // Move back to the original tenant so the add-broker path below continues to exercise the logical table.
+    logicalTableConfig.setBrokerTenant(BROKER_TENANT_NAME);
+    _helixResourceManager.updateLogicalTableConfig(logicalTableConfig);
 
     // Add a new broker instance with same tenant; verify add-broker path updates logical table partition
     Instance newBrokerInstance =

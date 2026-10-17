@@ -84,14 +84,27 @@ public class BrokerAdminApiApplication extends ResourceConfig {
       HelixManager helixManager, QueryQuotaManager queryQuotaManager, ThreadAccountant threadAccountant,
       AbstractResponseStore responseStore) {
     this(routingManager, brokerRequestHandler, brokerMetrics, brokerConf, sqlQueryExecutor, serverRoutingStatsManager,
-        accessFactory, helixManager, queryQuotaManager, threadAccountant, responseStore, null);
+        accessFactory, helixManager, queryQuotaManager, threadAccountant, responseStore, null,
+        BrokerDrainManager.unsupported("unknown"));
+  }
+
+  /// Keeps broker extensions that pass a table cache working. Without a shared drain manager, this application
+  /// rejects drain requests.
+  public BrokerAdminApiApplication(BrokerRoutingManager routingManager, BrokerRequestHandler brokerRequestHandler,
+      BrokerMetrics brokerMetrics, PinotConfiguration brokerConf, SqlQueryExecutor sqlQueryExecutor,
+      ServerRoutingStatsManager serverRoutingStatsManager, AccessControlFactory accessFactory,
+      HelixManager helixManager, QueryQuotaManager queryQuotaManager, ThreadAccountant threadAccountant,
+      AbstractResponseStore responseStore, @Nullable TableCache tableCache) {
+    this(routingManager, brokerRequestHandler, brokerMetrics, brokerConf, sqlQueryExecutor, serverRoutingStatsManager,
+        accessFactory, helixManager, queryQuotaManager, threadAccountant, responseStore, tableCache,
+        BrokerDrainManager.unsupported("unknown"));
   }
 
   public BrokerAdminApiApplication(BrokerRoutingManager routingManager, BrokerRequestHandler brokerRequestHandler,
       BrokerMetrics brokerMetrics, PinotConfiguration brokerConf, SqlQueryExecutor sqlQueryExecutor,
       ServerRoutingStatsManager serverRoutingStatsManager, AccessControlFactory accessFactory,
       HelixManager helixManager, QueryQuotaManager queryQuotaManager, ThreadAccountant threadAccountant,
-      AbstractResponseStore responseStore, @Nullable TableCache tableCache) {
+      AbstractResponseStore responseStore, @Nullable TableCache tableCache, BrokerDrainManager brokerDrainManager) {
     _brokerResourcePackages = brokerConf.getProperty(CommonConstants.Broker.BROKER_RESOURCE_PACKAGES,
         CommonConstants.Broker.DEFAULT_BROKER_RESOURCE_PACKAGES);
     String[] pkgs = _brokerResourcePackages.split(",");
@@ -134,6 +147,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
         bind(startTime).named(BrokerAdminApiApplication.START_TIME);
         bind(threadAccountant).to(ThreadAccountant.class);
         bind(responseStore).to(AbstractResponseStore.class);
+        bind(brokerDrainManager).to(BrokerDrainManager.class);
         bind(brokerConf).to(PinotConfiguration.class);
         if (tableCache != null) {
           bind(tableCache).to(TableCache.class);

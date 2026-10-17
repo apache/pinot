@@ -190,6 +190,9 @@ public class PinotBrokerRestletResource {
     Set<InstanceConfig> tenantBrokers =
         new HashSet<>(_pinotHelixResourceManager.getAllInstancesConfigsForBrokerTenant(tenantName));
     Set<InstanceInfo> instanceInfoSet = tenantBrokers.stream()
+        // A draining broker keeps its tenant membership so it can rejoin on restart, but it rejects new queries.
+        // Clients use this endpoint for broker discovery, so do not return it.
+        .filter(x -> !x.getRecord().getBooleanField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, false))
         .map(x -> new InstanceInfo(x.getInstanceName(), x.getHostName(), Integer.parseInt(x.getPort()),
             Integer.parseInt(HelixHelper.getGrpcPort(x))))
         .collect(Collectors.toSet());

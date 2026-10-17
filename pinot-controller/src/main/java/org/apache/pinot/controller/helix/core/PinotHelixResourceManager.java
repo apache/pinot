@@ -51,6 +51,8 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -268,7 +270,7 @@ public class PinotHelixResourceManager {
   private PinotLLCRealtimeSegmentManager _pinotLLCRealtimeSegmentManager;
   private TableCache _tableCache;
   private final LineageManager _lineageManager;
-  private QueryWorkloadManager _queryWorkloadManager;
+  private volatile QueryWorkloadManager _queryWorkloadManager;
   private final PageCacheWarmupControllerExecutor _pageCacheWarmupControllerExecutor;
   // Dedicated ZkClient for transactional multi-path writes (atomic ZK multi()). Lazily built on
   // first multiWriteZK call. A dedicated session is used because Helix 1.3.2 does not expose
@@ -380,6 +382,11 @@ public class PinotHelixResourceManager {
   public synchronized void stop() {
     _segmentDeletionManager.stop();
     _pageCacheWarmupControllerExecutor.shutdown();
+    QueryWorkloadManager queryWorkloadManager = _queryWorkloadManager;
+    _queryWorkloadManager = null;
+    if (queryWorkloadManager != null) {
+      queryWorkloadManager.close();
+    }
     ZkClient zkClient = _zkClient;
     if (zkClient != null) {
       _zkClient = null;
@@ -603,8 +610,7 @@ public class PinotHelixResourceManager {
     if (shouldUpdateBrokerResource) {
       long startTimeMs = System.currentTimeMillis();
       List<String> tablesAdded = new ArrayList<>();
-      HelixHelper.updateBrokerResource(_helixZkManager, instanceId, newBrokerTags, tablesAdded, null,
-          _queryWorkloadManager);
+      HelixHelper.updateBrokerResource(_helixZkManager, instanceId, newBrokerTags, tablesAdded, null);
       LOGGER.info("Updated broker resource for broker: {} with tags: {} in {}ms, tables added: {}", instanceId,
           newBrokerTags, System.currentTimeMillis() - startTimeMs, tablesAdded);
       return PinotResourceManagerResponse.success(
@@ -631,22 +637,29 @@ public class PinotHelixResourceManager {
     //                   host/tags/ports must NOT silently re-route queries to a server an
     //                   operator has explicitly removed from routing).
     //   - body=false + live!=true -> leave as is (no-op / cleared).
-    boolean liveQueriesDisabled =
-        Boolean.parseBoolean(instanceConfig.getRecord().getSimpleField(CommonConstants.Helix.QUERIES_DISABLED));
-
     List<String> newTags = newInstance.getTags();
-    List<String> oldTags = instanceConfig.getTags();
-    InstanceUtils.updateHelixInstanceConfig(instanceConfig, newInstance);
-    // If the live record had queriesDisabled=true but the request body defaulted it to false,
-    // restore the operational flag so it survives a request-body-driven update.
-    if (liveQueriesDisabled && !newInstance.isQueriesDisabled()) {
-      instanceConfig.getRecord().setSimpleField(CommonConstants.Helix.QUERIES_DISABLED, Boolean.TRUE.toString());
+    AtomicReference<List<String>> oldTagsRef = new AtomicReference<>();
+    AtomicBoolean queriesDisabledPreserved = new AtomicBoolean();
+    boolean updated = HelixHelper.updateInstanceConfig(_helixDataAccessor, instanceId, currentInstanceConfig -> {
+      oldTagsRef.set(new ArrayList<>(currentInstanceConfig.getTags()));
+      boolean liveQueriesDisabled = Boolean.parseBoolean(
+          currentInstanceConfig.getRecord().getSimpleField(CommonConstants.Helix.QUERIES_DISABLED));
+      InstanceUtils.updateHelixInstanceConfig(currentInstanceConfig, newInstance);
+      // If the live record had queriesDisabled=true but the request body defaulted it to false,
+      // restore the operational flag so it survives a request-body-driven update.
+      queriesDisabledPreserved.set(liveQueriesDisabled && !newInstance.isQueriesDisabled());
+      if (queriesDisabledPreserved.get()) {
+        currentInstanceConfig.getRecord()
+            .setSimpleField(CommonConstants.Helix.QUERIES_DISABLED, Boolean.TRUE.toString());
+      }
+    });
+    if (!updated) {
+      throw new RuntimeException("Failed to update instance config for instance: " + instanceId);
+    }
+    if (queriesDisabledPreserved.get()) {
       LOGGER.warn("Ignoring request body's queriesDisabled=false for instance: {} because the live config has "
               + "queriesDisabled=true; use PUT /instances/{}/state?state=QUERIES_ENABLE to clear the flag.", instanceId,
           instanceId);
-    }
-    if (!_helixDataAccessor.setProperty(_keyBuilder.instanceConfig(instanceId), instanceConfig)) {
-      throw new RuntimeException("Failed to set instance config for instance: " + instanceId);
     }
 
     // Update broker resource if necessary
@@ -656,6 +669,7 @@ public class PinotHelixResourceManager {
       newBrokerTags =
           newTags != null ? newTags.stream().filter(TagNameUtils::isBrokerTag).sorted().collect(Collectors.toList())
               : List.of();
+      List<String> oldTags = oldTagsRef.get();
       List<String> oldBrokerTags =
           oldTags.stream().filter(TagNameUtils::isBrokerTag).sorted().collect(Collectors.toList());
       shouldUpdateBrokerResource = !newBrokerTags.equals(oldBrokerTags);
@@ -664,8 +678,7 @@ public class PinotHelixResourceManager {
       long startTimeMs = System.currentTimeMillis();
       List<String> tablesAdded = new ArrayList<>();
       List<String> tablesRemoved = new ArrayList<>();
-      HelixHelper.updateBrokerResource(_helixZkManager, instanceId, newBrokerTags, tablesAdded, tablesRemoved,
-          _queryWorkloadManager);
+      HelixHelper.updateBrokerResource(_helixZkManager, instanceId, newBrokerTags, tablesAdded, tablesRemoved);
       LOGGER.info("Updated broker resource for broker: {} with tags: {} in {}ms, tables added: {}, tables removed: {}",
           instanceId, newBrokerTags, System.currentTimeMillis() - startTimeMs, tablesAdded, tablesRemoved);
       return PinotResourceManagerResponse.success(
@@ -679,8 +692,8 @@ public class PinotHelixResourceManager {
   /// Sets the `queriesDisabled` flag on the instance config using a field-scoped Helix write.
   ///
   /// This avoids clobbering other fields (e.g. `shutdownInProgress`) that are concurrently set
-  /// by other field-scoped writes during rolling upgrades. Full-record writes ([#updateInstance])
-  /// preserve this flag explicitly; see that method for details.
+  /// by other field-scoped writes during rolling upgrades. [#updateInstance] also mutates the latest
+  /// instance config atomically and preserves this flag explicitly; see that method for details.
   ///
   /// @param serverInstanceName the Helix participant id (must be a server instance)
   /// @param disabled `true` to disable query routing, `false` to re-enable it
@@ -705,14 +718,18 @@ public class PinotHelixResourceManager {
     }
 
     List<String> newTags = Arrays.asList(StringUtils.split(tagsString, ','));
-    List<String> oldTags = instanceConfig.getTags();
 
-    // Apply new tags in-memory, validate, then persist. Safe: instanceConfig is a fresh local fetch,
-    // oldTags is captured above, and if validation throws the mutated config is never persisted.
+    // Apply new tags to the fetched config for validation only. If validation passes, the atomic update below applies
+    // the tags to the latest config while preserving fields owned by other lifecycle operations.
     instanceConfig.getRecord().setListField(InstanceConfig.InstanceConfigProperty.TAG_LIST.name(), newTags);
     InstanceConfigValidatorRegistry.validate(InstanceUtils.toInstance(instanceConfig));
 
-    if (!_helixDataAccessor.setProperty(_keyBuilder.instanceConfig(instanceId), instanceConfig)) {
+    AtomicReference<List<String>> oldTagsRef = new AtomicReference<>();
+    if (!HelixHelper.updateInstanceConfig(_helixDataAccessor, instanceId, currentInstanceConfig -> {
+      oldTagsRef.set(new ArrayList<>(currentInstanceConfig.getTags()));
+      currentInstanceConfig.getRecord()
+          .setListField(InstanceConfig.InstanceConfigProperty.TAG_LIST.name(), new ArrayList<>(newTags));
+    })) {
       throw new RuntimeException("Failed to set instance config for instance: " + instanceId);
     }
 
@@ -721,6 +738,7 @@ public class PinotHelixResourceManager {
     List<String> newBrokerTags = null;
     if (InstanceTypeUtils.isBroker(instanceId) && updateBrokerResource) {
       newBrokerTags = newTags.stream().filter(TagNameUtils::isBrokerTag).sorted().collect(Collectors.toList());
+      List<String> oldTags = oldTagsRef.get();
       List<String> oldBrokerTags =
           oldTags.stream().filter(TagNameUtils::isBrokerTag).sorted().collect(Collectors.toList());
       shouldUpdateBrokerResource = !newBrokerTags.equals(oldBrokerTags);
@@ -729,8 +747,7 @@ public class PinotHelixResourceManager {
       long startTimeMs = System.currentTimeMillis();
       List<String> tablesAdded = new ArrayList<>();
       List<String> tablesRemoved = new ArrayList<>();
-      HelixHelper.updateBrokerResource(_helixZkManager, instanceId, newBrokerTags, tablesAdded, tablesRemoved,
-          _queryWorkloadManager);
+      HelixHelper.updateBrokerResource(_helixZkManager, instanceId, newBrokerTags, tablesAdded, tablesRemoved);
       LOGGER.info("Updated broker resource for broker: {} with tags: {} in {}ms, tables added: {}, tables removed: {}",
           instanceId, newBrokerTags, System.currentTimeMillis() - startTimeMs, tablesAdded, tablesRemoved);
       return PinotResourceManagerResponse.success(
@@ -757,8 +774,7 @@ public class PinotHelixResourceManager {
         instanceConfig.getTags().stream().filter(TagNameUtils::isBrokerTag).collect(Collectors.toList());
     List<String> tablesAdded = new ArrayList<>();
     List<String> tablesRemoved = new ArrayList<>();
-    HelixHelper.updateBrokerResource(_helixZkManager, instanceId, brokerTags, tablesAdded, tablesRemoved,
-        _queryWorkloadManager);
+    HelixHelper.updateBrokerResource(_helixZkManager, instanceId, brokerTags, tablesAdded, tablesRemoved);
     LOGGER.info("Updated broker resource for broker: {} with tags: {} in {}ms, tables added: {}, tables removed: {}",
         instanceId, brokerTags, System.currentTimeMillis() - startTimeMs, tablesAdded, tablesRemoved);
     return PinotResourceManagerResponse.success(
@@ -1280,16 +1296,18 @@ public class PinotHelixResourceManager {
   public PinotResourceManagerResponse rebuildBrokerResourceFromHelixTags(String tableNameWithType)
       throws Exception {
     Set<String> brokerInstances;
+    List<InstanceConfig> instanceConfigs = getAllHelixInstanceConfigs();
     try {
       TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
       if (tableConfig != null) {
-        brokerInstances = getAllInstancesForBrokerTenant(tableConfig.getTenantConfig().getBroker());
+        brokerInstances =
+            getAllInstancesForBrokerTenant(instanceConfigs, tableConfig.getTenantConfig().getBroker());
       } else {
         LogicalTableConfig logicalTableConfig =
             ZKMetadataProvider.getLogicalTableConfig(_propertyStore, tableNameWithType);
         Preconditions.checkNotNull(logicalTableConfig, "No table config or logical table config found for %s",
             tableNameWithType);
-        brokerInstances = getAllInstancesForBrokerTenant(logicalTableConfig.getBrokerTenant());
+        brokerInstances = getAllInstancesForBrokerTenant(instanceConfigs, logicalTableConfig.getBrokerTenant());
       }
     } catch (Exception e) {
       LOGGER.warn("Caught exception while getting config for table {}", tableNameWithType, e);
@@ -1300,26 +1318,33 @@ public class PinotHelixResourceManager {
   }
 
   public PinotResourceManagerResponse rebuildBrokerResource(String tableNameWithType, Set<String> brokerInstances) {
+    return rebuildBrokerResource(tableNameWithType, brokerInstances, getAllHelixInstanceConfigs());
+  }
+
+  /// Rebuilds BrokerResource from a shared instance-config snapshot. A matching snapshot normally avoids a ZK write;
+  /// if it contains a draining candidate, live configs are checked before returning so a concurrently restarted broker
+  /// cannot remain excluded.
+  public PinotResourceManagerResponse rebuildBrokerResource(String tableNameWithType, Set<String> brokerInstances,
+      List<InstanceConfig> instanceConfigs) {
     IdealState brokerIdealState = HelixHelper.getBrokerIdealStates(_helixAdmin, _helixClusterName);
-    Set<String> brokerInstancesInIdealState = brokerIdealState.getInstanceSet(tableNameWithType);
-    if (brokerInstancesInIdealState.equals(brokerInstances)) {
-      return PinotResourceManagerResponse.success(
-          "Broker resource is not rebuilt because ideal state is the same for table: " + tableNameWithType);
+    if (brokerIdealState != null && brokerIdealState.getPartitionSet().contains(tableNameWithType)) {
+      Set<String> brokerInstancesInIdealState = brokerIdealState.getInstanceSet(tableNameWithType);
+      Set<String> snapshotAssignment = excludeShuttingDownBrokers(brokerInstances, instanceConfigs);
+      if (brokerInstancesInIdealState.equals(snapshotAssignment)) {
+        boolean snapshotContainsDrainingCandidate = instanceConfigs.stream()
+            .filter(instanceConfig -> brokerInstances.contains(instanceConfig.getInstanceName()))
+            .anyMatch(instanceConfig -> instanceConfig.getRecord()
+                .getBooleanField(Helix.IS_SHUTDOWN_IN_PROGRESS, false));
+        if (!snapshotContainsDrainingCandidate || brokerInstancesInIdealState.equals(
+            excludeShuttingDownBrokers(brokerInstances, getHelixInstanceConfigs(brokerInstances)))) {
+          return PinotResourceManagerResponse.success(
+              "Broker resource is not rebuilt because ideal state is the same for table: " + tableNameWithType);
+        }
+      }
     }
 
-    // Update ideal state with the new broker instances
     try {
-      HelixHelper.updateIdealState(getHelixZkManager(), Helix.BROKER_RESOURCE_INSTANCE, idealState -> {
-        assert idealState != null;
-        Map<String, String> instanceStateMap = idealState.getInstanceStateMap(tableNameWithType);
-        if (instanceStateMap != null) {
-          instanceStateMap.clear();
-        }
-        for (String brokerInstance : brokerInstances) {
-          idealState.setPartitionState(tableNameWithType, brokerInstance, BrokerResourceStateModel.ONLINE);
-        }
-        return idealState;
-      }, DEFAULT_RETRY_POLICY);
+      updateBrokerResourcePartition(tableNameWithType, brokerInstances);
 
       LOGGER.info("Successfully rebuilt brokerResource for table: {}", tableNameWithType);
       return PinotResourceManagerResponse.success("Rebuilt brokerResource for table: " + tableNameWithType);
@@ -1329,10 +1354,61 @@ public class PinotHelixResourceManager {
     }
   }
 
+  private void updateBrokerResourcePartition(String tableNameWithType, Set<String> brokerInstances) {
+    HelixHelper.updateIdealState(getHelixZkManager(), Helix.BROKER_RESOURCE_INSTANCE, idealState -> {
+      assert idealState != null;
+      // Read instance configs after this IdealState version. If a drain updates the instance config and then removes
+      // the broker concurrently, either this CAS commits first and the drain removes it afterwards, or this CAS retries
+      // against the drain's newer IdealState and observes shutdownInProgress=true.
+      Set<String> brokerInstancesToAssign =
+          excludeShuttingDownBrokers(brokerInstances, getHelixInstanceConfigs(brokerInstances));
+      Map<String, String> instanceStateMap = idealState.getInstanceStateMap(tableNameWithType);
+      if (instanceStateMap == null) {
+        idealState.getRecord().setMapField(tableNameWithType, new HashMap<>());
+      } else {
+        instanceStateMap.clear();
+      }
+      for (String brokerInstance : brokerInstancesToAssign) {
+        idealState.setPartitionState(tableNameWithType, brokerInstance, BrokerResourceStateModel.ONLINE);
+      }
+      return idealState;
+    }, DEFAULT_RETRY_POLICY);
+  }
+
+  /// Reads the latest instance configs of the given instances in one batch, skipping instances that do not exist. This
+  /// avoids reading every instance config in the cluster when only a few broker candidates need to be checked.
+  private List<InstanceConfig> getHelixInstanceConfigs(Set<String> instanceIds) {
+    if (instanceIds.isEmpty()) {
+      return List.of();
+    }
+    List<PropertyKey> instanceConfigKeys = new ArrayList<>(instanceIds.size());
+    for (String instanceId : instanceIds) {
+      instanceConfigKeys.add(_keyBuilder.instanceConfig(instanceId));
+    }
+    List<InstanceConfig> instanceConfigs = _helixDataAccessor.getProperty(instanceConfigKeys, true);
+    return instanceConfigs.stream().filter(Objects::nonNull).collect(Collectors.toList());
+  }
+
+  private static Set<String> excludeShuttingDownBrokers(Set<String> brokerInstances,
+      List<InstanceConfig> instanceConfigs) {
+    Set<String> brokerInstancesToAssign = new HashSet<>(brokerInstances);
+    for (InstanceConfig instanceConfig : instanceConfigs) {
+      if (instanceConfig.getRecord().getBooleanField(Helix.IS_SHUTDOWN_IN_PROGRESS, false)) {
+        brokerInstancesToAssign.remove(instanceConfig.getInstanceName());
+      }
+    }
+    return brokerInstancesToAssign;
+  }
+
   private void addInstanceToBrokerIdealState(String brokerTenantTag, String instanceName) {
     // Use atomic read-modify-write so updates (including for logical tables) are persisted and not lost to races.
     HelixHelper.updateIdealState(getHelixZkManager(), Helix.BROKER_RESOURCE_INSTANCE, idealState -> {
       Preconditions.checkNotNull(idealState, "Broker ideal state must not be null");
+      InstanceConfig instanceConfig = getHelixInstanceConfig(instanceName);
+      if (instanceConfig != null && instanceConfig.getRecord()
+          .getBooleanField(Helix.IS_SHUTDOWN_IN_PROGRESS, false)) {
+        return idealState;
+      }
       for (String partitionName : idealState.getPartitionSet()) {
         String brokerTag = resolveBrokerTagForTable(partitionName);
         if (brokerTag.equals(brokerTenantTag)) {
@@ -1371,14 +1447,14 @@ public class PinotHelixResourceManager {
   }
 
   private void retagInstance(String instanceName, String oldTag, String newTag) {
-    PropertyKey instanceConfigKey = _keyBuilder.instanceConfig(instanceName);
-    InstanceConfig instanceConfig = _helixDataAccessor.getProperty(instanceConfigKey);
+    InstanceConfig instanceConfig = getHelixInstanceConfig(instanceName);
     if (instanceConfig == null) {
       throw new NotFoundException("Failed to find instance config for instance: " + instanceName);
     }
-    instanceConfig.removeTag(oldTag);
-    instanceConfig.addTag(newTag);
-    if (!_helixDataAccessor.setProperty(instanceConfigKey, instanceConfig)) {
+    if (!HelixHelper.updateInstanceConfig(_helixDataAccessor, instanceName, currentInstanceConfig -> {
+      currentInstanceConfig.removeTag(oldTag);
+      currentInstanceConfig.addTag(newTag);
+    })) {
       throw new RuntimeException("Failed to set instance config for instance: " + instanceName);
     }
   }
@@ -2072,10 +2148,7 @@ public class PinotHelixResourceManager {
     }
 
     LOGGER.info("Adding table {}: Updating BrokerResource for table", tableNameWithType);
-    List<String> brokers =
-        HelixHelper.getInstancesWithTag(_helixZkManager, TagNameUtils.extractBrokerTag(tableConfig.getTenantConfig()));
-    HelixHelper.updateBrokerResource(_helixZkManager, tableNameWithType,
-        SegmentAssignmentUtils.getInstanceStateMap(brokers, BrokerResourceStateModel.ONLINE), _queryWorkloadManager);
+    updateBrokerResourceForTable(tableNameWithType, TagNameUtils.extractBrokerTag(tableConfig.getTenantConfig()));
     // Persist the MV definition znode BEFORE notify so the consistency manager registration
     // below reads the authoritative `baseTables` list rather than relying on its
     // `extractSourceTableName(definedSQL)` fallback. The write is best-effort: a transient
@@ -2430,9 +2503,16 @@ public class PinotHelixResourceManager {
     LOGGER.info("Updating logical table {}: Updating logical table config in the property store", tableName);
     ZKMetadataProvider.setLogicalTableConfig(_propertyStore, logicalTableConfig);
 
-    if (!oldLogicalTableConfig.getBrokerTenant().equals(logicalTableConfig.getBrokerTenant())) {
-      LOGGER.info("Updating logical table {}: Updating BrokerResource for table", tableName);
-      updateBrokerResourceForLogicalTable(logicalTableConfig, tableName);
+    // Reconcile after the config write even when the tenant did not change. If a previous request committed the
+    // config and then failed before updating BrokerResource, retrying that same request must repair the assignment.
+    LOGGER.info("Updating logical table {}: Reconciling BrokerResource for table", tableName);
+    boolean brokerAssignmentChanged = updateBrokerResourceForLogicalTable(logicalTableConfig, tableName);
+    // Read once because stop() clears the field concurrently.
+    QueryWorkloadManager queryWorkloadManager = _queryWorkloadManager;
+    if (!brokerAssignmentChanged && queryWorkloadManager != null) {
+      // A config update can resolve to the same broker assignment. In that case Helix does not emit an IdealState
+      // change, so explicitly refresh the table's workload configuration.
+      queryWorkloadManager.onBrokerResourceChanged(List.of(tableName), List.of());
     }
 
     sendLogicalTableConfigRefreshMessage(logicalTableConfig.getTableName());
@@ -2455,11 +2535,26 @@ public class PinotHelixResourceManager {
     }
   }
 
-  private void updateBrokerResourceForLogicalTable(LogicalTableConfig logicalTableConfig, String tableName) {
-    List<String> brokers = HelixHelper.getInstancesWithTag(_helixZkManager,
+  private boolean updateBrokerResourceForLogicalTable(LogicalTableConfig logicalTableConfig, String tableName) {
+    return updateBrokerResourceForTable(tableName,
         TagNameUtils.getBrokerTagForTenant(logicalTableConfig.getBrokerTenant()));
-    HelixHelper.updateBrokerResource(_helixZkManager, tableName,
-        SegmentAssignmentUtils.getInstanceStateMap(brokers, BrokerResourceStateModel.ONLINE), _queryWorkloadManager);
+  }
+
+  private boolean updateBrokerResourceForTable(String tableName, String brokerTag) {
+    Map<String, String> brokerAssignmentBefore = getBrokerAssignment(tableName);
+    List<InstanceConfig> instanceConfigs = getAllHelixInstanceConfigs();
+    Set<String> brokerInstances = new HashSet<>(HelixHelper.getInstancesWithTag(instanceConfigs, brokerTag));
+    rebuildBrokerResource(tableName, brokerInstances);
+    return !Objects.equals(brokerAssignmentBefore, getBrokerAssignment(tableName));
+  }
+
+  private Map<String, String> getBrokerAssignment(String tableName) {
+    IdealState brokerIdealState = HelixHelper.getBrokerIdealStates(_helixAdmin, _helixClusterName);
+    if (brokerIdealState == null) {
+      return null;
+    }
+    Map<String, String> brokerAssignment = brokerIdealState.getInstanceStateMap(tableName);
+    return brokerAssignment != null ? new HashMap<>(brokerAssignment) : null;
   }
 
   public void validateNewLogicalTableConfig(LogicalTableConfig logicalTableConfig) {
@@ -4266,10 +4361,12 @@ public class PinotHelixResourceManager {
   /// Computes the broker nodes that are untagged and free to be used.
   /// @return List of online untagged broker instances.
   public List<String> getOnlineUnTaggedBrokerInstanceList() {
-    List<String> instanceList = HelixHelper.getInstancesWithTag(_helixZkManager, Helix.UNTAGGED_BROKER_INSTANCE);
-    List<String> liveInstances = _helixDataAccessor.getChildNames(_keyBuilder.liveInstances());
-    instanceList.retainAll(liveInstances);
-    return instanceList;
+    Set<String> liveInstances = new HashSet<>(_helixDataAccessor.getChildNames(_keyBuilder.liveInstances()));
+    return getAllHelixInstanceConfigs().stream()
+        .filter(instanceConfig -> instanceConfig.containsTag(Helix.UNTAGGED_BROKER_INSTANCE))
+        .filter(instanceConfig -> !instanceConfig.getRecord()
+            .getBooleanField(Helix.IS_SHUTDOWN_IN_PROGRESS, false))
+        .map(InstanceConfig::getInstanceName).filter(liveInstances::contains).collect(Collectors.toList());
   }
 
   /// Computes the server nodes that are untagged and free to be used.

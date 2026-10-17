@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller;
 
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.helix.ConfigAccessor;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
@@ -111,6 +112,36 @@ public class LeadControllerManagerTest {
     becomeHelixLeader(true);
     leadControllerManager.onHelixControllerChange();
     Assert.assertTrue(leadControllerManager.isLeaderForTable(tableName));
+  }
+
+  @Test
+  public void testLeadershipAcquiredCallbackExceptionIsIsolated() {
+    LeadControllerManager leadControllerManager =
+        new LeadControllerManager(HELIX_CONTROLLER_INSTANCE_ID, _helixManager, _controllerMetrics);
+    String tableName = "callbackTestTable";
+    String partitionName = LeadControllerUtils.generatePartitionName(
+        LeadControllerUtils.getPartitionIdForTable(tableName));
+    enableResourceConfig(true);
+    leadControllerManager.onResourceConfigChange();
+
+    AtomicInteger callbackCount = new AtomicInteger();
+    leadControllerManager.registerLeadershipAcquiredCallback(() -> {
+      callbackCount.incrementAndGet();
+      throw new IllegalStateException("test callback failure");
+    });
+
+    // The callback failure must not escape the Helix state-model callback or roll back cached leadership.
+    leadControllerManager.addPartitionLeader(partitionName);
+    Assert.assertEquals(callbackCount.get(), 1);
+    Assert.assertTrue(leadControllerManager.isLeaderForTable(tableName));
+
+    // Duplicate assignment is not a new acquisition, and unregistering prevents subsequent invocation.
+    leadControllerManager.addPartitionLeader(partitionName);
+    Assert.assertEquals(callbackCount.get(), 1);
+    leadControllerManager.unregisterLeadershipAcquiredCallback();
+    leadControllerManager.removePartitionLeader(partitionName);
+    leadControllerManager.addPartitionLeader(partitionName);
+    Assert.assertEquals(callbackCount.get(), 1);
   }
 
   private void becomeHelixLeader(boolean becomeHelixLeader) {
