@@ -304,6 +304,13 @@ public class QueryEnvironmentTestBase {
   public static QueryEnvironment getQueryEnvironment(int reducerPort, int port1, int port2,
       Map<String, Schema> schemaMap, Map<String, List<String>> segmentMap1, Map<String, List<String>> segmentMap2,
       @Nullable Map<String, Pair<String, List<List<String>>>> partitionedSegmentsMap) {
+    return getQueryEnvironment(reducerPort, port1, port2, schemaMap, segmentMap1, segmentMap2, partitionedSegmentsMap,
+        false);
+  }
+
+  protected static QueryEnvironment getQueryEnvironment(int reducerPort, int port1, int port2,
+      Map<String, Schema> schemaMap, Map<String, List<String>> segmentMap1, Map<String, List<String>> segmentMap2,
+      @Nullable Map<String, Pair<String, List<List<String>>>> partitionedSegmentsMap, boolean mergeSupported) {
     MockRoutingManagerFactory factory = new MockRoutingManagerFactory(port1, port2);
     for (Map.Entry<String, Schema> entry : schemaMap.entrySet()) {
       factory.registerTable(entry.getValue(), entry.getKey());
@@ -341,8 +348,10 @@ public class QueryEnvironmentTestBase {
     }
     RoutingManager routingManager = factory.buildRoutingManager(partitionInfoMap);
     TableCache tableCache = factory.buildTableCache();
-    return new QueryEnvironment(CommonConstants.DEFAULT_DATABASE, tableCache,
-        new WorkerManager("Broker_localhost", "localhost", reducerPort, routingManager));
+    return new QueryEnvironment(QueryEnvironment.configBuilder().requestId(-1L)
+        .database(CommonConstants.DEFAULT_DATABASE).tableCache(tableCache).isNullHandlingEnabled(true)
+        .workerManager(new WorkerManager("Broker_localhost", "localhost", reducerPort, routingManager))
+        .isKWayMergeSupported(mergeSupported).build());
   }
 
   /// JSON test case definition for query planner test cases. Tables and schemas will come from those already defined

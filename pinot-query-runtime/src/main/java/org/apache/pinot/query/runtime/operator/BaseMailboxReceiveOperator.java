@@ -27,7 +27,7 @@ import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.planner.physical.MailboxIdUtils;
-import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
+import org.apache.pinot.query.planner.plannode.BaseMailboxReceiveNode;
 import org.apache.pinot.query.routing.MailboxInfos;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.operator.utils.AsyncStream;
@@ -52,7 +52,7 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
   protected final List<StatMap<ReceivingMailbox.StatKey>> _receivingStats;
   protected final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
-  public BaseMailboxReceiveOperator(OpChainExecutionContext context, MailboxReceiveNode node) {
+  public BaseMailboxReceiveOperator(OpChainExecutionContext context, BaseMailboxReceiveNode node) {
     super(context);
     _mailboxService = context.getMailboxService();
     RelDistribution.Type distributionType = node.getDistributionType();
