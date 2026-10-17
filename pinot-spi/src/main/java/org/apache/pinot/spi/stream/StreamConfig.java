@@ -18,13 +18,16 @@
  */
 package org.apache.pinot.spi.stream;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.DataSizeUtils;
+import org.apache.pinot.spi.utils.Obfuscator;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,6 +51,13 @@ public class StreamConfig {
   public static final int DEFAULT_IDLE_TIMEOUT_MILLIS = 3 * 60 * 1000;
 
   public static final double CONSUMPTION_RATE_LIMIT_NOT_SPECIFIED = -1;
+
+  // Matches "username=" or "password=" key-value pairs embedded inside a single config value, e.g. a Kafka
+  // sasl.jaas.config login-module string: `... required username="foo" password="bar";`. Obfuscator (used below)
+  // only masks values of fields whose *key* looks sensitive, so it cannot redact a secret that is embedded inside
+  // the value of an otherwise innocuous-looking key such as "sasl.jaas.config".
+  private static final Pattern EMBEDDED_CREDENTIAL_PATTERN =
+      Pattern.compile("((?:username|password)\\s*=\\s*\")[^\"]*(\")", Pattern.CASE_INSENSITIVE);
 
   private final String _type;
   private final String _topicName;
@@ -443,6 +453,22 @@ public class StreamConfig {
     return _streamConfigMap;
   }
 
+  /// Returns a copy of the given config map with sensitive values masked, suitable for logging.
+  ///
+  /// Keys that look sensitive (password, secret, token, apiKey, keytab suffixes, see [Obfuscator]) have their
+  /// whole value masked. In addition, any `username="..."` / `password="..."` pair embedded inside a value (as
+  /// found in a Kafka `sasl.jaas.config` login-module string) is redacted, since such a secret is not the value
+  /// of a sensitive-looking key but is nested inside the value of an unrelated one.
+  private static Map<String, String> redactSensitiveValues(Map<String, String> configMap) {
+    JsonNode maskedByKey = Obfuscator.DEFAULT.toJson(configMap);
+    Map<String, String> redacted = new HashMap<>();
+    for (String key : configMap.keySet()) {
+      String value = maskedByKey.get(key).asText();
+      redacted.put(key, EMBEDDED_CREDENTIAL_PATTERN.matcher(value).replaceAll("$1*****$2"));
+    }
+    return redacted;
+  }
+
   @Override
   public String toString() {
     return "StreamConfig{"
@@ -451,7 +477,7 @@ public class StreamConfig {
         + ", _tableNameWithType='" + _tableNameWithType + '\''
         + ", _consumerFactoryClassName='" + _consumerFactoryClassName + '\''
         + ", _decoderClass='" + _decoderClass + '\''
-        + ", _decoderProperties=" + _decoderProperties
+        + ", _decoderProperties=" + redactSensitiveValues(_decoderProperties)
         + ", _connectionTimeoutMillis=" + _connectionTimeoutMillis
         + ", _fetchTimeoutMillis=" + _fetchTimeoutMillis
         + ", _idleTimeoutMillis=" + _idleTimeoutMillis
@@ -467,7 +493,7 @@ public class StreamConfig {
         + ", _offsetAutoResetOffsetThreshold=" + _offsetAutoResetOffsetThreshold
         + ", _offsetAutoResetTimeSecThreshold=" + _offsetAutoResetTimeSecThreshold
         + ", _backfillTopic=" + _backfillTopic
-        + ", _streamConfigMap=" + _streamConfigMap
+        + ", _streamConfigMap=" + redactSensitiveValues(_streamConfigMap)
         + ", _offsetCriteria=" + _offsetCriteria
         + ", _serverUploadToDeepStore=" + _serverUploadToDeepStore
         + '}';
