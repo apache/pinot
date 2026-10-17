@@ -964,6 +964,14 @@ public class QueryOptionsUtils {
     return queryOptions.getOrDefault(QueryOptionKey.WORKLOAD_NAME, CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME);
   }
 
+  public static boolean isLateMaterializeSortedOrderByEnabled(Map<String, String> queryOptions) {
+    String value = queryOptions.get(QueryOptionKey.LATE_MATERIALIZE_SORTED_ORDER_BY);
+    if (value == null) {
+      return QueryOptionKey.DEFAULT_LATE_MATERIALIZE_SORTED_ORDER_BY;
+    }
+    return Boolean.parseBoolean(value);
+  }
+
   public static boolean isReverseOrderAllowed(Map<String, String> queryOptions) {
     String value = queryOptions.get(QueryOptionKey.ALLOW_REVERSE_ORDER);
     if (value == null) {
