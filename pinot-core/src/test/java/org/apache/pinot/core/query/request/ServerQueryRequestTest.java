@@ -18,22 +18,81 @@
  */
 package org.apache.pinot.core.query.request;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.function.IntFunction;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.function.AggregationFunctionTypeResolver;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.request.TableSegmentsInfo;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants.Query.Request;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
+import org.mockito.MockedStatic;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.mockStatic;
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertSame;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
 /// Tests how a request answers whether it has segments to read, which depends on which of its two mutually
-/// exclusive segment representations is populated.
+/// exclusive segment representations is populated, and how SQL submitted directly to a server defers aggregation
+/// construction until the executor supplies the table schema.
 public class ServerQueryRequestTest {
+
+  @Test
+  public void testDirectSqlDefersAggregationsUntilSchemaIsKnown()
+      throws Exception {
+    QueryContext query = directSql("SELECT count(*), mode(ts) FROM tbl_OFFLINE WHERE 1 = 0");
+    assertThrows(IllegalStateException.class, query::getAggregationFunctions);
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("ts", DataType.TIMESTAMP).build();
+    query.setSchema(schema);
+    AggregationFunction<?, ?>[] functions = query.getAggregationFunctions();
+    assertEquals(functions.length, 2);
+    assertEquals(functions[0].getFinalResultColumnType(), ColumnDataType.LONG);
+    assertEquals(functions[1].getFinalResultColumnType(), ColumnDataType.DOUBLE);
+    query.setSchema(schema);
+    assertSame(query.getAggregationFunctions(), functions, "Aggregations should be constructed once");
+  }
+
+  @Test
+  public void testDirectSqlResolvesBuiltInVirtualColumns()
+      throws Exception {
+    // A server's table schema does not declare the built-in virtual columns, but a call over them must still resolve
+    // its input types. Record the types the per-call binding rule receives.
+    List<ColumnDataType> resolved = new ArrayList<>();
+    try (MockedStatic<AggregationFunctionTypeResolver> resolver = mockStatic(AggregationFunctionTypeResolver.class)) {
+      resolver.when(() -> AggregationFunctionTypeResolver.bind(any(), anyList(), any())).thenAnswer(invocation -> {
+        IntFunction<ColumnDataType> argumentTypes = invocation.getArgument(2);
+        resolved.add(argumentTypes.apply(0));
+        return null;
+      });
+      QueryContext query = directSql("SELECT mode($docId), mode($segmentName) FROM tbl_OFFLINE");
+      query.setSchema(new Schema.SchemaBuilder().addSingleValueDimension("ts", DataType.TIMESTAMP).build());
+      assertEquals(query.getAggregationFunctions().length, 2);
+    }
+    assertEquals(resolved, List.of(ColumnDataType.INT, ColumnDataType.STRING));
+  }
+
+  private static QueryContext directSql(String sql)
+      throws Exception {
+    Server.ServerRequest request =
+        Server.ServerRequest.newBuilder().putMetadata(Request.MetadataKeys.REQUEST_ID, "1").setSql(sql).build();
+    return new ServerQueryRequest(request, ServerMetrics.get()).getQueryContext();
+  }
 
   @Test
   public void shouldHaveSegmentsWhenTheFlatListIsPopulated() {

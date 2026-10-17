@@ -37,6 +37,7 @@ import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
+import org.apache.pinot.core.query.aggregation.AggregationFunctionBinder;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 import org.apache.pinot.core.util.GroupByUtils;
@@ -92,6 +93,7 @@ public class QueryContext implements QueryScopedCache {
   private boolean _hasFilteredAggregations;
   // Set by the instance planner after bounding all local BASE and derived grouping-set keys.
   private boolean _groupingSetsBaseAggregationAllowed = true;
+  private boolean _requiresSchemaBinding;
   private Set<String> _columns;
 
   // Other properties to be shared across all the segments
@@ -374,6 +376,7 @@ public class QueryContext implements QueryScopedCache {
   /// Returns the aggregation functions for the query, or `null` if the query does not have any aggregation.
   @Nullable
   public AggregationFunction[] getAggregationFunctions() {
+    Preconditions.checkState(!_requiresSchemaBinding, "Query must be bound to its schema before aggregation planning");
     return _aggregationFunctions;
   }
 
@@ -381,6 +384,7 @@ public class QueryContext implements QueryScopedCache {
   /// aggregation.
   @Nullable
   public List<Pair<AggregationFunction, FilterContext>> getFilteredAggregationFunctions() {
+    Preconditions.checkState(!_requiresSchemaBinding, "Query must be bound to its schema before aggregation planning");
     return _filteredAggregationFunctions;
   }
 
@@ -388,12 +392,14 @@ public class QueryContext implements QueryScopedCache {
   /// index of corresponding AggregationFunction in the aggregation functions array.
   @Nullable
   public Map<Pair<FunctionContext, FilterContext>, Integer> getFilteredAggregationsIndexMap() {
+    Preconditions.checkState(!_requiresSchemaBinding, "Query must be bound to its schema before aggregation planning");
     return _filteredAggregationsIndexMap;
   }
 
   /// Returns whether any aggregation in the query carries a FILTER clause, no matter whether it is referenced in the
   /// SELECT list, the HAVING clause or the ORDER-BY clause.
   public boolean hasFilteredAggregations() {
+    Preconditions.checkState(!_requiresSchemaBinding, "Query must be bound to its schema before aggregation planning");
     return _hasFilteredAggregations;
   }
 
@@ -408,6 +414,12 @@ public class QueryContext implements QueryScopedCache {
 
   public void setSchema(Schema schema) {
     _schema = schema;
+    if (_requiresSchemaBinding) {
+      // Direct server SQL has no broker binding. Initialize once, before pruning or publishing to segment workers.
+      Builder.generateAggregationFunctions(this);
+      Builder.extractColumns(this);
+      _requiresSchemaBinding = false;
+    }
   }
 
   public long getEndTimeMs() {
@@ -742,6 +754,7 @@ public class QueryContext implements QueryScopedCache {
     private Map<String, String> _queryOptions;
     private Map<ExpressionContext, ExpressionContext> _expressionOverrideHints;
     private ExplainMode _explain = ExplainMode.NONE;
+    private boolean _requiresSchemaBinding;
 
     public Builder() {
       _selectExpressions = List.of();
@@ -826,6 +839,12 @@ public class QueryContext implements QueryScopedCache {
       return this;
     }
 
+    /// Defers aggregate construction until setSchema(), for SQL submitted directly to a server.
+    public Builder setRequiresSchemaBinding(boolean requiresSchemaBinding) {
+      _requiresSchemaBinding = requiresSchemaBinding;
+      return this;
+    }
+
     public QueryContext build() {
       // TODO: Add validation logic here
 
@@ -850,7 +869,10 @@ public class QueryContext implements QueryScopedCache {
       }
 
       // Pre-calculate the aggregation functions and columns for the query
-      generateAggregationFunctions(queryContext);
+      queryContext._requiresSchemaBinding = _requiresSchemaBinding;
+      if (!_requiresSchemaBinding) {
+        generateAggregationFunctions(queryContext);
+      }
       extractColumns(queryContext);
 
       // Pre-calculate group-by configs
@@ -880,7 +902,7 @@ public class QueryContext implements QueryScopedCache {
     }
 
     /// Helper method to generate the aggregation functions for the query.
-    private void generateAggregationFunctions(QueryContext queryContext) {
+    private static void generateAggregationFunctions(QueryContext queryContext) {
       List<Pair<AggregationFunction, FilterContext>> filteredAggregationFunctions = new ArrayList<>();
       Map<Pair<FunctionContext, FilterContext>, Integer> filteredAggregationsIndexMap = new HashMap<>();
 
@@ -892,6 +914,9 @@ public class QueryContext implements QueryScopedCache {
       }
       for (Pair<FunctionContext, FilterContext> pair : filteredAggregations) {
         FunctionContext aggregation = pair.getLeft();
+        if (queryContext._requiresSchemaBinding) {
+          aggregation = AggregationFunctionBinder.bind(aggregation, queryContext._schema);
+        }
         FilterContext filter = pair.getRight();
         int functionIndex = filteredAggregationFunctions.size();
         AggregationFunction aggregationFunction =
@@ -913,6 +938,9 @@ public class QueryContext implements QueryScopedCache {
       for (Pair<FunctionContext, FilterContext> pair : filteredAggregations) {
         if (!filteredAggregationsIndexMap.containsKey(pair)) {
           FunctionContext aggregation = pair.getLeft();
+          if (queryContext._requiresSchemaBinding) {
+            aggregation = AggregationFunctionBinder.bind(aggregation, queryContext._schema);
+          }
           FilterContext filter = pair.getRight();
           int functionIndex = filteredAggregationFunctions.size();
           AggregationFunction aggregationFunction =
@@ -986,7 +1014,7 @@ public class QueryContext implements QueryScopedCache {
     }
 
     /// Helper method to extract the columns (IDENTIFIER expressions) for the query.
-    private void extractColumns(QueryContext query) {
+    private static void extractColumns(QueryContext query) {
       Set<String> columns = new HashSet<>();
 
       for (ExpressionContext expression : query._selectExpressions) {
