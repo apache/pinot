@@ -1382,7 +1382,7 @@ public class ObjectSerDeUtils {
       Preconditions.checkArgument(size >= 0, "Serialized bitmap exceeds the maximum buffer size");
       byte[] bytes = new byte[size];
       ByteBuffer destination = ByteBuffer.wrap(bytes);
-      RoaringBitmapUtils.serialize(bitmap, destination);
+      serialize(bitmap, destination);
       Preconditions.checkState(destination.position() == size && destination.limit() == size,
           "Serialized bitmap size does not match expected payload size");
       return bytes;
