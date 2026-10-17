@@ -19,6 +19,7 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.math.IntMath;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelFieldCollation;
@@ -109,7 +110,8 @@ public abstract class SortOperator extends MultiStageOperator {
     // Setting numRowsToKeep as default maximum on Broker if limit not set.
     // TODO: make this default behavior configurable.
     int fetch = node.getFetch();
-    int numRowsToKeep = fetch > 0 ? fetch + offset : defaultResponseLimit;
+    // Saturate the sum so that a large fetch and offset cannot wrap to a negative number of rows to keep.
+    int numRowsToKeep = fetch > 0 ? IntMath.saturatedAdd(fetch, offset) : defaultResponseLimit;
     List<RelFieldCollation> collations = node.getCollations();
     DataSchema dataSchema = node.getDataSchema();
     if (collations.isEmpty()) {

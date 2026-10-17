@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.request.context;
 
 import com.google.common.base.Preconditions;
+import com.google.common.math.IntMath;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -341,6 +342,12 @@ public class QueryContext implements QueryScopedCache {
   /// Returns the offset of the query.
   public int getOffset() {
     return _offset;
+  }
+
+  /// Returns the number of rows a sorted intermediate result has to keep to answer the query, i.e. the limit plus the
+  /// offset, saturated at [Integer#MAX_VALUE] so that a large limit and offset cannot wrap to a negative value.
+  public int getLimitPlusOffset() {
+    return IntMath.saturatedAdd(_limit, _offset);
   }
 
   /// Returns the query options of the query.

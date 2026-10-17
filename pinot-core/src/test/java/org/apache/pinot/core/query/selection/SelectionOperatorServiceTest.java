@@ -175,7 +175,7 @@ public class SelectionOperatorServiceTest {
     assertNotNull(_queryContext.getOrderByExpressions());
     Comparator<Object[]> comparator =
         OrderByComparatorFactory.getComparator(_queryContext.getOrderByExpressions(), false);
-    int maxNumRows = _queryContext.getOffset() + _queryContext.getLimit();
+    int maxNumRows = _queryContext.getLimitPlusOffset();
     SelectionResultsBlock mergedBlock =
         new SelectionResultsBlock(_dataSchema, List.of(), comparator, _queryContext);
     List<Object[]> rowsToMerge1 = Arrays.asList(_row2, _row1);
@@ -191,6 +191,38 @@ public class SelectionOperatorServiceTest {
     assertSame(mergedRows.get(0), _row4);
     assertSame(mergedRows.get(1), _row2);
     assertSame(mergedRows.get(2), _row3);
+  }
+
+  /// `LIMIT` plus `OFFSET` can exceed the int range. Wrapping to a negative number of rows to keep makes the single
+  /// data table path read an empty window, and makes the n-way merge build a priority queue with a negative capacity.
+  @Test
+  public void testReduceWithOrderingWhenLimitPlusOffsetOverflows()
+      throws Exception {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT " + String.join(", ", _columnNames) + " FROM testTable ORDER BY int DESC LIMIT 1, 2147483647");
+    assertEquals(queryContext.getLimitPlusOffset(), Integer.MAX_VALUE);
+    int[] columnIndices = new int[_columnNames.length];
+    for (int i = 0; i < columnIndices.length; i++) {
+      columnIndices[i] = i;
+    }
+    SelectionOperatorService selectionOperatorService =
+        new SelectionOperatorService(queryContext, _dataSchema, columnIndices);
+
+    // Rows are sorted on 'int' in descending order within each data table, as the servers return them
+    DataTable dataTable1 = SelectionOperatorUtils.getDataTableFromRows(List.of(_row2, _row1), _dataSchema, false);
+    DataTable dataTable2 = SelectionOperatorUtils.getDataTableFromRows(List.of(_row4, _row3), _dataSchema, false);
+
+    // Single data table: everything but the first row
+    List<Object[]> resultRows = selectionOperatorService.reduceWithOrdering(List.of(dataTable1)).getRows();
+    assertEquals(resultRows.size(), 1);
+    assertEquals(resultRows.get(0)[0], 0);
+
+    // N-way merge: everything but the first row of the merged sequence 11, 10, 1, 0
+    resultRows = selectionOperatorService.reduceWithOrdering(List.of(dataTable1, dataTable2)).getRows();
+    assertEquals(resultRows.size(), 3);
+    assertEquals(resultRows.get(0)[0], 10);
+    assertEquals(resultRows.get(1)[0], 1);
+    assertEquals(resultRows.get(2)[0], 0);
   }
 
   @Test

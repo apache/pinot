@@ -33,7 +33,7 @@ public class SelectionOrderByResultsBlockMerger implements ResultsBlockMerger<Se
   private final int _numRowsToKeep;
 
   public SelectionOrderByResultsBlockMerger(QueryContext queryContext) {
-    _numRowsToKeep = queryContext.getLimit() + queryContext.getOffset();
+    _numRowsToKeep = queryContext.getLimitPlusOffset();
   }
 
   @Override
