@@ -21,6 +21,7 @@ package org.apache.pinot.plugin.ingestion.batch.standalone;
 import java.util.Map;
 import org.apache.pinot.plugin.ingestion.batch.common.BaseSegmentPushJobRunner;
 import org.apache.pinot.segment.local.utils.SegmentPushUtils;
+import org.apache.pinot.spi.ingestion.batch.spec.PushJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 
 
@@ -35,6 +36,12 @@ public class SegmentMetadataPushJobRunner extends BaseSegmentPushJobRunner {
 
   public void uploadSegments(Map<String, String> segmentsUriToTarPathMap)
       throws Exception {
-    SegmentPushUtils.sendSegmentUriAndMetadata(_spec, _outputDirFS, segmentsUriToTarPathMap);
+    if (_consistentPushEnabled) {
+      SegmentPushUtils.sendSegmentUriAndMetadata(_spec, _outputDirFS, segmentsUriToTarPathMap);
+    } else {
+      PushJobSpec pushSpec = _spec.getPushJobSpec();
+      SegmentPushUtils.sendSegmentUriAndMetadata(_spec, _outputDirFS, segmentsUriToTarPathMap,
+          pushSpec != null ? pushSpec.getPushParallelism() : 1);
+    }
   }
 }

@@ -33,14 +33,21 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletionService;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BooleanSupplier;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.core5.http.Header;
@@ -182,6 +189,15 @@ public class SegmentPushUtils implements Serializable {
   public static void sendSegmentUriAndMetadata(SegmentGenerationJobSpec spec, PinotFS fileSystem,
       Map<String, String> segmentUriToTarPathMap)
       throws Exception {
+    sendSegmentUriAndMetadata(spec, fileSystem, segmentUriToTarPathMap, 1);
+  }
+
+  /// Standalone metadata push can divide a batch into at most `parallelism` disjoint concurrent requests.
+  /// Existing callers retain a single batch; non-batch metadata push is unchanged. All launched requests finish
+  /// before temporary metadata or the job-owned client is released, including on failure or caller interruption.
+  public static void sendSegmentUriAndMetadata(SegmentGenerationJobSpec spec, PinotFS fileSystem,
+      Map<String, String> segmentUriToTarPathMap, int parallelism)
+      throws Exception {
     String tableName = spec.getTableSpec().getTableName();
     AuthProvider authProvider = AuthProviderUtils.makeAuthProvider(spec.getAuthToken());
     List<Header> headers = AuthProviderUtils.toRequestHeaders(authProvider);
@@ -190,7 +206,7 @@ public class SegmentPushUtils implements Serializable {
     parameters.add(FileUploadDownloadClient.makeParallelProtectionParam(pushJobSpec));
     if (pushJobSpec != null && pushJobSpec.isBatchSegmentUpload()) {
       // segments are uploaded in batch when batch mode is enabled.
-      sendSegmentsUriAndMetadata(spec, fileSystem, segmentUriToTarPathMap, headers, parameters);
+      sendSegmentsUriAndMetadata(spec, fileSystem, segmentUriToTarPathMap, headers, parameters, parallelism);
     } else {
       sendSegmentUriAndMetadata(spec, fileSystem, segmentUriToTarPathMap, headers, parameters);
     }
@@ -483,6 +499,24 @@ public class SegmentPushUtils implements Serializable {
   public static void sendSegmentsUriAndMetadata(SegmentGenerationJobSpec spec, PinotFS fileSystem,
       Map<String, String> segmentUriToTarPathMap, List<Header> headers, List<NameValuePair> parameters)
       throws Exception {
+    sendSegmentsUriAndMetadata(spec, fileSystem, segmentUriToTarPathMap, headers, parameters, 1);
+  }
+
+  private static void sendSegmentsUriAndMetadata(SegmentGenerationJobSpec spec, PinotFS fileSystem,
+      Map<String, String> segmentUriToTarPathMap, List<Header> headers, List<NameValuePair> parameters, int parallelism)
+      throws Exception {
+    segmentUriToTarPathMap = new LinkedHashMap<>(segmentUriToTarPathMap);
+    Map<String, String> pathsByName = new HashMap<>();
+    for (String path : segmentUriToTarPathMap.values()) {
+      String segmentName = getSegmentName(path);
+      Preconditions.checkArgument(pathsByName.putIfAbsent(segmentName, path) == null,
+          "Multiple metadata files for segment: %s", segmentName);
+    }
+    validateMetadataUris(segmentUriToTarPathMap.keySet());
+    validateMetadataControllers(spec);
+    if (segmentUriToTarPathMap.isEmpty()) {
+      return;
+    }
     LOGGER.info("Start pushing segment metadata: {} to locations: {} for table: {} with parallelism: {}",
         segmentUriToTarPathMap, Arrays.toString(spec.getPinotClusterSpecs()), spec.getTableSpec().getTableName(),
         spec.getPushJobSpec().getPushParallelism());
@@ -493,7 +527,7 @@ public class SegmentPushUtils implements Serializable {
     try {
       generateSegmentMetadataFiles(spec, fileSystem, segmentUriToTarPathMap, segmentMetadataFileMap, segmentURIs,
           executor);
-      pushSegmentsMetadata(spec, segmentURIs, segmentMetadataFileMap, headers, parameters);
+      pushSegmentsMetadata(spec, segmentURIs, segmentMetadataFileMap, headers, parameters, parallelism);
     } finally {
       for (File segmentMetadataFile : segmentMetadataFileMap.values()) {
         FileUtils.deleteQuietly(segmentMetadataFile);
@@ -507,28 +541,217 @@ public class SegmentPushUtils implements Serializable {
   public static void sendSegmentsUriAndMetadata(SegmentGenerationJobSpec spec,
       Map<String, File> segmentUriToMetadataFileMap, List<Header> headers, List<NameValuePair> parameters)
       throws Exception {
+    sendSegmentsUriAndMetadata(spec, segmentUriToMetadataFileMap, headers, parameters, 1);
+  }
+
+  @VisibleForTesting
+  static void sendSegmentsUriAndMetadata(SegmentGenerationJobSpec spec,
+      Map<String, File> segmentUriToMetadataFileMap, List<Header> headers, List<NameValuePair> parameters,
+      int parallelism)
+      throws Exception {
+    validateMetadataUris(segmentUriToMetadataFileMap.keySet());
+    validateMetadataControllers(spec);
     Map<String, File> segmentMetadataFileMap = new HashMap<>();
     List<String> segmentURIs = new ArrayList<>();
     for (Map.Entry<String, File> entry : segmentUriToMetadataFileMap.entrySet()) {
       String segmentName = getSegmentNameFromMetadataFile(entry.getValue());
-      segmentMetadataFileMap.put(segmentName, entry.getValue());
+      Preconditions.checkArgument(segmentMetadataFileMap.putIfAbsent(segmentName, entry.getValue()) == null,
+          "Multiple metadata files for segment: %s", segmentName);
       segmentURIs.add(segmentName);
       segmentURIs.add(entry.getKey());
     }
-    pushSegmentsMetadata(spec, segmentURIs, segmentMetadataFileMap, headers, parameters);
+    pushSegmentsMetadata(spec, segmentURIs, segmentMetadataFileMap, headers, parameters, parallelism);
   }
 
   private static void pushSegmentsMetadata(SegmentGenerationJobSpec spec, Collection<String> segmentURIs,
-      Map<String, File> segmentMetadataFileMap, List<Header> headers, List<NameValuePair> parameters)
+      Map<String, File> segmentMetadataFileMap, List<Header> headers, List<NameValuePair> parameters, int parallelism)
       throws Exception {
+    List<MetadataBatch> batches = partitionMetadataBatches(segmentURIs, segmentMetadataFileMap, parallelism);
+    if (batches.isEmpty()) {
+      return;
+    }
+    if (batches.size() == 1) {
+      FileUploadDownloadClient client = getOrCreateFileUploadDownloadClient(spec);
+      try {
+        pushMetadataBatch(spec, batches.get(0), headers, parameters, client, () -> false);
+      } finally {
+        closeFileUploadDownloadClient(spec, client);
+      }
+      return;
+    }
+    pushMetadataBatches(spec, batches, headers, parameters);
+  }
+
+  /// Each batch owns its immutable name/URI pairs and metadata-file mapping; source files stay caller-owned.
+  private static final class MetadataBatch {
+    private final List<String> _segmentUris;
+    private final Map<String, File> _metadataFiles;
+
+    private MetadataBatch(List<String> segmentUris, Map<String, File> metadataFiles) {
+      _segmentUris = List.copyOf(segmentUris);
+      _metadataFiles = Map.copyOf(metadataFiles);
+    }
+  }
+
+  private static List<MetadataBatch> partitionMetadataBatches(Collection<String> segmentURIs,
+      Map<String, File> metadataFiles, int parallelism) {
+    List<String> pairs = new ArrayList<>(segmentURIs);
+    Preconditions.checkArgument(pairs.size() == 2 * metadataFiles.size(), "Incomplete metadata name/URI pairs");
+    Map<String, String> urisByName = new LinkedHashMap<>();
+    for (int i = 0; i < pairs.size(); i += 2) {
+      String name = pairs.get(i);
+      SegmentNameUtils.validatePartialOrFullSegmentName(name);
+      String uri = pairs.get(i + 1);
+      Preconditions.checkArgument(urisByName.putIfAbsent(name, uri) == null,
+          "Multiple metadata files for segment: %s", name);
+      File metadata = metadataFiles.get(name);
+      Preconditions.checkArgument(metadata != null && metadata.isFile(), "Missing metadata file for segment: %s", name);
+    }
+    int count = Math.min(Math.max(parallelism, 1), urisByName.size());
+    if (count == 0) {
+      return List.of();
+    }
+    List<MetadataBatch> batches = new ArrayList<>(count);
+    var entries = urisByName.entrySet().iterator();
+    int size = urisByName.size() / count;
+    int remainder = urisByName.size() % count;
+    for (int i = 0; i < count; i++) {
+      List<String> batchUris = new ArrayList<>();
+      Map<String, File> batchFiles = new LinkedHashMap<>();
+      for (int j = 0; j < size + (i < remainder ? 1 : 0); j++) {
+        Map.Entry<String, String> entry = entries.next();
+        batchUris.add(entry.getKey());
+        batchUris.add(entry.getValue());
+        batchFiles.put(entry.getKey(), metadataFiles.get(entry.getKey()));
+      }
+      batches.add(new MetadataBatch(batchUris, batchFiles));
+    }
+    return batches;
+  }
+
+  private static void validateMetadataUris(Collection<String> uris) {
+    for (String uri : uris) {
+      Preconditions.checkArgument(StringUtils.isNotBlank(uri) && !uri.contains("\n") && !uri.contains("\r"),
+          "Invalid metadata download URI: %s", uri);
+      URI.create(uri);
+    }
+  }
+
+  private static void validateMetadataControllers(SegmentGenerationJobSpec spec)
+      throws URISyntaxException {
+    for (PinotClusterSpec cluster : spec.getPinotClusterSpecs()) {
+      URI controller = new URI(cluster.getControllerURI());
+      Preconditions.checkArgument(controller.getRawAuthority() != null && (
+          "http".equalsIgnoreCase(controller.getScheme()) || "https".equalsIgnoreCase(controller.getScheme())),
+          "Invalid controller URI: %s", controller);
+      getBatchSegmentUploadURI(controller);
+    }
+  }
+
+  private static void pushMetadataBatches(SegmentGenerationJobSpec spec, List<MetadataBatch> batches,
+      List<Header> headers, List<NameValuePair> parameters)
+      throws Exception {
+    int parallelism = batches.size();
+    TlsSpec tls = spec.getTlsSpec();
+    HttpClientConfig.Builder builder = HttpClientConfig.newBuilder(new PinotConfiguration())
+        .withMaxConns(parallelism).withMaxConnsPerRoute(parallelism);
+    if (tls != null) {
+      builder.withConnectionTimeoutMs(tls.getConnectTimeout());
+    }
+    AtomicReference<Throwable> failure = new AtomicReference<>();
+    boolean interrupted = false;
+    try (FileUploadDownloadClient client = tls == null ? new FileUploadDownloadClient(builder.build())
+        : new FileUploadDownloadClient(builder.build(),
+            TlsUtils.createSslContextWithoutAutoRenewal(tls.getKeyStoreType(), tls.getKeyStorePath(),
+                tls.getKeyStorePassword(), tls.getTrustStoreType(), tls.getTrustStorePath(),
+                tls.getTrustStorePassword()))) {
+      ExecutorService executor = Executors.newFixedThreadPool(parallelism);
+      CompletionService<Void> completions = new ExecutorCompletionService<>(executor);
+      int submitted = 0;
+      try {
+        if (Thread.interrupted()) {
+          interrupted = true;
+          recordMetadataPushFailure(failure, new InterruptedException("Metadata push interrupted"));
+        }
+        for (MetadataBatch batch : batches) {
+          if (failure.get() != null) {
+            break;
+          }
+          completions.submit(() -> {
+            if (failure.get() == null) {
+              try {
+                pushMetadataBatch(spec, batch, headers, parameters, client, () -> failure.get() != null);
+              } catch (Exception | Error e) {
+                recordMetadataPushFailure(failure, e);
+                throw e;
+              }
+            }
+            return null;
+          });
+          submitted++;
+        }
+      } catch (Exception | Error e) {
+        recordMetadataPushFailure(failure, e);
+      } finally {
+        executor.shutdown();
+        // Never cancel active HTTP: a disconnected caller does not prove the controller stopped its operation.
+        for (int i = 0; i < submitted; ) {
+          try {
+            completions.take().get();
+            i++;
+          } catch (InterruptedException e) {
+            interrupted = true;
+            recordMetadataPushFailure(failure, e);
+          } catch (ExecutionException e) {
+            recordMetadataPushFailure(failure, e.getCause());
+            i++;
+          }
+        }
+        while (!executor.isTerminated()) {
+          try {
+            executor.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+          } catch (InterruptedException e) {
+            interrupted = true;
+            recordMetadataPushFailure(failure, e);
+          }
+        }
+      }
+      Throwable error = failure.get();
+      if (error instanceof Exception) {
+        throw (Exception) error;
+      }
+      if (error instanceof Error) {
+        throw (Error) error;
+      }
+    } finally {
+      if (interrupted) {
+        Thread.currentThread().interrupt();
+      }
+    }
+  }
+
+  private static void recordMetadataPushFailure(AtomicReference<Throwable> failure, Throwable error) {
+    if (!failure.compareAndSet(null, error) && failure.get() != error) {
+      failure.get().addSuppressed(error);
+    }
+  }
+
+  private static void pushMetadataBatch(SegmentGenerationJobSpec spec, MetadataBatch batch, List<Header> headers,
+      List<NameValuePair> parameters, FileUploadDownloadClient fileUploadDownloadClient, BooleanSupplier shouldStop)
+      throws Exception {
+    if (shouldStop.getAsBoolean()) {
+      return;
+    }
     String tableName = spec.getTableSpec().getTableName();
-    FileUploadDownloadClient fileUploadDownloadClient = getOrCreateFileUploadDownloadClient(spec);
     int socketTimeoutMs = getSocketTimeoutMs(spec);
-    File allSegmentsMetadataTarFile = createSegmentsMetadataTarFile(segmentURIs, segmentMetadataFileMap);
+    File allSegmentsMetadataTarFile = createSegmentsMetadataTarFile(batch._segmentUris, batch._metadataFiles);
     // the key is unused in batch upload mode and hence 'noopKey'
     Map<String, File> allSegmentsMetadataMap = Map.of("noopKey", allSegmentsMetadataTarFile);
     try {
       for (PinotClusterSpec pinotClusterSpec : spec.getPinotClusterSpecs()) {
+        if (shouldStop.getAsBoolean()) {
+          return;
+        }
         URI controllerURI;
         try {
           controllerURI = new URI(pinotClusterSpec.getControllerURI());
@@ -536,7 +759,7 @@ public class SegmentPushUtils implements Serializable {
           throw new RuntimeException("Got invalid controller uri: " + pinotClusterSpec.getControllerURI());
         }
         LOGGER.info("Pushing segments: {} to location: {} for table: {}",
-            segmentMetadataFileMap.keySet(), controllerURI, tableName);
+            batch._metadataFiles.keySet(), controllerURI, tableName);
         int attempts = 1;
         if (spec.getPushJobSpec() != null && spec.getPushJobSpec().getPushAttempts() > 0) {
           attempts = spec.getPushJobSpec().getPushAttempts();
@@ -546,26 +769,30 @@ public class SegmentPushUtils implements Serializable {
           retryWaitMs = spec.getPushJobSpec().getPushRetryIntervalMillis();
         }
         RetryPolicies.exponentialBackoffRetryPolicy(attempts, retryWaitMs, 5).attempt(() -> {
+          if (shouldStop.getAsBoolean()) {
+            return true;
+          }
           List<Header> reqHttpHeaders = new ArrayList<>(headers);
           try {
             addHeaders(spec, reqHttpHeaders);
             URI segmentUploadURI = getBatchSegmentUploadURI(controllerURI);
             SimpleHttpResponse response = fileUploadDownloadClient.uploadSegmentMetadataFiles(segmentUploadURI,
-                allSegmentsMetadataMap, reqHttpHeaders, parameters, socketTimeoutMs);
+                allSegmentsMetadataMap, reqHttpHeaders, parameters == null ? null : new ArrayList<>(parameters),
+                socketTimeoutMs);
             LOGGER.info("Response for pushing table {} segments {} to location {} - {}: {}", tableName,
-                segmentMetadataFileMap.keySet(), controllerURI, response.getStatusCode(), response.getResponse());
+                batch._metadataFiles.keySet(), controllerURI, response.getStatusCode(), response.getResponse());
             return true;
           } catch (HttpErrorStatusException e) {
             int statusCode = e.getStatusCode();
             if (statusCode >= 500) {
               // Temporary exception
               LOGGER.warn("Caught temporary exception while pushing table: {} segments: {} to {}, will retry",
-                  tableName, segmentMetadataFileMap.keySet(), controllerURI, e);
+                  tableName, batch._metadataFiles.keySet(), controllerURI, e);
               return false;
             } else {
               // Permanent exception
               LOGGER.error("Caught permanent exception while pushing table: {} segments: {} to {}, won't retry",
-                  tableName, segmentMetadataFileMap.keySet(), controllerURI, e);
+                  tableName, batch._metadataFiles.keySet(), controllerURI, e);
               throw e;
             }
           }
@@ -573,7 +800,6 @@ public class SegmentPushUtils implements Serializable {
       }
     } finally {
       FileUtils.deleteQuietly(allSegmentsMetadataTarFile);
-      closeFileUploadDownloadClient(spec, fileUploadDownloadClient);
     }
   }
 
@@ -590,25 +816,41 @@ public class SegmentPushUtils implements Serializable {
             String tarFilePath = segmentUriToTarPathMap.get(segmentUriPath);
             String segmentName = getSegmentName(tarFilePath);
             segmentMetadataFileMap.put(segmentName, getSegmentMetadataFile(spec, fileSystem, tarFilePath, segmentName));
-            segmentURIs.add(segmentName);
-            segmentURIs.add(segmentUriPath);
             return null;
           }));
     }
     int errorCount = 0;
     Exception exception = null;
+    boolean interrupted = false;
     for (Future<Void> future : futures) {
-      try {
-        future.get();
-      } catch (Exception e) {
-        errorCount++;
-        exception = e;
+      boolean complete = false;
+      while (!complete) {
+        try {
+          future.get();
+          complete = true;
+        } catch (InterruptedException e) {
+          interrupted = true;
+          exception = e;
+        } catch (Exception e) {
+          errorCount++;
+          exception = e;
+          complete = true;
+        }
       }
+    }
+    if (interrupted) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException("Interrupted while generating segment metadata", exception);
     }
     if (errorCount > 0) {
       throw new RuntimeException(
           String.format("%d out of %d segment metadata generation failed", errorCount, segmentUriToTarPathMap.size()),
           exception);
+    }
+    // The controller consumes alternating name/URI lines; publish pairs together after all parallel work succeeds.
+    for (Map.Entry<String, String> entry : segmentUriToTarPathMap.entrySet()) {
+      segmentURIs.add(getSegmentName(entry.getValue()));
+      segmentURIs.add(entry.getKey());
     }
   }
 

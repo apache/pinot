@@ -21,9 +21,11 @@ package org.apache.pinot.segment.local.utils;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
+import com.sun.net.httpserver.HttpServer;
 import com.sun.net.httpserver.HttpsConfigurator;
 import com.sun.net.httpserver.HttpsParameters;
 import com.sun.net.httpserver.HttpsServer;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -48,8 +50,11 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLParameters;
@@ -57,10 +62,13 @@ import javax.net.ssl.TrustManagerFactory;
 import org.apache.commons.io.FileUtils;
 import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.NameValuePair;
+import org.apache.hc.core5.http.message.BasicHeader;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.http.HttpClientConfig;
 import org.apache.pinot.common.utils.tls.TlsUtils;
+import org.apache.pinot.segment.local.constants.SegmentUploadConstants;
+import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotClusterSpec;
@@ -68,18 +76,24 @@ import org.apache.pinot.spi.ingestion.batch.spec.PushJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.TableSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.TlsSpec;
-import org.mockito.Mockito;
-import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class SegmentPushUtilsTest {
@@ -114,14 +128,14 @@ public class SegmentPushUtilsTest {
     SegmentGenerationJobSpec jobSpec = new SegmentGenerationJobSpec();
     PushJobSpec pushJobSpec = new PushJobSpec();
     NameValuePair nameValuePair = FileUploadDownloadClient.makeParallelProtectionParam(pushJobSpec);
-    Assert.assertEquals(nameValuePair.getName(),
+    assertEquals(nameValuePair.getName(),
         FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION);
-    Assert.assertEquals(nameValuePair.getValue(), "false");
+    assertEquals(nameValuePair.getValue(), "false");
     pushJobSpec.setPushParallelism(2);
     nameValuePair = FileUploadDownloadClient.makeParallelProtectionParam(pushJobSpec);
-    Assert.assertEquals(nameValuePair.getName(),
+    assertEquals(nameValuePair.getName(),
         FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION);
-    Assert.assertEquals(nameValuePair.getValue(), "true");
+    assertEquals(nameValuePair.getValue(), "true");
   }
 
   @Test
@@ -237,6 +251,11 @@ public class SegmentPushUtilsTest {
 
   private static HttpsServer createHttpsServer(Map<String, HttpHandler> handlers)
       throws Exception {
+    return createHttpsServer(handlers, null);
+  }
+
+  private static HttpsServer createHttpsServer(Map<String, HttpHandler> handlers, ExecutorService executor)
+      throws Exception {
     SSLContext sslContext = createTestSslContext();
     HttpsServer server = HttpsServer.create(new InetSocketAddress("localhost", 0), 0);
     server.setHttpsConfigurator(new HttpsConfigurator(sslContext) {
@@ -248,7 +267,7 @@ public class SegmentPushUtilsTest {
       }
     });
     handlers.forEach(server::createContext);
-    server.setExecutor(null);
+    server.setExecutor(executor);
     server.start();
     return server;
   }
@@ -292,7 +311,7 @@ public class SegmentPushUtilsTest {
 
   private static String getTlsResourcePath(String fileName) {
     URL resource = SegmentPushUtilsTest.class.getClassLoader().getResource(TLS_RESOURCE_FOLDER + fileName);
-    Assert.assertNotNull(resource, "Missing TLS test resource: " + fileName);
+    assertNotNull(resource, "Missing TLS test resource: " + fileName);
     return resource.toString();
   }
 
@@ -436,6 +455,7 @@ public class SegmentPushUtilsTest {
     try {
       URI controllerUri = new URI("https://localhost:" + httpsServer.getAddress().getPort());
       SegmentGenerationJobSpec spec = createSegmentGenerationJobSpec(controllerUri, createTlsSpec());
+      spec.getPushJobSpec().setPushParallelism(32);
       Map<String, File> segmentUriToMetadataFileMap = new HashMap<>();
       segmentUriToMetadataFileMap.put("file:///tmp/segment1.tar.gz", createMetadataTar("segment1"));
       segmentUriToMetadataFileMap.put("file:///tmp/segment2.tar.gz", createMetadataTar("segment2"));
@@ -443,7 +463,7 @@ public class SegmentPushUtilsTest {
       SegmentPushUtils.sendSegmentsUriAndMetadata(spec, segmentUriToMetadataFileMap, new ArrayList<>(),
           new ArrayList<>());
 
-      // One batch request for both segments, and the caller still owns the metadata files
+      // Existing overloads retain one batch even when distributed callers configure their own parallelism.
       assertEquals(requests.size(), 1);
       assertEquals(requests.get(0).getFirst(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE),
           FileUploadDownloadClient.FileUploadType.METADATA.toString());
@@ -451,6 +471,361 @@ public class SegmentPushUtilsTest {
     } finally {
       httpsServer.stop(0);
     }
+  }
+
+  @DataProvider
+  public Object[][] metadataPushTls() {
+    return new Object[][]{{false}, {true}};
+  }
+
+  @Test(dataProvider = "metadataPushTls", timeOut = 30000)
+  public void testParallelMetadataBatchesPreserveSegmentUris(boolean tls)
+      throws Exception {
+    int parallelism = 32;
+    CountDownLatch requestsStarted = new CountDownLatch(parallelism);
+    CountDownLatch releaseResponses = new CountDownLatch(1);
+    AtomicInteger active = new AtomicInteger();
+    AtomicInteger maxActive = new AtomicInteger();
+    List<Map<String, String>> receivedBatches = new CopyOnWriteArrayList<>();
+    AtomicReference<Throwable> handlerFailure = new AtomicReference<>();
+    ExecutorService serverExecutor = Executors.newCachedThreadPool();
+    ExecutorService callerExecutor = Executors.newSingleThreadExecutor();
+    HttpHandler handler = exchange -> {
+      maxActive.accumulateAndGet(active.incrementAndGet(), Math::max);
+      try {
+        assertEquals(exchange.getRequestHeaders().getFirst("Authorization"), "Bearer metadata-push-test");
+        assertEquals(exchange.getRequestHeaders().getFirst(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE),
+            FileUploadDownloadClient.FileUploadType.METADATA.toString());
+        assertEquals(exchange.getRequestHeaders().getFirst(
+            FileUploadDownloadClient.CustomHeaders.COPY_SEGMENT_TO_DEEP_STORE), "true");
+        assertTrue(exchange.getRequestURI().getQuery().contains("enableParallelPushProtection=true"));
+        receivedBatches.add(readMetadataBatch(exchange));
+        requestsStarted.countDown();
+        if (!releaseResponses.await(15, TimeUnit.SECONDS)) {
+          throw new IOException("Timed out waiting to release metadata batches");
+        }
+        writeResponse(exchange, OK_RESPONSE);
+      } catch (Exception | AssertionError e) {
+        handlerFailure.compareAndSet(null, e);
+        requestsStarted.countDown();
+      } finally {
+        active.decrementAndGet();
+        exchange.close();
+      }
+    };
+    HttpServer server = tls ? createHttpsServer(Map.of("/segments/batchUpload", handler), serverExecutor)
+        : createMetadataHttpServer(handler, serverExecutor);
+    try {
+      URI controllerUri = URI.create((tls ? "https" : "http") + "://localhost:" + server.getAddress().getPort());
+      SegmentGenerationJobSpec spec = createSegmentGenerationJobSpec(controllerUri, tls ? createTlsSpec() : null);
+      spec.getPushJobSpec().setPushParallelism(parallelism);
+      spec.getPushJobSpec().setCopyToDeepStoreForMetadataPush(true);
+      Map<String, File> metadataFiles = createMetadataFiles(65);
+      List<NameValuePair> parameters = FileUploadDownloadClient.makeTableParam(TEST_TABLE_NAME);
+      parameters.add(FileUploadDownloadClient.makeParallelProtectionParam(spec.getPushJobSpec()));
+      Future<?> push = callerExecutor.submit(() -> {
+        SegmentPushUtils.sendSegmentsUriAndMetadata(spec, metadataFiles,
+            List.of(new BasicHeader("Authorization", "Bearer metadata-push-test")), parameters, parallelism);
+        return null;
+      });
+      assertTrue(requestsStarted.await(15, TimeUnit.SECONDS), "All batch workers must reach one controller together");
+      assertNull(handlerFailure.get());
+      assertEquals(active.get(), parallelism);
+      assertEquals(receivedBatches.size(), parallelism);
+      assertFalse(push.isDone());
+      releaseResponses.countDown();
+      push.get(10, TimeUnit.SECONDS);
+      assertNull(handlerFailure.get());
+      assertEquals(maxActive.get(), parallelism);
+      assertEquals(receivedBatches.size(), parallelism, "Partition once instead of issuing another request wave");
+      Map<String, String> receivedSegments = new HashMap<>();
+      for (Map<String, String> batch : receivedBatches) {
+        assertTrue(batch.size() >= 2 && batch.size() <= 3, "Batches must be balanced and nonempty");
+        batch.forEach((name, uri) -> assertNull(receivedSegments.put(name, uri), "Repeated segment " + name));
+      }
+      assertEquals(receivedSegments, metadataSegmentUris(metadataFiles));
+      metadataFiles.values().forEach(file -> assertTrue(file.isFile(), "The caller owns local metadata files"));
+    } finally {
+      releaseResponses.countDown();
+      callerExecutor.shutdownNow();
+      callerExecutor.close();
+      server.stop(0);
+      serverExecutor.shutdownNow();
+      serverExecutor.close();
+    }
+  }
+
+  @Test(timeOut = 10000)
+  public void testParallelMetadataBatchesRetryWithoutChangingSegmentUris()
+      throws Exception {
+    Map<Map<String, String>, AtomicInteger> batchAttempts = new ConcurrentHashMap<>();
+    ExecutorService serverExecutor = Executors.newCachedThreadPool();
+    HttpServer server = createMetadataHttpServer(exchange -> {
+      Map<String, String> batch = readMetadataBatch(exchange);
+      int attempt = batchAttempts.computeIfAbsent(batch, ignored -> new AtomicInteger()).incrementAndGet();
+      if (attempt < 3) {
+        // HttpClient retries 503 internally; use 500 to exercise the push job's configured attempts.
+        exchange.sendResponseHeaders(HttpStatus.SC_INTERNAL_SERVER_ERROR, -1);
+      } else {
+        writeResponse(exchange, OK_RESPONSE);
+      }
+      exchange.close();
+    }, serverExecutor);
+    try {
+      URI controllerUri = URI.create("http://localhost:" + server.getAddress().getPort());
+      SegmentGenerationJobSpec spec = createSegmentGenerationJobSpec(controllerUri, null);
+      spec.getPushJobSpec().setPushAttempts(3);
+      spec.getPushJobSpec().setPushRetryIntervalMillis(1);
+      Map<String, File> metadataFiles = createMetadataFiles(3);
+      SegmentPushUtils.sendSegmentsUriAndMetadata(spec, metadataFiles, List.of(), List.of(), 2);
+      assertEquals(batchAttempts.size(), 2);
+      Map<String, String> receivedSegments = new HashMap<>();
+      batchAttempts.forEach((batch, attempts) -> {
+        assertEquals(attempts.get(), 3, "Each batch must retain its manifest through both retries");
+        batch.forEach((name, uri) -> assertNull(receivedSegments.put(name, uri), "Repeated segment " + name));
+      });
+      assertEquals(receivedSegments, metadataSegmentUris(metadataFiles));
+      metadataFiles.values().forEach(file -> assertTrue(file.isFile(), "Retries must preserve caller-owned input"));
+    } finally {
+      server.stop(0);
+      serverExecutor.shutdownNow();
+      serverExecutor.close();
+    }
+  }
+
+  @DataProvider
+  public Object[][] serialMetadataPushCases() {
+    return new Object[][]{{0, 3}, {1, 3}, {8, 1}, {8, 0}};
+  }
+
+  @Test(dataProvider = "serialMetadataPushCases", timeOut = 10000)
+  public void testMetadataPushSerialFallback(int parallelism, int segmentCount)
+      throws Exception {
+    List<Map<String, String>> receivedBatches = new CopyOnWriteArrayList<>();
+    ExecutorService serverExecutor = Executors.newSingleThreadExecutor();
+    HttpServer server = createMetadataHttpServer(exchange -> {
+      receivedBatches.add(readMetadataBatch(exchange));
+      writeResponse(exchange, OK_RESPONSE);
+      exchange.close();
+    }, serverExecutor);
+    try {
+      URI controllerUri = URI.create("http://localhost:" + server.getAddress().getPort());
+      SegmentGenerationJobSpec spec = createSegmentGenerationJobSpec(controllerUri, null);
+      Map<String, File> metadataFiles = createMetadataFiles(segmentCount);
+      SegmentPushUtils.sendSegmentsUriAndMetadata(spec, metadataFiles, List.of(), List.of(), parallelism);
+      assertEquals(receivedBatches, segmentCount == 0 ? List.of() : List.of(metadataSegmentUris(metadataFiles)));
+    } finally {
+      server.stop(0);
+      serverExecutor.shutdownNow();
+      serverExecutor.close();
+    }
+  }
+
+  @DataProvider
+  public Object[][] metadataPushAbortCases() {
+    return new Object[][]{{false, false}, {true, false}, {false, true}};
+  }
+
+  @Test(dataProvider = "metadataPushAbortCases", timeOut = 15000)
+  public void testMetadataPushDrainsActiveRequestsBeforeCleanup(boolean interruptCaller, boolean retryBlockedRequest)
+      throws Exception {
+    CountDownLatch requestsStarted = new CountDownLatch(2);
+    CountDownLatch failureResponded = new CountDownLatch(1);
+    CountDownLatch releaseResponses = new CountDownLatch(1);
+    CountDownLatch callerExited = new CountDownLatch(1);
+    AtomicInteger requests = new AtomicInteger();
+    AtomicInteger completedResponses = new AtomicInteger();
+    AtomicReference<Exception> failure = new AtomicReference<>();
+    AtomicBoolean callerInterrupted = new AtomicBoolean();
+    List<File> stagedMetadata = new CopyOnWriteArrayList<>();
+    ExecutorService serverExecutor = Executors.newCachedThreadPool();
+    HttpServer server = createMetadataHttpServer(exchange -> {
+      exchange.getRequestBody().readAllBytes();
+      int request = requests.incrementAndGet();
+      requestsStarted.countDown();
+      try {
+        if (!requestsStarted.await(5, TimeUnit.SECONDS)) {
+          throw new IOException("The other metadata batch did not start");
+        }
+        if (!interruptCaller && request == 2) {
+          exchange.sendResponseHeaders(HttpStatus.SC_BAD_REQUEST, -1);
+          failureResponded.countDown();
+        } else {
+          if (!releaseResponses.await(10, TimeUnit.SECONDS)) {
+            throw new IOException("Timed out waiting to release active metadata request");
+          }
+          if (retryBlockedRequest) {
+            // The job retry policy sees this 500 after the other batch has already failed permanently.
+            exchange.sendResponseHeaders(HttpStatus.SC_INTERNAL_SERVER_ERROR, -1);
+          } else {
+            writeResponse(exchange, OK_RESPONSE);
+          }
+          completedResponses.incrementAndGet();
+        }
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new IOException(e);
+      } finally {
+        exchange.close();
+      }
+    }, serverExecutor);
+    URI controllerUri = URI.create("http://localhost:" + server.getAddress().getPort());
+    SegmentGenerationJobSpec spec = createSegmentGenerationJobSpec(controllerUri, null);
+    spec.setPinotClusterSpecs(new PinotClusterSpec[]{spec.getPinotClusterSpecs()[0], spec.getPinotClusterSpecs()[0]});
+    spec.getPushJobSpec().setBatchSegmentUpload(true);
+    spec.getPushJobSpec().setPreferMetadataTarGz(true);
+    spec.getPushJobSpec().setSegmentMetadataGenerationParallelism(2);
+    spec.getPushJobSpec().setPushAttempts(2);
+    spec.getPushJobSpec().setPushRetryIntervalMillis(1);
+    Map<String, File> metadataFiles = createMetadataFiles(2);
+    Map<String, String> segmentPaths = new HashMap<>();
+    metadataFiles.forEach((uri, file) -> segmentPaths.put(uri,
+        new File(file.getParentFile(), file.getName().replace(Constants.METADATA_TAR_GZ_FILE_EXT, ".tar.gz"))
+            .toURI().toString()));
+    LocalPinotFS fileSystem = new LocalPinotFS() {
+      @Override
+      public void copyToLocalFile(URI srcUri, File dstFile)
+          throws Exception {
+        super.copyToLocalFile(srcUri, dstFile);
+        stagedMetadata.add(dstFile);
+      }
+    };
+    Thread caller = new Thread(() -> {
+      try {
+        SegmentPushUtils.sendSegmentUriAndMetadata(spec, fileSystem, segmentPaths, 2);
+      } catch (Exception e) {
+        failure.set(e);
+      } finally {
+        callerInterrupted.set(Thread.currentThread().isInterrupted());
+        callerExited.countDown();
+      }
+    });
+    try {
+      caller.start();
+      assertTrue(requestsStarted.await(5, TimeUnit.SECONDS));
+      if (interruptCaller) {
+        caller.interrupt();
+      } else {
+        assertTrue(failureResponded.await(5, TimeUnit.SECONDS));
+      }
+      assertFalse(callerExited.await(200, TimeUnit.MILLISECONDS), "Cleanup must wait for every active HTTP request");
+      assertEquals(stagedMetadata.size(), 2);
+      stagedMetadata.forEach(file -> assertTrue(file.isFile(), "Active batches still own their staged input"));
+      releaseResponses.countDown();
+      caller.join(5000);
+      assertFalse(caller.isAlive());
+      assertNotNull(failure.get());
+      assertEquals(callerInterrupted.get(), interruptCaller);
+      assertEquals(completedResponses.get(), interruptCaller ? 2 : 1);
+      assertEquals(requests.get(), 2, "Failure or interruption must suppress retries and subsequent cluster requests");
+      stagedMetadata.forEach(file -> assertFalse(file.exists(), "Delete staged metadata after the workers finish"));
+      metadataFiles.values().forEach(file -> assertTrue(file.isFile(), "Keep the caller's original metadata"));
+    } finally {
+      releaseResponses.countDown();
+      caller.interrupt();
+      caller.join(5000);
+      server.stop(0);
+      serverExecutor.shutdownNow();
+      serverExecutor.close();
+    }
+  }
+
+  @Test(timeOut = 10000)
+  public void testParallelMetadataPushRejectsInvalidInputBeforeHttp()
+      throws Exception {
+    AtomicInteger requests = new AtomicInteger();
+    ExecutorService serverExecutor = Executors.newSingleThreadExecutor();
+    HttpServer server = createMetadataHttpServer(exchange -> {
+      requests.incrementAndGet();
+      exchange.getRequestBody().readAllBytes();
+      writeResponse(exchange, OK_RESPONSE);
+      exchange.close();
+    }, serverExecutor);
+    try {
+      File metadata = createMetadataTar(TEST_SEGMENT_NAME);
+      File duplicate = new File(_tempDir, "duplicate/" + metadata.getName());
+      FileUtils.copyFile(metadata, duplicate);
+      URI controllerUri = URI.create("http://localhost:" + server.getAddress().getPort());
+      SegmentGenerationJobSpec spec = createSegmentGenerationJobSpec(controllerUri, null);
+      Map<String, File> metadataFiles = Map.of("file:///first/segment.tar.gz", metadata,
+          "file:///second/segment.tar.gz", duplicate);
+      assertThrows(IllegalArgumentException.class,
+          () -> SegmentPushUtils.sendSegmentsUriAndMetadata(spec, metadataFiles, List.of(), List.of(), 2));
+
+      PinotFS fileSystem = mock(PinotFS.class);
+      Map<String, String> invalidUris = Map.of("file:///invalid uri/segment.tar.gz", "segment.tar.gz");
+      assertThrows(IllegalArgumentException.class,
+          () -> SegmentPushUtils.sendSegmentsUriAndMetadata(spec, fileSystem, invalidUris, List.of(), List.of()));
+      assertThrows(IllegalArgumentException.class,
+          () -> SegmentPushUtils.sendSegmentsUriAndMetadata(spec,
+              Map.of("file:///invalid uri/segment.tar.gz", metadata), List.of(), List.of()));
+
+      spec.getPinotClusterSpecs()[0].setControllerURI("file:///invalid-controller");
+      assertThrows(IllegalArgumentException.class,
+          () -> SegmentPushUtils.sendSegmentsUriAndMetadata(spec, fileSystem,
+              Map.of(TEST_SEGMENT_URI, "segment.tar.gz"), List.of(), List.of()));
+      assertThrows(IllegalArgumentException.class,
+          () -> SegmentPushUtils.sendSegmentsUriAndMetadata(spec, Map.of(TEST_SEGMENT_URI, metadata), List.of(),
+              List.of()));
+      verifyNoInteractions(fileSystem);
+      assertEquals(requests.get(), 0);
+      assertTrue(metadata.isFile());
+      assertTrue(duplicate.isFile());
+    } finally {
+      server.stop(0);
+      serverExecutor.shutdownNow();
+      serverExecutor.close();
+    }
+  }
+
+  private static HttpServer createMetadataHttpServer(HttpHandler handler, ExecutorService executor)
+      throws IOException {
+    HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+    server.createContext("/segments/batchUpload", handler);
+    server.setExecutor(executor);
+    server.start();
+    return server;
+  }
+
+  private Map<String, File> createMetadataFiles(int count)
+      throws IOException {
+    Map<String, File> metadataFiles = new HashMap<>();
+    for (int i = 0; i < count; i++) {
+      String segmentName = "segment" + i;
+      metadataFiles.put("file:///download/" + segmentName + ".tar.gz", createMetadataTar(segmentName));
+    }
+    return metadataFiles;
+  }
+
+  private static Map<String, String> metadataSegmentUris(Map<String, File> metadataFiles) {
+    Map<String, String> segmentUris = new HashMap<>();
+    metadataFiles.forEach((uri, file) -> segmentUris.put(
+        file.getName().substring(0, file.getName().length() - Constants.METADATA_TAR_GZ_FILE_EXT.length()), uri));
+    return segmentUris;
+  }
+
+  private Map<String, String> readMetadataBatch(HttpExchange exchange)
+      throws IOException {
+    byte[] requestBody = exchange.getRequestBody().readAllBytes();
+    String multipart = new String(requestBody, StandardCharsets.ISO_8859_1);
+    int partHeadersEnd = multipart.indexOf("\r\n\r\n");
+    int partEnd = multipart.lastIndexOf("\r\n--");
+    assertTrue(partHeadersEnd >= 0 && partEnd > partHeadersEnd + 4, "Expected one multipart metadata TAR");
+    File unpacked = TarCompressionUtils.untar(
+        new ByteArrayInputStream(requestBody, partHeadersEnd + 4, partEnd - partHeadersEnd - 4),
+        new File(_tempDir, "received-" + UUID.randomUUID())).get(0);
+    List<String> lines = Files.readAllLines(new File(unpacked,
+        SegmentUploadConstants.ALL_SEGMENTS_METADATA_FILENAME).toPath(), StandardCharsets.UTF_8);
+    assertEquals(lines.size() % 2, 0);
+    Map<String, String> segmentUris = new HashMap<>();
+    for (int i = 0; i < lines.size(); i += 2) {
+      String name = lines.get(i);
+      assertNull(segmentUris.put(name, lines.get(i + 1)), "Repeated name within a batch");
+      assertTrue(new File(unpacked, name + ".metadata.properties").isFile());
+      assertTrue(new File(unpacked, name + ".creation.meta").isFile());
+    }
+    assertEquals(unpacked.list().length, 2 * segmentUris.size() + 1);
+    return segmentUris;
   }
 
   @Test
@@ -492,7 +867,7 @@ public class SegmentPushUtilsTest {
       throws Exception {
     SegmentGenerationJobSpec defaultJobSpec = new SegmentGenerationJobSpec();
     FileUploadDownloadClient defaultClient = SegmentPushUtils.getOrCreateFileUploadDownloadClient(defaultJobSpec);
-    Assert.assertSame(SegmentPushUtils.getOrCreateFileUploadDownloadClient(defaultJobSpec), defaultClient);
+    assertSame(SegmentPushUtils.getOrCreateFileUploadDownloadClient(defaultJobSpec), defaultClient);
   }
 
   @Test
@@ -588,13 +963,30 @@ public class SegmentPushUtilsTest {
     PushJobSpec pushJobSpec = new PushJobSpec();
     pushJobSpec.setSegmentMetadataGenerationParallelism(2);
     jobSpec.setPushJobSpec(pushJobSpec);
-    PinotFS mockFs = Mockito.mock(PinotFS.class);
+    PinotFS mockFs = mock(PinotFS.class);
     Map<String, String> segmentUriToTarPathMap = Map.of(
-        "segment1", "segment1.tar.gz",
-        "segment2", "segment2.tar.gz"
+        "file:///download/segment1.tar.gz", "segment1.tar.gz",
+        "file:///download/segment2.tar.gz", "segment2.tar.gz"
     );
     ConcurrentHashMap<String, File> segmentMetadataFileMap = new ConcurrentHashMap<>();
-    ConcurrentLinkedQueue<String> segmentURIs = new ConcurrentLinkedQueue<>();
+    Thread producer = Thread.currentThread();
+    CountDownLatch namesPublished = new CountDownLatch(2);
+    ConcurrentLinkedQueue<String> segmentURIs = new ConcurrentLinkedQueue<>() {
+      @Override
+      public boolean add(String value) {
+        boolean added = super.add(value);
+        if (Thread.currentThread() != producer && !value.contains("://")) {
+          namesPublished.countDown();
+          try {
+            assertTrue(namesPublished.await(10, TimeUnit.SECONDS), "Both names must publish before either URI");
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(e);
+          }
+        }
+        return added;
+      }
+    };
 
     when(mockFs.exists(any(URI.class))).thenReturn(true);
     mockFs.copyToLocalFile(any(URI.class), any(File.class));
@@ -609,6 +1001,11 @@ public class SegmentPushUtilsTest {
 
     assertEquals(segmentMetadataFileMap.size(), 2);
     assertEquals(segmentURIs.size(), 4);
+    List<String> entries = new ArrayList<>(segmentURIs);
+    for (int i = 0; i < entries.size(); i += 2) {
+      assertEquals(segmentUriToTarPathMap.get(entries.get(i + 1)), entries.get(i) + ".tar.gz",
+          "Every segment name must remain adjacent to its own download URI");
+    }
   }
 
   @Test
@@ -617,7 +1014,7 @@ public class SegmentPushUtilsTest {
     SegmentGenerationJobSpec jobSpec = new SegmentGenerationJobSpec();
     PushJobSpec pushJobSpec = new PushJobSpec();
     jobSpec.setPushJobSpec(pushJobSpec);
-    PinotFS mockFs = Mockito.mock(PinotFS.class);
+    PinotFS mockFs = mock(PinotFS.class);
     Map<String, String> segmentUriToTarPathMap = Map.of(
         "segment1", "segment1.tar.gz",
         "segment2", "segment2.tar.gz"
@@ -632,15 +1029,15 @@ public class SegmentPushUtilsTest {
 
     ExecutorService executor = Executors.newSingleThreadExecutor();
     try {
-      SegmentPushUtils.generateSegmentMetadataFiles(jobSpec, mockFs, segmentUriToTarPathMap, segmentMetadataFileMap,
-          segmentURIs, executor);
-    } catch (Exception e) {
-      assertEquals(e.getMessage(), "1 out of 2 segment metadata generation failed");
+      RuntimeException failure = expectThrows(RuntimeException.class,
+          () -> SegmentPushUtils.generateSegmentMetadataFiles(jobSpec, mockFs, segmentUriToTarPathMap,
+              segmentMetadataFileMap, segmentURIs, executor));
+      assertEquals(failure.getMessage(), "1 out of 2 segment metadata generation failed");
     } finally {
       executor.shutdown();
     }
 
     assertEquals(segmentMetadataFileMap.size(), 1);
-    assertEquals(segmentURIs.size(), 2);
+    assertTrue(segmentURIs.isEmpty(), "Do not publish a partial download manifest after metadata generation fails");
   }
 }
