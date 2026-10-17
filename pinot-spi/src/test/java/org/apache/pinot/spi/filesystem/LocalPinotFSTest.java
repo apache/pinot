@@ -20,6 +20,7 @@ package org.apache.pinot.spi.filesystem;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -330,5 +331,77 @@ public class LocalPinotFSTest {
     URI fileUri = testFile.toURI();
     Assert.assertThrows(IOException.class, () -> localPinotFS.listFiles(fileUri, false));
     Assert.assertThrows(IOException.class, () -> localPinotFS.listFilesWithMetadata(fileUri, false));
+  }
+
+  @Test
+  public void testOpenForRead()
+      throws IOException {
+    LocalPinotFS localPinotFS = new LocalPinotFS();
+    Assert.assertTrue(localPinotFS.supportsRangedRead());
+
+    File rangeFile = new File(_absoluteTmpDirPath, "rangeFile");
+    byte[] data = new byte[256];
+    for (int i = 0; i < data.length; i++) {
+      data[i] = (byte) i;
+    }
+    FileUtils.writeByteArrayToFile(rangeFile, data);
+    URI uri = rangeFile.toURI();
+
+    // Mid-file range [10, 30)
+    try (InputStream in = localPinotFS.openForRead(uri, 10, 20)) {
+      Assert.assertEquals(in.readAllBytes(), Arrays.copyOfRange(data, 10, 30));
+    }
+    // From the start
+    try (InputStream in = localPinotFS.openForRead(uri, 0, 5)) {
+      Assert.assertEquals(in.readAllBytes(), Arrays.copyOfRange(data, 0, 5));
+    }
+    // Length beyond EOF is truncated at end-of-file
+    try (InputStream in = localPinotFS.openForRead(uri, 250, 100)) {
+      Assert.assertEquals(in.readAllBytes(), Arrays.copyOfRange(data, 250, 256));
+    }
+    // Zero length yields an empty stream
+    try (InputStream in = localPinotFS.openForRead(uri, 30, 0)) {
+      Assert.assertEquals(in.readAllBytes().length, 0);
+    }
+    // Whole file
+    try (InputStream in = localPinotFS.openForRead(uri, 0, 256)) {
+      Assert.assertEquals(in.readAllBytes(), data);
+    }
+    // Negative arguments are rejected
+    Assert.assertThrows(IllegalArgumentException.class, () -> localPinotFS.openForRead(uri, -1, 10));
+    Assert.assertThrows(IllegalArgumentException.class, () -> localPinotFS.openForRead(uri, 0, -1));
+
+    Assert.assertTrue(rangeFile.delete());
+  }
+
+  @Test
+  public void testOpenForReadSkipStaysWithinRange()
+      throws IOException {
+    LocalPinotFS localPinotFS = new LocalPinotFS();
+
+    File rangeFile = new File(_absoluteTmpDirPath, "skipRangeFile");
+    byte[] data = new byte[256];
+    for (int i = 0; i < data.length; i++) {
+      data[i] = (byte) i;
+    }
+    FileUtils.writeByteArrayToFile(rangeFile, data);
+    URI uri = rangeFile.toURI();
+
+    // Skipping must consume the range, not extend it: 5 skipped of [0, 10) leaves 5 readable
+    try (InputStream in = localPinotFS.openForRead(uri, 0, 10)) {
+      Assert.assertEquals(in.skip(5), 5);
+      Assert.assertEquals(in.readAllBytes(), Arrays.copyOfRange(data, 5, 10));
+    }
+    // Skipping beyond the range is capped at the range end
+    try (InputStream in = localPinotFS.openForRead(uri, 10, 20)) {
+      Assert.assertEquals(in.skip(100), 20);
+      Assert.assertEquals(in.readAllBytes().length, 0);
+    }
+    // mark/reset must not be advertised, or a caller could re-read past the bound
+    try (InputStream in = localPinotFS.openForRead(uri, 0, 10)) {
+      Assert.assertFalse(in.markSupported());
+    }
+
+    Assert.assertTrue(rangeFile.delete());
   }
 }
