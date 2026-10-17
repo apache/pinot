@@ -38,6 +38,8 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentTestUtils.assignSegment;
+import static org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentTestUtils.rebalanceTable;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -130,7 +132,7 @@ public class RealtimeNonReplicaGroupSegmentAssignmentTest {
         "uploadedSegment_3");
     uploadedSegments.forEach(segmentName -> {
       List<String> actualInstances =
-          segmentAssignment.assignSegment(segmentName, currentAssignment, onlyCompletedInstancePartitionMap);
+          assignSegment(segmentAssignment, segmentName, currentAssignment, onlyCompletedInstancePartitionMap);
       assertEquals(actualInstances.size(), Integer.parseInt(NUM_REPLICAS_PER_PARTITION));
       assertEquals(new HashSet<>(actualInstances).size(), Integer.parseInt(NUM_REPLICAS_PER_PARTITION));
       actualInstances.forEach(instance -> assertTrue(instance.startsWith(COMPLETED_INSTANCE_NAME_PREFIX)));
@@ -147,7 +149,7 @@ public class RealtimeNonReplicaGroupSegmentAssignmentTest {
     for (int segmentId = 0; segmentId < NUM_SEGMENTS; segmentId++) {
       String segmentName = _segments.get(segmentId);
       List<String> instancesAssigned =
-          _segmentAssignment.assignSegment(segmentName, currentAssignment, onlyConsumingInstancePartitionMap);
+          assignSegment(_segmentAssignment, segmentName, currentAssignment, onlyConsumingInstancePartitionMap);
       assertEquals(instancesAssigned.size(), NUM_REPLICAS);
 
       // Segment 0 (partition 0) should be assigned to instance 0, 1, 2
@@ -175,7 +177,7 @@ public class RealtimeNonReplicaGroupSegmentAssignmentTest {
     for (int segmentId = 0; segmentId < NUM_SEGMENTS; segmentId++) {
       String segmentName = _segments.get(segmentId);
       List<String> instancesAssigned =
-          _segmentAssignment.assignSegment(segmentName, currentAssignment, onlyConsumingInstancePartitionMap);
+          assignSegment(_segmentAssignment, segmentName, currentAssignment, onlyConsumingInstancePartitionMap);
       addToAssignment(currentAssignment, segmentId, instancesAssigned);
     }
 
@@ -200,7 +202,7 @@ public class RealtimeNonReplicaGroupSegmentAssignmentTest {
         Map.of(InstancePartitionsType.CONSUMING, _instancePartitionsMap.get(InstancePartitionsType.CONSUMING));
     for (String segmentName : uploadedSegments) {
       List<String> instancesAssigned =
-          _segmentAssignment.assignSegment(segmentName, currentAssignment, onlyConsumingInstancePartitionMap);
+          assignSegment(_segmentAssignment, segmentName, currentAssignment, onlyConsumingInstancePartitionMap);
       currentAssignment.put(segmentName,
           SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.ONLINE));
     }
@@ -219,13 +221,14 @@ public class RealtimeNonReplicaGroupSegmentAssignmentTest {
     // Rebalance without COMPLETED instance partitions should not change the segment assignment
     Map<InstancePartitionsType, InstancePartitions> noRelocationInstancePartitionsMap =
         Map.of(InstancePartitionsType.CONSUMING, _instancePartitionsMap.get(InstancePartitionsType.CONSUMING));
-    assertEquals(_segmentAssignment.rebalanceTable(currentAssignment, noRelocationInstancePartitionsMap, null, null,
+    assertEquals(rebalanceTable(_segmentAssignment, currentAssignment, noRelocationInstancePartitionsMap, null, null,
         new RebalanceConfig()), currentAssignment);
 
     // Rebalance with COMPLETED instance partitions should relocate all COMPLETED (ONLINE) segments to the COMPLETED
     // instances
     Map<String, Map<String, String>> newAssignment =
-        _segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, null, null, new RebalanceConfig());
+        rebalanceTable(_segmentAssignment, currentAssignment, _instancePartitionsMap, null, null,
+            new RebalanceConfig());
     assertEquals(newAssignment.size(), NUM_SEGMENTS + numUploadedSegments + 1);
     for (int segmentId = 0; segmentId < NUM_SEGMENTS; segmentId++) {
       if (segmentId < NUM_SEGMENTS - NUM_PARTITIONS) {
@@ -265,26 +268,26 @@ public class RealtimeNonReplicaGroupSegmentAssignmentTest {
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setIncludeConsuming(true);
     assertEquals(
-        _segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, null, null, rebalanceConfig),
+        rebalanceTable(_segmentAssignment, currentAssignment, _instancePartitionsMap, null, null, rebalanceConfig),
         newAssignment);
 
     // Rebalance without COMPLETED instance partitions again should change the segment assignment back
     currentAssignment.put(offlineSegmentName, offlineSegmentInstanceStateMap);
-    assertEquals(_segmentAssignment.rebalanceTable(newAssignment, noRelocationInstancePartitionsMap, null, null,
+    assertEquals(rebalanceTable(_segmentAssignment, newAssignment, noRelocationInstancePartitionsMap, null, null,
         new RebalanceConfig()), currentAssignment);
 
     // Bootstrap table without COMPLETED instance partitions should be the same as regular rebalance
     rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setBootstrap(true);
-    assertEquals(_segmentAssignment.rebalanceTable(currentAssignment, noRelocationInstancePartitionsMap, null, null,
+    assertEquals(rebalanceTable(_segmentAssignment, currentAssignment, noRelocationInstancePartitionsMap, null, null,
         rebalanceConfig), currentAssignment);
-    assertEquals(_segmentAssignment.rebalanceTable(newAssignment, noRelocationInstancePartitionsMap, null, null,
+    assertEquals(rebalanceTable(_segmentAssignment, newAssignment, noRelocationInstancePartitionsMap, null, null,
         rebalanceConfig), currentAssignment);
 
     // Bootstrap table with COMPLETED instance partitions should reassign all COMPLETED segments based on their
     // alphabetical order
     newAssignment =
-        _segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, null, null, rebalanceConfig);
+        rebalanceTable(_segmentAssignment, currentAssignment, _instancePartitionsMap, null, null, rebalanceConfig);
     int index = 0;
     for (Map.Entry<String, Map<String, String>> entry : newAssignment.entrySet()) {
       String segmentName = entry.getKey();
@@ -316,7 +319,7 @@ public class RealtimeNonReplicaGroupSegmentAssignmentTest {
         "uploadedSegment_4");
     uploadedSegments.forEach(segmentName -> {
       List<String> actualInstances =
-          _segmentAssignment.assignSegment(segmentName, currentAssignment, onlyCompletedInstancePartitionMap);
+          assignSegment(_segmentAssignment, segmentName, currentAssignment, onlyCompletedInstancePartitionMap);
       assertEquals(actualInstances.size(), NUM_REPLICAS);
       assertEquals(new HashSet<>(actualInstances).size(), NUM_REPLICAS);
       actualInstances.forEach(instance -> assertTrue(instance.startsWith(COMPLETED_INSTANCE_NAME_PREFIX)));

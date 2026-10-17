@@ -20,15 +20,26 @@ package org.apache.pinot.controller.helix.core.assignment.segment;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixManager;
+import org.apache.helix.model.IdealState;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.assignment.InstancePartitions;
+import org.apache.pinot.common.assignment.PartitionAssignmentUtils;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.tier.Tier;
+import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.controller.helix.core.assignment.segment.strategy.SegmentAssignmentStrategy;
 import org.apache.pinot.controller.helix.core.assignment.segment.strategy.SegmentAssignmentStrategyFactory;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
@@ -58,6 +69,13 @@ import org.slf4j.LoggerFactory;
 ///   the smallest index if there is a tie. Repeat the process for all the partitions in one replica-group, and mirror
 ///   the assignment to other replica-groups. With this greedy algorithm, the result is deterministic and with minimum
 ///   segment moves.
+/// - Partition-pinned assignment (table with strict replica-group routing):
+///
+///   All segments of a segment partition are assigned to the same instances, recorded per partition in the partition
+///   assignment of the ideal state (see [org.apache.pinot.common.assignment.PartitionAssignmentUtils]). A new segment
+///   is assigned to the instances of its partition when the partition has an entry, and the entry is created from the
+///   instance partitions otherwise. To rebalance a table, the target instances of each partition are computed from the
+///   instance partitions, and the segments follow their partition.
 public abstract class BaseSegmentAssignment implements SegmentAssignment {
   protected final Logger _logger = LoggerFactory.getLogger(getClass());
 
@@ -67,6 +85,9 @@ public abstract class BaseSegmentAssignment implements SegmentAssignment {
   protected String _partitionColumn;
   protected TableConfig _tableConfig;
   protected ControllerMetrics _controllerMetrics;
+  // Whether all segments of a partition must be assigned to the same instances (strict replica-group routing), see
+  // the class Javadoc. Subclasses may further require the instance partitions to support it.
+  protected boolean _partitionPinned;
 
   // Cache of segment name to the name of the tier it is eligible for (null value means not eligible for any tier), to
   // avoid reading each segment's ZK metadata on every rebalanceTiers() invocation.
@@ -82,6 +103,12 @@ public abstract class BaseSegmentAssignment implements SegmentAssignment {
   @Nullable
   private Map<String, String> _segmentToTierName;
 
+  // Cache of segment name to partition id (null value means the partition id cannot be determined) for the segments
+  // whose partition id is not in the segment name, loaded with a single bulk ZK read on first use. Same scope and
+  // limitations as _segmentToTierName; a segment absent from the cache is resolved on demand and merged in.
+  @Nullable
+  private Map<String, Integer> _segmentToPartitionId;
+
   @Override
   public void init(HelixManager helixManager, TableConfig tableConfig, @Nullable ControllerMetrics controllerMetrics) {
     _helixManager = helixManager;
@@ -90,13 +117,78 @@ public abstract class BaseSegmentAssignment implements SegmentAssignment {
     _replication = tableConfig.getReplication();
     _partitionColumn = TableConfigUtils.getPartitionColumn(_tableConfig);
     _controllerMetrics = controllerMetrics;
+    _partitionPinned = SegmentAssignmentUtils.isStrictReplicaGroupRouting(tableConfig);
     if (_partitionColumn == null) {
-      _logger.info("Initialized with replication: {} without partition column for table: {} ", _replication,
-          _tableNameWithType);
+      _logger.info("Initialized with replication: {} without partition column, partitionPinned: {} for table: {}",
+          _replication, _partitionPinned, _tableNameWithType);
     } else {
-      _logger.info("Initialized with replication: {} and partition column: {} for table: {}", _replication,
-          _partitionColumn, _tableNameWithType);
+      _logger.info("Initialized with replication: {} and partition column: {}, partitionPinned: {} for table: {}",
+          _replication, _partitionColumn, _partitionPinned, _tableNameWithType);
     }
+  }
+
+  /// Returns the instances of the given partition of a partition-pinned table, creating its entry in the partition
+  /// assignment of the given ideal state when the partition has no entry yet. A missing entry is created from the
+  /// existing assignment of the partition when the partition already has segments (a table created before the
+  /// partition assignment was introduced), else from the given candidate instances computed from the instance
+  /// partitions.
+  ///
+  /// When the entry differs from the candidate instances, the instance partitions have changed since the partition
+  /// was placed and the table needs a rebalance. The mismatch is logged and metered, and the entry wins so that the
+  /// segments of the partition stay collocated.
+  protected List<String> getOrCreatePartitionInstances(IdealState idealState, int partitionId,
+      List<String> candidateInstances, Supplier<Collection<String>> existingAssignmentSupplier) {
+    List<String> instances = PartitionAssignmentUtils.getInstances(idealState, partitionId);
+    if (instances == null) {
+      Collection<String> existingAssignment = existingAssignmentSupplier.get();
+      if (existingAssignment != null) {
+        _logger.info("Adding partition: {} with instances: {} from existing segments to the partition assignment for "
+            + "table: {}", partitionId, existingAssignment, _tableNameWithType);
+        instances = PartitionAssignmentUtils.toInstanceList(existingAssignment);
+      } else {
+        _logger.info("Adding partition: {} with instances: {} from instance partitions to the partition assignment "
+            + "for table: {}", partitionId, candidateInstances, _tableNameWithType);
+        instances = PartitionAssignmentUtils.toInstanceList(candidateInstances);
+      }
+      PartitionAssignmentUtils.setInstances(idealState, partitionId, instances);
+    }
+    if (instances.size() != candidateInstances.size() || !instances.containsAll(candidateInstances)) {
+      _logger.warn("Instances: {} of partition: {} in the partition assignment are inconsistent with the ones: {} "
+              + "computed from the instance partitions for table: {}, using the ones from the partition assignment",
+          instances, partitionId, candidateInstances, _tableNameWithType);
+      if (_controllerMetrics != null) {
+        _controllerMetrics.addMeteredTableValue(_tableNameWithType,
+            ControllerMeter.CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_MISMATCH, 1L);
+      }
+    }
+    return instances;
+  }
+
+  /// Returns the partition id of the given segment for table rebalance, or `null` if it cannot be determined. The
+  /// partition id is read from the segment name when possible, and from the segment ZK metadata otherwise, which is
+  /// fetched for all segments of the table with a single bulk ZK read on first use (see `_segmentToPartitionId`).
+  @Nullable
+  protected Integer getPartitionIdForRebalance(String segmentName) {
+    Integer partitionId = SegmentUtils.getPartitionIdFromSegmentName(segmentName);
+    if (partitionId != null) {
+      return partitionId;
+    }
+    ZkHelixPropertyStore<ZNRecord> propertyStore = _helixManager.getHelixPropertyStore();
+    if (_segmentToPartitionId == null) {
+      _segmentToPartitionId = new HashMap<>();
+      for (SegmentZKMetadata segmentZKMetadata : ZKMetadataProvider.getSegmentsZKMetadata(propertyStore,
+          _tableNameWithType)) {
+        _segmentToPartitionId.put(segmentZKMetadata.getSegmentName(),
+            SegmentUtils.getSegmentPartitionId(segmentZKMetadata, _partitionColumn));
+      }
+    }
+    if (!_segmentToPartitionId.containsKey(segmentName)) {
+      SegmentZKMetadata segmentZKMetadata =
+          ZKMetadataProvider.getSegmentZKMetadata(propertyStore, _tableNameWithType, segmentName);
+      _segmentToPartitionId.put(segmentName,
+          segmentZKMetadata != null ? SegmentUtils.getSegmentPartitionId(segmentZKMetadata, _partitionColumn) : null);
+    }
+    return _segmentToPartitionId.get(segmentName);
   }
 
   /// Rebalances tiers and returns a pair of tier assignments and non-tier assignment.

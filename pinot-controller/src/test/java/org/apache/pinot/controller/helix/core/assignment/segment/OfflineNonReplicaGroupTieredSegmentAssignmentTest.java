@@ -48,6 +48,8 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentTestUtils.assignSegment;
+import static org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentTestUtils.rebalanceTable;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -170,7 +172,7 @@ public class OfflineNonReplicaGroupTieredSegmentAssignmentTest {
     Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
     for (String segmentName : SEGMENTS) {
       List<String> instancesAssigned =
-          _segmentAssignment.assignSegment(segmentName, currentAssignment, _instancePartitionsMap);
+          assignSegment(_segmentAssignment, segmentName, currentAssignment, _instancePartitionsMap);
       currentAssignment.put(segmentName,
           SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.ONLINE));
     }
@@ -191,7 +193,7 @@ public class OfflineNonReplicaGroupTieredSegmentAssignmentTest {
 
     // On rebalancing, segments move to tiers
     Map<String, Map<String, String>> newAssignment =
-        _segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, _sortedTiers,
+        rebalanceTable(_segmentAssignment, currentAssignment, _instancePartitionsMap, _sortedTiers,
             _tierInstancePartitionsMap, new RebalanceConfig());
     assertEquals(newAssignment.size(), NUM_SEGMENTS);
 
@@ -232,7 +234,7 @@ public class OfflineNonReplicaGroupTieredSegmentAssignmentTest {
 
     // rebalance without tierInstancePartitions resets the assignment
     Map<String, Map<String, String>> resetAssignment =
-        _segmentAssignment.rebalanceTable(newAssignment, _instancePartitionsMap, null, null, new RebalanceConfig());
+        rebalanceTable(_segmentAssignment, newAssignment, _instancePartitionsMap, null, null, new RebalanceConfig());
     for (String segment : SEGMENTS) {
       Assert.assertTrue(INSTANCES.containsAll(resetAssignment.get(segment).keySet()));
     }
@@ -246,7 +248,7 @@ public class OfflineNonReplicaGroupTieredSegmentAssignmentTest {
     // segment separately, we need to process the segments in the same order.
     for (String segmentName : new TreeSet<>(SEGMENTS)) {
       List<String> instancesAssigned =
-          _segmentAssignment.assignSegment(segmentName, currentAssignment, _instancePartitionsMap);
+          assignSegment(_segmentAssignment, segmentName, currentAssignment, _instancePartitionsMap);
       currentAssignment.put(segmentName,
           SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.ONLINE));
     }
@@ -255,7 +257,7 @@ public class OfflineNonReplicaGroupTieredSegmentAssignmentTest {
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setBootstrap(true);
     Map<String, Map<String, String>> newAssignment =
-        _segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, _sortedTiers,
+        rebalanceTable(_segmentAssignment, currentAssignment, _instancePartitionsMap, _sortedTiers,
             _tierInstancePartitionsMap, rebalanceConfig);
     assertEquals(newAssignment.size(), NUM_SEGMENTS);
 
@@ -308,7 +310,7 @@ public class OfflineNonReplicaGroupTieredSegmentAssignmentTest {
     }
 
     // First rebalance resolves the segment to tier map from the single bulk read
-    segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, _sortedTiers,
+    rebalanceTable(segmentAssignment, currentAssignment, _instancePartitionsMap, _sortedTiers,
         _tierInstancePartitionsMap, new RebalanceConfig());
     //noinspection unchecked
     verify(propertyStore, times(1)).getChildren(anyString(), eq(null), eq(AccessOption.PERSISTENT), anyInt(), anyInt());
@@ -319,7 +321,7 @@ public class OfflineNonReplicaGroupTieredSegmentAssignmentTest {
     currentAssignment.put(newSegment,
         SegmentAssignmentUtils.getInstanceStateMap(INSTANCES.subList(0, NUM_REPLICAS), SegmentStateModel.ONLINE));
     Map<String, Map<String, String>> newAssignment =
-        segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, _sortedTiers,
+        rebalanceTable(segmentAssignment, currentAssignment, _instancePartitionsMap, _sortedTiers,
             _tierInstancePartitionsMap, new RebalanceConfig());
 
     // No second bulk read happens, and the new segment is kept on the default instances (not relocated to tierC)

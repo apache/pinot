@@ -39,6 +39,8 @@ import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.tier.Tier;
+import org.apache.pinot.spi.config.table.RoutingConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.Pairs;
@@ -47,6 +49,22 @@ import org.apache.pinot.spi.utils.Pairs;
 /// Utility class for segment assignment.
 public class SegmentAssignmentUtils {
   private SegmentAssignmentUtils() {
+  }
+
+  /// Returns whether the table uses strict replica-group routing, which requires all segments of a partition to be
+  /// hosted by the same instances (upsert and dedup tables use it). The segment assignment pins the segments of such a
+  /// table to their partition, see [org.apache.pinot.common.assignment.PartitionAssignmentUtils].
+  public static boolean isStrictReplicaGroupRouting(TableConfig tableConfig) {
+    RoutingConfig routingConfig = tableConfig.getRoutingConfig();
+    return routingConfig != null && RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE.equalsIgnoreCase(
+        routingConfig.getInstanceSelectorType());
+  }
+
+  /// Returns `true` if all instances of the segment are OFFLINE (neither ONLINE nor CONSUMING), `false` otherwise.
+  /// OFFLINE segments are not rebalanced, so their assignment can be stale.
+  public static boolean isOfflineSegment(Map<String, String> instanceStateMap) {
+    return !instanceStateMap.containsValue(SegmentStateModel.ONLINE) && !instanceStateMap.containsValue(
+        SegmentStateModel.CONSUMING);
   }
 
   /// Returns the number of segments assigned to each instance.

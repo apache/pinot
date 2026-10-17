@@ -20,6 +20,13 @@ package org.apache.pinot.controller.helix.core.assignment.segment;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.helix.model.IdealState;
+import org.apache.pinot.common.assignment.InstancePartitions;
+import org.apache.pinot.common.restlet.resources.RebalanceConfig;
+import org.apache.pinot.common.tier.Tier;
+import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 
 
 public class SegmentAssignmentTestUtils {
@@ -33,5 +40,30 @@ public class SegmentAssignmentTestUtils {
       names.add(namePrefix + nameId);
     }
     return names;
+  }
+
+  /// Returns an ideal state holding the given segment assignment (the same map, not a copy) and no partition
+  /// assignment.
+  private static IdealState toIdealState(Map<String, Map<String, String>> segmentAssignment) {
+    IdealState idealState = new IdealState("testTable");
+    idealState.getRecord().setMapFields(segmentAssignment);
+    return idealState;
+  }
+
+  /// Assigns the segment with the given current segment assignment and no partition assignment.
+  public static List<String> assignSegment(SegmentAssignment segmentAssignment, String segmentName,
+      Map<String, Map<String, String>> currentAssignment,
+      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap) {
+    return segmentAssignment.assignSegment(segmentName, toIdealState(currentAssignment), instancePartitionsMap);
+  }
+
+  /// Rebalances the table with the given current segment assignment and no partition assignment, and returns the
+  /// rebalanced segment assignment.
+  public static Map<String, Map<String, String>> rebalanceTable(SegmentAssignment segmentAssignment,
+      Map<String, Map<String, String>> currentAssignment,
+      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap, @Nullable List<Tier> sortedTiers,
+      @Nullable Map<String, InstancePartitions> tierInstancePartitionsMap, RebalanceConfig config) {
+    return segmentAssignment.rebalanceTable(toIdealState(currentAssignment), instancePartitionsMap, sortedTiers,
+        tierInstancePartitionsMap, config).getSegmentAssignment();
   }
 }

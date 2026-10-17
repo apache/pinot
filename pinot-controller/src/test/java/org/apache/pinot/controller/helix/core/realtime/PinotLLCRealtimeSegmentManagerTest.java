@@ -2590,7 +2590,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
           committingSegmentInstanceStateMap != null && committingSegmentInstanceStateMap.containsValue(
               SegmentStateModel.CONSUMING), "Failed to find instance in CONSUMING state in IdealState for segment: %s",
           committingSegmentName);
-      updateInstanceStatesForNewConsumingSegment(_idealState.getRecord().getMapFields(), committingSegmentName,
+      updateInstanceStatesForNewConsumingSegment(_idealState, committingSegmentName,
           isTablePaused(_idealState) || isTopicPaused(_idealState, committingSegmentName) ? null : newSegmentName,
           segmentAssignment, instancePartitionsMap);
       return _idealState;

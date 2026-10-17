@@ -21,10 +21,8 @@ package org.apache.pinot.controller.helix.core.assignment.segment;
 import javax.annotation.Nullable;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.config.table.UpsertConfig;
 
 
 /// Factory for the [SegmentAssignment].
@@ -34,20 +32,9 @@ public class SegmentAssignmentFactory {
 
   public static SegmentAssignment getSegmentAssignment(HelixManager helixManager, TableConfig tableConfig,
       @Nullable ControllerMetrics controllerMetrics) {
-    SegmentAssignment segmentAssignment;
-    if (tableConfig.getTableType() == TableType.OFFLINE) {
-      segmentAssignment = new OfflineSegmentAssignment();
-    } else {
-      UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
-      DedupConfig dedupConfig = tableConfig.getDedupConfig();
-      if (upsertConfig != null && upsertConfig.getMode() != UpsertConfig.Mode.NONE) {
-        segmentAssignment = new SingleTierStrictRealtimeSegmentAssignment();
-      } else if (dedupConfig != null && dedupConfig.isDedupEnabled()) {
-        segmentAssignment = new MultiTierStrictRealtimeSegmentAssignment();
-      } else {
-        segmentAssignment = new RealtimeSegmentAssignment();
-      }
-    }
+    SegmentAssignment segmentAssignment =
+        tableConfig.getTableType() == TableType.OFFLINE ? new OfflineSegmentAssignment()
+            : new RealtimeSegmentAssignment();
     segmentAssignment.init(helixManager, tableConfig, controllerMetrics);
     return segmentAssignment;
   }
