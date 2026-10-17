@@ -24,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.function.IntFunction;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -197,10 +198,12 @@ public class AnyValueAggregationFunction extends BaseSingleInputAggregationFunct
         }
       });
     } else {
-      // Fall back to direct value access based on type
+      // Fall back to direct value access based on type. Read the values once per block: for a transform input, each
+      // get*ValuesSV() call evaluates the transform on the whole block again.
+      IntFunction<Object> valueReader = getDirectValueReader(bvs);
       forEachNotNull(length, bvs, (from, to) -> {
         for (int i = from; i < to; i++) {
-          Object value = getDirectValue(bvs, i);
+          Object value = valueReader.apply(i);
           if (value != null && processor.process(i, value)) {
             break;
           }
@@ -231,23 +234,38 @@ public class AnyValueAggregationFunction extends BaseSingleInputAggregationFunct
     }
   }
 
-  /// Get value directly from BlockValSet based on data type
-  private Object getDirectValue(BlockValSet bvs, int index) {
+  /// Returns a reader for the values of the BlockValSet based on data type. The values are read once, when this method
+  /// is called.
+  private IntFunction<Object> getDirectValueReader(BlockValSet bvs) {
     switch (bvs.getValueType().getStoredType()) {
-      case INT:
-        return bvs.getIntValuesSV()[index];
-      case LONG:
-        return bvs.getLongValuesSV()[index];
-      case FLOAT:
-        return bvs.getFloatValuesSV()[index];
-      case DOUBLE:
-        return bvs.getDoubleValuesSV()[index];
-      case STRING:
-        return bvs.getStringValuesSV()[index];
-      case BIG_DECIMAL:
-        return bvs.getBigDecimalValuesSV()[index];
-      case BYTES:
-        return new ByteArray(bvs.getBytesValuesSV()[index]);
+      case INT: {
+        int[] values = bvs.getIntValuesSV();
+        return i -> values[i];
+      }
+      case LONG: {
+        long[] values = bvs.getLongValuesSV();
+        return i -> values[i];
+      }
+      case FLOAT: {
+        float[] values = bvs.getFloatValuesSV();
+        return i -> values[i];
+      }
+      case DOUBLE: {
+        double[] values = bvs.getDoubleValuesSV();
+        return i -> values[i];
+      }
+      case STRING: {
+        String[] values = bvs.getStringValuesSV();
+        return i -> values[i];
+      }
+      case BIG_DECIMAL: {
+        BigDecimal[] values = bvs.getBigDecimalValuesSV();
+        return i -> values[i];
+      }
+      case BYTES: {
+        byte[][] values = bvs.getBytesValuesSV();
+        return i -> new ByteArray(values[i]);
+      }
       default:
         throw new IllegalStateException("Unsupported direct access type: " + bvs.getValueType().getStoredType());
     }
