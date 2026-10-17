@@ -27,6 +27,7 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.routing.MailboxInfo;
@@ -35,6 +36,7 @@ import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.routing.SharedMailboxInfos;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.mockito.Mockito;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -106,6 +108,10 @@ public class MailboxAssignmentVisitorTest extends QueryEnvironmentTestBase {
     assertFalse(senderMailboxes.get(1).get(RECEIVER_STAGE) instanceof SharedMailboxInfos);
     assertEquals(singleMailbox(senderMailboxes, 1, RECEIVER_STAGE).getHostname(), "host_C");
     assertEquals(singleMailbox(receiverMailboxes, 1, SENDER_STAGE).getHostname(), "host_B");
+    // Only the sender learns which instance is at the other end, see #assertOnlyReceiversCarryInstanceIdHash
+    assertEquals(singleMailbox(senderMailboxes, 1, RECEIVER_STAGE).getInstanceIdHash(),
+        QueryServerInstance.hashInstanceId("C"));
+    assertEquals(singleMailbox(receiverMailboxes, 1, SENDER_STAGE).getInstanceIdHash(), 0L);
   }
 
   /// A KEYED local exchange (a UNION ALL input carries the projected columns) whose worker counts do not divide
@@ -189,6 +195,7 @@ public class MailboxAssignmentVisitorTest extends QueryEnvironmentTestBase {
     assertEquals(senderToReceiver.getWorkerIds(), List.of(0, 1));
     assertEquals(singleMailbox(receiver.getWorkerIdToMailboxesMap(), 0, SENDER_STAGE).getHostname(), "host_A");
     assertEquals(singleMailbox(receiver.getWorkerIdToMailboxesMap(), 1, SENDER_STAGE).getHostname(), "host_A");
+    assertOnlyReceiversCarryInstanceIdHash(sender, receiver);
   }
 
   /// A mismatch means the one-class-list-per-colocated-group invariant regressed (see
@@ -216,6 +223,7 @@ public class MailboxAssignmentVisitorTest extends QueryEnvironmentTestBase {
     // Shuffled: every receiver worker reads from every sender worker, rather than only from the one with its own id.
     assertEquals(expandedWorkerIds(receiver.getWorkerIdToMailboxesMap(), 0, SENDER_STAGE), List.of(0, 1));
     assertEquals(expandedWorkerIds(receiver.getWorkerIdToMailboxesMap(), 1, SENDER_STAGE), List.of(0, 1));
+    assertOnlyReceiversCarryInstanceIdHash(sender, receiver);
   }
 
   /// The control for the test above: with both sides in the same class space the very same shapes are wired 1-to-1.
@@ -263,6 +271,74 @@ public class MailboxAssignmentVisitorTest extends QueryEnvironmentTestBase {
 
     assertTrue(sender.getWorkerIdToMailboxesMap().isEmpty());
     assertTrue(receiver.getWorkerIdToMailboxesMap().isEmpty());
+  }
+
+  /// Through the whole planner, each sender learns which instance each of its receivers is. The plans include exchanges
+  /// that wire workers 1-to-1, which both planners do in code of their own: the direct exchange of a colocated join,
+  /// and the identity exchange of the physical optimizer.
+  @Test(dataProvider = "queriesWithOneToOneExchanges")
+  public void testPlansTellSendersTheInstanceOfEachReceiver(String query) {
+    // By mailbox port, see QueryEnvironmentTestBase
+    Map<Integer, Long> instanceIdHashes = Map.of(
+        1, QueryServerInstance.hashInstanceId("Server_localhost_1"),
+        2, QueryServerInstance.hashInstanceId("Server_localhost_2"),
+        3, QueryServerInstance.hashInstanceId("Broker_localhost"));
+    boolean hasOneToOneExchange = false;
+    try (QueryEnvironment.CompiledQuery compiledQuery = _queryEnvironment.compile(query)) {
+      DispatchableSubPlan subPlan = compiledQuery.planQuery(0).getQueryPlan();
+      for (DispatchablePlanFragment fragment : subPlan.getQueryStageMap().values()) {
+        int stageId = fragment.getPlanFragment().getFragmentId();
+        for (WorkerMetadata workerMetadata : fragment.getWorkerMetadataList()) {
+          int workerId = workerMetadata.getWorkerId();
+          for (Map.Entry<Integer, MailboxInfos> entry : workerMetadata.getMailboxInfosMap().entrySet()) {
+            // The other stage receives from this one when its id is lower
+            if (entry.getKey() < stageId) {
+              List<MailboxInfo> receivers = entry.getValue().getMailboxInfos();
+              for (MailboxInfo mailboxInfo : receivers) {
+                assertEquals(mailboxInfo.getInstanceIdHash(), (long) instanceIdHashes.get(mailboxInfo.getPort()),
+                    "Stage: " + stageId + ", worker: " + workerId + ", mailbox: " + mailboxInfo);
+              }
+              hasOneToOneExchange |= workerId > 0 && receivers.size() == 1
+                  && receivers.get(0).getWorkerIds().equals(List.of(workerId));
+            }
+          }
+        }
+      }
+    }
+    assertTrue(hasOneToOneExchange, "No exchange wires workers 1-to-1 in the plan of: " + query);
+  }
+
+  @DataProvider
+  public Object[][] queriesWithOneToOneExchanges() {
+    return new Object[][]{
+        {"SELECT /*+ joinOptions(is_colocated_by_join_keys='true') */ a.col2, a.col3, b.col3 FROM a "
+            + "/*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */ JOIN b "
+            + "/*+ tableOptions(partition_function='hashcode', partition_key='col1', partition_size='4') */ "
+            + "ON a.col1 = b.col2 WHERE b.col3 > 0"},
+        {"SET usePhysicalOptimizer=true; WITH teamOne AS (SELECT col2, PERCENTILE(col3, 50) AS sum_of_runs FROM a "
+            + "GROUP BY col2), teamTwo AS (SELECT col2, PERCENTILE(col3, 50) AS sum_of_runs FROM a GROUP BY col2), "
+            + "all_teams AS (SELECT col2, sum_of_runs FROM teamOne UNION ALL SELECT col2, sum_of_runs FROM teamTwo) "
+            + "SELECT col2, PERCENTILE(sum_of_runs, 50) FROM all_teams GROUP BY col2"}
+    };
+  }
+
+  /// Senders learn which instance each receiver is, so that an instance that a stream reaches through a stale
+  /// connection rejects it. Receivers never connect to senders, so the lists of senders leave it out.
+  private static void assertOnlyReceiversCarryInstanceIdHash(DispatchablePlanMetadata sender,
+      DispatchablePlanMetadata receiver) {
+    for (Map<Integer, MailboxInfos> mailboxesMap : sender.getWorkerIdToMailboxesMap().values()) {
+      for (MailboxInfo mailboxInfo : mailboxesMap.get(RECEIVER_STAGE).getMailboxInfos()) {
+        // See #server(String)
+        String id = mailboxInfo.getHostname().substring("host_".length());
+        assertEquals(mailboxInfo.getInstanceIdHash(), QueryServerInstance.hashInstanceId(id),
+            String.valueOf(mailboxInfo));
+      }
+    }
+    for (Map<Integer, MailboxInfos> mailboxesMap : receiver.getWorkerIdToMailboxesMap().values()) {
+      for (MailboxInfo mailboxInfo : mailboxesMap.get(SENDER_STAGE).getMailboxInfos()) {
+        assertEquals(mailboxInfo.getInstanceIdHash(), 0L, String.valueOf(mailboxInfo));
+      }
+    }
   }
 
   private static QueryServerInstance server(String id) {

@@ -275,6 +275,17 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   public static final BrokerMeter MSE_STREAM_STATS_CANCEL_FANOUTS =
       create("MSE_STREAM_STATS_CANCEL_FANOUTS", "broadcasts", true);
 
+  /// Number of mailbox streams this broker rejected because they were addressed to another instance and reached this
+  /// one through a stale connection of the sender.
+  public static final BrokerMeter MULTI_STAGE_MISROUTED_REQUESTS_REJECTED =
+      create("MULTI_STAGE_MISROUTED_REQUESTS_REJECTED", "requests", true);
+
+  /// Number of requests this broker sent (stage plans, cancel and explain requests, and mailbox streams) that the
+  /// receiving instance rejected as addressed to another instance. Each one makes the broker reset its connection to
+  /// that address, at most once a second.
+  public static final BrokerMeter MULTI_STAGE_MISROUTED_REQUESTS_REJECTED_BY_PEER =
+      create("MULTI_STAGE_MISROUTED_REQUESTS_REJECTED_BY_PEER", "requests", true);
+
   /// How many MSE queries have encountered segments with invalid partitions.
   ///
   /// This is only emitted for when usePhysicalOptimizer is set to true.

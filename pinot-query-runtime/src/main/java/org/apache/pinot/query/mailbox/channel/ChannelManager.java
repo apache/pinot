@@ -29,6 +29,7 @@ import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 import java.time.Duration;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.query.grpc.GrpcKeepAliveConfig;
@@ -43,8 +44,13 @@ import org.slf4j.LoggerFactory;
 public class ChannelManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(ChannelManager.class);
 
+  /// A channel is refreshed at most once in this interval, see [#refreshChannel].
+  private static final long MIN_REFRESH_INTERVAL_NS = TimeUnit.SECONDS.toNanos(1);
+
   /// Map from (hostname, port) to the ManagedChannel with all known channels
   private final ConcurrentHashMap<Pair<String, Integer>, ManagedChannel> _channelMap = new ConcurrentHashMap<>();
+  /// When each channel was last refreshed, from [System#nanoTime()], by (hostname, port), see [#refreshChannel].
+  private final ConcurrentHashMap<Pair<String, Integer>, AtomicLong> _lastRefreshTimeNs = new ConcurrentHashMap<>();
   /// The idle timeout for the channel, which cannot be disabled in gRPC.
   ///
   /// In general we want to prevent the channel from going idle, so that we don't have to re-establish the connection
@@ -140,7 +146,7 @@ public class ChannelManager {
         return;
       }
       ConnectivityState next = channel.getState(false);
-      if (state == ConnectivityState.READY && next != ConnectivityState.READY) {
+      if (state == ConnectivityState.READY && next != ConnectivityState.READY && !isRecentlyRefreshed(hostname, port)) {
         LOGGER.warn("Mailbox channel to {}:{} left READY for {}; sends to that peer will fail until it "
             + "reconnects. If keep-alive reported it, the peer stopped answering about one keep-alive "
             + "interval ago.", hostname, port, next);
@@ -150,18 +156,63 @@ public class ChannelManager {
     return channel;
   }
 
-  /// Resets the connection backoff for the channel to the given server if the channel is in
-  /// TRANSIENT_FAILURE state. Returns true if a reset was performed, false otherwise.
+  /// Makes the channel to the given address resolve the hostname again and open a new connection before its next
+  /// stream, dropping the connection it has, and any reconnect backoff. Streams in flight finish on the old
+  /// connection. Returns false if there is no channel to the address, or if it was refreshed less than a second ago.
   ///
-  /// @return true if the channel was in TRANSIENT_FAILURE and backoff was reset
-  public boolean resetConnectBackoff(String hostname, int port) {
-    ManagedChannel channel = _channelMap.get(Pair.of(hostname, port));
-    if (channel != null && channel.getState(false) == ConnectivityState.TRANSIENT_FAILURE) {
-      LOGGER.info("Resetting mailbox channel backoff for server: {}:{}", hostname, port);
-      channel.resetConnectBackoff();
-      return true;
+  /// A channel resolves the hostname only when it starts, and again after a connection fails or is lost. When the
+  /// server at that address goes away, gRPC resolves once, right then, and keeps that answer until the next failure.
+  /// If DNS still had the old IP address at that moment (a terminating pod stays in DNS for a while), the channel
+  /// later reconnects to the old address, and when another server took that address over and listens on the same
+  /// port, the connection succeeds and is never questioned again. Call this when the address is known to be stale or
+  /// suspect: the receiver rejected a stream as meant for someone else, or the server at the address has restarted.
+  ///
+  /// Moving the channel to IDLE, rather than replacing it, keeps the channel object that concurrent senders may
+  /// already hold valid. The refreshes are limited to one a second, because a stale connection usually fails many
+  /// streams at once, and each refresh drops the connection that the previous one opened.
+  public boolean refreshChannel(String hostname, int port) {
+    Pair<String, Integer> key = Pair.of(hostname, port);
+    ManagedChannel channel = _channelMap.get(key);
+    if (channel == null) {
+      return false;
     }
-    return false;
+    long nowNs = System.nanoTime();
+    AtomicLong lastRefreshTimeNs =
+        _lastRefreshTimeNs.computeIfAbsent(key, k -> new AtomicLong(nowNs - MIN_REFRESH_INTERVAL_NS));
+    long lastNs = lastRefreshTimeNs.get();
+    if (nowNs - lastNs < MIN_REFRESH_INTERVAL_NS || !lastRefreshTimeNs.compareAndSet(lastNs, nowNs)) {
+      return false;
+    }
+    channel.enterIdle();
+    return true;
+  }
+
+  private boolean isRecentlyRefreshed(String hostname, int port) {
+    AtomicLong lastRefreshTimeNs = _lastRefreshTimeNs.get(Pair.of(hostname, port));
+    return lastRefreshTimeNs != null && System.nanoTime() - lastRefreshTimeNs.get() < MIN_REFRESH_INTERVAL_NS;
+  }
+
+  /// Removes the channel to the given address and shuts it down, letting streams in flight finish. Use it for an
+  /// address that is no longer used, such as the old mailbox port of a server that restarted on another port, so
+  /// that channels do not pile up. Returns false if there is no channel to the address.
+  public boolean retireChannel(String hostname, int port) {
+    Pair<String, Integer> key = Pair.of(hostname, port);
+    ManagedChannel channel = _channelMap.remove(key);
+    if (channel == null) {
+      return false;
+    }
+    _lastRefreshTimeNs.remove(key);
+    channel.shutdown();
+    return true;
+  }
+
+  /// Shuts down all channels, letting streams in flight finish.
+  public void shutdown() {
+    for (ManagedChannel channel : _channelMap.values()) {
+      channel.shutdown();
+    }
+    _channelMap.clear();
+    _lastRefreshTimeNs.clear();
   }
 
   private NettyChannelBuilder decorate(NettyChannelBuilder builder) {

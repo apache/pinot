@@ -65,6 +65,7 @@ import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsMa
 import org.apache.pinot.core.util.DataBlockExtractUtils;
 import org.apache.pinot.core.util.trace.TracedThreadFactory;
 import org.apache.pinot.query.grpc.GrpcKeepAliveConfig;
+import org.apache.pinot.query.grpc.ReceiverIdentity;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
@@ -124,6 +125,9 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
   private final MailboxService _mailboxService;
   private final ExecutorService _executorService;
   private final Map<String, DispatchClient> _dispatchClientMap = new ConcurrentHashMap<>();
+  /// Last known dispatch address of each server, by instance id, kept by [#onServerEnabled] to retire the dispatch
+  /// client of an address a server has left.
+  private final Map<String, String> _dispatchAddressByInstanceId = new ConcurrentHashMap<>();
   @Nullable
   private final TlsConfig _tlsConfig;
   @Nullable
@@ -704,7 +708,8 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
     return dispatchCallbacks;
   }
 
-  private <E> void processResults(long requestId, int numServers, BiConsumer<E, QueryServerInstance> resultConsumer,
+  @VisibleForTesting
+  <E> void processResults(long requestId, int numServers, BiConsumer<E, QueryServerInstance> resultConsumer,
       Deadline deadline, BlockingQueue<AsyncResponse<E>> dispatchCallbacks)
       throws InterruptedException, TimeoutException {
     int numSuccessCalls = 0;
@@ -714,6 +719,16 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
           dispatchCallbacks.poll(Math.max(1, deadline.timeRemaining(TimeUnit.MILLISECONDS)), TimeUnit.MILLISECONDS);
       if (resp != null) {
         if (resp.getThrowable() != null) {
+          String misroutedTo = ReceiverIdentity.getMisroutedTo(resp.getThrowable());
+          if (misroutedTo != null) {
+            // The server is fine, but the connection of the broker to it leads to another instance. The dispatch
+            // client has already reset the connection, so the next query reaches the server. Do not mark the server
+            // unhealthy.
+            throw new QueryException(QueryErrorCode.SERVER_NOT_RESPONDING, String.format(
+                "Query: %d was sent to server: %s but reached %s, because the connection of the broker to that "
+                    + "server is stale. The broker reset the connection. Retry the query.", requestId,
+                resp.getServerInstance().getInstanceId(), misroutedTo));
+          }
           // If it's a connectivity issue between the broker and the server, mark the server as unhealthy to prevent
           // subsequent query failures
           if (getOrCreateDispatchClient(resp.getServerInstance()).getChannel().getState(false)
@@ -876,7 +891,7 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
     }
     for (QueryServerInstance queryServerInstance : servers) {
       try {
-        getOrCreateDispatchClient(queryServerInstance).cancelAsync(requestId);
+        getOrCreateDispatchClient(queryServerInstance).cancelAsync(requestId, queryServerInstance);
       } catch (Throwable t) {
         LOGGER.warn("Caught exception while cancelling query: {} on server: {}", requestId, queryServerInstance, t);
       }
@@ -896,16 +911,31 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
             _dispatchMaxInboundMessageSizeBytes));
   }
 
-  /// Reset the connection backoff for a server. When the GRPC channel enters a TRANSIENT_FAILURE state from
-  /// connection failures, it will fast fail requests and reconnect with exponential backoff. This method
-  /// resets the backoff so servers that have recovered can be reconnected to immediately.
-  public void resetClientConnectionBackoff(ServerInstance serverInstance) {
-    String hostname = serverInstance.getHostname();
-    int port = serverInstance.getQueryServicePort();
-    DispatchClient dispatchClient = _dispatchClientMap.get(toHostnamePortKey(hostname, port));
+  /// Called when a server becomes routable, which it does when it starts and when it is enabled again after it was
+  /// disabled or excluded. The server may have restarted at a new address, so:
+  ///
+  /// - the channel to its address resolves the hostname again before the next request, and connects without
+  ///   reconnect backoff. A channel resolves only when a connection fails or is lost, and the last time was likely
+  ///   when the server went away, while DNS could still have the old IP address. Reconnecting to that address could
+  ///   reach another server that took it over.
+  /// - the channel to its previous address, if the server moved to another port, is shut down, since nothing uses it
+  ///   again.
+  public void onServerEnabled(ServerInstance serverInstance) {
+    String hostnamePortKey = toHostnamePortKey(serverInstance.getHostname(), serverInstance.getQueryServicePort());
+    String previousKey = _dispatchAddressByInstanceId.put(serverInstance.getInstanceId(), hostnamePortKey);
+    if (previousKey != null && !previousKey.equals(hostnamePortKey)
+        && !_dispatchAddressByInstanceId.containsValue(previousKey)) {
+      DispatchClient previousClient = _dispatchClientMap.remove(previousKey);
+      if (previousClient != null) {
+        LOGGER.info("Server: {} moved from {} to {}, shutting down the dispatch channel to the old address",
+            serverInstance.getInstanceId(), previousKey, hostnamePortKey);
+        previousClient.getChannel().shutdown();
+      }
+    }
+    DispatchClient dispatchClient = _dispatchClientMap.get(hostnamePortKey);
     if (dispatchClient != null) {
-      LOGGER.info("Resetting connection backoff for server: {}", serverInstance.getInstanceId());
-      dispatchClient.getChannel().resetConnectBackoff();
+      LOGGER.info("Server: {} is enabled, refreshing the dispatch channel to it", serverInstance.getInstanceId());
+      dispatchClient.refreshChannel();
     }
   }
 
