@@ -21,10 +21,16 @@ package org.apache.pinot.query.planner.logical;
 import java.util.List;
 import java.util.Map;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.MatchNode;
+import org.apache.pinot.query.planner.plannode.PatternSymbol;
+import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.plannode.RowPattern;
 import org.apache.pinot.query.planner.plannode.WindowNode.WindowExclusion;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -39,6 +45,10 @@ public class EquivalentStagesFinderTest extends StagesTestBase {
   private final DataSchema _dataSchema2 = new DataSchema(
       new String[]{"col2"},
       new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING}
+  );
+  private final DataSchema _matchDataSchema = new DataSchema(
+      new String[]{"col1", "value"},
+      new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT}
   );
 
   @Test
@@ -221,6 +231,69 @@ public class EquivalentStagesFinderTest extends StagesTestBase {
     assertEquals(result.toString(), "[[0], [1], [2]]");
   }
 
+  @Test
+  public void sameMatchKeepsEquivalence() {
+    when(
+        join(
+            exchange(1, match(tableScan("T1"), "baseline")),
+            exchange(2, match(tableScan("T1"), "baseline"))
+        )
+    );
+    GroupedStages result = EquivalentStagesFinder.findEquivalentStages(stage(0));
+    assertEquals(result.toString(), "[[0], [1, 2]]");
+  }
+
+  @Test(dataProvider = "nonEquivalentMatchProperties")
+  public void differentMatchPropertiesBreakEquivalence(String variation) {
+    when(
+        join(
+            exchange(1, match(tableScan("T1"), "baseline")),
+            exchange(2, match(tableScan("T1"), variation))
+        )
+    );
+    GroupedStages result = EquivalentStagesFinder.findEquivalentStages(stage(0));
+    assertEquals(result.toString(), "[[0], [1], [2]]",
+        "MATCH_RECOGNIZE stages that differ in " + variation + " must not be spooled together");
+  }
+
+  @Test
+  public void differentMatchInputsBreakEquivalence() {
+    when(
+        join(
+            exchange(1, match(tableScan("T1"), "baseline")),
+            exchange(2, match(tableScan("T2"), "baseline"))
+        )
+    );
+    GroupedStages result = EquivalentStagesFinder.findEquivalentStages(stage(0));
+    assertEquals(result.toString(), "[[0], [1], [2]]");
+  }
+
+  @Test
+  public void matchAndDifferentNodeTypeBreakEquivalence() {
+    when(
+        join(
+            exchange(1, tableScan("T1").withDataSchema(_matchDataSchema)),
+            exchange(2, match(tableScan("T1"), "baseline"))
+        )
+    );
+    GroupedStages result = EquivalentStagesFinder.findEquivalentStages(stage(0));
+    assertEquals(result.toString(), "[[0], [1], [2]]");
+  }
+
+  @DataProvider(name = "nonEquivalentMatchProperties")
+  public static Object[][] nonEquivalentMatchProperties() {
+    return new Object[][]{
+        {"pattern symbols"},
+        {"pattern"},
+        {"measures"},
+        {"partition keys"},
+        {"collations"},
+        {"skip mode"},
+        {"skip target"},
+        {"rows per match"}
+    };
+  }
+
   /// The group keys only hold the union of the grouping columns, so `ROLLUP(col1, col2)` and `CUBE(col1, col2)` agree
   /// on every other field (including the data schema) and are only told apart by the grouping sets themselves.
   @Test
@@ -285,6 +358,60 @@ public class EquivalentStagesFinderTest extends StagesTestBase {
   private static RexExpression comparison(SqlKind kind) {
     return new RexExpression.FunctionCall(DataSchema.ColumnDataType.BOOLEAN, kind.name(),
         List.of(new RexExpression.InputRef(0), new RexExpression.InputRef(1)));
+  }
+
+  private SimpleChildBuilder<MatchNode> match(SimpleChildBuilder<? extends PlanNode> childBuilder,
+      String variation) {
+    return (stageId, mySchema, myHints) -> {
+      PlanNode input = childBuilder.build(stageId);
+      List<PatternSymbol> patternSymbols = List.of(new PatternSymbol("A", null), new PatternSymbol("B", null));
+      RowPattern pattern = new RowPattern.Concat(List.of(
+          new RowPattern.Quantifier(new RowPattern.Symbol(0), 1, RowPattern.Quantifier.UNBOUNDED, true),
+          new RowPattern.Symbol(1)));
+      List<MatchNode.Measure> measures = List.of(
+          new MatchNode.Measure("value", new RexExpression.PatternFieldRef(0, 0, "A")));
+      List<Integer> partitionKeys = List.of(0);
+      List<RelFieldCollation> collations = List.of(new RelFieldCollation(0));
+      MatchNode.AfterMatchSkipMode skipMode = MatchNode.AfterMatchSkipMode.TO_FIRST;
+      int skipTarget = 0;
+      MatchNode.RowsPerMatchMode rowsPerMatchMode = MatchNode.RowsPerMatchMode.ONE_ROW_PER_MATCH;
+
+      switch (variation) {
+        case "baseline":
+          break;
+        case "pattern symbols":
+          patternSymbols = List.of(new PatternSymbol("A", RexExpression.Literal.FALSE),
+              new PatternSymbol("B", null));
+          break;
+        case "pattern":
+          pattern = new RowPattern.Concat(List.of(new RowPattern.Symbol(0), new RowPattern.Symbol(1)));
+          break;
+        case "measures":
+          measures = List.of(new MatchNode.Measure("value", new RexExpression.PatternFieldRef(0, 1, "B")));
+          break;
+        case "partition keys":
+          partitionKeys = List.of();
+          break;
+        case "collations":
+          collations = List.of(new RelFieldCollation(0, RelFieldCollation.Direction.DESCENDING));
+          break;
+        case "skip mode":
+          skipMode = MatchNode.AfterMatchSkipMode.TO_LAST;
+          break;
+        case "skip target":
+          skipTarget = 1;
+          break;
+        case "rows per match":
+          rowsPerMatchMode = MatchNode.RowsPerMatchMode.ALL_ROWS_PER_MATCH;
+          break;
+        default:
+          throw new IllegalArgumentException("Unknown variation: " + variation);
+      }
+
+      DataSchema dataSchema = mySchema != null ? mySchema : _matchDataSchema;
+      return new MatchNode(stageId, dataSchema, myHints, List.of(input), patternSymbols, pattern, measures,
+          partitionKeys, collations, skipMode, skipTarget, rowsPerMatchMode);
+    };
   }
 
   @Test
