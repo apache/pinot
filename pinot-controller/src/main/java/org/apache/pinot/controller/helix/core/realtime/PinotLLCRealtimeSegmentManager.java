@@ -2879,7 +2879,9 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
   ///
   /// API signature: POST http://\[serverURL\]/reingestSegment/\[segmentName\] Request body (JSON):
   ///
-  /// If segment is in ERROR state in only few replicas but has download URL, we instead trigger a segment reset
+  /// If a segment is in ERROR state in only some replicas, or is committed, we instead reset the ERROR replicas so
+  /// they reload from a peer or from the deep store. Only re-ingestion is gated on dedup / partial upsert (it can
+  /// admit duplicate or inconsistent rows); resets run for every table so a lagging replica can recover.
   ///
   /// @param tableConfig The table config
   public void repairSegmentsInErrorState(TableConfig tableConfig,
@@ -2956,22 +2958,14 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     boolean repairCommittingSegments =
         allowRepairOfCommittingSegments(repairErrorSegmentsForPartialUpsertOrDedup, tableConfig);
     int segmentsInUnRecoverableState = 0;
-    if (isPauselessTable && !repairCommittingSegments) {
-      // We do not run reingestion for dedup and partial upsert tables in pauseless as it can
-      // lead to data inconsistencies
-      _controllerMetrics.setOrUpdateTableGauge(realtimeTableName,
-          ControllerGauge.PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT, segmentsInErrorStateInAllReplicas.size());
-      return;
-    } else {
-      LOGGER.info("Repairing error segments in table: {}.", realtimeTableName);
-    }
 
+    // Count segments with any ERROR replica so a single lagging replica is visible in the metric
     if (isPauselessTable) {
       _controllerMetrics.setOrUpdateTableGauge(realtimeTableName, ControllerGauge.PAUSELESS_SEGMENTS_IN_ERROR_COUNT,
-          segmentsInErrorStateInAllReplicas.size());
+          segmentsInErrorStateInAtLeastOneReplica.size());
     } else {
       _controllerMetrics.setOrUpdateTableGauge(realtimeTableName, ControllerGauge.SEGMENTS_IN_ERROR_STATE,
-          segmentsInErrorStateInAllReplicas.size());
+          segmentsInErrorStateInAtLeastOneReplica.size());
     }
 
     for (String segmentName : segmentsInErrorStateInAtLeastOneReplica) {
@@ -2983,14 +2977,20 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
       }
 
       Status status = segmentZKMetadata.getStatus();
+      Map<String, String> currentStateMap = segmentToInstanceCurrentStateMap.get(segmentName);
 
-      // 1) For COMMITTING segments where all replicas are in ERROR, try re-ingestion (subject to policy)
+      // 1) For COMMITTING segments where all replicas are in ERROR, try re-ingestion (subject to policy). Re-ingestion
+      // is the only repair that can admit duplicate or inconsistent rows on dedup / partial upsert tables, so it is
+      // the only repair gated on repairCommittingSegments. The resets below only reload data another replica or the
+      // deep store already holds, so they stay enabled for such tables.
       if (status == Status.COMMITTING && segmentsInErrorStateInAllReplicas.contains(segmentName)) {
         if (!repairCommittingSegments) {
           segmentsInUnRecoverableState += 1;
-          LOGGER.info(
-              "Segment: {} in table: {} is COMMITTING with all replicas in ERROR state. Skipping re-ingestion since "
-                  + "repairErrorSegments is false.",
+          LOGGER.warn(
+              "Segment: {} in table: {} is COMMITTING with all replicas in ERROR state. Skipping re-ingestion because "
+                  + "repair of committing segments is disabled for dedup and partial upsert tables. Set "
+                  + "disasterRecoveryMode=ALWAYS or run the validation task with "
+                  + "repairErrorSegmentsForPartialUpsertOrDedup=true to repair it.",
               segmentName, realtimeTableName);
           continue;
         }
@@ -3020,19 +3020,37 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
       if (status == Status.IN_PROGRESS && segmentsInErrorStateInAllReplicas.contains(segmentName)) {
         LOGGER.info("Resetting IN_PROGRESS segment: {} in table: {} since all replicas are in ERROR state.",
             segmentName, realtimeTableName);
-        _helixResourceManager.resetSegment(realtimeTableName, segmentName, null);
+        resetErrorReplicas(realtimeTableName, segmentName, currentStateMap);
         continue;
       }
 
       // 3) For all other non-IN_PROGRESS statuses with any ERROR replica, trigger a reset to download/refresh
       if (status != Status.IN_PROGRESS) {
-        _helixResourceManager.resetSegment(realtimeTableName, segmentName, null);
+        resetErrorReplicas(realtimeTableName, segmentName, currentStateMap);
       }
     }
 
     if (isPauselessTable) {
       _controllerMetrics.setOrUpdateTableGauge(realtimeTableName,
           ControllerGauge.PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT, segmentsInUnRecoverableState);
+    }
+  }
+
+  /// Resets only the replicas of the segment that are in ERROR state in the external view. Healthy replicas are left
+  /// untouched: resetting a healthy replica takes it through OFFLINE, which on dedup / upsert tables briefly drops its
+  /// keys from the metadata manager while other replicas keep consuming, and can make the only good copy of a
+  /// segment without a deep-store copy unavailable.
+  private void resetErrorReplicas(String realtimeTableName, String segmentName, Map<String, String> currentStateMap) {
+    for (Map.Entry<String, String> entry : currentStateMap.entrySet()) {
+      if (SegmentStateModel.ERROR.equals(entry.getValue())) {
+        String instanceName = entry.getKey();
+        try {
+          _helixResourceManager.resetSegment(realtimeTableName, segmentName, instanceName);
+        } catch (Exception e) {
+          LOGGER.error("Failed to reset segment: {} in table: {} on instance: {}", segmentName, realtimeTableName,
+              instanceName, e);
+        }
+      }
     }
   }
 
@@ -3066,8 +3084,8 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
         == UpsertConfig.Mode.PARTIAL);
     if (isPartialUpsertEnabled) {
       // If isPartialUpsert is enabled, do not allow repair.
-      LOGGER.warn("Skipping repair for errored segments in table: {} because partialUpsert is enabled",
-          tableConfig.getTableName());
+      LOGGER.warn("Disallowing re-ingestion of errored COMMITTING segments in table: {} because partialUpsert is "
+          + "enabled", tableConfig.getTableName());
       return false;
     }
 
@@ -3075,7 +3093,7 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     boolean isDedupEnabled = (dedupConfig != null) && (dedupConfig.isDedupEnabled());
     if (isDedupEnabled) {
       // If dedup is enabled, do not allow repair of error segment.
-      LOGGER.warn("Skipping repair for errored segments in table: {} because dedup is enabled",
+      LOGGER.warn("Disallowing re-ingestion of errored COMMITTING segments in table: {} because dedup is enabled",
           tableConfig.getTableName());
       return false;
     }

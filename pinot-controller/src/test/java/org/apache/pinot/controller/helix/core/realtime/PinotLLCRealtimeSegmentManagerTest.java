@@ -56,9 +56,11 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
+import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.restlet.resources.BatchConfig;
 import org.apache.pinot.common.restlet.resources.PauseStatusDetails;
@@ -77,6 +79,7 @@ import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
+import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.DisasterRecoveryMode;
 import org.apache.pinot.spi.config.table.PauseState;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
@@ -2316,6 +2319,118 @@ public class PinotLLCRealtimeSegmentManagerTest {
   }
 
   @Test
+  public void testRepairSegmentsInErrorStateResetsOnlyErrorReplicasForPauselessDedupTable()
+      throws InvalidConfigException {
+    PinotHelixResourceManager mockHelixResourceManager = mock(PinotHelixResourceManager.class);
+    ControllerMetrics mockControllerMetrics = mock(ControllerMetrics.class);
+    FakePinotLLCRealtimeSegmentManager segmentManager =
+        new FakePinotLLCRealtimeSegmentManager(mockHelixResourceManager, mockControllerMetrics);
+    TableConfig tableConfig = createPauselessDedupTableConfig();
+
+    String server0 = Helix.PREFIX_OF_SERVER_INSTANCE + 0;
+    String server1 = Helix.PREFIX_OF_SERVER_INSTANCE + 1;
+    String committingPartialErrorSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+    String committingAllErrorSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 1, CURRENT_TIME_MS).getSegmentName();
+    String doneSegment = new LLCSegmentName(RAW_TABLE_NAME, 1, 0, CURRENT_TIME_MS).getSegmentName();
+    String inProgressSegment = new LLCSegmentName(RAW_TABLE_NAME, 1, 1, CURRENT_TIME_MS).getSegmentName();
+
+    IdealState idealState = new IdealState(REALTIME_TABLE_NAME);
+    ExternalView externalView = new ExternalView(REALTIME_TABLE_NAME);
+    for (String segment : List.of(committingPartialErrorSegment, committingAllErrorSegment, doneSegment,
+        inProgressSegment)) {
+      idealState.setPartitionState(segment, server0, SegmentStateModel.ONLINE);
+      idealState.setPartitionState(segment, server1, SegmentStateModel.ONLINE);
+    }
+    externalView.setState(committingPartialErrorSegment, server0, SegmentStateModel.ONLINE);
+    externalView.setState(committingPartialErrorSegment, server1, SegmentStateModel.ERROR);
+    externalView.setState(committingAllErrorSegment, server0, SegmentStateModel.ERROR);
+    externalView.setState(committingAllErrorSegment, server1, SegmentStateModel.ERROR);
+    externalView.setState(doneSegment, server0, SegmentStateModel.ONLINE);
+    externalView.setState(doneSegment, server1, SegmentStateModel.ERROR);
+    externalView.setState(inProgressSegment, server0, SegmentStateModel.ERROR);
+    externalView.setState(inProgressSegment, server1, SegmentStateModel.ERROR);
+    segmentManager._idealState = idealState;
+    when(mockHelixResourceManager.getTableExternalView(REALTIME_TABLE_NAME)).thenReturn(externalView);
+    mockSegmentZKMetadataStatus(mockHelixResourceManager, committingPartialErrorSegment, Status.COMMITTING);
+    mockSegmentZKMetadataStatus(mockHelixResourceManager, committingAllErrorSegment, Status.COMMITTING);
+    mockSegmentZKMetadataStatus(mockHelixResourceManager, doneSegment, Status.DONE);
+    mockSegmentZKMetadataStatus(mockHelixResourceManager, inProgressSegment, Status.IN_PROGRESS);
+
+    segmentManager.repairSegmentsInErrorState(tableConfig, false);
+
+    // ERROR replicas are reset even though dedup is enabled, since a reset only reloads data a peer or the deep
+    // store already holds
+    verify(mockHelixResourceManager).resetSegment(REALTIME_TABLE_NAME, committingPartialErrorSegment, server1);
+    verify(mockHelixResourceManager).resetSegment(REALTIME_TABLE_NAME, doneSegment, server1);
+    verify(mockHelixResourceManager).resetSegment(REALTIME_TABLE_NAME, inProgressSegment, server0);
+    verify(mockHelixResourceManager).resetSegment(REALTIME_TABLE_NAME, inProgressSegment, server1);
+    // Healthy replicas are never reset, and no untargeted (all-replica) reset is issued
+    verify(mockHelixResourceManager, never()).resetSegment(eq(REALTIME_TABLE_NAME), anyString(), isNull());
+    verify(mockHelixResourceManager, never()).resetSegment(REALTIME_TABLE_NAME, committingPartialErrorSegment,
+        server0);
+    verify(mockHelixResourceManager, never()).resetSegment(REALTIME_TABLE_NAME, doneSegment, server0);
+    // The COMMITTING segment with all replicas in ERROR is neither reset nor re-ingested without the override
+    verify(mockHelixResourceManager, never()).resetSegment(eq(REALTIME_TABLE_NAME), eq(committingAllErrorSegment),
+        any());
+    verify(mockHelixResourceManager, never()).getDataInstanceAdminEndpoints(any());
+    // Every segment with an ERROR replica is counted, and only the segment left unrepaired is unrecoverable
+    verify(mockControllerMetrics).setOrUpdateTableGauge(REALTIME_TABLE_NAME,
+        ControllerGauge.PAUSELESS_SEGMENTS_IN_ERROR_COUNT, 4L);
+    verify(mockControllerMetrics).setOrUpdateTableGauge(REALTIME_TABLE_NAME,
+        ControllerGauge.PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT, 1L);
+  }
+
+  @Test
+  public void testRepairSegmentsInErrorStateReingestsCommittingSegmentForDedupTableWithOverride()
+      throws InvalidConfigException {
+    PinotHelixResourceManager mockHelixResourceManager = mock(PinotHelixResourceManager.class);
+    FakePinotLLCRealtimeSegmentManager segmentManager =
+        new FakePinotLLCRealtimeSegmentManager(mockHelixResourceManager);
+    TableConfig tableConfig = createPauselessDedupTableConfig();
+
+    String server0 = Helix.PREFIX_OF_SERVER_INSTANCE + 0;
+    String server1 = Helix.PREFIX_OF_SERVER_INSTANCE + 1;
+    String committingAllErrorSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+
+    IdealState idealState = new IdealState(REALTIME_TABLE_NAME);
+    idealState.setPartitionState(committingAllErrorSegment, server0, SegmentStateModel.ONLINE);
+    idealState.setPartitionState(committingAllErrorSegment, server1, SegmentStateModel.ONLINE);
+    ExternalView externalView = new ExternalView(REALTIME_TABLE_NAME);
+    externalView.setState(committingAllErrorSegment, server0, SegmentStateModel.ERROR);
+    externalView.setState(committingAllErrorSegment, server1, SegmentStateModel.ERROR);
+    segmentManager._idealState = idealState;
+    when(mockHelixResourceManager.getTableExternalView(REALTIME_TABLE_NAME)).thenReturn(externalView);
+    mockSegmentZKMetadataStatus(mockHelixResourceManager, committingAllErrorSegment, Status.COMMITTING);
+
+    segmentManager.repairSegmentsInErrorState(tableConfig, true);
+
+    // With the override, the re-ingestion path is taken (server lookup is attempted) and no reset is issued
+    verify(mockHelixResourceManager).getDataInstanceAdminEndpoints(any());
+    verify(mockHelixResourceManager, never()).resetSegment(any(), any(), any());
+  }
+
+  private TableConfig createPauselessDedupTableConfig() {
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    StreamIngestionConfig streamIngestionConfig = new StreamIngestionConfig(
+        List.of(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap()));
+    streamIngestionConfig.setPauselessConsumptionEnabled(true);
+    ingestionConfig.setStreamIngestionConfig(streamIngestionConfig);
+    return new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
+        .setNumReplicas(2)
+        .setIngestionConfig(ingestionConfig)
+        .setDedupConfig(new DedupConfig())
+        .build();
+  }
+
+  private void mockSegmentZKMetadataStatus(PinotHelixResourceManager mockHelixResourceManager, String segmentName,
+      Status status) {
+    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
+    segmentZKMetadata.setStatus(status);
+    when(mockHelixResourceManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentName))
+        .thenReturn(segmentZKMetadata);
+  }
+
+  @Test
   public void testOnChangeUpdatesMaxSegmentCompletionTime() {
     FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager();
 
@@ -2453,7 +2568,12 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     FakePinotLLCRealtimeSegmentManager(PinotHelixResourceManager pinotHelixResourceManager) {
-      super(pinotHelixResourceManager, CONTROLLER_CONF, mock(ControllerMetrics.class));
+      this(pinotHelixResourceManager, mock(ControllerMetrics.class));
+    }
+
+    FakePinotLLCRealtimeSegmentManager(PinotHelixResourceManager pinotHelixResourceManager,
+        ControllerMetrics controllerMetrics) {
+      super(pinotHelixResourceManager, CONTROLLER_CONF, controllerMetrics);
       _mockResourceManager = pinotHelixResourceManager;
     }
 
