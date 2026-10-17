@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.nio.ByteOrder;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -34,11 +33,11 @@ import org.apache.lucene.document.Document;
 import org.apache.lucene.document.DocumentStoredFieldVisitor;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.FieldInfo;
-import org.apache.lucene.index.IndexCommit;
 import org.apache.lucene.index.IndexFormatTooOldException;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexableField;
 import org.apache.lucene.index.SegmentInfos;
+import org.apache.lucene.index.StandardDirectoryReader;
 import org.apache.lucene.index.StoredFields;
 import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.queryparser.classic.QueryParserBase;
@@ -95,50 +94,8 @@ public class LuceneTextIndexReader implements TextIndexReader {
     try {
       return DirectoryReader.open(directory);
     } catch (IndexFormatTooOldException e) {
-      SegmentInfos segmentInfos = SegmentInfos.readLatestCommit(directory, 8);
-      IndexCommit commit = new IndexCommit() {
-        @Override
-        public String getSegmentsFileName() {
-          return segmentInfos.getSegmentsFileName();
-        }
-
-        @Override
-        public Collection<String> getFileNames()
-            throws IOException {
-          return segmentInfos.files(true);
-        }
-
-        @Override
-        public Directory getDirectory() {
-          return directory;
-        }
-
-        @Override
-        public void delete() {
-          throw new UnsupportedOperationException("Cannot delete an immutable text index commit");
-        }
-
-        @Override
-        public boolean isDeleted() {
-          return false;
-        }
-
-        @Override
-        public int getSegmentCount() {
-          return segmentInfos.size();
-        }
-
-        @Override
-        public long getGeneration() {
-          return segmentInfos.getGeneration();
-        }
-
-        @Override
-        public Map<String, String> getUserData() {
-          return segmentInfos.getUserData();
-        }
-      };
-      return DirectoryReader.open(commit, 8, null);
+      // This lower-level reader accepts the Lucene 8 commit rejected by the default version check.
+      return StandardDirectoryReader.open(directory, SegmentInfos.readLatestCommit(directory, 8), null, null);
     }
   }
 
