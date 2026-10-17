@@ -22,6 +22,7 @@ import com.fasterxml.jackson.core.JsonParseException;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
@@ -30,6 +31,7 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
 import org.apache.pinot.segment.spi.index.IndexCreator;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.readers.ColumnReader;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.PinotDataType;
@@ -243,6 +245,69 @@ public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
         }
       } catch (JsonParseException jpe) {
         throw new ColumnJsonParserException(columnName, jpe);
+      }
+    }
+  }
+
+  /// Internal SV path for the provider-backed driver: transforms have already run, so JSON must not be converted
+  /// again. Bind creators once and resolve one dictionary ID per cell, sharing the value with deferred statistics.
+  void indexNormalizedColumn(String columnName, ColumnReader reader, @Nullable Consumer<Object> statistics)
+      throws IOException {
+    int numDocs = reader.getTotalDocs();
+    if (numDocs == 0) {
+      return;
+    }
+    if (numDocs != _totalDocs) {
+      throw new IllegalStateException("Column document count changed: " + columnName);
+    }
+    reader.rewind();
+    ColumnIndexCreators indexes = _colIndexes.get(columnName);
+    SegmentDictionaryCreator dictionary = indexes.getDictionaryCreator();
+    IndexCreator[] creators = indexes.getIndexCreators().toArray(IndexCreator[]::new);
+    DataType type = _schema.getFieldSpecFor(columnName).getDataType().getStoredType();
+    for (int doc = 0; doc < numDocs; doc++) {
+      Object value = reader.getValue(doc);
+      if (value == null) {
+        throw new IllegalStateException("Normalized value is null for column: " + columnName);
+      }
+      if (statistics != null) {
+        statistics.accept(value);
+      }
+      int dictionaryId = dictionary != null ? dictionary.indexOfSV(value) : -1;
+      try {
+        switch (type) {
+          case INT:
+            int intValue = (Integer) value;
+            for (IndexCreator creator : creators) {
+              creator.addInt(intValue, dictionaryId);
+            }
+            break;
+          case LONG:
+            long longValue = (Long) value;
+            for (IndexCreator creator : creators) {
+              creator.addLong(longValue, dictionaryId);
+            }
+            break;
+          case FLOAT:
+            float floatValue = (Float) value;
+            for (IndexCreator creator : creators) {
+              creator.addFloat(floatValue, dictionaryId);
+            }
+            break;
+          case DOUBLE:
+            double doubleValue = (Double) value;
+            for (IndexCreator creator : creators) {
+              creator.addDouble(doubleValue, dictionaryId);
+            }
+            break;
+          default:
+            for (IndexCreator creator : creators) {
+              creator.add(value, dictionaryId);
+            }
+            break;
+        }
+      } catch (JsonParseException e) {
+        throw new ColumnJsonParserException(columnName, e);
       }
     }
   }

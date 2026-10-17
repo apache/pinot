@@ -91,6 +91,13 @@ public interface ColumnReader extends Closeable, Serializable {
   @Nullable
   PinotDataType getValueType();
 
+  /// Whether non-null values are owned, immutable canonical JSON strings, already converted exactly as ingestion's
+  /// JSON datatype conversion would produce. This does not include other ingestion transforms or sanitization.
+  /// Such a reader must report [PinotDataType#STRING] from [#getValueType()]. Existing readers retain conversion.
+  default boolean isCanonicalJson() {
+    return false;
+  }
+
   /// Maps a stored [DataType] and cardinality to the [PinotDataType] a [#getValueType()] implementation should report,
   /// or `null` when the type has no dedicated accessor (e.g. BOOLEAN, TIMESTAMP, or a complex type). A convenience for
   /// implementations that already hold the column's [DataType]. `JSON` maps to [PinotDataType#STRING], since it is

@@ -40,20 +40,46 @@ import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.Path;
+import org.apache.parquet.column.ColumnDescriptor;
+import org.apache.parquet.column.Dictionary;
+import org.apache.parquet.column.Encoding;
 import org.apache.parquet.example.data.Group;
 import org.apache.parquet.example.data.simple.SimpleGroupFactory;
+import org.apache.parquet.hadoop.ParquetFileReader;
 import org.apache.parquet.hadoop.ParquetWriter;
 import org.apache.parquet.hadoop.example.ExampleParquetWriter;
 import org.apache.parquet.hadoop.metadata.CompressionCodecName;
+import org.apache.parquet.hadoop.metadata.ParquetMetadata;
+import org.apache.parquet.hadoop.util.HadoopInputFile;
+import org.apache.parquet.io.api.Binary;
+import org.apache.parquet.io.api.GroupConverter;
+import org.apache.parquet.io.api.PrimitiveConverter;
+import org.apache.parquet.schema.LogicalTypeAnnotation;
+import org.apache.parquet.schema.LogicalTypeAnnotation.MapKeyValueTypeAnnotation;
+import org.apache.parquet.schema.LogicalTypeAnnotation.TimeUnit;
 import org.apache.parquet.schema.MessageType;
 import org.apache.parquet.schema.MessageTypeParser;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema.SchemaBuilder;
+import org.apache.pinot.spi.data.readers.ColumnReader;
+import org.apache.pinot.spi.data.readers.ColumnReaderFactory;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.MapUtils;
+import org.apache.pinot.spi.utils.PinotDataType;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertSame;
+import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 
 /// Tests Parquet collection-wrapper handling end-to-end:
@@ -160,6 +186,586 @@ public class ParquetCollectionAndEquivalenceTest {
       assertFalse(recordReader.useAvroParquetRecordReader());
       assertFixtureValues(recordReader);
     }
+  }
+
+  @DataProvider
+  public Object[][] directReaderModes() {
+    return new Object[][]{{false, false}, {true, false}, {false, true}, {true, true}};
+  }
+
+  @Test(dataProvider = "directReaderModes")
+  public void testDirectReaderCollectionsAndRowGroups(boolean dictionary, boolean rawTimeValues)
+      throws IOException {
+    File dataFile = writeDirectReaderFixture(dictionary);
+    ParquetRecordReaderConfig groupConfig = new ParquetRecordReaderConfig();
+    groupConfig.setExtractRawTimeValues(rawTimeValues);
+    ParquetRecordReaderConfig directConfig = new ParquetRecordReaderConfig();
+    directConfig.setExtractRawTimeValues(rawTimeValues);
+    directConfig.setUseParquetNativeDirectReader(true);
+    try (ParquetNativeRecordReader groupReader = new ParquetNativeRecordReader();
+        ParquetNativeRecordReader directReader = new ParquetNativeRecordReader()) {
+      List<GenericRow> expected = readAll(groupReader, dataFile, groupConfig);
+      assertFalse(groupReader.isDirectRecordReader());
+      List<GenericRow> actual = readAll(directReader, dataFile, directConfig);
+      assertTrue(directReader.isDirectRecordReader());
+      assertEquals(actual.size(), 1000);
+      assertReadersAgree(dataFile.getName(), expected, actual);
+      for (int i = 0; i < actual.size(); i++) {
+        Object expectedMap = expected.get(i).getValue("attributes");
+        Object actualMap = actual.get(i).getValue("attributes");
+        if (actualMap != null) {
+          // Pinot JSON conversion sorts keys; direct materialization must preserve its canonical output.
+          assertEquals(MapUtils.toString((Map<String, Object>) actualMap),
+              MapUtils.toString((Map<String, Object>) expectedMap));
+        }
+      }
+      assertNull(actual.get(0).getValue("attributes"));
+      assertEquals(actual.get(1).getValue("attributes"), Map.of());
+      Map<String, Object> populatedMap = (Map<String, Object>) actual.get(2).getValue("attributes");
+      assertEquals(populatedMap.get("z"), "last\\\"\n雪");
+      assertTrue(populatedMap.containsKey("null"));
+      assertNull(populatedMap.get("null"));
+      assertNull(actual.get(0).getValue("tags"));
+      assertEquals(actual.get(1).getValue("tags"), new Object[0]);
+      assertEquals(actual.get(2).getValue("tags"), new Object[]{"tag", null});
+
+      directReader.rewind();
+      assertReadersAgree("rewind", actual, readRows(directReader));
+
+      MessageType fileSchema;
+      try (ParquetFileReader fileReader = ParquetFileReader.open(HadoopInputFile.fromPath(
+          new Path(dataFile.getAbsolutePath()), ParquetUtils.getParquetHadoopConfiguration()))) {
+        fileSchema = fileReader.getFooter().getFileMetaData().getSchema();
+      }
+      Set<String> selected = Set.of("timestampNanos", "flags");
+      assertTrue(directReader.rewind(selected));
+      for (int i = 0; i < actual.size(); i++) {
+        assertTrue(directReader.hasNext());
+        // The row group's physical pages, including nested MAP/LIST leaves, must exclude every omitted field.
+        for (ColumnDescriptor column : fileSchema.getColumns()) {
+          if (selected.contains(column.getPath()[0])) {
+            assertNotNull(directReader.getPageReadStore().getPageReader(column));
+          } else {
+            assertThrows(IllegalArgumentException.class, () -> directReader.getPageReadStore().getPageReader(column));
+          }
+        }
+        GenericRow projected = directReader.next();
+        assertEquals(projected.getFieldToValueMap().keySet(), selected);
+        for (String field : selected) {
+          assertEquals(projected.getValue(field), actual.get(i).getValue(field));
+        }
+      }
+      assertFalse(directReader.hasNext());
+      directReader.rewind();
+      assertReadersAgree("restore after physical projection", actual, readRows(directReader));
+      assertTrue(directReader.rewind(Set.of()));
+      assertReadersAgree("empty projection means original fields", actual, readRows(directReader));
+    }
+    try (ParquetNativeRecordReader projected = new ParquetNativeRecordReader()) {
+      Set<String> initialFields = new HashSet<>(Set.of("timestampNanos", "attributes", "absent"));
+      projected.init(dataFile, initialFields, directConfig);
+      initialFields.add("body");
+      assertTrue(projected.rewind(Set.of("timestampNanos", "body")));
+      assertEquals(projected.next().getFieldToValueMap().keySet(), Set.of("timestampNanos"));
+      assertFalse(projected.rewind(Set.of("body", "unknown")));
+      assertEquals(projected.next().getValue("timestampNanos"), actualTimestamp(1, rawTimeValues));
+      projected.rewind();
+      GenericRow reuse = new GenericRow();
+      for (int i = 0; i < 1000; i++) {
+        reuse.clear();
+        assertTrue(projected.hasNext());
+        projected.next(reuse);
+        assertEquals(reuse.getFieldToValueMap().keySet(), Set.of("timestampNanos", "attributes"));
+      }
+      assertFalse(projected.hasNext());
+    }
+    try (ParquetRecordReader wrapper = new ParquetRecordReader()) {
+      directConfig.setUseParquetNativeRecordReader(true);
+      wrapper.init(dataFile, null, directConfig);
+      assertTrue(wrapper.rewind(Set.of("flags")));
+      assertEquals(wrapper.next().getFieldToValueMap().keySet(), Set.of("flags"));
+      wrapper.rewind();
+      assertTrue(wrapper.next().getFieldToValueMap().containsKey("body"));
+    }
+    try (ParquetRecordReader avro = new ParquetRecordReader()) {
+      ParquetRecordReaderConfig avroConfig = new ParquetRecordReaderConfig();
+      avroConfig.setUseParquetAvroRecordReader(true);
+      avroConfig.setUseParquetNativeDirectReader(true);
+      avro.init(dataFile, null, avroConfig);
+      assertFalse(avro.rewind(Set.of("flags")));
+    }
+    try (ParquetNativeRecordReader missingOnly = new ParquetNativeRecordReader()) {
+      missingOnly.init(dataFile, Set.of("absent"), directConfig);
+      assertTrue(missingOnly.next().getFieldToValueMap().isEmpty());
+      assertFalse(missingOnly.rewind(Set.of("body")));
+      missingOnly.rewind();
+      assertEquals(readRows(missingOnly).size(), 1000);
+      missingOnly.rewind();
+      assertTrue(missingOnly.next().getFieldToValueMap().isEmpty());
+    }
+  }
+
+  @DataProvider
+  public Object[][] columnarReaderModes() {
+    List<Object[]> modes = new ArrayList<>();
+    for (String annotation : List.of("", "MAP_KEY_VALUE", "MAP")) {
+      for (Object[] mode : directReaderModes()) {
+        modes.add(new Object[]{mode[0], mode[1], annotation});
+      }
+    }
+    return modes.toArray(new Object[0][]);
+  }
+
+  @Test(dataProvider = "columnarReaderModes")
+  @SuppressWarnings("unchecked")
+  public void testColumnarReadersPreserveRawValuesAndOwnTheirResources(boolean dictionary, boolean rawTimeValues,
+      String entryAnnotation)
+      throws IOException {
+    File file = writeColumnarReaderFixture(dictionary, entryAnnotation);
+    var schema = columnarSchema().build();
+    ParquetRecordReaderConfig config = columnarConfig();
+    config.setExtractRawTimeValues(rawTimeValues);
+    List<GenericRow> expected;
+    try (ParquetNativeRecordReader reader = new ParquetNativeRecordReader()) {
+      expected = readAll(reader, file, config);
+    }
+    ColumnReaderFactory factory;
+    try (ParquetRecordReader reader = new ParquetRecordReader()) {
+      Set<String> sourceFields = new HashSet<>(schema.getPhysicalColumnNames());
+      reader.init(file, sourceFields, config);
+      // The capability snapshots initial options/restrictions, rather than retaining mutable caller state.
+      sourceFields.clear();
+      config.setUseColumnMajorSegmentBuilder(false);
+      config.setExtractRawTimeValues(!rawTimeValues);
+      factory = reader.tryCreateColumnReaderFactory(schema);
+      assertNotNull(factory);
+      assertThrows(IllegalStateException.class, factory::getAllColumnReaders);
+      assertEquals(reader.next().getValue("eventId"), expected.get(0).getValue("eventId"),
+          "Offering column readers must not consume or rewind the row reader");
+    }
+    // Closing the original row reader before factory initialization must leave the new readers usable.
+    Map<String, ColumnReader> columns;
+    try (factory) {
+      factory.init(schema);
+      columns = factory.getAllColumnReaders();
+      assertEquals(columns.keySet(), schema.getPhysicalColumnNames());
+      assertTrue(factory.getAvailableColumns().contains("unused"));
+      for (Map.Entry<String, ColumnReader> entry : columns.entrySet()) {
+        String name = entry.getKey();
+        ColumnReader column = entry.getValue();
+        assertEquals(column.getTotalDocs(), expected.size());
+        boolean json = schema.getFieldSpecFor(name).getDataType() == DataType.JSON;
+        assertEquals(column.isCanonicalJson(), json);
+        assertEquals(column.getValueType(), json ? PinotDataType.STRING : null);
+        for (int doc = 0; doc < expected.size(); doc++) {
+          assertFalse(column.isNull(doc));
+          Object actual = column.getValue(doc);
+          assertSame(column.getValue(doc), actual, "Repeated access must not advance the reader");
+          Object expectedValue = expected.get(doc).getValue(name);
+          if (json) {
+            expectedValue = MapUtils.toString((Map<String, Object>) expectedValue);
+            assertSame(column.getString(doc), actual);
+          }
+          assertEquals(wrapArrayValue(actual), wrapArrayValue(expectedValue), name + ":" + doc);
+        }
+        assertThrows(IndexOutOfBoundsException.class, () -> column.getValue(expected.size()));
+        column.rewind();
+        Object first = expected.get(0).getValue(name);
+        if (json) {
+          first = MapUtils.toString((Map<String, Object>) first);
+        }
+        assertEquals(wrapArrayValue(column.getValue(0)), wrapArrayValue(first));
+        column.getValue(42);
+        assertThrows(UnsupportedOperationException.class, () -> column.getValue(41));
+        assertEquals(wrapArrayValue(column.getValue(0)), wrapArrayValue(first),
+            "A new sequential pass starts from zero");
+      }
+      ColumnReader maps = columns.get("properties");
+      Object retained = maps.getValue(2);
+      maps.getValue(3);
+      assertEquals(retained, MapUtils.toString((Map<String, Object>) expected.get(2).getValue("properties")),
+          "Later rows must not change an owned canonical JSON string");
+    }
+    factory.close();
+    for (ColumnReader column : columns.values()) {
+      column.close();
+      assertThrows(IllegalStateException.class, () -> column.getValue(0));
+    }
+  }
+
+  @Test
+  public void testCanonicalJsonDictionaryEpochsPlainPagesAndFallback() {
+    MessageType schema = MessageTypeParser.parseMessageType("""
+        message JsonMap {
+          required group properties (MAP) {
+            repeated group entries {
+              required binary key (STRING);
+              required binary value (STRING);
+            }
+          }
+        }
+        """);
+    ParquetNativeRecordMaterializer materializer =
+        new ParquetNativeRecordMaterializer(schema, Set.of("properties"), false, Set.of("properties"));
+    materializer.setRecord(new GenericRow());
+    GroupConverter entries = materializer.getRootConverter().getConverter(0).asGroupConverter()
+        .getConverter(0).asGroupConverter();
+    PrimitiveConverter keys = entries.getConverter(0).asPrimitiveConverter();
+    PrimitiveConverter values = entries.getConverter(1).asPrimitiveConverter();
+    keys.setDictionary(stringDictionary("a", "z"));
+    values.setDictionary(stringDictionary("before", "雪\"\\\n", "last"));
+    String dictionary = materializeMap(materializer, 1, 0, 0, 1, 1, 2);
+    assertEquals(dictionary, MapUtils.toString(Map.of("a", "雪\"\\\n", "z", "last")));
+    assertSame(materializeMap(materializer, 1, 0, 0, 1, 1, 2), dictionary);
+    String plain = materializeMap(materializer, "z", "before", "a", "雪\"\\\n", "z", "last");
+    assertEquals(plain, dictionary);
+    assertSame(materializeMap(materializer, "z", "before", "a", "雪\"\\\n", "z", "last"), plain,
+        "PLAIN pages must retain canonical caching");
+    String mixed = materializeMap(materializer, 0, "plain-value", "plain-key", 2);
+    assertEquals(mixed, MapUtils.toString(Map.of("a", "plain-value", "plain-key", "last")));
+    assertSame(materializeMap(materializer, 0, "plain-value", "plain-key", 2), mixed);
+    String collision = materializeMap(materializer, "a", "Aa");
+    assertEquals(materializeMap(materializer, "a", "BB"), "{\"a\":\"BB\"}");
+    assertSame(materializeMap(materializer, "a", "Aa"), collision, "Hash collisions must compare all tokens");
+    assertEquals(materializeMap(materializer, 0, 0), "{\"a\":\"before\"}");
+    values.setDictionary(stringDictionary("changed"));
+    assertEquals(materializeMap(materializer, 0, 0), "{\"a\":\"changed\"}");
+    keys.setDictionary(stringDictionary("new-key"));
+    assertEquals(materializeMap(materializer, 0, 0), "{\"new-key\":\"changed\"}");
+    assertEquals(materializeMap(materializer), "{}");
+    Object[] oversizedSequence = new Object[600];
+    for (int i = 0; i < oversizedSequence.length; i += 2) {
+      oversizedSequence[i] = "duplicate";
+      oversizedSequence[i + 1] = i + 2 == oversizedSequence.length ? "last" : "before";
+    }
+    String fallback = materializeMap(materializer, oversizedSequence);
+    assertEquals(fallback, "{\"duplicate\":\"last\"}");
+    assertSame(materializeMap(materializer, oversizedSequence), fallback,
+        "Bounded token overflow must retain the logical-map cache path");
+    String oversizedValue = "large".repeat(60_000);
+    assertEquals(materializeMap(materializer, "key", oversizedValue), MapUtils.toString(Map.of("key", oversizedValue)));
+    materializer.resetCanonicalJsonCaches();
+    assertEquals(materializeMap(materializer, "plain", "after-reset"), "{\"plain\":\"after-reset\"}");
+    keys.setDictionary(stringDictionary("a"));
+    values.setDictionary(stringDictionary("after-rewind"));
+    assertEquals(materializeMap(materializer, 0, 0), "{\"a\":\"after-rewind\"}");
+  }
+
+  private static Dictionary stringDictionary(String... values) {
+    return new Dictionary(Encoding.PLAIN) {
+      @Override
+      public int getMaxId() {
+        return values.length - 1;
+      }
+
+      @Override
+      public Binary decodeToBinary(int id) {
+        return Binary.fromString(values[id]);
+      }
+    };
+  }
+
+  private static String materializeMap(ParquetNativeRecordMaterializer materializer, Object... tokens) {
+    GroupConverter root = materializer.getRootConverter();
+    GroupConverter map = root.getConverter(0).asGroupConverter();
+    GroupConverter entries = map.getConverter(0).asGroupConverter();
+    root.start();
+    map.start();
+    for (int i = 0; i < tokens.length; i += 2) {
+      entries.start();
+      for (int field = 0; field < 2; field++) {
+        PrimitiveConverter converter = entries.getConverter(field).asPrimitiveConverter();
+        Object token = tokens[i + field];
+        if (token instanceof Integer id) {
+          converter.addValueFromDictionary(id);
+        } else {
+          converter.addBinary(Binary.fromString((String) token));
+        }
+      }
+      entries.end();
+    }
+    map.end();
+    root.end();
+    return (String) materializer.getCurrentRecord().getValue("properties");
+  }
+
+  @Test
+  public void testColumnarReaderOptInAndFallback()
+      throws IOException {
+    assertFalse(new ParquetRecordReaderConfig().useColumnMajorSegmentBuilder());
+    File file = writeColumnarReaderFixture(false);
+    var schema = columnarSchema().build();
+    for (boolean direct : new boolean[]{false, true}) {
+      ParquetRecordReaderConfig config = columnarConfig();
+      config.setUseParquetNativeDirectReader(direct);
+      config.setUseColumnMajorSegmentBuilder(!direct);
+      try (ParquetRecordReader reader = new ParquetRecordReader()) {
+        reader.init(file, null, config);
+        assertNull(reader.tryCreateColumnReaderFactory(schema), "Both native direct and explicit opt-in are required");
+        assertEquals(reader.next().getValue("eventId"), 9000000000L);
+      }
+    }
+    ParquetRecordReaderConfig avroConfig = columnarConfig();
+    avroConfig.setUseParquetAvroRecordReader(true);
+    try (ParquetRecordReader reader = new ParquetRecordReader()) {
+      reader.init(file, null, avroConfig);
+      assertTrue(reader.useAvroParquetRecordReader());
+      assertNull(reader.tryCreateColumnReaderFactory(schema), "Explicit Avro wins over all native/columnar options");
+    }
+    ParquetRecordReaderConfig config = columnarConfig();
+    File unrelatedAnnotation = writeColumnarReaderFixture(false, "LIST");
+    try (ParquetNativeRecordReader reader = new ParquetNativeRecordReader()) {
+      reader.init(unrelatedAnnotation, null, config);
+      assertTrue(reader.isDirectRecordReader());
+      assertNull(reader.tryCreateColumnReaderFactory(schema), "Unrelated entry annotations retain the row reader");
+      assertEquals(reader.next().getValue("eventId"), 9000000000L, "Rejected annotations leave row position unchanged");
+    }
+    try (ParquetNativeRecordReader reader = new ParquetNativeRecordReader()) {
+      reader.init(file, null, config);
+      assertNull(reader.tryCreateColumnReaderFactory(
+          columnarSchema().addSingleValueDimension("missing", DataType.STRING).build()));
+      assertNull(reader.tryCreateColumnReaderFactory(
+          new SchemaBuilder().addSingleValueDimension("unused", DataType.STRING).build()),
+          "A physically OPTIONAL field cannot opt into this path");
+      assertNull(reader.tryCreateColumnReaderFactory(
+          new SchemaBuilder().addMultiValueDimension("description", DataType.STRING).build()),
+          "Multi-value targets retain the row reader");
+      assertNull(reader.tryCreateColumnReaderFactory(
+          new SchemaBuilder().addSingleValueDimension("properties", DataType.STRING).build()),
+          "MAP materialization is offered only to a JSON target");
+      assertEquals(reader.next().getValue("eventId"), 9000000000L,
+          "Unsupported selection leaves row position unchanged");
+    }
+    try (ParquetNativeRecordReader reader = new ParquetNativeRecordReader()) {
+      Set<String> restricted = new HashSet<>(Set.of("eventId"));
+      reader.init(file, restricted, config);
+      restricted.addAll(schema.getPhysicalColumnNames());
+      assertNull(reader.tryCreateColumnReaderFactory(schema), "Initial source-field restrictions cannot be expanded");
+      assertEquals(reader.next().getFieldToValueMap().keySet(), Set.of("eventId"));
+    }
+    try (ParquetNativeRecordReader reader = new ParquetNativeRecordReader()) {
+      reader.init(file, null, config);
+      try (ColumnReaderFactory factory = reader.tryCreateColumnReaderFactory(schema)) {
+        assertNotNull(factory);
+        factory.init(schema);
+        // Both construction and init leave data pages unopened; a later source I/O failure must propagate.
+        var moved = file.toPath().resolveSibling(file.getName() + ".moved");
+        Files.move(file.toPath(), moved);
+        try {
+          assertThrows(IOException.class, () -> factory.getColumnReader("eventId").getValue(0));
+        } finally {
+          Files.move(moved, file.toPath());
+        }
+      }
+    }
+  }
+
+  @Test
+  public void testColumnarReaderRejectsNullableOrNonStringMapValues()
+      throws IOException {
+    var schema = new SchemaBuilder().addSingleValueDimension("renamedMap", DataType.JSON).build();
+    for (boolean nullable : new boolean[]{true, false}) {
+      String valueField = nullable ? "optional binary value (STRING);" : "required int32 value;";
+      File file = writeParquet("columnar-unsupported-map-" + nullable + ".parquet", """
+          message UnsupportedMap {
+            required group renamedMap (MAP) {
+              repeated group entries {
+                required binary key (STRING);
+                %s
+              }
+            }
+          }
+          """.formatted(valueField), row -> {
+          Group entry = row.addGroup("renamedMap").addGroup("entries").append("key", "present");
+          if (!nullable) {
+            entry.append("value", 17);
+          }
+        });
+      try (ParquetNativeRecordReader reader = new ParquetNativeRecordReader()) {
+        reader.init(file, null, columnarConfig());
+        assertTrue(reader.isDirectRecordReader());
+        assertNull(reader.tryCreateColumnReaderFactory(schema));
+        Map<?, ?> value = (Map<?, ?>) reader.next().getValue("renamedMap");
+        assertTrue(value.containsKey("present"));
+        assertEquals(value.get("present"), nullable ? null : 17);
+      }
+    }
+  }
+
+  private static SchemaBuilder columnarSchema() {
+    return new SchemaBuilder().setSchemaName("renamedColumns").addSingleValueDimension("eventId", DataType.LONG)
+        .addSingleValueDimension("code", DataType.INT).addSingleValueDimension("description", DataType.STRING)
+        .addSingleValueDimension("properties", DataType.JSON)
+        .addDateTime("moment", DataType.TIMESTAMP, "TIMESTAMP", "1:MILLISECONDS");
+  }
+
+  private static ParquetRecordReaderConfig columnarConfig() {
+    ParquetRecordReaderConfig config = new ParquetRecordReaderConfig();
+    config.setUseParquetNativeRecordReader(true);
+    config.setUseParquetNativeDirectReader(true);
+    config.setUseColumnMajorSegmentBuilder(true);
+    return config;
+  }
+
+  private File writeColumnarReaderFixture(boolean dictionary)
+      throws IOException {
+    return writeColumnarReaderFixture(dictionary, "");
+  }
+
+  private File writeColumnarReaderFixture(boolean dictionary, String entryAnnotation)
+      throws IOException {
+    MessageType schema = MessageTypeParser.parseMessageType("""
+        message GenericRequiredColumns {
+          required int64 eventId;
+          required int32 code;
+          required int64 moment (TIMESTAMP(NANOS,true));
+          required binary description (STRING);
+          required group properties (MAP) {
+            repeated group entries %s {
+              required binary key (STRING);
+              required binary value (STRING);
+            }
+          }
+          optional binary unused (STRING);
+        }
+        """.formatted(entryAnnotation.isEmpty() ? "" : "(" + entryAnnotation + ")"));
+    FileUtils.forceMkdir(_tempDir);
+    File file = new File(_tempDir, "columnar-required-" + dictionary + "-" + entryAnnotation + ".parquet");
+    FileUtils.deleteQuietly(file);
+    try (ParquetWriter<Group> writer = ExampleParquetWriter.builder(new Path(file.getAbsolutePath()))
+        .withType(schema).withDictionaryEncoding(dictionary).withDictionaryPageSize(1024).withPageSize(1024)
+        .withMinRowCountForPageSizeCheck(10).withMaxRowCountForPageSizeCheck(10).withRowGroupRowCountLimit(64)
+        .build()) {
+      SimpleGroupFactory factory = new SimpleGroupFactory(schema);
+      for (int i = 0; i < 1000; i++) {
+        Group row = factory.newGroup().append("eventId", 9000000000L + i).append("code", i % 256)
+            .append("moment", -1234567890L + i).append("description", "event-" + i);
+        Group map = row.addGroup("properties");
+        if (i % 3 != 0) {
+          map.addGroup("entries").append("key", "z").append("value", "before");
+          map.addGroup("entries").append("key", "a").append("value", "value");
+          map.addGroup("entries").append("key", "z").append("value", "last-" + i + "雪");
+        }
+        writer.write(row);
+      }
+    }
+    try (ParquetFileReader reader = ParquetFileReader.open(HadoopInputFile.fromPath(
+        new Path(file.getAbsolutePath()), ParquetUtils.getParquetHadoopConfiguration()))) {
+      LogicalTypeAnnotation expected = switch (entryAnnotation) {
+        case "" -> null;
+        case "MAP_KEY_VALUE" -> MapKeyValueTypeAnnotation.getInstance();
+        case "MAP" -> LogicalTypeAnnotation.mapType();
+        case "LIST" -> LogicalTypeAnnotation.listType();
+        default -> throw new IllegalArgumentException("Unexpected fixture annotation: " + entryAnnotation);
+      };
+      assertEquals(reader.getFooter().getFileMetaData().getSchema().getType("properties").asGroupType().getType(0)
+          .getLogicalTypeAnnotation(), expected, "Written footer must retain the entry annotation under test");
+      assertTrue(reader.getFooter().getBlocks().size() > 1, "Equivalence must cross row-group boundaries");
+    }
+    return file;
+  }
+
+  private static Object actualTimestamp(int row, boolean rawTimeValues) {
+    long nanos = -1234567890L + row;
+    return rawTimeValues ? nanos : ParquetUtils.convertLongToTimestamp(nanos, TimeUnit.NANOS);
+  }
+
+  @Test
+  public void testDirectAndGroupNativeReadersAgreeOnAllTestResources()
+      throws Exception {
+    ParquetRecordReaderConfig directConfig = new ParquetRecordReaderConfig();
+    directConfig.setUseParquetNativeDirectReader(true);
+    int directFiles = 0;
+    int fallbackFiles = 0;
+    for (File file : listAllTestParquetFiles()) {
+      if (KNOWN_FAILURES_BOTH.containsKey(file.getName())) {
+        continue;
+      }
+      try (ParquetNativeRecordReader groupReader = new ParquetNativeRecordReader();
+          ParquetNativeRecordReader directReader = new ParquetNativeRecordReader()) {
+        List<GenericRow> expected = readAll(groupReader, file);
+        assertFalse(groupReader.rewind(Set.of("missing")), "Default native reader must keep its existing path");
+        List<GenericRow> actual = readAll(directReader, file, directConfig);
+        assertReadersAgree(file.getName(), expected, actual);
+        if (directReader.isDirectRecordReader()) {
+          directFiles++;
+        } else {
+          fallbackFiles++;
+          assertFalse(directReader.rewind(Set.of("missing")), "Unsupported schemas cannot use physical projection");
+        }
+      }
+    }
+    assertTrue(directFiles > 5, "Must exercise real direct materialization");
+    assertTrue(fallbackFiles > 5, "Must preserve legacy/unsupported logical-type fallback");
+  }
+
+  private File writeDirectReaderFixture(boolean dictionary)
+      throws IOException {
+    MessageType schema = MessageTypeParser.parseMessageType("""
+        message DirectReader {
+          required int64 timestampNanos (TIMESTAMP(NANOS,true));
+          required int64 timestampMicros (TIMESTAMP(MICROS,true));
+          required int64 timestampMillis (TIMESTAMP(MILLIS,true));
+          required int32 flags (INTEGER(8,false));
+          required boolean active;
+          required float floatValue;
+          required double doubleValue;
+          required binary bytes;
+          optional binary label (STRING);
+          required binary body (STRING);
+          optional group attributes (MAP) {
+            repeated group key_value {
+              required binary key (STRING);
+              optional binary value (STRING);
+            }
+          }
+          optional group tags (LIST) {
+            repeated group list {
+              optional binary element (STRING);
+            }
+          }
+        }
+        """);
+    FileUtils.forceMkdir(_tempDir);
+    File file = new File(_tempDir, "direct-reader-" + dictionary + ".parquet");
+    FileUtils.deleteQuietly(file);
+    try (ParquetWriter<Group> writer = ExampleParquetWriter.builder(new Path(file.getAbsolutePath()))
+        .withType(schema).withDictionaryEncoding(dictionary).withDictionaryPageSize(1024).withPageSize(1024)
+        .withMinRowCountForPageSizeCheck(10).withMaxRowCountForPageSizeCheck(10).withRowGroupRowCountLimit(64)
+        .build()) {
+      SimpleGroupFactory factory = new SimpleGroupFactory(schema);
+      for (int i = 0; i < 1000; i++) {
+        Group row = factory.newGroup().append("timestampNanos", -1234567890L + i)
+            .append("timestampMicros", -1234567L + i).append("timestampMillis", -1234L + i)
+            .append("flags", i % 256).append("active", i % 2 == 0).append("floatValue", i / 10F)
+            .append("doubleValue", i / 10D).append("bytes", Binary.fromConstantByteArray(new byte[]{(byte) i, 0}))
+            .append("body", i + "x".repeat(200));
+        if (i % 3 != 0) {
+          row.append("label", "label-" + i % 2);
+          Group attributes = row.addGroup("attributes");
+          Group tags = row.addGroup("tags");
+          if (i % 3 == 2) {
+            attributes.addGroup("key_value").append("key", "z").append("value", "first");
+            attributes.addGroup("key_value").append("key", "null");
+            attributes.addGroup("key_value").append("key", "a").append("value", "value");
+            attributes.addGroup("key_value").append("key", "z").append("value", "last\\\"\n雪");
+            tags.addGroup("list").append("element", "tag");
+            tags.addGroup("list");
+          }
+        }
+        writer.write(row);
+      }
+    }
+    try (ParquetFileReader reader = ParquetFileReader.open(HadoopInputFile.fromPath(
+        new Path(file.getAbsolutePath()), ParquetUtils.getParquetHadoopConfiguration()))) {
+      ParquetMetadata footer = reader.getFooter();
+      assertTrue(footer.getBlocks().size() > 1, "Fixture must cross row-group boundaries");
+      assertEquals(footer.getBlocks().stream().flatMap(block -> block.getColumns().stream())
+          .anyMatch(column -> column.getEncodingStats().hasDictionaryEncodedPages()), dictionary);
+      assertTrue(footer.getBlocks().stream().flatMap(block -> block.getColumns().stream())
+          .anyMatch(column -> column.getEncodingStats().hasNonDictionaryEncodedPages()));
+    }
+    return file;
   }
 
   /// Regression: nested `LIST<LIST<STRING>>` written with the standard 3-level encoding must have BOTH the
@@ -604,12 +1210,23 @@ public class ParquetCollectionAndEquivalenceTest {
 
   private static List<GenericRow> readAll(RecordReader reader, File file)
       throws IOException {
-    reader.init(file, null, null);
+    return readAll(reader, file, null);
+  }
+
+  private static List<GenericRow> readAll(RecordReader reader, File file, ParquetRecordReaderConfig config)
+      throws IOException {
+    reader.init(file, null, config);
+    return readRows(reader);
+  }
+
+  private static List<GenericRow> readRows(RecordReader reader)
+      throws IOException {
     List<GenericRow> rows = new ArrayList<>();
+    GenericRow reuse = new GenericRow();
     while (reader.hasNext()) {
-      GenericRow row = new GenericRow();
-      reader.next(row);
-      rows.add(row.copy());
+      reuse.clear();
+      reader.next(reuse);
+      rows.add(reuse.copy());
     }
     return rows;
   }
