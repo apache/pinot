@@ -32,6 +32,8 @@ on:
       - "licenses-binary/**"
       - "**.md"
   pull_request:
+    branches:
+      - master
     paths-ignore:
       - "contrib/**"
       - "docs/**"
@@ -74,9 +76,9 @@ jobs:
           fi
           echo "Comparing baseline $BASELINE against $(git rev-parse HEAD)"
           echo "sha=$BASELINE" >> "$GITHUB_OUTPUT"
-          # #19900 is the minimum Lucene 9.12 rollback target for Lucene 10 writers.
+          # Merged #19900 is the minimum Lucene 9.12 rollback target for Lucene 10 writers.
           # Unpatched releases (including 1.5.0) cannot read the newly generated Lucene indexes.
-          RECOVERY_BASELINE_SHA=0d97da6d57cdfafd561494e1baa70b3f9eb5705c
+          RECOVERY_BASELINE_SHA=a45ebf01379257591c27c900c3525612a3c49b92
           RUNTIME_BASELINES=$(python3 -c \
             'import json, sys; print(json.dumps(list(dict.fromkeys(sys.argv[1:]))))' \
             "$RECOVERY_BASELINE_SHA" "$BASELINE")
