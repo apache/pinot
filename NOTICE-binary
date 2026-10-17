@@ -1407,3 +1407,41 @@ The licenses for these third party components are included in LICENSE.txt
 - For Apache Commons Lang see also this required NOTICE:
   Apache Commons Lang
   Copyright 2001-2020 The Apache Software Foundation
+
+Apache Kafka
+Copyright 2026 The Apache Software Foundation.
+
+This distribution has a binary dependency on jersey, which is available under the CDDL
+License. The source code of jersey can be found at https://github.com/jersey/jersey/.
+
+This distribution has a binary test dependency on jqwik, which is available under
+the Eclipse Public License 2.0. The source code can be found at
+https://github.com/jlink/jqwik.
+
+The streams-scala (streams/streams-scala) module was donated by Lightbend and the original code was copyrighted by them:
+Copyright (C) 2018 Lightbend Inc. <https://www.lightbend.com>
+Copyright (C) 2017-2018 Alexis Seigneurin.
+
+This project contains the following code copied from Apache Hadoop:
+clients/src/main/java/org/apache/kafka/common/utils/PureJavaCrc32C.java
+Some portions of this file Copyright (c) 2004-2006 Intel Corporation and licensed under the BSD license.
+
+This project contains the following code copied from Apache Hive:
+streams/src/main/java/org/apache/kafka/streams/state/internals/Murmur3.java
+
+Scala
+Copyright (c) 2002-2025 EPFL
+Copyright (c) 2011-2025 Lightbend, Inc. dba Akka
+
+Scala includes software developed at
+LAMP/EPFL (https://lamp.epfl.ch/) and
+Akka (https://akka.io/).
+
+Licensed under the Apache License, Version 2.0 (the "License").
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+This software includes projects with other licenses -- see `doc/LICENSE.md`.
