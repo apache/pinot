@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import java.math.BigDecimal;
 import java.util.List;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.utils.DataSchema;
@@ -200,6 +201,41 @@ public class FilterOperatorTest {
     List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
     assertEquals(resultRows.size(), 1);
     assertEquals(resultRows.get(0), new Object[]{3, 2});
+  }
+
+  @Test
+  public void shouldCompareBigDecimalsByValueInInFilter() {
+    DataSchema inputSchema = new DataSchema(new String[]{"bigDecimal0"}, new ColumnDataType[]{
+        ColumnDataType.BIG_DECIMAL
+    });
+    when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{new BigDecimal("1.0")},
+        new Object[]{new BigDecimal("2.5")}, new Object[]{new BigDecimal("3")}));
+    // 1.0 has another scale than 1, and 3 is a LONG
+    RexExpression.FunctionCall in = new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.IN.name(),
+        List.of(new RexExpression.InputRef(0),
+            new RexExpression.Literal(ColumnDataType.BIG_DECIMAL, new BigDecimal("1")),
+            new RexExpression.Literal(ColumnDataType.LONG, 3L)));
+    FilterOperator operator = getOperator(inputSchema, in);
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+    assertEquals(resultRows.size(), 2);
+    assertEquals(resultRows.get(0), new Object[]{new BigDecimal("1.0")});
+    assertEquals(resultRows.get(1), new Object[]{new BigDecimal("3")});
+  }
+
+  @Test
+  public void shouldCompareNumbersOfOtherClassesInNotInFilter() {
+    DataSchema inputSchema = new DataSchema(new String[]{"long0"}, new ColumnDataType[]{
+        ColumnDataType.LONG
+    });
+    when(_input.nextBlock()).thenReturn(
+        OperatorTestUtil.block(inputSchema, new Object[]{1L}, new Object[]{2L}, new Object[]{3L}));
+    RexExpression.FunctionCall notIn = new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.NOT_IN.name(),
+        List.of(new RexExpression.InputRef(0), new RexExpression.Literal(ColumnDataType.INT, 1),
+            new RexExpression.Literal(ColumnDataType.DOUBLE, 3.0)));
+    FilterOperator operator = getOperator(inputSchema, notIn);
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+    assertEquals(resultRows.size(), 1);
+    assertEquals(resultRows.get(0), new Object[]{2L});
   }
 
   @Test

@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.query.planner.physical.v2;
 
+import org.apache.calcite.rel.type.RelDataTypeSystem;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.type.ArraySqlType;
+import org.apache.calcite.sql.type.BasicSqlType;
 import org.apache.calcite.sql.type.ObjectSqlType;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.common.utils.DataSchema;
@@ -58,6 +60,32 @@ public class PRelToPlanNodeConverterTest {
         DataSchema.ColumnDataType.LONG_ARRAY);
     Assert.assertThrows(IllegalArgumentException.class, () -> PRelToPlanNodeConverter.convertToColumnDataType(
         new ArraySqlType(new ObjectSqlType(SqlTypeName.UBIGINT, SqlIdentifier.STAR, true, null, null), true)));
+  }
+
+  @Test
+  public void testConvertDecimalTypes() {
+    // DECIMAL(p, 0) maps to the narrowest type that holds every value: INT up to 9 digits, LONG up to 18 digits
+    Assert.assertEquals(PRelToPlanNodeConverter.convertToColumnDataType(
+            new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DECIMAL, 9)),
+        DataSchema.ColumnDataType.INT);
+    Assert.assertEquals(PRelToPlanNodeConverter.convertToColumnDataType(
+            new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DECIMAL, 10)),
+        DataSchema.ColumnDataType.LONG);
+    Assert.assertEquals(PRelToPlanNodeConverter.convertToColumnDataType(
+            new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DECIMAL, 18)),
+        DataSchema.ColumnDataType.LONG);
+    Assert.assertEquals(PRelToPlanNodeConverter.convertToColumnDataType(
+            new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DECIMAL, 19)),
+        DataSchema.ColumnDataType.BIG_DECIMAL);
+    Assert.assertEquals(PRelToPlanNodeConverter.convertToColumnDataType(
+            new ArraySqlType(new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DECIMAL, 9), true)),
+        DataSchema.ColumnDataType.INT_ARRAY);
+    Assert.assertEquals(PRelToPlanNodeConverter.convertToColumnDataType(
+            new ArraySqlType(new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DECIMAL, 18), true)),
+        DataSchema.ColumnDataType.LONG_ARRAY);
+    Assert.assertEquals(PRelToPlanNodeConverter.convertToColumnDataType(
+            new ArraySqlType(new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DECIMAL, 19), true)),
+        DataSchema.ColumnDataType.DOUBLE_ARRAY);
   }
 
   @Test

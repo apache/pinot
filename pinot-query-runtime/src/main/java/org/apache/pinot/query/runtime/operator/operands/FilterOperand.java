@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.operator.operands;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Ordering;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.IntPredicate;
@@ -132,11 +133,48 @@ public abstract class FilterOperand implements TransformOperand {
         if (result == null) {
           return null;
         }
-        if (firstResult.equals(result)) {
+        if (valuesEqual(firstResult, result)) {
           return _isNotIn ? 0 : 1;
         }
       }
       return _isNotIn ? 1 : 0;
+    }
+
+    /// Compares numbers by value, like a comparison does and like the single-stage engine does for IN. `equals()` also
+    /// compares the scale of a BigDecimal, so 1.0 (e.g. a SUM, which is a DOUBLE) does not equal 1, and the class of a
+    /// number, so a LONG does not equal the same INT. The planner gives the values of an IN the same type, so the
+    /// classes differ only if that changes.
+    private static boolean valuesEqual(Object value1, Object value2) {
+      if (value1 instanceof Number && value2 instanceof Number
+          && (value1 instanceof BigDecimal || value1.getClass() != value2.getClass())) {
+        return numbersEqual((Number) value1, (Number) value2);
+      }
+      return value1.equals(value2);
+    }
+
+    private static boolean numbersEqual(Number value1, Number value2) {
+      if (value1 instanceof BigDecimal || value2 instanceof BigDecimal) {
+        BigDecimal bigDecimal1 = toBigDecimal(value1);
+        BigDecimal bigDecimal2 = toBigDecimal(value2);
+        return bigDecimal1 != null && bigDecimal2 != null && bigDecimal1.compareTo(bigDecimal2) == 0;
+      }
+      if (value1 instanceof Double || value1 instanceof Float || value2 instanceof Double || value2 instanceof Float) {
+        return Double.compare(value1.doubleValue(), value2.doubleValue()) == 0;
+      }
+      return value1.longValue() == value2.longValue();
+    }
+
+    /// Returns the BigDecimal of a number, or `null` for NaN and the infinities, which have none.
+    @Nullable
+    private static BigDecimal toBigDecimal(Number value) {
+      if (value instanceof BigDecimal) {
+        return (BigDecimal) value;
+      }
+      if (value instanceof Double || value instanceof Float) {
+        double doubleValue = value.doubleValue();
+        return Double.isFinite(doubleValue) ? BigDecimal.valueOf(doubleValue) : null;
+      }
+      return BigDecimal.valueOf(value.longValue());
     }
   }
 

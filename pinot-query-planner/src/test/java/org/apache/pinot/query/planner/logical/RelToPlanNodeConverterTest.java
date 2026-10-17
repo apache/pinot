@@ -115,15 +115,34 @@ public class RelToPlanNodeConverterTest {
 
   @Test
   public void testBigDecimal() {
+    // DECIMAL(p, 0) maps to the narrowest type that holds every value: INT up to 9 digits, LONG up to 18 digits
     Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
-            new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DECIMAL, 10)),
+            new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DECIMAL, 9)),
         DataSchema.ColumnDataType.INT);
     Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
-            new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DECIMAL, 38)),
+            new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DECIMAL, 10)),
         DataSchema.ColumnDataType.LONG);
+    Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
+            new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DECIMAL, 18)),
+        DataSchema.ColumnDataType.LONG);
+    Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
+            new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DECIMAL, 19)),
+        DataSchema.ColumnDataType.BIG_DECIMAL);
+    Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
+            new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DECIMAL, 38)),
+        DataSchema.ColumnDataType.BIG_DECIMAL);
     Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
             new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DECIMAL, 39)),
         DataSchema.ColumnDataType.BIG_DECIMAL);
+    Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
+            new ArraySqlType(new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DECIMAL, 9), true)),
+        DataSchema.ColumnDataType.INT_ARRAY);
+    Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
+            new ArraySqlType(new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DECIMAL, 18), true)),
+        DataSchema.ColumnDataType.LONG_ARRAY);
+    Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
+            new ArraySqlType(new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DECIMAL, 19), true)),
+        DataSchema.ColumnDataType.DOUBLE_ARRAY);
 
     Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
             new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DECIMAL, 14, 10)),
@@ -134,6 +153,36 @@ public class RelToPlanNodeConverterTest {
     Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
             new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DECIMAL, 31, 10)),
         DataSchema.ColumnDataType.BIG_DECIMAL);
+  }
+
+  @Test
+  public void testIsCastThroughLong() {
+    RelDataType doubleType = new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DOUBLE);
+    RelDataType decimal19 = new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DECIMAL, 19);
+    RelDataType decimal38 = new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DECIMAL, 38);
+    // Types that can have a fraction convert through LONG to DECIMAL(p, 0) with 19 <= p <= 38
+    Assert.assertTrue(RelToPlanNodeConverter.isCastThroughLong(decimal19, doubleType));
+    Assert.assertTrue(RelToPlanNodeConverter.isCastThroughLong(decimal38, doubleType));
+    Assert.assertTrue(RelToPlanNodeConverter.isCastThroughLong(decimal19,
+        new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DECIMAL, 10, 2)));
+    Assert.assertTrue(RelToPlanNodeConverter.isCastThroughLong(decimal19,
+        new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.VARCHAR)));
+    // Integer types convert directly
+    Assert.assertFalse(RelToPlanNodeConverter.isCastThroughLong(decimal19,
+        new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.INTEGER)));
+    Assert.assertFalse(RelToPlanNodeConverter.isCastThroughLong(decimal19,
+        new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.BIGINT)));
+    Assert.assertFalse(RelToPlanNodeConverter.isCastThroughLong(decimal19,
+        new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DECIMAL, 20)));
+    // Other target types: LONG drops the fraction itself, and BIG_DECIMAL beyond 38 digits keeps it as before
+    Assert.assertFalse(RelToPlanNodeConverter.isCastThroughLong(
+        new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DECIMAL, 18), doubleType));
+    Assert.assertFalse(RelToPlanNodeConverter.isCastThroughLong(
+        new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DECIMAL, 39), doubleType));
+    Assert.assertFalse(RelToPlanNodeConverter.isCastThroughLong(
+        new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DECIMAL, 20, 2), doubleType));
+    Assert.assertFalse(RelToPlanNodeConverter.isCastThroughLong(
+        new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.BIGINT), doubleType));
   }
 
   @Test

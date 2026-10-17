@@ -189,7 +189,12 @@ public class PinotEvaluateLiteralRule {
       // to is determined by the operator's return type. Pinot's CAST function implementation requires two arguments:
       // the value to be cast and the target type.
       argumentTypes = new ColumnDataType[]{argumentTypes[0], ColumnDataType.STRING};
-      arguments = new Object[]{arguments[0], RelToPlanNodeConverter.convertToColumnDataType(rexCall.getType()).name()};
+      // A CAST to some DECIMAL types converts through LONG to drop the fraction, as at runtime (see
+      // RexExpressionUtils.handleCast()). The LONG result converts to the type of the CAST after the call.
+      ColumnDataType castType =
+          RelToPlanNodeConverter.isCastThroughLong(rexCall.getType(), operands.get(0).getType()) ? ColumnDataType.LONG
+              : RelToPlanNodeConverter.convertToColumnDataType(rexCall.getType());
+      arguments = new Object[]{arguments[0], castType.name()};
     }
     String canonicalName = FunctionRegistry.canonicalize(PinotRuleUtils.extractFunctionName(rexCall));
     FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(canonicalName, argumentTypes);

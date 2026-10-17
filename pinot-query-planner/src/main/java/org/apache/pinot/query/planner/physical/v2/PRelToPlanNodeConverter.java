@@ -363,7 +363,6 @@ public class PRelToPlanNodeConverter {
   /// the proper primitive type for Pinot.
   /// TODO: Revisit this method:
   ///  - Currently we are converting exact value to approximate value
-  ///  - Integer can only cover all values with precision 9; Long can only cover all values with precision 18
   ///
   /// [org.apache.pinot.common.utils.request.RequestUtils#getLiteralExpression(
 ///     org.apache.calcite.sql.SqlLiteral)]
@@ -375,9 +374,12 @@ public class PRelToPlanNodeConverter {
     int precision = relDataType.getPrecision();
     int scale = relDataType.getScale();
     if (scale == 0) {
-      if (precision <= 10) {
+      // Pick the type by the precision, so that it holds every value of the DECIMAL type: INT holds every number with
+      // up to 9 digits, and LONG every number with up to 18 digits. For example, Calcite gives an integer literal
+      // beyond the BIGINT range the type DECIMAL(p, 0) with p >= 19, which LONG would wrap around.
+      if (precision <= 9) {
         return isArray ? ColumnDataType.INT_ARRAY : ColumnDataType.INT;
-      } else if (precision <= 38) {
+      } else if (precision <= 18) {
         return isArray ? ColumnDataType.LONG_ARRAY : ColumnDataType.LONG;
       } else {
         // TODO: Modify it to return ColumnDataType.BIG_DECIMAL_ARRAY after `1.6.0` release

@@ -1103,7 +1103,6 @@ public final class RelToPlanNodeConverter {
   /// the proper primitive type for Pinot.
   /// TODO: Revisit this method:
   ///  - Currently we are converting exact value to approximate value
-  ///  - Integer can only cover all values with precision 9; Long can only cover all values with precision 18
   ///
   /// [org.apache.pinot.common.utils.request.RequestUtils#getLiteralExpression(
 ///     org.apache.calcite.sql.SqlLiteral)]
@@ -1115,9 +1114,12 @@ public final class RelToPlanNodeConverter {
     int precision = relDataType.getPrecision();
     int scale = relDataType.getScale();
     if (scale == 0) {
-      if (precision <= 10) {
+      // Pick the type by the precision, so that it holds every value of the DECIMAL type: INT holds every number with
+      // up to 9 digits, and LONG every number with up to 18 digits. For example, Calcite gives an integer literal
+      // beyond the BIGINT range the type DECIMAL(p, 0) with p >= 19, which LONG would wrap around.
+      if (precision <= 9) {
         return isArray ? ColumnDataType.INT_ARRAY : ColumnDataType.INT;
-      } else if (precision <= 38) {
+      } else if (precision <= 18) {
         return isArray ? ColumnDataType.LONG_ARRAY : ColumnDataType.LONG;
       } else {
         // TODO: Modify it to return ColumnDataType.BIG_DECIMAL_ARRAY after `1.6.0` release
@@ -1134,6 +1136,38 @@ public final class RelToPlanNodeConverter {
         //       BIG_DECIMAL_ARRAY support is added in `1.6.0`
         return isArray ? ColumnDataType.DOUBLE_ARRAY : ColumnDataType.BIG_DECIMAL;
       }
+    }
+  }
+
+  /// Returns whether a CAST of a value of the operand type to the target type converts the value to LONG first.
+  ///
+  /// [#resolveDecimal] gives DECIMAL(p, 0) with 19 <= p <= 38 the type BIG_DECIMAL, which keeps the fraction of a
+  /// value. A CAST to these types from a type that is not an integer type (e.g. DOUBLE) converts the value through
+  /// LONG, as it did when the planner gave these types the type LONG, so that the result is an integer. As before, such
+  /// a CAST does not hold values beyond the LONG range: a DOUBLE saturates, a BIG_DECIMAL wraps around, and a STRING
+  /// fails to parse. A CAST to DECIMAL(p, 0) with p > 38 keeps the fraction, as before.
+  public static boolean isCastThroughLong(RelDataType targetType, RelDataType operandType) {
+    if (targetType.getSqlTypeName() != SqlTypeName.DECIMAL || targetType.getScale() != 0) {
+      return false;
+    }
+    int precision = targetType.getPrecision();
+    if (precision <= 18 || precision > 38) {
+      return false;
+    }
+    switch (operandType.getSqlTypeName()) {
+      case TINYINT:
+      case SMALLINT:
+      case INTEGER:
+      case BIGINT:
+      case UTINYINT:
+      case USMALLINT:
+      case UINTEGER:
+      case UBIGINT:
+        return false;
+      case DECIMAL:
+        return operandType.getScale() != 0;
+      default:
+        return true;
     }
   }
 
