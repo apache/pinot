@@ -24,11 +24,14 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableSet;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
@@ -47,6 +50,7 @@ import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
+import org.apache.pinot.segment.spi.index.metadata.EmptyColumnMetadata;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
@@ -77,6 +81,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNotSame;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertSame;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
@@ -407,6 +412,175 @@ public class SegmentMetadataImplTest {
     } finally {
       segment.destroy();
     }
+  }
+
+  /// The columns are held as sorted arrays; the `TreeMap` view exists only for compatibility and costs a map entry
+  /// per column, so it is derived on the first getColumnMetadataMap() and never by the accessors the load and query
+  /// paths use.
+  @Test
+  public void testColumnMetadataMapDerivedLazily()
+      throws Exception {
+    SegmentMetadataImpl metadata = new SegmentMetadataImpl(_segmentDirectory);
+    assertFalse(metadata.isColumnMetadataMapMaterialized());
+
+    List<String> columns = new ArrayList<>(metadata.getAllColumns());
+    assertEquals(metadata.getAllColumnMetadata().size(), columns.size());
+    for (String column : columns) {
+      assertNotNull(metadata.getColumnMetadataFor(column), column);
+    }
+    metadata.toJson(null);
+    assertFalse(metadata.isColumnMetadataMapMaterialized(), "reading the columns must not build the map");
+
+    TreeMap<String, ColumnMetadata> map = metadata.getColumnMetadataMap();
+    assertTrue(metadata.isColumnMetadataMapMaterialized());
+    assertEquals(new ArrayList<>(map.keySet()), columns);
+    assertEquals(new ArrayList<>(map.values()), new ArrayList<>(metadata.getAllColumnMetadata()));
+    assertSame(metadata.getColumnMetadataMap(), map);
+    assertNull(metadata.getColumnMetadataFor("noSuchColumn"));
+  }
+
+  /// getAllColumns() is a view of the metadata's own name array, so it must refuse every mutator rather than let a
+  /// caller narrow a loaded segment's columns, and it must not reflect later column changes.
+  /// The map handed out by getColumnMetadataMap() is derived from the column arrays, so a write to it would reach no
+  /// other accessor. It therefore rejects writes, through every view too, while the metadata keeps changing through
+  /// addColumnMetadata()/removeColumn() and a fresh map reflects that.
+  @Test
+  public void testColumnMetadataMapRejectsWrites()
+      throws Exception {
+    SegmentMetadataImpl metadata = new SegmentMetadataImpl(_segmentDirectory);
+    TreeMap<String, ColumnMetadata> map = metadata.getColumnMetadataMap();
+    String column = map.firstKey();
+    ColumnMetadata columnMetadata = map.get(column);
+    assertThrows(UnsupportedOperationException.class, () -> map.put("added", columnMetadata));
+    assertThrows(UnsupportedOperationException.class, () -> map.remove(column));
+    assertThrows(UnsupportedOperationException.class, map::clear);
+    assertThrows(UnsupportedOperationException.class, () -> map.computeIfAbsent("added", k -> columnMetadata));
+    assertThrows(UnsupportedOperationException.class, () -> map.keySet().remove(column));
+    assertThrows(UnsupportedOperationException.class, () -> map.navigableKeySet().pollFirst());
+    assertThrows(UnsupportedOperationException.class, () -> map.values().clear());
+    Iterator<Map.Entry<String, ColumnMetadata>> entries = map.entrySet().iterator();
+    entries.next();
+    assertThrows(UnsupportedOperationException.class, entries::remove);
+    assertThrows(UnsupportedOperationException.class, () -> map.headMap(column, true).clear());
+    assertThrows(UnsupportedOperationException.class, () -> map.descendingMap().remove(column));
+    assertTrue(map.containsKey(column));
+
+    metadata.addColumnMetadata("added", columnMetadata);
+    assertFalse(map.containsKey("added"), "an earlier map is a snapshot");
+    assertTrue(metadata.getColumnMetadataMap().containsKey("added"));
+    assertSame(metadata.getColumnMetadataFor("added"), columnMetadata);
+  }
+
+  @Test
+  public void testGetAllColumnsIsAnUnmodifiableSnapshot()
+      throws Exception {
+    SegmentMetadataImpl metadata = new SegmentMetadataImpl(_segmentDirectory);
+    NavigableSet<String> columns = metadata.getAllColumns();
+    String column = columns.stream().filter(c -> !c.equals(metadata.getTimeColumn())).findFirst().orElseThrow();
+    assertThrows(UnsupportedOperationException.class, () -> columns.remove(column));
+    assertThrows(UnsupportedOperationException.class, () -> columns.retainAll(Set.of(column)));
+
+    metadata.removeColumn(column);
+    assertTrue(columns.contains(column), "the earlier view stays the snapshot it was");
+    assertFalse(metadata.getAllColumns().contains(column));
+  }
+
+  /// The loader registers the built-in virtual columns through addColumnMetadata(), which has to keep the arrays
+  /// sorted and drop both derived views.
+  @Test
+  public void testAddColumnMetadataKeepsColumnsSortedAndDropsDerivedViews()
+      throws Exception {
+    SegmentMetadataImpl metadata = new SegmentMetadataImpl(_segmentDirectory);
+    assertNotNull(metadata.getColumnMetadataMap());
+    assertNotNull(metadata.getSchema());
+    int numColumns = metadata.getAllColumns().size();
+
+    String column = "$aVirtualColumn";
+    ColumnMetadata added =
+        new EmptyColumnMetadata(new DimensionFieldSpec(column, FieldSpec.DataType.INT, true), null, null);
+    metadata.addColumnMetadata(column, added);
+    assertFalse(metadata.isColumnMetadataMapMaterialized());
+    assertFalse(metadata.isSchemaMaterialized());
+    assertEquals(metadata.getAllColumns().size(), numColumns + 1);
+    assertSame(metadata.getColumnMetadataFor(column), added);
+    assertEquals(new ArrayList<>(metadata.getAllColumns()), new ArrayList<>(metadata.getColumnMetadataMap().keySet()));
+    assertEquals(metadata.getAllColumns().first(), column, "must be inserted in natural order, not appended");
+    assertTrue(metadata.getSchema().hasColumn(column));
+
+    // Re-registering replaces the column rather than duplicating it
+    ColumnMetadata replacement =
+        new EmptyColumnMetadata(new DimensionFieldSpec(column, FieldSpec.DataType.LONG, true), null, null);
+    metadata.addColumnMetadata(column, replacement);
+    assertEquals(metadata.getAllColumns().size(), numColumns + 1);
+    assertSame(metadata.getColumnMetadataFor(column), replacement);
+  }
+
+  /// The column arrays are replaced as a whole, never written in place, so a collection handed out earlier stays the
+  /// snapshot it is documented to be — through an insertion and through a replacement of a column already there —
+  /// and every name stays paired with its own metadata.
+  @Test
+  public void testColumnMetadataViewIsASnapshot()
+      throws Exception {
+    SegmentMetadataImpl metadata = new SegmentMetadataImpl(_segmentDirectory);
+    int numColumns = metadata.getAllColumns().size();
+    Collection<ColumnMetadata> snapshot = metadata.getAllColumnMetadata();
+    String column = metadata.getAllColumns().first();
+    ColumnMetadata original = metadata.getColumnMetadataFor(column);
+    assertSame(new ArrayList<>(snapshot).get(0), original);
+
+    metadata.addColumnMetadata(column,
+        new EmptyColumnMetadata(new DimensionFieldSpec(column, FieldSpec.DataType.INT, true), null, null));
+    metadata.addColumnMetadata("$aVirtualColumn",
+        new EmptyColumnMetadata(new DimensionFieldSpec("$aVirtualColumn", FieldSpec.DataType.INT, true), null, null));
+    assertEquals(snapshot.size(), numColumns);
+    assertSame(new ArrayList<>(snapshot).get(0), original, "a replacement must not reach the earlier snapshot");
+    assertNotSame(metadata.getColumnMetadataFor(column), original);
+
+    assertEquals(metadata.getAllColumns().size(), numColumns + 1);
+    assertEquals(metadata.getAllColumnMetadata().size(), numColumns + 1);
+    assertEquals(metadata.getAllColumnMetadata().stream().map(ColumnMetadata::getColumnName).toList(),
+        new ArrayList<>(metadata.getAllColumns()));
+  }
+
+  /// A CONSUMING segment holds no column metadata: its column names come from the explicit schema, the column
+  /// metadata accessors are empty, and both mutators reject it rather than drop the schema it was given.
+  @Test
+  public void testConsumingSegmentHoldsNoColumnMetadata() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("consuming")
+        .addSingleValueDimension("dim", FieldSpec.DataType.STRING)
+        .addMetric("metric", FieldSpec.DataType.LONG)
+        .build();
+    SegmentMetadataImpl metadata =
+        new SegmentMetadataImpl("testTable", "testTable__0__0__20240101T0000Z", schema, 123L);
+    assertEquals(metadata.getAllColumns(), schema.getColumnNames());
+    assertEquals(metadata.getAllColumns().size(), schema.size());
+    assertTrue(metadata.getAllColumnMetadata().isEmpty());
+    assertNull(metadata.getColumnMetadataMap());
+    assertNull(metadata.getColumnMetadataFor("dim"));
+
+    ColumnMetadata added =
+        new EmptyColumnMetadata(new DimensionFieldSpec("added", FieldSpec.DataType.INT, true), null, null);
+    assertThrows(IllegalStateException.class, () -> metadata.addColumnMetadata("added", added));
+    assertThrows(IllegalStateException.class, () -> metadata.removeColumn("dim"));
+    assertSame(metadata.getSchema(), schema, "the explicit schema survives a rejected mutation");
+    assertEquals(metadata.getAllColumns(), schema.getColumnNames());
+  }
+
+  /// The metadata JSON is a public REST payload: it must list the columns in the same natural order the map view
+  /// does, filter included.
+  @Test
+  public void testToJsonColumnOrderMatchesTheMapView()
+      throws Exception {
+    SegmentMetadataImpl metadata = new SegmentMetadataImpl(_segmentDirectory);
+    List<String> expected = new ArrayList<>(metadata.getColumnMetadataMap().keySet());
+    List<String> actual = new ArrayList<>();
+    metadata.toJson(null).get("columns").forEach(column -> actual.add(column.get("columnName").asText()));
+    assertEquals(actual, expected);
+
+    Set<String> filter = Set.of(expected.get(expected.size() - 1), expected.get(0));
+    List<String> filtered = new ArrayList<>();
+    metadata.toJson(filter).get("columns").forEach(column -> filtered.add(column.get("columnName").asText()));
+    assertEquals(filtered, List.of(expected.get(0), expected.get(expected.size() - 1)));
   }
 
   /// removeColumn() drops the column from the column metadata and from any schema derived afterwards.
