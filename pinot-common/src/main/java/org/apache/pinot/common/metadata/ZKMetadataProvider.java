@@ -648,12 +648,20 @@ public class ZKMetadataProvider {
   /// `segmentNames`, and `null` wherever the record is `null`.
   public static List<SegmentZKMetadata> getSegmentsZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore,
       String tableNameWithType, List<String> segmentNames, @Nullable List<Stat> stats) {
+    return getSegmentsZKMetadata(propertyStore, tableNameWithType, segmentNames, stats, false);
+  }
+
+  /// Same as [#getSegmentsZKMetadata(ZkHelixPropertyStore, String, List, List)], except that with
+  /// `throwOnReadFailure` a failed read throws instead of yielding `null`, so that a `null` entry means that the
+  /// segment's znode does not exist.
+  public static List<SegmentZKMetadata> getSegmentsZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      String tableNameWithType, List<String> segmentNames, @Nullable List<Stat> stats, boolean throwOnReadFailure) {
     int numSegments = segmentNames.size();
     List<String> paths = new ArrayList<>(numSegments);
     for (String segmentName : segmentNames) {
       paths.add(constructPropertyStorePathForSegment(tableNameWithType, segmentName));
     }
-    List<ZNRecord> znRecords = propertyStore.get(paths, stats, AccessOption.PERSISTENT, false);
+    List<ZNRecord> znRecords = propertyStore.get(paths, stats, AccessOption.PERSISTENT, throwOnReadFailure);
     Preconditions.checkState(znRecords.size() == numSegments,
         "Got %s segment ZN records for %s segments of table: %s", znRecords.size(), numSegments, tableNameWithType);
     Preconditions.checkState(stats == null || stats.size() == numSegments,
