@@ -198,8 +198,9 @@ New text and HNSW indexes use Lucene 10; FST and IFST indexes retain their exist
 First deploy the Lucene 9.12 recovery release to every server that may receive these segments, then upgrade to this
 version. Downgrading to that recovery release automatically rebuilds Lucene 10 indexes during normal segment loading,
 using the original forward indexes and unchanged table configuration. Plan capacity for the additional rebuilding
-work and validate representative segments before production rollout. Unpatched Lucene 9.12 releases still reject
-Lucene 10 indexes, so they are not supported rollback targets.
+work and validate representative segments before production rollout. Unpatched Lucene 9.12 releases, including
+Pinot 1.5.0, still reject Lucene 10 indexes and are not supported rollback targets. The rollback release must include
+the recovery changes merged in #19900.
 
 Automatic recovery requires preprocessing. Pause minion tasks and tools that disable preprocessing until their input
 segments match their running Lucene version; those paths can still reject newer indexes.
