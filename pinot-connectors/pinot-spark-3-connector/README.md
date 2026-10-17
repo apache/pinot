@@ -24,6 +24,57 @@ Spark-pinot connector to read data from Pinot.
 
 Detailed read model documentation is here; [Spark-Pinot Connector Read Model](documentation/read_model.md)
 
+## ⚠️ Deprecated — migrate to `pinot-spark-4-connector`
+
+`pinot-spark-3-connector` is **deprecated** and slated for removal in the next minor Pinot
+release. New users should adopt
+[`pinot-spark-4-connector`](../pinot-spark-4-connector); existing users should plan their
+migration during this release cycle.
+
+### Runtime requirements (this release)
+
+This module and its Pinot dependencies inherit the default Java 25 baseline (class file
+major version 69). Build with JDK 25 or newer and use JDK 25 or newer on the Spark driver
+and executors. An older Java runtime cannot load these jars; use artifacts from a Pinot
+release compatible with your deployment if you cannot update the runtime.
+
+### Migration path to Spark 4
+
+`pinot-spark-4-connector` is a faithful port of this module: the read API surface is
+identical (`spark.read.format("pinot")…`), the write API is the same except `mode("overwrite")`
+now fails fast (which is also true here as of this release — see "Behavior changes" below).
+The Spark 4 module requires Spark 4.1.x and JDK 25+.
+
+## Behavior changes since the previous release
+
+> ⚠️ **Overwrite/truncate writes now fail fast.** `df.write.mode("overwrite").format("pinot")…`
+> and SQL `INSERT OVERWRITE` previously *appeared* to succeed but silently appended new
+> segments without replacing existing rows — leaving stale data queryable and producing
+> duplicate segments on retry. The connector now rejects both the V1 `SupportsOverwrite#overwrite`
+> and the `SupportsTruncate#truncate` paths with `UnsupportedOperationException` and a message
+> pointing at the supported alternatives. To replace data, drop the Pinot table via the
+> controller REST API first, or use `pinot-batch-ingestion-spark-3`'s `SparkSegment*PushJobRunner`
+> with `REFRESH` / consistent-push enabled. This is a breaking change for any existing Spark
+> 3 job that depended on the (incorrect) silent-append behavior; those jobs must be migrated
+> to `mode("append")` (or one of the alternatives above) before upgrading.
+
+> ⚠️ **`SparkToPinotTypeTranslator` now rejects unit-mismatched / unsupported types.** The
+> previous version mapped Spark `TimestampType` → Pinot `LONG` and Spark `DateType` → Pinot
+> `INT` directly. Spark stores `TimestampType` as **microseconds-since-epoch** in
+> `InternalRow`, while Pinot's broker convention for time columns is **milliseconds-since-
+> epoch** (`TimestampUtils#toMillisSinceEpoch`) — so the prior mapping silently produced
+> values 1000× too large. The translator now throws `UnsupportedOperationException` with a
+> hint to cast upstream:
+> ```scala
+> df.withColumn("ts", (col("ts").cast("long") / 1000))   // micros → millis, before write
+> df.withColumn("d",  date_format(col("d"), "yyyy-MM-dd")) // DateType → STRING
+> ```
+> The translator also rejects `ArrayType(BinaryType)` and `ArrayType(DecimalType)` (Pinot's
+> segment-build path has no multi-value BYTES / BIG_DECIMAL writer support), and replaces
+> the previous `null` return for unknown types with an explicit
+> `UnsupportedOperationException`. **Existing pipelines that wrote `TimestampType`
+> columns will fail at translation time on upgrade** — validate your schema and add the
+> upstream cast before bumping the connector jar.
 
 ## Features
 - Query realtime, offline or hybrid tables
