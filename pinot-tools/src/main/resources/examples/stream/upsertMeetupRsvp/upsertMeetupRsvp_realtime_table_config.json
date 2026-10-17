@@ -61,10 +61,15 @@
   "fieldConfigList": [
     {
       "name": "location",
-      "encodingType": "RAW",
-      "indexType": "H3",
-      "properties": {
-        "resolutions": "5"
+      "indexes": {
+        "h3": {
+          "resolution": [
+            5
+          ]
+        },
+        "forward": {
+          "encodingType": "RAW"
+        }
       }
     }
   ],

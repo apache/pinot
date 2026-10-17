@@ -121,10 +121,9 @@ public class ConsumingSegmentTierOverrideRealtimeTest extends CustomDataQueryClu
 
   @Override
   protected List<FieldConfig> getFieldConfigs() {
-    return List.of(new FieldConfig.Builder(PROFILED_STRING_COLUMN)
-        .withEncodingType(FieldConfig.EncodingType.RAW)
-        .withTierOverwrites(jsonNode("{\"consuming\":{\"encodingType\":\"DICTIONARY\","
-            + "\"indexes\":{\"inverted\":{\"disabled\":false}}}}"))
+    return List.of(fieldConfigBuilderWithForwardEncoding(PROFILED_STRING_COLUMN, FieldConfig.EncodingType.RAW)
+        .withTierOverwrites(jsonNode("{\"consuming\":{\"indexes\":{\"forward\":{\"encodingType\":\"DICTIONARY\"},"
+            + "\"inverted\":{\"disabled\":false}}}}"))
         .build());
   }
 
