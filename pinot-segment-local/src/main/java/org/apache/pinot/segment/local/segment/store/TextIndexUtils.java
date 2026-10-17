@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.segment.store;
 
 import java.io.File;
+import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -43,7 +44,10 @@ import org.apache.pinot.segment.local.segment.index.text.CaseAwareStandardAnalyz
 import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
@@ -112,6 +116,22 @@ public class TextIndexUtils {
         || new File(segDir, column + Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION).exists()
         || new File(segDir, column + Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION).exists();
     //@formatter:on
+  }
+
+  /// Returns a v3 packed text entry, or null only when the store reports that the entry is absent.
+  /// Other store failures propagate. The returned buffer remains owned by the segment directory.
+  @Nullable
+  public static PinotDataBuffer getConsolidatedTextEntry(SegmentDirectory.Reader reader, String column)
+      throws IOException {
+    try {
+      return reader.getIndexFor(column, StandardIndexes.text());
+    } catch (RuntimeException e) {
+      String message = e.getMessage();
+      if (message != null && message.startsWith(SingleFileIndexDirectory.INDEX_NOT_FOUND_MESSAGE_PREFIX)) {
+        return null;
+      }
+      throw e;
+    }
   }
 
   /// Bulk form of [#hasTextIndex]: which of `columns` have a Lucene text index in `segDir`.

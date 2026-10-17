@@ -175,6 +175,21 @@ To verify which profile is active, run:
 
 If you encounter issues, check that the `protoc-gen-grpc-java` binary is present in one of the expected locations and is executable.
 
+### Lucene index recovery during loading
+
+Normal segment preprocessing automatically rebuilds text and HNSW indexes whose Lucene format cannot be read by
+the running version. Single-column text, multi-column text, and directory/packed HNSW indexes are rebuilt using
+the segment's original forward-index values and existing table configuration; no recovery flag is needed.
+Compatible indexes are reused, and subsequent loads do not rebuild the recovered indexes again. Interrupted builds
+restart from the retained source values before the segment is loaded.
+
+Install this recovery release on the intended rollback target before upgrading Lucene. After a downgrade, loading
+segments containing newer Lucene indexes rebuilds those indexes with the older writer. Retain the original forward
+indexes: dictionary/inverted-index reconstruction can lose multi-value ordering and duplicate values. When original
+values are unavailable, recovery fails before replacing the incompatible index; restore a compatible segment or
+refresh it from retained source data. Rebuilding adds CPU/I/O and segment-loading time. Existing preprocessing
+opt-outs remain in effect. Corruption and ordinary I/O errors fail loading instead of triggering format recovery.
+
 ## Deploying Pinot to Kubernetes
 Please refer to [Running Pinot on Kubernetes](https://docs.pinot.apache.org/basics/getting-started/kubernetes-quickstart) in our project documentation. Pinot also provides Kubernetes integrations with the interactive query engine, [Trino](https://docs.pinot.apache.org/integrations/trino), and the data visualization tool, [Apache Superset](helm/superset.yaml).
 
