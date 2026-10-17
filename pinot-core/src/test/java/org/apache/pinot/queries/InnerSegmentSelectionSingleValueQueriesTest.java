@@ -725,4 +725,21 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     assertEquals(brokerResponse.getOfflineThreadMemAllocatedBytes(), 0);
     assertEquals(brokerResponse.getRealtimeThreadMemAllocatedBytes(), 0);
   }
+
+  @Test
+  public void testSelectionOrderByNowWithAnotherColumn() {
+    // now() is constant-folded to a literal. A literal-only order-by must not be planned as a sorted identifier.
+    String[] queries = new String[]{
+        "SELECT column1, now() AS t FROM testTable ORDER BY 2 DESC LIMIT 1",
+        "SELECT column1, now() AS t FROM testTable ORDER BY 2 ASC LIMIT 1",
+        "SELECT column1, now() AS t FROM testTable ORDER BY 2 LIMIT 1",
+        "SELECT column1, now() AS t FROM testTable ORDER BY now() DESC LIMIT 1",
+        "SELECT now() AS t FROM testTable ORDER BY 1 DESC LIMIT 1"
+    };
+    for (String query : queries) {
+      BaseOperator<SelectionResultsBlock> operator = getOperator(query);
+      SelectionResultsBlock resultsBlock = operator.nextBlock();
+      assertEquals(resultsBlock.getRows().size(), 1, query);
+    }
+  }
 }
