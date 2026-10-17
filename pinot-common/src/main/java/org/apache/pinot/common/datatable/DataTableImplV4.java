@@ -34,6 +34,8 @@ import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
+import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
 import org.apache.pinot.spi.accounting.ThreadResourceSnapshot;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.query.QueryThreadContext;
@@ -88,10 +90,12 @@ public class DataTableImplV4 implements DataTable {
   protected int _fixDataSize;
   protected DataSchema _dataSchema;
   protected String[] _stringDictionary;
-  protected byte[] _fixedSizeDataBytes;
-  protected ByteBuffer _fixedSizeData;
-  protected byte[] _variableSizeDataBytes;
-  protected ByteBuffer _variableSizeData;
+  /// Both sections are read with absolute offsets only, so they can be split in pages (as the server builds them) or
+  /// be a single array (as the broker deserializes them).
+  @Nullable
+  protected DataBuffer _fixedSizeData;
+  @Nullable
+  protected DataBuffer _variableSizeData;
   protected Map<String, String> _metadata;
   protected int[] _columnOffsets;
   protected int _rowSizeInBytes;
@@ -102,9 +106,7 @@ public class DataTableImplV4 implements DataTable {
     _fixDataSize = 0;
     _dataSchema = null;
     _stringDictionary = null;
-    _fixedSizeDataBytes = null;
     _fixedSizeData = null;
-    _variableSizeDataBytes = null;
     _variableSizeData = null;
     _rowSizeInBytes = 0;
     _columnOffsets = null;
@@ -112,17 +114,17 @@ public class DataTableImplV4 implements DataTable {
     _errCodeToExceptionMap = new HashMap<>();
   }
 
-  public DataTableImplV4(int numRows, DataSchema dataSchema, String[] stringDictionary, byte[] fixedSizeDataBytes,
-      byte[] variableSizeDataBytes) {
+  /// Creates a table that reads its fixed and variable size sections from the given big-endian buffers, without
+  /// copying them.
+  public DataTableImplV4(int numRows, DataSchema dataSchema, String[] stringDictionary, DataBuffer fixedSizeData,
+      DataBuffer variableSizeData) {
     _numRows = numRows;
     _dataSchema = dataSchema;
     _numColumns = dataSchema == null ? 0 : dataSchema.size();
     _fixDataSize = 0;
     _stringDictionary = stringDictionary;
-    _fixedSizeDataBytes = fixedSizeDataBytes;
-    _fixedSizeData = ByteBuffer.wrap(fixedSizeDataBytes);
-    _variableSizeDataBytes = variableSizeDataBytes;
-    _variableSizeData = ByteBuffer.wrap(variableSizeDataBytes);
+    _fixedSizeData = fixedSizeData;
+    _variableSizeData = variableSizeData;
     _metadata = new HashMap<>();
     _errCodeToExceptionMap = new HashMap<>();
     computeBlockObjectConstants();
@@ -170,22 +172,21 @@ public class DataTableImplV4 implements DataTable {
 
     // Read fixed size data.
     if (fixedSizeDataLength != 0) {
-      _fixedSizeDataBytes = new byte[fixedSizeDataLength];
+      byte[] fixedSizeDataBytes = new byte[fixedSizeDataLength];
       byteBuffer.position(fixedSizeDataStart);
-      byteBuffer.get(_fixedSizeDataBytes);
-      _fixedSizeData = ByteBuffer.wrap(_fixedSizeDataBytes);
+      byteBuffer.get(fixedSizeDataBytes);
+      _fixedSizeData = PinotByteBuffer.wrap(fixedSizeDataBytes);
     } else {
-      _fixedSizeDataBytes = null;
       _fixedSizeData = null;
     }
 
     // Read variable size data.
-    _variableSizeDataBytes = new byte[variableSizeDataLength];
+    byte[] variableSizeDataBytes = new byte[variableSizeDataLength];
     if (variableSizeDataLength != 0) {
       byteBuffer.position(variableSizeDataStart);
-      byteBuffer.get(_variableSizeDataBytes);
+      byteBuffer.get(variableSizeDataBytes);
     }
-    _variableSizeData = ByteBuffer.wrap(_variableSizeDataBytes);
+    _variableSizeData = PinotByteBuffer.wrap(variableSizeDataBytes);
 
     // Read metadata.
     int metadataLength = byteBuffer.getInt();
@@ -243,10 +244,8 @@ public class DataTableImplV4 implements DataTable {
 
   @Override
   public BigDecimal getBigDecimal(int rowId, int colId) {
-    int size = positionOffsetInVariableBufferAndGetLength(rowId, colId);
-    ByteBuffer byteBuffer = _variableSizeData.slice();
-    byteBuffer.limit(size);
-    return BigDecimalUtils.deserialize(byteBuffer);
+    int offsetInFixed = getOffsetInFixedBuffer(rowId, colId);
+    return BigDecimalUtils.deserialize(copyFromVariableBuffer(offsetInFixed));
   }
 
   @Override
@@ -256,64 +255,70 @@ public class DataTableImplV4 implements DataTable {
 
   @Override
   public ByteArray getBytes(int rowId, int colId) {
-    int size = positionOffsetInVariableBufferAndGetLength(rowId, colId);
-    byte[] buffer = new byte[size];
-    _variableSizeData.get(buffer);
-    return new ByteArray(buffer);
+    int offsetInFixed = getOffsetInFixedBuffer(rowId, colId);
+    return new ByteArray(copyFromVariableBuffer(offsetInFixed));
   }
 
   // --------------------------------------------------------------------------
   // Variable sized element access.
   // --------------------------------------------------------------------------
+  // These read with absolute offsets instead of a stream: a stream over a paged buffer creates a view of every page
+  // up to the end of the section on each call.
 
   @Override
   public int[] getIntArray(int rowId, int colId) {
-    int length = positionOffsetInVariableBufferAndGetLength(rowId, colId);
-    int[] ints = new int[length];
-    for (int i = 0; i < length; i++) {
-      ints[i] = _variableSizeData.getInt();
+    int offsetInFixed = getOffsetInFixedBuffer(rowId, colId);
+    long offsetInVar = _fixedSizeData.getInt(offsetInFixed);
+    int[] ints = new int[_fixedSizeData.getInt(offsetInFixed + Integer.BYTES)];
+    for (int i = 0; i < ints.length; i++) {
+      ints[i] = _variableSizeData.getInt(offsetInVar + (long) i * Integer.BYTES);
     }
     return ints;
   }
 
   @Override
   public long[] getLongArray(int rowId, int colId) {
-    int length = positionOffsetInVariableBufferAndGetLength(rowId, colId);
-    long[] longs = new long[length];
-    for (int i = 0; i < length; i++) {
-      longs[i] = _variableSizeData.getLong();
+    int offsetInFixed = getOffsetInFixedBuffer(rowId, colId);
+    long offsetInVar = _fixedSizeData.getInt(offsetInFixed);
+    long[] longs = new long[_fixedSizeData.getInt(offsetInFixed + Integer.BYTES)];
+    for (int i = 0; i < longs.length; i++) {
+      longs[i] = _variableSizeData.getLong(offsetInVar + (long) i * Long.BYTES);
     }
     return longs;
   }
 
   @Override
   public float[] getFloatArray(int rowId, int colId) {
-    int length = positionOffsetInVariableBufferAndGetLength(rowId, colId);
-    float[] floats = new float[length];
-    for (int i = 0; i < length; i++) {
-      floats[i] = _variableSizeData.getFloat();
+    int offsetInFixed = getOffsetInFixedBuffer(rowId, colId);
+    long offsetInVar = _fixedSizeData.getInt(offsetInFixed);
+    float[] floats = new float[_fixedSizeData.getInt(offsetInFixed + Integer.BYTES)];
+    for (int i = 0; i < floats.length; i++) {
+      floats[i] = _variableSizeData.getFloat(offsetInVar + (long) i * Float.BYTES);
     }
     return floats;
   }
 
   @Override
   public double[] getDoubleArray(int rowId, int colId) {
-    int length = positionOffsetInVariableBufferAndGetLength(rowId, colId);
-    double[] doubles = new double[length];
-    for (int i = 0; i < length; i++) {
-      doubles[i] = _variableSizeData.getDouble();
+    int offsetInFixed = getOffsetInFixedBuffer(rowId, colId);
+    long offsetInVar = _fixedSizeData.getInt(offsetInFixed);
+    double[] doubles = new double[_fixedSizeData.getInt(offsetInFixed + Integer.BYTES)];
+    for (int i = 0; i < doubles.length; i++) {
+      doubles[i] = _variableSizeData.getDouble(offsetInVar + (long) i * Double.BYTES);
     }
     return doubles;
   }
 
   @Override
   public BigDecimal[] getBigDecimalArray(int rowId, int colId) {
-    int length = positionOffsetInVariableBufferAndGetLength(rowId, colId);
-    BigDecimal[] bigDecimals = new BigDecimal[length];
-    for (int i = 0; i < length; i++) {
-      int byteLength = _variableSizeData.getInt();
-      byte[] bytes = new byte[byteLength];
-      _variableSizeData.get(bytes);
+    int offsetInFixed = getOffsetInFixedBuffer(rowId, colId);
+    long offsetInVar = _fixedSizeData.getInt(offsetInFixed);
+    BigDecimal[] bigDecimals = new BigDecimal[_fixedSizeData.getInt(offsetInFixed + Integer.BYTES)];
+    for (int i = 0; i < bigDecimals.length; i++) {
+      byte[] bytes = new byte[_variableSizeData.getInt(offsetInVar)];
+      offsetInVar += Integer.BYTES;
+      _variableSizeData.copyTo(offsetInVar, bytes, 0, bytes.length);
+      offsetInVar += bytes.length;
       bigDecimals[i] = BigDecimalUtils.deserialize(bytes);
     }
     return bigDecimals;
@@ -321,22 +326,25 @@ public class DataTableImplV4 implements DataTable {
 
   @Override
   public String[] getStringArray(int rowId, int colId) {
-    int length = positionOffsetInVariableBufferAndGetLength(rowId, colId);
-    String[] strings = new String[length];
-    for (int i = 0; i < length; i++) {
-      strings[i] = _stringDictionary[_variableSizeData.getInt()];
+    int offsetInFixed = getOffsetInFixedBuffer(rowId, colId);
+    long offsetInVar = _fixedSizeData.getInt(offsetInFixed);
+    String[] strings = new String[_fixedSizeData.getInt(offsetInFixed + Integer.BYTES)];
+    for (int i = 0; i < strings.length; i++) {
+      strings[i] = _stringDictionary[_variableSizeData.getInt(offsetInVar + (long) i * Integer.BYTES)];
     }
     return strings;
   }
 
   @Override
   public ByteArray[] getBytesArray(int rowId, int colId) {
-    int length = positionOffsetInVariableBufferAndGetLength(rowId, colId);
-    ByteArray[] bytes = new ByteArray[length];
-    for (int i = 0; i < length; i++) {
-      int byteLength = _variableSizeData.getInt();
-      byte[] value = new byte[byteLength];
-      _variableSizeData.get(value);
+    int offsetInFixed = getOffsetInFixedBuffer(rowId, colId);
+    long offsetInVar = _fixedSizeData.getInt(offsetInFixed);
+    ByteArray[] bytes = new ByteArray[_fixedSizeData.getInt(offsetInFixed + Integer.BYTES)];
+    for (int i = 0; i < bytes.length; i++) {
+      byte[] value = new byte[_variableSizeData.getInt(offsetInVar)];
+      offsetInVar += Integer.BYTES;
+      _variableSizeData.copyTo(offsetInVar, value, 0, value.length);
+      offsetInVar += value.length;
       bytes[i] = new ByteArray(value);
     }
     return bytes;
@@ -345,27 +353,27 @@ public class DataTableImplV4 implements DataTable {
   @Nullable
   @Override
   public Map<String, Object> getMap(int rowId, int colId) {
-    int size = positionOffsetInVariableBufferAndGetLength(rowId, colId);
-    if (size == 0) {
+    int offsetInFixed = getOffsetInFixedBuffer(rowId, colId);
+    if (_fixedSizeData.getInt(offsetInFixed + Integer.BYTES) == 0) {
       return null;
     }
-    ByteBuffer buffer = _variableSizeData.slice();
-    buffer.limit(size);
-    return MapUtils.deserializeMap(buffer);
+    return MapUtils.deserializeMap(copyFromVariableBuffer(offsetInFixed));
   }
 
   @Nullable
   @Override
   public CustomObject getCustomObject(int rowId, int colId) {
-    int size = positionOffsetInVariableBufferAndGetLength(rowId, colId);
-    int type = _variableSizeData.getInt();
+    int offsetInFixed = getOffsetInFixedBuffer(rowId, colId);
+    int offsetInVar = _fixedSizeData.getInt(offsetInFixed);
+    int size = _fixedSizeData.getInt(offsetInFixed + Integer.BYTES);
+    int type = _variableSizeData.getInt(offsetInVar);
     if (size == 0) {
       assert type == CustomObject.NULL_TYPE_VALUE;
       return null;
     }
-    ByteBuffer buffer = _variableSizeData.slice();
-    buffer.limit(size);
-    return new CustomObject(type, buffer);
+    // A view when the value fits in one page, otherwise a copy. On a table built in this process the pages are
+    // read-only, so the returned buffer can be read-only too: deserializers must not call array() on it.
+    return new CustomObject(type, _variableSizeData.copyOrView(offsetInVar + Integer.BYTES, size));
   }
 
   @Nullable
@@ -373,16 +381,13 @@ public class DataTableImplV4 implements DataTable {
   public RoaringBitmap getNullRowIds(int colId) {
     // _fixedSizeData stores two ints per col's null bitmap: offset, and length.
     int position = _fixDataSize + colId * Integer.BYTES * 2;
-    if (_fixedSizeData == null || position >= _fixedSizeData.limit()) {
+    if (_fixedSizeData == null || position >= _fixedSizeData.size()) {
       return null;
     }
-    _fixedSizeData.position(position);
-    int offset = _fixedSizeData.getInt();
-    int bytesLength = _fixedSizeData.getInt();
+    int bytesLength = _fixedSizeData.getInt(position + Integer.BYTES);
     if (bytesLength > 0) {
-      _variableSizeData.position(offset);
       byte[] nullBitmapBytes = new byte[bytesLength];
-      _variableSizeData.get(nullBitmapBytes);
+      _variableSizeData.copyTo(_fixedSizeData.getInt(position), nullBitmapBytes, 0, bytesLength);
       return RoaringBitmapUtils.deserialize(nullBitmapBytes);
     } else {
       return null;
@@ -428,23 +433,44 @@ public class DataTableImplV4 implements DataTable {
     return _errCodeToExceptionMap;
   }
 
+  /// Serializes the table into one array of the exact final size, so the fixed and variable size sections are copied
+  /// once and no buffer grows by doubling.
   @Override
   public byte[] toBytes()
       throws IOException {
     ThreadResourceSnapshot resourceSnapshot = new ThreadResourceSnapshot();
 
-    ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-    DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
-    writeLeadingSections(dataOutputStream);
-
     // Add table serialization time and memory metadata when the corresponding measurement is enabled.
     // When CPU time/memory usage is not collectable, we omit these values from the metadata.
-    if (ThreadResourceUsageProvider.isThreadCpuTimeMeasurementEnabled()) {
-      getMetadata().put(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName(),
-          String.valueOf(resourceSnapshot.getCpuTimeNs()));
+    // The entries are reserved before the array is sized and filled in after the sections are copied. Both are LONG
+    // keys, whose encoded length does not depend on the value, so the metadata length does not change.
+    boolean measureCpuTime = ThreadResourceUsageProvider.isThreadCpuTimeMeasurementEnabled();
+    boolean measureAllocatedBytes = ThreadResourceUsageProvider.isThreadMemoryMeasurementEnabled();
+    if (measureCpuTime) {
+      _metadata.put(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName(), "0");
     }
-    if (ThreadResourceUsageProvider.isThreadMemoryMeasurementEnabled()) {
-      getMetadata().put(MetadataKey.RESPONSE_SER_MEM_ALLOCATED_BYTES.getName(),
+    if (measureAllocatedBytes) {
+      _metadata.put(MetadataKey.RESPONSE_SER_MEM_ALLOCATED_BYTES.getName(), "0");
+    }
+
+    byte[] exceptionsBytes = serializeExceptions();
+    byte[] dictionaryBytes = _stringDictionary != null ? serializeStringDictionary() : null;
+    byte[] dataSchemaBytes = _dataSchema != null ? _dataSchema.toBytes() : null;
+    int metadataLength = serializeMetadata().length;
+    long totalLength = HEADER_SIZE + exceptionsBytes.length + lengthOf(dictionaryBytes) + lengthOf(dataSchemaBytes)
+        + sizeOf(_fixedSizeData) + sizeOf(_variableSizeData) + Integer.BYTES + metadataLength;
+    if (totalLength > Integer.MAX_VALUE) {
+      throw new IllegalStateException("Serialized data table size " + totalLength + " exceeds the 2 GB limit");
+    }
+    byte[] bytes = new byte[(int) totalLength];
+    ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+    writeLeadingSections(byteBuffer, exceptionsBytes, dictionaryBytes, dataSchemaBytes);
+
+    if (measureCpuTime) {
+      _metadata.put(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName(), String.valueOf(resourceSnapshot.getCpuTimeNs()));
+    }
+    if (measureAllocatedBytes) {
+      _metadata.put(MetadataKey.RESPONSE_SER_MEM_ALLOCATED_BYTES.getName(),
           String.valueOf(resourceSnapshot.getAllocatedBytes()));
     }
 
@@ -452,83 +478,74 @@ public class DataTableImplV4 implements DataTable {
     // NOTE: We ignore metadata serialization time in "responseSerializationCpuTimeNs" as it's negligible while
     // considering it will bring a lot code complexity.
     byte[] metadataBytes = serializeMetadata();
-    dataOutputStream.writeInt(metadataBytes.length);
-    dataOutputStream.write(metadataBytes);
-
-    return byteArrayOutputStream.toByteArray();
+    if (metadataBytes.length != metadataLength) {
+      throw new IllegalStateException(
+          "Metadata length changed during serialization from " + metadataLength + " to " + metadataBytes.length);
+    }
+    byteBuffer.putInt(metadataBytes.length);
+    byteBuffer.put(metadataBytes);
+    assert !byteBuffer.hasRemaining();
+    return bytes;
   }
 
-  private void writeLeadingSections(DataOutputStream dataOutputStream)
-      throws IOException {
-    dataOutputStream.writeInt(getVersion());
-    dataOutputStream.writeInt(_numRows);
-    dataOutputStream.writeInt(_numColumns);
+  private static int lengthOf(@Nullable byte[] bytes) {
+    return bytes != null ? bytes.length : 0;
+  }
+
+  private static long sizeOf(@Nullable DataBuffer dataBuffer) {
+    return dataBuffer != null ? dataBuffer.size() : 0;
+  }
+
+  private void writeLeadingSections(ByteBuffer byteBuffer, byte[] exceptionsBytes, @Nullable byte[] dictionaryBytes,
+      @Nullable byte[] dataSchemaBytes) {
+    int fixedSizeDataLength = (int) sizeOf(_fixedSizeData);
+    int variableSizeDataLength = (int) sizeOf(_variableSizeData);
+
+    byteBuffer.putInt(getVersion());
+    byteBuffer.putInt(_numRows);
+    byteBuffer.putInt(_numColumns);
     int dataOffset = HEADER_SIZE;
 
     // Write exceptions section offset(START|SIZE).
-    dataOutputStream.writeInt(dataOffset);
-    byte[] exceptionsBytes;
-    exceptionsBytes = serializeExceptions();
-    dataOutputStream.writeInt(exceptionsBytes.length);
+    byteBuffer.putInt(dataOffset);
+    byteBuffer.putInt(exceptionsBytes.length);
     dataOffset += exceptionsBytes.length;
 
     // Write dictionary map section offset(START|SIZE).
-    dataOutputStream.writeInt(dataOffset);
-    byte[] dictionaryBytes = null;
-    if (_stringDictionary != null) {
-      dictionaryBytes = serializeStringDictionary();
-      dataOutputStream.writeInt(dictionaryBytes.length);
-      dataOffset += dictionaryBytes.length;
-    } else {
-      dataOutputStream.writeInt(0);
-    }
+    byteBuffer.putInt(dataOffset);
+    byteBuffer.putInt(lengthOf(dictionaryBytes));
+    dataOffset += lengthOf(dictionaryBytes);
 
     // Write data schema section offset(START|SIZE).
-    dataOutputStream.writeInt(dataOffset);
-    byte[] dataSchemaBytes = null;
-    if (_dataSchema != null) {
-      dataSchemaBytes = _dataSchema.toBytes();
-      dataOutputStream.writeInt(dataSchemaBytes.length);
-      dataOffset += dataSchemaBytes.length;
-    } else {
-      dataOutputStream.writeInt(0);
-    }
+    byteBuffer.putInt(dataOffset);
+    byteBuffer.putInt(lengthOf(dataSchemaBytes));
+    dataOffset += lengthOf(dataSchemaBytes);
 
     // Write fixed size data section offset(START|SIZE).
-    dataOutputStream.writeInt(dataOffset);
-    if (_fixedSizeDataBytes != null) {
-      dataOutputStream.writeInt(_fixedSizeDataBytes.length);
-      dataOffset += _fixedSizeDataBytes.length;
-    } else {
-      dataOutputStream.writeInt(0);
-    }
+    byteBuffer.putInt(dataOffset);
+    byteBuffer.putInt(fixedSizeDataLength);
+    dataOffset += fixedSizeDataLength;
 
     // Write variable size data section offset(START|SIZE).
-    dataOutputStream.writeInt(dataOffset);
-    if (_variableSizeDataBytes != null) {
-      dataOutputStream.writeInt(_variableSizeDataBytes.length);
-    } else {
-      dataOutputStream.writeInt(0);
-    }
+    byteBuffer.putInt(dataOffset);
+    byteBuffer.putInt(variableSizeDataLength);
 
     // Write actual data.
-    // Write exceptions bytes.
-    dataOutputStream.write(exceptionsBytes);
-    // Write dictionary map bytes.
+    byteBuffer.put(exceptionsBytes);
     if (dictionaryBytes != null) {
-      dataOutputStream.write(dictionaryBytes);
+      byteBuffer.put(dictionaryBytes);
     }
-    // Write data schema bytes.
     if (dataSchemaBytes != null) {
-      dataOutputStream.write(dataSchemaBytes);
+      byteBuffer.put(dataSchemaBytes);
     }
-    // Write fixed size data bytes.
-    if (_fixedSizeDataBytes != null) {
-      dataOutputStream.write(_fixedSizeDataBytes);
-    }
-    // Write variable size data bytes.
-    if (_variableSizeDataBytes != null) {
-      dataOutputStream.write(_variableSizeDataBytes);
+    copySection(_fixedSizeData, byteBuffer, fixedSizeDataLength);
+    copySection(_variableSizeData, byteBuffer, variableSizeDataLength);
+  }
+
+  private static void copySection(@Nullable DataBuffer section, ByteBuffer byteBuffer, int length) {
+    if (length > 0) {
+      section.copyTo(0, byteBuffer.array(), byteBuffer.position(), length);
+      byteBuffer.position(byteBuffer.position() + length);
     }
   }
 
@@ -648,7 +665,7 @@ public class DataTableImplV4 implements DataTable {
     }
   }
 
-  /// return the offset in `_fixedSizeDataBytes` of the row/column ID.
+  /// Returns the offset in the fixed size buffer of the row/column ID.
   /// @param rowId row ID
   /// @param colId column ID
   /// @return the offset in the fixed size buffer for the row/columnID.
@@ -656,16 +673,13 @@ public class DataTableImplV4 implements DataTable {
     return rowId * _rowSizeInBytes + _columnOffsets[colId];
   }
 
-  /// position the `_variableSizeDataBytes` to the corresponding row/column ID. and return the
-  /// length of bytes to extract from the variable size buffer.
-  ///
-  /// @param rowId row ID
-  /// @param colId column ID
-  /// @return the length to extract from variable size buffer.
-  protected int positionOffsetInVariableBufferAndGetLength(int rowId, int colId) {
-    int offset = getOffsetInFixedBuffer(rowId, colId);
-    _variableSizeData.position(_fixedSizeData.getInt(offset));
-    return _fixedSizeData.getInt(offset + 4);
+  /// Copies the variable size value referenced by the (offset, length) pair at `offsetInFixed` into a new array.
+  private byte[] copyFromVariableBuffer(int offsetInFixed) {
+    int offsetInVar = _fixedSizeData.getInt(offsetInFixed);
+    int length = _fixedSizeData.getInt(offsetInFixed + Integer.BYTES);
+    byte[] bytes = new byte[length];
+    _variableSizeData.copyTo(offsetInVar, bytes, 0, length);
+    return bytes;
   }
 
   @Override
@@ -678,7 +692,7 @@ public class DataTableImplV4 implements DataTable {
 
   @Override
   public DataTable toDataOnlyDataTable() {
-    return new DataTableImplV4(_numRows, _dataSchema, _stringDictionary, _fixedSizeDataBytes, _variableSizeDataBytes);
+    return new DataTableImplV4(_numRows, _dataSchema, _stringDictionary, _fixedSizeData, _variableSizeData);
   }
 
   public int getRowSizeInBytes() {
