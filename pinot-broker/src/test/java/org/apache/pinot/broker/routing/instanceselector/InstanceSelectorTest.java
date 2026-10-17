@@ -79,6 +79,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
@@ -1089,6 +1090,17 @@ public class InstanceSelectorTest {
     selectionResult = strictReplicaGroupInstanceSelector.select(brokerRequest, segments, 0);
     assertTrue(selectionResult.getSegmentToInstanceMap().isEmpty());
     assertEquals(selectionResult.getUnavailableSegments(), Arrays.asList(segment0, segment1));
+    verify(brokerMetrics, times(2)).addMeteredGlobalValue(BrokerMeter.FAIL_OPEN_ELIGIBLE_REQUESTS, 1);
+    // Both selectors transition segment0 and segment1 into the unavailable-with-candidates state on init.
+    verify(brokerMetrics, times(4))
+        .addMeteredTableValue(offlineTableName, BrokerMeter.FAIL_OPEN_ELIGIBLE_SEGMENTS, 1);
+
+    // An unchanged routing refresh should not re-count the transition meter since the segments were already
+    // unavailable with candidates.
+    balancedInstanceSelector.onInstancesChange(enabledInstances, List.of());
+    strictReplicaGroupInstanceSelector.onInstancesChange(enabledInstances, List.of());
+    verify(brokerMetrics, times(4))
+        .addMeteredTableValue(offlineTableName, BrokerMeter.FAIL_OPEN_ELIGIBLE_SEGMENTS, 1);
 
     // Iterate 5 times
     for (int i = 0; i < 5; i++) {
@@ -1566,6 +1578,59 @@ public class InstanceSelectorTest {
     selectionResult = selector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedResult);
     assertTrue(selectionResult.getUnavailableSegments().isEmpty());
+  }
+
+  @Test(dataProvider = "selectorType")
+  public void testFailOpenEligibleSegmentsMeter(String selectorType) {
+    String segment = "segment0";
+    String instance = "instance0";
+    Set<String> onlineSegments = Set.of(segment);
+    IdealState idealState = createIdealState(Map.of(segment, List.of(Pair.of(instance, ONLINE))));
+    ExternalView externalView = createExternalView(Map.of(segment, List.of()));
+    InstanceSelector selector =
+        createTestInstanceSelector(selectorType, Set.of(), idealState, externalView, onlineSegments);
+
+    // Segment has no candidates at all yet, so it is not a transition into the unavailable-with-candidates state.
+    verify(_brokerMetrics, never())
+        .addMeteredTableValue(TABLE_NAME, BrokerMeter.FAIL_OPEN_ELIGIBLE_SEGMENTS, 1);
+
+    selector.select(_brokerRequest, List.of(segment), 0);
+    selector.select(_brokerRequest, List.of(segment), 1);
+    verify(_brokerMetrics, never()).addMeteredGlobalValue(BrokerMeter.FAIL_OPEN_ELIGIBLE_REQUESTS, 1);
+
+    externalView = createExternalView(Map.of(segment, List.of(Pair.of(instance, ONLINE))));
+    selector.onAssignmentChange(idealState, externalView, onlineSegments);
+
+    // Segment transitioned from "no candidates" to "unavailable with a disabled candidate".
+    verify(_brokerMetrics)
+        .addMeteredTableValue(TABLE_NAME, BrokerMeter.FAIL_OPEN_ELIGIBLE_SEGMENTS, 1);
+
+    selector.select(_brokerRequest, List.of(segment), 2);
+    selector.select(_brokerRequest, List.of(segment), 3);
+    verify(_brokerMetrics, times(2)).addMeteredGlobalValue(BrokerMeter.FAIL_OPEN_ELIGIBLE_REQUESTS, 1);
+
+    // An unchanged refresh must not re-count the transition meter since the segment was already unavailable with a
+    // candidate.
+    selector.onAssignmentChange(idealState, externalView, onlineSegments);
+
+    verify(_brokerMetrics, times(1))
+        .addMeteredTableValue(TABLE_NAME, BrokerMeter.FAIL_OPEN_ELIGIBLE_SEGMENTS, 1);
+
+    selector.onInstancesChange(Set.of(instance), List.of(instance));
+
+    // Recovery is not a transition into the unhealthy state, so the meter must not increment.
+    verify(_brokerMetrics, times(1))
+        .addMeteredTableValue(TABLE_NAME, BrokerMeter.FAIL_OPEN_ELIGIBLE_SEGMENTS, 1);
+
+    selector.select(_brokerRequest, List.of(segment), 4);
+    verify(_brokerMetrics, times(2)).addMeteredGlobalValue(BrokerMeter.FAIL_OPEN_ELIGIBLE_REQUESTS, 1);
+
+    // Disable the instance again to re-enter the unavailable-with-candidates state after recovery; the meter must
+    // fire again since this is a fresh transition, not a repeat of the earlier one.
+    selector.onInstancesChange(Set.of(), List.of(instance));
+
+    verify(_brokerMetrics, times(2))
+        .addMeteredTableValue(TABLE_NAME, BrokerMeter.FAIL_OPEN_ELIGIBLE_SEGMENTS, 1);
   }
 
   // Test that we mark new segment as old when external view state converges with ideal state.
