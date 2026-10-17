@@ -25,6 +25,7 @@ import java.util.Timer;
 import java.util.TimerTask;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.spi.accounting.ExternalExecutionSampler;
 import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.ThreadAccountantFactory;
@@ -67,6 +68,14 @@ public class HeapUsagePublishingAccountantFactory implements ThreadAccountantFac
 
     @Override
     public void sampleUsage() {
+    }
+
+    @Override
+    public ExternalExecutionSampler captureExternalExecutionSampler() {
+      if (getClass() != HeapUsagePublishingAccountant.class) {
+        return null;
+      }
+      return new ExternalExecutionSampler(() -> { }, () -> false);
     }
 
     @Override
