@@ -73,6 +73,18 @@ public class IndexLoadingConfigTest {
   }
 
   @Test
+  public void testLazyColumnMaterializationIsSourcedFromInstanceConfig() {
+    assertFalse(new IndexLoadingConfig().isLazyColumnMaterialization());
+
+    InstanceDataManagerConfig instanceConfig = mock(InstanceDataManagerConfig.class);
+    when(instanceConfig.isLazyColumnMaterialization()).thenReturn(true);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    IndexLoadingConfig config = new IndexLoadingConfig(instanceConfig, tableConfig, null);
+    assertTrue(config.isLazyColumnMaterialization());
+    assertTrue(config.withSegmentTier("coldTier").isLazyColumnMaterialization());
+  }
+
+  @Test
   public void testCalculateIndexConfigsWithoutTierOverwrites()
       throws IOException {
     InstanceDataManagerConfig idmCfg = mock(InstanceDataManagerConfig.class);
@@ -206,6 +218,12 @@ public class IndexLoadingConfigTest {
     assertNotSame(derived, base);
     assertNotNull(derived.getFieldIndexConfig("event$key"));
     assertNull(base.getFieldIndexConfig("event$key"));
+
+    // A loaded segment keeps the resolved map it captured, even if its config is refreshed later.
+    Map<String, FieldIndexConfigs> captured = derived.getFieldIndexConfigByColName();
+    derived.refreshIndexConfigs();
+    assertNotNull(captured.get("event$key"));
+    assertNull(derived.getFieldIndexConfig("event$key"));
 
     TableConfig schemaLessTable = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     IndexLoadingConfig schemaLess = new IndexLoadingConfig(schemaLessTable, null);

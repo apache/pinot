@@ -25,6 +25,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
@@ -328,5 +329,35 @@ public class OpenStructIndexConfigTest {
     OpenStructIndexConfig config = new OpenStructIndexConfig(false, null, -1, null, 0.5, null, true);
     assertTrue(config.getIgnoredKeys().isEmpty());
     assertTrue(config.isSparseJsonIndex());
+  }
+
+  @Test
+  public void testEqualityCoversEverySetting() {
+    OpenStructIndexConfig base = new OpenStructIndexConfig(false, null, 5, Set.of("k"), 0.25, null, false, false, null,
+        null, null);
+    assertEquals(new OpenStructIndexConfig(false, null, 5, Set.of("k"), 0.25, null, false, false, null,
+        null, null), base);
+    assertEquals(new OpenStructIndexConfig(false, null, 5, Set.of("k"), 0.25, null, false, false, null,
+        null, null).hashCode(),
+        base.hashCode());
+    assertNotEquals(new OpenStructIndexConfig(true, null, 5, Set.of("k"), 0.25, null, false, false, null,
+        null, null), base);
+    assertNotEquals(new OpenStructIndexConfig(false, null, 6, Set.of("k"), 0.25, null, false, false, null,
+        null, null), base);
+    assertNotEquals(new OpenStructIndexConfig(false, null, 5, Set.of("other"), 0.25, null, false, false, null,
+        null, null), base);
+    assertNotEquals(new OpenStructIndexConfig(false, null, 5, Set.of("k"), 0.5, null, false, false, null,
+        null, null), base);
+    assertNotEquals(new OpenStructIndexConfig(false, null, 5, Set.of("k"), 0.25, null, true, false, null,
+        null, null), base);
+    assertNotEquals(new OpenStructIndexConfig(false, null, 5, Set.of("k"), 0.25, null, false, true, null,
+        null, null), base);
+    assertNotEquals(new OpenStructIndexConfig(false, null, 5, Set.of("k"), 0.25, null, false, false, Set.of("i"),
+        null, null),
+        base);
+    assertNotEquals(new OpenStructIndexConfig(false, null, 5, Set.of("k"), 0.25, null, false, false, null,
+        2, null), base);
+    assertNotEquals(new OpenStructIndexConfig(false, null, 5, Set.of("k"), 0.25, null, false, false, null,
+        null, new FieldConfig("blob", null, null, null, null)), base);
   }
 }
