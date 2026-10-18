@@ -246,9 +246,10 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
             TableNameBuilder.REALTIME.tableNameWithType(tableName));
     QuotaEnforcementMode result = null;
     for (String entityName : entityNames) {
-      // Entries without a QPS quota have a null rate limiter but are still listed, so their mode is included here. This
-      // is safe because the mode is only consulted after acquire() reported a breach, which such a table cannot cause.
-      if (!_rateLimiterMap.containsKey(entityName)) {
+      // Skip tables without a QPS quota (listed with a null rate limiter): they cannot breach, so their default mode
+      // must not turn a breach of the other side of a hybrid table into a rejection
+      QueryQuotaEntity queryQuotaEntity = _rateLimiterMap.get(entityName);
+      if (queryQuotaEntity == null || queryQuotaEntity.getRateLimiter() == null) {
         continue;
       }
       QuotaEnforcementMode mode = _enforcementModeOverrideMap.getOrDefault(entityName, QuotaEnforcementMode.ENFORCED);

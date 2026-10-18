@@ -623,13 +623,12 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     Assert.assertEquals(queryQuotaMode(OFFLINE_TABLE_NAME),
         QuotaEnforcementMode.DISABLED);
 
-    // Override without any QPS quota is still tracked
+    // A mode without any QPS quota is not reported: such a table cannot breach, so it has no effect
     quotaConfig = new QuotaConfig("6G", null, null, QuotaEnforcementMode.SHADOW);
     tableConfig.setQuotaConfig(quotaConfig);
     ZKMetadataProvider.setTableConfig(_testPropertyStore, tableConfig);
     _queryQuotaManager.initOrUpdateTableQueryQuota(tableConfig, brokerResource);
-    Assert.assertEquals(queryQuotaMode(OFFLINE_TABLE_NAME),
-        QuotaEnforcementMode.SHADOW);
+    Assert.assertEquals(queryQuotaMode(OFFLINE_TABLE_NAME), QuotaEnforcementMode.ENFORCED);
 
     // Removing the mode reverts to the default (null, i.e. ENFORCED)
     tableConfig.setQuotaConfig(new QuotaConfig(null, TABLE_MAX_QPS_STR));
@@ -713,6 +712,37 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
 
     // Unknown tables default to ENFORCED
     Assert.assertEquals(queryQuotaMode("unknownTable"), QuotaEnforcementMode.ENFORCED);
+  }
+
+  @Test
+  public void testQueryQuotaEnforcementModeIgnoresSiblingWithoutQpsQuota()
+      throws Exception {
+    ExternalView brokerResource = generateBrokerResource(OFFLINE_TABLE_NAME);
+    brokerResource.setState(REALTIME_TABLE_NAME, BROKER_INSTANCE_ID, "ONLINE");
+
+    // The REALTIME table has no QPS quota (and no mode): it is tracked with a null rate limiter and cannot breach
+    TableConfig realtime = generateDefaultTableConfig(REALTIME_TABLE_NAME);
+    ZKMetadataProvider.setTableConfig(_testPropertyStore, realtime);
+    _queryQuotaManager.initOrUpdateTableQueryQuota(realtime, brokerResource);
+
+    // A breach on the raw name can only come from the OFFLINE table, so its mode must apply
+    for (QuotaEnforcementMode mode : new QuotaEnforcementMode[]{QuotaEnforcementMode.SHADOW,
+        QuotaEnforcementMode.DISABLED}) {
+      TableConfig offline = tableConfigWithQueryQuotaMode(TableType.OFFLINE, mode);
+      _queryQuotaManager.initOrUpdateTableQueryQuota(offline, brokerResource);
+      Assert.assertEquals(queryQuotaMode(RAW_TABLE_NAME), mode);
+      Assert.assertEquals(queryQuotaMode(OFFLINE_TABLE_NAME), mode);
+    }
+
+    // The same holds with the roles swapped
+    _queryQuotaManager.dropTableQueryQuota(OFFLINE_TABLE_NAME);
+    _queryQuotaManager.dropTableQueryQuota(REALTIME_TABLE_NAME);
+    TableConfig offline = generateDefaultTableConfig(OFFLINE_TABLE_NAME);
+    ZKMetadataProvider.setTableConfig(_testPropertyStore, offline);
+    _queryQuotaManager.initOrUpdateTableQueryQuota(offline, brokerResource);
+    realtime = tableConfigWithQueryQuotaMode(TableType.REALTIME, QuotaEnforcementMode.SHADOW);
+    _queryQuotaManager.initOrUpdateTableQueryQuota(realtime, brokerResource);
+    Assert.assertEquals(queryQuotaMode(RAW_TABLE_NAME), QuotaEnforcementMode.SHADOW);
   }
 
   private TableConfig generateDefaultTableConfig(String tableName) {
