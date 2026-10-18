@@ -86,7 +86,7 @@ import org.slf4j.LoggerFactory;
 /// Its effect shows in the stats: a never-activated segment scans no docs, so `numSegmentsMatched` excludes it while
 /// `numSegmentsProcessed` counts every segment. Their difference also counts activated segments that matched no rows.
 /// TODO: report the activated count separately; that needs a new `DataTable.MetadataKey`.
-///       See https://github.com/apache/pinot/pull/19120#discussion_r3871714063
+///       See https://github.com/apache/pinot/issues/19924 (item B3)
 ///
 /// **Segment acquire/release lifecycle.** A cursor acquires its
 /// [AcquireReleaseColumnsSegmentOperator] on activation and releases it only when its child operator is fully
@@ -317,7 +317,7 @@ public class StreamingSelectionOrderByCombineOperator extends BaseStreamingCombi
       // TODO: move whole runs with one addAll(subList(...)) after a binary search for the cut. Deferred because
       //       advancing _numRowsEmitted by a run steps over the 0x1FFF mask in the termination check below, losing
       //       cancellation/pause/deadline observation; needs an unconditional check per run or a run-length clamp.
-      //       See https://github.com/apache/pinot/pull/19120#discussion_r3871714056
+      //       See https://github.com/apache/pinot/issues/19924 (item B2)
       SegmentCursor leader = null;
       while (_numRowsEmitted < _numRowsToKeep) {
         // The merge drains the heap on this thread and, for single-block cursors, may never re-enter a child operator.

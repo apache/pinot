@@ -1009,7 +1009,7 @@ public class StreamingSelectionOrderByCombineOperatorTest {
     // BaseStreamingCombineOperator subclass; both the MSE leaf and the gRPC streaming reduce tolerate the null today,
     // so it is pinned here rather than left free to change unnoticed.
     // TODO: revisit if the terminal block ever carries a schema -- the per-child guarantee that would need is now in
-    //       place. See https://github.com/apache/pinot/pull/19120#discussion_r3871714002
+    //       place. See https://github.com/apache/pinot/issues/19924 (item B4)
     Result result = run(_sortedSegments,
         "SELECT sortedCol, valCol FROM testTable WHERE sortedCol < 0 ORDER BY sortedCol, valCol LIMIT 10", true, false,
         true, 0);
@@ -1550,7 +1550,6 @@ public class StreamingSelectionOrderByCombineOperatorTest {
     // ColumnMetadata.isNonNull() instead, which is one-sided: false means nulls or unknown. That is stricter than
     // SelectionPlanNode.isColumnSorted(), which still reads the bitmap after acquire. An old segment with an empty
     // bitmap and no flag therefore resolves OFF rather than streaming over a materialized child.
-    // See https://github.com/apache/pinot/pull/19120#discussion_r3871713975
     String query = "SELECT sortedCol, valCol FROM testTable ORDER BY sortedCol, valCol LIMIT 50";
 
     QueryContext nullHandlingOff = modeContext(query, SortedSelectionMergeMode.AUTO);
