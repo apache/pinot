@@ -560,7 +560,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       // TODO: allowReverseOrder=true still does not guarantee streaming leaves. getSortedByProject() swallows the
       //       failure when a docId set cannot be reversed and returns the unreversed operator, so the leaf gate then
       //       declines and AUTO has resolved ON over materialized children.
-      //       See https://github.com/apache/pinot/pull/19120#discussion_r3871713989
+      //       See https://github.com/apache/pinot/issues/19923 (item A3)
       LOGGER.debug("Not using {} for a DESC leading ORDER BY expression without {}: {}",
           QueryOptionKey.SORTED_SELECTION_MERGE_MODE, QueryOptionKey.ALLOW_REVERSE_ORDER, firstOrderByExpression);
       return false;
@@ -574,7 +574,6 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       // SelectionPlanNode.isColumnFlaggedNonNull() instead. It is one-sided (false means nulls or unknown) and
       // stricter than the leaf, which can see an empty bitmap after acquire: an old segment with no flag resolves OFF
       // rather than streaming over a materialized child.
-      // See https://github.com/apache/pinot/pull/19120#discussion_r3871713975
       IndexSegment segment = segmentContext.getIndexSegment();
       if (!SelectionPlanNode.isColumnPhysicallySorted(segment, queryContext, column)) {
         continue;
