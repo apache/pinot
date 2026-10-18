@@ -130,8 +130,9 @@ public class StreamingSelectionOrderByCombineOperatorTest {
   private static final String ONE_ROW_PER_BLOCK_QUERY =
       "SELECT sortedCol, tailCol, valCol FROM testTable ORDER BY sortedCol, tailCol LIMIT %d";
 
-  /// Create (MAX_NUM_THREADS_PER_QUERY * 2) sorted segments so the leaf runs plan nodes across multiple threads.
-  private static final int NUM_SEGMENTS = QueryMultiThreadingUtils.MAX_NUM_THREADS_PER_QUERY * 2;
+  /// Create (MAX_NUM_THREADS_PER_QUERY * 2) sorted segments so the leaf runs plan nodes across multiple threads. At
+  /// least 4, because some tests address segments by index and the thread count is 1 on a 2-core machine.
+  private static final int NUM_SEGMENTS = Math.max(4, QueryMultiThreadingUtils.MAX_NUM_THREADS_PER_QUERY * 2);
   private static final int NUM_RECORDS_PER_SEGMENT = 100;
 
   private static final TableConfig SORTED_TABLE_CONFIG =
@@ -1737,9 +1738,11 @@ public class StreamingSelectionOrderByCombineOperatorTest {
     assertEquals(metadata.get(MetadataKey.NUM_DOCS_SCANNED.getName()), Long.toString(handDriven._numDocsScanned));
     assertEquals(metadata.get(MetadataKey.NUM_SEGMENTS_MATCHED.getName()),
         Integer.toString(handDriven._numSegmentsMatched));
-    assertTrue(handDriven._numDocsScanned
-            < Long.parseLong(baselineMetadata.get(MetadataKey.NUM_DOCS_SCANNED.getName())),
-        "The streaming merge should stop before scanning every matching document");
+    // Compared with the total, not with the baseline: the MinMax combine prunes more segments with fewer worker
+    // threads, so its docs scanned depends on the number of cores.
+    assertTrue(handDriven._numDocsScanned < NUM_SEGMENTS * NUM_RECORDS_PER_SEGMENT,
+        "The streaming merge should stop before scanning every matching document, but scanned "
+            + handDriven._numDocsScanned);
   }
 
   /// AUTO that resolves to OFF keeps the MinMax combine inside the streaming instance plan. That combine returns one
