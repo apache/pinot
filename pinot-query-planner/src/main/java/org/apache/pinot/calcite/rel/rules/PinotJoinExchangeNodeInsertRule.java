@@ -139,16 +139,19 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
   ///
   /// Broadcasting a side gives every worker all of its rows, so it stands in for any partitioning of the other side. A
   /// LOCAL scan of a table hinted `is_replicated='true'` does the same, since its leaf hands every worker the whole
-  /// table. Broadcasting both sides gives every worker all the rows of both, and each joined row is then emitted once
-  /// per worker. Broadcasting neither leaves both sides partitioned, and they only line up when both are partitioned
-  /// the same way on the join keys, which also requires the join to have keys to partition on. LOCAL on both sides is
-  /// accepted on the user's word that the two inputs are co-partitioned, like the colocated join hint: nothing here can
-  /// check it.
+  /// table. Two such sides give every worker all the rows of both, and each joined row is then emitted once per worker,
+  /// whether the sides are broadcast, replicated tables read locally, or one of each. Broadcasting neither leaves both
+  /// sides partitioned, and they only line up when both are partitioned the same way on the join keys, which also
+  /// requires the join to have keys to partition on. LOCAL on both sides is accepted on the user's word that the two
+  /// inputs are co-partitioned, like the colocated join hint: nothing here can check it.
   ///
   /// A join that decides a left row's output from the right rows it saw -- LEFT emits the left rows that matched
   /// nothing, SEMI and ANTI emit a left row on the presence or absence of a match, and ASOF / LEFT_ASOF pick the
   /// closest match -- can only decide on a worker that holds every right row. So the broadcast side must be the right
-  /// one; RIGHT is the mirror image. A FULL join emits the unmatched rows of both sides, so with keys it cannot use a
+  /// one; RIGHT is the mirror image. SEMI is the exception when the right side is hashed on the join keys: every right
+  /// row sharing a left row's key is on the one worker that key hashes to, so only that worker can emit the left row,
+  /// and it does exactly when a match exists. ANTI and LEFT get no such exception, since every other worker would emit
+  /// the left row as unmatched. A FULL join emits the unmatched rows of both sides, so with keys it cannot use a
   /// broadcast side at all, and without keys it runs on a single worker, where only an exchange that delivers every
   /// row there (RANDOM or BROADCAST) is workable.
   @VisibleForTesting
@@ -162,18 +165,26 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
               + "to reach it, got left: %s, right: %s", leftDistributionType, rightDistributionType);
       return;
     }
-    if (leftDistributionType == PinotHintOptions.DistributionType.BROADCAST
-        && rightDistributionType == PinotHintOptions.DistributionType.BROADCAST) {
-      throw new IllegalArgumentException(
-          "Cannot broadcast both sides of the join: every worker would hold every row of both sides and emit each "
-              + "joined row, repeating the join result once per worker. Broadcast at most one side.");
-    }
     boolean leftWhole = holdsWholeSide(leftDistributionType, leftReplicated);
     boolean rightWhole = holdsWholeSide(rightDistributionType, rightReplicated);
+    Preconditions.checkArgument(!(leftWhole && rightWhole),
+        "Cannot give every worker the whole of both sides of the join (broadcast, or a LOCAL scan of a table hinted "
+            + "is_replicated='true'): every worker would emit each joined row, repeating the join result once per "
+            + "worker. At most one side can be whole, got left: %s, right: %s", leftDistributionType,
+        rightDistributionType);
     if (leftWhole || rightWhole) {
       switch (joinType) {
-        case LEFT:
         case SEMI:
+          if (rightDistributionType == PinotHintOptions.DistributionType.HASH && !joinInfo.leftKeys.isEmpty()) {
+            // Every right row with a given key is on one worker, so a left row can only be emitted there.
+            break;
+          }
+          Preconditions.checkArgument(rightWhole,
+              "SEMI join requires every right row on each worker (broadcast the right side, read a replicated right "
+                  + "table locally, or hash the right side on the join keys): a worker decides each left row from "
+                  + "the right rows it holds, got left: %s, right: %s", leftDistributionType, rightDistributionType);
+          break;
+        case LEFT:
         case ANTI:
         case ASOF:
         case LEFT_ASOF:
