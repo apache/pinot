@@ -83,6 +83,13 @@ struct NativeQuerySegment {
   5: required string materializationId;
 }
 
+// An immutable deadline in a deployment-qualified shared clock domain, preserved across fanout and retries.
+struct NativeQueryTimeBound {
+  1: required string clockDomain;
+  2: required i64 originLowerMillis;
+  3: required i64 notAfterMillis;
+}
+
 struct NativeQueryIdentity {
   1: required i32 version;
   2: required string historyId;
@@ -96,4 +103,5 @@ struct NativeQueryIdentity {
  10: required NativeQueryObject schema;
  11: required list<NativeQuerySegment> requiredSegments;
  12: required list<NativeQuerySegment> optionalSegments;
+ 13: optional NativeQueryTimeBound deadline;
 }

@@ -61,6 +61,13 @@ message NativeQuerySegment {
   string materializationId = 5;
 }
 
+// An immutable deadline in a deployment-qualified shared clock domain, preserved across fanout and retries.
+message NativeQueryTimeBound {
+  string clockDomain = 1;
+  int64 originLowerMillis = 2;
+  int64 notAfterMillis = 3;
+}
+
 message NativeQueryIdentity {
   int32 version = 1;
   string historyId = 2;
@@ -74,6 +81,7 @@ message NativeQueryIdentity {
   NativeQueryObject schema = 10;
   repeated NativeQuerySegment requiredSegments = 11;
   repeated NativeQuerySegment optionalSegments = 12;
+  NativeQueryTimeBound deadline = 13;
 }
 
 message ServerResponse {

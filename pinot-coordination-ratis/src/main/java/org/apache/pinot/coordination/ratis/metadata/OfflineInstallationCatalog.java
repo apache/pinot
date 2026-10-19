@@ -52,11 +52,12 @@ final class OfflineInstallationCatalog {
 
   static void validateSession(ParticipantToken server, OperationCatalog.View view) {
     validateProjectionSession(server, view);
-    require(view.participant(server.participantId()).ready(), Status.FENCED,
-        "Installation participant is not ready");
+    ParticipantState current = view.participant(server.participantId());
+    require(current.ready() && !current.draining(), Status.FENCED, "Installation participant is not ready or draining");
   }
 
-  /// Bootstrap metadata is available before readiness, but never to an expired or replaced registration.
+  /// Metadata is available before readiness and while draining, but never to an expired or replaced registration.
+  /// Draining readers need the committed view for bounded delivery checks; it grants no installation authority.
   static void validateProjectionSession(ParticipantToken server, OperationCatalog.View view) {
     require(server != null && view.historyId().equals(server.historyId()), Status.HISTORY_MISMATCH,
         "Installation participant history differs");
@@ -66,9 +67,9 @@ final class OfflineInstallationCatalog {
     ParticipantState current = view.participant(server.participantId());
     ControlState control = view.control();
     require(current != null && current.participant().equals(server) && control != null
-        && control.controlEpoch() != null && !current.draining() && !current.retired()
+        && control.controlEpoch() != null && !current.retired()
         && current.expiryRound() > control.round(), Status.FENCED,
-        "Installation participant is replaced, draining, retired or expired");
+        "Installation participant is replaced, retired or expired");
   }
 
   static List<CatalogRecord> stage(ReportInstallation request, OperationCatalog.View view, long index)

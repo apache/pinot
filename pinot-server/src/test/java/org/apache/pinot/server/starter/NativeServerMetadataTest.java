@@ -36,6 +36,12 @@ import org.apache.pinot.common.config.provider.NativeOfflineSegmentAction.Partic
 import org.apache.pinot.common.config.provider.NativeOfflineSegmentAction.Role;
 import org.apache.pinot.common.config.provider.RecoverableClusterConfigCache;
 import org.apache.pinot.common.config.provider.TableDataManagerMetadata;
+import org.apache.pinot.common.coordination.ServingPermitGuard.MembershipView;
+import org.apache.pinot.common.coordination.ServingPermitGuard.ReadOnlyCapability;
+import org.apache.pinot.common.proto.Server;
+import org.apache.pinot.common.request.context.NativeQueryContext;
+import org.apache.pinot.common.request.context.NativeQueryContext.ProcessIdentity;
+import org.apache.pinot.common.request.context.NativeQueryContext.Segment;
 import org.apache.pinot.coordination.ratis.rpc.MetadataRpc;
 import org.apache.pinot.coordination.ratis.rpc.MetadataRpc.CatalogRecord;
 import org.apache.pinot.coordination.ratis.rpc.MetadataRpc.RecordKind;
@@ -56,6 +62,214 @@ import static org.testng.Assert.assertTrue;
 
 /// Exercises complete-image recovery and per-incarnation metadata fencing for the native installation runtime.
 public class NativeServerMetadataTest {
+  @Test
+  public void testCoherentMembershipViewRequiresExplicitServerCapability()
+      throws Exception {
+    Fixture fixture = new Fixture();
+    RecoverableClusterConfigCache cache = new RecoverableClusterConfigCache();
+    NativeServerMetadata metadata = new NativeServerMetadata(fixture._server, cache,
+        Set.of(ReadOnlyCapability.SERVER_QUERY));
+    assertThrows(IllegalStateException.class, metadata::membershipView);
+    MetadataRpc.InstallationSnapshot base = fixture.snapshot(10, Map.of(), fixture.records());
+    MetadataRpc.InstallationSnapshot initial = base.toBuilder().setParticipant(base.getParticipant().toBuilder()
+        .addCapabilities(MetadataRpc.ServingCapability.SERVER_QUERY)).build();
+    assertThrows(IOException.class, () -> new NativeServerMetadata(fixture._server, cache).apply(initial));
+    assertThrows(IOException.class, () -> new NativeServerMetadata(fixture._server, cache,
+        Set.of(ReadOnlyCapability.BROKER_QUERY)));
+    metadata.apply(initial);
+    MembershipView first = metadata.membershipView();
+    assertEquals(first.revision(), metadata.revision());
+    assertEquals(first.control(), initial.getControl().getControlEpoch());
+    assertEquals(first.participant(), fixture._server);
+    assertTrue(first.live());
+    assertTrue(first.ready());
+    assertFalse(first.draining());
+    assertEquals(first.capabilities(), Set.of(ReadOnlyCapability.SERVER_QUERY));
+    assertEquals(first.policyVersion(), initial.getControl().getPolicy().getVersion());
+
+    MetadataRpc.InstallationSnapshot malformed = fixture.snapshot(11, Map.of(), fixture.records());
+    MetadataRpc.MembershipControl timing = malformed.getControl();
+    for (MetadataRpc.MembershipControl invalid : List.of(
+        timing.toBuilder().clearMinimumTickDelayMillis().build(),
+        timing.toBuilder().clearMaxConfiguredPermitLifetimeMillis().build(),
+        timing.toBuilder().setMaxConfiguredPermitLifetimeMillis(200).build(),
+        timing.toBuilder().setPolicy(timing.getPolicy().toBuilder().setLeaseRounds(2)).build())) {
+      assertThrows(IOException.class, () -> metadata.apply(malformed.toBuilder().setControl(invalid).build()));
+      assertEquals(metadata.membershipView(), first, "Unsafe timing must not replace the current coherent image");
+    }
+
+    MetadataRpc.InstallationSnapshot nextBase = fixture.snapshot(11, Map.of(), fixture.records());
+    MetadataRpc.InstallationSnapshot next = nextBase.toBuilder().setParticipant(initial.getParticipant())
+        .setControl(nextBase.getControl().toBuilder()
+            .setControlEpoch(nextBase.getControl().getControlEpoch().toBuilder().setRaftTerm(2).setBarrierIndex(9))
+            .setClockBarrierIndex(9)
+            .setPolicy(nextBase.getControl().getPolicy().toBuilder().setVersion(2))).build();
+    metadata.apply(next);
+    MembershipView second = metadata.membershipView();
+    assertEquals(second.revision(), metadata.revision());
+    assertEquals(second.revision().getIndex(), 11);
+    assertEquals(second.control().getRaftTerm(), 2);
+    assertEquals(second.policyVersion(), 2);
+    assertEquals(first.revision().getIndex(), 10, "A captured membership view must remain immutable");
+    assertEquals(first.control().getRaftTerm(), 1);
+    assertThrows(IOException.class, () -> metadata.apply(initial));
+    assertEquals(metadata.membershipView(), second);
+    assertThrows(IOException.class, () -> metadata.apply(next.toBuilder().setParticipant(next.getParticipant()
+        .toBuilder().clearCapabilities()).build()));
+    assertEquals(metadata.membershipView(), second, "A same-revision change must not replace the coherent view");
+
+    MetadataRpc.InstallationSnapshot narrowed = fixture.snapshot(12, Map.of(), fixture.records()).toBuilder()
+        .setControl(next.getControl()).build();
+    metadata.apply(narrowed);
+    assertEquals(metadata.membershipView().revision().getIndex(), 12);
+    assertTrue(metadata.membershipView().capabilities().isEmpty());
+    for (List<MetadataRpc.ServingCapability> invalid : List.of(List.of(MetadataRpc.ServingCapability.BROKER_QUERY),
+        List.of(MetadataRpc.ServingCapability.SERVER_QUERY, MetadataRpc.ServingCapability.SERVER_QUERY))) {
+      MetadataRpc.InstallationSnapshot invalidBase = fixture.snapshot(13, Map.of(), fixture.records());
+      assertThrows(IOException.class, () -> metadata.apply(invalidBase.toBuilder()
+          .setParticipant(invalidBase.getParticipant().toBuilder().addAllCapabilities(invalid)).build()));
+      assertEquals(metadata.membershipView().revision().getIndex(), 12);
+    }
+    metadata.invalidate();
+    assertThrows(IllegalStateException.class, metadata::membershipView);
+    assertThrows(IOException.class, () -> metadata.apply(next));
+    metadata.apply(narrowed);
+    assertEquals(metadata.membershipView().revision(), narrowed.getRevision());
+
+    Identity work = fixture._orders.identity(fixture._server, UUID.randomUUID(), fixture._orders._assignment);
+    NativeQueryContext query = query(work, false);
+    MetadataRpc.InstallationSnapshot active = fixture.snapshot(13, Map.of(), fixture.records()).toBuilder()
+        .setParticipant(initial.getParticipant()).setControl(next.getControl())
+        .addOperationIds(work.operation().operationId().toString()).build();
+    metadata.apply(active);
+    assertTrue(metadata.isCurrent(work));
+    assertTrue(metadata.isCurrentQuery(query));
+    MetadataRpc.InstallationSnapshot draining = active.toBuilder()
+        .setRevision(active.getRevision().toBuilder().setIndex(14))
+        .setParticipant(active.getParticipant().toBuilder().setReady(false).setDraining(true)).build();
+    metadata.apply(draining);
+    assertTrue(metadata.membershipView().live());
+    assertTrue(metadata.membershipView().draining());
+    assertFalse(metadata.membershipView().ready());
+    assertFalse(metadata.isCurrent(work), "Committed drain must fence installation publication");
+    assertFalse(metadata.isCurrentQuery(query), "Committed drain must fence new query admission");
+  }
+
+  @Test
+  public void testQueryFenceRequiresExactMetadataWithoutOperationDiscovery()
+      throws Exception {
+    Fixture fixture = new Fixture();
+    NativeServerMetadata metadata = new NativeServerMetadata(fixture._server, new RecoverableClusterConfigCache(),
+        Set.of(ReadOnlyCapability.SERVER_QUERY));
+    Identity installed = fixture._orders.identity(fixture._server, UUID.randomUUID(), fixture._orders._assignment);
+    NativeQueryContext query = query(installed, false);
+    assertFalse(metadata.isCurrentQuery(query));
+    MetadataRpc.InstallationSnapshot base = fixture.snapshot(10, Map.of(), fixture.records());
+    MetadataRpc.InstallationSnapshot snapshot = base.toBuilder().setParticipant(base.getParticipant().toBuilder()
+        .addCapabilities(MetadataRpc.ServingCapability.SERVER_QUERY)).build();
+    metadata.apply(snapshot);
+    assertTrue(metadata.isCurrentQuery(query), "Completed installations do not need active operation discovery");
+    assertTrue(metadata.isCurrentQuery(query(installed, true)), "Optional segments still require exact metadata");
+    assertFalse(metadata.isCurrent(installed), "Installation publication still requires active operation discovery");
+
+    Server.NativeQueryIdentity wire = query.toProto();
+    Server.NativeQuerySegment segment = wire.getRequiredSegments(0);
+    for (Server.NativeQueryIdentity changed : List.of(
+        wire.toBuilder().setHistoryId(UUID.randomUUID().toString()).build(),
+        wire.toBuilder().setServer(wire.getServer().toBuilder().setParticipantId("other")).build(),
+        wire.toBuilder().setServer(wire.getServer().toBuilder().setIncarnation(UUID.randomUUID().toString())).build(),
+        wire.toBuilder().setServer(wire.getServer().toBuilder().setRegistrationEpoch(2)).build(),
+        wire.toBuilder().setTable(wire.getTable().toBuilder().setObjectId(UUID.randomUUID().toString())).build(),
+        wire.toBuilder().setTable(wire.getTable().toBuilder().setVersion(2)).build(),
+        wire.toBuilder().setSchema(wire.getSchema().toBuilder().setObjectId(UUID.randomUUID().toString())).build(),
+        wire.toBuilder().setSchema(wire.getSchema().toBuilder().setVersion(2)).build(),
+        wire.toBuilder().setRequiredSegments(0, segment.toBuilder().setName("other")).build(),
+        wire.toBuilder().setRequiredSegments(0, segment.toBuilder()
+            .setContent(segment.getContent().toBuilder().setObjectId(UUID.randomUUID().toString()))).build(),
+        wire.toBuilder().setRequiredSegments(0, segment.toBuilder()
+            .setContent(segment.getContent().toBuilder().setVersion(2))).build(),
+        wire.toBuilder().setRequiredSegments(0, segment.toBuilder().setContentSha256("b".repeat(64))).build(),
+        wire.toBuilder().setRequiredSegments(0, segment.toBuilder()
+            .setAssignment(segment.getAssignment().toBuilder().setObjectId(UUID.randomUUID().toString()))).build(),
+        wire.toBuilder().setRequiredSegments(0, segment.toBuilder()
+            .setAssignment(segment.getAssignment().toBuilder().setVersion(2))).build(),
+        wire.toBuilder().setRequiredSegments(0, segment.toBuilder()
+            .setMaterializationId(UUID.randomUUID().toString())).build())) {
+      assertFalse(metadata.isCurrentQuery(NativeQueryContext.fromProto(changed)), changed.toString());
+    }
+    Server.NativeQuerySegment absentOptional = segment.toBuilder().setName("absent")
+        .setContent(segment.getContent().toBuilder().setObjectId(UUID.randomUUID().toString()))
+        .setAssignment(segment.getAssignment().toBuilder().setObjectId(UUID.randomUUID().toString()))
+        .setMaterializationId(UUID.randomUUID().toString()).build();
+    assertFalse(metadata.isCurrentQuery(NativeQueryContext.fromProto(wire.toBuilder()
+        .addOptionalSegments(absentOptional).build())),
+        "A valid required segment cannot hide absent optional metadata");
+
+    MetadataRpc.InstallationSnapshot notReady = snapshot.toBuilder()
+        .setRevision(snapshot.getRevision().toBuilder().setIndex(11))
+        .setParticipant(snapshot.getParticipant().toBuilder().setReady(false)).build();
+    metadata.apply(notReady);
+    assertFalse(metadata.isCurrentQuery(query));
+    MetadataRpc.InstallationSnapshot noCapability = snapshot.toBuilder()
+        .setRevision(snapshot.getRevision().toBuilder().setIndex(12))
+        .setParticipant(snapshot.getParticipant().toBuilder().clearCapabilities()).build();
+    metadata.apply(noCapability);
+    assertFalse(metadata.isCurrentQuery(query));
+  }
+
+  @Test
+  public void testQueryFenceTracksAssignmentReplacementAndFailedImagePublication()
+      throws Exception {
+    Fixture fixture = new Fixture();
+    RecoverableClusterConfigCache cache = new RecoverableClusterConfigCache();
+    NativeServerMetadata metadata = new NativeServerMetadata(fixture._server, cache,
+        Set.of(ReadOnlyCapability.SERVER_QUERY));
+    Identity installed = fixture._orders.identity(fixture._server, UUID.randomUUID(), fixture._orders._assignment);
+    NativeQueryContext query = query(installed, false);
+    MetadataRpc.InstallationSnapshot base = fixture.snapshot(10, Map.of(), fixture.records());
+    MetadataRpc.ParticipantState participant = base.getParticipant().toBuilder()
+        .addCapabilities(MetadataRpc.ServingCapability.SERVER_QUERY).build();
+    MetadataRpc.InstallationSnapshot snapshot = base.toBuilder().setParticipant(participant).build();
+    metadata.apply(snapshot);
+    assertTrue(metadata.isCurrentQuery(query));
+    metadata.apply(fixture.snapshot(11, Map.of("unrelated", "value"), fixture.records()).toBuilder()
+        .setParticipant(participant).build());
+    assertTrue(metadata.isCurrentQuery(query));
+    CatalogRecord original = fixture._orders._assignment;
+    CatalogRecord replacement = original.toBuilder().setVersion(2).setLastModifiedIndex(12)
+        .setValue(MetadataRpc.CatalogValue.newBuilder().setOfflineReplicaAssignment(original.getValue()
+            .getOfflineReplicaAssignment().toBuilder().setAssignmentEpoch(2)
+            .setMaterializationId(UUID.randomUUID().toString()))).build();
+    List<CatalogRecord> records = new ArrayList<>(fixture.records());
+    records.replaceAll(record -> record.getObjectId().equals(original.getObjectId()) ? replacement : record);
+    MetadataRpc.InstallationSnapshot next = fixture.snapshot(12, Map.of("unrelated", "next"), records).toBuilder()
+        .setParticipant(participant).build();
+    AtomicBoolean fail = new AtomicBoolean();
+    cache.registerClusterConfigChangeListener((changed, values) -> {
+      if (fail.getAndSet(false)) {
+        throw new IllegalStateException("Callback failed");
+      }
+    });
+    fail.set(true);
+    assertThrows(IllegalStateException.class, () -> metadata.apply(next));
+    assertFalse(metadata.isCurrentQuery(query));
+    metadata.apply(next);
+    assertFalse(metadata.isCurrentQuery(query));
+    NativeQueryContext current = query(fixture._orders.identity(fixture._server, UUID.randomUUID(), replacement),
+        false);
+    assertTrue(metadata.isCurrentQuery(current));
+    metadata.invalidate();
+    assertFalse(metadata.isCurrentQuery(current));
+    metadata.apply(next);
+    CatalogRecord offline = replacement.toBuilder().setVersion(3).setLastModifiedIndex(13)
+        .setValue(MetadataRpc.CatalogValue.newBuilder().setOfflineReplicaAssignment(replacement.getValue()
+            .getOfflineReplicaAssignment().toBuilder().setAssignmentEpoch(3).setDesiredOnline(false))).build();
+    records.replaceAll(record -> record.getObjectId().equals(original.getObjectId()) ? offline : record);
+    metadata.apply(fixture.snapshot(13, Map.of(), records).toBuilder().setParticipant(participant).build());
+    assertFalse(metadata.isCurrentQuery(query(fixture._orders.identity(fixture._server, UUID.randomUUID(), offline),
+        false)), "Exact replica identity cannot admit a replica no longer desired online");
+  }
+
   @Test
   public void testLocalPublicationFenceTracksConfigAssignmentAndImageInvalidation()
       throws Exception {
@@ -182,11 +396,13 @@ public class NativeServerMetadataTest {
     fail.set(true);
     assertThrows(IllegalStateException.class, () -> metadata.apply(next));
     assertThrows(IllegalStateException.class, metadata::revision);
+    assertThrows(IllegalStateException.class, metadata::membershipView);
     assertEquals(secondApplied, original, "Later listener must not have received the failed update");
     assertEquals(firstApplied.get("removed"), "old");
 
     metadata.apply(next);
     assertEquals(metadata.revision().getIndex(), 11);
+    assertEquals(metadata.membershipView().revision(), next.getRevision());
     assertEquals(firstApplied, replacement);
     assertEquals(secondApplied, replacement);
     assertEquals(delivered.get(delivered.size() - 1), Set.of("changed", "added", "removed"));
@@ -202,10 +418,12 @@ public class NativeServerMetadataTest {
     metadata.apply(initial);
     metadata.invalidate();
     assertThrows(IllegalStateException.class, metadata::revision);
+    assertThrows(IllegalStateException.class, metadata::membershipView);
     assertThrows(IOException.class, () -> metadata.apply(fixture.snapshot(9, Map.of(), fixture.records())));
     assertThrows(IOException.class, () -> metadata.apply(initial.toBuilder()
         .addOperationIds(UUID.randomUUID().toString()).build()));
     assertThrows(IllegalStateException.class, metadata::revision);
+    assertThrows(IllegalStateException.class, metadata::membershipView);
     metadata.apply(initial);
     assertEquals(metadata.revision().getIndex(), 10);
 
@@ -223,6 +441,7 @@ public class NativeServerMetadataTest {
     assertThrows(IOException.class, () -> metadata.apply(failed.toBuilder()
         .addOperationIds(UUID.randomUUID().toString()).build()));
     assertThrows(IllegalStateException.class, metadata::revision);
+    assertThrows(IllegalStateException.class, metadata::membershipView);
     metadata.apply(failed);
     assertEquals(metadata.revision().getIndex(), 12);
   }
@@ -314,6 +533,15 @@ public class NativeServerMetadataTest {
     }
   }
 
+  private static NativeQueryContext query(Identity identity, boolean optional) {
+    Segment segment = new Segment(identity.segmentName(), identity.content(), identity.contentSha256(),
+        identity.assignment(), identity.materializationId());
+    return new NativeQueryContext(1, identity.historyId(), new ProcessIdentity("broker", UUID.randomUUID(), 1),
+        identity.server(), UUID.randomUUID(), UUID.randomUUID(), identity.tableName(), identity.table(),
+        identity.schemaName(), identity.schema(), optional ? List.of() : List.of(segment),
+        optional ? List.of(segment) : List.of());
+  }
+
   private static final class Fixture {
     private final UUID _history = UUID.randomUUID();
     private final UUID _clusterId = UUID.randomUUID();
@@ -342,10 +570,10 @@ public class NativeServerMetadataTest {
       MetadataRpc.Revision revision = MetadataRpc.Revision.newBuilder().setHistoryId(_history.toString())
           .setIndex(index).build();
       MetadataRpc.MembershipControl control = MetadataRpc.MembershipControl.newBuilder()
+          .setMinimumTickDelayMillis(10).setMaxConfiguredPermitLifetimeMillis(100)
           .setControlEpoch(MetadataRpc.ControlToken.newBuilder().setHistoryId(_history.toString()).setRaftTerm(1)
               .setBarrierIndex(1).setLeaderId("leader").setActivationId(_activation.toString()))
-          .setRound(1).setClockBarrierIndex(1).setMinimumTickDelayMillis(10).setMaxConfiguredPermitLifetimeMillis(100)
-          .setPolicy(MetadataRpc.MembershipPolicy.newBuilder()
+          .setRound(1).setClockBarrierIndex(1).setPolicy(MetadataRpc.MembershipPolicy.newBuilder()
               .setVersion(1).setMinTickIntervalMillis(10).setLeaseRounds(100).setPermitLifetimeMillis(100)
               .setMaxQueryLifetimeMillis(10).setMaxRevisionLag(1000)).build();
       MetadataRpc.ParticipantState participant = MetadataRpc.ParticipantState.newBuilder().setParticipant(_server)

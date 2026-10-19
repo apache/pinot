@@ -40,7 +40,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
-import org.apache.pinot.coordination.ratis.client.ServingPermitGuard.MonotonicClock;
+import org.apache.pinot.common.coordination.ServingPermitGuard.MonotonicClock;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.Operation;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol;

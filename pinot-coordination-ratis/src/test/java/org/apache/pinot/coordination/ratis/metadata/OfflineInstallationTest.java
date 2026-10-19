@@ -29,6 +29,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.LongFunction;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.ActivateControlEpoch;
+import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.BeginDrain;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.Capability;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.ConfigurePolicy;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.ParticipantToken;
@@ -186,6 +187,14 @@ public class OfflineInstallationTest {
         && record.deleted()), "Name recreation must preserve the assignment's original incarnation fence");
     assertFalse(recreated.records().stream().anyMatch(record -> record.objectId().equals(replacementTable)),
         "An unassigned replacement table must not substitute for the old referenced object");
+    assertEquals(fixture.member(new BeginDrain(fixture._first)).status(), Status.OK);
+    InstallationSnapshot draining = fixture._catalog.installationSnapshot(fixture._first, 128,
+        OfflineInstallationProtocol.MAX_SNAPSHOT_BYTES);
+    assertEquals(draining.status(), Status.OK, "Draining readers still need a coherent membership projection");
+    assertTrue(draining.participant().draining());
+    assertFalse(draining.participant().ready());
+    assertEquals(fixture.work(fixture._first).status(), Status.FENCED,
+        "A draining projection must not authorize installation work");
     assertEquals(fixture.member(new Unregister(fixture._first)).status(), Status.OK);
     ParticipantToken replacement = fixture.member(new Register(fixture._first.participantId(), Role.SERVER,
         UUID.randomUUID(), 1, Map.of(), Set.of(Capability.SERVER_QUERY))).participant().participant();

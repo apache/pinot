@@ -38,6 +38,7 @@ import org.apache.pinot.common.request.NativeQueryIdentity;
 import org.apache.pinot.common.request.NativeQueryObject;
 import org.apache.pinot.common.request.NativeQueryProcess;
 import org.apache.pinot.common.request.NativeQuerySegment;
+import org.apache.pinot.common.request.NativeQueryTimeBound;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.thrift.TException;
@@ -49,12 +50,17 @@ import static java.util.Objects.requireNonNull;
 /// Immutable, bounded identity of one offline single-table query attempt, shared by the Thrift and gRPC paths.
 /// Version 1 is an identity-only contract: it provides neither serving permission nor a query deadline. Callers must
 /// independently enforce membership, authenticated process identity, admission and response-delivery fences.
+/// Version 2 additionally requires an immutable end-to-end deadline in a deployment-qualified shared clock domain.
 /// Required and optional names match as sets; duplicates or a name in both sets are rejected.
 public final class NativeQueryContext {
   public static final int VERSION = 1;
+  public static final int DEADLINE_VERSION = 2;
   public static final int MAX_SEGMENTS = 4096;
   public static final int MAX_BYTES = 2 * 1024 * 1024;
 
+  private final int _version;
+  @Nullable
+  private final NativeQueryDeadline _deadline;
   private final UUID _historyId;
   private final ProcessIdentity _broker;
   private final Participant _server;
@@ -73,7 +79,17 @@ public final class NativeQueryContext {
   public NativeQueryContext(int version, UUID historyId, ProcessIdentity broker, Participant server, UUID queryId,
       UUID attemptId, String tableName, ObjectVersion table, String schemaName, ObjectVersion schema,
       List<Segment> requiredSegments, List<Segment> optionalSegments) {
-    checkArgument(version == VERSION, "Unsupported native query identity version: %s", version);
+    this(version, historyId, broker, server, queryId, attemptId, tableName, table, schemaName, schema,
+        requiredSegments, optionalSegments, null);
+  }
+
+  private NativeQueryContext(int version, UUID historyId, ProcessIdentity broker, Participant server, UUID queryId,
+      UUID attemptId, String tableName, ObjectVersion table, String schemaName, ObjectVersion schema,
+      List<Segment> requiredSegments, List<Segment> optionalSegments, @Nullable NativeQueryDeadline deadline) {
+    checkArgument(version == VERSION && deadline == null || version == DEADLINE_VERSION && deadline != null,
+        "Unsupported native query identity version or deadline: %s", version);
+    _version = version;
+    _deadline = deadline;
     _historyId = requireNonNull(historyId, "historyId");
     _broker = requireNonNull(broker, "broker");
     _server = requireNonNull(server, "server");
@@ -114,7 +130,23 @@ public final class NativeQueryContext {
   }
 
   public int version() {
-    return VERSION;
+    return _version;
+  }
+
+  @Nullable
+  public NativeQueryDeadline deadline() {
+    return _deadline;
+  }
+
+  /// Attaches the originating deadline once. An already attached value cannot be reset by a retry or fanout.
+  public NativeQueryContext withDeadline(NativeQueryDeadline deadline) {
+    requireNonNull(deadline, "deadline");
+    if (_deadline != null) {
+      checkArgument(_deadline.equals(deadline), "An existing native query deadline cannot be changed");
+      return this;
+    }
+    return new NativeQueryContext(DEADLINE_VERSION, _historyId, _broker, _server, _queryId, _attemptId, _tableName,
+        _table, _schemaName, _schema, _requiredSegments, _optionalSegments, deadline);
   }
 
   public UUID historyId() {
@@ -218,7 +250,8 @@ public final class NativeQueryContext {
         uuid(wire.getQueryId()), uuid(wire.getAttemptId()), wire.getTableName(), object(wire.getTable()),
         wire.getSchemaName(), object(wire.getSchema()),
         wire.getRequiredSegments().stream().map(NativeQueryContext::segment).collect(Collectors.toList()),
-        wire.getOptionalSegments().stream().map(NativeQueryContext::segment).collect(Collectors.toList()));
+        wire.getOptionalSegments().stream().map(NativeQueryContext::segment).collect(Collectors.toList()),
+        wire.isSetDeadline() ? deadline(wire.getDeadline()) : null);
   }
 
   public static NativeQueryContext fromProto(Server.NativeQueryIdentity wire) {
@@ -234,12 +267,13 @@ public final class NativeQueryContext {
         uuid(wire.getQueryId()), uuid(wire.getAttemptId()), wire.getTableName(), object(wire.getTable()),
         wire.getSchemaName(), object(wire.getSchema()),
         wire.getRequiredSegmentsList().stream().map(NativeQueryContext::segment).collect(Collectors.toList()),
-        wire.getOptionalSegmentsList().stream().map(NativeQueryContext::segment).collect(Collectors.toList()));
+        wire.getOptionalSegmentsList().stream().map(NativeQueryContext::segment).collect(Collectors.toList()),
+        wire.hasDeadline() ? deadline(wire.getDeadline()) : null);
   }
 
   public NativeQueryIdentity toThrift() {
     NativeQueryIdentity wire = new NativeQueryIdentity();
-    wire.setVersion(VERSION);
+    wire.setVersion(_version);
     wire.setHistoryId(_historyId.toString());
     wire.setBroker(thriftProcess(_broker));
     wire.setServer(thriftProcess(new ProcessIdentity(_server.participantId(), _server.incarnation(),
@@ -254,11 +288,16 @@ public final class NativeQueryContext {
         .collect(Collectors.toList()));
     wire.setOptionalSegments(_optionalSegments.stream().map(NativeQueryContext::thriftSegment)
         .collect(Collectors.toList()));
+    if (_deadline != null) {
+      wire.setDeadline(new NativeQueryTimeBound(_deadline.clockDomain(), _deadline.originLowerMillis(),
+          _deadline.notAfterMillis()));
+    }
     return wire;
   }
 
   public Server.NativeQueryIdentity toProto() {
-    return Server.NativeQueryIdentity.newBuilder().setVersion(VERSION).setHistoryId(_historyId.toString())
+    Server.NativeQueryIdentity.Builder wire = Server.NativeQueryIdentity.newBuilder().setVersion(_version)
+        .setHistoryId(_historyId.toString())
         .setBroker(protoProcess(_broker)).setServer(protoProcess(new ProcessIdentity(_server.participantId(),
             _server.incarnation(), _server.registrationEpoch())))
         .setQueryId(_queryId.toString()).setAttemptId(_attemptId.toString()).setTableName(_tableName)
@@ -266,7 +305,22 @@ public final class NativeQueryContext {
         .addAllRequiredSegments(_requiredSegments.stream().map(NativeQueryContext::protoSegment)
             .collect(Collectors.toList()))
         .addAllOptionalSegments(_optionalSegments.stream().map(NativeQueryContext::protoSegment)
-            .collect(Collectors.toList())).build();
+            .collect(Collectors.toList()));
+    if (_deadline != null) {
+      wire.setDeadline(Server.NativeQueryTimeBound.newBuilder().setClockDomain(_deadline.clockDomain())
+          .setOriginLowerMillis(_deadline.originLowerMillis()).setNotAfterMillis(_deadline.notAfterMillis()));
+    }
+    return wire.build();
+  }
+
+  private static NativeQueryDeadline deadline(NativeQueryTimeBound value) {
+    checkArgument(value.isSetOriginLowerMillis() && value.isSetNotAfterMillis(), "Incomplete native query deadline");
+    return new NativeQueryDeadline(value.getClockDomain(), value.getOriginLowerMillis(), value.getNotAfterMillis());
+  }
+
+  private static NativeQueryDeadline deadline(Server.NativeQueryTimeBound value) {
+    known(value);
+    return new NativeQueryDeadline(value.getClockDomain(), value.getOriginLowerMillis(), value.getNotAfterMillis());
   }
 
   private static ProcessIdentity process(NativeQueryProcess value) {

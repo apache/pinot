@@ -126,7 +126,7 @@ cannot be replaced. An expired or retired registration needs a new incarnation a
 cannot revive it. Renewals use contiguous sequences, retain their original success or semantic rejection, and validate
 each member of a bounded batch separately. Expiry is evaluated against the committed round on every authority check,
 without requiring a full membership scan or cleanup on each tick. Snapshots preserve these fences and retry outcomes.
-Unregister is voluntary self-revocation: callers must close local serving authority before retiring a session.
+Unregister is voluntary self-revocation: the participant closes its local serving guard before retiring its session.
 These timing bounds do not yet provide safe administrative forced retirement of a still-serving participant.
 
 The optional membership gRPC service derives participant ID, role and query capabilities from the authenticated
@@ -140,16 +140,21 @@ issuance and rotation remain unimplemented.
 
 Read-only serving permits are separate from membership and never authorize ingestion, ownership or publication.
 A permit includes the revision of its committed renewal, so a worker must apply that revision before admission.
-`ServingPermitGuard` remembers the first local send time across retries and term changes, rejects expired or conflicting
+The shared `pinot-common` `ServingPermitGuard` remembers the first local send time across retries and term changes,
+rejects expired or conflicting
 grants, and checks a coherent local membership view. Its opaque query tickets have a finite deadline that renewals
 cannot extend; capability removal, policy changes and lifetime narrowing fence previous tickets. Admission and result
 delivery both recheck the local clock after reading the view. Clock regression, excessive uncertainty or image failure
 closes admission. These checks require no RPC on the query path.
 
 The guard requires an explicitly qualified clock and lifetime conversion policy. Test clocks are not production clock
-qualification. The process-local guard is not yet wired into normal Pinot roles, and its tickets are not a cross-host
-query protocol. Worker metadata projections, heartbeat scheduling/reconnect, additive query deadline propagation and
-actual query/ingestion lifecycle integration remain required. A membership projection consumes the generic immutable image directly.
+qualification. Its native-server consumer uses the heartbeat lane and coherent own-session projection. Process-local
+tickets never cross hosts; the versioned query context carries a separate immutable absolute deadline. Production
+qualification must bound both participant and authority clock rates and include suspension and VM lifecycle behavior.
+The policy and grace rules enforce the lease/permit relationship only when those supplied clock bounds hold.
+Production clock binding, deadline propagation and actual query/ingestion lifecycle integration remain
+required. `RatisMembershipView` projects generic Ratis images for other local consumers without exposing model types
+in the shared guard.
 
 ## Controller ownership and operations
 
@@ -232,7 +237,14 @@ hydrates the complete own-session projection, and discovers durable operation ID
 Its bounded workers use `NativeOfflineSegmentWorker` from `pinot-common`; server runtime code has no dependency on
 Ratis consensus/model classes. Work is validated before creating a table manager. Cluster callbacks retain their
 last successful delivery so failed updates, including removed keys, can be retried without advancing applied metadata.
-The server rejects query-serving capability grants until query admission is integrated.
+The default server runtime rejects query-serving capabilities. Explicit `ServingSettings` supply a qualified clock
+and lifetime policy and permit only `SERVER_QUERY`. The heartbeat records the first logical renewal send, preserves it
+across retries, and stages only its matching committed grant. Clock failure terminates that registration's admission.
+`admitQuery` checks the permit and exact desired table/schema/content/replica identities using local state;
+`checkQueryDelivery` preserves the ticket's finite deadline. Completed operation IDs are not needed for query admission.
+A live draining participant can still hydrate its own image and finish previously admitted work within its original
+deadline, but cannot admit new queries or publish installations. These APIs do not start query listeners or authenticate
+query transports, and physical acquisition must still pin and verify the exact installed identities.
 
 `InstallationOutbox` persists the exact SERVER session, request incarnation, sequence, report and outcome under the
 exclusive native data-directory lock. Unknown outcomes reuse the same request; a result is fsynced before its
@@ -240,7 +252,7 @@ acknowledgement. Recovery runs independently of operation discovery, so a comple
 snapshot cannot strand the report stream. Old-session files are retained as evidence, never replayed under a new
 session. Evidence is bounded to 128 files of at most 256 KiB each; saturation requires explicit archival. Startup and
 shutdown serialize; shutdown drains local actions and outbox leases before releasing directory ownership, then
-retires the confirmed registration. Normal starter configuration, query admission and general table lifecycle remain
+retires the confirmed registration. Normal starter configuration, network query integration and general table lifecycle remain
 unimplemented; this runtime does not make the replacement complete or alter Helix defaults.
 
 `RatisOfflineSegmentExecutor` connects fresh own-target work to the native `LOAD`, `RELOAD` or `RECONCILE` action and receipt publisher.
@@ -274,6 +286,19 @@ identities. It bounds the context to 4096 segments and 2 MiB, rejects malformed 
 duplicate-free agreement with the legacy required/optional name lists. Requests without the context retain their
 existing Helix behavior. Version 1 covers one ordinary OFFLINE table and grants no serving permission or deadline.
 
+Version 2 adds `NativeQueryTimeBound` at identity field 13 in both wire formats. `NativeQueryDeadline` retains the
+explicit shared clock domain, original lower time bound and absolute expiration. `withDeadline` attaches it once;
+retries and fan-out must reuse it. Version 1 remains readable for identity validation but native participant query
+admission requires version 2. Neither version authenticates the sender.
+
+`QueryDeadlineGuard` requires a qualified shared-time interval provider with no production defaults. The query origin
+uses the interval's lower bound; each receiver uses its fresh upper bound to conservatively consume transit time.
+Admission maps the remaining interval onto the serving ticket's local monotonic clock, sampled before the shared
+clock, using an explicitly qualified minimum clock rate. That immutable local endpoint also bounds pauses between
+clock reads. Delivery checks shared-clock qualification and expiration, then rechecks local time. Renewal cannot
+extend the ticket, and an expired or rejected deadline cannot revive it. Qualification loss permanently closes the
+shared-clock guard; expiration of one query does not invalidate unrelated queries or membership.
+
 Native publication binds the installation identity and detached normalized schema to the exact reference-counted
 segment manager. `SingleTableExecutionInfo` pins those handles before checking identities, retains their schema
 with Pinot's built-in virtual columns, and releases all acquired handles if validation fails. Replacing a name or
@@ -285,8 +310,8 @@ content must match. Logical-table acquisition also releases earlier handles when
 Native names-only, realtime and logical queries remain rejected. A native request with no acquired content cannot
 yet obtain a version-checked schema-only catalog snapshot and is rejected instead of returning an empty scan.
 Normal broker production, pinned routing images, feature-level negotiation, authenticated process admission,
-qualified-clock permits, immutable end-to-end deadlines, response-delivery fencing and whole-query retry/drain
-remain unimplemented. MSE/time-series and other unsupported paths cannot silently drop the context. Native
+production clock qualification, broker deadline propagation, transport response-delivery fencing and whole-query
+retry/drain remain unimplemented. MSE/time-series and other unsupported paths cannot silently drop the context. Native
 `ServerInstance` query resources remain disabled until those gates are implemented and tested together.
 
 ## Voter configuration and validation
@@ -303,7 +328,7 @@ Build the module and its dependencies from the repository root:
 
 ```bash
 ./mvnw -pl pinot-coordination-ratis -am \
-  '-Dtest=MetadataCatalogTest,MetadataChangeFeedTest,MembershipStateTest,ControllerCoordinationTest,OfflineInstallationTest,RatisMetadataStoreTest,RatisReadSafetyTest,RatisMembershipClockTest,ServingPermitGuardTest,MetadataGrpcTransportTest' \
+  '-Dtest=MetadataCatalogTest,MetadataChangeFeedTest,MembershipStateTest,ControllerCoordinationTest,OfflineInstallationTest,RatisMetadataStoreTest,RatisReadSafetyTest,RatisMembershipClockTest,ServingPermitGuardTest,RatisMembershipViewTest,MetadataGrpcTransportTest' \
   -Dsurefire.failIfNoSpecifiedTests=false test
 ```
 
@@ -312,6 +337,14 @@ Validate the shared worker and native server lifecycle, including existing Helix
 ```bash
 ./mvnw -pl pinot-server -am \
   '-Dtest=NativeOfflineSegmentWorkerTest,NativeServerMetadataTest,NativeServerParticipantTest,InstallationOutboxTest,NativeInstanceDataManagerTest,HelixInstanceDataManagerConfigTest,HelixInstanceDataManagerTest,HelixInstanceDataManagerLifecycleTest' \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+```
+
+Validate the shared query wire context and deadline/permit composition:
+
+```bash
+./mvnw -pl pinot-common -am \
+  '-Dtest=NativeQueryContextTest,QueryDeadlineGuardTest,ServingPermitGuardTest' \
   -Dsurefire.failIfNoSpecifiedTests=false test
 ```
 
