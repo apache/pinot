@@ -339,10 +339,10 @@ public class AggregationOptimizerTest {
     }
   }
 
-  @Test(enabled = false)  // TODO: GROUP BY optimization needs investigation - currently uses 'values' function
+  @Test
   public void testGroupByWithOptimization() {
-    // Test: SELECT sum(value + 10) FROM mytable GROUP BY category
-    String query = "SELECT sum(value + 10) FROM mytable GROUP BY category";
+    // Quote VALUE so the parser treats it as a column instead of a table value constructor.
+    String query = "SELECT sum(\"value\" + 10) FROM mytable GROUP BY category";
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
 
     assertTopLevelOperator(pinotQuery.getSelectList().get(0), "sum");
