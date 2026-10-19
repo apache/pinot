@@ -84,6 +84,11 @@ public interface DataTable {
   @Nullable
   Map<String, Object> getMap(int rowId, int colId);
 
+  /// Returns the custom object at the given cell, or `null` for a null value.
+  ///
+  /// The buffer of the returned object can be a read-only view, for example on a table built in this process. Code
+  /// that reads it, such as `AggregationFunction.deserializeIntermediateResult` implementations and
+  /// `ObjectSerDeUtils` deserializers, must read it through the `ByteBuffer` API and must not call `array()` on it.
   @Nullable
   CustomObject getCustomObject(int rowId, int colId);
 

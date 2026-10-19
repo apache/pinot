@@ -372,7 +372,7 @@ public class DataTableImplV4 implements DataTable {
       return null;
     }
     // A view when the value fits in one page, otherwise a copy. On a table built in this process the pages are
-    // read-only, so the returned buffer can be read-only too: deserializers must not call array() on it.
+    // read-only, so the view is read-only too. See DataTable.getCustomObject for the contract.
     return new CustomObject(type, _variableSizeData.copyOrView(offsetInVar + Integer.BYTES, size));
   }
 
