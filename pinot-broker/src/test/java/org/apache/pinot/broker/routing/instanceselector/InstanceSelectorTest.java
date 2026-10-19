@@ -1092,15 +1092,18 @@ public class InstanceSelectorTest {
     assertEquals(selectionResult.getUnavailableSegments(), Arrays.asList(segment0, segment1));
     verify(brokerMetrics, times(2)).addMeteredGlobalValue(BrokerMeter.FAIL_OPEN_ELIGIBLE_REQUESTS, 1);
     // Both selectors transition segment0 and segment1 into the unavailable-with-candidates state on init.
-    verify(brokerMetrics, times(4))
-        .addMeteredTableValue(offlineTableName, BrokerMeter.FAIL_OPEN_ELIGIBLE_SEGMENTS, 1);
+    assertEquals(balancedInstanceSelector.getReplicaHealth().getNumNewFailOpenEligibleSegments(), 2);
+    assertEquals(strictReplicaGroupInstanceSelector.getReplicaHealth().getNumNewFailOpenEligibleSegments(), 2);
+    // The selectors only count the transitions; the routing manager emits the meter from the table's own selector
+    verify(brokerMetrics, never()).addMeteredTableValue(eq(offlineTableName),
+        eq(BrokerMeter.FAIL_OPEN_ELIGIBLE_SEGMENTS), anyLong());
 
-    // An unchanged routing refresh should not re-count the transition meter since the segments were already
+    // An unchanged routing refresh should not re-count the transitions since the segments were already
     // unavailable with candidates.
     balancedInstanceSelector.onInstancesChange(enabledInstances, List.of());
     strictReplicaGroupInstanceSelector.onInstancesChange(enabledInstances, List.of());
-    verify(brokerMetrics, times(4))
-        .addMeteredTableValue(offlineTableName, BrokerMeter.FAIL_OPEN_ELIGIBLE_SEGMENTS, 1);
+    assertEquals(balancedInstanceSelector.getReplicaHealth().getNumNewFailOpenEligibleSegments(), 0);
+    assertEquals(strictReplicaGroupInstanceSelector.getReplicaHealth().getNumNewFailOpenEligibleSegments(), 0);
 
     // Iterate 5 times
     for (int i = 0; i < 5; i++) {
@@ -1591,8 +1594,7 @@ public class InstanceSelectorTest {
         createTestInstanceSelector(selectorType, Set.of(), idealState, externalView, onlineSegments);
 
     // Segment has no candidates at all yet, so it is not a transition into the unavailable-with-candidates state.
-    verify(_brokerMetrics, never())
-        .addMeteredTableValue(TABLE_NAME, BrokerMeter.FAIL_OPEN_ELIGIBLE_SEGMENTS, 1);
+    assertEquals(selector.getReplicaHealth().getNumNewFailOpenEligibleSegments(), 0);
 
     selector.select(_brokerRequest, List.of(segment), 0);
     selector.select(_brokerRequest, List.of(segment), 1);
@@ -1602,35 +1604,33 @@ public class InstanceSelectorTest {
     selector.onAssignmentChange(idealState, externalView, onlineSegments);
 
     // Segment transitioned from "no candidates" to "unavailable with a disabled candidate".
-    verify(_brokerMetrics)
-        .addMeteredTableValue(TABLE_NAME, BrokerMeter.FAIL_OPEN_ELIGIBLE_SEGMENTS, 1);
+    assertEquals(selector.getReplicaHealth().getNumNewFailOpenEligibleSegments(), 1);
 
+    selector.select(_brokerRequest, List.of(segment), 2);
+    // Routing the same table again for the same request (e.g. a second leaf scan of a self-join) is not recounted
     selector.select(_brokerRequest, List.of(segment), 2);
     selector.select(_brokerRequest, List.of(segment), 3);
     verify(_brokerMetrics, times(2)).addMeteredGlobalValue(BrokerMeter.FAIL_OPEN_ELIGIBLE_REQUESTS, 1);
 
-    // An unchanged refresh must not re-count the transition meter since the segment was already unavailable with a
+    // An unchanged refresh must not re-count the transition since the segment was already unavailable with a
     // candidate.
     selector.onAssignmentChange(idealState, externalView, onlineSegments);
 
-    verify(_brokerMetrics, times(1))
-        .addMeteredTableValue(TABLE_NAME, BrokerMeter.FAIL_OPEN_ELIGIBLE_SEGMENTS, 1);
+    assertEquals(selector.getReplicaHealth().getNumNewFailOpenEligibleSegments(), 0);
 
     selector.onInstancesChange(Set.of(instance), List.of(instance));
 
-    // Recovery is not a transition into the unhealthy state, so the meter must not increment.
-    verify(_brokerMetrics, times(1))
-        .addMeteredTableValue(TABLE_NAME, BrokerMeter.FAIL_OPEN_ELIGIBLE_SEGMENTS, 1);
+    // Recovery is not a transition into the unhealthy state, so it must not be counted.
+    assertEquals(selector.getReplicaHealth().getNumNewFailOpenEligibleSegments(), 0);
 
     selector.select(_brokerRequest, List.of(segment), 4);
     verify(_brokerMetrics, times(2)).addMeteredGlobalValue(BrokerMeter.FAIL_OPEN_ELIGIBLE_REQUESTS, 1);
 
-    // Disable the instance again to re-enter the unavailable-with-candidates state after recovery; the meter must
-    // fire again since this is a fresh transition, not a repeat of the earlier one.
+    // Disable the instance again to re-enter the unavailable-with-candidates state after recovery; it must be
+    // counted again since this is a fresh transition, not a repeat of the earlier one.
     selector.onInstancesChange(Set.of(), List.of(instance));
 
-    verify(_brokerMetrics, times(2))
-        .addMeteredTableValue(TABLE_NAME, BrokerMeter.FAIL_OPEN_ELIGIBLE_SEGMENTS, 1);
+    assertEquals(selector.getReplicaHealth().getNumNewFailOpenEligibleSegments(), 1);
   }
 
   // Test that we mark new segment as old when external view state converges with ideal state.

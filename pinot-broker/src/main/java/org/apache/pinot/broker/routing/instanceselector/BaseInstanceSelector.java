@@ -29,6 +29,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
 import org.apache.helix.AccessOption;
 import org.apache.helix.model.ExternalView;
@@ -137,6 +138,9 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
   // gauges. Volatile so that a reader on another thread cannot see it lagging the segment states it was
   // computed alongside.
   protected volatile TableReplicaHealth _replicaHealth;
+  // Last request counted as fail-open eligible, so that a request routing this table more than once (e.g. one routing
+  // per leaf scan in a multi-stage self-join, or a pruned routing retried unpruned) is counted once
+  private final AtomicLong _lastFailOpenEligibleRequestId = new AtomicLong(Long.MIN_VALUE);
   protected Map<String, ServerInstance> _enabledServerStore;
   // Only read by the rebuild thread. Not final so that tests can disable or bound the sharing.
   @VisibleForTesting
@@ -414,7 +418,11 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
         new HashMap<>(HashUtil.getHashMapCapacity(_oldSegmentCandidatesMap.size() + _newSegmentStateMap.size()));
     Set<String> servingInstances = new HashSet<>();
     Set<String> unavailableSegments = new HashSet<>();
-    Set<String> segmentsWithoutCandidates = new HashSet<>();
+    Set<String> failOpenEligibleSegments = new HashSet<>();
+    SegmentStates previousSegmentStates = _segmentStates;
+    Set<String> previousFailOpenEligibleSegments =
+        previousSegmentStates != null ? previousSegmentStates.getFailOpenEligibleSegments() : Set.of();
+    int numNewFailOpenEligibleSegments = 0;
     int minPercentOfReplicas = TableReplicaHealth.FULLY_REPLICATED_PERCENT;
     // Segments seen at exactly minPercentOfReplicas so far. Reset whenever a lower percentage displaces the
     // minimum, so that the pair published below always describes the same population.
@@ -447,8 +455,12 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
                 + "(all candidate instances: {} are disabled, counting segment as unavailable)", segment,
             _tableNameWithType, candidateInstances);
         unavailableSegments.add(segment);
-        if (candidates.isEmpty()) {
-          segmentsWithoutCandidates.add(segment);
+        if (!candidates.isEmpty()) {
+          failOpenEligibleSegments.add(segment);
+          // Counts only the transition into the fail-open eligible state, not every refresh that finds it there
+          if (!previousFailOpenEligibleSegments.contains(segment)) {
+            numNewFailOpenEligibleSegments++;
+          }
         }
         _brokerMetrics.addMeteredTableValue(_tableNameWithType, BrokerMeter.NO_SERVING_HOST_FOR_SEGMENT, 1);
       }
@@ -474,23 +486,10 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
       }
     }
 
-    SegmentStates previousSegmentStates = _segmentStates;
-    Set<String> previousUnavailableSegments =
-        previousSegmentStates != null ? previousSegmentStates.getUnavailableSegments() : Set.of();
-    Set<String> previousSegmentsWithoutCandidates =
-        previousSegmentStates != null ? previousSegmentStates.getSegmentsWithoutCandidates() : Set.of();
-    for (String segment : unavailableSegments) {
-      boolean wasAlreadyUnavailableWithCandidates =
-          previousUnavailableSegments.contains(segment) && !previousSegmentsWithoutCandidates.contains(segment);
-      if (!segmentsWithoutCandidates.contains(segment) && !wasAlreadyUnavailableWithCandidates) {
-        _brokerMetrics.addMeteredTableValue(_tableNameWithType, BrokerMeter.FAIL_OPEN_ELIGIBLE_SEGMENTS, 1);
-      }
-    }
-
     _segmentStates =
-        new SegmentStates(instanceCandidatesMap, servingInstances, unavailableSegments, segmentsWithoutCandidates);
+        new SegmentStates(instanceCandidatesMap, servingInstances, unavailableSegments, failOpenEligibleSegments);
     _replicaHealth = new TableReplicaHealth(minPercentOfReplicas, numSegmentsAtMinPercentOfReplicas,
-        unavailableSegments.size());
+        unavailableSegments.size(), numNewFailOpenEligibleSegments);
   }
 
   /// Returns the enabled candidates, and adds their instances to the serving instances.
@@ -593,26 +592,25 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
     // Copy the volatile reference so that the segment-to-instance map and unavailable segments have a consistent view
     // of the state.
     SegmentStates segmentStates = _segmentStates;
-    InstanceMapping mapping = select(segments, requestIdInt, segmentStates, queryOptions);
     Set<String> unavailableSegments = segmentStates.getUnavailableSegments();
-    Set<String> segmentsWithoutCandidates = segmentStates.getSegmentsWithoutCandidates();
-
-    if (unavailableSegments.isEmpty()) {
-      return new SelectionResult(mapping, List.of(), 0);
-    } else {
-      List<String> unavailableSegmentsForRequest = new ArrayList<>();
+    List<String> unavailableSegmentsForRequest = List.of();
+    // Classify before subclass selection, which can throw on unavailable segments (e.g. multi-stage replica-group)
+    if (!unavailableSegments.isEmpty()) {
+      Set<String> failOpenEligibleSegments = segmentStates.getFailOpenEligibleSegments();
+      unavailableSegmentsForRequest = new ArrayList<>();
       boolean failOpenEligible = false;
       for (String segment : segments) {
         if (unavailableSegments.contains(segment)) {
           unavailableSegmentsForRequest.add(segment);
-          failOpenEligible |= !segmentsWithoutCandidates.contains(segment);
+          failOpenEligible |= failOpenEligibleSegments.contains(segment);
         }
       }
-      if (failOpenEligible) {
+      if (failOpenEligible && _lastFailOpenEligibleRequestId.getAndSet(requestId) != requestId) {
         _brokerMetrics.addMeteredGlobalValue(BrokerMeter.FAIL_OPEN_ELIGIBLE_REQUESTS, 1);
       }
-      return new SelectionResult(mapping, unavailableSegmentsForRequest, 0);
     }
+    InstanceMapping mapping = select(segments, requestIdInt, segmentStates, queryOptions);
+    return new SelectionResult(mapping, unavailableSegmentsForRequest, 0);
   }
 
   @Override

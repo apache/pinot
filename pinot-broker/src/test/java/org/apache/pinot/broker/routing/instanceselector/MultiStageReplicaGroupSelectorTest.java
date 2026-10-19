@@ -32,6 +32,7 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.assignment.InstancePartitions;
+import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.PinotQuery;
@@ -47,10 +48,13 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 import static org.testng.Assert.fail;
 
 
@@ -197,6 +201,36 @@ public class MultiStageReplicaGroupSelectorTest {
       fail("Method call above should have failed");
     } catch (Exception ignored) {
     }
+  }
+
+  @Test
+  public void testFailOpenEligibleRequestCountedWhenSelectionThrows() {
+    List<String> replicaGroup0 = List.of("instance-0", "instance-1");
+    List<String> replicaGroup1 = List.of("instance-2", "instance-3");
+    MultiStageReplicaGroupSelector multiStageSelector =
+        createMultiStageSelector(createInstancePartitions(replicaGroup0, replicaGroup1));
+
+    List<String> enabledInstances = createEnabledInstances(4);
+    IdealState idealState = new IdealState(TABLE_NAME);
+    ExternalView externalView = new ExternalView(TABLE_NAME);
+    Set<String> onlineSegments = new HashSet<>();
+    setupBasicTestEnvironment(enabledInstances, idealState, externalView, onlineSegments);
+
+    // Disable both hosts of the even segments, so they are unavailable but still have (disabled) candidates
+    enabledInstances.remove("instance-0");
+    enabledInstances.remove("instance-2");
+    multiStageSelector.init(_tableConfig, _propertyStore, _brokerMetrics, null, Clock.systemUTC(),
+        INSTANCE_SELECTOR_CONFIG, new HashSet<>(enabledInstances), EMPTY_SERVER_MAP, idealState, externalView,
+        onlineSegments);
+
+    // Requests touching only available segments are not fail-open eligible
+    multiStageSelector.select(_brokerRequest, List.of("segment1", "segment3"), 0);
+    verify(_brokerMetrics, never()).addMeteredGlobalValue(BrokerMeter.FAIL_OPEN_ELIGIBLE_REQUESTS, 1);
+
+    // Selection still throws for the unavailable segment, but the request is counted before it does
+    expectThrows(IllegalStateException.class,
+        () -> multiStageSelector.select(_brokerRequest, List.of("segment0", "segment1"), 0));
+    verify(_brokerMetrics).addMeteredGlobalValue(BrokerMeter.FAIL_OPEN_ELIGIBLE_REQUESTS, 1);
   }
 
   @Test
