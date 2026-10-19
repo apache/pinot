@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.core.common.datatable;
 
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
@@ -32,6 +30,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.segment.spi.memory.PagedPinotOutputStream;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.MapUtils;
@@ -60,17 +59,19 @@ public abstract class BaseDataTableBuilder implements DataTableBuilder {
   /// decodes as garbage in an 8-byte `LONG` / `DOUBLE` one.
   private static final EnumSet<ColumnDataType> IN_BAND_NULL_TYPES =
       EnumSet.of(ColumnDataType.OBJECT, ColumnDataType.UNKNOWN, ColumnDataType.MAP);
+  /// Heap pages need no release, so one stateless allocator serves every builder.
+  private static final PagedPinotOutputStream.PageAllocator PAGE_ALLOCATOR =
+      PagedPinotOutputStream.HeapPageAllocator.createSmall();
 
   protected final DataSchema _dataSchema;
   protected final int _version;
   protected final int[] _columnOffsets;
   protected final ByteBuffer _currentRowDataByteBuffer;
-  protected final ByteArrayOutputStream _fixedSizeDataByteArrayOutputStream = new ByteArrayOutputStream();
-  protected final DataOutputStream _fixedSizeDataOutputStream =
-      new DataOutputStream(_fixedSizeDataByteArrayOutputStream);
-  protected final ByteArrayOutputStream _variableSizeDataByteArrayOutputStream = new ByteArrayOutputStream();
-  protected final DataOutputStream _variableSizeDataOutputStream =
-      new DataOutputStream(_variableSizeDataByteArrayOutputStream);
+  /// Both sections are written in heap pages of [PagedPinotOutputStream.PageAllocator#MIN_RECOMMENDED_PAGE_SIZE]
+  /// bytes and handed to the built table as is, without copying them into one contiguous array. A large response
+  /// therefore never needs a humongous allocation while it is built.
+  protected final PagedPinotOutputStream _fixedSizeDataOutputStream = new PagedPinotOutputStream(PAGE_ALLOCATOR);
+  protected final PagedPinotOutputStream _variableSizeDataOutputStream = new PagedPinotOutputStream(PAGE_ALLOCATOR);
 
   private final ColumnDataType[] _storedColumnDataTypes;
   /// Entries are allocated lazily so a table without nulls pays nothing.
@@ -92,6 +93,12 @@ public abstract class BaseDataTableBuilder implements DataTableBuilder {
     _currentRowDataByteBuffer = ByteBuffer.allocate(rowSizeInBytes);
     _storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
     _nullBitmaps = new RoaringBitmap[dataSchema.size()];
+  }
+
+  /// Returns the offset of the next byte in the variable size section. The wire format stores it as an int. The
+  /// section had the same 2 GB limit when it was a `ByteArrayOutputStream`, which failed with an `OutOfMemoryError`.
+  protected int variableSizeDataOffset() {
+    return Math.toIntExact(_variableSizeDataOutputStream.getCurrentOffset());
   }
 
   @Override
@@ -127,23 +134,23 @@ public abstract class BaseDataTableBuilder implements DataTableBuilder {
   public void setColumn(int colId, BigDecimal value)
       throws IOException {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
-    _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
+    _currentRowDataByteBuffer.putInt(variableSizeDataOffset());
     byte[] bytes = BigDecimalUtils.serialize(value);
     _currentRowDataByteBuffer.putInt(bytes.length);
-    _variableSizeDataByteArrayOutputStream.write(bytes);
+    _variableSizeDataOutputStream.write(bytes);
   }
 
   @Override
   public void setColumn(int colId, @Nullable Map<String, Object> value)
       throws IOException {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
-    _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
+    _currentRowDataByteBuffer.putInt(variableSizeDataOffset());
     if (value == null) {
       _currentRowDataByteBuffer.putInt(0);
     } else {
       byte[] bytes = MapUtils.serializeMap(value, false);
       _currentRowDataByteBuffer.putInt(bytes.length);
-      _variableSizeDataByteArrayOutputStream.write(bytes);
+      _variableSizeDataOutputStream.write(bytes);
     }
   }
 
@@ -151,7 +158,7 @@ public abstract class BaseDataTableBuilder implements DataTableBuilder {
   public void setColumn(int colId, int[] values)
       throws IOException {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
-    _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
+    _currentRowDataByteBuffer.putInt(variableSizeDataOffset());
     _currentRowDataByteBuffer.putInt(values.length);
     for (int value : values) {
       _variableSizeDataOutputStream.writeInt(value);
@@ -162,7 +169,7 @@ public abstract class BaseDataTableBuilder implements DataTableBuilder {
   public void setColumn(int colId, long[] values)
       throws IOException {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
-    _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
+    _currentRowDataByteBuffer.putInt(variableSizeDataOffset());
     _currentRowDataByteBuffer.putInt(values.length);
     for (long value : values) {
       _variableSizeDataOutputStream.writeLong(value);
@@ -173,7 +180,7 @@ public abstract class BaseDataTableBuilder implements DataTableBuilder {
   public void setColumn(int colId, float[] values)
       throws IOException {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
-    _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
+    _currentRowDataByteBuffer.putInt(variableSizeDataOffset());
     _currentRowDataByteBuffer.putInt(values.length);
     for (float value : values) {
       _variableSizeDataOutputStream.writeFloat(value);
@@ -184,7 +191,7 @@ public abstract class BaseDataTableBuilder implements DataTableBuilder {
   public void setColumn(int colId, double[] values)
       throws IOException {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
-    _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
+    _currentRowDataByteBuffer.putInt(variableSizeDataOffset());
     _currentRowDataByteBuffer.putInt(values.length);
     for (double value : values) {
       _variableSizeDataOutputStream.writeDouble(value);
@@ -195,12 +202,12 @@ public abstract class BaseDataTableBuilder implements DataTableBuilder {
   public void setColumn(int colId, BigDecimal[] values)
       throws IOException {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
-    _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
+    _currentRowDataByteBuffer.putInt(variableSizeDataOffset());
     _currentRowDataByteBuffer.putInt(values.length);
     for (BigDecimal value : values) {
       byte[] bytes = BigDecimalUtils.serialize(value);
       _variableSizeDataOutputStream.writeInt(bytes.length);
-      _variableSizeDataByteArrayOutputStream.write(bytes);
+      _variableSizeDataOutputStream.write(bytes);
     }
   }
 
@@ -208,12 +215,12 @@ public abstract class BaseDataTableBuilder implements DataTableBuilder {
   public void setColumn(int colId, ByteArray[] values)
       throws IOException {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
-    _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
+    _currentRowDataByteBuffer.putInt(variableSizeDataOffset());
     _currentRowDataByteBuffer.putInt(values.length);
     for (ByteArray value : values) {
       byte[] bytes = value.getBytes();
       _variableSizeDataOutputStream.writeInt(bytes.length);
-      _variableSizeDataByteArrayOutputStream.write(bytes);
+      _variableSizeDataOutputStream.write(bytes);
     }
   }
 
@@ -221,7 +228,7 @@ public abstract class BaseDataTableBuilder implements DataTableBuilder {
   public void setColumn(int colId, AggregationFunction.SerializedIntermediateResult value)
       throws IOException {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
-    _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
+    _currentRowDataByteBuffer.putInt(variableSizeDataOffset());
     _currentRowDataByteBuffer.putInt(value.getSize());
     _variableSizeDataOutputStream.writeInt(value.getType());
     value.writeTo(_variableSizeDataOutputStream);
@@ -233,7 +240,7 @@ public abstract class BaseDataTableBuilder implements DataTableBuilder {
     ColumnDataType storedColumnDataType = _storedColumnDataTypes[colId];
     if (IN_BAND_NULL_TYPES.contains(storedColumnDataType)) {
       _currentRowDataByteBuffer.position(_columnOffsets[colId]);
-      _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
+      _currentRowDataByteBuffer.putInt(variableSizeDataOffset());
       _currentRowDataByteBuffer.putInt(0);
       _variableSizeDataOutputStream.writeInt(CustomObject.NULL_TYPE_VALUE);
       return;
@@ -256,7 +263,7 @@ public abstract class BaseDataTableBuilder implements DataTableBuilder {
   @Override
   public void finishRow()
       throws IOException {
-    _fixedSizeDataByteArrayOutputStream.write(_currentRowDataByteBuffer.array());
+    _fixedSizeDataOutputStream.write(_currentRowDataByteBuffer.array());
   }
 
   @Override
@@ -289,13 +296,13 @@ public abstract class BaseDataTableBuilder implements DataTableBuilder {
     }
     _nullBitmapsWritten = true;
     for (RoaringBitmap nullBitmap : _nullBitmaps) {
-      _fixedSizeDataOutputStream.writeInt(_variableSizeDataByteArrayOutputStream.size());
+      _fixedSizeDataOutputStream.writeInt(variableSizeDataOffset());
       if (nullBitmap == null) {
         _fixedSizeDataOutputStream.writeInt(0);
       } else {
         byte[] bitmapBytes = RoaringBitmapUtils.serialize(nullBitmap);
         _fixedSizeDataOutputStream.writeInt(bitmapBytes.length);
-        _variableSizeDataByteArrayOutputStream.write(bitmapBytes);
+        _variableSizeDataOutputStream.write(bitmapBytes);
       }
     }
   }
