@@ -45,6 +45,7 @@ import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
+import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.spi.exception.QueryErrorCode;
@@ -1187,6 +1188,96 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
       }
     }
     return null;
+  }
+
+  /// A Sort without fetch/offset over a hash-partitioned exchange orders each partition only. It feeds a
+  /// `PARTITION BY ... ORDER BY` window or a `WITHIN GROUP` aggregate, so its stage must keep the partitioned worker
+  /// assignment (one worker per server, times `stageParallelism`) instead of the single worker of a final ORDER BY.
+  @Test(dataProvider = "partitionedSortQueries")
+  public void testSortOverPartitionedExchangeKeepsPartitionedWorkers(String query, int expectedNumWorkers) {
+    Map<SortNode, DispatchablePlanFragment> sortStages = findSortOverReceiveStages(_queryEnvironment.planQuery(query));
+    assertEquals(sortStages.size(), 1, "Expected one Sort over a mailbox receive");
+    Map.Entry<SortNode, DispatchablePlanFragment> entry = sortStages.entrySet().iterator().next();
+    assertTrue(isOverPartitionedReceive(entry.getKey()), "Expected the Sort to read a hash-partitioned exchange");
+    DispatchablePlanFragment sortStage = entry.getValue();
+    assertEquals(sortStage.getServerInstanceToWorkerIdMap().size(), 2, "Sort stage should run on every server");
+    assertEquals(sortStage.getWorkerMetadataList().size(), expectedNumWorkers);
+  }
+
+  @DataProvider(name = "partitionedSortQueries")
+  public Object[][] partitionedSortQueries() {
+    return new Object[][]{
+        {"SELECT col1, ROW_NUMBER() OVER (PARTITION BY col1 ORDER BY col3 DESC) FROM a", 2},
+        {"SELECT col1, SUM(col3) OVER (PARTITION BY col1 ORDER BY col3) FROM a", 2},
+        {"SET stageParallelism=2; SELECT col1, ROW_NUMBER() OVER (PARTITION BY col1 ORDER BY col3 DESC) FROM a", 4},
+        {"SELECT col1, LISTAGG(col2, ',') WITHIN GROUP (ORDER BY col3) FROM a GROUP BY col1", 2},
+        {"SET stageParallelism=2; SELECT col1, LISTAGG(col2, ',') WITHIN GROUP (ORDER BY col3) FROM a GROUP BY col1",
+            4}
+    };
+  }
+
+  /// A Sort that trims (fetch/offset) or reads a keyless exchange establishes a total order, so its stage must run on
+  /// a single worker even when `stageParallelism` asks for more.
+  @Test(dataProvider = "globalSortQueries")
+  public void testSortOverGlobalExchangeUsesSingletonWorker(String query) {
+    Map<SortNode, DispatchablePlanFragment> sortStages = findSortOverReceiveStages(_queryEnvironment.planQuery(query));
+    assertEquals(sortStages.size(), 1, "Expected one Sort over a mailbox receive");
+    Map.Entry<SortNode, DispatchablePlanFragment> entry = sortStages.entrySet().iterator().next();
+    assertFalse(isOverPartitionedReceive(entry.getKey()), "Expected the Sort to read a keyless exchange");
+    assertEquals(entry.getValue().getWorkerMetadataList().size(), 1, "Global sort stage should use a single worker");
+  }
+
+  @DataProvider(name = "globalSortQueries")
+  public Object[][] globalSortQueries() {
+    return new Object[][]{
+        {"SET stageParallelism=2; SELECT * FROM a ORDER BY col1"},
+        {"SET stageParallelism=2; SELECT * FROM a ORDER BY col1 LIMIT 10"},
+        {"SET stageParallelism=2; SELECT col1, ROW_NUMBER() OVER (ORDER BY col3) FROM a"},
+        {"SET stageParallelism=2; SELECT LISTAGG(col2, ',') WITHIN GROUP (ORDER BY col3) FROM a"}
+    };
+  }
+
+  /// A partitioned window under a final ORDER BY: the window's Sort keeps the partitioned workers, and the final Sort
+  /// still runs on a single worker.
+  @Test
+  public void testPartitionedWindowUnderFinalOrderBy() {
+    String query = "SET stageParallelism=2; SELECT col1, ROW_NUMBER() OVER (PARTITION BY col1 ORDER BY col3) AS rn "
+        + "FROM a ORDER BY rn";
+    Map<SortNode, DispatchablePlanFragment> sortStages = findSortOverReceiveStages(_queryEnvironment.planQuery(query));
+    assertEquals(sortStages.size(), 2, "Expected the window Sort and the final Sort");
+    for (Map.Entry<SortNode, DispatchablePlanFragment> entry : sortStages.entrySet()) {
+      int expectedNumWorkers = isOverPartitionedReceive(entry.getKey()) ? 4 : 1;
+      assertEquals(entry.getValue().getWorkerMetadataList().size(), expectedNumWorkers);
+    }
+  }
+
+  /// Maps each Sort that reads straight from a mailbox to the stage that runs it.
+  private static Map<SortNode, DispatchablePlanFragment> findSortOverReceiveStages(
+      DispatchableSubPlan dispatchableSubPlan) {
+    Map<SortNode, DispatchablePlanFragment> sortStages = new HashMap<>();
+    for (DispatchablePlanFragment fragment : dispatchableSubPlan.getQueryStages()) {
+      List<SortNode> sortNodes = new ArrayList<>();
+      collectSortsOverReceive(fragment.getPlanFragment().getFragmentRoot(), sortNodes);
+      for (SortNode sortNode : sortNodes) {
+        sortStages.put(sortNode, fragment);
+      }
+    }
+    return sortStages;
+  }
+
+  private static void collectSortsOverReceive(PlanNode node, List<SortNode> sortNodes) {
+    if (node instanceof SortNode && node.getInputs().get(0) instanceof MailboxReceiveNode) {
+      sortNodes.add((SortNode) node);
+    }
+    for (PlanNode input : node.getInputs()) {
+      collectSortsOverReceive(input, sortNodes);
+    }
+  }
+
+  private static boolean isOverPartitionedReceive(SortNode sortNode) {
+    MailboxReceiveNode receiveNode = (MailboxReceiveNode) sortNode.getInputs().get(0);
+    return receiveNode.getDistributionType() == RelDistribution.Type.HASH_DISTRIBUTED
+        && !receiveNode.getKeys().isEmpty();
   }
 
   /// Tests that FULL OUTER JOIN with only non-equi conditions uses a singleton worker for the join stage, to ensure
