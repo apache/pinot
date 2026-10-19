@@ -32,9 +32,6 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import net.jpountz.lz4.LZ4FrameOutputStream;
-import net.jpountz.lz4.LZ4FrameOutputStream.BLOCKSIZE;
-import net.jpountz.lz4.LZ4FrameOutputStream.FLG.Bits;
 import org.apache.commons.compress.archivers.ArchiveEntry;
 import org.apache.commons.compress.archivers.ArchiveInputStream;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
@@ -126,9 +123,8 @@ public class TarCompressionUtils {
       throws IOException {
     try (OutputStream fileOut = Files.newOutputStream(outputFile.toPath());
         BufferedOutputStream bufferedOut = new BufferedOutputStream(fileOut);
-        OutputStream compressorOut = CompressorStreamFactory.LZ4_FRAMED.equalsIgnoreCase(compressorName)
-            ? new LZ4FrameOutputStream(bufferedOut, BLOCKSIZE.SIZE_4MB, Bits.BLOCK_INDEPENDENCE, Bits.CONTENT_CHECKSUM)
-            : COMPRESSOR_STREAM_FACTORY.createCompressorOutputStream(compressorName, bufferedOut);
+        OutputStream compressorOut =
+            COMPRESSOR_STREAM_FACTORY.createCompressorOutputStream(compressorName, bufferedOut);
         TarArchiveOutputStream tarOut = new TarArchiveOutputStream(compressorOut)) {
       tarOut.setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_STAR);
       tarOut.setLongFileMode(TarArchiveOutputStream.LONGFILE_GNU);
