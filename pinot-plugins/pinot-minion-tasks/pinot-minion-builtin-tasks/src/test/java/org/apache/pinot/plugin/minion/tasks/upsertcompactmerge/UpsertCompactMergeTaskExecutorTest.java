@@ -32,7 +32,6 @@ import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
-import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
@@ -47,12 +46,8 @@ public class UpsertCompactMergeTaskExecutorTest {
   private MinionEventObserver _eventObserver;
 
   @BeforeClass
-  public void setUpClass() {
-    MockitoAnnotations.openMocks(this);
-  }
-
-  @BeforeMethod
   public void setUp() {
+    MockitoAnnotations.openMocks(this);
     _taskExecutor = new UpsertCompactMergeTaskExecutor(_minionConf);
     _taskExecutor.setMinionEventObserver(_eventObserver);
   }
