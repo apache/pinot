@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.segment.local.utils.SegmentPushUtils;
@@ -31,7 +30,6 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.runner.IngestionJobRunner;
-import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 
@@ -79,24 +77,14 @@ public class HadoopSegmentMetadataPushJobRunner implements IngestionJobRunner, S
       throw new RuntimeException("Unable to list all files under outputDirURI - '" + outputDirURI + "'");
     }
 
-    List<String> segmentsToPush = new ArrayList<>();
-    for (String file : files) {
-      if (Constants.isSegmentTarFile(file)) {
-        segmentsToPush.add(file);
-      }
-    }
-
-    SegmentPushUtils.validateUniqueSegmentNames(segmentsToPush);
-
-    int pushParallelism = _spec.getPushJobSpec().getPushParallelism();
-    if (pushParallelism < 1) {
-      pushParallelism = segmentsToPush.size();
+    Map<String, String> segmentUriToTarPathMap =
+        SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, _spec.getPushJobSpec(), files);
+    if (segmentUriToTarPathMap.isEmpty()) {
+      return;
     }
     // Push from driver
 
     try {
-      Map<String, String> segmentUriToTarPathMap = SegmentPushUtils
-          .getSegmentUriToTarPathMap(outputDirURI, _spec.getPushJobSpec(), segmentsToPush.toArray(new String[0]));
       SegmentPushUtils
           .sendSegmentUriAndMetadata(_spec, PinotFSFactory.create(outputDirURI.getScheme()), segmentUriToTarPathMap);
     } catch (Exception e) {

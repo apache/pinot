@@ -30,7 +30,6 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.runner.IngestionJobRunner;
-import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
@@ -79,14 +78,11 @@ public abstract class BaseSparkSegmentMetadataPushJobRunner implements Ingestion
       throw new RuntimeException("Unable to list all files under outputDirURI - '" + outputDirURI + "'");
     }
 
-    List<String> segmentsToPush = new ArrayList<>();
-    for (String file : files) {
-      if (Constants.isSegmentTarFile(file)) {
-        segmentsToPush.add(file);
-      }
+    List<String> segmentsToPush = new ArrayList<>(
+        SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, _spec.getPushJobSpec(), files).values());
+    if (segmentsToPush.isEmpty()) {
+      return;
     }
-
-    SegmentPushUtils.validateUniqueSegmentNames(segmentsToPush);
 
     int pushParallelism = _spec.getPushJobSpec().getPushParallelism();
     if (pushParallelism < 1) {
