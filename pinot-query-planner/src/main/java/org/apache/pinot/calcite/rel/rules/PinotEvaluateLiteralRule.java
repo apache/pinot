@@ -187,12 +187,7 @@ public class PinotEvaluateLiteralRule {
       // to is determined by the operator's return type. Pinot's CAST function implementation requires two arguments:
       // the value to be cast and the target type.
       argumentTypes = new ColumnDataType[]{argumentTypes[0], ColumnDataType.STRING};
-      // A CAST to some DECIMAL types converts through LONG to drop the fraction, as at runtime (see
-      // RexExpressionUtils.handleCast()). The LONG result converts to the type of the CAST after the call.
-      ColumnDataType castType =
-          RelToPlanNodeConverter.isCastThroughLong(rexCall.getType(), operands.get(0).getType()) ? ColumnDataType.LONG
-              : RelToPlanNodeConverter.convertToColumnDataType(rexCall.getType());
-      castTargetType = castType.name();
+      castTargetType = RelToPlanNodeConverter.convertToColumnDataType(rexCall.getType()).name();
     }
     String canonicalName = FunctionRegistry.canonicalize(PinotRuleUtils.extractFunctionName(rexCall));
     FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(canonicalName, argumentTypes);
@@ -407,9 +402,36 @@ public class PinotEvaluateLiteralRule {
       // The runtime cannot represent this literal (for example an INTERVAL), so keep the value that Calcite stores
       return rexLiteral.getValue();
     }
+    if (canExceedArgumentType(rexLiteral, argumentType)) {
+      // Keep the exact value, which the conversion to INT or LONG can wrap around
+      return rexLiteral.getValue();
+    }
     RexExpression.Literal literal = RexExpressionUtils.fromRexLiteral(rexLiteral);
     Object value = literal.getValue();
     return value != null ? literal.getDataType().toExternal(value) : null;
+  }
+
+  /// Returns whether the literal is a DECIMAL whose type can hold numbers beyond the range of its INT or LONG argument
+  /// type. The planner gives DECIMAL(p, 0) the type INT or LONG by its precision only, for example INT to
+  /// DECIMAL(10, 0), and LONG to an integer literal beyond the BIGINT range. The decision depends on the type, not on
+  /// the value, so that the literals of one type (for example the elements of an array) get the same Java class.
+  private static boolean canExceedArgumentType(RexLiteral rexLiteral, ColumnDataType argumentType) {
+    // NOTE: Check the SQL type, because RexLiteral.getTypeName() is DECIMAL for every exact number, e.g. INTEGER
+    RelDataType type = rexLiteral.getType();
+    if (type.getSqlTypeName() != SqlTypeName.DECIMAL) {
+      return false;
+    }
+    int precision = type.getPrecision();
+    switch (argumentType) {
+      case INT:
+        // An INT holds every number with up to 9 digits
+        return precision > 9;
+      case LONG:
+        // A LONG holds every number with up to 18 digits
+        return precision > 18;
+      default:
+        return false;
+    }
   }
 
   @Nullable
