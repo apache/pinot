@@ -19,6 +19,7 @@
 package org.apache.pinot.query.planner.logical;
 
 import java.util.List;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
@@ -204,13 +205,85 @@ public class SpoolDeadlockGuardTest extends StagesTestBase {
     assertRisk(SpoolDeadlockGuard.findRisk(root), 1, "the pipeline breaker", 4, 2, 3);
   }
 
+  /// Both receives belong to the pipeline breaker, which reads them in round-robin with blocking reads. The join alone
+  /// is safe, because the aggregate in stage 2 reads the whole spool. But a blocking read on stage 2 keeps stage 4
+  /// unread, and stage 4 stops the spool that stage 2 needs.
+  @Test
+  public void pipelineBreakerReceivesDeferEachOther() {
+    SpoolBuilder spool = new SpoolBuilder(3, tableScan("T1"));
+    MailboxSendNode root = when(
+        exchange(1,
+            join(
+                exchange(2, aggregate(spool.newReceiver(), List.of())).asPipelineBreaker(),
+                exchange(4, spool.newReceiver()).asPipelineBreaker()
+            )
+        )
+    );
+    assertRisk(SpoolDeadlockGuard.findRisk(root), 1, "the pipeline breaker", 4, 2, 3);
+  }
+
+  /// Two joins read the same two spools with the sides swapped. Each join alone is safe: its probe spool is not
+  /// needed by its own build input. Together they block: stage 2 waits for spool 4 to finish its build input while
+  /// spool 4 stops because stage 6 does not read its probe input, and stage 6 waits for spool 3 in the same way.
+  @Test
+  public void joinsWithSwappedSidesBlockEachOther() {
+    SpoolBuilder spoolA = new SpoolBuilder(3, tableScan("A"));
+    SpoolBuilder spoolB = new SpoolBuilder(4, tableScan("B"));
+    MailboxSendNode root = when(
+        exchange(1,
+            setOp(SetOpNode.SetOpType.UNION, List.of(
+                exchange(2, aggregate(join(spoolA.newReceiver(), spoolB.newReceiver()), List.of())),
+                exchange(6, aggregate(join(spoolB.newReceiver(), spoolA.newReceiver()), List.of()))
+            ))
+        )
+    );
+    SpoolDeadlockGuard.DeadlockRisk risk = SpoolDeadlockGuard.findRisk(root);
+    assertNotNull(risk, "Expected a circular wait");
+    List<SpoolDeadlockGuard.Wait> cycle = risk.getCycle();
+    assertEquals(cycle.size(), 2, risk.toString());
+    for (SpoolDeadlockGuard.Wait wait : cycle) {
+      assertEquals(wait.getOperator(), "JOIN", risk.toString());
+      // Each wait is kept by the spool it reads as build input, which the other wait stops.
+      assertEquals(wait.getSharedStageId(), wait.getBlockingSenderStageId(), risk.toString());
+    }
+    assertEquals(Set.of(cycle.get(0).getStageId(), cycle.get(1).getStageId()), Set.of(2, 6), risk.toString());
+    assertEquals(risk.toString(), "Circular wait: "
+        + "In stage " + cycle.get(0).getStageId() + ", JOIN reads the input from stage "
+        + cycle.get(0).getWaitingSenderStageId() + " only after the input from stage "
+        + cycle.get(0).getBlockingSenderStageId() + " finishes, and stage " + cycle.get(0).getBlockingSenderStageId()
+        + " depends on stage " + cycle.get(0).getSharedStageId() + ", which the next wait stops; "
+        + "In stage " + cycle.get(1).getStageId() + ", JOIN reads the input from stage "
+        + cycle.get(1).getWaitingSenderStageId() + " only after the input from stage "
+        + cycle.get(1).getBlockingSenderStageId() + " finishes, and stage " + cycle.get(1).getBlockingSenderStageId()
+        + " depends on stage " + cycle.get(1).getSharedStageId() + ", which the next wait stops");
+  }
+
+  /// Same shape as [#joinsWithSwappedSidesBlockEachOther()], but both joins read spool 3 as the build input. Spool 3
+  /// is drained by both builds, so no wait stops it, and there is no cycle.
+  @Test
+  public void joinsWithTheSameSidesDoNotBlock() {
+    SpoolBuilder spoolA = new SpoolBuilder(3, tableScan("A"));
+    SpoolBuilder spoolB = new SpoolBuilder(4, tableScan("B"));
+    MailboxSendNode root = when(
+        exchange(1,
+            setOp(SetOpNode.SetOpType.UNION, List.of(
+                exchange(2, aggregate(join(spoolB.newReceiver(), spoolA.newReceiver()), List.of())),
+                exchange(6, aggregate(join(spoolB.newReceiver(), spoolA.newReceiver()), List.of(List.of(0))))
+            ))
+        )
+    );
+    assertNull(SpoolDeadlockGuard.findRisk(root));
+  }
+
   private static void assertRisk(@Nullable SpoolDeadlockGuard.DeadlockRisk risk, int stageId, String operator,
       int waitingSenderStageId, int blockingSenderStageId, int sharedStageId) {
     assertNotNull(risk, "Expected a deadlock risk");
-    assertEquals(risk.getStageId(), stageId, risk.toString());
-    assertEquals(risk.getOperator(), operator, risk.toString());
-    assertEquals(risk.getWaitingSenderStageId(), waitingSenderStageId, risk.toString());
-    assertEquals(risk.getBlockingSenderStageId(), blockingSenderStageId, risk.toString());
-    assertEquals(risk.getSharedStageId(), sharedStageId, risk.toString());
+    assertEquals(risk.getCycle().size(), 1, risk.toString());
+    SpoolDeadlockGuard.Wait wait = risk.getCycle().get(0);
+    assertEquals(wait.getStageId(), stageId, risk.toString());
+    assertEquals(wait.getOperator(), operator, risk.toString());
+    assertEquals(wait.getWaitingSenderStageId(), waitingSenderStageId, risk.toString());
+    assertEquals(wait.getBlockingSenderStageId(), blockingSenderStageId, risk.toString());
+    assertEquals(wait.getSharedStageId(), sharedStageId, risk.toString());
   }
 }

@@ -655,6 +655,9 @@ public class CommonConstants {
     /// - `auto` shares a stage only when the planner can prove that the sharing cannot block the query.
     /// - `on` shares every equivalent stage that the planner supports, without that safety check.
     ///
+    /// Only the default planner applies spools. With [Request.QueryOptionKey#USE_PHYSICAL_OPTIMIZER] the mode is
+    /// ignored.
+    ///
     /// This value can always be overridden by [Request.QueryOptionKey#USE_SPOOLS] query option
     public static final String CONFIG_OF_SPOOLS = "pinot.broker.multistage.spools";
     public static final String DEFAULT_SPOOLS_MODE = "auto";

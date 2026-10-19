@@ -106,7 +106,8 @@ public class EquivalentStagesReplacer {
         // receivers in the same stage, we cannot optimize this case right now.
         _substitutions.add(new SpoolSubstitution(node.getStageId(), sender.getStageId(), leader.getStageId(),
             SpoolSubstitution.Outcome.REJECTED_SAME_RECEIVER_STAGE, null));
-        visitMailboxSend(leader, equivalenceGroups);
+        // The original sender stays in the plan, so the stages below it can still be shared.
+        visitMailboxSend(sender, equivalenceGroups);
         return null;
       }
       node.setSender(leader);
