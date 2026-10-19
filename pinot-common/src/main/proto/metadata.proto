@@ -1,0 +1,563 @@
+//
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+//
+
+syntax = "proto3";
+
+package pinot.coordination;
+option java_package = "org.apache.pinot.coordination.ratis.rpc";
+option java_outer_classname = "MetadataRpc";
+
+// Controller-only metadata access. Client identity is derived exclusively from the mutually authenticated TLS peer.
+service MetadataService {
+  rpc Execute(CommandRequest) returns (CommandResult);
+  rpc Read(ReadRequest) returns (CommandResult);
+  rpc OpenSnapshot(OpenSnapshotRequest) returns (OpenSnapshotResult);
+  rpc GetSnapshotPage(SnapshotPageRequest) returns (SnapshotPage);
+  rpc GetChanges(ChangesRequest) returns (ChangePage);
+  rpc CloseSnapshot(CloseSnapshotRequest) returns (Empty);
+}
+
+// Participants access only their certificate-bound membership. Lease ticks and control-epoch activation are
+// internal consensus operations and deliberately have no public request representation.
+service ParticipantMembershipService {
+  rpc Execute(MembershipCommandRequest) returns (MembershipResponse);
+  rpc Read(MembershipReadRequest) returns (MembershipResponse);
+}
+
+// A separate bounded lane for a SERVER's own installation work and durable reports. No catalog listing,
+// generic metadata mutation or another participant's outcome can be represented by these requests.
+service ServerInstallationService {
+  rpc Execute(InstallationCommandRequest) returns (CommandResult);
+  rpc Lookup(InstallationLookupRequest) returns (InstallationWorkResult);
+  rpc Outcome(InstallationOutcomeRequest) returns (CommandResult);
+  rpc Snapshot(InstallationSnapshotRequest) returns (InstallationSnapshot);
+}
+
+enum RecordKind {
+  RECORD_KIND_UNSPECIFIED = 0;
+  CLUSTER_CONFIG = 1;
+  SCHEMA = 2;
+  TABLE_CONFIG = 3;
+  MEMBERSHIP_CONTROL = 4;
+  PARTICIPANT = 5;
+  OWNER_LAYOUT = 6;
+  OWNER_ASSIGNMENT = 7;
+  CONTROLLER_OPERATION = 8;
+  OFFLINE_SEGMENT_CONTENT = 9;
+  OFFLINE_REPLICA_ASSIGNMENT = 10;
+  OFFLINE_INSTALLATION = 11;
+}
+
+enum ResultStatus {
+  RESULT_STATUS_UNSPECIFIED = 0;
+  OK = 1;
+  CONFLICT = 2;
+  FENCED = 3;
+  HISTORY_MISMATCH = 4;
+  INVALID_REQUEST = 5;
+  NOT_FOUND = 6;
+  RESULT_EXPIRED = 7;
+  OUT_OF_ORDER = 8;
+  UNACKNOWLEDGED_RESULT = 9;
+  LIMIT_EXCEEDED = 10;
+  CURSOR_EXPIRED = 11;
+  NOT_READY = 12;
+  RESPONSE_TOO_LARGE = 13;
+}
+
+message Revision { string history_id = 1; int64 index = 2; }
+message ObjectVersion { string history_id = 1; string object_id = 2; int64 version = 3; }
+message ClusterConfig { map<string, string> properties = 1; }
+
+// These are domain values, never arbitrary commands. JSON preserves Pinot's schema/table plugin fields and exact
+// decimals; the existing typed Schema/TableConfig validators check the selected value against its declared kind.
+message CatalogValue {
+  oneof value {
+    ClusterConfig cluster_config = 1;
+    bytes schema_json = 2;
+    bytes table_config_json = 3;
+    MembershipControl membership_control = 4;
+    ParticipantState participant = 5;
+    OwnershipLayout owner_layout = 6;
+    OwnershipAssignment owner_assignment = 7;
+    ControllerOperationState controller_operation = 8;
+    OfflineSegmentContent offline_segment_content = 9;
+    OfflineReplicaAssignment offline_replica_assignment = 10;
+    InstallationReceipt offline_installation = 11;
+  }
+}
+
+message Mutation {
+  enum Action { ACTION_UNSPECIFIED = 0; CREATE = 1; UPDATE = 2; DELETE = 3; }
+  Action action = 1;
+  RecordKind kind = 2;
+  string name = 3;
+  ObjectVersion expected = 4;
+  CatalogValue value = 5;
+}
+
+message RegisterClient { string incarnation = 1; int64 expected_epoch = 2; }
+message RetireClient { int64 client_epoch = 1; }
+message Transaction {
+  int64 client_epoch = 1;
+  string stream_id = 2;
+  int64 sequence = 3;
+  repeated Mutation mutations = 4;
+}
+message Acknowledge { int64 client_epoch = 1; string stream_id = 2; int64 through_sequence = 3; }
+message CommandRequest {
+  string history_id = 1;
+  oneof command {
+    RegisterClient register = 2;
+    RetireClient retire = 3;
+    Transaction transaction = 4;
+    Acknowledge acknowledge = 5;
+    ControllerOperationRequest controller_operation = 6;
+  }
+}
+
+message RecordQuery { RecordKind kind = 1; string name = 2; }
+message OutcomeQuery { int64 client_epoch = 1; string stream_id = 2; int64 sequence = 3; }
+message ReadRequest {
+  string history_id = 1;
+  oneof query { RecordQuery record = 2; OutcomeQuery outcome = 3; Empty revision = 4; }
+}
+message CatalogRecord {
+  RecordKind kind = 1;
+  string name = 2;
+  string object_id = 3;
+  int64 version = 4;
+  int32 schema_version = 5;
+  int64 last_modified_index = 6;
+  bool deleted = 7;
+  CatalogValue value = 8;
+}
+message CommandResult {
+  ResultStatus status = 1;
+  Revision revision = 2;
+  string detail = 3;
+  optional int64 client_epoch = 4;
+  repeated ObjectVersion versions = 5;
+  CatalogRecord record = 6;
+}
+
+message Cursor { string history_id = 1; int64 index = 2; string scope_id = 3; }
+message OpenSnapshotRequest { string history_id = 1; repeated RecordKind kinds = 2; }
+message OpenSnapshotResult {
+  ResultStatus status = 1;
+  string snapshot_handle = 2;
+  Cursor cursor = 3;
+  int32 record_count = 4;
+}
+message SnapshotPageRequest {
+  string snapshot_handle = 1;
+  int32 offset = 2;
+  int32 max_records = 3;
+  int32 max_bytes = 4;
+}
+message SnapshotPage {
+  ResultStatus status = 1;
+  repeated CatalogRecord records = 2;
+  int32 next_offset = 3;
+  bool complete = 4;
+  Cursor cursor = 5;
+}
+message ChangesRequest {
+  Cursor cursor = 1;
+  repeated RecordKind kinds = 2;
+  int32 max_transactions = 3;
+  int32 max_records = 4;
+  int32 max_bytes = 5;
+}
+message ChangeTransaction {
+  int64 previous_index = 1;
+  int64 index = 2;
+  repeated CatalogRecord records = 3;
+}
+message ChangePage {
+  ResultStatus status = 1;
+  Cursor from = 2;
+  Cursor next = 3;
+  int64 retention_floor = 4;
+  repeated ChangeTransaction transactions = 5;
+  bool has_more = 6;
+}
+message CloseSnapshotRequest { string snapshot_handle = 1; }
+message Empty {}
+
+enum ParticipantRole {
+  PARTICIPANT_ROLE_UNSPECIFIED = 0;
+  CONTROLLER = 1;
+  BROKER = 2;
+  SERVER = 3;
+  MINION = 4;
+}
+enum ServingCapability {
+  SERVING_CAPABILITY_UNSPECIFIED = 0;
+  BROKER_QUERY = 1;
+  SERVER_QUERY = 2;
+}
+
+message ParticipantToken {
+  string history_id = 1;
+  string participant_id = 2;
+  ParticipantRole role = 3;
+  string incarnation = 4;
+  int64 registration_epoch = 5;
+}
+message ControlToken {
+  string history_id = 1;
+  int64 raft_term = 2;
+  int64 barrier_index = 3;
+  string leader_id = 4;
+  string activation_id = 5;
+}
+message MembershipPolicy {
+  int64 version = 1;
+  int64 min_tick_interval_millis = 2;
+  int64 lease_rounds = 3;
+  int64 permit_lifetime_millis = 4;
+  int64 max_query_lifetime_millis = 5;
+  int64 max_revision_lag = 6;
+}
+message MembershipControl {
+  ControlToken control_epoch = 1;
+  int64 round = 2;
+  MembershipPolicy policy = 3;
+  int64 clock_barrier_index = 4;
+  int64 minimum_tick_delay_millis = 5;
+  int64 max_configured_permit_lifetime_millis = 6;
+}
+message ParticipantState {
+  ParticipantToken participant = 1;
+  map<string, string> endpoints = 2;
+  repeated ServingCapability capabilities = 3;
+  int64 expiry_round = 4;
+  bool ready = 5;
+  bool draining = 6;
+  bool retired = 7;
+  Revision applied_revision = 8;
+  int64 last_renewal_sequence = 9;
+  int64 last_modified_index = 10;
+}
+message ServingPermit {
+  ParticipantToken participant = 1;
+  int64 renewal_sequence = 2;
+  ControlToken control_epoch = 3;
+  Revision min_applied_revision = 4;
+  int64 permit_lifetime_millis = 5;
+  int64 max_query_lifetime_millis = 6;
+  int64 policy_version = 7;
+  repeated ServingCapability capabilities = 8;
+}
+message RenewalResult {
+  ParticipantToken participant = 1;
+  int64 sequence = 2;
+  ResultStatus status = 3;
+  ServingPermit permit = 4;
+  string detail = 5;
+}
+message MembershipResponse {
+  ResultStatus status = 1;
+  Revision revision = 2;
+  string detail = 3;
+  MembershipControl control = 4;
+  ParticipantState participant = 5;
+  repeated RenewalResult renewals = 6;
+}
+
+// Request sessions omit participant ID and role: both always come from current authenticated policy.
+message ParticipantSession { string incarnation = 1; int64 registration_epoch = 2; }
+message ParticipantRegistration {
+  string incarnation = 1;
+  int64 expected_epoch = 2;
+  map<string, string> endpoints = 3;
+}
+message ParticipantRenewal {
+  ParticipantSession session = 1;
+  int64 sequence = 2;
+  Revision applied_revision = 3;
+}
+message ParticipantReadiness {
+  ParticipantSession session = 1;
+  Revision applied_revision = 2;
+  bool ready = 3;
+}
+message MembershipCommandRequest {
+  string history_id = 1;
+  oneof command {
+    ParticipantRegistration register = 2;
+    ParticipantRenewal renew = 3;
+    ParticipantReadiness ready = 4;
+    ParticipantSession drain = 5;
+    ParticipantSession unregister = 6;
+  }
+}
+message MembershipReadRequest { string history_id = 1; }
+
+// Ownership assignment and layout changes are trusted embedded coordinator operations, with no public RPC form.
+enum OwnershipHashVersion {
+  OWNERSHIP_HASH_VERSION_UNSPECIFIED = 0;
+  MURMUR2_UTF8_MASK_POSITIVE_V1 = 1;
+}
+message OwnershipLayout {
+  int64 generation = 1;
+  int32 table_shards = 2;
+  OwnershipHashVersion hash_version = 3;
+}
+message OwnershipScope {
+  oneof scope { int32 table_shard = 1; string cluster_work = 2; string tableless_task = 3; }
+}
+message OwnerToken {
+  string history_id = 1;
+  int64 layout_generation = 2;
+  OwnershipScope scope = 3;
+  int64 owner_epoch = 4;
+  ParticipantToken participant = 5;
+}
+message OwnershipAssignment {
+  int64 layout_generation = 1;
+  OwnershipScope scope = 2;
+  int64 owner_epoch = 3;
+  ParticipantToken owner = 4;
+}
+
+// Inputs cannot select an owner participant ID or role. Both come from the authenticated certificate's current
+// controller participant policy; the outer metadata policy independently supplies the durable client identity.
+message ClaimedOwner {
+  int64 layout_generation = 1;
+  OwnershipScope scope = 2;
+  int64 owner_epoch = 3;
+  ParticipantSession session = 4;
+}
+message TargetMaterialization {
+  ParticipantToken server = 1;
+  int64 assignment_epoch = 2;
+  string materialization_id = 3;
+}
+message OfflineSegmentReload {
+  string table_name = 1;
+  string table_object_id = 2;
+  string segment_name = 3;
+  string segment_object_id = 4;
+  string content_sha256 = 5;
+  repeated TargetMaterialization targets = 6;
+  bool force_download = 7;
+  bool initial_load = 8;
+  bool reconcile = 9;
+  int64 submitted_at_ms = 10;
+}
+// Assigned input is a read-only projection produced by consensus from authoritative catalog records.
+message AssignedOfflineSegmentReload { OfflineSegmentReload reload = 1; repeated ObjectVersion dependencies = 2; }
+message OperationSpec {
+  oneof spec {
+    OfflineSegmentReload offline_segment_reload = 1;
+    AssignedOfflineSegmentReload assigned_offline_segment_reload = 2;
+  }
+}
+enum OperationStatus {
+  OPERATION_STATUS_UNSPECIFIED = 0;
+  ACCEPTED = 1;
+  RUNNING = 2;
+  SUCCEEDED = 3;
+  FAILED = 4;
+  CANCELLED = 5;
+}
+message OperationProgress { int32 completed_targets = 1; int32 failed_targets = 2; string detail = 3; }
+message InstallationCompletionProof { repeated ObjectVersion installations = 1; }
+message ControllerOperationState {
+  string history_id = 1;
+  string operation_id = 2;
+  OperationSpec input = 3;
+  OperationStatus status = 4;
+  int64 attempt = 5;
+  OwnerToken owner = 6;
+  repeated ObjectVersion dependencies = 7;
+  OperationProgress progress = 8;
+  OperationProgress result = 9;
+  InstallationCompletionProof completion_proof = 10;
+}
+message SubmitOperation { string operation_id = 1; OperationSpec input = 2; }
+message ClaimOperation {
+  string operation_id = 1;
+  int64 expected_version = 2;
+  ClaimedOwner owner = 3;
+  repeated ObjectVersion dependencies = 4;
+}
+message CheckpointOperation {
+  string operation_id = 1;
+  int64 expected_version = 2;
+  ClaimedOwner owner = 3;
+  int64 attempt = 4;
+  OperationProgress progress = 5;
+}
+message CompleteOperation {
+  string operation_id = 1;
+  int64 expected_version = 2;
+  ClaimedOwner owner = 3;
+  int64 attempt = 4;
+  OperationStatus terminal = 5;
+  OperationProgress result = 6;
+  repeated Mutation effects = 7;
+}
+message CancelOperation {
+  string operation_id = 1;
+  int64 expected_version = 2;
+  ClaimedOwner owner = 3;
+  string detail = 4;
+}
+message CompleteInstalledOperation {
+  string operation_id = 1;
+  int64 expected_version = 2;
+  ClaimedOwner owner = 3;
+  int64 attempt = 4;
+}
+message ControllerOperationRequest {
+  int64 client_epoch = 1;
+  string stream_id = 2;
+  int64 sequence = 3;
+  oneof operation {
+    SubmitOperation submit = 4;
+    ClaimOperation claim = 5;
+    CheckpointOperation checkpoint = 6;
+    CompleteOperation complete = 7;
+    CancelOperation cancel = 8;
+    CompleteInstalledOperation complete_installed = 9;
+  }
+}
+
+// Read/feed projections only. Manifest and desired-assignment writes remain trusted embedded operations.
+message SegmentLoaderDescriptor {
+  int64 crc = 1;
+  int64 data_crc = 2;
+  bool use_data_crc = 3;
+  optional string tier = 4;
+  optional string crypter_name = 5;
+  int64 creation_time_ms = 6;
+  int64 push_time_ms = 7;
+  map<string, string> custom_configs = 8;
+}
+message OfflineSegmentContent {
+  string table_name = 1;
+  string table_object_id = 2;
+  string segment_name = 3;
+  string segment_object_id = 4;
+  string content_sha256 = 5;
+  string download_uri = 6;
+  SegmentLoaderDescriptor loader = 7;
+}
+message MaterializationCompatibility { ObjectVersion table = 1; ObjectVersion schema = 2; }
+message OfflineReplicaAssignment {
+  string table_name = 1;
+  string table_object_id = 2;
+  string segment_name = 3;
+  string segment_object_id = 4;
+  string content_sha256 = 5;
+  int64 assignment_epoch = 6;
+  ParticipantToken server = 7;
+  string materialization_id = 8;
+  MaterializationCompatibility compatibility = 9;
+  bool desired_online = 10;
+}
+
+// Report inputs omit server identity. The service derives it from the authenticated SERVER policy and session.
+message InstallationTarget {
+  string table_name = 1;
+  string table_object_id = 2;
+  string segment_name = 3;
+  string segment_object_id = 4;
+  string content_sha256 = 5;
+  ObjectVersion assignment = 6;
+  string materialization_id = 7;
+  MaterializationCompatibility compatibility = 8;
+}
+message InstalledMaterialization { InstallationTarget target = 1; ParticipantToken server = 2; }
+message InstallationReport {
+  string operation_id = 1;
+  int64 attempt = 2;
+  OwnerToken owner = 3;
+  InstallationTarget installed = 4;
+  string installation_id = 5;
+  string manifest_sha256 = 6;
+}
+message InstallationReceipt {
+  string history_id = 1;
+  InstallationReport installation = 2;
+  ParticipantToken server = 3;
+}
+message SequencedInstallationReport {
+  int64 client_epoch = 1;
+  string stream_id = 2;
+  int64 sequence = 3;
+  InstallationReport report = 4;
+}
+message InstallationCommandRequest {
+  string history_id = 1;
+  ParticipantSession session = 2;
+  oneof command {
+    RegisterClient register = 3;
+    Acknowledge acknowledge = 4;
+    SequencedInstallationReport report = 5;
+  }
+}
+message InstallationLookupRequest {
+  string history_id = 1;
+  ParticipantSession session = 2;
+  string operation_id = 3;
+}
+message InstallationOutcomeRequest {
+  string history_id = 1;
+  ParticipantSession session = 2;
+  OutcomeQuery outcome = 3;
+}
+// Complete own-session metadata, including pre-ready bootstrap. Limits cover the entire image; oversize returns
+// RESPONSE_TOO_LARGE with no partial records. Applying a work response alone cannot advance applied_revision.
+message InstallationSnapshotRequest {
+  string history_id = 1;
+  ParticipantSession session = 2;
+  int32 max_records = 3;
+  int32 max_bytes = 4;
+}
+message InstallationSnapshot {
+  ResultStatus status = 1;
+  Revision revision = 2;
+  string detail = 3;
+  ParticipantState participant = 4;
+  repeated CatalogRecord records = 5;
+  repeated string operation_ids = 6;
+  MembershipControl control = 7;
+}
+message InstallationWork {
+  string operation_id = 1;
+  int64 attempt = 2;
+  OwnerToken owner = 3;
+  InstalledMaterialization target = 4;
+  OfflineSegmentContent content = 5;
+  CatalogRecord table = 6;
+  CatalogRecord schema = 7;
+  bool force_download = 8;
+  bool initial_load = 9;
+  bool reconcile = 10;
+}
+message InstallationWorkResult {
+  ResultStatus status = 1;
+  Revision revision = 2;
+  string detail = 3;
+  InstallationWork work = 4;
+}

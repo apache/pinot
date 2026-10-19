@@ -52,6 +52,7 @@ import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -143,7 +144,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
       String tableNameWithType = getTableNameWithType(instanceRequest);
       LOGGER.error("Failed to compile query request: {} on table: {}", requestId, tableNameWithType, e);
       sendErrorResponse(ctx, requestId, tableNameWithType, queryArrivalTimeMs,
-          DataTableBuilderFactory.getEmptyDataTable(), e);
+          DataTableBuilderFactory.getEmptyDataTable(), e, instanceRequest.isSetNativeQueryContext());
       return;
     }
     _serverMetrics.addMeteredTableValue(queryRequest.getTableNameWithType(), ServerMeter.QUERIES_ON_TABLE, 1);
@@ -285,6 +286,11 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
   /// Send an exception back to broker as response to the query request.
   private void sendErrorResponse(ChannelHandlerContext ctx, long requestId, String tableNameWithType,
       long queryArrivalTimeMs, DataTable dataTable, Exception e) {
+    sendErrorResponse(ctx, requestId, tableNameWithType, queryArrivalTimeMs, dataTable, e, false);
+  }
+
+  private void sendErrorResponse(ChannelHandlerContext ctx, long requestId, String tableNameWithType,
+      long queryArrivalTimeMs, DataTable dataTable, Exception e, boolean preserveQueryCode) {
     boolean cancelled = (e instanceof CancellationException);
     try {
       Map<String, String> dataTableMetadata = dataTable.getMetadata();
@@ -292,6 +298,8 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
       if (cancelled) {
         dataTable.addException(QueryErrorCode.QUERY_CANCELLATION.getId(),
             "Query cancelled on: " + _instanceName + " " + e.getMessage());
+      } else if (preserveQueryCode && e instanceof QueryException) {
+        dataTable.addException(((QueryException) e).getErrorCode().getId(), e.getMessage());
       } else {
         dataTable.addException(QueryErrorCode.QUERY_EXECUTION.getId(),
             "Query execution error on: " + _instanceName + " " + e.getMessage());

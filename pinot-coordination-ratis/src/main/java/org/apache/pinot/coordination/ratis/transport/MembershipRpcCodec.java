@@ -171,13 +171,13 @@ final class MembershipRpcCodec {
         participant.getLastRenewalSequence(), participant.getLastModifiedIndex());
   }
 
-  private static MetadataRpc.ParticipantToken participant(ParticipantToken token) {
+  static MetadataRpc.ParticipantToken participant(ParticipantToken token) {
     return MetadataRpc.ParticipantToken.newBuilder().setHistoryId(token.historyId().toString())
         .setParticipantId(token.participantId()).setRole(MetadataRpc.ParticipantRole.valueOf(token.role().name()))
         .setIncarnation(token.incarnation().toString()).setRegistrationEpoch(token.registrationEpoch()).build();
   }
 
-  private static ParticipantToken participant(MetadataRpc.ParticipantToken token) {
+  static ParticipantToken participant(MetadataRpc.ParticipantToken token) {
     return new ParticipantToken(UUID.fromString(token.getHistoryId()), token.getParticipantId(),
         MembershipProtocol.Role.valueOf(token.getRole().name()), UUID.fromString(token.getIncarnation()),
         token.getRegistrationEpoch());

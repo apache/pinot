@@ -46,6 +46,10 @@ import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.ObjectVersi
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Query;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.RecordKind;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Result;
+import org.apache.pinot.coordination.ratis.metadata.OfflineInstallationProtocol;
+import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol;
+import org.apache.pinot.coordination.ratis.metadata.OperationProtocol;
+import org.apache.pinot.coordination.ratis.metadata.OwnershipProtocol;
 import org.apache.pinot.coordination.ratis.rpc.MetadataRpc;
 import org.apache.pinot.spi.utils.JsonUtils;
 
@@ -81,29 +85,35 @@ final class MetadataRpcCodec {
         }
         List<Mutation> mutations = new ArrayList<>();
         for (MetadataRpc.Mutation mutation : transaction.getMutationsList()) {
-          RecordKind kind = kind(mutation.getKind());
-          if (kind == RecordKind.MEMBERSHIP_CONTROL || kind == RecordKind.PARTICIPANT) {
-            throw new IllegalArgumentException("Membership records require the typed membership protocol");
-          }
-          if (!mutation.hasExpected()) {
-            throw new IllegalArgumentException("Expected object version is required");
-          }
-          Action action = switch (mutation.getAction()) {
-            case CREATE -> Action.CREATE;
-            case UPDATE -> Action.UPDATE;
-            case DELETE -> Action.DELETE;
-            default -> throw new IllegalArgumentException("Unknown mutation action");
-          };
-          JsonNode value = mutation.hasValue() ? value(kind, mutation.getValue()) : null;
-          mutations.add(new Mutation(action, kind, mutation.getName(), new ObjectVersion(
-              UUID.fromString(mutation.getExpected().getHistoryId()),
-              UUID.fromString(mutation.getExpected().getObjectId()), mutation.getExpected().getVersion()), value));
+          mutations.add(mutation(mutation));
         }
         yield new MetadataProtocol.Transaction(history, clientId, transaction.getClientEpoch(),
             transaction.getStreamId(), transaction.getSequence(), mutations);
       }
       default -> throw new IllegalArgumentException("A typed command is required");
     };
+  }
+
+  static Mutation mutation(MetadataRpc.Mutation mutation)
+      throws IOException {
+    rejectUnknown(mutation);
+    RecordKind kind = kind(mutation.getKind());
+    if (kind != RecordKind.CLUSTER_CONFIG && kind != RecordKind.SCHEMA && kind != RecordKind.TABLE_CONFIG) {
+      throw new IllegalArgumentException("Coordination records require typed coordination commands");
+    }
+    if (!mutation.hasExpected()) {
+      throw new IllegalArgumentException("Expected object version is required");
+    }
+    Action action = switch (mutation.getAction()) {
+      case CREATE -> Action.CREATE;
+      case UPDATE -> Action.UPDATE;
+      case DELETE -> Action.DELETE;
+      default -> throw new IllegalArgumentException("Unknown mutation action");
+    };
+    JsonNode value = mutation.hasValue() ? value(kind, mutation.getValue()) : null;
+    return new Mutation(action, kind, mutation.getName(), new ObjectVersion(
+        UUID.fromString(mutation.getExpected().getHistoryId()),
+        UUID.fromString(mutation.getExpected().getObjectId()), mutation.getExpected().getVersion()), value);
   }
 
   static Query query(MetadataRpc.ReadRequest request, String clientId) {
@@ -158,6 +168,18 @@ final class MetadataRpcCodec {
             MembershipRpcCodec.control(MembershipProtocol.decodeControl(record.value())));
         case PARTICIPANT -> value.setParticipant(
             MembershipRpcCodec.participant(MembershipProtocol.decodeParticipant(record.value())));
+        case OWNER_LAYOUT -> value.setOwnerLayout(
+            ControllerRpcCodec.layout(OwnershipProtocol.decodeLayout(record.value())));
+        case OWNER_ASSIGNMENT -> value.setOwnerAssignment(
+            ControllerRpcCodec.assignment(OwnershipProtocol.decodeAssignment(record.value())));
+        case CONTROLLER_OPERATION -> value.setControllerOperation(
+            ControllerRpcCodec.operation(OperationProtocol.decodeOperation(record.value())));
+        case OFFLINE_SEGMENT_CONTENT -> value.setOfflineSegmentContent(
+            OfflineSegmentRpcCodec.content(OfflineSegmentProtocol.decodeContent(record.value())));
+        case OFFLINE_REPLICA_ASSIGNMENT -> value.setOfflineReplicaAssignment(
+            OfflineSegmentRpcCodec.assignment(OfflineSegmentProtocol.decodeAssignment(record.value())));
+        case OFFLINE_INSTALLATION -> value.setOfflineInstallation(
+            InstallationRpcCodec.receipt(OfflineInstallationProtocol.decodeReceipt(record.value())));
         default -> throw new IOException("Unsupported catalog record kind");
       }
       builder.setValue(value);
@@ -172,6 +194,12 @@ final class MetadataRpcCodec {
       case TABLE_CONFIG -> RecordKind.TABLE_CONFIG;
       case MEMBERSHIP_CONTROL -> RecordKind.MEMBERSHIP_CONTROL;
       case PARTICIPANT -> RecordKind.PARTICIPANT;
+      case OWNER_LAYOUT -> RecordKind.OWNER_LAYOUT;
+      case OWNER_ASSIGNMENT -> RecordKind.OWNER_ASSIGNMENT;
+      case CONTROLLER_OPERATION -> RecordKind.CONTROLLER_OPERATION;
+      case OFFLINE_SEGMENT_CONTENT -> RecordKind.OFFLINE_SEGMENT_CONTENT;
+      case OFFLINE_REPLICA_ASSIGNMENT -> RecordKind.OFFLINE_REPLICA_ASSIGNMENT;
+      case OFFLINE_INSTALLATION -> RecordKind.OFFLINE_INSTALLATION;
       default -> throw new IllegalArgumentException("Unknown catalog record kind");
     };
   }
@@ -249,18 +277,54 @@ final class MetadataRpcCodec {
         break;
       case MEMBERSHIP_CONTROL:
         if (kind == RecordKind.MEMBERSHIP_CONTROL) {
-          return JsonUtils.objectToJsonNode(MembershipRpcCodec.control(value.getMembershipControl()));
+          return typedValue(MembershipRpcCodec.control(value.getMembershipControl()));
         }
         break;
       case PARTICIPANT:
         if (kind == RecordKind.PARTICIPANT) {
-          return JsonUtils.objectToJsonNode(MembershipRpcCodec.participant(value.getParticipant()));
+          return typedValue(MembershipRpcCodec.participant(value.getParticipant()));
+        }
+        break;
+      case OWNER_LAYOUT:
+        if (kind == RecordKind.OWNER_LAYOUT) {
+          return typedValue(ControllerRpcCodec.layout(value.getOwnerLayout()));
+        }
+        break;
+      case OWNER_ASSIGNMENT:
+        if (kind == RecordKind.OWNER_ASSIGNMENT) {
+          return typedValue(ControllerRpcCodec.assignment(value.getOwnerAssignment()));
+        }
+        break;
+      case CONTROLLER_OPERATION:
+        if (kind == RecordKind.CONTROLLER_OPERATION) {
+          return typedValue(ControllerRpcCodec.operation(value.getControllerOperation()));
+        }
+        break;
+      case OFFLINE_SEGMENT_CONTENT:
+        if (kind == RecordKind.OFFLINE_SEGMENT_CONTENT) {
+          return typedValue(OfflineSegmentRpcCodec.content(value.getOfflineSegmentContent()));
+        }
+        break;
+      case OFFLINE_REPLICA_ASSIGNMENT:
+        if (kind == RecordKind.OFFLINE_REPLICA_ASSIGNMENT) {
+          return typedValue(OfflineSegmentRpcCodec.assignment(value.getOfflineReplicaAssignment()));
+        }
+        break;
+      case OFFLINE_INSTALLATION:
+        if (kind == RecordKind.OFFLINE_INSTALLATION) {
+          return typedValue(InstallationRpcCodec.receipt(value.getOfflineInstallation()));
         }
         break;
       default:
         break;
     }
     throw new IllegalArgumentException("Catalog value does not match its declared record kind");
+  }
+
+  private static JsonNode typedValue(Object value)
+      throws IOException {
+    // Parse the serialized representation just like catalog query responses, including integer node widths.
+    return JSON.readTree(JsonUtils.objectToBytes(value));
   }
 
   private static JsonNode object(ByteString bytes)

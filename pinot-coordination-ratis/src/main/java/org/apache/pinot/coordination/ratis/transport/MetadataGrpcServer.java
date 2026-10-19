@@ -48,6 +48,7 @@ import javax.annotation.Nullable;
 import javax.net.ssl.SSLSession;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol;
 import org.apache.pinot.coordination.ratis.rpc.ParticipantMembershipServiceGrpc;
+import org.apache.pinot.coordination.ratis.rpc.ServerInstallationServiceGrpc;
 
 
 /// Mutually authenticated metadata and own-participant endpoint. The certificate trust store authenticates peers;
@@ -59,6 +60,7 @@ public final class MetadataGrpcServer implements AutoCloseable {
   private final MetadataGrpcService _service;
   private final ThreadPoolExecutor _executor;
   private final ThreadPoolExecutor _membershipExecutor;
+  private final ThreadPoolExecutor _installationExecutor;
   private final ThreadPoolExecutor _dispatchExecutor;
   private final ScheduledThreadPoolExecutor _deadlines;
 
@@ -79,13 +81,15 @@ public final class MetadataGrpcServer implements AutoCloseable {
         Executors.defaultThreadFactory(), new ThreadPoolExecutor.AbortPolicy());
     _membershipExecutor = new ThreadPoolExecutor(2, 2, 0, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(16),
         Executors.defaultThreadFactory(), new ThreadPoolExecutor.AbortPolicy());
+    _installationExecutor = new ThreadPoolExecutor(2, 2, 0, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(16),
+        Executors.defaultThreadFactory(), new ThreadPoolExecutor.AbortPolicy());
     // gRPC performs method lookup before callExecutor selection. Keep that short dispatch off both handler pools;
     // its SerializingExecutor switches to the selected pool before starting the application call.
     _dispatchExecutor = new ThreadPoolExecutor(2, 2, 0, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(64),
         Executors.defaultThreadFactory(), new ThreadPoolExecutor.AbortPolicy());
     _deadlines = new ScheduledThreadPoolExecutor(1);
     _deadlines.setRemoveOnCancelPolicy(true);
-    _service = new MetadataGrpcService(access, policy, audit, limits);
+    _service = new MetadataGrpcService(access, policy, participantPolicy, audit, limits);
     Server server = null;
     try {
       NettyServerBuilder builder = NettyServerBuilder.forAddress(address)
@@ -94,8 +98,11 @@ public final class MetadataGrpcServer implements AutoCloseable {
           .executor(_dispatchExecutor).callExecutor(new ServerCallExecutorSupplier() {
             @Override
             public <REQ, RESP> Executor getExecutor(ServerCall<REQ, RESP> call, Metadata headers) {
-              return ParticipantMembershipServiceGrpc.SERVICE_NAME.equals(call.getMethodDescriptor().getServiceName())
-                  ? _membershipExecutor : _executor;
+              String service = call.getMethodDescriptor().getServiceName();
+              if (ParticipantMembershipServiceGrpc.SERVICE_NAME.equals(service)) {
+                return _membershipExecutor;
+              }
+              return ServerInstallationServiceGrpc.SERVICE_NAME.equals(service) ? _installationExecutor : _executor;
             }
           }).maxInboundMessageSize(MetadataProtocol.MAX_COMMAND_BYTES).maxInboundMetadataSize(8192)
           .maxConcurrentCallsPerConnection(limits.maxConcurrentCalls())
@@ -104,6 +111,11 @@ public final class MetadataGrpcServer implements AutoCloseable {
         builder.addService(ServerInterceptors.intercept(
             new MembershipGrpcService(membershipAccess, participantPolicy, audit, limits.maxRpcMillis()),
             new PeerInterceptor(limits.maxRpcMillis(), audit)));
+        if (access instanceof InstallationAccess installationAccess) {
+          builder.addService(ServerInterceptors.intercept(
+              new InstallationGrpcService(access, installationAccess, participantPolicy, audit, limits.maxRpcMillis()),
+              new PeerInterceptor(limits.maxRpcMillis(), audit)));
+        }
       }
       server = builder.build().start();
       _server = server;
@@ -113,6 +125,7 @@ public final class MetadataGrpcServer implements AutoCloseable {
       }
       _executor.shutdownNow();
       _membershipExecutor.shutdownNow();
+      _installationExecutor.shutdownNow();
       _dispatchExecutor.shutdownNow();
       _deadlines.shutdownNow();
       throw e;
@@ -129,6 +142,7 @@ public final class MetadataGrpcServer implements AutoCloseable {
     _service.close();
     _executor.shutdownNow();
     _membershipExecutor.shutdownNow();
+    _installationExecutor.shutdownNow();
     _dispatchExecutor.shutdownNow();
     _deadlines.shutdownNow();
     try {

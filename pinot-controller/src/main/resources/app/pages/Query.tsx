@@ -178,6 +178,7 @@ const queryErrorCodeMap = {
   211: "ServerOutOfCapacity",
   230: "ServerTableMissing",
   235: "ServerSegmentMissing",
+  236: "ServerQueryIdentityMismatch",
   240: "QuerySchedulingTimeoutError",
   245: "ServerResourceLimitExceededError",
   250: "ExecutionTimeoutError",

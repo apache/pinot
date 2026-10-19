@@ -20,7 +20,7 @@
 -->
 # Ratis metadata coordination
 
-This internal, experimental module develops the controller-side metadata and recovery foundation for embedded Apache
+This internal, experimental module develops metadata, recovery and native offline installation for embedded Apache
 Ratis. It targets Java 25, keeps Ratis dependencies outside the Java 11 common/SPI artifacts, and uses Apache Ratis 3.3.1.
 
 The module is not a complete ZooKeeper or Helix replacement. Existing Pinot starters and quickstarts continue to use
@@ -81,6 +81,10 @@ Caller-controlled headers and message fields cannot select an identity. Trusted 
 controller mapping are denied. Requests and responses use a closed typed protobuf vocabulary; JSON is limited to
 existing schema/table domain payloads, preserving exact decimal values and plugin fields.
 
+The protobuf definitions and bounded `MetadataRpcClient` live in `pinot-common`, retaining Java 11 compatibility.
+Workers can use this wire client without depending on Ratis server libraries or the controller metadata model.
+`MetadataGrpcClient` adds model codecs on top of that client; existing wire names and tags are retained.
+
 Snapshot handles retain a coherent image while the client reads bounded pages. Every page, including the final
 handoff, checks the original revision against the current journal floor. Slow clients may need to resnapshot;
 handles do not pin journal history indefinitely. Default limits are 16 handles, 8 MiB and 10,000 records per image,
@@ -90,8 +94,8 @@ operations and a 15-second RPC deadline. Java object overhead is additional to s
 Authorization is checked at admission and before sending the response. Revoking access cannot roll back an admitted
 write: a timeout or denied response can still mean an unknown write outcome. The audit hook records the controller,
 operation and outcome without metadata payloads. This endpoint currently grants trusted controllers full catalog
-authority. Worker projections, delegated public API authorization, peer Raft TLS and live certificate rotation are
-not implemented; this module does not claim production security completeness.
+authority. General worker metadata projections, delegated public API authorization, peer Raft TLS and live certificate
+rotation are not implemented; this module does not claim production security completeness.
 
 `MetadataImage` installs complete snapshots and applies whole change-feed transactions into an immutable local image.
 Invalid histories, scopes, cursors or record identities leave the prior image untouched. Config/cache adapters are
@@ -129,8 +133,10 @@ The optional membership gRPC service derives participant ID, role and query capa
 certificate's current `ParticipantAccessPolicy`. Requests can operate only on that participant; they cannot encode
 control activation, clock ticks, policy changes or generic catalog writes. Two bounded membership workers are separate
 from the four catalog workers, with separate Raft-client admission capacity so catalog requests with unknown outcomes
-cannot consume the membership slots. Admission and reply authorization checks also apply to membership calls. This is an
-internal identity policy interface; production credential issuance and rotation remain unimplemented.
+cannot consume the membership slots. Admission and reply authorization checks also apply to membership calls.
+Handler isolation does not reserve HTTP/2 streams: normal-role wiring must use a dedicated membership connection
+to prevent bulk requests on a shared connection from exhausting connection-level admission. Production credential
+issuance and rotation remain unimplemented.
 
 Read-only serving permits are separate from membership and never authorize ingestion, ownership or publication.
 A permit includes the revision of its committed renewal, so a worker must apply that revision before admission.
@@ -164,10 +170,124 @@ each claim increases its attempt number. Checkpoint and completion require that 
 version. Completion checks the captured dependency versions before atomically publishing permitted table changes
 and a terminal result. Cancellation fences late publication; it does not undo external work already performed.
 
-The ledger is the durable orchestration foundation, not a physical reload implementation. These commands currently
-use the trusted embedded controller API. Authenticated controller command bindings, automatic owner assignment,
-bounded per-table reconcilers and the normal controller/server reload path remain required before P05 is complete.
-No new operation is exposed as a successful normal Pinot API action by this module alone.
+The metadata RPC exposes typed operation commands only when the same TLS certificate has current controller client
+and controller participant grants. The server derives the owner participant identity from that grant and rechecks
+both grants before returning a result. An existing configuration client does not automatically gain operation access.
+Ownership assignment remains a trusted embedded coordinator command. Snapshots and deltas expose typed ownership,
+operation, content, assignment and installation receipt values; generic config transactions cannot write these families.
+
+Native submission resolves every target against published content and current desired assignments, then captures
+the exact content, assignment, table and schema versions. Callers cannot supply the captured dependencies. Claims
+must retain them, and progress checks revalidate the target identities. A separate native command tag preserves
+replay of earlier ledger-only commands; those old operations cannot acquire native execution rights. Native success
+uses `CompleteInstalled`, which revalidates the current owner, attempt, dependencies and assignments, then records
+the exact committed receipt versions for every target. Controller-supplied completion counters cannot declare success.
+
+The SERVER installation RPC derives identity from `ParticipantAccessPolicy` and validates the exact live registration
+against committed state. It exposes only that server's work for a supplied operation ID, receipt reporting and its own durable
+request registration, acknowledgement and outcome lookup. Its request namespace includes the complete SERVER session;
+normal metadata clients cannot use it. Authorization is rechecked before replies. Two separate installation workers
+accept requests up to 64 KiB and responses up to 2 MiB without occupying membership workers. A lost report response
+requires resolving or retrying the same request identity; it does not undo installation or imply completion.
+
+`Snapshot` provides a complete own-session metadata projection after a committed read barrier, including before
+readiness. It captures current participant/control state, cluster configuration, assignments targeting that exact
+registration (including released assignments), their content and referenced table/schema records, plus IDs
+of nonterminal assigned operations targeting that registration. Other targets, operation payloads and receipts are
+omitted. Referenced config tombstones remain keyed by object identity after name recreation; they do not block
+unrelated tables. A server advances `applied_revision` only after applying the entire projection; a work lookup's
+revision does not certify metadata hydration. Requests bound the combined record/operation count to at most 4096
+and the response to 1 KiB–2 MiB. Oversized images return `RESPONSE_TOO_LARGE` without a partial image. Capture scans
+the current catalog; paged, indexed distribution for larger clusters remains future work. This projection creates
+no serving or query authority and does not change disk snapshot formats.
+
+## Offline content and loading inputs
+
+Owner-fenced publication creates an immutable manifest with an unreused segment object ID, table incarnation,
+SHA-256 content digest, download URI and native loader attributes. It does not verify external bytes during apply.
+This initial publication protocol cannot overwrite an existing name in the same table incarnation; replacement,
+retirement and physical reclamation need their own protocols.
+
+Desired replica assignments bind that manifest to a complete server registration and exact table/schema versions.
+Each reassignment or release advances an epoch and derives a new materialization ID. ONLINE assignment requires a
+ready, live server. A current controller owner can release an old assignment after server or table replacement.
+Desired ONLINE state is not an observation of installed or serving data.
+
+`RatisOfflineTableMetadata` adapts one coherent committed image to the shared native offline loader input contract.
+It rejects changed server/table incarnations and stale assignment compatibility. Config and schema objects are
+detached from the published image. The ordinary offline table manager has an explicit metadata-based initializer;
+the existing Helix initializer and provider values are preserved. Native initialization currently rejects realtime,
+upsert, dimension tables, custom table-manager extensions and peer downloading until their adapters are implemented. The native
+loading pipeline still uses a leaf `SegmentZKMetadata` value at its existing loader boundary; it creates no Helix
+manager or property store. Loading inputs alone do not authorize installation or query serving.
+
+`NativeInstanceDataManager` shares the table registry, lifecycle locks and executors with the default Helix instance
+manager. It creates ordinary offline table managers and exposes conditional actions, rejecting legacy unfenced
+mutations. A stable directory lock prevents two native instances from sharing installation paths; shutdown retains
+that lock until in-flight actions drain. The injected `ServerInstance` construction path accepts this initialized
+manager and access control without initializing Helix. It does not start query resources or grant query readiness.
+
+`NativeServerParticipant` owns a real server registration and its independent membership connection, periodically
+hydrates the complete own-session projection, and discovers durable operation IDs without relying on local wake-ups.
+Its bounded workers use `NativeOfflineSegmentWorker` from `pinot-common`; server runtime code has no dependency on
+Ratis consensus/model classes. Work is validated before creating a table manager. Cluster callbacks retain their
+last successful delivery so failed updates, including removed keys, can be retried without advancing applied metadata.
+The server rejects query-serving capability grants until query admission is integrated.
+
+`InstallationOutbox` persists the exact SERVER session, request incarnation, sequence, report and outcome under the
+exclusive native data-directory lock. Unknown outcomes reuse the same request; a result is fsynced before its
+acknowledgement. Recovery runs independently of operation discovery, so a completed operation disappearing from a
+snapshot cannot strand the report stream. Old-session files are retained as evidence, never replayed under a new
+session. Evidence is bounded to 128 files of at most 256 KiB each; saturation requires explicit archival. Startup and
+shutdown serialize; shutdown drains local actions and outbox leases before releasing directory ownership, then
+retires the confirmed registration. Normal starter configuration, query admission and general table lifecycle remain
+unimplemented; this runtime does not make the replacement complete or alter Helix defaults.
+
+`RatisOfflineSegmentExecutor` connects fresh own-target work to the native `LOAD`, `RELOAD` or `RECONCILE` action and receipt publisher.
+The installer verifies the downloaded SHA-256 and segment CRC, runs Pinot's existing preprocessing, and opens the
+segment at its permanent materialization path. It fsyncs the files and checksummed manifest, atomically publishes the
+selection manifest, then registers the segment with the table manager. Older directories remain stable for held readers;
+their reclamation is deferred. Exact replay verifies the selected manifest and files and reuses its installation ID,
+including after table-worker restart within the same SERVER session. A missing reload target returns `ABSENT` rather
+than creating a segment. New process registrations require new assignment authority.
+
+Explicit `RECONCILE` can restore an absent segment or replace the selected installation using an expected local
+installation ID. With matching content and table/schema versions, it verifies the old manifest and exact file
+inventory, copies those prepared bytes into a new permanent directory, and verifies the copy. Otherwise it downloads
+and preprocesses the authoritative content. A new operation or server registration receives a fresh installation ID,
+manifest and receipt; old receipts never authorize the new session. Only exact replay of that new operation reuses
+its installation ID. Forced download bypasses local-byte reuse. Ordinary `LOAD` and `RELOAD` semantics are unchanged.
+
+Publication refreshes work and checks local authority and the expected prior installation under the segment lock;
+consensus revalidates the receipt against later global changes. Neither local installation nor a committed receipt
+grants query-serving rights. This path currently supports ordinary OFFLINE tables with the default local segment
+directory loader, without tiers, peer download, upsert or dimension tables. Normal-role starters, controller REST
+actions, controller work scheduling, routing publication and complete query-serving fences remain absent. This is an internal execution
+path, not a complete controller/server reload integration or a supported Helix/ZooKeeper replacement.
+
+## Query identity and pinned content
+
+The normal Thrift `InstanceRequest` (optional field 9) and gRPC `ServerRequest` (optional field 7) carry the same
+versioned native query identity. `NativeQueryContext` normalizes history, broker and target-server registrations,
+query/attempt UUIDs, exact table/schema versions and per-segment content, digest, assignment and materialization
+identities. It bounds the context to 4096 segments and 2 MiB, rejects malformed identities and requires exact,
+duplicate-free agreement with the legacy required/optional name lists. Requests without the context retain their
+existing Helix behavior. Version 1 covers one ordinary OFFLINE table and grants no serving permission or deadline.
+
+Native publication binds the installation identity and detached normalized schema to the exact reference-counted
+segment manager. `SingleTableExecutionInfo` pins those handles before checking identities, retains their schema
+with Pinot's built-in virtual columns, and releases all acquired handles if validation fails. Replacing a name or
+refreshing the table cache cannot change a pinned reader's inputs. Wrong generations return structured query error
+236 (`ServerQueryIdentityMismatch`). Missing required content returns `ServerSegmentMissing`; it cannot be hidden
+by a recent-deletion hint or `ignoreMissingSegments`. Missing optional content remains optional, but present optional
+content must match. Logical-table acquisition also releases earlier handles when a later table fails validation.
+
+Native names-only, realtime and logical queries remain rejected. A native request with no acquired content cannot
+yet obtain a version-checked schema-only catalog snapshot and is rejected instead of returning an empty scan.
+Normal broker production, pinned routing images, feature-level negotiation, authenticated process admission,
+qualified-clock permits, immutable end-to-end deadlines, response-delivery fencing and whole-query retry/drain
+remain unimplemented. MSE/time-series and other unsupported paths cannot silently drop the context. Native
+`ServerInstance` query resources remain disabled until those gates are implemented and tested together.
 
 ## Voter configuration and validation
 
@@ -183,7 +303,15 @@ Build the module and its dependencies from the repository root:
 
 ```bash
 ./mvnw -pl pinot-coordination-ratis -am \
-  '-Dtest=MetadataCatalogTest,MetadataChangeFeedTest,MembershipStateTest,ControllerCoordinationTest,RatisMetadataStoreTest,RatisReadSafetyTest,RatisMembershipClockTest,ServingPermitGuardTest,MetadataGrpcTransportTest' \
+  '-Dtest=MetadataCatalogTest,MetadataChangeFeedTest,MembershipStateTest,ControllerCoordinationTest,OfflineInstallationTest,RatisMetadataStoreTest,RatisReadSafetyTest,RatisMembershipClockTest,ServingPermitGuardTest,MetadataGrpcTransportTest' \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+```
+
+Validate the shared worker and native server lifecycle, including existing Helix lifecycle coverage:
+
+```bash
+./mvnw -pl pinot-server -am \
+  '-Dtest=NativeOfflineSegmentWorkerTest,NativeServerMetadataTest,NativeServerParticipantTest,InstallationOutboxTest,NativeInstanceDataManagerTest,HelixInstanceDataManagerConfigTest,HelixInstanceDataManagerTest,HelixInstanceDataManagerLifecycleTest' \
   -Dsurefire.failIfNoSpecifiedTests=false test
 ```
 
