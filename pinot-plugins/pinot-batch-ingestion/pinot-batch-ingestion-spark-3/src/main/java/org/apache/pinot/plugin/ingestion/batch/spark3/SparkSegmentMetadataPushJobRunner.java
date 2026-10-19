@@ -306,7 +306,6 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
   ///                                tarPaths (values), or both may be used depending on upload mode.
   public List<String> getSegmentsToReplace(Map<String, String> segmentsUriToTarPathMap) {
     Collection<String> tarFilePaths = segmentsUriToTarPathMap.values();
-    SegmentPushUtils.validateUniqueSegmentNames(tarFilePaths);
     List<String> segmentNames = new ArrayList<>(tarFilePaths.size());
     for (String tarFilePath : tarFilePaths) {
       segmentNames.add(SegmentPushUtils.getSegmentNameFromTarFile(tarFilePath));

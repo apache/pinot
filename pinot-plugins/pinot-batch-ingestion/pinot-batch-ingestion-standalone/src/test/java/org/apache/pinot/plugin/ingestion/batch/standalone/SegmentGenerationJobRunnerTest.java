@@ -22,6 +22,7 @@ import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -45,9 +46,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.Schema.SchemaBuilder;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.data.readers.RecordReaderUtils;
-import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
-import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.batch.spec.ExecutionFrameworkSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
@@ -86,9 +85,12 @@ public class SegmentGenerationJobRunnerTest {
       File outputDir = new File(testDir, "output");
       SegmentGenerationJobSpec spec = makeJobSpec(inputDir, outputDir, makeSchemaFile(testDir, "mySchema"),
           makeTableConfigFile(testDir, "mySchema"));
-      spec.getPinotFSSpecs().get(0).setClassName(TrackingLocalPinotFS.class.getName());
+      spec.setPinotFSSpecs(List.of());
       SegmentGenerationJobRunner runner = new SegmentGenerationJobRunner(spec);
-      TrackingLocalPinotFS fileSystem = TrackingLocalPinotFS._instance;
+      TrackingLocalPinotFS fileSystem = new TrackingLocalPinotFS();
+      Field inputDirFS = SegmentGenerationJobRunner.class.getDeclaredField("_inputDirFS");
+      inputDirFS.setAccessible(true);
+      inputDirFS.set(runner, fileSystem);
       if (failGeneration) {
         RuntimeException failure = expectThrows(RuntimeException.class, runner::run);
         assertTrue(failure.getMessage().contains("Failed to generate Pinot segment"));
@@ -101,7 +103,6 @@ public class SegmentGenerationJobRunnerTest {
       assertTrue(fileSystem._copiedInputs.isEmpty(), "Local inputs must be borrowed without copying");
       assertEquals(Files.readAllBytes(inputFile.toPath()), originalBytes);
     } finally {
-      PinotFSFactory.register("file", LocalPinotFS.class.getName(), new PinotConfiguration());
       FileUtils.deleteDirectory(testDir);
     }
   }
@@ -366,15 +367,8 @@ public class SegmentGenerationJobRunnerTest {
   }
 
   /// Records copies to verify that plain local inputs are borrowed.
-  public static class TrackingLocalPinotFS extends LocalPinotFS {
-    private static TrackingLocalPinotFS _instance;
+  private static class TrackingLocalPinotFS extends LocalPinotFS {
     private final List<File> _copiedInputs = new ArrayList<>();
-
-    @Override
-    public void init(PinotConfiguration config) {
-      super.init(config);
-      _instance = this;
-    }
 
     @Override
     public void copyToLocalFile(URI source, File destination)

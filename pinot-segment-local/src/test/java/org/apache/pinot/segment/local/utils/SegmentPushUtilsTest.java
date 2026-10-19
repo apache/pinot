@@ -85,7 +85,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -605,8 +604,8 @@ public class SegmentPushUtilsTest {
     String[] segmentFiles = new String[]{
         outputDirURI.resolve("segment.tar.gz").toString(),
         outputDirURI.resolve("stats_202201.tar.gz").toString(),
-        outputDirURI.resolve("/2022/segment_2022.tar.gz").toString(),
-        outputDirURI.resolve("/2022/stats_202202.tar.gz").toString()
+        outputDirURI.resolve("/2022/segment.tar.gz").toString(),
+        outputDirURI.resolve("/2022/stats_202201.tar.gz").toString()
     };
 
     PushJobSpec pushSpec = new PushJobSpec();
@@ -651,23 +650,6 @@ public class SegmentPushUtilsTest {
         () -> SegmentPushUtils.getSegmentNameFromTarFile("testSegment.metadata.tar.gz"));
     assertThrows(IllegalArgumentException.class,
         () -> SegmentPushUtils.getSegmentNameFromTarFile("testSegment.tar.bz2"));
-  }
-
-  @Test
-  public void testCodecSwitchRejectsDuplicateSegmentsBeforeUpload() {
-    String gzip = _tempDir.toURI().resolve(TEST_SEGMENT_NAME + ".tar.gz").toString();
-    String zstd = _tempDir.toURI().resolve(TEST_SEGMENT_NAME + ".tar.zst").toString();
-    List<String> archives = List.of(gzip, zstd);
-    PushJobSpec pushSpec = new PushJobSpec();
-    assertThrows(IllegalArgumentException.class,
-        () -> SegmentPushUtils.getSegmentUriToTarPathMap(_tempDir.toURI(), pushSpec, archives.toArray(new String[0])));
-    pushSpec.setPushFileNamePattern("glob:**/*.tar.zst");
-    assertEquals(SegmentPushUtils.getSegmentUriToTarPathMap(_tempDir.toURI(), pushSpec,
-        archives.toArray(new String[0])), Map.of(zstd, zstd));
-    PinotFS fileSystem = mock(PinotFS.class);
-    SegmentGenerationJobSpec spec = createSegmentGenerationJobSpec(URI.create("https://localhost:1"), null);
-    assertThrows(IllegalArgumentException.class, () -> SegmentPushUtils.pushSegments(spec, fileSystem, archives));
-    verifyNoInteractions(fileSystem);
   }
 
   @Test
