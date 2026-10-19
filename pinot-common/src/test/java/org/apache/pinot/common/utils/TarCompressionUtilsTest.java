@@ -24,8 +24,10 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.compressors.CompressorException;
@@ -90,6 +92,25 @@ public class TarCompressionUtilsTest {
     untarredFile = new File(UNTAR_DIR, "untarred");
     TarCompressionUtils.untarOneFile(compressedTarFile, fileName, untarredFile);
     assertEquals(FileUtils.readFileToString(untarredFile, StandardCharsets.UTF_8), fileContent);
+  }
+
+  @Test
+  public void testLz4MultipleBlocks()
+      throws IOException {
+    byte[] content = new byte[5 * 1024 * 1024];
+    new Random(0).nextBytes(content);
+    Arrays.fill(content, 1024 * 1024, 3 * 1024 * 1024, (byte) 42);
+    File inputFile = new File(DATA_DIR, "data");
+    Files.write(inputFile.toPath(), content);
+    File archive = new File(TAR_DIR, "data" + TarCompressionUtils.TAR_LZ4_FILE_EXTENSION);
+    TarCompressionUtils.createCompressedTarFile(inputFile, archive);
+
+    List<File> extractedFiles = TarCompressionUtils.untar(archive, UNTAR_DIR);
+    assertEquals(extractedFiles.size(), 1);
+    assertEquals(Files.readAllBytes(extractedFiles.get(0).toPath()), content);
+    File extractedFile = new File(UNTAR_DIR, "single");
+    TarCompressionUtils.untarOneFile(archive, inputFile.getName(), extractedFile);
+    assertEquals(Files.readAllBytes(extractedFile.toPath()), content);
   }
 
   @Test

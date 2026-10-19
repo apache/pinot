@@ -32,6 +32,9 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import net.jpountz.lz4.LZ4FrameOutputStream;
+import net.jpountz.lz4.LZ4FrameOutputStream.BLOCKSIZE;
+import net.jpountz.lz4.LZ4FrameOutputStream.FLG.Bits;
 import org.apache.commons.compress.archivers.ArchiveEntry;
 import org.apache.commons.compress.archivers.ArchiveInputStream;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
@@ -123,8 +126,10 @@ public class TarCompressionUtils {
       throws IOException {
     try (OutputStream fileOut = Files.newOutputStream(outputFile.toPath());
         BufferedOutputStream bufferedOut = new BufferedOutputStream(fileOut);
-        OutputStream compressorOut = COMPRESSOR_STREAM_FACTORY.createCompressorOutputStream(compressorName,
-            bufferedOut); TarArchiveOutputStream tarOut = new TarArchiveOutputStream(compressorOut)) {
+        OutputStream compressorOut = CompressorStreamFactory.LZ4_FRAMED.equalsIgnoreCase(compressorName)
+            ? new LZ4FrameOutputStream(bufferedOut, BLOCKSIZE.SIZE_4MB, Bits.BLOCK_INDEPENDENCE, Bits.CONTENT_CHECKSUM)
+            : COMPRESSOR_STREAM_FACTORY.createCompressorOutputStream(compressorName, bufferedOut);
+        TarArchiveOutputStream tarOut = new TarArchiveOutputStream(compressorOut)) {
       tarOut.setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_STAR);
       tarOut.setLongFileMode(TarArchiveOutputStream.LONGFILE_GNU);
 
@@ -230,7 +235,9 @@ public class TarCompressionUtils {
             if (maxStreamRateInByte != NO_DISK_WRITE_RATE_LIMIT) {
               copyWithRateLimiter(tarIn, out, maxStreamRateInByte);
             } else {
-              IOUtils.copy(tarIn, out);
+              try (OutputStream bufferedOut = new BufferedOutputStream(out)) {
+                IOUtils.copy(tarIn, bufferedOut);
+              }
             }
           }
         }
@@ -255,7 +262,7 @@ public class TarCompressionUtils {
           String entryName = entry.getName();
           String[] parts = StringUtils.split(entryName, ENTRY_NAME_SEPARATOR);
           if (parts.length > 0 && parts[parts.length - 1].equals(fileName)) {
-            try (OutputStream out = Files.newOutputStream(outputFile.toPath())) {
+            try (OutputStream out = new BufferedOutputStream(Files.newOutputStream(outputFile.toPath()))) {
               IOUtils.copy(tarIn, out);
             }
             return;
