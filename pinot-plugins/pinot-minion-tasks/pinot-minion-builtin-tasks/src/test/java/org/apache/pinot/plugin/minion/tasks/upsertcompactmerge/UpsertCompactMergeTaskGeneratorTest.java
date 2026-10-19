@@ -318,16 +318,6 @@ public class UpsertCompactMergeTaskGeneratorTest {
     Assert.assertEquals(_taskGenerator.getMaxZKCreationTimeMillis(segmentMergerMetadataList), creationTime2);
   }
 
-  /// Tests the generateTasks method with various scenarios.
-  /// This test is disabled because it requires complex mocking of server segment metadata reader.
-  /// The actual integration test covers this scenario.
-  @Test(enabled = false)
-  public void testGenerateTasks()
-      throws Exception {
-    // This test would require extensive mocking of ServerSegmentMetadataReader
-    // which is better covered in the integration test
-  }
-
   /// Tests task generation with incomplete tasks present.
   @Test
   public void testGenerateTasksWithIncompleteTasks() {
