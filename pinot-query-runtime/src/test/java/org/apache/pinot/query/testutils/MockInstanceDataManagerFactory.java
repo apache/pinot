@@ -72,7 +72,8 @@ public class MockInstanceDataManagerFactory {
   private final String _serverName;
 
   public MockInstanceDataManagerFactory(String serverName) {
-    _serverName = serverName;
+    // Parallel tests can use the same logical server name without sharing their segment directories.
+    _serverName = serverName + "_" + UUID.randomUUID();
     _serverTableDataDirMap = new HashMap<>();
     _tableSegmentMap = new HashMap<>();
     _tableSegmentNameMap = new HashMap<>();
