@@ -295,6 +295,81 @@ public class SegmentPartitionMetadataManagerTest extends ControllerTest {
     assertEquals(tablePartitionReplicatedServersInfo.getSegmentsWithInvalidPartition().get(0), segmentInvalid);
   }
 
+  /// A new segment is deferred only while its replicas are still coming up. One that is already online on every server
+  /// the ideal state assigns, but on other servers than the rest of its partition, will never cover them: deferring it
+  /// made a partition-hinted query silently skip its rows until it stopped being new. It must instead count like an
+  /// old segment, so the partition reports that no server holds all of it.
+  @Test
+  public void testFullyOnlineNewSegmentOnOtherServersIsNotDeferred() {
+    ExternalView externalView = new ExternalView(OFFLINE_TABLE_NAME);
+    Map<String, Map<String, String>> segmentAssignment = externalView.getRecord().getMapFields();
+    IdealState idealState = new IdealState(OFFLINE_TABLE_NAME);
+    Map<String, Map<String, String>> idealAssignment = idealState.getRecord().getMapFields();
+    Set<String> onlineSegments = new HashSet<>();
+
+    SegmentPartitionMetadataManager partitionMetadataManager =
+        new SegmentPartitionMetadataManager(OFFLINE_TABLE_NAME, PARTITION_COLUMN, PARTITION_COLUMN_FUNC, NUM_PARTITIONS,
+            TimeUnit.MINUTES.toMillis(5));
+    SegmentZkMetadataFetcher segmentZkMetadataFetcher =
+        new SegmentZkMetadataFetcher(OFFLINE_TABLE_NAME, _propertyStore);
+    segmentZkMetadataFetcher.register(partitionMetadataManager);
+    segmentZkMetadataFetcher.init(idealState, externalView, onlineSegments);
+
+    // An old segment of partition 0 on server0.
+    String oldSegment = "oldSegment";
+    onlineSegments.add(oldSegment);
+    idealAssignment.put(oldSegment, Map.of(SERVER_0, ONLINE));
+    segmentAssignment.put(oldSegment, Map.of(SERVER_0, ONLINE));
+    setSegmentZKMetadata(oldSegment, PARTITION_COLUMN_FUNC, NUM_PARTITIONS, 0, 0L);
+
+    // A new segment of partition 0 still coming up: assigned to server0 and server1, online on server1 only.
+    String comingUp = "comingUpSegment";
+    onlineSegments.add(comingUp);
+    idealAssignment.put(comingUp, Map.of(SERVER_0, ONLINE, SERVER_1, ONLINE));
+    segmentAssignment.put(comingUp, Map.of(SERVER_1, ONLINE));
+    setSegmentZKMetadata(comingUp, PARTITION_COLUMN_FUNC, NUM_PARTITIONS, 0, System.currentTimeMillis());
+    segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, onlineSegments);
+
+    TablePartitionReplicatedServersInfo.PartitionInfo[] partitionInfoMap =
+        partitionMetadataManager.getTablePartitionReplicatedServersInfo().getPartitionInfoMap();
+    assertEquals(partitionInfoMap[0]._segments, List.of(oldSegment), "a segment still coming up stays deferred");
+    assertEquals(partitionInfoMap[0]._fullyReplicatedServers, Set.of(SERVER_0));
+
+    // A new segment of partition 0 fully online, but only on server1 -- the default spread of a table without
+    // partition-aware placement.
+    String placedElsewhere = "placedElsewhereSegment";
+    onlineSegments.add(placedElsewhere);
+    idealAssignment.put(placedElsewhere, Map.of(SERVER_1, ONLINE));
+    segmentAssignment.put(placedElsewhere, Map.of(SERVER_1, ONLINE));
+    setSegmentZKMetadata(placedElsewhere, PARTITION_COLUMN_FUNC, NUM_PARTITIONS, 0, System.currentTimeMillis());
+    segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, onlineSegments);
+
+    partitionInfoMap = partitionMetadataManager.getTablePartitionReplicatedServersInfo().getPartitionInfoMap();
+    assertEqualsNoOrder(partitionInfoMap[0]._segments.toArray(), new String[]{oldSegment, placedElsewhere});
+    assertTrue(partitionInfoMap[0]._fullyReplicatedServers.isEmpty(),
+        "no server holds every segment of the partition, and the info must say so rather than hide a segment");
+
+    // A new segment of partition 1 mid-reassignment: the ideal state moved it to server0 and server1, while the
+    // external view still lists the server it is leaving next to server1. Two online servers match the two assigned,
+    // yet assigned server0 is still down, so the segment is still coming up and must stay deferred.
+    String oldSegment1 = "oldSegment1";
+    onlineSegments.add(oldSegment1);
+    idealAssignment.put(oldSegment1, Map.of(SERVER_0, ONLINE, SERVER_1, ONLINE));
+    segmentAssignment.put(oldSegment1, Map.of(SERVER_0, ONLINE, SERVER_1, ONLINE));
+    setSegmentZKMetadata(oldSegment1, PARTITION_COLUMN_FUNC, NUM_PARTITIONS, 1, 0L);
+    String midReassignment = "midReassignmentSegment";
+    onlineSegments.add(midReassignment);
+    idealAssignment.put(midReassignment, Map.of(SERVER_0, ONLINE, SERVER_1, ONLINE));
+    segmentAssignment.put(midReassignment, Map.of(SERVER_1, ONLINE, "leavingServer", ONLINE));
+    setSegmentZKMetadata(midReassignment, PARTITION_COLUMN_FUNC, NUM_PARTITIONS, 1, System.currentTimeMillis());
+    segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, onlineSegments);
+
+    partitionInfoMap = partitionMetadataManager.getTablePartitionReplicatedServersInfo().getPartitionInfoMap();
+    assertEquals(partitionInfoMap[1]._segments, List.of(oldSegment1),
+        "an assigned replica is still down, so the segment is not ready even though the replica counts match");
+    assertEquals(partitionInfoMap[1]._fullyReplicatedServers, Set.of(SERVER_0, SERVER_1));
+  }
+
   /// A partition whose only segments are new ones without all replicas available holds data that no single server can
   /// serve as a whole, so it must be told apart from a genuinely empty partition (see
   /// [TablePartitionReplicatedServersInfo#getPartitionsWithOnlyDeferredSegments()]).
