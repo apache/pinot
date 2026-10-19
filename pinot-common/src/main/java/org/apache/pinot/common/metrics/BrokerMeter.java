@@ -244,6 +244,10 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   ///
   /// For each query with at least one join, this meter is increased as many times as joins in the query.
   public static final BrokerMeter JOIN_COUNT = create("JOIN_COUNT", "queries", true);
+  /// How many times the multi-stage planner made a stage feed one more consumer stage (a spool).
+  public static final BrokerMeter SPOOLS_APPLIED = create("SPOOLS_APPLIED", "spools", true);
+  /// How many spools the multi-stage planner refused because the shared stage could block the query.
+  public static final BrokerMeter SPOOLS_REJECTED_BY_GUARD = create("SPOOLS_REJECTED_BY_GUARD", "spools", true);
   /// How many queries with window functions have been executed.
   ///
   /// For each query with at least one window function, this meter is increased exactly once.

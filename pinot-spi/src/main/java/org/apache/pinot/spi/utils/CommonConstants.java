@@ -648,10 +648,16 @@ public class CommonConstants {
     public static final String CONFIG_OF_INFER_PARTITION_HINT = "pinot.broker.multistage.infer.partition.hint";
     public static final boolean DEFAULT_INFER_PARTITION_HINT = false;
 
-    /// Whether to use spools in multistage query engine by default.
+    /// The default spool mode of the multistage query engine: `off`, `auto` or `on`. `false` and `true` are accepted
+    /// as aliases of `off` and `on`.
+    ///
+    /// - `off` never shares a stage between consumers.
+    /// - `auto` shares a stage only when the planner can prove that the sharing cannot block the query.
+    /// - `on` shares every equivalent stage that the planner supports, without that safety check.
+    ///
     /// This value can always be overridden by [Request.QueryOptionKey#USE_SPOOLS] query option
     public static final String CONFIG_OF_SPOOLS = "pinot.broker.multistage.spools";
-    public static final boolean DEFAULT_OF_SPOOLS = false;
+    public static final String DEFAULT_SPOOLS_MODE = "auto";
 
     /// Whether the multistage query engine prunes unused input (passthrough) columns - notably the unnested source
     /// array - from the UNNEST output by default. This value can always be overridden by the
@@ -1002,7 +1008,12 @@ public class CommonConstants {
         public static final String INFER_PARTITION_HINT = "inferPartitionHint";
         public static final String ENABLE_NULL_HANDLING = "enableNullHandling";
         public static final String APPLICATION_NAME = "applicationName";
+        /// The spool mode for the query: `off`, `auto` or `on` (`false` and `true` are aliases of `off` and `on`).
+        /// See [Broker#CONFIG_OF_SPOOLS].
         public static final String USE_SPOOLS = "useSpools";
+        /// When true, the broker response carries a `spools` entry in `responseMetadata` that lists each spool the
+        /// planner considered and whether it applied it.
+        public static final String SPOOLS_FEEDBACK = "spoolsFeedback";
         public static final String USE_PHYSICAL_OPTIMIZER = "usePhysicalOptimizer";
         // When true, the multi-stage planner prunes input (passthrough) columns - notably the unnested source array -
         // from the UNNEST output when they are not referenced downstream, avoiding copying them into every exploded

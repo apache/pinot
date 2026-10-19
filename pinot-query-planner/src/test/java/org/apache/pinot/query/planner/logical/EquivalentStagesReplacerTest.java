@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.planner.logical;
 
+import java.util.List;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.testng.annotations.Test;
 
@@ -91,7 +92,9 @@ public class EquivalentStagesReplacerTest extends StagesTestBase {
     assertEquals(groupedStages.toString(), "[[0], [1], [2, 3]]");
 
     MailboxSendNode rootStage = stage(0);
-    EquivalentStagesReplacer.replaceEquivalentStages(rootStage, groupedStages);
+    List<SpoolSubstitution> substitutions = EquivalentStagesReplacer.replaceEquivalentStages(rootStage,
+        groupedStages, EquivalentStagesReplacer.OnSubstitution.NO_OP, false);
+    assertEquals(substitutions.toString(), "[stage 1: 3 -> 2 REJECTED_SAME_RECEIVER_STAGE]");
 
     cleanup();
     MailboxSendNode expected = when(// stage 0
@@ -99,6 +102,95 @@ public class EquivalentStagesReplacerTest extends StagesTestBase {
             join(
                 exchange(2, tableScan("T1")),
                 exchange(3, tableScan("T1"))
+            )
+        )
+    );
+    assertEqualPlan(rootStage, expected);
+  }
+
+  /// Same plan as [#test()]. Stage 1 reads stage 2 (the probe input) only after stage 5 finishes, and both depend on
+  /// the scan of T1, so the guard refuses to share it.
+  @Test
+  void guardRejectsSpoolThatCanBlock() {
+    when(// stage 0
+        exchange(1,
+            join(
+                exchange(2,
+                    join(
+                        exchange(3, tableScan("T1")),
+                        exchange(4, tableScan("T2"))
+                    )
+                ),
+                exchange(5,
+                    join(
+                        exchange(6, tableScan("T1")),
+                        exchange(7, tableScan("T3"))
+                    )
+                )
+            )
+        )
+    );
+    GroupedStages groupedStages = EquivalentStagesFinder.findEquivalentStages(stage(0));
+    MailboxSendNode rootStage = stage(0);
+    List<SpoolSubstitution> substitutions = EquivalentStagesReplacer.replaceEquivalentStages(rootStage,
+        groupedStages, EquivalentStagesReplacer.OnSubstitution.NO_OP, true);
+    assertEquals(substitutions.size(), 1);
+    SpoolSubstitution substitution = substitutions.get(0);
+    assertEquals(substitution.getOutcome(), SpoolSubstitution.Outcome.REJECTED_BY_GUARD);
+    assertEquals(substitution.getReceiverStageId(), 5);
+    assertEquals(substitution.getReplacedStageId(), 6);
+    assertEquals(substitution.getLeaderStageId(), 3);
+    assertEquals(substitution.getReason(), "In stage 1, JOIN reads the input from stage 2 only after the input from "
+        + "stage 5 finishes, and both depend on stage 3");
+
+    cleanup();
+    MailboxSendNode expected = when(// stage 0
+        exchange(1,
+            join(
+                exchange(2,
+                    join(
+                        exchange(3, tableScan("T1")),
+                        exchange(4, tableScan("T2"))
+                    )
+                ),
+                exchange(5,
+                    join(
+                        exchange(6, tableScan("T1")),
+                        exchange(7, tableScan("T3"))
+                    )
+                )
+            )
+        )
+    );
+    assertEqualPlan(rootStage, expected);
+  }
+
+  /// Each consumer of the scan aggregates it, so the aggregates read the whole scan before the join of stage 1 waits.
+  @Test
+  void guardAcceptsSpoolWhenAggregatesReadItFirst() {
+    when(// stage 0
+        exchange(1,
+            join(
+                exchange(2, aggregate(exchange(3, tableScan("T1")), List.of())),
+                exchange(4, aggregate(exchange(5, tableScan("T1")), List.of(List.of(0))))
+            )
+        )
+    );
+    GroupedStages groupedStages = EquivalentStagesFinder.findEquivalentStages(stage(0));
+    assertEquals(groupedStages.toString(), "[[0], [1], [2], [3, 5], [4]]");
+
+    MailboxSendNode rootStage = stage(0);
+    List<SpoolSubstitution> substitutions = EquivalentStagesReplacer.replaceEquivalentStages(rootStage,
+        groupedStages, EquivalentStagesReplacer.OnSubstitution.NO_OP, true);
+    assertEquals(substitutions.toString(), "[stage 4: 5 -> 3 APPLIED]");
+
+    cleanup();
+    SpoolBuilder readT1 = new SpoolBuilder(3, tableScan("T1"));
+    MailboxSendNode expected = when(// stage 0
+        exchange(1,
+            join(
+                exchange(2, aggregate(readT1.newReceiver(), List.of())),
+                exchange(4, aggregate(readT1.newReceiver(), List.of(List.of(0))))
             )
         )
     );
