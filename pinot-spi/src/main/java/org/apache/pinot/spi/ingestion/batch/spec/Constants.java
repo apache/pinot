@@ -26,11 +26,19 @@ public class Constants {
 
   /// By default Pinot segments are compressed in 'tar.gz' format then pushed to controller.
   public static final String TAR_GZ_FILE_EXT = ".tar.gz";
+  public static final String TAR_LZ4_FILE_EXT = ".tar.lz4";
+  public static final String TAR_ZST_FILE_EXT = ".tar.zst";
   public static final String METADATA_TAR_GZ_FILE_EXT = ".metadata.tar.gz";
+
+  public static final String SEGMENT_COMPRESSION_CODEC_GZIP = "gzip";
+  public static final String SEGMENT_COMPRESSION_CODEC_LZ4 = "lz4";
+  public static final String SEGMENT_COMPRESSION_CODEC_ZSTD = "zstd";
+  public static final String DEFAULT_SEGMENT_COMPRESSION_CODEC = SEGMENT_COMPRESSION_CODEC_GZIP;
 
   /// Archive extensions understood by segment upload and metadata extraction, including existing LZ4 archives.
   public static final Map<String, String> SEGMENT_TAR_FILE_EXTENSIONS =
-      Map.of("gzip", TAR_GZ_FILE_EXT, "lz4", ".tar.lz4", "zstd", ".tar.zst");
+      Map.of(SEGMENT_COMPRESSION_CODEC_GZIP, TAR_GZ_FILE_EXT, SEGMENT_COMPRESSION_CODEC_LZ4, TAR_LZ4_FILE_EXT,
+          SEGMENT_COMPRESSION_CODEC_ZSTD, TAR_ZST_FILE_EXT);
 
   /// Returns whether a path names a supported segment archive, excluding the gzip metadata sidecars.
   public static boolean isSegmentTarFile(String fileName) {

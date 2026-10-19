@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.utils;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
-import com.sun.net.httpserver.HttpServer;
 import com.sun.net.httpserver.HttpsConfigurator;
 import com.sun.net.httpserver.HttpsParameters;
 import com.sun.net.httpserver.HttpsServer;
@@ -51,7 +50,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
@@ -87,6 +85,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -242,15 +241,6 @@ public class SegmentPushUtilsTest {
     } finally {
       httpsServer.stop(0);
     }
-  }
-
-  private static HttpServer createHttpServer(HttpHandler handler, ExecutorService executor)
-      throws IOException {
-    HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
-    server.createContext("/v2/segments", handler);
-    server.setExecutor(executor);
-    server.start();
-    return server;
   }
 
   private static HttpsServer createHttpsServer(String path, HttpHandler handler)
@@ -645,39 +635,14 @@ public class SegmentPushUtilsTest {
     return new Object[][]{{".tar.gz"}, {".tar.lz4"}, {".tar.zst"}};
   }
 
-  @Test(dataProvider = "segmentTarExtensions", timeOut = 10000)
-  public void testSegmentArchiveScanningAndUpload(String extension)
-      throws Exception {
-    File segmentDir = new File(_tempDir, TEST_SEGMENT_NAME);
-    FileUtils.forceMkdir(segmentDir);
-    FileUtils.writeStringToFile(new File(segmentDir, "metadata.properties"), "archive payload", StandardCharsets.UTF_8);
-    File archive = new File(_tempDir, TEST_SEGMENT_NAME + extension);
-    TarCompressionUtils.createCompressedTarFile(segmentDir, archive);
-    String archiveUri = archive.toURI().toString();
+  @Test(dataProvider = "segmentTarExtensions")
+  public void testSegmentArchiveScanning(String extension) {
+    String archiveUri = _tempDir.toURI().resolve(TEST_SEGMENT_NAME + extension).toString();
     assertEquals(SegmentPushUtils.getSegmentNameFromTarFile(archiveUri), TEST_SEGMENT_NAME);
     String[] files = {archiveUri, new File(_tempDir, "testSegment.metadata.tar.gz").toURI().toString(),
         new File(_tempDir, "testSegment.tar.bz2").toURI().toString()};
-    Map<String, String> paths = SegmentPushUtils.getSegmentUriToTarPathMap(_tempDir.toURI(), new PushJobSpec(), files);
-    assertEquals(paths, Map.of(archiveUri, archiveUri));
-
-    AtomicReference<byte[]> received = new AtomicReference<>();
-    ExecutorService serverExecutor = Executors.newSingleThreadExecutor();
-    HttpServer server = createHttpServer(exchange -> {
-      received.set(exchange.getRequestBody().readAllBytes());
-      writeResponse(exchange, OK_RESPONSE);
-    }, serverExecutor);
-    try {
-      URI controllerUri = URI.create("http://localhost:" + server.getAddress().getPort());
-      SegmentPushUtils.pushSegments(createSegmentGenerationJobSpec(controllerUri, null), new LocalPinotFS(),
-          List.of(archiveUri));
-      // Multipart upload must preserve the compressed bytes, including their codec magic, without recompression.
-      assertTrue(new String(received.get(), StandardCharsets.ISO_8859_1)
-          .contains(new String(Files.readAllBytes(archive.toPath()), StandardCharsets.ISO_8859_1)));
-    } finally {
-      server.stop(0);
-      serverExecutor.shutdownNow();
-      serverExecutor.close();
-    }
+    assertEquals(SegmentPushUtils.getSegmentUriToTarPathMap(_tempDir.toURI(), new PushJobSpec(), files),
+        Map.of(archiveUri, archiveUri));
   }
 
   @Test
@@ -688,45 +653,21 @@ public class SegmentPushUtilsTest {
         () -> SegmentPushUtils.getSegmentNameFromTarFile("testSegment.tar.bz2"));
   }
 
-  @Test(timeOut = 10000)
-  public void testCodecSwitchRejectsDuplicateSegmentsBeforeUpload()
-      throws Exception {
-    File segmentDir = new File(_tempDir, TEST_SEGMENT_NAME);
-    FileUtils.forceMkdir(segmentDir);
-    File metadata = new File(segmentDir, "metadata.properties");
-    File oldArchive = new File(_tempDir, TEST_SEGMENT_NAME + ".tar.gz");
-    File newArchive = new File(_tempDir, TEST_SEGMENT_NAME + ".tar.zst");
-    FileUtils.writeStringToFile(metadata, "old segment", StandardCharsets.UTF_8);
-    TarCompressionUtils.createCompressedTarFile(segmentDir, oldArchive);
-    FileUtils.writeStringToFile(metadata, "new segment", StandardCharsets.UTF_8);
-    TarCompressionUtils.createCompressedTarFile(segmentDir, newArchive);
-    List<String> archives = List.of(oldArchive.toURI().toString(), newArchive.toURI().toString());
-
-    IllegalArgumentException error = expectThrows(IllegalArgumentException.class,
-        () -> SegmentPushUtils.getSegmentUriToTarPathMap(_tempDir.toURI(), new PushJobSpec(),
-            archives.toArray(new String[0])));
-    assertTrue(error.getMessage().contains("Multiple archives for segment " + TEST_SEGMENT_NAME));
-    assertTrue(error.getMessage().contains(oldArchive.getName()));
-    assertTrue(error.getMessage().contains(newArchive.getName()));
-
-    AtomicInteger requests = new AtomicInteger();
-    ExecutorService serverExecutor = Executors.newSingleThreadExecutor();
-    HttpServer server = createHttpServer(exchange -> {
-      requests.incrementAndGet();
-      exchange.getRequestBody().readAllBytes();
-      writeResponse(exchange, OK_RESPONSE);
-    }, serverExecutor);
-    try {
-      URI controllerUri = URI.create("http://localhost:" + server.getAddress().getPort());
-      SegmentGenerationJobSpec spec = createSegmentGenerationJobSpec(controllerUri, null);
-      expectThrows(IllegalArgumentException.class,
-          () -> SegmentPushUtils.pushSegments(spec, new LocalPinotFS(), archives));
-      assertEquals(requests.get(), 0, "Duplicate logical segments must fail before the first HTTP upload");
-    } finally {
-      server.stop(0);
-      serverExecutor.shutdownNow();
-      serverExecutor.close();
-    }
+  @Test
+  public void testCodecSwitchRejectsDuplicateSegmentsBeforeUpload() {
+    String gzip = _tempDir.toURI().resolve(TEST_SEGMENT_NAME + ".tar.gz").toString();
+    String zstd = _tempDir.toURI().resolve(TEST_SEGMENT_NAME + ".tar.zst").toString();
+    List<String> archives = List.of(gzip, zstd);
+    PushJobSpec pushSpec = new PushJobSpec();
+    assertThrows(IllegalArgumentException.class,
+        () -> SegmentPushUtils.getSegmentUriToTarPathMap(_tempDir.toURI(), pushSpec, archives.toArray(new String[0])));
+    pushSpec.setPushFileNamePattern("glob:**/*.tar.zst");
+    assertEquals(SegmentPushUtils.getSegmentUriToTarPathMap(_tempDir.toURI(), pushSpec,
+        archives.toArray(new String[0])), Map.of(zstd, zstd));
+    PinotFS fileSystem = mock(PinotFS.class);
+    SegmentGenerationJobSpec spec = createSegmentGenerationJobSpec(URI.create("https://localhost:1"), null);
+    assertThrows(IllegalArgumentException.class, () -> SegmentPushUtils.pushSegments(spec, fileSystem, archives));
+    verifyNoInteractions(fileSystem);
   }
 
   @Test

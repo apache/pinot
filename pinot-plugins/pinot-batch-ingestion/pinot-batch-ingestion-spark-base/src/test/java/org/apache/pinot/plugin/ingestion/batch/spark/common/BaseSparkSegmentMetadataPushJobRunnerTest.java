@@ -19,72 +19,56 @@
 package org.apache.pinot.plugin.ingestion.batch.spark.common;
 
 import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
-import org.apache.pinot.segment.local.utils.SegmentPushUtils;
-import org.apache.pinot.spi.filesystem.PinotFS;
-import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.PushJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
-import org.mockito.MockedStatic;
 import org.testng.annotations.Test;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyCollection;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.mockStatic;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertThrows;
 
 
-/// Tests driver-side archive selection with scoped mocks and without starting Spark.
+/// Exercises driver-side filtering with real local files before dispatching a metadata push.
 public class BaseSparkSegmentMetadataPushJobRunnerTest {
   @Test
   public void testPushPatternFiltersBeforeDuplicateValidation()
       throws Exception {
-    URI outputDir = URI.create("file:/output/");
-    String selected = "file:/output/current/segment.tar.zst";
-    PinotFS fileSystem = mock(PinotFS.class);
-    when(fileSystem.listFiles(outputDir, true)).thenReturn(new String[]{
-        selected, "file:/output/current/segment.tar.gz", "file:/output/stale/segment.tar.zst"});
-    SegmentGenerationJobSpec spec = new SegmentGenerationJobSpec();
-    spec.setOutputDirURI(outputDir.toString());
-    spec.setPinotFSSpecs(List.of());
-    PushJobSpec pushSpec = new PushJobSpec();
-    pushSpec.setPushParallelism(1);
-    pushSpec.setPushFileNamePattern("glob:**/current/*.tar.zst");
-    spec.setPushJobSpec(pushSpec);
-    BaseSparkSegmentMetadataPushJobRunner runner = new BaseSparkSegmentMetadataPushJobRunner(spec) {
-      @Override
-      public void parallelizeMetadataPushJob(List<String> segmentsToPush, List<PinotFSSpec> pinotFSSpecs,
-          int pushParallelism, URI outputDirURI) {
-        throw new AssertionError("Sequential push must not start Spark");
-      }
-    };
-
-    try (MockedStatic<PinotFSFactory> fileSystems = mockStatic(PinotFSFactory.class);
-        MockedStatic<SegmentPushUtils> pushes = mockStatic(SegmentPushUtils.class)) {
-      fileSystems.when(() -> PinotFSFactory.create("file")).thenReturn(fileSystem);
-      pushes.when(() -> SegmentPushUtils.getSegmentUriToTarPathMap(eq(outputDir), eq(pushSpec), any(String[].class)))
-          .thenCallRealMethod();
-      pushes.when(() -> SegmentPushUtils.validateUniqueSegmentNames(anyCollection())).thenCallRealMethod();
-      pushes.when(() -> SegmentPushUtils.getSegmentNameFromTarFile(anyString())).thenCallRealMethod();
-      pushes.when(() -> SegmentPushUtils.generateSegmentTarURI(eq(outputDir), any(URI.class), any(), any()))
-          .thenCallRealMethod();
+    Path outputDir = Files.createTempDirectory("metadata-push-");
+    try {
+      Path current = Files.createDirectory(outputDir.resolve("current"));
+      Path selected = Files.createFile(current.resolve("segment.tar.zst"));
+      Files.createFile(current.resolve("segment.tar.gz"));
+      Files.createFile(Files.createDirectory(outputDir.resolve("stale")).resolve("segment.tar.zst"));
+      SegmentGenerationJobSpec spec = new SegmentGenerationJobSpec();
+      spec.setOutputDirURI(outputDir.toUri().toString());
+      spec.setPinotFSSpecs(List.of());
+      PushJobSpec pushSpec = new PushJobSpec();
+      pushSpec.setPushParallelism(2);
+      pushSpec.setPushFileNamePattern("glob:**/current/*.tar.zst");
+      spec.setPushJobSpec(pushSpec);
+      List<String> pushed = new ArrayList<>();
+      BaseSparkSegmentMetadataPushJobRunner runner = new BaseSparkSegmentMetadataPushJobRunner(spec) {
+        @Override
+        public void parallelizeMetadataPushJob(List<String> segments, List<PinotFSSpec> fileSystems,
+            int parallelism, URI output) {
+          pushed.addAll(segments);
+        }
+      };
       runner.run();
-      pushes.verify(() -> SegmentPushUtils.pushSegments(spec, fileSystem, List.of(selected)));
-
+      assertEquals(pushed, List.of(selected.toString()));
       pushSpec.setPushParallelism(0);
       pushSpec.setPushFileNamePattern("glob:**/missing/*");
       runner.run();
-
+      assertEquals(pushed, List.of(selected.toString()));
       pushSpec.setPushFileNamePattern(null);
       assertThrows(IllegalArgumentException.class, runner::run);
-      pushes.verify(() -> SegmentPushUtils.pushSegments(eq(spec), eq(fileSystem), anyList()), times(1));
+    } finally {
+      FileUtils.deleteDirectory(outputDir.toFile());
     }
   }
 }
