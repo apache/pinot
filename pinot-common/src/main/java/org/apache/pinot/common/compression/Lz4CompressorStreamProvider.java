@@ -33,18 +33,15 @@ import org.apache.commons.compress.compressors.CompressorInputStream;
 import org.apache.commons.compress.compressors.CompressorOutputStream;
 import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.commons.compress.compressors.CompressorStreamProvider;
-import org.apache.commons.compress.compressors.lz4.FramedLZ4CompressorOutputStream;
 import org.apache.commons.io.output.CloseShieldOutputStream;
 
 
 /// Adds explicit LZ4 frame encoders to the Commons Compress factory. This provider is stateless and thread-safe;
 /// returned streams are not thread-safe. All variants use the Commons reader for existing frame compatibility.
 public class Lz4CompressorStreamProvider implements CompressorStreamProvider {
-  /// Preserves the existing Commons Compress encoder.
-  public static final String LZ4_DEFAULT = "lz4-default";
   public static final String LZ4_FAST = "lz4-fast";
   public static final String LZ4_HC = "lz4-hc";
-  private static final Set<String> NAMES = Set.of(LZ4_DEFAULT, LZ4_FAST, LZ4_HC);
+  private static final Set<String> NAMES = Set.of(LZ4_FAST, LZ4_HC);
 
   @Override
   public CompressorInputStream createCompressorInputStream(String name, InputStream in, boolean decompressConcatenated)
@@ -84,20 +81,15 @@ public class Lz4CompressorStreamProvider implements CompressorStreamProvider {
 
   /// Adapts frame encoders to the Commons stream lifecycle, including finish without closing the caller's output.
   private static class Lz4OutputStream<T extends OutputStream> extends CompressorOutputStream<T> {
-    private final OutputStream _frameOut;
+    private final LZ4FrameOutputStream _frameOut;
 
     private Lz4OutputStream(T out, String name)
         throws IOException {
       super(out);
-      OutputStream shield = CloseShieldOutputStream.wrap(out);
-      if (LZ4_DEFAULT.equalsIgnoreCase(name)) {
-        _frameOut = new FramedLZ4CompressorOutputStream(shield);
-      } else {
-        LZ4Factory factory = LZ4Factory.fastestInstance();
-        _frameOut = new LZ4FrameOutputStream(shield, BLOCKSIZE.SIZE_4MB, -1,
-            LZ4_HC.equalsIgnoreCase(name) ? factory.highCompressor() : factory.fastCompressor(),
-            XXHashFactory.fastestInstance().hash32(), Bits.BLOCK_INDEPENDENCE, Bits.CONTENT_CHECKSUM);
-      }
+      LZ4Factory factory = LZ4Factory.fastestInstance();
+      _frameOut = new LZ4FrameOutputStream(CloseShieldOutputStream.wrap(out), BLOCKSIZE.SIZE_4MB, -1,
+          LZ4_HC.equalsIgnoreCase(name) ? factory.highCompressor() : factory.fastCompressor(),
+          XXHashFactory.fastestInstance().hash32(), Bits.BLOCK_INDEPENDENCE, Bits.CONTENT_CHECKSUM);
     }
 
     @Override

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.utils;
 
+import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -42,7 +43,6 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.common.compression.Lz4CompressorStreamProvider.LZ4_DEFAULT;
 import static org.apache.pinot.common.compression.Lz4CompressorStreamProvider.LZ4_FAST;
 import static org.apache.pinot.common.compression.Lz4CompressorStreamProvider.LZ4_HC;
 import static org.testng.Assert.assertEquals;
@@ -80,6 +80,7 @@ public class TarCompressionUtilsTest {
     for (String compressedTarFileExtension : TarCompressionUtils.COMPRESSOR_NAME_BY_FILE_EXTENSIONS.keySet()) {
       testFile(compressedTarFileExtension);
     }
+    testFile(TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
   }
 
   public void testFile(String compressedTarFileExtension)
@@ -91,6 +92,11 @@ public class TarCompressionUtilsTest {
 
     File compressedTarFile = new File(TAR_DIR, fileName + compressedTarFileExtension);
     TarCompressionUtils.createCompressedTarFile(dataFile, compressedTarFile);
+    if (compressedTarFileExtension.equals(TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION)) {
+      try (InputStream input = new BufferedInputStream(Files.newInputStream(compressedTarFile.toPath()))) {
+        assertEquals(CompressorStreamFactory.detect(input), CompressorStreamFactory.GZIP);
+      }
+    }
 
     List<File> untarredFiles = TarCompressionUtils.untar(compressedTarFile, UNTAR_DIR);
     assertEquals(untarredFiles.size(), 1);
@@ -105,19 +111,25 @@ public class TarCompressionUtilsTest {
 
   @DataProvider(name = "lz4Implementations")
   public Object[][] lz4Implementations() {
-    return new Object[][]{{LZ4_DEFAULT}, {LZ4_FAST}, {LZ4_HC}};
+    return new Object[][]{{CompressorStreamFactory.LZ4_FRAMED}, {LZ4_FAST}, {LZ4_HC}};
   }
 
   @Test(dataProvider = "lz4Implementations")
   public void testLz4ArchiveRoundTrip(String compressorName)
       throws IOException {
-    byte[] content = new byte[compressorName.equals(LZ4_DEFAULT) ? 32 * 1024 : 5 * 1024 * 1024];
+    int contentSize = compressorName.equals(CompressorStreamFactory.LZ4_FRAMED) ? 32 * 1024 : 5 * 1024 * 1024;
+    byte[] content = new byte[contentSize];
     new Random(0).nextBytes(content);
     Arrays.fill(content, content.length / 5, content.length * 3 / 5, (byte) 42);
     File inputFile = new File(DATA_DIR, "data");
     Files.write(inputFile.toPath(), content);
     File archive = new File(TAR_DIR, "data" + TarCompressionUtils.TAR_LZ4_FILE_EXTENSION);
     TarCompressionUtils.createCompressedTarFile(inputFile, archive, compressorName);
+    if (compressorName.equals(LZ4_FAST)) {
+      File defaultArchive = new File(TAR_DIR, "default" + TarCompressionUtils.TAR_LZ4_FILE_EXTENSION);
+      TarCompressionUtils.createCompressedTarFile(inputFile, defaultArchive);
+      assertEquals(Files.readAllBytes(defaultArchive.toPath()), Files.readAllBytes(archive.toPath()));
+    }
 
     List<File> extractedFiles = TarCompressionUtils.untar(archive, UNTAR_DIR);
     assertEquals(extractedFiles.size(), 1);

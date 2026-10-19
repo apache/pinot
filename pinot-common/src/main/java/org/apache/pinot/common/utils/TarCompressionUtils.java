@@ -42,6 +42,7 @@ import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.compression.Lz4CompressorStreamProvider;
 
 
 /// Utility class to compress/de-compress tar files compressed using various compressors.
@@ -76,7 +77,7 @@ public class TarCompressionUtils {
   public static final String TAR_ZST_FILE_EXTENSION = ".tar.zst";
   public static final Map<String, String> COMPRESSOR_NAME_BY_FILE_EXTENSIONS =
       Map.of(TAR_GZ_FILE_EXTENSION, CompressorStreamFactory.GZIP, TAR_LZ4_FILE_EXTENSION,
-          CompressorStreamFactory.LZ4_FRAMED, TAR_ZST_FILE_EXTENSION, CompressorStreamFactory.ZSTANDARD);
+          Lz4CompressorStreamProvider.LZ4_FAST, TAR_ZST_FILE_EXTENSION, CompressorStreamFactory.ZSTANDARD);
   private static final CompressorStreamFactory COMPRESSOR_STREAM_FACTORY = CompressorStreamFactory.getSingleton();
   private static final char ENTRY_NAME_SEPARATOR = '/';
   private static String _defaultCompressorName = CompressorStreamFactory.GZIP;
