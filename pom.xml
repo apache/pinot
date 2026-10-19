@@ -204,7 +204,7 @@
     <jsonsmart.version>2.6.0</jsonsmart.version>
     <quartz.version>2.5.2</quartz.version>
     <calcite.version>1.42.0</calcite.version>
-    <joou.version>0.9.5</joou.version>
+    <joou.version>0.9.6</joou.version>
     <immutables.version>2.12.3</immutables.version>
     <lucene.version>9.12.0</lucene.version>
     <reflections.version>0.10.2</reflections.version>
