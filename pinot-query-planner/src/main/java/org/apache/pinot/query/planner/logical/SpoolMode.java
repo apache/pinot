@@ -49,22 +49,24 @@ public enum SpoolMode {
     return this == AUTO;
   }
 
-  /// Parses a mode, ignoring case. `false` and `true` are accepted as aliases of [#OFF] and [#ON].
+  /// Parses a mode, ignoring case. `false` and `no` are aliases of [#OFF], and `true` and `yes` are aliases of [#ON].
   ///
   /// @throws IllegalArgumentException if the value is not a known mode.
   public static SpoolMode fromString(String value) {
     switch (value.trim().toLowerCase(Locale.ROOT)) {
       case "off":
       case "false":
+      case "no":
         return OFF;
       case "auto":
         return AUTO;
       case "on":
       case "true":
+      case "yes":
         return ON;
       default:
         throw new IllegalArgumentException(
-            "Invalid spool mode '" + value + "'. Valid values are: off, auto, on (or false, true)");
+            "Invalid spool mode '" + value + "'. Valid values are: off, auto, on (or false, no, true, yes)");
     }
   }
 }

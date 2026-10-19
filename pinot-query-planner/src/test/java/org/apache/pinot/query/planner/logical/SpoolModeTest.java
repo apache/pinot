@@ -33,8 +33,10 @@ public class SpoolModeTest {
   public static Object[][] validValues() {
     return new Object[][]{
         {"off", SpoolMode.OFF}, {"OFF", SpoolMode.OFF}, {"false", SpoolMode.OFF}, {"False", SpoolMode.OFF},
+        {"no", SpoolMode.OFF}, {"NO", SpoolMode.OFF},
         {"auto", SpoolMode.AUTO}, {" Auto ", SpoolMode.AUTO},
-        {"on", SpoolMode.ON}, {"true", SpoolMode.ON}, {"TRUE", SpoolMode.ON}
+        {"on", SpoolMode.ON}, {"true", SpoolMode.ON}, {"TRUE", SpoolMode.ON},
+        {"yes", SpoolMode.ON}, {"Yes", SpoolMode.ON}
     };
   }
 
@@ -45,7 +47,7 @@ public class SpoolModeTest {
 
   @Test
   public void fromStringRejectsUnknownValues() {
-    assertThrows(IllegalArgumentException.class, () -> SpoolMode.fromString("yes"));
+    assertThrows(IllegalArgumentException.class, () -> SpoolMode.fromString("1"));
     assertThrows(IllegalArgumentException.class, () -> SpoolMode.fromString(""));
   }
 

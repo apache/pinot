@@ -648,8 +648,8 @@ public class CommonConstants {
     public static final String CONFIG_OF_INFER_PARTITION_HINT = "pinot.broker.multistage.infer.partition.hint";
     public static final boolean DEFAULT_INFER_PARTITION_HINT = false;
 
-    /// The default spool mode of the multistage query engine: `off`, `auto` or `on`. `false` and `true` are accepted
-    /// as aliases of `off` and `on`.
+    /// The default spool mode of the multistage query engine: `off`, `auto` or `on`. `false` and `no` are aliases of
+    /// `off`, and `true` and `yes` are aliases of `on`.
     ///
     /// - `off` never shares a stage between consumers.
     /// - `auto` shares a stage only when the planner can prove that the sharing cannot block the query.
@@ -1011,7 +1011,7 @@ public class CommonConstants {
         public static final String INFER_PARTITION_HINT = "inferPartitionHint";
         public static final String ENABLE_NULL_HANDLING = "enableNullHandling";
         public static final String APPLICATION_NAME = "applicationName";
-        /// The spool mode for the query: `off`, `auto` or `on` (`false` and `true` are aliases of `off` and `on`).
+        /// The spool mode for the query: `off`, `auto` or `on` (`false`/`no` and `true`/`yes` are aliases).
         /// See [Broker#CONFIG_OF_SPOOLS].
         public static final String USE_SPOOLS = "useSpools";
         /// When true, the broker response carries a `spools` entry in `responseMetadata` that lists each spool the
