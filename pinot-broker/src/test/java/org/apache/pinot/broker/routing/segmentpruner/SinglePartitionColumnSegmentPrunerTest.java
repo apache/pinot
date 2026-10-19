@@ -427,6 +427,19 @@ public class SinglePartitionColumnSegmentPrunerTest {
     assertEquals(pruner.prune(request(function("INVALID_OPERATOR")), segments), segments);
   }
 
+  @Test
+  public void testUnbuildablePartitionFunctionKeepsSegmentAndTableRoutable()
+      throws Exception {
+    Map<String, ZNRecord> records = new LinkedHashMap<>();
+    records.put("known", metadata("known", "Modulo", 8, Set.of(1), null));
+    records.put("unknown", metadata("unknown", "NoSuchPartitionFunction", 8, Set.of(1), null));
+    SinglePartitionColumnSegmentPruner pruner = pruner(records);
+    assertEquals(pruner.prune(request(predicate("EQUALS", "1")), records.keySet()), Set.of("known", "unknown"));
+    assertEquals(pruner.prune(request(predicate("EQUALS", "2")), records.keySet()), Set.of("unknown"));
+    pruner.refreshSegment("known", metadata("known", "NoSuchPartitionFunction", 8, Set.of(1), null));
+    assertEquals(pruner.prune(request(predicate("EQUALS", "2")), records.keySet()), Set.of("known", "unknown"));
+  }
+
   @Test(dataProvider = "candidateCounts")
   public void testRefreshUsesCurrentPartitionsAndConfiguration(int numSegments, @Nullable Integer queryMinSegments)
       throws Exception {
