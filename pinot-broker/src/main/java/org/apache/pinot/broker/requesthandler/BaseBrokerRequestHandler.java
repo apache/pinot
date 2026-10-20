@@ -285,6 +285,22 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   ///         enableMultiClusterRouting=true
   protected void validatePhysicalTablesWithMultiClusterRouting(Set<String> tableNames,
       Map<String, String> queryOptions) {
+    validatePhysicalTablesWithMultiClusterRoutingAgainstCache(tableNames, queryOptions, _tableCache);
+  }
+
+  /// Uses the same captured table metadata as the request's compilation and routing phases.
+  protected void validatePhysicalTablesWithMultiClusterRouting(Set<String> tableNames,
+      Map<String, String> queryOptions, TableCache tableCache) {
+    if (tableCache == _tableCache) {
+      // Preserve existing subclass validation on the default backend.
+      validatePhysicalTablesWithMultiClusterRouting(tableNames, queryOptions);
+    } else {
+      validatePhysicalTablesWithMultiClusterRoutingAgainstCache(tableNames, queryOptions, tableCache);
+    }
+  }
+
+  private static void validatePhysicalTablesWithMultiClusterRoutingAgainstCache(Set<String> tableNames,
+      Map<String, String> queryOptions, TableCache tableCache) {
     Preconditions.checkNotNull(tableNames, "Table names cannot be null when validating multi-cluster routing");
     Preconditions.checkNotNull(queryOptions, "Query options cannot be null");
     boolean isMultiClusterRoutingEnabled = queryOptions.containsKey(QueryOptionKey.ENABLE_MULTI_CLUSTER_ROUTING)
@@ -292,7 +308,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     if (isMultiClusterRoutingEnabled) {
       for (String tableName : tableNames) {
-        if (!_tableCache.isLogicalTable(tableName)) {
+        if (!tableCache.isLogicalTable(tableName)) {
           throw QueryErrorCode.QUERY_VALIDATION.asException(
               "Physical table '" + tableName + "' cannot be queried with enableMultiClusterRouting=true. "
               + "Multi-cluster routing is only supported for logical tables. "

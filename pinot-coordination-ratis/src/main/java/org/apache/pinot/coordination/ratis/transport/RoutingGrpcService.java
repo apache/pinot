@@ -23,12 +23,21 @@ import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
+import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.ParticipantToken;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.Role;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.CatalogRecord;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.ObjectVersion;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.RecordKind;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Revision;
 import org.apache.pinot.coordination.ratis.metadata.OfflineRoutingProtocol;
+import org.apache.pinot.coordination.ratis.metadata.OfflineRoutingProtocol.RoutingSnapshot;
 import org.apache.pinot.coordination.ratis.rpc.BrokerRoutingServiceGrpc;
 import org.apache.pinot.coordination.ratis.rpc.MetadataRpc;
 import org.apache.pinot.coordination.ratis.transport.ParticipantAccessPolicy.ParticipantIdentity;
@@ -79,11 +88,13 @@ final class RoutingGrpcService extends BrokerRoutingServiceGrpc.BrokerRoutingSer
           || !snapshot.tables().isEmpty()) {
         throw Status.INTERNAL.withDescription("Failed routing projection contains data").asRuntimeException();
       }
+      long records = snapshot.status() == MetadataProtocol.Status.OK ? validatePlanning(snapshot) : 0;
       MetadataRpc.RoutingSnapshot response = RoutingRpcCodec.snapshot(snapshot);
       if (response.getSerializedSize() > request.getMaxBytes()
-          || response.getSerializedSize() > OfflineRoutingProtocol.MAX_SNAPSHOT_BYTES) {
+          || response.getSerializedSize() > OfflineRoutingProtocol.MAX_SNAPSHOT_BYTES
+          || records > request.getMaxRecords()) {
         response = MetadataRpc.RoutingSnapshot.newBuilder().setStatus(MetadataRpc.ResultStatus.RESPONSE_TOO_LARGE)
-            .setRevision(response.getRevision()).setDetail("Routing projection exceeds its wire byte bound").build();
+            .setRevision(response.getRevision()).setDetail("Routing projection exceeds its wire bounds").build();
       }
       remainingMillis();
       if (!identity.equals(authorize())) {
@@ -111,6 +122,53 @@ final class RoutingGrpcService extends BrokerRoutingServiceGrpc.BrokerRoutingSer
       }
       MetadataGrpcService.audit(_audit, identity == null ? "" : identity.participantId(), "RoutingSnapshot", outcome);
     }
+  }
+
+  /// Planning extends only the requested table image, never the generic catalog authorization scope.
+  private static long validatePlanning(RoutingSnapshot snapshot) {
+    var table = snapshot.table();
+    if (table == null) {
+      return 2L + snapshot.tables().size();
+    }
+    if (!snapshot.tables().isEmpty()
+        || (table.tableConfig() == null) != (table.schemaRecord() == null)
+        || !matches(table.tableConfig(), RecordKind.TABLE_CONFIG, table.tableName(), table.table(), snapshot.revision())
+        || !matches(table.schemaRecord(), RecordKind.SCHEMA, table.schemaName(), table.schema(), snapshot.revision())) {
+      throw Status.INTERNAL.withDescription("Routing planning records differ from their identities")
+          .asRuntimeException();
+    }
+    long records = 4L + table.segments().size() + table.serverAuthorities().size();
+    Set<ParticipantToken> candidates = new HashSet<>();
+    for (var segment : table.segments()) {
+      records += segment.replicas().size();
+      segment.replicas().forEach(replica -> candidates.add(replica.server()));
+    }
+    Set<String> servers = new HashSet<>();
+    for (var authority : table.serverAuthorities()) {
+      var token = authority.participant();
+      if (token.role() != Role.SERVER || !token.historyId().equals(snapshot.revision().historyId())
+          || !servers.add(token.participantId()) || !candidates.remove(token)
+          || authority.retired() || authority.draining() || !authority.ready()
+          || authority.expiryRound() <= snapshot.control().round()
+          || authority.lastModifiedIndex() <= 0 || authority.lastModifiedIndex() > snapshot.revision().index()) {
+        throw Status.INTERNAL.withDescription("Routing server authority differs from its candidates")
+            .asRuntimeException();
+      }
+    }
+    if (table.tableConfig() != null && !candidates.isEmpty()) {
+      throw Status.INTERNAL.withDescription("Routing planning lacks candidate membership").asRuntimeException();
+    }
+    return records;
+  }
+
+  private static boolean matches(@Nullable CatalogRecord record, RecordKind kind, String name, ObjectVersion version,
+      Revision revision) {
+    // Older identity-only observations remain representable; a planning consumer must reject absent values.
+    return record == null || record.kind() == kind && record.name().equals(name) && !record.deleted()
+        && record.schemaVersion() == 1 && record.value() != null && record.objectId().equals(version.objectId())
+        && record.version() > 0 && record.version() == version.version()
+        && version.historyId().equals(revision.historyId()) && record.lastModifiedIndex() > 0
+        && record.lastModifiedIndex() <= revision.index();
   }
 
   private ParticipantIdentity authorize() {

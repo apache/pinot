@@ -24,6 +24,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.ControlState;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.ParticipantState;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.ParticipantToken;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.CatalogRecord;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.ObjectVersion;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Revision;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Status;
@@ -31,7 +32,8 @@ import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Status;
 
 /// Complete bounded OFFLINE routing observations, never serving grants. Every current segment is represented,
 /// including segments without an installed replica. A null endpoint means installed evidence is not selectable.
-/// Config payloads, archive locations and other participants' private metadata are deliberately not exposed.
+/// Planning includes only the authorized table's exact config/schema and the membership of its installed candidates.
+/// Archive locations, cluster configuration and unrelated participants are deliberately not exposed.
 public final class OfflineRoutingProtocol {
   public static final int MAX_SNAPSHOT_RECORDS = 4096;
   public static final int MIN_SNAPSHOT_BYTES = 1024;
@@ -52,9 +54,17 @@ public final class OfflineRoutingProtocol {
   }
 
   public record TableRouting(String tableName, ObjectVersion table, String schemaName, ObjectVersion schema,
-                             List<SegmentRouting> segments) {
+                             List<SegmentRouting> segments, @Nullable CatalogRecord tableConfig,
+                             @Nullable CatalogRecord schemaRecord, List<ParticipantState> serverAuthorities) {
+    /// Legacy observations lack planning inputs; consumers must not use them for native query compilation.
+    public TableRouting(String tableName, ObjectVersion table, String schemaName, ObjectVersion schema,
+        List<SegmentRouting> segments) {
+      this(tableName, table, schemaName, schema, segments, null, null, List.of());
+    }
+
     public TableRouting {
       segments = List.copyOf(segments);
+      serverAuthorities = List.copyOf(serverAuthorities);
     }
   }
 

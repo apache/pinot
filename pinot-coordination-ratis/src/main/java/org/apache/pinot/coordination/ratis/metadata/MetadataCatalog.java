@@ -476,8 +476,11 @@ public final class MetadataCatalog {
       require(schema != null && !schema.deleted(), Status.NOT_READY, "Routing schema is absent");
       TableRouting tableHeader = new TableRouting(tableName, routingVersion(table), schemaName,
           routingVersion(schema), List.of());
-      projection.add(tableHeader, 2);
+      projection.add(tableHeader, 0);
+      projection.addRecord(table, _recordBytes.get(table.objectId()));
+      projection.addRecord(schema, _recordBytes.get(schema.objectId()));
       List<SegmentRouting> segments = new ArrayList<>();
+      Map<String, ParticipantState> serverAuthorities = new HashMap<>();
       String contentPrefix = table.objectId() + "/";
       String serverTenant = NativeReplicaPlacementPolicy.tenant(config);
       List<String> approvedServers = placement.servers().keySet().stream().sorted().toList();
@@ -502,6 +505,11 @@ public final class MetadataCatalog {
           }
           ReplicaRouting replica = routingReplica(view, policy, content, record, table, schema, serverId);
           if (replica != null) {
+            if (!serverAuthorities.containsKey(serverId)) {
+              ParticipantState authority = view.participant(serverId);
+              projection.add(authority, 1);
+              serverAuthorities.put(serverId, authority);
+            }
             projection.add(replica, 1);
             replicas.add(replica);
           }
@@ -510,7 +518,9 @@ public final class MetadataCatalog {
       }
       segments.sort(Comparator.comparing(SegmentRouting::name));
       return new RoutingSnapshot(Status.OK, header.revision(), "", participant, control, List.of(),
-          new TableRouting(tableName, tableHeader.table(), schemaName, tableHeader.schema(), segments));
+          new TableRouting(tableName, tableHeader.table(), schemaName, tableHeader.schema(), segments, table, schema,
+              serverAuthorities.values().stream()
+                  .sorted(Comparator.comparing(authority -> authority.participant().participantId())).toList()));
     } catch (Rejection e) {
       return routingSnapshotError(e._status, e.getMessage());
     } catch (CoordinationRejection e) {
@@ -615,8 +625,8 @@ public final class MetadataCatalog {
         assignment.materializationId(), report.installationId(), policy.endpoint(server));
   }
 
-  /// Only bounded identity DTOs are encoded while holding apply. Config and archive payloads never enter this image;
-  /// reject before retaining each additional element and let transport separately check the final protobuf size.
+  /// Config/schema use maintained canonical sizes so large planning records are not serialized under apply.
+  /// Reject before retaining each element; transport separately checks the complete protobuf byte and record bounds.
   private static final class RoutingProjection {
     private final int _maxRecords;
     private final int _maxBytes;
@@ -634,6 +644,14 @@ public final class MetadataCatalog {
       _records += records;
       // Empty arrays/nulls in the skeleton remain charged, conservatively covering replacement and separators.
       _bytes += MetadataProtocol.encodeValue(value).length + 1;
+      checkBounds();
+    }
+
+    private void addRecord(CatalogRecord record, int bytes) {
+      require(record.kind() == RecordKind.TABLE_CONFIG || record.kind() == RecordKind.SCHEMA, Status.NOT_READY,
+          "Routing planning record has an unexpected kind");
+      _records++;
+      _bytes += bytes + 1L;
       checkBounds();
     }
 

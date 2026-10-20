@@ -500,8 +500,11 @@ public class RatisStartersTest {
         assertEquals(recovered, reinstalled, "Controller restart must retain the current installation and proof");
         assertEquals(awaitInstallation(voterConfig, replacement, uploaded.content()), uploadedAgain,
             "Controller restart must not create another materialization for an uploaded segment");
+        // Heartbeats advance server authority; the planning records and installation proof must remain unchanged.
         assertEquals(assertRoutingInstallation(brokerClient, brokerState.getParticipant(), uploaded.content(),
-            replacement, uploadedAgain), recoveredRouting, "Routing must retain the recovered installation proof");
+            replacement, uploadedAgain).toBuilder().clearServerAuthorities().build(),
+            recoveredRouting.toBuilder().clearServerAuthorities().build(),
+            "Routing must retain the recovered installation proof");
         var taskState = JsonUtils.stringToJsonNode(get(http, controllerUrl + "/tasks/native/nativeTasks", true).body());
         assertEquals(taskState.path("tasks").size(), 1);
         assertEquals(taskState.path("publications").size(), 1);
@@ -582,6 +585,14 @@ public class RatisStartersTest {
     assertEquals(replica.getMaterializationId(), installed.assignment().materializationId().toString());
     assertEquals(replica.getInstallationId(), installed.installationId().toString());
     assertFalse(replica.hasEndpoint(), "An approved address cannot grant a missing server query capability");
+    assertEquals(snapshot.getTable().getServerAuthoritiesCount(), 1);
+    MetadataRpc.ParticipantState authority = snapshot.getTable().getServerAuthorities(0);
+    assertEquals(authority.getParticipant(), server);
+    assertTrue(authority.getReady());
+    assertFalse(authority.getRetired());
+    assertFalse(authority.getDraining());
+    assertTrue(authority.getExpiryRound() > snapshot.getControl().getRound());
+    assertEquals(authority.getCapabilitiesCount(), 0, "Native query listeners must remain disabled");
     return snapshot.getTable();
   }
 

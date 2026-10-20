@@ -20,7 +20,10 @@ package org.apache.pinot.core.transport;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
@@ -122,6 +125,35 @@ public final class ServerInstance {
     _hostname = hostname;
     _port = port;
     _grpcPort = INVALID_PORT;
+    _nettyTlsPort = INVALID_PORT;
+    _queryServicePort = INVALID_PORT;
+    _queryMailboxPort = INVALID_PORT;
+    _adminEndpoint = null;
+    _pool = FALLBACK_POOL_ID;
+  }
+
+  /// Represents an approved native gRPC destination without constructing Helix instance metadata.
+  /// Other transports and administrative endpoints remain unavailable; this value grants no query authority.
+  public static ServerInstance forNativeGrpc(String participantId, String hostname, int grpcPort) {
+    Preconditions.checkArgument(participantId != null && !participantId.isBlank() && participantId.length() <= 128
+        && participantId.chars().noneMatch(Character::isISOControl), "Invalid native server participant ID");
+    Preconditions.checkArgument(hostname != null && !hostname.isBlank()
+        && hostname.equals(hostname.toLowerCase(Locale.ROOT)) && grpcPort > 0 && grpcPort <= 65535,
+        "Invalid native gRPC host or port");
+    try {
+      URI endpoint = new URI("grpcs", null, hostname, grpcPort, null, null, null);
+      Preconditions.checkArgument(hostname.equals(endpoint.getHost()), "Noncanonical native gRPC hostname");
+    } catch (URISyntaxException e) {
+      throw new IllegalArgumentException("Invalid native gRPC hostname", e);
+    }
+    return new ServerInstance(participantId, hostname, grpcPort);
+  }
+
+  private ServerInstance(String participantId, String hostname, int grpcPort) {
+    _instanceId = participantId.intern();
+    _hostname = hostname;
+    _grpcPort = grpcPort;
+    _port = INVALID_PORT;
     _nettyTlsPort = INVALID_PORT;
     _queryServicePort = INVALID_PORT;
     _queryMailboxPort = INVALID_PORT;

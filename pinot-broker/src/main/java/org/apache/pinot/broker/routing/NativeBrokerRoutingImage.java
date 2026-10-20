@@ -35,16 +35,23 @@ import java.util.UUID;
 import org.apache.pinot.common.config.provider.NativeOfflineSegmentAction.ObjectVersion;
 import org.apache.pinot.common.config.provider.NativeOfflineSegmentAction.Participant;
 import org.apache.pinot.common.config.provider.NativeOfflineSegmentAction.Role;
+import org.apache.pinot.common.config.provider.StaticTableCache;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.coordination.NativeOfflineSegmentWorker;
 import org.apache.pinot.common.request.context.NativeQueryContext;
 import org.apache.pinot.common.request.context.NativeQueryContext.ProcessIdentity;
 import org.apache.pinot.common.request.context.NativeQueryContext.Segment;
 import org.apache.pinot.common.request.context.NativeQueryDeadline;
 import org.apache.pinot.coordination.ratis.rpc.MetadataRpc;
+import org.apache.pinot.coordination.ratis.rpc.MetadataRpc.CatalogRecord;
 import org.apache.pinot.coordination.ratis.rpc.MetadataRpc.ParticipantRole;
+import org.apache.pinot.coordination.ratis.rpc.MetadataRpc.ParticipantState;
 import org.apache.pinot.coordination.ratis.rpc.MetadataRpc.ParticipantToken;
 import org.apache.pinot.coordination.ratis.rpc.MetadataRpc.ReplicaRouting;
 import org.apache.pinot.coordination.ratis.rpc.MetadataRpc.RoutingSnapshot;
+import org.apache.pinot.core.routing.RoutingManager;
+import org.apache.pinot.core.routing.SegmentsToQuery;
+import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
@@ -60,6 +67,7 @@ public final class NativeBrokerRoutingImage {
   public static final int MAX_RECORDS = 4096;
   public static final int MAX_BYTES = 2 * 1024 * 1024;
   private final RoutingSnapshot _snapshot;
+  private final Map<String, ParticipantState> _serverAuthorities;
 
   public NativeBrokerRoutingImage(RoutingSnapshot snapshot, ParticipantToken broker, String tableName)
       throws IOException {
@@ -75,6 +83,14 @@ public final class NativeBrokerRoutingImage {
     checkArgument(identities.add(object(table.getTable(), broker.getHistoryId()).objectId())
         && identities.add(object(table.getSchema(), broker.getHistoryId()).objectId()),
         "Routing table/schema identities overlap");
+    checkArgument(table.hasTableConfig() == table.hasSchemaRecord(), "Partial native planning metadata");
+    if (table.hasTableConfig()) {
+      validatePlanningRecord(table.getTableConfig(), table.getTable(), tableName, snapshot.getRevision().getIndex());
+      validatePlanningRecord(table.getSchemaRecord(), table.getSchema(), table.getSchemaName(),
+          snapshot.getRevision().getIndex());
+      NativeOfflineSegmentWorker.decodeTable(table.getTableConfig());
+      NativeOfflineSegmentWorker.decodeSchema(table.getSchemaRecord());
+    }
     Set<String> names = new HashSet<>();
     Set<UUID> materializations = new HashSet<>();
     Set<UUID> installations = new HashSet<>();
@@ -111,6 +127,33 @@ public final class NativeBrokerRoutingImage {
             "Routing image mixes query endpoint approvals");
       }
     }
+    Map<String, ParticipantState> authorities = new HashMap<>();
+    for (ParticipantState state : table.getServerAuthoritiesList()) {
+      checkArgument(++records <= MAX_RECORDS, "Server authority exceeds routing record bound");
+      ParticipantToken token = state.getParticipant();
+      participant(token, broker.getHistoryId(), ParticipantRole.SERVER);
+      checkArgument(state.hasParticipant() && token.equals(servers.get(token.getParticipantId()))
+          && authorities.put(token.getParticipantId(), state) == null && state.getReady()
+          && !state.getRetired() && !state.getDraining() && state.getExpiryRound() > snapshot.getControl().getRound()
+          && state.getLastModifiedIndex() > 0 && state.getLastModifiedIndex() <= snapshot.getRevision().getIndex()
+          && state.getLastRenewalSequence() >= 0 && state.hasAppliedRevision()
+          && state.getAppliedRevision().getHistoryId().equals(broker.getHistoryId())
+          && state.getAppliedRevision().getIndex() >= 0
+          && state.getAppliedRevision().getIndex() <= snapshot.getRevision().getIndex(),
+          "Invalid, repeated or unreferenced routing server authority");
+      checkArgument(state.getCapabilitiesCount() == 0
+          || state.getCapabilitiesList().equals(List.of(MetadataRpc.ServingCapability.SERVER_QUERY)),
+          "Invalid routing server capabilities");
+      String endpoint = endpoints.get(token.getParticipantId());
+      checkArgument(endpoint.isEmpty()
+          || state.getCapabilitiesList().contains(MetadataRpc.ServingCapability.SERVER_QUERY)
+          && endpoint.equals(state.getEndpointsMap().get("queryGrpc"))
+          && "2".equals(state.getEndpointsMap().get("nativeQueryVersion")),
+          "Query endpoint differs from its current server authority");
+    }
+    checkArgument(!table.hasTableConfig() && authorities.isEmpty() || authorities.keySet().equals(servers.keySet()),
+        "Incomplete native planning server authorities");
+    _serverAuthorities = Map.copyOf(authorities);
     _snapshot = snapshot;
   }
 
@@ -143,12 +186,83 @@ public final class NativeBrokerRoutingImage {
     return _snapshot.getTable().getSegmentsCount();
   }
 
+  public MetadataRpc.MembershipControl control() {
+    return _snapshot.getControl();
+  }
+
+  public Map<String, ParticipantState> serverAuthorities() {
+    return _serverAuthorities;
+  }
+
+  /// Exact planning/content/assignment/session/endpoint identity, excluding routine server lease renewals.
+  public MetadataRpc.TableRouting queryIdentity() {
+    return _snapshot.getTable().toBuilder().clearServerAuthorities().build();
+  }
+
+  public boolean hasPlanningMetadata() {
+    return _snapshot.getTable().hasTableConfig() && _snapshot.getTable().hasSchemaRecord();
+  }
+
+  /// Derives ordinary Pinot name/column/expression maps from freshly decoded request-owned values. Virtual columns
+  /// or later planner mutations cannot modify the canonical snapshot or another request's cache.
+  public TableCache newTableCache(boolean ignoreCase) {
+    checkState(hasPlanningMetadata(), "Native planning requires complete captured table and schema records");
+    try {
+      return new StaticTableCache(
+          List.of(NativeOfflineSegmentWorker.decodeTable(_snapshot.getTable().getTableConfig())),
+          List.of(NativeOfflineSegmentWorker.decodeSchema(_snapshot.getTable().getSchemaRecord())),
+          List.of(), ignoreCase);
+    } catch (IOException e) {
+      throw new IllegalStateException("Validated native planning records cannot be decoded", e);
+    }
+  }
+
+  public RoutingManager newRoutingManager() {
+    checkState(hasPlanningMetadata(), "Native planning requires complete captured table and schema records");
+    Selection selection = select();
+    Map<ServerInstance, SegmentsToQuery> routes = new HashMap<>();
+    selection.segments().forEach((id, segments) -> {
+      URI endpoint = endpoint(selection.targets().get(id).getEndpoint());
+      routes.put(ServerInstance.forNativeGrpc(id, endpoint.getHost(), endpoint.getPort()),
+          new SegmentsToQuery(segments.stream().map(Segment::name).toList(), List.of()));
+    });
+    return new NativeBrokerRoutingManager(tableName(), routes);
+  }
+
+  /// Both normal Pinot providers belong to this one immutable table image. Create a new pair for each request.
+  public PlanningMetadata planningMetadata(boolean ignoreCase) {
+    return new PlanningMetadata(newTableCache(ignoreCase), newRoutingManager());
+  }
+
+  public record PlanningMetadata(TableCache tableCache, RoutingManager routingManager) {
+  }
+
   /// Selects exactly one approved replica for every segment, in deterministic order. The same originating deadline
   /// is attached to every fanout request; callers must preserve it across retries and independently qualify its clock.
   public List<ServerRequest> requests(UUID queryId, UUID attemptId, NativeQueryDeadline deadline) {
     requireNonNull(queryId, "queryId");
     requireNonNull(attemptId, "attemptId");
     requireNonNull(deadline, "deadline");
+    var table = _snapshot.getTable();
+    Selection selection = select();
+    ParticipantToken broker = _snapshot.getParticipant().getParticipant();
+    ProcessIdentity process = new ProcessIdentity(broker.getParticipantId(), uuid(broker.getIncarnation()),
+        broker.getRegistrationEpoch());
+    List<ServerRequest> requests = new ArrayList<>();
+    selection.segments().forEach((id, segments) -> {
+      ReplicaRouting replica = selection.targets().get(id);
+      ParticipantToken server = replica.getServer();
+      NativeQueryContext context = new NativeQueryContext(NativeQueryContext.VERSION, uuid(broker.getHistoryId()),
+          process, new Participant(id, Role.SERVER, uuid(server.getIncarnation()), server.getRegistrationEpoch()),
+          queryId, attemptId, table.getTableName(), object(table.getTable(), broker.getHistoryId()),
+          table.getSchemaName(), object(table.getSchema(), broker.getHistoryId()), segments, List.of())
+          .withDeadline(deadline);
+      requests.add(new ServerRequest(endpoint(replica.getEndpoint()), context));
+    });
+    return List.copyOf(requests);
+  }
+
+  private Selection select() {
     var table = _snapshot.getTable();
     checkState(table.getSegmentsCount() > 0, "Native empty-table query execution is not supported");
     Map<String, List<Segment>> selected = new TreeMap<>();
@@ -165,25 +279,21 @@ public final class NativeBrokerRoutingImage {
           object(replica.getAssignment(), _snapshot.getRevision().getHistoryId()),
           uuid(replica.getMaterializationId())));
     }
-    ParticipantToken broker = _snapshot.getParticipant().getParticipant();
-    ProcessIdentity process = new ProcessIdentity(broker.getParticipantId(), uuid(broker.getIncarnation()),
-        broker.getRegistrationEpoch());
-    List<ServerRequest> requests = new ArrayList<>();
-    selected.forEach((id, segments) -> {
-      ReplicaRouting replica = targets.get(id);
-      ParticipantToken server = replica.getServer();
-      NativeQueryContext context = new NativeQueryContext(NativeQueryContext.VERSION, uuid(broker.getHistoryId()),
-          process, new Participant(id, Role.SERVER, uuid(server.getIncarnation()), server.getRegistrationEpoch()),
-          queryId, attemptId, table.getTableName(), object(table.getTable(), broker.getHistoryId()),
-          table.getSchemaName(), object(table.getSchema(), broker.getHistoryId()), segments, List.of())
-          .withDeadline(deadline);
-      requests.add(new ServerRequest(endpoint(replica.getEndpoint()), context));
-    });
-    return List.copyOf(requests);
+    return new Selection(selected, targets);
+  }
+
+  private record Selection(Map<String, List<Segment>> segments, Map<String, ReplicaRouting> targets) {
   }
 
   /// An exact destination and identity envelope, not a dispatched or admitted query.
   public record ServerRequest(URI endpoint, NativeQueryContext context) {
+  }
+
+  private static void validatePlanningRecord(CatalogRecord record, MetadataRpc.ObjectVersion expected, String name,
+      long index) {
+    checkArgument(record.getObjectId().equals(expected.getObjectId()) && record.getVersion() == expected.getVersion()
+        && record.getName().equals(name) && record.getLastModifiedIndex() <= index,
+        "Planning record differs from captured routing identity or revision");
   }
 
   private static void validateHeader(RoutingSnapshot snapshot, ParticipantToken broker) throws IOException {
@@ -213,6 +323,13 @@ public final class NativeBrokerRoutingImage {
     checkArgument(policy.getVersion() > 0 && policy.getMinTickIntervalMillis() > 0 && policy.getLeaseRounds() >= 2
         && policy.getPermitLifetimeMillis() > 0 && policy.getMaxQueryLifetimeMillis() > 0
         && policy.getMaxRevisionLag() > 0, "Invalid routing membership policy");
+    checkArgument((policy.getPermitLifetimeMillis() - 1) / policy.getMinTickIntervalMillis()
+        < policy.getLeaseRounds() - 1
+        && control.getMinimumTickDelayMillis() >= policy.getMinTickIntervalMillis()
+        && control.getMaxConfiguredPermitLifetimeMillis() >= policy.getPermitLifetimeMillis()
+        && (control.getMaxConfiguredPermitLifetimeMillis() == policy.getPermitLifetimeMillis()
+            || control.getMinimumTickDelayMillis() >= control.getMaxConfiguredPermitLifetimeMillis()),
+        "Routing control timing does not protect serving authority");
   }
 
   private static ObjectVersion object(MetadataRpc.ObjectVersion value, String history) {

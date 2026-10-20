@@ -728,6 +728,10 @@ public class TaskCatalogTest {
     Fixture f = new Fixture();
     ParticipantToken broker = f.routingBroker(0);
     f.routingPolicies("DefaultTenant", "grpcs://localhost:8090", true);
+    assertEquals(f.mutate(Mutation.updateTableConfig(f.objectVersion(f.record(RecordKind.TABLE_CONFIG, TABLE)),
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("orders")
+            .setCustomConfig(new TableCustomConfig(Map.of("planning", "x".repeat(5000)))).build())).status(),
+        Status.OK);
     UUID hiddenTable = UUID.randomUUID();
     assertEquals(f.mutate(Mutation.createTableConfig(f._history, hiddenTable,
         new TableConfigBuilder(TableType.OFFLINE).setTableName("private").setBrokerTenant("PrivateTenant").build()))
@@ -741,6 +745,11 @@ public class TaskCatalogTest {
     assertEquals(f.routing(broker, TABLE).table().segments().getFirst().replicas().size(), 0,
         "Desired assignment is not installation evidence");
     f.install(f.assignments(installed).getFirst());
+    Content second = f.publishRoutingContent("installed-second");
+    ReconcileContent secondReconcile = new ReconcileContent(f._owner, second.segmentObjectId());
+    assertEquals(f.segment(secondReconcile).status(), Status.OK);
+    assertEquals(f.segment(secondReconcile).status(), Status.OK);
+    f.install(f.assignments(second).getFirst(), "second-install");
     RoutingSnapshot discovery = f.routing(broker, "");
     assertEquals(discovery.status(), Status.OK);
     assertEquals(discovery.tables(), List.of(TABLE));
@@ -748,12 +757,24 @@ public class TaskCatalogTest {
     assertTrue(discovery.participant().capabilities().isEmpty());
     RoutingSnapshot image = f.routing(broker, TABLE);
     assertEquals(image.status(), Status.OK);
-    assertEquals(image.table().segments().size(), 2, "Uninstalled published content must remain explicit");
-    assertEquals(image.table().segments().get(1).name(), "pending");
-    assertTrue(image.table().segments().get(1).replicas().isEmpty());
+    assertEquals(image.revision(), new Revision(f._history, f._index));
+    assertEquals(image.control(), f._catalog.membershipControl());
+    assertEquals(image.table().tableConfig(), f.record(RecordKind.TABLE_CONFIG, TABLE));
+    assertEquals(image.table().schemaRecord(), f.record(RecordKind.SCHEMA, "orders"));
+    assertEquals(image.table().table(), f.objectVersion(image.table().tableConfig()));
+    assertEquals(image.table().schema(), f.objectVersion(image.table().schemaRecord()));
+    assertTrue(image.table().tableConfig().lastModifiedIndex() <= image.revision().index());
+    assertTrue(image.table().schemaRecord().lastModifiedIndex() <= image.revision().index());
+    assertEquals(image.table().segments().size(), 3, "Uninstalled published content must remain explicit");
+    assertEquals(image.table().segments().get(2).name(), "pending");
+    assertTrue(image.table().segments().get(2).replicas().isEmpty());
     var replica = image.table().segments().getFirst().replicas().getFirst();
     assertEquals(replica.server(), server);
     assertEquals(replica.endpoint(), null, "Installed SERVER without SERVER_QUERY is not selectable");
+    assertEquals(image.table().serverAuthorities(), List.of(MembershipProtocol.decodeParticipant(
+        f.record(RecordKind.PARTICIPANT, server.participantId()).value())));
+    assertEquals(f._catalog.routingSnapshot(broker, TABLE, 10, OfflineRoutingProtocol.MAX_SNAPSHOT_BYTES), image,
+        "Multiple installed segments share one bounded server authority");
     String json = new String(MetadataProtocol.encodeValue(image), StandardCharsets.UTF_8);
     assertFalse(json.contains("private-archive"));
     assertFalse(json.contains("never-expose"));
@@ -765,8 +786,8 @@ public class TaskCatalogTest {
     assertEquals(f.routing(broker, "orders_OFFLINE_OFFLINE").status(), Status.INVALID_REQUEST);
     assertEquals(f.routing(broker, ".orders_OFFLINE").status(), Status.INVALID_REQUEST);
     for (RoutingSnapshot rejected : List.of(
-        f._catalog.routingSnapshot(broker, TABLE, 6, OfflineRoutingProtocol.MAX_SNAPSHOT_BYTES),
-        f._catalog.routingSnapshot(broker, TABLE, 4096, 1024),
+        f._catalog.routingSnapshot(broker, TABLE, 9, OfflineRoutingProtocol.MAX_SNAPSHOT_BYTES),
+        f._catalog.routingSnapshot(broker, TABLE, 4096, 5000),
         f._catalog.routingSnapshot(broker, "", 2, OfflineRoutingProtocol.MAX_SNAPSHOT_BYTES))) {
       assertEquals(rejected.status(), Status.RESPONSE_TOO_LARGE);
       assertEquals(rejected.table(), null);
@@ -842,6 +863,13 @@ public class TaskCatalogTest {
         .addSingleValueDimension("newField", DataType.STRING).build())).status(), Status.OK);
     assertTrue(f.routing(broker, TABLE).table().segments().getFirst().replicas().isEmpty(),
         "A proof against a previous exact schema version is not a current candidate");
+    RoutingSnapshot changed = f.routing(broker, TABLE);
+    assertEquals(changed.revision(), new Revision(f._history, f._index));
+    assertEquals(changed.table().schemaRecord(), f.record(RecordKind.SCHEMA, "orders"));
+    assertEquals(changed.table().schema().version(), schema.version() + 1);
+    assertTrue(changed.table().schemaRecord().value().toString().contains("newField"));
+    assertTrue(changed.table().serverAuthorities().isEmpty(),
+        "An obsolete installation must not leave unreferenced server authority");
     for (String policy : List.of("{}", "{\"brokers\":{},\"servers\":{},\"extra\":{}}",
         "{\"brokers\":{\"routing-broker\":[\"*\"]},\"servers\":{}}",
         "{\"brokers\":{\"routing-broker\":[\"DefaultTenant\",\"DefaultTenant\"]},\"servers\":{}}",
@@ -1136,6 +1164,10 @@ public class TaskCatalogTest {
     }
 
     private void install(Assignment assignment) throws IOException {
+      install(assignment, "install");
+    }
+
+    private void install(Assignment assignment, String streamId) throws IOException {
       UUID operation = NativeReplicaPlacementPolicy.operationId(_history, assignment.materializationId());
       var work = OfflineInstallationProtocol.decodeWorkResult(_catalog.query(MetadataProtocol.encode(
           new GetInstallationWork(_history, assignment.server(), operation))));
@@ -1147,7 +1179,7 @@ public class TaskCatalogTest {
       assertEquals(apply(new InstallationSessionCommand(assignment.server(), new RegisterClient(_history, client,
           assignment.server().incarnation(), 0))).status(), Status.OK);
       assertEquals(apply(new InstallationSessionCommand(assignment.server(), new NativeInstallationCommand(_history,
-          client, 1, "install", 1, report))).status(), Status.OK);
+          client, 1, streamId, 1, report))).status(), Status.OK);
     }
 
     private Result submit() throws IOException {

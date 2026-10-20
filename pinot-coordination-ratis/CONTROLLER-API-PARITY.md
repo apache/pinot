@@ -38,7 +38,8 @@ The standard resource package has **264 annotated HTTP methods across 43 resourc
   This does not provide replacement/deletion, general rebalance, physical cleanup or query-serving qualification.
 - Native broker routing: authenticated, tenant-scoped table discovery and complete OFFLINE routing observations,
   immutable broker images and query-identity construction. Typed broker certificate/session/tenant grants now support
-  local server admission and guarded gRPC delivery. Normal query planning, dispatch and serving activation remain
+  local server admission and guarded gRPC delivery. Coherent table/schema planning inputs and a captured environment
+  in the shared single-stage compiler are available. Normal broker admission, dispatch and serving activation remain
   outstanding; installed replicas without query authority are not selectable.
 - Outstanding: remaining offline lifecycle, full existing task API/plugin parity, realtime,
   remaining feature families and query-serving qualification. A full replacement is not yet implemented.
