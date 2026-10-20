@@ -20,6 +20,7 @@ package org.apache.pinot.query.planner.logical;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -71,6 +72,9 @@ import org.apache.pinot.query.planner.plannode.WindowNode;
 ///
 /// This class is stateless and thread-safe.
 public final class SpoolDeadlockGuard {
+  /// Marks the absence of a shared stage in the matrix of [Analysis#findRisk]. Stage ids are never negative.
+  private static final int NO_STAGE = -1;
+
   private SpoolDeadlockGuard() {
   }
 
@@ -148,26 +152,26 @@ public final class SpoolDeadlockGuard {
   /// One run of the check. Not thread-safe; each call to [SpoolDeadlockGuard#findRisk] creates its own instance.
   private static final class Analysis {
     private final Map<PlanNode, StageInfo> _stageInfos = new IdentityHashMap<>();
-    /// For each sender, the stages that stop when nobody reads the output of that sender.
-    private final Map<MailboxSendNode, Set<MailboxSendNode>> _stopped = new IdentityHashMap<>();
-    /// For each sender, the stages that must finish before that sender finishes.
-    private final Map<MailboxSendNode, Set<MailboxSendNode>> _needed = new IdentityHashMap<>();
+    /// For each sender, the ids of the stages that stop when nobody reads the output of that sender.
+    private final Map<MailboxSendNode, BitSet> _stopped = new IdentityHashMap<>();
+    /// For each sender, the ids of the stages that must finish before that sender finishes.
+    private final Map<MailboxSendNode, BitSet> _needed = new IdentityHashMap<>();
 
     @Nullable
     DeadlockRisk findRisk(PlanNode root) {
       List<Deferral> deferrals = collectDeferrals(root);
       int numDeferrals = deferrals.size();
-      // shared[i][j] is a stage that the waiting receive of deferral i stops and that the blocking receive of
-      // deferral j needs, or null. When it is not null, deferral i blocks deferral j.
-      MailboxSendNode[][] shared = new MailboxSendNode[numDeferrals][numDeferrals];
+      // shared[i][j] is the id of a stage that the waiting receive of deferral i stops and that the blocking receive
+      // of deferral j needs, or NO_STAGE. When it is not NO_STAGE, deferral i blocks deferral j.
+      int[][] shared = new int[numDeferrals][numDeferrals];
       for (int i = 0; i < numDeferrals; i++) {
-        Set<MailboxSendNode> stopped = getStopped(deferrals.get(i).waiting().getSender());
+        BitSet stopped = getStopped(deferrals.get(i).waiting().getSender());
         for (int j = 0; j < numDeferrals; j++) {
           shared[i][j] = firstShared(stopped, getNeeded(deferrals.get(j).blocking().getSender()));
         }
       }
       for (int i = 0; i < numDeferrals; i++) {
-        if (shared[i][i] != null) {
+        if (shared[i][i] != NO_STAGE) {
           return new DeadlockRisk(List.of(toWait(deferrals.get(i), shared[i][i])));
         }
       }
@@ -186,16 +190,20 @@ public final class SpoolDeadlockGuard {
       return new DeadlockRisk(waits);
     }
 
-    private static Wait toWait(Deferral deferral, MailboxSendNode sharedStage) {
+    private static Wait toWait(Deferral deferral, int sharedStageId) {
       // Both receives of a deferral belong to the stage of the operator that defers one behind the other.
       return new Wait(deferral.waiting().getStageId(), deferral.operator(), deferral.waiting().getSenderStageId(),
-          deferral.blocking().getSenderStageId(), sharedStage.getStageId());
+          deferral.blocking().getSenderStageId(), sharedStageId);
     }
 
     /// Returns the deferrals of every stage reachable from `root`. Two deferrals with the same pair of senders behave
     /// the same, so only the first one is kept.
+    ///
+    /// Returns an empty list when no stage sends to more than one stage. Without a spool, the stages form a tree: the
+    /// subtrees of two inputs never share a stage, so no deferral can block itself or take part in a cycle.
     private List<Deferral> collectDeferrals(PlanNode root) {
       List<Deferral> result = new ArrayList<>();
+      boolean hasSpool = false;
       Map<MailboxSendNode, Set<MailboxSendNode>> seenPairs = new IdentityHashMap<>();
       ArrayDeque<PlanNode> pending = new ArrayDeque<>();
       Set<PlanNode> visited = Collections.newSetFromMap(new IdentityHashMap<>());
@@ -203,6 +211,7 @@ public final class SpoolDeadlockGuard {
       visited.add(root);
       while (!pending.isEmpty()) {
         PlanNode stageRoot = pending.poll();
+        hasSpool |= stageRoot instanceof MailboxSendNode && ((MailboxSendNode) stageRoot).isMultiSend();
         StageInfo info = getStageInfo(stageRoot);
         for (Deferral deferral : info.deferrals()) {
           Set<MailboxSendNode> blockingSenders = seenPairs.computeIfAbsent(deferral.waiting().getSender(),
@@ -218,13 +227,13 @@ public final class SpoolDeadlockGuard {
           }
         }
       }
-      return result;
+      return hasSpool ? result : List.of();
     }
 
-    /// Returns the nodes of a cycle in the graph where `i -> j` exists when `edges[i][j]` is not null, in the order of
-    /// the edges, or null if the graph has no cycle.
+    /// Returns the nodes of a cycle in the graph where `i -> j` exists when `edges[i][j]` is not [#NO_STAGE], in the
+    /// order of the edges, or null if the graph has no cycle.
     @Nullable
-    private static List<Integer> findCycle(Object[][] edges) {
+    private static List<Integer> findCycle(int[][] edges) {
       int numNodes = edges.length;
       // 0 = not visited, 1 = on the current path, 2 = done
       int[] state = new int[numNodes];
@@ -247,7 +256,7 @@ public final class SpoolDeadlockGuard {
             continue;
           }
           int successor = next[node]++;
-          if (edges[node][successor] == null) {
+          if (edges[node][successor] == NO_STAGE) {
             continue;
           }
           if (state[successor] == 1) {
@@ -269,36 +278,38 @@ public final class SpoolDeadlockGuard {
       return null;
     }
 
-    @Nullable
-    private static MailboxSendNode firstShared(Set<MailboxSendNode> stopped, Set<MailboxSendNode> needed) {
-      for (MailboxSendNode node : stopped) {
-        if (needed.contains(node)) {
-          return node;
-        }
+    /// Returns the lowest stage id present in both sets, or [#NO_STAGE].
+    private static int firstShared(BitSet stopped, BitSet needed) {
+      if (!stopped.intersects(needed)) {
+        return NO_STAGE;
       }
-      return null;
+      BitSet shared = (BitSet) stopped.clone();
+      shared.and(needed);
+      return shared.nextSetBit(0);
     }
 
-    private Set<MailboxSendNode> getStopped(MailboxSendNode sender) {
-      Set<MailboxSendNode> result = _stopped.get(sender);
+    /// The sets are indexed by stage id. Stage ids are unique among the stages reachable from the root, and they are
+    /// small consecutive integers, so a [BitSet] is compact and makes each intersection a word-level operation.
+    private BitSet getStopped(MailboxSendNode sender) {
+      BitSet result = _stopped.get(sender);
       if (result == null) {
-        result = Collections.newSetFromMap(new IdentityHashMap<>());
-        result.add(sender);
+        result = new BitSet();
+        result.set(sender.getStageId());
         for (MailboxReceiveNode receive : getStageInfo(sender).receives().streaming()) {
-          result.addAll(getStopped(receive.getSender()));
+          result.or(getStopped(receive.getSender()));
         }
         _stopped.put(sender, result);
       }
       return result;
     }
 
-    private Set<MailboxSendNode> getNeeded(MailboxSendNode sender) {
-      Set<MailboxSendNode> result = _needed.get(sender);
+    private BitSet getNeeded(MailboxSendNode sender) {
+      BitSet result = _needed.get(sender);
       if (result == null) {
-        result = Collections.newSetFromMap(new IdentityHashMap<>());
-        result.add(sender);
+        result = new BitSet();
+        result.set(sender.getStageId());
         for (MailboxReceiveNode receive : getStageInfo(sender).receives().all()) {
-          result.addAll(getNeeded(receive.getSender()));
+          result.or(getNeeded(receive.getSender()));
         }
         _needed.put(sender, result);
       }
