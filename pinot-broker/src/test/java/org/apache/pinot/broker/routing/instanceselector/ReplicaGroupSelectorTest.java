@@ -32,7 +32,10 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.broker.routing.FailOpenPolicy;
 import org.apache.pinot.broker.routing.adaptiveserverselector.HybridSelector;
+import org.apache.pinot.common.failuredetector.FailureDetector;
+import org.apache.pinot.common.failuredetector.NoOpFailureDetector;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -378,6 +381,16 @@ public class ReplicaGroupSelectorTest {
 
   private ReplicaGroupInstanceSelector buildArSelector(String selectorType, HybridSelector hybridSelector,
       PinotConfiguration brokerConfig) {
+    return buildArSelector(selectorType, hybridSelector, brokerConfig,
+        Set.of(AR_P0_RG0_SERVER_A, AR_P1_RG1_SERVER_B, AR_P0_RG0_SERVER_C, AR_P1_RG1_SERVER_D, AR_P0_RG0_SERVER_E),
+        FailOpenPolicy.disabled(), new NoOpFailureDetector());
+  }
+
+  // Same topology as the other buildArSelector overloads, but with the enabled-instance set and fail-open plumbing
+  // parameterized so a test can simulate some AR candidates becoming unavailable and triggering fail-open.
+  private ReplicaGroupInstanceSelector buildArSelector(String selectorType, HybridSelector hybridSelector,
+      PinotConfiguration brokerConfig, Set<String> enabledInstances, FailOpenPolicy failOpenPolicy,
+      FailureDetector failureDetector) {
     RoutingConfig routingConfig = new RoutingConfig(null, null, selectorType, false);
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testTable")
         .setRoutingConfig(routingConfig).build();
@@ -407,9 +420,8 @@ public class ReplicaGroupSelectorTest {
         AR_P0_RG0_SERVER_E, serverE);
     return (ReplicaGroupInstanceSelector) InstanceSelectorFactory.getInstanceSelector(tableConfig,
         mock(ZkHelixPropertyStore.class), mock(BrokerMetrics.class), hybridSelector,
-        brokerConfig,
-        Set.of(AR_P0_RG0_SERVER_A, AR_P1_RG1_SERVER_B, AR_P0_RG0_SERVER_C, AR_P1_RG1_SERVER_D, AR_P0_RG0_SERVER_E),
-        serverMap, idealState, externalView, new HashSet<>(AR_SEGMENTS));
+        brokerConfig, enabledInstances, serverMap, idealState, externalView, new HashSet<>(AR_SEGMENTS),
+        failOpenPolicy, failureDetector);
   }
 
   @Test
@@ -575,6 +587,17 @@ public class ReplicaGroupSelectorTest {
 
   private StrictReplicaGroupInstanceSelector buildStrictReplicaGroupArSelector(HybridSelector hybridSelector,
       BrokerMetrics brokerMetrics, PinotConfiguration brokerConfig, Boolean useFixedReplica) {
+    return buildStrictReplicaGroupArSelector(hybridSelector, brokerMetrics, brokerConfig, useFixedReplica,
+        Set.of(STRICT_RG0_SERVER_A, STRICT_RG0_SERVER_B, STRICT_RG1_SERVER_C, STRICT_RG1_SERVER_D),
+        FailOpenPolicy.disabled(), new NoOpFailureDetector());
+  }
+
+  // Same topology as the other buildStrictReplicaGroupArSelector overloads, but with the enabled-instance set and
+  // fail-open plumbing parameterized so a test can simulate some AR candidates becoming unavailable and triggering
+  // fail-open.
+  private StrictReplicaGroupInstanceSelector buildStrictReplicaGroupArSelector(HybridSelector hybridSelector,
+      BrokerMetrics brokerMetrics, PinotConfiguration brokerConfig, Boolean useFixedReplica,
+      Set<String> enabledInstances, FailOpenPolicy failOpenPolicy, FailureDetector failureDetector) {
     RoutingConfig routingConfig = new RoutingConfig(null, null, STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
         useFixedReplica);
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testUpsertTable")
@@ -614,10 +637,141 @@ public class ReplicaGroupSelectorTest {
         STRICT_RG1_SERVER_C, serverC, STRICT_RG1_SERVER_D, serverD);
     return (StrictReplicaGroupInstanceSelector) InstanceSelectorFactory.getInstanceSelector(tableConfig,
         mock(ZkHelixPropertyStore.class), brokerMetrics, hybridSelector,
-        brokerConfig,
-        Set.of(STRICT_RG0_SERVER_A, STRICT_RG0_SERVER_B,
-            STRICT_RG1_SERVER_C, STRICT_RG1_SERVER_D),
-        serverMap, idealState, externalView, new HashSet<>(STRICT_SEGMENTS));
+        brokerConfig, enabledInstances, serverMap, idealState, externalView, new HashSet<>(STRICT_SEGMENTS),
+        failOpenPolicy, failureDetector);
+  }
+
+  // --- Fail-open bypasses adaptive ranking ---
+
+  private BalancedInstanceSelector buildBalancedArSelector(HybridSelector hybridSelector,
+      Set<String> enabledInstances, FailOpenPolicy failOpenPolicy, FailureDetector failureDetector) {
+    RoutingConfig routingConfig = new RoutingConfig(null, null, RoutingConfig.BALANCED_INSTANCE_SELECTOR_TYPE, false);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testBalancedTable")
+        .setRoutingConfig(routingConfig).build();
+    IdealState idealState = createIdealState(Map.of(
+        AR_SEGMENT0, List.of(Pair.of(AR_P0_RG0_SERVER_A, ONLINE), Pair.of(AR_P1_RG1_SERVER_B, ONLINE))));
+    ExternalView externalView = createExternalView(Map.of(
+        AR_SEGMENT0, List.of(Pair.of(AR_P0_RG0_SERVER_A, ONLINE), Pair.of(AR_P1_RG1_SERVER_B, ONLINE))));
+    ServerInstance serverA = mock(ServerInstance.class);
+    when(serverA.getPool()).thenReturn(0);
+    ServerInstance serverB = mock(ServerInstance.class);
+    when(serverB.getPool()).thenReturn(1);
+    Map<String, ServerInstance> serverMap = Map.of(AR_P0_RG0_SERVER_A, serverA, AR_P1_RG1_SERVER_B, serverB);
+    return (BalancedInstanceSelector) InstanceSelectorFactory.getInstanceSelector(tableConfig,
+        mock(ZkHelixPropertyStore.class), mock(BrokerMetrics.class), hybridSelector,
+        new PinotConfiguration(Map.of()), enabledInstances, serverMap, idealState, externalView,
+        Set.of(AR_SEGMENT0), failOpenPolicy, failureDetector);
+  }
+
+  @Test
+  public void testReplicaGroupFailOpenBypassesAdaptiveRanking() {
+    // Scenario: segment0 has two normal candidates, AR_P0_RG0_SERVER_A and AR_P1_RG1_SERVER_B. A healthy selector
+    // (both candidates enabled, fail-open disabled) ranks B ahead of A via AR and must pick B. A second selector,
+    // over the same segment/candidate topology, has both candidates excluded from enabledInstances (so the segment
+    // is fully unavailable) while both are reported unhealthy by the FailureDetector and fail-open is enabled; this
+    // makes both candidates eligible fail-open candidates.
+    // Expected: the fail-open selector must bypass AR (ReplicaGroupInstanceSelector.selectForFailOpen passes a null
+    // server-rank map) and fall back to deterministic round-robin-by-requestId, landing on the candidate at index 0
+    // (A, since fail-open candidates are produced in sorted-instance-name order) rather than AR's preferred B.
+    // hybridSelector.fetchServerRankingsWithScores must never be consulted on the fail-open selector.
+    Set<String> allInstances = Set.of(AR_P0_RG0_SERVER_A, AR_P1_RG1_SERVER_B);
+
+    HybridSelector healthyHybridSelector = mock(HybridSelector.class);
+    when(healthyHybridSelector.fetchServerRankingsWithScores(any())).thenReturn(List.of(
+        new ImmutablePair<>(AR_P1_RG1_SERVER_B, 1.0), new ImmutablePair<>(AR_P0_RG0_SERVER_A, 2.0)));
+    ReplicaGroupInstanceSelector healthySelector = buildArSelector(REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
+        healthyHybridSelector, new PinotConfiguration(Map.of()), allInstances, FailOpenPolicy.disabled(),
+        new NoOpFailureDetector());
+    BrokerRequest brokerRequest = mock(BrokerRequest.class);
+    PinotQuery pinotQuery = mock(PinotQuery.class);
+    when(brokerRequest.getPinotQuery()).thenReturn(pinotQuery);
+    when(pinotQuery.getQueryOptions()).thenReturn(null);
+    InstanceSelector.SelectionResult healthyResult = healthySelector.select(brokerRequest, List.of(AR_SEGMENT0), 0);
+    assertEquals(healthyResult.getSegmentToInstanceMap(), Map.of(AR_SEGMENT0, AR_P1_RG1_SERVER_B));
+
+    HybridSelector failOpenHybridSelector = mock(HybridSelector.class);
+    when(failOpenHybridSelector.fetchServerRankingsWithScores(any())).thenReturn(List.of(
+        new ImmutablePair<>(AR_P1_RG1_SERVER_B, 1.0), new ImmutablePair<>(AR_P0_RG0_SERVER_A, 2.0)));
+    FailureDetector failureDetector = mock(FailureDetector.class);
+    when(failureDetector.getUnhealthyServers()).thenReturn(allInstances);
+    ReplicaGroupInstanceSelector failOpenSelector = buildArSelector(REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
+        failOpenHybridSelector, new PinotConfiguration(Map.of()), Set.of(), new FailOpenPolicy(false, true),
+        failureDetector);
+    InstanceSelector.SelectionResult failOpenResult =
+        failOpenSelector.select(brokerRequest, List.of(AR_SEGMENT0), 0);
+
+    assertEquals(failOpenResult.getSegmentToInstanceMap(), Map.of(AR_SEGMENT0, AR_P0_RG0_SERVER_A));
+    assertTrue(failOpenResult.getUnavailableSegments().isEmpty());
+    verify(failOpenHybridSelector, never()).fetchServerRankingsWithScores(any());
+  }
+
+  @Test
+  public void testBalancedFailOpenBypassesAdaptiveRanking() {
+    // Scenario: mirrors testReplicaGroupFailOpenBypassesAdaptiveRanking, but for BalancedInstanceSelector, whose
+    // selectForFailOpen() drops adaptive selection by calling selectInstances(..., allowAdaptive=false).
+    // Expected: healthy selection honors AR's preference for B; the fail-open selection (both candidates unavailable
+    // + unhealthy, fail-open enabled) ignores AR and falls back to round-robin-by-requestId (candidate index 0 = A).
+    Set<String> allInstances = Set.of(AR_P0_RG0_SERVER_A, AR_P1_RG1_SERVER_B);
+
+    HybridSelector healthyHybridSelector = mock(HybridSelector.class);
+    when(healthyHybridSelector.fetchServerRankingsWithScores(any())).thenReturn(List.of(
+        new ImmutablePair<>(AR_P1_RG1_SERVER_B, 1.0), new ImmutablePair<>(AR_P0_RG0_SERVER_A, 2.0)));
+    // BalancedInstanceSelector's AR path (PriorityPoolInstanceSelector.choose) calls select(), not just
+    // fetchServerRankingsWithScores(), so it must be stubbed too, unlike ReplicaGroup/StrictReplicaGroup.
+    when(healthyHybridSelector.select(any())).thenReturn(AR_P1_RG1_SERVER_B);
+    BalancedInstanceSelector healthySelector = buildBalancedArSelector(healthyHybridSelector, allInstances,
+        FailOpenPolicy.disabled(), new NoOpFailureDetector());
+    BrokerRequest brokerRequest = mock(BrokerRequest.class);
+    PinotQuery pinotQuery = mock(PinotQuery.class);
+    when(brokerRequest.getPinotQuery()).thenReturn(pinotQuery);
+    when(pinotQuery.getQueryOptions()).thenReturn(null);
+    InstanceSelector.SelectionResult healthyResult = healthySelector.select(brokerRequest, List.of(AR_SEGMENT0), 0);
+    assertEquals(healthyResult.getSegmentToInstanceMap(), Map.of(AR_SEGMENT0, AR_P1_RG1_SERVER_B));
+
+    HybridSelector failOpenHybridSelector = mock(HybridSelector.class);
+    when(failOpenHybridSelector.fetchServerRankingsWithScores(any())).thenReturn(List.of(
+        new ImmutablePair<>(AR_P1_RG1_SERVER_B, 1.0), new ImmutablePair<>(AR_P0_RG0_SERVER_A, 2.0)));
+    FailureDetector failureDetector = mock(FailureDetector.class);
+    when(failureDetector.getUnhealthyServers()).thenReturn(allInstances);
+    BalancedInstanceSelector failOpenSelector = buildBalancedArSelector(failOpenHybridSelector, Set.of(),
+        new FailOpenPolicy(false, true), failureDetector);
+    InstanceSelector.SelectionResult failOpenResult =
+        failOpenSelector.select(brokerRequest, List.of(AR_SEGMENT0), 0);
+
+    assertEquals(failOpenResult.getSegmentToInstanceMap(), Map.of(AR_SEGMENT0, AR_P0_RG0_SERVER_A));
+    assertTrue(failOpenResult.getUnavailableSegments().isEmpty());
+    verify(failOpenHybridSelector, never()).fetchServerRankingsWithScores(any());
+  }
+
+  @Test
+  public void testStrictReplicaGroupFailOpenBypassesAdaptiveWithoutSplittingPartition() {
+    // Scenario: seg0 and seg1 share one partition (candidates STRICT_RG0_SERVER_A / STRICT_RG1_SERVER_C). Both
+    // candidates are excluded from enabledInstances (fully unavailable) and reported unhealthy, with fail-open
+    // enabled, so AR must be bypassed for the whole partition during fail-open reselection.
+    // Expected: both seg0 and seg1 land on the same instance (round-robin candidate index 0 = A, consistent with the
+    // partition-shared candidate ordering), proving the AR bypass does not split a same-partition segment group
+    // across different candidates. hybridSelector.fetchServerRankingsWithScores must never be consulted.
+    HybridSelector hybridSelector = mock(HybridSelector.class);
+    when(hybridSelector.fetchServerRankingsWithScores(any())).thenReturn(List.of(
+        new ImmutablePair<>(STRICT_RG1_SERVER_C, 1.0), new ImmutablePair<>(STRICT_RG0_SERVER_A, 2.0)));
+    FailureDetector failureDetector = mock(FailureDetector.class);
+    when(failureDetector.getUnhealthyServers()).thenReturn(Set.of(STRICT_RG0_SERVER_A, STRICT_RG1_SERVER_C));
+    StrictReplicaGroupInstanceSelector failOpenSelector = buildStrictReplicaGroupArSelector(hybridSelector,
+        mock(BrokerMetrics.class), new PinotConfiguration(Map.of()), false, Set.of(),
+        new FailOpenPolicy(false, true), failureDetector);
+    BrokerRequest brokerRequest = mock(BrokerRequest.class);
+    PinotQuery pinotQuery = mock(PinotQuery.class);
+    when(brokerRequest.getPinotQuery()).thenReturn(pinotQuery);
+    when(pinotQuery.getQueryOptions()).thenReturn(null);
+
+    InstanceSelector.SelectionResult result =
+        failOpenSelector.select(brokerRequest, List.of(STRICT_SEGMENT0, STRICT_SEGMENT1), 0);
+
+    assertEquals(result.getSegmentToInstanceMap(), Map.of(
+        STRICT_SEGMENT0, STRICT_RG0_SERVER_A,
+        STRICT_SEGMENT1, STRICT_RG0_SERVER_A));
+    assertTrue(result.getUnavailableSegments().isEmpty());
+    verify(hybridSelector, never()).fetchServerRankingsWithScores(any());
   }
 
   @Test
@@ -633,13 +787,19 @@ public class ReplicaGroupSelectorTest {
         new ImmutablePair<>(STRICT_RG0_SERVER_A, 3.0),  // rank 2
         new ImmutablePair<>(STRICT_RG0_SERVER_B, 4.0)   // rank 3 (worst)
     ));
+    // Pool metrics are recorded centrally by BaseInstanceSelector from the final mapping, which only happens via the
+    // BrokerRequest-based select() entry point (not the internal select(segments, requestId, segmentStates, ...)
+    // used by the other tests in this file), so this test goes through that entry point.
+    BrokerRequest brokerRequest = mock(BrokerRequest.class);
+    PinotQuery pinotQuery = mock(PinotQuery.class);
+    when(brokerRequest.getPinotQuery()).thenReturn(pinotQuery);
+    when(pinotQuery.getQueryOptions()).thenReturn(null);
 
-    InstanceSelector.InstanceMapping result =
-        instanceSelector.select(STRICT_SEGMENTS, 0, buildStrictReplicaGroupSegmentStates(), null);
+    InstanceSelector.SelectionResult result = instanceSelector.select(brokerRequest, STRICT_SEGMENTS, 0);
 
     // Each partition independently prefers its healthier replica. Segments 0 and 1 share a candidate list, so they
     // make the same choice.
-    assertEquals(result.segmentToInstanceMap(), Map.of(
+    assertEquals(result.getSegmentToInstanceMap(), Map.of(
         STRICT_SEGMENT0, STRICT_RG1_SERVER_C,
         STRICT_SEGMENT1, STRICT_RG1_SERVER_C,
         STRICT_SEGMENT2, STRICT_RG1_SERVER_D));

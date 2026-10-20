@@ -219,6 +219,10 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   // Panic routing metrics
   public static final BrokerMeter FAIL_OPEN_ELIGIBLE_REQUESTS =
       create("FAIL_OPEN_ELIGIBLE_REQUESTS", "failOpenEligibleRequests", true);
+  public static final BrokerMeter FAIL_OPEN_ROUTING_SUCCESSES =
+      create("FAIL_OPEN_ROUTING_SUCCESSES", "failOpenRoutingSuccesses", true);
+  public static final BrokerMeter FAIL_OPEN_ROUTING_FAILURES =
+      create("FAIL_OPEN_ROUTING_FAILURES", "failOpenRoutingFailures", true);
 
   // Tracks segments that become eligible for fail-open routing.
   public static final BrokerMeter FAIL_OPEN_ELIGIBLE_SEGMENTS =

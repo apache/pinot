@@ -40,6 +40,7 @@ public class SegmentStates {
   private final Set<String> _unavailableSegments;
   private final Set<String> _segmentsWithoutCandidates;
   private final Map<String, List<SegmentInstanceCandidate>> _failOpenCandidatesMap;
+  private final Set<String> _newSegments;
 
   public SegmentStates(Map<String, List<SegmentInstanceCandidate>> instanceCandidatesMap, Set<String> servingInstances,
       Set<String> unavailableSegments) {
@@ -54,11 +55,19 @@ public class SegmentStates {
   SegmentStates(Map<String, List<SegmentInstanceCandidate>> instanceCandidatesMap, Set<String> servingInstances,
       Set<String> unavailableSegments, Set<String> segmentsWithoutCandidates,
       Map<String, List<SegmentInstanceCandidate>> failOpenCandidatesMap) {
+    this(instanceCandidatesMap, servingInstances, unavailableSegments, segmentsWithoutCandidates,
+        failOpenCandidatesMap, Set.of());
+  }
+
+  SegmentStates(Map<String, List<SegmentInstanceCandidate>> instanceCandidatesMap, Set<String> servingInstances,
+      Set<String> unavailableSegments, Set<String> segmentsWithoutCandidates,
+      Map<String, List<SegmentInstanceCandidate>> failOpenCandidatesMap, Set<String> newSegments) {
     _instanceCandidatesMap = instanceCandidatesMap;
     _servingInstances = servingInstances;
     _unavailableSegments = unavailableSegments;
     _segmentsWithoutCandidates = segmentsWithoutCandidates;
     _failOpenCandidatesMap = failOpenCandidatesMap;
+    _newSegments = newSegments;
   }
 
   @Nullable
@@ -81,5 +90,11 @@ public class SegmentStates {
   @Nullable
   List<SegmentInstanceCandidate> getFailOpenCandidates(String segment) {
     return _failOpenCandidatesMap.get(segment);
+  }
+
+  /// Returns whether the segment was classified as new in this snapshot. New segments are tolerated as skippable
+  /// during fail-open reselection because it is expected for them to lack candidates (see class doc).
+  boolean isNewSegment(String segment) {
+    return _newSegments.contains(segment);
   }
 }

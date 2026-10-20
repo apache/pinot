@@ -18,16 +18,11 @@
  */
 package org.apache.pinot.broker.routing.instanceselector;
 
-import it.unimi.dsi.fastutil.ints.Int2IntMap;
-import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.broker.routing.adaptiveserverselector.ServerSelectionContext;
-import org.apache.pinot.common.metrics.BrokerMeter;
-import org.apache.pinot.common.metrics.BrokerMetrics;
-import org.apache.pinot.common.utils.HashUtil;
 
 /// Instance selector to balance the number of segments served by each selected server instance.
 ///
@@ -46,32 +41,25 @@ import org.apache.pinot.common.utils.HashUtil;
 public class BalancedInstanceSelector extends BaseInstanceSelector {
 
   @Override
-  protected InstanceMapping selectForFailOpen(List<String> unavailableSegments, int requestId,
+  protected InstanceMapping selectForFailOpen(List<String> segments, int requestId,
       SegmentStates failOpenSegmentStates, Map<String, String> queryOptions) {
-    Map<String, String> selected = new HashMap<>(HashUtil.getHashMapCapacity(unavailableSegments.size()));
-    Map<String, String> optional = new HashMap<>();
-    for (String segment : unavailableSegments) {
-      List<SegmentInstanceCandidate> candidates = failOpenSegmentStates.getCandidates(segment);
-      if (candidates != null && !candidates.isEmpty()) {
-        SegmentInstanceCandidate candidate = candidates.get(requestId++ % candidates.size());
-        if (candidate.isOnline()) {
-          selected.put(segment, candidate.getInstance());
-        } else {
-          optional.put(segment, candidate.getInstance());
-        }
-      }
-    }
-    return new InstanceMapping(selected, optional);
+    // Adaptive server selection is intentionally dropped in favor of non-adaptive selection during fail-open. Pool
+    // metrics are recorded centrally by BaseInstanceSelector from the final mapping, not here.
+    return selectInstances(segments, requestId, failOpenSegmentStates, queryOptions, false);
   }
 
   @Override
   public InstanceMapping select(List<String> segments, int requestId,
       SegmentStates segmentStates, Map<String, String> queryOptions) {
+    return selectInstances(segments, requestId, segmentStates, queryOptions, true);
+  }
+
+  private InstanceMapping selectInstances(List<String> segments, int requestId, SegmentStates segmentStates,
+      Map<String, String> queryOptions, boolean allowAdaptive) {
     Map<String, String> segmentToSelectedInstanceMap = new Object2ObjectOpenHashMap<>(segments.size());
     // No need to adjust this map per total segment numbers, as optional segments should be empty most of the time.
     Map<String, String> optionalSegmentToInstanceMap = new HashMap<>();
     ServerSelectionContext ctx = new ServerSelectionContext(queryOptions, _config);
-    Int2IntOpenHashMap poolToSegmentCount = new Int2IntOpenHashMap(2);
 
     for (String segment : segments) {
       List<SegmentInstanceCandidate> candidates = segmentStates.getCandidates(segment);
@@ -82,7 +70,7 @@ public class BalancedInstanceSelector extends BaseInstanceSelector {
       }
       SegmentInstanceCandidate selectedCandidate;
 
-      if (_priorityPoolInstanceSelector != null) {
+      if (allowAdaptive && _priorityPoolInstanceSelector != null) {
         // Adaptive server selection is enabled
         selectedCandidate = _priorityPoolInstanceSelector.select(ctx, candidates);
         // If candidates is not null, candidates is always non-empty because segments with no enabled online servers
@@ -94,7 +82,6 @@ public class BalancedInstanceSelector extends BaseInstanceSelector {
       } else {
         selectedCandidate = candidates.get(requestId++ % candidates.size());
       }
-      poolToSegmentCount.addTo(selectedCandidate.getPool(), 1);
       // This can only be offline when it is a new segment. And such segment is marked as optional segment so that
       // broker or server can skip it upon any issue to process it.
       if (selectedCandidate.isOnline()) {
@@ -104,10 +91,6 @@ public class BalancedInstanceSelector extends BaseInstanceSelector {
       }
     }
 
-    for (Int2IntMap.Entry entry : poolToSegmentCount.int2IntEntrySet()) {
-      _brokerMetrics.addMeteredValue(BrokerMeter.POOL_SEG_QUERIES, entry.getIntValue(),
-          BrokerMetrics.getTagForPreferredPool(queryOptions), String.valueOf(entry.getIntKey()));
-    }
     return new InstanceMapping(segmentToSelectedInstanceMap, optionalSegmentToInstanceMap);
   }
 }

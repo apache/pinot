@@ -19,6 +19,7 @@
 package org.apache.pinot.broker.routing.instanceselector;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.util.concurrent.RateLimiter;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -47,7 +48,6 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.SegmentUtils;
-import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
@@ -108,6 +108,14 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
   /// sharing. In a realtime table, all the segments of a stream partition usually have the same pair, so the number of
   /// distinct pairs is close to the number of partitions, far below this bound.
   static final int MAX_SHARED_CANDIDATE_LISTS = 4096;
+  // Shared across all tables to bound log volume during an outage, but FAIL_OPEN_ROUTING_FAILURES meter still
+  // tracks the full failure count regardless of throttling, and FAIL_OPEN_ELIGIBLE_SEGMENTS still records which
+  // tables had unavailable segments.
+  // TODO(STREAMANALYTICS-4865): consider reusing the broker's query-log rate limiter instead.
+  private static final RateLimiter FAIL_OPEN_ROUTING_FAILURE_LOG_RATE_LIMITER = RateLimiter.create(1);
+  // Caps the number of unavailable segment names included in the fail-open failure warning log so that log line
+  // size doesn't scale with the number of unavailable segments.
+  private static final int MAX_LOGGED_UNAVAILABLE_SEGMENTS = 5;
 
   protected TableConfig _tableConfig;
   protected String _tableNameWithType;
@@ -456,6 +464,9 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
       }
       if (!enabledCandidates.isEmpty()) {
         instanceCandidatesMap.put(segment, enabledCandidates);
+        if (shouldTrackFailOpenCandidatesForHealthySegments()) {
+          addFailOpenCandidates(segment, candidates, failOpenCandidatesMap);
+        }
       } else {
         List<String> candidateInstances = new ArrayList<>(candidates.size());
         List<SegmentInstanceCandidate> failOpenCandidates = new ArrayList<>(candidates.size());
@@ -497,6 +508,9 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
                 + "(all candidate instances: {} are disabled, but not counting new segment as unavailable)", segment,
             _tableNameWithType, candidateInstances);
       }
+      if (shouldTrackFailOpenCandidatesForHealthySegments()) {
+        addFailOpenCandidates(segment, candidates, failOpenCandidatesMap);
+      }
     }
 
     SegmentStates previousSegmentStates = _segmentStates;
@@ -514,7 +528,7 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
 
     _segmentStates =
         new SegmentStates(instanceCandidatesMap, servingInstances, unavailableSegments, segmentsWithoutCandidates,
-            failOpenCandidatesMap);
+            failOpenCandidatesMap, Set.copyOf(_newSegmentStateMap.keySet()));
     _replicaHealth = new TableReplicaHealth(minPercentOfReplicas, numSegmentsAtMinPercentOfReplicas,
         unavailableSegments.size());
   }
@@ -553,6 +567,23 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
       }
     }
     return enabledCandidates;
+  }
+
+  private void addFailOpenCandidates(String segment, List<SegmentInstanceCandidate> candidates,
+      Map<String, List<SegmentInstanceCandidate>> failOpenCandidatesMap) {
+    List<SegmentInstanceCandidate> failOpenCandidates = null;
+    for (SegmentInstanceCandidate candidate : candidates) {
+      String instanceId = candidate.getInstance();
+      if (!_enabledInstances.contains(instanceId) && _failOpenEligibleInstances.contains(instanceId)) {
+        if (failOpenCandidates == null) {
+          failOpenCandidates = new ArrayList<>();
+        }
+        failOpenCandidates.add(candidate);
+      }
+    }
+    if (failOpenCandidates != null) {
+      failOpenCandidatesMap.put(segment, failOpenCandidates);
+    }
   }
 
   /// {@inheritDoc}
@@ -628,12 +659,11 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
     SegmentStates segmentStates = _segmentStates;
     Set<String> unavailableSegments = segmentStates.getUnavailableSegments();
     Set<String> segmentsWithoutCandidates = segmentStates.getSegmentsWithoutCandidates();
-    // TODO: Remove the multi-stage query gate when fail-open routing is supported by MSE.
-    boolean failOpenEnabled =
-        _failOpenPolicy.isEnabled() && !QueryOptionsUtils.isUseMultistageEngine(queryOptions);
-    InstanceMapping mapping = select(segments, requestIdInt, segmentStates, queryOptions);
+    boolean failOpenEnabled = _failOpenPolicy.isEnabled();
+    InstanceMapping mapping = select(segments, requestIdInt, segmentStates, queryOptions, failOpenEnabled);
 
     if (unavailableSegments.isEmpty()) {
+      recordPoolMetrics(mapping, queryOptions);
       return new SelectionResult(mapping, List.of(), 0);
     } else {
       List<String> unavailableSegmentsForRequest = new ArrayList<>();
@@ -648,15 +678,25 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
         _brokerMetrics.addMeteredGlobalValue(BrokerMeter.FAIL_OPEN_ELIGIBLE_REQUESTS, 1);
       }
       if (!failOpenEligible || !failOpenEnabled) {
+        recordPoolMetrics(mapping, queryOptions);
         return new SelectionResult(mapping, unavailableSegmentsForRequest, 0);
       }
 
-      SelectionResult failOpenResult = selectFailOpen(requestIdInt, segmentStates, queryOptions, mapping,
+      SelectionResult failOpenResult = selectFailOpen(segments, requestIdInt, segmentStates, queryOptions,
           unavailableSegmentsForRequest);
       if (failOpenResult != null) {
-        recordFailOpenPoolMetrics(failOpenResult, unavailableSegmentsForRequest, queryOptions);
+        _brokerMetrics.addMeteredGlobalValue(BrokerMeter.FAIL_OPEN_ROUTING_SUCCESSES, 1);
         return failOpenResult;
       }
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.FAIL_OPEN_ROUTING_FAILURES, 1);
+      if (FAIL_OPEN_ROUTING_FAILURE_LOG_RATE_LIMITER.tryAcquire()) {
+        List<String> loggedUnavailableSegments = unavailableSegmentsForRequest.size() > MAX_LOGGED_UNAVAILABLE_SEGMENTS
+            ? unavailableSegmentsForRequest.subList(0, MAX_LOGGED_UNAVAILABLE_SEGMENTS)
+            : unavailableSegmentsForRequest;
+        LOGGER.warn("Fail-open routing failed for table: {} with {} unavailable segments (sample: {})",
+            _tableNameWithType, unavailableSegmentsForRequest.size(), loggedUnavailableSegments);
+      }
+      recordPoolMetrics(mapping, queryOptions);
       return new SelectionResult(mapping, unavailableSegmentsForRequest, 0);
     }
   }
@@ -665,52 +705,101 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
   ///
   /// @return a complete fail-open selection, or `null` when an unavailable segment has no eligible candidate
   @Nullable
-  private SelectionResult selectFailOpen(int requestId, SegmentStates segmentStates, Map<String, String> queryOptions,
-      InstanceMapping normalMapping, List<String> unavailableSegmentsForRequest) {
+  private SelectionResult selectFailOpen(List<String> segments, int requestId, SegmentStates segmentStates,
+      Map<String, String> queryOptions, List<String> unavailableSegmentsForRequest) {
     Set<String> unhealthyServers = new HashSet<>(_failureDetector.getUnhealthyServers());
     Map<String, List<SegmentInstanceCandidate>> candidatesMap = new HashMap<>();
-    for (String segment : unavailableSegmentsForRequest) {
+    // Unhealthy servers a healthy segment may fall back to, exposed via getFailOpenCandidates() on the fail-open
+    // states. Kept separate from candidatesMap so a selector only uses them as a last resort, when it can't satisfy its
+    // constraints (e.g. one replica group per partition) with healthy servers alone.
+    Map<String, List<SegmentInstanceCandidate>> fallbackCandidatesMap = new HashMap<>();
+    // Always recompute over the full, original per-query segment list (not just the unavailable subset) so that
+    // selectForFailOpen() sees the exact same iteration order/positions the ideal select() call used. Healthy segments
+    // keep their normal candidates, so they only land on an unhealthy server if the selector explicitly falls back to
+    // fallbackCandidatesMap. The segment that was actually unavailable now has real candidates instead of being
+    // skipped, so it naturally takes its place in whatever rotation the selector uses.
+    List<String> segmentsToSelect = segments;
+    Set<String> unavailableSegments = Set.copyOf(unavailableSegmentsForRequest);
+    Set<String> skippableSegments = new HashSet<>();
+    for (String segment : segmentsToSelect) {
       List<SegmentInstanceCandidate> failOpenCandidates = segmentStates.getFailOpenCandidates(segment);
-      if (failOpenCandidates == null) {
-        return null;
-      }
-      List<SegmentInstanceCandidate> eligibleCandidates = new ArrayList<>();
-      for (SegmentInstanceCandidate candidate : failOpenCandidates) {
-        String instanceId = candidate.getInstance();
-        if (unhealthyServers.contains(instanceId)) {
-          eligibleCandidates.add(candidate);
+      List<SegmentInstanceCandidate> eligibleFailOpenCandidates =
+          getEligibleFailOpenCandidates(failOpenCandidates, unhealthyServers);
+      if (unavailableSegments.contains(segment)) {
+        if (eligibleFailOpenCandidates.isEmpty()) {
+          return null;
         }
+        candidatesMap.put(segment, eligibleFailOpenCandidates);
+        continue;
       }
-      if (eligibleCandidates.isEmpty()) {
+      List<SegmentInstanceCandidate> candidates = segmentStates.getCandidates(segment);
+      if (candidates != null && !candidates.isEmpty()) {
+        candidatesMap.put(segment, candidates);
+        if (!eligibleFailOpenCandidates.isEmpty()) {
+          fallbackCandidatesMap.put(segment, eligibleFailOpenCandidates);
+        }
+      } else if (!shouldFailOpenSegmentsWithoutHealthyCandidates() && failOpenCandidates != null) {
+        // The normal pass skips this segment (e.g. a new segment whose candidates are all unhealthy), so skip it here
+        // too rather than letting it influence how the rest of the query is routed. Only new segments can reach this
+        // branch: an old segment without enabled candidates is unavailable and handled above.
+        skippableSegments.add(segment);
+      } else if (!eligibleFailOpenCandidates.isEmpty()) {
+        // No healthy route at all (e.g. a new segment whose candidates are all unhealthy), so fail open for it.
+        candidatesMap.put(segment, eligibleFailOpenCandidates);
+      } else if (canSkipSegmentForFailOpen(segment, segmentStates)) {
+        skippableSegments.add(segment);
+      } else {
         return null;
       }
-      candidatesMap.put(segment, eligibleCandidates);
     }
 
     SegmentStates failOpenStates = new SegmentStates(candidatesMap, segmentStates.getServingInstances(), Set.of(),
-        Set.of());
+        Set.of(), fallbackCandidatesMap);
     InstanceMapping failOpenMapping =
-        selectForFailOpen(unavailableSegmentsForRequest, requestId, failOpenStates, queryOptions);
-    if (!failOpenMapping.segmentToInstanceMap().keySet().containsAll(unavailableSegmentsForRequest)) {
+        selectForFailOpen(segmentsToSelect, requestId, failOpenStates, queryOptions);
+    Set<String> assignedSegments = new HashSet<>(failOpenMapping.segmentToInstanceMap().keySet());
+    assignedSegments.addAll(failOpenMapping.optionalSegmentToInstanceMap().keySet());
+    Set<String> requiredSegments = new HashSet<>(segmentsToSelect);
+    requiredSegments.removeAll(skippableSegments);
+    if (!assignedSegments.containsAll(requiredSegments)) {
       return null;
     }
-    Map<String, String> selected = new HashMap<>(normalMapping.segmentToInstanceMap());
-    selected.putAll(failOpenMapping.segmentToInstanceMap());
-    Map<String, String> optional = new HashMap<>(normalMapping.optionalSegmentToInstanceMap());
-    optional.putAll(failOpenMapping.optionalSegmentToInstanceMap());
+    recordPoolMetrics(failOpenMapping, queryOptions);
     // Keep recovery owned by the failure detector. Async query responses need epoch-aware ordering before they can
     // safely update server health because an older success must not overwrite a newer failure.
-    return new SelectionResult(new InstanceMapping(selected, optional), List.of(), 0);
+    return new SelectionResult(failOpenMapping, List.of(), 0);
   }
 
-  private void recordFailOpenPoolMetrics(SelectionResult selectionResult, List<String> failOpenSegments,
-      Map<String, String> queryOptions) {
+  /**
+   * Returns the fail-open candidates that the failure detector currently reports as unhealthy, preserving their order.
+   */
+  private static List<SegmentInstanceCandidate> getEligibleFailOpenCandidates(
+      @Nullable List<SegmentInstanceCandidate> failOpenCandidates, Set<String> unhealthyServers) {
+    if (failOpenCandidates == null) {
+      return List.of();
+    }
+    List<SegmentInstanceCandidate> eligibleCandidates = new ArrayList<>(failOpenCandidates.size());
+    for (SegmentInstanceCandidate candidate : failOpenCandidates) {
+      if (unhealthyServers.contains(candidate.getInstance())) {
+        eligibleCandidates.add(candidate);
+      }
+    }
+    return eligibleCandidates;
+  }
+
+  /**
+   * Records {@link BrokerMeter#POOL_SEG_QUERIES} once per query, from whichever {@link InstanceMapping} is actually
+   * being returned to the caller (the ideal mapping, or the fail-open mapping when fail-open succeeded). Recording
+   * from the final mapping - rather than eagerly during the ideal pass and separately patching only the segments
+   * that were unavailable - ensures the metric reflects the real instance (and pool) a segment ends up on even when
+   * fail-open reselects an already-healthy sibling segment to keep a partition on one consistent replica group.
+   */
+  private void recordPoolMetrics(InstanceMapping mapping, Map<String, String> queryOptions) {
     Map<Integer, Integer> poolToSegmentCount = new HashMap<>();
-    Map<String, String> selectedSegments = selectionResult.getSegmentToInstanceMap();
-    for (String segment : failOpenSegments) {
-      // selectFailOpen() only returns a non-null result when every fail-open segment resolves through the "real"
-      // (non-optional) map, so instanceId is always present here.
-      String instanceId = selectedSegments.get(segment);
+    for (String instanceId : mapping.segmentToInstanceMap().values()) {
+      poolToSegmentCount.merge(getPool(instanceId), 1, Integer::sum);
+    }
+    for (String instanceId : mapping.optionalSegmentToInstanceMap().values()) {
       poolToSegmentCount.merge(getPool(instanceId), 1, Integer::sum);
     }
     for (Map.Entry<Integer, Integer> entry : poolToSegmentCount.entrySet()) {
@@ -719,11 +808,49 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
     }
   }
 
-  /// Selects against query-local fail-open candidates. Built-in selectors override this to bypass sticky or adaptive
-  /// preferences while retaining their normal coverage guarantees.
-  protected InstanceMapping selectForFailOpen(List<String> unavailableSegments, int requestId,
+  /**
+   * Selects against query-local fail-open candidates, over the full, original per-query segment list (not just the
+   * unavailable subset) so implementations see the exact same iteration order/positions the ideal {@link #select}
+   * call used. Built-in selectors override this to bypass sticky or adaptive preferences while retaining their
+   * normal coverage guarantees. In {@code failOpenSegmentStates}, {@link SegmentStates#getCandidates} holds the
+   * healthy segments' normal candidates and the unavailable segments' fail-open candidates, while
+   * {@link SegmentStates#getFailOpenCandidates} holds the healthy segments' unhealthy servers; implementations must
+   * only use the latter when no assignment satisfying their constraints exists without them.
+   */
+  protected InstanceMapping selectForFailOpen(List<String> segments, int requestId,
       SegmentStates failOpenSegmentStates, Map<String, String> queryOptions) {
-    return select(unavailableSegments, requestId, failOpenSegmentStates, queryOptions);
+    return select(segments, requestId, failOpenSegmentStates, queryOptions);
+  }
+
+  /**
+   * Returns whether healthy segments should also track their unhealthy (fail-open eligible) servers. During fail-open
+   * reselection, a healthy segment with enabled candidates keeps them as its candidates and only exposes these servers
+   * via {@link SegmentStates#getFailOpenCandidates}, as a last-resort fallback for selectors that can't otherwise keep
+   * a partition on one consistent replica (e.g. multi-stage). A healthy segment without any enabled candidates (e.g. a
+   * new segment) uses them as its candidates directly, unless
+   * {@link #shouldFailOpenSegmentsWithoutHealthyCandidates()} says to skip it. Note: fail-open reselection always
+   * recomputes over the full per-query segment list regardless of this flag.
+   */
+  protected boolean shouldTrackFailOpenCandidatesForHealthySegments() {
+    return false;
+  }
+
+  /**
+   * Returns whether a segment that is not unavailable but has no healthy candidates (e.g. a new segment whose
+   * candidates are all unhealthy) should be routed to its fail-open candidates during fail-open reselection. When
+   * {@code false}, such a segment is skipped, matching how the normal pass treats it.
+   */
+  protected boolean shouldFailOpenSegmentsWithoutHealthyCandidates() {
+    return true;
+  }
+
+  /**
+   * Returns whether a segment without fail-open candidates may be omitted from a complete reselection. Consults the
+   * query's captured {@code segmentStates} snapshot (not any separately-mutable, live field) so this stays
+   * consistent with the rest of the query's fail-open decisions even if an assignment refresh races this query.
+   */
+  protected boolean canSkipSegmentForFailOpen(String segment, SegmentStates segmentStates) {
+    return segmentStates.isNewSegment(segment);
   }
 
   @Override
@@ -750,6 +877,11 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
   /// servers and let servers decide how to handle them.
   protected abstract InstanceMapping select(List<String> segments, int requestId, SegmentStates segmentStates,
       Map<String, String> queryOptions);
+
+  protected InstanceMapping select(List<String> segments, int requestId, SegmentStates segmentStates,
+      Map<String, String> queryOptions, boolean failOpenEnabled) {
+    return select(segments, requestId, segmentStates, queryOptions);
+  }
 
   /// The ideal state and external view instance state maps of a segment, compared by content. Within one rebuild,
   /// segments with equal maps get the same routing candidates, so the canonical instance (see

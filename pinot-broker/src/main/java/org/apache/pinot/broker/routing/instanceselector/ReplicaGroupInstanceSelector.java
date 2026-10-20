@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.broker.routing.instanceselector;
 
-import it.unimi.dsi.fastutil.ints.Int2IntMap;
-import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -32,11 +30,8 @@ import org.apache.commons.collections.MapUtils;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.broker.routing.adaptiveserverselector.ServerSelectionContext;
-import org.apache.pinot.common.metrics.BrokerMeter;
-import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
-import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -75,12 +70,13 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
   private static final Logger LOGGER = LoggerFactory.getLogger(ReplicaGroupInstanceSelector.class);
 
   @Override
-  protected InstanceMapping selectForFailOpen(List<String> unavailableSegments, int requestId,
+  protected InstanceMapping selectForFailOpen(List<String> segments, int requestId,
       SegmentStates failOpenSegmentStates, Map<String, String> queryOptions) {
-    Map<String, String> failOpenOptions = new HashMap<>(queryOptions);
-    failOpenOptions.put(QueryOptionKey.USE_FIXED_REPLICA, Boolean.FALSE.toString());
-    ServerSelectionContext ctx = new ServerSelectionContext(failOpenOptions, _config);
-    return selectServers(unavailableSegments, requestId, failOpenSegmentStates, null, ctx, false);
+    // Adaptive server selection is intentionally dropped (serverRankMap = null) in favor of plain round robin /
+    // fixed-replica selection during fail-open. Pool metrics are recorded centrally by BaseInstanceSelector from
+    // the final mapping, not here.
+    ServerSelectionContext ctx = new ServerSelectionContext(queryOptions, _config);
+    return selectServers(segments, requestId, failOpenSegmentStates, null, ctx);
   }
 
   @Override
@@ -111,17 +107,10 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
 
   protected InstanceMapping selectServers(List<String> segments, int requestId,
       SegmentStates segmentStates, @Nullable Map<String, Integer> serverRankMap, ServerSelectionContext ctx) {
-    return selectServers(segments, requestId, segmentStates, serverRankMap, ctx, true);
-  }
-
-  private InstanceMapping selectServers(List<String> segments, int requestId,
-      SegmentStates segmentStates, @Nullable Map<String, Integer> serverRankMap, ServerSelectionContext ctx,
-      boolean recordPoolMetrics) {
 
     Map<String, String> segmentToSelectedInstanceMap = new Object2ObjectOpenHashMap<>(segments.size());
     // No need to adjust this map per total segment numbers, as optional segments should be empty most of the time.
     Map<String, String> optionalSegmentToInstanceMap = new HashMap<>();
-    Int2IntOpenHashMap poolToSegmentCount = recordPoolMetrics ? new Int2IntOpenHashMap(2) : null;
     boolean useFixedReplica = ctx.isUseFixedReplica();
     Integer numReplicaGroupsToQuery = QueryOptionsUtils.getNumReplicaGroupsToQuery(ctx.getQueryOptions());
     int numReplicaGroups = numReplicaGroupsToQuery != null ? numReplicaGroupsToQuery : 1;
@@ -160,9 +149,6 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
         }
       }
 
-      if (recordPoolMetrics) {
-        poolToSegmentCount.addTo(selectedInstance.getPool(), 1);
-      }
       // This can only be offline when it is a new segment. And such segment is marked as optional segment so that
       // broker or server can skip it upon any issue to process it.
       if (selectedInstance.isOnline()) {
@@ -174,12 +160,6 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
         numReplicaGroups = numCandidates;
       }
       replicaOffset = (replicaOffset + 1) % numReplicaGroups;
-    }
-    if (recordPoolMetrics) {
-      for (Int2IntMap.Entry entry : poolToSegmentCount.int2IntEntrySet()) {
-        _brokerMetrics.addMeteredValue(BrokerMeter.POOL_SEG_QUERIES, entry.getIntValue(),
-            BrokerMetrics.getTagForPreferredPool(ctx.getQueryOptions()), String.valueOf(entry.getIntKey()));
-      }
     }
     return new InstanceMapping(segmentToSelectedInstanceMap, optionalSegmentToInstanceMap);
   }
