@@ -461,6 +461,16 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       List<String> arguments = functionEvaluator.getArguments();
       List<DerivedColumnArgument> argumentSources = new ArrayList<>(arguments.size());
       for (String argument : arguments) {
+        if (_cyclicColumns.contains(argument)) {
+          // A cycle member is created after everything that reads it and takes its own default value. Reading it
+          // here would see either nothing or, when it already exists and is only being updated, its pre-update
+          // values, baked into this column for good. Fall back explicitly rather than rely on absent metadata.
+          LOGGER.warn("Assigning default value to derived column: {} because argument: {} is part of a transform "
+              + "function dependency cycle", column, argument);
+          createDefaultValueColumnV1Indices(column);
+          recordCreatedColumnMetadata(column);
+          return true;
+        }
         Object[] createdValues = _createdColumnValues.get(argument);
         if (createdValues != null) {
           // Derived earlier in this same run: use the expression results it produced, not the converted values its
@@ -1370,16 +1380,17 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
   private void visitForOrdering(String column, Map<String, DefaultColumnAction> actionMap,
       Map<String, List<String>> dependencies, Map<String, DefaultColumnAction> ordered) {
     // A column on a cycle is left out here and appended at the end, so that anything reading it is created first and
-    // takes the fallback on a missing argument instead of deriving a value from a sibling's default. Skipping those
-    // columns is also what bounds this traversal: every edge that closes a cycle leads into one of them.
+    // takes the fallback for a cyclic argument (see [#createColumnV1Indices]) instead of deriving a value from a
+    // sibling's default. Skipping those columns is also what bounds this traversal: every edge that closes a cycle
+    // leads into one of them.
     if (ordered.containsKey(column) || _cyclicColumns.contains(column) || !actionMap.containsKey(column)) {
       return;
     }
     for (String dependency : dependencies.getOrDefault(column, List.of())) {
       visitForOrdering(dependency, actionMap, dependencies, ordered);
     }
-    // A dependency stuck in a cycle is absent from `ordered`; emitting this column anyway is safe because the
-    // missing argument makes it take the default-value path.
+    // A dependency stuck in a cycle is absent from `ordered`; emitting this column anyway is safe because the cyclic
+    // argument makes it take the default-value path.
     ordered.put(column, actionMap.get(column));
   }
 
