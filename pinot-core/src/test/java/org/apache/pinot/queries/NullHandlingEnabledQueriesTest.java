@@ -333,6 +333,30 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
         COLUMN1, COLUMN2)).get(0)[0], (long) NUM_OF_SEGMENT_COPIES);
   }
 
+  /// A scalar function that accepts null arguments gets null for the null row, and returns its default value there,
+  /// also when nested inside another function.
+  @Test
+  public void testScalarFunctionWithNullableParameters()
+      throws Exception {
+    initializeRows();
+    insertRow("{\"a\":\"x\",\"b\":1}");
+    insertRow(null);
+    Schema schema = schemaBuilder().addSingleValueDimension(COLUMN1, DataType.STRING).build();
+    setUpSegments(TABLE_CONFIG, schema);
+
+    List<Object[]> rows = getRows(String.format(
+        "SELECT jsonPathString(%s, '$.a', 'none'), COUNT(*) FROM testTable GROUP BY 1 ORDER BY 1", COLUMN1));
+    assertEquals(rows.size(), 2);
+    assertEquals(rows.get(0), new Object[]{"none", (long) NUM_OF_SEGMENT_COPIES});
+    assertEquals(rows.get(1), new Object[]{"x", (long) NUM_OF_SEGMENT_COPIES});
+
+    rows = getRows(String.format(
+        "SELECT jsonPathLong(%s, '$.b', 5) + 0, COUNT(*) FROM testTable GROUP BY 1 ORDER BY 1", COLUMN1));
+    assertEquals(rows.size(), 2);
+    assertEquals(rows.get(0), new Object[]{1.0, (long) NUM_OF_SEGMENT_COPIES});
+    assertEquals(rows.get(1), new Object[]{5.0, (long) NUM_OF_SEGMENT_COPIES});
+  }
+
   /// A multi-value column's null row is stored as a single default value, and its posting lists overlap across values,
   /// so the count is taken over their union.
   @Test

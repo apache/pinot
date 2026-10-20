@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import com.google.common.collect.Maps;
 import it.unimi.dsi.fastutil.ints.IntLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import java.nio.charset.StandardCharsets;
@@ -40,8 +41,11 @@ import org.apache.pinot.common.function.scalar.StringFunctions;
 import org.apache.pinot.common.function.scalar.uuid.UuidToStringScalarFunction;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
@@ -54,6 +58,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -1303,6 +1308,66 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
       }
     }
     testTransformFunctionWithNull(transformFunction, expectedValues, bitmap);
+  }
+
+  @Test
+  public void testNullArgumentsWithNullHandling() {
+    String expression = String.format("prefixesWithPrefix(%s, 3, %s)", STRING_SV_COLUMN, STRING_SV_NULL_COLUMN);
+    TransformFunction transformFunction = getTransformFunctionWithNullHandling(expression);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertNull(transformFunction.getNullBitmap(_projectionBlock));
+    String[][] values = transformFunction.transformToStringValuesMV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      String prefix = isNullRow(i) ? null : _stringSVValues[i];
+      assertEquals(values[i], StringFunctions.prefixesWithPrefix(_stringSVValues[i], 3, prefix));
+    }
+
+    // Without null handling, a null argument makes the row null
+    transformFunction = TransformFunctionFactory.get(RequestContextUtils.getExpression(expression), _dataSourceMap);
+    assertEquals(transformFunction.getNullBitmap(_projectionBlock), getNullRows());
+  }
+
+  @Test
+  public void testNullLiteralArgumentWithNullHandling() {
+    TransformFunction transformFunction =
+        getTransformFunctionWithNullHandling(String.format("prefixesWithPrefix(%s, 3, null)", STRING_SV_COLUMN));
+    assertNull(transformFunction.getNullBitmap(_projectionBlock));
+    String[][] values = transformFunction.transformToStringValuesMV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      assertEquals(values[i], StringFunctions.prefixes(_stringSVValues[i], 3));
+    }
+  }
+
+  @Test
+  public void testNullResultsWithNullHandling() {
+    TransformFunction transformFunction =
+        getTransformFunctionWithNullHandling(String.format("prefixesWithPrefix(%s, 3, '^')", STRING_SV_NULL_COLUMN));
+    String[][] values = transformFunction.transformToStringValuesMV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      String[] expectedValues = isNullRow(i) ? NullValuePlaceHolder.STRING_ARRAY
+          : StringFunctions.prefixesWithPrefix(_stringSVValues[i], 3, "^");
+      assertEquals(values[i], expectedValues);
+    }
+    assertEquals(transformFunction.getNullBitmap(_projectionBlock), getNullRows());
+  }
+
+  private TransformFunction getTransformFunctionWithNullHandling(String expression) {
+    Map<String, ColumnContext> columnContextMap = Maps.newHashMapWithExpectedSize(_dataSourceMap.size());
+    _dataSourceMap.forEach(
+        (column, dataSource) -> columnContextMap.put(column, ColumnContext.fromDataSource(dataSource)));
+    QueryContext queryContext =
+        QueryContextConverterUtils.getQueryContext("SET enableNullHandling=true; SELECT * FROM testTable");
+    return TransformFunctionFactory.get(RequestContextUtils.getExpression(expression), columnContextMap, queryContext);
+  }
+
+  private RoaringBitmap getNullRows() {
+    RoaringBitmap nullRows = new RoaringBitmap();
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (isNullRow(i)) {
+        nullRows.add(i);
+      }
+    }
+    return nullRows;
   }
 
   @Test
