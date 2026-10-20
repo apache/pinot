@@ -439,17 +439,20 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
       if (!enabledCandidates.isEmpty()) {
         instanceCandidatesMap.put(segment, enabledCandidates);
       } else {
-        List<String> candidateInstances = new ArrayList<>(candidates.size());
-        for (SegmentInstanceCandidate candidate : candidates) {
-          candidateInstances.add(candidate.getInstance());
-        }
-        LOGGER.warn("Failed to find servers hosting old segment: {} for table: {} "
-                + "(all candidate instances: {} are disabled, counting segment as unavailable)", segment,
-            _tableNameWithType, candidateInstances);
-        unavailableSegments.add(segment);
         if (candidates.isEmpty()) {
+          LOGGER.warn("Failed to find servers hosting old segment: {} for table: {} "
+              + "(no candidate instances, counting segment as unavailable)", segment, _tableNameWithType);
           segmentsWithoutCandidates.add(segment);
+        } else {
+          List<String> candidateInstances = new ArrayList<>(candidates.size());
+          for (SegmentInstanceCandidate candidate : candidates) {
+            candidateInstances.add(candidate.getInstance());
+          }
+          LOGGER.warn("Failed to find servers hosting old segment: {} for table: {} "
+                  + "(all candidate instances: {} are disabled, counting segment as unavailable)", segment,
+              _tableNameWithType, candidateInstances);
         }
+        unavailableSegments.add(segment);
         _brokerMetrics.addMeteredTableValue(_tableNameWithType, BrokerMeter.NO_SERVING_HOST_FOR_SEGMENT, 1);
       }
     }
