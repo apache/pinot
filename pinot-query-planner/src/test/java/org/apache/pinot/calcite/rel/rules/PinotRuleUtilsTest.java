@@ -40,6 +40,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
 
@@ -161,7 +162,8 @@ public class PinotRuleUtilsTest {
   /// relocatable (otherwise MV filters stay above joins and fail validation). Its operands must still be checked.
   @Test
   public void testArrayToMvIsRelocatable() {
-    SqlOperator arrayToMv = resolvedOperator("ARRAY_TO_MV");
+    SqlOperator arrayToMv = resolvedOperator("arrayToMv");
+    assertSame(arrayToMv, PinotOperatorTable.ARRAY_TO_MV, "isRelocatable matches ARRAY_TO_MV by identity");
     assertFalse(arrayToMv.isDeterministic(), "ARRAY_TO_MV is expected to be flagged non-deterministic");
     RexNode mvCol = _rexBuilder.makeInputRef(
         _typeFactory.createArrayType(_typeFactory.createSqlType(SqlTypeName.VARCHAR), -1), 0);

@@ -53,6 +53,7 @@ import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.calcite.util.Util;
 import org.apache.pinot.calcite.rel.hint.PinotHintStrategyTable;
+import org.apache.pinot.calcite.sql.fun.PinotOperatorTable;
 import org.apache.pinot.common.function.sql.PinotSqlFunction;
 
 
@@ -154,9 +155,9 @@ public class PinotRuleUtils {
   ///   [PinotEvaluateLiteralRule] can still fold them once at plan time, which is precisely why
   ///   [SqlOperator#isDeterministic()] alone does not catch them.
   ///
-  /// `ARRAY_TO_MV` is the one exception. It is marked non-deterministic (and so volatile) only to stop Calcite from
-  /// simplifying MV predicates such as `ARRAY_TO_MV(col) = 'a' AND ARRAY_TO_MV(col) = 'b'` to `false`. Its value
-  /// depends only on its row, so its own flags are ignored here. Its operands are still checked.
+  /// [PinotOperatorTable#ARRAY_TO_MV] is the one exception. It is marked non-deterministic (and so volatile) only to
+  /// stop Calcite from simplifying MV predicates such as `ARRAY_TO_MV(col) = 'a' AND ARRAY_TO_MV(col) = 'b'` to
+  /// `false`. Its value depends only on its row, so its own flags are ignored here. Its operands are still checked.
   ///
   /// Relocating an expression that fails this check changes how many times, and in what context, it is evaluated --
   /// which changes query results. `FunctionVolatility.STABLE` deliberately passes: it is constant within a single
@@ -170,7 +171,7 @@ public class PinotRuleUtils {
         @Override
         public Void visitCall(RexCall call) {
           SqlOperator operator = call.getOperator();
-          if (!operator.getName().equals("ARRAY_TO_MV") && (!operator.isDeterministic()
+          if (operator != PinotOperatorTable.ARRAY_TO_MV && (!operator.isDeterministic()
               || operator.isDynamicFunction()
               || (operator instanceof PinotSqlFunction && ((PinotSqlFunction) operator).isVolatile()))) {
             throw Util.FoundOne.NULL;
