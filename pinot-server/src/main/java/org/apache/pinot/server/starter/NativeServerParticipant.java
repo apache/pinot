@@ -19,6 +19,7 @@
 package org.apache.pinot.server.starter;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -44,14 +45,17 @@ import org.apache.pinot.common.config.provider.RecoverableClusterConfigCache;
 import org.apache.pinot.common.coordination.NativeOfflineSegmentWorker;
 import org.apache.pinot.common.coordination.QueryDeadlineGuard;
 import org.apache.pinot.common.coordination.ServingPermitGuard;
+import org.apache.pinot.common.coordination.ServingPermitGuard.LeaseObservation;
 import org.apache.pinot.common.coordination.ServingPermitGuard.MembershipView;
 import org.apache.pinot.common.coordination.ServingPermitGuard.MonotonicClock;
+import org.apache.pinot.common.coordination.ServingPermitGuard.PeerLeaseBound;
 import org.apache.pinot.common.coordination.ServingPermitGuard.QualifiedLifetimePolicy;
 import org.apache.pinot.common.coordination.ServingPermitGuard.QueryTicket;
 import org.apache.pinot.common.coordination.ServingPermitGuard.ReadOnlyCapability;
 import org.apache.pinot.common.coordination.ServingPermitGuard.ServingDeniedException;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.context.NativeQueryContext;
+import org.apache.pinot.common.request.context.NativeQueryGate;
 import org.apache.pinot.coordination.ratis.rpc.MetadataRpc;
 import org.apache.pinot.coordination.ratis.rpc.MetadataRpc.ResultStatus;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
@@ -115,14 +119,21 @@ public final class NativeServerParticipant implements AutoCloseable {
   }
 
   /// One local query admission, bound to its immutable attempt identity and original finite serving ticket.
-  /// Callers must still authenticate the broker and pin exact segment handles. The original end-to-end deadline
-  /// is retained by the ticket and cannot be extended by a renewed serving permit.
+  /// Binds the verified peer certificate; callers must still pin exact segment handles. The original end-to-end
+  /// deadline is retained by the ticket and cannot be extended by a renewed serving permit.
   public static final class QueryAdmission {
     private final NativeQueryContext _context;
+    private final String _peerFingerprint;
+    private final long _authorizationGeneration;
+    private final PeerLeaseBound _peerLease;
     private final QueryTicket _ticket;
 
-    private QueryAdmission(NativeQueryContext context, QueryTicket ticket) {
+    private QueryAdmission(NativeQueryContext context, String peerFingerprint, long authorizationGeneration,
+        PeerLeaseBound peerLease, QueryTicket ticket) {
       _context = context;
+      _peerFingerprint = peerFingerprint;
+      _authorizationGeneration = authorizationGeneration;
+      _peerLease = peerLease;
       _ticket = ticket;
     }
 
@@ -147,6 +158,7 @@ public final class NativeServerParticipant implements AutoCloseable {
   private final Set<UUID> _queued = ConcurrentHashMap.newKeySet();
   private final AtomicBoolean _closed = new AtomicBoolean();
   private final ReentrantReadWriteLock _admission = new ReentrantReadWriteLock();
+  private Map<String, PeerLeaseBound> _peerLeases = Map.of();
   @Nullable
   private volatile MetadataRpc.ParticipantToken _participant;
   @Nullable
@@ -259,6 +271,7 @@ public final class NativeServerParticipant implements AutoCloseable {
   }
 
   private void hydrate() throws Exception {
+    LeaseObservation observation = _serving == null ? null : _serving.beginLeaseObservation();
     MetadataRpc.InstallationSnapshot snapshot = _work.snapshot(MetadataRpc.InstallationSnapshotRequest.newBuilder()
         .setHistoryId(_settings.historyId().toString()).setSession(session()).setMaxRecords(4096)
         .setMaxBytes(2 * 1024 * 1024).build(), _settings.rpcTimeoutMillis());
@@ -268,7 +281,23 @@ public final class NativeServerParticipant implements AutoCloseable {
     }
     hydration(false);
     metadata().apply(snapshot);
-    hydration(true);
+    Map<String, PeerLeaseBound> peerLeases = new HashMap<>();
+    if (_serving != null) {
+      MetadataRpc.MembershipControl control = snapshot.getControl();
+      for (MetadataRpc.QueryBrokerAuthority broker : snapshot.getQueryBrokersList()) {
+        peerLeases.put(broker.getParticipant().getParticipant().getParticipantId(),
+            _serving.boundPeerLease(requireNonNull(observation), control.getRound(),
+                broker.getParticipant().getExpiryRound(), control.getPolicy().getMinTickIntervalMillis(),
+                control.getPolicy().getPermitLifetimeMillis()));
+      }
+    }
+    _admission.writeLock().lock();
+    try {
+      _peerLeases = Map.copyOf(peerLeases);
+      _hydrated = !_closed.get() && !_fenced;
+    } finally {
+      _admission.writeLock().unlock();
+    }
   }
 
   private void reconcile() {
@@ -481,9 +510,15 @@ public final class NativeServerParticipant implements AutoCloseable {
     }
   }
 
-  /// Local admission only. The metadata predicate checks the current desired content; physical acquisition must
-  /// independently pin and compare installed identities before execution. No metadata RPC is performed here.
+  /// Legacy identity-only entry point cannot authenticate a native broker and never grants serving authority.
   public QueryAdmission admitQuery(NativeQueryContext context) {
+    throw new IllegalStateException("Native query admission requires an authenticated peer certificate");
+  }
+
+  /// Local admission only. The peer fingerprint must come from verified mTLS, never request metadata.
+  /// The metadata predicate checks the current desired content; physical acquisition must
+  /// independently pin and compare installed identities before execution. No metadata RPC is performed here.
+  public QueryAdmission admitQuery(NativeQueryContext context, String peerFingerprint) {
     requireNonNull(context, "context");
     checkState(context.version() == NativeQueryContext.DEADLINE_VERSION && context.deadline() != null,
         "Native query admission requires an immutable end-to-end deadline");
@@ -492,9 +527,13 @@ public final class NativeServerParticipant implements AutoCloseable {
       ServingPermitGuard guard = serving();
       QueryTicket ticket = guard.admit(ReadOnlyCapability.SERVER_QUERY, context.deadline(),
           requireNonNull(_servingSettings).queryDeadlines());
+      checkState(metadata().isAuthorizedQuery(context, peerFingerprint),
+          "Native query broker certificate or current authority differs");
       checkState(metadata().isCurrentQuery(context), "Native query identity differs from current metadata");
+      PeerLeaseBound peerLease = _peerLeases.get(context.broker().participantId());
       guard.checkDelivery(ticket);
-      return new QueryAdmission(context, ticket);
+      guard.checkPeerLease(peerLease);
+      return new QueryAdmission(context, peerFingerprint, metadata().authorizationGeneration(), peerLease, ticket);
     } finally {
       _admission.readLock().unlock();
     }
@@ -507,9 +546,34 @@ public final class NativeServerParticipant implements AutoCloseable {
     _admission.readLock().lock();
     try {
       serving().checkDelivery(admission._ticket);
+      serving().checkPeerLease(admission._peerLease);
+      checkState(metadata().authorizationGeneration() == admission._authorizationGeneration
+          && metadata().isAuthorizedQuery(admission._context, admission._peerFingerprint),
+          "Native query broker certificate or current authority changed");
     } finally {
       _admission.readLock().unlock();
     }
+  }
+
+  /// Serializes the actual result callback with local metadata publication, revocation and participant fencing.
+  /// Callbacks must be bounded and must not attempt a participant lifecycle change requiring the write lock.
+  public void deliverQuery(QueryAdmission admission, Runnable callback) {
+    requireNonNull(callback, "callback");
+    _admission.readLock().lock();
+    try {
+      checkQueryDelivery(admission);
+      callback.run();
+    } finally {
+      _admission.readLock().unlock();
+    }
+  }
+
+  /// Supplies native gRPC admission and delivery fencing without creating or activating any query listener.
+  public NativeQueryGate queryGate() {
+    return (context, peerFingerprint) -> {
+      QueryAdmission admission = admitQuery(context, peerFingerprint);
+      return callback -> deliverQuery(admission, callback);
+    };
   }
 
   private ServingPermitGuard serving() {

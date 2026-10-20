@@ -289,6 +289,30 @@ public final class ServingPermitGuard {
     }
   }
 
+  /// Opaque qualified lower time bound captured before transmitting a coherent membership snapshot request.
+  public static final class LeaseObservation {
+    private final Object _owner;
+    private final long _firstSendLowerBound;
+
+    private LeaseObservation(Object owner, long firstSendLowerBound) {
+      _owner = owner;
+      _firstSendLowerBound = firstSendLowerBound;
+    }
+  }
+
+  /// An immutable peer-lease deadline derived from one snapshot observation. Refresh or renewal cannot extend an
+  /// admitted attempt's captured bound, and a rejected bound cannot revive if clock uncertainty later narrows.
+  public static final class PeerLeaseBound {
+    private final Object _owner;
+    private final long _deadline;
+    private boolean _rejected;
+
+    private PeerLeaseBound(Object owner, long deadline) {
+      _owner = owner;
+      _deadline = deadline;
+    }
+  }
+
   public ServingPermitGuard(ParticipantToken participant, Set<ReadOnlyCapability> allowedCapabilities,
       MonotonicClock clock, QualifiedLifetimePolicy policy, Supplier<MembershipView> view) {
     _participant = normalize(participant);
@@ -312,6 +336,43 @@ public final class ServingPermitGuard {
         "Renewal sends must use the next logical sequence or retry the current one");
     _lastSentSequence = sequence;
     _firstSendLowerBound = subtract(now.nanos(), now.uncertaintyNanos());
+  }
+
+  /// Call immediately before sending the snapshot RPC, never on receipt. Network transit consumes the lease budget.
+  public synchronized LeaseObservation beginLeaseObservation() {
+    ClockReading now = readClock();
+    return new LeaseObservation(_ticketOwner, subtract(now.nanos(), now.uncertaintyNanos()));
+  }
+
+  /// Bounds a peer's remaining lease using the snapshot's current policy, including possible future policy changes.
+  /// The next tick may be immediate, so only `expiryRound - round - 1` full intervals are guaranteed. A later policy
+  /// may accelerate subsequent ticks, but its persisted transition barrier first waits out the current policy's
+  /// permit lifetime. Cap by that lifetime, not by the transient minimum-tick delay or historical maximum lifetime.
+  /// This relies on the same qualified membership clock driver as serving permits.
+  public synchronized PeerLeaseBound boundPeerLease(LeaseObservation observation, long round, long expiryRound,
+      long minTickIntervalMillis, long permitLifetimeMillis) {
+    require(observation != null && observation._owner == _ticketOwner,
+        "Lease observation belongs to another guard or process");
+    readClock();
+    require(round >= 0 && expiryRound > round && minTickIntervalMillis > 0 && permitLifetimeMillis > 0,
+        "Invalid peer membership lease");
+    long fullRounds = expiryRound - round - 1;
+    long cap = Math.min(permitLifetimeMillis, _policy.maxPermitLifetimeMillis());
+    // Compare before multiplying: historical leases can retain arbitrarily large remaining round counts.
+    long millis = fullRounds > cap / minTickIntervalMillis ? cap : fullRounds * minTickIntervalMillis;
+    long nanos = Math.max(0, convertedLifetime(millis, _policy.safeLifetimeFractionPpm()));
+    return new PeerLeaseBound(_ticketOwner, add(observation._firstSendLowerBound, nanos));
+  }
+
+  /// Check both before admission and every result callback, even when membership snapshots stop arriving.
+  public synchronized void checkPeerLease(PeerLeaseBound bound) {
+    require(bound != null && bound._owner == _ticketOwner, "Peer lease belongs to another guard or process");
+    require(!bound._rejected, "Peer membership lease was already rejected");
+    ClockReading now = readClock();
+    if (add(now.nanos(), now.uncertaintyNanos()) >= bound._deadline) {
+      bound._rejected = true;
+      deny("Peer membership lease expired");
+    }
   }
 
   /// Stages an authenticated grant. Admission independently requires its minimum coherent image revision. Exact
@@ -547,10 +608,14 @@ public final class ServingPermitGuard {
   }
 
   private long safeLifetime(long millis, int fractionPpm) {
-    long nanos = subtract(Math.multiplyExact(millis, fractionPpm),
-        Math.multiplyExact(_policy.safetyMarginMillis(), NANOS_PER_MILLI));
+    long nanos = convertedLifetime(millis, fractionPpm);
     require(nanos > 0, "No positive lifetime remains under the qualified safety policy");
     return nanos;
+  }
+
+  private long convertedLifetime(long millis, int fractionPpm) {
+    return subtract(Math.multiplyExact(millis, fractionPpm),
+        Math.multiplyExact(_policy.safetyMarginMillis(), NANOS_PER_MILLI));
   }
 
   private long add(long first, long second) {

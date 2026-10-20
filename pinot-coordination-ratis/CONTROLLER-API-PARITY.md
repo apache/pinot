@@ -37,7 +37,8 @@ The standard resource package has **264 annotated HTTP methods across 43 resourc
   intent and exact server receipts. The task API reports publication, desired and installed replicas separately.
   This does not provide replacement/deletion, general rebalance, physical cleanup or query-serving qualification.
 - Native broker routing: authenticated, tenant-scoped table discovery and complete OFFLINE routing observations,
-  immutable broker images and query-identity construction. Query planning, dispatch and serving activation remain
+  immutable broker images and query-identity construction. Typed broker certificate/session/tenant grants now support
+  local server admission and guarded gRPC delivery. Normal query planning, dispatch and serving activation remain
   outstanding; installed replicas without query authority are not selectable.
 - Outstanding: remaining offline lifecycle, full existing task API/plugin parity, realtime,
   remaining feature families and query-serving qualification. A full replacement is not yet implemented.

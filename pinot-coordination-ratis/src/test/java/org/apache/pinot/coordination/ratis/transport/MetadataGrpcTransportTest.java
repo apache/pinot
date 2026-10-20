@@ -53,6 +53,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.UnaryOperator;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.config.provider.NativeOfflineSegmentAction;
 import org.apache.pinot.common.coordination.QueryDeadlineGuard;
@@ -136,13 +137,14 @@ public class MetadataGrpcTransportTest {
   public void generateCertificates()
       throws Exception {
     _directory = Files.createTempDirectory("pinot-metadata-mtls-");
-    for (String name : List.of("server", "controller-a", "controller-b", "worker", "untrusted")) {
+    for (String name : List.of("server", "controller-a", "controller-b", "worker", "broker", "untrusted")) {
       _certificates.put(name, certificate(name));
     }
     _trustClients = _directory.resolve("trusted-clients.pem");
     Files.writeString(_trustClients, Files.readString(_certificates.get("controller-a").certificate())
         + Files.readString(_certificates.get("controller-b").certificate())
-        + Files.readString(_certificates.get("worker").certificate()));
+        + Files.readString(_certificates.get("worker").certificate())
+        + Files.readString(_certificates.get("broker").certificate()));
   }
 
   @AfterClass(alwaysRun = true)
@@ -536,13 +538,17 @@ public class MetadataGrpcTransportTest {
         if (fingerprint.equals(_certificates.get("controller-b").fingerprint())) {
           return otherBinding.get();
         }
+        if (fingerprint.equals(_certificates.get("broker").fingerprint())) {
+          return new ParticipantIdentity("Broker_query", Role.BROKER, Set.of(Capability.BROKER_QUERY));
+        }
         return fingerprint.equals(_certificates.get("worker").fingerprint()) ? workerBinding.get() : null;
       };
       try (Fixture fixture = new Fixture(MetadataGrpcService.Limits.defaults(), quorum._history, access,
           quorum._access, participants);
           MetadataGrpcClient first = fixture.client("controller-a");
           MetadataGrpcClient second = fixture.client("controller-b");
-          MetadataGrpcClient worker = fixture.client("worker")) {
+          MetadataGrpcClient worker = fixture.client("worker");
+          MetadataGrpcClient broker = fixture.client("broker")) {
         UUID history = quorum._history;
         MetadataRpc.MembershipResponse registered = first.membershipExecute(memberRegistration(history));
         MetadataRpc.ParticipantToken controller = registered.getParticipant().getParticipant();
@@ -753,6 +759,50 @@ public class MetadataGrpcTransportTest {
         assertFalse(oversizedSnapshot.hasParticipant());
         assertStatus(Status.Code.INVALID_ARGUMENT, () -> worker.installationSnapshot(serverSnapshot.toBuilder()
             .setMaxBytes(0).build(), 5000));
+        MetadataRpc.ParticipantToken brokerSession = registerReady(broker, history);
+        String brokerFingerprint = _certificates.get("broker").fingerprint();
+        String routingPolicy = "{\"brokers\":{\"Broker_query\":[\"DefaultTenant\",\"OtherTenant\"]},"
+            + "\"servers\":{},\"principals\":{\"" + brokerFingerprint + "\":\"Broker_query\"}}";
+        UUID clusterId = UUID.randomUUID();
+        commitNativeTest(quorum, new MetadataProtocol.Transaction(history, "coordinator", 1, "routing-policy", 1,
+            List.of(MetadataProtocol.Mutation.createClusterConfig(history, clusterId,
+                Map.of(NativeBrokerRoutingPolicy.CONFIG_KEY, routingPolicy)))));
+        MetadataRpc.InstallationSnapshot authority = worker.installationSnapshot(serverSnapshot, 5000);
+        assertEquals(authority.getStatus(), MetadataRpc.ResultStatus.OK);
+        assertEquals(authority.getQueryBrokersCount(), 1);
+        MetadataRpc.QueryBrokerAuthority grant = authority.getQueryBrokers(0);
+        assertEquals(grant.getParticipant().getParticipant(), brokerSession);
+        assertEquals(grant.getCertificateSha256List(), List.of(brokerFingerprint));
+        assertEquals(grant.getBrokerTenantsList(), List.of("DefaultTenant"),
+            "Only tenants of this server's assigned tables may authorize queries");
+        assertEquals(second.installationSnapshot(serverSnapshot.toBuilder()
+            .setSession(session(otherServer.getParticipant().getParticipant())).build(), 5000).getQueryBrokersCount(),
+            0, "An unassigned server receives no broker query authority");
+        assertStatus(Status.Code.PERMISSION_DENIED, () -> broker.installationSnapshot(serverSnapshot, 5000));
+        assertStatus(Status.Code.PERMISSION_DENIED, () -> worker.read(fixture.revision()));
+        assertStatus(Status.Code.PERMISSION_DENIED, () -> worker.openSnapshot(fixture.open()));
+        MetadataRpc.InstallationSnapshot bounded = worker.installationSnapshot(serverSnapshot.toBuilder()
+            .setMaxRecords(authority.getRecordsCount() + authority.getOperationIdsCount()).build(), 5000);
+        assertEquals(bounded.getStatus(), MetadataRpc.ResultStatus.RESPONSE_TOO_LARGE);
+        assertEquals(bounded.getQueryBrokersCount(), 0);
+        assertEquals(bounded.getRecordsCount(), 0);
+        assertEquals(bounded.getOperationIdsCount(), 0);
+        assertFalse(bounded.hasParticipant());
+        assertFalse(bounded.hasControl());
+        access._installationResult.set(image -> new OfflineInstallationProtocol.InstallationSnapshot(
+            MetadataProtocol.Status.NOT_READY, image.revision(), "Unavailable", null, List.of(), List.of(), null,
+            image.queryBrokers()));
+        try {
+          assertStatus(Status.Code.INTERNAL, () -> worker.installationSnapshot(serverSnapshot, 5000));
+        } finally {
+          access._installationResult.set(UnaryOperator.identity());
+        }
+        commitNativeTest(quorum, new MetadataProtocol.Transaction(history, "coordinator", 1, "routing-policy", 2,
+            List.of(MetadataProtocol.Mutation.updateClusterConfig(
+                new MetadataProtocol.ObjectVersion(history, clusterId, 1), Map.of(NativeBrokerRoutingPolicy.CONFIG_KEY,
+                    "{\"brokers\":{\"Broker_query\":[\"DefaultTenant\"]},\"servers\":{}}")))));
+        assertEquals(worker.installationSnapshot(serverSnapshot, 5000).getQueryBrokersCount(), 0,
+            "A valid legacy policy without principals grants no query authority");
         Work work = MetadataGrpcClient.decodeInstallationWork(worker.installationLookup(lookup, 5000)).work();
         assertEquals(work.target().server(), MembershipRpcCodec.participant(server));
         assertEquals(work.content(), content);
@@ -1114,9 +1164,14 @@ public class MetadataGrpcTransportTest {
   public void testNativeServerParticipantDiscoversAndReconcilesInstallations()
       throws Exception {
     String participantId = "Server_runtime";
+    String brokerId = "Broker_runtime";
+    String brokerFingerprint = _certificates.get("broker").fingerprint();
     ParticipantAccessPolicy participants = fingerprint -> {
       if (fingerprint.equals(_certificates.get("controller-a").fingerprint())) {
         return new ParticipantIdentity("Controller_runtime", Role.CONTROLLER, Set.of());
+      }
+      if (fingerprint.equals(brokerFingerprint)) {
+        return new ParticipantIdentity(brokerId, Role.BROKER, Set.of(Capability.BROKER_QUERY));
       }
       return fingerprint.equals(_certificates.get("worker").fingerprint())
           ? new ParticipantIdentity(participantId, Role.SERVER, Set.of(Capability.SERVER_QUERY)) : null;
@@ -1125,9 +1180,11 @@ public class MetadataGrpcTransportTest {
       quorum.startMembership();
       try (Fixture fixture = new Fixture(MetadataGrpcService.Limits.defaults(), quorum._history, quorum._access,
           quorum._access, participants); MetadataGrpcClient controller = fixture.client("controller-a");
-          MetadataGrpcClient observer = fixture.client("worker")) {
+          MetadataGrpcClient observer = fixture.client("worker");
+          MetadataGrpcClient broker = fixture.client("broker")) {
         UUID history = quorum._history;
         MetadataRpc.ParticipantToken controllerSession = registerReady(controller, history);
+        MetadataRpc.ParticipantToken brokerSession = registerReady(broker, history);
         assertEquals(quorum._access.execute(new MetadataProtocol.RegisterClient(history, "native-test",
             UUID.randomUUID(), 0), 5000).status(), MetadataProtocol.Status.OK);
         MembershipProtocol.ControlToken control = quorum._access.query(new MetadataProtocol.MembershipQuery(history,
@@ -1150,7 +1207,11 @@ public class MetadataGrpcTransportTest {
             .addSingleValueDimension("id", DataType.INT).build();
         commitNativeTest(quorum, new MetadataProtocol.Transaction(history, "native-test", 1, "config", 1,
             List.of(MetadataProtocol.Mutation.createTableConfig(history, tableId, table),
-                MetadataProtocol.Mutation.createSchema(history, schemaId, schema))));
+                MetadataProtocol.Mutation.createSchema(history, schemaId, schema),
+                MetadataProtocol.Mutation.createClusterConfig(history, UUID.randomUUID(),
+                    Map.of(NativeBrokerRoutingPolicy.CONFIG_KEY, "{\"brokers\":{\"" + brokerId
+                        + "\":[\"DefaultTenant\"]},\"servers\":{},\"principals\":{\"" + brokerFingerprint
+                        + "\":\"" + brokerId + "\"}}")))));
         // Only this test supplies a synthetic qualified clock. No network query listener is started.
         AtomicLong clockNanos = new AtomicLong();
         ServingSettings serving = new ServingSettings(() -> new ClockReading(clockNanos.get(), 0, true),
@@ -1222,8 +1283,8 @@ public class MetadataGrpcTransportTest {
           assertTrue(recoveredOutcomes.get() > 0, "A completed operation's unknown receipt still needs recovery");
           awaitNativeHeartbeat(quorum, first, before);
           NativeQueryContext firstContext = installedQuery(first, tableName, content.segmentName(),
-              serving.queryDeadlines());
-          QueryAdmission firstAdmission = awaitNativeAdmission(first, firstContext);
+              brokerSession, serving.queryDeadlines());
+          QueryAdmission firstAdmission = awaitNativeAdmission(first, firstContext, brokerFingerprint);
           assertEquals(firstAdmission.context(), firstContext);
           SingleTableExecutionInfo pinned = SingleTableExecutionInfo.create(first.dataManager(), tableName,
               firstContext.requiredNames(), firstContext.optionalNames(), mock(QueryContext.class),
@@ -1239,7 +1300,7 @@ public class MetadataGrpcTransportTest {
               .setHistoryId(history.toString()).setDrain(session(firstToken)).build()).getStatus(),
               MetadataRpc.ResultStatus.OK);
           awaitNativeDelivery(first, firstAdmission, true);
-          expectThrows(IllegalStateException.class, () -> first.admitQuery(firstContext));
+          expectThrows(IllegalStateException.class, () -> first.admitQuery(firstContext, brokerFingerprint));
           assertFalse(first.wake(load), "Draining rejects new installation work");
           clockNanos.set(TimeUnit.MILLISECONDS.toNanos(1001));
           expectThrows(IllegalStateException.class, () -> first.checkQueryDelivery(firstAdmission));
@@ -1278,9 +1339,10 @@ public class MetadataGrpcTransportTest {
             assertEquals(completed.status(), OperationProtocol.State.SUCCEEDED);
             assertEquals(completed.completionProof().installations().size(), 1);
             NativeQueryContext replacementContext = installedQuery(restarted, tableName, content.segmentName(),
-                serving.queryDeadlines());
-            QueryAdmission replacementAdmission = awaitNativeAdmission(restarted, replacementContext);
-            expectThrows(IllegalStateException.class, () -> restarted.admitQuery(firstContext));
+                brokerSession, serving.queryDeadlines());
+            QueryAdmission replacementAdmission =
+                awaitNativeAdmission(restarted, replacementContext, brokerFingerprint);
+            expectThrows(IllegalStateException.class, () -> restarted.admitQuery(firstContext, brokerFingerprint));
             expectThrows(IllegalStateException.class, () -> restarted.checkQueryDelivery(firstAdmission));
             awaitNativeDelivery(restarted, replacementAdmission, false);
           }
@@ -1296,12 +1358,12 @@ public class MetadataGrpcTransportTest {
   }
 
   private static NativeQueryContext installedQuery(NativeServerParticipant server, String tableName,
-      String segmentName, QueryDeadlineGuard queryDeadlines) throws IOException {
+      String segmentName, MetadataRpc.ParticipantToken broker, QueryDeadlineGuard queryDeadlines) throws IOException {
     NativeOfflineSegmentAction.Identity installed = server.dataManager().executor(tableName).installed(segmentName)
         .identity();
-    // The normal broker's authentication/routing is outside this local admission test and remains gated.
     return new NativeQueryContext(NativeQueryContext.VERSION, installed.historyId(),
-        new NativeQueryContext.ProcessIdentity("Broker_test", UUID.randomUUID(), 1), installed.server(),
+        new NativeQueryContext.ProcessIdentity(broker.getParticipantId(), UUID.fromString(broker.getIncarnation()),
+            broker.getRegistrationEpoch()), installed.server(),
         UUID.randomUUID(), UUID.randomUUID(), installed.tableName(), installed.table(), installed.schemaName(),
         installed.schema(),
         List.of(new NativeQueryContext.Segment(segmentName, installed.content(), installed.contentSha256(),
@@ -1309,12 +1371,13 @@ public class MetadataGrpcTransportTest {
         .withDeadline(queryDeadlines.originate(1000));
   }
 
-  private static QueryAdmission awaitNativeAdmission(NativeServerParticipant server, NativeQueryContext context)
+  private static QueryAdmission awaitNativeAdmission(NativeServerParticipant server, NativeQueryContext context,
+      String peerFingerprint)
       throws InterruptedException {
     long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
     while (System.nanoTime() < deadline) {
       try {
-        return server.admitQuery(context);
+        return server.admitQuery(context, peerFingerprint);
       } catch (IllegalStateException e) {
         // A real committed heartbeat grant still needs a coherent own-server image at its minimum revision.
         Thread.sleep(20);
@@ -1935,6 +1998,8 @@ public class MetadataGrpcTransportTest {
     private final AtomicReference<Runnable> _afterExecute = new AtomicReference<>(() -> { });
     private final AtomicReference<Runnable> _beforeWork = new AtomicReference<>(() -> { });
     private final AtomicReference<Runnable> _beforeRouting = new AtomicReference<>(() -> { });
+    private final AtomicReference<UnaryOperator<OfflineInstallationProtocol.InstallationSnapshot>> _installationResult =
+        new AtomicReference<>(UnaryOperator.identity());
     private final CountDownLatch _entered = new CountDownLatch(4);
     private final CountDownLatch _release = new CountDownLatch(1);
     private volatile boolean _block;
@@ -1976,7 +2041,8 @@ public class MetadataGrpcTransportTest {
     public OfflineInstallationProtocol.InstallationSnapshot installationSnapshot(
         MembershipProtocol.ParticipantToken server, int maxRecords, int maxBytes, long timeoutMillis)
         throws IOException {
-      return ((InstallationAccess) _delegate).installationSnapshot(server, maxRecords, maxBytes, timeoutMillis);
+      return _installationResult.get().apply(
+          ((InstallationAccess) _delegate).installationSnapshot(server, maxRecords, maxBytes, timeoutMillis));
     }
 
     @Override

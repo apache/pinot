@@ -81,6 +81,7 @@ import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.TaskSession
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.TaskSessionQuery;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Transaction;
 import org.apache.pinot.coordination.ratis.metadata.OfflineInstallationProtocol.InstallationSnapshot;
+import org.apache.pinot.coordination.ratis.metadata.OfflineInstallationProtocol.QueryBrokerAuthority;
 import org.apache.pinot.coordination.ratis.metadata.OfflineInstallationProtocol.WorkResult;
 import org.apache.pinot.coordination.ratis.metadata.OfflineRoutingProtocol.ReplicaRouting;
 import org.apache.pinot.coordination.ratis.metadata.OfflineRoutingProtocol.RoutingSnapshot;
@@ -657,6 +658,7 @@ public final class MetadataCatalog {
       InstallationSnapshot header = new InstallationSnapshot(Status.OK, revision(_lastAppliedIndex), "",
           view.participant(server.participantId()), List.of(), List.of(), view.control());
       InstallationProjection projection = new InstallationProjection(header, maxRecords, maxBytes);
+      Set<UUID> queryTables = new HashSet<>();
       for (UUID objectId : _names.values()) {
         CatalogRecord record = _records.get(objectId);
         if (record.kind() == RecordKind.CLUSTER_CONFIG) {
@@ -668,6 +670,14 @@ public final class MetadataCatalog {
             projection.addReferenced(assignment.segmentObjectId(), RecordKind.OFFLINE_SEGMENT_CONTENT);
             projection.addReferenced(assignment.compatibility().table().objectId(), RecordKind.TABLE_CONFIG);
             projection.addReferenced(assignment.compatibility().schema().objectId(), RecordKind.SCHEMA);
+            CatalogRecord table = view.record(RecordKind.TABLE_CONFIG, assignment.tableName());
+            CatalogRecord schema = view.record(RecordKind.SCHEMA,
+                TableNameBuilder.extractRawTableName(assignment.tableName()));
+            if (table != null && schema != null && !table.deleted() && !schema.deleted()
+                && assignment.compatibility().table().equals(routingVersion(table))
+                && assignment.compatibility().schema().equals(routingVersion(schema))) {
+              queryTables.add(table.objectId());
+            }
           }
         } else if (record.kind() == RecordKind.CONTROLLER_OPERATION) {
           OperationState operation = OperationProtocol.decodeOperation(record.value());
@@ -678,11 +688,59 @@ public final class MetadataCatalog {
           }
         }
       }
+      addQueryBrokerAuthorities(projection, queryTables, view);
       return projection.result();
     } catch (Rejection e) {
       return installationSnapshotError(e._status, e.getMessage());
     } catch (CoordinationRejection e) {
       return installationSnapshotError(e.status(), e.getMessage());
+    }
+  }
+
+  /// Query authority is an optional policy projection. Invalid/missing policy revokes every grant while preserving
+  /// installation-only hydration. Bound failures remain all-or-error and never return a partially authorized image.
+  private void addQueryBrokerAuthorities(InstallationProjection projection, Set<UUID> queryTables,
+      OperationCatalog.View view) throws IOException {
+    if (queryTables.isEmpty() || view.control() == null || view.control().policy() == null) {
+      return;
+    }
+    NativeBrokerRoutingPolicy policy;
+    try {
+      policy = NativeBrokerRoutingPolicy.parse(routingPolicyValue(
+          view.record(RecordKind.CLUSTER_CONFIG, MetadataProtocol.CLUSTER_CONFIG_NAME),
+          NativeBrokerRoutingPolicy.CONFIG_KEY));
+    } catch (IllegalArgumentException e) {
+      return;
+    }
+    if (policy.principals().isEmpty()) {
+      return;
+    }
+    Set<String> tenants = new HashSet<>();
+    for (UUID tableId : queryTables) {
+      TableConfig table = JsonUtils.jsonNodeToObject(view.record(tableId).value(), TableConfig.class);
+      try {
+        NativeReplicaPlacementPolicy.validateTable(table);
+        tenants.add(NativeBrokerRoutingPolicy.brokerTenant(table));
+      } catch (IllegalArgumentException e) {
+        // Unsupported table constraints never broaden query authority or prevent installation metadata hydration.
+      }
+    }
+    for (String brokerId : policy.brokers().keySet().stream().sorted().toList()) {
+      ParticipantState broker = view.participant(brokerId);
+      if (broker == null || broker.participant().role() != Role.BROKER || !broker.ready() || broker.draining()
+          || broker.retired() || broker.expiryRound() <= view.control().round()
+          || !broker.capabilities().contains(MembershipProtocol.Capability.BROKER_QUERY)) {
+        continue;
+      }
+      List<String> grantedTenants = policy.brokers().get(brokerId).stream().filter(tenants::contains).sorted().toList();
+      if (grantedTenants.isEmpty()) {
+        continue;
+      }
+      List<String> principals = policy.principals().entrySet().stream()
+          .filter(entry -> entry.getValue().equals(brokerId)).map(Map.Entry::getKey).sorted().toList();
+      if (!principals.isEmpty()) {
+        projection.addAuthority(new QueryBrokerAuthority(broker, principals, grantedTenants));
+      }
     }
   }
 
@@ -698,6 +756,7 @@ public final class MetadataCatalog {
     private final int _maxBytes;
     private final Map<UUID, CatalogRecord> _selected = new HashMap<>();
     private final List<UUID> _operations = new ArrayList<>();
+    private final List<QueryBrokerAuthority> _queryBrokers = new ArrayList<>();
     private long _bytes;
 
     private InstallationProjection(InstallationSnapshot header, int maxRecords, int maxBytes)
@@ -714,7 +773,7 @@ public final class MetadataCatalog {
         return;
       }
       _bytes += _recordBytes.get(record.objectId()) + (_selected.isEmpty() ? 0 : 1);
-      require(_selected.size() + _operations.size() < _maxRecords, Status.RESPONSE_TOO_LARGE,
+      require(_selected.size() + _operations.size() + _queryBrokers.size() < _maxRecords, Status.RESPONSE_TOO_LARGE,
           "Installation snapshot exceeds its record bound");
       checkBounds();
       _selected.put(record.objectId(), record);
@@ -732,10 +791,18 @@ public final class MetadataCatalog {
 
     private void addOperation(UUID operationId) {
       _bytes += 38 + (_operations.isEmpty() ? 0 : 1);
-      require(_selected.size() + _operations.size() < _maxRecords, Status.RESPONSE_TOO_LARGE,
+      require(_selected.size() + _operations.size() + _queryBrokers.size() < _maxRecords, Status.RESPONSE_TOO_LARGE,
           "Installation snapshot exceeds its record bound");
       checkBounds();
       _operations.add(operationId);
+    }
+
+    private void addAuthority(QueryBrokerAuthority authority) throws IOException {
+      require(_selected.size() + _operations.size() + _queryBrokers.size() < _maxRecords, Status.RESPONSE_TOO_LARGE,
+          "Installation snapshot exceeds its record bound");
+      _bytes += MetadataProtocol.encodeValue(authority).length + (_queryBrokers.isEmpty() ? 0 : 1);
+      checkBounds();
+      _queryBrokers.add(authority);
     }
 
     private void checkBounds() {
@@ -748,7 +815,7 @@ public final class MetadataCatalog {
           .thenComparing(CatalogRecord::objectId));
       _operations.sort(Comparator.naturalOrder());
       return new InstallationSnapshot(Status.OK, _header.revision(), "", _header.participant(), records, _operations,
-          _header.control());
+          _header.control(), _queryBrokers);
     }
   }
 

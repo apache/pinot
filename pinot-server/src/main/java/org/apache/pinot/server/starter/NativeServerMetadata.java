@@ -19,6 +19,7 @@
 package org.apache.pinot.server.starter;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -39,6 +40,7 @@ import org.apache.pinot.common.request.context.NativeQueryContext;
 import org.apache.pinot.common.request.context.NativeQueryContext.Segment;
 import org.apache.pinot.coordination.ratis.rpc.MetadataRpc;
 import org.apache.pinot.coordination.ratis.rpc.MetadataRpc.CatalogRecord;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 import static com.google.common.base.Preconditions.checkState;
@@ -55,10 +57,25 @@ public final class NativeServerMetadata {
   private MetadataRpc.InstallationSnapshot _lastSnapshot;
   @Nullable
   private volatile Image _image;
+  @Nullable
+  private QueryAuthorities _lastAuthorities;
+  private long _authorizationGeneration;
 
   private record Image(MetadataRpc.Revision revision, Map<String, CatalogRecord> tables,
                        Map<String, CatalogRecord> schemas, Map<String, CatalogRecord> contents,
-                       Map<String, CatalogRecord> assignments, List<UUID> operations, MembershipView membership) {
+                       Map<String, CatalogRecord> assignments, List<UUID> operations, MembershipView membership,
+                       Map<String, String> tableTenants, Map<String, QueryBroker> queryBrokers,
+                       Map<String, String> queryPrincipals, long authorizationGeneration) {
+  }
+
+  private record QueryBroker(MetadataRpc.ParticipantToken participant, Set<String> tenants) {
+  }
+
+  private record TableTenant(String objectId, String tenant) {
+  }
+
+  private record QueryAuthorities(Map<String, QueryBroker> brokers, Map<String, String> principals,
+                                  Map<String, TableTenant> tables) {
   }
 
   public NativeServerMetadata(MetadataRpc.ParticipantToken server, RecoverableClusterConfigCache clusterConfig)
@@ -128,9 +145,10 @@ public final class NativeServerMetadata {
         "Membership timing barrier does not protect serving permits");
     require(_lastSnapshot == null || revision.getIndex() > _lastSnapshot.getRevision().getIndex()
         || snapshot.equals(_lastSnapshot), "Server metadata revision regressed or changed at the same index");
-    require(snapshot.getRecordsCount() + snapshot.getOperationIdsCount() <= 4096,
+    require(snapshot.getRecordsCount() + snapshot.getOperationIdsCount() + snapshot.getQueryBrokersCount() <= 4096,
         "Server metadata snapshot exceeds record bound");
     Map<String, CatalogRecord> tables = new HashMap<>();
+    Map<String, String> tableTenants = new HashMap<>();
     Map<String, CatalogRecord> schemas = new HashMap<>();
     Map<String, CatalogRecord> configsById = new HashMap<>();
     Map<String, CatalogRecord> contents = new HashMap<>();
@@ -152,8 +170,16 @@ public final class NativeServerMetadata {
         }
         case TABLE_CONFIG -> {
           if (!record.getDeleted()) {
-            NativeOfflineSegmentWorker.decodeTable(record);
+            TableConfig table = NativeOfflineSegmentWorker.decodeTable(record);
             require(tables.put(record.getName(), record) == null, "Repeated live table configuration");
+            // Unsupported tenant configurations cannot grant query access but still permit installation hydration.
+            if (table.getTenantConfig() != null) {
+              String tenant = table.getTenantConfig().getBroker();
+              tenant = tenant == null ? "DefaultTenant" : tenant;
+              if (validRoutingIdentifier(tenant)) {
+                tableTenants.put(record.getName(), tenant);
+              }
+            }
           } else {
             require(!record.hasValue(), "Deleted table retains a value");
           }
@@ -210,11 +236,60 @@ public final class NativeServerMetadata {
     for (String operation : snapshot.getOperationIdsList()) {
       require(operations.add(uuid(operation)), "Repeated operation discovery hint");
     }
+    Map<String, QueryBroker> queryBrokers = new HashMap<>();
+    Map<String, String> queryPrincipals = new HashMap<>();
+    Set<String> serverTenants = new HashSet<>(tableTenants.values());
+    require(snapshot.getQueryBrokersCount() <= 64, "Too many query broker authorities");
+    for (MetadataRpc.QueryBrokerAuthority authority : snapshot.getQueryBrokersList()) {
+      MetadataRpc.ParticipantState broker = authority.getParticipant();
+      MetadataRpc.ParticipantToken token = broker.getParticipant();
+      require(authority.hasParticipant() && broker.hasParticipant()
+          && token.getHistoryId().equals(_server.getHistoryId())
+          && token.getRole() == MetadataRpc.ParticipantRole.BROKER
+          && token.getRegistrationEpoch() > 0 && validRoutingIdentifier(token.getParticipantId())
+          && !token.getParticipantId().equals(_server.getParticipantId()), "Invalid query broker identity");
+      uuid(token.getIncarnation());
+      require(broker.getReady() && !broker.getRetired() && !broker.getDraining()
+          && broker.getExpiryRound() > control.getRound() && broker.getLastRenewalSequence() >= 0
+          && broker.getLastModifiedIndex() > 0 && broker.getLastModifiedIndex() <= revision.getIndex()
+          && broker.hasAppliedRevision() && broker.getAppliedRevision().getHistoryId().equals(_server.getHistoryId())
+          && broker.getAppliedRevision().getIndex() >= 0
+          && broker.getAppliedRevision().getIndex() <= revision.getIndex()
+          && broker.getCapabilitiesList().equals(List.of(MetadataRpc.ServingCapability.BROKER_QUERY)),
+          "Query broker registration is not current and eligible");
+      require(authority.getCertificateSha256Count() > 0 && authority.getCertificateSha256Count() <= 64
+          && authority.getBrokerTenantsCount() > 0 && authority.getBrokerTenantsCount() <= 64,
+          "Query broker authority is empty or oversized");
+      Set<String> tenants = new HashSet<>();
+      for (String tenant : authority.getBrokerTenantsList()) {
+        require(validRoutingIdentifier(tenant) && tenants.add(tenant) && serverTenants.contains(tenant),
+            "Query broker tenant is invalid, repeated or outside this server's tables");
+      }
+      require(queryBrokers.put(token.getParticipantId(), new QueryBroker(token, Set.copyOf(tenants))) == null,
+          "Repeated query broker identity");
+      for (String fingerprint : authority.getCertificateSha256List()) {
+        require(fingerprint.matches("[0-9a-f]{64}")
+            && queryPrincipals.put(fingerprint, token.getParticipantId()) == null,
+            "Query certificate fingerprint is invalid or repeated");
+      }
+      require(queryPrincipals.size() <= 64, "Too many query certificate principals");
+    }
     MembershipView membership = new MembershipView(revision, epoch, participant.getParticipant(),
         !participant.getRetired() && participant.getExpiryRound() > control.getRound(), participant.getReady(),
         participant.getDraining(), capabilities, policy.getVersion());
+    Map<String, TableTenant> authorizedTables = new HashMap<>();
+    tableTenants.forEach((name, tenant) -> authorizedTables.put(name,
+        new TableTenant(tables.get(name).getObjectId(), tenant)));
+    QueryAuthorities authorities = new QueryAuthorities(Map.copyOf(queryBrokers), Map.copyOf(queryPrincipals),
+        Map.copyOf(authorizedTables));
+    if (!authorities.equals(_lastAuthorities)) {
+      require(_authorizationGeneration < Long.MAX_VALUE, "Query authorization generation exhausted");
+      _authorizationGeneration++;
+      _lastAuthorities = authorities;
+    }
     Image next = new Image(revision, Map.copyOf(tables), Map.copyOf(schemas), Map.copyOf(contents),
-        Map.copyOf(assignments), operations.stream().sorted().toList(), membership);
+        Map.copyOf(assignments), operations.stream().sorted().toList(), membership, Map.copyOf(tableTenants),
+        authorities.brokers(), authorities.principals(), _authorizationGeneration);
     // Retain the validated high watermark even if a callback partially applies the update and then fails.
     _lastSnapshot = snapshot;
     _image = null;
@@ -347,6 +422,37 @@ public final class NativeServerMetadata {
       }
     }
     return true;
+  }
+
+  /// Authenticates the claimed broker against one committed image and the current table incarnation's tenant.
+  /// Delivery intentionally does not recheck desired segment identities: an admitted attempt retains pinned readers.
+  boolean isAuthorizedQuery(NativeQueryContext query, @Nullable String certificateSha256) {
+    Image current = _image;
+    if (current == null || certificateSha256 == null
+        || !_server.getHistoryId().equals(query.historyId().toString())
+        || !query.broker().participantId().equals(current.queryPrincipals().get(certificateSha256))) {
+      return false;
+    }
+    QueryBroker broker = current.queryBrokers().get(query.broker().participantId());
+    CatalogRecord table = current.tables().get(query.tableName());
+    String tenant = current.tableTenants().get(query.tableName());
+    return broker != null && table != null && !table.getDeleted()
+        && tenant != null
+        && table.getObjectId().equals(query.table().objectId().toString())
+        && broker.participant().getIncarnation().equals(query.broker().incarnation().toString())
+        && broker.participant().getRegistrationEpoch() == query.broker().registrationEpoch()
+        && broker.tenants().contains(tenant);
+  }
+
+  /// Semantic authorization changes conservatively fence all admitted attempts. Renewal counters and compatible
+  /// table version changes do not advance this generation; a removed then re-added grant cannot revive an old ticket.
+  long authorizationGeneration() {
+    return image().authorizationGeneration();
+  }
+
+  private static boolean validRoutingIdentifier(String value) {
+    return value != null && !value.isBlank() && value.length() <= 1024 && !value.contains("*")
+        && value.chars().noneMatch(Character::isISOControl) && StandardCharsets.UTF_8.newEncoder().canEncode(value);
   }
 
   private static boolean matches(@Nullable CatalogRecord record, ObjectVersion expected) {

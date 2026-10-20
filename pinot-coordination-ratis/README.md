@@ -248,9 +248,10 @@ last successful delivery so failed updates, including removed keys, can be retri
 The default server runtime rejects query-serving capabilities. Explicit `ServingSettings` supply a qualified clock
 and lifetime policy and permit only `SERVER_QUERY`. The heartbeat records the first logical renewal send, preserves it
 across retries, and stages only its matching committed grant. Clock failure terminates that registration's admission.
-`admitQuery` checks the permit and exact desired table/schema/content/replica identities using local state;
-`checkQueryDelivery` preserves the ticket's finite deadline. Completed operation IDs are not needed for query admission.
-A live draining participant can still hydrate its own image and finish previously admitted work within its original
+The authenticated `admitQuery` overload checks broker authority, both participant lease bounds, the original deadline
+and exact desired table/schema/content/replica identities using local state. `deliverQuery` holds the admission fence
+through each result callback. Completed operation IDs are not needed for query admission.
+A live draining server can still hydrate its own image and finish previously admitted work within its original
 deadline, but cannot admit new queries or publish installations. These APIs do not start query listeners or authenticate
 query transports, and physical acquisition must still pin and verify the exact installed identities.
 
@@ -260,8 +261,9 @@ acknowledgement. Recovery runs independently of operation discovery, so a comple
 snapshot cannot strand the report stream. Old-session files are retained as evidence, never replayed under a new
 session. Evidence is bounded to 128 files of at most 256 KiB each; saturation requires explicit archival. Startup and
 shutdown serialize; shutdown drains local actions and outbox leases before releasing directory ownership, then
-retires the confirmed registration. Normal starter configuration is available for the installation-only lifecycle below. Network query integration and
-general table lifecycle remain unimplemented; this runtime does not make the replacement complete or alter Helix defaults.
+retires the confirmed registration. Normal starter configuration is available for the installation-only lifecycle below.
+Normal query activation and general table lifecycle remain unimplemented; this runtime does not make the replacement
+complete or alter Helix defaults.
 
 `RatisOfflineSegmentExecutor` connects fresh own-target work to the native `LOAD`, `RELOAD` or `RECONCILE` action and receipt publisher.
 The installer verifies the downloaded SHA-256 and segment CRC, runs Pinot's existing preprocessing, and opens the
@@ -363,8 +365,9 @@ content must match. Logical-table acquisition also releases earlier handles when
 Native names-only, realtime and logical queries remain rejected. A native request with no acquired content cannot
 yet obtain a version-checked schema-only catalog snapshot and is rejected instead of returning an empty scan.
 Broker routing observations and immutable identity construction are described below. Normal query planning and
-dispatch, feature-level negotiation, authenticated process admission, production clock qualification, broker
-deadline origination, transport response-delivery fencing and whole-query retry/drain remain unimplemented.
+dispatch, feature-level negotiation, production clock qualification, broker deadline origination, receiver-side
+delivery validation and whole-query retry/drain remain unimplemented. Server-side authenticated admission and the
+explicit guarded gRPC transport are described below; normal starters do not activate them.
 MSE/time-series and other unsupported paths cannot silently drop the context. Native
 `ServerInstance` query resources remain disabled until those gates are implemented and tested together.
 
@@ -410,6 +413,49 @@ unsupported; no fallback can silently turn required segments into optional ones.
 
 These observations and contexts do not authorize queries. Connecting the normal query handlers requires the
 remaining serving-permit, routing-revision, transport-identity, clock and response-delivery checks together.
+
+## Authenticated native query admission
+
+The optional `principals` object in `pinot.coordination.ratis.broker.routing` maps lowercase SHA-256 leaf-certificate
+fingerprints to declared broker IDs. For example, add `"principals": {"<64 lowercase hex characters>": "Broker_native"}`
+to the policy above, using the actual certificate fingerprint. The existing two-key policy remains valid and supplies
+no query principals. At most 64 principals are accepted; wildcard grants, undeclared brokers and malformed values
+are rejected by controller writes. Certificate fingerprints are public identifiers, not private keys.
+
+Each complete server installation snapshot now includes typed query grants captured with its assignments and membership
+control at one committed revision. A grant requires a live, ready, non-draining `BROKER_QUERY` session and intersects
+its approved tenants with current compatible tables assigned to this exact server registration. Missing, legacy or
+invalid policy produces no query grants while preserving installation hydration. The existing full cluster-config
+projection remains intact; raw policy settings alone never authorize a query. Grants count toward the existing
+4,096-record/2-MiB image budget. An oversized authority set makes the entire snapshot unavailable rather than returning
+a prefix; the earlier installation admission reservation does not reserve space for new query grants.
+
+`NativeServerParticipant.queryGate()` binds a TLS-verified certificate fingerprint to the exact broker incarnation,
+registration epoch and table tenant, then applies the existing serving-permit/deadline and content identity checks.
+Every delivered callback rechecks authority while holding the participant admission lock. A semantic authorization
+change fences existing attempts, including after a grant is later restored; ordinary renewals and compatible table
+version updates do not reset this generation. The generation currently applies to all local admissions, so an unrelated
+authorization change can conservatively abort another query. Pinned readers may survive desired-content changes,
+but cannot bypass certificate, session, tenant, original deadline or membership fences.
+
+A broker's remaining lease is bounded independently of the server's serving permit. The local clock is sampled
+before sending the installation snapshot request, and the conservative lifetime is the lesser of the current policy's
+permit lifetime and `(brokerExpiryRound - snapshotRound - 1) * minTickInterval`. The next tick may already be due, so
+it contributes no guaranteed time. The qualified relative clock-rate conversion, uncertainty and safety margin apply
+to this bound; transit consumes it. No remaining full round means no query authority. Each admission retains its
+original bound across later snapshots and renewals. Policy-change grace protects the cap against faster future ticks.
+
+An explicit `GrpcQueryServer` constructor accepts this gate. It requires mutually verified TLS with explicit identity
+and trust stores, derives identity from the peer certificate rather than request metadata, checks certificate validity
+at RPC admission and delivery, and guards every streamed block, final response and successful completion. Native
+contexts without the gate, and names-only requests with the gate, are rejected. Legacy queries retain the existing
+constructor and behavior. Native TLS credentials are fixed for a listener's lifetime and rotation requires recreating
+it; an owned renewable TLS lifecycle remains required for normal activation.
+
+These are local admission and enqueue-time delivery fences, not proof that a remote receiver consumed a response before
+its deadline or observed a revocation immediately. Qualified clocks, receiver-side validation, broker lifecycle and
+normal query planning/dispatch must be integrated and tested together. Native query listeners remain disabled in all
+normal starters, and no serving capability is granted by constructing the transport or configuring a routing policy.
 
 ## Normal starters (experimental, query listeners disabled)
 

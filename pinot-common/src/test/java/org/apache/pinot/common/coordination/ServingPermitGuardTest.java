@@ -28,7 +28,9 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.pinot.common.coordination.QueryDeadlineGuard.TimeInterval;
 import org.apache.pinot.common.coordination.ServingPermitGuard.ClockReading;
+import org.apache.pinot.common.coordination.ServingPermitGuard.LeaseObservation;
 import org.apache.pinot.common.coordination.ServingPermitGuard.MembershipView;
+import org.apache.pinot.common.coordination.ServingPermitGuard.PeerLeaseBound;
 import org.apache.pinot.common.coordination.ServingPermitGuard.QualifiedLifetimePolicy;
 import org.apache.pinot.common.coordination.ServingPermitGuard.QueryTicket;
 import org.apache.pinot.common.coordination.ServingPermitGuard.ReadOnlyCapability;
@@ -49,6 +51,49 @@ import static org.testng.Assert.expectThrows;
 /// Model checks use an explicitly qualified fake clock; no production clock, coordinator RPC or sleeping is used.
 /// They exercise delayed/retried grants, coherent-image fences and result delivery after pauses or revocation.
 public class ServingPermitGuardTest {
+  @Test
+  public void testPeerLeaseUsesPreRequestAnchorAndCannotExtendCapturedBound() {
+    Fixture fixture = new Fixture();
+    LeaseObservation firstSend = fixture._guard.beginLeaseObservation();
+    fixture._clock.millis(9);
+    PeerLeaseBound original = fixture._guard.boundPeerLease(firstSend, 9, 11, 10, 100);
+    fixture._guard.checkPeerLease(original);
+    PeerLeaseBound renewed = fixture._guard.boundPeerLease(fixture._guard.beginLeaseObservation(),
+        9, 100, 10, 100);
+    fixture._clock.millis(10);
+    expectThrows(ServingDeniedException.class, () -> fixture._guard.checkPeerLease(original));
+    fixture._guard.checkPeerLease(renewed);
+    fixture._clock.millis(11);
+    PeerLeaseBound delayed = fixture._guard.boundPeerLease(firstSend, 9, 11, 10, 100);
+    expectThrows(ServingDeniedException.class, () -> fixture._guard.checkPeerLease(delayed));
+    PeerLeaseBound nextTick = fixture._guard.boundPeerLease(fixture._guard.beginLeaseObservation(), 9, 10, 10, 100);
+    expectThrows(ServingDeniedException.class, () -> fixture._guard.checkPeerLease(nextTick));
+
+    // Large historical round counts cannot overflow or bypass the current-policy permit transition barrier.
+    Fixture policyChange = new Fixture();
+    PeerLeaseBound capped = policyChange._guard.boundPeerLease(policyChange._guard.beginLeaseObservation(),
+        9, Long.MAX_VALUE, Long.MAX_VALUE, 30);
+    policyChange._clock.millis(29);
+    policyChange._guard.checkPeerLease(capped);
+    policyChange._clock.millis(30);
+    expectThrows(ServingDeniedException.class, () -> policyChange._guard.checkPeerLease(capped));
+    expectThrows(ServingDeniedException.class, () -> policyChange._guard.checkPeerLease(renewed));
+
+    Fixture uncertainty = new Fixture();
+    ServingPermitGuard conservative = new ServingPermitGuard(uncertainty._participant,
+        Set.of(ReadOnlyCapability.BROKER_QUERY), uncertainty._clock,
+        new QualifiedLifetimePolicy(100, 50, 500_000, 2, 1_000_000), uncertainty._image::get);
+    uncertainty._clock._uncertainty = 1_000_000;
+    uncertainty._clock.millis(1);
+    PeerLeaseBound bounded = conservative.boundPeerLease(conservative.beginLeaseObservation(), 0, 3, 10, 100);
+    uncertainty._clock.millis(6);
+    conservative.checkPeerLease(bounded);
+    uncertainty._clock.millis(7);
+    expectThrows(ServingDeniedException.class, () -> conservative.checkPeerLease(bounded));
+    uncertainty._clock._uncertainty = 0;
+    expectThrows(ServingDeniedException.class, () -> conservative.checkPeerLease(bounded));
+  }
+
   @Test
   public void testFirstSendSurvivesRetryDuplicateAndLostRenewal() {
     Fixture fixture = new Fixture();
