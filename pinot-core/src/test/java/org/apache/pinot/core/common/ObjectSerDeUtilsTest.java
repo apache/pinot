@@ -20,8 +20,6 @@ package org.apache.pinot.core.common;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.dynatrace.hash4j.distinctcount.UltraLogLog;
-import com.tdunning.math.stats.Centroid;
-import com.tdunning.math.stats.TDigest;
 import it.unimi.dsi.fastutil.doubles.Double2LongOpenHashMap;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import it.unimi.dsi.fastutil.floats.Float2LongOpenHashMap;
@@ -34,10 +32,14 @@ import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
+import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.ReadOnlyBufferException;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashMap;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
@@ -51,6 +53,9 @@ import org.apache.datasketches.tuple.TupleSketch;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.datasketches.tuple.aninteger.IntegerSummarySetOperations;
 import org.apache.datasketches.tuple.aninteger.IntegerTupleSketch;
+import org.apache.pinot.common.utils.RoaringBitmapUtils;
+import org.apache.pinot.core.common.ObjectSerDeUtils.ObjectSerDe;
+import org.apache.pinot.core.common.ObjectSerDeUtils.ObjectType;
 import org.apache.pinot.core.query.aggregation.function.PercentileEstAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.funnel.FunnelStepEvent;
@@ -66,11 +71,17 @@ import org.apache.pinot.segment.local.customobject.StringLongPair;
 import org.apache.pinot.segment.local.customobject.ThetaSketchAccumulator;
 import org.apache.pinot.segment.local.customobject.TupleIntSketchAccumulator;
 import org.apache.pinot.segment.local.customobject.ValueLongPair;
+import org.apache.pinot.segment.local.customobject.tdigest.SerializedTDigestInput;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigest.Centroid;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigestAccumulator;
 import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
+import org.roaringbitmap.RoaringBitmap;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
@@ -98,6 +109,160 @@ public class ObjectSerDeUtilsTest {
           + "gAAAQI/1LD+AAABAnZ6aP4AAAECtJUM/gAAAQL7pkj+AAABA02aDP4AAAEDrOzE/gAAAQQOcVz+AAABBFDtQP4AAAEEoOWA/gAAA"
           + "QUChLz+AAABBXvGHP4AAAEGCsOA/gAAAQZutuD+AAABBvS/yP4AAAEHr7EA/gAAAQhhGxT+AAABCTlsKP4AAAEKWasI/gAAAQvfH"
           + "yz+AAABDgpJvP4AAAESXLNE=";
+
+  @DataProvider(name = "directSerializationValues")
+  public Object[][] directSerializationValues() {
+    RoaringBitmap runBitmap = new RoaringBitmap();
+    runBitmap.add(100L, 10000L);
+    runBitmap.runOptimize();
+    return new Object[][]{
+        {new IntArrayList(), ObjectType.IntArrayList, HexFormat.of().parseHex("00000000")},
+        {IntArrayList.wrap(new int[]{Integer.MIN_VALUE, Integer.MAX_VALUE, 0, 99}, 3), ObjectType.IntArrayList,
+            HexFormat.of().parseHex("00000003800000007fffffff00000000")},
+        {new LongArrayList(), ObjectType.LongArrayList, HexFormat.of().parseHex("00000000")},
+        {LongArrayList.wrap(new long[]{Long.MIN_VALUE, Long.MAX_VALUE, 0, 99}, 3), ObjectType.LongArrayList,
+            HexFormat.of().parseHex("0000000380000000000000007fffffffffffffff0000000000000000")},
+        {new FloatArrayList(), ObjectType.FloatArrayList, HexFormat.of().parseHex("00000000")},
+        {FloatArrayList.wrap(new float[]{Float.intBitsToFloat(0x7fa12345), -0.0f, Float.POSITIVE_INFINITY,
+            Float.NEGATIVE_INFINITY, 99}, 4), ObjectType.FloatArrayList,
+            HexFormat.of().parseHex("000000047fa12345800000007f800000ff800000")},
+        {new DoubleArrayList(), ObjectType.DoubleArrayList, HexFormat.of().parseHex("00000000")},
+        {DoubleArrayList.wrap(new double[]{Double.longBitsToDouble(0x7ff0123456789abcL), -0.0d,
+            Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY, 99}, 4), ObjectType.DoubleArrayList,
+            HexFormat.of().parseHex("000000047ff0123456789abc80000000000000007ff0000000000000fff0000000000000")},
+        {UltraLogLog.create(3), ObjectType.UltraLogLog, HexFormat.of().parseHex("030000000000000000")},
+        {UltraLogLog.wrap(new byte[]{0, 1, 2, 3, 4, 5, 6, 7}), ObjectType.UltraLogLog,
+            HexFormat.of().parseHex("030001020304050607")},
+        {new RoaringBitmap(), ObjectType.RoaringBitmap, HexFormat.of().parseHex("3a30000000000000")},
+        {RoaringBitmap.bitmapOf(1, 3), ObjectType.RoaringBitmap,
+            HexFormat.of().parseHex("3a30000001000000000001001000000001000300")},
+        {runBitmap, ObjectType.RoaringBitmap, RoaringBitmapUtils.serialize(runBitmap)}
+    };
+  }
+
+  @Test(dataProvider = "directSerializationValues")
+  public void testSerializeIntoBuffer(Object value, ObjectType type, byte[] expected) {
+    int typeId = type.getValue();
+    Object inputState = copyInputState(value);
+    assertEquals(ObjectSerDeUtils.getSerializedSize(value, typeId), expected.length);
+    assertEquals(ObjectSerDeUtils.serialize(value, typeId), expected);
+    for (boolean direct : new boolean[]{false, true}) {
+      for (ByteOrder order : new ByteOrder[]{ByteOrder.BIG_ENDIAN, ByteOrder.LITTLE_ENDIAN}) {
+        for (int extraRemaining : new int[]{0, 5}) {
+          ByteBuffer destination = direct ? ByteBuffer.allocateDirect(expected.length + 10)
+              : ByteBuffer.allocate(expected.length + 10);
+          while (destination.hasRemaining()) {
+            destination.put((byte) 0x5a);
+          }
+          destination.position(5).limit(5 + expected.length + extraRemaining);
+          destination.order(order);
+          ObjectSerDeUtils.serialize(value, typeId, destination);
+          assertEquals(destination.position(), 5 + expected.length);
+          assertEquals(destination.limit(), 5 + expected.length + extraRemaining);
+          assertSame(destination.order(), order);
+          destination.clear();
+          for (int i = 0; i < 5; i++) {
+            assertEquals(destination.get(), (byte) 0x5a);
+          }
+          byte[] actual = new byte[expected.length];
+          destination.get(actual);
+          assertEquals(actual, expected);
+          while (destination.hasRemaining()) {
+            assertEquals(destination.get(), (byte) 0x5a);
+          }
+        }
+      }
+    }
+    Object decoded = ObjectSerDeUtils.deserialize(expected, type);
+    assertEquals(ObjectSerDeUtils.serialize(decoded, typeId), expected);
+    assertEquals(copyInputState(value), inputState);
+    assertEquals(ObjectSerDeUtils.getSerializedSize(value, typeId), expected.length);
+    assertEquals(ObjectSerDeUtils.serialize(value, typeId), expected);
+  }
+
+  @Test(dataProvider = "directSerializationValues")
+  public void testSerializeIntoInvalidBuffer(Object value, ObjectType type, byte[] expected) {
+    ByteBuffer tooSmall = ByteBuffer.allocate(expected.length + 10).order(ByteOrder.LITTLE_ENDIAN);
+    Arrays.fill(tooSmall.array(), (byte) 0x5a);
+    byte[] before = tooSmall.array().clone();
+    tooSmall.position(5).limit(5 + expected.length - 1);
+    assertThrows(BufferOverflowException.class, () -> ObjectSerDeUtils.serialize(value, type.getValue(), tooSmall));
+    assertEquals(tooSmall.position(), 5);
+    assertSame(tooSmall.order(), ByteOrder.LITTLE_ENDIAN);
+    assertEquals(tooSmall.array(), before);
+
+    ByteBuffer readOnly = ByteBuffer.allocateDirect(expected.length + 5).asReadOnlyBuffer();
+    readOnly.position(5).order(ByteOrder.LITTLE_ENDIAN);
+    assertThrows(ReadOnlyBufferException.class, () -> ObjectSerDeUtils.serialize(value, type.getValue(), readOnly));
+    assertEquals(readOnly.position(), 5);
+    assertSame(readOnly.order(), ByteOrder.LITTLE_ENDIAN);
+  }
+
+  @Test
+  public void testDefaultBufferSerialization() {
+    int[] serializationCount = {0};
+    ObjectSerDe<Integer> codec = new ObjectSerDe<>() {
+      @Override
+      public byte[] serialize(Integer value) {
+        serializationCount[0]++;
+        return new byte[]{value.byteValue()};
+      }
+
+      @Override
+      public Integer deserialize(byte[] bytes) {
+        return (int) bytes[0];
+      }
+
+      @Override
+      public Integer deserialize(ByteBuffer byteBuffer) {
+        return (int) byteBuffer.get();
+      }
+    };
+    assertEquals(codec.getSerializedSize(42), -1);
+    assertEquals(serializationCount[0], 0);
+    ByteBuffer destination = ByteBuffer.allocateDirect(3).order(ByteOrder.LITTLE_ENDIAN);
+    destination.position(1).limit(2);
+    codec.serialize(42, destination);
+    assertEquals(serializationCount[0], 1);
+    assertEquals(destination.position(), 2);
+    assertEquals(destination.limit(), 2);
+    assertSame(destination.order(), ByteOrder.LITTLE_ENDIAN);
+    assertEquals(destination.get(1), (byte) 42);
+
+    assertEquals(ObjectSerDeUtils.getSerializedSize("abc", ObjectType.String.getValue()), -1);
+    ByteBuffer stringDestination = ByteBuffer.allocate(3);
+    ObjectSerDeUtils.serialize("abc", ObjectType.String.getValue(), stringDestination);
+    assertEquals(stringDestination.array(), new byte[]{'a', 'b', 'c'});
+  }
+
+  private static Object copyInputState(Object value) {
+    if (value instanceof IntArrayList list) {
+      return list.elements().clone();
+    }
+    if (value instanceof LongArrayList list) {
+      return list.elements().clone();
+    }
+    if (value instanceof FloatArrayList list) {
+      float[] elements = list.elements();
+      int[] bits = new int[elements.length];
+      for (int i = 0; i < elements.length; i++) {
+        bits[i] = Float.floatToRawIntBits(elements[i]);
+      }
+      return bits;
+    }
+    if (value instanceof DoubleArrayList list) {
+      double[] elements = list.elements();
+      long[] bits = new long[elements.length];
+      for (int i = 0; i < elements.length; i++) {
+        bits[i] = Double.doubleToRawLongBits(elements[i]);
+      }
+      return bits;
+    }
+    if (value instanceof UltraLogLog sketch) {
+      return sketch.getState().clone();
+    }
+    return ((RoaringBitmap) value).clone();
+  }
 
   @Test
   public void testString() {
@@ -319,7 +484,9 @@ public class ObjectSerDeUtilsTest {
   @Test
   public void testTDigest() {
     for (int i = 0; i < NUM_ITERATIONS; i++) {
-      TDigest expected = TDigest.createMergingDigest(PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION);
+      TDigest expected =
+          TDigestAccumulator.forLegacyAggregation(
+              PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION);
       int size = RANDOM.nextInt(100) + 1;
       for (int j = 0; j < size; j++) {
         expected.add(RANDOM.nextDouble());
@@ -337,7 +504,7 @@ public class ObjectSerDeUtilsTest {
     List<Double> compressionFactorsToTest = Arrays.asList(10d, 200d, 500d, 1000d, 10000d);
     for (double compressionFactor : compressionFactorsToTest) {
       for (int i = 0; i < NUM_ITERATIONS; i++) {
-        TDigest expected = TDigest.createMergingDigest(compressionFactor);
+        TDigest expected = TDigestAccumulator.forLegacyAggregation(compressionFactor);
         int size = RANDOM.nextInt(100) + 1;
         for (int j = 0; j < size; j++) {
           expected.add(RANDOM.nextDouble());
@@ -351,6 +518,33 @@ public class ObjectSerDeUtilsTest {
         }
       }
     }
+  }
+
+  @Test
+  public void testTDigestIntermediateReductionStrategy() {
+    TDigest source = TDigestAccumulator.forLegacyAggregation(100.0);
+    Random random = new Random(42);
+    for (int i = 0; i < 1000; i++) {
+      source.add(random.nextDouble());
+    }
+    byte[] bytes = source.serialize();
+    SerializedTDigestInput input = new SerializedTDigestInput();
+    input.reset(bytes);
+    TDigestAccumulator expected = TDigestAccumulator.forReduction(input.getCompression());
+    expected.addSerializedTDigest(input);
+    TDigest fromBytes = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(bytes);
+    TDigest fromBuffer = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(ByteBuffer.wrap(bytes));
+    // Raw values appended to a peer's intermediate must use reducer compression, rather than the stored-sketch policy.
+    for (int i = 0; i < 5000; i++) {
+      double value = random.nextDouble();
+      expected.add(value);
+      fromBytes.add(value);
+      fromBuffer.add(value);
+    }
+    byte[] expectedBytes = expected.serialize();
+    assertEquals(ObjectSerDeUtils.TDIGEST_SER_DE.serialize(fromBytes), expectedBytes);
+    assertEquals(ObjectSerDeUtils.TDIGEST_SER_DE.serialize(fromBuffer), expectedBytes);
+    assertEquals(fromBytes.getTotalWeight(), 6000.0);
   }
 
   @DataProvider(name = "tdigest32Fixtures")
@@ -376,9 +570,9 @@ public class ObjectSerDeUtilsTest {
     double previousMean = Double.NEGATIVE_INFINITY;
     for (Centroid centroid : digest.centroids()) {
       assertTrue(Double.isFinite(centroid.mean()));
-      assertTrue(centroid.count() > 0);
+      assertTrue(centroid.weight() > 0);
       assertTrue(centroid.mean() + 1e-12 >= previousMean);
-      centroidWeight += centroid.count();
+      centroidWeight += centroid.weight();
       previousMean = centroid.mean();
     }
     assertEquals(centroidWeight, expectedSize);

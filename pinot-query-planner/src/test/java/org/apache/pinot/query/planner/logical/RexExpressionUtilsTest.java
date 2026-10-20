@@ -28,6 +28,7 @@ import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
+import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexUnknownAs;
 import org.apache.calcite.sql.SqlCollation;
 import org.apache.calcite.sql.SqlKind;
@@ -44,6 +45,10 @@ import org.apache.pinot.spi.utils.UuidUtils;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertSame;
+import static org.testng.Assert.assertTrue;
 
 
 /// Tests for RexExpressionUtils, focusing on the handleSearch method and null handling.
@@ -69,6 +74,36 @@ public class RexExpressionUtilsTest {
     RexLiteral roundTrip = RexExpressionUtils.toRexLiteral(relBuilder, literal);
     Assert.assertEquals(roundTrip.getTypeName(), SqlTypeName.UUID);
     Assert.assertEquals(roundTrip.getValue(), uuid);
+  }
+
+  @Test
+  public void testSqlKindFunctionNames() {
+    // Plan nodes name most standard operators by SqlKind, e.g. DIVIDE for "/" and SUM0 for "$SUM0"
+    RelBuilder relBuilder = RelBuilder.create(Frameworks.newConfigBuilder().build()).values(new String[]{"a"}, 1.0);
+    RexExpression input = new RexExpression.InputRef(0);
+    List<RexExpression> inOperands = List.of(input, new RexExpression.Literal(ColumnDataType.DOUBLE, 1.0),
+        new RexExpression.Literal(ColumnDataType.DOUBLE, 2.0));
+    for (RexExpression call : List.of(
+        new RexExpression.FunctionCall(ColumnDataType.DOUBLE, SqlKind.DIVIDE.name(), List.of(input, input)),
+        new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.IN.name(), inOperands),
+        new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.NOT_IN.name(), inOperands))) {
+      assertEquals(RexExpressionUtils.fromRexNode(RexExpressionUtils.toRexNode(relBuilder, call)), call);
+    }
+    RexExpression.FunctionCall sum0 =
+        new RexExpression.FunctionCall(ColumnDataType.DOUBLE, SqlKind.SUM0.name(), List.of(input));
+    assertSame(RexExpressionUtils.getAggFunction(sum0), SqlStdOperatorTable.SUM0);
+  }
+
+  @Test
+  public void testCastRoundTrip() {
+    // Plan nodes hold the target type of CAST as a STRING literal operand. Field "a" is a nullable INTEGER.
+    RelBuilder relBuilder =
+        RelBuilder.create(Frameworks.newConfigBuilder().build()).values(new String[]{"a"}, 1, null);
+    RexExpression castCall = new RexExpression.FunctionCall(ColumnDataType.DOUBLE, SqlKind.CAST.name(),
+        List.of(new RexExpression.InputRef(0), new RexExpression.Literal(ColumnDataType.STRING, "DOUBLE")));
+    RexNode rexNode = RexExpressionUtils.toRexNode(relBuilder, castCall);
+    assertTrue(rexNode.getType().isNullable());
+    assertEquals(RexExpressionUtils.fromRexNode(rexNode), castCall);
   }
 
   @Test

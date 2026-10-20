@@ -21,12 +21,15 @@ package org.apache.pinot.core.query.aggregation.function;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 
 /// Unit test for {@link AggregationFunctionUtils#getAggregationResult}, the metadata/dictionary based aggregation
@@ -63,6 +66,36 @@ public class AggregationFunctionUtilsTest {
     Object maxResult = AggregationFunctionUtils.getAggregationResult(mockFunction(AggregationFunctionType.MAX),
         dataSource, 100, "TEST");
     assertEquals(maxResult, 10.0);
+  }
+
+  @Test
+  public void testMinAndMaxOnNonNumericDictionaryThrows() {
+    // Reproduces https://github.com/apache/pinot/issues/19603: MIN/MAX resolved from a dictionary-encoded
+    // non-numeric (e.g. STRING) column must fail with a clear, actionable message instead of letting an opaque
+    // NumberFormatException escape from Double.parseDouble.
+    Dictionary dictionary = mock(Dictionary.class);
+    when(dictionary.getMinVal()).thenReturn("2013-07-01");
+    when(dictionary.getMaxVal()).thenReturn("2013-07-01");
+    DataSource dataSource = mock(DataSource.class);
+    when(dataSource.getDictionary()).thenReturn(dictionary);
+
+    try {
+      AggregationFunctionUtils.getAggregationResult(mockFunction(AggregationFunctionType.MIN), dataSource, 100,
+          "TEST");
+      fail("Should throw BadQueryRequestException");
+    } catch (BadQueryRequestException e) {
+      assertTrue(e.getMessage().contains("MINSTRING"));
+      assertTrue(e.getMessage().contains("autoRewriteAggregationType"));
+    }
+
+    try {
+      AggregationFunctionUtils.getAggregationResult(mockFunction(AggregationFunctionType.MAX), dataSource, 100,
+          "TEST");
+      fail("Should throw BadQueryRequestException");
+    } catch (BadQueryRequestException e) {
+      assertTrue(e.getMessage().contains("MAXSTRING"));
+      assertTrue(e.getMessage().contains("autoRewriteAggregationType"));
+    }
   }
 
   @Test

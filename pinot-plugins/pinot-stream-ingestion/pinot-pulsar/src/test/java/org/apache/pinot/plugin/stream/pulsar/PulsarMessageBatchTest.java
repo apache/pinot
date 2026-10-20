@@ -161,6 +161,11 @@ public class PulsarMessageBatchTest {
     }
 
     @Override
+    public Optional<byte[]> getSchemaId() {
+      return Optional.empty();
+    }
+
+    @Override
     public boolean isReplicated() {
       return false;
     }

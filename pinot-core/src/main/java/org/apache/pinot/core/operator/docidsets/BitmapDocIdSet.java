@@ -23,19 +23,20 @@ import org.apache.pinot.core.operator.dociditerators.BitmapDocIdIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
-public class BitmapDocIdSet implements BlockDocIdSet {
+public final class BitmapDocIdSet implements BlockDocIdSet {
   private final BitmapDocIdIterator _iterator;
   private final long _numEntriesScannedInFilter;
 
   /// Returns a doc id set over the given documents, or [EmptyDocIdSet] when there is none.
   public static BlockDocIdSet create(ImmutableRoaringBitmap docIds, int numDocs) {
-    return docIds.isEmpty() ? EmptyDocIdSet.unscanned() : new BitmapDocIdSet(docIds, numDocs);
+    return docIds.isEmpty() ? EmptyDocIdSet.unscanned() : new BitmapDocIdSet(docIds, numDocs, 0L);
   }
 
   /// Returns a doc id set over the given documents found by scanning `numEntriesScannedInFilter` entries, or
   /// [EmptyDocIdSet] when there is none.
   public static BlockDocIdSet create(ImmutableRoaringBitmap docIds, int numDocs, long numEntriesScannedInFilter) {
-    return docIds.isEmpty() ? new EmptyDocIdSet(numEntriesScannedInFilter)
+    return docIds.isEmpty()
+        ? new EmptyDocIdSet(numEntriesScannedInFilter)
         : new BitmapDocIdSet(docIds, numDocs, numEntriesScannedInFilter);
   }
 
@@ -44,16 +45,12 @@ public class BitmapDocIdSet implements BlockDocIdSet {
     return iterator.getDocIds().isEmpty() ? EmptyDocIdSet.unscanned() : new BitmapDocIdSet(iterator);
   }
 
-  public BitmapDocIdSet(ImmutableRoaringBitmap docIds, int numDocs) {
-    this(docIds, numDocs, 0L);
-  }
-
-  public BitmapDocIdSet(ImmutableRoaringBitmap docIds, int numDocs, long numEntriesScannedInFilter) {
+  private BitmapDocIdSet(ImmutableRoaringBitmap docIds, int numDocs, long numEntriesScannedInFilter) {
     _iterator = new BitmapDocIdIterator(docIds, numDocs);
     _numEntriesScannedInFilter = numEntriesScannedInFilter;
   }
 
-  public BitmapDocIdSet(BitmapDocIdIterator iterator) {
+  private BitmapDocIdSet(BitmapDocIdIterator iterator) {
     _iterator = iterator;
     _numEntriesScannedInFilter = 0L;
   }

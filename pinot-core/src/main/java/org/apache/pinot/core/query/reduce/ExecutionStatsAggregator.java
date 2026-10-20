@@ -71,6 +71,10 @@ public class ExecutionStatsAggregator {
   private long _numSegmentsPrunedInvalid = 0L;
   private long _numSegmentsPrunedByLimit = 0L;
   private long _numSegmentsPrunedByValue = 0L;
+  private long _numRemoteAccesses = 0L;
+  private long _remoteAccessBytes = 0L;
+  private long _numDirectRemoteAccesses = 0L;
+  private long _directRemoteAccessBytes = 0L;
   private long _explainPlanNumEmptyFilterSegments = 0L;
   private long _explainPlanNumMatchAllFilterSegments = 0L;
   private boolean _groupsTrimmed = false;
@@ -217,6 +221,12 @@ public class ExecutionStatsAggregator {
         l -> _numSegmentsPrunedByLimit += l);
     withNotNullLongMetadata(metadata, DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_VALUE,
         l -> _numSegmentsPrunedByValue += l);
+    withNotNullLongMetadata(metadata, DataTable.MetadataKey.NUM_REMOTE_ACCESSES, l -> _numRemoteAccesses += l);
+    withNotNullLongMetadata(metadata, DataTable.MetadataKey.REMOTE_ACCESS_BYTES, l -> _remoteAccessBytes += l);
+    withNotNullLongMetadata(metadata, DataTable.MetadataKey.NUM_DIRECT_REMOTE_ACCESSES,
+        l -> _numDirectRemoteAccesses += l);
+    withNotNullLongMetadata(metadata, DataTable.MetadataKey.DIRECT_REMOTE_ACCESS_BYTES,
+        l -> _directRemoteAccessBytes += l);
 
     String explainPlanNumEmptyFilterSegments =
         metadata.get(DataTable.MetadataKey.EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS.getName());
@@ -303,6 +313,10 @@ public class ExecutionStatsAggregator {
     brokerResponseNative.setNumSegmentsPrunedInvalid(_numSegmentsPrunedInvalid);
     brokerResponseNative.setNumSegmentsPrunedByLimit(_numSegmentsPrunedByLimit);
     brokerResponseNative.setNumSegmentsPrunedByValue(_numSegmentsPrunedByValue);
+    brokerResponseNative.setNumRemoteAccesses(_numRemoteAccesses);
+    brokerResponseNative.setRemoteAccessBytes(_remoteAccessBytes);
+    brokerResponseNative.setNumDirectRemoteAccesses(_numDirectRemoteAccesses);
+    brokerResponseNative.setDirectRemoteAccessBytes(_directRemoteAccessBytes);
     brokerResponseNative.setExplainPlanNumEmptyFilterSegments(_explainPlanNumEmptyFilterSegments);
     brokerResponseNative.setExplainPlanNumMatchAllFilterSegments(_explainPlanNumMatchAllFilterSegments);
     if (_numConsumingSegmentsQueried > 0) {
@@ -400,6 +414,10 @@ public class ExecutionStatsAggregator {
     putLong(metadata, DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_INVALID, _numSegmentsPrunedInvalid);
     putLong(metadata, DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_LIMIT, _numSegmentsPrunedByLimit);
     putLong(metadata, DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_VALUE, _numSegmentsPrunedByValue);
+    putLong(metadata, DataTable.MetadataKey.NUM_REMOTE_ACCESSES, _numRemoteAccesses);
+    putLong(metadata, DataTable.MetadataKey.REMOTE_ACCESS_BYTES, _remoteAccessBytes);
+    putLong(metadata, DataTable.MetadataKey.NUM_DIRECT_REMOTE_ACCESSES, _numDirectRemoteAccesses);
+    putLong(metadata, DataTable.MetadataKey.DIRECT_REMOTE_ACCESS_BYTES, _directRemoteAccessBytes);
     putLong(metadata, DataTable.MetadataKey.EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS,
         _explainPlanNumEmptyFilterSegments);
     putLong(metadata, DataTable.MetadataKey.EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS,

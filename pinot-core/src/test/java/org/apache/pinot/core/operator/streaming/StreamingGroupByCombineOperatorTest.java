@@ -405,6 +405,11 @@ public class StreamingGroupByCombineOperatorTest {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
         "SELECT groupColumn, SUM(intColumn) FROM testTable GROUP BY ROLLUP(groupColumn) LIMIT 100");
     queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
+    // Mirror the real MSE leaf-stage setup (InstancePlanMakerImplV2 sets this before building the segment
+    // plans): a positive streaming flush threshold selects the streaming combine, which does not derive
+    // grouping sets from base groups, so the segment operators must expand per row and emit the $groupingId
+    // discriminator directly (grouping-set base aggregation is disabled for this path).
+    queryContext.setStreamingGroupByFlushThreshold(10);
 
     List<Operator> operators = buildOperators(queryContext);
     StreamingGroupByCombineOperator combineOperator =

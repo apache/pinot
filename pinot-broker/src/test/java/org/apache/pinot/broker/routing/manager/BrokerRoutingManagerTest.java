@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import org.apache.helix.AccessOption;
 import org.apache.helix.BaseDataAccessor;
@@ -31,6 +32,7 @@ import org.apache.helix.HelixConstants.ChangeType;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.PropertyKey;
+import org.apache.helix.model.ClusterConfig;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
@@ -46,9 +48,11 @@ import org.apache.pinot.broker.routing.segmentpruner.SegmentPruner;
 import org.apache.pinot.broker.routing.segmentselector.SegmentSelector;
 import org.apache.pinot.broker.routing.tablesampler.TableSampler;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryManager;
+import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
@@ -73,6 +77,8 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.CONFIG_OF_PARTITION_PRUNING_PREPARATION_THRESHOLD;
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.DEFAULT_PARTITION_PRUNING_PREPARATION_THRESHOLD;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -521,13 +527,14 @@ public class BrokerRoutingManagerTest {
     Constructor<?> constructor = routingEntryClass.getDeclaredConstructor(String.class, String.class, String.class,
         SegmentPreSelector.class, SegmentSelector.class, List.class, InstanceSelector.class, int.class, int.class,
         SegmentZkMetadataFetcher.class, TimeBoundaryManager.class, SegmentPartitionMetadataManager.class, Long.class,
-        Map.class, boolean.class);
+        Map.class, boolean.class, int.class);
     constructor.setAccessible(true);
+    SegmentPreSelector segmentPreSelector = onlineSegments -> onlineSegments;
     return constructor.newInstance(tableNameWithType, "/IDEALSTATES/" + tableNameWithType,
-        "/EXTERNALVIEW/" + tableNameWithType, mock(SegmentPreSelector.class), segmentSelector, segmentPruners,
+        "/EXTERNALVIEW/" + tableNameWithType, segmentPreSelector, segmentSelector, segmentPruners,
         instanceSelector, 1, 1,
         mock(SegmentZkMetadataFetcher.class), timeBoundaryManager, partitionMetadataManager, null, samplerInfos,
-        disabled);
+        disabled, 0);
   }
 
   private static Object createSamplerInfo(InstanceSelector instanceSelector)
@@ -569,6 +576,52 @@ public class BrokerRoutingManagerTest {
     _routingManager.removeRouting(TEST_TABLE);
 
     verifyReplicaHealthGaugesRemoved();
+    verify(_brokerMetrics).removeTableGauge(TEST_TABLE, BrokerGauge.ROUTING_TABLE_SEGMENTS);
+  }
+
+  @Test
+  public void testAssignmentChangeReportsRoutingUpdateMetrics()
+      throws Exception {
+    // Every routing update triggered by an ideal state or external view change is timed, counted and reports the
+    // number of segments the routing tracks
+    InstanceSelector instanceSelector = mock(InstanceSelector.class);
+    putRoutingEntry(TEST_TABLE, createRoutingEntry(TEST_TABLE, null, null, Map.of(), instanceSelector, false));
+    IdealState idealState = createIdealState(true);
+    idealState.getRecord().setMapField("seg0", Map.of(SERVER_INSTANCE_ID, "ONLINE"));
+    idealState.getRecord().setMapField("seg1", Map.of(SERVER_INSTANCE_ID, "ONLINE"));
+    idealState.getRecord().setMapField("offlineSeg", Map.of(SERVER_INSTANCE_ID, "OFFLINE"));
+    stubSegmentAssignmentChange(idealState);
+
+    _routingManager.processSegmentAssignmentChangeInternal();
+
+    verify(_brokerMetrics).addTimedTableValue(eq(TEST_TABLE), eq(BrokerTimer.ROUTING_TABLE_UPDATE_TIME), anyLong(),
+        eq(TimeUnit.NANOSECONDS));
+    verify(_brokerMetrics).addTimedValue(eq(BrokerTimer.ROUTING_TABLE_UPDATE_TIME), anyLong(),
+        eq(TimeUnit.NANOSECONDS));
+    verify(_brokerMetrics).addMeteredTableValue(TEST_TABLE, BrokerMeter.ROUTING_TABLE_UPDATE_SUCCESS, 1L);
+    verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.ROUTING_TABLE_SEGMENTS, 2L);
+    verify(_brokerMetrics, never()).addMeteredTableValue(TEST_TABLE, BrokerMeter.ROUTING_TABLE_UPDATE_FAILURE, 1L);
+  }
+
+  @Test
+  public void testFailedAssignmentChangeReportsFailureMetric()
+      throws Exception {
+    // A failed update is counted as a failure, not as an update, and is not timed, so that a table whose update
+    // keeps failing does not look like a table with many assignment changes
+    InstanceSelector instanceSelector = mock(InstanceSelector.class);
+    doThrow(new RuntimeException("test")).when(instanceSelector).onAssignmentChange(any(), any(), any());
+    putRoutingEntry(TEST_TABLE, createRoutingEntry(TEST_TABLE, null, null, Map.of(), instanceSelector, false));
+    IdealState idealState = createIdealState(true);
+    idealState.getRecord().setMapField("seg0", Map.of(SERVER_INSTANCE_ID, "ONLINE"));
+    stubSegmentAssignmentChange(idealState);
+
+    _routingManager.processSegmentAssignmentChangeInternal();
+
+    verify(_brokerMetrics).addMeteredTableValue(TEST_TABLE, BrokerMeter.ROUTING_TABLE_UPDATE_FAILURE, 1L);
+    verify(_brokerMetrics, never()).addMeteredTableValue(TEST_TABLE, BrokerMeter.ROUTING_TABLE_UPDATE_SUCCESS, 1L);
+    verify(_brokerMetrics, never()).addTimedTableValue(eq(TEST_TABLE), eq(BrokerTimer.ROUTING_TABLE_UPDATE_TIME),
+        anyLong(), any());
+    verify(_brokerMetrics, never()).addTimedValue(eq(BrokerTimer.ROUTING_TABLE_UPDATE_TIME), anyLong(), any());
   }
 
   @Test
@@ -653,6 +706,7 @@ public class BrokerRoutingManagerTest {
     verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.PERCENT_OF_REPLICAS, 100);
     verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.SEGMENTS_AT_MIN_PERCENT_OF_REPLICAS, 0);
     verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.UNAVAILABLE_SEGMENTS, 0);
+    verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.ROUTING_TABLE_SEGMENTS, 0);
   }
 
   @Test
@@ -804,6 +858,35 @@ public class BrokerRoutingManagerTest {
     // Routable map contains the server again.
     assertTrue(_routingManager.getEnabledServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
     assertTrue(_routingManager.getRoutableServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
+  }
+
+  @Test
+  public void testPartitionPruningThresholdUpdates()
+      throws Exception {
+    String key = CONFIG_OF_PARTITION_PRUNING_PREPARATION_THRESHOLD;
+    _routingManager = spy(_routingManager);
+    putRoutingEntry(TEST_TABLE, createRoutingEntry(TEST_TABLE, null, null, Map.of()));
+    DefaultClusterConfigChangeHandler handler = new DefaultClusterConfigChangeHandler();
+    ClusterConfig config = new ClusterConfig("testCluster");
+    config.getRecord().setSimpleField(key, "128");
+    handler.onClusterConfigChange(config, null);
+    handler.registerClusterConfigChangeListener(_routingManager);
+    assertEquals(_routingManager.getPartitionPruningPreparationThreshold(), 128);
+
+    config.getRecord().setSimpleField(key, "-1");
+    handler.onClusterConfigChange(config, null);
+    assertEquals(_routingManager.getPartitionPruningPreparationThreshold(), -1);
+
+    config.getRecord().setSimpleField(key, "invalid");
+    handler.onClusterConfigChange(config, null);
+    assertEquals(_routingManager.getPartitionPruningPreparationThreshold(),
+        DEFAULT_PARTITION_PRUNING_PREPARATION_THRESHOLD);
+
+    config.getRecord().getSimpleFields().clear();
+    handler.onClusterConfigChange(config, null);
+    assertEquals(_routingManager.getPartitionPruningPreparationThreshold(),
+        DEFAULT_PARTITION_PRUNING_PREPARATION_THRESHOLD);
+    verify(_routingManager, never()).buildRouting(TEST_TABLE);
   }
 
   /// Creates a ZNRecord representing an enabled server instance.

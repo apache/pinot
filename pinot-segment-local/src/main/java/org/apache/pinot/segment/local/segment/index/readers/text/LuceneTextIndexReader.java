@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers.text;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
@@ -49,10 +50,12 @@ import org.apache.pinot.segment.local.utils.LuceneTextIndexUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.TextIndexConfig.DocIdTranslatorMode;
+import org.apache.pinot.segment.spi.index.reader.QueryScopedCache;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.exception.QueryException;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.LoggerFactory;
@@ -67,6 +70,9 @@ public class LuceneTextIndexReader implements TextIndexReader {
   private final IndexReader _indexReader;
   private final Directory _indexDirectory;
   private final IndexSearcher _indexSearcher;
+  /// Number of documents in the Pinot segment. A Lucene index holding more than this means a corrupted or
+  /// partially converted segment; see [#getNumMatchingDocs].
+  private final int _numDocs;
   private final String _column;
   private final DocIdTranslator _docIdTranslator;
   private final Analyzer _analyzer;
@@ -74,6 +80,9 @@ public class LuceneTextIndexReader implements TextIndexReader {
   private final String _queryParserClass;
   private Constructor<QueryParserBase> _queryParserClassConstructor;
   private boolean _enablePrefixSuffixMatchingInPhraseQueries = false;
+  /// Everything about this column that changes how a search string parses. Two readers may share a
+  /// parsed query only when these are equal. Computed once; immutable, with structural equality.
+  private final ParseConfig _parseConfig;
 
   public LuceneTextIndexReader(String column, File indexDir, int numDocs, TextIndexConfig config) {
     _column = column;
@@ -82,6 +91,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
       _indexDirectory = FSDirectory.open(indexFile.toPath());
       _indexReader = DirectoryReader.open(_indexDirectory);
       _indexSearcher = new IndexSearcher(_indexReader);
+      _numDocs = numDocs;
       if (!config.isEnableQueryCache()) {
         // Disable Lucene query result cache. While it helps a lot with performance for
         // repeated queries, on the downside it can cause heap issues.
@@ -106,6 +116,8 @@ public class LuceneTextIndexReader implements TextIndexReader {
       _queryParserClass = config.getLuceneQueryParserClass();
       _queryParserClassConstructor =
           TextIndexUtils.getQueryParserWithStringAndAnalyzerTypeConstructor(_queryParserClass);
+      // after the properties-file override above, so it reflects the configuration actually in force
+      _parseConfig = buildParseConfig(_column, config);
       LOGGER.info("Successfully read lucene index for {} from {}", _column, indexDir);
     } catch (Exception e) {
       LOGGER.error("Failed to instantiate Lucene text index reader for column {}, exception {}", column,
@@ -151,6 +163,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
       _indexDirectory = indexDirectory;
       _indexReader = DirectoryReader.open(_indexDirectory);
       _indexSearcher = new IndexSearcher(_indexReader);
+      _numDocs = numDocs;
 
       if (!config.isEnableQueryCache()) {
         // Disable Lucene query result cache. While it helps a lot with performance for
@@ -176,6 +189,8 @@ public class LuceneTextIndexReader implements TextIndexReader {
       _queryParserClass = config.getLuceneQueryParserClass();
       _queryParserClassConstructor =
           TextIndexUtils.getQueryParserWithStringAndAnalyzerTypeConstructor(_queryParserClass);
+      // after the properties-file override above, so it reflects the configuration actually in force
+      _parseConfig = buildParseConfig(_column, config);
 
       LOGGER.info("Successfully read lucene index for {} from buffer", _column);
     } catch (Exception e) {
@@ -218,59 +233,177 @@ public class LuceneTextIndexReader implements TextIndexReader {
 
   @Override
   public MutableRoaringBitmap getDocIds(String searchQuery, @Nullable String optionsString) {
-    if (optionsString != null && !optionsString.trim().isEmpty()) {
-      LuceneTextIndexUtils.LuceneTextIndexOptions options = LuceneTextIndexUtils.createOptions(optionsString);
-      if (!options.getOptions().isEmpty()) {
-        return getDocIdsWithOptions(searchQuery, options);
-      }
-    }
-    return getDocIdsWithoutOptions(searchQuery);
+    return getDocIds(searchQuery, optionsString, null);
   }
 
-  private MutableRoaringBitmap getDocIdsWithoutOptions(String searchQuery) {
+  @Override
+  public MutableRoaringBitmap getDocIds(String searchQuery, @Nullable String optionsString,
+      @Nullable QueryScopedCache queryScopedCache) {
     MutableRoaringBitmap docIds = new MutableRoaringBitmap();
     Collector docIDCollector = new LuceneDocIdCollector(docIds, _docIdTranslator);
     try {
-      // Lucene query parsers are generally stateful and a new instance must be created per query.
-      QueryParserBase parser = _queryParserClassConstructor.newInstance(_column, _analyzer);
-      // Phrase search with prefix/suffix matching may have leading *. E.g., `*pache pinot` which can be stripped by
-      // the query parser. To support the feature, we need to explicitly set the config to be true.
-      if (_enablePrefixSuffixMatchingInPhraseQueries) {
-        parser.setAllowLeadingWildcard(true);
-      }
-      if (_useANDForMultiTermQueries) {
-        parser.setDefaultOperator(QueryParser.Operator.AND);
-      }
-      Query query = parser.parse(searchQuery);
-      if (_queryParserClass.equals("org.apache.lucene.queryparser.classic.QueryParser")
-              && _enablePrefixSuffixMatchingInPhraseQueries) {
-        query = LuceneTextIndexUtils.convertToMultiTermSpanQuery(query);
-      }
-      _indexSearcher.search(query, docIDCollector);
+      _indexSearcher.search(buildQuery(searchQuery, optionsString, queryScopedCache), docIDCollector);
       return docIds;
+    } catch (QueryException e) {
+      throw e;
     } catch (Exception e) {
-      String msg =
-          "Caught exception while searching the text index for column:" + _column + " search query:" + searchQuery;
-      throw new RuntimeException(msg, e);
+      // Both wordings are preserved verbatim from before the two paths were merged: the options path's text is
+      // asserted on in TextSearchQueriesTest#testTextFilterOptimizerWithWildcardsDifferentOptions, and the
+      // no-options path is the common one whose text operators may already alert on.
+      throw new RuntimeException(hasOptions(optionsString)
+          ? "Failed while searching the text index for column " + _column + " with search query: " + searchQuery
+          : "Caught exception while searching the text index for column:" + _column + " search query:" + searchQuery,
+          e);
     }
   }
 
-  // TODO: Consider creating a base class (e.g., BaseLuceneTextIndexReader) to avoid code duplication
-  // for getDocIdsWithOptions method across LuceneTextIndexReader, MultiColumnLuceneTextIndexReader,
-  // RealtimeLuceneTextIndex, and MultiColumnRealtimeLuceneTextIndex
-  private MutableRoaringBitmap getDocIdsWithOptions(String actualQuery,
-      LuceneTextIndexUtils.LuceneTextIndexOptions options) {
-    MutableRoaringBitmap docIds = new MutableRoaringBitmap();
-    Collector docIDCollector = new LuceneDocIdCollector(docIds, _docIdTranslator);
+  /// Identifies a parsing configuration. A record so that equality is structural: comparing the
+  /// rendered text of these lists instead would conflate `["failed", "order"]` with
+  /// `["failed, order"]`, which are different stop-word sets that parse the same string differently.
+  private record ParseConfig(String column, String analyzerClass, List<String> analyzerArgs,
+                             List<String> analyzerArgTypes, List<String> stopWordsInclude,
+                             List<String> stopWordsExclude, boolean caseSensitive, String queryParserClass,
+                             boolean useANDForMultiTermQueries, boolean prefixSuffixMatchingInPhraseQueries) {
+    private ParseConfig {
+      analyzerArgs = copy(analyzerArgs);
+      analyzerArgTypes = copy(analyzerArgTypes);
+      stopWordsInclude = copy(stopWordsInclude);
+      stopWordsExclude = copy(stopWordsExclude);
+    }
+
+    private static List<String> copy(@Nullable List<String> values) {
+      return values == null ? List.of() : List.copyOf(values);
+    }
+  }
+
+  /// Cache key for one parsed query: the configuration plus the request-supplied text.
+  private record ParsedQueryKey(ParseConfig parseConfig, String searchQuery, @Nullable String optionsString) {
+  }
+
+  /// Carries a checked parse failure out of the cache's mapper so the original exception, and in
+  /// particular a [QueryException]'s error code, survives instead of being wrapped.
+  private static final class ParseFailure extends RuntimeException {
+    ParseFailure(Exception cause) {
+      super(cause);
+    }
+  }
+
+  private static ParseConfig buildParseConfig(String column, TextIndexConfig config) {
+    return new ParseConfig(column, config.getLuceneAnalyzerClass(), config.getLuceneAnalyzerClassArgs(),
+        config.getLuceneAnalyzerClassArgTypes(), config.getStopWordsInclude(), config.getStopWordsExclude(),
+        config.isCaseSensitive(), config.getLuceneQueryParserClass(), config.isUseANDForMultiTermQueries(),
+        config.isEnablePrefixSuffixMatchingInPhraseQueries());
+  }
+
+  /// Parses a search string into a Lucene query, applying the configured parser and options.
+  ///
+  /// Shared by the doc-id and the count paths so that a `count(*)` and the filter it counts can never
+  /// interpret the same query differently.
+  private Query parseQueryWithoutOptions(String searchQuery)
+      throws Exception {
+    // Lucene query parsers are generally stateful and a new instance must be created per query.
+    QueryParserBase parser = _queryParserClassConstructor.newInstance(_column, _analyzer);
+    // Phrase search with prefix/suffix matching may have leading *. E.g., `*pache pinot` which can be stripped by
+    // the query parser. To support the feature, we need to explicitly set the config to be true.
+    if (_enablePrefixSuffixMatchingInPhraseQueries) {
+      parser.setAllowLeadingWildcard(true);
+    }
+    if (_useANDForMultiTermQueries) {
+      parser.setDefaultOperator(QueryParser.Operator.AND);
+    }
+    Query query = parser.parse(searchQuery);
+    if (_queryParserClass.equals("org.apache.lucene.queryparser.classic.QueryParser")
+            && _enablePrefixSuffixMatchingInPhraseQueries) {
+      query = LuceneTextIndexUtils.convertToMultiTermSpanQuery(query);
+    }
+    return query;
+  }
+
+  @Override
+  public int getNumMatchingDocs(String searchQuery, @Nullable String optionsString) {
+    return getNumMatchingDocs(searchQuery, optionsString, null);
+  }
+
+  @Override
+  public int getNumMatchingDocs(String searchQuery, @Nullable String optionsString,
+      @Nullable QueryScopedCache queryScopedCache) {
     try {
-      Query query = LuceneTextIndexUtils.createQueryParserWithOptions(actualQuery, options, _column, _analyzer);
-      _indexSearcher.search(query, docIDCollector);
-      return docIds;
+      // A Lucene index larger than the segment means the doc-id mapping is broken -- a state getDocIds
+      // surfaces as an IndexOutOfBoundsException from the translator. Counting does not consult the
+      // translator, so without this guard the corruption would become a silently inflated count instead.
+      // Compared against maxDoc(), not numDocs(): LuceneDocIdCollector indexes the translator by
+      // `context.docBase + doc`, which is maxDoc() space, and with deletions numDocs() < maxDoc() would let a
+      // broken index slip through. Fall back so that it keeps failing loudly.
+      if (_indexReader.maxDoc() > _numDocs) {
+        return getDocIds(searchQuery, optionsString, queryScopedCache).getCardinality();
+      }
+      return LuceneTextIndexUtils.countWithoutMaterializing(_indexSearcher,
+          buildQuery(searchQuery, optionsString, queryScopedCache));
+    } catch (QueryException e) {
+      // A timeout or accountant kill arrives as a QueryException; wrapping it would erase its error code,
+      // since only QueryException keeps its code through BaseSingleBlockCombineOperator.
+      throw e;
     } catch (Exception e) {
       throw new RuntimeException(
-          "Failed while searching the text index for column " + _column + " with search query: " + actualQuery, e);
+          "Caught exception while counting matches in the text index for column:" + _column + " search query:"
+              + searchQuery, e);
     }
   }
+
+  /// Parses a search string into a Lucene query, honouring the options string when one is given, and
+  /// reusing the query already parsed for this request when a cache is given.
+  ///
+  /// Both [#getDocIds(String, String)] and [#getNumMatchingDocs] go through this method, so a `count(*)` and
+  /// the filter it counts cannot interpret the same query differently. Keep it that way: any new entry point
+  /// that parses a search string itself reintroduces that divergence.
+  ///
+  /// Every segment of a request parses the same string against the same configuration, so without a
+  /// cache the work is repeated once per segment. With a cache the string is parsed once per effective
+  /// parsing configuration rather than once per segment: one request can span segments whose text
+  /// indexes are configured differently, and those keep their own entries. A parse that throws caches
+  /// nothing, so the next segment retries and fails the same way.
+  ///
+  /// The returned query may be shared: Lucene queries are immutable and [Query#rewrite] does not
+  /// mutate them, so a multi-term query is still expanded per segment against that segment's own
+  /// term dictionary.
+  @VisibleForTesting
+  Query buildQuery(String searchQuery, @Nullable String optionsString, @Nullable QueryScopedCache queryScopedCache)
+      throws Exception {
+    if (queryScopedCache == null) {
+      return parseQuery(searchQuery, optionsString);
+    }
+    ParsedQueryKey key = new ParsedQueryKey(_parseConfig, searchQuery, optionsString);
+    try {
+      return queryScopedCache.getOrComputeSharedValue(Query.class, key, k -> {
+        try {
+          return parseQuery(k.searchQuery(), k.optionsString());
+        } catch (Exception e) {
+          throw new ParseFailure(e);
+        }
+      });
+    } catch (ParseFailure e) {
+      throw (Exception) e.getCause();
+    }
+  }
+
+  /// Parses unconditionally, bypassing any cache.
+  @VisibleForTesting
+  Query parseQuery(String searchQuery, @Nullable String optionsString)
+      throws Exception {
+    if (hasOptions(optionsString)) {
+      LuceneTextIndexUtils.LuceneTextIndexOptions options = LuceneTextIndexUtils.createOptions(optionsString);
+      return LuceneTextIndexUtils.createQueryParserWithOptions(searchQuery, options, _column, _analyzer);
+    }
+    return parseQueryWithoutOptions(searchQuery);
+  }
+
+  /// Whether `optionsString` selects the options-driven parser, i.e. it is non-blank and parses to at least
+  /// one option. Shared so the query built and the error reported cannot disagree about which path ran.
+  private static boolean hasOptions(@Nullable String optionsString) {
+    return optionsString != null && !optionsString.trim().isEmpty()
+        && !LuceneTextIndexUtils.createOptions(optionsString).getOptions().isEmpty();
+  }
+
 
   /// When we destroy the loaded ImmutableSegment, all the indexes
   /// (for each column) are destroyed and as part of that

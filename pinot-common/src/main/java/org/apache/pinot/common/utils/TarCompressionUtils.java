@@ -42,6 +42,7 @@ import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.compression.Lz4CompressorStreamProvider;
 
 
 /// Utility class to compress/de-compress tar files compressed using various compressors.
@@ -76,7 +77,7 @@ public class TarCompressionUtils {
   public static final String TAR_ZST_FILE_EXTENSION = ".tar.zst";
   public static final Map<String, String> COMPRESSOR_NAME_BY_FILE_EXTENSIONS =
       Map.of(TAR_GZ_FILE_EXTENSION, CompressorStreamFactory.GZIP, TAR_LZ4_FILE_EXTENSION,
-          CompressorStreamFactory.LZ4_FRAMED, TAR_ZST_FILE_EXTENSION, CompressorStreamFactory.ZSTANDARD);
+          Lz4CompressorStreamProvider.LZ4_FAST, TAR_ZST_FILE_EXTENSION, CompressorStreamFactory.ZSTANDARD);
   private static final CompressorStreamFactory COMPRESSOR_STREAM_FACTORY = CompressorStreamFactory.getSingleton();
   private static final char ENTRY_NAME_SEPARATOR = '/';
   private static String _defaultCompressorName = CompressorStreamFactory.GZIP;
@@ -123,8 +124,9 @@ public class TarCompressionUtils {
       throws IOException {
     try (OutputStream fileOut = Files.newOutputStream(outputFile.toPath());
         BufferedOutputStream bufferedOut = new BufferedOutputStream(fileOut);
-        OutputStream compressorOut = COMPRESSOR_STREAM_FACTORY.createCompressorOutputStream(compressorName,
-            bufferedOut); TarArchiveOutputStream tarOut = new TarArchiveOutputStream(compressorOut)) {
+        OutputStream compressorOut =
+            COMPRESSOR_STREAM_FACTORY.createCompressorOutputStream(compressorName, bufferedOut);
+        TarArchiveOutputStream tarOut = new TarArchiveOutputStream(compressorOut)) {
       tarOut.setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_STAR);
       tarOut.setLongFileMode(TarArchiveOutputStream.LONGFILE_GNU);
 
@@ -230,7 +232,9 @@ public class TarCompressionUtils {
             if (maxStreamRateInByte != NO_DISK_WRITE_RATE_LIMIT) {
               copyWithRateLimiter(tarIn, out, maxStreamRateInByte);
             } else {
-              IOUtils.copy(tarIn, out);
+              try (OutputStream bufferedOut = new BufferedOutputStream(out)) {
+                IOUtils.copy(tarIn, bufferedOut);
+              }
             }
           }
         }
@@ -255,7 +259,7 @@ public class TarCompressionUtils {
           String entryName = entry.getName();
           String[] parts = StringUtils.split(entryName, ENTRY_NAME_SEPARATOR);
           if (parts.length > 0 && parts[parts.length - 1].equals(fileName)) {
-            try (OutputStream out = Files.newOutputStream(outputFile.toPath())) {
+            try (OutputStream out = new BufferedOutputStream(Files.newOutputStream(outputFile.toPath()))) {
               IOUtils.copy(tarIn, out);
             }
             return;

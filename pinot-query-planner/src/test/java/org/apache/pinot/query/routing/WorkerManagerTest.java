@@ -33,6 +33,7 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.core.routing.MockRoutingManagerFactory;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.SegmentsToQuery;
@@ -41,6 +42,7 @@ import org.apache.pinot.core.routing.TablePartitionReplicatedServersInfo;
 import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.QueryEnvironment;
+import org.apache.pinot.query.planner.physical.DispatchablePlanContext;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -2296,6 +2298,118 @@ public class WorkerManagerTest {
       _unavailableSegments = unavailableSegments;
       return this;
     }
+  }
+
+  private static final String LOOKUP_JOINS_OVER_AGGREGATE_QUERY =
+      "SELECT /*+ joinOptions(join_strategy='lookup') */ t.col1, t.cnt, dim1.col2, dim2.col2 "
+          + "FROM (SELECT col1, COUNT(*) AS cnt FROM fact GROUP BY col1) t "
+          + "JOIN dim1 ON t.col1 = dim1.col1 JOIN dim2 ON t.col1 = dim2.col1";
+
+  /// A lookup join over an intermediate input (the aggregation of a subquery) is assigned after its input. By default
+  /// it takes the workers of its input, like a lookup join over a leaf input. The second lookup join takes the workers
+  /// of the first one, so it must be assigned after the first one too.
+  @Test
+  public void testLookupJoinOverIntermediateInputTakesInputWorkers() {
+    DispatchableSubPlan plan = newLookupJoinQueryEnvironment(null).planQuery(LOOKUP_JOINS_OVER_AGGREGATE_QUERY);
+    DispatchablePlanFragment dim1Join = lookupJoinFragment(plan, "dim1");
+    DispatchablePlanFragment dim2Join = lookupJoinFragment(plan, "dim2");
+    Map<Integer, String> aggregateWorkers = workerIdToServer(inputFragment(plan, dim1Join));
+    assertEquals(aggregateWorkers.size(), 2);
+    assertEquals(workerIdToServer(dim1Join), aggregateWorkers);
+    assertEquals(workerIdToServer(dim2Join), aggregateWorkers);
+  }
+
+  /// When the intermediate stages run on an instance that cannot scan segments, like a broker, a lookup join over an
+  /// intermediate input runs on the servers from [WorkerManager#getCandidateServersForReplicatedLeaf]. Only servers
+  /// hold the dimension tables.
+  @Test
+  public void testLookupJoinOverIntermediateInputUsesReplicatedLeafServers() {
+    QueryServerInstance broker = new QueryServerInstance("Broker_localhost_9", "localhost", 9, 9);
+    DispatchableSubPlan plan = newLookupJoinQueryEnvironment(broker).planQuery(LOOKUP_JOINS_OVER_AGGREGATE_QUERY);
+    DispatchablePlanFragment dim1Join = lookupJoinFragment(plan, "dim1");
+    DispatchablePlanFragment dim2Join = lookupJoinFragment(plan, "dim2");
+    assertEquals(workerIdToServer(inputFragment(plan, dim1Join)), Map.of(0, broker.getInstanceId()));
+    Set<String> factServers = new HashSet<>(workerIdToServer(leafFragmentForTable(plan, "fact")).values());
+    assertEquals(factServers.size(), 2);
+    assertEquals(new HashSet<>(workerIdToServer(dim1Join).values()), factServers);
+    assertEquals(workerIdToServer(dim2Join), workerIdToServer(dim1Join));
+  }
+
+  /// A lookup join over a leaf input takes the workers of the leaf, also when the intermediate stages run on an
+  /// instance that cannot scan segments.
+  @Test
+  public void testLookupJoinOverLeafInputTakesLeafWorkers() {
+    QueryServerInstance broker = new QueryServerInstance("Broker_localhost_9", "localhost", 9, 9);
+    DispatchableSubPlan plan = newLookupJoinQueryEnvironment(broker).planQuery(
+        "SELECT /*+ joinOptions(join_strategy='lookup') */ fact.col1, dim1.col2 "
+            + "FROM fact JOIN dim1 ON fact.col1 = dim1.col1");
+    DispatchablePlanFragment dim1Join = lookupJoinFragment(plan, "dim1");
+    DispatchablePlanFragment factLeaf = inputFragment(plan, dim1Join);
+    assertEquals(factLeaf, leafFragmentForTable(plan, "fact"));
+    assertEquals(workerIdToServer(dim1Join), workerIdToServer(factLeaf));
+  }
+
+  /// Builds a QueryEnvironment over the offline table "fact", with one segment on each of 2 servers, and the offline
+  /// tables "dim1" and "dim2", with one segment on both servers like dimension tables.
+  ///
+  /// @param intermediateStageWorker when set, every intermediate stage runs on this instance, see
+  ///        [NonServerIntermediateStageWorkerManager]
+  private static QueryEnvironment newLookupJoinQueryEnvironment(@Nullable QueryServerInstance intermediateStageWorker) {
+    MockRoutingManagerFactory factory = new MockRoutingManagerFactory(1, 2);
+    factory.registerTable(getSchemaBuilder("fact").build(), "fact_OFFLINE");
+    factory.registerSegment(1, "fact_OFFLINE", "fact_1");
+    factory.registerSegment(2, "fact_OFFLINE", "fact_2");
+    for (String dimTableName : List.of("dim1", "dim2")) {
+      String dimTableNameWithType = dimTableName + "_OFFLINE";
+      factory.registerTable(getSchemaBuilder(dimTableName).build(), dimTableNameWithType);
+      factory.registerSegment(1, dimTableNameWithType, dimTableName + "_0");
+      factory.registerSegment(2, dimTableNameWithType, dimTableName + "_0");
+    }
+    RoutingManager routingManager = factory.buildRoutingManager(null);
+    WorkerManager workerManager = intermediateStageWorker == null
+        ? new WorkerManager("Broker_localhost", "localhost", 3, routingManager)
+        : new NonServerIntermediateStageWorkerManager(routingManager, intermediateStageWorker);
+    return new QueryEnvironment(CommonConstants.DEFAULT_DATABASE, factory.buildTableCache(), workerManager);
+  }
+
+  /// Runs every intermediate stage on one instance that cannot scan segments, like a broker. So it runs the replicated
+  /// leaf stages on the servers that host the tables.
+  private static class NonServerIntermediateStageWorkerManager extends WorkerManager {
+    private final QueryServerInstance _intermediateStageWorker;
+
+    NonServerIntermediateStageWorkerManager(RoutingManager routingManager,
+        QueryServerInstance intermediateStageWorker) {
+      super("Broker_localhost", "localhost", 3, routingManager);
+      _intermediateStageWorker = intermediateStageWorker;
+    }
+
+    @Override
+    protected List<QueryServerInstance> getCandidateServers(DispatchablePlanContext context) {
+      // Mutable, because the caller sorts it
+      return new ArrayList<>(List.of(_intermediateStageWorker));
+    }
+
+    @Override
+    protected List<QueryServerInstance> getCandidateServersForReplicatedLeaf(DispatchablePlanContext context,
+        List<QueryServerInstance> intermediateStageWorkers) {
+      return getCandidateServersPerTables(context);
+    }
+  }
+
+  /// Returns the lookup join fragment that probes the given dimension table. It scans the dimension table, has the
+  /// input of the join as its only child, and every worker is a leaf stage worker.
+  private static DispatchablePlanFragment lookupJoinFragment(DispatchableSubPlan dispatchableSubPlan,
+      String dimTableName) {
+    DispatchablePlanFragment fragment = leafFragmentForTable(dispatchableSubPlan, dimTableName);
+    assertEquals(fragment.getPlanFragment().getChildren().size(), 1, "Not a lookup join fragment: " + dimTableName);
+    assertEquals(fragment.getWorkerIdToSegmentsMap().keySet(), workerIdToServer(fragment).keySet());
+    return fragment;
+  }
+
+  /// Returns the fragment that feeds the given fragment, which has a single child.
+  private static DispatchablePlanFragment inputFragment(DispatchableSubPlan dispatchableSubPlan,
+      DispatchablePlanFragment fragment) {
+    return dispatchableSubPlan.getQueryStageMap().get(fragment.getPlanFragment().getChildren().get(0).getFragmentId());
   }
 
   /// Returns the only fragment below the reduce stage with neither segments nor children, i.e. the join stage.

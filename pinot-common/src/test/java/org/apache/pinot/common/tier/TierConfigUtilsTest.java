@@ -19,11 +19,24 @@
 package org.apache.pinot.common.tier;
 
 import com.google.common.collect.Lists;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import org.apache.helix.AccessOption;
+import org.apache.helix.HelixDataAccessor;
+import org.apache.helix.HelixManager;
+import org.apache.helix.PropertyKey;
+import org.apache.helix.model.InstanceConfig;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.common.assignment.InstancePartitions;
+import org.apache.pinot.common.assignment.InstancePartitionsUtils;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -31,6 +44,13 @@ import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 
 /// Tests the utility methods for TierConfig
@@ -219,5 +239,99 @@ public class TierConfigUtilsTest {
             Map.of("dataDir", "/foo/bar")))).build();
     dataDir = TierConfigUtils.getDataDirForTier(tableConfig, "myTier", instanceTierConfigs);
     Assert.assertEquals(dataDir, "/foo/bar");
+  }
+
+  /// A tier whose instance partitions have been assigned and persisted must be placed on exactly those instances.
+  /// Recomputing a default placement here would send segments added after the assignment to different instances than
+  /// the ones the assignment already placed the existing segments on.
+  @Test
+  public void testGetTieredInstancePartitionsUsesPersistedAssignment() {
+    String rawTableName = "myTable";
+    String tableNameWithType = "myTable_OFFLINE";
+    String tierName = "myTier";
+    String serverTag = "tierTag_OFFLINE";
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).build();
+    Tier tier = TierFactory.getTier(
+        new TierConfig(tierName, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "10d", null,
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, serverTag, null, null));
+
+    // Two replica-groups over two partitions, which is what instance assignment persists for the tier and which no
+    // default placement can produce.
+    InstancePartitions persisted = new InstancePartitions(
+        InstancePartitionsUtils.getInstancePartitionsNameForTier(tableNameWithType, tierName));
+    persisted.setInstances(0, 0, List.of("tierServer_0"));
+    persisted.setInstances(0, 1, List.of("tierServer_2"));
+    persisted.setInstances(1, 0, List.of("tierServer_1"));
+    persisted.setInstances(1, 1, List.of("tierServer_3"));
+
+    HelixManager helixManager =
+        mockHelixManager(serverTag, List.of("tierServer_0", "tierServer_1", "tierServer_2", "tierServer_3"), persisted);
+
+    InstancePartitions instancePartitions =
+        TierConfigUtils.getTieredInstancePartitions(tableConfig, tier, helixManager);
+    Assert.assertEquals(instancePartitions.getNumPartitions(), 2);
+    Assert.assertEquals(instancePartitions.getNumReplicaGroups(), 2);
+    Assert.assertEquals(instancePartitions.getInstances(0, 0), List.of("tierServer_0"));
+    Assert.assertEquals(instancePartitions.getInstances(1, 1), List.of("tierServer_3"));
+    Assert.assertEquals(instancePartitions.getInstancePartitionsName(), persisted.getInstancePartitionsName());
+
+    // The same assignment must be reached through the per-segment entry point, which is what segment assignment uses.
+    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata("mySegment");
+    segmentZKMetadata.setEndTime(System.currentTimeMillis() - TimeUnit.DAYS.toMillis(30));
+    segmentZKMetadata.setTimeUnit(TimeUnit.MILLISECONDS);
+    InstancePartitions forSegment =
+        TierConfigUtils.getTieredInstancePartitionsForSegment(tableConfig, segmentZKMetadata, List.of(tier),
+            helixManager);
+    Assert.assertNotNull(forSegment);
+    Assert.assertEquals(forSegment.getPartitionToInstancesMap(), persisted.getPartitionToInstancesMap());
+  }
+
+  /// Without a persisted assignment the tier still falls back to a default placement over its tagged instances.
+  @Test
+  public void testGetTieredInstancePartitionsFallsBackToDefault() {
+    String rawTableName = "myTable";
+    String tierName = "myTier";
+    String serverTag = "tierTag_OFFLINE";
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).build();
+    Tier tier = TierFactory.getTier(
+        new TierConfig(tierName, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "10d", null,
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, serverTag, null, null));
+
+    HelixManager helixManager =
+        mockHelixManager(serverTag, List.of("tierServer_0", "tierServer_1", "tierServer_2", "tierServer_3"), null);
+
+    InstancePartitions instancePartitions =
+        TierConfigUtils.getTieredInstancePartitions(tableConfig, tier, helixManager);
+    Assert.assertEquals(instancePartitions.getNumPartitions(), 1);
+    Assert.assertEquals(instancePartitions.getNumReplicaGroups(), 1);
+    Assert.assertEquals(Set.copyOf(instancePartitions.getInstances(0, 0)),
+        Set.of("tierServer_0", "tierServer_1", "tierServer_2", "tierServer_3"));
+  }
+
+  /// Mocks a Helix manager holding the given tagged instances, and the given instance partitions if not null.
+  private HelixManager mockHelixManager(String serverTag, List<String> taggedInstances,
+      InstancePartitions instancePartitions) {
+    List<InstanceConfig> instanceConfigs = new ArrayList<>();
+    for (String instance : taggedInstances) {
+      InstanceConfig instanceConfig = new InstanceConfig(instance);
+      instanceConfig.addTag(serverTag);
+      instanceConfigs.add(instanceConfig);
+    }
+    HelixDataAccessor helixDataAccessor = mock(HelixDataAccessor.class);
+    when(helixDataAccessor.keyBuilder()).thenReturn(new PropertyKey.Builder("testCluster"));
+    when(helixDataAccessor.getChildValues(any(PropertyKey.class), anyBoolean())).thenAnswer(
+        invocation -> instanceConfigs);
+
+    @SuppressWarnings("unchecked")
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
+    String path = instancePartitions != null ? ZKMetadataProvider.constructPropertyStorePathForInstancePartitions(
+        instancePartitions.getInstancePartitionsName()) : null;
+    when(propertyStore.get(anyString(), eq(null), eq(AccessOption.PERSISTENT))).thenAnswer(
+        invocation -> invocation.getArgument(0, String.class).equals(path) ? instancePartitions.toZNRecord() : null);
+
+    HelixManager helixManager = mock(HelixManager.class);
+    when(helixManager.getHelixDataAccessor()).thenReturn(helixDataAccessor);
+    when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
+    return helixManager;
   }
 }

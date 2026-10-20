@@ -30,6 +30,7 @@ import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.broker.AllowAllAccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
@@ -42,6 +43,12 @@ import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.planner.physical.PinotDispatchPlanner;
 import org.apache.pinot.query.routing.WorkerManager;
+import org.apache.pinot.query.runtime.operator.BaseMailboxReceiveOperator;
+import org.apache.pinot.query.runtime.operator.LeafOperator;
+import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
+import org.apache.pinot.query.runtime.operator.MultiStageOperator;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
+import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerOperator;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
@@ -200,6 +207,36 @@ public class MultiStageBrokerRequestHandlerTest extends QueryEnvironmentTestBase
   }
 
   @Test
+  public void testMergeStageStatsTotalMemAllocatedBytes() {
+    StatMap<BaseMailboxReceiveOperator.StatKey> rootReceive = new StatMap<>(BaseMailboxReceiveOperator.StatKey.class)
+        .merge(BaseMailboxReceiveOperator.StatKey.ALLOCATED_MEMORY_BYTES, 100_000L);
+    StatMap<BaseMailboxReceiveOperator.StatKey> breakerReceive =
+        new StatMap<>(BaseMailboxReceiveOperator.StatKey.class)
+            .merge(BaseMailboxReceiveOperator.StatKey.ALLOCATED_MEMORY_BYTES, 1L);
+    StatMap<PipelineBreakerOperator.StatKey> breaker = new StatMap<>(PipelineBreakerOperator.StatKey.class)
+        .merge(PipelineBreakerOperator.StatKey.ALLOCATED_MEMORY_BYTES, 10L);
+    StatMap<LeafOperator.StatKey> leaf = new StatMap<>(LeafOperator.StatKey.class)
+        .merge(LeafOperator.StatKey.ALLOCATED_MEMORY_BYTES, 100L)
+        .merge(LeafOperator.StatKey.THREAD_MEM_ALLOCATED_BYTES, 1_000L);
+    StatMap<MailboxSendOperator.StatKey> send = new StatMap<>(MailboxSendOperator.StatKey.class)
+        .merge(MailboxSendOperator.StatKey.ALLOCATED_MEMORY_BYTES, 10_000L);
+
+    // Stage 1 is a leaf stage with a pipeline breaker, flattened the same way in legacy and stream stats modes
+    BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
+    MultiStageBrokerRequestHandler.mergeStageStats(brokerResponse, List.of(
+        new MultiStageQueryStats.StageStats.Closed(List.of(MultiStageOperator.Type.MAILBOX_RECEIVE),
+            List.of(rootReceive)),
+        new MultiStageQueryStats.StageStats.Closed(
+            List.of(MultiStageOperator.Type.MAILBOX_RECEIVE, MultiStageOperator.Type.PIPELINE_BREAKER,
+                MultiStageOperator.Type.LEAF, MultiStageOperator.Type.MAILBOX_SEND),
+            List.of(breakerReceive, breaker, leaf, send))));
+
+    // Op chain roots (stage roots and the breaker) plus the leaf threads, but not the breaker's receive or the leaf's
+    // own op chain allocation, which their roots already include
+    assertEquals(brokerResponse.getTotalMemAllocatedBytes(), 100_000L + 10_000L + 1_000L + 10L);
+  }
+
+  @Test
   public void testApplyBrokerDefaultQueryOptionsNoStreamingDistinctInjectionWhenConfigUnset()
       throws Exception {
     MultiStageBrokerRequestHandler handler = newHandlerWithStreamingDistinctFlushThreshold(null);
@@ -208,6 +245,16 @@ public class MultiStageBrokerRequestHandlerTest extends QueryEnvironmentTestBase
     handler.applyBrokerDefaultQueryOptions(queryOptions);
     Assert.assertFalse(queryOptions.containsKey(QueryOptionKey.STREAMING_DISTINCT_FLUSH_THRESHOLD),
         "No option should be injected when the broker default is unset");
+  }
+
+  @Test
+  public void testDispatchMaxInboundMessageSizeFromConfig()
+      throws Exception {
+    assertEquals(newHandler(new PinotConfiguration()).getQueryDispatcher().getDispatchMaxInboundMessageSizeBytes(),
+        MultiStageQueryRunner.DEFAULT_OF_DISPATCH_CHANNEL_MAX_INBOUND_MESSAGE_SIZE_BYTES);
+    PinotConfiguration config = new PinotConfiguration();
+    config.setProperty(MultiStageQueryRunner.KEY_OF_DISPATCH_CHANNEL_MAX_INBOUND_MESSAGE_SIZE_BYTES, "12345678");
+    assertEquals(newHandler(config).getQueryDispatcher().getDispatchMaxInboundMessageSizeBytes(), 12_345_678);
   }
 
   @Test
@@ -247,8 +294,6 @@ public class MultiStageBrokerRequestHandlerTest extends QueryEnvironmentTestBase
       @Nullable String streamingGroupByFlushThreshold, @Nullable String streamingDistinctFlushThreshold)
       throws Exception {
     PinotConfiguration config = new PinotConfiguration();
-    config.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, "localhost");
-    config.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, Integer.toString(NetUtils.findOpenPort()));
     if (streamingGroupByFlushThreshold != null) {
       config.setProperty(CommonConstants.Broker.CONFIG_OF_MSE_STREAMING_GROUP_BY_FLUSH_THRESHOLD,
           streamingGroupByFlushThreshold);
@@ -257,6 +302,13 @@ public class MultiStageBrokerRequestHandlerTest extends QueryEnvironmentTestBase
       config.setProperty(CommonConstants.Broker.CONFIG_OF_MSE_STREAMING_DISTINCT_FLUSH_THRESHOLD,
           streamingDistinctFlushThreshold);
     }
+    return newHandler(config);
+  }
+
+  private static MultiStageBrokerRequestHandler newHandler(PinotConfiguration config)
+      throws Exception {
+    config.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, "localhost");
+    config.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, Integer.toString(NetUtils.findOpenPort()));
     BrokerQueryEventListenerFactory.init(config);
     BrokerMetrics.register(mock(BrokerMetrics.class));
 

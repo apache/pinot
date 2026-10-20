@@ -39,6 +39,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.WindowOverFlowMode;
+import org.apache.pinot.spi.utils.CommonConstants.Server.AndRestrictionPushdownMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,7 +68,7 @@ public class QueryOptionsUtils {
   public enum SqlOptionsMode {
     /// The options are applied. Default.
     ALLOW,
-    /// The options are dropped.
+    /// The options are dropped, except that a DELETE statement carrying any fails, since its options configure it.
     IGNORE,
     /// The statement fails.
     REJECT
@@ -342,6 +343,26 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.AND_SCAN_REORDERING));
   }
 
+  /// Per-query override of [AndRestrictionPushdownMode], or `null` when the query does not set one, in which case
+  /// the server default applies.
+  @Nullable
+  public static AndRestrictionPushdownMode getAndRestrictionPushdownMode(Map<String, String> queryOptions) {
+    String mode = queryOptions.get(QueryOptionKey.AND_RESTRICTION_PUSHDOWN_MODE);
+    return mode != null ? parseAndRestrictionPushdownMode(QueryOptionKey.AND_RESTRICTION_PUSHDOWN_MODE, mode) : null;
+  }
+
+  /// Parses an [AndRestrictionPushdownMode], naming the offending key and the legal values on failure. The option
+  /// reads like a toggle, so `true`/`false` is a likely mistake and the message has to say so.
+  public static AndRestrictionPushdownMode parseAndRestrictionPushdownMode(String key, String value) {
+    try {
+      return AndRestrictionPushdownMode.valueOf(value.toUpperCase(Locale.ROOT));
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException(
+          String.format("Invalid value for %s: '%s'. Expected one of: %s (this option is a mode, not a boolean toggle)",
+              key, value, Arrays.toString(AndRestrictionPushdownMode.values())));
+    }
+  }
+
   public static boolean isSkipUpsert(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SKIP_UPSERT));
   }
@@ -351,6 +372,14 @@ public class QueryOptionsUtils {
   public static Integer getInPredicatePruningThreshold(Map<String, String> queryOptions) {
     return uncheckedParseInt(QueryOptionKey.IN_PREDICATE_PRUNING_THRESHOLD,
         queryOptions.get(QueryOptionKey.IN_PREDICATE_PRUNING_THRESHOLD));
+  }
+
+  /// Query-level override for the minimum candidate segments needed to prepare the partition-pruning predicate.
+  /// A negative value disables preparation.
+  @Nullable
+  public static Integer getPartitionPruningPreparationThreshold(@Nullable Map<String, String> queryOptions) {
+    return queryOptions != null ? uncheckedParseInt(QueryOptionKey.PARTITION_PRUNING_PREPARATION_THRESHOLD,
+        queryOptions.get(QueryOptionKey.PARTITION_PRUNING_PREPARATION_THRESHOLD)) : null;
   }
 
   /// Returns whether materialized-view rewrite is allowed for this query. Defaults to `true`
@@ -554,6 +583,22 @@ public class QueryOptionsUtils {
     String minServerGroupTrimSizeString = queryOptions.get(QueryOptionKey.MIN_SERVER_GROUP_TRIM_SIZE);
     // NOTE: Non-positive value means turning off the segment level trim
     return uncheckedParseInt(QueryOptionKey.MIN_SERVER_GROUP_TRIM_SIZE, minServerGroupTrimSizeString);
+  }
+
+  /// Maximum estimated base-group count for which grouping-set base aggregation is used; `null` lets the
+  /// caller fall back to its default (`numGroupsLimit`). Must be a positive integer when set.
+  @Nullable
+  public static Integer getGroupingSetsBaseAggregationMaxGroups(Map<String, String> queryOptions) {
+    String value = queryOptions.get(QueryOptionKey.GROUPING_SETS_BASE_AGGREGATION_MAX_GROUPS);
+    return checkedParseIntPositive(QueryOptionKey.GROUPING_SETS_BASE_AGGREGATION_MAX_GROUPS, value);
+  }
+
+  @Nullable
+  public static Integer getGroupingSetsMinServerTrimSize(Map<String, String> queryOptions) {
+    String groupingSetsMinServerTrimSizeString =
+        queryOptions.get(QueryOptionKey.GROUPING_SETS_MIN_SERVER_TRIM_SIZE);
+    // NOTE: Non-positive value means turning off the per-set server trim for grouping-set base aggregation
+    return uncheckedParseInt(QueryOptionKey.GROUPING_SETS_MIN_SERVER_TRIM_SIZE, groupingSetsMinServerTrimSizeString);
   }
 
   @Nullable

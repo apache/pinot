@@ -569,9 +569,10 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         "Legacy raw forward index for column=%s returned null ChunkCompressionType", column);
     ChunkCompressionType newCompressionType = newConfig.getChunkCompressionType();
 
-    // Note that default compression type (PASS_THROUGH for metric and LZ4 for dimension) is not considered if the
-    // compressionType is not explicitly provided in tableConfig. This is to avoid incorrectly rewriting all the
-    // forward indexes during segmentReload when the default compressionType changes.
+    // Note that the default compression type (PASS_THROUGH for metric, and otherwise whatever
+    // ForwardIndexConfig#getDefaultCompressionType() is set to) is not considered if the compressionType is not
+    // explicitly provided in tableConfig. This is to avoid incorrectly rewriting all the forward indexes during
+    // segmentReload when the default compressionType changes.
     return newCompressionType != null && existingCompressionType != newCompressionType;
   }
 

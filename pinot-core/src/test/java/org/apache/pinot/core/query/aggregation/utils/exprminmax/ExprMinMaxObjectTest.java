@@ -29,6 +29,9 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
+/// Verifies how the broker merges serialized ExprMin/ExprMax results whose measuring keys tie: every server's
+/// projected rows and the extremum key must survive the merge and a later re-serialization. Each test builds its own
+/// objects, so the class has no shared mutable state.
 public class ExprMinMaxObjectTest {
   private static final DataSchema MEASURING_SCHEMA =
       new DataSchema(new String[]{"measure"}, new ColumnDataType[]{ColumnDataType.INT});

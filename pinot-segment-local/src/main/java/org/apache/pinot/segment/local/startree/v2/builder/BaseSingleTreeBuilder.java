@@ -212,6 +212,17 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
   abstract Record getStarTreeRecord(int docId)
       throws IOException;
 
+  /// Serializes metrics whose [ValueAggregator#getMaxAggregatedValueByteSize] is derived during serialization before
+  /// the forward indexes are sized. Returns, per metric, whether [#getStarTreeRecord] now holds the serialized
+  /// `byte[]` in place of the aggregated value. A builder that already serialized every record when it was appended
+  /// (the off-heap builder) has nothing to do and returns all `false`.
+  ///
+  /// @return per-metric flag telling whether the star-tree records hold pre-serialized values
+  boolean[] preSerializeMetrics()
+      throws IOException {
+    return new boolean[_numMetrics];
+  }
+
   /// Returns the dimension value of the given document and dimension Id in the star-tree.
   ///
   /// @param docId Document Id
@@ -541,6 +552,9 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
 
   private void createForwardIndexes()
       throws Exception {
+    // Finalize sizes for aggregators that track their maximum during serialization before opening any creator.
+    boolean[] preSerializedMetrics = preSerializeMetrics();
+
     SingleValueUnsortedForwardIndexCreator[] dimensionIndexCreators =
         new SingleValueUnsortedForwardIndexCreator[_numDimensions];
     for (int i = 0; i < _numDimensions; i++) {
@@ -613,6 +627,9 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
             if (value == null) {
               metricNullValueVectorCreators[i].setNull(docId);
             }
+          } else if (preSerializedMetrics[i]) {
+            metricIndexCreators[i].putBytes((byte[]) value);
+            continue;
           }
           putMetricValue(metricIndexCreators[i], valueAggregator, value);
         }

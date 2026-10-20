@@ -64,6 +64,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   UPSERT_KEYS_IN_WRONG_SEGMENT("rows", false),
   PARTIAL_UPSERT_OUT_OF_ORDER("rows", false),
   PARTIAL_UPSERT_KEYS_NOT_REPLACED("rows", false),
+  FULL_UPSERT_KEYS_NOT_REPLACED("rows", false),
   UPSERT_OUT_OF_ORDER("rows", false),
   DELETED_KEYS_TTL_PRIMARY_KEYS_REMOVED("rows", false),
   TOTAL_KEYS_MARKED_FOR_DELETION("rows", false),
@@ -73,6 +74,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   UPSERT_MISSED_VALID_DOC_ID_SNAPSHOT_COUNT("segments", false),
   UPSERT_MISSED_QUERYABLE_DOC_ID_SNAPSHOT_COUNT("segments", false),
   UPSERT_PRELOAD_FAILURE("count", false),
+  UPSERT_REVERT_WITH_CONSUMPTION_DURING_DOWNLOAD("segments", false),
   ROWS_WITH_ERRORS("rows", false),
   LLC_CONTROLLER_RESPONSE_NOT_SENT("messages", true),
   LLC_CONTROLLER_RESPONSE_COMMIT("messages", true),
@@ -178,6 +180,10 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   /// It is increased in one by each worker that reaches the limit within the stage.
   /// That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 10.
   AGGREGATE_TIMES_NUM_GROUPS_WARNING_LIMIT_REACHED("times", true),
+  /// Number of times a grouping-set query's combine derived the grouping sets from BASE (union) groups, i.e. the
+  /// opt-in `groupingSetsBaseAggregation` optimization actually ran on this server (at least one segment emitted
+  /// base-layout groups). Lets users who opt in verify the optimization applied.
+  GROUPING_SETS_BASE_AGGREGATION("times", true),
   /// The number of blocks that have been sent to the next stage without being serialized.
   /// This is the sum of all blocks sent by all workers in the stage.
   MULTI_STAGE_IN_MEMORY_MESSAGES("messages", true),

@@ -213,7 +213,7 @@ public class OpenStructIndexTypeTest {
     IllegalStateException exception = expectThrows(IllegalStateException.class,
         () -> validateTableWithOpenStruct(openStructConfig));
     assertEquals(exception.getMessage(), "OPEN_STRUCT column 'payload': codecSpec is not supported for "
-        + expectedTarget + "; materialized keys always use a dictionary-encoded or LZ4 raw forward index");
+        + expectedTarget + "; the splitter fixes materialized keys to a dictionary-encoded or LZ4 raw forward index");
   }
 
   /// Per-key settings that a materialized key would silently ignore. JSON uses single quotes for readability.
@@ -261,9 +261,6 @@ public class OpenStructIndexTypeTest {
         {"{'name': 'clicks', 'indexes': {'dictionary': {'disabled': true}}}",
             "OPEN_STRUCT column 'payload': indexes.dictionary of key 'clicks' disables the dictionary, but the key is "
                 + "built with one; "},
-        {"{'name': 'clicks', 'encodingType': 'RAW', 'indexes': {'dictionary': {}}}",
-            "OPEN_STRUCT column 'payload': indexes.dictionary of key 'clicks' enables the dictionary, but the key is "
-                + "built without one; "},
         // An enabled inverted index requires a dictionary, so a RAW key with one is still built with a dictionary.
         {"{'name': 'clicks', 'encodingType': 'RAW', 'indexes': {'inverted': {}, 'dictionary': {'disabled': true}}}",
             "OPEN_STRUCT column 'payload': indexes.dictionary of key 'clicks' disables the dictionary, but the key is "
@@ -347,7 +344,8 @@ public class OpenStructIndexTypeTest {
     IllegalStateException exception = expectThrows(IllegalStateException.class, () -> validateTableWithOpenStruct(
         new OpenStructIndexConfig(false, null, -1, null, 0.5, List.of(ignoredKey), null, null, null, null)));
     assertEquals(exception.getMessage(), "OPEN_STRUCT column 'payload': indexes.forward.targetDocsPerChunk is not "
-        + "supported for key 'clicks'; materialized keys always use a dictionary-encoded or LZ4 raw forward index");
+        + "supported for key 'clicks'; the splitter fixes materialized keys to a dictionary-encoded or LZ4 "
+        + "raw forward index");
   }
 
   private static FieldConfig parseFieldConfig(String singleQuotedJson)

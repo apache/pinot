@@ -631,7 +631,9 @@ public class DataSchema {
         case TIMESTAMP:
           return new Timestamp((long) value);
         case BYTES:
-          return ((ByteArray) value).getBytes();
+          return value instanceof ByteArray
+              ? ((ByteArray) value).getBytes()
+              : (byte[]) value;
         case UUID:
           return UuidUtils.toUUID((ByteArray) value);
         case BOOLEAN_ARRAY:

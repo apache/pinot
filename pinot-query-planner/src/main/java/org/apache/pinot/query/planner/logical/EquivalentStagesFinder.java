@@ -111,10 +111,9 @@ public class EquivalentStagesFinder {
           return _equivalentStages.getGroup(stage).contains(visitedStage);
         }
 
+        // Fields of MailboxSendNode that are deliberately not compared here are listed, with the reason, in
+        // NodeEquivalenceFieldCoverageTest.NOT_COMPARED.
         return areBaseNodesEquivalent(stage, visitedStage)
-            // Commented out fields are used in equals() method of MailboxSendNode but not needed for equivalence.
-            // Receiver stage is not important for equivalence
-//            && stage.getReceiverStageId() == visitedStage.getReceiverStageId()
             && stage.getExchangeType() == visitedStage.getExchangeType()
             // TODO: Distribution type not needed for equivalence in the first substituted send nodes. Their different
             //  distribution can be implemented in synthetic stages. But it is important in recursive send nodes
@@ -211,12 +210,9 @@ public class EquivalentStagesFinder {
           return false;
         }
 
+        // Fields of MailboxReceiveNode that are deliberately not compared here are listed, with the reason, in
+        // NodeEquivalenceFieldCoverageTest.NOT_COMPARED.
         return areBaseNodesEquivalent(node1, node2)
-            // Commented out fields are used in equals() method of MailboxReceiveNode but not needed for equivalence.
-            // sender stage id will be different for sure, but we want (and already did) to compare sender equivalence
-            // instead
-//          && node1.getSenderStageId() == that.getSenderStageId()
-
             // TODO: Keys should probably be removed from the equivalence check, but would require to verify both
             //  keys are present in the data schema. We are not doing that for now.
             && Objects.equals(node1.getKeys(), that.getKeys())
@@ -359,9 +355,9 @@ public class EquivalentStagesFinder {
         UnnestNode that = (UnnestNode) node2;
         return areBaseNodesEquivalent(node1, node2)
             && Objects.equals(node1.getArrayExprs(), that.getArrayExprs())
-            && node1.isWithOrdinality() == that.isWithOrdinality()
-            && Objects.equals(node1.getElementIndexes(), that.getElementIndexes())
-            && node1.getOrdinalityIndex() == that.getOrdinalityIndex();
+            // Compare the context as a whole so that this stays in step with the fields it holds. Unrolling a subset
+            // of them here is how passthroughInputIndexes and prunedPassthrough came to be missed.
+            && Objects.equals(node1.getTableFunctionContext(), that.getTableFunctionContext());
       }
     }
   }

@@ -84,4 +84,25 @@ public class TypeUtilsTest {
       assertThrows(NullPointerException.class, () -> TypeUtils.convert(null, type));
     }
   }
+
+  @Test
+  public void testNumericArrayKeepsItsType() {
+    int[] intArray = {1, 2};
+    assertSame(TypeUtils.convert(intArray, ColumnDataType.INT_ARRAY), intArray);
+    double[] doubleArray = {1.5, 2.5};
+    assertSame(TypeUtils.convert(doubleArray, ColumnDataType.DOUBLE_ARRAY), doubleArray);
+  }
+
+  /// The single-stage engine can compute another element type than the one the multi-stage planner inferred, for
+  /// example a `double[]` from `generateArray(intCol, intCol + 1)`, whose `plus` returns DOUBLE.
+  @Test
+  public void testNumericArrayConvertsToTheStoredType() {
+    assertEquals(TypeUtils.convert(new double[]{1, 2}, ColumnDataType.INT_ARRAY), new int[]{1, 2});
+    assertEquals(TypeUtils.convert(new double[]{1, 2}, ColumnDataType.LONG_ARRAY), new long[]{1, 2});
+    assertEquals(TypeUtils.convert(new int[]{1, 2}, ColumnDataType.LONG_ARRAY), new long[]{1, 2});
+    assertEquals(TypeUtils.convert(new long[]{1, 2}, ColumnDataType.INT_ARRAY), new int[]{1, 2});
+    assertEquals(TypeUtils.convert(new int[]{1, 2}, ColumnDataType.FLOAT_ARRAY), new float[]{1, 2});
+    assertEquals(TypeUtils.convert(new float[]{1.5f}, ColumnDataType.DOUBLE_ARRAY), new double[]{1.5});
+    assertEquals(TypeUtils.convert(new long[]{1L << 40}, ColumnDataType.DOUBLE_ARRAY), new double[]{1L << 40});
+  }
 }

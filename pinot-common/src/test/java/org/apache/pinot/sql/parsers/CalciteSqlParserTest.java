@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.sql.parsers;
 
-import java.io.StringReader;
 import java.util.List;
 import org.apache.calcite.sql.SqlBinaryStringLiteral;
 import org.apache.calcite.sql.SqlCall;
@@ -32,8 +31,10 @@ import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.sql.parsers.parser.SqlPhysicalExplain;
 import org.apache.pinot.sql.parsers.parser.SqlPinotCreateMaterializedView;
+import org.testng.SkipException;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -171,8 +172,8 @@ public class CalciteSqlParserTest {
   @Test
   public void testPostgreSqlByteaLiteralUnderNodeWithoutSetOperandIsRejected()
       throws Exception {
-    SqlNode query = CalciteSqlParser.newSqlParser(new StringReader("SELECT a FROM t")).parseSqlStmtEof();
-    SqlNode bytea = CalciteSqlParser.newSqlParser(new StringReader("'\\x01'::bytea")).parseSqlExpressionEof();
+    SqlNode query = CalciteSqlParser.newSqlParser("SELECT a FROM t").parseSqlStmtEof();
+    SqlNode bytea = CalciteSqlParser.newSqlParser("'\\x01'::bytea").parseSqlExpressionEof();
     SqlOrderBy orderBy = new SqlOrderBy(SqlParserPos.ZERO, query, SqlNodeList.EMPTY, bytea, null);
     SqlCompilationException e =
         expectThrows(SqlCompilationException.class, () -> PostgreSqlCastRewriter.rewrite(orderBy));
@@ -183,7 +184,7 @@ public class CalciteSqlParserTest {
   @Test
   public void testPostgreSqlByteaLiteralInImmutableNodeListIsRejected()
       throws Exception {
-    SqlNode bytea = CalciteSqlParser.newSqlParser(new StringReader("'\\x01'::bytea")).parseSqlExpressionEof();
+    SqlNode bytea = CalciteSqlParser.newSqlParser("'\\x01'::bytea").parseSqlExpressionEof();
     SqlNodeList immutable = SqlNodeList.of(SqlParserPos.ZERO, List.of(bytea));
     SqlCompilationException e =
         expectThrows(SqlCompilationException.class, () -> PostgreSqlCastRewriter.rewrite(immutable));
@@ -199,17 +200,17 @@ public class CalciteSqlParserTest {
       throws Exception {
     String sql = "SELECT a FROM t WHERE b = " + BYTEA_CONSTANT;
     SqlSelect select = (SqlSelect) PostgreSqlCastRewriter.rewrite(
-        CalciteSqlParser.newSqlParser(new StringReader(sql)).parseSqlStmtEof());
+        CalciteSqlParser.newSqlParser(sql).parseSqlStmtEof());
     assertSpansByteaConstant(((SqlCall) select.getWhere()).operand(1), sql);
 
     sql = "SELECT a FROM t WHERE c LIKE 'x' AND b = " + BYTEA_CONSTANT;
     select = (SqlSelect) PostgreSqlCastRewriter.rewrite(
-        CalciteSqlParser.newSqlParser(new StringReader(sql)).parseSqlStmtEof());
+        CalciteSqlParser.newSqlParser(sql).parseSqlStmtEof());
     assertSpansByteaConstant(((SqlCall) ((SqlCall) select.getWhere()).operand(1)).operand(1), sql);
 
     sql = "a || " + BYTEA_CONSTANT;
     SqlCall concat = (SqlCall) PostgreSqlCastRewriter.rewrite(
-        CalciteSqlParser.newSqlParser(new StringReader(sql)).parseSqlExpressionEof());
+        CalciteSqlParser.newSqlParser(sql).parseSqlExpressionEof());
     assertSpansByteaConstant(concat.operand(1), sql);
   }
 
@@ -517,6 +518,48 @@ public class CalciteSqlParserTest {
     assertQualifyRejected("SELECT city FROM (SELECT city FROM myTable QUALIFY city > 'a') AS t");
     // EXPLAIN unwraps to the same SELECT node.
     assertQualifyRejected("EXPLAIN PLAN FOR SELECT city FROM myTable QUALIFY city > 'a'");
+  }
+
+  /// A string literal of millions of chars, e.g. a serialized IdSet, must parse in linear time and memory. The
+  /// generated JavaCC char stream grows its buffer by 2,048 chars at a time while it reads a token, so with it, parsing
+  /// a literal of 2M chars allocates over 10 GB.
+  @Test
+  public void testParsesLongStringLiteralInLinearMemory() {
+    boolean threadMemoryMeasurementEnabled = ThreadResourceUsageProvider.isThreadMemoryMeasurementEnabled();
+    ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
+    try {
+      if (!ThreadResourceUsageProvider.isThreadMemoryMeasurementEnabled()) {
+        throw new SkipException("Thread memory measurement is not supported");
+      }
+      // Loads the parser classes before the allocation is measured
+      CalciteSqlParser.compileToPinotQuery("SELECT COUNT(*) FROM myTable WHERE IN_ID_SET(col, 'AA==') = 1");
+      String literal = "A".repeat(2 * 1024 * 1024);
+      String sql = "SELECT COUNT(*) FROM myTable WHERE IN_ID_SET(col, '" + literal + "') = 1";
+      long allocatedBytesBefore = ThreadResourceUsageProvider.getCurrentThreadAllocatedBytes();
+      PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+      long allocatedBytes = ThreadResourceUsageProvider.getCurrentThreadAllocatedBytes() - allocatedBytesBefore;
+      Function inIdSet = pinotQuery.getFilterExpression().getFunctionCall().getOperands().get(0).getFunctionCall();
+      assertEquals(inIdSet.getOperands().get(1).getLiteral().getStringValue(), literal);
+      // The char buffer takes 10 bytes per char, and the literal is copied a few times
+      assertTrue(allocatedBytes < 50L * sql.length(),
+          "Allocated " + allocatedBytes + " bytes to parse " + sql.length() + " chars");
+    } finally {
+      ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(threadMemoryMeasurementEnabled);
+    }
+  }
+
+  /// The parser reads the SQL through a custom char stream, which must also handle an empty SQL.
+  @Test
+  public void testRejectsEmptyQuery() {
+    // The second query reaches the parser as a comment
+    for (String sql : List.of("", "/* comment */")) {
+      SqlCompilationException e =
+          expectThrows(SqlCompilationException.class, () -> CalciteSqlParser.compileToPinotQuery(sql));
+      assertTrue(e.getMessage().contains("SqlNode with executable statement not found"), e.getMessage());
+    }
+    SqlCompilationException e =
+        expectThrows(SqlCompilationException.class, () -> CalciteSqlParser.compileToExpression(""));
+    assertTrue(e.getCause().getMessage().contains("Encountered \"<EOF>\""), e.getCause().getMessage());
   }
 
   private void assertQualifyRejected(String query) {

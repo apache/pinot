@@ -90,6 +90,8 @@ import org.apache.pinot.core.query.reduce.BaseGapfillProcessor;
 import org.apache.pinot.core.query.reduce.GapfillProcessorFactory;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.core.query.utils.rewriter.ParentAggregationResultRewriter;
+import org.apache.pinot.core.query.utils.rewriter.ResultRewriterFactory;
 import org.apache.pinot.core.routing.ImplicitHybridTableRouteInfo;
 import org.apache.pinot.core.routing.ImplicitHybridTableRouteProvider;
 import org.apache.pinot.core.routing.LogicalTableRouteProvider;
@@ -137,6 +139,7 @@ import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
+import org.apache.pinot.sql.parsers.rewriter.ExprMinMaxRewriter;
 import org.apache.pinot.sql.parsers.rewriter.RlsFiltersRewriter;
 import org.apache.pinot.sql.parsers.rewriter.RlsUtils;
 import org.slf4j.Logger;
@@ -146,6 +149,7 @@ import org.slf4j.LoggerFactory;
 @ThreadSafe
 public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseSingleStageBrokerRequestHandler.class);
+  // Listed in DeleteStatement.CROSS_TABLE_FUNCTIONS: a DELETE predicate must not call this function
   private static final String IN_SUBQUERY = "insubquery";
   private static final String IN_ID_SET = "inidset";
   private static final Expression FALSE = RequestUtils.getLiteralExpression(false);
@@ -154,6 +158,12 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   /// Canonical name (see [RequestUtils#canonicalizeFunctionName]) of the `lookup()` transform function, which reads a
   /// dimension table named by a string literal argument instead of by the FROM clause.
   private static final String LOOKUP_FUNCTION = "lookup";
+  private static final String EXPR_MIN = "exprmin";
+  private static final String EXPR_MAX = "exprmax";
+  private static final Set<String> EXPR_MIN_MAX_FUNCTIONS = Set.of(EXPR_MIN, EXPR_MAX);
+  private static final Set<String> CHILD_EXPR_MIN_MAX_FUNCTIONS =
+      Set.of(CommonConstants.RewriterConstants.CHILD_AGGREGATION_NAME_PREFIX + EXPR_MIN,
+          CommonConstants.RewriterConstants.CHILD_AGGREGATION_NAME_PREFIX + EXPR_MAX);
   private static final int MAX_UNAVAILABLE_SEGMENTS_TO_PRINT_IN_QUERY_EXCEPTION = 10;
 
   protected final QueryOptimizer _queryOptimizer = new QueryOptimizer();
@@ -2454,6 +2464,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   /// - Value for 'LIMIT' <= configured value
   /// - Query options must be set to SQL mode
   /// - Check if numReplicaGroupsToQuery option provided is valid
+  /// - EXPR_MIN/EXPR_MAX can be executed with the configured rewriters, see [#validateExprMinMax(PinotQuery)]
   @VisibleForTesting
   static void validateRequest(PinotQuery pinotQuery, int queryResponseLimit) {
     // Verify LIMIT
@@ -2463,9 +2474,96 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           "Value for 'LIMIT' (" + limit + ") exceeds maximum allowed value of " + queryResponseLimit);
     }
     QueryOptionsUtils.getNumReplicaGroupsToQuery(pinotQuery.getQueryOptions());
+    validateExprMinMax(pinotQuery);
     if (pinotQuery.getDataSource().getSubquery() != null) {
       validateRequest(pinotQuery.getDataSource().getSubquery(), queryResponseLimit);
     }
+  }
+
+  /// Servers cannot execute EXPR_MIN/EXPR_MAX directly. The broker must rewrite them into parent and child
+  /// aggregations with [ExprMinMaxRewriter], and merge the parent result back into the child columns with
+  /// [ParentAggregationResultRewriter]. Neither rewriter is enabled by default.
+  ///
+  /// Without this check, a query that still has EXPR_MIN/EXPR_MAX fails on the servers, and a query without the
+  /// result rewriter returns the placeholder values of the child aggregations instead of the expected values.
+  @VisibleForTesting
+  static void validateExprMinMax(PinotQuery pinotQuery) {
+    String exprMinMax = findFunction(pinotQuery, EXPR_MIN_MAX_FUNCTIONS);
+    if (exprMinMax != null) {
+      String functionName = exprMinMax.equals(EXPR_MIN) ? "EXPR_MIN" : "EXPR_MAX";
+      boolean queryRewriterEnabled =
+          CalciteSqlParser.QUERY_REWRITERS.stream().anyMatch(ExprMinMaxRewriter.class::isInstance);
+      if (!queryRewriterEnabled) {
+        throw new BadQueryRequestException(
+            functionName + " is not enabled on this broker. To enable it, add '" + ExprMinMaxRewriter.class.getName()
+                + "' to '" + Broker.CONFIG_OF_BROKER_QUERY_REWRITER_CLASS_NAMES + "' and '"
+                + ParentAggregationResultRewriter.class.getName() + "' to '"
+                + Broker.CONFIG_OF_BROKER_RESULT_REWRITER_CLASS_NAMES + "'");
+      }
+      // The rewriter only handles the top-level expressions of the select list, so the function has an alias, is nested
+      // in another expression, or is in another clause.
+      throw new BadQueryRequestException(functionName + " is only supported as a top-level expression in the select "
+          + "list, without an alias. It is not supported in other expressions or in the WHERE, GROUP BY, HAVING or "
+          + "ORDER BY clauses");
+    }
+    if (findFunction(pinotQuery, CHILD_EXPR_MIN_MAX_FUNCTIONS) != null) {
+      boolean resultRewriterEnabled = ResultRewriterFactory.getResultRewriter().stream()
+          .anyMatch(ParentAggregationResultRewriter.class::isInstance);
+      if (!resultRewriterEnabled) {
+        throw new BadQueryRequestException(
+            "EXPR_MIN and EXPR_MAX require the result rewriter '" + ParentAggregationResultRewriter.class.getName()
+                + "'. To enable it, add it to '" + Broker.CONFIG_OF_BROKER_RESULT_REWRITER_CLASS_NAMES + "'");
+      }
+    }
+  }
+
+  /// Returns the first function of the given names in the select, filter, group-by, having or order-by expressions, or
+  /// `null` if there is none.
+  @Nullable
+  private static String findFunction(PinotQuery pinotQuery, Set<String> functionNames) {
+    String functionName = findFunction(pinotQuery.getSelectList(), functionNames);
+    if (functionName == null) {
+      functionName = findFunction(pinotQuery.getFilterExpression(), functionNames);
+    }
+    if (functionName == null) {
+      functionName = findFunction(pinotQuery.getGroupByList(), functionNames);
+    }
+    if (functionName == null) {
+      functionName = findFunction(pinotQuery.getHavingExpression(), functionNames);
+    }
+    if (functionName == null) {
+      functionName = findFunction(pinotQuery.getOrderByList(), functionNames);
+    }
+    return functionName;
+  }
+
+  @Nullable
+  private static String findFunction(@Nullable List<Expression> expressions, Set<String> functionNames) {
+    if (expressions == null) {
+      return null;
+    }
+    for (Expression expression : expressions) {
+      String functionName = findFunction(expression, functionNames);
+      if (functionName != null) {
+        return functionName;
+      }
+    }
+    return null;
+  }
+
+  @Nullable
+  private static String findFunction(@Nullable Expression expression, Set<String> functionNames) {
+    if (expression == null) {
+      return null;
+    }
+    Function function = expression.getFunctionCall();
+    if (function == null) {
+      return null;
+    }
+    if (functionNames.contains(function.getOperator())) {
+      return function.getOperator();
+    }
+    return findFunction(function.getOperands(), functionNames);
   }
 
   /// Broker-side helper invoked by the MV handler's split-dispatcher callback. Owns the generic

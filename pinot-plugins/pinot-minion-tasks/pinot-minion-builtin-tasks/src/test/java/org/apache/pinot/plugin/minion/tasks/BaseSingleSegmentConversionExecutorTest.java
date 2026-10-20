@@ -165,8 +165,8 @@ public class BaseSingleSegmentConversionExecutorTest {
             Mockito.mockStatic(SegmentPushUtils.class, Mockito.CALLS_REAL_METHODS)) {
       minionTaskUtils.when(() -> MinionTaskUtils.getOutputPinotFS(Mockito.any(), Mockito.any()))
           .thenReturn(mockOutputFS);
-      segmentPushUtils.when(() -> SegmentPushUtils.sendSegmentUriAndMetadata(Mockito.any(), Mockito.any(),
-              Mockito.any(), Mockito.anyList(), Mockito.anyList()))
+      segmentPushUtils.when(() -> SegmentPushUtils.sendSegmentUriAndMetadata(Mockito.any(), Mockito.anyMap(),
+              Mockito.anyList(), Mockito.anyList()))
           .thenThrow(new RuntimeException("simulated metadata push failure"));
 
       TestSingleSegmentConversionExecutor executor = new TestSingleSegmentConversionExecutor(STALE_SEGMENT_CRC);
@@ -182,30 +182,40 @@ public class BaseSingleSegmentConversionExecutorTest {
   }
 
 
-  /// The default METADATA push still registers the staged tar's URI and never takes the controller-copy path.
+  /// The default METADATA push still registers the staged tar's URI, with a metadata tar built from the local
+  /// segment instead of the staged tar being downloaded back, and never takes the controller-copy path.
   @Test
   public void testDefaultMetadataPushRegistersStagedUri()
       throws Exception {
     File outputDir = new File(TEMP_DIR, "output-default");
     FileUtils.forceMkdir(outputDir);
+    File capturedMetadataTar = new File(TEMP_DIR, "captured-default-metadata.tar.gz");
+    List<String> capturedUris = new ArrayList<>();
     try (MockedStatic<SegmentPushUtils> segmentPushUtils = Mockito.mockStatic(SegmentPushUtils.class,
             Mockito.CALLS_REAL_METHODS);
         MockedStatic<SegmentConversionUtils> conversionUtils = Mockito.mockStatic(SegmentConversionUtils.class)) {
-      segmentPushUtils.when(() -> SegmentPushUtils.sendSegmentUriAndMetadata(Mockito.any(), Mockito.any(),
-          Mockito.any(), Mockito.anyList(), Mockito.anyList())).thenAnswer(invocation -> null);
+      segmentPushUtils.when(() -> SegmentPushUtils.sendSegmentUriAndMetadata(Mockito.any(), Mockito.anyMap(),
+          Mockito.anyList(), Mockito.anyList())).thenAnswer(invocation -> {
+            Map<String, File> uriToMetadataFile = invocation.getArgument(1);
+            capturedUris.addAll(uriToMetadataFile.keySet());
+            FileUtils.copyFile(uriToMetadataFile.values().iterator().next(), capturedMetadataTar);
+            return null;
+          });
 
       new TestSingleSegmentConversionExecutor(STALE_SEGMENT_CRC).executeTask(
           createMetadataPushTaskConfig(STALE_SEGMENT_CRC, outputDir));
 
-      String stagedTarName = SEGMENT_NAME + TarCompressionUtils.TAR_GZ_FILE_EXTENSION;
-      segmentPushUtils.verify(() -> SegmentPushUtils.sendSegmentUriAndMetadata(Mockito.any(), Mockito.any(),
-          Mockito.argThat((Map<String, String> uriToTar) -> uriToTar.size() == 1
-              && uriToTar.values().iterator().next().endsWith(stagedTarName)),
-          Mockito.anyList(), Mockito.anyList()));
+      // No PinotFS-based push, which is the variant that downloads the staged tar back.
+      segmentPushUtils.verify(() -> SegmentPushUtils.sendSegmentUriAndMetadata(Mockito.any(),
+          Mockito.any(PinotFS.class), Mockito.anyMap(), Mockito.anyList(), Mockito.anyList()), Mockito.never());
       conversionUtils.verifyNoInteractions();
     }
+    File stagedTar = new File(outputDir, SEGMENT_NAME + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
+    Assert.assertEquals(capturedUris.size(), 1);
+    Assert.assertEquals(new File(URI.create(capturedUris.get(0))), stagedTar);
+    assertMetadataTarDescribesSegment(capturedMetadataTar, new File(TEMP_DIR, "untar-default-metadata"));
     // The staged tar is the segment's download URL in this mode, so it stays.
-    Assert.assertTrue(new File(outputDir, SEGMENT_NAME + TarCompressionUtils.TAR_GZ_FILE_EXTENSION).isFile());
+    Assert.assertTrue(stagedTar.isFile());
   }
 
   /// Controller-copy push of a changed segment: task-unique staging name, TAR guards plus copy flag, a metadata-only
@@ -250,9 +260,13 @@ public class BaseSingleSegmentConversionExecutorTest {
     String downloadUri = headerValue(capturedHeaders, FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI);
     Assert.assertEquals(new File(URI.create(downloadUri)), stagedTar);
 
-    // The metadata tar carries only the two files the controller reads, and they describe the converted segment.
-    File untarredMetadataDir = TarCompressionUtils.untar(capturedMetadataTar, new File(TEMP_DIR, "untar-metadata"))
-        .get(0);
+    assertMetadataTarDescribesSegment(capturedMetadataTar, new File(TEMP_DIR, "untar-metadata"));
+  }
+
+  /// The metadata tar carries only the two files the controller reads, and they describe the converted segment.
+  private void assertMetadataTarDescribesSegment(File metadataTar, File untarDir)
+      throws Exception {
+    File untarredMetadataDir = TarCompressionUtils.untar(metadataTar, untarDir).get(0);
     Set<String> fileNames =
         java.util.Arrays.stream(untarredMetadataDir.listFiles()).map(File::getName).collect(Collectors.toSet());
     Assert.assertEquals(fileNames,

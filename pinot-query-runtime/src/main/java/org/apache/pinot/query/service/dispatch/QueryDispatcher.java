@@ -129,6 +129,7 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
   @Nullable
   private final SslContext _clientGrpcSslContext;
   private final GrpcKeepAliveConfig _keepAliveConfig;
+  private final int _dispatchMaxInboundMessageSizeBytes;
   // maps broker-generated query id to the set of servers that the query was dispatched to
   private final Map<Long, Set<QueryServerInstance>> _serversByQuery;
   private final FailureDetector _failureDetector;
@@ -147,7 +148,8 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
       boolean enableCancellation, Duration cancelTimeout) {
     this(mailboxService, failureDetector, tlsConfig, enableCancellation, cancelTimeout,
         GrpcKeepAliveConfig.DISABLED, false, CommonConstants.Broker.DEFAULT_STREAM_STATS_DRAIN_MS,
-        CommonConstants.Broker.DEFAULT_MSE_ENABLE_PROTO_SEGMENT_LIST);
+        CommonConstants.Broker.DEFAULT_MSE_ENABLE_PROTO_SEGMENT_LIST,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_OF_DISPATCH_CHANNEL_MAX_INBOUND_MESSAGE_SIZE_BYTES);
   }
 
   /// Overload that accepts gRPC keep-alive settings for broker dispatch channels. A non-positive `keepAliveTimeMs`
@@ -165,14 +167,29 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
       boolean enableCancellation, Duration cancelTimeout, int keepAliveTimeMs, int keepAliveTimeoutMs,
       boolean keepAliveWithoutCalls, boolean streamStatsDefault, long statsDrainMs,
       boolean enableProtoSegmentList) {
+    this(mailboxService, failureDetector, tlsConfig, enableCancellation, cancelTimeout, keepAliveTimeMs,
+        keepAliveTimeoutMs, keepAliveWithoutCalls, streamStatsDefault, statsDrainMs, enableProtoSegmentList,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_OF_DISPATCH_CHANNEL_MAX_INBOUND_MESSAGE_SIZE_BYTES);
+  }
+
+  /// Overload that also takes the max size of a message the dispatch channels accept from the servers.
+  public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
+      boolean enableCancellation, Duration cancelTimeout, int keepAliveTimeMs, int keepAliveTimeoutMs,
+      boolean keepAliveWithoutCalls, boolean streamStatsDefault, long statsDrainMs,
+      boolean enableProtoSegmentList, int dispatchMaxInboundMessageSizeBytes) {
     this(mailboxService, failureDetector, tlsConfig, enableCancellation, cancelTimeout,
         new GrpcKeepAliveConfig(keepAliveTimeMs, keepAliveTimeoutMs, keepAliveWithoutCalls),
-        streamStatsDefault, statsDrainMs, enableProtoSegmentList);
+        streamStatsDefault, statsDrainMs, enableProtoSegmentList, dispatchMaxInboundMessageSizeBytes);
   }
 
   private QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
       boolean enableCancellation, Duration cancelTimeout, GrpcKeepAliveConfig keepAliveConfig,
-      boolean streamStatsDefault, long statsDrainMs, boolean enableProtoSegmentList) {
+      boolean streamStatsDefault, long statsDrainMs, boolean enableProtoSegmentList,
+      int dispatchMaxInboundMessageSizeBytes) {
+    // Checked here, because the dispatch channels are created only when queries are dispatched
+    Preconditions.checkArgument(dispatchMaxInboundMessageSizeBytes > 0, "%s must be positive, got: %s",
+        CommonConstants.MultiStageQueryRunner.KEY_OF_DISPATCH_CHANNEL_MAX_INBOUND_MESSAGE_SIZE_BYTES,
+        dispatchMaxInboundMessageSizeBytes);
     _cancelTimeout = cancelTimeout;
     _statsDrainMs = statsDrainMs;
     _mailboxService = mailboxService;
@@ -181,6 +198,7 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
     _tlsConfig = tlsConfig;
     _clientGrpcSslContext = initClientSslContext(tlsConfig);
     _keepAliveConfig = keepAliveConfig;
+    _dispatchMaxInboundMessageSizeBytes = dispatchMaxInboundMessageSizeBytes;
     _failureDetector = failureDetector;
     _streamStatsDefault = streamStatsDefault;
     _enableProtoSegmentList = enableProtoSegmentList;
@@ -749,6 +767,11 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
     return _enableProtoSegmentList;
   }
 
+  @VisibleForTesting
+  public int getDispatchMaxInboundMessageSizeBytes() {
+    return _dispatchMaxInboundMessageSizeBytes;
+  }
+
   /// Builds the request for one server: the plans of the stages it takes part in, with only its own workers'
   /// metadata. The leaf-stage segment lists are encoded here, once per worker, rather than at plan time.
   private static Worker.QueryRequest createRequest(QueryServerInstance serverInstance,
@@ -864,11 +887,13 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
     return true;
   }
 
-  private DispatchClient getOrCreateDispatchClient(QueryServerInstance queryServerInstance) {
+  @VisibleForTesting
+  DispatchClient getOrCreateDispatchClient(QueryServerInstance queryServerInstance) {
     String hostname = queryServerInstance.getHostname();
     int port = queryServerInstance.getQueryServicePort();
     return _dispatchClientMap.computeIfAbsent(toHostnamePortKey(hostname, port),
-        k -> new DispatchClient(hostname, port, _tlsConfig, _clientGrpcSslContext, _keepAliveConfig));
+        k -> new DispatchClient(hostname, port, _tlsConfig, _clientGrpcSslContext, _keepAliveConfig,
+            _dispatchMaxInboundMessageSizeBytes));
   }
 
   /// Reset the connection backoff for a server. When the GRPC channel enters a TRANSIENT_FAILURE state from

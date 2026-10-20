@@ -37,12 +37,12 @@ import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.pulsar.client.admin.Topics;
 import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.client.api.MessageId;
+import org.apache.pulsar.client.api.MessageIdAdv;
 import org.apache.pulsar.client.api.MessageRouter;
 import org.apache.pulsar.client.api.Producer;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.Schema;
 import org.apache.pulsar.client.api.TopicMetadata;
-import org.apache.pulsar.client.impl.BatchMessageIdImpl;
 import org.testcontainers.pulsar.PulsarContainer;
 import org.testcontainers.utility.DockerImageName;
 import org.testng.annotations.AfterClass;
@@ -120,7 +120,7 @@ public class PulsarConsumerTest {
         producer.flush();
         for (int i = 0; i < NUM_RECORDS_PER_PARTITION; i++) {
           MessageId messageId = futures.get(i).get();
-          assertFalse(messageId instanceof BatchMessageIdImpl);
+          assertEquals(((MessageIdAdv) messageId).getBatchIndex(), -1);
           messageIds.add(messageId);
         }
       }
@@ -147,7 +147,7 @@ public class PulsarConsumerTest {
         producer.flush();
         for (int i = 0; i < NUM_RECORDS_PER_PARTITION; i++) {
           MessageId messageId = futures.get(i).get();
-          assertTrue(messageId instanceof BatchMessageIdImpl);
+          assertTrue(((MessageIdAdv) messageId).getBatchIndex() >= 0);
           messageIds.add(messageId);
         }
       }

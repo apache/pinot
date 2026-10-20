@@ -40,21 +40,21 @@ import org.apache.pinot.common.response.ProcessingException;
 /// TODO: Currently this class cannot be used to deserialize the JSON response.
 @JsonPropertyOrder({
     "resultTable", "numRowsResultSet", "partialResult", "exceptions", "numGroupsLimitReached",
-    "numGroupsWarningLimitReached", "numGroups", "earlyTerminationReasons",
-    "maxRowsInJoinReached",
-    "maxRowsInJoin", "maxRowsInWindowReached", "maxRowsInWindow", "timeUsedMs", "stageStats", "streamStatsCoverage",
+    "numGroupsWarningLimitReached", "numGroups", "earlyTerminationReasons", "maxRowsInJoinReached", "maxRowsInJoin",
+    "maxRowsInWindowReached", "maxRowsInWindow", "timeUsedMs", "stageStats", "streamStatsCoverage",
     "maxRowsInOperator", "requestId", "clientRequestId", "brokerId", "numDocsScanned", "totalDocs",
     "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numServersQueried", "numServersResponded",
     "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried",
     "numConsumingSegmentsProcessed", "numConsumingSegmentsMatched", "minConsumingFreshnessTimeMs",
     "numSegmentsPrunedByBroker", "numSegmentsPrunedByServer", "numSegmentsPrunedInvalid", "numSegmentsPrunedByLimit",
-    "numSegmentsPrunedByValue", "brokerReduceTimeMs", "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs",
+    "numSegmentsPrunedByValue", "numRemoteAccesses", "remoteAccessBytes", "numDirectRemoteAccesses",
+    "directRemoteAccessBytes", "brokerReduceTimeMs", "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs",
     "offlineSystemActivitiesCpuTimeNs", "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
     "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs", "realtimeTotalCpuTimeNs",
     "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tablesQueried",
     "offlineThreadMemAllocatedBytes", "realtimeThreadMemAllocatedBytes", "offlineResponseSerMemAllocatedBytes",
     "realtimeResponseSerMemAllocatedBytes", "offlineTotalMemAllocatedBytes", "realtimeTotalMemAllocatedBytes",
-    "pools", "rlsFiltersApplied", "approximateFunctionApplied", "groupsTrimmed",
+    "totalMemAllocatedBytes", "pools", "rlsFiltersApplied", "approximateFunctionApplied", "groupsTrimmed",
     "mseLiteLeafStageLimitReached", "mseLiteLeafStageEffectiveLimit", "mseLiteFanOutAdjustedLimitApplied",
     "responseMetadata"
 })
@@ -82,6 +82,7 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   /// virtual rows can be generated. For example, in a join query, the number of rows can be more than the number of
   /// rows in the table.
   private long _maxRowsInOperator;
+  private long _totalMemAllocatedBytes;
   private String _requestId;
   private String _clientRequestId;
   private String _brokerId;
@@ -125,7 +126,7 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   @Override
   public boolean isPartialResult() {
     return getExceptionsSize() > 0 || isNumGroupsLimitReached() || !getEarlyTerminationReasons().isEmpty()
-        || isMaxRowsInJoinReached() || isMseLiteLeafStageLimitReached();
+        || isMaxRowsInJoinReached() || isMaxRowsInWindowReached() || isMseLiteLeafStageLimitReached();
   }
 
   @Override
@@ -273,6 +274,17 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
     _maxRowsInOperator = Math.max(_maxRowsInOperator, maxRows);
   }
 
+  /// Returns the heap bytes allocated by the query across all its stages and workers, as reported in the stage stats.
+  /// This is the total allocated (including short-lived objects), not the peak heap used. It is 0 unless thread
+  /// allocated bytes measurement is enabled on the brokers and servers.
+  public long getTotalMemAllocatedBytes() {
+    return _totalMemAllocatedBytes;
+  }
+
+  public void addTotalMemAllocatedBytes(long bytes) {
+    _totalMemAllocatedBytes += bytes;
+  }
+
   @Override
   public long getTimeUsedMs() {
     return _timeUsedMs;
@@ -408,6 +420,30 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   @Override
   public long getNumSegmentsPrunedByValue() {
     return _brokerStats.getLong(StatKey.NUM_SEGMENTS_PRUNED_BY_VALUE);
+  }
+
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+  @Override
+  public long getNumRemoteAccesses() {
+    return _brokerStats.getLong(StatKey.NUM_REMOTE_ACCESSES);
+  }
+
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+  @Override
+  public long getRemoteAccessBytes() {
+    return _brokerStats.getLong(StatKey.REMOTE_ACCESS_BYTES);
+  }
+
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+  @Override
+  public long getNumDirectRemoteAccesses() {
+    return _brokerStats.getLong(StatKey.NUM_DIRECT_REMOTE_ACCESSES);
+  }
+
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+  @Override
+  public long getDirectRemoteAccessBytes() {
+    return _brokerStats.getLong(StatKey.DIRECT_REMOTE_ACCESS_BYTES);
   }
 
   @Override
@@ -571,7 +607,11 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
       }
     },
     EARLY_TERMINATION_REASONS(StatMap.Type.STRING_SET),
-    LITE_MODE_LEAF_STAGE_LIMIT_REACHED(StatMap.Type.BOOLEAN);
+    LITE_MODE_LEAF_STAGE_LIMIT_REACHED(StatMap.Type.BOOLEAN),
+    NUM_REMOTE_ACCESSES(StatMap.Type.LONG),
+    REMOTE_ACCESS_BYTES(StatMap.Type.LONG),
+    NUM_DIRECT_REMOTE_ACCESSES(StatMap.Type.LONG),
+    DIRECT_REMOTE_ACCESS_BYTES(StatMap.Type.LONG);
 
     private final StatMap.Type _type;
 

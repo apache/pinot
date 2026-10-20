@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
@@ -33,6 +34,8 @@ import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
+import org.apache.pinot.segment.spi.index.IndexService;
+import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
@@ -47,6 +50,10 @@ import org.apache.pinot.spi.utils.JsonUtils;
 /// get virtual [SparseKeyDataSource]s backed by the shared blob parser; keys absent from the segment (no sparse blob,
 /// or not listed in the sparse manifest) resolve to an all-null [NullDataSource].
 public class ImmutableOpenStructDataSource extends BaseDataSource implements OpenStructDataSource {
+  /// Looked up by id rather than referenced: the composite JSON index ships as a plugin and is absent from most
+  /// deployments, so this resolves to nothing unless one registered it.
+  private static final String COMPOSITE_JSON_INDEX_ID = "composite_json_index";
+
   private final ComplexFieldSpec _fieldSpec;
   private final Map<String, DataSource> _perKeyDataSources;
   @Nullable
@@ -189,7 +196,19 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
   @Override
   @Nullable
   public JsonIndexReader getSparseJsonIndex() {
-    return _sparseDataSource != null ? _sparseDataSource.getJsonIndex() : null;
+    if (_sparseDataSource == null) {
+      return null;
+    }
+    JsonIndexReader jsonIndex = _sparseDataSource.getJsonIndex();
+    if (jsonIndex != null) {
+      return jsonIndex;
+    }
+    // A composite JSON index reads as a [JsonIndexReader] and answers the same predicates, so a sparse key is
+    // served by whichever of the two the blob was given. This is the fallback an ordinary column already gets in
+    // [org.apache.pinot.core.operator.filter.MapFilterOperator]; without it here the index is built on the blob and
+    // then never consulted, and the key falls back to a full scan that silently costs what the index was for.
+    Optional<IndexType<?, ?, ?>> compositeIndex = IndexService.getInstance().getOptional(COMPOSITE_JSON_INDEX_ID);
+    return compositeIndex.map(indexType -> (JsonIndexReader) _sparseDataSource.getIndex(indexType)).orElse(null);
   }
 
   @Nullable

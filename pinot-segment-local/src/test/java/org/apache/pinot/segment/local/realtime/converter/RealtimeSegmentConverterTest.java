@@ -66,6 +66,8 @@ import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
@@ -1555,6 +1557,88 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
       return ByteArray.compare((byte[]) v1, (byte[]) v2);
     }
     return storedType.compare(v1, v2);
+  }
+
+  /// Ingestion-aggregated metric columns are forced to be no-dictionary and skip min/max tracking during consumption
+  /// (their values mutate in place). A BitSliced (version 2) range index on such a column previously failed to build
+  /// because the creator had no value domain. This test verifies the full seal path: after conversion, the aggregated
+  /// no-dictionary metric column has recovered min/max in its column metadata and carries a range index.
+  @Test
+  public void testRangeIndexOnIngestionAggregatedNoDictColumn()
+      throws Exception {
+    File tmpDir = new File(TMP_DIR, "tmp_" + System.currentTimeMillis());
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    List<AggregationConfig> aggregationConfigs =
+        List.of(new AggregationConfig(LONG_COLUMN4, "SUM(" + LONG_COLUMN4 + ")"));
+    ingestionConfig.setAggregationConfigs(aggregationConfigs);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName("testTable")
+        .setTimeColumnName(DATE_TIME_COLUMN)
+        .setIngestionConfig(ingestionConfig)
+        .setNoDictionaryColumns(List.of(LONG_COLUMN4))
+        .setRangeIndexColumns(List.of(LONG_COLUMN4))
+        .setColumnMajorSegmentBuilderEnabled(false)
+        .build();
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName("testTable")
+        .addSingleValueDimension(STRING_COLUMN1, DataType.STRING)
+        .addMetric(LONG_COLUMN4, DataType.LONG)
+        .addDateTime(DATE_TIME_COLUMN, DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+
+    String tableNameWithType = tableConfig.getTableName();
+    String segmentName = "testTable__0__0__123456";
+
+    RealtimeSegmentConfig realtimeSegmentConfig = new RealtimeSegmentConfig.Builder()
+        .setTableNameWithType(tableNameWithType)
+        .setSegmentName(segmentName)
+        .setStreamName(tableNameWithType)
+        .setSchema(schema)
+        .setTimeColumnName(DATE_TIME_COLUMN)
+        .setCapacity(1000)
+        .setIngestionAggregationConfigs(aggregationConfigs)
+        .setIndex(Set.of(LONG_COLUMN4), StandardIndexes.dictionary(), DictionaryIndexConfig.DISABLED)
+        .setIndex(Set.of(LONG_COLUMN4), StandardIndexes.forward(),
+            ForwardIndexConfig.getDefault(FieldConfig.EncodingType.RAW))
+        .setSegmentZKMetadata(getSegmentZKMetadata(segmentName))
+        .setOffHeap(true)
+        .setMemoryManager(new DirectMemoryManager(segmentName))
+        .setStatsHistory(RealtimeSegmentStatsHistory.deserializeFrom(new File(tmpDir, "stats")))
+        .setConsumerDir(new File(tmpDir, "consumerDir").getAbsolutePath())
+        .build();
+
+    MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfig, null);
+    try {
+      // Each row carries a distinct dimension/time value, so no rows collapse and the aggregated metric retains its
+      // per-row values 64..73 (SUM over a single-row group). The mutable segment reports null min/max for it.
+      List<GenericRow> rows = generateTestData();
+      for (GenericRow row : rows) {
+        mutableSegmentImpl.index(row, null);
+      }
+
+      File outputDir = new File(tmpDir, "outputDir");
+      RealtimeSegmentConverter converter =
+          new RealtimeSegmentConverter(mutableSegmentImpl, new SegmentZKPropsConfig(), outputDir.getAbsolutePath(),
+              schema, tableNameWithType, tableConfig, segmentName, false);
+      converter.build(SegmentVersion.v3);
+
+      File indexDir = new File(outputDir, segmentName);
+      SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
+      ColumnMetadata metricMetadata = segmentMetadata.getColumnMetadataFor(LONG_COLUMN4);
+      assertFalse(metricMetadata.hasDictionary(), "Aggregated metric column must stay no-dictionary");
+      // Min/max are recovered by scanning the sealed forward index despite the mutable segment not tracking them.
+      assertEquals(metricMetadata.getMinValue(), 64L);
+      assertEquals(metricMetadata.getMaxValue(), 73L);
+
+      // The BitSliced range index must be present on the aggregated no-dictionary column.
+      try (SegmentLocalFSDirectory segmentDir = new SegmentLocalFSDirectory(indexDir, segmentMetadata, ReadMode.mmap);
+          SegmentDirectory.Reader segmentReader = segmentDir.createReader()) {
+        assertTrue(segmentReader.hasIndexFor(LONG_COLUMN4, StandardIndexes.range()),
+            "Range index should be built on the aggregated no-dictionary column");
+      }
+    } finally {
+      mutableSegmentImpl.destroy();
+    }
   }
 
   private List<GenericRow> generateTestData() {

@@ -22,7 +22,6 @@ import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
 import com.dynatrace.hash4j.distinctcount.UltraLogLog;
 import com.google.common.primitives.Longs;
-import com.tdunning.math.stats.TDigest;
 import java.io.IOException;
 import java.lang.foreign.MemorySegment;
 import java.nio.ByteBuffer;
@@ -208,24 +207,6 @@ public class CustomSerDeUtils {
       byte[] bytes = new byte[byteBuffer.remaining()];
       byteBuffer.get(bytes);
       return deserialize(bytes);
-    }
-  };
-
-  public static final ObjectSerDe<TDigest> TDIGEST_SER_DE = new ObjectSerDe<TDigest>() {
-
-    @Override
-    public byte[] serialize(TDigest tDigest) {
-      return TDigestUtils.serialize(tDigest);
-    }
-
-    @Override
-    public TDigest deserialize(byte[] bytes) {
-      return TDigestUtils.deserialize(bytes);
-    }
-
-    @Override
-    public TDigest deserialize(ByteBuffer byteBuffer) {
-      return TDigestUtils.deserialize(byteBuffer);
     }
   };
 
