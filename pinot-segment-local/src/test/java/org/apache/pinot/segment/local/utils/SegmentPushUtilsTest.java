@@ -627,6 +627,15 @@ public class SegmentPushUtilsTest {
   }
 
   @Test
+  public void testGetSegmentUriToTarPathMapWithoutOutputDirectory() {
+    PushJobSpec pushSpec = new PushJobSpec();
+    pushSpec.setSegmentUriPrefix("https://segments.example.com");
+    String segmentPath = "/output/segment.tar.gz";
+    assertEquals(SegmentPushUtils.getSegmentUriToTarPathMap(null, pushSpec, new String[]{segmentPath}),
+        Map.of("https://segments.example.com/output/segment.tar.gz", segmentPath));
+  }
+
+  @Test
   public void testDuplicateSegmentsRejectedBeforeUpload()
       throws Exception {
     List<String> archives = List.of("file:///output/segment.tar.gz", "file:///output/2022/segment.tar.gz");
