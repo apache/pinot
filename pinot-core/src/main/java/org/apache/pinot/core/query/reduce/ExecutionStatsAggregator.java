@@ -299,7 +299,7 @@ public class ExecutionStatsAggregator {
     brokerResponseNative.setNumGroupsLimitReached(_numGroupsLimitReached);
     brokerResponseNative.setNumGroupsWarningLimitReached(_numGroupsWarningLimitReached);
     if (_approximatedResult) {
-      brokerResponseNative.setApproximateFunctionApplied(true);
+      brokerResponseNative.setApproximatedResult(true);
     }
     brokerResponseNative.setMaxRowsInDistinctReached(_maxRowsInDistinctReached);
     brokerResponseNative.setMaxRowsWithoutChangeInDistinctReached(_maxRowsWithoutChangeInDistinctReached);

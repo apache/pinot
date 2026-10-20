@@ -231,7 +231,7 @@ public class BrokerReduceServiceTest {
 
       BrokerResponseNative response = reduce(brokerReduceService, brokerRequest, dataTableMap, 10_000L);
       assertEquals(response.getExceptions().size(), 0, response.getExceptions().toString());
-      assertEquals(response.isApproximateFunctionApplied(), threshold == 1, params);
+      assertEquals(response.isApproximatedResult(), threshold == 1, params);
     }
     brokerReduceService.shutDown();
   }
@@ -249,7 +249,7 @@ public class BrokerReduceServiceTest {
     Map<ServerRoutingInstance, DataTable> dataTableMap = new HashMap<>();
     dataTableMap.put(new ServerRoutingInstance("localhost", 12345, TableType.OFFLINE), dataTable);
 
-    assertTrue(reduce(brokerReduceService, brokerRequest, dataTableMap, 10_000L).isApproximateFunctionApplied());
+    assertTrue(reduce(brokerReduceService, brokerRequest, dataTableMap, 10_000L).isApproximatedResult());
     brokerReduceService.shutDown();
   }
 

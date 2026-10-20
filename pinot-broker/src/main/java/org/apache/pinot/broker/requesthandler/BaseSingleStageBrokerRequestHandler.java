@@ -684,10 +684,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     HandlerContext handlerContext =
         getHandlerContext(offlineTableQueryConfig, realtimeTableQueryConfig, pinotQuery.getQueryOptions());
     validateGroovyScript(serverPinotQuery, handlerContext._disableGroovy);
-    boolean approximateFunctionRewritten = false;
     if (handlerContext._useApproximateFunction) {
-      approximateFunctionRewritten = handleApproximateFunctionOverride(serverPinotQuery,
-          handlerContext._distinctCountParams, handlerContext._percentileParams);
+      handleApproximateFunctionOverride(serverPinotQuery, handlerContext._distinctCountParams,
+          handlerContext._percentileParams);
     }
 
     // Validate the request
@@ -1056,6 +1055,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     if (brokerResponse.isGroupsTrimmed()) {
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_GROUPS_TRIMMED, 1);
     }
+    if (brokerResponse.isApproximatedResult()) {
+      _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_APPROXIMATED_RESULT, 1);
+    }
 
     // server returns STRING as default dataType for all columns in (some) scenarios where no rows are returned
     // this is an attempt to return more faithful information based on other sources
@@ -1093,13 +1095,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
 
     brokerResponse.setRLSFiltersApplied(rlsFiltersApplied.get());
-    // The reduce reports any function that returned an approximate result. Report it only for the functions the
-    // broker rewrote: a query that asks for a SMART function itself has chosen to accept an approximation.
-    boolean approximateFunctionApplied = approximateFunctionRewritten && brokerResponse.isApproximateFunctionApplied();
-    brokerResponse.setApproximateFunctionApplied(approximateFunctionApplied);
-    if (approximateFunctionApplied) {
-      _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.APPROXIMATE_FUNCTION_OVERRIDES, 1);
-    }
 
     // Record per-server stats on the SSE BrokerResponse so downstream consumers can read it.
     brokerResponse.setServerStats(serverStats.getServerStats());
@@ -2009,7 +2004,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   /// The rewritten functions stay exact until an accumulator crosses their conversion threshold, which the
   /// parameters carry. An empty parameter string appends nothing, so the aggregation function defaults apply.
   ///
-  /// @return true if at least one function was rewritten, so that the result can turn approximate
+  /// @return true if at least one function was rewritten
   @VisibleForTesting
   static boolean handleApproximateFunctionOverride(PinotQuery pinotQuery, String distinctCountParams,
       String percentileParams) {

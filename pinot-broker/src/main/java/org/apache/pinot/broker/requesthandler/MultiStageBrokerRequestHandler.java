@@ -1086,6 +1086,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         if (brokerResponse.isGroupsTrimmed()) {
           _brokerMetrics.addMeteredTableValue(table, BrokerMeter.BROKER_RESPONSES_WITH_GROUPS_TRIMMED, 1);
         }
+        if (brokerResponse.isApproximatedResult()) {
+          _brokerMetrics.addMeteredTableValue(table, BrokerMeter.BROKER_RESPONSES_WITH_APPROXIMATED_RESULT, 1);
+        }
         if (brokerResponse.isMseLiteLeafStageLimitReached()) {
           _brokerMetrics.addMeteredTableValue(table,
               BrokerMeter.BROKER_RESPONSES_WITH_MSE_LITE_LEAF_STAGE_LIMIT_REACHED, 1);
@@ -1108,16 +1111,6 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
       // set if rls (row level security) filters have been applied on the query
       brokerResponse.setRLSFiltersApplied(rlsFiltersApplied);
-
-      // set if an exact aggregation was rewritten into its approximate counterpart, and that function then returned an
-      // approximate result. The operators report any function that did, so a query that asks for a SMART function
-      // itself does not set it.
-      if (query.getPlannerContext().isApproximateFunctionApplied() && brokerResponse.isApproximatedResult()) {
-        brokerResponse.setApproximateFunctionApplied(true);
-        for (String tableName : tableNames) {
-          _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.APPROXIMATE_FUNCTION_OVERRIDES, 1);
-        }
-      }
 
       // Log query and stats
       _queryLogger.logQueryCompleted(

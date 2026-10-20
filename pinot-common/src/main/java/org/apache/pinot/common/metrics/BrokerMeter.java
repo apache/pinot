@@ -43,11 +43,6 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   /// At this moment this counter does not include queries executed in multi-stage mode.
   public static final BrokerMeter QUERIES = create("QUERIES", "queries", false);
 
-  /// Queries in which the broker rewrote at least one exact aggregation into its approximate counterpart, because
-  /// `pinot.broker.use.approximate.function` was on, and that function then returned an approximate result. A
-  /// rewritten function that stayed under its conversion threshold returns an exact result and is not counted.
-  public static final BrokerMeter APPROXIMATE_FUNCTION_OVERRIDES =
-      create("APPROXIMATE_FUNCTION_OVERRIDES", "queries", false);
   /// Number of single-stage queries that have been started.
   ///
   /// Unlike [#QUERIES], this metric is global and not attached to a particular table.
@@ -167,6 +162,11 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   // This metric track the number of broker responses with number of groups limit reached (potential bad responses).
   public static final BrokerMeter BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED = create(
       "BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED", "badResponses", false);
+
+  // This metric tracks the number of broker responses with an approximated result: a function that can answer exactly,
+  // such as a SMART function past its conversion threshold, returned an approximate result.
+  public static final BrokerMeter BROKER_RESPONSES_WITH_APPROXIMATED_RESULT = create(
+      "BROKER_RESPONSES_WITH_APPROXIMATED_RESULT", "badResponses", false);
 
   public static final BrokerMeter BROKER_RESPONSES_WITH_MSE_LITE_LEAF_STAGE_LIMIT_REACHED = create(
       "BROKER_RESPONSES_WITH_MSE_LITE_LEAF_STAGE_LIMIT_REACHED", "badResponses", false);

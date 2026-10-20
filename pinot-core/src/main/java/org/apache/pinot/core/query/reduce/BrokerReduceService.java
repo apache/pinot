@@ -136,7 +136,7 @@ public class BrokerReduceService extends BaseReduceService {
     // The reducers extract the final results with the functions of this query context, which record a result that
     // turned approximate. Servers that extracted final results themselves report it through the aggregator instead.
     if (AggregationFunctionUtils.hasApproximatedResult(serverQueryContext.getAggregationFunctions())) {
-      brokerResponseNative.setApproximateFunctionApplied(true);
+      brokerResponseNative.setApproximatedResult(true);
     }
     QueryContext queryContext;
     if (brokerRequest == serverBrokerRequest) {

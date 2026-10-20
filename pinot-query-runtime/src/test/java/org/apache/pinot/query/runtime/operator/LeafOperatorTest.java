@@ -607,10 +607,7 @@ public class LeafOperatorTest {
     BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
     MultiStageOperator.Type.LEAF.mergeInto(brokerResponse, leafStats);
     assertTrue(brokerResponse.isApproximatedResult());
-    // The broker reports it as approximateFunctionApplied, and only for the functions it rewrote.
-    JsonNode responseJson = JsonUtils.objectToJsonNode(brokerResponse);
-    assertFalse(responseJson.has("approximatedResult"));
-    assertFalse(responseJson.path("approximateFunctionApplied").asBoolean());
+    assertTrue(JsonUtils.objectToJsonNode(brokerResponse).path("approximatedResult").asBoolean());
     operator.close();
   }
 

@@ -54,7 +54,7 @@ import org.apache.pinot.common.response.ProcessingException;
     "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tablesQueried",
     "offlineThreadMemAllocatedBytes", "realtimeThreadMemAllocatedBytes", "offlineResponseSerMemAllocatedBytes",
     "realtimeResponseSerMemAllocatedBytes", "offlineTotalMemAllocatedBytes", "realtimeTotalMemAllocatedBytes",
-    "totalMemAllocatedBytes", "pools", "rlsFiltersApplied", "approximateFunctionApplied", "groupsTrimmed",
+    "totalMemAllocatedBytes", "pools", "rlsFiltersApplied", "approximatedResult", "groupsTrimmed",
     "mseLiteLeafStageLimitReached", "mseLiteLeafStageEffectiveLimit", "mseLiteFanOutAdjustedLimitApplied",
     "responseMetadata"
 })
@@ -93,7 +93,6 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
 
   private Set<Integer> _pools = Set.of();
   private boolean _rlsFiltersApplied = false;
-  private boolean _approximateFunctionApplied = false;
   @Nullable
   private Integer _mseLiteLeafStageEffectiveLimit;
   @Nullable
@@ -185,10 +184,9 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
     _brokerStats.merge(StatKey.LITE_MODE_LEAF_STAGE_LIMIT_REACHED, mseLiteLeafStageLimitReached);
   }
 
-  /// Returns whether an operator reported a function that returned an approximate final result, for example a SMART
-  /// function that switched to a sketch. The broker turns it into [#isApproximateFunctionApplied()] only for the
-  /// functions it rewrote, so it is not part of the response itself.
-  @JsonIgnore
+  /// Merged from the stats that the operators of every stage report.
+  @JsonProperty("approximatedResult")
+  @Override
   public boolean isApproximatedResult() {
     return _brokerStats.getBoolean(StatKey.APPROXIMATED_RESULT);
   }
@@ -568,18 +566,6 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   @Override
   public boolean getRLSFiltersApplied() {
     return _rlsFiltersApplied;
-  }
-
-  @JsonProperty("approximateFunctionApplied")
-  @Override
-  public void setApproximateFunctionApplied(boolean approximateFunctionApplied) {
-    _approximateFunctionApplied = approximateFunctionApplied;
-  }
-
-  @JsonProperty("approximateFunctionApplied")
-  @Override
-  public boolean isApproximateFunctionApplied() {
-    return _approximateFunctionApplied;
   }
 
   public void addBrokerStats(StatMap<StatKey> brokerStats) {

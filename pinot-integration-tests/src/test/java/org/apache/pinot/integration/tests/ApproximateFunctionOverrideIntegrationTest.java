@@ -39,8 +39,8 @@ import static org.testng.Assert.assertEquals;
 
 /// End-to-end test of the cluster config that rewrites exact aggregations into their approximate counterparts. It
 /// covers the properties unit tests cannot show: the config takes effect on a running broker without a restart, the
-/// rewrite is invisible to the caller while the rewritten functions stay exact, and the flag on the response reports
-/// a result that turned approximate.
+/// rewrite is invisible to the caller while the rewritten functions stay exact, and the `approximatedResult` flag on
+/// the response reports a result that turned approximate.
 public class ApproximateFunctionOverrideIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final String DISTINCT_COUNT_QUERY =
       "SELECT Carrier, DISTINCTCOUNT(Origin) FROM mytable GROUP BY Carrier ORDER BY Carrier LIMIT 100";
@@ -100,8 +100,8 @@ public class ApproximateFunctionOverrideIntegrationTest extends BaseClusterInteg
 
     JsonNode exactDistinctCount = postQuery(DISTINCT_COUNT_QUERY);
     JsonNode exactPercentile = postQuery(PERCENTILE_QUERY);
-    assertApplied(exactDistinctCount, false);
-    assertApplied(exactPercentile, false);
+    assertApproximated(exactDistinctCount, false);
+    assertApproximated(exactPercentile, false);
 
     // A threshold far above the cardinality of the test data keeps the rewritten functions exact, which is what makes
     // the answers comparable before and after the flip. The results stay exact, so the flag stays off.
@@ -109,10 +109,10 @@ public class ApproximateFunctionOverrideIntegrationTest extends BaseClusterInteg
     waitForOverride(true);
 
     JsonNode distinctCount = postQuery(DISTINCT_COUNT_QUERY);
-    assertApplied(distinctCount, false);
+    assertApproximated(distinctCount, false);
     assertSameResult(exactDistinctCount, distinctCount);
     JsonNode percentile = postQuery(PERCENTILE_QUERY);
-    assertApplied(percentile, false);
+    assertApproximated(percentile, false);
     assertSameResult(exactPercentile, percentile);
 
     // A threshold below the cardinality has to make the answer approximate rather than fail, keeping the same shape,
@@ -121,33 +121,35 @@ public class ApproximateFunctionOverrideIntegrationTest extends BaseClusterInteg
     waitForOverride(true);
 
     // COUNT(DISTINCT x) is the standard SQL spelling and must be rewritten too.
-    assertApplied(postQuery(COUNT_DISTINCT_QUERY), true);
+    assertApproximated(postQuery(COUNT_DISTINCT_QUERY), true);
 
     // The query option is the escape hatch back to exact results.
     JsonNode forcedExact = postQuery("SET useApproximateFunction = false; " + DISTINCT_COUNT_QUERY);
-    assertApplied(forcedExact, false);
+    assertApproximated(forcedExact, false);
     assertSameResult(exactDistinctCount, forcedExact);
 
     for (JsonNode exact : List.of(exactDistinctCount, exactPercentile)) {
       String query = exact == exactDistinctCount ? DISTINCT_COUNT_QUERY : PERCENTILE_QUERY;
       JsonNode approximate = postQuery(query);
-      assertApplied(approximate, true);
+      assertApproximated(approximate, true);
       assertEquals(approximate.get("exceptions").size(), 0, approximate.toString());
       assertEquals(columnDataTypes(approximate), columnDataTypes(exact));
       assertEquals(rows(approximate).size(), rows(exact).size());
     }
   }
 
-  /// The flag reports what the rewrite did. A query that asks for a SMART function itself has chosen to accept an
-  /// approximation, so its result does not set the flag, even when it switches to a sketch.
+  /// The flag reports the result, however the SMART function got into the query: a query that asks for one itself
+  /// sets it too, once the function switches to a sketch.
   @Test(dataProvider = "useBothQueryEngines")
-  public void testExplicitSmartFunctionDoesNotSetTheFlag(boolean useMultiStageQueryEngine)
+  public void testExplicitSmartFunction(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    JsonNode response = postQuery("SELECT Carrier, DISTINCTCOUNTSMARTHLL(Origin, 'threshold=1') FROM mytable "
-        + "GROUP BY Carrier ORDER BY Carrier LIMIT 100");
-    assertEquals(response.get("exceptions").size(), 0, response.toString());
-    assertApplied(response, false);
+    for (int threshold : new int[]{1, 1000000}) {
+      JsonNode response = postQuery("SELECT Carrier, DISTINCTCOUNTSMARTHLL(Origin, 'threshold=" + threshold
+          + "') FROM mytable GROUP BY Carrier ORDER BY Carrier LIMIT 100");
+      assertEquals(response.get("exceptions").size(), 0, response.toString());
+      assertApproximated(response, threshold == 1);
+    }
   }
 
   /// Pins the one visible difference the rewrite makes to a single-stage response, so that changing it is a
@@ -175,8 +177,8 @@ public class ApproximateFunctionOverrideIntegrationTest extends BaseClusterInteg
     assertEquals(rows(actual), rows(expected));
   }
 
-  private static void assertApplied(JsonNode response, boolean expected) {
-    assertEquals(response.get("approximateFunctionApplied").asBoolean(), expected, response.toString());
+  private static void assertApproximated(JsonNode response, boolean expected) {
+    assertEquals(response.get("approximatedResult").asBoolean(), expected, response.toString());
   }
 
   private static JsonNode columnDataTypes(JsonNode response) {

@@ -207,7 +207,7 @@ public class ExecutionStatsAggregatorTest {
     aggregator.aggregate(SERVER, table);
     BrokerResponseNative response = new BrokerResponseNative();
     aggregator.setStats("testTable", response, mock(BrokerMetrics.class));
-    assertTrue(response.isApproximateFunctionApplied());
+    assertTrue(response.isApproximatedResult());
 
     DataTable merged = emptyServerTable();
     aggregator.setStatsOnMergedDataTable(merged);
