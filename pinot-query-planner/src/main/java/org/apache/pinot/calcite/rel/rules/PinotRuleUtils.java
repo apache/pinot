@@ -42,7 +42,6 @@ import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
-import org.apache.calcite.rex.RexUtil;
 import org.apache.calcite.rex.RexVisitorImpl;
 import org.apache.calcite.rex.RexWindowBound;
 import org.apache.calcite.rex.RexWindowBounds;
@@ -147,13 +146,17 @@ public class PinotRuleUtils {
   /// An expression must be clear of three axes of variability:
   ///
   /// - [SqlOperator#isDeterministic()] -- `false` for `rand()`, `UUID_V4`, `UUID_V7` and Calcite's own `RAND` /
-  ///   `RAND_INTEGER`. Delegated to `RexUtil#isDeterministic` so this half tracks upstream automatically.
+  ///   `RAND_INTEGER`.
   /// - [SqlOperator#isDynamicFunction()] -- Calcite's own "fold once per query, never re-evaluate" marker, used by
   ///   `CURRENT_TIMESTAMP` and friends.
   /// - [PinotSqlFunction#isVolatile()] -- Pinot's equivalent marker, `true` for `FunctionVolatility.VOLATILE`
   ///   functions such as `now()`, `ago()` and `stageId()`. These deliberately stay `isDeterministic() == true` so that
   ///   [PinotEvaluateLiteralRule] can still fold them once at plan time, which is precisely why
-  ///   `RexUtil#isDeterministic` alone does not catch them.
+  ///   [SqlOperator#isDeterministic()] alone does not catch them.
+  ///
+  /// `ARRAY_TO_MV` is the one exception. It is marked non-deterministic (and so volatile) only to stop Calcite from
+  /// simplifying MV predicates such as `ARRAY_TO_MV(col) = 'a' AND ARRAY_TO_MV(col) = 'b'` to `false`. Its value
+  /// depends only on its row, so its own flags are ignored here. Its operands are still checked.
   ///
   /// Relocating an expression that fails this check changes how many times, and in what context, it is evaluated --
   /// which changes query results. `FunctionVolatility.STABLE` deliberately passes: it is constant within a single
@@ -162,16 +165,14 @@ public class PinotRuleUtils {
   /// Note this is a predicate that callers must apply; it is not enforced globally. Only [PinotFilterJoinRule]
   /// consults it today, so other rules that relocate expressions can still move volatile ones.
   public static boolean isRelocatable(RexNode node) {
-    if (!RexUtil.isDeterministic(node)) {
-      return false;
-    }
     try {
       node.accept(new RexVisitorImpl<Void>(true) {
         @Override
         public Void visitCall(RexCall call) {
           SqlOperator operator = call.getOperator();
-          if (operator.isDynamicFunction()
-              || (operator instanceof PinotSqlFunction && ((PinotSqlFunction) operator).isVolatile())) {
+          if (!operator.getName().equals("ARRAY_TO_MV") && (!operator.isDeterministic()
+              || operator.isDynamicFunction()
+              || (operator instanceof PinotSqlFunction && ((PinotSqlFunction) operator).isVolatile()))) {
             throw Util.FoundOne.NULL;
           }
           return super.visitCall(call);

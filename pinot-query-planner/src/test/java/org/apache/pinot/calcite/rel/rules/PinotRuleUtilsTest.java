@@ -156,4 +156,21 @@ public class PinotRuleUtilsTest {
     RexNode nested = call(SqlStdOperatorTable.PLUS, literal(1), call(registryFunction("stageId"), literal(0)));
     assertFalse(PinotRuleUtils.isRelocatable(nested));
   }
+
+  /// `ARRAY_TO_MV` is flagged non-deterministic only to stop Calcite from folding MV predicates, so it must still be
+  /// relocatable (otherwise MV filters stay above joins and fail validation). Its operands must still be checked.
+  @Test
+  public void testArrayToMvIsRelocatable() {
+    SqlOperator arrayToMv = resolvedOperator("ARRAY_TO_MV");
+    assertFalse(arrayToMv.isDeterministic(), "ARRAY_TO_MV is expected to be flagged non-deterministic");
+    RexNode mvCol = _rexBuilder.makeInputRef(
+        _typeFactory.createArrayType(_typeFactory.createSqlType(SqlTypeName.VARCHAR), -1), 0);
+    RexNode predicate = _rexBuilder.makeCall(SqlStdOperatorTable.EQUALS,
+        _rexBuilder.makeCall(_typeFactory.createSqlType(SqlTypeName.VARCHAR), arrayToMv, List.of(mvCol)),
+        _rexBuilder.makeLiteral("a"));
+    assertTrue(PinotRuleUtils.isRelocatable(predicate));
+
+    assertFalse(PinotRuleUtils.isRelocatable(call(arrayToMv, call(registryFunction("rand")))));
+    assertFalse(PinotRuleUtils.isRelocatable(call(arrayToMv, call(registryFunction("stageId"), literal(0)))));
+  }
 }
