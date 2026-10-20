@@ -26,6 +26,7 @@ import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.exception.QueryCancelledException;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -128,6 +129,7 @@ public class AsyncQueryResponseTest {
     // The send-time skip also records the server for quarantine.
     assertEquals(response.getFailedServer(), SERVER_1);
   }
+
   /// A channel going down only affects the query written to it. A request whose channel is not known yet has not been
   /// written, so no channel going down concerns it: its own write or connect settles it.
   @Test
@@ -260,5 +262,119 @@ public class AsyncQueryResponseTest {
     assertEquals(response.getStatus(), QueryResponse.Status.COMPLETED);
     verify(queryRouter, never()).recordServerTimeout(eq(SERVER_1), anyLong(), any());
     assertNull(response.getFailedServer());
+  }
+
+  @Test
+  public void testReceiveDeserializationErrorSetsFailedServerAndDataTable() {
+    AsyncQueryResponse response = newResponse(Set.of(SERVER_1, SERVER_2), 10_000L, true);
+
+    response.receiveDeserializationError(SERVER_1, new RuntimeException("bad bytes"), 100, 5);
+
+    // The query is not failed globally
+    assertNull(response.getException());
+    assertEquals(response.getStatus(), QueryResponse.Status.IN_PROGRESS);
+    // The failed server is recorded for the failure detector
+    assertEquals(response.getFailedServer(), SERVER_1);
+
+    // The ServerResponse contains a synthetic DataTable with DESERIALIZATION_ERROR
+    ServerResponse serverResponse = response.getCurrentResponses().get(SERVER_1);
+    assertNotNull(serverResponse);
+    assertNotNull(serverResponse.getDataTable());
+    assertTrue(serverResponse.getDataTable().getExceptions()
+        .containsKey(QueryErrorCode.DESERIALIZATION_ERROR.getId()));
+    assertEquals(serverResponse.getResponseSize(), 100);
+    assertEquals(serverResponse.getDeserializationTimeMs(), 5);
+    assertEquals(serverResponse.getResponseDelayMs(), -1);
+  }
+
+  @Test
+  public void testSkipServerResponseThenDeserializationErrorIsIdempotent()
+      throws Exception {
+    AsyncQueryResponse response = newResponse(Set.of(SERVER_1, SERVER_2), 500L, true);
+
+    response.skipServerResponse(SERVER_1);
+    // The later deserialization error for the same server must be a no-op for the latch.
+    response.receiveDeserializationError(SERVER_1, new RuntimeException("bad bytes"), 0, 0);
+
+    // Only SERVER_1's single slot was released; SERVER_2 never responds, so the query must TIME OUT, not COMPLETE.
+    Map<ServerRoutingInstance, ServerResponse> responses = response.getFinalResponses();
+    assertEquals(responses.size(), 2);
+    assertEquals(response.getStatus(), QueryResponse.Status.TIMED_OUT);
+    assertNull(response.getException());
+    assertEquals(response.getFailedServer(), SERVER_1);
+  }
+
+  @Test
+  public void testReceiveDeserializationErrorThenServerUnavailableIsIdempotent()
+      throws Exception {
+    AsyncQueryResponse response = newResponse(Set.of(SERVER_1, SERVER_2), 500L, true);
+
+    response.receiveDeserializationError(SERVER_1, new RuntimeException("bad bytes"), 0, 0);
+    // The later channel-inactive report for the same server must be a no-op for the latch.
+    assertFalse(response.markServerUnavailable(SERVER_1, new RuntimeException("channel inactive")));
+
+    // Only SERVER_1's single slot was released; SERVER_2 never responds, so the query must TIME OUT, not COMPLETE.
+    Map<ServerRoutingInstance, ServerResponse> responses = response.getFinalResponses();
+    assertEquals(responses.size(), 2);
+    assertEquals(response.getStatus(), QueryResponse.Status.TIMED_OUT);
+    assertNull(response.getException());
+    assertEquals(response.getFailedServer(), SERVER_1);
+  }
+
+  @Test
+  public void testReceiveDeserializationErrorThenReceiveDataTableIsIdempotent()
+      throws Exception {
+    AsyncQueryResponse response = newResponse(Set.of(SERVER_1, SERVER_2), 500L, true);
+
+    response.receiveDeserializationError(SERVER_1, new RuntimeException("bad"), 0, 0);
+    response.receiveDataTable(SERVER_1, DataTableBuilderFactory.getEmptyDataTable(), 100, 5);
+
+    Map<ServerRoutingInstance, ServerResponse> responses = response.getFinalResponses();
+    assertEquals(responses.size(), 2);
+    assertEquals(response.getStatus(), QueryResponse.Status.TIMED_OUT);
+    assertNull(response.getException());
+    assertEquals(response.getFailedServer(), SERVER_1);
+
+    ServerResponse serverResponse = responses.get(SERVER_1);
+    assertNotNull(serverResponse);
+    assertNotNull(serverResponse.getDataTable());
+    assertTrue(serverResponse.getDataTable().getExceptions()
+        .containsKey(QueryErrorCode.DESERIALIZATION_ERROR.getId()));
+  }
+
+  @Test
+  public void testReceiveDataTableThenReceiveDeserializationErrorIsIdempotent()
+      throws Exception {
+    AsyncQueryResponse response = newResponse(Set.of(SERVER_1, SERVER_2), 500L, true);
+
+    DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
+    response.receiveDataTable(SERVER_1, dataTable, 100, 5);
+    response.receiveDeserializationError(SERVER_1, new RuntimeException("bad"), 0, 0);
+
+    Map<ServerRoutingInstance, ServerResponse> responses = response.getFinalResponses();
+    assertEquals(responses.size(), 2);
+    assertEquals(response.getStatus(), QueryResponse.Status.TIMED_OUT);
+    assertNull(response.getException());
+    assertEquals(responses.get(SERVER_1).getDataTable(), dataTable);
+  }
+
+  @Test
+  public void testReceiveDeserializationErrorIsScopedToTheRequestChannel() {
+    Channel requestChannel = mock(Channel.class);
+    Channel otherChannel = mock(Channel.class);
+    AsyncQueryResponse response = newResponse(Set.of(SERVER_1, SERVER_2), 10_000L, true);
+    response.markRequestChannel(SERVER_1, requestChannel);
+    response.markRequestSubmitted(SERVER_1);
+    response.markRequestSubmitted(SERVER_2);
+
+    // Deserialization error on other channel should NOT affect SERVER_1's query
+    response.receiveDeserializationError(SERVER_1, otherChannel, new RuntimeException("other"), 100, 5);
+    assertEquals(response.getStatus(), QueryResponse.Status.IN_PROGRESS);
+    assertNull(response.getFailedServer());
+
+    // Deserialization error on SERVER_1's own channel affects it
+    response.receiveDeserializationError(SERVER_1, requestChannel, new RuntimeException("own"), 100, 5);
+    assertEquals(response.getStatus(), QueryResponse.Status.IN_PROGRESS);
+    assertEquals(response.getFailedServer(), SERVER_1);
   }
 }
