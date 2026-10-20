@@ -131,7 +131,7 @@ function waitForServerReady() {
   while [ $status -ne 0 ]; do
     sleep 1
     echo "Checking port ${SERVER_ADMIN_PORT} for server ready"
-    curl localhost:${SERVER_ADMIN_PORT}/health 1>/dev/null 2>&1
+    curl --fail localhost:${SERVER_ADMIN_PORT}/health 1>/dev/null 2>&1
     status=$?
   done
 }
@@ -141,7 +141,7 @@ function waitForServer2Ready() {
   while [ $status -ne 0 ]; do
     sleep 1
     echo "Checking port ${SERVER_2_ADMIN_PORT} for server ready"
-    curl localhost:${SERVER_2_ADMIN_PORT}/health 1>/dev/null 2>&1
+    curl --fail localhost:${SERVER_2_ADMIN_PORT}/health 1>/dev/null 2>&1
     status=$?
   done
 }
