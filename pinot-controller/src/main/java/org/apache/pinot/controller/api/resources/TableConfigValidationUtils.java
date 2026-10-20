@@ -23,6 +23,7 @@ import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
+import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -120,7 +121,9 @@ public final class TableConfigValidationUtils {
   }
 
   /// Computes the instance partitions the table would get on creation, so that an instance assignment that cannot be
-  /// satisfied by the current instances is rejected before the table config is persisted.
+  /// satisfied by the current instances is rejected before the table config is persisted, and validates that the
+  /// OFFLINE segments are placed by partition when the OFFLINE instance partitions have multiple partitions. This
+  /// covers pre-configured instance partitions, whose layout is not visible in the table config.
   private static void validateInstanceAssignment(PinotHelixResourceManager resourceManager, TableConfig tableConfig) {
     List<InstancePartitionsType> instancePartitionsTypes;
     if (tableConfig.getTableType() == TableType.OFFLINE) {
@@ -131,20 +134,28 @@ public final class TableConfigValidationUtils {
       instancePartitionsTypes = List.of(InstancePartitionsType.CONSUMING);
     }
     List<InstanceConfig> instanceConfigs = resourceManager.getAllHelixInstanceConfigs();
+    InstancePartitions offlineInstancePartitions = null;
     try {
       for (InstancePartitionsType instancePartitionsType : instancePartitionsTypes) {
+        InstancePartitions instancePartitions;
         if (InstanceAssignmentConfigUtils.allowInstanceAssignment(tableConfig, instancePartitionsType)) {
-          InstanceAssignmentUtils.computeInstancePartitions(tableConfig, instancePartitionsType,
+          instancePartitions = InstanceAssignmentUtils.computeInstancePartitions(tableConfig, instancePartitionsType,
               resourceManager.getPropertyStore(), instanceConfigs, null);
         } else {
-          InstancePartitionsUtils.computeDefaultInstancePartitions(resourceManager.getHelixZkManager(), tableConfig,
-              instancePartitionsType);
+          instancePartitions = InstancePartitionsUtils.computeDefaultInstancePartitions(
+              resourceManager.getHelixZkManager(), tableConfig, instancePartitionsType);
+        }
+        if (instancePartitionsType == InstancePartitionsType.OFFLINE) {
+          offlineInstancePartitions = instancePartitions;
         }
       }
     } catch (Exception e) {
       throw new RuntimeException(
           "Failed to calculate instance partitions for table: " + tableConfig.getTableName() + ", reason: "
               + e.getMessage(), e);
+    }
+    if (offlineInstancePartitions != null && offlineInstancePartitions.getNumPartitions() > 1) {
+      TableConfigUtils.validatePartitionedSegmentAssignment(tableConfig, InstancePartitionsType.OFFLINE.name());
     }
   }
 }

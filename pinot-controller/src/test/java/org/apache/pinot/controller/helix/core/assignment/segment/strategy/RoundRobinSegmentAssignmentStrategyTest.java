@@ -64,7 +64,8 @@ public class RoundRobinSegmentAssignmentStrategyTest {
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS)
             .setSegmentAssignmentConfigMap(Map.of(InstancePartitionsType.OFFLINE.toString(),
-                new SegmentAssignmentConfig(AssignmentStrategy.ROUND_ROBIN_SEGMENT_ASSIGNMENT_STRATEGY))).build();
+                new SegmentAssignmentConfig(AssignmentStrategy.ROUND_ROBIN_SEGMENT_ASSIGNMENT_STRATEGY, null)))
+            .build();
     _segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(null, tableConfig, null);
 
     // {

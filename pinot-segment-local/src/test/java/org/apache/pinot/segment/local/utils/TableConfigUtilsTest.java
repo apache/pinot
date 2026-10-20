@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.utils;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Throwables;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -299,7 +300,7 @@ public class TableConfigUtilsTest {
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setIsDimTable(true)
         .setSegmentAssignmentConfigMap(Map.of(InstancePartitionsType.OFFLINE.toString(),
-            new SegmentAssignmentConfig(AssignmentStrategy.DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY)))
+            new SegmentAssignmentConfig(AssignmentStrategy.DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY, null)))
         .build();
     TableConfigUtils.validate(tableConfig, schema);
 
@@ -307,7 +308,7 @@ public class TableConfigUtilsTest {
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setIsDimTable(true)
         .setSegmentAssignmentConfigMap(Map.of(InstancePartitionsType.OFFLINE.toString(),
-            new SegmentAssignmentConfig("replicaGroup")))
+            new SegmentAssignmentConfig("replicaGroup", null)))
         .build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
@@ -3851,6 +3852,7 @@ public class TableConfigUtilsTest {
     TableConfigUtils.validateTTLForUpsertConfig(tableConfigWithValidTimestampTTLConfig, schema);
   }
 
+  @SuppressWarnings("removal")
   @Test
   public void testValidatePartitionedReplicaGroupInstance() {
     String partitionColumn = "testPartitionCol";
@@ -4300,18 +4302,259 @@ public class TableConfigUtilsTest {
     assertNull(TableConfigUtils.getPartitionColumn(tableConfig));
   }
 
-  @SuppressWarnings("deprecation")
+  @SuppressWarnings("removal")
   @Test
-  public void testGetPartitionColumnWithReplicaGroupConfig() {
-    ReplicaGroupStrategyConfig replicaGroupStrategyConfig = new ReplicaGroupStrategyConfig(PARTITION_COLUMN, 1);
-    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).build();
+  public void testValidateAcceptsReplicaGroupStrategyConfig()
+      throws IOException {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    tableConfig.getValidationConfig().setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig("myCol", 1));
+    // The deprecated config must still be parsed and accepted
+    TableConfigUtils.validate(JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class), schema);
+  }
 
-    // setting up ReplicaGroupStrategyConfig for backward compatibility test.
-    SegmentsValidationAndRetentionConfig validationConfig = new SegmentsValidationAndRetentionConfig();
-    validationConfig.setReplicaGroupStrategyConfig(replicaGroupStrategyConfig);
-    tableConfig.setValidationConfig(validationConfig);
+  @Test
+  public void testValidateSegmentAssignmentConfigs() {
+    String offlineKey = InstancePartitionsType.OFFLINE.name();
+    SegmentPartitionConfig segmentPartitionConfig =
+        new SegmentPartitionConfig(Map.of("myCol", new ColumnPartitionConfig("murmur", 4)));
 
+    // Both the strategy and the partition column are optional, and the strategy is case insensitive
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setSegmentPartitionConfig(segmentPartitionConfig)
+        .setSegmentAssignmentConfigMap(Map.of(offlineKey, new SegmentAssignmentConfig(null, null)))
+        .build();
+    TableConfigUtils.validateSegmentAssignmentConfigs(tableConfig);
+    tableConfig.setSegmentAssignmentConfigMap(Map.of(offlineKey, new SegmentAssignmentConfig(null, "myCol")));
+    TableConfigUtils.validateSegmentAssignmentConfigs(tableConfig);
+    tableConfig.setSegmentAssignmentConfigMap(Map.of(offlineKey,
+        new SegmentAssignmentConfig(AssignmentStrategy.ROUND_ROBIN_REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY,
+            "myCol")));
+    TableConfigUtils.validateSegmentAssignmentConfigs(tableConfig);
+    tableConfig.setSegmentAssignmentConfigMap(Map.of(offlineKey, new SegmentAssignmentConfig("ReplicaGroup", "myCol")));
+    TableConfigUtils.validateSegmentAssignmentConfigs(tableConfig);
+    tableConfig.setSegmentAssignmentConfigMap(Map.of(offlineKey,
+        new SegmentAssignmentConfig(AssignmentStrategy.ROUND_ROBIN_SEGMENT_ASSIGNMENT_STRATEGY, null)));
+    TableConfigUtils.validateSegmentAssignmentConfigs(tableConfig);
+
+    // The strategy must be a known one
+    tableConfig.setSegmentAssignmentConfigMap(Map.of(offlineKey, new SegmentAssignmentConfig("unknown", null)));
+    IllegalStateException e = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validateSegmentAssignmentConfigs(tableConfig));
+    assertEquals(e.getMessage(),
+        "Invalid segment assignment strategy: unknown for: OFFLINE of table: testTable_OFFLINE");
+
+    // The partition column only applies to partition based strategies
+    tableConfig.setSegmentAssignmentConfigMap(Map.of(offlineKey,
+        new SegmentAssignmentConfig(AssignmentStrategy.BALANCE_NUM_SEGMENT_ASSIGNMENT_STRATEGY, "myCol")));
+    e = expectThrows(IllegalStateException.class, () -> TableConfigUtils.validateSegmentAssignmentConfigs(tableConfig));
+    assertEquals(e.getMessage(), "Partition column: myCol does not apply to the segment assignment strategy for: "
+        + "OFFLINE of table: testTable_OFFLINE");
+    TableConfig dimTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setIsDimTable(true)
+        .setSegmentPartitionConfig(segmentPartitionConfig)
+        .setSegmentAssignmentConfigMap(Map.of(offlineKey, new SegmentAssignmentConfig(null, "myCol")))
+        .build();
+    e = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validateSegmentAssignmentConfigs(dimTableConfig));
+    assertEquals(e.getMessage(), "Partition column: myCol does not apply to the segment assignment strategy for: "
+        + "OFFLINE of table: testTable_OFFLINE");
+
+    // The partition column must be a column of the segment partition config
+    tableConfig.setSegmentAssignmentConfigMap(Map.of(offlineKey, new SegmentAssignmentConfig(null, "otherCol")));
+    e = expectThrows(IllegalStateException.class, () -> TableConfigUtils.validateSegmentAssignmentConfigs(tableConfig));
+    assertEquals(e.getMessage(),
+        "Partition column: otherCol configured for segment assignment is not found in segment partition config");
+  }
+
+  private static InstanceAssignmentConfig createInstanceAssignmentConfig(@Nullable String partitionColumn) {
+    return new InstanceAssignmentConfig(new InstanceTagPoolConfig("DefaultTenant_OFFLINE", false, 0, null), null,
+        new InstanceReplicaGroupPartitionConfig(true, 0, 2, 0, 4, 1, false, partitionColumn), null, false);
+  }
+
+  @Test
+  public void testValidatePartitionedSegmentAssignment() {
+    String offlineKey = InstancePartitionsType.OFFLINE.name();
+    SegmentPartitionConfig singleColumnPartitionConfig =
+        new SegmentPartitionConfig(Map.of("myCol", new ColumnPartitionConfig("murmur", 4)));
+    SegmentPartitionConfig multiColumnPartitionConfig = new SegmentPartitionConfig(Map.of(
+        "myCol", new ColumnPartitionConfig("murmur", 4),
+        "otherCol", new ColumnPartitionConfig("murmur", 4)
+    ));
+
+    // Without configured partition column, the segment partition config must have exactly one column
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    TableConfig noPartitionConfig = tableConfig;
+    IllegalStateException e = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validatePartitionedSegmentAssignment(noPartitionConfig, offlineKey));
+    assertEquals(e.getMessage(), "Offline table with partitioned instance partitions must have segment partition "
+        + "config (segmentPartitionConfig in the indexingConfig) to resolve the partition of a segment");
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setSegmentPartitionConfig(singleColumnPartitionConfig)
+        .build();
+    TableConfigUtils.validatePartitionedSegmentAssignment(tableConfig, offlineKey);
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setSegmentPartitionConfig(multiColumnPartitionConfig)
+        .build();
+    TableConfig multiColumnConfig = tableConfig;
+    e = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validatePartitionedSegmentAssignment(multiColumnConfig, offlineKey));
+    assertEquals(e.getMessage(), "Offline table with partitioned instance partitions must configure the partition "
+        + "column (partitionColumn in the segment assignment config) when segment partition config has multiple "
+        + "columns");
+
+    // The configured partition column must be a column of the segment partition config
+    Map<String, SegmentAssignmentConfig> segmentAssignmentConfigMap =
+        Map.of(offlineKey, new SegmentAssignmentConfig(null, "myCol"));
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setSegmentPartitionConfig(multiColumnPartitionConfig)
+        .setSegmentAssignmentConfigMap(segmentAssignmentConfigMap)
+        .build();
+    TableConfigUtils.validatePartitionedSegmentAssignment(tableConfig, offlineKey);
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setSegmentPartitionConfig(
+            new SegmentPartitionConfig(Map.of("otherCol", new ColumnPartitionConfig("murmur", 4))))
+        .setSegmentAssignmentConfigMap(segmentAssignmentConfigMap)
+        .build();
+    TableConfig missingColumnConfig = tableConfig;
+    e = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validatePartitionedSegmentAssignment(missingColumnConfig, offlineKey));
+    assertEquals(e.getMessage(),
+        "Partition column: myCol configured for segment assignment is not found in segment partition config");
+
+    // The deprecated partition column of the instance assignment config is still honored
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setSegmentPartitionConfig(multiColumnPartitionConfig)
+        .setInstanceAssignmentConfigMap(Map.of(offlineKey, createInstanceAssignmentConfig("myCol")))
+        .build();
+    TableConfigUtils.validatePartitionedSegmentAssignment(tableConfig, offlineKey);
+
+    // The segment assignment strategy configured for the key, if any, must be partition based
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setSegmentPartitionConfig(singleColumnPartitionConfig)
+        .setSegmentAssignmentConfigMap(Map.of(offlineKey,
+            new SegmentAssignmentConfig(AssignmentStrategy.ROUND_ROBIN_REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY,
+                null)))
+        .build();
+    TableConfigUtils.validatePartitionedSegmentAssignment(tableConfig, offlineKey);
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setSegmentPartitionConfig(singleColumnPartitionConfig)
+        .setSegmentAssignmentConfigMap(Map.of(offlineKey,
+            new SegmentAssignmentConfig(AssignmentStrategy.BALANCE_NUM_SEGMENT_ASSIGNMENT_STRATEGY, null)))
+        .build();
+    TableConfig balancedConfig = tableConfig;
+    e = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validatePartitionedSegmentAssignment(balancedConfig, offlineKey));
+    assertEquals(e.getMessage(), "Segment assignment strategy: balanced for: OFFLINE of table: testTable_OFFLINE must "
+        + "be partition based because the instance partitions are partitioned");
+
+    // Dimension tables are assigned to all servers regardless of the instance partitions
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setIsDimTable(true)
+        .setSegmentAssignmentConfigMap(Map.of(offlineKey,
+            new SegmentAssignmentConfig(AssignmentStrategy.DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY, null)))
+        .build();
+    TableConfigUtils.validatePartitionedSegmentAssignment(tableConfig, offlineKey);
+
+    // Partitioned OFFLINE instance assignment config runs the validation
+    InstanceAssignmentConfig instanceAssignmentConfig = createInstanceAssignmentConfig(null);
+    Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = Map.of(offlineKey, instanceAssignmentConfig);
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setInstanceAssignmentConfigMap(instanceAssignmentConfigMap)
+        .build();
+    TableConfig partitionedConfig = tableConfig;
+    e = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validateInstanceAssignmentConfigs(partitionedConfig));
+    assertEquals(e.getMessage(), "Offline table with partitioned instance partitions must have segment partition "
+        + "config (segmentPartitionConfig in the indexingConfig) to resolve the partition of a segment");
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setSegmentPartitionConfig(singleColumnPartitionConfig)
+        .setInstanceAssignmentConfigMap(instanceAssignmentConfigMap)
+        .build();
+    TableConfigUtils.validateInstanceAssignmentConfigs(tableConfig);
+
+    // Partitioned instance assignment config of a tier of an OFFLINE table runs the validation too
+    List<TierConfig> tierConfigs = List.of(new TierConfig("hotTier", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d",
+        null, TierFactory.PINOT_SERVER_STORAGE_TYPE, "hotTier_OFFLINE", null, null));
+    Map<String, InstanceAssignmentConfig> tierInstanceAssignmentConfigMap = Map.of("hotTier", instanceAssignmentConfig);
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setTierConfigList(tierConfigs)
+        .setInstanceAssignmentConfigMap(tierInstanceAssignmentConfigMap)
+        .build();
+    TableConfig tierConfigWithoutPartitionConfig = tableConfig;
+    e = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validateInstanceAssignmentConfigs(tierConfigWithoutPartitionConfig));
+    assertEquals(e.getMessage(), "Offline table with partitioned instance partitions must have segment partition "
+        + "config (segmentPartitionConfig in the indexingConfig) to resolve the partition of a segment");
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setTierConfigList(tierConfigs)
+        .setSegmentPartitionConfig(singleColumnPartitionConfig)
+        .setInstanceAssignmentConfigMap(tierInstanceAssignmentConfigMap)
+        .build();
+    TableConfigUtils.validateInstanceAssignmentConfigs(tableConfig);
+
+    // Instance assignment configs of a REALTIME table are not validated because the partition of a realtime segment
+    // is encoded in its name
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setInstanceAssignmentConfigMap(Map.of(InstancePartitionsType.COMPLETED.name(), instanceAssignmentConfig))
+        .build();
+    TableConfigUtils.validateInstanceAssignmentConfigs(tableConfig);
+  }
+
+  @SuppressWarnings("removal")
+  @Test
+  public void testValidatePartitionColumnConsistency() {
+    String offlineKey = InstancePartitionsType.OFFLINE.name();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setSegmentAssignmentConfigMap(Map.of(
+            offlineKey, new SegmentAssignmentConfig(null, "myCol"),
+            "hotTier", new SegmentAssignmentConfig(null, "myCol")
+        ))
+        .setInstanceAssignmentConfigMap(Map.of(offlineKey, createInstanceAssignmentConfig("myCol")))
+        .build();
+    TableConfigUtils.validatePartitionColumnConsistency(tableConfig);
+
+    // A different column is rejected wherever it is configured
+    String expectedMessage = "Table: testTable_OFFLINE must configure the same partition column in "
+        + "segmentAssignmentConfigMap, instanceAssignmentConfigMap and replicaGroupStrategyConfig, found: [myCol, "
+        + "otherCol]";
+    tableConfig.setSegmentAssignmentConfigMap(Map.of(
+        offlineKey, new SegmentAssignmentConfig(null, "myCol"),
+        "hotTier", new SegmentAssignmentConfig(null, "otherCol")
+    ));
+    IllegalStateException e = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validatePartitionColumnConsistency(tableConfig));
+    assertEquals(e.getMessage(), expectedMessage);
+    tableConfig.setSegmentAssignmentConfigMap(Map.of(offlineKey, new SegmentAssignmentConfig(null, "myCol")));
+    tableConfig.setInstanceAssignmentConfigMap(Map.of(offlineKey, createInstanceAssignmentConfig("otherCol")));
+    e = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validatePartitionColumnConsistency(tableConfig));
+    assertEquals(e.getMessage(), expectedMessage);
+    tableConfig.setInstanceAssignmentConfigMap(null);
+    tableConfig.getValidationConfig().setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig("otherCol", 1));
+    e = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validatePartitionColumnConsistency(tableConfig));
+    assertEquals(e.getMessage(), expectedMessage);
+  }
+
+  @SuppressWarnings("removal")
+  @Test
+  public void testGetPartitionColumn() {
+    String offlineKey = InstancePartitionsType.OFFLINE.name();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setSegmentAssignmentConfigMap(Map.of(offlineKey, new SegmentAssignmentConfig(null, PARTITION_COLUMN)))
+        .setInstanceAssignmentConfigMap(Map.of(offlineKey, createInstanceAssignmentConfig("instanceAssignmentCol")))
+        .build();
+    tableConfig.getValidationConfig().setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig("legacyCol", 1));
+
+    // The segment assignment config takes precedence over the deprecated configs of existing tables
     assertEquals(TableConfigUtils.getPartitionColumn(tableConfig), PARTITION_COLUMN);
+    tableConfig.setSegmentAssignmentConfigMap(Map.of(offlineKey, new SegmentAssignmentConfig(null, null)));
+    assertEquals(TableConfigUtils.getPartitionColumn(tableConfig), "instanceAssignmentCol");
+    tableConfig.setInstanceAssignmentConfigMap(null);
+    assertEquals(TableConfigUtils.getPartitionColumn(tableConfig), "legacyCol");
+    tableConfig.getValidationConfig().setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig("", 1));
+    assertNull(TableConfigUtils.getPartitionColumn(tableConfig));
   }
 
   @DataProvider(name = "tableTypeTestDataProvider")

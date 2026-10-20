@@ -37,7 +37,6 @@ import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignme
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentTestUtils;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
-import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
@@ -94,8 +93,9 @@ public class RoundRobinReplicaGroupSegmentAssignmentStrategyTest {
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME_WITHOUT_PARTITION)
             .setNumReplicas(NUM_REPLICAS)
             .setSegmentAssignmentConfigMap(Map.of(InstancePartitionsType.OFFLINE.toString(),
-                new SegmentAssignmentConfig(
-                    AssignmentStrategy.ROUND_ROBIN_REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY))).build();
+                new SegmentAssignmentConfig(AssignmentStrategy.ROUND_ROBIN_REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY,
+                    null)))
+            .build();
     _segmentAssignmentWithoutPartition =
         SegmentAssignmentFactory.getSegmentAssignment(null, tableConfigWithoutPartitions, null);
 
@@ -139,15 +139,13 @@ public class RoundRobinReplicaGroupSegmentAssignmentStrategyTest {
     when(helixManagerWithPartitions.getHelixPropertyStore()).thenReturn(propertyStoreWithPartitions);
 
     int numInstancesPerPartition = numInstancesPerReplicaGroup / NUM_PARTITIONS;
-    ReplicaGroupStrategyConfig replicaGroupStrategyConfig =
-        new ReplicaGroupStrategyConfig(PARTITION_COLUMN, numInstancesPerPartition);
     TableConfig tableConfigWithPartitions =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME_WITH_PARTITION)
             .setNumReplicas(NUM_REPLICAS)
-            .setReplicaGroupStrategyConfig(replicaGroupStrategyConfig)
             .setSegmentAssignmentConfigMap(Map.of(InstancePartitionsType.OFFLINE.toString(),
-                new SegmentAssignmentConfig(
-                    AssignmentStrategy.ROUND_ROBIN_REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY))).build();
+                new SegmentAssignmentConfig(AssignmentStrategy.ROUND_ROBIN_REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY,
+                    PARTITION_COLUMN)))
+            .build();
     _segmentAssignmentWithPartition =
         SegmentAssignmentFactory.getSegmentAssignment(helixManagerWithPartitions, tableConfigWithPartitions, null);
 

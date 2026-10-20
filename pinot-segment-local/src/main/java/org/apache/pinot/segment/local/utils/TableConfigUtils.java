@@ -22,16 +22,17 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -84,6 +85,7 @@ import org.apache.pinot.spi.config.table.TimestampConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
 import org.apache.pinot.spi.config.table.assignment.SegmentAssignmentConfig;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
@@ -141,9 +143,10 @@ public final class TableConfigUtils {
   private static final String KINESIS_STREAM_TYPE = "kinesis";
   private static final String CONSUMING_SEGMENT_TIER = "consuming";
 
-  private static final Set<String> UPSERT_DEDUP_ALLOWED_ROUTING_STRATEGIES =
-      ImmutableSet.of(RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
-          RoutingConfig.MULTI_STAGE_REPLICA_GROUP_SELECTOR_TYPE);
+  private static final Set<String> UPSERT_DEDUP_ALLOWED_ROUTING_STRATEGIES = Set.of(
+      RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
+      RoutingConfig.MULTI_STAGE_REPLICA_GROUP_SELECTOR_TYPE
+  );
 
   private static boolean _disableGroovy;
 
@@ -211,7 +214,8 @@ public final class TableConfigUtils {
         existingOverriddenColumns);
 
     validateValidationConfig(tableConfig, schema);
-    validateSegmentAssignmentConfig(tableConfig);
+    validateSegmentAssignmentConfigs(tableConfig);
+    validatePartitionColumnConsistency(tableConfig);
     validateIngestionConfig(tableConfig, schema, existingTableConfig);
     if (tableConfig.getTableType() == TableType.REALTIME) {
       validateStreamConfigMaps(tableConfig);
@@ -431,26 +435,76 @@ public final class TableConfigUtils {
     validateRetentionConfig(tableConfig);
   }
 
-  private static void validateSegmentAssignmentConfig(TableConfig tableConfig) {
+  /// Validates the segment assignment configs: the strategy must be a known one (`allservers` for a dimension table),
+  /// and the partition column, which only applies to partition based strategies, must be a column of the segment
+  /// partition config.
+  @VisibleForTesting
+  static void validateSegmentAssignmentConfigs(TableConfig tableConfig) {
     Map<String, SegmentAssignmentConfig> segmentAssignmentConfigMap = tableConfig.getSegmentAssignmentConfigMap();
-    if (segmentAssignmentConfigMap == null) {
+    if (MapUtils.isEmpty(segmentAssignmentConfigMap)) {
       return;
     }
-    if (tableConfig.isDimTable()) {
-      SegmentAssignmentConfig segmentAssignmentConfig =
-          segmentAssignmentConfigMap.get(InstancePartitionsType.OFFLINE.toString());
-      if (segmentAssignmentConfig == null) {
-        return;
+    String tableName = tableConfig.getTableName();
+    boolean isDimTable = tableConfig.isDimTable();
+    for (Map.Entry<String, SegmentAssignmentConfig> entry : segmentAssignmentConfigMap.entrySet()) {
+      String key = entry.getKey();
+      SegmentAssignmentConfig segmentAssignmentConfig = entry.getValue();
+      String assignmentStrategy = segmentAssignmentConfig.getAssignmentStrategy();
+      boolean partitionBased = !isDimTable;
+      if (assignmentStrategy != null) {
+        assignmentStrategy = assignmentStrategy.toLowerCase(Locale.ROOT);
+        if (isDimTable) {
+          Preconditions.checkState(assignmentStrategy.equals(AssignmentStrategy.DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY),
+              "Dimension table: %s can only use '%s' segment assignment strategy, found: %s", tableName,
+              AssignmentStrategy.DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY, assignmentStrategy);
+        } else {
+          Preconditions.checkState(AssignmentStrategy.CONFIGURABLE_STRATEGIES.contains(assignmentStrategy),
+              "Invalid segment assignment strategy: %s for: %s of table: %s", assignmentStrategy, key, tableName);
+        }
+        partitionBased = AssignmentStrategy.PARTITION_BASED_STRATEGIES.contains(assignmentStrategy);
       }
-      String segmentAssignmentStrategy = segmentAssignmentConfig.getAssignmentStrategy();
-      if (segmentAssignmentStrategy != null
-          && !segmentAssignmentStrategy.equalsIgnoreCase(AssignmentStrategy.DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY)) {
-        throw new IllegalStateException(
-            String.format("Dimension table: %s can only use '%s' segment assignment strategy, found: %s",
-                tableConfig.getTableName(),
-                CommonConstants.Segment.AssignmentStrategy.DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY,
-                segmentAssignmentStrategy));
+      String partitionColumn = segmentAssignmentConfig.getPartitionColumn();
+      if (StringUtils.isNotEmpty(partitionColumn)) {
+        Preconditions.checkState(partitionBased,
+            "Partition column: %s does not apply to the segment assignment strategy for: %s of table: %s",
+            partitionColumn, key, tableName);
+        validatePartitionColumnInSegmentPartitionConfig(tableConfig, partitionColumn);
       }
+    }
+  }
+
+  /// Validates that every place that configures the partition column for segment assignment names the same column:
+  /// the segment assignment configs, and the deprecated instance assignment configs and `replicaGroupStrategyConfig`
+  /// that existing tables may still carry. The column is resolved table-wide, so a disagreement would be settled by
+  /// precedence and map iteration order.
+  @VisibleForTesting
+  static void validatePartitionColumnConsistency(TableConfig tableConfig) {
+    Set<String> partitionColumns = new TreeSet<>();
+    Map<String, SegmentAssignmentConfig> segmentAssignmentConfigMap = tableConfig.getSegmentAssignmentConfigMap();
+    if (segmentAssignmentConfigMap != null) {
+      for (SegmentAssignmentConfig segmentAssignmentConfig : segmentAssignmentConfigMap.values()) {
+        addIfNotEmpty(partitionColumns, segmentAssignmentConfig.getPartitionColumn());
+      }
+    }
+    Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = tableConfig.getInstanceAssignmentConfigMap();
+    if (instanceAssignmentConfigMap != null) {
+      for (InstanceAssignmentConfig instanceAssignmentConfig : instanceAssignmentConfigMap.values()) {
+        addIfNotEmpty(partitionColumns, instanceAssignmentConfig.getReplicaGroupPartitionConfig().getPartitionColumn());
+      }
+    }
+    ReplicaGroupStrategyConfig replicaGroupStrategyConfig =
+        tableConfig.getValidationConfig().getReplicaGroupStrategyConfig();
+    if (replicaGroupStrategyConfig != null) {
+      addIfNotEmpty(partitionColumns, replicaGroupStrategyConfig.getPartitionColumn());
+    }
+    Preconditions.checkState(partitionColumns.size() <= 1,
+        "Table: %s must configure the same partition column in segmentAssignmentConfigMap, instanceAssignmentConfigMap "
+            + "and replicaGroupStrategyConfig, found: %s", tableConfig.getTableName(), partitionColumns);
+  }
+
+  private static void addIfNotEmpty(Set<String> values, @Nullable String value) {
+    if (StringUtils.isNotEmpty(value)) {
+      values.add(value);
     }
   }
 
@@ -1426,6 +1480,18 @@ public final class TableConfigUtils {
     if (tableConfig.getInstanceAssignmentConfigMap() == null) {
       return;
     }
+    // Keys of the instance assignment configs that place OFFLINE segments: the OFFLINE instance partitions and the
+    // tiers of an OFFLINE table
+    Set<String> offlineSegmentKeys = new HashSet<>();
+    if (tableConfig.getTableType() == TableType.OFFLINE) {
+      offlineSegmentKeys.add(InstancePartitionsType.OFFLINE.name());
+      List<TierConfig> tierConfigs = tableConfig.getTierConfigsList();
+      if (tierConfigs != null) {
+        for (TierConfig tierConfig : tierConfigs) {
+          offlineSegmentKeys.add(tierConfig.getName());
+        }
+      }
+    }
     for (Map.Entry<String, InstanceAssignmentConfig> instanceAssignmentConfigMapEntry
         : tableConfig.getInstanceAssignmentConfigMap()
         .entrySet()) {
@@ -1448,7 +1514,59 @@ public final class TableConfigUtils {
             "numInstancesPerPartition must be 1 when using IMPLICIT_REALTIME_TABLE_PARTITION_SELECTOR");
       }
       // TODO: Add more validations for other partition selectors here
+
+      InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig =
+          instanceAssignmentConfig.getReplicaGroupPartitionConfig();
+      // Explicitly partitioned instance partitions require the OFFLINE segments to be placed by partition
+      if (offlineSegmentKeys.contains(instancePartitionsType) && replicaGroupPartitionConfig.isReplicaGroupBased()
+          && replicaGroupPartitionConfig.getNumPartitions() > 1) {
+        validatePartitionedSegmentAssignment(tableConfig, instancePartitionsType);
+      }
     }
+  }
+
+  /// Validates that OFFLINE segments are placed by partition for the given instance partitions type or tier, which
+  /// is required when its instance partitions have multiple partitions. The segment assignment strategy configured
+  /// for it, if any, must be partition based, and the partition column must be resolvable: the column configured
+  /// for segment assignment must be a column of the segment partition config, and without a configured column the
+  /// segment partition config must have exactly one column, which is how the partition id of a segment is read from
+  /// its metadata. The OFFLINE instance partitions may also be pre-configured, in which case the controller runs
+  /// this validation on the fetched ones. Dimension tables are exempt, since their segments are assigned to all
+  /// servers regardless of the instance partitions.
+  public static void validatePartitionedSegmentAssignment(TableConfig tableConfig, String key) {
+    if (tableConfig.isDimTable()) {
+      return;
+    }
+    Map<String, SegmentAssignmentConfig> segmentAssignmentConfigMap = tableConfig.getSegmentAssignmentConfigMap();
+    SegmentAssignmentConfig segmentAssignmentConfig =
+        segmentAssignmentConfigMap != null ? segmentAssignmentConfigMap.get(key) : null;
+    String assignmentStrategy =
+        segmentAssignmentConfig != null ? segmentAssignmentConfig.getAssignmentStrategy() : null;
+    if (assignmentStrategy != null) {
+      Preconditions.checkState(
+          AssignmentStrategy.PARTITION_BASED_STRATEGIES.contains(assignmentStrategy.toLowerCase(Locale.ROOT)),
+          "Segment assignment strategy: %s for: %s of table: %s must be partition based because the instance "
+              + "partitions are partitioned", assignmentStrategy, key, tableConfig.getTableName());
+    }
+    Map<String, ColumnPartitionConfig> columnPartitionMap = getColumnPartitionMap(tableConfig);
+    Preconditions.checkState(!columnPartitionMap.isEmpty(),
+        "Offline table with partitioned instance partitions must have segment partition config "
+            + "(segmentPartitionConfig in the indexingConfig) to resolve the partition of a segment");
+    String partitionColumn = getPartitionColumn(tableConfig);
+    if (partitionColumn != null) {
+      validatePartitionColumnInSegmentPartitionConfig(tableConfig, partitionColumn);
+    } else {
+      Preconditions.checkState(columnPartitionMap.size() == 1,
+          "Offline table with partitioned instance partitions must configure the partition column (partitionColumn in "
+              + "the segment assignment config) when segment partition config has multiple columns");
+    }
+  }
+
+  private static void validatePartitionColumnInSegmentPartitionConfig(TableConfig tableConfig,
+      String partitionColumn) {
+    Preconditions.checkState(getColumnPartitionMap(tableConfig).containsKey(partitionColumn),
+        "Partition column: %s configured for segment assignment is not found in segment partition config",
+        partitionColumn);
   }
 
   /// Validates the partial upsert-related configurations:
@@ -2594,26 +2712,36 @@ public final class TableConfigUtils {
     return tierOverwrites != null && tierOverwrites.isObject() ? tierOverwrites.get(tier) : null;
   }
 
-  /// Get the partition column from tableConfig instance assignment config map.
-  /// @param tableConfig table config
-  /// @return partition column
+  /// Returns the partition column configured for segment assignment, or `null` if none is configured. The column is
+  /// read from the segment assignment configs, falling back to the deprecated partition column of the instance
+  /// assignment configs and then to the deprecated `replicaGroupStrategyConfig`.
+  @Nullable
   public static String getPartitionColumn(TableConfig tableConfig) {
-    // check InstanceAssignmentConfigMap is null or empty,
-    if (!MapUtils.isEmpty(tableConfig.getInstanceAssignmentConfigMap())) {
-      for (InstanceAssignmentConfig instanceAssignmentConfig : tableConfig.getInstanceAssignmentConfigMap().values()) {
-        //check InstanceAssignmentConfig has the InstanceReplicaGroupPartitionConfig with non-empty partitionColumn
-        if (StringUtils.isNotEmpty(instanceAssignmentConfig.getReplicaGroupPartitionConfig().getPartitionColumn())) {
-          return instanceAssignmentConfig.getReplicaGroupPartitionConfig().getPartitionColumn();
+    // TODO: Revisit to resolve the partition column per key (instance partitions type or tier) instead of returning
+    //   the first configured one across all entries.
+    Map<String, SegmentAssignmentConfig> segmentAssignmentConfigMap = tableConfig.getSegmentAssignmentConfigMap();
+    if (segmentAssignmentConfigMap != null) {
+      for (SegmentAssignmentConfig segmentAssignmentConfig : segmentAssignmentConfigMap.values()) {
+        String partitionColumn = segmentAssignmentConfig.getPartitionColumn();
+        if (StringUtils.isNotEmpty(partitionColumn)) {
+          return partitionColumn;
         }
       }
     }
-
-    // for backward-compatibility, If partitionColumn value isn't there in InstanceReplicaGroupPartitionConfig
-    // check ReplicaGroupStrategyConfig for partitionColumn
-    //noinspection deprecation
+    Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = tableConfig.getInstanceAssignmentConfigMap();
+    if (instanceAssignmentConfigMap != null) {
+      for (InstanceAssignmentConfig instanceAssignmentConfig : instanceAssignmentConfigMap.values()) {
+        String partitionColumn = instanceAssignmentConfig.getReplicaGroupPartitionConfig().getPartitionColumn();
+        if (StringUtils.isNotEmpty(partitionColumn)) {
+          return partitionColumn;
+        }
+      }
+    }
     ReplicaGroupStrategyConfig replicaGroupStrategyConfig =
         tableConfig.getValidationConfig().getReplicaGroupStrategyConfig();
-    return replicaGroupStrategyConfig != null ? replicaGroupStrategyConfig.getPartitionColumn() : null;
+    String partitionColumn =
+        replicaGroupStrategyConfig != null ? replicaGroupStrategyConfig.getPartitionColumn() : null;
+    return StringUtils.isNotEmpty(partitionColumn) ? partitionColumn : null;
   }
 
   public static Set<String> getRelevantTags(TableConfig tableConfig) {

@@ -73,7 +73,6 @@ import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
-import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -305,11 +304,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return null;
   }
 
-  @Nullable
-  protected ReplicaGroupStrategyConfig getReplicaGroupStrategyConfig() {
-    return null;
-  }
-
   /// Creates a new schema.
   protected Schema createSchema()
       throws IOException {
@@ -475,8 +469,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setStreamConfigs(getStreamConfigs())
         .setNullHandlingEnabled(getNullHandlingEnabled())
         .setSegmentPartitionConfig(getSegmentPartitionConfig())
-        .setOptimizeNoDictStatsCollection(true)
-        .setReplicaGroupStrategyConfig(getReplicaGroupStrategyConfig());
+        .setOptimizeNoDictStatsCollection(true);
   }
 
   /// Creates a new Upsert enabled table config.
@@ -504,7 +497,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setRoutingConfig(
             new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
         .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap))
-        .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(primaryKeyColumn, 1))
         .setOptimizeNoDictStatsCollection(true)
         .setUpsertConfig(upsertConfig)
         .build();
@@ -563,7 +555,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setRoutingConfig(
             new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
         .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap))
-        .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(primaryKeyColumn, 1))
         .setOptimizeNoDictStatsCollection(true)
         .setUpsertConfig(upsertConfig)
         .build();
@@ -589,7 +580,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setRoutingConfig(
             new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
         .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap))
-        .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(primaryKeyColumn, 1))
         .setDedupConfig(new DedupConfig())
         .setOptimizeNoDictStatsCollection(true)
         .build();

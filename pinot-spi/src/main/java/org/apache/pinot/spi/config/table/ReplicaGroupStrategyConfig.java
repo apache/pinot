@@ -25,7 +25,9 @@ import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
-/// Class representing configurations related to segment assignment strategy.
+/// Legacy replica-group config, superseded by `InstanceAssignmentConfig` for the instance assignment and by the
+/// partition column of `SegmentAssignmentConfig`. It is still accepted and honored until it is removed.
+@Deprecated(since = "1.3.0", forRemoval = true)
 public class ReplicaGroupStrategyConfig extends BaseJsonConfig {
   private final String _partitionColumn;
   private final int _numInstancesPerPartition;
