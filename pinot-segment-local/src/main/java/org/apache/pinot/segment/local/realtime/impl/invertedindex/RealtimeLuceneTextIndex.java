@@ -348,7 +348,8 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
     IndexSearcher indexSearcher = null;
     try {
       indexSearcher = searcherManager.acquire();
-      return indexSearcher.getIndexReader().numDocs();
+      // This is a doc-id fence, so deleted document slots must remain within its bounds.
+      return indexSearcher.getIndexReader().maxDoc();
     } catch (IOException e) {
       throw new RuntimeException("Failed to get searchable document count for realtime text index for segment "
           + _segmentName + " for column " + _column, e);
