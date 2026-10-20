@@ -18,13 +18,18 @@
  */
 
 import { AuthLocalStorageKeys, AuthWorkflow } from 'Models';
+import { Box, Button } from '@material-ui/core';
+import Alert from '@material-ui/lab/Alert';
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { useHistory, useLocation } from 'react-router-dom';
 import { baseApi, getAxiosErrorInterceptor, getAxiosRequestInterceptor, getAxiosResponseInterceptor, transformApi } from '../../utils/axios-config';
 import PinotMethodUtils from '../../utils/PinotMethodUtils';
 import { AppLoadingIndicator } from '../AppLoadingIndicator';
 
+export type CoordinationBackend = 'HELIX' | 'RATIS';
+
 interface AuthProviderContextProps {
+    coordinationBackend: CoordinationBackend;
     accessToken: string;
     authUserName: string;
     authUserEmail: string;
@@ -34,6 +39,8 @@ interface AuthProviderContextProps {
 
 export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState<boolean>(true);
+    const [discoveryError, setDiscoveryError] = useState<boolean>(false);
+    const [coordinationBackend, setCoordinationBackend] = useState<CoordinationBackend | null>(null);
     const [redirectUri, setRedirectUri] = useState<string | null>(null);
     const [clientId, setClientId] = useState<string | null>(null);
     const [authWorkflow, setAuthWorkflow] = useState<AuthWorkflow | null>(null);
@@ -56,12 +63,12 @@ export const AuthProvider = ({ children }) => {
     }, []);
 
     useEffect(() => {
-        if (loading || authenticated) {
+        if (loading || discoveryError || authenticated) {
             return;
         }
 
         initOidcAuth();
-    }, [loading, authenticated]);
+    }, [loading, discoveryError, authenticated]);
 
     useEffect(() => {
         if (!autoLogout) {
@@ -72,46 +79,33 @@ export const AuthProvider = ({ children }) => {
     }, [autoLogout])
 
     const initAuthDetails = async () => {
-        // fetch auth info details
-        const authInfoResponse = await PinotMethodUtils.getAuthInfo();
-
-        const authWorkFlowInternal =
-            authInfoResponse && authInfoResponse.workflow
-                ? authInfoResponse.workflow
-                : AuthWorkflow.NONE;
-
-        // set auth workflow
-        setAuthWorkflow(authWorkFlowInternal);
-
-        if (authWorkFlowInternal === AuthWorkflow.NONE) {
-            // No authentication required
-            setAuthenticated(true);
+        setLoading(true);
+        setDiscoveryError(false);
+        try {
+            const authInfoResponse = await PinotMethodUtils.getAuthInfo();
+            const backend = authInfoResponse.coordinationBackend;
+            const workflow = authInfoResponse.workflow;
+            if ((backend !== 'HELIX' && backend !== 'RATIS')
+                || ![AuthWorkflow.NONE, AuthWorkflow.BASIC, AuthWorkflow.OIDC].includes(workflow)) {
+                throw new Error('Unsupported controller discovery response.');
+            }
+            setCoordinationBackend(backend);
+            setAuthWorkflow(workflow);
+            if (workflow === AuthWorkflow.NONE) {
+                setAuthenticated(true);
+            }
+            // BASIC authentication continues to use the normal login page.
+            if (workflow === AuthWorkflow.OIDC) {
+                setAuthorizationEndpoint(`${authInfoResponse.issuer || ''}/auth`);
+                setRedirectUri(authInfoResponse.redirectUri || '');
+                setClientId(authInfoResponse.clientId || '');
+            }
+        } catch (error) {
+            // Do not mount any routes until the server has identified its backend and auth workflow.
+            setDiscoveryError(true);
+        } finally {
+            setLoading(false);
         }
-
-        if (authWorkFlowInternal === AuthWorkflow.BASIC) {
-            // basic auth is handled by login page
-        }
-
-        // set OIDC auth details
-        if (authWorkFlowInternal === AuthWorkflow.OIDC) {
-            const issuer =
-                authInfoResponse && authInfoResponse.issuer ? authInfoResponse.issuer : '';
-
-            setAuthorizationEndpoint(`${issuer}/auth`);
-            setRedirectUri(
-                authInfoResponse && authInfoResponse.redirectUri
-                    ? authInfoResponse.redirectUri
-                    : ''
-            );
-            setClientId(
-                authInfoResponse && authInfoResponse.clientId
-                    ? authInfoResponse.clientId
-                    : ''
-            );
-        }
-
-        // auth loading complete
-        setLoading(false);
     }
 
     const initOidcAuth = () => {
@@ -219,6 +213,7 @@ export const AuthProvider = ({ children }) => {
     }
 
     const authProvider: AuthProviderContextProps = {
+        coordinationBackend: coordinationBackend,
         authWorkflow: authWorkflow,
         accessToken: accessToken,
         authUserName: authUserName,
@@ -229,7 +224,14 @@ export const AuthProvider = ({ children }) => {
     if (loading) {
         return <AppLoadingIndicator />
     }
-
+    if (discoveryError || !coordinationBackend) {
+        return (
+            <Box p={3}>
+                <Alert severity="error">Unable to load controller configuration. The console is unavailable.</Alert>
+                <Box mt={2}><Button onClick={initAuthDetails} variant="contained">Retry</Button></Box>
+            </Box>
+        );
+    }
 
     return (
         <AuthProviderContext.Provider value={authProvider}>

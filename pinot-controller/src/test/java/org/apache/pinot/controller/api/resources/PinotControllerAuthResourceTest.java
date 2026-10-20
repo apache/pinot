@@ -18,8 +18,14 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.util.Set;
 import javax.ws.rs.NotAuthorizedException;
+import javax.ws.rs.core.Application;
 import javax.ws.rs.core.HttpHeaders;
+import org.apache.pinot.common.coordination.CoordinationBackend;
+import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.api.ControllerAdminApiApplication;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessType;
@@ -31,6 +37,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 
 
@@ -45,6 +52,8 @@ public class PinotControllerAuthResourceTest {
   private AccessControl _accessControl;
   @Mock
   private HttpHeaders _httpHeaders;
+  @Mock
+  private Application _application;
   @InjectMocks
   private PinotControllerAuthResource _resource;
 
@@ -68,5 +77,50 @@ public class PinotControllerAuthResourceTest {
         .thenThrow(new NotAuthorizedException("Basic"));
 
     assertFalse(_resource.verify(TABLE_NAME, AccessType.READ, ENDPOINT_URL));
+  }
+
+  @Test
+  public void testAuthInfoPreservesProviderFieldsAndUsesStartupBackend() {
+    for (CoordinationBackend backend : CoordinationBackend.values()) {
+      ControllerConf configuration = new ControllerConf();
+      if (backend == CoordinationBackend.RATIS) {
+        configuration.setProperty(CoordinationBackend.CONFIG_KEY, "RATIS");
+      }
+      ControllerAdminApiApplication application = backend == CoordinationBackend.RATIS
+          ? new ControllerAdminApiApplication(configuration, Set.of(PinotControllerAuthResource.class))
+          : new ControllerAdminApiApplication(configuration);
+      try {
+        configuration.setProperty(CoordinationBackend.CONFIG_KEY,
+            backend == CoordinationBackend.RATIS ? "HELIX" : "RATIS");
+        when(_application.getProperties()).thenReturn(application.getProperties());
+        when(_accessControlFactory.create()).thenReturn(_accessControl);
+        when(_accessControl.getAuthWorkflowInfo()).thenReturn(new ExtendedWorkflow());
+        ObjectNode info = _resource.info();
+        assertEquals(info.get("workflow").asText(), AccessControl.WORKFLOW_BASIC);
+        assertEquals(info.get("loginHint").asText(), "Sign in");
+        assertEquals(info.get("coordinationBackend").asText(), backend.name());
+        if (backend == CoordinationBackend.RATIS) {
+          assertFalse(application.isRegistered(PinotSchemaRestletResource.class));
+        }
+      } finally {
+        // Constructed applications also own the async executor, even when no HTTP listener was started.
+        application.stop();
+        application.stop();
+      }
+    }
+  }
+
+  private static final class ExtendedWorkflow extends AccessControl.AuthWorkflowInfo {
+    private ExtendedWorkflow() {
+      super(AccessControl.WORKFLOW_BASIC);
+    }
+
+    public String getLoginHint() {
+      return "Sign in";
+    }
+
+    public String getCoordinationBackend() {
+      return "provider-value-must-not-control-backend";
+    }
   }
 }

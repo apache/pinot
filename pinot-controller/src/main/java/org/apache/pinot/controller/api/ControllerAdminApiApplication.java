@@ -23,6 +23,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.swagger.jaxrs.listing.SwaggerSerializers;
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -37,6 +38,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.ext.ContextResolver;
 import javax.ws.rs.ext.Provider;
 import org.apache.pinot.common.audit.AuditLogFilter;
+import org.apache.pinot.common.coordination.CoordinationBackend;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.swagger.SwaggerApiListingResource;
@@ -75,6 +77,8 @@ public class ControllerAdminApiApplication extends ResourceConfig {
 
   public static final String START_TIME = "controllerStartTime";
 
+  public static final String COORDINATION_BACKEND = "controllerCoordinationBackend";
+
   private final String _controllerResourcePackages;
   private final boolean _useHttps;
   private final boolean _enableSwagger;
@@ -82,24 +86,43 @@ public class ControllerAdminApiApplication extends ResourceConfig {
   private final ThreadPoolExecutor _managedAsyncExecutor;
 
   public ControllerAdminApiApplication(ControllerConf conf) {
+    this(conf, true, Set.of());
+  }
+
+  /// Registers an explicit HTTP resource set without legacy package scanning, service discovery or multipart upload
+  /// providers. Swagger is disabled on this path because the existing package scanner uses a shared global registry
+  /// and cannot safely describe an isolated resource set alongside other controllers in the same JVM.
+  public ControllerAdminApiApplication(ControllerConf conf, Set<Class<?>> resourceClasses) {
+    this(conf, false, Set.copyOf(resourceClasses));
+  }
+
+  private ControllerAdminApiApplication(ControllerConf conf, boolean scanLegacyPackages,
+      Set<Class<?>> resourceClasses) {
     super();
     property(PINOT_CONFIGURATION, conf);
+    property(COORDINATION_BACKEND, CoordinationBackend.from(conf));
 
     _controllerResourcePackages = conf.getControllerResourcePackages();
-    packages(_controllerResourcePackages);
+    if (scanLegacyPackages) {
+      packages(_controllerResourcePackages);
+    } else {
+      registerClasses(resourceClasses);
+    }
     // TODO See ControllerResponseFilter
     // register(new LoggingFeature());
     _useHttps = Boolean.parseBoolean(conf.getProperty(ControllerConf.CONSOLE_SWAGGER_USE_HTTPS));
-    _enableSwagger = conf.isEnableSwagger();
-    if (conf.getProperty(CommonConstants.Controller.CONTROLLER_SERVICE_AUTO_DISCOVERY, false)) {
+    _enableSwagger = scanLegacyPackages && conf.isEnableSwagger();
+    if (scanLegacyPackages && conf.getProperty(CommonConstants.Controller.CONTROLLER_SERVICE_AUTO_DISCOVERY, false)) {
       register(ServiceAutoDiscoveryFeature.class);
     }
     register(JacksonFeature.class);
-    register(MultiPartFeature.class);
-    register(new MultiPartTempDirResolver());
-    register(new MultiPartTempDirGuard());
-    register(SwaggerApiListingResource.class);
-    register(SwaggerSerializers.class);
+    if (scanLegacyPackages) {
+      register(MultiPartFeature.class);
+      register(new MultiPartTempDirResolver());
+      register(new MultiPartTempDirGuard());
+      register(SwaggerApiListingResource.class);
+      register(SwaggerSerializers.class);
+    }
     register(new CorsFilter());
     register(AuthenticationFilter.class);
     register(AuditLogFilter.class);
@@ -145,11 +168,13 @@ public class ControllerAdminApiApplication extends ResourceConfig {
   }
 
   public void stop() {
-    if (!_httpServer.isStarted()) {
-      return;
+    try {
+      if (_httpServer != null) {
+        _httpServer.shutdownNow();
+      }
+    } finally {
+      _managedAsyncExecutor.shutdown();
     }
-    _httpServer.shutdownNow();
-    _managedAsyncExecutor.shutdown();
   }
 
   private class CorsFilter implements ContainerResponseFilter {

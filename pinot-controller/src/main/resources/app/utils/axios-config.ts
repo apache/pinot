@@ -35,6 +35,7 @@ export const getAxiosRequestInterceptor = (
         // basic auth
         if (app_state.authWorkflow === AuthWorkflow.BASIC && app_state.authToken) {
             requestConfig.headers = {
+                ...requestConfig.headers,
                 Authorization: app_state.authToken,
             };
         }
@@ -42,6 +43,7 @@ export const getAxiosRequestInterceptor = (
         // OIDC auth
         if (accessToken) {
             requestConfig.headers = {
+                ...requestConfig.headers,
                 Authorization: accessToken,
             };
         }

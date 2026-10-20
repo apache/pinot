@@ -41,12 +41,14 @@ import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.CatalogReco
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.ChangePage;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.ChangeTransaction;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Command;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.ConfigTransaction;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.FeedCursor;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.FeedScope;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.GetInstallationWork;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.GetOutcome;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.GetRecord;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.GetRevision;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.GetStreamTip;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.InstallationSessionCommand;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.InstallationSessionQuery;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.MembershipCommand;
@@ -68,6 +70,7 @@ import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.RetireClien
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Revision;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.SequencedCommand;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Status;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.StreamTipResult;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Transaction;
 import org.apache.pinot.coordination.ratis.metadata.OfflineInstallationProtocol.InstallationSnapshot;
 import org.apache.pinot.coordination.ratis.metadata.OfflineInstallationProtocol.WorkResult;
@@ -99,6 +102,8 @@ public final class MetadataCatalog {
   private final UUID _clusterId;
   private final UUID _historyId;
   private long _lastAppliedIndex;
+  // Retained records, including tombstones, reconstruct this fence on restore. Membership-only progress is excluded.
+  private long _catalogMutationIndex;
   private Map<UUID, CatalogRecord> _records = new HashMap<>();
   private Map<UUID, Integer> _recordBytes = new HashMap<>();
   private Map<RecordKey, UUID> _names = new HashMap<>();
@@ -219,6 +224,9 @@ public final class MetadataCatalog {
     if (query instanceof GetInstallationWork work) {
       return installationWork(work, readIndex);
     }
+    if (query instanceof GetStreamTip tip) {
+      return streamTip(tip, readIndex);
+    }
     try {
       require(_historyId.equals(query.historyId()), Status.HISTORY_MISMATCH, "Metadata history differs");
       return encode(switch (query) {
@@ -233,6 +241,7 @@ public final class MetadataCatalog {
           yield readOutcome(session.request());
         }
         case GetInstallationWork ignored -> throw new IllegalStateException("Installation work dispatch failed");
+        case GetStreamTip ignored -> throw new IllegalStateException("Stream tip dispatch failed");
         case MembershipQuery ignored -> throw new IllegalStateException("Membership dispatch failed");
       });
     } catch (Rejection e) {
@@ -242,6 +251,27 @@ public final class MetadataCatalog {
     } catch (ResponseTooLargeException e) {
       return encode(result(Status.RESPONSE_TOO_LARGE, e.getMessage(), readIndex));
     }
+  }
+
+  private byte[] streamTip(GetStreamTip query, long index)
+      throws IOException {
+    StreamTipResult result;
+    try {
+      require(_historyId.equals(query.historyId()), Status.HISTORY_MISMATCH, "Metadata history differs");
+      ClientState client = currentClient(query.clientId(), query.clientEpoch());
+      identifier(query.streamId());
+      StreamState stream = client.streams().get(query.streamId());
+      Outcome outcome = stream == null ? null : stream.outcome();
+      result = new StreamTipResult(Status.OK, revision(index), "", client.epoch(),
+          stream == null ? 0 : stream.sequence(), stream == null ? 0 : stream.floor(),
+          outcome == null ? null : outcome.digest(), outcome == null ? null : outcome.result());
+    } catch (Rejection e) {
+      result = new StreamTipResult(e._status, revision(index), e.getMessage(), 0, 0, 0, null, null);
+    }
+    byte[] encoded = MetadataProtocol.encodeValue(result);
+    return encoded.length <= MAX_RESULT_BYTES ? encoded : MetadataProtocol.encodeValue(
+        new StreamTipResult(Status.RESPONSE_TOO_LARGE, revision(index), "Stream tip exceeds the supported size",
+            0, 0, 0, null, null));
   }
 
   private byte[] installationWork(GetInstallationWork query, long index)
@@ -699,6 +729,7 @@ public final class MetadataCatalog {
       require(restored.lastAppliedIndex() >= 0 && restored.records() != null && restored.clients() != null,
           Status.INVALID_REQUEST, "Invalid snapshot header");
       Map<UUID, CatalogRecord> records = new HashMap<>();
+      long catalogMutationIndex = 0;
       Map<UUID, Integer> recordBytes = new HashMap<>();
       Map<RecordKey, UUID> names = new HashMap<>();
       for (CatalogRecord record : restored.records()) {
@@ -706,6 +737,9 @@ public final class MetadataCatalog {
             && detached.path("formatVersion").asInt() >= minimumSnapshotFormat(record),
             Status.INVALID_REQUEST, "Snapshot contains a record family newer than its format");
         validateRecord(record, restored.lastAppliedIndex());
+        if (isCatalogMutation(record)) {
+          catalogMutationIndex = Math.max(catalogMutationIndex, record.lastModifiedIndex());
+        }
         require(records.putIfAbsent(record.objectId(), record) == null, Status.INVALID_REQUEST,
             "Duplicate object ID in snapshot");
         int encodedBytes = MetadataProtocol.encodeValue(record).length;
@@ -755,6 +789,7 @@ public final class MetadataCatalog {
       _names = names;
       _clients = clients;
       _lastAppliedIndex = restored.lastAppliedIndex();
+      _catalogMutationIndex = catalogMutationIndex;
       _journal = journal;
       _journalFloor = restored.journalFloor();
       _journalBytes = journalBytes;
@@ -857,13 +892,16 @@ public final class MetadataCatalog {
     Result outcome;
     try {
       switch (command) {
-        case Transaction transaction -> {
-          require(transaction.mutations() != null && !transaction.mutations().isEmpty()
-              && transaction.mutations().size() <= MetadataProtocol.MAX_MUTATIONS, Status.INVALID_REQUEST,
-              "Transaction mutation count is outside the supported bounds");
-          for (Mutation mutation : transaction.mutations()) {
-            staged.add(stage(mutation, index));
-          }
+        case Transaction transaction -> stageMutations(transaction.mutations(), index, staged);
+        case ConfigTransaction transaction -> {
+          Revision validated = transaction.validatedSnapshot();
+          require(validated != null && validated.index() >= 0 && validated.index() <= _lastAppliedIndex,
+              Status.INVALID_REQUEST, "Validation snapshot must be an applied catalog revision");
+          require(_historyId.equals(validated.historyId()), Status.HISTORY_MISMATCH,
+              "Validation snapshot history differs");
+          require(_catalogMutationIndex <= validated.index(), Status.CONFLICT,
+              "Catalog changed after validation; read and validate a fresh image");
+          stageMutations(transaction.mutations(), index, staged);
         }
         case OwnershipCommand ownership -> staged.addAll(
             OwnershipCatalog.stage(ownership.request(), coordinationView(), actualTerm, index));
@@ -914,6 +952,9 @@ public final class MetadataCatalog {
     int recordIndex = 0;
     for (CatalogRecord record : staged) {
       _records.put(record.objectId(), record);
+      if (isCatalogMutation(record)) {
+        _catalogMutationIndex = index;
+      }
       _recordBytes.put(record.objectId(), encodedSizes.get(recordIndex++));
       RecordKey key = new RecordKey(record.kind(), record.name());
       if (record.deleted()) {
@@ -925,6 +966,18 @@ public final class MetadataCatalog {
     client.streams().put(command.streamId(), new StreamState(command.sequence(), stream.floor(),
         new Outcome(digest, outcome)));
     return outcome;
+  }
+
+  private static boolean isCatalogMutation(CatalogRecord record) {
+    return record.kind() != RecordKind.MEMBERSHIP_CONTROL && record.kind() != RecordKind.PARTICIPANT;
+  }
+
+  private void stageMutations(List<Mutation> mutations, long index, List<CatalogRecord> staged) {
+    require(mutations != null && !mutations.isEmpty() && mutations.size() <= MetadataProtocol.MAX_MUTATIONS,
+        Status.INVALID_REQUEST, "Transaction mutation count is outside the supported bounds");
+    for (Mutation mutation : mutations) {
+      staged.add(stage(mutation, index));
+    }
   }
 
   private CatalogRecord stage(Mutation mutation, long index) {

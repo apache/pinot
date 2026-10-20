@@ -20,11 +20,16 @@ package org.apache.pinot.tools.service;
 
 import java.io.IOException;
 import java.net.ServerSocket;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.KeyStore;
 import java.security.cert.X509Certificate;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
@@ -36,12 +41,16 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManagerFactory;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.coordination.MetadataRpcClient;
 import org.apache.pinot.common.coordination.NativeMetadataConfig;
 import org.apache.pinot.common.coordination.ServingPermitGuard.ClockReading;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.controller.ControllerStarter;
+import org.apache.pinot.controller.api.access.BasicAuthAccessControlFactory;
+import org.apache.pinot.controller.api.access.ZkBasicAuthAccessControlFactory;
 import org.apache.pinot.controller.coordination.RatisControllerProvider;
 import org.apache.pinot.coordination.ratis.RatisMetadataStore.MembershipClockSettings;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.Policy;
@@ -52,9 +61,16 @@ import org.apache.pinot.coordination.ratis.transport.ControllerAccessPolicy;
 import org.apache.pinot.coordination.ratis.transport.ControllerAccessPolicy.ControllerIdentity;
 import org.apache.pinot.coordination.ratis.transport.ParticipantAccessPolicy;
 import org.apache.pinot.coordination.ratis.transport.ParticipantAccessPolicy.ParticipantIdentity;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -66,7 +82,7 @@ import static org.testng.Assert.expectThrows;
 
 
 /// Exercises normal service-manager dispatch with real voters and mTLS. No ZooKeeper is started; configured query
-/// ports remain available because these native starters expose metadata and installation membership only.
+/// ports remain available while the controller serves its normal HTTP/UI shell and conditional metadata writes.
 public class RatisStartersTest {
   private static final String PREFIX = NativeMetadataConfig.PREFIX;
   private static final String BROKER = "Broker_native";
@@ -86,7 +102,7 @@ public class RatisStartersTest {
         new ServiceStatus.LifecycleServiceStatusCallback(() -> false, () -> false));
     try {
       CertificateFiles certificate = certificate(directory, "controller");
-      int[] ports = ports(4);
+      int[] ports = ports(5);
       Map<String, Object> config = tls(UUID.randomUUID().toString(), certificate, certificate.certificate());
       config.put(PREFIX + "clusterId", UUID.randomUUID().toString());
       config.put(PREFIX + "id", "failure-0");
@@ -96,8 +112,18 @@ public class RatisStartersTest {
       config.put(PREFIX + "bootstrap", true);
       config.put(PREFIX + "metadata.host", "127.0.0.1");
       config.put(PREFIX + "metadata.port", ports[3]);
+      config.put("controller.port", ports[4]);
       config.put(PREFIX + "controller.provider.class", TestProvider.class.getName());
       config.put(PREFIX + "controller.startup.timeoutMs", 250L);
+      config.put("controller.admin.access.control.factory.class", ZkBasicAuthAccessControlFactory.class.getName());
+      ControllerStarter unsupportedAuth = new ControllerStarter();
+      try {
+        unsupportedAuth.init(new PinotConfiguration(config));
+        expectThrows(IOException.class, unsupportedAuth::start);
+      } finally {
+        unsupportedAuth.stop();
+      }
+      config.remove("controller.admin.access.control.factory.class");
       for (int attempt = 0; attempt < 2; attempt++) {
         ControllerStarter starter = new ControllerStarter();
         try {
@@ -132,7 +158,7 @@ public class RatisStartersTest {
       Path trust = directory.resolve("clients.pem");
       Files.writeString(trust, Files.readString(controller.certificate()) + Files.readString(broker.certificate())
           + Files.readString(server.certificate()));
-      int[] ports = ports(9);
+      int[] ports = ports(12);
       String history = UUID.randomUUID().toString();
       String cluster = UUID.randomUUID().toString();
       String voters = "voter-0@127.0.0.1:" + ports[0] + ",voter-1@127.0.0.1:" + ports[1]
@@ -149,6 +175,23 @@ public class RatisStartersTest {
         config.put(PREFIX + "bootstrap", true);
         config.put(PREFIX + "metadata.host", "127.0.0.1");
         config.put(PREFIX + "metadata.port", ports[3 + i]);
+        config.put(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, "native-test");
+        config.put("pinot.controller.http.server.thread.pool.corePoolSize", 2);
+        config.put("pinot.controller.http.server.thread.pool.maxPoolSize", 4);
+        if (i == 1) {
+          config.put("controller.access.protocols", "https");
+          config.put("controller.access.protocols.https.port", ports[9 + i]);
+          config.put("controller.tls.keystore.type", "PKCS12");
+          config.put("controller.tls.keystore.path", directory.resolve("controller.p12").toString());
+          config.put("controller.tls.keystore.password", "test-password");
+        } else {
+          config.put("controller.port", ports[9 + i]);
+        }
+        if (i < 2) {
+          config.put("controller.admin.access.control.factory.class", BasicAuthAccessControlFactory.class.getName());
+          config.put("controller.admin.access.control.principals", "admin");
+          config.put("controller.admin.access.control.principals.admin.password", "test-password");
+        }
         config.put(PREFIX + "controller.provider.class", TestProvider.class.getName());
         config.put("test.controllerFingerprint", controller.fingerprint());
         config.put("test.brokerFingerprint", broker.fingerprint());
@@ -161,6 +204,78 @@ public class RatisStartersTest {
         assertEquals(ServiceStatus.getServiceStatus("Controller_ratis_voter-" + i), ServiceStatus.Status.GOOD);
         assertTrue(ServiceStatus.getStatusDescription("Controller_ratis_voter-" + i).contains("HTTP"));
       }
+
+      HttpClient http = httpClient(directory.resolve("controller.p12"));
+      for (int i = 0; i < 3; i++) {
+        String base = (i == 1 ? "https" : "http") + "://127.0.0.1:" + ports[9 + i];
+        assertEquals(get(http, base + "/", false).statusCode(), 200);
+        assertTrue(get(http, base + "/", false).body().contains("<html"));
+        HttpResponse<String> auth = get(http, base + "/auth/info", false);
+        assertEquals(auth.statusCode(), 200);
+        assertEquals(JsonUtils.stringToJsonNode(auth.body()).path("coordinationBackend").asText(), "RATIS");
+        assertEquals(get(http, base + "/schemas", false).statusCode(), i < 2 ? 401 : 200);
+        assertEquals(get(http, base + "/schemas", true).body(), "[]");
+        assertEquals(get(http, base + "/health", false).statusCode(), 200);
+        assertEquals(get(http, base + "/zk/ls", true).statusCode(), 404);
+        assertEquals(get(http, base + "/query/sql", true).statusCode(), 404);
+        assertEquals(get(http, base + "/tables/example/idealstate", true).statusCode(), 404);
+      }
+
+      String controllerUrl = "http://127.0.0.1:" + ports[9];
+      String secondControllerUrl = "https://127.0.0.1:" + ports[10];
+      Schema schema = new Schema.SchemaBuilder().setSchemaName("orders")
+          .addSingleValueDimension("id", DataType.LONG).build();
+      String schemaJson = JsonUtils.objectToString(schema);
+      Map<String, String> createHeaders = Map.of("If-None-Match", "*", "Idempotency-Key", UUID.randomUUID().toString());
+      HttpResponse<String> rejected = write(http, controllerUrl + "/schemas", "POST", schemaJson, Map.of());
+      assertEquals(rejected.statusCode(), 428);
+      assertTrue(JsonUtils.stringToJsonNode(rejected.body()).path("outcomeUnknown").isBoolean(), rejected.body());
+      assertFalse(JsonUtils.stringToJsonNode(rejected.body()).path("outcomeUnknown").asBoolean());
+      HttpResponse<String> created = write(http, controllerUrl + "/schemas", "POST", schemaJson, createHeaders);
+      assertEquals(created.statusCode(), 200, created.body());
+      assertEquals(JsonUtils.stringToJsonNode(created.body()).path("status").asText(), "OK");
+      assertEquals(write(http, secondControllerUrl + "/schemas", "POST", schemaJson, createHeaders).statusCode(), 409,
+          "Repeating a create must not publish another object");
+      String schemaTag = get(http, secondControllerUrl + "/schemas/orders", true).headers()
+          .firstValue("ETag").orElseThrow();
+      schema.addField(new DimensionFieldSpec("label", DataType.STRING, true));
+      HttpResponse<String> updated = write(http, secondControllerUrl + "/schemas/orders", "PUT",
+          JsonUtils.objectToString(schema), Map.of("If-Match", schemaTag));
+      assertEquals(updated.statusCode(), 200, updated.body());
+      assertEquals(write(http, controllerUrl + "/schemas/orders", "PUT", schemaJson,
+          Map.of("If-Match", schemaTag)).statusCode(), 412, "A stale editor must not overwrite newer metadata");
+
+      TableConfig table = new TableConfigBuilder(TableType.OFFLINE).setTableName("orders").build();
+      created = write(http, controllerUrl + "/tables", "POST", JsonUtils.objectToString(table),
+          Map.of("If-None-Match", "*", "Idempotency-Key", UUID.randomUUID().toString()));
+      assertEquals(created.statusCode(), 200, created.body());
+      String tableTag = get(http, secondControllerUrl + "/tables/orders_OFFLINE", true).headers()
+          .firstValue("ETag").orElseThrow();
+      table.getValidationConfig().setReplication("2");
+      updated = write(http, controllerUrl + "/tables/orders_OFFLINE", "PUT", JsonUtils.objectToString(table),
+          Map.of("If-Match", tableTag));
+      assertEquals(updated.statusCode(), 200, updated.body());
+      schemaTag = get(http, controllerUrl + "/schemas/orders", true).headers().firstValue("ETag").orElseThrow();
+      assertEquals(write(http, controllerUrl + "/schemas/orders", "DELETE", "",
+          Map.of("If-Match", schemaTag)).statusCode(), 409, "A referenced schema cannot be deleted");
+      assertEquals(write(http, controllerUrl + "/tables/orders_OFFLINE", "DELETE", "",
+          Map.of("If-Match", tableTag)).statusCode(), 405, "Table cleanup remains unsupported");
+
+      Schema disposable = new Schema.SchemaBuilder().setSchemaName("disposable")
+          .addSingleValueDimension("id", DataType.LONG).build();
+      String disposableJson = JsonUtils.objectToString(disposable);
+      created = write(http, controllerUrl + "/schemas", "POST", disposableJson, createHeaders);
+      assertEquals(created.statusCode(), 200, created.body());
+      String deletedTag = created.headers().firstValue("ETag").orElseThrow();
+      assertEquals(write(http, controllerUrl + "/schemas/disposable", "DELETE", "",
+          Map.of("If-Match", deletedTag)).statusCode(), 200);
+      assertEquals(write(http, secondControllerUrl + "/schemas", "POST", disposableJson, createHeaders).statusCode(),
+          409, "A lost create reply must not resurrect the same object after deletion");
+      created = write(http, secondControllerUrl + "/schemas", "POST", disposableJson,
+          Map.of("If-None-Match", "*", "Idempotency-Key", UUID.randomUUID().toString()));
+      assertEquals(created.statusCode(), 200, created.body());
+      assertEquals(write(http, controllerUrl + "/schemas/disposable", "DELETE", "",
+          Map.of("If-Match", deletedTag)).statusCode(), 412, "Old ETags must not affect a recreated name");
 
       String endpoints = "127.0.0.1:" + ports[3] + ",127.0.0.1:" + ports[4] + ",127.0.0.1:" + ports[5];
       Map<String, Object> brokerConfig = tls(history, broker, controller.certificate());
@@ -183,6 +298,35 @@ public class RatisStartersTest {
       try (MetadataRpcClient metadata = client(ports[4], controller, controller.certificate());
           MetadataRpcClient brokerClient = client(ports[4], broker, controller.certificate());
           MetadataRpcClient serverClient = client(ports[4], server, controller.certificate())) {
+        assertEquals(metadata.execute(MetadataRpc.CommandRequest.newBuilder().setHistoryId(history)
+            .setRegister(MetadataRpc.RegisterClient.newBuilder().setIncarnation(UUID.randomUUID().toString()))
+            .build()).getStatus(), ResultStatus.OK);
+        assertEquals(metadata.execute(MetadataRpc.CommandRequest.newBuilder().setHistoryId(history)
+            .setTransaction(MetadataRpc.Transaction.newBuilder().setClientEpoch(1).setStreamId("http-test")
+                .setSequence(1).addMutations(MetadataRpc.Mutation.newBuilder()
+                    .setAction(MetadataRpc.Mutation.Action.CREATE).setKind(MetadataRpc.RecordKind.CLUSTER_CONFIG)
+                    .setName("cluster").setExpected(MetadataRpc.ObjectVersion.newBuilder().setHistoryId(history)
+                        .setObjectId(UUID.randomUUID().toString()))
+                    .setValue(MetadataRpc.CatalogValue.newBuilder().setClusterConfig(MetadataRpc.ClusterConfig
+                        .newBuilder().putProperties("example", "committed")))))
+            .build()).getStatus(), ResultStatus.OK);
+        for (int i = 0; i < 3; i++) {
+          String base = (i == 1 ? "https" : "http") + "://127.0.0.1:" + ports[9 + i];
+          HttpResponse<String> configs = get(http, base + "/cluster/configs", true);
+          assertEquals(configs.statusCode(), 200);
+          assertEquals(JsonUtils.stringToJsonNode(configs.body()).path("example").asText(), "committed");
+        }
+        String clusterTag = get(http, controllerUrl + "/cluster/configs", true).headers()
+            .firstValue("ETag").orElseThrow();
+        updated = write(http, controllerUrl + "/cluster/configs", "POST", "{\"http\":\"committed\"}",
+            Map.of("If-Match", clusterTag));
+        assertEquals(updated.statusCode(), 200, updated.body());
+        HttpResponse<String> clusterConfig = get(http, secondControllerUrl + "/cluster/configs", true);
+        assertEquals(JsonUtils.stringToJsonNode(clusterConfig.body()).path("example").asText(), "committed");
+        assertEquals(JsonUtils.stringToJsonNode(clusterConfig.body()).path("http").asText(), "committed");
+        updated = write(http, secondControllerUrl + "/cluster/configs/http", "DELETE", "",
+            Map.of("If-Match", clusterConfig.headers().firstValue("ETag").orElseThrow()));
+        assertEquals(updated.statusCode(), 200, updated.body());
         assertEquals(metadata.read(MetadataRpc.ReadRequest.newBuilder().setHistoryId(history)
             .setRevision(MetadataRpc.Empty.getDefaultInstance()).build()).getStatus(), ResultStatus.OK);
         MetadataRpc.MembershipReadRequest read = MetadataRpc.MembershipReadRequest.newBuilder()
@@ -197,7 +341,7 @@ public class RatisStartersTest {
         assertEquals(serverState.getEndpointsCount(), 0);
         assertEquals(ServiceStatus.getServiceStatus(BROKER), ServiceStatus.Status.BAD);
         assertEquals(ServiceStatus.getServiceStatus(SERVER), ServiceStatus.Status.GOOD);
-        for (int i = 6; i < ports.length; i++) {
+        for (int i = 6; i < 9; i++) {
           try (ServerSocket unused = new ServerSocket(ports[i])) {
             assertTrue(unused.isBound(), "Native query/admin listener must remain closed");
           }
@@ -213,9 +357,33 @@ public class RatisStartersTest {
         assertTrue(manager.stopPinotInstanceById("Controller_ratis_voter-0"));
         controllers.getFirst().put(PREFIX + "bootstrap", false);
         controllers.getFirst().put("test.bootstrapPermitMillis", 2000L);
+        try (ServerSocket occupied = new ServerSocket(ports[9])) {
+          assertTrue(occupied.isBound());
+          expectThrows(RuntimeException.class,
+              () -> manager.startRole(ServiceRole.CONTROLLER, controllers.getFirst()));
+        }
         assertEquals(manager.startRole(ServiceRole.CONTROLLER, controllers.getFirst()), "Controller_ratis_voter-0");
         assertEquals(metadata.membershipRead(read).getControl().getPolicy().getPermitLifetimeMillis(), 1000L,
             "Restart must retain committed policy instead of resetting it from bootstrap configuration");
+        clusterTag = get(http, controllerUrl + "/cluster/configs", true).headers().firstValue("ETag").orElseThrow();
+        updated = write(http, controllerUrl + "/cluster/configs", "POST", "{\"restart\":\"committed\"}",
+            Map.of("If-Match", clusterTag));
+        assertEquals(updated.statusCode(), 200, updated.body());
+        assertEquals(JsonUtils.stringToJsonNode(get(http, secondControllerUrl + "/cluster/configs", true).body())
+            .path("restart").asText(), "committed", "Restart must recover the bounded HTTP writer stream");
+        // Stop participants before losing quorum so the test does not wait for failed retirements.
+        manager.stopPinotInstanceById(BROKER);
+        manager.stopPinotInstanceById(SERVER);
+        assertTrue(manager.stopPinotInstanceById("Controller_ratis_voter-1"));
+        assertTrue(manager.stopPinotInstanceById("Controller_ratis_voter-2"));
+        assertEquals(get(http, "http://127.0.0.1:" + ports[9] + "/cluster/configs", true).statusCode(), 503,
+            "Quorum loss must not return a successful cached catalog response");
+        assertTrue(manager.stopPinotInstanceById("Controller_ratis_voter-0"));
+        for (int i = 9; i < 12; i++) {
+          try (ServerSocket released = new ServerSocket(ports[i])) {
+            assertTrue(released.isBound(), "Controller shutdown must release its HTTP listener");
+          }
+        }
       }
     } finally {
       starters.shutdownNow();
@@ -226,6 +394,40 @@ public class RatisStartersTest {
       manager.stopAll();
       FileUtils.deleteDirectory(directory.toFile());
     }
+  }
+
+  private static HttpClient httpClient(Path trustFile) throws Exception {
+    KeyStore trust = KeyStore.getInstance("PKCS12");
+    try (var input = Files.newInputStream(trustFile)) {
+      trust.load(input, "test-password".toCharArray());
+    }
+    TrustManagerFactory manager = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+    manager.init(trust);
+    SSLContext context = SSLContext.getInstance("TLS");
+    context.init(null, manager.getTrustManagers(), null);
+    return HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).sslContext(context)
+        .connectTimeout(Duration.ofSeconds(5)).build();
+  }
+
+  private static HttpResponse<String> get(HttpClient client, String url, boolean authenticated) throws Exception {
+    HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(10));
+    if (authenticated) {
+      request.header("Authorization", authorization());
+    }
+    return client.send(request.build(), HttpResponse.BodyHandlers.ofString());
+  }
+
+  private static HttpResponse<String> write(HttpClient client, String url, String method, String body,
+      Map<String, String> headers) throws Exception {
+    HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(10))
+        .header("Authorization", authorization()).header("Content-Type", "application/json")
+        .method(method, HttpRequest.BodyPublishers.ofString(body));
+    headers.forEach(request::header);
+    return client.send(request.build(), HttpResponse.BodyHandlers.ofString());
+  }
+
+  private static String authorization() {
+    return "Basic " + Base64.getEncoder().encodeToString("admin:test-password".getBytes(StandardCharsets.UTF_8));
   }
 
   private static Map<String, Object> tls(String history, CertificateFiles certificate, Path trust) {

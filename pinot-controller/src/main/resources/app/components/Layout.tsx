@@ -42,6 +42,9 @@ const BASE_NAVIGATION_ITEMS = [
 const Layout = (props) => {
   const role = props.role;
   const navigationItems = React.useMemo(() => {
+    if (props.coordinationBackend === 'RATIS') {
+      return [{ id: 1, name: 'Native Metadata', link: '/', icon: <ClusterManagerIcon /> }];
+    }
     // IMPORTANT: do not mutate a module-level array here. Layout can re-render many times,
     // and mutation would duplicate entries in the sidebar.
     if (props.authWorkflow === 'NONE') {
@@ -59,7 +62,7 @@ const Layout = (props) => {
       ];
     }
     return BASE_NAVIGATION_ITEMS;
-  }, [props.authWorkflow, role]);
+  }, [props.authWorkflow, props.coordinationBackend, role]);
 
   const hash = `/${window.location.hash.split('/')[1]}`;
   const routeObj = navigationItems.find((obj) => obj.link === hash);
@@ -69,6 +72,9 @@ const Layout = (props) => {
   const [openSidebar, setOpenSidebar] = React.useState(sidebarOpenState);
 
   const appNavigationItems = React.useMemo(() => {
+    if (props.coordinationBackend === 'RATIS') {
+      return navigationItems;
+    }
     if (app_state.queryConsoleOnlyView) {
       return navigationItems.filter((navItem) => navItem.link === '/query');
     }
@@ -77,7 +83,7 @@ const Layout = (props) => {
     }
 
     return navigationItems;
-  }, [navigationItems, app_state.queryConsoleOnlyView, app_state.hideQueryConsoleTab]);
+  }, [navigationItems, props.coordinationBackend, app_state.queryConsoleOnlyView, app_state.hideQueryConsoleTab]);
 
   const highlightSidebarLink = (id: number) => {
     setSelectedId(id);

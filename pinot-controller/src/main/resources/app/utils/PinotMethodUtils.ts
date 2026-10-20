@@ -1237,7 +1237,10 @@ const getTableState = (tableName, tableType) => {
 };
 
 const getAuthInfo = () => {
-  return getInfo().then((response)=>{
+  return getInfo().then((response) => {
+    if (response.status !== 200 || !response.data) {
+      throw new Error('Unable to discover controller authentication and coordination backend.');
+    }
     return response.data;
   });
 };

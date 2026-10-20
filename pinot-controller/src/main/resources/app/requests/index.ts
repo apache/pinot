@@ -391,7 +391,7 @@ export const getState = (tableName: string, tableType: string): Promise<AxiosRes
   baseApi.get(`/tables/${tableName}/state?type=${tableType}`);
 
 export const getInfo = (): Promise<AxiosResponse<OperationResponse>> =>
-  baseApi.get(`/auth/info`);
+  baseApi.get(`/auth/info`, { timeout: 5000 });
 
 export const authenticateUser = (authToken): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/auth/verify/v2`, {headers:{"Authorization": authToken}});

@@ -56,6 +56,7 @@ import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.CatalogImag
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.ChangePage;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.FeedScope;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.GetRecord;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.GetStreamTip;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.MembershipCommand;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.MembershipQuery;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Mutation;
@@ -183,6 +184,12 @@ public class RatisMetadataStoreTest {
           assertEquals(current.records(RecordKind.CLUSTER_CONFIG).values().iterator().next().value()
               .path("value").asText(), "second");
           assertEquals(current.cursor(), page.next());
+          var tip = access.query(new GetStreamTip(cluster._historyId, "test-client", 1, "main"), 10_000);
+          assertEquals(tip.status(), Status.OK);
+          assertEquals(tip.sequence(), 2L);
+          assertEquals(tip.floor(), 1L);
+          assertEquals(tip.outcome().revision().index(), cluster._lastCommittedIndex);
+          assertTrue(tip.revision().index() > page.next().index());
           for (int i = 0; i < 3; i++) {
             if (i != follower) {
               cluster.closeVoter(i);

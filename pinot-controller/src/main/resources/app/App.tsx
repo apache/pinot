@@ -28,6 +28,7 @@ import { AppLoadingIndicator } from './components/AppLoadingIndicator';
 import { AuthWorkflow } from 'Models';
 import { TimezoneProvider } from './contexts/TimezoneContext';
 import { runBootstrapRequest } from './utils/bootstrap';
+import NativeMetadataPage from './pages/NativeMetadataPage';
 
 const INITIAL_BOOTSTRAP_TIMEOUT_MS = 3000;
 
@@ -38,7 +39,8 @@ export const App = () => {
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(null);
   const [role, setRole] = useState('');
-  const { authUserName, authUserEmail, authenticated, authWorkflow } = useAuthProvider();
+  const { authUserName, authUserEmail, authenticated, authWorkflow, coordinationBackend } = useAuthProvider();
+  const nativeBackend = coordinationBackend === 'RATIS';
   const history = useHistory();
 
   useEffect(() => {
@@ -138,6 +140,9 @@ export const App = () => {
   };
 
   const getRouterData = () => {
+    if (nativeBackend) {
+      return [{ path: '/', Component: NativeMetadataPage }, ...RouterData.filter((route) => route.path === '/login')];
+    }
     if (queryConsoleOnlyView) {
       return RouterData.filter((routeObj) => {
         return routeObj.path === '/query' || routeObj.path === '/query/timeseries';
@@ -151,6 +156,10 @@ export const App = () => {
 
   useEffect(() => {
     if (isAuthenticated) {
+      if (nativeBackend) {
+        setLoading(false);
+        return fetchClusterName();
+      }
       const cancelClusterConfig = fetchClusterConfig();
       const cancelClusterName = fetchClusterName();
       const cancelUserRole = fetchUserRole();
@@ -161,7 +170,7 @@ export const App = () => {
         cancelUserRole();
       };
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, nativeBackend]);
 
   const loginRender = (Component, props) => {
     if(isAuthenticated) {
@@ -179,7 +188,8 @@ export const App = () => {
   const componentRender = (Component, props, role) => {
     return (
       <div className="p-8">
-        <Layout clusterName={clusterName} {...props} role={role} authWorkflow={authWorkflow}>
+        <Layout clusterName={clusterName} {...props} role={role} authWorkflow={authWorkflow}
+          coordinationBackend={coordinationBackend}>
           <Component {...props} />
         </Layout>
       </div>
@@ -212,7 +222,7 @@ export const App = () => {
         ))}
         <Route path="*">
           <Redirect
-            to={PinotMethodUtils.getURLWithoutAccessToken(
+            to={nativeBackend ? '/' : PinotMethodUtils.getURLWithoutAccessToken(
               queryConsoleOnlyView ? '/query' : '/'
             )}
           />

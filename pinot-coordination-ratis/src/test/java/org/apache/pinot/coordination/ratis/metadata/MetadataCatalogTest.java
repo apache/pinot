@@ -34,10 +34,12 @@ import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.ActivateC
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Acknowledge;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Action;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Command;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.ConfigTransaction;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.FeedScope;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.GetOutcome;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.GetRecord;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.GetRevision;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.GetStreamTip;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.MembershipCommand;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.MembershipQuery;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Mutation;
@@ -47,7 +49,9 @@ import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.RecordKind;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.RegisterClient;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Result;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.RetireClient;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Revision;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Status;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.StreamTipResult;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Transaction;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -60,6 +64,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotEquals;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
@@ -67,6 +72,112 @@ import static org.testng.Assert.expectThrows;
 
 /// Exercises catalog invariants across conditional writes, lost responses, client retirement and snapshot replay.
 public class MetadataCatalogTest {
+  @Test
+  public void testValidatedConfigFencesSchemaDeletionAndConcurrentTableCreationAcrossRestore()
+      throws Exception {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("orders")
+        .addSingleValueDimension("id", DataType.STRING).build();
+    TableConfig table = new TableConfigBuilder(TableType.OFFLINE).setTableName("orders").build();
+    for (boolean deleteFirst : List.of(false, true)) {
+      Fixture fixture = new Fixture();
+      UUID schemaId = UUID.randomUUID();
+      assertStatus(fixture.transact(Mutation.createSchema(fixture.history(), schemaId, schema)), "OK");
+      Revision validated = fixture.catalog().currentRevision();
+      ConfigTransaction delete = new ConfigTransaction(fixture.history(), "client", 1, "delete", 1, validated,
+          List.of(Mutation.delete(RecordKind.SCHEMA, "orders", new ObjectVersion(fixture.history(), schemaId, 1))));
+      Mutation create = Mutation.createTableConfig(fixture.history(), UUID.randomUUID(), table);
+      ConfigTransaction createTable = new ConfigTransaction(fixture.history(), "client", 1, "create", 1,
+          validated, List.of(create));
+      // Exercise both serializations of the race; a legacy writer must invalidate validation too.
+      JsonNode first = fixture.execute(deleteFirst ? delete : fixture.transaction("legacy", 1, create));
+      assertStatus(first, "OK");
+      ConfigTransaction losing = deleteFirst ? createTable : delete;
+      JsonNode rejected = fixture.execute(losing);
+      assertStatus(rejected, "CONFLICT");
+      assertEquals(fixture.execute(losing), rejected, "Lost failure replies must replay the original result");
+      assertStatus(fixture.read(RecordKind.SCHEMA, "orders"), deleteFirst ? "NOT_FOUND" : "OK");
+      assertStatus(fixture.read(RecordKind.TABLE_CONFIG, "orders_OFFLINE"), deleteFirst ? "NOT_FOUND" : "OK");
+
+      MetadataCatalog restored = new MetadataCatalog(fixture.cluster(), fixture.history());
+      restored.restoreSnapshot(JsonUtils.bytesToJsonNode(JsonUtils.objectToBytes(fixture.catalog().captureSnapshot())));
+      long index = fixture.index();
+      assertEquals(JsonUtils.bytesToJsonNode(restored.execute(MetadataProtocol.encode(losing), ++index)), rejected);
+      ConfigTransaction afterRestart = new ConfigTransaction(fixture.history(), "client", 1, "restart", 1,
+          validated, losing.mutations());
+      assertEquals(MetadataProtocol.decodeResult(restored.execute(MetadataProtocol.encode(afterRestart), ++index))
+          .status(), Status.CONFLICT, "Retained tombstones must reconstruct the validation fence");
+      GetStreamTip query = new GetStreamTip(fixture.history(), "client", 1, losing.streamId());
+      StreamTipResult tip = MetadataProtocol.decodeStreamTipResult(restored.execute(
+          MetadataProtocol.encode(new ReadBarrier(query)), ++index));
+      assertEquals(tip.status(), Status.OK);
+      assertEquals(tip.sequence(), 1L);
+      assertEquals(tip.floor(), 0L);
+      assertEquals(tip.digest(), MetadataProtocol.digest(losing));
+      assertEquals(tip.outcome(), MetadataProtocol.fromTree(rejected, Result.class));
+      assertEquals(tip.revision().index(), index);
+      restored.execute(MetadataProtocol.encode(new Acknowledge(fixture.history(), "client", 1,
+          losing.streamId(), 1)), ++index);
+      StreamTipResult acknowledged = MetadataProtocol.decodeStreamTipResult(
+          restored.query(MetadataProtocol.encode(query)));
+      assertEquals(acknowledged.floor(), acknowledged.sequence());
+      assertNull(acknowledged.digest());
+      assertNull(acknowledged.outcome());
+      assertEquals(MetadataProtocol.decodeResult(restored.execute(MetadataProtocol.encode(losing), ++index))
+          .status(), Status.RESULT_EXPIRED);
+    }
+  }
+
+  @Test
+  public void testValidatedConfigIgnoresHeartbeatAndRequestProgressAndRetainsSuccess()
+      throws Exception {
+    Fixture fixture = new Fixture();
+    UUID id = UUID.randomUUID();
+    assertStatus(fixture.execute(fixture.transaction("main", 1,
+        Mutation.createClusterConfig(fixture.history(), id, Map.of("value", "before")))), "OK");
+    Revision validated = fixture.catalog().currentRevision();
+    assertStatus(fixture.execute(new Acknowledge(fixture.history(), "client", 1, "main", 1)), "OK");
+    assertStatus(fixture.execute(new ReadBarrier(new GetRevision(fixture.history()))), "OK");
+    assertEquals(fixture.member(new ActivateControlEpoch(1, "controller", UUID.randomUUID())).status(), Status.OK);
+    var control = fixture.catalog().membershipControl().controlEpoch();
+    assertEquals(fixture.member(new MembershipProtocol.ConfigurePolicy(control, 0,
+        new MembershipProtocol.Policy(1, 100, 3, 200, 300, 1000))).status(), Status.OK);
+    var participant = fixture.member(new MembershipProtocol.Register("broker", MembershipProtocol.Role.BROKER,
+        UUID.randomUUID(), 0, Map.of(), Set.of())).participant().participant();
+    assertEquals(fixture.member(new MembershipProtocol.Tick(control, 0, 1)).status(), Status.OK);
+    assertEquals(fixture.member(new MembershipProtocol.RenewBatch(List.of(new MembershipProtocol.Renewal(participant,
+        1, fixture.catalog().currentRevision(), Set.of())))).renewals().getFirst().status(), Status.OK);
+    Mutation update = Mutation.updateClusterConfig(new ObjectVersion(fixture.history(), id, 1),
+        Map.of("value", "after"));
+    ConfigTransaction command = new ConfigTransaction(fixture.history(), "client", 1, "main", 2, validated,
+        List.of(update));
+    assertEquals(MetadataProtocol.decodeCommand(MetadataProtocol.encode(command)), command);
+    JsonNode result = fixture.execute(command);
+    assertStatus(result, "OK");
+    assertEquals(fixture.execute(command), result, "The command's own write must not invalidate its retry");
+    ConfigTransaction changedRequest = new ConfigTransaction(fixture.history(), "client", 1, "main", 2,
+        fixture.catalog().currentRevision(), List.of(update));
+    assertStatus(fixture.execute(changedRequest), "CONFLICT");
+    StreamTipResult tip = MetadataProtocol.decodeStreamTipResult(fixture.catalog().query(MetadataProtocol.encode(
+        new GetStreamTip(fixture.history(), "client", 1, "main"))));
+    assertEquals(tip.digest(), MetadataProtocol.digest(command));
+    assertEquals(tip.outcome(), MetadataProtocol.fromTree(result, Result.class));
+    StreamTipResult absent = MetadataProtocol.decodeStreamTipResult(fixture.catalog().query(MetadataProtocol.encode(
+        new GetStreamTip(fixture.history(), "client", 1, "absent"))));
+    assertEquals(absent.status(), Status.OK);
+    assertEquals(absent.sequence(), 0L);
+    assertEquals(absent.floor(), 0L);
+    assertNull(absent.outcome());
+    assertEquals(MetadataProtocol.decodeStreamTipResult(fixture.catalog().query(MetadataProtocol.encode(
+        new GetStreamTip(fixture.history(), "client", 2, "main")))).status(), Status.FENCED);
+    for (Revision invalid : List.of(new Revision(UUID.randomUUID(), validated.index()),
+        new Revision(fixture.history(), -1), new Revision(fixture.history(), Long.MAX_VALUE))) {
+      String stream = "invalid-" + invalid.index();
+      JsonNode rejected = fixture.execute(new ConfigTransaction(fixture.history(), "client", 1, stream, 1,
+          invalid, List.of(update)));
+      assertStatus(rejected, invalid.historyId().equals(fixture.history()) ? "INVALID_REQUEST" : "HISTORY_MISMATCH");
+    }
+  }
+
   @Test
   public void testCommittedReadBarrierPreservesOutcomesAndAdvancesCompleteFeed()
       throws Exception {
@@ -479,6 +590,12 @@ public class MetadataCatalogTest {
     private JsonNode execute(Command command)
         throws IOException {
       return JsonUtils.bytesToJsonNode(_catalog.execute(MetadataProtocol.encode(command), ++_index));
+    }
+
+    private MembershipProtocol.Response member(MembershipProtocol.Operation operation)
+        throws IOException {
+      return MembershipProtocol.decodeResponse(_catalog.execute(MetadataProtocol.encode(
+          new MembershipCommand(_history, "membership", operation)), 1, ++_index));
     }
 
     private JsonNode transact(Mutation... mutations)

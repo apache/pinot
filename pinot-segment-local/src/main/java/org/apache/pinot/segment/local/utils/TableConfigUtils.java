@@ -177,15 +177,23 @@ public final class TableConfigUtils {
 
   public static void validate(TableConfig tableConfig, Schema schema, @Nullable String typesToSkip,
       @Nullable TableConfig existingTableConfig) {
+    validate(tableConfig, schema, typesToSkip, existingTableConfig, _disableGroovy, _enforcePoolBasedAssignment);
+  }
+
+  /// Validates with controller-scoped policy without changing the legacy process-wide defaults.
+  public static void validate(TableConfig tableConfig, Schema schema, @Nullable String typesToSkip,
+      @Nullable TableConfig existingTableConfig, boolean disableGroovy, boolean enforcePoolBasedAssignment) {
     Preconditions.checkArgument(schema != null, "Schema should not be null for table: %s", tableConfig.getTableName());
     Set<ValidationType> skipTypes = parseTypesToSkipString(typesToSkip);
-    validateEffectiveTableConfig(tableConfig, schema, skipTypes, existingTableConfig);
+    validateEffectiveTableConfig(tableConfig, schema, skipTypes, existingTableConfig, disableGroovy,
+        enforcePoolBasedAssignment);
     if (skipTypes.contains(ValidationType.ALL) || !hasConsumingSegmentTierOverwriteForRealtimeTable(tableConfig)) {
       return;
     }
     try {
       TableConfig consumingTableConfig = overwriteTableConfigForConsumingSegmentTier(tableConfig);
-      validateEffectiveTableConfig(consumingTableConfig, schema, skipTypes, existingTableConfig);
+      validateEffectiveTableConfig(consumingTableConfig, schema, skipTypes, existingTableConfig, disableGroovy,
+          enforcePoolBasedAssignment);
     } catch (RuntimeException e) {
       throw new IllegalStateException(
           "tierOverwrites.consuming produces an invalid table config: " + e.getMessage(), e);
@@ -193,7 +201,8 @@ public final class TableConfigUtils {
   }
 
   private static void validateEffectiveTableConfig(TableConfig tableConfig, Schema schema,
-      Set<ValidationType> skipTypes, @Nullable TableConfig existingTableConfig) {
+      Set<ValidationType> skipTypes, @Nullable TableConfig existingTableConfig, boolean disableGroovy,
+      boolean enforcePoolBasedAssignment) {
     // Sanitize the table config before validation
     sanitize(tableConfig);
 
@@ -212,7 +221,7 @@ public final class TableConfigUtils {
 
     validateValidationConfig(tableConfig, schema);
     validateSegmentAssignmentConfig(tableConfig);
-    validateIngestionConfig(tableConfig, schema, existingTableConfig);
+    validateIngestionConfig(tableConfig, schema, existingTableConfig, disableGroovy);
     if (tableConfig.getTableType() == TableType.REALTIME) {
       validateStreamConfigMaps(tableConfig);
     }
@@ -223,13 +232,13 @@ public final class TableConfigUtils {
     validateInstanceAssignmentConfigs(tableConfig);
 
     if (!skipTypes.contains(ValidationType.UPSERT)) {
-      validateUpsertAndDedupConfig(tableConfig, schema, existingTableConfig);
+      validateUpsertAndDedupConfig(tableConfig, schema, existingTableConfig, disableGroovy);
     }
 
     validateTaskConfig(tableConfig);
     validateMaterializedViewInvariants(tableConfig);
 
-    if (_enforcePoolBasedAssignment) {
+    if (enforcePoolBasedAssignment) {
       validateInstancePoolsAndReplicaGroups(tableConfig);
     }
   }
@@ -483,6 +492,11 @@ public final class TableConfigUtils {
   @VisibleForTesting
   static void validateIngestionConfig(TableConfig tableConfig, Schema schema,
       @Nullable TableConfig existingTableConfig) {
+    validateIngestionConfig(tableConfig, schema, existingTableConfig, _disableGroovy);
+  }
+
+  private static void validateIngestionConfig(TableConfig tableConfig, Schema schema,
+      @Nullable TableConfig existingTableConfig, boolean disableGroovy) {
     // All metrics-aggregation validation lives here; it returns the columns referenced as aggregation sources, which
     // a transform config is allowed to target as its destination (see the transform validation below).
     Set<String> aggregationSourceColumns = validateMetricsAggregation(tableConfig, schema);
@@ -548,7 +562,7 @@ public final class TableConfigUtils {
     if (filterConfig != null) {
       String filterFunction = filterConfig.getFilterFunction();
       if (filterFunction != null) {
-        if (_disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(filterFunction)) {
+        if (disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(filterFunction)) {
           throw new IllegalStateException(
               "Groovy filter functions are disabled for table config. Found '" + filterFunction + "'");
         }
@@ -583,7 +597,7 @@ public final class TableConfigUtils {
     if (enrichmentConfigs != null) {
       for (EnrichmentConfig enrichmentConfig : enrichmentConfigs) {
         RecordEnricherRegistry.validateEnrichmentConfig(enrichmentConfig,
-            new RecordEnricherValidationConfig(_disableGroovy));
+            new RecordEnricherValidationConfig(disableGroovy));
       }
     }
 
@@ -604,7 +618,7 @@ public final class TableConfigUtils {
         // Skip Groovy expressions when Groovy is disabled: do not compile them just to collect arguments (the main
         // loop below rejects Groovy without compiling). Such a config is rejected anyway, so these columns are not
         // needed as valid intermediate targets.
-        if (transformFunction != null && !(_disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(
+        if (transformFunction != null && !(disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(
             transformFunction))) {
           try {
             transformInputColumns.addAll(
@@ -630,7 +644,7 @@ public final class TableConfigUtils {
             + "' of the transform function must be present in the schema, be consumed as the input of another "
             + "transform function, or be a source column for aggregations");
         FunctionEvaluator expressionEvaluator;
-        if (_disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(transformFunction)) {
+        if (disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(transformFunction)) {
           throw new IllegalStateException(
               "Groovy transform functions are disabled for table config. Found '" + transformFunction + "' for column '"
                   + columnName + "'");
@@ -1016,6 +1030,11 @@ public final class TableConfigUtils {
 
   static void validateUpsertAndDedupConfig(TableConfig tableConfig, Schema schema,
       @Nullable TableConfig existingTableConfig) {
+    validateUpsertAndDedupConfig(tableConfig, schema, existingTableConfig, _disableGroovy);
+  }
+
+  private static void validateUpsertAndDedupConfig(TableConfig tableConfig, Schema schema,
+      @Nullable TableConfig existingTableConfig, boolean disableGroovy) {
     boolean upsertEnabled = tableConfig.isUpsertEnabled();
     boolean dedupEnabled = tableConfig.isDedupEnabled();
     if (!upsertEnabled && !dedupEnabled) {
@@ -1179,7 +1198,7 @@ public final class TableConfigUtils {
           Preconditions.checkState(schema.hasColumn(columnName),
               "The destination column '%s' of the post-partial-upsert transform function must be present in the "
                   + "schema", columnName);
-          if (_disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(transformFunction)) {
+          if (disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(transformFunction)) {
             throw new IllegalStateException(
                 "Groovy transform functions are disabled. Found '" + transformFunction + "' for column '"
                     + columnName + "' in postPartialUpsertTransformConfigs");
