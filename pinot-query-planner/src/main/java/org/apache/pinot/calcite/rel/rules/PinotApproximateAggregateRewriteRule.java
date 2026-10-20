@@ -56,6 +56,11 @@ import org.apache.pinot.spi.utils.CommonConstants.Broker.PlannerRuleNames;
 /// It must run before [PinotAggregateExchangeNodeInsertRule], which derives the leaf-to-final intermediate result
 /// format from the function name, hence `Phase.BASIC` rather than that rule's `POST_LOGICAL`. That is also why the
 /// runtime is not a valid place to do this rewrite.
+///
+/// It must also run after `AggregateCaseToFilterRule`, which only matches a single-argument call. With the parameter
+/// argument appended first, `COUNT(DISTINCT CASE WHEN c THEN x END)` keeps its CASE and counts the NULL as a value,
+/// instead of becoming `COUNT(DISTINCT x) FILTER (WHERE c)`. The rewrite keeps the call's filter, so a converted CASE
+/// carries over.
 public class PinotApproximateAggregateRewriteRule extends RelOptRule {
   public static final PinotApproximateAggregateRewriteRule INSTANCE =
       new PinotApproximateAggregateRewriteRule(PinotRuleUtils.PINOT_REL_FACTORY);
@@ -93,8 +98,9 @@ public class PinotApproximateAggregateRewriteRule extends RelOptRule {
     String percentileParams = hasPercentile ? envConfig.approximateFunctionPercentileParams() : "";
 
     // The parameters must be input fields, because an aggregate call holds field indices rather than inline literals,
-    // so they are projected underneath the aggregate. With no parameters configured the plan keeps the shape it had
-    // before, with no extra project.
+    // so they are projected underneath the aggregate. They go after the input fields, so the argument and filter
+    // indices of every call stay valid. With no parameters configured the plan keeps the shape it had before, with no
+    // extra project.
     //
     // Invariant: this project has to stay directly beneath the aggregate. Both PinotAggregateExchangeNodeInsertRule
     // and AggregatePushdownRule inline the literal only through findImmediateProjects(input), so anything that puts a

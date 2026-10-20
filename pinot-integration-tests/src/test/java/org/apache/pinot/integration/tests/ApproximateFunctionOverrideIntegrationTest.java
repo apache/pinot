@@ -46,6 +46,12 @@ public class ApproximateFunctionOverrideIntegrationTest extends BaseClusterInteg
       "SELECT Carrier, COUNT(DISTINCT AirlineID) FROM mytable GROUP BY Carrier ORDER BY Carrier LIMIT 100";
   private static final String PERCENTILE_QUERY =
       "SELECT Carrier, PERCENTILE(ArrDelay, 90) FROM mytable GROUP BY Carrier ORDER BY Carrier LIMIT 100";
+  // The last predicate matches no row, so the exact multi-stage count is 0 and a counted NULL would show up as 1.
+  private static final String CONDITIONAL_DISTINCT_COUNT_QUERY = "SELECT Carrier, "
+      + "COUNT(DISTINCT CASE WHEN ArrDelay > 0 THEN Origin ELSE NULL END), "
+      + "DISTINCTCOUNT(CASE WHEN ArrDelay > 0 THEN Origin ELSE NULL END), "
+      + "COUNT(DISTINCT CASE WHEN ArrDelay > 1000000 THEN Origin ELSE NULL END) "
+      + "FROM mytable GROUP BY Carrier ORDER BY Carrier LIMIT 100";
 
   private HelixConfigScope _clusterScope;
 
@@ -133,6 +139,28 @@ public class ApproximateFunctionOverrideIntegrationTest extends BaseClusterInteg
       assertEquals(columnDataTypes(approximate), columnDataTypes(exact));
       assertEquals(rows(approximate).size(), rows(exact).size());
     }
+  }
+
+  /// The multi-stage engine turns `COUNT(DISTINCT CASE WHEN c THEN x END)` into `COUNT(DISTINCT x) FILTER (WHERE c)`,
+  /// and the rewrite must not stop that, or the NULL of every row that fails `c` counts as one more value. The
+  /// single-stage engine has no such conversion, but its answer must not change either.
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testConditionalDistinctCountMatchesExact(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    JsonNode exact = postQuery(CONDITIONAL_DISTINCT_COUNT_QUERY);
+    assertApplied(exact, false);
+    if (useMultiStageQueryEngine) {
+      for (JsonNode row : rows(exact)) {
+        assertEquals(row.get(3).asLong(), 0L, exact.toString());
+      }
+    }
+
+    setApproximateFunctionOverride("threshold=1000000");
+    waitForOverride(true);
+    JsonNode approximate = postQuery(CONDITIONAL_DISTINCT_COUNT_QUERY);
+    assertApplied(approximate, true);
+    assertSameResult(exact, approximate);
   }
 
   /// Pins the one visible difference the rewrite makes to a single-stage response, so that changing it is a
