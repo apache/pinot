@@ -306,10 +306,15 @@ public class ZKOperator {
             "New segment crc '{}' is the same as existing segment crc for segment '{}'. Updating ZK metadata without "
                 + "refreshing the segment.", newCrc, segmentName);
         // NOTE: Even though we don't need to refresh the segment, we should still update the following fields:
-        // - Creation time (not included in the crc)
+        // - Creation time (not included in the crc), except for upsert tables
         // - Refresh time
         // - Custom map
-        segmentZKMetadata.setCreationTime(segmentMetadata.getIndexCreationTime());
+        // Upsert servers copy the ZK creation time when they load a segment and use it to break comparison ties.
+        // Servers don't reload a segment with the same crc, so changing it here would let a restarted replica break
+        // ties differently from a running one.
+        if (!tableConfig.isUpsertEnabled()) {
+          segmentZKMetadata.setCreationTime(segmentMetadata.getIndexCreationTime());
+        }
         segmentZKMetadata.setRefreshTime(System.currentTimeMillis());
         if (customMapModifier != null) {
           segmentZKMetadata.setCustomMap(customMapModifier.modifyMap(segmentZKMetadata.getCustomMap()));
