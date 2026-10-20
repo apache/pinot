@@ -70,6 +70,8 @@ public class MockInstanceDataManagerFactory {
   private final Map<String, Schema> _registeredSchemaMap;
 
   private final String _serverName;
+  // Parallel test classes can use the same server and table names, so each factory must own its directories.
+  private final UUID _factoryId = UUID.randomUUID();
 
   public MockInstanceDataManagerFactory(String serverName) {
     _serverName = serverName;
@@ -95,7 +97,7 @@ public class MockInstanceDataManagerFactory {
 
   private void registerTableNameWithType(Schema schema, String tableNameWithType) {
     File tableDataDir = new File(FileUtils.getTempDirectory(),
-        String.format("%s_%s_%s", DATA_DIR_PREFIX, _serverName, tableNameWithType));
+        String.format("%s_%s_%s_%s", DATA_DIR_PREFIX, _serverName, tableNameWithType, _factoryId));
     FileUtils.deleteQuietly(tableDataDir);
     _serverTableDataDirMap.put(tableNameWithType, tableDataDir);
   }
