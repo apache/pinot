@@ -20,6 +20,7 @@ package org.apache.pinot.server.starter;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.coordination.NativeMetadataConfig;
@@ -30,6 +31,8 @@ import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.tls.PinotInsecureMode;
 import org.apache.pinot.common.version.PinotVersion;
+import org.apache.pinot.core.transport.ListenerConfig;
+import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.local.utils.ClusterConfigForTable;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
@@ -37,12 +40,16 @@ import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.memory.unsafe.MmapMemoryConfig;
+import org.apache.pinot.server.access.AccessControlFactory;
+import org.apache.pinot.server.api.NativeServerAdminApplication;
 import org.apache.pinot.server.conf.ServerConf;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.PinotMd5Mode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,7 +61,7 @@ import static java.util.Objects.requireNonNull;
 
 /// Owns the installation-only native branch of the normal server starter. Initialization validates local bootstrap
 /// inputs; start and close serialize ownership of metadata channels, participant, storage factories, and metrics.
-/// No Helix client, server admin endpoint, query listener, or query-serving capability is created.
+/// The explicit read-only admin surface observes installations; query listeners and serving capabilities stay disabled.
 public final class NativeServerStarterLifecycle implements AutoCloseable {
   private static final Logger LOGGER = LoggerFactory.getLogger(NativeServerStarterLifecycle.class);
   private static final String PREFIX = "pinot.coordination.ratis.server.";
@@ -62,7 +69,9 @@ public final class NativeServerStarterLifecycle implements AutoCloseable {
   private final NativeMetadataConfig _metadataConfig;
   private final NativeServerParticipant.Settings _settings;
   @Nullable
-  private NativeServerParticipant _participant;
+  private volatile NativeServerParticipant _participant;
+  @Nullable
+  private NativeServerAdminApplication _adminApi;
   @Nullable
   private ServerMetrics _metrics;
   @Nullable
@@ -104,7 +113,7 @@ public final class NativeServerStarterLifecycle implements AutoCloseable {
     checkState(!_started && !_closed, "Native starter is already started or closed");
     _started = true;
     try {
-      LOGGER.info("Starting installation-only Ratis server: {}; admin and query listeners are disabled", instanceId());
+      LOGGER.info("Starting Ratis server: {}; query listeners are disabled", instanceId());
       ServerConf serverConf = new ServerConf(_config);
       _metrics = ServerMetricsInitUtils.initServerMetrics(serverConf);
       _metrics.setValueOfGlobalGauge(ServerGauge.VERSION, PinotVersion.VERSION_METRIC_NAME, 1);
@@ -126,6 +135,25 @@ public final class NativeServerStarterLifecycle implements AutoCloseable {
       _storageInitialized = true;
       initializeSegmentFetching(_config);
       ServerReloadJobStatusCache jobs = new ServerReloadJobStatusCache(instanceId());
+      Map<String, String> endpoints = Map.of();
+      if (_config.containsKey(Server.CONFIG_OF_ADMIN_API_PORT)
+          || !_config.getProperty("pinot.server.adminapi.access.protocols", "").isBlank()) {
+        String factoryClass = _config.getProperty(Server.ACCESS_CONTROL_FACTORY_CLASS,
+            Server.DEFAULT_ACCESS_CONTROL_FACTORY_CLASS);
+        AccessControlFactory accessControlFactory = PluginManager.get().createInstance(factoryClass);
+        accessControlFactory.initWithoutHelix(_config.subset(Server.PREFIX_OF_CONFIG_OF_ACCESS_CONTROL));
+        List<ListenerConfig> listeners = ListenerConfigUtil.buildServerAdminConfigs(_config);
+        String host = _config.getProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST);
+        if (host == null) {
+          host = _config.getProperty(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false)
+              ? NetUtils.getHostnameOrAddress() : NetUtils.getHostAddress();
+        }
+        _adminApi = new NativeServerAdminApplication(() -> _participant, accessControlFactory);
+        endpoints = _adminApi.start(listeners, host);
+      }
+      NativeServerParticipant.Settings settings = new NativeServerParticipant.Settings(_settings.historyId(),
+          _settings.participantId(), endpoints, _settings.rpcTimeoutMillis(), _settings.heartbeatMillis(),
+          _settings.snapshotMillis(), _settings.actionThreads(), _settings.queuedActions());
       NativeMetadataConnection membership = connection();
       NativeMetadataConnection work;
       try {
@@ -135,7 +163,7 @@ public final class NativeServerStarterLifecycle implements AutoCloseable {
         throw e;
       }
       try {
-        _participant = new NativeServerParticipant(_settings, membership, work);
+        _participant = new NativeServerParticipant(settings, membership, work);
       } catch (RuntimeException e) {
         work.close();
         membership.close();
@@ -197,6 +225,9 @@ public final class NativeServerStarterLifecycle implements AutoCloseable {
     if (_statusCallback != null) {
       ServiceStatus.removeServiceStatusCallback(instanceId(), _statusCallback);
       _statusCallback = null;
+    }
+    if (_adminApi != null) {
+      _adminApi.close();
     }
     if (_participant != null) {
       // Drain actions before releasing shared storage resources. A failed drain must retain those resources.

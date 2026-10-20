@@ -34,7 +34,6 @@ import javax.annotation.Nullable;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.common.compression.ColumnCompressionStatsAccumulator;
 import org.apache.pinot.common.exception.InvalidConfigException;
-import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.restlet.resources.ColumnCompressionStatsInfo;
@@ -45,8 +44,9 @@ import org.apache.pinot.common.restlet.resources.TableSizeInfo;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.api.resources.ServerTableSizeReader;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.controller.util.TableSizeMetadataProvider.Replicas;
+import org.apache.pinot.controller.util.TableSizeMetadataProvider.Snapshot;
+import org.apache.pinot.controller.util.TableSizeMetadataProvider.Table;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -77,19 +77,23 @@ public class TableSizeReader {
 
   private final Executor _executor;
   private final HttpClientConnectionManager _connectionManager;
-  private final PinotHelixResourceManager _helixResourceManager;
+  private final TableSizeMetadataProvider _metadataProvider;
   private final ControllerMetrics _controllerMetrics;
-  private final LeadControllerManager _leadControllerManager;
   private final Object _compressionMetricsLock = new Object();
 
   public TableSizeReader(Executor executor, HttpClientConnectionManager connectionManager,
       ControllerMetrics controllerMetrics, PinotHelixResourceManager helixResourceManager,
       LeadControllerManager leadControllerManager) {
+    this(executor, connectionManager, controllerMetrics,
+        new HelixTableSizeMetadataProvider(helixResourceManager, leadControllerManager));
+  }
+
+  public TableSizeReader(Executor executor, HttpClientConnectionManager connectionManager,
+      ControllerMetrics controllerMetrics, TableSizeMetadataProvider metadataProvider) {
     _executor = executor;
     _connectionManager = connectionManager;
     _controllerMetrics = controllerMetrics;
-    _helixResourceManager = helixResourceManager;
-    _leadControllerManager = leadControllerManager;
+    _metadataProvider = metadataProvider;
   }
 
   /// Reads table size without collecting compression statistics.
@@ -129,13 +133,11 @@ public class TableSizeReader {
     boolean includeCompressionStats = compressionStatsMode._includeSummary;
     boolean includeColumnCompressionStats = compressionStatsMode._includeColumns;
 
-    TableConfig offlineTableConfig =
-        ZKMetadataProvider.getOfflineTableConfig(_helixResourceManager.getPropertyStore(), tableName);
-    TableConfig realtimeTableConfig =
-        ZKMetadataProvider.getRealtimeTableConfig(_helixResourceManager.getPropertyStore(), tableName);
-
-    boolean hasRealtimeTableConfig = (realtimeTableConfig != null);
-    boolean hasOfflineTableConfig = (offlineTableConfig != null);
+    Snapshot snapshot = _metadataProvider.readTableSizes(tableName, includeReplacedSegments);
+    Table offlineTable = snapshot.offline();
+    Table realtimeTable = snapshot.realtime();
+    boolean hasRealtimeTableConfig = (realtimeTable != null);
+    boolean hasOfflineTableConfig = (offlineTable != null);
     boolean isMissingAllRealtimeSegments = false;
     boolean isMissingAllOfflineSegments = false;
 
@@ -144,11 +146,11 @@ public class TableSizeReader {
     }
     TableSizeDetails tableSizeDetails = new TableSizeDetails(tableName);
     if (hasRealtimeTableConfig) {
-      String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+      String realtimeTableName = realtimeTable.tableNameWithType();
       boolean compressionStatsCollectionEnabled = compressionStatsMode != CompressionStatsMode.NONE
-          && isCompressionStatsEnabled(realtimeTableConfig);
+          && realtimeTable.compressionStatsEnabled();
       tableSizeDetails._realtimeSegments =
-          getTableSubtypeSize(realtimeTableName, timeoutMsec, includeReplacedSegments,
+          getTableSubtypeSize(realtimeTableName, realtimeTable.replicas(), timeoutMsec,
               compressionStatsCollectionEnabled, includeColumnCompressionStats,
               compressionStatsMode._includeSelectedSegments);
       // taking max(0,value) as values as set to -1 if all the segments are in error
@@ -161,8 +163,7 @@ public class TableSizeReader {
       emitMetrics(realtimeTableName, ControllerGauge.TABLE_TOTAL_SIZE_ON_SERVER,
           tableSizeDetails._realtimeSegments._estimatedSizeInBytes);
       emitMetrics(realtimeTableName, ControllerGauge.TABLE_SIZE_PER_REPLICA_ON_SERVER,
-          tableSizeDetails._realtimeSegments._estimatedSizeInBytes / _helixResourceManager.getNumReplicas(
-              realtimeTableConfig));
+          tableSizeDetails._realtimeSegments._estimatedSizeInBytes / realtimeTable.replicaCount());
 
       long largestSegmentSizeOnServer = DEFAULT_SIZE_WHEN_MISSING_OR_ERROR;
       for (SegmentSizeDetails segmentSizeDetail : tableSizeDetails._realtimeSegments._segments.values()) {
@@ -183,11 +184,11 @@ public class TableSizeReader {
       }
     }
     if (hasOfflineTableConfig) {
-      String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+      String offlineTableName = offlineTable.tableNameWithType();
       boolean compressionStatsCollectionEnabled = compressionStatsMode != CompressionStatsMode.NONE
-          && isCompressionStatsEnabled(offlineTableConfig);
+          && offlineTable.compressionStatsEnabled();
       tableSizeDetails._offlineSegments =
-          getTableSubtypeSize(offlineTableName, timeoutMsec, includeReplacedSegments,
+          getTableSubtypeSize(offlineTableName, offlineTable.replicas(), timeoutMsec,
               compressionStatsCollectionEnabled, includeColumnCompressionStats,
               compressionStatsMode._includeSelectedSegments);
       // taking max(0,value) as values as set to -1 if all the segments are in error
@@ -200,8 +201,7 @@ public class TableSizeReader {
       emitMetrics(offlineTableName, ControllerGauge.TABLE_TOTAL_SIZE_ON_SERVER,
           tableSizeDetails._offlineSegments._estimatedSizeInBytes);
       emitMetrics(offlineTableName, ControllerGauge.TABLE_SIZE_PER_REPLICA_ON_SERVER,
-          tableSizeDetails._offlineSegments._estimatedSizeInBytes / _helixResourceManager.getNumReplicas(
-              offlineTableConfig));
+          tableSizeDetails._offlineSegments._estimatedSizeInBytes / offlineTable.replicaCount());
 
       long largestSegmentSizeOnServer = DEFAULT_SIZE_WHEN_MISSING_OR_ERROR;
       for (SegmentSizeDetails segmentSizeDetail : tableSizeDetails._offlineSegments._segments.values()) {
@@ -237,7 +237,7 @@ public class TableSizeReader {
   /// concurrent REST size request cannot republish gauges from a stale table-config snapshot.
   public void updateCompressionMetrics(String tableNameWithType, TableSubTypeSizeDetails subTypeDetails) {
     synchronized (_compressionMetricsLock) {
-      if (!_leadControllerManager.isLeaderForTable(tableNameWithType)) {
+      if (!_metadataProvider.canPublishMetrics(tableNameWithType)) {
         return;
       }
       CompressionStatsSummary stats = subTypeDetails._compressionStats;
@@ -275,20 +275,15 @@ public class TableSizeReader {
   }
 
   private void emitMetrics(String tableNameWithType, ControllerGauge controllerGauge, long value) {
-    if (_leadControllerManager.isLeaderForTable(tableNameWithType)) {
+    if (_metadataProvider.canPublishMetrics(tableNameWithType)) {
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, controllerGauge, value);
     }
   }
 
   private void removeMetric(String tableNameWithType, ControllerGauge controllerGauge) {
-    if (_leadControllerManager.isLeaderForTable(tableNameWithType)) {
+    if (_metadataProvider.canPublishMetrics(tableNameWithType)) {
       _controllerMetrics.removeTableGauge(tableNameWithType, controllerGauge);
     }
-  }
-
-  private static boolean isCompressionStatsEnabled(@Nullable TableConfig tableConfig) {
-    return tableConfig != null && tableConfig.getIndexingConfig() != null
-        && tableConfig.getIndexingConfig().isCompressionStatsEnabled();
   }
 
   //
@@ -381,28 +376,28 @@ public class TableSizeReader {
   public TableSubTypeSizeDetails getTableSubtypeSize(String tableNameWithType, int timeoutMs,
       boolean includeReplacedSegments)
       throws InvalidConfigException {
-    return getTableSubtypeSize(tableNameWithType, timeoutMs, includeReplacedSegments, false, false, false);
+    return getTableSubtypeSize(tableNameWithType,
+        _metadataProvider.readReplicaAssignments(tableNameWithType, includeReplacedSegments), timeoutMs,
+        false, false, false);
   }
 
   public TableSubTypeSizeDetails getTableSubtypeSize(String tableNameWithType, int timeoutMs,
       boolean includeReplacedSegments, boolean includeColumnCompressionStats)
       throws InvalidConfigException {
-    return getTableSubtypeSize(tableNameWithType, timeoutMs, includeReplacedSegments, true,
-        includeColumnCompressionStats, true);
+    return getTableSubtypeSize(tableNameWithType,
+        _metadataProvider.readReplicaAssignments(tableNameWithType, includeReplacedSegments), timeoutMs,
+        true, includeColumnCompressionStats, true);
   }
 
-  private TableSubTypeSizeDetails getTableSubtypeSize(String tableNameWithType, int timeoutMs,
-      boolean includeReplacedSegments, boolean compressionStatsEnabled, boolean includeColumnCompressionStats,
+  private TableSubTypeSizeDetails getTableSubtypeSize(String tableNameWithType, Replicas replicas, int timeoutMs,
+      boolean compressionStatsEnabled, boolean includeColumnCompressionStats,
       boolean includeSelectedCompressionStats)
       throws InvalidConfigException {
     long deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs);
-    Map<String, List<String>> serverToSegmentsMap = _helixResourceManager.getServerToSegmentsMap(tableNameWithType,
-        null, includeReplacedSegments);
-    ServerTableSizeReader serverTableSizeReader = new ServerTableSizeReader(_executor, _connectionManager,
-        _helixResourceManager.getServerAdminAuthProvider());
-    BiMap<String, String> endpoints = _helixResourceManager.getDataInstanceAdminEndpoints(serverToSegmentsMap.keySet());
-    Map<String, TableSizeInfo> serverToTableSizeInfoMap =
-        serverTableSizeReader.getTableSizeInfoFromServers(endpoints, tableNameWithType, timeoutMs);
+    Map<String, List<String>> serverToSegmentsMap = replicas.serverToSegments();
+    BiMap<String, String> endpoints = replicas.serverEndpoints();
+    Map<String, TableSizeInfo> serverToTableSizeInfoMap = _metadataProvider.validateServerReports(replicas,
+        readServerReports(replicas, tableNameWithType, timeoutMs));
 
     TableSubTypeSizeDetails subTypeSizeDetails = new TableSubTypeSizeDetails();
     Map<String, SegmentSizeDetails> segmentToSizeDetailsMap = subTypeSizeDetails._segments;
@@ -482,7 +477,7 @@ public class TableSizeReader {
     if (compressionStatsEnabled) {
       ServerCompressionStatsReader compressionStatsReader =
           new ServerCompressionStatsReader(_executor, _connectionManager,
-              _helixResourceManager.getServerAdminAuthProvider());
+              replicas.authProvider());
       ServerCompressionStatsReader.CompressionStatsResult compressionStats = includeSelectedCompressionStats
           ? compressionStatsReader.readWithSelectedSegments(tableNameWithType, serverToSegmentsMap, endpoints, null,
               includeColumnCompressionStats, deadlineNanos)
@@ -514,6 +509,12 @@ public class TableSizeReader {
     }
 
     return subTypeSizeDetails;
+  }
+
+  /// Collects observations before backend-specific identity validation and shared size aggregation.
+  protected Map<String, TableSizeInfo> readServerReports(Replicas replicas, String tableNameWithType, int timeoutMs) {
+    return new ServerTableSizeReader(_executor, _connectionManager, replicas.authProvider())
+        .getTableSizeInfoFromServers(replicas.serverEndpoints(), tableNameWithType, timeoutMs);
   }
 
   private static void attachSelectedCompressionStats(Map<String, SegmentSizeDetails> segmentToSizeDetailsMap,

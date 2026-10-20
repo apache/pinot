@@ -20,8 +20,13 @@ package org.apache.pinot.server.starter.helix;
 
 import java.io.IOException;
 import java.net.ServerSocket;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
@@ -52,6 +57,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 /// Exercises the normal starter's native dispatch and real participant lifecycle with controlled metadata replies.
@@ -64,7 +70,6 @@ public class NativeServerStarterTest {
         MockedConstruction<NativeMetadataConnection> connections = fixture.connections()) {
       PinotConfiguration config = fixture.config();
       config.setProperty(Helix.KEY_OF_SERVER_NETTY_PORT, occupied.getLocalPort());
-      config.setProperty(Server.CONFIG_OF_ADMIN_API_PORT, occupied.getLocalPort());
       HelixServerStarter starter = new HelixServerStarter();
       try {
         starter.init(config);
@@ -111,15 +116,64 @@ public class NativeServerStarterTest {
   }
 
   @Test
+  public void testExplicitAdminListenerIsBoundBeforeRegistrationAndClosedWithStarter() throws Exception {
+    try (Fixture fixture = new Fixture();
+        MockedStatic<HelixManagerFactory> helix = mockStatic(HelixManagerFactory.class);
+        MockedConstruction<NativeMetadataConnection> connections = fixture.connections()) {
+      PinotConfiguration config = fixture.config();
+      config.setProperty(Server.CONFIG_OF_ADMIN_API_PORT, 0);
+      config.setProperty(Helix.KEY_OF_SERVER_NETTY_HOST, "127.0.0.1");
+      config.setProperty("pinot.server.http.server.thread.pool.corePoolSize", 1);
+      config.setProperty("pinot.server.http.server.thread.pool.maxPoolSize", 2);
+      fixture._checkAdminBeforeRegistration = true;
+      HelixServerStarter starter = new HelixServerStarter();
+      String endpoint;
+      try {
+        starter.init(config);
+        starter.start();
+        endpoint = fixture._endpoints.get("adminHttp");
+        assertTrue(URI.create(endpoint).getPort() > 0);
+        assertEquals(fixture._registeredEndpoints, 1);
+        assertFalse(starter.isServerReadyToServeQueries());
+        assertThrows(IllegalStateException.class, starter.getServerInstance()::startQueryServer);
+        assertEquals(get(endpoint + "/tables"), 404, "Legacy admin resources must not be registered");
+      } finally {
+        starter.stop();
+      }
+      try (ServerSocket released = new ServerSocket(URI.create(endpoint).getPort())) {
+        assertTrue(released.isBound());
+      }
+      connections.constructed().forEach(connection -> verify(connection).close());
+      helix.verifyNoInteractions();
+    }
+  }
+
+  private static int get(String url) throws Exception {
+    try (HttpClient client = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1)
+        .connectTimeout(Duration.ofSeconds(5)).build()) {
+      return client.send(HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(5)).GET().build(),
+          HttpResponse.BodyHandlers.discarding()).statusCode();
+    }
+  }
+
+  @Test
   public void testFailedRegistrationClosesChannelsAndReleasesDirectory() throws Exception {
     try (Fixture fixture = new Fixture();
         MockedStatic<HelixManagerFactory> helix = mockStatic(HelixManagerFactory.class);
         MockedConstruction<NativeMetadataConnection> connections = fixture.connections()) {
       fixture._rejectRegistration = true;
       HelixServerStarter starter = new HelixServerStarter();
-      starter.init(fixture.config());
-      assertThrows(IOException.class, starter::start);
+      PinotConfiguration config = fixture.config();
+      config.setProperty(Server.CONFIG_OF_ADMIN_API_PORT, 0);
+      config.setProperty("pinot.server.http.server.thread.pool.corePoolSize", 1);
+      config.setProperty("pinot.server.http.server.thread.pool.maxPoolSize", 2);
+      starter.init(config);
+      IOException failure = expectThrows(IOException.class, starter::start);
+      assertTrue(failure.getMessage().contains("Cannot acquire native registration"), failure.getMessage());
       starter.stop();
+      try (ServerSocket released = new ServerSocket(URI.create(fixture._endpoints.get("adminHttp")).getPort())) {
+        assertTrue(released.isBound(), "Failed registration must close the pre-bound admin listener");
+      }
       connections.constructed().forEach(connection -> verify(connection).close());
       assertEquals(ServiceStatus.getServiceStatus(Fixture.INSTANCE_ID), ServiceStatus.Status.NOT_STARTED);
       fixture._rejectRegistration = false;
@@ -173,6 +227,8 @@ public class NativeServerStarterTest {
     private volatile boolean _ready;
     private volatile boolean _rejectRegistration;
     private volatile int _registeredEndpoints;
+    private boolean _checkAdminBeforeRegistration;
+    private Map<String, String> _endpoints;
 
     private Fixture() throws IOException {
       // These readable placeholders are never parsed: this fixture controls the metadata channel boundary.
@@ -206,9 +262,13 @@ public class NativeServerStarterTest {
       });
     }
 
-    private MetadataRpc.MembershipResponse membership(MembershipCommandRequest request) {
+    private MetadataRpc.MembershipResponse membership(MembershipCommandRequest request) throws Exception {
       switch (request.getCommandCase()) {
         case REGISTER:
+          _endpoints = request.getRegister().getEndpointsMap();
+          if (_checkAdminBeforeRegistration) {
+            assertEquals(get(_endpoints.get("adminHttp") + "/tables/native_OFFLINE/size"), 503);
+          }
           if (_rejectRegistration) {
             return response(ResultStatus.CONFLICT);
           }

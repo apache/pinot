@@ -334,7 +334,8 @@ selection, process identity, peers, TLS and local storage are bootstrap settings
   membership/control projection, not a routing image.
 
 No broker HTTP/gRPC/MSE or server Netty/TLS/gRPC/MSE query listeners are allocated, even if legacy query-port settings
-are present. Helix-dependent REST resources and server admin resources are not started on the native path. Minions
+are present. Helix-dependent REST resources are not started on the native path. An explicitly configured server admin listener
+serves the native read-only size endpoint described below. Minions
 and multi-cluster brokers are unsupported. These entry points exercise coordination and offline installation; they
 do not yet provide a queryable replacement cluster.
 
@@ -468,6 +469,43 @@ listener cache. A refresh failure retains the last listener value and makes heal
 cache is never used to answer REST reads. Under `pinot.coordination.ratis.controller.http.`, `timeoutMs` defaults to
 5000, `configRefreshMs` to 1000 (both bounded to 1–60000), `maxRecords` to 4096, and `maxBytes` to 2097152. Image limits
 bound full reads; oversized images fail rather than returning partial lists. These are component bootstrap limits.
+
+## Native table-size observations
+
+`GET /tables/{tableName}/size` now uses the normal response shape and the shared table-size aggregation.
+The controller captures committed content/assignments and participant registrations, collects measured untarred
+segment disk sizes, and rechecks those dependencies before replying. Reported size includes only measured assigned
+replicas. Estimated size uses another valid replica of the same segment for missing reports; an entirely unreported
+segment remains unknown. Incomplete desired placement returns unavailable rather than inventing replica identities.
+A table with no published content has size zero; an absent table returns 404. `verbose=false` omits segment details.
+
+Native servers start a read-only admin listener only when the normal `pinot.server.adminapi.port` or
+`pinot.server.adminapi.access.protocols` is explicitly configured. Standard server admin authentication and TLS
+settings apply. Allow-all and configuration Basic Auth opt in; custom access factories must implement
+`initWithoutHelix`. The listener advertises its bound `adminHttp`/`adminHttps` address through its own registration.
+No legacy mutating resource or query listener is registered. Requests before participant readiness fail closed.
+Controller-to-server requests retain `controller.server.admin.auth.*` credential-provider configuration. Before a
+controller sends credentials, an operator must approve the advertised address in cluster configuration under
+`pinot.coordination.ratis.server.admin.endpoint.<participantId>`. The value must exactly match the registered admin
+URI. HTTPS advertisements take precedence and never fall back to HTTP. Missing approvals leave that replica's size
+unknown. Approval changes are allowed with native table state and rechecked before replies; they do not require
+segment reconciliation. All other cluster changes retain their existing reconciliation gate.
+
+Outbound size collection disables redirects and automatic retries, caps each response at 2 MiB, and cancels queued
+and active work at one overall timeout. The controller owns a four-connection client with its own verified TLS context
+from `controller.tls.*`; it does not install process-global SSL state. Its key/trust stores and allowed protocols are
+captured at startup, so changes require controller restart; no unowned renewal watcher is created.
+
+Each response carries the exact server incarnation and the table/schema/content/assignment/materialization identity
+of every pinned segment handle used to measure bytes. A stale process, replaced materialization, expired registration,
+or changed dependency cannot contribute a successful report. Native reports are bounded to 4096 measured segments
+and 2 MiB; controller fan-out is bounded to 128 servers, four concurrent requests and four HTTP workers. These bounds
+reject oversized reads; they do not return partial catalog lists. Native compression-stat collection is not yet
+supported. REST reads do not publish ownership-dependent table gauges.
+
+The Ratis metadata UI shows measured and estimated size on table details. This is an observability extension;
+segment publication/placement/replacement and the query-enablement gates remain outstanding. See
+[controller API parity](CONTROLLER-API-PARITY.md) for the remaining implementation dependencies.
 
 ## Voter configuration and validation
 

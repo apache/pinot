@@ -28,11 +28,13 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.KeyStore;
+import java.security.MessageDigest;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -48,24 +50,40 @@ import org.apache.pinot.common.coordination.MetadataRpcClient;
 import org.apache.pinot.common.coordination.NativeMetadataConfig;
 import org.apache.pinot.common.coordination.ServingPermitGuard.ClockReading;
 import org.apache.pinot.common.utils.ServiceStatus;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.controller.ControllerStarter;
 import org.apache.pinot.controller.api.access.BasicAuthAccessControlFactory;
 import org.apache.pinot.controller.api.access.ZkBasicAuthAccessControlFactory;
 import org.apache.pinot.controller.coordination.RatisControllerProvider;
+import org.apache.pinot.coordination.ratis.RatisMetadataStore;
 import org.apache.pinot.coordination.ratis.RatisMetadataStore.MembershipClockSettings;
+import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.Policy;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.Role;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.CatalogRecord;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.ObjectVersion;
+import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol;
+import org.apache.pinot.coordination.ratis.metadata.OperationProtocol;
+import org.apache.pinot.coordination.ratis.metadata.OwnershipProtocol;
 import org.apache.pinot.coordination.ratis.rpc.MetadataRpc;
 import org.apache.pinot.coordination.ratis.rpc.MetadataRpc.ResultStatus;
 import org.apache.pinot.coordination.ratis.transport.ControllerAccessPolicy;
 import org.apache.pinot.coordination.ratis.transport.ControllerAccessPolicy.ControllerIdentity;
+import org.apache.pinot.coordination.ratis.transport.MetadataGrpcClient;
 import org.apache.pinot.coordination.ratis.transport.ParticipantAccessPolicy;
 import org.apache.pinot.coordination.ratis.transport.ParticipantAccessPolicy.ParticipantIdentity;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.server.access.BasicAuthAccessFactory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -177,6 +195,7 @@ public class RatisStartersTest {
         config.put(PREFIX + "metadata.port", ports[3 + i]);
         config.put(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, "native-test");
         config.put("pinot.controller.http.server.thread.pool.corePoolSize", 2);
+        config.put("controller.server.admin.auth.token", authorization());
         config.put("pinot.controller.http.server.thread.pool.maxPoolSize", 4);
         if (i == 1) {
           config.put("controller.access.protocols", "https");
@@ -249,6 +268,14 @@ public class RatisStartersTest {
       created = write(http, controllerUrl + "/tables", "POST", JsonUtils.objectToString(table),
           Map.of("If-None-Match", "*", "Idempotency-Key", UUID.randomUUID().toString()));
       assertEquals(created.statusCode(), 200, created.body());
+      assertEquals(get(http, controllerUrl + "/tables/orders/size", false).statusCode(), 401);
+      HttpResponse<String> emptySize = get(http, secondControllerUrl + "/tables/orders/size", true);
+      assertEquals(emptySize.statusCode(), 200, emptySize.body());
+      assertEquals(JsonUtils.stringToJsonNode(emptySize.body()).path("reportedSizeInBytes").asLong(-1), 0L);
+      assertEquals(JsonUtils.stringToJsonNode(emptySize.body()).path("estimatedSizeInBytes").asLong(-1), 0L);
+      assertEquals(get(http, controllerUrl + "/tables/absent/size", true).statusCode(), 404);
+      assertEquals(get(http, controllerUrl + "/tables/orders/size?includeColumnCompressionStats=true", true)
+          .statusCode(), 501);
       String tableTag = get(http, secondControllerUrl + "/tables/orders_OFFLINE", true).headers()
           .firstValue("ETag").orElseThrow();
       table.getValidationConfig().setReplication("2");
@@ -293,6 +320,13 @@ public class RatisStartersTest {
           directory.resolve("server-tar").toString());
       serverConfig.put(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT, ports[7]);
       serverConfig.put(CommonConstants.Server.CONFIG_OF_ADMIN_API_PORT, ports[8]);
+      serverConfig.put(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST, "127.0.0.1");
+      serverConfig.put("pinot.server.http.server.thread.pool.corePoolSize", 1);
+      serverConfig.put("pinot.server.http.server.thread.pool.maxPoolSize", 2);
+      serverConfig.put(CommonConstants.Server.ACCESS_CONTROL_FACTORY_CLASS, BasicAuthAccessFactory.class.getName());
+      serverConfig.put("pinot.server.admin.access.control.principals", "admin");
+      serverConfig.put("pinot.server.admin.access.control.principals.admin.password", "test-password");
+      serverConfig.put("pinot.server.admin.access.control.principals.admin.permissions", "admin");
       assertEquals(manager.startRole(ServiceRole.SERVER, serverConfig), SERVER);
 
       try (MetadataRpcClient metadata = client(ports[4], controller, controller.certificate());
@@ -338,21 +372,62 @@ public class RatisStartersTest {
         assertEquals(brokerState.getCapabilitiesCount(), 0);
         assertEquals(serverState.getCapabilitiesCount(), 0);
         assertEquals(brokerState.getEndpointsCount(), 0);
-        assertEquals(serverState.getEndpointsCount(), 0);
+        assertEquals(serverState.getEndpointsCount(), 1);
+        String serverAdmin = serverState.getEndpointsOrThrow("adminHttp");
+        assertEquals(serverAdmin, "http://127.0.0.1:" + ports[8]);
+        assertEquals(get(http, serverAdmin + "/tables/orders_OFFLINE/size", false).statusCode(), 401);
+        assertEquals(get(http, serverAdmin + "/tables/orders_OFFLINE/size", true).statusCode(), 404,
+            "A configured table without an installed replica has no local size observation");
+        assertEquals(get(http, serverAdmin + "/tables/orders_OFFLINE/reload", true).statusCode(), 404);
+        // Keep a single desired replica while exercising actual installation and controller-to-server measurement.
+        tableTag = get(http, controllerUrl + "/tables/orders_OFFLINE", true).headers().firstValue("ETag").orElseThrow();
+        table.getValidationConfig().setReplication("1");
+        updated = write(http, controllerUrl + "/tables/orders_OFFLINE", "PUT", JsonUtils.objectToString(table),
+            Map.of("If-Match", tableTag));
+        assertEquals(updated.statusCode(), 200, updated.body());
+        long expectedBytes = installSizeTestSegment(directory, new PinotConfiguration(controllers.getFirst()),
+            metadata, serverState.getParticipant(), table, schema);
+        awaitSize(http, serverAdmin + "/tables/orders_OFFLINE/size", "diskSizeInBytes", expectedBytes);
+        assertMissingSize(http, controllerUrl);
+        String approvalKey = PREFIX + "server.admin.endpoint." + SERVER;
+        clusterTag = get(http, controllerUrl + "/cluster/configs", true).headers().firstValue("ETag").orElseThrow();
+        updated = write(http, controllerUrl + "/cluster/configs", "POST",
+            JsonUtils.objectToString(Map.of(approvalKey, serverAdmin)), Map.of("If-Match", clusterTag));
+        assertEquals(updated.statusCode(), 200, updated.body());
+        awaitSize(http, secondControllerUrl + "/tables/orders/size", "reportedSizeInBytes", expectedBytes);
+        HttpResponse<String> measured = get(http, controllerUrl + "/tables/orders/size", true);
+        assertEquals(measured.statusCode(), 200, measured.body());
+        var measuredSize = JsonUtils.stringToJsonNode(measured.body());
+        assertEquals(measuredSize.path("estimatedSizeInBytes").asLong(-1), expectedBytes);
+        assertEquals(measuredSize.path("offlineSegments").path("missingSegments").asInt(), 0);
+        clusterTag = get(http, controllerUrl + "/cluster/configs", true).headers().firstValue("ETag").orElseThrow();
+        updated = write(http, controllerUrl + "/cluster/configs/" + approvalKey, "DELETE", "",
+            Map.of("If-Match", clusterTag));
+        assertEquals(updated.statusCode(), 200, updated.body());
+        assertMissingSize(http, secondControllerUrl);
+        clusterTag = get(http, controllerUrl + "/cluster/configs", true).headers().firstValue("ETag").orElseThrow();
+        updated = write(http, controllerUrl + "/cluster/configs", "POST",
+            JsonUtils.objectToString(Map.of(approvalKey, serverAdmin)), Map.of("If-Match", clusterTag));
+        assertEquals(updated.statusCode(), 200, updated.body());
+        awaitSize(http, controllerUrl + "/tables/orders/size", "reportedSizeInBytes", expectedBytes);
         assertEquals(ServiceStatus.getServiceStatus(BROKER), ServiceStatus.Status.BAD);
         assertEquals(ServiceStatus.getServiceStatus(SERVER), ServiceStatus.Status.GOOD);
-        for (int i = 6; i < 9; i++) {
+        for (int i = 6; i < 8; i++) {
           try (ServerSocket unused = new ServerSocket(ports[i])) {
-            assertTrue(unused.isBound(), "Native query/admin listener must remain closed");
+            assertTrue(unused.isBound(), "Native query listener must remain closed");
           }
         }
 
         assertTrue(manager.stopPinotInstanceById(SERVER));
         assertTrue(serverClient.membershipRead(read).getParticipant().getRetired());
+        try (ServerSocket released = new ServerSocket(ports[8])) {
+          assertTrue(released.isBound(), "Server shutdown must release its administrative listener");
+        }
         assertEquals(manager.startRole(ServiceRole.SERVER, serverConfig), SERVER);
         MetadataRpc.ParticipantToken replacement = serverClient.membershipRead(read).getParticipant().getParticipant();
         assertEquals(replacement.getRegistrationEpoch(), serverState.getParticipant().getRegistrationEpoch() + 1);
         assertNotEquals(replacement.getIncarnation(), serverState.getParticipant().getIncarnation());
+        assertMissingSize(http, controllerUrl); // The old assignment cannot authorize the replacement process.
 
         assertTrue(manager.stopPinotInstanceById("Controller_ratis_voter-0"));
         controllers.getFirst().put(PREFIX + "bootstrap", false);
@@ -366,11 +441,11 @@ public class RatisStartersTest {
         assertEquals(metadata.membershipRead(read).getControl().getPolicy().getPermitLifetimeMillis(), 1000L,
             "Restart must retain committed policy instead of resetting it from bootstrap configuration");
         clusterTag = get(http, controllerUrl + "/cluster/configs", true).headers().firstValue("ETag").orElseThrow();
-        updated = write(http, controllerUrl + "/cluster/configs", "POST", "{\"restart\":\"committed\"}",
+        updated = write(http, controllerUrl + "/cluster/configs/" + approvalKey, "DELETE", "",
             Map.of("If-Match", clusterTag));
         assertEquals(updated.statusCode(), 200, updated.body());
-        assertEquals(JsonUtils.stringToJsonNode(get(http, secondControllerUrl + "/cluster/configs", true).body())
-            .path("restart").asText(), "committed", "Restart must recover the bounded HTTP writer stream");
+        assertFalse(JsonUtils.stringToJsonNode(get(http, secondControllerUrl + "/cluster/configs", true).body())
+            .has(approvalKey), "Restart must recover the bounded HTTP writer stream");
         // Stop participants before losing quorum so the test does not wait for failed retirements.
         manager.stopPinotInstanceById(BROKER);
         manager.stopPinotInstanceById(SERVER);
@@ -394,6 +469,133 @@ public class RatisStartersTest {
       manager.stopAll();
       FileUtils.deleteDirectory(directory.toFile());
     }
+  }
+
+  /// Uses the existing trusted consensus test API to publish content; public segment upload remains a separate API.
+  private static long installSizeTestSegment(Path directory, PinotConfiguration config, MetadataRpcClient metadata,
+      MetadataRpc.ParticipantToken serverSession, TableConfig table, Schema schema) throws Exception {
+    Path generated = Files.createDirectories(directory.resolve("generated"));
+    String segmentName = "orders_segment";
+    SegmentGeneratorConfig generator = new SegmentGeneratorConfig(table, schema);
+    generator.setOutDir(generated.toString());
+    generator.setSegmentName(segmentName);
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    GenericRow first = new GenericRow();
+    first.putValues(Map.of("id", 1L, "label", "one"));
+    GenericRow second = new GenericRow();
+    second.putValues(Map.of("id", 2L, "label", "two"));
+    driver.init(generator, new GenericRowRecordReader(List.of(first, second)));
+    driver.build();
+    Path segment = generated.resolve(segmentName);
+    Path archive = directory.resolve("orders.tar.gz");
+    TarCompressionUtils.createCompressedTarFile(segment.toFile(), archive.toFile());
+    long expectedBytes = FileUtils.sizeOfDirectory(segment.resolve("v3").toFile());
+    assertTrue(expectedBytes > 0);
+    UUID history = UUID.fromString(serverSession.getHistoryId());
+    UUID segmentId = UUID.randomUUID();
+    try (RatisMetadataStore.Client consensus = RatisMetadataStore.connect(config)) {
+      MetadataProtocol.Result registered = MetadataProtocol.decodeResult(consensus.execute(MetadataProtocol.encode(
+          new MetadataProtocol.RegisterClient(history, "size-test", UUID.randomUUID(), 0))));
+      assertEquals(registered.status(), MetadataProtocol.Status.OK, registered.detail());
+      MetadataRpc.MembershipResponse controller = metadata.membershipExecute(MetadataRpc.MembershipCommandRequest
+          .newBuilder().setHistoryId(history.toString()).setRegister(MetadataRpc.ParticipantRegistration.newBuilder()
+              .setIncarnation(UUID.randomUUID().toString())).build());
+      assertEquals(controller.getStatus(), ResultStatus.OK);
+      MetadataRpc.ParticipantToken session = controller.getParticipant().getParticipant();
+      MetadataRpc.MembershipResponse ready = metadata.membershipExecute(MetadataRpc.MembershipCommandRequest
+          .newBuilder().setHistoryId(history.toString()).setReady(MetadataRpc.ParticipantReadiness.newBuilder()
+              .setSession(MetadataRpc.ParticipantSession.newBuilder().setIncarnation(session.getIncarnation())
+                  .setRegistrationEpoch(session.getRegistrationEpoch()))
+              .setAppliedRevision(controller.getRevision()).setReady(true)).build());
+      assertEquals(ready.getStatus(), ResultStatus.OK);
+      MembershipProtocol.ControlToken control = MetadataGrpcClient.decodeMembershipResponse(ready)
+          .control().controlEpoch();
+      OwnershipProtocol.Layout layout = new OwnershipProtocol.Layout(1, 24,
+          OwnershipProtocol.HashVersion.MURMUR2_UTF8_MASK_POSITIVE_V1);
+      commit(consensus, new MetadataProtocol.OwnershipCommand(history, "size-test", 1, "ownership", 1,
+          new OwnershipProtocol.ConfigureLayout(control, layout)));
+      OwnershipProtocol.TableShard shard = OwnershipProtocol.tableScope(layout, table.getTableName());
+      MembershipProtocol.ParticipantToken controllerToken = MetadataGrpcClient.decodeMembershipResponse(ready)
+          .participant().participant();
+      commit(consensus, new MetadataProtocol.OwnershipCommand(history, "size-test", 1, "ownership", 2,
+          new OwnershipProtocol.AssignOwner(control, 1, shard, 0, controllerToken)));
+      OwnershipProtocol.OwnerToken owner = new OwnershipProtocol.OwnerToken(history, 1, shard, 1, controllerToken);
+      CatalogRecord tableRecord = record(consensus, history, MetadataProtocol.RecordKind.TABLE_CONFIG,
+          table.getTableName());
+      CatalogRecord schemaRecord = record(consensus, history, MetadataProtocol.RecordKind.SCHEMA,
+          schema.getSchemaName());
+      ObjectVersion tableVersion = new ObjectVersion(history, tableRecord.objectId(), tableRecord.version());
+      ObjectVersion schemaVersion = new ObjectVersion(history, schemaRecord.objectId(), schemaRecord.version());
+      String digest = HexFormat.of().formatHex(
+          MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(archive)));
+      OfflineSegmentProtocol.Content content = new OfflineSegmentProtocol.Content(table.getTableName(),
+          tableRecord.objectId(), segmentName, segmentId, digest, archive.toUri().toString(),
+          new OfflineSegmentProtocol.LoaderDescriptor(new SegmentMetadataImpl(segment.toFile()).getCrc(), 0, false,
+              null, null, 100, 200, Map.of()));
+      MembershipProtocol.ParticipantToken server = new MembershipProtocol.ParticipantToken(history,
+          serverSession.getParticipantId(), Role.SERVER, UUID.fromString(serverSession.getIncarnation()),
+          serverSession.getRegistrationEpoch());
+      commit(consensus, new MetadataProtocol.OfflineSegmentCommand(history, "size-test", 1, "segments", 1,
+          new OfflineSegmentProtocol.PublishContent(owner, tableVersion, content)));
+      commit(consensus, new MetadataProtocol.OfflineSegmentCommand(history, "size-test", 1, "segments", 2,
+          new OfflineSegmentProtocol.AssignReplica(owner, segmentId, 0, server,
+              new OfflineSegmentProtocol.Compatibility(tableVersion, schemaVersion), true)));
+      OfflineSegmentProtocol.Assignment assignment = OfflineSegmentProtocol.decodeAssignment(record(consensus, history,
+          MetadataProtocol.RecordKind.OFFLINE_REPLICA_ASSIGNMENT,
+          OfflineSegmentProtocol.assignmentName(segmentId, SERVER)).value());
+      UUID operation = UUID.randomUUID();
+      OperationProtocol.OfflineSegmentReload intent = new OperationProtocol.OfflineSegmentReload(table.getTableName(),
+          tableRecord.objectId(), segmentName, segmentId, digest, List.of(new OperationProtocol.TargetMaterialization(
+              server, assignment.assignmentEpoch(), assignment.materializationId())), true, true, false);
+      commit(consensus, new MetadataProtocol.NativeOperationCommand(history, "size-test", 1, "load", 1,
+          new OperationProtocol.Submit(operation, intent)));
+      OperationProtocol.OperationState accepted = OperationProtocol.decodeOperation(record(consensus, history,
+          MetadataProtocol.RecordKind.CONTROLLER_OPERATION, operation.toString()).value());
+      commit(consensus, new MetadataProtocol.NativeOperationCommand(history, "size-test", 1, "load", 2,
+          new OperationProtocol.Claim(operation, 1, owner,
+              ((OperationProtocol.AssignedOfflineSegmentReload) accepted.input()).dependencies())));
+    }
+    return expectedBytes;
+  }
+
+  private static CatalogRecord record(RatisMetadataStore.Client client, UUID history, MetadataProtocol.RecordKind kind,
+      String name) throws IOException {
+    MetadataProtocol.Result result = MetadataProtocol.decodeResult(client.query(MetadataProtocol.encode(
+        new MetadataProtocol.GetRecord(history, kind, name))));
+    assertEquals(result.status(), MetadataProtocol.Status.OK, result.detail());
+    return result.record();
+  }
+
+  private static void commit(RatisMetadataStore.Client client, MetadataProtocol.SequencedCommand command)
+      throws IOException {
+    MetadataProtocol.Result result = MetadataProtocol.decodeResult(client.execute(MetadataProtocol.encode(command)));
+    assertEquals(result.status(), MetadataProtocol.Status.OK, result.detail());
+    result = MetadataProtocol.decodeResult(client.execute(MetadataProtocol.encode(new MetadataProtocol.Acknowledge(
+        command.historyId(), command.clientId(), command.clientEpoch(), command.streamId(), command.sequence()))));
+    assertEquals(result.status(), MetadataProtocol.Status.OK, result.detail());
+  }
+
+  private static void awaitSize(HttpClient client, String url, String field, long expectedBytes) throws Exception {
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
+    HttpResponse<String> response;
+    do {
+      response = get(client, url, true);
+      if (response.statusCode() == 200
+          && JsonUtils.stringToJsonNode(response.body()).path(field).asLong(-1) == expectedBytes) {
+        return;
+      }
+      Thread.sleep(50);
+    } while (System.nanoTime() < deadline);
+    throw new AssertionError("Native segment did not report " + expectedBytes + " bytes: " + response.body());
+  }
+
+  private static void assertMissingSize(HttpClient client, String controllerUrl) throws Exception {
+    HttpResponse<String> response = get(client, controllerUrl + "/tables/orders/size", true);
+    assertEquals(response.statusCode(), 200, response.body());
+    var size = JsonUtils.stringToJsonNode(response.body());
+    assertEquals(size.path("reportedSizeInBytes").asLong(), -1L, response.body());
+    assertEquals(size.path("estimatedSizeInBytes").asLong(), -1L, response.body());
+    assertEquals(size.path("offlineSegments").path("missingSegments").asInt(), 1, response.body());
   }
 
   private static HttpClient httpClient(Path trustFile) throws Exception {

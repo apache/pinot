@@ -28,6 +28,7 @@ import {
   nativeEditorJson, pendingNativeWrite, readNativeMetadata, readNativeWriteCapabilities
 } from '../requests/nativeMetadata';
 import NativeMetadataEditor, { NativeEditDraft } from '../components/NativeMetadataEditor';
+import NativeTableSize from '../components/NativeTableSize';
 
 const useStyles = makeStyles({
   page: { flex: 1, minWidth: 0, padding: 24, maxHeight: 'calc(100vh - 70px)', overflowY: 'auto' },
@@ -257,6 +258,8 @@ const NativeMetadataPage = () => {
             {loading && <CircularProgress size={24} aria-label="Loading committed metadata" />}
             {error && <Alert severity="error">{error}</Alert>}
             {!loading && !error && renderActions()}
+            {!loading && !error && section === 0 && selected && capabilities?.tableSize &&
+              <NativeTableSize key={selected} tableName={selected} refresh={refresh} />}
             {!loading && !error && renderResult()}
             {result && <Typography variant="caption" component="p" className={classes.revision}>
               Committed revision: {result.revision}

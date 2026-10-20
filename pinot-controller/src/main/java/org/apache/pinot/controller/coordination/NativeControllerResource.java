@@ -268,7 +268,7 @@ public final class NativeControllerResource {
     Snapshot snapshot = read(headers, null, Actions.Cluster.GET_APP_CONFIG, "/metadata/capabilities");
     return response(snapshot, Map.of("schemaCreate", true, "schemaUpdate", true, "schemaDelete", true,
         "tableCreate", true, "tableUpdate", true, "tableDelete", false, "clusterConfigUpdate", true,
-        "clusterConfigDelete", true));
+        "clusterConfigDelete", true, "tableSize", true, "columnCompressionStats", false));
   }
 
   @POST

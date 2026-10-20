@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Executors;
@@ -189,6 +190,8 @@ public final class NativeControllerMetadata implements PinotClusterConfigProvide
     Map<String, ParticipantState> participants = new HashMap<>();
     ControlState control = null;
     Set<String> nativeTables = new HashSet<>();
+    Map<String, CatalogRecord> contents = new HashMap<>();
+    Map<String, CatalogRecord> assignments = new HashMap<>();
     CatalogRecord clusterRecord = null;
     try {
       for (CatalogRecord record : image.records()) {
@@ -210,10 +213,14 @@ public final class NativeControllerMetadata implements PinotClusterConfigProvide
             participants.put(record.name(), participant);
           }
           case CLUSTER_CONFIG -> clusterRecord = record;
-          case OFFLINE_SEGMENT_CONTENT -> nativeTables.add(
-              OfflineSegmentProtocol.decodeContent(record.value()).tableName());
-          case OFFLINE_REPLICA_ASSIGNMENT -> nativeTables.add(
-              OfflineSegmentProtocol.decodeAssignment(record.value()).tableName());
+          case OFFLINE_SEGMENT_CONTENT -> {
+            nativeTables.add(OfflineSegmentProtocol.decodeContent(record.value()).tableName());
+            contents.put(record.name(), record);
+          }
+          case OFFLINE_REPLICA_ASSIGNMENT -> {
+            nativeTables.add(OfflineSegmentProtocol.decodeAssignment(record.value()).tableName());
+            assignments.put(record.name(), record);
+          }
           case CONTROLLER_OPERATION -> nativeTables.add(
               OperationProtocol.decodeOperation(record.value()).input().tableName());
           default -> throw new IOException("Unexpected native HTTP record family");
@@ -224,7 +231,7 @@ public final class NativeControllerMetadata implements PinotClusterConfigProvide
         throw new IOException("Native membership control is not initialized");
       }
       return new Snapshot(new Revision(_history, image.cursor().index()), clusterConfig(image.records()), schemas,
-          tables, control, participants, clusterRecord, nativeTables);
+          tables, control, participants, clusterRecord, nativeTables, contents, assignments);
     } catch (IllegalArgumentException | NullPointerException e) {
       throw new IOException("Malformed native controller metadata image", e);
     }
@@ -342,7 +349,15 @@ public final class NativeControllerMetadata implements PinotClusterConfigProvide
   public void validateClusterConfig(Snapshot snapshot, Map<String, String> values) throws IOException {
     requireLiteralConfig(values);
     if (!snapshot.nativeTables().isEmpty()) {
-      throw new UnsupportedOperationException("Cluster config changes require native table reconciliation");
+      Set<String> changed = new HashSet<>(snapshot.clusterConfig().keySet());
+      changed.addAll(values.keySet());
+      changed.removeIf(key -> Objects.equals(snapshot.clusterConfig().get(key), values.get(key)));
+      // Endpoint approvals govern read-only controller fan-out and require no segment reconciliation. Their
+      // removal/change is rechecked before returning an observation; all other changes retain the lifecycle gate.
+      if (changed.isEmpty() || changed.stream().anyMatch(
+          key -> !key.startsWith(NativeTableSizeMetadataProvider.ENDPOINT_APPROVAL_PREFIX))) {
+        throw new UnsupportedOperationException("Cluster config changes require native table reconciliation");
+      }
     }
     String ignoreCase = values.get(CommonConstants.Helix.ENABLE_CASE_INSENSITIVE_KEY);
     checkArgument(ignoreCase == null || "true".equalsIgnoreCase(ignoreCase) || "false".equalsIgnoreCase(ignoreCase),
@@ -484,13 +499,16 @@ public final class NativeControllerMetadata implements PinotClusterConfigProvide
   public record Snapshot(Revision revision, Map<String, String> clusterConfig, Map<String, CatalogRecord> schemas,
                          Map<String, CatalogRecord> tables, ControlState control,
                          Map<String, ParticipantState> participants, @Nullable CatalogRecord clusterRecord,
-                         Set<String> nativeTables) {
+                         Set<String> nativeTables, Map<String, CatalogRecord> contents,
+                         Map<String, CatalogRecord> assignments) {
     public Snapshot {
       clusterConfig = Map.copyOf(clusterConfig);
       schemas = Map.copyOf(schemas);
       tables = Map.copyOf(tables);
       participants = Map.copyOf(participants);
       nativeTables = Set.copyOf(nativeTables);
+      contents = Map.copyOf(contents);
+      assignments = Map.copyOf(assignments);
     }
   }
 }

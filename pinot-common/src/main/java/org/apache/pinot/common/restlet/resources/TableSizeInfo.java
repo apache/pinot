@@ -35,6 +35,8 @@ public class TableSizeInfo {
   private final long _diskSizeInBytes;
   private final List<SegmentSizeInfo> _segments;
   private final int _metadataVersion;
+  @Nullable
+  private NativeTableSizeIdentity _nativeMetadata;
 
   public TableSizeInfo(String tableName, long sizeInBytes, List<SegmentSizeInfo> segments) {
     this(tableName, sizeInBytes, segments, 0);
@@ -60,6 +62,17 @@ public class TableSizeInfo {
 
   public List<SegmentSizeInfo> getSegments() {
     return _segments;
+  }
+
+  @Nullable
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  public NativeTableSizeIdentity getNativeMetadata() {
+    return _nativeMetadata;
+  }
+
+  public TableSizeInfo setNativeMetadata(@Nullable NativeTableSizeIdentity nativeMetadata) {
+    _nativeMetadata = nativeMetadata;
+    return this;
   }
 
   /// Returns the server size contribution protocol version, or `0` for a legacy response.
