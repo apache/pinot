@@ -239,23 +239,23 @@ public class SpoolDeadlockGuardTest extends StagesTestBase {
     );
     SpoolDeadlockGuard.DeadlockRisk risk = SpoolDeadlockGuard.findRisk(root);
     assertNotNull(risk, "Expected a circular wait");
-    List<SpoolDeadlockGuard.Wait> cycle = risk.getCycle();
+    List<SpoolDeadlockGuard.Wait> cycle = risk.cycle();
     assertEquals(cycle.size(), 2, risk.toString());
     for (SpoolDeadlockGuard.Wait wait : cycle) {
-      assertEquals(wait.getOperator(), "JOIN", risk.toString());
+      assertEquals(wait.operator(), "JOIN", risk.toString());
       // Each wait is kept by the spool it reads as build input, which the other wait stops.
-      assertEquals(wait.getSharedStageId(), wait.getBlockingSenderStageId(), risk.toString());
+      assertEquals(wait.sharedStageId(), wait.blockingSenderStageId(), risk.toString());
     }
-    assertEquals(Set.of(cycle.get(0).getStageId(), cycle.get(1).getStageId()), Set.of(2, 6), risk.toString());
+    assertEquals(Set.of(cycle.get(0).stageId(), cycle.get(1).stageId()), Set.of(2, 6), risk.toString());
     assertEquals(risk.toString(), "Circular wait: "
-        + "In stage " + cycle.get(0).getStageId() + ", JOIN reads the input from stage "
-        + cycle.get(0).getWaitingSenderStageId() + " only after the input from stage "
-        + cycle.get(0).getBlockingSenderStageId() + " finishes, and stage " + cycle.get(0).getBlockingSenderStageId()
-        + " depends on stage " + cycle.get(0).getSharedStageId() + ", which the next wait stops; "
-        + "In stage " + cycle.get(1).getStageId() + ", JOIN reads the input from stage "
-        + cycle.get(1).getWaitingSenderStageId() + " only after the input from stage "
-        + cycle.get(1).getBlockingSenderStageId() + " finishes, and stage " + cycle.get(1).getBlockingSenderStageId()
-        + " depends on stage " + cycle.get(1).getSharedStageId() + ", which the next wait stops");
+        + "In stage " + cycle.get(0).stageId() + ", JOIN reads the input from stage "
+        + cycle.get(0).waitingSenderStageId() + " only after the input from stage "
+        + cycle.get(0).blockingSenderStageId() + " finishes, and stage " + cycle.get(0).blockingSenderStageId()
+        + " depends on stage " + cycle.get(0).sharedStageId() + ", which the next wait stops; "
+        + "In stage " + cycle.get(1).stageId() + ", JOIN reads the input from stage "
+        + cycle.get(1).waitingSenderStageId() + " only after the input from stage "
+        + cycle.get(1).blockingSenderStageId() + " finishes, and stage " + cycle.get(1).blockingSenderStageId()
+        + " depends on stage " + cycle.get(1).sharedStageId() + ", which the next wait stops");
   }
 
   /// Same shape as [#joinsWithSwappedSidesBlockEachOther()], but both joins read spool 3 as the build input. Spool 3
@@ -278,12 +278,12 @@ public class SpoolDeadlockGuardTest extends StagesTestBase {
   private static void assertRisk(@Nullable SpoolDeadlockGuard.DeadlockRisk risk, int stageId, String operator,
       int waitingSenderStageId, int blockingSenderStageId, int sharedStageId) {
     assertNotNull(risk, "Expected a deadlock risk");
-    assertEquals(risk.getCycle().size(), 1, risk.toString());
-    SpoolDeadlockGuard.Wait wait = risk.getCycle().get(0);
-    assertEquals(wait.getStageId(), stageId, risk.toString());
-    assertEquals(wait.getOperator(), operator, risk.toString());
-    assertEquals(wait.getWaitingSenderStageId(), waitingSenderStageId, risk.toString());
-    assertEquals(wait.getBlockingSenderStageId(), blockingSenderStageId, risk.toString());
-    assertEquals(wait.getSharedStageId(), sharedStageId, risk.toString());
+    assertEquals(risk.cycle().size(), 1, risk.toString());
+    SpoolDeadlockGuard.Wait wait = risk.cycle().get(0);
+    assertEquals(wait.stageId(), stageId, risk.toString());
+    assertEquals(wait.operator(), operator, risk.toString());
+    assertEquals(wait.waitingSenderStageId(), waitingSenderStageId, risk.toString());
+    assertEquals(wait.blockingSenderStageId(), blockingSenderStageId, risk.toString());
+    assertEquals(wait.sharedStageId(), sharedStageId, risk.toString());
   }
 }

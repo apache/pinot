@@ -84,32 +84,26 @@ public final class SpoolDeadlockGuard {
 
   /// A cycle of deferrals that can block the query.
   ///
-  /// Each element of [#getCycle()] is a wait that cannot end until the next wait (the first one after the last) ends.
-  public static final class DeadlockRisk {
-    private final List<Wait> _cycle;
-
-    DeadlockRisk(List<Wait> cycle) {
-      _cycle = List.copyOf(cycle);
-    }
-
-    public List<Wait> getCycle() {
-      return _cycle;
+  /// Each element of `cycle` is a wait that cannot end until the next wait (the first one after the last) ends.
+  public record DeadlockRisk(List<Wait> cycle) {
+    public DeadlockRisk {
+      cycle = List.copyOf(cycle);
     }
 
     @Override
     public String toString() {
-      if (_cycle.size() == 1) {
-        Wait wait = _cycle.get(0);
-        return wait.describe() + ", and both depend on stage " + wait.getSharedStageId();
+      if (cycle.size() == 1) {
+        Wait wait = cycle.get(0);
+        return wait + ", and both depend on stage " + wait.sharedStageId();
       }
       StringBuilder builder = new StringBuilder("Circular wait: ");
-      for (int i = 0; i < _cycle.size(); i++) {
-        Wait wait = _cycle.get(i);
+      for (int i = 0; i < cycle.size(); i++) {
+        Wait wait = cycle.get(i);
         if (i > 0) {
           builder.append("; ");
         }
-        builder.append(wait.describe()).append(", and stage ").append(wait.getBlockingSenderStageId())
-            .append(" depends on stage ").append(wait.getSharedStageId()).append(", which the next wait stops");
+        builder.append(wait).append(", and stage ").append(wait.blockingSenderStageId())
+            .append(" depends on stage ").append(wait.sharedStageId()).append(", which the next wait stops");
       }
       return builder.toString();
     }
@@ -118,87 +112,37 @@ public final class SpoolDeadlockGuard {
   /// In stage `stageId`, the `operator` reads the receive from `waitingSenderStageId` only after the receive from
   /// `blockingSenderStageId` finishes. The blocking receive needs `sharedStageId`, a stage that the next wait of the
   /// cycle stops.
-  public static final class Wait {
-    private final int _stageId;
-    private final String _operator;
-    private final int _waitingSenderStageId;
-    private final int _blockingSenderStageId;
-    private final int _sharedStageId;
-
-    Wait(int stageId, String operator, int waitingSenderStageId, int blockingSenderStageId, int sharedStageId) {
-      _stageId = stageId;
-      _operator = operator;
-      _waitingSenderStageId = waitingSenderStageId;
-      _blockingSenderStageId = blockingSenderStageId;
-      _sharedStageId = sharedStageId;
-    }
-
-    public int getStageId() {
-      return _stageId;
-    }
-
-    public String getOperator() {
-      return _operator;
-    }
-
-    public int getWaitingSenderStageId() {
-      return _waitingSenderStageId;
-    }
-
-    public int getBlockingSenderStageId() {
-      return _blockingSenderStageId;
-    }
-
-    public int getSharedStageId() {
-      return _sharedStageId;
-    }
-
-    private String describe() {
-      return "In stage " + _stageId + ", " + _operator + " reads the input from stage " + _waitingSenderStageId
-          + " only after the input from stage " + _blockingSenderStageId + " finishes";
-    }
-
+  public record Wait(int stageId, String operator, int waitingSenderStageId, int blockingSenderStageId,
+                     int sharedStageId) {
     @Override
     public String toString() {
-      return describe();
+      return "In stage " + stageId + ", " + operator + " reads the input from stage " + waitingSenderStageId
+          + " only after the input from stage " + blockingSenderStageId + " finishes";
     }
   }
 
-  /// A pair of receives in one stage where `_waiting` is read only after `_blocking` finishes.
-  private static final class Deferral {
-    private final MailboxReceiveNode _waiting;
-    private final MailboxReceiveNode _blocking;
-    private final String _operator;
-
-    Deferral(MailboxReceiveNode waiting, MailboxReceiveNode blocking, String operator) {
-      _waiting = waiting;
-      _blocking = blocking;
-      _operator = operator;
-    }
+  /// A pair of receives in one stage where `waiting` is read only after `blocking` finishes.
+  private record Deferral(MailboxReceiveNode waiting, MailboxReceiveNode blocking, String operator) {
   }
 
-  /// The receives of one subtree inside a stage.
-  private static final class Receives {
-    /// Every receive in the subtree.
-    private final List<MailboxReceiveNode> _all = new ArrayList<>();
-    /// The receives that reach the root of the subtree through a streaming path.
-    private final List<MailboxReceiveNode> _streaming = new ArrayList<>();
+  /// The receives of one subtree inside a stage. The lists are mutable: [Analysis#collect] fills them while it walks
+  /// the subtree.
+  ///
+  /// @param all every receive in the subtree
+  /// @param streaming the receives that reach the root of the subtree through a streaming path
+  private record Receives(List<MailboxReceiveNode> all, List<MailboxReceiveNode> streaming) {
+    Receives() {
+      this(new ArrayList<>(), new ArrayList<>());
+    }
 
     void addAll(Receives other) {
-      _all.addAll(other._all);
-      _streaming.addAll(other._streaming);
+      all.addAll(other.all);
+      streaming.addAll(other.streaming);
     }
   }
 
   /// What the analysis knows about one stage.
-  private static final class StageInfo {
-    private final Receives _receives;
-    private final List<Deferral> _deferrals;
-
-    StageInfo(Receives receives, List<Deferral> deferrals) {
-      _receives = receives;
-      _deferrals = deferrals;
-    }
+  private record StageInfo(Receives receives, List<Deferral> deferrals) {
   }
 
   /// One run of the check. Not thread-safe; each call to [SpoolDeadlockGuard#findRisk] creates its own instance.
@@ -217,9 +161,9 @@ public final class SpoolDeadlockGuard {
       // deferral j needs, or null. When it is not null, deferral i blocks deferral j.
       MailboxSendNode[][] shared = new MailboxSendNode[numDeferrals][numDeferrals];
       for (int i = 0; i < numDeferrals; i++) {
-        Set<MailboxSendNode> stopped = getStopped(deferrals.get(i)._waiting.getSender());
+        Set<MailboxSendNode> stopped = getStopped(deferrals.get(i).waiting().getSender());
         for (int j = 0; j < numDeferrals; j++) {
-          shared[i][j] = firstShared(stopped, getNeeded(deferrals.get(j)._blocking.getSender()));
+          shared[i][j] = firstShared(stopped, getNeeded(deferrals.get(j).blocking().getSender()));
         }
       }
       for (int i = 0; i < numDeferrals; i++) {
@@ -244,8 +188,8 @@ public final class SpoolDeadlockGuard {
 
     private static Wait toWait(Deferral deferral, MailboxSendNode sharedStage) {
       // Both receives of a deferral belong to the stage of the operator that defers one behind the other.
-      return new Wait(deferral._waiting.getStageId(), deferral._operator, deferral._waiting.getSenderStageId(),
-          deferral._blocking.getSenderStageId(), sharedStage.getStageId());
+      return new Wait(deferral.waiting().getStageId(), deferral.operator(), deferral.waiting().getSenderStageId(),
+          deferral.blocking().getSenderStageId(), sharedStage.getStageId());
     }
 
     /// Returns the deferrals of every stage reachable from `root`. Two deferrals with the same pair of senders behave
@@ -260,14 +204,14 @@ public final class SpoolDeadlockGuard {
       while (!pending.isEmpty()) {
         PlanNode stageRoot = pending.poll();
         StageInfo info = getStageInfo(stageRoot);
-        for (Deferral deferral : info._deferrals) {
-          Set<MailboxSendNode> blockingSenders = seenPairs.computeIfAbsent(deferral._waiting.getSender(),
+        for (Deferral deferral : info.deferrals()) {
+          Set<MailboxSendNode> blockingSenders = seenPairs.computeIfAbsent(deferral.waiting().getSender(),
               k -> Collections.newSetFromMap(new IdentityHashMap<>()));
-          if (blockingSenders.add(deferral._blocking.getSender())) {
+          if (blockingSenders.add(deferral.blocking().getSender())) {
             result.add(deferral);
           }
         }
-        for (MailboxReceiveNode receive : info._receives._all) {
+        for (MailboxReceiveNode receive : info.receives().all()) {
           MailboxSendNode sender = receive.getSender();
           if (visited.add(sender)) {
             pending.add(sender);
@@ -340,7 +284,7 @@ public final class SpoolDeadlockGuard {
       if (result == null) {
         result = Collections.newSetFromMap(new IdentityHashMap<>());
         result.add(sender);
-        for (MailboxReceiveNode receive : getStageInfo(sender)._receives._streaming) {
+        for (MailboxReceiveNode receive : getStageInfo(sender).receives().streaming()) {
           result.addAll(getStopped(receive.getSender()));
         }
         _stopped.put(sender, result);
@@ -353,7 +297,7 @@ public final class SpoolDeadlockGuard {
       if (result == null) {
         result = Collections.newSetFromMap(new IdentityHashMap<>());
         result.add(sender);
-        for (MailboxReceiveNode receive : getStageInfo(sender)._receives._all) {
+        for (MailboxReceiveNode receive : getStageInfo(sender).receives().all()) {
           result.addAll(getNeeded(receive.getSender()));
         }
         _needed.put(sender, result);
@@ -381,7 +325,7 @@ public final class SpoolDeadlockGuard {
     /// can keep the others unread. Each pair of pipeline-breaker receives is therefore treated as deferred both ways.
     private static void addPipelineBreakerDeferrals(Receives receives, List<Deferral> deferrals) {
       List<MailboxReceiveNode> breakers = new ArrayList<>();
-      for (MailboxReceiveNode receive : receives._all) {
+      for (MailboxReceiveNode receive : receives.all()) {
         if (receive.getExchangeType() == PinotRelExchangeType.PIPELINE_BREAKER) {
           breakers.add(receive);
         }
@@ -389,14 +333,14 @@ public final class SpoolDeadlockGuard {
       if (breakers.isEmpty()) {
         return;
       }
-      for (MailboxReceiveNode receive : receives._all) {
+      for (MailboxReceiveNode receive : receives.all()) {
         for (MailboxReceiveNode breaker : breakers) {
           if (receive != breaker) {
             deferrals.add(new Deferral(receive, breaker, "the pipeline breaker"));
           }
         }
       }
-      receives._streaming.removeAll(breakers);
+      receives.streaming().removeAll(breakers);
     }
 
     /// Collects the receives of the subtree that starts at `node`, without crossing into other stages, and adds to
@@ -405,8 +349,8 @@ public final class SpoolDeadlockGuard {
       Receives result = new Receives();
       if (node instanceof MailboxReceiveNode) {
         MailboxReceiveNode receive = (MailboxReceiveNode) node;
-        result._all.add(receive);
-        result._streaming.add(receive);
+        result.all().add(receive);
+        result.streaming().add(receive);
         return result;
       }
       List<Receives> inputs = new ArrayList<>(node.getInputs().size());
@@ -418,9 +362,9 @@ public final class SpoolDeadlockGuard {
         Receives left = inputs.get(0);
         Receives right = inputs.get(1);
         addDeferrals(left, right, "JOIN", deferrals);
-        result._all.addAll(left._all);
-        result._all.addAll(right._all);
-        result._streaming.addAll(left._streaming);
+        result.all().addAll(left.all());
+        result.all().addAll(right.all());
+        result.streaming().addAll(left.streaming());
         return result;
       }
       if (node instanceof SetOpNode) {
@@ -440,9 +384,9 @@ public final class SpoolDeadlockGuard {
           Receives left = inputs.get(0);
           Receives right = inputs.get(1);
           addDeferrals(left, right, setOp.getSetOpType().name(), deferrals);
-          result._all.addAll(left._all);
-          result._all.addAll(right._all);
-          result._streaming.addAll(left._streaming);
+          result.all().addAll(left.all());
+          result.all().addAll(right.all());
+          result.streaming().addAll(left.streaming());
         }
         return result;
       }
@@ -450,14 +394,14 @@ public final class SpoolDeadlockGuard {
         result.addAll(input);
       }
       if (readsWholeInputFirst(node)) {
-        result._streaming.clear();
+        result.streaming().clear();
       }
       return result;
     }
 
     private static void addDeferrals(Receives waiting, Receives blocking, String operator, List<Deferral> deferrals) {
-      for (MailboxReceiveNode waitingReceive : waiting._all) {
-        for (MailboxReceiveNode blockingReceive : blocking._all) {
+      for (MailboxReceiveNode waitingReceive : waiting.all()) {
+        for (MailboxReceiveNode blockingReceive : blocking.all()) {
           deferrals.add(new Deferral(waitingReceive, blockingReceive, operator));
         }
       }

@@ -184,9 +184,9 @@ public class PinotLogicalQueryPlanner {
     int applied = 0;
     int rejectedByGuard = 0;
     for (SpoolSubstitution substitution : substitutions) {
-      if (substitution.getOutcome() == SpoolSubstitution.Outcome.APPLIED) {
+      if (substitution.outcome() == SpoolSubstitution.Outcome.APPLIED) {
         applied++;
-      } else if (substitution.getOutcome() == SpoolSubstitution.Outcome.REJECTED_BY_GUARD) {
+      } else if (substitution.outcome() == SpoolSubstitution.Outcome.REJECTED_BY_GUARD) {
         rejectedByGuard++;
       }
     }
@@ -210,12 +210,12 @@ public class PinotLogicalQueryPlanner {
     ArrayNode entries = feedback.putArray("substitutions");
     for (SpoolSubstitution substitution : substitutions) {
       ObjectNode entry = entries.addObject();
-      entry.put("receiverStage", substitution.getReceiverStageId());
-      entry.put("replacedStage", substitution.getReplacedStageId());
-      entry.put("leaderStage", substitution.getLeaderStageId());
-      entry.put("outcome", substitution.getOutcome().name());
-      if (substitution.getReason() != null) {
-        entry.put("reason", substitution.getReason());
+      entry.put("receiverStage", substitution.receiverStageId());
+      entry.put("replacedStage", substitution.replacedStageId());
+      entry.put("leaderStage", substitution.leaderStageId());
+      entry.put("outcome", substitution.outcome().name());
+      if (substitution.reason() != null) {
+        entry.put("reason", substitution.reason());
       }
     }
     return feedback;

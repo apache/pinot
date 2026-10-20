@@ -24,8 +24,9 @@ import javax.annotation.Nullable;
 /// One decision of [EquivalentStagesReplacer]: whether a receive that read from `replacedStageId` now reads from
 /// `leaderStageId`, the stage that the replacer keeps for the equivalence group.
 ///
-/// Instances are immutable.
-public final class SpoolSubstitution {
+/// @param reason why the substitution was rejected, or null when it was applied
+public record SpoolSubstitution(int receiverStageId, int replacedStageId, int leaderStageId, Outcome outcome,
+                                @Nullable String reason) {
   /// The result of a decision.
   public enum Outcome {
     /// The receive reads from the leader, and the replaced stage is removed from the plan.
@@ -36,47 +37,9 @@ public final class SpoolSubstitution {
     REJECTED_SAME_RECEIVER_STAGE
   }
 
-  private final int _receiverStageId;
-  private final int _replacedStageId;
-  private final int _leaderStageId;
-  private final Outcome _outcome;
-  @Nullable
-  private final String _reason;
-
-  public SpoolSubstitution(int receiverStageId, int replacedStageId, int leaderStageId, Outcome outcome,
-      @Nullable String reason) {
-    _receiverStageId = receiverStageId;
-    _replacedStageId = replacedStageId;
-    _leaderStageId = leaderStageId;
-    _outcome = outcome;
-    _reason = reason;
-  }
-
-  public int getReceiverStageId() {
-    return _receiverStageId;
-  }
-
-  public int getReplacedStageId() {
-    return _replacedStageId;
-  }
-
-  public int getLeaderStageId() {
-    return _leaderStageId;
-  }
-
-  public Outcome getOutcome() {
-    return _outcome;
-  }
-
-  /// Returns why the substitution was rejected, or null when it was applied.
-  @Nullable
-  public String getReason() {
-    return _reason;
-  }
-
   @Override
   public String toString() {
-    return "stage " + _receiverStageId + ": " + _replacedStageId + " -> " + _leaderStageId + " " + _outcome
-        + (_reason != null ? " (" + _reason + ")" : "");
+    return "stage " + receiverStageId + ": " + replacedStageId + " -> " + leaderStageId + " " + outcome
+        + (reason != null ? " (" + reason + ")" : "");
   }
 }

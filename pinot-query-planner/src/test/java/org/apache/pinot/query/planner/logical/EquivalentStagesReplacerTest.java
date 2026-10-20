@@ -136,11 +136,11 @@ public class EquivalentStagesReplacerTest extends StagesTestBase {
         groupedStages, EquivalentStagesReplacer.OnSubstitution.NO_OP, true);
     assertEquals(substitutions.size(), 1);
     SpoolSubstitution substitution = substitutions.get(0);
-    assertEquals(substitution.getOutcome(), SpoolSubstitution.Outcome.REJECTED_BY_GUARD);
-    assertEquals(substitution.getReceiverStageId(), 5);
-    assertEquals(substitution.getReplacedStageId(), 6);
-    assertEquals(substitution.getLeaderStageId(), 3);
-    assertEquals(substitution.getReason(), "In stage 1, JOIN reads the input from stage 2 only after the input from "
+    assertEquals(substitution.outcome(), SpoolSubstitution.Outcome.REJECTED_BY_GUARD);
+    assertEquals(substitution.receiverStageId(), 5);
+    assertEquals(substitution.replacedStageId(), 6);
+    assertEquals(substitution.leaderStageId(), 3);
+    assertEquals(substitution.reason(), "In stage 1, JOIN reads the input from stage 2 only after the input from "
         + "stage 5 finishes, and both depend on stage 3");
 
     cleanup();
