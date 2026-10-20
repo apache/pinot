@@ -308,7 +308,9 @@ public class QueryEnvironmentTestBase {
         false);
   }
 
-  protected static QueryEnvironment getQueryEnvironment(int reducerPort, int port1, int port2,
+  /// Like the overload above. `mergeSupported` stands in for the broker's single-version cluster check, which is
+  /// always off on SNAPSHOT builds, so runtime tests can exercise the k-way merge plan.
+  public static QueryEnvironment getQueryEnvironment(int reducerPort, int port1, int port2,
       Map<String, Schema> schemaMap, Map<String, List<String>> segmentMap1, Map<String, List<String>> segmentMap2,
       @Nullable Map<String, Pair<String, List<List<String>>>> partitionedSegmentsMap, boolean mergeSupported) {
     MockRoutingManagerFactory factory = new MockRoutingManagerFactory(port1, port2);

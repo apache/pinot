@@ -48,6 +48,7 @@ import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.StagePlan;
+import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.OpChainConverterDispatcher;
@@ -59,6 +60,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Server.SortedSelectionMergeMode;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.rewriter.NonAggregationGroupByToDistinctQueryRewriter;
@@ -101,10 +103,13 @@ public class ServerPlanRequestUtils {
       boolean explain, @Nullable Map<String, String> rowFilters) {
     long queryArrivalTimeMs = System.currentTimeMillis();
 
+    Map<String, String> opChainMetadata = executionContext.getOpChainMetadata();
     ServerPlanRequestContext serverContext = new ServerPlanRequestContext(stagePlan, leafQueryExecutor, executorService,
-        executionContext.getPipelineBreakerResult());
+        executionContext.getPipelineBreakerResult(),
+        isSinglePhysicalRequest(executionContext.getStageMetadata(), executionContext.getWorkerMetadata()),
+        isSortedSelectionMergeRequested(opChainMetadata));
     // 1. Compile the PinotQuery
-    constructPinotQueryPlan(serverContext, executionContext.getOpChainMetadata());
+    constructPinotQueryPlan(serverContext, opChainMetadata);
     // 2. Convert PinotQuery into InstanceRequest list (one for each physical table)
     PinotQuery pinotQuery = serverContext.getPinotQuery();
     pinotQuery.setExplain(explain);
@@ -132,6 +137,35 @@ public class ServerPlanRequestUtils {
     // 3. Compile the OpChain
     executionContext.setLeafStageContext(serverContext);
     return OpChainConverterDispatcher.convert(stagePlan.getRootNode(), executionContext, relationConsumer);
+  }
+
+  /// Returns true when every worker of the leaf stage produces exactly one [ServerQueryRequest]: a plain
+  /// (non-logical) table routed to a single table type. Logical tables are conservatively excluded. A hybrid table
+  /// always carries a time boundary in the stage metadata, so it is excluded on every worker, including one that only
+  /// holds segments of one table type: workers of a stage must build the same operator chain, or the per-stage stats
+  /// of the differing workers cannot be merged.
+  static boolean isSinglePhysicalRequest(StageMetadata stageMetadata, WorkerMetadata workerMetadata) {
+    if (stageMetadata.getTimeBoundary() != null || workerMetadata.getLogicalTableSegmentsMap() != null) {
+      return false;
+    }
+    Map<String, List<String>> tableSegmentsMap = workerMetadata.getTableSegmentsMap();
+    return tableSegmentsMap != null && tableSegmentsMap.size() == 1;
+  }
+
+  /// Returns true when the query requests the streaming sorted-selection combine: `sortedSelectionMergeMode` resolves,
+  /// as in `InstancePlanMakerImplV2.applyQueryOptions`, to ON or AUTO (AUTO is resolved later, per query, by V1). An
+  /// invalid value returns false here: only selection leaves fail on it, as before, when V1 parses the option.
+  static boolean isSortedSelectionMergeRequested(Map<String, String> queryOptions) {
+    SortedSelectionMergeMode mode;
+    try {
+      mode = QueryOptionsUtils.getSortedSelectionMergeMode(queryOptions);
+    } catch (IllegalArgumentException e) {
+      return false;
+    }
+    if (mode == null) {
+      mode = CommonConstants.Server.DEFAULT_SORTED_SELECTION_MERGE_MODE;
+    }
+    return mode != SortedSelectionMergeMode.OFF;
   }
 
   /// First step of Server physical plan - construct [PinotQuery] and determine the leaf-stage boundary
