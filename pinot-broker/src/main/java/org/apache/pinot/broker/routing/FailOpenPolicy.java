@@ -27,12 +27,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Thread-safe policy for broker fail-open routing.
- *
- * <p>The broker-configured value is retained separately from the effective startup value so removing a dynamic
- * cluster override restores the broker value (or the default when the broker did not configure one).
- */
+/// Thread-safe policy for broker fail-open routing.
+///
+/// The broker-configured value is retained separately from the effective startup value so removing a dynamic
+/// cluster override restores the broker value (or the default when the broker did not configure one).
+///
+/// This class currently only lands the config plumbing: the policy is constructed and registered for cluster config
+/// changes, but is not yet consulted on the routing path. Instance selection will read [#isEnabled()] in a
+/// follow-up change.
 @ThreadSafe
 public final class FailOpenPolicy implements PinotClusterConfigChangeListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(FailOpenPolicy.class);
@@ -45,10 +47,14 @@ public final class FailOpenPolicy implements PinotClusterConfigChangeListener {
     _enabled = startupEnabled;
   }
 
+  /// Returns a policy with fail-open routing disabled and no broker-configured override. Not yet called; intended for
+  /// routing components that are constructed without a broker-provided policy once fail-open routing is wired in.
   public static FailOpenPolicy disabled() {
     return new FailOpenPolicy(false, false);
   }
 
+  /// Returns whether fail-open routing is currently enabled. Not yet read on the routing path; instance selection will
+  /// consult this in a follow-up change.
   public boolean isEnabled() {
     return _enabled;
   }
