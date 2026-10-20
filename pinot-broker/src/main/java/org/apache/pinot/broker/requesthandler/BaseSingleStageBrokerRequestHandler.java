@@ -684,13 +684,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     HandlerContext handlerContext =
         getHandlerContext(offlineTableQueryConfig, realtimeTableQueryConfig, pinotQuery.getQueryOptions());
     validateGroovyScript(serverPinotQuery, handlerContext._disableGroovy);
-    boolean approximateFunctionApplied = false;
+    boolean approximateFunctionRewritten = false;
     if (handlerContext._useApproximateFunction) {
-      approximateFunctionApplied = handleApproximateFunctionOverride(serverPinotQuery,
+      approximateFunctionRewritten = handleApproximateFunctionOverride(serverPinotQuery,
           handlerContext._distinctCountParams, handlerContext._percentileParams);
-      if (approximateFunctionApplied) {
-        _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.APPROXIMATE_FUNCTION_OVERRIDES, 1);
-      }
     }
 
     // Validate the request
@@ -1096,7 +1093,13 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
 
     brokerResponse.setRLSFiltersApplied(rlsFiltersApplied.get());
+    // The reduce reports any function that returned an approximate result. Report it only for the functions the
+    // broker rewrote: a query that asks for a SMART function itself has chosen to accept an approximation.
+    boolean approximateFunctionApplied = approximateFunctionRewritten && brokerResponse.isApproximateFunctionApplied();
     brokerResponse.setApproximateFunctionApplied(approximateFunctionApplied);
+    if (approximateFunctionApplied) {
+      _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.APPROXIMATE_FUNCTION_OVERRIDES, 1);
+    }
 
     // Record per-server stats on the SSE BrokerResponse so downstream consumers can read it.
     brokerResponse.setServerStats(serverStats.getServerStats());
@@ -2006,7 +2009,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   /// The rewritten functions stay exact until an accumulator crosses their conversion threshold, which the
   /// parameters carry. An empty parameter string appends nothing, so the aggregation function defaults apply.
   ///
-  /// @return true if at least one function was rewritten, which makes the result of the query approximate
+  /// @return true if at least one function was rewritten, so that the result can turn approximate
   @VisibleForTesting
   static boolean handleApproximateFunctionOverride(PinotQuery pinotQuery, String distinctCountParams,
       String percentileParams) {

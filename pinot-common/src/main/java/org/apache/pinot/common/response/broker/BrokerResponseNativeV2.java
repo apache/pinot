@@ -185,6 +185,18 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
     _brokerStats.merge(StatKey.LITE_MODE_LEAF_STAGE_LIMIT_REACHED, mseLiteLeafStageLimitReached);
   }
 
+  /// Returns whether an operator reported a function that returned an approximate final result, for example a SMART
+  /// function that switched to a sketch. The broker turns it into [#isApproximateFunctionApplied()] only for the
+  /// functions it rewrote, so it is not part of the response itself.
+  @JsonIgnore
+  public boolean isApproximatedResult() {
+    return _brokerStats.getBoolean(StatKey.APPROXIMATED_RESULT);
+  }
+
+  public void mergeApproximatedResult(boolean approximatedResult) {
+    _brokerStats.merge(StatKey.APPROXIMATED_RESULT, approximatedResult);
+  }
+
   @JsonInclude(JsonInclude.Include.NON_NULL)
   @Nullable
   public Integer getMseLiteLeafStageEffectiveLimit() {
@@ -611,7 +623,8 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
     NUM_REMOTE_ACCESSES(StatMap.Type.LONG),
     REMOTE_ACCESS_BYTES(StatMap.Type.LONG),
     NUM_DIRECT_REMOTE_ACCESSES(StatMap.Type.LONG),
-    DIRECT_REMOTE_ACCESS_BYTES(StatMap.Type.LONG);
+    DIRECT_REMOTE_ACCESS_BYTES(StatMap.Type.LONG),
+    APPROXIMATED_RESULT(StatMap.Type.BOOLEAN);
 
     private final StatMap.Type _type;
 

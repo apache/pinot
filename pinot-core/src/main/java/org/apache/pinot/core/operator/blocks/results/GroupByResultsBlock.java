@@ -35,6 +35,7 @@ import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.Table;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
@@ -236,6 +237,10 @@ public class GroupByResultsBlock extends BaseResultsBlock {
     }
     if (_numGroupsWarningLimitReached) {
       metadata.put(MetadataKey.NUM_GROUPS_WARNING_LIMIT_REACHED.getName(), "true");
+    }
+    // The combine step has already extracted the final results when the server returns them.
+    if (AggregationFunctionUtils.hasApproximatedResult(_queryContext.getAggregationFunctions())) {
+      metadata.put(MetadataKey.APPROXIMATED_RESULT.getName(), "true");
     }
     metadata.put(MetadataKey.NUM_RESIZES.getName(), Integer.toString(_numResizes));
     metadata.put(MetadataKey.RESIZE_TIME_MS.getName(), Long.toString(_resizeTimeMs));

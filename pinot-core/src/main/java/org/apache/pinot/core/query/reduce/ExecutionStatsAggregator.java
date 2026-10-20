@@ -80,6 +80,7 @@ public class ExecutionStatsAggregator {
   private boolean _groupsTrimmed = false;
   private boolean _numGroupsLimitReached = false;
   private boolean _numGroupsWarningLimitReached = false;
+  private boolean _approximatedResult = false;
   private boolean _maxRowsInDistinctReached = false;
   private boolean _maxRowsWithoutChangeInDistinctReached = false;
   private boolean _maxExecutionTimeInDistinctReached = false;
@@ -250,6 +251,7 @@ public class ExecutionStatsAggregator {
         Boolean.parseBoolean(metadata.get(DataTable.MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName()));
     _numGroupsWarningLimitReached |=
         Boolean.parseBoolean(metadata.get(DataTable.MetadataKey.NUM_GROUPS_WARNING_LIMIT_REACHED.getName()));
+    _approximatedResult |= Boolean.parseBoolean(metadata.get(DataTable.MetadataKey.APPROXIMATED_RESULT.getName()));
     String distinctEarlyTermination =
         metadata.get(DataTable.MetadataKey.EARLY_TERMINATION_REASON.getName());
     if (distinctEarlyTermination != null) {
@@ -296,6 +298,9 @@ public class ExecutionStatsAggregator {
     brokerResponseNative.setGroupsTrimmed(_groupsTrimmed);
     brokerResponseNative.setNumGroupsLimitReached(_numGroupsLimitReached);
     brokerResponseNative.setNumGroupsWarningLimitReached(_numGroupsWarningLimitReached);
+    if (_approximatedResult) {
+      brokerResponseNative.setApproximateFunctionApplied(true);
+    }
     brokerResponseNative.setMaxRowsInDistinctReached(_maxRowsInDistinctReached);
     brokerResponseNative.setMaxRowsWithoutChangeInDistinctReached(_maxRowsWithoutChangeInDistinctReached);
     brokerResponseNative.setMaxExecutionTimeInDistinctReached(_maxExecutionTimeInDistinctReached);
@@ -451,6 +456,9 @@ public class ExecutionStatsAggregator {
     }
     if (_numGroupsWarningLimitReached) {
       metadata.put(DataTable.MetadataKey.NUM_GROUPS_WARNING_LIMIT_REACHED.getName(), "true");
+    }
+    if (_approximatedResult) {
+      metadata.put(DataTable.MetadataKey.APPROXIMATED_RESULT.getName(), "true");
     }
 
     // EARLY_TERMINATION_REASON: 1-string wire format ↔ 3-boolean accumulator. aggregate() OR-reduces

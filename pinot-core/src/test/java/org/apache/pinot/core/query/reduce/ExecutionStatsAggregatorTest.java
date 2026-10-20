@@ -197,4 +197,20 @@ public class ExecutionStatsAggregatorTest {
     assertEquals(merged.getMetadata().get(MetadataKey.NUM_DIRECT_REMOTE_ACCESSES.getName()), "3");
     assertEquals(merged.getMetadata().get(MetadataKey.DIRECT_REMOTE_ACCESS_BYTES.getName()), "30");
   }
+
+  @Test
+  public void testApproximatedResultIsOrReducedAndRoundTrips() {
+    DataTable table = emptyServerTable();
+    table.getMetadata().put(MetadataKey.APPROXIMATED_RESULT.getName(), "true");
+    ExecutionStatsAggregator aggregator = new ExecutionStatsAggregator(false);
+    aggregator.aggregate(SERVER, emptyServerTable());
+    aggregator.aggregate(SERVER, table);
+    BrokerResponseNative response = new BrokerResponseNative();
+    aggregator.setStats("testTable", response, mock(BrokerMetrics.class));
+    assertTrue(response.isApproximateFunctionApplied());
+
+    DataTable merged = emptyServerTable();
+    aggregator.setStatsOnMergedDataTable(merged);
+    assertEquals(merged.getMetadata().get(MetadataKey.APPROXIMATED_RESULT.getName()), "true");
+  }
 }

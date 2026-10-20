@@ -21,6 +21,7 @@ package org.apache.pinot.integration.tests;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.util.List;
+import java.util.Locale;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
@@ -37,13 +38,14 @@ import static org.testng.Assert.assertEquals;
 
 
 /// End-to-end test of the cluster config that rewrites exact aggregations into their approximate counterparts. It
-/// covers the two properties unit tests cannot show: the config takes effect on a running broker without a restart,
-/// and the rewrite is invisible to the caller apart from the flag on the response.
+/// covers the properties unit tests cannot show: the config takes effect on a running broker without a restart, the
+/// rewrite is invisible to the caller while the rewritten functions stay exact, and the flag on the response reports
+/// a result that turned approximate.
 public class ApproximateFunctionOverrideIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final String DISTINCT_COUNT_QUERY =
-      "SELECT Carrier, DISTINCTCOUNT(AirlineID) FROM mytable GROUP BY Carrier ORDER BY Carrier LIMIT 100";
+      "SELECT Carrier, DISTINCTCOUNT(Origin) FROM mytable GROUP BY Carrier ORDER BY Carrier LIMIT 100";
   private static final String COUNT_DISTINCT_QUERY =
-      "SELECT Carrier, COUNT(DISTINCT AirlineID) FROM mytable GROUP BY Carrier ORDER BY Carrier LIMIT 100";
+      "SELECT Carrier, COUNT(DISTINCT Origin) FROM mytable GROUP BY Carrier ORDER BY Carrier LIMIT 100";
   private static final String PERCENTILE_QUERY =
       "SELECT Carrier, PERCENTILE(ArrDelay, 90) FROM mytable GROUP BY Carrier ORDER BY Carrier LIMIT 100";
 
@@ -102,16 +104,21 @@ public class ApproximateFunctionOverrideIntegrationTest extends BaseClusterInteg
     assertApplied(exactPercentile, false);
 
     // A threshold far above the cardinality of the test data keeps the rewritten functions exact, which is what makes
-    // the answers comparable before and after the flip.
+    // the answers comparable before and after the flip. The results stay exact, so the flag stays off.
     setApproximateFunctionOverride("threshold=1000000");
     waitForOverride(true);
 
     JsonNode distinctCount = postQuery(DISTINCT_COUNT_QUERY);
-    assertApplied(distinctCount, true);
+    assertApplied(distinctCount, false);
     assertSameResult(exactDistinctCount, distinctCount);
     JsonNode percentile = postQuery(PERCENTILE_QUERY);
-    assertApplied(percentile, true);
+    assertApplied(percentile, false);
     assertSameResult(exactPercentile, percentile);
+
+    // A threshold below the cardinality has to make the answer approximate rather than fail, keeping the same shape,
+    // and the flag reports it. This is also what proves the parameters reach the servers and parse there.
+    setApproximateFunctionOverride("threshold=1");
+    waitForOverride(true);
 
     // COUNT(DISTINCT x) is the standard SQL spelling and must be rewritten too.
     assertApplied(postQuery(COUNT_DISTINCT_QUERY), true);
@@ -121,10 +128,6 @@ public class ApproximateFunctionOverrideIntegrationTest extends BaseClusterInteg
     assertApplied(forcedExact, false);
     assertSameResult(exactDistinctCount, forcedExact);
 
-    // A threshold below the cardinality has to make the answer approximate rather than fail, keeping the same shape.
-    // This is also what proves the parameters reach the servers and parse there.
-    setApproximateFunctionOverride("threshold=1");
-    waitForOverride(true);
     for (JsonNode exact : List.of(exactDistinctCount, exactPercentile)) {
       String query = exact == exactDistinctCount ? DISTINCT_COUNT_QUERY : PERCENTILE_QUERY;
       JsonNode approximate = postQuery(query);
@@ -135,21 +138,33 @@ public class ApproximateFunctionOverrideIntegrationTest extends BaseClusterInteg
     }
   }
 
+  /// The flag reports what the rewrite did. A query that asks for a SMART function itself has chosen to accept an
+  /// approximation, so its result does not set the flag, even when it switches to a sketch.
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testExplicitSmartFunctionDoesNotSetTheFlag(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    JsonNode response = postQuery("SELECT Carrier, DISTINCTCOUNTSMARTHLL(Origin, 'threshold=1') FROM mytable "
+        + "GROUP BY Carrier ORDER BY Carrier LIMIT 100");
+    assertEquals(response.get("exceptions").size(), 0, response.toString());
+    assertApplied(response, false);
+  }
+
   /// Pins the one visible difference the rewrite makes to a single-stage response, so that changing it is a
   /// deliberate decision. The multi-stage engine keeps the Calcite-derived column name.
   @Test
   public void testSingleStageRenamesTheColumn()
       throws Exception {
     setUseMultiStageQueryEngine(false);
-    assertEquals(columnName(postQuery(DISTINCT_COUNT_QUERY)), "distinctcount(AirlineID)");
+    assertEquals(columnName(postQuery(DISTINCT_COUNT_QUERY)), "distinctcount(Origin)");
 
     setApproximateFunctionOverride("threshold=1000000");
     waitForOverride(true);
-    assertEquals(columnName(postQuery(DISTINCT_COUNT_QUERY)), "distinctcountsmarthll(AirlineID)");
+    assertEquals(columnName(postQuery(DISTINCT_COUNT_QUERY)), "distinctcountsmarthll(Origin)");
 
     // An explicit alias is the way to keep the old name.
     assertEquals(columnName(postQuery(
-        "SELECT Carrier, DISTINCTCOUNT(AirlineID) AS dc FROM mytable GROUP BY Carrier ORDER BY Carrier LIMIT 100")),
+        "SELECT Carrier, DISTINCTCOUNT(Origin) AS dc FROM mytable GROUP BY Carrier ORDER BY Carrier LIMIT 100")),
         "dc");
   }
 
@@ -190,13 +205,25 @@ public class ApproximateFunctionOverrideIntegrationTest extends BaseClusterInteg
   }
 
   /// The broker picks the change up from a ZooKeeper watch, so the test waits for it instead of restarting anything.
+  /// The response flag only reports a result that turned approximate, so the wait checks the rewrite itself, in both
+  /// engines: the single-stage column name, and the multi-stage plan.
   private void waitForOverride(boolean expected) {
-    TestUtils.waitForCondition(aVoid -> {
-      try {
-        return postQuery(DISTINCT_COUNT_QUERY).get("approximateFunctionApplied").asBoolean() == expected;
-      } catch (Exception e) {
-        return false;
-      }
-    }, 100L, 60_000L, "Broker did not pick up the approximate function cluster config");
+    boolean useMultiStageQueryEngine = useMultiStageQueryEngine();
+    try {
+      TestUtils.waitForCondition(aVoid -> {
+        try {
+          setUseMultiStageQueryEngine(false);
+          boolean singleStage = columnName(postQuery(DISTINCT_COUNT_QUERY)).startsWith("distinctcountsmarthll");
+          setUseMultiStageQueryEngine(true);
+          boolean multiStage = postQuery("EXPLAIN PLAN FOR " + DISTINCT_COUNT_QUERY).toString()
+              .toUpperCase(Locale.ROOT).contains("DISTINCTCOUNTSMARTHLL");
+          return singleStage == expected && multiStage == expected;
+        } catch (Exception e) {
+          return false;
+        }
+      }, 100L, 60_000L, "Broker did not pick up the approximate function cluster config");
+    } finally {
+      setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    }
   }
 }

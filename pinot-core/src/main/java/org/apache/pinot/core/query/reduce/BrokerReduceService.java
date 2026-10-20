@@ -33,6 +33,7 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
@@ -131,6 +132,11 @@ public class BrokerReduceService extends BaseReduceService {
         brokerResponseNative.addException(new QueryProcessingException(QueryErrorCode.MERGE_RESPONSE,
             "Caught exception while reducing data tables: " + e.getMessage()));
       }
+    }
+    // The reducers extract the final results with the functions of this query context, which record a result that
+    // turned approximate. Servers that extracted final results themselves report it through the aggregator instead.
+    if (AggregationFunctionUtils.hasApproximatedResult(serverQueryContext.getAggregationFunctions())) {
+      brokerResponseNative.setApproximateFunctionApplied(true);
     }
     QueryContext queryContext;
     if (brokerRequest == serverBrokerRequest) {

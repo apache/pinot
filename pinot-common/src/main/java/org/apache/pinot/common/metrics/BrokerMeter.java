@@ -44,7 +44,8 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   public static final BrokerMeter QUERIES = create("QUERIES", "queries", false);
 
   /// Queries in which the broker rewrote at least one exact aggregation into its approximate counterpart, because
-  /// `pinot.broker.use.approximate.function` was on. The results of those queries are approximate.
+  /// `pinot.broker.use.approximate.function` was on, and that function then returned an approximate result. A
+  /// rewritten function that stayed under its conversion threshold returns an exact result and is not counted.
   public static final BrokerMeter APPROXIMATE_FUNCTION_OVERRIDES =
       create("APPROXIMATE_FUNCTION_OVERRIDES", "queries", false);
   /// Number of single-stage queries that have been started.

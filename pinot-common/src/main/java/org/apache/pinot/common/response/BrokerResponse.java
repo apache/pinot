@@ -328,14 +328,16 @@ public interface BrokerResponse {
   boolean getRLSFiltersApplied();
 
   /// Set whether the broker rewrote an exact aggregation into its approximate counterpart, for example
-  /// `DISTINCT_COUNT` into `DISTINCT_COUNT_SMART_HLL`. The result is then approximate, not exact.
+  /// `DISTINCT_COUNT` into `DISTINCT_COUNT_SMART_HLL`, and that function then returned an approximate result. A
+  /// rewritten function stays exact until it crosses its conversion threshold, so a rewrite alone does not set it.
   /// The default is a no-op so that implementations which do not track this need no change.
-  /// @param approximateFunctionApplied true if at least one function was rewritten
+  /// @param approximateFunctionApplied true if at least one rewritten function returned an approximate result
   default void setApproximateFunctionApplied(boolean approximateFunctionApplied) {
   }
 
-  /// Get whether the broker rewrote an exact aggregation into its approximate counterpart.
-  /// @return true if at least one function was rewritten, false otherwise
+  /// Get whether the broker rewrote an exact aggregation into its approximate counterpart, and that function then
+  /// returned an approximate result.
+  /// @return true if at least one rewritten function returned an approximate result, false otherwise
   default boolean isApproximateFunctionApplied() {
     return false;
   }

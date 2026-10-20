@@ -1109,9 +1109,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       // set if rls (row level security) filters have been applied on the query
       brokerResponse.setRLSFiltersApplied(rlsFiltersApplied);
 
-      // set if an exact aggregation was rewritten into its approximate counterpart, which makes the result
-      // approximate rather than exact
-      if (query.getPlannerContext().isApproximateFunctionApplied()) {
+      // set if an exact aggregation was rewritten into its approximate counterpart, and that function then returned an
+      // approximate result. The operators report any function that did, so a query that asks for a SMART function
+      // itself does not set it.
+      if (query.getPlannerContext().isApproximateFunctionApplied() && brokerResponse.isApproximatedResult()) {
         brokerResponse.setApproximateFunctionApplied(true);
         for (String tableName : tableNames) {
           _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.APPROXIMATE_FUNCTION_OVERRIDES, 1);
