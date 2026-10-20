@@ -171,9 +171,9 @@ public class PinotRuleUtils {
         @Override
         public Void visitCall(RexCall call) {
           SqlOperator operator = call.getOperator();
-          if (operator != PinotOperatorTable.ARRAY_TO_MV && (!operator.isDeterministic()
-              || operator.isDynamicFunction()
-              || (operator instanceof PinotSqlFunction && ((PinotSqlFunction) operator).isVolatile()))) {
+          boolean isVariable = !operator.isDeterministic() || operator.isDynamicFunction()
+              || (operator instanceof PinotSqlFunction && ((PinotSqlFunction) operator).isVolatile());
+          if (isVariable && operator != PinotOperatorTable.ARRAY_TO_MV) {
             throw Util.FoundOne.NULL;
           }
           return super.visitCall(call);
