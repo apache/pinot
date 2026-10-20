@@ -29,6 +29,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import org.apache.pinot.coordination.ratis.rpc.MetadataRpc;
 import org.apache.pinot.coordination.ratis.rpc.MetadataServiceGrpc;
+import org.apache.pinot.coordination.ratis.rpc.MinionTaskServiceGrpc;
 import org.apache.pinot.coordination.ratis.rpc.ParticipantMembershipServiceGrpc;
 import org.apache.pinot.coordination.ratis.rpc.ServerInstallationServiceGrpc;
 
@@ -43,10 +44,12 @@ public class MetadataRpcClient implements AutoCloseable {
   public static final int MAX_RESPONSE_BYTES = 2 * MAX_COMMAND_BYTES;
   public static final int MAX_MEMBERSHIP_BYTES = 64 * 1024;
   public static final int MAX_INSTALLATION_REQUEST_BYTES = 64 * 1024;
+  public static final int MAX_TASK_REQUEST_BYTES = 64 * 1024;
   private final ManagedChannel _channel;
   private final MetadataServiceGrpc.MetadataServiceBlockingStub _stub;
   private final ParticipantMembershipServiceGrpc.ParticipantMembershipServiceBlockingStub _membership;
   private final ServerInstallationServiceGrpc.ServerInstallationServiceBlockingStub _installation;
+  private final MinionTaskServiceGrpc.MinionTaskServiceBlockingStub _task;
   private final long _timeoutMillis;
 
   public MetadataRpcClient(String host, int port, Path certificateChain, Path privateKey, Path trustCertificates,
@@ -63,6 +66,31 @@ public class MetadataRpcClient implements AutoCloseable {
     _stub = MetadataServiceGrpc.newBlockingStub(_channel);
     _membership = ParticipantMembershipServiceGrpc.newBlockingStub(_channel);
     _installation = ServerInstallationServiceGrpc.newBlockingStub(_channel);
+    _task = MinionTaskServiceGrpc.newBlockingStub(_channel);
+  }
+
+  public MetadataRpc.CommandResult taskExecute(MetadataRpc.TaskCommandRequest request, long timeoutMillis) {
+    return taskCall(request, timeoutMillis, stub -> stub.execute(request));
+  }
+
+  public MetadataRpc.TaskWorkResult taskWork(MetadataRpc.TaskWorkRequest request, long timeoutMillis) {
+    return taskCall(request, timeoutMillis, stub -> stub.work(request));
+  }
+
+  public MetadataRpc.CommandResult taskOutcome(MetadataRpc.TaskOutcomeRequest request, long timeoutMillis) {
+    return taskCall(request, timeoutMillis, stub -> stub.outcome(request));
+  }
+
+  private <T> T taskCall(Message request, long timeoutMillis,
+      Function<MinionTaskServiceGrpc.MinionTaskServiceBlockingStub, T> operation) {
+    if (request == null || request.getSerializedSize() > MAX_TASK_REQUEST_BYTES) {
+      throw Status.RESOURCE_EXHAUSTED.withDescription("Task request exceeds transport byte limit")
+          .asRuntimeException();
+    }
+    if (timeoutMillis <= 0) {
+      throw Status.DEADLINE_EXCEEDED.withDescription("Task request deadline expired").asRuntimeException();
+    }
+    return operation.apply(_task.withDeadlineAfter(Math.min(_timeoutMillis, timeoutMillis), TimeUnit.MILLISECONDS));
   }
 
   public MetadataRpc.CommandResult installationExecute(MetadataRpc.InstallationCommandRequest request,

@@ -18,49 +18,133 @@
  */
 package org.apache.pinot.coordination.ratis.metadata;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import javax.annotation.Nullable;
+import org.apache.pinot.common.coordination.NativeTaskOutputIdentity;
+import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.ControlState;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.ParticipantState;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.ParticipantToken;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.CatalogRecord;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.ObjectVersion;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.RecordKind;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Revision;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Status;
+import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.Content;
 import org.apache.pinot.coordination.ratis.metadata.OwnershipProtocol.OwnerToken;
 
 
-/// Internal durable task execution ledger. This protocol does not publish task outputs or enable native plugins.
+/// Durable task scheduling, execution and immutable OFFLINE output publication. Legacy plugins are not enabled.
 /// Participant tokens identify sessions; a future authenticated transport must derive them from its caller identity.
 public final class TaskProtocol {
   public static final int MAX_ATTEMPTS = 16;
   public static final int MAX_DEPENDENCIES = 32;
   public static final int MAX_CONFIGS = 128;
   public static final int MAX_DETAIL_LENGTH = 1024;
+  public static final int MAX_OUTPUTS = 16;
+  public static final int MAX_OCCURRENCES = 1024;
+  public static final int MAX_SNAPSHOT_RECORDS = 128;
+  public static final int MIN_SNAPSHOT_BYTES = 1024;
+  public static final int MAX_SNAPSHOT_BYTES = 2 * 1024 * 1024;
+  public static final String NATIVE_SEGMENT_GENERATION_TASK = "NativeSegmentGenerationTask";
 
   private TaskProtocol() {
   }
 
   /// EXECUTION_FINISHED records worker execution only. It does not certify output publication or task success.
   public enum TaskStatus {
-    READY, RUNNING, EXECUTION_FINISHED, RETRYABLE_FAILED, FATAL_FAILED, CANCELLED
+    READY, RUNNING, EXECUTION_FINISHED, RETRYABLE_FAILED, FATAL_FAILED, CANCELLED, SUCCEEDED
   }
 
   /// FENCED revokes further reports. It does not assert that a cancelled or unavailable worker stopped executing.
   public enum AttemptStatus {
-    RUNNING, EXECUTION_FINISHED, RETRYABLE_FAILED, FATAL_FAILED, FENCED
+    RUNNING, EXECUTION_FINISHED, RETRYABLE_FAILED, FATAL_FAILED, FENCED, SUCCEEDED
   }
 
   public record QueueKey(String tableName, UUID tableObjectId, String taskType) {
   }
 
-  /// Explicit minion identity is a bounded initial assignment policy, not plugin capability discovery or scheduling.
-  public record Input(QueueKey queue, String minionId, Map<String, String> configs, int maxAttempts) {
+  /// Explicit assignment remains independent of plugin discovery. Only an explicit typed output policy grants
+  /// publication authority; old inputs remain readable and cannot publish outputs.
+  public record Input(QueueKey queue, String minionId, Map<String, String> configs, int maxAttempts,
+                      @Nullable @JsonInclude(JsonInclude.Include.NON_NULL) OutputPolicy outputPolicy) {
     public Input {
       configs = configs == null ? null : Map.copyOf(configs);
+    }
+
+    public Input(QueueKey queue, String minionId, Map<String, String> configs, int maxAttempts) {
+      this(queue, minionId, configs, maxAttempts, null);
+    }
+
+    /// Preserve replay of pre-publication commands without weakening missing-field validation for other records.
+    @JsonCreator(mode = JsonCreator.Mode.DELEGATING)
+    public static Input fromJson(JsonNode value) throws IOException {
+      Set<String> fields = Set.of("queue", "minionId", "configs", "maxAttempts", "outputPolicy");
+      if (!value.isObject() || !value.has("queue") || !value.has("minionId") || !value.has("configs")
+          || (!value.path("minionId").isTextual() && !value.path("minionId").isNull())
+          || (!value.path("configs").isObject() && !value.path("configs").isNull())
+          || !value.path("maxAttempts").isIntegralNumber()
+          || !value.path("maxAttempts").canConvertToInt()) {
+        throw new IOException("Invalid task input fields");
+      }
+      Map<String, String> configs = new HashMap<>();
+      for (var entry : value.properties()) {
+        if (!fields.contains(entry.getKey())) {
+          throw new IOException("Unsupported task input field");
+        }
+      }
+      for (var entry : value.path("configs").properties()) {
+        if (!entry.getValue().isTextual()) {
+          throw new IOException("Task config must be a string");
+        }
+        configs.put(entry.getKey(), entry.getValue().textValue());
+      }
+      JsonNode policy = value.get("outputPolicy");
+      return new Input(MetadataProtocol.fromTree(value.get("queue"), QueueKey.class),
+          value.get("minionId").textValue(), value.get("configs").isNull() ? null : configs,
+          value.get("maxAttempts").intValue(),
+          policy == null || policy.isNull() ? null : MetadataProtocol.fromTree(policy, OutputPolicy.class));
+    }
+  }
+
+  /// Controller-approved immutable artifact namespace. Local workers separately enforce their configured I/O roots.
+  public record OutputPolicy(String rootUri, int maxOutputs) {
+  }
+
+  /// A schedule identity is its immutable configuration generation. One FireSchedule creates at most one occurrence;
+  /// finite CATCH_UP scheduling uses committed membership rounds and never wall-clock values supplied by a worker.
+  public record ScheduleState(UUID historyId, UUID scheduleId, Input input, List<ObjectVersion> dependencies,
+                              OwnerToken controller, long firstRound, long intervalRounds, long maxOccurrences,
+                              long firedOccurrences, long policyVersion) {
+    public ScheduleState {
+      dependencies = dependencies == null ? null : List.copyOf(dependencies);
+    }
+  }
+
+  /// The manifest and successful terminal task/attempt records share one committed transaction with these contents.
+  /// It certifies catalog publication, not installed replicas, serving eligibility or physical file reclamation.
+  public record PublicationState(UUID historyId, UUID taskId, long attempt, ParticipantToken minion,
+                                 List<Content> outputs, long committedIndex) {
+    public PublicationState {
+      outputs = outputs == null ? null : List.copyOf(outputs);
+    }
+  }
+
+  public record WorkSnapshot(Status status, Revision revision, String detail, ParticipantState participant,
+                             List<CatalogRecord> records, ControlState control) {
+    public WorkSnapshot {
+      records = List.copyOf(records);
     }
   }
 
@@ -90,8 +174,11 @@ public final class TaskProtocol {
   @JsonSubTypes({@JsonSubTypes.Type(value = Submit.class, name = "SUBMIT"),
       @JsonSubTypes.Type(value = SetQueuePaused.class, name = "SET_QUEUE_PAUSED"),
       @JsonSubTypes.Type(value = Cancel.class, name = "CANCEL"),
-      @JsonSubTypes.Type(value = Retry.class, name = "RETRY")})
-  public sealed interface ControllerOperation permits Submit, SetQueuePaused, Cancel, Retry {
+      @JsonSubTypes.Type(value = Retry.class, name = "RETRY"),
+      @JsonSubTypes.Type(value = CreateSchedule.class, name = "CREATE_SCHEDULE"),
+      @JsonSubTypes.Type(value = FireSchedule.class, name = "FIRE_SCHEDULE")})
+  public sealed interface ControllerOperation
+      permits Submit, SetQueuePaused, Cancel, Retry, CreateSchedule, FireSchedule {
     OwnerToken owner();
   }
 
@@ -101,6 +188,18 @@ public final class TaskProtocol {
     public Submit {
       dependencies = dependencies == null ? null : List.copyOf(dependencies);
     }
+  }
+
+  public record CreateSchedule(OwnerToken owner, UUID scheduleId, Input input, List<ObjectVersion> dependencies,
+                               long firstRound, long intervalRounds, long maxOccurrences)
+      implements ControllerOperation {
+    public CreateSchedule {
+      dependencies = dependencies == null ? null : List.copyOf(dependencies);
+    }
+  }
+
+  public record FireSchedule(OwnerToken owner, UUID scheduleId, long expectedVersion)
+      implements ControllerOperation {
   }
 
   /// Version zero creates the queue; existing queues require their exact current version.
@@ -120,8 +219,9 @@ public final class TaskProtocol {
   @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "operation")
   @JsonSubTypes({@JsonSubTypes.Type(value = Claim.class, name = "CLAIM"),
       @JsonSubTypes.Type(value = Checkpoint.class, name = "CHECKPOINT"),
-      @JsonSubTypes.Type(value = Complete.class, name = "COMPLETE")})
-  public sealed interface WorkerOperation permits Claim, Checkpoint, Complete {
+      @JsonSubTypes.Type(value = Complete.class, name = "COMPLETE"),
+      @JsonSubTypes.Type(value = PublishOfflineOutputs.class, name = "PUBLISH_OFFLINE_OUTPUTS")})
+  public sealed interface WorkerOperation permits Claim, Checkpoint, Complete, PublishOfflineOutputs {
     UUID taskId();
 
     long expectedVersion();
@@ -137,6 +237,51 @@ public final class TaskProtocol {
   /// Only execution-finished, retryable-failed and fatal-failed reports are supported. No domain effects are accepted.
   public record Complete(UUID taskId, long expectedVersion, long attempt, AttemptStatus result, Progress progress)
       implements WorkerOperation {
+  }
+
+  public record PublishOfflineOutputs(UUID taskId, long expectedVersion, long attempt, List<Content> outputs,
+                                      Progress progress) implements WorkerOperation {
+    public PublishOfflineOutputs {
+      outputs = outputs == null ? null : List.copyOf(outputs);
+    }
+  }
+
+  public static ScheduleState decodeSchedule(JsonNode value) throws IOException {
+    return MetadataProtocol.fromTree(value, ScheduleState.class);
+  }
+
+  public static PublicationState decodePublication(JsonNode value) throws IOException {
+    return MetadataProtocol.fromTree(value, PublicationState.class);
+  }
+
+  public static UUID occurrenceTaskId(UUID historyId, UUID scheduleId, long occurrence) {
+    if (historyId == null || scheduleId == null || occurrence <= 0 || occurrence > MAX_OCCURRENCES) {
+      throw new IllegalArgumentException("Invalid scheduled occurrence identity");
+    }
+    return UUID.nameUUIDFromBytes((historyId + "\0TASK_OCCURRENCE\0" + scheduleId + "\0" + occurrence)
+        .getBytes(StandardCharsets.UTF_8));
+  }
+
+  public static String outputSegmentName(UUID taskId, long attempt, int ordinal) {
+    return NativeTaskOutputIdentity.outputSegmentName(taskId, attempt, ordinal);
+  }
+
+  public static UUID outputObjectId(UUID historyId, UUID taskId, long attempt, int ordinal) {
+    return NativeTaskOutputIdentity.outputObjectId(historyId, taskId, attempt, ordinal);
+  }
+
+  public static String outputUri(OutputPolicy policy, UUID historyId, UUID taskId, long attempt, UUID incarnation,
+      int ordinal, String sha256) {
+    outputRoot(policy);
+    return NativeTaskOutputIdentity.outputUri(policy.rootUri(), historyId, taskId, attempt, incarnation, ordinal,
+        sha256);
+  }
+
+  public static URI outputRoot(OutputPolicy policy) {
+    if (policy == null || policy.maxOutputs() <= 0 || policy.maxOutputs() > MAX_OUTPUTS) {
+      throw new IllegalArgumentException("Invalid output publication policy");
+    }
+    return NativeTaskOutputIdentity.outputRoot(policy.rootUri());
   }
 
   public static QueueState decodeQueue(JsonNode value) throws IOException {

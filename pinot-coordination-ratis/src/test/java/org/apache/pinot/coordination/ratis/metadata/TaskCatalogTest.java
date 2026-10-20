@@ -21,6 +21,7 @@ package org.apache.pinot.coordination.ratis.metadata;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,12 +31,14 @@ import java.util.function.LongFunction;
 import java.util.stream.Collectors;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.ActivateControlEpoch;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.BeginDrain;
+import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.Capability;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.ConfigurePolicy;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.ParticipantToken;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.Policy;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.Register;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.Role;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.SetReady;
+import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.Tick;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.Unregister;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Acknowledge;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Action;
@@ -47,6 +50,7 @@ import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.MembershipC
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Mutation;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.NativeTaskCommand;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.ObjectVersion;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.OfflineSegmentCommand;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.OwnershipCommand;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.RecordKind;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.RegisterClient;
@@ -56,6 +60,9 @@ import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Status;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.TaskCommand;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.TaskSessionCommand;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Transaction;
+import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.Content;
+import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.LoaderDescriptor;
+import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.PublishContent;
 import org.apache.pinot.coordination.ratis.metadata.OwnershipProtocol.AssignOwner;
 import org.apache.pinot.coordination.ratis.metadata.OwnershipProtocol.ConfigureLayout;
 import org.apache.pinot.coordination.ratis.metadata.OwnershipProtocol.OwnerToken;
@@ -64,8 +71,12 @@ import org.apache.pinot.coordination.ratis.metadata.TaskProtocol.Cancel;
 import org.apache.pinot.coordination.ratis.metadata.TaskProtocol.Checkpoint;
 import org.apache.pinot.coordination.ratis.metadata.TaskProtocol.Claim;
 import org.apache.pinot.coordination.ratis.metadata.TaskProtocol.Complete;
+import org.apache.pinot.coordination.ratis.metadata.TaskProtocol.CreateSchedule;
+import org.apache.pinot.coordination.ratis.metadata.TaskProtocol.FireSchedule;
 import org.apache.pinot.coordination.ratis.metadata.TaskProtocol.Input;
+import org.apache.pinot.coordination.ratis.metadata.TaskProtocol.OutputPolicy;
 import org.apache.pinot.coordination.ratis.metadata.TaskProtocol.Progress;
+import org.apache.pinot.coordination.ratis.metadata.TaskProtocol.PublishOfflineOutputs;
 import org.apache.pinot.coordination.ratis.metadata.TaskProtocol.QueueKey;
 import org.apache.pinot.coordination.ratis.metadata.TaskProtocol.Retry;
 import org.apache.pinot.coordination.ratis.metadata.TaskProtocol.SetQueuePaused;
@@ -79,6 +90,7 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
@@ -247,7 +259,7 @@ public class TaskCatalogTest {
     old.put("formatVersion", 8);
     MetadataCatalog upgraded = new MetadataCatalog(f._cluster, f._history);
     upgraded.restoreSnapshot(old);
-    assertEquals(upgraded.captureSnapshot().path("formatVersion").asInt(), 9);
+    assertEquals(upgraded.captureSnapshot().path("formatVersion").asInt(), 10);
     assertEquals(f.submit().status(), Status.OK);
     assertEquals(f.worker(new Claim(f._task, f.version())).status(), Status.OK);
     long claimIndex = f._index;
@@ -282,7 +294,200 @@ public class TaskCatalogTest {
     assertEquals(upgraded.captureSnapshot(), current);
   }
 
+  @Test
+  public void testOccurrenceWatermarkAndPublicationCommitAtomicallyAcrossRecovery() throws Exception {
+    Fixture f = new Fixture(true);
+    UUID scheduleId = UUID.randomUUID();
+    CreateSchedule create = new CreateSchedule(f._owner, scheduleId, f.input(), List.of(), 1, 1, 2);
+    assertEquals(f.task(create).status(), Status.OK);
+    assertEquals(f.task(create).status(), Status.OK);
+    assertEquals(f.task(new CreateSchedule(f._owner, scheduleId, f.input(), List.of(), 2, 1, 2)).status(),
+        Status.CONFLICT);
+    assertEquals(f.task(new FireSchedule(f._owner, scheduleId, 1)).status(), Status.NOT_READY);
+    var control = f._catalog.membershipControl();
+    assertEquals(f.member(new Tick(control.controlEpoch(), 0, control.policy().version())).status(), Status.OK);
+    assertEquals(f.task(new FireSchedule(f._owner, scheduleId, 1)).status(), Status.OK);
+    UUID taskId = TaskProtocol.occurrenceTaskId(f._history, scheduleId, 1);
+    assertEquals(f.worker(new Claim(taskId, 1)).status(), Status.OK);
+    Content output = f.output(taskId, 1);
+    long before = f._index;
+    assertEquals(f.worker(new PublishOfflineOutputs(taskId, 2, 1, List.of(output), new Progress(1, "published")))
+        .status(), Status.OK);
+    long published = f._lastWorkerResult.revision().index();
+    assertTrue(published > before);
+    for (CatalogRecord record : List.of(f.record(RecordKind.TASK, taskId.toString()),
+        f.record(RecordKind.TASK_ATTEMPT, TaskProtocol.attemptName(taskId, 1)),
+        f.record(RecordKind.TASK_PUBLICATION, taskId.toString()),
+        f.record(RecordKind.OFFLINE_SEGMENT_CONTENT, OfflineSegmentProtocol.contentName(f._table,
+            output.segmentName())))) {
+      assertEquals(record.lastModifiedIndex(), published);
+    }
+    assertEquals(TaskProtocol.decodeTask(f.record(RecordKind.TASK, taskId.toString()).value()).status(),
+        TaskStatus.SUCCEEDED);
+    f.restore();
+    assertEquals(f.apply(f._lastWorker), f._lastWorkerResult);
+    assertTrue(f._catalog.taskSnapshot(f._minion, 128, 100_000).records().isEmpty());
+    assertEquals(f.task(new Cancel(f._owner, taskId, 3, "too late")).status(), Status.CONFLICT);
+    assertEquals(f.task(new FireSchedule(f._owner, scheduleId, 1)).status(), Status.CONFLICT);
+    assertEquals(f.task(new FireSchedule(f._owner, scheduleId, 2)).status(), Status.NOT_READY);
+    assertEquals(f.member(new Tick(control.controlEpoch(), 1, control.policy().version())).status(), Status.OK);
+    assertEquals(f.task(new FireSchedule(f._owner, scheduleId, 2)).status(), Status.OK);
+    assertEquals(f.task(new FireSchedule(f._owner, scheduleId, 3)).status(), Status.CONFLICT);
+    f.restore();
+    ObjectNode corrupt = f._catalog.captureSnapshot().deepCopy();
+    for (JsonNode records : corrupt.findValues("records")) {
+      for (JsonNode record : records) {
+        if (record.path("kind").asText().equals(RecordKind.TASK_PUBLICATION.name())) {
+          ((ObjectNode) record.at("/value/outputs/0")).put("contentSha256", "b".repeat(64));
+        }
+      }
+    }
+    assertThrows(IOException.class, () -> new MetadataCatalog(f._cluster, f._history).restoreSnapshot(corrupt));
+  }
+
+  @Test
+  public void testPublicationRejectsUnownedArtifactsAndFencedAttemptsWithoutPartialEffects() throws Exception {
+    Fixture f = new Fixture(true);
+    assertEquals(f.submit().status(), Status.OK);
+    assertEquals(f.worker(new Claim(f._task, f.version())).status(), Status.OK);
+    Content output = f.output(f._task, 1);
+    Content wrongPath = new Content(output.tableName(), output.tableObjectId(), output.segmentName(),
+        output.segmentObjectId(), output.contentSha256(), "file:///outside/result.tar.gz", output.loader());
+    assertEquals(f.worker(new PublishOfflineOutputs(f._task, f.version(), 1, List.of(wrongPath),
+        new Progress(1, "bad path"))).status(), Status.INVALID_REQUEST);
+    assertEquals(f.state().status(), TaskStatus.RUNNING);
+    assertEquals(f.worker(new Complete(f._task, f.version(), 1, AttemptStatus.EXECUTION_FINISHED,
+        new Progress(1, "no publication"))).status(), Status.INVALID_REQUEST);
+    UUID second = UUID.randomUUID();
+    assertEquals(f.task(new Submit(f._owner, second, f.input(), List.of())).status(), Status.OK);
+    assertEquals(f.worker(new Claim(second, 1)).status(), Status.NOT_READY);
+    ParticipantToken old = f._minion;
+    assertEquals(f.member(new Unregister(old)).status(), Status.OK);
+    f._minion = f.registerMinion("minion", 1);
+    assertEquals(f.worker(new Claim(second, 1)).status(), Status.NOT_READY);
+    assertEquals(f.task(new Retry(f._owner, f._task, f.version())).status(), Status.OK);
+    assertEquals(f.worker(new Claim(f._task, f.version())).status(), Status.OK);
+    assertEquals(f.worker(new PublishOfflineOutputs(f._task, f.version(), 1, List.of(output),
+        new Progress(1, "stale attempt"))).status(), Status.FENCED);
+    assertEquals(f.task(new Cancel(f._owner, f._task, f.version(), "cancel")).status(), Status.OK);
+    assertEquals(f.worker(new PublishOfflineOutputs(f._task, f.version(), 2, List.of(f.output(f._task, 2)),
+        new Progress(1, "late"))).status(), Status.FENCED);
+    assertFalse(f._catalog.captureImage(new FeedScope(Set.of(RecordKind.TASK_PUBLICATION,
+        RecordKind.OFFLINE_SEGMENT_CONTENT), "outputs"), 10, 100_000).records().iterator().hasNext());
+    f.restore();
+  }
+
+  @Test
+  public void testPublicationCollisionAndInputChangeCannotCertifySuccess() throws Exception {
+    Fixture f = new Fixture(true);
+    assertEquals(f.submit().status(), Status.OK);
+    assertEquals(f.worker(new Claim(f._task, f.version())).status(), Status.OK);
+    Content output = f.output(f._task, 1);
+    ObjectVersion table = f.objectVersion(f.record(RecordKind.TABLE_CONFIG, TABLE));
+    assertEquals(f.controller(sequence -> new OfflineSegmentCommand(f._history, "controller", 1, "controller",
+        sequence, new PublishContent(f._owner, table, output))).status(), Status.OK);
+    assertEquals(f.worker(new PublishOfflineOutputs(f._task, f.version(), 1, List.of(output),
+        new Progress(1, "collision"))).status(), Status.CONFLICT);
+    assertEquals(f.state().status(), TaskStatus.RUNNING);
+    assertEquals(f.mutate(new Mutation(Action.UPDATE, RecordKind.TABLE_CONFIG, TABLE, table,
+        MetadataProtocol.toTree(f.table()))).status(), Status.OK);
+    assertEquals(f.worker(new PublishOfflineOutputs(f._task, f.version(), 1, List.of(output),
+        new Progress(1, "changed input"))).status(), Status.CONFLICT);
+    assertEquals(f._catalog.taskSnapshot(f._minion, 1, 100_000).status(), Status.RESPONSE_TOO_LARGE);
+    assertEquals(f._catalog.taskSnapshot(f._minion, 128, 1024).status(), Status.RESPONSE_TOO_LARGE);
+    var image = f._catalog.taskSnapshot(f._minion, 128, 100_000);
+    assertEquals(image.status(), Status.OK);
+    assertTrue(image.records().stream().noneMatch(record -> record.kind() == RecordKind.PARTICIPANT));
+    f.restore();
+  }
+
+  @Test
+  public void testLegacyInputEncodingAndSnapshotRemainReplayable() throws Exception {
+    Fixture f = new Fixture();
+    TaskCommand command = new TaskCommand(f._history, "controller", 1, "controller", f._sequence + 1,
+        new Submit(f._owner, f._task, f.input(), List.of()));
+    byte[] legacy = MetadataProtocol.encode(command);
+    assertFalse(new String(legacy, StandardCharsets.UTF_8).contains("outputPolicy"));
+    Command decoded = MetadataProtocol.decodeCommand(legacy);
+    assertEquals(MetadataProtocol.encode(decoded), legacy);
+    assertEquals(MetadataProtocol.digest(decoded), MetadataProtocol.digest(command));
+    for (Input invalid : List.of(new Input(null, "minion", Map.of(), 2),
+        new Input(f.input().queue(), null, Map.of(), 2), new Input(f.input().queue(), "minion", null, 2))) {
+      TaskCommand rejected = new TaskCommand(f._history, "controller", 1, "controller", f._sequence + 1,
+          new Submit(f._owner, f._task, invalid, List.of()));
+      byte[] rejectedBytes = MetadataProtocol.encode(rejected);
+      assertEquals(MetadataProtocol.encode(MetadataProtocol.decodeCommand(rejectedBytes)), rejectedBytes);
+      assertEquals(f.task(new Submit(f._owner, f._task, invalid, List.of())).status(), Status.INVALID_REQUEST);
+    }
+    assertEquals(f.submit().status(), Status.OK);
+    ObjectNode old = f._catalog.captureSnapshot().deepCopy();
+    old.put("formatVersion", 9);
+    MetadataCatalog restored = new MetadataCatalog(f._cluster, f._history);
+    restored.restoreSnapshot(old);
+    assertEquals(restored.captureSnapshot().path("formatVersion").asInt(), 10);
+  }
+
+  @Test
+  public void testActionableAdmissionPreservesWatermarkAndReservesClaimCapacity() throws Exception {
+    for (boolean largeInput : List.of(false, true)) {
+      Fixture f = new Fixture(true);
+      Input input = f.input();
+      if (largeInput) {
+        input = new Input(input.queue(), input.minionId(),
+            Map.of("sourceUri", "file:///" + "a".repeat(16_000), "sourceSha256", "a".repeat(64)),
+            input.maxAttempts(), input.outputPolicy());
+      }
+      UUID schedule = UUID.randomUUID();
+      assertEquals(f.task(new CreateSchedule(f._owner, schedule, input, List.of(), 0, 0, 1)).status(), Status.OK);
+      int admitted = 0;
+      while (admitted < TaskProtocol.MAX_SNAPSHOT_RECORDS) {
+        UUID id = admitted == 0 ? f._task : UUID.randomUUID();
+        Result result = f.task(new Submit(f._owner, id, input, List.of()));
+        if (result.status() == Status.NOT_READY) {
+          break;
+        }
+        assertEquals(result.status(), Status.OK);
+        admitted++;
+      }
+      assertTrue(admitted > 0 && admitted < TaskProtocol.MAX_SNAPSHOT_RECORDS);
+      var image = f._catalog.taskSnapshot(f._minion, TaskProtocol.MAX_SNAPSHOT_RECORDS,
+          TaskProtocol.MAX_SNAPSHOT_BYTES);
+      assertEquals(image.status(), Status.OK);
+      if (largeInput) {
+        assertTrue(image.records().size() < TaskProtocol.MAX_SNAPSHOT_RECORDS - 1,
+            "Byte admission must reject before the record bound is exhausted");
+      }
+      // Configuration creation adds no actionable work, even while this minion is full.
+      assertEquals(f.task(new CreateSchedule(f._owner, UUID.randomUUID(), input, List.of(), 0, 0, 1)).status(),
+          Status.OK);
+      assertEquals(f.task(new FireSchedule(f._owner, schedule, 1)).status(), Status.NOT_READY);
+      CatalogRecord retained = f.record(RecordKind.TASK_SCHEDULE, schedule.toString());
+      assertEquals(retained.version(), 1L);
+      assertEquals(TaskProtocol.decodeSchedule(retained.value()).firedOccurrences(), 0L);
+      assertEquals(f.worker(new Claim(f._task, 1)).status(), Status.OK);
+      assertEquals(f.worker(new Checkpoint(f._task, f.version(), 1,
+          new Progress(1, "\u0000".repeat(TaskProtocol.MAX_DETAIL_LENGTH)))).status(), Status.OK);
+      assertEquals(f._catalog.taskSnapshot(f._minion, TaskProtocol.MAX_SNAPSHOT_RECORDS,
+          TaskProtocol.MAX_SNAPSHOT_BYTES).status(), Status.OK);
+      // A failed first attempt can return to READY at the full queue; historical attempt records do not consume
+      // actionable capacity, and the second claim still has its reserved slot.
+      assertEquals(f.worker(new Complete(f._task, f.version(), 1, AttemptStatus.RETRYABLE_FAILED,
+          new Progress(1, "retry"))).status(), Status.OK);
+      assertEquals(f.task(new Retry(f._owner, f._task, f.version())).status(), Status.OK);
+      assertEquals(f.worker(new Claim(f._task, f.version())).status(), Status.OK);
+      assertEquals(f._catalog.taskSnapshot(f._minion, TaskProtocol.MAX_SNAPSHOT_RECORDS,
+          TaskProtocol.MAX_SNAPSHOT_BYTES).status(), Status.OK);
+      assertEquals(f.worker(new Complete(f._task, f.version(), 2, AttemptStatus.FATAL_FAILED,
+          new Progress(0, "execution failed"))).status(), Status.OK);
+      assertEquals(f.task(new FireSchedule(f._owner, schedule, 1)).status(), Status.OK);
+      assertEquals(TaskProtocol.decodeSchedule(f.record(RecordKind.TASK_SCHEDULE, schedule.toString()).value())
+          .firedOccurrences(), 1L);
+      f.restore();
+    }
+  }
+
   private static final class Fixture {
+    private final boolean _nativeTask;
     private final UUID _cluster = UUID.randomUUID();
     private final UUID _history = UUID.randomUUID();
     private final UUID _table = UUID.randomUUID();
@@ -297,6 +502,11 @@ public class TaskCatalogTest {
     private Result _lastWorkerResult;
 
     private Fixture() throws Exception {
+      this(false);
+    }
+
+    private Fixture(boolean nativeTask) throws Exception {
+      _nativeTask = nativeTask;
       assertEquals(apply(new RegisterClient(_history, "controller", UUID.randomUUID(), 0)).status(), Status.OK);
       assertEquals(member(new ActivateControlEpoch(1, "controller", UUID.randomUUID())).status(), Status.OK);
       assertEquals(member(new ConfigurePolicy(_catalog.membershipControl().controlEpoch(), 0,
@@ -320,7 +530,20 @@ public class TaskCatalogTest {
     }
 
     private Input input() {
+      if (_nativeTask) {
+        return new Input(new QueueKey(TABLE, _table, TaskProtocol.NATIVE_SEGMENT_GENERATION_TASK), "minion",
+            Map.of("sourceUri", "file:///inputs/source.json", "sourceSha256", "a".repeat(64)), 2,
+            new OutputPolicy("file:///outputs", 1));
+      }
       return new Input(new QueueKey(TABLE, _table, "TestTask"), "minion", Map.of("tableName", TABLE), 2);
+    }
+
+    private Content output(UUID taskId, long attempt) {
+      String digest = "a".repeat(64);
+      return new Content(TABLE, _table, TaskProtocol.outputSegmentName(taskId, attempt, 0),
+          TaskProtocol.outputObjectId(_history, taskId, attempt, 0), digest,
+          TaskProtocol.outputUri(input().outputPolicy(), _history, taskId, attempt, _minion.incarnation(), 0, digest),
+          new LoaderDescriptor(1, 0, false, null, null, 1, 1, Map.of()));
     }
 
     private Result submit() throws IOException {
@@ -328,7 +551,8 @@ public class TaskCatalogTest {
     }
 
     private ParticipantToken register(String id, Role role, long epoch) throws IOException {
-      var response = member(new Register(id, role, UUID.randomUUID(), epoch, Map.of(), Set.of()));
+      var response = member(new Register(id, role, UUID.randomUUID(), epoch, Map.of(),
+          _nativeTask && role == Role.MINION ? Set.of(Capability.MINION_TASK) : Set.of()));
       assertEquals(response.status(), Status.OK);
       ParticipantToken token = response.participant().participant();
       assertEquals(member(new SetReady(token, new Revision(_history, _index), true)).status(), Status.OK);

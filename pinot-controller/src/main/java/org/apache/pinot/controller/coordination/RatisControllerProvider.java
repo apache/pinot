@@ -29,7 +29,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 /// Supplies explicitly qualified clock and certificate authorization inputs to the native controller lifecycle.
 /// There is no default implementation: selecting a class or configuring numeric bounds does not qualify a clock.
 /// Authorization policies must be current, nonblocking and thread-safe. This starter denies participant bindings
-/// with serving capabilities; query listeners and controller HTTP resources are outside this lifecycle.
+/// with query-serving capabilities. MINION_TASK is accepted only for explicitly bound MINION identities.
 public interface RatisControllerProvider extends AutoCloseable {
   void init(PinotConfiguration configuration) throws Exception;
 

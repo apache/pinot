@@ -83,6 +83,18 @@ public class MetadataRpcConnection implements AutoCloseable {
     return call(timeoutMillis, (client, timeout) -> client.membershipExecute(request, timeout));
   }
 
+  public MetadataRpc.CommandResult taskExecute(MetadataRpc.TaskCommandRequest request, long timeoutMillis) {
+    return call(timeoutMillis, (client, timeout) -> client.taskExecute(request, timeout));
+  }
+
+  public MetadataRpc.TaskWorkResult taskWork(MetadataRpc.TaskWorkRequest request, long timeoutMillis) {
+    return call(timeoutMillis, (client, timeout) -> client.taskWork(request, timeout));
+  }
+
+  public MetadataRpc.CommandResult taskOutcome(MetadataRpc.TaskOutcomeRequest request, long timeoutMillis) {
+    return call(timeoutMillis, (client, timeout) -> client.taskOutcome(request, timeout));
+  }
+
   public MetadataRpc.InstallationSnapshot snapshot(MetadataRpc.InstallationSnapshotRequest request,
       long timeoutMillis) {
     return call(timeoutMillis, (client, timeout) -> client.installationSnapshot(request, timeout));

@@ -83,7 +83,7 @@ public final class MetadataProtocol {
   public enum RecordKind {
     CLUSTER_CONFIG, SCHEMA, TABLE_CONFIG, MEMBERSHIP_CONTROL, PARTICIPANT, OWNER_LAYOUT, OWNER_ASSIGNMENT,
     CONTROLLER_OPERATION, OFFLINE_SEGMENT_CONTENT, OFFLINE_REPLICA_ASSIGNMENT, OFFLINE_INSTALLATION,
-    TASK_QUEUE, TASK, TASK_ATTEMPT
+    TASK_QUEUE, TASK, TASK_ATTEMPT, TASK_SCHEDULE, TASK_PUBLICATION
   }
 
   public enum Action {
@@ -384,10 +384,11 @@ public final class MetadataProtocol {
       @JsonSubTypes.Type(value = GetStreamTip.class, name = "GET_STREAM_TIP"),
       @JsonSubTypes.Type(value = GetRevision.class, name = "GET_REVISION"),
       @JsonSubTypes.Type(value = InstallationSessionQuery.class, name = "INSTALLATION_SESSION"),
+      @JsonSubTypes.Type(value = TaskSessionQuery.class, name = "TASK_SESSION"),
       @JsonSubTypes.Type(value = GetInstallationWork.class, name = "GET_INSTALLATION_WORK"),
       @JsonSubTypes.Type(value = MembershipQuery.class, name = "MEMBERSHIP")})
   public sealed interface Query permits GetRecord, GetOutcome, GetStreamTip, GetRevision, MembershipQuery,
-      InstallationSessionQuery, GetInstallationWork {
+      InstallationSessionQuery, TaskSessionQuery, GetInstallationWork {
     UUID historyId();
   }
 
@@ -418,6 +419,13 @@ public final class MetadataProtocol {
 
   public record InstallationSessionQuery(MembershipProtocol.ParticipantToken server, GetOutcome request)
       implements Query {
+    @Override
+    public UUID historyId() {
+      return request == null ? null : request.historyId();
+    }
+  }
+
+  public record TaskSessionQuery(MembershipProtocol.ParticipantToken minion, GetOutcome request) implements Query {
     @Override
     public UUID historyId() {
       return request == null ? null : request.historyId();

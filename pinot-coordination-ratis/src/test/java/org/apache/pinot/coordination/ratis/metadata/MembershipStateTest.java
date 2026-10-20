@@ -314,7 +314,7 @@ public class MembershipStateTest {
     v2.remove("membership");
     empty.restoreSnapshot(v2);
     assertNull(empty.membershipControl().controlEpoch());
-    assertEquals(empty.captureSnapshot().path("formatVersion").asInt(), 9);
+    assertEquals(empty.captureSnapshot().path("formatVersion").asInt(), 10);
   }
 
   @Test

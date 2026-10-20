@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.Capability;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.ParticipantState;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.ParticipantToken;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.Role;
@@ -29,14 +30,19 @@ import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.CatalogReco
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.ObjectVersion;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.RecordKind;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Revision;
+import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.Content;
+import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.LoaderDescriptor;
 import org.apache.pinot.coordination.ratis.metadata.OwnershipProtocol.OwnerToken;
 import org.apache.pinot.coordination.ratis.metadata.OwnershipProtocol.TableShard;
 import org.apache.pinot.coordination.ratis.metadata.TaskProtocol.AttemptState;
 import org.apache.pinot.coordination.ratis.metadata.TaskProtocol.AttemptStatus;
 import org.apache.pinot.coordination.ratis.metadata.TaskProtocol.Input;
+import org.apache.pinot.coordination.ratis.metadata.TaskProtocol.OutputPolicy;
 import org.apache.pinot.coordination.ratis.metadata.TaskProtocol.Progress;
+import org.apache.pinot.coordination.ratis.metadata.TaskProtocol.PublicationState;
 import org.apache.pinot.coordination.ratis.metadata.TaskProtocol.QueueKey;
 import org.apache.pinot.coordination.ratis.metadata.TaskProtocol.QueueState;
+import org.apache.pinot.coordination.ratis.metadata.TaskProtocol.ScheduleState;
 import org.apache.pinot.coordination.ratis.metadata.TaskProtocol.TaskState;
 import org.apache.pinot.coordination.ratis.metadata.TaskProtocol.TaskStatus;
 import org.apache.pinot.coordination.ratis.rpc.MetadataRpc;
@@ -48,7 +54,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertThrows;
 
 
-/// Task read/feed values preserve their fences without exposing task commands or enabling MINION transport access.
+/// Typed task values preserve their fences; worker commands use only authenticated MINION session identities.
 public class TaskRpcCodecTest {
   @Test
   public void testTypedTaskFeedRoundTrip() throws Exception {
@@ -61,13 +67,21 @@ public class TaskRpcCodecTest {
     ParticipantToken minion = new ParticipantToken(history, "minion", Role.MINION, UUID.randomUUID(), 1);
     ParticipantState participant = new ParticipantState(minion, Map.of(), Set.of(), 3, true, false, false,
         new Revision(history, 2), 0, 3);
+    Input input = new Input(key, "minion", Map.of("key", "v"), 2, new OutputPolicy("file:/tmp/task-outputs/", 1));
+    List<ObjectVersion> dependencies =
+        List.of(new ObjectVersion(history, table, 1), new ObjectVersion(history, UUID.randomUUID(), 1));
+    Content output = new Content("orders_OFFLINE", table, "segment", UUID.randomUUID(), "a".repeat(64),
+        "file:/tmp/task-outputs/segment.tar.gz", new LoaderDescriptor(1, -1, false, null, null, -1, -1, Map.of()));
     List<CatalogRecord> records = List.of(
         record(RecordKind.TASK_QUEUE, "queue", new QueueState(history, key, false, owner)),
-        record(RecordKind.TASK, "task", new TaskState(history, taskId, new Input(key, "minion", Map.of("key", "v"), 2),
-            List.of(new ObjectVersion(history, table, 1), new ObjectVersion(history, UUID.randomUUID(), 1)), owner,
-            TaskStatus.RUNNING, 1)),
+        record(RecordKind.TASK, "task",
+            new TaskState(history, taskId, input, dependencies, owner, TaskStatus.SUCCEEDED, 1)),
         record(RecordKind.TASK_ATTEMPT, "attempt", new AttemptState(history, taskId, 1, participant,
-            new ObjectVersion(history, UUID.randomUUID(), 2), 4, AttemptStatus.RUNNING, new Progress(0, ""))));
+            new ObjectVersion(history, UUID.randomUUID(), 2), 4, AttemptStatus.SUCCEEDED, new Progress(1, ""))),
+        record(RecordKind.TASK_SCHEDULE, "schedule", new ScheduleState(history, UUID.randomUUID(), input, dependencies,
+            owner, 0, 1, 2, 1, 1)),
+        record(RecordKind.TASK_PUBLICATION, "publication",
+            new PublicationState(history, taskId, 1, minion, List.of(output), 4)));
     MetadataRpc.ChangeTransaction.Builder transaction = MetadataRpc.ChangeTransaction.newBuilder()
         .setPreviousIndex(3).setIndex(4);
     for (CatalogRecord record : records) {
@@ -86,10 +100,14 @@ public class TaskRpcCodecTest {
   }
 
   @Test
-  public void testReadTypesDoNotAuthorizeTaskWritesOrMinionMembership() {
-    assertThrows(IllegalArgumentException.class, () -> new ParticipantIdentity("minion", Role.MINION, Set.of()));
+  public void testReadTypesDoNotAuthorizeGenericTaskWritesOrQueryCapabilities() {
+    assertThrows(IllegalArgumentException.class,
+        () -> new ParticipantIdentity("minion", Role.MINION, Set.of(Capability.SERVER_QUERY)));
+    assertThrows(IllegalArgumentException.class,
+        () -> new ParticipantIdentity("server", Role.SERVER, Set.of(Capability.MINION_TASK)));
     for (MetadataRpc.RecordKind kind : List.of(MetadataRpc.RecordKind.TASK_QUEUE, MetadataRpc.RecordKind.TASK,
-        MetadataRpc.RecordKind.TASK_ATTEMPT)) {
+        MetadataRpc.RecordKind.TASK_ATTEMPT, MetadataRpc.RecordKind.TASK_SCHEDULE,
+        MetadataRpc.RecordKind.TASK_PUBLICATION)) {
       assertThrows(IllegalArgumentException.class, () -> MetadataRpcCodec.mutation(
           MetadataRpc.Mutation.newBuilder().setKind(kind).setAction(MetadataRpc.Mutation.Action.CREATE).build()));
     }

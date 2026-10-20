@@ -44,6 +44,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -85,6 +86,7 @@ import org.apache.pinot.coordination.ratis.metadata.OwnershipProtocol;
 import org.apache.pinot.coordination.ratis.metadata.OwnershipProtocol.HashVersion;
 import org.apache.pinot.coordination.ratis.metadata.OwnershipProtocol.Layout;
 import org.apache.pinot.coordination.ratis.metadata.OwnershipProtocol.TableShard;
+import org.apache.pinot.coordination.ratis.metadata.TaskProtocol;
 import org.apache.pinot.coordination.ratis.rpc.MetadataRpc;
 import org.apache.pinot.coordination.ratis.rpc.MetadataServiceGrpc;
 import org.apache.pinot.coordination.ratis.transport.ControllerAccessPolicy.ControllerIdentity;
@@ -1382,6 +1384,152 @@ public class MetadataGrpcTransportTest {
     throw new AssertionError("Native runtime did not advance its applied metadata heartbeat: " + server.failure());
   }
 
+  @Test(timeOut = 90_000)
+  public void testMinionTaskIdentityOutcomesAndProtectedRenewal() throws Exception {
+    ParticipantIdentity minion = new ParticipantIdentity("Minion_worker", Role.MINION, Set.of(Capability.MINION_TASK));
+    AtomicReference<ParticipantIdentity> binding = new AtomicReference<>(minion);
+    ParticipantAccessPolicy policy = fingerprint -> {
+      if (fingerprint.equals(_certificates.get("worker").fingerprint())) {
+        return binding.get();
+      }
+      if (fingerprint.equals(_certificates.get("controller-a").fingerprint())) {
+        return new ParticipantIdentity("Controller_tasks", Role.CONTROLLER, Set.of());
+      }
+      return fingerprint.equals(_certificates.get("controller-b").fingerprint())
+          ? new ParticipantIdentity("Minion_other", Role.MINION, Set.of(Capability.MINION_TASK)) : null;
+    };
+    try (Quorum quorum = new Quorum()) {
+      quorum.startMembership();
+      BlockingAccess access = new BlockingAccess(quorum._access);
+      try (Fixture fixture = new Fixture(MetadataGrpcService.Limits.defaults(), quorum._history, access,
+          quorum._access, policy);
+          MetadataGrpcClient controller = fixture.client("controller-a");
+          MetadataGrpcClient worker = fixture.client("worker");
+          MetadataGrpcClient other = fixture.client("controller-b")) {
+        UUID history = quorum._history;
+        MetadataRpc.ParticipantToken controllerSession = registerReady(controller, history);
+        MetadataRpc.ParticipantToken workerSession = registerReady(worker, history);
+        MetadataRpc.ParticipantToken otherSession = registerReady(other, history);
+        assertEquals(workerSession.getRole(), MetadataRpc.ParticipantRole.MINION);
+        assertStatus(Status.Code.PERMISSION_DENIED, () -> worker.read(fixture.revision()));
+        assertStatus(Status.Code.PERMISSION_DENIED, () -> worker.openSnapshot(fixture.open()));
+        assertEquals(quorum._access.execute(new MetadataProtocol.RegisterClient(history, "native-test",
+            UUID.randomUUID(), 0), 5000).status(), MetadataProtocol.Status.OK);
+        MembershipProtocol.ControlToken control = quorum._access.query(new MetadataProtocol.MembershipQuery(history,
+            new MembershipProtocol.GetControl()), 5000).control().controlEpoch();
+        Layout layout = new Layout(1, 24, HashVersion.MURMUR2_UTF8_MASK_POSITIVE_V1);
+        commitNativeTest(quorum, new MetadataProtocol.OwnershipCommand(history, "native-test", 1, "ownership", 1,
+            new OwnershipProtocol.ConfigureLayout(control, layout)));
+        String tableName = "tasks_OFFLINE";
+        UUID tableId = UUID.randomUUID();
+        TableShard scope = OwnershipProtocol.tableScope(layout, tableName);
+        commitNativeTest(quorum, new MetadataProtocol.OwnershipCommand(history, "native-test", 1, "ownership", 2,
+            new OwnershipProtocol.AssignOwner(control, 1, scope, 0,
+                MembershipRpcCodec.participant(controllerSession))));
+        OwnershipProtocol.OwnerToken owner = new OwnershipProtocol.OwnerToken(history, 1, scope, 1,
+            MembershipRpcCodec.participant(controllerSession));
+        commitNativeTest(quorum, new MetadataProtocol.Transaction(history, "native-test", 1, "config", 1,
+            List.of(MetadataProtocol.Mutation.createTableConfig(history, tableId,
+                    new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).build()),
+                MetadataProtocol.Mutation.createSchema(history, UUID.randomUUID(),
+                    new Schema.SchemaBuilder().setSchemaName("tasks").addSingleValueDimension("id", DataType.INT)
+                        .build()))));
+        TaskProtocol.QueueKey queue = new TaskProtocol.QueueKey(tableName, tableId,
+            TaskProtocol.NATIVE_SEGMENT_GENERATION_TASK);
+        UUID ownTask = UUID.randomUUID();
+        UUID otherTask = UUID.randomUUID();
+        commitNativeTest(quorum, new MetadataProtocol.TaskCommand(history, "native-test", 1, "tasks", 1,
+            new TaskProtocol.Submit(owner, ownTask, new TaskProtocol.Input(queue, minion.participantId(), Map.of(), 2),
+                List.of())));
+        commitNativeTest(quorum, new MetadataProtocol.TaskCommand(history, "native-test", 1, "tasks", 2,
+            new TaskProtocol.Submit(owner, otherTask,
+                new TaskProtocol.Input(queue, otherSession.getParticipantId(), Map.of(), 2), List.of())));
+        MetadataRpc.TaskWorkRequest work = MetadataRpc.TaskWorkRequest.newBuilder().setHistoryId(history.toString())
+            .setSession(session(workerSession)).setMaxRecords(128).setMaxBytes(TaskProtocol.MAX_SNAPSHOT_BYTES).build();
+        MetadataRpc.TaskWorkResult image = worker.taskWork(work, 5000);
+        assertEquals(image.getStatus(), MetadataRpc.ResultStatus.OK);
+        assertEquals(image.getParticipant().getParticipant(), workerSession);
+        assertEquals(image.getRecordsList().stream().filter(r -> r.getKind() == MetadataRpc.RecordKind.TASK)
+            .map(r -> r.getValue().getTask().getTaskId()).toList(), List.of(ownTask.toString()));
+        assertEquals(other.taskWork(work, 5000).getStatus(), MetadataRpc.ResultStatus.FENCED);
+        assertStatus(Status.Code.PERMISSION_DENIED, () -> controller.taskWork(work, 5000));
+        MetadataRpc.TaskWorkResult oversized = worker.taskWork(work.toBuilder().setMaxRecords(1).build(), 5000);
+        assertEquals(oversized.getStatus(), MetadataRpc.ResultStatus.RESPONSE_TOO_LARGE);
+        assertEquals(oversized.getRecordsCount(), 0);
+        MetadataRpc.TaskCommandRequest registration = MetadataRpc.TaskCommandRequest.newBuilder()
+            .setHistoryId(history.toString()).setSession(session(workerSession)).setRegister(
+                MetadataRpc.RegisterClient.newBuilder().setIncarnation(workerSession.getIncarnation())).build();
+        assertEquals(worker.taskExecute(registration, 5000).getStatus(), MetadataRpc.ResultStatus.OK);
+        assertStatus(Status.Code.INVALID_ARGUMENT, () -> worker.taskExecute(registration.toBuilder().setRegister(
+            registration.getRegister().toBuilder().setIncarnation(UUID.randomUUID().toString())).build(), 5000));
+        MetadataRpc.TaskCommandRequest claim = registration.toBuilder().setOperation(
+            MetadataRpc.SequencedTaskOperation.newBuilder().setClientEpoch(1).setStreamId("tasks").setSequence(1)
+                .setClaim(MetadataRpc.TaskClaim.newBuilder().setTaskId(ownTask.toString()).setExpectedVersion(1)))
+            .build();
+        MetadataRpc.CommandResult accepted = worker.taskExecute(claim, 5000);
+        assertEquals(accepted.getStatus(), MetadataRpc.ResultStatus.OK);
+        assertEquals(worker.taskExecute(claim, 5000), accepted, "Lost reply retries retain the committed outcome");
+        MetadataRpc.TaskOutcomeRequest outcome = MetadataRpc.TaskOutcomeRequest.newBuilder()
+            .setHistoryId(history.toString()).setSession(session(workerSession)).setOutcome(
+                MetadataRpc.OutcomeQuery.newBuilder().setClientEpoch(1).setStreamId("tasks").setSequence(1)).build();
+        assertEquals(worker.taskOutcome(outcome, 5000), accepted);
+        assertEquals(other.taskOutcome(outcome, 5000).getStatus(), MetadataRpc.ResultStatus.FENCED);
+        assertStatus(Status.Code.INVALID_ARGUMENT, () -> worker.taskExecute(claim.toBuilder().setUnknownFields(
+            UnknownFieldSet.newBuilder().addField(100, UnknownFieldSet.Field.newBuilder()
+                .addLengthDelimited(ByteString.copyFromUtf8("generic mutation")).build()).build()).build(), 5000));
+        binding.set(new ParticipantIdentity(minion.participantId(), Role.MINION, Set.of()));
+        assertStatus(Status.Code.PERMISSION_DENIED, () -> worker.taskWork(work, 5000));
+        assertStatus(Status.Code.PERMISSION_DENIED, () -> worker.taskExecute(claim, 5000));
+        binding.set(minion);
+        CountDownLatch entered = new CountDownLatch(2);
+        CountDownLatch release = new CountDownLatch(1);
+        access._beforeWork.set(() -> {
+          entered.countDown();
+          try {
+            if (!release.await(10, TimeUnit.SECONDS)) {
+              throw new IllegalStateException("Task test gate was not released");
+            }
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(e);
+          }
+        });
+        ExecutorService requests = Executors.newFixedThreadPool(2);
+        try {
+          Future<MetadataRpc.TaskWorkResult> first = requests.submit(() -> worker.taskWork(work, 5000));
+          Future<MetadataRpc.TaskWorkResult> second = requests.submit(() -> worker.taskWork(work, 5000));
+          assertTrue(entered.await(5, TimeUnit.SECONDS));
+          MetadataRpc.MembershipResponse renewed = worker.membershipExecute(memberRenewal(history,
+              session(workerSession), 1, image.getRevision()));
+          assertEquals(renewed.getRenewals(0).getStatus(), MetadataRpc.ResultStatus.OK);
+          assertEquals(renewed.getRenewals(0).getPermit().getCapabilitiesList(),
+              List.of(MetadataRpc.ServingCapability.MINION_TASK));
+          assertEquals(release.getCount(), 1L, "Membership renewal must not wait for task handlers");
+          binding.set(new ParticipantIdentity(minion.participantId(), Role.MINION, Set.of()));
+          release.countDown();
+          for (Future<MetadataRpc.TaskWorkResult> pending : List.of(first, second)) {
+            ExecutionException denied = expectThrows(ExecutionException.class, () -> pending.get(5, TimeUnit.SECONDS));
+            assertEquals(Status.fromThrowable(denied.getCause()).getCode(), Status.Code.PERMISSION_DENIED);
+          }
+        } finally {
+          release.countDown();
+          requests.shutdownNow();
+          access._beforeWork.set(() -> { });
+          binding.set(minion);
+        }
+        MetadataRpc.TaskCommandRequest acknowledge = registration.toBuilder().setAcknowledge(
+            MetadataRpc.Acknowledge.newBuilder().setClientEpoch(1).setStreamId("tasks").setThroughSequence(1)).build();
+        assertEquals(worker.taskExecute(acknowledge, 5000).getStatus(), MetadataRpc.ResultStatus.OK);
+        assertEquals(worker.taskOutcome(outcome, 5000).getStatus(), MetadataRpc.ResultStatus.RESULT_EXPIRED);
+        assertEquals(worker.membershipExecute(MetadataRpc.MembershipCommandRequest.newBuilder()
+            .setHistoryId(history.toString()).setUnregister(session(workerSession)).build()).getStatus(),
+            MetadataRpc.ResultStatus.OK);
+        assertEquals(worker.taskExecute(claim, 5000).getStatus(), MetadataRpc.ResultStatus.FENCED);
+        assertEquals(worker.taskOutcome(outcome, 5000).getStatus(), MetadataRpc.ResultStatus.FENCED);
+      }
+    }
+  }
+
   private static MetadataRpc.ParticipantToken registerReady(MetadataGrpcClient client, UUID history)
       throws IOException {
     return registerReady(client, history, 0);
@@ -1662,7 +1810,7 @@ public class MetadataGrpcTransportTest {
   }
 
   /// Blocks the four catalog handler threads without blocking membership access to the same real quorum.
-  private static final class BlockingAccess implements MetadataAccess, InstallationAccess {
+  private static final class BlockingAccess implements MetadataAccess, InstallationAccess, TaskAccess {
     private final MetadataAccess _delegate;
     private final AtomicReference<Runnable> _afterExecute = new AtomicReference<>(() -> { });
     private final AtomicReference<Runnable> _beforeWork = new AtomicReference<>(() -> { });
@@ -1687,6 +1835,13 @@ public class MetadataGrpcTransportTest {
         throws IOException {
       _beforeWork.get().run();
       return ((InstallationAccess) _delegate).query(query, timeoutMillis);
+    }
+
+    @Override
+    public TaskProtocol.WorkSnapshot taskSnapshot(MembershipProtocol.ParticipantToken minion, int maxRecords,
+        int maxBytes, long timeoutMillis) throws IOException {
+      _beforeWork.get().run();
+      return ((TaskAccess) _delegate).taskSnapshot(minion, maxRecords, maxBytes, timeoutMillis);
     }
 
     @Override

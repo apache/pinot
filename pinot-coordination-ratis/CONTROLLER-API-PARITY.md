@@ -29,8 +29,9 @@ The standard resource package has **264 annotated HTTP methods across 43 resourc
 - Baseline: validated configuration reads/writes, controller authentication, HTTP/HTTPS, and metadata UI.
 - Added in this change: shared table-size metadata adapter, optional read-only native server admin endpoint,
   identity-checked native OFFLINE table-size REST/UI support. Query listeners remain disabled.
-- In progress separately: minion metadata-read extraction. It does not authorize native task execution.
-- Outstanding: offline lifecycle and placement, durable minion scheduling/execution/publication, realtime,
+- Native minions: explicit `MINION_TASK` authorization, durable bounded schedules, normal minion startup and atomic
+  output publication for `NativeSegmentGenerationTask`; see [the task contract](MINION-TASK-PLAN.md).
+- Outstanding: automatic offline placement, full existing task API/plugin parity, realtime,
   remaining feature families and query-serving qualification. A full replacement is not yet implemented.
 - ZooKeeper tree APIs are not applicable to the replacement; a mutable compatibility tree will not be introduced.
 

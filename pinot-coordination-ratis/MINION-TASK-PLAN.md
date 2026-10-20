@@ -20,30 +20,109 @@
 -->
 # Native minion task framework implementation plan
 
-Status: **draft; the internal execution ledger is implemented, while native scheduling, worker runtime and task
-publication remain unimplemented**.
+Status: **draft; the execution ledger now includes bounded occurrence scheduling, an authenticated minion worker,
+and fenced publication for `NativeSegmentGenerationTask`. General task-plugin and task-API parity remain incomplete.**
 
 The metadata read adapter is the first integration step. `MinionMetadataAccessor` exposes table, schema and segment
 reads; `HelixMinionMetadataAccessor` preserves the current behavior. Existing property-store bindings install that
 adapter. An explicit alternate read accessor cannot enable legacy task execution. The existing task factories still
 accept `MinionTaskZkMetadataManager`, and existing plugins still contain direct Helix calls and unfenced publication.
-The `MINION` membership enum alone is insufficient: participant transport authorization currently rejects this role.
+The dedicated minion transport requires an explicit certificate binding with the `MINION_TASK` capability.
+No minion receives a controller metadata identity or query-serving capability.
 
 The internal ledger now supports table-owned submissions, queue pause/resume, explicit minion identity assignments,
 session-fenced claims, monotonic progress, execution outcomes, bounded retries and cancellation. Captured table/schema
-and declared input versions are immutable. Snapshot format 9 preserves task queues, tasks, attempt history and the
-existing durable request-stream sequence/floor; format 8 remains readable when it contains no task records. Typed
-protobuf values expose controller read/feed projections only. No task execution service or public task command exists.
-`EXECUTION_FINISHED` records worker execution and does not certify publication or successful task completion.
+and declared input versions are immutable. Snapshot format 10 adds schedules and publication manifests to task queues,
+tasks, attempt history and the durable request-stream sequence/floor. Formats 8 and 9 remain readable only with their
+original record families and states. Typed
+protobuf values expose bounded controller and own-minion projections. `EXECUTION_FINISHED` remains an execution-only
+legacy ledger state. Output-producing native tasks can become `SUCCEEDED` only in the transaction that creates their
+publication manifest and immutable offline content records.
 
 Retry of a running attempt requires expiry, retirement or replacement of its exact session. Readiness and draining
-changes alone cannot permit stealing that attempt. Controller occurrence scheduling, plugin capability negotiation,
-resource/concurrency admission, timers/backoff, checkpoint mutation and output publication remain future work.
+changes alone cannot permit stealing that attempt. The first worker has one active attempt at a time, finite retries,
+and immutable inputs and outputs. General plugin negotiation, resource pools, cron schedules, execution timeouts,
+retry backoff and plugin checkpoint mutation remain future work.
 
-Helix/ZooKeeper remains the default. This plan does not enable native query listeners or authorize native minion
-execution. A task type becomes available only after its scheduler, executor, observers and publication paths satisfy
+Helix/ZooKeeper remains the default. Native query listeners remain disabled. A task type becomes available only
+after its scheduler, executor, observers and publication paths satisfy
 the gates below. An unavailable task type must return an explicit unsupported error, rather than an empty successful
 queue or a task marked complete without its effects.
+
+## Implemented execution slice
+
+`StartMinion` now selects the native runtime only for `pinot.coordination.backend=RATIS`, before constructing a Helix
+manager or applying ZK cluster configuration. It uses the normal minion instance/data-directory settings and the
+existing native identity, endpoints and TLS settings. It never initializes legacy task factories or mutable
+`MinionContext` bindings.
+
+The qualified task generates a genuine Pinot OFFLINE segment from a digest-pinned JSON-lines file using Pinot's
+segment creation driver. This loopback foundation requires approved local source and shared output directories:
+
+```properties
+pinot.coordination.backend=RATIS
+pinot.minion.instance.id=Minion_native_0
+dataDir=/absolute/minion-state
+pinot.coordination.ratis.participantId=Minion_native_0
+pinot.coordination.ratis.minion.sourceRoot=/absolute/task-input
+pinot.coordination.ratis.minion.outputRoot=/absolute/task-output
+```
+
+Configure the usual `pinot.coordination.ratis.historyId`, `metadata.endpoints`, `tls.certChain`, `tls.privateKey` and
+`tls.trustCerts` values as for other native participants. The controller's provider must explicitly bind the minion
+certificate to this participant ID, role `MINION` and capability `MINION_TASK`. On each controller, configure
+`pinot.coordination.ratis.controller.tasks.outputRoot=/absolute/task-output`. All output roots must identify the same
+existing directory; runtime construction does not grant access to an arbitrary path from a REST request.
+
+The controller exposes these experimental, authorized, table-scoped APIs:
+
+- `PUT /tasks/native/{table}/schedules/{uuid}` creates an immutable schedule generation.
+- `GET /tasks/native/{table}` returns committed schedules, queues, tasks and publications, plus the current round.
+- `POST /tasks/native/{table}/{taskUuid}/cancel?expectedVersion={version}` fences the selected task version.
+
+For an immediate one-shot task, submit the following body with a fresh schedule UUID:
+
+```json
+{
+  "minionId": "Minion_native_0",
+  "sourceUri": "file:///absolute/task-input/rows.json",
+  "sourceSha256": "<64 lowercase hexadecimal SHA-256 characters>",
+  "firstRound": 0,
+  "intervalRounds": 0,
+  "occurrences": 1,
+  "maxAttempts": 2
+}
+```
+
+The same schedule ID and identical request resolve the same schedule; different inputs conflict. A recurring finite
+schedule uses an absolute `firstRound`, positive `intervalRounds` and bounded `occurrences`. It catches up one
+occurrence per scheduler cycle. These are committed membership rounds, not cron or wall-clock timestamps; a membership
+timing-policy change fences that schedule generation. Only its live table owner schedules or retries tasks.
+Admission applies backpressure before a new runnable task can exceed the worker's complete bounded projection;
+an unaccepted occurrence does not advance its schedule watermark.
+
+The worker stores exact pending requests and outcomes in its durable directory, retries unknown responses without
+changing their identity, and separates heartbeats from execution. A new process receives a new registration incarnation
+and cannot replay an old attempt's publication. Lease uncertainty stops admission and generation; replicated validation
+is the final authority. Cancellation acceptance revokes publication and does not assert that remote computation has
+already stopped.
+
+Files are created without overwrite under history/task/attempt/incarnation paths and synced before publication.
+The publication transaction validates the current live minion session, attempt, table incarnation, captured input
+versions and output identities. It atomically creates the immutable content records, publication manifest and
+`SUCCEEDED` task/attempt states. A stale worker can leave an unreferenced artifact but cannot publish it. No
+automatic physical cleanup or exactly-once computation is claimed.
+
+The initial bounds are explicit: one active attempt per minion, a 128-record/2 MiB worker projection, a 4,096-record
+controller task image, and 128 retained local process journals before explicit archival is required. Terminal
+catalog history is retained; exceeding the controller image limit fails closed. Retention/compaction and larger-scale
+qualification remain outstanding. Input files default to 16 MiB and 100,000 rows, with component-configured ceilings
+of 64 MiB and 1,000,000 rows.
+
+Publication means committed content, not replica installation or query availability. The integration test passes a
+real generated output through the existing native assignment/installation protocol and measures its installed bytes.
+Automatic placement, full existing `/tasks` REST/UI compatibility, remote deep-store adapters, plugin checkpoint
+mutation, replacement/deletion/lineage and other legacy task types remain separate requirements below.
 
 ## Authority and durability requirements
 

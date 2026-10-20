@@ -34,6 +34,7 @@ import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.ChangePage;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.FeedCursor;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.FeedScope;
 import org.apache.pinot.coordination.ratis.metadata.OfflineInstallationProtocol.InstallationSnapshot;
+import org.apache.pinot.coordination.ratis.metadata.TaskProtocol.WorkSnapshot;
 import org.apache.ratis.proto.RaftProtos.LogEntryProto;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientRequest;
@@ -172,6 +173,12 @@ final class MetadataStateMachine extends BaseStateMachine {
       throws IOException {
     awaitApplied(minimumIndex, deadlineNanos);
     return _catalog.installationSnapshot(server, maxRecords, maxBytes);
+  }
+
+  synchronized WorkSnapshot taskSnapshot(ParticipantToken minion, int maxRecords, int maxBytes, long minimumIndex,
+      long deadlineNanos) throws IOException {
+    awaitApplied(minimumIndex, deadlineNanos);
+    return _catalog.taskSnapshot(minion, maxRecords, maxBytes);
   }
 
   synchronized ChangePage changes(FeedScope scope, FeedCursor cursor, int maxTransactions, int maxRecords,
