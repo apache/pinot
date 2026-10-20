@@ -64,6 +64,7 @@ import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Status;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.TaskCommand;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.TaskSessionCommand;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Transaction;
+import org.apache.pinot.coordination.ratis.metadata.OfflineRoutingProtocol.RoutingSnapshot;
 import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.Assignment;
 import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.Content;
 import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.LoaderDescriptor;
@@ -721,6 +722,136 @@ public class TaskCatalogTest {
     f.restore();
   }
 
+  @Test
+  public void testRoutingDiscoveryCoverageBoundsAndNoPrivatePayloads() throws Exception {
+    Fixture f = new Fixture();
+    ParticipantToken broker = f.routingBroker(0);
+    f.routingPolicies("DefaultTenant", "grpcs://localhost:8090", true);
+    UUID hiddenTable = UUID.randomUUID();
+    assertEquals(f.mutate(Mutation.createTableConfig(f._history, hiddenTable,
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("private").setBrokerTenant("PrivateTenant").build()))
+        .status(), Status.OK);
+    Content installed = f.publishRoutingContent("installed");
+    f.publishRoutingContent("pending");
+    ParticipantToken server = f.routingServer(Set.of());
+    ReconcileContent reconcile = new ReconcileContent(f._owner, installed.segmentObjectId());
+    assertEquals(f.segment(reconcile).status(), Status.OK);
+    assertEquals(f.segment(reconcile).status(), Status.OK);
+    assertEquals(f.routing(broker, TABLE).table().segments().getFirst().replicas().size(), 0,
+        "Desired assignment is not installation evidence");
+    f.install(f.assignments(installed).getFirst());
+    RoutingSnapshot discovery = f.routing(broker, "");
+    assertEquals(discovery.status(), Status.OK);
+    assertEquals(discovery.tables(), List.of(TABLE));
+    assertFalse(discovery.participant().ready(), "Routing bootstrap must not manufacture broker readiness");
+    assertTrue(discovery.participant().capabilities().isEmpty());
+    RoutingSnapshot image = f.routing(broker, TABLE);
+    assertEquals(image.status(), Status.OK);
+    assertEquals(image.table().segments().size(), 2, "Uninstalled published content must remain explicit");
+    assertEquals(image.table().segments().get(1).name(), "pending");
+    assertTrue(image.table().segments().get(1).replicas().isEmpty());
+    var replica = image.table().segments().getFirst().replicas().getFirst();
+    assertEquals(replica.server(), server);
+    assertEquals(replica.endpoint(), null, "Installed SERVER without SERVER_QUERY is not selectable");
+    String json = new String(MetadataProtocol.encodeValue(image), StandardCharsets.UTF_8);
+    assertFalse(json.contains("private-archive"));
+    assertFalse(json.contains("never-expose"));
+    assertFalse(json.contains("PrivateTenant"));
+    assertFalse(json.contains("loader"));
+    assertEquals(f.routing(broker, "private_OFFLINE").status(), Status.FENCED);
+    assertEquals(f.routing(broker, "orders").status(), Status.INVALID_REQUEST);
+    assertEquals(f.routing(broker, "orders_REALTIME").status(), Status.INVALID_REQUEST);
+    assertEquals(f.routing(broker, "orders_OFFLINE_OFFLINE").status(), Status.INVALID_REQUEST);
+    assertEquals(f.routing(broker, ".orders_OFFLINE").status(), Status.INVALID_REQUEST);
+    for (RoutingSnapshot rejected : List.of(
+        f._catalog.routingSnapshot(broker, TABLE, 6, OfflineRoutingProtocol.MAX_SNAPSHOT_BYTES),
+        f._catalog.routingSnapshot(broker, TABLE, 4096, 1024),
+        f._catalog.routingSnapshot(broker, "", 2, OfflineRoutingProtocol.MAX_SNAPSHOT_BYTES))) {
+      assertEquals(rejected.status(), Status.RESPONSE_TOO_LARGE);
+      assertEquals(rejected.table(), null);
+      assertEquals(rejected.participant(), null);
+      assertTrue(rejected.tables().isEmpty());
+    }
+    f.restore();
+    assertEquals(f.routing(broker, TABLE), image);
+  }
+
+  @Test
+  public void testRoutingExactProofEndpointAndCurrentSessionFences() throws Exception {
+    Fixture f = new Fixture();
+    ParticipantToken broker = f.routingBroker(0);
+    f.routingPolicies("DefaultTenant", "grpcs://localhost:8090", true);
+    Content content = f.publishRoutingContent("installed");
+    ParticipantToken server = f.routingServer(Set.of(Capability.SERVER_QUERY));
+    ReconcileContent reconcile = new ReconcileContent(f._owner, content.segmentObjectId());
+    assertEquals(f.segment(reconcile).status(), Status.OK);
+    assertEquals(f.segment(reconcile).status(), Status.OK);
+    f.install(f.assignments(content).getFirst());
+    assertEquals(f.segment(reconcile).status(), Status.OK);
+    var replica = f.routing(broker, TABLE).table().segments().getFirst().replicas().getFirst();
+    assertEquals(replica.endpoint(), "grpcs://localhost:8090");
+    assertEquals(f.member(new Unregister(f._owner.participant())).status(), Status.OK);
+    assertEquals(f.routing(broker, TABLE).table().segments().getFirst().replicas().getFirst(), replica,
+        "Completed proof must survive the former controller owner's retirement");
+    f.restore();
+    assertEquals(f.routing(broker, TABLE).table().segments().getFirst().replicas().getFirst(), replica);
+    f.routingPolicies("DefaultTenant", "grpcs://other:8090", true);
+    assertEquals(f.routing(broker, TABLE).table().segments().getFirst().replicas().getFirst().endpoint(), null,
+        "A self-advertised endpoint cannot bypass changed administrator approval");
+    f.routingPolicies("DefaultTenant", "grpcs://localhost:8090", false);
+    assertTrue(f.routing(broker, TABLE).table().segments().getFirst().replicas().isEmpty(),
+        "Revoking placement approval invalidates the candidate before reconciliation");
+    f.routingPolicies("DefaultTenant", "grpcs://localhost:8090", true);
+    assertEquals(f.member(new BeginDrain(server)).status(), Status.OK);
+    assertTrue(f.routing(broker, TABLE).table().segments().getFirst().replicas().isEmpty());
+    assertEquals(f.member(new Unregister(server)).status(), Status.OK);
+    var replacement = f.member(new Register(server.participantId(), Role.SERVER, UUID.randomUUID(), 1,
+        Map.of("queryGrpc", "grpcs://localhost:8090", "nativeQueryVersion", "2"), Set.of(Capability.SERVER_QUERY)));
+    assertEquals(replacement.status(), Status.OK);
+    assertEquals(f.member(new SetReady(replacement.participant().participant(), new Revision(f._history, f._index),
+        true)).status(), Status.OK);
+    assertTrue(f.routing(broker, TABLE).table().segments().getFirst().replicas().isEmpty(),
+        "Replacement server cannot inherit another incarnation's receipt");
+    assertEquals(f.member(new Unregister(broker)).status(), Status.OK);
+    ParticipantToken newBroker = f.routingBroker(1);
+    assertEquals(f.routing(broker, TABLE).status(), Status.FENCED);
+    assertEquals(f.routing(newBroker, TABLE).status(), Status.OK);
+    f.routingPolicies("OtherTenant", "grpcs://localhost:8090", true);
+    assertEquals(f.routing(newBroker, TABLE).status(), Status.FENCED);
+    assertTrue(f.routing(newBroker, "").tables().isEmpty());
+    assertEquals(f.member(new BeginDrain(newBroker)).status(), Status.OK);
+    assertEquals(f.routing(newBroker, "").status(), Status.FENCED);
+  }
+
+  @Test
+  public void testRoutingConfigurationChangesAndPolicyValidationFailClosed() throws Exception {
+    Fixture f = new Fixture();
+    ParticipantToken broker = f.routingBroker(0);
+    assertEquals(f.routing(broker, TABLE).status(), Status.NOT_READY);
+    f.routingPolicies("DefaultTenant", "grpcs://localhost:8090", true);
+    Content content = f.publishRoutingContent("installed");
+    f.routingServer(Set.of(Capability.SERVER_QUERY));
+    ReconcileContent reconcile = new ReconcileContent(f._owner, content.segmentObjectId());
+    assertEquals(f.segment(reconcile).status(), Status.OK);
+    assertEquals(f.segment(reconcile).status(), Status.OK);
+    f.install(f.assignments(content).getFirst());
+    CatalogRecord schema = f.record(RecordKind.SCHEMA, "orders");
+    assertEquals(f.mutate(Mutation.updateSchema(f.objectVersion(schema), new Schema.SchemaBuilder()
+        .setSchemaName("orders").addSingleValueDimension("id", DataType.INT)
+        .addSingleValueDimension("newField", DataType.STRING).build())).status(), Status.OK);
+    assertTrue(f.routing(broker, TABLE).table().segments().getFirst().replicas().isEmpty(),
+        "A proof against a previous exact schema version is not a current candidate");
+    for (String policy : List.of("{}", "{\"brokers\":{},\"servers\":{},\"extra\":{}}",
+        "{\"brokers\":{\"routing-broker\":[\"*\"]},\"servers\":{}}",
+        "{\"brokers\":{\"routing-broker\":[\"DefaultTenant\",\"DefaultTenant\"]},\"servers\":{}}",
+        "{\"brokers\":{},\"servers\":{\"server\":\"http://localhost:8090\"}}",
+        "{\"brokers\":{},\"servers\":{\"server\":\"grpcs://localhost:8090/path\"}}",
+        "{\"brokers\":{},\"servers\":{\"server\":\"grpcs://user@localhost:8090\"}}")) {
+      f.cluster(Map.of(NativeBrokerRoutingPolicy.CONFIG_KEY, policy));
+      assertEquals(f.routing(broker, TABLE).status(), Status.NOT_READY);
+    }
+  }
+
   private static final class Fixture {
     private final boolean _nativeTask;
     private final UUID _cluster = UUID.randomUUID();
@@ -758,6 +889,45 @@ public class TaskCatalogTest {
       assertEquals(mutate(Mutation.createTableConfig(_history, _table, table()),
           Mutation.createSchema(_history, UUID.randomUUID(), new Schema.SchemaBuilder().setSchemaName("orders")
               .addSingleValueDimension("id", DataType.INT).build())).status(), Status.OK);
+    }
+
+    private ParticipantToken routingBroker(long epoch) throws IOException {
+      var registered = member(
+          new Register("routing-broker", Role.BROKER, UUID.randomUUID(), epoch, Map.of(), Set.of()));
+      assertEquals(registered.status(), Status.OK);
+      return registered.participant().participant();
+    }
+
+    private ParticipantToken routingServer(Set<Capability> capabilities) throws IOException {
+      var registered = member(new Register("routing-server", Role.SERVER, UUID.randomUUID(), 0,
+          Map.of("queryGrpc", "grpcs://localhost:8090", "nativeQueryVersion", "2"), capabilities));
+      assertEquals(registered.status(), Status.OK);
+      ParticipantToken server = registered.participant().participant();
+      assertEquals(member(new SetReady(server, new Revision(_history, _index), true)).status(), Status.OK);
+      return server;
+    }
+
+    private void routingPolicies(String tenant, String endpoint, boolean placed) throws IOException {
+      cluster(Map.of(NativeReplicaPlacementPolicy.CONFIG_KEY, JsonUtils.objectToString(
+              new NativeReplicaPlacementPolicy(placed
+                  ? Map.of("routing-server", new NativeReplicaPlacementPolicy.Server("DefaultTenant", "zone-a"))
+                  : Map.of())),
+          NativeBrokerRoutingPolicy.CONFIG_KEY, JsonUtils.objectToString(new NativeBrokerRoutingPolicy(
+              Map.of("routing-broker", Set.of(tenant)), Map.of("routing-server", endpoint))),
+          "controller.password", "never-expose"));
+    }
+
+    private Content publishRoutingContent(String name) throws IOException {
+      Content content = new Content(TABLE, _table, name, UUID.randomUUID(), "a".repeat(64),
+          "file:///private-archive/segment.tar.gz", new LoaderDescriptor(1, -1, false, null, null, 1, -1, Map.of()));
+      assertEquals(segment(new PublishValidatedContent(_owner, objectVersion(record(RecordKind.TABLE_CONFIG, TABLE)),
+          objectVersion(record(RecordKind.SCHEMA, "orders")), content)).status(), Status.OK);
+      return content;
+    }
+
+    private RoutingSnapshot routing(ParticipantToken broker, String table) throws IOException {
+      return _catalog.routingSnapshot(broker, table, OfflineRoutingProtocol.MAX_SNAPSHOT_RECORDS,
+          OfflineRoutingProtocol.MAX_SNAPSHOT_BYTES);
     }
 
     private TableConfig table() {

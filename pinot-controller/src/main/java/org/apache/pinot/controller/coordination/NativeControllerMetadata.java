@@ -54,6 +54,7 @@ import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Result;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Revision;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Status;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.StreamTipResult;
+import org.apache.pinot.coordination.ratis.metadata.NativeBrokerRoutingPolicy;
 import org.apache.pinot.coordination.ratis.metadata.NativeReplicaPlacementPolicy;
 import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol;
 import org.apache.pinot.coordination.ratis.metadata.OperationProtocol;
@@ -354,15 +355,20 @@ public final class NativeControllerMetadata implements PinotClusterConfigProvide
     if (placement != null) {
       NativeReplicaPlacementPolicy.parse(placement);
     }
+    String routing = values.get(NativeBrokerRoutingPolicy.CONFIG_KEY);
+    if (routing != null) {
+      NativeBrokerRoutingPolicy.parse(routing);
+    }
     if (!snapshot.nativeTables().isEmpty()) {
       Set<String> changed = new HashSet<>(snapshot.clusterConfig().keySet());
       changed.addAll(values.keySet());
       changed.removeIf(key -> Objects.equals(snapshot.clusterConfig().get(key), values.get(key)));
-      // Endpoint approvals are rechecked before observations return. The native output reconciler validates each
-      // placement policy change in replicated apply; unrelated settings retain the existing lifecycle gate.
+      // Endpoint and broker routing approvals are rechecked by observations. The native output reconciler validates
+      // each placement policy change in replicated apply; unrelated settings retain the existing lifecycle gate.
       if (changed.isEmpty() || changed.stream().anyMatch(
           key -> !key.startsWith(NativeTableSizeMetadataProvider.ENDPOINT_APPROVAL_PREFIX)
-              && !NativeReplicaPlacementPolicy.CONFIG_KEY.equals(key))) {
+              && !NativeReplicaPlacementPolicy.CONFIG_KEY.equals(key)
+              && !NativeBrokerRoutingPolicy.CONFIG_KEY.equals(key))) {
         throw new UnsupportedOperationException("Cluster config changes require native table reconciliation");
       }
     }

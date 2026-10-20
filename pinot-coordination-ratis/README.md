@@ -362,10 +362,54 @@ content must match. Logical-table acquisition also releases earlier handles when
 
 Native names-only, realtime and logical queries remain rejected. A native request with no acquired content cannot
 yet obtain a version-checked schema-only catalog snapshot and is rejected instead of returning an empty scan.
-Normal broker production, pinned routing images, feature-level negotiation, authenticated process admission,
-production clock qualification, broker deadline propagation, transport response-delivery fencing and whole-query
-retry/drain remain unimplemented. MSE/time-series and other unsupported paths cannot silently drop the context. Native
+Broker routing observations and immutable identity construction are described below. Normal query planning and
+dispatch, feature-level negotiation, authenticated process admission, production clock qualification, broker
+deadline origination, transport response-delivery fencing and whole-query retry/drain remain unimplemented.
+MSE/time-series and other unsupported paths cannot silently drop the context. Native
 `ServerInstance` query resources remain disabled until those gates are implemented and tested together.
+
+## Broker routing observations
+
+The metadata endpoint exposes a separate, read-only `BrokerRoutingService.Snapshot` RPC to certificate-bound BROKER
+sessions. An empty table name discovers authorized OFFLINE tables; a canonical table name captures one complete
+table image after a consensus read barrier. Bootstrap observation requires a live session, not query readiness or
+`BROKER_QUERY` authority. Other participant roles cannot use this endpoint.
+
+Configure the cluster key `pinot.coordination.ratis.broker.routing` with a JSON string such as:
+
+```json
+{
+  "brokers": {"Broker_native": ["DefaultTenant"]},
+  "servers": {"Server_native": "grpcs://server.example:8090"}
+}
+```
+
+Broker IDs are mapped explicitly to allowed broker tenants. Server IDs are mapped to canonical TLS query addresses.
+There are no wildcard or implicit policy grants. Normal omitted table tenants retain Pinot's `DefaultTenant`
+convention. Policy changes take effect through subsequent committed reads; participant advertisements cannot grant
+tenant access or destination approval.
+
+Each table image carries exact table/schema versions and every published immutable segment, including segments
+with zero installed replicas. Installed candidates require current configuration and assignment identities, a live
+ready server incarnation, placement-policy eligibility and matching installation evidence from the durable
+reconciliation operation. A completed proof does not expire merely because its former controller owner expires.
+Archive locations, loader configuration, task configuration and unrelated cluster metadata are not exposed.
+
+A candidate includes a query destination only if its server also has `SERVER_QUERY`, advertises the exact approved
+`queryGrpc` address and declares `nativeQueryVersion=2`. This is routing metadata, not a serving grant or an
+authenticated query handshake. Normal server starters still advertise neither query capability nor query endpoints.
+Consequently their installed replicas are visible as observations but cannot be selected for query dispatch.
+
+Snapshots allow at most 4,096 logical records and 2 MiB, rejecting excessive counts without returning partial
+routing data. The broker bounds its cache to 128 tables and 8 MiB and uses a separate connection and polling lane
+from membership heartbeats. It validates immutable per-table images and invalidates cached selection on refresh
+failure. Discovery and per-table revisions are not a cluster-wide applied watermark.
+The selector requires coverage for every published segment and constructs per-server `NativeQueryContext` values
+using one caller-supplied deadline for the whole attempt. Missing coverage and empty-table execution remain
+unsupported; no fallback can silently turn required segments into optional ones.
+
+These observations and contexts do not authorize queries. Connecting the normal query handlers requires the
+remaining serving-permit, routing-revision, transport-identity, clock and response-delivery checks together.
 
 ## Normal starters (experimental, query listeners disabled)
 
@@ -382,13 +426,14 @@ selection, process identity, peers, TLS and local storage are bootstrap settings
   data directory, metadata hydration and installation reconciliation. It requests no query capabilities and advertises
   no query endpoints. The existing server query-start gate stays closed.
 - Broker registers and renews an empty-capability membership session. It remains `ready=false`, with service status
-  explicitly reporting that routing and query listeners are unavailable. Its applied revision covers only its own
-  membership/control projection, not a routing image.
+  reporting routing-cache observations and disabled query listeners. Its membership applied revision covers only
+  its own participant/control projection, not a routing image. Routing snapshots retain their own table revisions.
 
 No broker HTTP/gRPC/MSE or server Netty/TLS/gRPC/MSE query listeners are allocated, even if legacy query-port settings
 are present. Helix-dependent REST resources are not started on the native path. An explicitly configured server admin listener
-serves the native read-only size endpoint described below. Minions
-and multi-cluster brokers are unsupported. These entry points exercise coordination and offline installation; they
+serves the native read-only size endpoint described below. The native minion path is described in
+[MINION-TASK-PLAN.md](MINION-TASK-PLAN.md); multi-cluster brokers remain unsupported.
+These entry points exercise coordination and offline installation; they
 do not yet provide a queryable replacement cluster.
 
 All native components need `pinot.coordination.ratis.historyId`. Controllers retain the voter settings in the next

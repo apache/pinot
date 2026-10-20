@@ -64,6 +64,7 @@ import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.Role;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.CatalogRecord;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.ObjectVersion;
+import org.apache.pinot.coordination.ratis.metadata.NativeBrokerRoutingPolicy;
 import org.apache.pinot.coordination.ratis.metadata.NativeReplicaPlacementPolicy;
 import org.apache.pinot.coordination.ratis.metadata.OfflineInstallationProtocol;
 import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol;
@@ -395,14 +396,24 @@ public class RatisStartersTest {
         assertEquals(updated.statusCode(), 200, updated.body());
         String placementPolicy = JsonUtils.objectToString(Map.of("servers", Map.of(SERVER,
             Map.of("tenant", "DefaultTenant", "failureDomain", "zone-a"))));
+        String routingPolicy = JsonUtils.objectToString(Map.of("brokers", Map.of(BROKER, List.of("DefaultTenant")),
+            "servers", Map.of(SERVER, "grpcs://127.0.0.1:" + ports[7])));
         clusterTag = get(http, controllerUrl + "/cluster/configs", true).headers().firstValue("ETag").orElseThrow();
         updated = write(http, controllerUrl + "/cluster/configs", "POST",
-            JsonUtils.objectToString(Map.of(PREFIX + "offline.placement", placementPolicy)),
+            JsonUtils.objectToString(Map.of(PREFIX + "offline.placement", placementPolicy,
+                NativeBrokerRoutingPolicy.CONFIG_KEY, routingPolicy)),
             Map.of("If-Match", clusterTag));
         assertEquals(updated.statusCode(), 200, updated.body());
+        MetadataRpc.RoutingSnapshot discovered = brokerClient.routingSnapshot(routingRequest(
+            brokerState.getParticipant(), ""));
+        assertEquals(discovered.getStatus(), ResultStatus.OK, discovered.getDetail());
+        assertTrue(discovered.getTablesList().contains("orders_OFFLINE"));
+        assertFalse(discovered.hasTable(), "Discovery must not include table or replica payloads");
         PinotConfiguration voterConfig = new PinotConfiguration(controllers.getFirst());
         InstalledOutput uploaded = uploadSizeTestSegment(directory, voterConfig, http, controllerUrl,
             secondControllerUrl, serverState.getParticipant(), table, schema);
+        assertRoutingInstallation(brokerClient, brokerState.getParticipant(), uploaded.content(),
+            serverState.getParticipant(), uploaded.installation());
         long expectedBytes = uploaded.bytes();
         awaitSize(http, serverAdmin + "/tables/orders_OFFLINE/size", "diskSizeInBytes", expectedBytes);
         assertMissingSize(http, controllerUrl);
@@ -431,6 +442,8 @@ public class RatisStartersTest {
         assertEquals(ServiceStatus.getServiceStatus(SERVER), ServiceStatus.Status.GOOD);
         InstalledOutput generatedOutput = runNativeTask(manager, directory, history, endpoints, minion, controller,
             http, controllerUrl, taskOutput, voterConfig, serverState.getParticipant(), serverAdmin);
+        assertRoutingInstallation(brokerClient, brokerState.getParticipant(), generatedOutput.content(),
+            serverState.getParticipant(), generatedOutput.installation());
         for (int i = 6; i < 8; i++) {
           try (ServerSocket unused = new ServerSocket(ports[i])) {
             assertTrue(unused.isBound(), "Native query listener must remain closed");
@@ -439,6 +452,12 @@ public class RatisStartersTest {
 
         assertTrue(manager.stopPinotInstanceById(SERVER));
         assertTrue(serverClient.membershipRead(read).getParticipant().getRetired());
+        MetadataRpc.RoutingSnapshot unavailable = brokerClient.routingSnapshot(
+            routingRequest(brokerState.getParticipant(), "orders_OFFLINE"));
+        assertEquals(unavailable.getStatus(), ResultStatus.OK, unavailable.getDetail());
+        assertEquals(unavailable.getTable().getSegmentsCount(), 1,
+            "A published segment must remain visible when its only server retires");
+        assertEquals(unavailable.getTable().getSegments(0).getReplicasCount(), 0);
         try (ServerSocket released = new ServerSocket(ports[8])) {
           assertTrue(released.isBound(), "Server shutdown must release its administrative listener");
         }
@@ -452,6 +471,8 @@ public class RatisStartersTest {
         assertNotEquals(uploadedAgain.assignment().materializationId(),
             uploaded.installation().assignment().materializationId());
         assertNotEquals(uploadedAgain.installationId(), uploaded.installation().installationId());
+        MetadataRpc.TableRouting recoveredRouting = assertRoutingInstallation(brokerClient,
+            brokerState.getParticipant(), uploaded.content(), replacement, uploadedAgain);
         awaitSize(http, serverAdmin + "/tables/orders_OFFLINE/size", "diskSizeInBytes", expectedBytes);
         awaitSize(http, controllerUrl + "/tables/orders/size", "reportedSizeInBytes", expectedBytes);
         ReplicaInstallation reinstalled = awaitInstallation(voterConfig, replacement, generatedOutput.content());
@@ -479,6 +500,8 @@ public class RatisStartersTest {
         assertEquals(recovered, reinstalled, "Controller restart must retain the current installation and proof");
         assertEquals(awaitInstallation(voterConfig, replacement, uploaded.content()), uploadedAgain,
             "Controller restart must not create another materialization for an uploaded segment");
+        assertEquals(assertRoutingInstallation(brokerClient, brokerState.getParticipant(), uploaded.content(),
+            replacement, uploadedAgain), recoveredRouting, "Routing must retain the recovered installation proof");
         var taskState = JsonUtils.stringToJsonNode(get(http, controllerUrl + "/tasks/native/nativeTasks", true).body());
         assertEquals(taskState.path("tasks").size(), 1);
         assertEquals(taskState.path("publications").size(), 1);
@@ -490,6 +513,15 @@ public class RatisStartersTest {
         assertEquals(updated.statusCode(), 200, updated.body());
         assertFalse(JsonUtils.stringToJsonNode(get(http, secondControllerUrl + "/cluster/configs", true).body())
             .has(approvalKey), "Restart must recover the bounded HTTP writer stream");
+        clusterTag = get(http, controllerUrl + "/cluster/configs", true).headers().firstValue("ETag").orElseThrow();
+        updated = write(http, controllerUrl + "/cluster/configs/" + NativeBrokerRoutingPolicy.CONFIG_KEY, "DELETE", "",
+            Map.of("If-Match", clusterTag));
+        assertEquals(updated.statusCode(), 200, updated.body());
+        MetadataRpc.RoutingSnapshot revoked = brokerClient.routingSnapshot(
+            routingRequest(brokerState.getParticipant(), "orders_OFFLINE"));
+        assertNotEquals(revoked.getStatus(), ResultStatus.OK, "Revoking routing policy must deny the next snapshot");
+        assertFalse(revoked.hasTable());
+        assertEquals(revoked.getTablesCount(), 0);
         // Stop participants before losing quorum so the test does not wait for failed retirements.
         manager.stopPinotInstanceById(BROKER);
         manager.stopPinotInstanceById(SERVER);
@@ -521,6 +553,36 @@ public class RatisStartersTest {
   }
 
   private record InstalledOutput(OfflineSegmentProtocol.Content content, long bytes, ReplicaInstallation installation) {
+  }
+
+  private static MetadataRpc.RoutingSnapshotRequest routingRequest(MetadataRpc.ParticipantToken broker,
+      String tableName) {
+    return MetadataRpc.RoutingSnapshotRequest.newBuilder().setHistoryId(broker.getHistoryId())
+        .setSession(MetadataRpc.ParticipantSession.newBuilder().setIncarnation(broker.getIncarnation())
+            .setRegistrationEpoch(broker.getRegistrationEpoch()))
+        .setTableName(tableName).setMaxRecords(4096).setMaxBytes(2 * 1024 * 1024).build();
+  }
+
+  private static MetadataRpc.TableRouting assertRoutingInstallation(MetadataRpcClient client,
+      MetadataRpc.ParticipantToken broker, OfflineSegmentProtocol.Content content,
+      MetadataRpc.ParticipantToken server, ReplicaInstallation installed) {
+    MetadataRpc.RoutingSnapshot snapshot = client.routingSnapshot(routingRequest(broker, content.tableName()));
+    assertEquals(snapshot.getStatus(), ResultStatus.OK, snapshot.getDetail());
+    assertEquals(snapshot.getParticipant().getParticipant(), broker);
+    assertEquals(snapshot.getTable().getTable().getObjectId(), content.tableObjectId().toString());
+    assertEquals(snapshot.getTable().getSegmentsCount(), 1);
+    MetadataRpc.SegmentRouting segment = snapshot.getTable().getSegments(0);
+    assertEquals(segment.getName(), content.segmentName());
+    assertEquals(segment.getContent().getObjectId(), content.segmentObjectId().toString());
+    assertEquals(segment.getContentSha256(), content.contentSha256());
+    assertEquals(segment.getReplicasCount(), 1);
+    MetadataRpc.ReplicaRouting replica = segment.getReplicas(0);
+    assertEquals(replica.getServer(), server);
+    assertEquals(replica.getAssignmentEpoch(), installed.assignment().assignmentEpoch());
+    assertEquals(replica.getMaterializationId(), installed.assignment().materializationId().toString());
+    assertEquals(replica.getInstallationId(), installed.installationId().toString());
+    assertFalse(replica.hasEndpoint(), "An approved address cannot grant a missing server query capability");
+    return snapshot.getTable();
   }
 
   private static InstalledOutput runNativeTask(PinotServiceManager manager, Path directory, String history,

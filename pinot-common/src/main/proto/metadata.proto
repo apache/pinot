@@ -57,6 +57,56 @@ service MinionTaskService {
   rpc Outcome(TaskOutcomeRequest) returns (CommandResult);
 }
 
+// BROKER-only complete routing observations. TLS policy selects the stable identity; committed policy authorizes
+// its table tenants. Responses contain identities and installation evidence, never catalog records or storage URIs.
+service BrokerRoutingService {
+  rpc Snapshot(RoutingSnapshotRequest) returns (RoutingSnapshot);
+}
+
+message RoutingSnapshotRequest {
+  string history_id = 1;
+  ParticipantSession session = 2;
+  // Empty means discovery of authorized table names.
+  string table_name = 3;
+  int32 max_records = 4;
+  int32 max_bytes = 5;
+}
+
+message RoutingSnapshot {
+  ResultStatus status = 1;
+  Revision revision = 2;
+  string detail = 3;
+  ParticipantState participant = 4;
+  MembershipControl control = 5;
+  repeated string tables = 6;
+  TableRouting table = 7;
+}
+
+message TableRouting {
+  string table_name = 1;
+  ObjectVersion table = 2;
+  string schema_name = 3;
+  ObjectVersion schema = 4;
+  repeated SegmentRouting segments = 5;
+}
+
+message SegmentRouting {
+  string name = 1;
+  ObjectVersion content = 2;
+  string content_sha256 = 3;
+  repeated ReplicaRouting replicas = 4;
+}
+
+message ReplicaRouting {
+  ParticipantToken server = 1;
+  ObjectVersion assignment = 2;
+  int64 assignment_epoch = 3;
+  string materialization_id = 4;
+  string installation_id = 5;
+  // Present only for an approved advertised query endpoint with the required current server capability.
+  optional string endpoint = 6;
+}
+
 enum RecordKind {
   RECORD_KIND_UNSPECIFIED = 0;
   CLUSTER_CONFIG = 1;

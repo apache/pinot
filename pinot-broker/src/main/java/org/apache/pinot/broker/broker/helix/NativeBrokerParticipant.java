@@ -22,11 +22,14 @@ import com.google.common.annotations.VisibleForTesting;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
+import org.apache.pinot.broker.routing.NativeBrokerRoutingImage;
 import org.apache.pinot.common.coordination.MetadataRpcConnection;
 import org.apache.pinot.common.coordination.NativeMetadataConfig;
 import org.apache.pinot.common.coordination.NativeOfflineSegmentWorker;
@@ -45,11 +48,17 @@ import static com.google.common.base.Preconditions.checkState;
 /// Lifecycle operations and the single bounded heartbeat lane are serialized; status reads never perform RPCs.
 final class NativeBrokerParticipant implements AutoCloseable, ServiceStatus.ServiceStatusCallback {
   private static final Logger LOGGER = LoggerFactory.getLogger(NativeBrokerParticipant.class);
+  private static final int MAX_ROUTING_TABLES = 128;
+  private static final int MAX_ROUTING_BYTES = 8 * 1024 * 1024;
   private final NativeMetadataConfig _config;
   private final MetadataRpcConnection _connection;
+  private final MetadataRpcConnection _routingConnection;
+  private final Object _routingLock = new Object();
   private final UUID _incarnation = UUID.randomUUID();
   private final ScheduledExecutorService _heartbeats = Executors.newSingleThreadScheduledExecutor(
       runnable -> new Thread(runnable, "native-broker-membership"));
+  private final ScheduledExecutorService _routingPoller = Executors.newSingleThreadScheduledExecutor(
+      runnable -> new Thread(runnable, "native-broker-routing"));
   @Nullable
   private MetadataRpc.ParticipantToken _participant;
   @Nullable
@@ -58,12 +67,20 @@ final class NativeBrokerParticipant implements AutoCloseable, ServiceStatus.Serv
   private long _appliedIndex;
   private boolean _started;
   private boolean _fenced;
+  private boolean _membershipHealthy;
+  private long _routingGeneration;
+  // This is only a read-regression floor on the separate routing lane, never a global applied revision.
+  private long _routingIndex;
+  private Map<String, NativeBrokerRoutingImage> _routingImages = Map.of();
   private volatile boolean _closed;
   private volatile String _description = "Native broker membership starting; query listeners disabled";
 
-  NativeBrokerParticipant(NativeMetadataConfig config, MetadataRpcConnection connection) {
+  NativeBrokerParticipant(NativeMetadataConfig config, MetadataRpcConnection connection,
+      MetadataRpcConnection routingConnection) {
+    checkArgument(connection != routingConnection, "Routing hydration requires a separate membership connection");
     _config = config;
     _connection = connection;
+    _routingConnection = routingConnection;
   }
 
   synchronized void start() throws IOException {
@@ -95,8 +112,11 @@ final class NativeBrokerParticipant implements AutoCloseable, ServiceStatus.Serv
       // Retain confirmed ownership before checking granted capabilities so failed startup can retire this session.
       _participant = token;
       validateOwnProjection(registered);
+      _membershipHealthy = true;
       _description = "Native broker membership active; routing unavailable and query listeners disabled";
       _heartbeats.scheduleWithFixedDelay(this::heartbeat, _config.heartbeatMillis(), _config.heartbeatMillis(),
+          TimeUnit.MILLISECONDS);
+      _routingPoller.scheduleWithFixedDelay(this::refreshRouting, _config.heartbeatMillis(), _config.heartbeatMillis(),
           TimeUnit.MILLISECONDS);
     } catch (IOException | RuntimeException e) {
       close();
@@ -122,6 +142,8 @@ final class NativeBrokerParticipant implements AutoCloseable, ServiceStatus.Serv
           _config.rpcTimeoutMillis());
       validateResponse(response);
       if (response.getStatus() == ResultStatus.NOT_READY) {
+        invalidateRouting();
+        _membershipHealthy = false;
         _description = "Native broker control epoch unavailable; query listeners disabled";
         return;
       }
@@ -135,8 +157,12 @@ final class NativeBrokerParticipant implements AutoCloseable, ServiceStatus.Serv
       checkArgument(_nextRenewal < Long.MAX_VALUE, "Broker renewal sequences exhausted");
       _nextRenewal++;
       _pendingRenewal = null;
+      _membershipHealthy = renewal.getStatus() == ResultStatus.OK;
+      if (!_membershipHealthy) {
+        invalidateRouting();
+      }
       _description = renewal.getStatus() == ResultStatus.OK
-          ? "Native broker membership active; routing unavailable and query listeners disabled"
+          ? routingDescription()
           : "Native broker membership projection must catch up; query listeners disabled";
     } catch (StatusRuntimeException e) {
       Status.Code code = e.getStatus().getCode();
@@ -144,6 +170,8 @@ final class NativeBrokerParticipant implements AutoCloseable, ServiceStatus.Serv
           || code == Status.Code.INVALID_ARGUMENT) {
         fence("Broker membership authorization or request rejected: " + code);
       } else {
+        invalidateRouting();
+        _membershipHealthy = false;
         _description = "Native broker membership transport unavailable; query listeners disabled";
       }
     } catch (IOException | IllegalArgumentException e) {
@@ -151,6 +179,90 @@ final class NativeBrokerParticipant implements AutoCloseable, ServiceStatus.Serv
     } catch (RuntimeException e) {
       fence("Broker membership failed: " + e.getClass().getSimpleName());
     }
+  }
+
+  /// One bounded discovery/hydration cycle. RPCs never hold the membership monitor; a heartbeat failure, fencing or
+  /// shutdown invalidates any overlapping cycle before its result can be published.
+  @VisibleForTesting
+  void refreshRouting() {
+    synchronized (_routingLock) {
+      MetadataRpc.ParticipantToken participant;
+      long generation;
+      synchronized (this) {
+        if (_closed || _fenced || !_membershipHealthy) {
+          return;
+        }
+        participant = _participant;
+        generation = _routingGeneration;
+      }
+      try {
+        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(_config.rpcTimeoutMillis());
+        var discovery = routingSnapshot(participant, "", MAX_ROUTING_TABLES + 2, deadline);
+        var tables = NativeBrokerRoutingImage.discover(discovery, participant);
+        checkArgument(tables.size() <= MAX_ROUTING_TABLES, "Routing cache exceeds its table limit");
+        _routingIndex = discovery.getRevision().getIndex();
+        Map<String, NativeBrokerRoutingImage> images = new HashMap<>();
+        int bytes = discovery.getSerializedSize();
+        for (String table : tables) {
+          var snapshot = routingSnapshot(participant, table, NativeBrokerRoutingImage.MAX_RECORDS, deadline);
+          NativeBrokerRoutingImage image = new NativeBrokerRoutingImage(snapshot, participant, table);
+          _routingIndex = snapshot.getRevision().getIndex();
+          checkArgument(image.serializedBytes() <= MAX_ROUTING_BYTES - bytes,
+              "Routing cache exceeds its aggregate byte limit");
+          bytes += image.serializedBytes();
+          images.put(table, image);
+        }
+        synchronized (this) {
+          if (!_closed && !_fenced && _membershipHealthy && generation == _routingGeneration
+              && participant.equals(_participant)) {
+            _routingImages = Map.copyOf(images);
+            _description = routingDescription();
+          }
+        }
+      } catch (IOException | RuntimeException e) {
+        synchronized (this) {
+          invalidateRouting();
+          if (!_closed && !_fenced) {
+            _description = "Native broker routing unavailable: " + e.getMessage() + "; query listeners disabled";
+          }
+        }
+      }
+    }
+  }
+
+  private MetadataRpc.RoutingSnapshot routingSnapshot(MetadataRpc.ParticipantToken participant, String table,
+      int maxRecords, long deadline) throws IOException {
+    long remaining = TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime());
+    if (_closed || remaining <= 0) {
+      throw new IOException("Native routing refresh deadline expired or broker stopped");
+    }
+    var response = _routingConnection.routingSnapshot(MetadataRpc.RoutingSnapshotRequest.newBuilder()
+        .setHistoryId(_config.historyId().toString()).setSession(MetadataRpc.ParticipantSession.newBuilder()
+            .setIncarnation(participant.getIncarnation()).setRegistrationEpoch(participant.getRegistrationEpoch()))
+        .setTableName(table).setMaxRecords(maxRecords).setMaxBytes(NativeBrokerRoutingImage.MAX_BYTES).build(),
+        remaining);
+    checkArgument(response.hasRevision() && response.getRevision().getIndex() >= _routingIndex,
+        "Routing revision regressed");
+    if (deadline - System.nanoTime() <= 0) {
+      throw new IOException("Native routing refresh deadline expired");
+    }
+    return response;
+  }
+
+  @VisibleForTesting
+  synchronized NativeBrokerRoutingImage routingImage(String table) {
+    checkState(!_closed && !_fenced && _membershipHealthy && _routingImages.containsKey(table),
+        "Current native table routing is unavailable");
+    return _routingImages.get(table);
+  }
+
+  private void invalidateRouting() {
+    _routingImages = Map.of();
+    _routingGeneration++;
+  }
+
+  private String routingDescription() {
+    return "Native broker has " + _routingImages.size() + " table routing images; query listeners disabled";
   }
 
   private MetadataRpc.MembershipResponse read() throws IOException {
@@ -203,8 +315,11 @@ final class NativeBrokerParticipant implements AutoCloseable, ServiceStatus.Serv
 
   private void fence(String detail) {
     _fenced = true;
+    _membershipHealthy = false;
+    invalidateRouting();
     _description = detail + "; query listeners disabled";
     _heartbeats.shutdown();
+    _routingPoller.shutdownNow();
     LOGGER.warn("{}", _description);
   }
 
@@ -224,8 +339,11 @@ final class NativeBrokerParticipant implements AutoCloseable, ServiceStatus.Serv
       return;
     }
     _closed = true;
+    invalidateRouting();
     _description = "Native broker stopped; query listeners disabled";
     _heartbeats.shutdownNow();
+    _routingPoller.shutdownNow();
+    _routingConnection.close();
     try {
       if (_participant != null) {
         try {

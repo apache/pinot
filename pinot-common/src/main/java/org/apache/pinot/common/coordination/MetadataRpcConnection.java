@@ -78,6 +78,10 @@ public class MetadataRpcConnection implements AutoCloseable {
     return call(timeoutMillis, (client, timeout) -> client.membershipRead(request, timeout));
   }
 
+  public MetadataRpc.RoutingSnapshot routingSnapshot(MetadataRpc.RoutingSnapshotRequest request, long timeoutMillis) {
+    return call(timeoutMillis, (client, timeout) -> client.routingSnapshot(request, timeout));
+  }
+
   public MetadataRpc.MembershipResponse membershipExecute(MetadataRpc.MembershipCommandRequest request,
       long timeoutMillis) {
     return call(timeoutMillis, (client, timeout) -> client.membershipExecute(request, timeout));

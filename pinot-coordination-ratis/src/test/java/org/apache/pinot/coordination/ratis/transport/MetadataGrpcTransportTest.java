@@ -77,9 +77,12 @@ import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.FeedCursor;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.FeedScope;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Query;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Result;
+import org.apache.pinot.coordination.ratis.metadata.NativeBrokerRoutingPolicy;
+import org.apache.pinot.coordination.ratis.metadata.NativeReplicaPlacementPolicy;
 import org.apache.pinot.coordination.ratis.metadata.OfflineInstallationProtocol;
 import org.apache.pinot.coordination.ratis.metadata.OfflineInstallationProtocol.ReportInstallation;
 import org.apache.pinot.coordination.ratis.metadata.OfflineInstallationProtocol.Work;
+import org.apache.pinot.coordination.ratis.metadata.OfflineRoutingProtocol;
 import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol;
 import org.apache.pinot.coordination.ratis.metadata.OperationProtocol;
 import org.apache.pinot.coordination.ratis.metadata.OwnershipProtocol;
@@ -1530,6 +1533,123 @@ public class MetadataGrpcTransportTest {
     }
   }
 
+  @Test(timeOut = 90_000)
+  public void testBrokerRoutingIdentityBoundsAndProtectedRenewal() throws Exception {
+    ParticipantIdentity broker = new ParticipantIdentity("Broker_worker", Role.BROKER, Set.of());
+    AtomicReference<ParticipantIdentity> binding = new AtomicReference<>(broker);
+    ParticipantAccessPolicy policy = fingerprint -> {
+      if (fingerprint.equals(_certificates.get("worker").fingerprint())) {
+        return binding.get();
+      }
+      if (fingerprint.equals(_certificates.get("controller-a").fingerprint())) {
+        return new ParticipantIdentity("Controller_routing", Role.CONTROLLER, Set.of());
+      }
+      return fingerprint.equals(_certificates.get("controller-b").fingerprint())
+          ? new ParticipantIdentity("Broker_other", Role.BROKER, Set.of()) : null;
+    };
+    try (Quorum quorum = new Quorum()) {
+      quorum.startMembership();
+      BlockingAccess access = new BlockingAccess(quorum._access);
+      try (Fixture fixture = new Fixture(MetadataGrpcService.Limits.defaults(), quorum._history, access,
+          quorum._access, policy);
+          MetadataGrpcClient controller = fixture.client("controller-a");
+          MetadataGrpcClient worker = fixture.client("worker");
+          MetadataGrpcClient other = fixture.client("controller-b")) {
+        UUID history = quorum._history;
+        MetadataRpc.ParticipantToken workerSession = registerReady(worker, history);
+        registerReady(other, history);
+        assertStatus(Status.Code.PERMISSION_DENIED, () -> worker.read(fixture.revision()));
+        assertStatus(Status.Code.PERMISSION_DENIED, () -> worker.openSnapshot(fixture.open()));
+        assertEquals(quorum._access.execute(new MetadataProtocol.RegisterClient(history, "native-test",
+            UUID.randomUUID(), 0), 5000).status(), MetadataProtocol.Status.OK);
+        commitNativeTest(quorum, new MetadataProtocol.Transaction(history, "native-test", 1, "config", 1,
+            List.of(MetadataProtocol.Mutation.createTableConfig(history, UUID.randomUUID(),
+                    new TableConfigBuilder(TableType.OFFLINE).setTableName("routes").setNumReplicas(1).build()),
+                MetadataProtocol.Mutation.createSchema(history, UUID.randomUUID(),
+                    new Schema.SchemaBuilder().setSchemaName("routes").addSingleValueDimension("id", DataType.INT)
+                        .build()),
+                MetadataProtocol.Mutation.createClusterConfig(history, UUID.randomUUID(), Map.of(
+                    NativeBrokerRoutingPolicy.CONFIG_KEY,
+                    "{\"brokers\":{\"Broker_worker\":[\"DefaultTenant\"]},\"servers\":{}}",
+                    NativeReplicaPlacementPolicy.CONFIG_KEY, "{\"servers\":{}}")))));
+        MetadataRpc.RoutingSnapshotRequest request = MetadataRpc.RoutingSnapshotRequest.newBuilder()
+            .setHistoryId(history.toString()).setSession(session(workerSession)).setMaxRecords(128)
+            .setMaxBytes(OfflineRoutingProtocol.MAX_SNAPSHOT_BYTES).build();
+        MetadataRpc.RoutingSnapshot discovery = worker.routingSnapshot(request);
+        assertEquals(discovery.getStatus(), MetadataRpc.ResultStatus.OK);
+        assertEquals(discovery.getParticipant().getParticipant(), workerSession);
+        assertEquals(discovery.getTablesList(), List.of("routes_OFFLINE"));
+        assertFalse(discovery.hasTable());
+        MetadataRpc.RoutingSnapshot table = worker.routingSnapshot(
+            request.toBuilder().setTableName("routes_OFFLINE").build(), 5000);
+        assertEquals(table.getStatus(), MetadataRpc.ResultStatus.OK);
+        assertTrue(table.hasTable());
+        assertTrue(table.getTable().hasTable());
+        assertTrue(table.getTable().hasSchema());
+        assertEquals(table.getTable().getTableName(), "routes_OFFLINE");
+        assertEquals(table.getTable().getSegmentsCount(), 0);
+        assertEquals(other.routingSnapshot(request).getStatus(), MetadataRpc.ResultStatus.FENCED);
+        assertStatus(Status.Code.PERMISSION_DENIED, () -> controller.routingSnapshot(request));
+        assertEquals(worker.routingSnapshot(request.toBuilder().setHistoryId(UUID.randomUUID().toString()).build())
+            .getStatus(), MetadataRpc.ResultStatus.HISTORY_MISMATCH);
+        assertStatus(Status.Code.INVALID_ARGUMENT, () -> worker.routingSnapshot(request.toBuilder()
+            .setSession(request.getSession().toBuilder().setRegistrationEpoch(0)).build()));
+        assertStatus(Status.Code.INVALID_ARGUMENT, () -> worker.routingSnapshot(request.toBuilder()
+            .setMaxBytes(OfflineRoutingProtocol.MIN_SNAPSHOT_BYTES - 1).build()));
+        assertStatus(Status.Code.INVALID_ARGUMENT, () -> worker.routingSnapshot(request.toBuilder()
+            .setSession(request.getSession().toBuilder().setUnknownFields(UnknownFieldSet.newBuilder()
+                .addField(100, UnknownFieldSet.Field.newBuilder().addVarint(1).build()).build())).build()));
+        MetadataRpc.RoutingSnapshot oversized = worker.routingSnapshot(request.toBuilder().setMaxRecords(1).build());
+        assertEquals(oversized.getStatus(), MetadataRpc.ResultStatus.RESPONSE_TOO_LARGE);
+        assertFalse(oversized.hasParticipant());
+        assertFalse(oversized.hasControl());
+        assertFalse(oversized.hasTable());
+        assertEquals(oversized.getTablesCount(), 0);
+
+        CountDownLatch entered = new CountDownLatch(2);
+        CountDownLatch release = new CountDownLatch(1);
+        access._beforeRouting.set(() -> {
+          entered.countDown();
+          try {
+            if (!release.await(10, TimeUnit.SECONDS)) {
+              throw new IllegalStateException("Routing test gate was not released");
+            }
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(e);
+          }
+        });
+        ExecutorService requests = Executors.newFixedThreadPool(2);
+        try {
+          Future<MetadataRpc.RoutingSnapshot> first = requests.submit(() -> worker.routingSnapshot(request));
+          Future<MetadataRpc.RoutingSnapshot> second = requests.submit(() -> worker.routingSnapshot(request));
+          assertTrue(entered.await(5, TimeUnit.SECONDS));
+          assertStatus(Status.Code.DEADLINE_EXCEEDED, () -> worker.routingSnapshot(request, 50));
+          MetadataRpc.MembershipResponse renewed = worker.membershipExecute(memberRenewal(history,
+              session(workerSession), 1, discovery.getRevision()));
+          assertEquals(renewed.getRenewals(0).getStatus(), MetadataRpc.ResultStatus.OK);
+          assertEquals(renewed.getRenewals(0).getPermit().getCapabilitiesCount(), 0);
+          assertEquals(release.getCount(), 1L, "Membership renewal must not wait for routing handlers");
+          binding.set(new ParticipantIdentity(broker.participantId(), Role.SERVER, Set.of()));
+          release.countDown();
+          for (Future<MetadataRpc.RoutingSnapshot> pending : List.of(first, second)) {
+            ExecutionException denied = expectThrows(ExecutionException.class, () -> pending.get(5, TimeUnit.SECONDS));
+            assertEquals(Status.fromThrowable(denied.getCause()).getCode(), Status.Code.PERMISSION_DENIED);
+          }
+        } finally {
+          release.countDown();
+          requests.shutdownNow();
+          access._beforeRouting.set(() -> { });
+          binding.set(broker);
+        }
+        assertEquals(worker.membershipExecute(MetadataRpc.MembershipCommandRequest.newBuilder()
+            .setHistoryId(history.toString()).setUnregister(session(workerSession)).build()).getStatus(),
+            MetadataRpc.ResultStatus.OK);
+        assertEquals(worker.routingSnapshot(request).getStatus(), MetadataRpc.ResultStatus.FENCED);
+      }
+    }
+  }
+
   private static MetadataRpc.ParticipantToken registerReady(MetadataGrpcClient client, UUID history)
       throws IOException {
     return registerReady(client, history, 0);
@@ -1810,10 +1930,11 @@ public class MetadataGrpcTransportTest {
   }
 
   /// Blocks the four catalog handler threads without blocking membership access to the same real quorum.
-  private static final class BlockingAccess implements MetadataAccess, InstallationAccess, TaskAccess {
+  private static final class BlockingAccess implements MetadataAccess, InstallationAccess, TaskAccess, RoutingAccess {
     private final MetadataAccess _delegate;
     private final AtomicReference<Runnable> _afterExecute = new AtomicReference<>(() -> { });
     private final AtomicReference<Runnable> _beforeWork = new AtomicReference<>(() -> { });
+    private final AtomicReference<Runnable> _beforeRouting = new AtomicReference<>(() -> { });
     private final CountDownLatch _entered = new CountDownLatch(4);
     private final CountDownLatch _release = new CountDownLatch(1);
     private volatile boolean _block;
@@ -1842,6 +1963,13 @@ public class MetadataGrpcTransportTest {
         int maxBytes, long timeoutMillis) throws IOException {
       _beforeWork.get().run();
       return ((TaskAccess) _delegate).taskSnapshot(minion, maxRecords, maxBytes, timeoutMillis);
+    }
+
+    @Override
+    public OfflineRoutingProtocol.RoutingSnapshot routingSnapshot(MembershipProtocol.ParticipantToken broker,
+        String tableName, int maxRecords, int maxBytes, long timeoutMillis) throws IOException {
+      _beforeRouting.get().run();
+      return ((RoutingAccess) _delegate).routingSnapshot(broker, tableName, maxRecords, maxBytes, timeoutMillis);
     }
 
     @Override

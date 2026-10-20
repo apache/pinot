@@ -49,6 +49,7 @@ import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.FeedCursor;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.FeedScope;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.RecordKind;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Revision;
+import org.apache.pinot.coordination.ratis.metadata.NativeBrokerRoutingPolicy;
 import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.Content;
 import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.LoaderDescriptor;
 import org.apache.pinot.coordination.ratis.transport.MetadataAccess;
@@ -132,13 +133,27 @@ public class NativeControllerResourceTest {
       HttpHeaders clusterHeaders = headers(null);
       when(clusterHeaders.getHeaderString(HttpHeaders.IF_MATCH)).thenReturn(clusterTag);
       assertStatus(501, () -> resource.updateClusterConfig("{}", clusterHeaders));
-      // Read-only endpoint approvals may rotate while segment state exists; loader settings still require reconcile.
+      // Observation approvals may rotate or be revoked while segment state exists; loader settings require reconcile.
       Map<String, String> approved = new HashMap<>(fixture._metadata.snapshot().clusterConfig());
       approved.put(NativeTableSizeMetadataProvider.ENDPOINT_APPROVAL_PREFIX + "Server_native", "https://host:8443");
       fixture._metadata.validateClusterConfig(fixture._metadata.snapshot(), approved);
-      approved.put("loader.setting", "changed");
+      approved.put(NativeBrokerRoutingPolicy.CONFIG_KEY,
+          "{\"brokers\":{\"Broker_native\":[\"DefaultTenant\"]},\"servers\":{}}");
+      fixture._metadata.validateClusterConfig(fixture._metadata.snapshot(), approved);
+      fixture.config(approved, 11);
+      Map<String, String> revoked = new HashMap<>(approved);
+      revoked.put(NativeBrokerRoutingPolicy.CONFIG_KEY, "{\"brokers\":{},\"servers\":{}}");
+      fixture._metadata.validateClusterConfig(fixture._metadata.snapshot(), revoked);
+      Map<String, String> malformed = new HashMap<>(revoked);
+      malformed.put(NativeBrokerRoutingPolicy.CONFIG_KEY, "{}");
+      assertThrows(IllegalArgumentException.class,
+          () -> fixture._metadata.validateClusterConfig(fixture._metadata.snapshot(), malformed));
+      fixture.config(revoked, 12);
+      revoked.remove(NativeBrokerRoutingPolicy.CONFIG_KEY);
+      fixture._metadata.validateClusterConfig(fixture._metadata.snapshot(), revoked);
+      revoked.put("loader.setting", "changed");
       assertThrows(UnsupportedOperationException.class,
-          () -> fixture._metadata.validateClusterConfig(fixture._metadata.snapshot(), approved));
+          () -> fixture._metadata.validateClusterConfig(fixture._metadata.snapshot(), revoked));
     }
   }
 
