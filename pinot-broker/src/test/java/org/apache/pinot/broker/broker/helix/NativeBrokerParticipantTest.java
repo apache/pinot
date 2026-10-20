@@ -35,6 +35,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import org.apache.pinot.broker.routing.NativeBrokerQueryAdmission.Admission;
 import org.apache.pinot.common.coordination.MetadataRpcConnection;
 import org.apache.pinot.common.coordination.NativeMetadataConfig;
 import org.apache.pinot.common.coordination.QueryDeadlineGuard;
@@ -277,6 +278,9 @@ public class NativeBrokerParticipantTest {
       fixture._participant.heartbeat();
       fixture._participant.refreshRouting();
       var original = fixture.admit();
+      long originalBudget = fixture._participant.remainingMillis(original);
+      assertTrue(originalBudget > 0 && originalBudget <= 300);
+      assertThrows(IllegalArgumentException.class, () -> fixture._participant.remainingMillis(mock(Admission.class)));
       assertEquals(original.requests().size(), 1);
       assertEquals(original.requests().getFirst().context().requiredNames(), List.of("segment"));
       assertEquals(original.planningMetadata(false).tableCache().getSchema("orders").getSchemaName(), "orders");
@@ -289,10 +293,12 @@ public class NativeBrokerParticipantTest {
       fixture._participant.heartbeat();
       fixture._participant.refreshRouting();
       fixture._participant.checkQueryDelivery(original);
+      assertTrue(fixture._participant.remainingMillis(original) < originalBudget);
       var renewed = fixture.admit();
       fixture._millis.set(201);
       assertThrows(IllegalStateException.class,
           () -> fixture._participant.deliverQuery(original, delivered::incrementAndGet));
+      assertThrows(IllegalStateException.class, () -> fixture._participant.remainingMillis(original));
       assertEquals(delivered.get(), 1, "Rejected delivery must never invoke the callback");
       fixture._participant.deliverQuery(renewed, delivered::incrementAndGet);
       assertEquals(delivered.get(), 2);
@@ -768,7 +774,7 @@ public class NativeBrokerParticipantTest {
       _participant.refreshRouting();
     }
 
-    private NativeBrokerParticipant.QueryAdmission admit() {
+    private Admission admit() {
       return _participant.admitQuery("orders_OFFLINE", UUID.randomUUID(), UUID.randomUUID(),
           _participant.originateDeadline(300));
     }
