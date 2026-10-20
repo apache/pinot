@@ -71,8 +71,8 @@ public class DataTableHandler extends SimpleChannelInboundHandler<ByteBuf> {
   protected void channelRead0(ChannelHandlerContext ctx, ByteBuf msg) {
     int responseSize = msg.readableBytes();
     _brokerMetrics.addMeteredGlobalValue(BrokerMeter.NETTY_CONNECTION_BYTES_RECEIVED, responseSize);
+    long deserializationStartTimeMs = System.currentTimeMillis();
     try {
-      long deserializationStartTimeMs = System.currentTimeMillis();
       ThreadResourceSnapshot resourceSnapshot = new ThreadResourceSnapshot();
       DataTable dataTable = DataTableFactory.getDataTable(msg.nioBuffer());
       _queryRouter.receiveDataTable(_serverRoutingInstance, dataTable, responseSize,
@@ -97,6 +97,13 @@ public class DataTableHandler extends SimpleChannelInboundHandler<ByteBuf> {
       LOGGER.error("Caught exception while deserializing data table of size: {} from server: {}", responseSize,
           _serverRoutingInstance, e);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.DATA_TABLE_DESERIALIZATION_EXCEPTIONS, 1);
+      // Issue #18866: Notify QueryRouter of deserialization failure and close corrupted channel
+      try {
+        _queryRouter.markServerDeserializationError(_serverRoutingInstance, e, responseSize,
+            (int) (System.currentTimeMillis() - deserializationStartTimeMs));
+      } finally {
+        ctx.close();
+      }
     }
   }
 
