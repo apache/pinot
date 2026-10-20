@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
+import org.apache.pinot.common.coordination.CoordinationBackend;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.controller.ControllerStarter;
 import org.apache.pinot.minion.MinionStarter;
@@ -106,7 +107,8 @@ public class PinotServiceManager {
     if (!controllerConf.containsKey(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME)) {
       controllerConf.setProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, _clusterName);
     }
-    if (!controllerConf.containsKey(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER)) {
+    if (CoordinationBackend.from(controllerConf) == CoordinationBackend.HELIX
+        && !controllerConf.containsKey(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER)) {
       controllerConf.setProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER, _zkAddress);
     }
     ServiceStartable controllerStarter = getServiceStartable(controllerStarterClassName);
@@ -124,7 +126,8 @@ public class PinotServiceManager {
     if (!brokerConf.containsKey(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME)) {
       brokerConf.setProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, _clusterName);
     }
-    if (!brokerConf.containsKey(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER)) {
+    if (CoordinationBackend.from(brokerConf) == CoordinationBackend.HELIX
+        && !brokerConf.containsKey(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER)) {
       brokerConf.setProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER, _zkAddress);
     }
     ServiceStartable brokerStarter;
@@ -155,7 +158,8 @@ public class PinotServiceManager {
       serverConf.setProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, _clusterName);
     }
 
-    if (!serverConf.containsKey(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER)) {
+    if (CoordinationBackend.from(serverConf) == CoordinationBackend.HELIX
+        && !serverConf.containsKey(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER)) {
       serverConf.setProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER, _zkAddress);
     }
     ServiceStartable serverStarter = getServiceStartable(serverStarterClassName);
@@ -170,6 +174,9 @@ public class PinotServiceManager {
 
   public String startMinion(String minionStarterClassName, PinotConfiguration minionConf)
       throws Exception {
+    if (CoordinationBackend.from(minionConf) == CoordinationBackend.RATIS) {
+      throw new IllegalArgumentException("Ratis minion startup is not supported");
+    }
     LOGGER.info("Trying to start Pinot Minion...");
     if (!minionConf.containsKey(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME)) {
       minionConf.setProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, _clusterName);

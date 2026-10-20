@@ -31,6 +31,7 @@ import org.apache.pinot.broker.routing.manager.MultiClusterRoutingManager;
 import org.apache.pinot.broker.routing.manager.RemoteClusterBrokerRoutingManager;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.config.provider.ZkTableCache;
+import org.apache.pinot.common.coordination.CoordinationBackend;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.core.routing.MultiClusterRoutingContext;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -72,6 +73,9 @@ public class MultiClusterHelixBrokerStarter extends BaseBrokerStarter {
   @Override
   public void init(PinotConfiguration brokerConf)
       throws Exception {
+    if (CoordinationBackend.from(brokerConf) != CoordinationBackend.HELIX) {
+      throw new IllegalArgumentException("Multi-cluster broker requires the Helix coordination backend");
+    }
     super.init(brokerConf);
     _remoteInstanceId = _instanceId + "_remote";
     initRemoteClusterNamesAndZk(brokerConf);

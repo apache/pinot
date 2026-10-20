@@ -72,6 +72,8 @@ import org.apache.pinot.common.config.NettyConfig;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.config.provider.ZkTableCache;
+import org.apache.pinot.common.coordination.CoordinationBackend;
+import org.apache.pinot.common.coordination.NativeMetadataConfig;
 import org.apache.pinot.common.cursors.AbstractResponseStore;
 import org.apache.pinot.common.evaluator.GroovyFunctionEvaluator;
 import org.apache.pinot.common.failuredetector.FailureDetector;
@@ -157,6 +159,14 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   @VisibleForTesting
   static final String WARMUP_GATE_STARTING_DESCRIPTION = "Warming up broker data plane";
 
+  private final Object _nativeLifecycleLock = new Object();
+  private boolean _nativeSelected;
+  private boolean _nativeStatusRegistered;
+  @Nullable
+  private NativeMetadataConfig _nativeConfig;
+  @Nullable
+  private NativeBrokerParticipant _nativeParticipant;
+
   protected PinotConfiguration _brokerConf;
   protected List<ListenerConfig> _listenerConfigs;
   protected String _clusterName;
@@ -228,6 +238,22 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   public void init(PinotConfiguration brokerConf)
       throws Exception {
     _brokerConf = brokerConf;
+    _nativeSelected = CoordinationBackend.from(brokerConf) == CoordinationBackend.RATIS;
+    if (_nativeSelected) {
+      NativeMetadataConfig nativeConfig = new NativeMetadataConfig(brokerConf);
+      _instanceId = nativeConfig.participantId();
+      Preconditions.checkArgument(InstanceTypeUtils.isBroker(_instanceId),
+          "Native broker participant ID must have prefix '%s'", Helix.PREFIX_OF_BROKER_INSTANCE);
+      // Preserve validation of the legacy instanceId alias accepted by the normal broker starter.
+      @SuppressWarnings("deprecation")
+      String configuredId = brokerConf.getProperty(Broker.CONFIG_OF_BROKER_ID,
+          brokerConf.getProperty(Helix.Instance.INSTANCE_ID_KEY));
+      Preconditions.checkArgument(configuredId == null || configuredId.equals(_instanceId),
+          "Broker ID differs from native participant ID");
+      brokerConf.setProperty(Broker.CONFIG_OF_BROKER_ID, _instanceId);
+      _nativeConfig = nativeConfig;
+      return;
+    }
     // Remove all white-spaces from the list of zkServers (if any).
     _zkServers = brokerConf.getProperty(Helix.CONFIG_OF_ZOOKEEPER_SERVER).replaceAll("\\s+", "");
     _clusterName = brokerConf.getProperty(Helix.CONFIG_OF_CLUSTER_NAME);
@@ -275,6 +301,11 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _brokerConf.setProperty(Broker.CONFIG_OF_BROKER_ID, _instanceId);
 
     NettyInspector.logAllChecks();
+  }
+
+  @VisibleForTesting
+  NativeBrokerParticipant createNativeParticipant(NativeMetadataConfig config) throws IOException {
+    return new NativeBrokerParticipant(config, config.openConnection());
   }
 
   /// Can be overridden to apply custom configs to the broker conf.
@@ -409,6 +440,29 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   @Override
   public void start()
       throws Exception {
+    if (_nativeSelected) {
+      synchronized (_nativeLifecycleLock) {
+        Preconditions.checkState(_nativeConfig != null, "Native broker initialization did not complete");
+        Preconditions.checkState(_nativeParticipant == null && !_isShuttingDown,
+            "Native broker lifecycle cannot be restarted");
+        _isStarting = true;
+        try {
+          _nativeParticipant = createNativeParticipant(_nativeConfig);
+          _nativeParticipant.start();
+          ServiceStatus.setServiceStatusCallback(_instanceId, _nativeParticipant);
+          _nativeStatusRegistered = true;
+          LOGGER.info("Native broker {} registered for membership only; query listeners remain disabled", _instanceId);
+        } catch (Exception | Error e) {
+          if (_nativeParticipant != null) {
+            _nativeParticipant.close();
+          }
+          throw e;
+        } finally {
+          _isStarting = false;
+        }
+      }
+      return;
+    }
     LOGGER.info("Starting Pinot broker (Version: {})", PinotVersion.VERSION);
     LOGGER.info("Broker configs: {}", new PinotAppConfigs(getConfig()).toJSONString());
     long startTimeMs = System.currentTimeMillis();
@@ -1154,6 +1208,19 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   @Override
   public void stop() {
     LOGGER.info("Shutting down Pinot broker");
+    if (_nativeSelected) {
+      synchronized (_nativeLifecycleLock) {
+        _isShuttingDown = true;
+        if (_nativeParticipant != null) {
+          _nativeParticipant.close();
+        }
+        if (_nativeStatusRegistered) {
+          ServiceStatus.removeServiceStatusCallback(_instanceId, _nativeParticipant);
+          _nativeStatusRegistered = false;
+        }
+      }
+      return;
+    }
     _isShuttingDown = true;
     stopWarmup();
     stopPreConnect();

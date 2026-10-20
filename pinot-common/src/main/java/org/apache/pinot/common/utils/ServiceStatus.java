@@ -65,6 +65,11 @@ public class ServiceStatus {
     ServiceStatus.SERVICE_STATUS_CALLBACK_MAP.remove(name);
   }
 
+  /// Removes only the caller's registration, preserving a replacement process's callback for the same stable ID.
+  public static void removeServiceStatusCallback(String name, ServiceStatusCallback callback) {
+    SERVICE_STATUS_CALLBACK_MAP.remove(name, callback);
+  }
+
   public static Status getServiceStatus() {
     return getServiceStatus(SERVICE_STATUS_CALLBACK);
   }

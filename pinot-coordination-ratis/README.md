@@ -24,7 +24,8 @@ This internal, experimental module develops metadata, recovery and native offlin
 Ratis. It targets Java 25, keeps Ratis dependencies outside the Java 11 common/SPI artifacts, and uses Apache Ratis 3.3.1.
 
 The module is not a complete ZooKeeper or Helix replacement. Existing Pinot starters and quickstarts continue to use
-Helix/ZooKeeper by default. No normal service starts a Ratis voter merely because this module is built.
+Helix/ZooKeeper by default. Explicit `pinot.coordination.backend=RATIS` selects the bounded native starter lifecycle
+described below; building this module alone does not select it.
 
 The initial catalog stores cluster configuration, schemas and table configurations. Conditional transactions check
 history, object identity and version before applying any mutation. Deleted object identities remain reserved so a
@@ -252,8 +253,8 @@ acknowledgement. Recovery runs independently of operation discovery, so a comple
 snapshot cannot strand the report stream. Old-session files are retained as evidence, never replayed under a new
 session. Evidence is bounded to 128 files of at most 256 KiB each; saturation requires explicit archival. Startup and
 shutdown serialize; shutdown drains local actions and outbox leases before releasing directory ownership, then
-retires the confirmed registration. Normal starter configuration, network query integration and general table lifecycle remain
-unimplemented; this runtime does not make the replacement complete or alter Helix defaults.
+retires the confirmed registration. Normal starter configuration is available for the installation-only lifecycle below. Network query integration and
+general table lifecycle remain unimplemented; this runtime does not make the replacement complete or alter Helix defaults.
 
 `RatisOfflineSegmentExecutor` connects fresh own-target work to the native `LOAD`, `RELOAD` or `RECONCILE` action and receipt publisher.
 The installer verifies the downloaded SHA-256 and segment CRC, runs Pinot's existing preprocessing, and opens the
@@ -273,7 +274,7 @@ its installation ID. Forced download bypasses local-byte reuse. Ordinary `LOAD` 
 Publication refreshes work and checks local authority and the expected prior installation under the segment lock;
 consensus revalidates the receipt against later global changes. Neither local installation nor a committed receipt
 grants query-serving rights. This path currently supports ordinary OFFLINE tables with the default local segment
-directory loader, without tiers, peer download, upsert or dimension tables. Normal-role starters, controller REST
+directory loader, without tiers, peer download, upsert or dimension tables. Controller REST
 actions, controller work scheduling, routing publication and complete query-serving fences remain absent. This is an internal execution
 path, not a complete controller/server reload integration or a supported Helix/ZooKeeper replacement.
 
@@ -314,6 +315,82 @@ production clock qualification, broker deadline propagation, transport response-
 retry/drain remain unimplemented. MSE/time-series and other unsupported paths cannot silently drop the context. Native
 `ServerInstance` query resources remain disabled until those gates are implemented and tested together.
 
+## Normal starters (experimental, query listeners disabled)
+
+`StartController`, `StartBroker`, and `StartServer` use their existing starter classes. Set
+`pinot.coordination.backend=RATIS` in each component config to select the native lifecycle **before** any Helix/ZK
+bootstrap or cluster-config read. Missing backend configuration retains `HELIX`; unknown values fail startup. Backend
+selection, process identity, peers, TLS and local storage are bootstrap settings, not runtime cluster toggles.
+
+- Controller starts one embedded voter, its explicitly qualified membership clock and the mutually authenticated
+  metadata/membership/installation endpoint. It initializes an absent membership policy with expected version zero;
+  restart or a competing controller cannot overwrite an existing committed policy.
+- Server starts the existing native offline participant with independent membership/work connections, a locked durable
+  data directory, metadata hydration and installation reconciliation. It requests no query capabilities and advertises
+  no query endpoints. The existing server query-start gate stays closed.
+- Broker registers and renews an empty-capability membership session. It remains `ready=false`, with service status
+  explicitly reporting that routing and query listeners are unavailable. Its applied revision covers only its own
+  membership/control projection, not a routing image.
+
+No broker HTTP/gRPC/MSE or server Netty/TLS/gRPC/MSE query listeners are allocated, even if legacy query-port settings
+are present. Helix-dependent controller HTTP/UI resources and server admin resources are not started on the native
+path. Minions and multi-cluster brokers are unsupported. These entry points exercise coordination and offline
+installation; they do not yet provide a queryable replacement cluster or the normal controller UI.
+
+All native components need `pinot.coordination.ratis.historyId`. Controllers retain the voter settings in the next
+section and additionally require:
+
+```properties
+pinot.coordination.backend=RATIS
+pinot.coordination.ratis.metadata.host=127.0.0.1
+pinot.coordination.ratis.metadata.port=24001
+pinot.coordination.ratis.tls.certChain=/absolute/path/controller.pem
+pinot.coordination.ratis.tls.privateKey=/absolute/path/controller-key.pem
+pinot.coordination.ratis.tls.trustCerts=/absolute/path/trust.pem
+pinot.coordination.ratis.controller.provider.class=your.deployment.QualifiedRatisControllerProvider
+```
+
+The provider implements `RatisControllerProvider`: initialization, qualified `MembershipClockSettings`, current
+certificate-to-controller and certificate-to-participant policies, and an explicit safe version-one bootstrap
+membership policy. There is **no bundled production clock provider or timing default**. Supplying a class name or
+positive bounds does not qualify a platform. Test providers are only test fixtures. Participant policies with serving
+capabilities are denied by this starter; certificate identities never come from RPC request fields. Controller
+startup waits for quorum and policy initialization, bounded by `controller.startup.timeoutMs` (default 30,000;
+maximum 300,000), so launch the three controller processes concurrently. Current Raft peers remain loopback-only.
+`StartServiceManager -bootstrapConfigPaths ...` starts configured Ratis controllers concurrently and waits for them
+before starting broker/server roles; its existing sequential Helix controller bootstrap is preserved.
+
+Broker and server configs use:
+
+```properties
+pinot.coordination.backend=RATIS
+pinot.coordination.ratis.historyId=<the-controller-history-uuid>
+pinot.coordination.ratis.participantId=Server_native1
+pinot.coordination.ratis.metadata.endpoints=127.0.0.1:24001,127.0.0.1:24002,127.0.0.1:24003
+pinot.coordination.ratis.tls.certChain=/absolute/path/participant.pem
+pinot.coordination.ratis.tls.privateKey=/absolute/path/participant-key.pem
+pinot.coordination.ratis.tls.trustCerts=/absolute/path/trust.pem
+```
+
+Use a `Broker_` participant ID for a broker and authorize each certificate for that exact role and stable ID.
+Servers additionally require `pinot.server.instance.id` equal to the participant ID and explicit absolute
+`pinot.server.instance.dataDir` and `pinot.server.instance.segmentTarDir` paths. Existing filesystem, fetcher and crypter
+plugin settings are retained. `rpc.timeoutMs` defaults to 5,000 and `heartbeatMillis` to 1,000 under the Ratis prefix;
+both are bounded to 1–30,000 milliseconds. Server-specific `server.snapshotMillis`, `server.actionThreads`, and
+`server.queuedActions` default to 1,000, 1, and 128. Scheduling intervals must fit the committed membership policy;
+these transport controls do not qualify clocks or grant serving authority.
+
+After supplying deployment-qualified providers, TLS identities and all voter settings, use the existing commands:
+
+```bash
+bin/pinot-admin.sh StartController -configFileName controller-1.conf
+bin/pinot-admin.sh StartBroker -configFileName broker.conf
+bin/pinot-admin.sh StartServer -configFileName server.conf
+```
+
+Startup failure closes owned channels, voters and directory ownership. Shutdown retires only the process's confirmed
+registration; unknown remote outcomes rely on lease expiry. The existing Helix/ZK quickstarts are unchanged.
+
 ## Voter configuration and validation
 
 The voter configuration uses the `pinot.coordination.ratis.` prefix with `clusterId`, `historyId`, `id`, `voters`,
@@ -348,7 +425,7 @@ Validate the shared query wire context and deadline/permit composition:
   -Dsurefire.failIfNoSpecifiedTests=false test
 ```
 
-Metadata durability, distribution and membership contracts are parts of the replacement. Normal role integration,
+Metadata durability, distribution, membership and starter wiring are parts of the replacement. Full role integration,
 qualified liveness and query fencing, controller ownership integration, assignment and state transitions, realtime
 ingestion, minion tasks, migration and a standalone Ratis quickstart require their own integration and qualification
 before a supported replacement is claimed.
