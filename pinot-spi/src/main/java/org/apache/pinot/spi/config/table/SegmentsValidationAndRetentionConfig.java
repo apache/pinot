@@ -130,7 +130,7 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
 
   /// @deprecated Use `segmentIngestionFrequency` from
   ///     [org.apache.pinot.spi.config.table.ingestion.IngestionConfig#getBatchIngestionConfig()]
-  @Deprecated
+  @Deprecated(since = "0.8.0", forRemoval = true)
   public String getSegmentPushFrequency() {
     return _segmentPushFrequency;
   }
@@ -142,7 +142,7 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
 
   /// @deprecated Use `segmentIngestionType` from
   ///     [org.apache.pinot.spi.config.table.ingestion.IngestionConfig#getBatchIngestionConfig()]
-  @Deprecated
+  @Deprecated(since = "0.8.0", forRemoval = true)
   public String getSegmentPushType() {
     return _segmentPushType;
   }
@@ -165,7 +165,7 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   /// @deprecated Use \_replication instead
   ///
   /// Will be deleted in future version of Pinot
-  @Deprecated
+  @Deprecated(since = "1.1.0", forRemoval = true)
   public String getReplicasPerPartition() {
     return _replicasPerPartition;
   }
@@ -179,7 +179,7 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   }
 
   /// @deprecated Use [org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig] instead.
-  @Deprecated
+  @Deprecated(since = "1.3.0", forRemoval = true)
   public ReplicaGroupStrategyConfig getReplicaGroupStrategyConfig() {
     return _replicaGroupStrategyConfig;
   }
@@ -214,7 +214,7 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   }
 
   /// @deprecated Use [org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig] instead
-  @Deprecated
+  @Deprecated(since = "1.3.0", forRemoval = true)
   public boolean isMinimizeDataMovement() {
     return _minimizeDataMovement;
   }

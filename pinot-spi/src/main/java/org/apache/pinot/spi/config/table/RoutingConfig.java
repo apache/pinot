@@ -54,7 +54,9 @@ public class RoutingConfig extends BaseJsonConfig {
     _useFixedReplica = useFixedReplica;
   }
 
+  /// @deprecated Use `routing.segmentPrunerTypes` and `routing.instanceSelectorType` instead.
   @Nullable
+  @Deprecated(since = "0.3.0", forRemoval = true)
   public String getRoutingTableBuilderName() {
     return _routingTableBuilderName;
   }
