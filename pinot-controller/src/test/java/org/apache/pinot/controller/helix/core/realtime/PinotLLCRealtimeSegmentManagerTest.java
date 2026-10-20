@@ -27,6 +27,7 @@ import java.net.URISyntaxException;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -40,15 +41,19 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import javax.annotation.Nullable;
 import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.AccessOption;
+import org.apache.helix.BaseDataAccessor;
 import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
+import org.apache.helix.PropertyKey;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
@@ -67,6 +72,7 @@ import org.apache.pinot.common.restlet.resources.TableLLCSegmentUploadResponse;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.URIUtils;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
@@ -114,6 +120,7 @@ import org.joda.time.Interval;
 import org.mockito.MockedStatic;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.ControllerConf.ControllerPeriodicTasksConf.ENABLE_TMP_SEGMENT_ASYNC_DELETION;
@@ -1042,24 +1049,123 @@ public class PinotLLCRealtimeSegmentManagerTest {
     // Partition 1: all replicas of the consuming segment are OFFLINE
     String offlineSegment = new LLCSegmentName(RAW_TABLE_NAME, 1, 0, CURRENT_TIME_MS).getSegmentName();
     instanceStatesMap.get(offlineSegment).replaceAll((instance, state) -> SegmentStateModel.OFFLINE);
+    // Partition 4: a new partition of the stream
+    segmentManager._numPartitions = 5;
 
     // The first attempt creates the new segments, but its IdealState write fails
     Map<String, Boolean> newSegmentsCreated = new HashMap<>();
     runFailedEnsureAllPartitionsConsumingAttempt(segmentManager, newSegmentsCreated);
     String newSegment0 = new LLCSegmentName(RAW_TABLE_NAME, 0, 1, CURRENT_TIME_MS).getSegmentName();
     String newSegment1 = new LLCSegmentName(RAW_TABLE_NAME, 1, 1, CURRENT_TIME_MS).getSegmentName();
+    String newSegment4 = new LLCSegmentName(RAW_TABLE_NAME, 4, 0, CURRENT_TIME_MS).getSegmentName();
 
     // The retry starts from the unchanged IdealState. It must add the new segments right away instead of waiting for
     // them to exceed the max segment completion time.
     segmentManager.ensureAllPartitionsConsuming(segmentManager._tableConfig, segmentManager._streamConfigs,
         segmentManager._idealState, getStreamMetadataList(segmentManager), null, newSegmentsCreated);
     assertEquals(segmentManager._segmentZKMetadataMap.keySet().stream()
-        .filter(segment -> new LLCSegmentName(segment).getPartitionGroupId() <= 1)
-        .collect(Collectors.toSet()), Set.of(committingSegment, newSegment0, offlineSegment, newSegment1));
+            .filter(segment -> Set.of(0, 1, 4).contains(new LLCSegmentName(segment).getPartitionGroupId()))
+            .collect(Collectors.toSet()),
+        Set.of(committingSegment, newSegment0, offlineSegment, newSegment1, newSegment4));
     assertEquals(new HashSet<>(instanceStatesMap.get(committingSegment).values()), Set.of(SegmentStateModel.ONLINE));
     assertEquals(new HashSet<>(instanceStatesMap.get(newSegment0).values()), Set.of(SegmentStateModel.CONSUMING));
     assertEquals(new HashSet<>(instanceStatesMap.get(offlineSegment).values()), Set.of(SegmentStateModel.OFFLINE));
     assertEquals(new HashSet<>(instanceStatesMap.get(newSegment1).values()), Set.of(SegmentStateModel.CONSUMING));
+    assertEquals(new HashSet<>(instanceStatesMap.get(newSegment4).values()), Set.of(SegmentStateModel.CONSUMING));
+    verify(controllerMetrics, never()).addMeteredTableValue(REALTIME_TABLE_NAME, ControllerMeter.LLC_STREAM_DATA_LOSS,
+        1L);
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  public void testEnsureAllPartitionsConsumingAddsSegmentsCreatedByAttemptWithFailedIdealStateWrite() {
+    PinotHelixResourceManager resourceManager = FakePinotLLCRealtimeSegmentManager.createMockedResourceManager();
+    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager(resourceManager);
+    setUpNewTable(segmentManager, 2, 5, 4);
+    String committingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+    SegmentZKMetadata committingSegmentZKMetadata = segmentManager._segmentZKMetadataMap.get(committingSegment);
+    committingSegmentZKMetadata.setStatus(Status.DONE);
+    committingSegmentZKMetadata.setEndOffset(NEXT_OFFSET);
+    segmentManager._segmentsExceedingMaxSegmentCompletionTime.add(committingSegment);
+
+    // The first IdealState write fails because another controller uploads a segment in the meantime
+    HelixDataAccessor dataAccessor = mock(HelixDataAccessor.class);
+    when(resourceManager.getHelixZkManager().getHelixDataAccessor()).thenReturn(dataAccessor);
+    when(dataAccessor.keyBuilder()).thenReturn(new PropertyKey.Builder(CLUSTER_NAME));
+    when(dataAccessor.getProperty(any(PropertyKey.class))).thenAnswer(
+        invocation -> HelixHelper.cloneIdealState(segmentManager._idealState));
+    BaseDataAccessor<ZNRecord> baseDataAccessor = mock(BaseDataAccessor.class);
+    when(dataAccessor.getBaseDataAccessor()).thenReturn(baseDataAccessor);
+    String uploadedSegment = "uploadedSegment";
+    AtomicInteger numWrites = new AtomicInteger();
+    when(baseDataAccessor.set(anyString(), any(ZNRecord.class), anyInt(), anyInt())).thenAnswer(invocation -> {
+      if (numWrites.getAndIncrement() == 0) {
+        segmentManager._idealState.getRecord().getMapFields()
+            .put(uploadedSegment, Map.of(Helix.PREFIX_OF_SERVER_INSTANCE + 0, SegmentStateModel.ONLINE));
+        return false;
+      }
+      segmentManager._idealState = new IdealState(invocation.<ZNRecord>getArgument(1));
+      return true;
+    });
+
+    // The retry adds the new segment created by the first attempt right away, and keeps the uploaded segment
+    segmentManager.ensureAllPartitionsConsuming(segmentManager._tableConfig, segmentManager._streamConfigs, null);
+    assertEquals(numWrites.get(), 2);
+    String newSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 1, CURRENT_TIME_MS).getSegmentName();
+    assertEquals(segmentManager._segmentZKMetadataMap.keySet().stream()
+        .filter(segment -> new LLCSegmentName(segment).getPartitionGroupId() == 0)
+        .collect(Collectors.toSet()), Set.of(committingSegment, newSegment));
+    Map<String, Map<String, String>> instanceStatesMap = segmentManager._idealState.getRecord().getMapFields();
+    assertEquals(new HashSet<>(instanceStatesMap.get(committingSegment).values()), Set.of(SegmentStateModel.ONLINE));
+    assertEquals(new HashSet<>(instanceStatesMap.get(newSegment).values()), Set.of(SegmentStateModel.CONSUMING));
+    assertTrue(instanceStatesMap.containsKey(uploadedSegment));
+  }
+
+  @DataProvider
+  public Object[][] reverseLLCSegments() {
+    return new Object[][]{{false}, {true}};
+  }
+
+  @Test(dataProvider = "reverseLLCSegments")
+  public void testEnsureAllPartitionsConsumingRetryKeepsSegmentAddedByAnotherController(boolean reverseLLCSegments) {
+    ControllerMetrics controllerMetrics = mock(ControllerMetrics.class);
+    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager(controllerMetrics);
+    setUpNewTable(segmentManager, 2, 5, 4);
+    // Lists the segments in both orders across the test runs, as the segments with the same sequence number below
+    // must be resolved the same way in either order
+    segmentManager._reverseLLCSegments = reverseLLCSegments;
+    Map<String, Map<String, String>> instanceStatesMap = segmentManager._idealState.getRecord().getMapFields();
+    String committingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+    SegmentZKMetadata committingSegmentZKMetadata = segmentManager._segmentZKMetadataMap.get(committingSegment);
+    committingSegmentZKMetadata.setStatus(Status.DONE);
+    committingSegmentZKMetadata.setEndOffset(NEXT_OFFSET);
+    segmentManager._segmentsExceedingMaxSegmentCompletionTime.add(committingSegment);
+
+    // The first attempt creates a new segment, but its IdealState write fails
+    Map<String, Boolean> newSegmentsCreated = new HashMap<>();
+    runFailedEnsureAllPartitionsConsumingAttempt(segmentManager, newSegmentsCreated);
+    String newSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 1, CURRENT_TIME_MS).getSegmentName();
+
+    // Meanwhile, another controller, e.g. the previous lead controller, creates its own new segment with the same
+    // sequence number and adds it to the IdealState first
+    String otherNewSegment =
+        new LLCSegmentName(RAW_TABLE_NAME, 0, 1, CURRENT_TIME_MS - TimeUnit.MINUTES.toMillis(1)).getSegmentName();
+    segmentManager.persistSegmentZKMetadata(REALTIME_TABLE_NAME, new SegmentZKMetadata(
+        new ZNRecord(segmentManager._segmentZKMetadataMap.get(newSegment).toZNRecord(), otherNewSegment)), -1);
+    Map<String, String> otherNewSegmentInstanceStateMap = new TreeMap<>();
+    for (String instance : instanceStatesMap.get(committingSegment).keySet()) {
+      otherNewSegmentInstanceStateMap.put(instance, SegmentStateModel.CONSUMING);
+    }
+    instanceStatesMap.get(committingSegment).replaceAll((instance, state) -> SegmentStateModel.ONLINE);
+    instanceStatesMap.put(otherNewSegment, otherNewSegmentInstanceStateMap);
+
+    // The retry keeps the segment of the other controller instead of adding its own one
+    Map<String, Map<String, String>> expectedInstanceStatesMap = cloneInstanceStatesMap(instanceStatesMap);
+    Set<String> expectedSegments = new HashSet<>(segmentManager._segmentZKMetadataMap.keySet());
+    segmentManager.ensureAllPartitionsConsuming(segmentManager._tableConfig, segmentManager._streamConfigs,
+        segmentManager._idealState, getStreamMetadataList(segmentManager), null, newSegmentsCreated);
+    assertEquals(instanceStatesMap, expectedInstanceStatesMap);
+    assertEquals(segmentManager._segmentZKMetadataMap.keySet(), expectedSegments);
     verify(controllerMetrics, never()).addMeteredTableValue(REALTIME_TABLE_NAME, ControllerMeter.LLC_STREAM_DATA_LOSS,
         1L);
   }
@@ -2519,6 +2625,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     boolean _exceededMaxSegmentCompletionTime = false;
     // Segments that exceed the max segment completion time even when _exceededMaxSegmentCompletionTime is false
     Set<String> _segmentsExceedingMaxSegmentCompletionTime = new HashSet<>();
+    // Whether to list the LLC segments in reverse order
+    boolean _reverseLLCSegments = false;
     FileUploadDownloadClient _mockedFileUploadDownloadClient;
     PinotHelixResourceManager _mockResourceManager;
 
@@ -2630,7 +2738,11 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     @Override
     List<String> getLLCSegments(String realtimeTableName) {
-      return new ArrayList<>(_segmentZKMetadataMap.keySet());
+      List<String> llcSegments = new ArrayList<>(_segmentZKMetadataMap.keySet());
+      if (_reverseLLCSegments) {
+        Collections.reverse(llcSegments);
+      }
+      return llcSegments;
     }
 
     @Override

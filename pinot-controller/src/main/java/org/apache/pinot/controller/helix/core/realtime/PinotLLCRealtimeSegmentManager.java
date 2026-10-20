@@ -1384,9 +1384,15 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
 
   /// Returns the latest LLC realtime segment ZK metadata for each partition.
   ///
+  /// When several segments of a partition have the highest sequence number, e.g. the new segments created by two
+  /// controllers repairing the partition at the same time, the one in the IdealState is the latest one. If none of them
+  /// is in the IdealState, whichever is listed first is the latest one.
+  ///
   /// @param realtimeTableName Realtime table name
+  /// @param instanceStatesMap Instance states map of the IdealState
   /// @return Map from partition group id to the latest LLC realtime segment ZK metadata
-  private Map<Integer, SegmentZKMetadata> getLatestSegmentZKMetadataMap(String realtimeTableName) {
+  private Map<Integer, SegmentZKMetadata> getLatestSegmentZKMetadataMap(String realtimeTableName,
+      Map<String, Map<String, String>> instanceStatesMap) {
     List<String> segments = getLLCSegments(realtimeTableName);
 
     Map<Integer, LLCSegmentName> latestLLCSegmentNameMap = new HashMap<>();
@@ -1398,6 +1404,11 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
         } else {
           if (llcSegmentName.getSequenceNumber() > latestLLCSegmentName.getSequenceNumber()) {
             return llcSegmentName;
+          } else if (llcSegmentName.getSequenceNumber() == latestLLCSegmentName.getSequenceNumber()) {
+            LOGGER.warn("Found segments: {} and {} with the same sequence number in partition: {} of table: {}",
+                latestLLCSegmentName.getSegmentName(), segmentName, partitionId, realtimeTableName);
+            return !instanceStatesMap.containsKey(latestLLCSegmentName.getSegmentName())
+                && instanceStatesMap.containsKey(segmentName) ? llcSegmentName : latestLLCSegmentName;
           } else {
             return latestLLCSegmentName;
           }
@@ -1749,7 +1760,8 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
         StreamConsumerFactoryProvider.create(streamConfigs.get(0)).createStreamMsgOffsetFactory();
 
     // Get the latest segment ZK metadata for each partition
-    Map<Integer, SegmentZKMetadata> latestSegmentZKMetadataMap = getLatestSegmentZKMetadataMap(realtimeTableName);
+    Map<Integer, SegmentZKMetadata> latestSegmentZKMetadataMap =
+        getLatestSegmentZKMetadataMap(realtimeTableName, instanceStatesMap);
 
     // Create a map from partition id to start offset
     // TODO: Directly return map from StreamMetadataProvider
