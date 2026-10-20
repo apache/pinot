@@ -64,7 +64,7 @@ final class OperationCatalog {
   private OperationCatalog() {
   }
 
-  interface View extends OfflineSegmentCatalog.View {
+  interface View extends OfflineSegmentCatalog.View, TaskCatalog.View {
     /// Validate and return a proposed record without modifying this view.
     CatalogRecord stage(Mutation mutation, long index);
   }

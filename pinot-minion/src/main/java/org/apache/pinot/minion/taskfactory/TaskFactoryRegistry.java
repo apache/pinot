@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.minion.taskfactory;
 
+import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -34,6 +35,7 @@ import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.metrics.MinionMetrics;
 import org.apache.pinot.common.metrics.MinionTimer;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.minion.MinionContext;
 import org.apache.pinot.minion.event.EventObserverFactoryRegistry;
 import org.apache.pinot.minion.event.MinionEventObserver;
 import org.apache.pinot.minion.event.MinionEventObserverFactory;
@@ -79,6 +81,8 @@ public class TaskFactoryRegistry {
           taskExecutorFactory.getClass().getSimpleName(), eventObserverFactory.getClass().getSimpleName());
       TaskFactory taskFactory = context -> {
         try {
+          Preconditions.checkState(MinionContext.getInstance().isLegacyTaskExecutionSupported(),
+              "Native minion tasks require attempt-bound publication; a metadata read accessor is insufficient");
           return new Task() {
             private final TaskConfig _taskConfig = context.getTaskConfig();
             private final PinotTaskExecutor _taskExecutor = taskExecutorFactory.create();

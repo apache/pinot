@@ -19,11 +19,14 @@
 package org.apache.pinot.minion;
 
 import java.io.File;
+import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.core.minion.SegmentPurger;
+import org.apache.pinot.minion.metadata.HelixMinionMetadataAccessor;
+import org.apache.pinot.minion.metadata.MinionMetadataAccessor;
 import org.apache.pinot.spi.auth.AuthProvider;
 
 
@@ -41,6 +44,7 @@ public class MinionContext {
   private File _dataDir;
   private ZkHelixPropertyStore<ZNRecord> _helixPropertyStore;
   private HelixManager _helixManager;
+  private volatile MinionMetadataAccessor _metadataAccessor;
 
   // For segment upload
   private SSLContext _sslContext;
@@ -65,6 +69,27 @@ public class MinionContext {
 
   public void setHelixPropertyStore(ZkHelixPropertyStore<ZNRecord> helixPropertyStore) {
     _helixPropertyStore = helixPropertyStore;
+    _metadataAccessor = helixPropertyStore == null ? null : new HelixMinionMetadataAccessor(helixPropertyStore);
+  }
+
+  @Nullable
+  public MinionMetadataAccessor getMetadataAccessor() {
+    return _metadataAccessor;
+  }
+
+  /// Binds task metadata reads during startup, before any task is registered or executed.
+  /// This does not enable task execution on a different coordination backend.
+  /// A non-Helix executor additionally needs durable attempt ownership and fenced publication support.
+  public void setMetadataAccessor(@Nullable MinionMetadataAccessor metadataAccessor) {
+    _metadataAccessor = metadataAccessor;
+  }
+
+  /// Legacy task factories can publish outside the task ledger, so a read accessor alone cannot enable them
+  /// against another backend. Unknown accessors, including decorators, require an explicit execution integration.
+  /// The unbound case preserves initialization before the Helix participant connects.
+  public boolean isLegacyTaskExecutionSupported() {
+    MinionMetadataAccessor metadataAccessor = _metadataAccessor;
+    return metadataAccessor == null || metadataAccessor instanceof HelixMinionMetadataAccessor;
   }
 
   public SSLContext getSSLContext() {

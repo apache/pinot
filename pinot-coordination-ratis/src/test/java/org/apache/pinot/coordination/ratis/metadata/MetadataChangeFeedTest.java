@@ -240,7 +240,7 @@ public class MetadataChangeFeedTest {
       }
       MetadataCatalog restored = new MetadataCatalog(fixture._cluster, fixture._history);
       restored.restoreSnapshot(prior);
-      assertEquals(restored.captureSnapshot().path("formatVersion").asInt(), 8);
+      assertEquals(restored.captureSnapshot().path("formatVersion").asInt(), 9);
       assertEquals(restored.captureImage(ALL), fixture._catalog.captureImage(ALL));
       assertEquals(restored.captureSnapshot().path("journal"), current.path("journal"));
       assertEquals(restored.captureSnapshot().path("journalFloor"), current.path("journalFloor"));
@@ -250,7 +250,7 @@ public class MetadataChangeFeedTest {
     legacy.remove(List.of("journalPolicyVersion", "journalFloor", "journal", "membership"));
     MetadataCatalog recovered = new MetadataCatalog(fixture._cluster, fixture._history);
     recovered.restoreSnapshot(legacy);
-    assertEquals(recovered.captureSnapshot().path("formatVersion").asInt(), 8);
+    assertEquals(recovered.captureSnapshot().path("formatVersion").asInt(), 9);
     assertEquals(recovered.captureImage(ALL), fixture._catalog.captureImage(ALL));
     FeedCursor before = new FeedCursor(fixture._history, 1, ALL.scopeId());
     assertEquals(recovered.changes(ALL, before, 128, 128, MetadataProtocol.MAX_CHANGE_BYTES).status(),

@@ -50,6 +50,7 @@ import org.apache.pinot.coordination.ratis.metadata.OfflineInstallationProtocol;
 import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol;
 import org.apache.pinot.coordination.ratis.metadata.OperationProtocol;
 import org.apache.pinot.coordination.ratis.metadata.OwnershipProtocol;
+import org.apache.pinot.coordination.ratis.metadata.TaskProtocol;
 import org.apache.pinot.coordination.ratis.rpc.MetadataRpc;
 import org.apache.pinot.spi.utils.JsonUtils;
 
@@ -180,6 +181,9 @@ final class MetadataRpcCodec {
             OfflineSegmentRpcCodec.assignment(OfflineSegmentProtocol.decodeAssignment(record.value())));
         case OFFLINE_INSTALLATION -> value.setOfflineInstallation(
             InstallationRpcCodec.receipt(OfflineInstallationProtocol.decodeReceipt(record.value())));
+        case TASK_QUEUE -> value.setTaskQueue(TaskRpcCodec.queue(TaskProtocol.decodeQueue(record.value())));
+        case TASK -> value.setTask(TaskRpcCodec.task(TaskProtocol.decodeTask(record.value())));
+        case TASK_ATTEMPT -> value.setTaskAttempt(TaskRpcCodec.attempt(TaskProtocol.decodeAttempt(record.value())));
         default -> throw new IOException("Unsupported catalog record kind");
       }
       builder.setValue(value);
@@ -200,6 +204,9 @@ final class MetadataRpcCodec {
       case OFFLINE_SEGMENT_CONTENT -> RecordKind.OFFLINE_SEGMENT_CONTENT;
       case OFFLINE_REPLICA_ASSIGNMENT -> RecordKind.OFFLINE_REPLICA_ASSIGNMENT;
       case OFFLINE_INSTALLATION -> RecordKind.OFFLINE_INSTALLATION;
+      case TASK_QUEUE -> RecordKind.TASK_QUEUE;
+      case TASK -> RecordKind.TASK;
+      case TASK_ATTEMPT -> RecordKind.TASK_ATTEMPT;
       default -> throw new IllegalArgumentException("Unknown catalog record kind");
     };
   }
@@ -313,6 +320,21 @@ final class MetadataRpcCodec {
       case OFFLINE_INSTALLATION:
         if (kind == RecordKind.OFFLINE_INSTALLATION) {
           return typedValue(InstallationRpcCodec.receipt(value.getOfflineInstallation()));
+        }
+        break;
+      case TASK_QUEUE:
+        if (kind == RecordKind.TASK_QUEUE) {
+          return typedValue(TaskRpcCodec.queue(value.getTaskQueue()));
+        }
+        break;
+      case TASK:
+        if (kind == RecordKind.TASK) {
+          return typedValue(TaskRpcCodec.task(value.getTask()));
+        }
+        break;
+      case TASK_ATTEMPT:
+        if (kind == RecordKind.TASK_ATTEMPT) {
+          return typedValue(TaskRpcCodec.attempt(value.getTaskAttempt()));
         }
         break;
       default:

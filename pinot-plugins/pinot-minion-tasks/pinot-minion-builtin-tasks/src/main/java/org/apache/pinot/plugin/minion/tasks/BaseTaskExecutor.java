@@ -31,7 +31,6 @@ import org.apache.hc.core5.http.NameValuePair;
 import org.apache.hc.core5.http.message.BasicHeader;
 import org.apache.hc.core5.http.message.BasicNameValuePair;
 import org.apache.pinot.common.auth.AuthProviderUtils;
-import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.metrics.MinionMeter;
@@ -80,20 +79,20 @@ public abstract class BaseTaskExecutor implements PinotTaskExecutor {
 
   protected TableConfig getTableConfig(String tableNameWithType) {
     TableConfig tableConfig =
-        ZKMetadataProvider.getTableConfig(MINION_CONTEXT.getHelixPropertyStore(), tableNameWithType);
+        MINION_CONTEXT.getMetadataAccessor().getTableConfig(tableNameWithType);
     Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", tableNameWithType);
     return tableConfig;
   }
 
   protected Schema getSchema(String tableName) {
-    Schema schema = ZKMetadataProvider.getTableSchema(MINION_CONTEXT.getHelixPropertyStore(), tableName);
+    Schema schema = MINION_CONTEXT.getMetadataAccessor().getTableSchema(tableName);
     Preconditions.checkState(schema != null, "Failed to find schema for table: %s", tableName);
     return schema;
   }
 
   protected long getSegmentCrc(String tableNameWithType, String segmentName) {
     SegmentZKMetadata segmentZKMetadata =
-        ZKMetadataProvider.getSegmentZKMetadata(MINION_CONTEXT.getHelixPropertyStore(), tableNameWithType, segmentName);
+        MINION_CONTEXT.getMetadataAccessor().getSegmentMetadata(tableNameWithType, segmentName);
     /*
      * If the segmentZKMetadata is null, it is likely that the segment has been deleted, return -1 as CRC in this case,
      * so that task can terminate early when verify CRC. If we throw exception, helix will keep retrying this forever
