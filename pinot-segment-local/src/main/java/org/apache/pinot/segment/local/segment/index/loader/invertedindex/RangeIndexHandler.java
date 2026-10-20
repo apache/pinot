@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.BitSlicedRangeIndexCreator;
+import org.apache.pinot.segment.local.segment.creator.impl.inv.RangeIndexCreator;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -106,16 +107,29 @@ public class RangeIndexHandler extends BaseIndexHandler {
     return rangeIndexUpdated;
   }
 
-  /// Returns `true` if the on-disk range index version doesn't match the configured version. Range index v1
-  /// (RangeIndexCreator) and v2 (BitSlicedRangeIndexCreator) have incompatible on-disk layouts and serve
+  /// Returns `true` if the on-disk range index version doesn't match the version the creator would build. Range index
+  /// v1 (RangeIndexCreator) and v2 (BitSlicedRangeIndexCreator) have incompatible on-disk layouts and serve
   /// different query semantics (v1 is non-exact, v2 is exact), so a version change requires rebuild.
   private boolean existingRangeIndexVersionDiffers(SegmentDirectory.Reader segmentReader, String column)
       throws Exception {
-    int configuredVersion = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.range()).getVersion();
+    int expectedVersion = getEffectiveRangeIndexVersion(column);
     // The buffer is owned by SegmentDirectory; don't close it here (mmap regions are shared).
     PinotDataBuffer rangeIndexBuffer = segmentReader.getIndexFor(column, StandardIndexes.range());
     int onDiskVersion = rangeIndexBuffer.getInt(0);
-    return onDiskVersion != configuredVersion;
+    return onDiskVersion != expectedVersion;
+  }
+
+  /// Returns the range index version that `RangeIndexType.createIndexCreator` actually builds for the column. It only
+  /// builds v2 for single-value columns and falls back to v1 for multi-value ones, so comparing against the raw
+  /// configured version would make every reload rebuild a multi-value column's v1 index.
+  private int getEffectiveRangeIndexVersion(String column) {
+    int configuredVersion = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.range()).getVersion();
+    ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+    if (configuredVersion == BitSlicedRangeIndexCreator.VERSION && columnMetadata != null
+        && !columnMetadata.isSingleValue()) {
+      return RangeIndexCreator.VERSION;
+    }
+    return configuredVersion;
   }
 
   @Override
