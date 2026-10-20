@@ -64,6 +64,8 @@ import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.Role;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.CatalogRecord;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.ObjectVersion;
+import org.apache.pinot.coordination.ratis.metadata.NativeReplicaPlacementPolicy;
+import org.apache.pinot.coordination.ratis.metadata.OfflineInstallationProtocol;
 import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol;
 import org.apache.pinot.coordination.ratis.metadata.OperationProtocol;
 import org.apache.pinot.coordination.ratis.metadata.OwnershipProtocol;
@@ -418,8 +420,9 @@ public class RatisStartersTest {
         awaitSize(http, controllerUrl + "/tables/orders/size", "reportedSizeInBytes", expectedBytes);
         assertEquals(ServiceStatus.getServiceStatus(BROKER), ServiceStatus.Status.BAD);
         assertEquals(ServiceStatus.getServiceStatus(SERVER), ServiceStatus.Status.GOOD);
-        runNativeTask(manager, directory, history, endpoints, minion, controller, http, controllerUrl, taskOutput,
-            new PinotConfiguration(controllers.getFirst()), serverState.getParticipant(), serverAdmin);
+        PinotConfiguration voterConfig = new PinotConfiguration(controllers.getFirst());
+        TaskOutput generatedOutput = runNativeTask(manager, directory, history, endpoints, minion, controller, http,
+            controllerUrl, taskOutput, voterConfig, serverState.getParticipant(), serverAdmin);
         for (int i = 6; i < 8; i++) {
           try (ServerSocket unused = new ServerSocket(ports[i])) {
             assertTrue(unused.isBound(), "Native query listener must remain closed");
@@ -435,7 +438,16 @@ public class RatisStartersTest {
         MetadataRpc.ParticipantToken replacement = serverClient.membershipRead(read).getParticipant().getParticipant();
         assertEquals(replacement.getRegistrationEpoch(), serverState.getParticipant().getRegistrationEpoch() + 1);
         assertNotEquals(replacement.getIncarnation(), serverState.getParticipant().getIncarnation());
-        assertMissingSize(http, controllerUrl); // The old assignment cannot authorize the replacement process.
+        assertMissingSize(http, controllerUrl); // Unmanaged content cannot borrow the replacement process's authority.
+        TaskInstallation reinstalled = awaitTaskInstallation(voterConfig, replacement, generatedOutput.content());
+        assertTrue(reinstalled.assignment().assignmentEpoch() > generatedOutput.installation().assignment()
+            .assignmentEpoch());
+        assertNotEquals(reinstalled.assignment().materializationId(),
+            generatedOutput.installation().assignment().materializationId());
+        assertNotEquals(reinstalled.installationId(), generatedOutput.installation().installationId());
+        awaitSize(http, serverAdmin + "/tables/nativeTasks_OFFLINE/size", "diskSizeInBytes", generatedOutput.bytes());
+        awaitSize(http, controllerUrl + "/tables/nativeTasks/size", "reportedSizeInBytes", generatedOutput.bytes());
+        awaitPlacement(http, controllerUrl, 2);
 
         assertTrue(manager.stopPinotInstanceById("Controller_ratis_voter-0"));
         controllers.getFirst().put(PREFIX + "bootstrap", false);
@@ -448,6 +460,13 @@ public class RatisStartersTest {
         assertEquals(manager.startRole(ServiceRole.CONTROLLER, controllers.getFirst()), "Controller_ratis_voter-0");
         assertEquals(metadata.membershipRead(read).getControl().getPolicy().getPermitLifetimeMillis(), 1000L,
             "Restart must retain committed policy instead of resetting it from bootstrap configuration");
+        TaskInstallation recovered = awaitTaskInstallation(voterConfig, replacement, generatedOutput.content());
+        assertEquals(recovered, reinstalled, "Controller restart must retain the current installation and proof");
+        var taskState = JsonUtils.stringToJsonNode(get(http, controllerUrl + "/tasks/native/nativeTasks", true).body());
+        assertEquals(taskState.path("tasks").size(), 1);
+        assertEquals(taskState.path("publications").size(), 1);
+        awaitPlacement(http, controllerUrl, 2);
+        awaitSize(http, controllerUrl + "/tables/nativeTasks/size", "reportedSizeInBytes", generatedOutput.bytes());
         clusterTag = get(http, controllerUrl + "/cluster/configs", true).headers().firstValue("ETag").orElseThrow();
         updated = write(http, controllerUrl + "/cluster/configs/" + approvalKey, "DELETE", "",
             Map.of("If-Match", clusterTag));
@@ -480,9 +499,23 @@ public class RatisStartersTest {
     }
   }
 
-  private static void runNativeTask(PinotServiceManager manager, Path directory, String history, String endpoints,
+  private record TaskInstallation(OfflineSegmentProtocol.Assignment assignment,
+                                  OperationProtocol.OperationState operation, UUID installationId) {
+  }
+
+  private record TaskOutput(OfflineSegmentProtocol.Content content, long bytes, TaskInstallation installation) {
+  }
+
+  private static TaskOutput runNativeTask(PinotServiceManager manager, Path directory, String history, String endpoints,
       CertificateFiles minion, CertificateFiles controller, HttpClient http, String controllerUrl, Path output,
       PinotConfiguration voterConfig, MetadataRpc.ParticipantToken server, String serverAdmin) throws Exception {
+    String clusterTag = get(http, controllerUrl + "/cluster/configs", true).headers().firstValue("ETag").orElseThrow();
+    String placementPolicy = JsonUtils.objectToString(Map.of("servers", Map.of(SERVER,
+        Map.of("tenant", "DefaultTenant", "failureDomain", "zone-a"))));
+    HttpResponse<String> configured = write(http, controllerUrl + "/cluster/configs", "POST",
+        JsonUtils.objectToString(Map.of(PREFIX + "offline.placement", placementPolicy)),
+        Map.of("If-Match", clusterTag));
+    assertEquals(configured.statusCode(), 200, configured.body());
     Path sourceRoot = Files.createDirectories(directory.resolve("task-source"));
     Path source = sourceRoot.resolve("rows.json");
     Files.writeString(source, "{\"id\":1}\n{\"id\":2}\n");
@@ -544,59 +577,64 @@ public class RatisStartersTest {
       SegmentMetadataImpl generated = new SegmentMetadataImpl(unpacked.resolve(content.path("segmentName").asText())
           .toFile());
       assertEquals(generated.getTotalDocs(), 2);
-      installTaskOutput(voterConfig, server, OfflineSegmentProtocol.decodeContent(content));
+      OfflineSegmentProtocol.Content published = OfflineSegmentProtocol.decodeContent(content);
+      TaskInstallation installation = awaitTaskInstallation(voterConfig, server, published);
       long bytes = FileUtils.sizeOfDirectory(unpacked.resolve(content.path("segmentName").asText()).resolve("v3")
           .toFile());
       awaitSize(http, serverAdmin + "/tables/nativeTasks_OFFLINE/size", "diskSizeInBytes", bytes);
+      awaitSize(http, controllerUrl + "/tables/nativeTasks/size", "reportedSizeInBytes", bytes);
+      awaitPlacement(http, controllerUrl, 1);
       assertTrue(manager.stopPinotInstanceById("Minion_native_test"));
       assertEquals(manager.startRole(ServiceRole.MINION, config), "Minion_native_test");
       snapshot = JsonUtils.stringToJsonNode(get(http, url, true).body());
       assertEquals(snapshot.path("tasks").size(), 1);
       assertEquals(snapshot.path("publications").size(), 1);
+      return new TaskOutput(published, bytes, installation);
     } finally {
       manager.stopPinotInstanceById("Minion_native_test");
     }
   }
 
-  /// Placement uses the existing trusted test protocol; the minion publishes content without acquiring controller
-  /// ownership or installation authority. This verifies the output is installable by the normal native server.
-  private static void installTaskOutput(PinotConfiguration config, MetadataRpc.ParticipantToken serverSession,
-      OfflineSegmentProtocol.Content content) throws Exception {
+  /// Reads committed placement and receipt proof; no test client submits assignments or installation operations.
+  private static TaskInstallation awaitTaskInstallation(PinotConfiguration config,
+      MetadataRpc.ParticipantToken serverSession, OfflineSegmentProtocol.Content content) throws Exception {
     UUID history = UUID.fromString(serverSession.getHistoryId());
+    var server = new MembershipProtocol.ParticipantToken(history, serverSession.getParticipantId(), Role.SERVER,
+        UUID.fromString(serverSession.getIncarnation()), serverSession.getRegistrationEpoch());
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
     try (RatisMetadataStore.Client client = RatisMetadataStore.connect(config)) {
-      assertEquals(MetadataProtocol.decodeResult(client.execute(MetadataProtocol.encode(
-          new MetadataProtocol.RegisterClient(history, "task-install-test", UUID.randomUUID(), 0)))).status(),
-          MetadataProtocol.Status.OK);
-      CatalogRecord table = record(client, history, MetadataProtocol.RecordKind.TABLE_CONFIG, content.tableName());
-      CatalogRecord schema = record(client, history, MetadataProtocol.RecordKind.SCHEMA, "nativeTasks");
-      var layout = OwnershipProtocol.decodeLayout(record(client, history, MetadataProtocol.RecordKind.OWNER_LAYOUT,
-          OwnershipProtocol.LAYOUT_NAME).value());
-      var scope = OwnershipProtocol.tableScope(layout, content.tableName());
-      var owner = OwnershipProtocol.decodeAssignment(record(client, history,
-          MetadataProtocol.RecordKind.OWNER_ASSIGNMENT, OwnershipProtocol.name(scope)).value());
-      var token =
-          new OwnershipProtocol.OwnerToken(history, layout.generation(), scope, owner.ownerEpoch(), owner.owner());
-      var server = new MembershipProtocol.ParticipantToken(history, serverSession.getParticipantId(), Role.SERVER,
-          UUID.fromString(serverSession.getIncarnation()), serverSession.getRegistrationEpoch());
-      commit(client, new MetadataProtocol.OfflineSegmentCommand(history, "task-install-test", 1, "segments", 1,
-          new OfflineSegmentProtocol.AssignReplica(token, content.segmentObjectId(), 0, server,
-              new OfflineSegmentProtocol.Compatibility(new ObjectVersion(history, table.objectId(), table.version()),
-                  new ObjectVersion(history, schema.objectId(), schema.version())), true)));
-      var assignment = OfflineSegmentProtocol.decodeAssignment(record(client, history,
-          MetadataProtocol.RecordKind.OFFLINE_REPLICA_ASSIGNMENT,
-          OfflineSegmentProtocol.assignmentName(content.segmentObjectId(), serverSession.getParticipantId())).value());
-      UUID operationId = UUID.randomUUID();
-      var intent = new OperationProtocol.OfflineSegmentReload(content.tableName(), content.tableObjectId(),
-          content.segmentName(), content.segmentObjectId(), content.contentSha256(),
-          List.of(new OperationProtocol.TargetMaterialization(server, assignment.assignmentEpoch(),
-              assignment.materializationId())), true, true, false);
-      commit(client, new MetadataProtocol.NativeOperationCommand(history, "task-install-test", 1, "load", 1,
-          new OperationProtocol.Submit(operationId, intent)));
-      var operation = OperationProtocol.decodeOperation(record(client, history,
-          MetadataProtocol.RecordKind.CONTROLLER_OPERATION, operationId.toString()).value());
-      commit(client, new MetadataProtocol.NativeOperationCommand(history, "task-install-test", 1, "load", 2,
-          new OperationProtocol.Claim(operationId, 1, token,
-              ((OperationProtocol.AssignedOfflineSegmentReload) operation.input()).dependencies())));
+      do {
+        MetadataProtocol.Result assigned = MetadataProtocol.decodeResult(client.query(MetadataProtocol.encode(
+            new MetadataProtocol.GetRecord(history, MetadataProtocol.RecordKind.OFFLINE_REPLICA_ASSIGNMENT,
+                OfflineSegmentProtocol.assignmentName(content.segmentObjectId(), serverSession.getParticipantId())))));
+        assertTrue(assigned.status() == MetadataProtocol.Status.OK
+            || assigned.status() == MetadataProtocol.Status.NOT_FOUND, assigned.detail());
+        if (assigned.status() == MetadataProtocol.Status.OK) {
+          var assignment = OfflineSegmentProtocol.decodeAssignment(assigned.record().value());
+          if (assignment.desiredOnline() && assignment.server().equals(server)) {
+            UUID operationId = NativeReplicaPlacementPolicy.operationId(history, assignment.materializationId());
+            CatalogRecord record = record(client, history, MetadataProtocol.RecordKind.CONTROLLER_OPERATION,
+                operationId.toString());
+            var operation = OperationProtocol.decodeOperation(record.value());
+            if (operation.status() == OperationProtocol.State.SUCCEEDED) {
+              assertEquals(operation.completionProof().installations().size(), 1);
+              CatalogRecord receiptRecord = record(client, history, MetadataProtocol.RecordKind.OFFLINE_INSTALLATION,
+                  OfflineInstallationProtocol.recordName(operationId, operation.attempt(), server.participantId()));
+              var receipt = OfflineInstallationProtocol.decodeReceipt(receiptRecord.value()).installation();
+              assertEquals(operation.completionProof().installations().getFirst(),
+                  new ObjectVersion(history, receiptRecord.objectId(), receiptRecord.version()));
+              assertEquals(receipt.owner(), operation.owner());
+              assertEquals(receipt.installed().server(), server);
+              assertEquals(receipt.installed().segmentObjectId(), content.segmentObjectId());
+              assertEquals(receipt.installed().assignment().version(), assignment.assignmentEpoch());
+              assertEquals(receipt.installed().materializationId(), assignment.materializationId());
+              return new TaskInstallation(assignment, operation, receipt.installationId());
+            }
+          }
+        }
+        Thread.sleep(100);
+      } while (System.nanoTime() < deadline);
+      throw new AssertionError("Automatic placement did not complete for " + content.segmentName() + " on " + server);
     }
   }
 
@@ -716,6 +754,30 @@ public class RatisStartersTest {
       Thread.sleep(50);
     } while (System.nanoTime() < deadline);
     throw new AssertionError("Native segment did not report " + expectedBytes + " bytes: " + response.body());
+  }
+
+  private static void awaitPlacement(HttpClient client, String controllerUrl, int expectedOperations) throws Exception {
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
+    HttpResponse<String> response;
+    do {
+      response = get(client, controllerUrl + "/tasks/native/nativeTasks", true);
+      if (response.statusCode() == 200) {
+        var snapshot = JsonUtils.stringToJsonNode(response.body());
+        assertTrue(snapshot.path("placementOperations").size() <= expectedOperations,
+            "Stable assignments must not create duplicate installation operations: " + response.body());
+        if (snapshot.path("placements").size() == 1
+            && snapshot.path("placements").get(0).path("state").asText().equals("INSTALLED")) {
+          var placement = snapshot.path("placements").get(0);
+          assertEquals(placement.path("requestedReplicas").asInt(), 1, response.body());
+          assertEquals(placement.path("desiredReplicas").asInt(), 1, response.body());
+          assertEquals(placement.path("installedReplicas").asInt(), 1, response.body());
+          assertEquals(snapshot.path("placementOperations").size(), expectedOperations, response.body());
+          return;
+        }
+      }
+      Thread.sleep(100);
+    } while (System.nanoTime() < deadline);
+    throw new AssertionError("Native task placement did not converge: " + response.body());
   }
 
   private static void assertMissingSize(HttpClient client, String controllerUrl) throws Exception {

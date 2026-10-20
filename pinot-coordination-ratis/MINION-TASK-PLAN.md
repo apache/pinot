@@ -119,10 +119,48 @@ catalog history is retained; exceeding the controller image limit fails closed. 
 qualification remain outstanding. Input files default to 16 MiB and 100,000 rows, with component-configured ceilings
 of 64 MiB and 1,000,000 rows.
 
-Publication means committed content, not replica installation or query availability. The integration test passes a
-real generated output through the existing native assignment/installation protocol and measures its installed bytes.
-Automatic placement, full existing `/tasks` REST/UI compatibility, remote deep-store adapters, plugin checkpoint
-mutation, replacement/deletion/lineage and other legacy task types remain separate requirements below.
+Publication means committed content, not replica installation or query availability. The controller now reconciles
+published task outputs through the existing native installation protocol. Its normal task scan shares one live
+controller registration, table ownership and durable request stream with scheduling; each cycle attempts at most one
+schedule, retry or output reconciliation, rotating fairly over all candidates. Unknown replies retain their request
+identity. Controller replacement reclaims unfinished operations; completed current installations do not churn.
+
+Automatic placement requires the administrator-owned cluster configuration key
+`pinot.coordination.ratis.offline.placement`, with this strict JSON value:
+
+```json
+{"servers":{"Server_one":{"tenant":"DefaultTenant","failureDomain":"zone-a"},"Server_two":{"tenant":"DefaultTenant","failureDomain":"zone-b"}}}
+```
+
+Configure it through the normal authenticated cluster-config API. The policy supports at most 64 approved stable
+SERVER IDs. `segmentsConfig.replication` must be an explicit integer from 1 through 16. A null server tenant retains
+Pinot's `DefaultTenant` semantics; explicit tenant names must match the approval. Each replica requires a distinct
+approved failure domain and a current ready, non-draining SERVER registration. Endpoint advertisements cannot grant
+these approvals. Tag overrides, tiers, replica-group/fixed-replica routing and Helix assignment options are rejected,
+not silently ignored. The supported placement policy and endpoint-approval keys can change with native content
+present; other cluster changes retain their existing reconciliation gate.
+
+The replicated command computes placement from current policy, table/schema versions, membership and assignments.
+It creates an assignment and its deterministic installation intent atomically, then claims/completes that intent
+through exact server receipts. A desired assignment alone never proves a physical installation. Policy changes take
+effect on subsequent reconciliation without restart. Removing the policy pauses automatic placement and reports
+`BLOCKED`; an explicit `{"servers":{}}` withdraws approvals for reconciliation. Neither action claims immediate
+physical file deletion or query availability.
+Eligible existing replicas are retained before selecting new servers. Explicit approval, tenant or failure-domain
+changes can release old assignments before replacements install; this slice does not guarantee add-before-remove
+migration or zero-downtime rebalance. Native query listeners remain disabled.
+
+`GET /tasks/native/{tableName}` adds `placements` and `placementOperations`. Each output reports requested, current
+eligible desired and installed replica counts separately. An unavailable count is `-1`. `BLOCKED` means missing or
+invalid policy/control; `UNSUPPORTED` means unsupported table or output constraints; `WAITING_FOR_SERVERS` means insufficient
+eligible failure domains; `UNDER_REPLICATED`, `INSTALLING` and `RECONCILING` expose unfinished transitions.
+`INSTALLED` requires exact current assignment/materialization receipts and successful installation operations.
+`FAILED` exposes terminal installation intent requiring operator recovery; the scheduler does not manufacture new
+epochs merely to retry terminal errors. Receipts from replaced or expired server sessions do not count.
+All of these statuses describe the captured metadata revision, not query-serving readiness.
+
+Full existing `/tasks` REST/UI compatibility, remote deep-store adapters, plugin checkpoint mutation,
+replacement/deletion/lineage and other legacy task types remain separate requirements below.
 
 ## Authority and durability requirements
 

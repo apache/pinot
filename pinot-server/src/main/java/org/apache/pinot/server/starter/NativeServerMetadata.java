@@ -243,14 +243,36 @@ public final class NativeServerMetadata {
   /// The participant must hold its admission read guard through publication to serialize invalidation with this check.
   /// Operation hints establish continued discovery, while the separate fresh-work guard checks attempt and owner.
   boolean isCurrent(Identity identity) {
-    Image current = _image;
+    return isCurrent(_image, identity, true);
+  }
+
+  /// Physical observations are intersected with one complete assignment image. Completed operation hints may
+  /// disappear; only the current materialization and configuration identify bytes that still belong to the table.
+  public record Observation(MetadataRpc.Revision revision, Set<Identity> identities) {
+    public Observation {
+      identities = Set.copyOf(identities);
+    }
+  }
+
+  Observation observeInstalled(List<Identity> identities) {
+    Image current = image();
+    Set<Identity> selected = new HashSet<>();
+    for (Identity identity : identities) {
+      if (isCurrent(current, identity, false)) {
+        selected.add(identity);
+      }
+    }
+    return new Observation(current.revision(), selected);
+  }
+
+  private boolean isCurrent(@Nullable Image current, Identity identity, boolean requireOperation) {
     if (current == null || !current.membership().live() || !current.membership().ready()
         || current.membership().draining() || !_server.getHistoryId().equals(identity.historyId().toString())
         || identity.server().role() != Role.SERVER
         || !_server.getParticipantId().equals(identity.server().participantId())
         || !_server.getIncarnation().equals(identity.server().incarnation().toString())
         || _server.getRegistrationEpoch() != identity.server().registrationEpoch()
-        || !current.operations().contains(identity.operation().operationId())
+        || requireOperation && !current.operations().contains(identity.operation().operationId())
         || !matches(current.tables().get(identity.tableName()), identity.table())
         || !matches(current.schemas().get(identity.schemaName()), identity.schema())) {
       return false;

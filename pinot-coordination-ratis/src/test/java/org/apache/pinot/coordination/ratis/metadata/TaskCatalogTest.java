@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,9 +46,12 @@ import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Action;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.CatalogRecord;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Command;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.FeedScope;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.GetInstallationWork;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.GetRecord;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.InstallationSessionCommand;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.MembershipCommand;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Mutation;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.NativeInstallationCommand;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.NativeTaskCommand;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.ObjectVersion;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.OfflineSegmentCommand;
@@ -60,9 +64,13 @@ import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Status;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.TaskCommand;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.TaskSessionCommand;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Transaction;
+import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.Assignment;
 import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.Content;
 import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.LoaderDescriptor;
 import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.PublishContent;
+import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.ReconcileTaskOutput;
+import org.apache.pinot.coordination.ratis.metadata.OperationProtocol.OperationState;
+import org.apache.pinot.coordination.ratis.metadata.OperationProtocol.State;
 import org.apache.pinot.coordination.ratis.metadata.OwnershipProtocol.AssignOwner;
 import org.apache.pinot.coordination.ratis.metadata.OwnershipProtocol.ConfigureLayout;
 import org.apache.pinot.coordination.ratis.metadata.OwnershipProtocol.OwnerToken;
@@ -82,10 +90,13 @@ import org.apache.pinot.coordination.ratis.metadata.TaskProtocol.Retry;
 import org.apache.pinot.coordination.ratis.metadata.TaskProtocol.SetQueuePaused;
 import org.apache.pinot.coordination.ratis.metadata.TaskProtocol.Submit;
 import org.apache.pinot.coordination.ratis.metadata.TaskProtocol.TaskStatus;
+import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableCustomConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
@@ -486,6 +497,150 @@ public class TaskCatalogTest {
     }
   }
 
+  @Test
+  public void testTaskOutputPlacementCommitsIntentAndRecoversWithoutJoinChurn() throws Exception {
+    Fixture f = new Fixture(true);
+    Content output = f.publish();
+    ParticipantToken server = f.register("server-a", Role.SERVER, 0);
+    assertEquals(f.reconcile(output).status(), Status.NOT_READY);
+    f.placementPolicy(Map.of("server-a", new NativeReplicaPlacementPolicy.Server("DefaultTenant", "zone-a")));
+    Result first = f.reconcile(output);
+    assertEquals(first.status(), Status.OK);
+    assertEquals(first.versions().size(), 2, "Assignment and installation intent must commit together");
+    Assignment assignment = f.assignments(output).getFirst();
+    CatalogRecord assignmentRecord = f.record(RecordKind.OFFLINE_REPLICA_ASSIGNMENT,
+        OfflineSegmentProtocol.assignmentName(output.segmentObjectId(), server.participantId()));
+    CatalogRecord operationRecord = f.operationRecord(assignment);
+    assertEquals(assignmentRecord.lastModifiedIndex(), operationRecord.lastModifiedIndex());
+    assertEquals(OperationProtocol.decodeOperation(operationRecord.value()).status(), State.ACCEPTED);
+    f.restore();
+    assertEquals(f.reconcile(output).status(), Status.OK);
+    assertEquals(f.operation(assignment).status(), State.RUNNING);
+    assertTrue(f.reconcile(output).versions().isEmpty(), "Waiting must not churn operation or assignment versions");
+    f.register("server-b", Role.SERVER, 0);
+    f.placementPolicy(Map.of("server-a", new NativeReplicaPlacementPolicy.Server("DefaultTenant", "zone-a"),
+        "server-b", new NativeReplicaPlacementPolicy.Server("DefaultTenant", "zone-b")));
+    assertTrue(f.reconcile(output).versions().isEmpty());
+    assertEquals(f.assignments(output), List.of(assignment), "A joining server must not move a healthy replica");
+    OwnerToken oldOwner = f._owner;
+    ParticipantToken nextController = f.register("next-controller", Role.CONTROLLER, 0);
+    assertEquals(f.owner(new AssignOwner(f._catalog.membershipControl().controlEpoch(), 1, oldOwner.scope(),
+        oldOwner.ownerEpoch(), nextController)).status(), Status.OK);
+    f._owner = new OwnerToken(f._history, 1, oldOwner.scope(), 2, nextController);
+    assertEquals(f.reconcile(output).status(), Status.OK);
+    assertEquals(f.operation(assignment).attempt(), 2L);
+    assertEquals(f.segment(new ReconcileTaskOutput(oldOwner, f._task, output.segmentObjectId())).status(),
+        Status.FENCED);
+    f.install(assignment);
+    assertEquals(f.reconcile(output).status(), Status.OK);
+    assertEquals(f.operation(assignment).status(), State.SUCCEEDED);
+    assertEquals(f.operation(assignment).completionProof().installations().size(), 1);
+    assertTrue(f.reconcile(output).versions().isEmpty());
+    f.restore();
+    assertEquals(f.assignments(output), List.of(assignment));
+  }
+
+  @Test
+  public void testTaskOutputPlacementUsesCurrentPolicyDomainsAndRegistration() throws Exception {
+    Fixture f = new Fixture(true);
+    TableConfig table = f.table();
+    table.getValidationConfig().setReplication("2");
+    assertEquals(f.mutate(Mutation.updateTableConfig(f.objectVersion(f.record(RecordKind.TABLE_CONFIG, TABLE)), table))
+        .status(), Status.OK);
+    Content output = f.publish();
+    ParticipantToken first = f.register("server-a", Role.SERVER, 0);
+    ParticipantToken second = f.register("server-b", Role.SERVER, 0);
+    ParticipantToken third = f.register("server-c", Role.SERVER, 0);
+    assertEquals(f.member(new SetReady(third, new Revision(f._history, f._index), false)).status(), Status.OK);
+    f.placementPolicy(Map.of("server-a", new NativeReplicaPlacementPolicy.Server("DefaultTenant", "zone-a"),
+        "server-b", new NativeReplicaPlacementPolicy.Server("DefaultTenant", "zone-a"),
+        "server-c", new NativeReplicaPlacementPolicy.Server("DefaultTenant", "zone-b")));
+    assertEquals(f.reconcile(output).status(), Status.OK);
+    assertEquals(f.assignments(output).size(), 1, "Same-domain servers cannot count as two replicas");
+    assertEquals(f.member(new SetReady(third, new Revision(f._history, f._index), true)).status(), Status.OK);
+    assertEquals(f.reconcile(output).status(), Status.OK);
+    assertEquals(f.assignments(output).size(), 2);
+    Assignment oldThird = f.assignments(output).stream().filter(a -> a.server().equals(third)).findFirst()
+        .orElseThrow();
+    assertEquals(f.reconcile(output).status(), Status.OK);
+    assertEquals(f.member(new Unregister(third)).status(), Status.OK);
+    ParticipantToken replacement = f.register("server-c", Role.SERVER, 1);
+    assertEquals(f.reconcile(output).status(), Status.OK);
+    Assignment newThird = f.assignments(output).stream().filter(a -> a.server().equals(replacement))
+        .findFirst().orElseThrow();
+    assertEquals(newThird.assignmentEpoch(), oldThird.assignmentEpoch() + 1);
+    assertNotEquals(newThird.materializationId(), oldThird.materializationId());
+    assertEquals(f.operation(oldThird).status(), State.CANCELLED);
+    assertEquals(f.operation(newThird).status(), State.ACCEPTED);
+    assertEquals(f.member(new BeginDrain(replacement)).status(), Status.OK);
+    assertEquals(f.reconcile(output).status(), Status.OK);
+    assertEquals(f.assignments(output).size(), 1);
+    assertTrue(f._catalog.installationSnapshot(replacement, 128, OfflineInstallationProtocol.MAX_SNAPSHOT_BYTES)
+        .records().stream().noneMatch(r -> r.kind() == RecordKind.OFFLINE_REPLICA_ASSIGNMENT));
+    // Policy removal revokes the remaining desired assignment, even when no replacement exists.
+    f.placementPolicy(Map.of());
+    assertEquals(f.reconcile(output).status(), Status.OK);
+    assertTrue(f.assignments(output).isEmpty());
+    assertEquals(f.record(RecordKind.OFFLINE_SEGMENT_CONTENT,
+        OfflineSegmentProtocol.contentName(output.tableObjectId(), output.segmentName())).version(), 1L);
+    // Expiry is evaluated at the committed round, not by caller wall-clock estimates.
+    f.placementPolicy(Map.of(first.participantId(), new NativeReplicaPlacementPolicy.Server("DefaultTenant", "zone-a"),
+        second.participantId(), new NativeReplicaPlacementPolicy.Server("DefaultTenant", "zone-b")));
+    assertEquals(f.reconcile(output).status(), Status.OK);
+    for (int round = 0; round < 2; round++) {
+      assertEquals(f.member(new Tick(f._catalog.membershipControl().controlEpoch(), round, 1)).status(), Status.OK);
+    }
+    assertEquals(f.member(new MembershipProtocol.RenewBatch(List.of(new MembershipProtocol.Renewal(
+        f._owner.participant(), 1, new Revision(f._history, f._index), Set.of())))).status(), Status.OK);
+    assertEquals(f.member(new Tick(f._catalog.membershipControl().controlEpoch(), 2, 1)).status(), Status.OK);
+    assertEquals(f.reconcile(output).status(), Status.OK);
+    assertTrue(f.assignments(output).isEmpty());
+    f.restore();
+  }
+
+  @Test
+  public void testTaskOutputPlacementRejectsInvalidPolicyAndOversizedProjectionAtomically() throws Exception {
+    Fixture tiered = new Fixture(true);
+    Content tieredOutput = tiered.publish("cold");
+    assertEquals(tiered.reconcile(tieredOutput).status(), Status.INVALID_REQUEST);
+    assertTrue(tiered.assignments(tieredOutput).isEmpty());
+    Fixture f = new Fixture(true);
+    Content output = f.publish();
+    f.register("server", Role.SERVER, 0);
+    for (String policy : List.of("{", "{\"servers\":{},\"unknown\":true}",
+        "{\"servers\":{\"server\":{\"tenant\":\"DefaultTenant\"}}}")) {
+      f.cluster(Map.of(NativeReplicaPlacementPolicy.CONFIG_KEY, policy));
+      assertEquals(f.reconcile(output).status(), Status.INVALID_REQUEST);
+      assertTrue(f.assignments(output).isEmpty());
+    }
+    TableConfig unsupported = f.table();
+    unsupported.setRoutingConfig(new RoutingConfig(null, null, "replicaGroup", null));
+    assertThrows(CoordinationRejection.class, () -> NativeReplicaPlacementPolicy.validateTable(unsupported));
+    assertEquals(NativeReplicaPlacementPolicy.tenant(f.table()), "DefaultTenant");
+    String policy = JsonUtils.objectToString(new NativeReplicaPlacementPolicy(Map.of("server",
+        new NativeReplicaPlacementPolicy.Server("DefaultTenant", "zone-a"))));
+    TableConfig large = f.table();
+    large.setCustomConfig(new TableCustomConfig(Map.of("large", "x".repeat(900_000))));
+    assertEquals(f.mutate(Mutation.updateTableConfig(f.objectVersion(f.record(RecordKind.TABLE_CONFIG, TABLE)), large))
+        .status(), Status.OK);
+    f.cluster(Map.of(NativeReplicaPlacementPolicy.CONFIG_KEY, policy, "large", "x".repeat(900_000)));
+    assertEquals(f.reconcile(output).status(), Status.NOT_READY);
+    assertTrue(f.assignments(output).isEmpty());
+    assertTrue(f._catalog.captureImage(new FeedScope(Set.of(RecordKind.CONTROLLER_OPERATION), "operations"))
+        .records().isEmpty(), "Rejected admission must not leave orphan operation intent");
+    large.setCustomConfig(new TableCustomConfig(Map.of()));
+    assertEquals(f.mutate(Mutation.updateTableConfig(f.objectVersion(f.record(RecordKind.TABLE_CONFIG, TABLE)), large))
+        .status(), Status.OK);
+    f.cluster(Map.of(NativeReplicaPlacementPolicy.CONFIG_KEY, policy));
+    assertEquals(f.reconcile(output).status(), Status.OK);
+    Assignment admitted = f.assignments(output).getFirst();
+    f.cluster(Map.of(NativeReplicaPlacementPolicy.CONFIG_KEY, policy, "large", "x".repeat(900_000)));
+    assertEquals(f._catalog.installationSnapshot(admitted.server(), 128,
+        OfflineInstallationProtocol.MAX_SNAPSHOT_BYTES).status(), Status.OK,
+        "A later legal cluster config expansion must fit the reserved projection budget");
+    f.restore();
+  }
+
   private static final class Fixture {
     private final boolean _nativeTask;
     private final UUID _cluster = UUID.randomUUID();
@@ -544,6 +699,83 @@ public class TaskCatalogTest {
           TaskProtocol.outputObjectId(_history, taskId, attempt, 0), digest,
           TaskProtocol.outputUri(input().outputPolicy(), _history, taskId, attempt, _minion.incarnation(), 0, digest),
           new LoaderDescriptor(1, 0, false, null, null, 1, 1, Map.of()));
+    }
+
+    private Content publish() throws IOException {
+      return publish(null);
+    }
+
+    private Content publish(String tier) throws IOException {
+      assertEquals(submit().status(), Status.OK);
+      assertEquals(worker(new Claim(_task, version())).status(), Status.OK);
+      Content output = output(_task, 1);
+      if (tier != null) {
+        output = new Content(output.tableName(), output.tableObjectId(), output.segmentName(), output.segmentObjectId(),
+            output.contentSha256(), output.downloadUri(),
+            new LoaderDescriptor(1, 0, false, tier, null, 1, 1, Map.of()));
+      }
+      assertEquals(worker(new PublishOfflineOutputs(_task, version(), 1, List.of(output), new Progress(1, "done")))
+          .status(), Status.OK);
+      return output;
+    }
+
+    private void cluster(Map<String, String> values) throws IOException {
+      Result current = MetadataProtocol.decodeResult(_catalog.query(MetadataProtocol.encode(new GetRecord(_history,
+          RecordKind.CLUSTER_CONFIG, MetadataProtocol.CLUSTER_CONFIG_NAME))));
+      Mutation mutation = current.status() == Status.NOT_FOUND
+          ? Mutation.createClusterConfig(_history, UUID.randomUUID(), values)
+          : Mutation.updateClusterConfig(objectVersion(current.record()), values);
+      assertEquals(mutate(mutation).status(), Status.OK);
+    }
+
+    private void placementPolicy(Map<String, NativeReplicaPlacementPolicy.Server> servers) throws IOException {
+      cluster(Map.of(NativeReplicaPlacementPolicy.CONFIG_KEY,
+          JsonUtils.objectToString(new NativeReplicaPlacementPolicy(servers))));
+    }
+
+    private Result segment(OfflineSegmentProtocol.Operation operation) throws IOException {
+      return controller(sequence -> new OfflineSegmentCommand(_history, "controller", 1, "controller", sequence,
+          operation));
+    }
+
+    private Result reconcile(Content output) throws IOException {
+      return segment(new ReconcileTaskOutput(_owner, _task, output.segmentObjectId()));
+    }
+
+    private List<Assignment> assignments(Content output) throws IOException {
+      List<Assignment> assignments = new ArrayList<>();
+      for (CatalogRecord record : _catalog.captureImage(new FeedScope(Set.of(RecordKind.OFFLINE_REPLICA_ASSIGNMENT),
+          "assignments")).records()) {
+        Assignment assignment = OfflineSegmentProtocol.decodeAssignment(record.value());
+        if (assignment.segmentObjectId().equals(output.segmentObjectId()) && assignment.desiredOnline()) {
+          assignments.add(assignment);
+        }
+      }
+      return assignments;
+    }
+
+    private CatalogRecord operationRecord(Assignment assignment) throws IOException {
+      return record(RecordKind.CONTROLLER_OPERATION,
+          NativeReplicaPlacementPolicy.operationId(_history, assignment.materializationId()).toString());
+    }
+
+    private OperationState operation(Assignment assignment) throws IOException {
+      return OperationProtocol.decodeOperation(operationRecord(assignment).value());
+    }
+
+    private void install(Assignment assignment) throws IOException {
+      UUID operation = NativeReplicaPlacementPolicy.operationId(_history, assignment.materializationId());
+      var work = OfflineInstallationProtocol.decodeWorkResult(_catalog.query(MetadataProtocol.encode(
+          new GetInstallationWork(_history, assignment.server(), operation))));
+      assertEquals(work.status(), Status.OK);
+      var value = work.work();
+      var report = new OfflineInstallationProtocol.ReportInstallation(operation, value.attempt(), value.owner(),
+          value.target(), UUID.randomUUID(), "a".repeat(64));
+      String client = OfflineInstallationProtocol.clientId(assignment.server());
+      assertEquals(apply(new InstallationSessionCommand(assignment.server(), new RegisterClient(_history, client,
+          assignment.server().incarnation(), 0))).status(), Status.OK);
+      assertEquals(apply(new InstallationSessionCommand(assignment.server(), new NativeInstallationCommand(_history,
+          client, 1, "install", 1, report))).status(), Status.OK);
     }
 
     private Result submit() throws IOException {

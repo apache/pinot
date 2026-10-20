@@ -40,12 +40,13 @@ import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.Conte
 import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.LoaderDescriptor;
 import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.Operation;
 import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.PublishContent;
+import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.ReconcileTaskOutput;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 /// Stateless OFFLINE publication and assignment staging over a coherent catalog view. Each command stages at most
-/// one record; the caller atomically commits it with the durable request outcome. No clocks or external I/O are used.
+/// bounded records; the caller atomically commits them with the durable request outcome. No external I/O is used.
 final class OfflineSegmentCatalog {
   private OfflineSegmentCatalog() {
   }
@@ -54,13 +55,14 @@ final class OfflineSegmentCatalog {
     CatalogRecord record(UUID objectId);
   }
 
-  static List<CatalogRecord> stage(Operation operation, View view, long index)
+  static List<CatalogRecord> stage(Operation operation, OperationCatalog.View view, long index)
       throws IOException {
     require(operation != null && index > 0, Status.INVALID_REQUEST,
         "Offline operation and committed index are required");
     return switch (operation) {
       case PublishContent publish -> publish(publish, view, index);
       case AssignReplica assign -> assign(assign, view, index);
+      case ReconcileTaskOutput reconcile -> TaskOutputPlacementCatalog.stage(reconcile, view, index);
     };
   }
 

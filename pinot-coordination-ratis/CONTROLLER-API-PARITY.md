@@ -31,7 +31,10 @@ The standard resource package has **264 annotated HTTP methods across 43 resourc
   identity-checked native OFFLINE table-size REST/UI support. Query listeners remain disabled.
 - Native minions: explicit `MINION_TASK` authorization, durable bounded schedules, normal minion startup and atomic
   output publication for `NativeSegmentGenerationTask`; see [the task contract](MINION-TASK-PLAN.md).
-- Outstanding: automatic offline placement, full existing task API/plugin parity, realtime,
+- Native task outputs now have bounded automatic replica placement from explicit administrator-owned tenant/domain
+  policy, durable installation intent and exact server receipts. The task API reports publication, desired and installed
+  replicas separately. This does not provide general rebalance, physical cleanup or query-serving qualification.
+- Outstanding: general offline placement and lifecycle, full existing task API/plugin parity, realtime,
   remaining feature families and query-serving qualification. A full replacement is not yet implemented.
 - ZooKeeper tree APIs are not applicable to the replacement; a mutable compatibility tree will not be introduced.
 

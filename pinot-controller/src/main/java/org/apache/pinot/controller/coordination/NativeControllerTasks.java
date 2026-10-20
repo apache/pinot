@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
@@ -52,6 +53,8 @@ import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.MembershipQ
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.RecordKind;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Result;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Status;
+import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol;
+import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.Content;
 import org.apache.pinot.coordination.ratis.metadata.OwnershipProtocol;
 import org.apache.pinot.coordination.ratis.metadata.OwnershipProtocol.Assignment;
 import org.apache.pinot.coordination.ratis.metadata.OwnershipProtocol.Layout;
@@ -79,7 +82,8 @@ public final class NativeControllerTasks implements AutoCloseable {
       RecordKind.CLUSTER_CONFIG, RecordKind.OFFLINE_SEGMENT_CONTENT,
       RecordKind.MEMBERSHIP_CONTROL, RecordKind.PARTICIPANT, RecordKind.OWNER_LAYOUT, RecordKind.OWNER_ASSIGNMENT,
       RecordKind.TASK_SCHEDULE, RecordKind.TASK_QUEUE, RecordKind.TASK, RecordKind.TASK_ATTEMPT,
-      RecordKind.TASK_PUBLICATION), "native-controller-tasks");
+      RecordKind.TASK_PUBLICATION, RecordKind.OFFLINE_REPLICA_ASSIGNMENT, RecordKind.CONTROLLER_OPERATION,
+      RecordKind.OFFLINE_INSTALLATION), "native-controller-tasks");
   private final MetadataAccess _access;
   private final MembershipAccess _membership;
   private final UUID _history;
@@ -152,7 +156,8 @@ public final class NativeControllerTasks implements AutoCloseable {
     }
   }
 
-  /// One cycle admits at most one due occurrence or retry. A quorum failure leaves pending command identity intact.
+  /// One cycle attempts at most one schedule, retry or output reconciliation. All three share a fair scan and one
+  /// durable request stream. A quorum failure leaves the pending command identity intact.
   synchronized void tick() throws IOException {
     ensureOpen();
     resolvePending();
@@ -160,14 +165,43 @@ public final class NativeControllerTasks implements AutoCloseable {
     CatalogImage image = image();
     Map<UUID, CatalogRecord> records = image.records().stream()
         .collect(Collectors.toMap(CatalogRecord::objectId, record -> record));
-    List<CatalogRecord> candidates = image.records().stream()
-        .filter(record -> record.kind() == RecordKind.TASK_SCHEDULE || record.kind() == RecordKind.TASK)
-        .sorted(Comparator.comparing(record -> record.objectId().toString())).toList();
+    NativeTaskPlacementStatus placement = new NativeTaskPlacementStatus(image);
+    List<Candidate> candidates = new ArrayList<>();
+    for (CatalogRecord record : image.records()) {
+      if (record.kind() == RecordKind.TASK_SCHEDULE || record.kind() == RecordKind.TASK) {
+        candidates.add(new Candidate(record, null));
+      } else if (record.kind() == RecordKind.TASK_PUBLICATION) {
+        for (Content output : TaskProtocol.decodePublication(record.value()).outputs()) {
+          candidates.add(new Candidate(record, output));
+        }
+      }
+    }
+    candidates.sort(Comparator.comparing(candidate -> candidate.record().objectId() + "/"
+        + (candidate.output() == null ? "" : candidate.output().segmentObjectId())));
     int start = candidates.isEmpty() ? 0 : _scanCursor % candidates.size();
     for (int offset = 0; offset < candidates.size(); offset++) {
       int position = (start + offset) % candidates.size();
       _scanCursor = (position + 1) % candidates.size();
-      CatalogRecord record = candidates.get(position);
+      Candidate candidate = candidates.get(position);
+      CatalogRecord record = candidate.record();
+      if (candidate.output() != null) {
+        var publication = TaskProtocol.decodePublication(record.value());
+        Content output = candidate.output();
+        NativeTaskPlacementStatus.Output status = placement.output(publication.taskId(), output);
+        if (!status.needsReconciliation()) {
+          continue;
+        }
+        OwnerToken owner = owner(image, output.tableName());
+        if (owner != null) {
+          Result reconciled = command(sequence -> new MetadataProtocol.OfflineSegmentCommand(
+              _history, _clientId, 1, "tasks", sequence,
+              new OfflineSegmentProtocol.ReconcileTaskOutput(owner, publication.taskId(), output.segmentObjectId())));
+          require(reconciled.status() == Status.OK,
+              "Native output reconciliation did not commit: " + reconciled.status());
+          return;
+        }
+        continue;
+      }
       if (record.kind() == RecordKind.TASK_SCHEDULE) {
         ScheduleState schedule = TaskProtocol.decodeSchedule(record.value());
         if (schedule.firedOccurrences() >= schedule.maxOccurrences()) {
@@ -216,6 +250,9 @@ public final class NativeControllerTasks implements AutoCloseable {
         }
       }
     }
+  }
+
+  private record Candidate(CatalogRecord record, @Nullable Content output) {
   }
 
   public synchronized Result schedule(String tableName, UUID scheduleId, ScheduleRequest request) throws IOException {

@@ -19,6 +19,7 @@
 package org.apache.pinot.server.api.nativeapi;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -44,6 +45,7 @@ import org.apache.pinot.core.data.manager.offline.NativeImmutableSegmentDataMana
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.server.api.resources.TableSizeResource;
+import org.apache.pinot.server.starter.NativeServerMetadata.Observation;
 import org.apache.pinot.server.starter.NativeServerParticipant;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
@@ -80,9 +82,8 @@ public final class NativeTableSizeResource {
     if (participant == null) {
       throw unavailable();
     }
-    MetadataRpc.Revision revision;
     try {
-      revision = participant.observationRevision();
+      participant.observationRevision();
     } catch (IllegalStateException e) {
       throw unavailable();
     }
@@ -108,12 +109,20 @@ public final class NativeTableSizeResource {
         }
       }
       NativeTableSizeIdentity provenance;
+      List<SegmentDataManager> currentSegments = new ArrayList<>();
       try {
-        provenance = NativeTableSizeIdentity.of(token, revision, identities);
-      } catch (IllegalArgumentException e) {
+        Observation observation = participant.observeInstalled(List.copyOf(identities.values()));
+        identities.values().removeIf(identity -> !observation.identities().contains(identity));
+        for (SegmentDataManager segment : segments) {
+          if (identities.containsKey(segment.getSegmentName())) {
+            currentSegments.add(segment);
+          }
+        }
+        provenance = NativeTableSizeIdentity.of(token, observation.revision(), identities);
+      } catch (IllegalArgumentException | IllegalStateException e) {
         throw unavailable();
       }
-      TableSizeInfo sizes = TableSizeResource.readTableSize(table, segments, detailed,
+      TableSizeInfo sizes = TableSizeResource.readTableSize(table, currentSegments, detailed,
           includeCompressionStats, includeColumnCompressionStats).setNativeMetadata(provenance);
       // A failed heartbeat, fencing, or shutdown during collection must not become a successful observation.
       try {

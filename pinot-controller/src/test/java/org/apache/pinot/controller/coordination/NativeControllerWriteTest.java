@@ -58,6 +58,7 @@ import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Result;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Status;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.StreamTipResult;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Transaction;
+import org.apache.pinot.coordination.ratis.metadata.NativeReplicaPlacementPolicy;
 import org.apache.pinot.coordination.ratis.transport.MetadataAccess;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -129,6 +130,32 @@ public class NativeControllerWriteTest {
       assertError(501, () -> resource.createTable(realtime, null, createHeaders()));
       assertEquals(fixture._catalog.captureSnapshot().path("clients").size(), 1,
           "HTTP writes must reuse one bounded controller stream rather than allocating a client per request");
+    }
+  }
+
+  @Test
+  public void testPlacementPolicyIsStrictAndOnlyItsExactKeyBypassesLifecycleGate() throws Exception {
+    try (Fixture fixture = new Fixture()) {
+      String key = NativeReplicaPlacementPolicy.CONFIG_KEY;
+      assertError(400, () -> fixture._resource.updateClusterConfig(
+          JsonUtils.objectToString(Map.of(key, "{\"servers\":{},\"ignored\":true}")), createHeaders()));
+      assertError(400, () -> fixture._resource.updateClusterConfig(
+          JsonUtils.objectToString(Map.of(key, "{\"servers\":{},\"servers\":{}}")), createHeaders()));
+      Map<String, String> approved = Map.of(key,
+          "{\"servers\":{\"Server_one\":{\"tenant\":\"DefaultTenant\",\"failureDomain\":\"zone-a\"}}}");
+      assertOk(fixture._resource.updateClusterConfig(JsonUtils.objectToString(approved), createHeaders()));
+      var captured = fixture._metadata.snapshot();
+      var withNativeState = new NativeControllerMetadata.Snapshot(captured.revision(), captured.clusterConfig(),
+          captured.schemas(), captured.tables(), captured.control(), captured.participants(), captured.clusterRecord(),
+          Set.of("orders_OFFLINE"), captured.contents(), captured.assignments());
+      fixture._metadata.validateClusterConfig(withNativeState, Map.of(key, "{\"servers\":{}}"));
+      fixture._metadata.validateClusterConfig(withNativeState, Map.of());
+      fixture._metadata.validateClusterConfig(withNativeState, Map.of(key, "{\"servers\":{}}",
+          NativeTableSizeMetadataProvider.ENDPOINT_APPROVAL_PREFIX + "Server_one", "https://server:8443"));
+      expectThrows(UnsupportedOperationException.class, () -> fixture._metadata.validateClusterConfig(withNativeState,
+          Map.of(key, "{\"servers\":{}}", key + ".ignored", "true")));
+      expectThrows(IllegalArgumentException.class, () -> fixture._metadata.validateClusterConfig(withNativeState,
+          Map.of(key, "{\"servers\":{\"Server_one\":{\"tenant\":\"DefaultTenant\"}}}")));
     }
   }
 

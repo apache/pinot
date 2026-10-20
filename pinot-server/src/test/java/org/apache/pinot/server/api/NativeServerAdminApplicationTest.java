@@ -32,6 +32,7 @@ import java.util.Base64;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
@@ -58,6 +59,7 @@ import org.apache.pinot.server.access.AllowAllAccessFactory;
 import org.apache.pinot.server.access.BasicAuthAccessFactory;
 import org.apache.pinot.server.access.ZkBasicAuthAccessFactory;
 import org.apache.pinot.server.starter.NativeInstanceDataManager;
+import org.apache.pinot.server.starter.NativeServerMetadata.Observation;
 import org.apache.pinot.server.starter.NativeServerParticipant;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -96,6 +98,15 @@ public class NativeServerAdminApplicationTest {
       assertEquals(fixture.get("/tables/native_OFFLINE/reload", "admin:password").statusCode(), 404);
       assertEquals(fixture.get("/query/sql", "admin:password").statusCode(), 404);
       assertEquals(fixture.get("/tables/absent_OFFLINE/size", "admin:password").statusCode(), 404);
+      clearInvocations(fixture._table);
+      when(fixture._participant.observeInstalled(List.of(fixture._identity)))
+          .thenReturn(new Observation(fixture._revision, Set.of()));
+      HttpResponse<String> released = fixture.get("/tables/native_OFFLINE/size", "admin:password");
+      assertEquals(released.statusCode(), 200, released.body());
+      TableSizeInfo empty = JsonUtils.stringToObject(released.body(), TableSizeInfo.class);
+      assertEquals(empty.getDiskSizeInBytes(), 0L);
+      assertTrue(empty.getNativeMetadata().getSegments().isEmpty());
+      verify(fixture._table).releaseSegment(fixture._installed);
     }
   }
 
@@ -192,6 +203,8 @@ public class NativeServerAdminApplicationTest {
       when(_participant.dataManager()).thenReturn(manager);
       when(_participant.participant()).thenReturn(_token);
       when(_participant.observationRevision()).thenReturn(_revision);
+      when(_participant.observeInstalled(List.of(_identity)))
+          .thenReturn(new Observation(_revision, Set.of(_identity)));
       BasicAuthAccessFactory auth = new BasicAuthAccessFactory();
       auth.initWithoutHelix(new PinotConfiguration(Map.of(
           "principals", "admin,reader", "principals.admin.password", "password",

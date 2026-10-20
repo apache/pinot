@@ -71,8 +71,9 @@ public final class OfflineSegmentProtocol {
 
   @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "operation")
   @JsonSubTypes({@JsonSubTypes.Type(value = PublishContent.class, name = "PUBLISH_CONTENT"),
-      @JsonSubTypes.Type(value = AssignReplica.class, name = "ASSIGN_REPLICA")})
-  public sealed interface Operation permits PublishContent, AssignReplica {
+      @JsonSubTypes.Type(value = AssignReplica.class, name = "ASSIGN_REPLICA"),
+      @JsonSubTypes.Type(value = ReconcileTaskOutput.class, name = "RECONCILE_TASK_OUTPUT")})
+  public sealed interface Operation permits PublishContent, AssignReplica, ReconcileTaskOutput {
     OwnerToken owner();
   }
 
@@ -83,6 +84,11 @@ public final class OfflineSegmentProtocol {
   /// table incarnation is no longer current. ONLINE assignment requires live current dependencies and a ready server.
   public record AssignReplica(OwnerToken owner, UUID segmentObjectId, long expectedEpoch, ParticipantToken server,
                               Compatibility compatibility, boolean desiredOnline) implements Operation {
+  }
+
+  /// Computes placement from current committed policy and membership, atomically pairing new assignments with
+  /// durable installation intent. Subsequent calls claim or complete that intent; this is not serving authority.
+  public record ReconcileTaskOutput(OwnerToken owner, UUID taskId, UUID segmentObjectId) implements Operation {
   }
 
   public static Content decodeContent(JsonNode value)
