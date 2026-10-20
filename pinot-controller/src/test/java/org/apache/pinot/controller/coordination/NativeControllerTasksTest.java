@@ -289,6 +289,43 @@ public class NativeControllerTasksTest {
     }
   }
 
+  @Test
+  public void testDirectPublicationLostReplyAndRestartReconcileWithoutTask() throws Exception {
+    try (Fixture f = new Fixture(); NativeControllerTasks first = f.controller("first")) {
+      f.placementPolicy(true);
+      f.readyServer();
+      var table = f.records(RecordKind.TABLE_CONFIG).getFirst();
+      var schema = f.records(RecordKind.SCHEMA).getFirst();
+      ObjectVersion tableVersion = new ObjectVersion(f._history, table.objectId(), table.version());
+      ObjectVersion schemaVersion = new ObjectVersion(f._history, schema.objectId(), schema.version());
+      Content content = new Content("orders_OFFLINE", table.objectId(), "uploaded", UUID.randomUUID(),
+          "a".repeat(64), "file:///approved/uploaded.tar.gz",
+          new OfflineSegmentProtocol.LoaderDescriptor(1, -1, false, null, null, 1, 1, Map.of()));
+      f._losePublicationReply = true;
+      expectThrows(IOException.class, () -> first.publish(content, tableVersion, schemaVersion));
+      assertEquals(first.publish(content, tableVersion, schemaVersion).status(), Status.OK);
+      try (NativeControllerTasks other = f.controller("other")) {
+        assertEquals(other.publish(content, tableVersion, schemaVersion).status(), Status.OK,
+            "A different controller can resolve an identical committed publication without stealing ownership");
+      }
+      first.tick();
+      CatalogRecord assignment = f.records(RecordKind.OFFLINE_REPLICA_ASSIGNMENT).getFirst();
+      assertEquals(f.records(RecordKind.OFFLINE_SEGMENT_CONTENT).size(), 1);
+      assertTrue(f.records(RecordKind.TASK).isEmpty(), "An HTTP upload must not manufacture a minion task");
+      first.close();
+      MetadataCatalog restored = new MetadataCatalog(f._cluster, f._history);
+      restored.restoreSnapshot(f._catalog.captureSnapshot());
+      f._catalog = restored;
+      try (NativeControllerTasks replacement = f.controller("first")) {
+        assertEquals(replacement.publish(content, tableVersion, schemaVersion).status(), Status.OK);
+        replacement.tick();
+        assertEquals(f.records(RecordKind.OFFLINE_REPLICA_ASSIGNMENT).getFirst(), assignment);
+        assertEquals(f.records(RecordKind.CONTROLLER_OPERATION).size(), 1);
+        assertEquals(f.records(RecordKind.OFFLINE_SEGMENT_CONTENT).size(), 1);
+      }
+    }
+  }
+
   private static final class Fixture implements MetadataAccess, MembershipAccess, AutoCloseable {
     private final UUID _cluster = UUID.randomUUID();
     private final UUID _history = UUID.randomUUID();
@@ -299,6 +336,7 @@ public class NativeControllerTasksTest {
     private boolean _loseRegistrationReply;
     private boolean _loseRenewalReply;
     private boolean _losePlacementReply;
+    private boolean _losePublicationReply;
     private int _taskCommands;
     private int _placementCommands;
     private long _workerSequence;
@@ -456,13 +494,19 @@ public class NativeControllerTasksTest {
         throw new IOException("Lost response after committed schedule");
       }
       if (command instanceof MetadataProtocol.OfflineSegmentCommand placement
-          && placement.request() instanceof OfflineSegmentProtocol.ReconcileTaskOutput) {
+          && placement.request() instanceof OfflineSegmentProtocol.ReconcileContent) {
         _placementCommands++;
         if (_losePlacementReply) {
           _losePlacementReply = false;
           assertEquals(result.status(), Status.OK);
           throw new IOException("Lost response after committed placement");
         }
+      }
+      if (_losePublicationReply && command instanceof MetadataProtocol.OfflineSegmentCommand publication
+          && publication.request() instanceof OfflineSegmentProtocol.PublishValidatedContent) {
+        _losePublicationReply = false;
+        assertEquals(result.status(), Status.OK);
+        throw new IOException("Lost response after committed content publication");
       }
       return result;
     }

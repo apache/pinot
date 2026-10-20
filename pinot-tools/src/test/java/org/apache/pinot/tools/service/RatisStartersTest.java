@@ -68,12 +68,10 @@ import org.apache.pinot.coordination.ratis.metadata.NativeReplicaPlacementPolicy
 import org.apache.pinot.coordination.ratis.metadata.OfflineInstallationProtocol;
 import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol;
 import org.apache.pinot.coordination.ratis.metadata.OperationProtocol;
-import org.apache.pinot.coordination.ratis.metadata.OwnershipProtocol;
 import org.apache.pinot.coordination.ratis.rpc.MetadataRpc;
 import org.apache.pinot.coordination.ratis.rpc.MetadataRpc.ResultStatus;
 import org.apache.pinot.coordination.ratis.transport.ControllerAccessPolicy;
 import org.apache.pinot.coordination.ratis.transport.ControllerAccessPolicy.ControllerIdentity;
-import org.apache.pinot.coordination.ratis.transport.MetadataGrpcClient;
 import org.apache.pinot.coordination.ratis.transport.ParticipantAccessPolicy;
 import org.apache.pinot.coordination.ratis.transport.ParticipantAccessPolicy.ParticipantIdentity;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -181,6 +179,7 @@ public class RatisStartersTest {
       Files.writeString(trust, Files.readString(controller.certificate()) + Files.readString(broker.certificate())
           + Files.readString(server.certificate()) + Files.readString(minion.certificate()));
       Path taskOutput = Files.createDirectories(directory.resolve("task-output"));
+      Path uploadStorage = Files.createDirectories(directory.resolve("upload-storage"));
       int[] ports = ports(12);
       String history = UUID.randomUUID().toString();
       String cluster = UUID.randomUUID().toString();
@@ -223,6 +222,7 @@ public class RatisStartersTest {
         config.put("test.minionFingerprint", minion.fingerprint());
         config.put(PREFIX + "controller.tasks.outputRoot", taskOutput.toString());
         config.put(PREFIX + "controller.tasks.pollMillis", 100L);
+        config.put(PREFIX + "controller.upload.storageRoot", uploadStorage.toString());
         controllers.add(config);
         starts.add(starters.submit(() -> manager.startRole(ServiceRole.CONTROLLER, config)));
       }
@@ -393,8 +393,17 @@ public class RatisStartersTest {
         updated = write(http, controllerUrl + "/tables/orders_OFFLINE", "PUT", JsonUtils.objectToString(table),
             Map.of("If-Match", tableTag));
         assertEquals(updated.statusCode(), 200, updated.body());
-        long expectedBytes = installSizeTestSegment(directory, new PinotConfiguration(controllers.getFirst()),
-            metadata, serverState.getParticipant(), table, schema);
+        String placementPolicy = JsonUtils.objectToString(Map.of("servers", Map.of(SERVER,
+            Map.of("tenant", "DefaultTenant", "failureDomain", "zone-a"))));
+        clusterTag = get(http, controllerUrl + "/cluster/configs", true).headers().firstValue("ETag").orElseThrow();
+        updated = write(http, controllerUrl + "/cluster/configs", "POST",
+            JsonUtils.objectToString(Map.of(PREFIX + "offline.placement", placementPolicy)),
+            Map.of("If-Match", clusterTag));
+        assertEquals(updated.statusCode(), 200, updated.body());
+        PinotConfiguration voterConfig = new PinotConfiguration(controllers.getFirst());
+        InstalledOutput uploaded = uploadSizeTestSegment(directory, voterConfig, http, controllerUrl,
+            secondControllerUrl, serverState.getParticipant(), table, schema);
+        long expectedBytes = uploaded.bytes();
         awaitSize(http, serverAdmin + "/tables/orders_OFFLINE/size", "diskSizeInBytes", expectedBytes);
         assertMissingSize(http, controllerUrl);
         String approvalKey = PREFIX + "server.admin.endpoint." + SERVER;
@@ -420,9 +429,8 @@ public class RatisStartersTest {
         awaitSize(http, controllerUrl + "/tables/orders/size", "reportedSizeInBytes", expectedBytes);
         assertEquals(ServiceStatus.getServiceStatus(BROKER), ServiceStatus.Status.BAD);
         assertEquals(ServiceStatus.getServiceStatus(SERVER), ServiceStatus.Status.GOOD);
-        PinotConfiguration voterConfig = new PinotConfiguration(controllers.getFirst());
-        TaskOutput generatedOutput = runNativeTask(manager, directory, history, endpoints, minion, controller, http,
-            controllerUrl, taskOutput, voterConfig, serverState.getParticipant(), serverAdmin);
+        InstalledOutput generatedOutput = runNativeTask(manager, directory, history, endpoints, minion, controller,
+            http, controllerUrl, taskOutput, voterConfig, serverState.getParticipant(), serverAdmin);
         for (int i = 6; i < 8; i++) {
           try (ServerSocket unused = new ServerSocket(ports[i])) {
             assertTrue(unused.isBound(), "Native query listener must remain closed");
@@ -438,8 +446,15 @@ public class RatisStartersTest {
         MetadataRpc.ParticipantToken replacement = serverClient.membershipRead(read).getParticipant().getParticipant();
         assertEquals(replacement.getRegistrationEpoch(), serverState.getParticipant().getRegistrationEpoch() + 1);
         assertNotEquals(replacement.getIncarnation(), serverState.getParticipant().getIncarnation());
-        assertMissingSize(http, controllerUrl); // Unmanaged content cannot borrow the replacement process's authority.
-        TaskInstallation reinstalled = awaitTaskInstallation(voterConfig, replacement, generatedOutput.content());
+        ReplicaInstallation uploadedAgain = awaitInstallation(voterConfig, replacement, uploaded.content());
+        assertTrue(uploadedAgain.assignment().assignmentEpoch()
+            > uploaded.installation().assignment().assignmentEpoch());
+        assertNotEquals(uploadedAgain.assignment().materializationId(),
+            uploaded.installation().assignment().materializationId());
+        assertNotEquals(uploadedAgain.installationId(), uploaded.installation().installationId());
+        awaitSize(http, serverAdmin + "/tables/orders_OFFLINE/size", "diskSizeInBytes", expectedBytes);
+        awaitSize(http, controllerUrl + "/tables/orders/size", "reportedSizeInBytes", expectedBytes);
+        ReplicaInstallation reinstalled = awaitInstallation(voterConfig, replacement, generatedOutput.content());
         assertTrue(reinstalled.assignment().assignmentEpoch() > generatedOutput.installation().assignment()
             .assignmentEpoch());
         assertNotEquals(reinstalled.assignment().materializationId(),
@@ -460,8 +475,10 @@ public class RatisStartersTest {
         assertEquals(manager.startRole(ServiceRole.CONTROLLER, controllers.getFirst()), "Controller_ratis_voter-0");
         assertEquals(metadata.membershipRead(read).getControl().getPolicy().getPermitLifetimeMillis(), 1000L,
             "Restart must retain committed policy instead of resetting it from bootstrap configuration");
-        TaskInstallation recovered = awaitTaskInstallation(voterConfig, replacement, generatedOutput.content());
+        ReplicaInstallation recovered = awaitInstallation(voterConfig, replacement, generatedOutput.content());
         assertEquals(recovered, reinstalled, "Controller restart must retain the current installation and proof");
+        assertEquals(awaitInstallation(voterConfig, replacement, uploaded.content()), uploadedAgain,
+            "Controller restart must not create another materialization for an uploaded segment");
         var taskState = JsonUtils.stringToJsonNode(get(http, controllerUrl + "/tasks/native/nativeTasks", true).body());
         assertEquals(taskState.path("tasks").size(), 1);
         assertEquals(taskState.path("publications").size(), 1);
@@ -499,23 +516,17 @@ public class RatisStartersTest {
     }
   }
 
-  private record TaskInstallation(OfflineSegmentProtocol.Assignment assignment,
+  private record ReplicaInstallation(OfflineSegmentProtocol.Assignment assignment,
                                   OperationProtocol.OperationState operation, UUID installationId) {
   }
 
-  private record TaskOutput(OfflineSegmentProtocol.Content content, long bytes, TaskInstallation installation) {
+  private record InstalledOutput(OfflineSegmentProtocol.Content content, long bytes, ReplicaInstallation installation) {
   }
 
-  private static TaskOutput runNativeTask(PinotServiceManager manager, Path directory, String history, String endpoints,
-      CertificateFiles minion, CertificateFiles controller, HttpClient http, String controllerUrl, Path output,
-      PinotConfiguration voterConfig, MetadataRpc.ParticipantToken server, String serverAdmin) throws Exception {
-    String clusterTag = get(http, controllerUrl + "/cluster/configs", true).headers().firstValue("ETag").orElseThrow();
-    String placementPolicy = JsonUtils.objectToString(Map.of("servers", Map.of(SERVER,
-        Map.of("tenant", "DefaultTenant", "failureDomain", "zone-a"))));
-    HttpResponse<String> configured = write(http, controllerUrl + "/cluster/configs", "POST",
-        JsonUtils.objectToString(Map.of(PREFIX + "offline.placement", placementPolicy)),
-        Map.of("If-Match", clusterTag));
-    assertEquals(configured.statusCode(), 200, configured.body());
+  private static InstalledOutput runNativeTask(PinotServiceManager manager, Path directory, String history,
+      String endpoints, CertificateFiles minion, CertificateFiles controller, HttpClient http, String controllerUrl,
+      Path output, PinotConfiguration voterConfig, MetadataRpc.ParticipantToken server, String serverAdmin)
+      throws Exception {
     Path sourceRoot = Files.createDirectories(directory.resolve("task-source"));
     Path source = sourceRoot.resolve("rows.json");
     Files.writeString(source, "{\"id\":1}\n{\"id\":2}\n");
@@ -578,7 +589,7 @@ public class RatisStartersTest {
           .toFile());
       assertEquals(generated.getTotalDocs(), 2);
       OfflineSegmentProtocol.Content published = OfflineSegmentProtocol.decodeContent(content);
-      TaskInstallation installation = awaitTaskInstallation(voterConfig, server, published);
+      ReplicaInstallation installation = awaitInstallation(voterConfig, server, published);
       long bytes = FileUtils.sizeOfDirectory(unpacked.resolve(content.path("segmentName").asText()).resolve("v3")
           .toFile());
       awaitSize(http, serverAdmin + "/tables/nativeTasks_OFFLINE/size", "diskSizeInBytes", bytes);
@@ -589,14 +600,14 @@ public class RatisStartersTest {
       snapshot = JsonUtils.stringToJsonNode(get(http, url, true).body());
       assertEquals(snapshot.path("tasks").size(), 1);
       assertEquals(snapshot.path("publications").size(), 1);
-      return new TaskOutput(published, bytes, installation);
+      return new InstalledOutput(published, bytes, installation);
     } finally {
       manager.stopPinotInstanceById("Minion_native_test");
     }
   }
 
   /// Reads committed placement and receipt proof; no test client submits assignments or installation operations.
-  private static TaskInstallation awaitTaskInstallation(PinotConfiguration config,
+  private static ReplicaInstallation awaitInstallation(PinotConfiguration config,
       MetadataRpc.ParticipantToken serverSession, OfflineSegmentProtocol.Content content) throws Exception {
     UUID history = UUID.fromString(serverSession.getHistoryId());
     var server = new MembershipProtocol.ParticipantToken(history, serverSession.getParticipantId(), Role.SERVER,
@@ -628,7 +639,7 @@ public class RatisStartersTest {
               assertEquals(receipt.installed().segmentObjectId(), content.segmentObjectId());
               assertEquals(receipt.installed().assignment().version(), assignment.assignmentEpoch());
               assertEquals(receipt.installed().materializationId(), assignment.materializationId());
-              return new TaskInstallation(assignment, operation, receipt.installationId());
+              return new ReplicaInstallation(assignment, operation, receipt.installationId());
             }
           }
         }
@@ -638,9 +649,60 @@ public class RatisStartersTest {
     }
   }
 
-  /// Uses the existing trusted consensus test API to publish content; public segment upload remains a separate API.
-  private static long installSizeTestSegment(Path directory, PinotConfiguration config, MetadataRpcClient metadata,
-      MetadataRpc.ParticipantToken serverSession, TableConfig table, Schema schema) throws Exception {
+  /// Uploads a real archive through the normal API and observes automatic installation without metadata mutations.
+  private static InstalledOutput uploadSizeTestSegment(Path directory, PinotConfiguration config, HttpClient http,
+      String controllerUrl, String secondControllerUrl, MetadataRpc.ParticipantToken serverSession, TableConfig table,
+      Schema schema) throws Exception {
+    PreparedSegment prepared = prepareSizeTestSegment(directory.resolve("upload-source"), table, schema, 2L);
+    HttpResponse<String> response = upload(http, controllerUrl, table.getTableName(), prepared.archive(), false);
+    assertEquals(response.statusCode(), 401, response.body());
+    for (String condition : List.of("If-Match", "If-None-Match")) {
+      response = upload(http, controllerUrl, table.getTableName(), prepared.archive(), true, Map.of(condition, "*"));
+      assertEquals(response.statusCode(), 400, response.body());
+      assertTrue(JsonUtils.stringToJsonNode(response.body()).path("error").asText()
+          .contains("Unsupported native upload option"), response.body());
+    }
+    response = upload(http, controllerUrl, table.getTableName(), prepared.archive(), true,
+        Map.of(CommonConstants.DATABASE, "default", CommonConstants.Controller.TABLE_NAME_HTTP_HEADER,
+            "other.orders_OFFLINE"));
+    assertEquals(response.statusCode(), 400, response.body());
+    assertTrue(JsonUtils.stringToJsonNode(response.body()).path("error").asText().contains("Invalid table name"),
+        response.body());
+    response = upload(http, controllerUrl, table.getTableName(), prepared.archive(), true);
+    assertEquals(response.statusCode(), 200, response.body());
+    UUID history = UUID.fromString(serverSession.getHistoryId());
+    try (RatisMetadataStore.Client consensus = RatisMetadataStore.connect(config)) {
+      CatalogRecord tableRecord = record(consensus, history, MetadataProtocol.RecordKind.TABLE_CONFIG,
+          table.getTableName());
+      String contentName = OfflineSegmentProtocol.contentName(tableRecord.objectId(), "orders_segment");
+      CatalogRecord original = record(consensus, history, MetadataProtocol.RecordKind.OFFLINE_SEGMENT_CONTENT,
+          contentName);
+      OfflineSegmentProtocol.Content content = OfflineSegmentProtocol.decodeContent(original.value());
+      assertEquals(content.contentSha256(), HexFormat.of().formatHex(
+          MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(prepared.archive()))));
+      Path stored = Path.of(URI.create(content.downloadUri()));
+      assertTrue(stored.toRealPath().startsWith(directory.resolve("upload-storage").toRealPath()));
+      assertEquals(Files.readAllBytes(stored), Files.readAllBytes(prepared.archive()));
+      ReplicaInstallation installation = awaitInstallation(config, serverSession, content);
+
+      response = upload(http, secondControllerUrl, "orders", prepared.archive(), true);
+      assertEquals(response.statusCode(), 200, response.body());
+      PreparedSegment conflict = prepareSizeTestSegment(directory.resolve("conflicting-upload"), table, schema, 3L);
+      response = upload(http, controllerUrl, table.getTableName(), conflict.archive(), true);
+      assertEquals(response.statusCode(), 409, response.body());
+      assertEquals(record(consensus, history, MetadataProtocol.RecordKind.OFFLINE_SEGMENT_CONTENT, contentName),
+          original, "Replay and conflicting bytes must leave the committed immutable content unchanged");
+      assertEquals(awaitInstallation(config, serverSession, content), installation,
+          "Upload replay must reuse the existing assignment, operation, and installation receipt");
+      return new InstalledOutput(content, prepared.bytes(), installation);
+    }
+  }
+
+  private record PreparedSegment(Path archive, long bytes) {
+  }
+
+  private static PreparedSegment prepareSizeTestSegment(Path directory, TableConfig table, Schema schema,
+      long secondId) throws Exception {
     Path generated = Files.createDirectories(directory.resolve("generated"));
     String segmentName = "orders_segment";
     SegmentGeneratorConfig generator = new SegmentGeneratorConfig(table, schema);
@@ -650,7 +712,7 @@ public class RatisStartersTest {
     GenericRow first = new GenericRow();
     first.putValues(Map.of("id", 1L, "label", "one"));
     GenericRow second = new GenericRow();
-    second.putValues(Map.of("id", 2L, "label", "two"));
+    second.putValues(Map.of("id", secondId, "label", "two"));
     driver.init(generator, new GenericRowRecordReader(List.of(first, second)));
     driver.build();
     Path segment = generated.resolve(segmentName);
@@ -658,71 +720,7 @@ public class RatisStartersTest {
     TarCompressionUtils.createCompressedTarFile(segment.toFile(), archive.toFile());
     long expectedBytes = FileUtils.sizeOfDirectory(segment.resolve("v3").toFile());
     assertTrue(expectedBytes > 0);
-    UUID history = UUID.fromString(serverSession.getHistoryId());
-    UUID segmentId = UUID.randomUUID();
-    try (RatisMetadataStore.Client consensus = RatisMetadataStore.connect(config)) {
-      MetadataProtocol.Result registered = MetadataProtocol.decodeResult(consensus.execute(MetadataProtocol.encode(
-          new MetadataProtocol.RegisterClient(history, "size-test", UUID.randomUUID(), 0))));
-      assertEquals(registered.status(), MetadataProtocol.Status.OK, registered.detail());
-      MetadataRpc.MembershipResponse controller = metadata.membershipExecute(MetadataRpc.MembershipCommandRequest
-          .newBuilder().setHistoryId(history.toString()).setRegister(MetadataRpc.ParticipantRegistration.newBuilder()
-              .setIncarnation(UUID.randomUUID().toString())).build());
-      assertEquals(controller.getStatus(), ResultStatus.OK);
-      MetadataRpc.ParticipantToken session = controller.getParticipant().getParticipant();
-      MetadataRpc.MembershipResponse ready = metadata.membershipExecute(MetadataRpc.MembershipCommandRequest
-          .newBuilder().setHistoryId(history.toString()).setReady(MetadataRpc.ParticipantReadiness.newBuilder()
-              .setSession(MetadataRpc.ParticipantSession.newBuilder().setIncarnation(session.getIncarnation())
-                  .setRegistrationEpoch(session.getRegistrationEpoch()))
-              .setAppliedRevision(controller.getRevision()).setReady(true)).build());
-      assertEquals(ready.getStatus(), ResultStatus.OK);
-      MembershipProtocol.ControlToken control = MetadataGrpcClient.decodeMembershipResponse(ready)
-          .control().controlEpoch();
-      OwnershipProtocol.Layout layout = new OwnershipProtocol.Layout(1, 24,
-          OwnershipProtocol.HashVersion.MURMUR2_UTF8_MASK_POSITIVE_V1);
-      commit(consensus, new MetadataProtocol.OwnershipCommand(history, "size-test", 1, "ownership", 1,
-          new OwnershipProtocol.ConfigureLayout(control, layout)));
-      OwnershipProtocol.TableShard shard = OwnershipProtocol.tableScope(layout, table.getTableName());
-      MembershipProtocol.ParticipantToken controllerToken = MetadataGrpcClient.decodeMembershipResponse(ready)
-          .participant().participant();
-      commit(consensus, new MetadataProtocol.OwnershipCommand(history, "size-test", 1, "ownership", 2,
-          new OwnershipProtocol.AssignOwner(control, 1, shard, 0, controllerToken)));
-      OwnershipProtocol.OwnerToken owner = new OwnershipProtocol.OwnerToken(history, 1, shard, 1, controllerToken);
-      CatalogRecord tableRecord = record(consensus, history, MetadataProtocol.RecordKind.TABLE_CONFIG,
-          table.getTableName());
-      CatalogRecord schemaRecord = record(consensus, history, MetadataProtocol.RecordKind.SCHEMA,
-          schema.getSchemaName());
-      ObjectVersion tableVersion = new ObjectVersion(history, tableRecord.objectId(), tableRecord.version());
-      ObjectVersion schemaVersion = new ObjectVersion(history, schemaRecord.objectId(), schemaRecord.version());
-      String digest = HexFormat.of().formatHex(
-          MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(archive)));
-      OfflineSegmentProtocol.Content content = new OfflineSegmentProtocol.Content(table.getTableName(),
-          tableRecord.objectId(), segmentName, segmentId, digest, archive.toUri().toString(),
-          new OfflineSegmentProtocol.LoaderDescriptor(new SegmentMetadataImpl(segment.toFile()).getCrc(), 0, false,
-              null, null, 100, 200, Map.of()));
-      MembershipProtocol.ParticipantToken server = new MembershipProtocol.ParticipantToken(history,
-          serverSession.getParticipantId(), Role.SERVER, UUID.fromString(serverSession.getIncarnation()),
-          serverSession.getRegistrationEpoch());
-      commit(consensus, new MetadataProtocol.OfflineSegmentCommand(history, "size-test", 1, "segments", 1,
-          new OfflineSegmentProtocol.PublishContent(owner, tableVersion, content)));
-      commit(consensus, new MetadataProtocol.OfflineSegmentCommand(history, "size-test", 1, "segments", 2,
-          new OfflineSegmentProtocol.AssignReplica(owner, segmentId, 0, server,
-              new OfflineSegmentProtocol.Compatibility(tableVersion, schemaVersion), true)));
-      OfflineSegmentProtocol.Assignment assignment = OfflineSegmentProtocol.decodeAssignment(record(consensus, history,
-          MetadataProtocol.RecordKind.OFFLINE_REPLICA_ASSIGNMENT,
-          OfflineSegmentProtocol.assignmentName(segmentId, SERVER)).value());
-      UUID operation = UUID.randomUUID();
-      OperationProtocol.OfflineSegmentReload intent = new OperationProtocol.OfflineSegmentReload(table.getTableName(),
-          tableRecord.objectId(), segmentName, segmentId, digest, List.of(new OperationProtocol.TargetMaterialization(
-              server, assignment.assignmentEpoch(), assignment.materializationId())), true, true, false);
-      commit(consensus, new MetadataProtocol.NativeOperationCommand(history, "size-test", 1, "load", 1,
-          new OperationProtocol.Submit(operation, intent)));
-      OperationProtocol.OperationState accepted = OperationProtocol.decodeOperation(record(consensus, history,
-          MetadataProtocol.RecordKind.CONTROLLER_OPERATION, operation.toString()).value());
-      commit(consensus, new MetadataProtocol.NativeOperationCommand(history, "size-test", 1, "load", 2,
-          new OperationProtocol.Claim(operation, 1, owner,
-              ((OperationProtocol.AssignedOfflineSegmentReload) accepted.input()).dependencies())));
-    }
-    return expectedBytes;
+    return new PreparedSegment(archive, expectedBytes);
   }
 
   private static CatalogRecord record(RatisMetadataStore.Client client, UUID history, MetadataProtocol.RecordKind kind,
@@ -731,15 +729,6 @@ public class RatisStartersTest {
         new MetadataProtocol.GetRecord(history, kind, name))));
     assertEquals(result.status(), MetadataProtocol.Status.OK, result.detail());
     return result.record();
-  }
-
-  private static void commit(RatisMetadataStore.Client client, MetadataProtocol.SequencedCommand command)
-      throws IOException {
-    MetadataProtocol.Result result = MetadataProtocol.decodeResult(client.execute(MetadataProtocol.encode(command)));
-    assertEquals(result.status(), MetadataProtocol.Status.OK, result.detail());
-    result = MetadataProtocol.decodeResult(client.execute(MetadataProtocol.encode(new MetadataProtocol.Acknowledge(
-        command.historyId(), command.clientId(), command.clientEpoch(), command.streamId(), command.sequence()))));
-    assertEquals(result.status(), MetadataProtocol.Status.OK, result.detail());
   }
 
   private static void awaitSize(HttpClient client, String url, String field, long expectedBytes) throws Exception {
@@ -815,6 +804,30 @@ public class RatisStartersTest {
     HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(10))
         .header("Authorization", authorization()).header("Content-Type", "application/json")
         .method(method, HttpRequest.BodyPublishers.ofString(body));
+    headers.forEach(request::header);
+    return client.send(request.build(), HttpResponse.BodyHandlers.ofString());
+  }
+
+  private static HttpResponse<String> upload(HttpClient client, String controllerUrl, String tableName, Path archive,
+      boolean authenticated) throws Exception {
+    return upload(client, controllerUrl, tableName, archive, authenticated, Map.of());
+  }
+
+  private static HttpResponse<String> upload(HttpClient client, String controllerUrl, String tableName, Path archive,
+      boolean authenticated, Map<String, String> headers) throws Exception {
+    String boundary = "native-upload-" + UUID.randomUUID();
+    String header = "--" + boundary + "\r\n"
+        + "Content-Disposition: form-data; name=\"segment\"; filename=\"segment.tar.gz\"\r\n"
+        + "Content-Type: application/octet-stream\r\n\r\n";
+    HttpRequest.BodyPublisher body = HttpRequest.BodyPublishers.concat(HttpRequest.BodyPublishers.ofString(header),
+        HttpRequest.BodyPublishers.ofFile(archive),
+        HttpRequest.BodyPublishers.ofString("\r\n--" + boundary + "--\r\n"));
+    HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(controllerUrl + "/v2/segments?tableName="
+            + tableName + "&tableType=OFFLINE&allowRefresh=false")).timeout(Duration.ofSeconds(15))
+        .header("Content-Type", "multipart/form-data; boundary=" + boundary).POST(body);
+    if (authenticated) {
+      request.header("Authorization", authorization());
+    }
     headers.forEach(request::header);
     return client.send(request.build(), HttpResponse.BodyHandlers.ofString());
   }

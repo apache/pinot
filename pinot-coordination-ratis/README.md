@@ -281,9 +281,54 @@ its installation ID. Forced download bypasses local-byte reuse. Ordinary `LOAD` 
 Publication refreshes work and checks local authority and the expected prior installation under the segment lock;
 consensus revalidates the receipt against later global changes. Neither local installation nor a committed receipt
 grants query-serving rights. This path currently supports ordinary OFFLINE tables with the default local segment
-directory loader, without tiers, peer download, upsert or dimension tables. Controller REST
-actions, controller work scheduling, routing publication and complete query-serving fences remain absent. This is an internal execution
-path, not a complete controller/server reload integration or a supported Helix/ZooKeeper replacement.
+directory loader, without tiers, peer download, upsert or dimension tables. Controller REST reload actions,
+routing publication and complete query-serving fences remain outstanding. Automatic content reconciliation uses
+this execution path; it is not a complete controller/server reload integration or a supported Helix/ZooKeeper replacement.
+
+## Immutable OFFLINE segment uploads
+
+The native controller accepts ordinary unencrypted segment archives through the normal multipart
+`POST /v2/segments` endpoint. Configure an existing shared local directory on every controller:
+
+```properties
+pinot.coordination.ratis.controller.upload.storageRoot=/absolute/shared-segments
+```
+
+The same directory must be accessible to the target servers; this slice uses `file:` archive locations and does not
+implement a remote deep-store upload adapter. Configure the explicit placement policy described in
+[MINION-TASK-PLAN.md](MINION-TASK-PLAN.md), then upload an existing segment:
+
+```bash
+curl --fail-with-body -X POST \
+  'http://localhost:9000/v2/segments?tableName=baseballStats&tableType=OFFLINE&allowRefresh=false' \
+  -F 'file=@/absolute/baseballStats-segment.tar.gz'
+```
+
+Use the deployment's normal controller credentials. Table-scoped upload authorization and database-name translation
+apply before archive processing. The destination table and schema must already exist. Both captured versions and
+the current table owner are checked atomically at publication. A concurrent configuration change rejects the upload
+instead of publishing content validated against stale inputs.
+
+The controller bounds concurrent uploads, request/archive bytes, expanded bytes and archive entries, validates the
+archive against the destination schema, and syncs the content-addressed archive before publishing its immutable
+manifest. Retrying identical bytes produces the same content identity across controller restarts. Different bytes
+under an existing segment name conflict. A successful response means committed publication; physical installation
+is performed by reconciliation and measured separately by the table-size API.
+Identical committed uploads can be resolved through any controller. New publication requires the table's live owner;
+another controller returns an unavailable response rather than stealing that ownership. Owner forwarding remains
+outstanding. The metadata UI does not yet expose an upload form.
+
+The component settings under `pinot.coordination.ratis.controller.upload.` are `maxArchiveBytes`,
+`maxExpandedBytes` and `maxEntries`. They default to 128 MiB, 512 MiB and 4,096 respectively, with ceilings of
+512 MiB, 2 GiB and 16,384.
+Two uploads can be processed concurrently per controller. Multipart and tar extension metadata have separate
+64 KiB bounds before parser allocation; these are not additional archive payload allowances.
+
+This endpoint supports one binary OFFLINE archive per request. Refresh/replacement, encrypted archives, URI/metadata
+uploads, quota-configured tables, consistent batch push and batch uploads remain unsupported. Native query listeners
+remain disabled.
+Unreferenced finalized archives can remain after rejected or unknown publication; reclamation requires a separate
+durable lifecycle protocol.
 
 ## Query identity and pinned content
 
@@ -550,7 +595,7 @@ Validate the shared query wire context and deadline/permit composition:
 ```
 
 The native minion execution slice adds bounded durable schedules, the normal `StartMinion` lifecycle and fenced
-publication for actual OFFLINE JSON-lines segment generation. Published task outputs can be placed automatically
+publication for actual OFFLINE JSON-lines segment generation. Published immutable OFFLINE content can be placed automatically
 using the explicit cluster key `pinot.coordination.ratis.offline.placement`. This strict policy maps approved stable
 SERVER IDs to tenant and failure-domain labels; no participant advertisement supplies placement authority. The
 controller reconciles desired replicas, installation operations and exact current server receipts while preserving

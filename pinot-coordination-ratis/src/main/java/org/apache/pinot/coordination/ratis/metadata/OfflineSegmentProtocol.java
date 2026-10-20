@@ -72,12 +72,21 @@ public final class OfflineSegmentProtocol {
   @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "operation")
   @JsonSubTypes({@JsonSubTypes.Type(value = PublishContent.class, name = "PUBLISH_CONTENT"),
       @JsonSubTypes.Type(value = AssignReplica.class, name = "ASSIGN_REPLICA"),
-      @JsonSubTypes.Type(value = ReconcileTaskOutput.class, name = "RECONCILE_TASK_OUTPUT")})
-  public sealed interface Operation permits PublishContent, AssignReplica, ReconcileTaskOutput {
+      @JsonSubTypes.Type(value = ReconcileTaskOutput.class, name = "RECONCILE_TASK_OUTPUT"),
+      @JsonSubTypes.Type(value = PublishValidatedContent.class, name = "PUBLISH_VALIDATED_CONTENT"),
+      @JsonSubTypes.Type(value = ReconcileContent.class, name = "RECONCILE_CONTENT")})
+  public sealed interface Operation
+      permits PublishContent, AssignReplica, ReconcileTaskOutput, PublishValidatedContent, ReconcileContent {
     OwnerToken owner();
   }
 
   public record PublishContent(OwnerToken owner, ObjectVersion expectedTable, Content content) implements Operation {
+  }
+
+  /// Publishes an externally validated immutable archive only while both exact validation dependencies remain
+  /// current. An identical existing manifest is a no-op; the state machine does not fetch or inspect archive bytes.
+  public record PublishValidatedContent(OwnerToken owner, ObjectVersion expectedTable, ObjectVersion expectedSchema,
+                                        Content content) implements Operation {
   }
 
   /// An OFFLINE release requires the exact previous server token and compatibility, even when that registration or
@@ -89,6 +98,10 @@ public final class OfflineSegmentProtocol {
   /// Computes placement from current committed policy and membership, atomically pairing new assignments with
   /// durable installation intent. Subsequent calls claim or complete that intent; this is not serving authority.
   public record ReconcileTaskOutput(OwnerToken owner, UUID taskId, UUID segmentObjectId) implements Operation {
+  }
+
+  /// Reconciles already published immutable content, independently of whether a task or validated upload produced it.
+  public record ReconcileContent(OwnerToken owner, UUID segmentObjectId) implements Operation {
   }
 
   public static Content decodeContent(JsonNode value)
