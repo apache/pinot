@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import javax.annotation.Nullable;
 import org.apache.commons.collections4.SetUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
@@ -46,6 +47,7 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.spi.config.DatabaseConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
+import org.apache.pinot.spi.config.table.QuotaEnforcementMode;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.LogicalTableConfig;
@@ -91,6 +93,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
   private final String _instanceId;
   private final AtomicInteger _lastKnownBrokerResourceVersion = new AtomicInteger(-1);
   private final Map<String, QueryQuotaEntity> _rateLimiterMap = new ConcurrentHashMap<>();
+  private final Map<String, QuotaEnforcementMode> _enforcementModeOverrideMap = new ConcurrentHashMap<>();
   private final Map<String, QueryQuotaEntity> _databaseRateLimiterMap = new ConcurrentHashMap<>();
   private final Map<String, QueryQuotaEntity> _applicationRateLimiterMap = new ConcurrentHashMap<>();
   private double _defaultQpsQuotaForDatabase;
@@ -222,6 +225,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
   /// @param physicalOrLogicalTable physical or logical table name.
   private void removeRateLimiter(String physicalOrLogicalTable) {
     _rateLimiterMap.remove(physicalOrLogicalTable);
+    _enforcementModeOverrideMap.remove(physicalOrLogicalTable);
   }
 
   /// Get QuotaConfig from property store.
@@ -235,6 +239,36 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     return tableConfig.getQuotaConfig();
   }
 
+  @Override
+  public QuotaEnforcementMode getQueryQuotaEnforcementMode(String tableName) {
+    List<String> entityNames = TableNameBuilder.getTableTypeFromTableName(tableName) != null ? List.of(tableName)
+        : List.of(tableName, TableNameBuilder.OFFLINE.tableNameWithType(tableName),
+            TableNameBuilder.REALTIME.tableNameWithType(tableName));
+    QuotaEnforcementMode result = null;
+    for (String entityName : entityNames) {
+      // Skip tables without a QPS quota (listed with a null rate limiter): they cannot breach, so their default mode
+      // must not turn a breach of the other side of a hybrid table into a rejection
+      QueryQuotaEntity queryQuotaEntity = _rateLimiterMap.get(entityName);
+      if (queryQuotaEntity == null || queryQuotaEntity.getRateLimiter() == null) {
+        continue;
+      }
+      QuotaEnforcementMode mode = _enforcementModeOverrideMap.getOrDefault(entityName, QuotaEnforcementMode.ENFORCED);
+      if (result == null || mode.isStricterThan(result)) {
+        result = mode;
+      }
+    }
+    return result != null ? result : QuotaEnforcementMode.ENFORCED;
+  }
+
+  private void updateEnforcementModeOverride(String physicalOrLogicalTableName, @Nullable QuotaConfig quotaConfig) {
+    QuotaEnforcementMode mode = quotaConfig != null ? quotaConfig.getQueryQuotaEnforcementMode() : null;
+    if (mode != null) {
+      _enforcementModeOverrideMap.put(physicalOrLogicalTableName, mode);
+    } else {
+      _enforcementModeOverrideMap.remove(physicalOrLogicalTableName);
+    }
+  }
+
   /// Create or update a rate limiter for a table.
   /// @param physicalOrLogicalTableName physical or logical table name.
   /// @param brokerResource broker resource which stores all the broker states of each table.
@@ -242,6 +276,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
   /// @param tableStat stat of the table config.
   private void createOrUpdateRateLimiter(String physicalOrLogicalTableName, ExternalView brokerResource,
       QuotaConfig quotaConfig, Stat tableStat) {
+    updateEnforcementModeOverride(physicalOrLogicalTableName, quotaConfig);
     if (quotaConfig == null || quotaConfig.getMaxQueriesPerSecond() == null) {
       LOGGER.info("No qps config specified for table: {}", physicalOrLogicalTableName);
       buildEmptyOrResetRateLimiterInQueryQuotaEntity(physicalOrLogicalTableName);
@@ -703,6 +738,11 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
   }
 
   @VisibleForTesting
+  public int getEnforcementModeOverrideMapSize() {
+    return _enforcementModeOverrideMap.size();
+  }
+
+  @VisibleForTesting
   public Map<String, QueryQuotaEntity> getDatabaseRateLimiterMap() {
     return _databaseRateLimiterMap;
   }
@@ -715,6 +755,8 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
   @VisibleForTesting
   public void cleanUpRateLimiterMap() {
     _rateLimiterMap.clear();
+    _enforcementModeOverrideMap.clear();
+    _lastKnownBrokerResourceVersion.set(-1);
   }
 
   /// Process query quota change when number of online brokers has changed.
@@ -747,6 +789,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
       if (stateMap == null) {
         LOGGER.info("No broker resource for Table {}. Removing its rate limit.", physicalOrLogicalTableName);
         it.remove();
+        _enforcementModeOverrideMap.remove(physicalOrLogicalTableName);
         continue;
       }
       int otherOnlineBrokerCount = 0;
@@ -768,6 +811,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
         LOGGER.info("Table {} has been deleted from property store. Removing its rate limit.",
             physicalOrLogicalTableName);
         it.remove();
+        _enforcementModeOverrideMap.remove(physicalOrLogicalTableName);
         continue;
       }
 
@@ -785,6 +829,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
           LOGGER.info("No query quota config or the config is invalid for Table {}. Removing its rate limit.",
               physicalOrLogicalTableName);
           it.remove();
+          _enforcementModeOverrideMap.remove(physicalOrLogicalTableName);
           continue;
         }
         overallRate = quotaConfig.getMaxQPS();

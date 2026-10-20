@@ -96,7 +96,9 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   QUERY_WORKLOAD_REQUEST_DROPPED("count", true),
   QUERY_WORKLOAD_HTTP_CALLBACK_DROPPED("count", true),
   // Number of segment-delete requests rejected because the targets participate in a live segment lineage entry.
-  LINEAGE_BLOCKED_DELETE_COUNT("LineageBlockedDeleteCount", false);
+  LINEAGE_BLOCKED_DELETE_COUNT("LineageBlockedDeleteCount", false),
+  // Storage quota breach detected for a table whose enforcement mode is ENFORCED or SHADOW (not DISABLED)
+  STORAGE_QUOTA_EXCEEDED("StorageQuotaExceeded", false);
 
   private final String _brokerMeterName;
   private final String _unit;

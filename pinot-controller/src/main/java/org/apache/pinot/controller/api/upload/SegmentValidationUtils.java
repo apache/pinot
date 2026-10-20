@@ -28,6 +28,7 @@ import org.apache.pinot.controller.validation.StorageQuotaChecker;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.QuotaEnforcementMode;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
@@ -143,6 +144,12 @@ public class SegmentValidationUtils {
               tableConfig.getTableName()), Response.Status.INTERNAL_SERVER_ERROR);
     }
     if (!response._isSegmentWithinQuota) {
+      QuotaEnforcementMode enforcementMode = quotaChecker.getEnforcementMode(tableConfig);
+      if (enforcementMode != QuotaEnforcementMode.ENFORCED) {
+        LOGGER.warn("Storage quota check failed for segment: {} of table: {} in {} mode, reason: {}", segmentName,
+            tableConfig.getTableName(), enforcementMode, response._reason);
+        return;
+      }
       throw new ControllerApplicationException(LOGGER,
           String.format("Storage quota check failed for segment: %s of table: %s, reason: %s", segmentName,
               tableConfig.getTableName(), response._reason), Response.Status.FORBIDDEN);

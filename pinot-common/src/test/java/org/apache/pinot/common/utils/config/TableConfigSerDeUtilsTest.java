@@ -32,6 +32,7 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
+import org.apache.pinot.spi.config.table.QuotaEnforcementMode;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
@@ -99,7 +100,8 @@ public class TableConfigSerDeUtilsTest {
     }
     {
       // With quota config
-      QuotaConfig quotaConfig = new QuotaConfig("30g", "100.00");
+      QuotaConfig quotaConfig =
+          new QuotaConfig("30g", "100.00", QuotaEnforcementMode.SHADOW, QuotaEnforcementMode.DISABLED);
       TableConfig tableConfig = tableConfigBuilder.setQuotaConfig(quotaConfig).build();
 
       checkQuotaConfig(tableConfig);
@@ -421,6 +423,8 @@ public class TableConfigSerDeUtilsTest {
     assertNotNull(quotaConfig);
     assertEquals(quotaConfig.getStorage(), "30G");
     assertEquals(quotaConfig.getMaxQueriesPerSecond(), "100.0");
+    assertEquals(quotaConfig.getStorageQuotaEnforcementMode(), QuotaEnforcementMode.SHADOW);
+    assertEquals(quotaConfig.getQueryQuotaEnforcementMode(), QuotaEnforcementMode.DISABLED);
   }
 
   private void checkTenantConfigWithoutTagOverride(TableConfig tableConfig) {
