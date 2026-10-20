@@ -853,7 +853,9 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
   /// The new segment is named after its creation time with minute granularity, and is created between step 1 of the
   /// first attempt (the modification time of the committing segment ZK metadata) and now, which is bounded by the max
   /// segment completion time. Probes the names for every minute in between, with one minute of slack on both ends for
-  /// clock differences between controllers and ZK.
+  /// clock differences between controllers and ZK. This relies on nothing rewriting the committing segment ZK metadata
+  /// while it stays COMMITTING, as a later modification time would skip the minutes in which the new segment was
+  /// created.
   @Nullable
   private String findNewSegmentOfEarlierAttempt(String realtimeTableName, LLCSegmentName committingLLCSegment) {
     Stat stat = new Stat();
@@ -1546,7 +1548,8 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
   /// Returns the latest LLC realtime segment ZK metadata for each partition.
   ///
   /// When several segments of a partition have the highest sequence number, e.g. the new segment of a failed commit
-  /// start and the new segment of a concurrent repair, the one in the IdealState is the latest one.
+  /// start and the new segment of a concurrent repair, the one in the IdealState is the latest one. If none of them is
+  /// in the IdealState, whichever is listed first is the latest one.
   ///
   /// @param realtimeTableName Realtime table name
   /// @param instanceStatesMap Instance states map of the IdealState
