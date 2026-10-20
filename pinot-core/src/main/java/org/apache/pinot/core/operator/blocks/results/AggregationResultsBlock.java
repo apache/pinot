@@ -49,7 +49,7 @@ public class AggregationResultsBlock extends BaseResultsBlock {
   private final AggregationFunction[] _aggregationFunctions;
   private final List<Object> _results;
   private final QueryContext _queryContext;
-  /// The final results, extracted once when the server returns final results. See [#getResultsMetadata()].
+  /// The final results, extracted once when the server returns final results. See [#getFinalResults()].
   @Nullable
   private Object[] _finalResults;
 
@@ -110,7 +110,11 @@ public class AggregationResultsBlock extends BaseResultsBlock {
     return List.<Object[]>of(getFinalResults().clone());
   }
 
-  private Object[] getFinalResults() {
+  /// Extracts the final results once, for [#getResultsMetadata()], [#getRows()] and [#getDataTable()]. Synchronized
+  /// because two threads can ask at once: a streamed block reaches the multi-stage leaf, which reads its rows, while
+  /// the server thread is still reading its metadata. Extraction can mutate the intermediate results in place, for
+  /// example `PERCENTILE` sorts its values, so it must not run twice concurrently.
+  private synchronized Object[] getFinalResults() {
     if (_finalResults == null) {
       int numColumns = _results.size();
       Object[] finalResults = new Object[numColumns];

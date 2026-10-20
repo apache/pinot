@@ -381,7 +381,7 @@ public class DistinctCountSmartULLAggregationFunction extends BaseDistinctCountS
       return 0;
     }
     if (intermediateResult instanceof UltraLogLog) {
-      _approximatedResult = true;
+      markApproximatedResult();
       return (int) Math.round(((UltraLogLog) intermediateResult).getDistinctCountEstimate());
     } else {
       return ((Set) intermediateResult).size();

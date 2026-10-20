@@ -118,7 +118,7 @@ public class ApproximateFunctionOverrideIntegrationTest extends BaseClusterInteg
     // A threshold below the cardinality has to make the answer approximate rather than fail, keeping the same shape,
     // and the flag reports it. This is also what proves the parameters reach the servers and parse there.
     setApproximateFunctionOverride("threshold=1");
-    waitForOverride(true);
+    waitForApproximatedResult();
 
     // COUNT(DISTINCT x) is the standard SQL spelling and must be rewritten too.
     assertApproximated(postQuery(COUNT_DISTINCT_QUERY), true);
@@ -191,6 +191,28 @@ public class ApproximateFunctionOverrideIntegrationTest extends BaseClusterInteg
 
   private static String columnName(JsonNode response) {
     return response.get("resultTable").get("dataSchema").get("columnNames").get(1).asText();
+  }
+
+  /// The rewrite is already on, so [#waitForOverride] would return before the new threshold arrives. Waits until both
+  /// engines report an approximated percentile instead. The percentile params are the last key that
+  /// [#setApproximateFunctionOverride] writes, so the distinct count params have arrived too by then.
+  private void waitForApproximatedResult() {
+    boolean useMultiStageQueryEngine = useMultiStageQueryEngine();
+    try {
+      TestUtils.waitForCondition(aVoid -> {
+        try {
+          setUseMultiStageQueryEngine(false);
+          boolean singleStage = postQuery(PERCENTILE_QUERY).get("approximatedResult").asBoolean();
+          setUseMultiStageQueryEngine(true);
+          boolean multiStage = postQuery(PERCENTILE_QUERY).get("approximatedResult").asBoolean();
+          return singleStage && multiStage;
+        } catch (Exception e) {
+          return false;
+        }
+      }, 100L, 60_000L, "Broker did not pick up the new conversion threshold");
+    } finally {
+      setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    }
   }
 
   private void setApproximateFunctionOverride(String params) {

@@ -65,6 +65,13 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
     return _approximatedResult;
   }
 
+  /// Reads before it writes, so that the threads that extract many groups share the field instead of contending on it.
+  protected void markApproximatedResult() {
+    if (!_approximatedResult) {
+      _approximatedResult = true;
+    }
+  }
+
   protected abstract int getThreshold();
 
   protected abstract Object convertSetToSketch(Set valueSet, DataType storedType);

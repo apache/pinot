@@ -238,7 +238,8 @@ public class GroupByResultsBlock extends BaseResultsBlock {
     if (_numGroupsWarningLimitReached) {
       metadata.put(MetadataKey.NUM_GROUPS_WARNING_LIMIT_REACHED.getName(), "true");
     }
-    // The combine step has already extracted the final results when the server returns them.
+    // The combine step has already extracted the final results when the server returns them. Unlike the aggregation
+    // block, this is not limited to that mode: ORDER BY trimming extracts too, also for groups it then trims away.
     if (AggregationFunctionUtils.hasApproximatedResult(_queryContext.getAggregationFunctions())) {
       metadata.put(MetadataKey.APPROXIMATED_RESULT.getName(), "true");
     }

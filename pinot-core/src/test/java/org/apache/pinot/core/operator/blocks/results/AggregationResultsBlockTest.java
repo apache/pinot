@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.blocks.results;
 
+import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -30,9 +31,14 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.testng.Assert.assertEquals;
 
 
+/// Covers how [AggregationResultsBlock] extracts final results when the server returns them.
 public class AggregationResultsBlockTest {
 
   /// The response metadata is read before the data table is built, so a server that returns final results has to
@@ -57,5 +63,23 @@ public class AggregationResultsBlockTest {
       assertEquals(dataTable.getNumberOfRows(), 1);
       assertEquals(resultsBlock.getRows().get(0)[0], dataTable.getInt(0, 0));
     }
+  }
+
+  /// The metadata, the rows and the data table share one extraction. Extraction can sort the values in place, and the
+  /// rows of a streamed block are read on another thread than its metadata.
+  @Test
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  public void testFinalResultsAreExtractedOnce()
+      throws IOException {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT PERCENTILE(col, 50) FROM testTable");
+    queryContext.setServerReturnFinalResult(true);
+    AggregationFunction function = spy(queryContext.getAggregationFunctions()[0]);
+    AggregationResultsBlock resultsBlock = new AggregationResultsBlock(new AggregationFunction[]{function},
+        new ArrayList<>(List.of(new DoubleArrayList(new double[]{3.0, 1.0, 2.0}))), queryContext);
+
+    resultsBlock.getResultsMetadata();
+    assertEquals(resultsBlock.getRows().get(0)[0], 2.0);
+    assertEquals(resultsBlock.getDataTable().getDouble(0, 0), 2.0);
+    verify(function, times(1)).extractFinalResult(any());
   }
 }

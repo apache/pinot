@@ -65,7 +65,7 @@ public class SmartFunctionApproximatedResultTest {
   public void testPercentile() {
     PercentileSmartTDigestAggregationFunction function = new PercentileSmartTDigestAggregationFunction(
         List.of(COLUMN, ExpressionContext.forLiteral(Literal.doubleValue(50.0)), THRESHOLD_ONE), false);
-    function.extractFinalResult(null);
+    assertEquals(function.extractFinalResult(null), Double.NEGATIVE_INFINITY);
     assertEquals(function.extractFinalResult(new DoubleArrayList(new double[]{1.0})), 1.0);
     assertFalse(function.hasApproximatedResult());
 

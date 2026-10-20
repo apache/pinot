@@ -298,9 +298,7 @@ public class ExecutionStatsAggregator {
     brokerResponseNative.setGroupsTrimmed(_groupsTrimmed);
     brokerResponseNative.setNumGroupsLimitReached(_numGroupsLimitReached);
     brokerResponseNative.setNumGroupsWarningLimitReached(_numGroupsWarningLimitReached);
-    if (_approximatedResult) {
-      brokerResponseNative.setApproximatedResult(true);
-    }
+    brokerResponseNative.setApproximatedResult(_approximatedResult);
     brokerResponseNative.setMaxRowsInDistinctReached(_maxRowsInDistinctReached);
     brokerResponseNative.setMaxRowsWithoutChangeInDistinctReached(_maxRowsWithoutChangeInDistinctReached);
     brokerResponseNative.setMaxExecutionTimeInDistinctReached(_maxExecutionTimeInDistinctReached);

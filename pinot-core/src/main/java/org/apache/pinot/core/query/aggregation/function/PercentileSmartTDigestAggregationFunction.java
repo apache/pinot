@@ -368,7 +368,10 @@ public class PercentileSmartTDigestAggregationFunction extends BaseSingleInputAg
       if (tDigest.isEmpty()) {
         return _nullHandlingEnabled ? null : DEFAULT_FINAL_RESULT;
       }
-      _approximatedResult = true;
+      // Read first, so that the threads that extract many groups do not contend on the field
+      if (!_approximatedResult) {
+        _approximatedResult = true;
+      }
       return tDigest.quantile(_percentile / 100.0);
     } else {
       DoubleArrayList valueList = (DoubleArrayList) intermediateResult;
