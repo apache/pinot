@@ -214,6 +214,15 @@ public class QueryRouter {
     }
   }
 
+  // Issue #18866: Notify in-flight queries about server DataTable deserialization failure
+  void markServerDeserializationError(ServerRoutingInstance serverRoutingInstance, Exception exception,
+      int responseSize, int deserializationTimeMs) {
+    for (AsyncQueryResponse asyncQueryResponse : _asyncQueryResponseMap.values()) {
+      asyncQueryResponse.receiveDeserializationError(serverRoutingInstance, exception, responseSize,
+          deserializationTimeMs);
+    }
+  }
+
   /// Marks a server as unavailable for every in-flight query. Called when a server's channel goes inactive
   /// ([DataTableHandler]) or a request write to it fails ([ServerChannels]). Queries submitted with
   /// `skipUnavailableServers=true` degrade to partial results for this genuine unavailability; others are failed.

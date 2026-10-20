@@ -189,6 +189,8 @@ const queryErrorCodeMap = {
   427: "ServerNotResponding",
   429: "TooManyRequests",
   430: "WorkloadBudgetExceededError",
+  // Issue #18866: Mapping for DataTable deserialization error
+  435: "DeserializationError",
   450: "InternalError",
   500: "MergeResponseError",
   503: "QueryCancellationError",
