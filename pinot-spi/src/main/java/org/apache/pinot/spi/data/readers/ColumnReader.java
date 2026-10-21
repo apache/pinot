@@ -24,6 +24,7 @@ import java.io.Serializable;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.columntransformer.ColumnTransformer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.PinotDataType;
@@ -187,6 +188,23 @@ public interface ColumnReader extends Closeable, Serializable {
   @Nullable
   Object getValue(int docId)
       throws IOException;
+
+  /// Applies the supplied deterministic JSON converter to the value at the given document id. By default, returns
+  /// `jsonTransformer.transform(getValue(docId))`, passing null values to the converter as well.
+  ///
+  /// Readers may override this method to avoid materializing repeated raw values or to reuse immutable conversion
+  /// results. Overrides must preserve the conversion result, including nulls and conversion failures; callers must not
+  /// depend on the converter's invocation count. This method does not change [#getValue(int)] or the typed accessors.
+  /// Callers remain responsible for applying this conversion in the correct order relative to other transformations.
+  ///
+  /// @param docId 0-based document id, from 0 (inclusive) to [#getTotalDocs()] (exclusive)
+  /// @param jsonTransformer deterministic converter to the column's JSON representation
+  /// @throws IOException if an I/O error occurs while reading
+  @Nullable
+  default Object getJsonValue(int docId, ColumnTransformer jsonTransformer)
+      throws IOException {
+    return jsonTransformer.transform(getValue(docId));
+  }
 
   // Single-value accessors
 

@@ -18,19 +18,76 @@
  */
 package org.apache.pinot.spi.data.readers;
 
+import java.io.IOException;
 import java.sql.Timestamp;
+import java.util.Map;
+import org.apache.pinot.spi.columntransformer.ColumnTransformer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.PinotDataType;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.same;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertSame;
+import static org.testng.Assert.expectThrows;
 
 
-/// Tests for the [ColumnReader] static helpers: [ColumnReader#toValueType(DataType, boolean)] maps a logical
-/// [DataType] to the value type a reader reports, and [ColumnReader#toLogicalValue(Object, DataType)] converts a
-/// physically-stored value to the logical object [ColumnReader#getValue(int)] returns.
+/// Tests the [ColumnReader] logical-type helpers and default JSON conversion contract.
 public class ColumnReaderTest {
+
+  @DataProvider(name = "jsonValues")
+  public Object[][] jsonValues() {
+    return new Object[][]{
+        {Map.of("key", "value"), "{\"key\":\"value\"}"},
+        {"{\"key\":\"value\"}", "{\"key\":\"value\"}"},
+        {null, "null"},
+        {Map.of(), null}
+    };
+  }
+
+  @Test(dataProvider = "jsonValues")
+  public void testGetJsonValue(Object rawValue, Object jsonValue)
+      throws IOException {
+    ColumnReader reader = mock(ColumnReader.class, CALLS_REAL_METHODS);
+    ColumnTransformer transformer = mock(ColumnTransformer.class);
+    when(reader.getValue(42)).thenReturn(rawValue);
+    when(transformer.transform(rawValue)).thenReturn(jsonValue);
+
+    assertEquals(reader.getJsonValue(42, transformer), jsonValue);
+    verify(reader).getValue(42);
+    verify(transformer).transform(same(rawValue));
+  }
+
+  @Test
+  public void testGetJsonValuePropagatesReadFailure()
+      throws IOException {
+    ColumnReader reader = mock(ColumnReader.class, CALLS_REAL_METHODS);
+    ColumnTransformer transformer = mock(ColumnTransformer.class);
+    IOException failure = new IOException("read failed");
+    when(reader.getValue(42)).thenThrow(failure);
+
+    assertSame(expectThrows(IOException.class, () -> reader.getJsonValue(42, transformer)), failure);
+    verifyNoInteractions(transformer);
+  }
+
+  @Test
+  public void testGetJsonValuePropagatesConversionFailure()
+      throws IOException {
+    ColumnReader reader = mock(ColumnReader.class, CALLS_REAL_METHODS);
+    ColumnTransformer transformer = mock(ColumnTransformer.class);
+    when(reader.getValue(42)).thenReturn("invalid JSON");
+    IllegalArgumentException failure = new IllegalArgumentException("conversion failed");
+    when(transformer.transform("invalid JSON")).thenThrow(failure);
+
+    assertSame(expectThrows(IllegalArgumentException.class, () -> reader.getJsonValue(42, transformer)), failure);
+  }
 
   @Test
   public void testToValueType() {
