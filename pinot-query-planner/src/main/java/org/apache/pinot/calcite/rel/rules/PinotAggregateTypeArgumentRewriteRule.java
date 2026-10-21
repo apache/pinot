@@ -163,8 +163,9 @@ public class PinotAggregateTypeArgumentRewriteRule extends RelOptRule {
       case UUID:
         return "UUID";
       default:
-        // Rejected during validation; leave the call as it is rather than guess a type.
-        return null;
+        // Rejected during validation
+        throw new IllegalStateException(
+            String.format("Unsupported data type for %s(dataColumn, timeColumn): %s", name, dataType));
     }
   }
 }

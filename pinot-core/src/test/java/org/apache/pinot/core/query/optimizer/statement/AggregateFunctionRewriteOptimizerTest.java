@@ -21,11 +21,13 @@ package org.apache.pinot.core.query.optimizer.statement;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.expectThrows;
 
 
 /// Verifies which aggregation calls are rewritten from the schema, with and without the `autoRewriteAggregationType`
@@ -66,9 +68,18 @@ public class AggregateFunctionRewriteOptimizerTest {
   }
 
   @Test
-  public void testValueWithTimeKeepsUnsupportedDataColumns() {
+  public void testValueWithTimeRejectsMultiValueDataColumn() {
+    PinotQuery query = CalciteSqlParser.compileToPinotQuery("SELECT FIRST_WITH_TIME(mvCol, timeCol) FROM testTable");
+    BadQueryRequestException exception = expectThrows(BadQueryRequestException.class,
+        () -> new AggregateFunctionRewriteOptimizer().optimize(query, SCHEMA));
+    assertEquals(exception.getMessage(),
+        "Unsupported data type for FIRSTWITHTIME(dataColumn, timeColumn): multi-value INT");
+  }
+
+  @Test
+  public void testValueWithTimeKeepsDataColumnsWithoutSchemaType() {
     // These keep the two-argument form, which fails with an error asking for the explicit data type.
-    for (String column : new String[]{"mvCol", "missingCol", "trim(stringCol)"}) {
+    for (String column : new String[]{"missingCol", "trim(stringCol)"}) {
       assertUnchanged("SELECT FIRST_WITH_TIME(" + column + ", timeCol) FROM testTable");
     }
     assertUnchanged("SELECT FIRST_WITH_TIME(stringCol, timeCol, 'STRING'), LAST_WITH_TIME(intCol, timeCol, 'LONG') "

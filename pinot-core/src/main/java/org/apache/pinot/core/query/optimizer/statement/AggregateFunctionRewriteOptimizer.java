@@ -27,6 +27,7 @@ import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
@@ -94,7 +95,7 @@ public class AggregateFunctionRewriteOptimizer implements StatementOptimizer {
     String normalizedName = AggregationFunctionType.getNormalizedAggregationFunctionName(functionName);
     if ((normalizedName.equals(AggregationFunctionType.FIRSTWITHTIME.name())
         || normalizedName.equals(AggregationFunctionType.LASTWITHTIME.name())) && function.getOperandsSize() == 2) {
-      addDataTypeArgument(function, fieldSpec);
+      addDataTypeArgument(function, normalizedName, fieldSpec);
       return;
     }
     if (rewriteToTypedVariants) {
@@ -103,30 +104,31 @@ public class AggregateFunctionRewriteOptimizer implements StatementOptimizer {
   }
 
   /// Appends the data column's logical type.
-  private static void addDataTypeArgument(Function function, FieldSpec fieldSpec) {
-    if (!fieldSpec.isSingleValueField()) {
-      return;
+  private static void addDataTypeArgument(Function function, String functionName, FieldSpec fieldSpec) {
+    if (fieldSpec.isSingleValueField()) {
+      switch (fieldSpec.getDataType()) {
+        case INT:
+        case LONG:
+        case FLOAT:
+        case DOUBLE:
+        case BIG_DECIMAL:
+        case STRING:
+        case BOOLEAN:
+        case TIMESTAMP:
+        case BYTES:
+        case UUID:
+          function.addToOperands(RequestUtils.getLiteralExpression(fieldSpec.getDataType().name()));
+          return;
+        case JSON:
+          // Same as the multi-stage engine, which types a JSON column as VARCHAR.
+          function.addToOperands(RequestUtils.getLiteralExpression(FieldSpec.DataType.STRING.name()));
+          return;
+        default:
+          break;
+      }
     }
-    switch (fieldSpec.getDataType()) {
-      case INT:
-      case LONG:
-      case FLOAT:
-      case DOUBLE:
-      case BIG_DECIMAL:
-      case STRING:
-      case BOOLEAN:
-      case TIMESTAMP:
-      case BYTES:
-      case UUID:
-        function.addToOperands(RequestUtils.getLiteralExpression(fieldSpec.getDataType().name()));
-        break;
-      case JSON:
-        // Same as the multi-stage engine, which types a JSON column as VARCHAR.
-        function.addToOperands(RequestUtils.getLiteralExpression(FieldSpec.DataType.STRING.name()));
-        break;
-      default:
-        break;
-    }
+    throw new BadQueryRequestException(String.format("Unsupported data type for %s(dataColumn, timeColumn): %s%s",
+        functionName, fieldSpec.isSingleValueField() ? "" : "multi-value ", fieldSpec.getDataType()));
   }
 
   private static void rewriteToTypedVariant(Function function, String functionName, FieldSpec.DataType operandType) {
