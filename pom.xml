@@ -31,7 +31,7 @@
 
   <groupId>org.apache.pinot</groupId>
   <artifactId>pinot</artifactId>
-  <version>1.6.0-SNAPSHOT</version>
+  <version>1.7.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>Pinot</name>
   <description>A realtime distributed OLAP datastore</description>
@@ -204,7 +204,7 @@
     <jsonsmart.version>2.6.0</jsonsmart.version>
     <quartz.version>2.5.2</quartz.version>
     <calcite.version>1.42.0</calcite.version>
-    <joou.version>0.9.5</joou.version>
+    <joou.version>0.9.6</joou.version>
     <immutables.version>2.12.3</immutables.version>
     <lucene.version>9.12.0</lucene.version>
     <reflections.version>0.10.2</reflections.version>
@@ -223,14 +223,14 @@
     <reactor-core.version>3.8.7</reactor-core.version>
     <reactivestreams.version>1.0.4</reactivestreams.version>
     <jts.version>1.20.0</jts.version>
-    <h3.version>4.5.0</h3.version>
+    <h3.version>4.5.1</h3.version>
     <ipaddress.version>5.6.2</ipaddress.version>
     <openhft.chronicle-bom.version>2.27ea100</openhft.chronicle-bom.version>
     <jmh.version>1.37</jmh.version>
     <audienceannotations.version>0.15.1</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.3.2</stax2-api.version>
-    <aws.sdk.version>2.55.15</aws.sdk.version>
+    <aws.sdk.version>2.56.0</aws.sdk.version>
     <azure.sdk.version>1.3.9</azure.sdk.version>
     <azure.msal4j.version>1.26.0</azure.msal4j.version>
     <joda-time.version>2.15.0</joda-time.version>
@@ -248,7 +248,7 @@
     <xml-apis.version>2.0.2</xml-apis.version>
     <roaring-bitmap.version>1.6.24</roaring-bitmap.version>
     <prometheus.jmx-exporter.version>1.7.0</prometheus.jmx-exporter.version>
-    <prometheus.metrics.version>1.9.0</prometheus.metrics.version>
+    <prometheus.metrics.version>1.10.0</prometheus.metrics.version>
     <fastutil.version>8.5.19</fastutil.version>
     <disruptor.version>4.0.0</disruptor.version>
     <snakeyaml.version>2.7</snakeyaml.version>
@@ -263,6 +263,7 @@
     <kafka3.version>3.9.2</kafka3.version>
     <kafka4.version>4.2.0</kafka4.version>
     <confluent.version>8.2.0</confluent.version>
+    <wire.version>7.1.0</wire.version>
     <pulsar.version>5.0.0</pulsar.version>
     <flink.version>2.3.0</flink.version>
 
@@ -304,7 +305,7 @@
 
     <!-- Google Libraries -->
     <protobuf.version>4.36.2</protobuf.version>
-    <grpc.version>1.84.2</grpc.version>
+    <grpc.version>1.85.0</grpc.version>
     <guava.version>33.7.2-jre</guava.version>
     <google.cloud.libraries.version>26.90.0</google.cloud.libraries.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
@@ -346,7 +347,7 @@
     <jna.version>5.19.1</jna.version>
     <jnr-ffi.version>2.3.3</jnr-ffi.version>
     <jnr-constants.version>0.11.2</jnr-constants.version>
-    <asm.version>9.11</asm.version>
+    <asm.version>9.11.1</asm.version>
     <paranamer.version>2.8.3</paranamer.version>
     <kotlin.stdlib.version>2.4.21</kotlin.stdlib.version>
     <jetbrains.annotations.version>26.1.0</jetbrains.annotations.version>
@@ -1739,6 +1740,17 @@
         <version>${confluent.version}</version>
       </dependency>
 
+      <dependency>
+        <groupId>com.squareup.wire</groupId>
+        <artifactId>wire-schema-jvm</artifactId>
+        <version>${wire.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.squareup.wire</groupId>
+        <artifactId>wire-runtime-jvm</artifactId>
+        <version>${wire.version}</version>
+      </dependency>
+
       <!-- pulsar bom -->
       <dependency>
         <groupId>org.apache.pulsar</groupId>
@@ -2911,6 +2923,7 @@
         <artifactId>buildnumber-maven-plugin</artifactId>
         <configuration>
           <skip>${pinot.skip.buildnumber}</skip>
+          <revisionOnScmFailure>UNKNOWN</revisionOnScmFailure>
         </configuration>
         <executions>
           <execution>
@@ -2977,6 +2990,39 @@
                 <exclude>shaded/parquet/com/fasterxml/jackson/**</exclude>
                 <exclude>META-INF/versions/**/shaded/parquet/com/fasterxml/jackson/**</exclude>
 
+                <!-- Keep Hadoop's shaded JAX-RS providers while using managed Jackson core and databind. -->
+                <exclude>org/apache/hadoop/shaded/com/fasterxml/jackson/core/**</exclude>
+                <exclude>META-INF/versions/**/org/apache/hadoop/shaded/com/fasterxml/jackson/core/**</exclude>
+                <exclude>org/apache/hadoop/shaded/com/fasterxml/jackson/databind/**</exclude>
+                <exclude>META-INF/versions/**/org/apache/hadoop/shaded/com/fasterxml/jackson/databind/**</exclude>
+                <exclude>org/apache/hadoop/shaded/com/fasterxml/jackson/annotation/**</exclude>
+                <exclude>META-INF/versions/**/org/apache/hadoop/shaded/com/fasterxml/jackson/annotation/**</exclude>
+                <exclude>com/facebook/presto/jdbc/internal/jackson/**</exclude>
+                <exclude>META-INF/versions/**/com/facebook/presto/jdbc/internal/jackson/**</exclude>
+                <exclude>software/amazon/awssdk/thirdparty/jackson/core/**</exclude>
+                <exclude>META-INF/versions/**/software/amazon/awssdk/thirdparty/jackson/core/**</exclude>
+                <!-- Presto's canonical Jackson Joda module must see canonical Joda-Time values. -->
+                <exclude>com/facebook/presto/jdbc/internal/joda/time/**</exclude>
+                <exclude>META-INF/versions/**/com/facebook/presto/jdbc/internal/joda/time/**</exclude>
+
+                <!-- Use managed Guava instead of copies embedded in dependencies. -->
+                <exclude>org/apache/hadoop/thirdparty/com/google/common/**</exclude>
+                <exclude>META-INF/versions/**/org/apache/hadoop/thirdparty/com/google/common/**</exclude>
+                <exclude>org/apache/hadoop/shaded/com/google/common/**</exclude>
+                <exclude>META-INF/versions/**/org/apache/hadoop/shaded/com/google/common/**</exclude>
+                <exclude>org/apache/hadoop/shaded/org/apache/curator/shaded/com/google/common/**</exclude>
+                <exclude>META-INF/versions/**/org/apache/hadoop/shaded/org/apache/curator/shaded/com/google/common/**</exclude>
+                <exclude>org/apache/curator/shaded/com/google/common/**</exclude>
+                <exclude>META-INF/versions/**/org/apache/curator/shaded/com/google/common/**</exclude>
+                <exclude>org/apache/iceberg/relocated/com/google/common/**</exclude>
+                <exclude>META-INF/versions/**/org/apache/iceberg/relocated/com/google/common/**</exclude>
+                <exclude>org/apache/pulsar/shade/com/google/common/**</exclude>
+                <exclude>META-INF/versions/**/org/apache/pulsar/shade/com/google/common/**</exclude>
+                <exclude>com/facebook/presto/jdbc/internal/guava/**</exclude>
+                <exclude>META-INF/versions/**/com/facebook/presto/jdbc/internal/guava/**</exclude>
+                <exclude>net/snowflake/client/jdbc/internal/google/common/**</exclude>
+                <exclude>META-INF/versions/**/net/snowflake/client/jdbc/internal/google/common/**</exclude>
+
                 <!-- Azure storage uses only HTTP clients. Remove the unused Reactor Netty HTTP server
                      and its vulnerable pipelining handler (CVE-2026-47874), including already shaded inputs. -->
                 <exclude>reactor/netty/http/server/**</exclude>
@@ -2997,6 +3043,28 @@
               <artifact>org.apache.pinot:pinot-parquet</artifact>
               <excludes>
                 <exclude>META-INF/maven/com.fasterxml.jackson.core/**</exclude>
+              </excludes>
+            </filter>
+            <filter>
+              <artifact>org.apache.hadoop*:*</artifact>
+              <excludes>
+                <exclude>META-INF/maven/com.google.guava/**</exclude>
+                <exclude>META-INF/maven/com.fasterxml.jackson.core/**</exclude>
+                <exclude>META-INF/versions/**/module-info.class</exclude>
+              </excludes>
+            </filter>
+            <filter>
+              <artifact>org.apache.iceberg:iceberg-bundled-guava</artifact>
+              <excludes>
+                <exclude>META-INF/maven/com.google.guava/**</exclude>
+                <exclude>META-INF/versions/**/module-info.class</exclude>
+              </excludes>
+            </filter>
+            <filter>
+              <!-- Already shaded plugins can also carry embedded Guava metadata. -->
+              <artifact>org.apache.pinot:*</artifact>
+              <excludes>
+                <exclude>META-INF/maven/com.google.guava/**</exclude>
               </excludes>
             </filter>
             <filter>
@@ -3023,12 +3091,68 @@
           </filters>
           <relocations>
             <relocation>
+              <pattern>org.apache.hadoop.shaded.com.fasterxml.jackson.core</pattern>
+              <shadedPattern>${shade.prefix}.com.fasterxml.jackson.core</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.apache.hadoop.shaded.com.fasterxml.jackson.databind</pattern>
+              <shadedPattern>${shade.prefix}.com.fasterxml.jackson.databind</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.apache.hadoop.shaded.com.fasterxml.jackson.annotation</pattern>
+              <shadedPattern>${shade.prefix}.com.fasterxml.jackson.annotation</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>com.facebook.presto.jdbc.internal.jackson</pattern>
+              <shadedPattern>${shade.prefix}.com.fasterxml.jackson</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>software.amazon.awssdk.thirdparty.jackson.core</pattern>
+              <shadedPattern>${shade.prefix}.com.fasterxml.jackson.core</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>com.facebook.presto.jdbc.internal.joda.time</pattern>
+              <shadedPattern>org.joda.time</shadedPattern>
+            </relocation>
+            <relocation>
               <pattern>shaded.parquet.com.fasterxml.jackson</pattern>
               <shadedPattern>${shade.prefix}.com.fasterxml.jackson</shadedPattern>
             </relocation>
             <relocation>
               <pattern>com.fasterxml.jackson</pattern>
               <shadedPattern>${shade.prefix}.com.fasterxml.jackson</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.apache.hadoop.thirdparty.com.google.common</pattern>
+              <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.apache.hadoop.shaded.com.google.common</pattern>
+              <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.apache.hadoop.shaded.org.apache.curator.shaded.com.google.common</pattern>
+              <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.apache.curator.shaded.com.google.common</pattern>
+              <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.apache.iceberg.relocated.com.google.common</pattern>
+              <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.apache.pulsar.shade.com.google.common</pattern>
+              <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>com.facebook.presto.jdbc.internal.guava</pattern>
+              <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>net.snowflake.client.jdbc.internal.google.common</pattern>
+              <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
             </relocation>
             <relocation>
               <pattern>com.google.common</pattern>

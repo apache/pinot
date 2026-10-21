@@ -53,8 +53,10 @@ import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.FakePropertyStore;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.offline.OfflineTableDataManager;
+import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.EmptyIndexSegment;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -98,10 +100,12 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -625,6 +629,194 @@ public class BaseTableDataManagerTest {
         reloadSemaphore.release();
       }
     }
+  }
+
+  @Test
+  public void testReloadOnlyIfNeededSkipsUpToDateSegment()
+      throws Exception {
+    File indexDir = createSegment(SegmentVersion.v3, 5);
+    SegmentZKMetadata zkMetadata = new SegmentZKMetadata(SEGMENT_NAME);
+    zkMetadata.setCrc(getCRC(indexDir));
+
+    BaseTableDataManager tableDataManager = spy(createTableManager());
+    ImmutableSegmentDataManager segmentDataManager = loadSegmentDataManager(indexDir);
+    tableDataManager.registerSegment(SEGMENT_NAME, segmentDataManager);
+    seedZKMetadata(tableDataManager, SEGMENT_NAME, zkMetadata);
+    doAnswer(invocation -> new IndexLoadingConfig(DEFAULT_TABLE_CONFIG, SCHEMA)).when(tableDataManager)
+        .fetchIndexLoadingConfig();
+
+    tableDataManager.reloadSegments(List.of(SEGMENT_NAME), false, true, "job");
+    assertSame(tableDataManager.getSegmentDataManager(SEGMENT_NAME), segmentDataManager);
+    verify(tableDataManager, never()).reloadSegment(any(SegmentDataManager.class), any(IndexLoadingConfig.class),
+        anyBoolean());
+    verify(tableDataManager._reloadJobStatusCache).recordSkipped("job", List.of(SEGMENT_NAME));
+
+    tableDataManager.reloadSegment(SEGMENT_NAME, false, true, "job2");
+    assertSame(tableDataManager.getSegmentDataManager(SEGMENT_NAME), segmentDataManager);
+    verify(tableDataManager._reloadJobStatusCache).recordSkipped("job2", List.of(SEGMENT_NAME));
+
+    // Without onlyIfNeeded the same segment goes through the regular reload path. Use the single-segment API, which
+    // reloads synchronously in every implementation (batch reloads may complete asynchronously in subclasses).
+    tableDataManager.reloadSegment(SEGMENT_NAME, false, false, "job3");
+    assertNotSame(tableDataManager.getSegmentDataManager(SEGMENT_NAME), segmentDataManager);
+  }
+
+  @Test
+  public void testReloadOnlyIfNeededReloadsSegmentNeedingPreprocess()
+      throws Exception {
+    File indexDir = createSegment(SegmentVersion.v3, 5);
+    assertFalse(hasInvertedIndex(indexDir, STRING_COLUMN));
+    SegmentZKMetadata zkMetadata = new SegmentZKMetadata(SEGMENT_NAME);
+    zkMetadata.setCrc(getCRC(indexDir));
+
+    BaseTableDataManager tableDataManager = spy(createTableManager());
+    ImmutableSegmentDataManager segmentDataManager = loadSegmentDataManager(indexDir);
+    tableDataManager.registerSegment(SEGMENT_NAME, segmentDataManager);
+    seedZKMetadata(tableDataManager, SEGMENT_NAME, zkMetadata);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setInvertedIndexColumns(List.of(STRING_COLUMN)).build();
+    doAnswer(invocation -> new IndexLoadingConfig(tableConfig, SCHEMA)).when(tableDataManager)
+        .fetchIndexLoadingConfig();
+
+    // Single-segment API so the reload has completed when it returns (see testReloadOnlyIfNeededSkipsUpToDateSegment)
+    tableDataManager.reloadSegment(SEGMENT_NAME, false, true, "job");
+    assertNotSame(tableDataManager.getSegmentDataManager(SEGMENT_NAME), segmentDataManager);
+    assertTrue(hasInvertedIndex(indexDir, STRING_COLUMN));
+    verify(tableDataManager._reloadJobStatusCache, never()).recordSkipped(any(), any());
+  }
+
+  @Test
+  public void testReloadForceDownloadTakesPrecedenceOverOnlyIfNeeded()
+      throws Exception {
+    // The segment is up to date, so onlyIfNeeded alone would skip it; forceDownload must still re-download it
+    File indexDir = createSegment(SegmentVersion.v3, 5);
+    SegmentZKMetadata zkMetadata =
+        makeRawSegment(indexDir, new File(TEMP_DIR, SEGMENT_NAME + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION),
+            false);
+
+    BaseTableDataManager tableDataManager = spy(createTableManager());
+    ImmutableSegmentDataManager segmentDataManager = loadSegmentDataManager(indexDir);
+    tableDataManager.registerSegment(SEGMENT_NAME, segmentDataManager);
+    seedZKMetadata(tableDataManager, SEGMENT_NAME, zkMetadata);
+    doAnswer(invocation -> new IndexLoadingConfig(DEFAULT_TABLE_CONFIG, SCHEMA)).when(tableDataManager)
+        .fetchIndexLoadingConfig();
+
+    tableDataManager.reloadSegment(SEGMENT_NAME, true, true, "job");
+    assertNotSame(tableDataManager.getSegmentDataManager(SEGMENT_NAME), segmentDataManager);
+    verify(tableDataManager._reloadJobStatusCache, never()).recordSkipped(any(), any());
+  }
+
+  @Test
+  public void testIsReloadNeeded()
+      throws Exception {
+    File indexDir = createSegment(SegmentVersion.v3, 5);
+    long crc = getCRC(indexDir);
+    BaseTableDataManager tableDataManager = spy(createTableManager());
+    ImmutableSegmentDataManager segmentDataManager = loadSegmentDataManager(indexDir);
+    tableDataManager.registerSegment(SEGMENT_NAME, segmentDataManager);
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(DEFAULT_TABLE_CONFIG, SCHEMA);
+
+    // Up to date
+    SegmentZKMetadata zkMetadata = new SegmentZKMetadata(SEGMENT_NAME);
+    zkMetadata.setCrc(crc);
+    seedZKMetadata(tableDataManager, SEGMENT_NAME, zkMetadata);
+    assertFalse(tableDataManager.isReloadNeeded(segmentDataManager, indexLoadingConfig));
+
+    // CRC changed on a completed segment, so the reload path would download it
+    zkMetadata.setCrc(crc + 1);
+    assertTrue(tableDataManager.isReloadNeeded(segmentDataManager, indexLoadingConfig));
+
+    // CRC changed but the segment is not completed yet, so the reload path would keep the local copy
+    zkMetadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
+    assertFalse(tableDataManager.isReloadNeeded(segmentDataManager, indexLoadingConfig));
+
+    // Target tier differs from the current one
+    SegmentZKMetadata tierZkMetadata = new SegmentZKMetadata(SEGMENT_NAME);
+    tierZkMetadata.setCrc(crc);
+    tierZkMetadata.setTier(TIER_NAME);
+    seedZKMetadata(tableDataManager, SEGMENT_NAME, tierZkMetadata);
+    assertTrue(tableDataManager.isReloadNeeded(segmentDataManager,
+        createTierIndexLoadingConfig(TIER_TABLE_CONFIG)));
+
+    // Consuming segments are never reloaded in this mode, and unknown segment types always are
+    assertFalse(tableDataManager.isReloadNeeded(mock(RealtimeSegmentDataManager.class), indexLoadingConfig));
+    assertTrue(tableDataManager.isReloadNeeded(createImmutableSegmentDataManager(SEGMENT_NAME, crc),
+        indexLoadingConfig));
+  }
+
+  @Test
+  public void testIsReloadNeededForEmptySegment()
+      throws Exception {
+    File indexDir = createSegment(SegmentVersion.v3, 0);
+    long crc = getCRC(indexDir);
+    BaseTableDataManager tableDataManager = spy(createTableManager());
+    ImmutableSegmentDataManager segmentDataManager = loadSegmentDataManager(indexDir);
+    assertTrue(segmentDataManager.getSegment() instanceof EmptyIndexSegment);
+    tableDataManager.registerSegment(SEGMENT_NAME, segmentDataManager);
+    SegmentZKMetadata zkMetadata = new SegmentZKMetadata(SEGMENT_NAME);
+    zkMetadata.setCrc(crc);
+    seedZKMetadata(tableDataManager, SEGMENT_NAME, zkMetadata);
+
+    // A new index does not apply to an empty segment, so a reload would not change it
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setInvertedIndexColumns(List.of(STRING_COLUMN)).build();
+    assertFalse(tableDataManager.isReloadNeeded(segmentDataManager, new IndexLoadingConfig(tableConfig, SCHEMA)));
+
+    // A changed CRC still needs a download
+    zkMetadata.setCrc(crc + 1);
+    assertTrue(tableDataManager.isReloadNeeded(segmentDataManager, new IndexLoadingConfig(tableConfig, SCHEMA)));
+  }
+
+  @Test
+  public void testNeedReloadSegmentsUsesReloadCheck()
+      throws Exception {
+    File indexDir = createSegment(SegmentVersion.v3, 5);
+    long crc = getCRC(indexDir);
+    BaseTableDataManager tableDataManager = spy(createTableManager());
+    tableDataManager.registerSegment(SEGMENT_NAME, loadSegmentDataManager(indexDir));
+    SegmentZKMetadata zkMetadata = new SegmentZKMetadata(SEGMENT_NAME);
+    zkMetadata.setCrc(crc);
+    seedZKMetadata(tableDataManager, SEGMENT_NAME, zkMetadata);
+    doAnswer(invocation -> new IndexLoadingConfig(DEFAULT_TABLE_CONFIG, SCHEMA)).when(tableDataManager)
+        .fetchIndexLoadingConfig();
+    assertFalse(tableDataManager.needReloadSegments());
+
+    // A CRC change is reported, which the preprocessing-only check used to miss
+    zkMetadata.setCrc(crc + 1);
+    assertTrue(tableDataManager.needReloadSegments());
+
+    // A segment whose check fails is reported as needing reload
+    zkMetadata.setCrc(crc);
+    assertFalse(tableDataManager.needReloadSegments());
+    doThrow(new RuntimeException("injected")).when(tableDataManager).isReloadNeeded(any(), any());
+    assertTrue(tableDataManager.needReloadSegments());
+  }
+
+  @Test
+  public void testSelectSegmentsNeedingReloadKeepsSegmentsThatCannotBeChecked()
+      throws Exception {
+    BaseTableDataManager tableDataManager = spy(createTableManager());
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(DEFAULT_TABLE_CONFIG, SCHEMA);
+
+    SegmentDataManager failingCheck = mock(SegmentDataManager.class);
+    when(failingCheck.getSegmentName()).thenReturn("failingCheck");
+    when(failingCheck.increaseReferenceCount()).thenReturn(true);
+    doThrow(new RuntimeException("injected")).when(tableDataManager).isReloadNeeded(eq(failingCheck), any());
+
+    SegmentDataManager destroyed = mock(SegmentDataManager.class);
+    when(destroyed.getSegmentName()).thenReturn("destroyed");
+    when(destroyed.increaseReferenceCount()).thenReturn(false);
+
+    SegmentDataManager upToDate = mock(SegmentDataManager.class);
+    when(upToDate.getSegmentName()).thenReturn("upToDate");
+    when(upToDate.increaseReferenceCount()).thenReturn(true);
+    doReturn(false).when(tableDataManager).isReloadNeeded(eq(upToDate), any());
+
+    List<SegmentDataManager> selected = tableDataManager.selectSegmentsNeedingReload(
+        List.of(failingCheck, destroyed, upToDate), indexLoadingConfig, "job");
+    assertEquals(selected, List.of(failingCheck, destroyed));
+    verify(tableDataManager, never()).isReloadNeeded(eq(destroyed), any());
+    verify(tableDataManager._reloadJobStatusCache).recordSkipped("job", List.of("upToDate"));
   }
 
   @Test
@@ -1589,6 +1781,12 @@ public class BaseTableDataManagerTest {
     indexLoadingConfig.setTableDataDir(TEMP_DIR.getAbsolutePath() + File.separator + tableConfig.getTableName());
     indexLoadingConfig.setSegmentTier(TIER_NAME);
     return indexLoadingConfig;
+  }
+
+  private static ImmutableSegmentDataManager loadSegmentDataManager(File indexDir)
+      throws Exception {
+    return new ImmutableSegmentDataManager(
+        ImmutableSegmentLoader.load(indexDir, new IndexLoadingConfig(DEFAULT_TABLE_CONFIG, SCHEMA)));
   }
 
   protected ImmutableSegmentDataManager createImmutableSegmentDataManager(String segmentName, long crc) {

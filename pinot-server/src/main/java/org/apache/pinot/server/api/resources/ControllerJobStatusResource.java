@@ -23,7 +23,6 @@ import io.swagger.annotations.ApiOperation;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.ws.rs.GET;
@@ -39,6 +38,7 @@ import org.apache.pinot.common.response.server.ServerReloadStatusResponse;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.local.utils.ReloadJobStatus;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.segment.spi.creator.name.SegmentNameUtils;
 import org.apache.pinot.server.starter.ServerInstance;
@@ -85,9 +85,15 @@ public class ControllerJobStatusResource {
       totalSegmentCount = targetSegments.size();
     }
     try {
+      ReloadJobStatus jobStatus = reloadJobId != null ? _serverReloadJobStatusCache.getJobStatus(reloadJobId) : null;
+      // Segments skipped by an only-if-needed reload keep their old load time but are up to date, so they count as
+      // successful. Checking by name counts each segment once, even if it was reloaded again after being skipped, and
+      // leaves out skipped segments that have since been dropped.
+      boolean hasSkippedSegments = jobStatus != null && jobStatus.hasSkippedSegments();
       int successCount = 0;
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-        if (segmentDataManager.getLoadTimeMs() >= reloadJobSubmissionTimestamp) {
+        if (segmentDataManager.getLoadTimeMs() >= reloadJobSubmissionTimestamp
+            || (hasSkippedSegments && jobStatus.isSkipped(segmentDataManager.getSegmentName()))) {
           successCount++;
         }
       }
@@ -96,11 +102,10 @@ public class ControllerJobStatusResource {
           .setTotalSegmentCount(totalSegmentCount)
           .setSuccessCount(successCount);
 
-      Optional.ofNullable(reloadJobId)
-          .map(_serverReloadJobStatusCache::getJobStatus)
-          .ifPresent(jobStatus -> response
-              .setFailureCount((long) jobStatus.getFailureCount())
-              .setSampleSegmentReloadFailures(jobStatus.getFailedSegmentDetails()));
+      if (jobStatus != null) {
+        response.setFailureCount((long) jobStatus.getFailureCount())
+            .setSampleSegmentReloadFailures(jobStatus.getFailedSegmentDetails());
+      }
 
       return JsonUtils.objectToString(response);
     } finally {

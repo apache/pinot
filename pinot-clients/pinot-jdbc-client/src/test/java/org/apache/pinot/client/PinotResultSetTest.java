@@ -23,7 +23,6 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLDataException;
-import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.sql.Types;
 import java.util.Arrays;
@@ -45,6 +44,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 /// Tests deserialization of a ResultSet given hardcoded Pinot results.
@@ -294,12 +294,11 @@ public class PinotResultSetTest {
       currentRow++;
     }
 
-    // test bad values and make sure exception is thrown
-    try {
-      pinotResultSet.getBigDecimal(6);
-    } catch (SQLException e) {
-      Assert.assertTrue(e.getMessage().contains("Unable to fetch BigDecimal value"));
-    }
+    // Read a valid row so the failure comes from parsing the date string as a decimal.
+    assertTrue(pinotResultSet.first());
+    SQLDataException exception = expectThrows(SQLDataException.class, () -> pinotResultSet.getBigDecimal(6));
+    assertTrue(exception.getMessage().contains("Unable to fetch BigDecimal value"));
+    assertEquals(exception.getCause().getClass(), NumberFormatException.class);
   }
 
   @Test

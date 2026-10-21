@@ -102,6 +102,8 @@ public class InstanceReplicaGroupPartitionConfig extends BaseJsonConfig {
     return _numInstancesPerPartition;
   }
 
+  /// @deprecated Remove this field; it will be removed in a future release.
+  @Deprecated(since = "1.1.0", forRemoval = true)
   public boolean isMinimizeDataMovement() {
     return _minimizeDataMovement;
   }
