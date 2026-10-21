@@ -225,6 +225,23 @@ message MailboxSendNode {
   bool sort = 7;
   repeated int32 receiverStageIds = 8;
   string hashFunction = 9;
+  // How the node sends to some of its receivers. A receiver without an entry uses distributionType, keys and every
+  // column. Servers that do not know this field send to every receiver as if it had no entry.
+  repeated ReceiverSpec receiverSpecs = 10;
+}
+
+message ReceiverSpec {
+  int32 receiverStageId = 1;
+  DistributionType distributionType = 2;
+  // Ordinals of the columns of the sender that compute the hash.
+  repeated int32 keys = 3;
+  // When set, the ordinals of the columns of the sender that the receiver reads, in the order that it expects. When
+  // not set, the receiver reads every column. A message keeps "every column" apart from "no column".
+  ColumnMask columnMask = 4;
+}
+
+message ColumnMask {
+  repeated int32 columns = 1;
 }
 
 message ProjectNode {

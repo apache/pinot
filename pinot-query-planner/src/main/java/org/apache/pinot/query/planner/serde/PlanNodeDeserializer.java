@@ -43,6 +43,7 @@ import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.MvAggregateNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
+import org.apache.pinot.query.planner.plannode.ReceiverSpec;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
@@ -184,7 +185,17 @@ public class PlanNodeDeserializer {
         receiverIds, convertExchangeType(protoMailboxSendNode.getExchangeType()),
         convertDistributionType(protoMailboxSendNode.getDistributionType()), protoMailboxSendNode.getKeysList(),
         protoMailboxSendNode.getPrePartitioned(), convertCollations(protoMailboxSendNode.getCollationsList()),
-        protoMailboxSendNode.getSort(), hashFunction);
+        protoMailboxSendNode.getSort(), hashFunction, convertReceiverSpecs(protoMailboxSendNode));
+  }
+
+  private static List<ReceiverSpec> convertReceiverSpecs(Plan.MailboxSendNode protoMailboxSendNode) {
+    List<ReceiverSpec> result = new ArrayList<>(protoMailboxSendNode.getReceiverSpecsCount());
+    for (Plan.ReceiverSpec protoSpec : protoMailboxSendNode.getReceiverSpecsList()) {
+      result.add(new ReceiverSpec(protoSpec.getReceiverStageId(),
+          convertDistributionType(protoSpec.getDistributionType()), protoSpec.getKeysList(),
+          protoSpec.hasColumnMask() ? protoSpec.getColumnMask().getColumnsList() : null));
+    }
+    return result;
   }
 
   private static ProjectNode deserializeProjectNode(Plan.PlanNode protoNode) {

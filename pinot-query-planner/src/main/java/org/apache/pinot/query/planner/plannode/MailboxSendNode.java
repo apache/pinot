@@ -20,9 +20,13 @@ package org.apache.pinot.query.planner.plannode;
 
 import com.google.common.base.Preconditions;
 import java.util.BitSet;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.TreeMap;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelFieldCollation;
@@ -39,12 +43,15 @@ public class MailboxSendNode extends BasePlanNode {
   private final List<RelFieldCollation> _collations;
   private final boolean _sort;
   private final String _hashFunction;
+  /// The explicit specs, by receiver stage id. A receiver without an entry uses [#getDefaultReceiverSpec(int)].
+  private final TreeMap<Integer, ReceiverSpec> _receiverSpecs;
 
   // NOTE: null List is converted to empty List because there is no way to differentiate them in proto during ser/de.
   private MailboxSendNode(int stageId, DataSchema dataSchema, List<PlanNode> inputs,
       BitSet receiverStages, PinotRelExchangeType exchangeType,
       RelDistribution.Type distributionType, @Nullable List<Integer> keys, boolean prePartitioned,
-      @Nullable List<RelFieldCollation> collations, boolean sort, String hashFunction) {
+      @Nullable List<RelFieldCollation> collations, boolean sort, String hashFunction,
+      Map<Integer, ReceiverSpec> receiverSpecs) {
     super(stageId, dataSchema, null, inputs);
     _receiverStages = receiverStages;
     _exchangeType = exchangeType;
@@ -54,6 +61,10 @@ public class MailboxSendNode extends BasePlanNode {
     _collations = collations != null ? collations : List.of();
     _sort = sort;
     _hashFunction = hashFunction;
+    _receiverSpecs = new TreeMap<>();
+    for (ReceiverSpec spec : receiverSpecs.values()) {
+      setReceiverSpec(spec);
+    }
   }
 
   public MailboxSendNode(int stageId, DataSchema dataSchema, List<PlanNode> inputs,
@@ -61,7 +72,7 @@ public class MailboxSendNode extends BasePlanNode {
       RelDistribution.Type distributionType, @Nullable List<Integer> keys, boolean prePartitioned,
       @Nullable List<RelFieldCollation> collations, boolean sort, String hashFunction) {
     this(stageId, dataSchema, inputs, toBitSet(receiverStages), exchangeType,
-        distributionType, keys, prePartitioned, collations, sort, hashFunction);
+        distributionType, keys, prePartitioned, collations, sort, hashFunction, Map.of());
   }
 
   public MailboxSendNode(int stageId, DataSchema dataSchema, List<PlanNode> inputs,
@@ -69,7 +80,24 @@ public class MailboxSendNode extends BasePlanNode {
       RelDistribution.Type distributionType, @Nullable List<Integer> keys, boolean prePartitioned,
       @Nullable List<RelFieldCollation> collations, boolean sort, String hashFunction) {
     this(stageId, dataSchema, inputs, toBitSet(receiverStage), exchangeType, distributionType, keys, prePartitioned,
-        collations, sort, hashFunction);
+        collations, sort, hashFunction, Map.of());
+  }
+
+  public MailboxSendNode(int stageId, DataSchema dataSchema, List<PlanNode> inputs,
+      @Nullable List<Integer> receiverStages, PinotRelExchangeType exchangeType,
+      RelDistribution.Type distributionType, @Nullable List<Integer> keys, boolean prePartitioned,
+      @Nullable List<RelFieldCollation> collations, boolean sort, String hashFunction,
+      Collection<ReceiverSpec> receiverSpecs) {
+    this(stageId, dataSchema, inputs, toBitSet(receiverStages), exchangeType, distributionType, keys, prePartitioned,
+        collations, sort, hashFunction, toSpecMap(receiverSpecs));
+  }
+
+  private static Map<Integer, ReceiverSpec> toSpecMap(Collection<ReceiverSpec> receiverSpecs) {
+    Map<Integer, ReceiverSpec> result = new TreeMap<>();
+    for (ReceiverSpec spec : receiverSpecs) {
+      result.put(spec.receiverStageId(), spec);
+    }
+    return result;
   }
 
   private static BitSet toBitSet(int receiverStage) {
@@ -130,12 +158,68 @@ public class MailboxSendNode extends BasePlanNode {
     _receiverStages.set(node.getStageId());
   }
 
-  /// Undoes [#addReceiver(MailboxReceiveNode)].
+  /// Undoes [#addReceiver(MailboxReceiveNode)]. It also removes the spec of that receiver, if any.
   public void removeReceiver(MailboxReceiveNode node) {
     if (!_receiverStages.get(node.getStageId())) {
       throw new IllegalStateException("Receiver not present: " + node.getStageId());
     }
     _receiverStages.clear(node.getStageId());
+    _receiverSpecs.remove(node.getStageId());
+  }
+
+  /// Returns how this node sends to the given receiver stage: its explicit spec, or [#getDefaultReceiverSpec(int)].
+  public ReceiverSpec getReceiverSpec(int receiverStageId) {
+    ReceiverSpec spec = _receiverSpecs.get(receiverStageId);
+    return spec != null ? spec : getDefaultReceiverSpec(receiverStageId);
+  }
+
+  /// Returns the spec of a receiver that has no explicit one: the distribution and the keys of the node, and every
+  /// column.
+  public ReceiverSpec getDefaultReceiverSpec(int receiverStageId) {
+    return new ReceiverSpec(receiverStageId, _distributionType, _keys, null);
+  }
+
+  /// Returns the explicit specs, sorted by receiver stage id. Receivers without an explicit spec are not included.
+  public Collection<ReceiverSpec> getReceiverSpecs() {
+    return Collections.unmodifiableCollection(_receiverSpecs.values());
+  }
+
+  /// Returns true if every receiver reads the same data in the same way, which is the behavior of a node without
+  /// explicit specs.
+  public boolean hasUniformReceivers() {
+    for (ReceiverSpec spec : _receiverSpecs.values()) {
+      if (!spec.equals(getDefaultReceiverSpec(spec.receiverStageId()))) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /// Sets how this node sends to one of its receiver stages.
+  ///
+  /// The node must not be a local exchange (`SINGLETON`) nor pre-partitioned, because the planner wires those 1-to-1,
+  /// and the spec must only reference columns of the data schema of the node.
+  public void setReceiverSpec(ReceiverSpec spec) {
+    int receiverStageId = spec.receiverStageId();
+    Preconditions.checkArgument(ReceiverSpec.isSupported(spec.distributionType()),
+        "Unsupported distribution for a receiver spec: %s", spec.distributionType());
+    Preconditions.checkArgument(_receiverStages.get(receiverStageId), "Stage %s is not a receiver of stage %s",
+        receiverStageId, _stageId);
+    Preconditions.checkState(ReceiverSpec.isSupported(_distributionType) && !_prePartitioned,
+        "Stage %s cannot have receiver specs: its distribution is %s and pre-partitioned is %s", _stageId,
+        _distributionType, _prePartitioned);
+    // Some planner tests build nodes without a data schema.
+    int numColumns = _dataSchema != null ? _dataSchema.size() : Integer.MAX_VALUE;
+    for (int key : spec.keys()) {
+      Preconditions.checkArgument(key >= 0 && key < numColumns, "Key %s is not a column of stage %s", key, _stageId);
+    }
+    if (spec.columnMask() != null) {
+      for (int column : spec.columnMask()) {
+        Preconditions.checkArgument(column >= 0 && column < numColumns, "Column %s is not a column of stage %s",
+            column, _stageId);
+      }
+    }
+    _receiverSpecs.put(receiverStageId, spec);
   }
 
   public PinotRelExchangeType getExchangeType() {
@@ -182,6 +266,9 @@ public class MailboxSendNode extends BasePlanNode {
     if (isSort()) {
       sb.append("[SORTED]");
     }
+    if (!hasUniformReceivers()) {
+      sb.append(_receiverSpecs.values());
+    }
     return sb.toString();
   }
 
@@ -193,7 +280,7 @@ public class MailboxSendNode extends BasePlanNode {
   @Override
   public PlanNode withInputs(List<PlanNode> inputs) {
     return new MailboxSendNode(_stageId, _dataSchema, inputs, _receiverStages, _exchangeType, _distributionType, _keys,
-        _prePartitioned, _collations, _sort, _hashFunction);
+        _prePartitioned, _collations, _sort, _hashFunction, _receiverSpecs);
   }
 
   @Override
@@ -211,13 +298,13 @@ public class MailboxSendNode extends BasePlanNode {
     return Objects.equals(_receiverStages, that._receiverStages) && _prePartitioned == that._prePartitioned
         && _sort == that._sort && _exchangeType == that._exchangeType && _distributionType == that._distributionType
         && Objects.equals(_keys, that._keys) && Objects.equals(_collations, that._collations)
-        && Objects.equals(_hashFunction, that._hashFunction);
+        && Objects.equals(_hashFunction, that._hashFunction) && Objects.equals(_receiverSpecs, that._receiverSpecs);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(super.hashCode(), _receiverStages, _exchangeType, _distributionType, _keys, _prePartitioned,
-        _collations, _sort, _hashFunction);
+        _collations, _sort, _hashFunction, _receiverSpecs);
   }
 
   @Override

@@ -43,6 +43,7 @@ import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNode.NodeHint;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
+import org.apache.pinot.query.planner.plannode.ReceiverSpec;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
@@ -228,9 +229,33 @@ public class PlanNodeSerializer {
           .setHashFunction(node.getHashFunction())
           .addAllCollations(convertCollations(node.getCollations()))
           .setSort(node.isSort())
+          .addAllReceiverSpecs(convertReceiverSpecs(node))
           .build();
       builder.setMailboxSendNode(mailboxSendNode);
       return null;
+    }
+
+    /// Only the explicit specs that differ from the default are written, so a node with uniform receivers keeps the
+    /// wire format of the versions without specs.
+    private static List<Plan.ReceiverSpec> convertReceiverSpecs(MailboxSendNode node) {
+      if (node.hasUniformReceivers()) {
+        return List.of();
+      }
+      List<Plan.ReceiverSpec> result = new ArrayList<>();
+      for (ReceiverSpec spec : node.getReceiverSpecs()) {
+        if (spec.equals(node.getDefaultReceiverSpec(spec.receiverStageId()))) {
+          continue;
+        }
+        Plan.ReceiverSpec.Builder specBuilder = Plan.ReceiverSpec.newBuilder()
+            .setReceiverStageId(spec.receiverStageId())
+            .setDistributionType(convertDistributionType(spec.distributionType()))
+            .addAllKeys(spec.keys());
+        if (spec.columnMask() != null) {
+          specBuilder.setColumnMask(Plan.ColumnMask.newBuilder().addAllColumns(spec.columnMask()));
+        }
+        result.add(specBuilder.build());
+      }
+      return result;
     }
 
     @Override

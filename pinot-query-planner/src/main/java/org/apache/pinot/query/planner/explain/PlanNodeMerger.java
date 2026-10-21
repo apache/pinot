@@ -359,6 +359,9 @@ class PlanNodeMerger {
       if (node.isSort() != otherNode.isSort()) {
         return null;
       }
+      if (!List.copyOf(node.getReceiverSpecs()).equals(List.copyOf(otherNode.getReceiverSpecs()))) {
+        return null;
+      }
       List<PlanNode> children = mergeChildren(node, context);
       if (children == null) {
         return null;

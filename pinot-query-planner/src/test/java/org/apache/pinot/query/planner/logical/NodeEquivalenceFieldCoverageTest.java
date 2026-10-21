@@ -92,7 +92,7 @@ public class NodeEquivalenceFieldCoverageTest {
       Map.entry(MailboxReceiveNode.class, List.of("_senderStageId", "_exchangeType", "_distributionType", "_keys",
           "_collations", "_sort", "_sortedOnSender", "_sender")),
       Map.entry(MailboxSendNode.class, List.of("_receiverStages", "_exchangeType", "_distributionType", "_keys",
-          "_prePartitioned", "_collations", "_sort", "_hashFunction")),
+          "_prePartitioned", "_collations", "_sort", "_hashFunction", "_receiverSpecs")),
       Map.entry(ProjectNode.class, List.of("_projects")),
       Map.entry(SetOpNode.class, List.of("_setOpType", "_all")),
       Map.entry(SortNode.class, List.of("_collations", "_fetch", "_offset")),
@@ -120,6 +120,8 @@ public class NodeEquivalenceFieldCoverageTest {
           "_senderStageId", "The senders themselves are compared for equivalence instead"),
       MailboxSendNode.class, Map.of(
           "_receiverStages", "Who reads a stage does not change what the stage computes",
+          "_receiverSpecs", "How a stage sends to each receiver does not change what the stage computes, and only "
+              + "the replacer sets specs, after the equivalence groups are known",
           "_sort", "Sending side sort is not implemented (see the TODO in MailboxSendOperator), and a difference "
               + "visible to a receiver is already compared in visitMailboxReceive",
           "_hashFunction", "Spooling runs only on the v1 planner, which threads one hash function through the "
