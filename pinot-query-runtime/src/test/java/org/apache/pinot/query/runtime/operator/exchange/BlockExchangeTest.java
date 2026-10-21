@@ -19,13 +19,18 @@
 package org.apache.pinot.query.runtime.operator.exchange;
 
 import com.google.common.collect.Iterators;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.mailbox.SendingMailbox;
+import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
+import org.apache.pinot.query.runtime.blocks.SerializedDataBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -185,6 +190,108 @@ public class BlockExchangeTest {
     SendingMailbox sendingMailbox = exchange.asSendingMailbox("1");
     Assert.assertFalse(sendingMailbox.deliversByReference());
     Assert.assertTrue(sendingMailbox.isLocal());
+  }
+
+  private static final String HASH = KeySelector.DEFAULT_HASH_ALGORITHM;
+  private static final DataSchema TWO_COLUMNS = new DataSchema(new String[]{"k", "v"},
+      new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING});
+  private static final DataSchema ONLY_V = new DataSchema(new String[]{"v"},
+      new ColumnDataType[]{ColumnDataType.STRING});
+
+  private static RowHeapDataBlock keyValueBlock(int numRows) {
+    List<Object[]> rows = new ArrayList<>();
+    for (int i = 0; i < numRows; i++) {
+      rows.add(new Object[]{i, "v" + i});
+    }
+    return new RowHeapDataBlock(rows, TWO_COLUMNS);
+  }
+
+  private static List<Object> receivedValues(SendingMailbox mailbox) {
+    ArgumentCaptor<MseBlock.Data> captor = ArgumentCaptor.forClass(MseBlock.Data.class);
+    Mockito.verify(mailbox, Mockito.atLeast(0)).send(captor.capture());
+    List<Object> values = new ArrayList<>();
+    for (MseBlock.Data block : captor.getAllValues()) {
+      RowHeapDataBlock rowHeap = block.asRowHeap();
+      for (Object[] row : rowHeap.getRows()) {
+        values.add(row[row.length - 1]);
+      }
+    }
+    return values;
+  }
+
+  /// A serialized block (forwarded as it was received) is converted to rows once, not once per mailbox.
+  @Test
+  public void serializedBlocksAreConvertedOnce() {
+    BlockExchange exchange = BlockExchange.getExchange(List.of(_mailbox1, _mailbox2),
+        RelDistribution.Type.BROADCAST_DISTRIBUTED, List.of(), BlockSplitter.DEFAULT, HASH, new int[]{1}, ONLY_V);
+    SerializedDataBlock serialized = Mockito.spy(keyValueBlock(2).asSerialized());
+
+    exchange.send(serialized);
+
+    Mockito.verify(serialized, Mockito.times(1)).asRowHeap();
+    for (SendingMailbox mailbox : List.of(_mailbox1, _mailbox2)) {
+      Assert.assertEquals(receivedValues(mailbox), List.of("v0", "v1"));
+    }
+  }
+
+  @Test
+  public void projectionReachesEveryMailbox() {
+    BlockExchange exchange = BlockExchange.getExchange(List.of(_mailbox1, _mailbox2),
+        RelDistribution.Type.BROADCAST_DISTRIBUTED, List.of(), BlockSplitter.DEFAULT, HASH, new int[]{1}, ONLY_V);
+
+    exchange.send(keyValueBlock(3));
+
+    for (SendingMailbox mailbox : List.of(_mailbox1, _mailbox2)) {
+      ArgumentCaptor<MseBlock.Data> captor = ArgumentCaptor.forClass(MseBlock.Data.class);
+      Mockito.verify(mailbox).send(captor.capture());
+      RowHeapDataBlock received = captor.getValue().asRowHeap();
+      Assert.assertEquals(received.getDataSchema(), ONLY_V);
+      Assert.assertTrue(Arrays.deepEquals(received.getRows().toArray(),
+          new Object[][]{new Object[]{"v0"}, new Object[]{"v1"}, new Object[]{"v2"}}));
+    }
+  }
+
+  /// The hash uses the keys of the full row, so a receiver that does not read the key column still gets the rows
+  /// that an exchange without a mask sends to it.
+  @Test
+  public void hashUsesColumnsThatTheMaskDrops() {
+    SendingMailbox unmasked1 = Mockito.mock(SendingMailbox.class);
+    SendingMailbox unmasked2 = Mockito.mock(SendingMailbox.class);
+    BlockExchange masked = BlockExchange.getExchange(List.of(_mailbox1, _mailbox2),
+        RelDistribution.Type.HASH_DISTRIBUTED, List.of(0), BlockSplitter.DEFAULT, HASH, new int[]{1}, ONLY_V);
+    BlockExchange unmasked = BlockExchange.getExchange(List.of(unmasked1, unmasked2),
+        RelDistribution.Type.HASH_DISTRIBUTED, List.of(0), BlockSplitter.DEFAULT, HASH, null, null);
+
+    masked.send(keyValueBlock(50));
+    unmasked.send(keyValueBlock(50));
+
+    Assert.assertEquals(receivedValues(_mailbox1), receivedValues(unmasked1));
+    Assert.assertEquals(receivedValues(_mailbox2), receivedValues(unmasked2));
+    Assert.assertFalse(receivedValues(_mailbox1).isEmpty());
+    Assert.assertFalse(receivedValues(_mailbox2).isEmpty());
+  }
+
+  /// The splitter reads the full block, and each split is projected afterwards.
+  @Test
+  public void splitsAreProjected() {
+    RowHeapDataBlock first = new RowHeapDataBlock(List.<Object[]>of(new Object[]{1, "one"}), TWO_COLUMNS);
+    RowHeapDataBlock second = new RowHeapDataBlock(List.<Object[]>of(new Object[]{2, "two"}), TWO_COLUMNS);
+    BlockSplitter splitter = (block, maxSize) -> {
+      Assert.assertEquals(block.getDataSchema(), TWO_COLUMNS, "The splitter must see the full block");
+      return List.of(first, second).iterator();
+    };
+    BlockExchange exchange = BlockExchange.getExchange(List.of(_mailbox1), RelDistribution.Type.BROADCAST_DISTRIBUTED,
+        List.of(), splitter, HASH, new int[]{1}, ONLY_V);
+
+    exchange.send(keyValueBlock(2));
+
+    Assert.assertEquals(receivedValues(_mailbox1), List.of("one", "two"));
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void columnMapNeedsASchema() {
+    BlockExchange.getExchange(List.of(_mailbox1), RelDistribution.Type.BROADCAST_DISTRIBUTED, List.of(),
+        BlockSplitter.DEFAULT, HASH, new int[]{1}, null);
   }
 
   private static class TestBlockExchange extends BlockExchange {

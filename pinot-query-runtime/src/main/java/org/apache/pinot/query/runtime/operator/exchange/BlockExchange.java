@@ -18,11 +18,14 @@
  */
 package org.apache.pinot.query.runtime.operator.exchange;
 
+import com.google.common.base.Preconditions;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
+import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.ExceptionUtils;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.partitioning.KeySelectorFactory;
@@ -44,6 +47,13 @@ public abstract class BlockExchange implements AutoCloseable {
   private final BlockSplitter _splitter;
   private final Function<List<SendingMailbox>, Integer> _statsIndexChooser;
   private final boolean _deliversByReference;
+  /// When not null, each block is reduced to these columns, in this order, right before it reaches a mailbox. Set
+  /// once by [#getExchange(List, RelDistribution.Type, List, BlockSplitter, Function, String, int[], DataSchema)],
+  /// before the exchange sends any block.
+  @Nullable
+  private int[] _columnMap;
+  @Nullable
+  private DataSchema _projectedSchema;
 
   protected static final Function<List<SendingMailbox>, Integer> RANDOM_INDEX_CHOOSER =
       (mailboxes) -> ThreadLocalRandom.current().nextInt(mailboxes.size());
@@ -57,6 +67,37 @@ public abstract class BlockExchange implements AutoCloseable {
   /// mailbox index that receives the stats should be tuned.
   /// @param statsIndexChooser a function to choose the mailbox index to send stats to.
   public static BlockExchange getExchange(List<SendingMailbox> sendingMailboxes,
+      RelDistribution.Type distributionType, List<Integer> keys, BlockSplitter splitter,
+      Function<List<SendingMailbox>, Integer> statsIndexChooser, String hashFunction) {
+    return getExchange(sendingMailboxes, distributionType, keys, splitter, statsIndexChooser, hashFunction, null,
+        null);
+  }
+
+  /// Same as [#getExchange(List, RelDistribution.Type, List, BlockSplitter, Function, String)], but the mailboxes
+  /// receive only some columns of each block.
+  ///
+  /// The exchange routes and splits each block with all its columns, so `keys` are ordinals of the input blocks.
+  /// Right before a block (or a split of it) reaches a mailbox, the exchange replaces it with a view that holds the
+  /// columns of `columnMap`, in that order, described by `projectedSchema`. A remote mailbox serializes the view
+  /// without creating projected rows. See
+  /// [org.apache.pinot.query.runtime.blocks.RowHeapDataBlock#project(int[], DataSchema)].
+  ///
+  /// @param columnMap the columns that the mailboxes receive, or null for every column
+  /// @param projectedSchema the schema of the projected blocks; must be set when `columnMap` is set
+  public static BlockExchange getExchange(List<SendingMailbox> sendingMailboxes,
+      RelDistribution.Type distributionType, List<Integer> keys, BlockSplitter splitter,
+      Function<List<SendingMailbox>, Integer> statsIndexChooser, String hashFunction, @Nullable int[] columnMap,
+      @Nullable DataSchema projectedSchema) {
+    Preconditions.checkArgument((columnMap == null) == (projectedSchema == null),
+        "The column map and the projected schema must be set together");
+    BlockExchange exchange = createExchange(sendingMailboxes, distributionType, keys, splitter, statsIndexChooser,
+        hashFunction);
+    exchange._columnMap = columnMap;
+    exchange._projectedSchema = projectedSchema;
+    return exchange;
+  }
+
+  private static BlockExchange createExchange(List<SendingMailbox> sendingMailboxes,
       RelDistribution.Type distributionType, List<Integer> keys, BlockSplitter splitter,
       Function<List<SendingMailbox>, Integer> statsIndexChooser, String hashFunction) {
     switch (distributionType) {
@@ -80,6 +121,15 @@ public abstract class BlockExchange implements AutoCloseable {
   public static BlockExchange getExchange(List<SendingMailbox> sendingMailboxes, RelDistribution.Type distributionType,
       List<Integer> keys, BlockSplitter splitter, String hashFunction) {
     return getExchange(sendingMailboxes, distributionType, keys, splitter, RANDOM_INDEX_CHOOSER, hashFunction);
+  }
+
+  /// Same as [#getExchange(List, RelDistribution.Type, List, BlockSplitter, Function, String, int[], DataSchema)],
+  /// with the stats sent to a random mailbox.
+  public static BlockExchange getExchange(List<SendingMailbox> sendingMailboxes, RelDistribution.Type distributionType,
+      List<Integer> keys, BlockSplitter splitter, String hashFunction, @Nullable int[] columnMap,
+      @Nullable DataSchema projectedSchema) {
+    return getExchange(sendingMailboxes, distributionType, keys, splitter, RANDOM_INDEX_CHOOSER, hashFunction,
+        columnMap, projectedSchema);
   }
 
   protected BlockExchange(List<SendingMailbox> sendingMailboxes, BlockSplitter splitter,
@@ -118,6 +168,10 @@ public abstract class BlockExchange implements AutoCloseable {
       }
     }
     if (!isEarlyTerminated) {
+      if (_columnMap != null && !block.isRowHeap()) {
+        // The projection needs the rows. Extract them once here, instead of once per destination.
+        block = block.asRowHeap();
+      }
       route(_sendingMailboxes, block);
     }
     return isEarlyTerminated;
@@ -168,16 +222,26 @@ public abstract class BlockExchange implements AutoCloseable {
     }
 
     if (sendingMailbox.isLocal()) {
-      sendingMailbox.send(block);
+      sendingMailbox.send(project(block));
     } else {
+      // Split before projecting: the splitter reads the rows, and a projected view creates them only when read.
       Iterator<? extends MseBlock.Data> splits = _splitter.split(block, MAX_MAILBOX_CONTENT_SIZE_BYTES);
       while (splits.hasNext()) {
-        sendingMailbox.send(splits.next());
+        sendingMailbox.send(project(splits.next()));
       }
     }
     if (LOGGER.isTraceEnabled()) {
       LOGGER.trace("Block sent: {} {} to {}", block, System.identityHashCode(block), sendingMailbox);
     }
+  }
+
+  private MseBlock.Data project(MseBlock.Data block) {
+    if (_columnMap == null) {
+      return block;
+    }
+    assert _projectedSchema != null;
+    // send(MseBlock.Data) already extracted the rows of a serialized block, so this conversion is free.
+    return block.asRowHeap().project(_columnMap, _projectedSchema);
   }
 
   /// Sends the block to the destinations, following the distribution strategy of this exchange.

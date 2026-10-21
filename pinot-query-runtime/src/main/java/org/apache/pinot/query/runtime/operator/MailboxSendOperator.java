@@ -28,10 +28,12 @@ import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.metrics.MseMetrics;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.physical.MailboxIdUtils;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.ReceiverSpec;
 import org.apache.pinot.query.routing.MailboxInfo;
 import org.apache.pinot.query.routing.RoutingInfo;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
@@ -86,8 +88,8 @@ public class MailboxSendOperator extends MultiStageOperator {
   ///
   /// In case of a multi-sender node, this method creates a two steps exchange:
   ///
-  /// 1. One inner exchange is created for each receiver stage, using the method mentioned above and keeping the
-  ///    distribution type specified in the [MailboxSendNode].
+  /// 1. One inner exchange is created for each receiver stage, using the method mentioned above. Each inner exchange
+  ///    follows the [ReceiverSpec] of its receiver stage: its distribution, its keys and its column mask.
   /// 2. Then, a single outer broadcast exchange is created to fan out the data to all the inner exchanges. It copies
   ///    blocks that carry aggregation intermediate results, so that no two receiver stages share them. Stages whose
   ///    workers all read the block within [SendingMailbox#send(MseBlock.Data)] do not need a copy.
@@ -150,7 +152,8 @@ public class MailboxSendOperator extends MultiStageOperator {
   /// In case of a multi-sender node, this method will be called for each receiver stage.
   private static BlockExchange getBlockExchange(OpChainExecutionContext context, int receiverStageId,
       MailboxSendNode node, StatMap<StatKey> statMap, BlockSplitter splitter) {
-    RelDistribution.Type distributionType = node.getDistributionType();
+    ReceiverSpec spec = node.getReceiverSpec(receiverStageId);
+    RelDistribution.Type distributionType = spec.distributionType();
     Preconditions.checkState(SUPPORTED_EXCHANGE_TYPES.contains(distributionType), "Unsupported distribution type: %s",
         distributionType);
     MailboxService mailboxService = context.getMailboxService();
@@ -169,8 +172,10 @@ public class MailboxSendOperator extends MultiStageOperator {
             v.getMailboxId(), deadlineMs, statMap))
         .collect(Collectors.toList());
     statMap.merge(StatKey.FAN_OUT, sendingMailboxes.size());
-    return BlockExchange.getExchange(sendingMailboxes, distributionType, node.getKeys(), splitter,
-        node.getHashFunction());
+    int[] columnMap = spec.columnMaskArray();
+    DataSchema projectedSchema = columnMap != null ? spec.receiverSchema(node.getDataSchema()) : null;
+    return BlockExchange.getExchange(sendingMailboxes, distributionType, spec.keys(), splitter, node.getHashFunction(),
+        columnMap, projectedSchema);
   }
 
   @Override
