@@ -28,6 +28,7 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.integration.tests.realtime.utils.FailureInjectingTableConfig;
 import org.apache.pinot.integration.tests.realtime.utils.FailureInjectingTableDataManagerProvider;
+import org.apache.pinot.integration.tests.realtime.utils.PauselessRealtimeTestUtils;
 import org.apache.pinot.server.starter.helix.HelixInstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
@@ -131,7 +132,7 @@ public class PauselessDedupErrorReplicaRepairTest extends BaseClusterIntegration
     return serverConf;
   }
 
-  @BeforeClass
+  @BeforeClass(alwaysRun = true)
   public void setUp()
       throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
@@ -163,10 +164,11 @@ public class PauselessDedupErrorReplicaRepairTest extends BaseClusterIntegration
         "Injected failures did not put any replica in ERROR state");
 
     // Drive the segment-level validation periodically (as it runs in production) until every ERROR replica is
-    // repaired. The runs are spaced out so a pass does not re-trigger resets still in flight from the previous pass.
+    // repaired, i.e. reaches its ideal state: leaving ERROR is not enough, since a reset replica goes through OFFLINE.
+    // The runs are spaced out so a pass does not re-trigger resets still in flight from the previous pass.
     long[] lastValidationRunMs = new long[1];
     TestUtils.waitForCondition(aVoid -> {
-      if (getNumErrorReplicasInEV(realtimeTableName) == 0) {
+      if (PauselessRealtimeTestUtils.isExternalViewConverged(_helixResourceManager, realtimeTableName)) {
         return true;
       }
       long nowMs = System.currentTimeMillis();
@@ -205,15 +207,75 @@ public class PauselessDedupErrorReplicaRepairTest extends BaseClusterIntegration
     _controllerStarter.getRealtimeSegmentValidationManager().run(periodicTaskProperties);
   }
 
-  @AfterClass
+  @AfterClass(alwaysRun = true)
   public void tearDown()
       throws Exception {
-    dropRealtimeTable(getTableName());
-    stopServer();
-    stopBroker();
-    stopController();
-    stopKafka();
-    stopZk();
-    FileUtils.deleteDirectory(_tempDir);
+    // Run every step even if an earlier one fails, so a failed test does not leak the cluster into later suites
+    Throwable cleanupFailure = null;
+    try {
+      if (_helixResourceManager != null && _helixResourceManager.getRealtimeTableConfig(getTableName()) != null) {
+        dropRealtimeTable(getTableName());
+      }
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
+    }
+    try {
+      if (!_serverStarters.isEmpty()) {
+        stopServer();
+      }
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
+    }
+    try {
+      if (!_brokerStarters.isEmpty()) {
+        stopBroker();
+      }
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
+    }
+    try {
+      if (_controllerStarter != null) {
+        stopController();
+      }
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
+    }
+    try {
+      stopKafka();
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
+    }
+    try {
+      stopZk();
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
+    }
+    try {
+      FileUtils.deleteDirectory(_tempDir);
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
+    }
+    if (cleanupFailure != null) {
+      rethrowCleanupFailure(cleanupFailure);
+    }
+  }
+
+  private static Throwable addCleanupFailure(Throwable cleanupFailure, Throwable failure) {
+    if (cleanupFailure == null) {
+      return failure;
+    }
+    cleanupFailure.addSuppressed(failure);
+    return cleanupFailure;
+  }
+
+  private static void rethrowCleanupFailure(Throwable cleanupFailure)
+      throws Exception {
+    if (cleanupFailure instanceof Error) {
+      throw (Error) cleanupFailure;
+    }
+    if (cleanupFailure instanceof Exception) {
+      throw (Exception) cleanupFailure;
+    }
+    throw new RuntimeException(cleanupFailure);
   }
 }

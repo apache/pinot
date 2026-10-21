@@ -3333,6 +3333,55 @@ public class PinotHelixResourceManager {
     }
   }
 
+  /// Resets the replicas of the given segments that are in ERROR state, leaving the other replicas untouched. The ideal
+  /// state and external view are read once, when the resets are sent, to find the ERROR replicas; a replica on an
+  /// instance the ideal state no longer assigns the segment to is skipped. The resets are sent in one batch per
+  /// instance, only for the segments still in ERROR in the instance's current state, and the instance discards a reset
+  /// if the segment has left ERROR by the time it processes it.
+  ///
+  /// @return the segments whose reset failed on at least one instance
+  public Set<String> resetErrorReplicas(String tableNameWithType, Set<String> segmentNames) {
+    IdealState idealState = getTableIdealState(tableNameWithType);
+    Preconditions.checkState(idealState != null, "Could not find ideal state for table: %s", tableNameWithType);
+    ExternalView externalView = getTableExternalView(tableNameWithType);
+    Preconditions.checkState(externalView != null, "Could not find external view for table: %s", tableNameWithType);
+
+    Map<String, Set<String>> instanceToResetSegmentsMap = new HashMap<>();
+    for (String segmentName : segmentNames) {
+      Map<String, String> externalViewStateMap = externalView.getStateMap(segmentName);
+      Map<String, String> idealStateMap = idealState.getInstanceStateMap(segmentName);
+      if (externalViewStateMap == null || idealStateMap == null) {
+        continue;
+      }
+      for (Map.Entry<String, String> entry : externalViewStateMap.entrySet()) {
+        String instance = entry.getKey();
+        if (!SegmentStateModel.ERROR.equals(entry.getValue())) {
+          continue;
+        }
+        if (idealStateMap.containsKey(instance)) {
+          instanceToResetSegmentsMap.computeIfAbsent(instance, i -> new HashSet<>()).add(segmentName);
+        } else {
+          LOGGER.warn("Skipping reset of ERROR segment: {} of table: {} on instance: {} which the ideal state no "
+              + "longer assigns it to", segmentName, tableNameWithType, instance);
+        }
+      }
+    }
+
+    Set<String> failedSegments = new HashSet<>();
+    for (Map.Entry<String, Set<String>> entry : instanceToResetSegmentsMap.entrySet()) {
+      String instance = entry.getKey();
+      Set<String> resetSegments = entry.getValue();
+      try {
+        resetPartitions(instance, tableNameWithType, resetSegments, true);
+      } catch (Exception e) {
+        LOGGER.error("Failed to reset ERROR segments: {} of table: {} on instance: {}", resetSegments,
+            tableNameWithType, instance, e);
+        failedSegments.addAll(resetSegments);
+      }
+    }
+    return failedSegments;
+  }
+
   private void resetPartitionAllState(String instance, String tableNameWithType, Set<String> segmentNames,
       List<String> failedInstances) {
     try {
@@ -3360,9 +3409,22 @@ public class PinotHelixResourceManager {
   /// However instead of resetting only the ERROR state to its initial state. we reset all state regardless.
   @VisibleForTesting
   void resetPartitionAllState(String instanceName, String resourceName, Set<String> resetPartitionNames) {
+    resetPartitions(instanceName, resourceName, resetPartitionNames, false);
+  }
+
+  /// Resets the given partitions on the instance to the initial state.
+  ///
+  /// With `errorStateOnly`, like [HelixAdmin#resetPartition(String, String, String, List)], only the partitions in
+  /// ERROR state in the instance's current state are reset, and each message is sent from ERROR, so the instance
+  /// discards it if the partition has left ERROR by the time it processes it. A partition with a pending state
+  /// transition message is skipped. Otherwise every partition is reset from its current state, and a pending state
+  /// transition message for any of them fails the call.
+  @VisibleForTesting
+  void resetPartitions(String instanceName, String resourceName, Set<String> resetPartitionNames,
+      boolean errorStateOnly) {
     LOGGER.info("Resetting partitions: {} for resource: {} on instance: {}", resetPartitionNames, resourceName,
         instanceName);
-    HelixDataAccessor accessor = _helixZkManager.getHelixDataAccessor();
+    HelixDataAccessor accessor = getHelixZkManager().getHelixDataAccessor();
     PropertyKey.Builder keyBuilder = accessor.keyBuilder();
 
     // check the instance is alive
@@ -3385,6 +3447,7 @@ public class PinotHelixResourceManager {
     CurrentState curState = accessor.getProperty(keyBuilder.currentState(instanceName, sessionId, resourceName));
 
     // check there is no pending messages for the partitions exist
+    Set<String> partitionsWithPendingMessage = new HashSet<>();
     List<Message> messages = accessor.getChildValues(keyBuilder.messages(instanceName), true);
     for (Message message : messages) {
       if (!Message.MessageType.STATE_TRANSITION.name().equalsIgnoreCase(message.getMsgType()) || !sessionId.equals(
@@ -3392,9 +3455,12 @@ public class PinotHelixResourceManager {
           || !resetPartitionNames.contains(message.getPartitionName())) {
         continue;
       }
-      throw new RuntimeException(
-          "Can't reset state for " + resourceName + "." + resetPartitionNames + " on " + instanceName
-              + ", because a pending message " + message + " exists for resource " + message.getResourceName());
+      if (!errorStateOnly) {
+        throw new RuntimeException(
+            "Can't reset state for " + resourceName + "." + resetPartitionNames + " on " + instanceName
+                + ", because a pending message " + message + " exists for resource " + message.getResourceName());
+      }
+      partitionsWithPendingMessage.add(message.getPartitionName());
     }
 
     String adminName;
@@ -3409,6 +3475,19 @@ public class PinotHelixResourceManager {
     List<Message> resetMessages = new ArrayList<>();
     List<PropertyKey> messageKeys = new ArrayList<>();
     for (String partitionName : resetPartitionNames) {
+      String fromState = curState.getState(partitionName);
+      if (errorStateOnly) {
+        if (!SegmentStateModel.ERROR.equals(fromState)) {
+          LOGGER.info("Skipping reset of partition: {} for resource: {} on instance: {} in state: {}", partitionName,
+              resourceName, instanceName, fromState);
+          continue;
+        }
+        if (partitionsWithPendingMessage.contains(partitionName)) {
+          LOGGER.info("Skipping reset of partition: {} for resource: {} on instance: {} with a pending message",
+              partitionName, resourceName, instanceName);
+          continue;
+        }
+      }
       // send currentState to initialState message
       String msgId = UUID.randomUUID().toString();
       Message message = new Message(Message.MessageType.STATE_TRANSITION, msgId);
@@ -3419,7 +3498,7 @@ public class PinotHelixResourceManager {
       message.setResourceName(resourceName);
       message.setTgtSessionId(sessionId);
       message.setStateModelDef(stateModelDef);
-      message.setFromState(curState.getState(partitionName));
+      message.setFromState(fromState);
       message.setToState(stateModel.getInitialState());
       message.setStateModelFactoryName(idealState.getStateModelFactoryName());
 
@@ -3434,7 +3513,21 @@ public class PinotHelixResourceManager {
       messageKeys.add(keyBuilder.message(instanceName, message.getId()));
     }
 
-    accessor.setChildren(messageKeys, resetMessages);
+    if (resetMessages.isEmpty()) {
+      return;
+    }
+    boolean[] results = accessor.setChildren(messageKeys, resetMessages);
+    List<String> failedPartitions = new ArrayList<>();
+    for (int i = 0; i < results.length; i++) {
+      if (!results[i]) {
+        failedPartitions.add(resetMessages.get(i).getPartitionName());
+      }
+    }
+    if (!failedPartitions.isEmpty()) {
+      throw new RuntimeException(
+          "Failed to send reset messages for partitions: " + failedPartitions + " of resource: " + resourceName
+              + " on instance: " + instanceName);
+    }
   }
 
   /// Sends a segment refresh message to:
