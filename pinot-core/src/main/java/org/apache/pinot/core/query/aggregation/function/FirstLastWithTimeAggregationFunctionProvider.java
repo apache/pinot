@@ -68,8 +68,17 @@ public final class FirstLastWithTimeAggregationFunctionProvider {
           return new FirstFloatValueWithTimeAggregationFunction(dataCol, timeCol, nullHandlingEnabled);
         case DOUBLE:
           return new FirstDoubleValueWithTimeAggregationFunction(dataCol, timeCol, nullHandlingEnabled);
+        case BIG_DECIMAL:
+          return new FirstBigDecimalValueWithTimeAggregationFunction(dataCol, timeCol, nullHandlingEnabled);
         case STRING:
+        case JSON:
           return new FirstStringValueWithTimeAggregationFunction(dataCol, timeCol, nullHandlingEnabled);
+        case BYTES:
+          return new FirstBytesValueWithTimeAggregationFunction(dataCol, timeCol, nullHandlingEnabled,
+              ColumnDataType.BYTES);
+        case UUID:
+          return new FirstBytesValueWithTimeAggregationFunction(dataCol, timeCol, nullHandlingEnabled,
+              ColumnDataType.UUID);
         default:
           throw new IllegalArgumentException("Unsupported data type for FIRST_WITH_TIME: " + dataType);
       }
@@ -111,8 +120,17 @@ public final class FirstLastWithTimeAggregationFunctionProvider {
           return new LastFloatValueWithTimeAggregationFunction(dataCol, timeCol, nullHandlingEnabled);
         case DOUBLE:
           return new LastDoubleValueWithTimeAggregationFunction(dataCol, timeCol, nullHandlingEnabled);
+        case BIG_DECIMAL:
+          return new LastBigDecimalValueWithTimeAggregationFunction(dataCol, timeCol, nullHandlingEnabled);
         case STRING:
+        case JSON:
           return new LastStringValueWithTimeAggregationFunction(dataCol, timeCol, nullHandlingEnabled);
+        case BYTES:
+          return new LastBytesValueWithTimeAggregationFunction(dataCol, timeCol, nullHandlingEnabled,
+              ColumnDataType.BYTES);
+        case UUID:
+          return new LastBytesValueWithTimeAggregationFunction(dataCol, timeCol, nullHandlingEnabled,
+              ColumnDataType.UUID);
         default:
           throw new IllegalArgumentException("Unsupported data type for LAST_WITH_TIME: " + dataType);
       }

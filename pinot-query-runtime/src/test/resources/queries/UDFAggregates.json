@@ -10,16 +10,17 @@
           {"name": "string_col", "type": "STRING"},
           {"name": "bool_col", "type": "BOOLEAN"},
           {"name": "decimal_col", "type": "BIG_DECIMAL"},
-          {"name": "timestamp_col", "type": "TIMESTAMP"}
+          {"name": "timestamp_col", "type": "TIMESTAMP"},
+          {"name": "bytes_col", "type": "BYTES"}
         ],
         "inputs": [
-          [2, 2, 300, 300, "a", true, "1E-307", "2020-01-01 03:10:12"],
-          [2, 2, 400, 400, "a", true, "1E+307", "2020-01-01 03:39:12"],
-          [3, 3, 100, 100, "b", false, "1E-308", "2020-01-01 08:32:12"],
-          [100, 100, 1, 1, "b", false, "1E+308", "2020-02-06 03:32:12"],
-          [101, 101, 1.01, 1.01, "c", false, "1E-317", "2020-05-01 03:32:12"],
-          [150, 150, 1.5, 1.5, "c", false, "1E+317", "2020-02-03 03:32:12"],
-          [175, 175, 1.75, 1.75, "c", true, "1E+328", "2020-01-02 03:32:12"]
+          [2, 2, 300, 300, "a", true, "1E-307", "2020-01-01 03:10:12", "DEADBEEF"],
+          [2, 2, 400, 400, "a", true, "1E+307", "2020-01-01 03:39:12", "FDEADBEE"],
+          [3, 3, 100, 100, "b", false, "1E-308", "2020-01-01 08:32:12", "EFDEADBE"],
+          [100, 100, 1, 1, "b", false, "1E+308", "2020-02-06 03:32:12", "BEEFDEAD"],
+          [101, 101, 1.01, 1.01, "c", false, "1E-317", "2020-05-01 03:32:12", "ADBEEFDE"],
+          [150, 150, 1.5, 1.5, "c", false, "1E+317", "2020-02-03 03:32:12", "DEADBE01"],
+          [175, 175, 1.75, 1.75, "c", true, "1E+328", "2020-01-02 03:32:12", "DEADBE02"]
         ]
       }
     },
@@ -76,6 +77,18 @@
       {
         "sql": "SELECT FIRST_WITH_TIME(timestamp_col, timestamp_col), LAST_WITH_TIME(timestamp_col, timestamp_col), FIRST_WITH_TIME(timestamp_col, timestamp_col, 'TIMESTAMP') FROM {tbl}",
         "outputs": [["2020-01-01 03:10:12.0", "2020-05-01 03:32:12.0", "2020-01-01 03:10:12.0"]]
+      },
+      {
+        "sql": "SELECT FIRST_WITH_TIME(decimal_col, timestamp_col), LAST_WITH_TIME(decimal_col, timestamp_col), FIRST_WITH_TIME(bytes_col, timestamp_col), LAST_WITH_TIME(bytes_col, timestamp_col, 'BYTES') FROM {tbl}",
+        "outputs": [["1E-307", "1E-317", "deadbeef", "adbeefde"]]
+      },
+      {
+        "sql": "SELECT string_col, FIRST_WITH_TIME(decimal_col, timestamp_col), LAST_WITH_TIME(decimal_col, timestamp_col), FIRST_WITH_TIME(bytes_col, timestamp_col), LAST_WITH_TIME(bytes_col, timestamp_col) FROM {tbl} GROUP BY string_col",
+        "outputs": [["a", "1E-307", "1E+307", "deadbeef", "fdeadbee"], ["b", "1E-308", "1E+308", "efdeadbe", "beefdead"], ["c", "1E+328", "1E-317", "deadbe02", "adbeefde"]]
+      },
+      {
+        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ string_col, FIRST_WITH_TIME(decimal_col, timestamp_col), LAST_WITH_TIME(decimal_col, timestamp_col), FIRST_WITH_TIME(bytes_col, timestamp_col), LAST_WITH_TIME(bytes_col, timestamp_col) FROM {tbl} GROUP BY string_col",
+        "outputs": [["a", "1E-307", "1E+307", "deadbeef", "fdeadbee"], ["b", "1E-308", "1E+308", "efdeadbe", "beefdead"], ["c", "1E+328", "1E-317", "deadbe02", "adbeefde"]]
       },
       {
         "sql": "SELECT SUMPRECISION(decimal_col) FROM {tbl}",

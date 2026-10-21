@@ -149,6 +149,8 @@ public class PinotAggregateTypeArgumentRewriteRule extends RelOptRule {
         return "FLOAT";
       case DOUBLE:
         return "DOUBLE";
+      case DECIMAL:
+        return "BIG_DECIMAL";
       case CHAR:
       case VARCHAR:
         return "STRING";
@@ -156,6 +158,11 @@ public class PinotAggregateTypeArgumentRewriteRule extends RelOptRule {
         return "BOOLEAN";
       case TIMESTAMP:
         return "TIMESTAMP";
+      case BINARY:
+      case VARBINARY:
+        return "BYTES";
+      case UUID:
+        return "UUID";
       default:
         // Rejected during validation; leave the call as it is rather than guess a type.
         return null;

@@ -77,6 +77,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.UuidUtils;
 
 
 /// The `AggregationFunctionUtils` class provides utility methods for aggregation function.
@@ -355,6 +356,8 @@ public class AggregationFunctionUtils {
         return dataTable.getString(rowId, colId);
       case BYTES:
         return dataTable.getBytes(rowId, colId).getBytes();
+      case UUID:
+        return UuidUtils.toUUID(dataTable.getBytes(rowId, colId));
       case INT_ARRAY:
         return dataTable.getIntArray(rowId, colId);
       case LONG_ARRAY:

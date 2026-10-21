@@ -102,7 +102,7 @@ public class AggregateFunctionRewriteOptimizer implements StatementOptimizer {
     }
   }
 
-  /// Appends the data column's logical type when the explicit form supports it.
+  /// Appends the data column's logical type.
   private static void addDataTypeArgument(Function function, FieldSpec fieldSpec) {
     if (!fieldSpec.isSingleValueField()) {
       return;
@@ -112,9 +112,12 @@ public class AggregateFunctionRewriteOptimizer implements StatementOptimizer {
       case LONG:
       case FLOAT:
       case DOUBLE:
+      case BIG_DECIMAL:
       case STRING:
       case BOOLEAN:
       case TIMESTAMP:
+      case BYTES:
+      case UUID:
         function.addToOperands(RequestUtils.getLiteralExpression(fieldSpec.getDataType().name()));
         break;
       case JSON:

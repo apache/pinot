@@ -21,6 +21,7 @@ package org.apache.pinot.queries;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -29,6 +30,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
@@ -56,6 +58,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
@@ -92,6 +95,9 @@ public class LastWithTimeQueriesTest extends BaseQueriesTest {
   private static final String STRING_NO_DICT_COLUMN = "stringNoDictColumn";
   private static final String TIME_COLUMN = "timestampColumn";
   private static final String TIMESTAMP_VALUE_COLUMN = "timestampValueColumn";
+  private static final String BIG_DECIMAL_COLUMN = "bigDecimalColumn";
+  private static final String BYTES_COLUMN = "bytesColumn";
+  private static final String UUID_COLUMN = "uuidColumn";
   private static final Schema SCHEMA = new Schema.SchemaBuilder()
       .addSingleValueDimension(BOOL_COLUMN, DataType.BOOLEAN)
       .addSingleValueDimension(BOOL_NO_DICT_COLUMN, DataType.BOOLEAN)
@@ -107,6 +113,9 @@ public class LastWithTimeQueriesTest extends BaseQueriesTest {
       .addSingleValueDimension(STRING_COLUMN, DataType.STRING)
       .addSingleValueDimension(STRING_NO_DICT_COLUMN, DataType.STRING)
       .addSingleValueDimension(TIMESTAMP_VALUE_COLUMN, DataType.TIMESTAMP)
+      .addSingleValueDimension(BYTES_COLUMN, DataType.BYTES)
+      .addSingleValueDimension(UUID_COLUMN, DataType.UUID)
+      .addMetric(BIG_DECIMAL_COLUMN, DataType.BIG_DECIMAL)
       .addSingleValueDimension(TIME_COLUMN, DataType.LONG).build();
   private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
       .setNoDictionaryColumns(
@@ -120,6 +129,9 @@ public class LastWithTimeQueriesTest extends BaseQueriesTest {
   private Double _expectedResultLastDouble;
   private String _expectedResultLastString;
   private Long _expectedResultLastTimestamp;
+  private BigDecimal _expectedResultLastBigDecimal;
+  private byte[] _expectedResultLastBytes;
+  private String _expectedResultLastUuid;
   private Map<Integer, Boolean> _boolGroupValues;
   private Map<Integer, Integer> _intGroupValues;
   private Map<Integer, Long> _longGroupValues;
@@ -127,6 +139,9 @@ public class LastWithTimeQueriesTest extends BaseQueriesTest {
   private Map<Integer, Double> _doubleGroupValues;
   private Map<Integer, String> _stringGroupValues;
   private Map<Integer, Long> _timestampGroupValues;
+  private Map<Integer, BigDecimal> _bigDecimalGroupValues;
+  private Map<Integer, byte[]> _bytesGroupValues;
+  private Map<Integer, String> _uuidGroupValues;
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
 
@@ -158,6 +173,9 @@ public class LastWithTimeQueriesTest extends BaseQueriesTest {
     _doubleGroupValues = new HashMap<>();
     _stringGroupValues = new HashMap<>();
     _timestampGroupValues = new HashMap<>();
+    _bigDecimalGroupValues = new HashMap<>();
+    _bytesGroupValues = new HashMap<>();
+    _uuidGroupValues = new HashMap<>();
     for (int i = 0; i < NUM_RECORDS; i++) {
       boolean boolValue = RANDOM.nextBoolean();
       int intValue = RANDOM.nextInt(MAX_VALUE);
@@ -166,6 +184,10 @@ public class LastWithTimeQueriesTest extends BaseQueriesTest {
       double doubleValue = RANDOM.nextDouble();
       String strValue = String.valueOf(RANDOM.nextDouble());
       long timestampValue = 1_600_000_000_000L + RANDOM.nextInt(1_000_000_000);
+      BigDecimal bigDecimalValue = BigDecimal.valueOf(RANDOM.nextLong(), 3);
+      byte[] bytesValue = new byte[4];
+      RANDOM.nextBytes(bytesValue);
+      String uuidValue = new UUID(RANDOM.nextLong(), RANDOM.nextLong()).toString();
       GenericRow record = new GenericRow();
       record.putValue(BOOL_COLUMN, boolValue);
       record.putValue(BOOL_NO_DICT_COLUMN, boolValue);
@@ -181,6 +203,9 @@ public class LastWithTimeQueriesTest extends BaseQueriesTest {
       record.putValue(STRING_COLUMN, strValue);
       record.putValue(STRING_NO_DICT_COLUMN, strValue);
       record.putValue(TIMESTAMP_VALUE_COLUMN, timestampValue);
+      record.putValue(BIG_DECIMAL_COLUMN, bigDecimalValue);
+      record.putValue(BYTES_COLUMN, bytesValue);
+      record.putValue(UUID_COLUMN, uuidValue);
       record.putValue(TIME_COLUMN, (long) i);
       if (i == NUM_RECORDS - 1) {
         _expectedResultLastBoolean = boolValue;
@@ -190,6 +215,9 @@ public class LastWithTimeQueriesTest extends BaseQueriesTest {
         _expectedResultLastDouble = doubleValue;
         _expectedResultLastString = strValue;
         _expectedResultLastTimestamp = timestampValue;
+        _expectedResultLastBigDecimal = bigDecimalValue;
+        _expectedResultLastBytes = bytesValue;
+        _expectedResultLastUuid = uuidValue;
       }
       _boolGroupValues.put(intValue, boolValue);
       _intGroupValues.put(intValue, intValue);
@@ -198,6 +226,9 @@ public class LastWithTimeQueriesTest extends BaseQueriesTest {
       _doubleGroupValues.put(intValue, doubleValue);
       _stringGroupValues.put(intValue, strValue);
       _timestampGroupValues.put(intValue, timestampValue);
+      _bigDecimalGroupValues.put(intValue, bigDecimalValue);
+      _bytesGroupValues.put(intValue, bytesValue);
+      _uuidGroupValues.put(intValue, uuidValue);
       records.add(record);
     }
 
@@ -444,7 +475,10 @@ public class LastWithTimeQueriesTest extends BaseQueriesTest {
         + "LASTWITHTIME(doubleColumn, timestampColumn), "
         + "LASTWITHTIME(stringColumn, timestampColumn), "
         + "LASTWITHTIME(timestampValueColumn, timestampColumn), "
-        + "LASTWITHTIME(timestampValueColumn, timestampColumn, 'TIMESTAMP') "
+        + "LASTWITHTIME(timestampValueColumn, timestampColumn, 'TIMESTAMP'), "
+        + "LASTWITHTIME(bigDecimalColumn, timestampColumn), "
+        + "LASTWITHTIME(bytesColumn, timestampColumn), "
+        + "LASTWITHTIME(uuidColumn, timestampColumn) "
         + "FROM testTable";
     BrokerResponseNative brokerResponse = getBrokerResponseForOptimizedQuery(query, SCHEMA);
     // The result columns are named after the explicit form the query is rewritten to.
@@ -456,7 +490,10 @@ public class LastWithTimeQueriesTest extends BaseQueriesTest {
         "lastwithtime(doubleColumn,timestampColumn,'DOUBLE')",
         "lastwithtime(stringColumn,timestampColumn,'STRING')",
         "lastwithtime(timestampValueColumn,timestampColumn,'TIMESTAMP')",
-        "lastwithtime(timestampValueColumn,timestampColumn,'TIMESTAMP')"
+        "lastwithtime(timestampValueColumn,timestampColumn,'TIMESTAMP')",
+        "lastwithtime(bigDecimalColumn,timestampColumn,'BIG_DECIMAL')",
+        "lastwithtime(bytesColumn,timestampColumn,'BYTES')",
+        "lastwithtime(uuidColumn,timestampColumn,'UUID')"
     }, new ColumnDataType[]{
         ColumnDataType.BOOLEAN,
         ColumnDataType.INT,
@@ -465,7 +502,10 @@ public class LastWithTimeQueriesTest extends BaseQueriesTest {
         ColumnDataType.DOUBLE,
         ColumnDataType.STRING,
         ColumnDataType.TIMESTAMP,
-        ColumnDataType.TIMESTAMP
+        ColumnDataType.TIMESTAMP,
+        ColumnDataType.BIG_DECIMAL,
+        ColumnDataType.BYTES,
+        ColumnDataType.UUID
     });
     String expectedTimestamp = new Timestamp(_expectedResultLastTimestamp).toString();
     Object[] expectedResults = new Object[]{
@@ -476,10 +516,24 @@ public class LastWithTimeQueriesTest extends BaseQueriesTest {
         _expectedResultLastDouble,
         _expectedResultLastString,
         expectedTimestamp,
-        expectedTimestamp
+        expectedTimestamp,
+        // Ingestion strips trailing zeros from BIG_DECIMAL values.
+        _expectedResultLastBigDecimal.stripTrailingZeros().toPlainString(),
+        BytesUtils.toHexString(_expectedResultLastBytes),
+        _expectedResultLastUuid
     };
-    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 4 * NUM_RECORDS, 0L, 4 * 8 * NUM_RECORDS,
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 4 * NUM_RECORDS, 0L, 4 * 11 * NUM_RECORDS,
         4 * NUM_RECORDS, new ResultTable(expectedDataSchema, List.<Object[]>of(expectedResults)));
+  }
+
+  @Test
+  public void testAggregationOnlyWithInferredDataTypeAndNoMatchingRows() {
+    // Without matching rows, the results are the default values; for UUID it is the nil UUID.
+    String query = "SELECT LASTWITHTIME(bigDecimalColumn, timestampColumn), "
+        + "LASTWITHTIME(bytesColumn, timestampColumn), LASTWITHTIME(uuidColumn, timestampColumn) "
+        + "FROM testTable WHERE timestampColumn < 0";
+    ResultTable resultTable = getBrokerResponseForOptimizedQuery(query, SCHEMA).getResultTable();
+    assertEquals(resultTable.getRows().get(0), new Object[]{"0", "", "00000000-0000-0000-0000-000000000000"});
   }
 
   @Test
@@ -488,13 +542,16 @@ public class LastWithTimeQueriesTest extends BaseQueriesTest {
         + "LASTWITHTIME(boolColumn, timestampColumn) AS v1, "
         + "LASTWITHTIME(longNoDictColumn, timestampColumn) AS v2, "
         + "LASTWITHTIME(stringColumn, timestampColumn) AS v3, "
-        + "LASTWITHTIME(timestampValueColumn, timestampColumn) AS v4 "
+        + "LASTWITHTIME(timestampValueColumn, timestampColumn) AS v4, "
+        + "LASTWITHTIME(bytesColumn, timestampColumn) AS v5, "
+        + "LASTWITHTIME(uuidColumn, timestampColumn) AS v6, "
+        + "LASTWITHTIME(bigDecimalColumn, timestampColumn) AS v7 "
         + "FROM testTable GROUP BY key ORDER BY LASTWITHTIME(longNoDictColumn, timestampColumn)";
     ResultTable resultTable = getBrokerResponseForOptimizedQuery(query, SCHEMA).getResultTable();
-    assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"key", "v1", "v2", "v3", "v4"},
-        new ColumnDataType[]{
+    assertEquals(resultTable.getDataSchema(),
+        new DataSchema(new String[]{"key", "v1", "v2", "v3", "v4", "v5", "v6", "v7"}, new ColumnDataType[]{
             ColumnDataType.INT, ColumnDataType.BOOLEAN, ColumnDataType.LONG, ColumnDataType.STRING,
-            ColumnDataType.TIMESTAMP
+            ColumnDataType.TIMESTAMP, ColumnDataType.BYTES, ColumnDataType.UUID, ColumnDataType.BIG_DECIMAL
         }));
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), 10);
@@ -505,6 +562,9 @@ public class LastWithTimeQueriesTest extends BaseQueriesTest {
       assertEquals(row[2], _longGroupValues.get(key));
       assertEquals(row[3], _stringGroupValues.get(key));
       assertEquals(row[4], new Timestamp(_timestampGroupValues.get(key)).toString());
+      assertEquals(row[5], BytesUtils.toHexString(_bytesGroupValues.get(key)));
+      assertEquals(row[6], _uuidGroupValues.get(key));
+      assertEquals(row[7], _bigDecimalGroupValues.get(key).stripTrailingZeros().toPlainString());
       // ORDER BY repeats the call, so it must be rewritten the same way as the SELECT list.
       assertTrue((Long) row[2] >= previous);
       previous = (Long) row[2];

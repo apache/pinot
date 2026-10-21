@@ -432,7 +432,8 @@ public enum AggregationFunctionType {
   private static class ValueWithTimeReturnTypeInference implements SqlReturnTypeInference {
     private static final Set<SqlTypeName> INFERRED_DATA_TYPES = Set.of(SqlTypeName.TINYINT, SqlTypeName.SMALLINT,
         SqlTypeName.INTEGER, SqlTypeName.BIGINT, SqlTypeName.REAL, SqlTypeName.FLOAT, SqlTypeName.DOUBLE,
-        SqlTypeName.CHAR, SqlTypeName.VARCHAR, SqlTypeName.BOOLEAN, SqlTypeName.TIMESTAMP);
+        SqlTypeName.DECIMAL, SqlTypeName.CHAR, SqlTypeName.VARCHAR, SqlTypeName.BOOLEAN, SqlTypeName.TIMESTAMP,
+        SqlTypeName.BINARY, SqlTypeName.VARBINARY, SqlTypeName.UUID);
 
     @Override
     public RelDataType inferReturnType(SqlOperatorBinding opBinding) {

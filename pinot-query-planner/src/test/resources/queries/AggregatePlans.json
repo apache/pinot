@@ -185,9 +185,22 @@
         ]
       },
       {
-        "description": "FIRST_WITH_TIME without a data type rejects an unsupported data argument",
-        "sql": "EXPLAIN PLAN FOR SELECT FIRST_WITH_TIME(a.col4, a.ts) FROM a",
-        "expectedException": ".*Unsupported data type for .*\\(dataColumn, timeColumn\\): DECIMAL.*"
+        "description": "FIRST_WITH_TIME and LAST_WITH_TIME without a data type infer BIG_DECIMAL and BYTES",
+        "sql": "EXPLAIN PLAN FOR SELECT FIRST_WITH_TIME(a.col4, a.ts), LAST_WITH_TIME(hexToBytes(a.col1), a.ts) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{}], agg#0=[FIRSTWITHTIME($0, $0, _UTF-8'BIG_DECIMAL')], agg#1=[LASTWITHTIME($1, $1, _UTF-8'BYTES')], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash])",
+          "\n    PinotLogicalAggregate(group=[{}], agg#0=[FIRSTWITHTIME($0, $1, _UTF-8'BIG_DECIMAL')], agg#1=[LASTWITHTIME($2, $1, _UTF-8'BYTES')], aggType=[LEAF])",
+          "\n      LogicalProject($f0=[$3], $f1=[$7], $f2=[HEXTOBYTES($0)], $f3=[_UTF-8'BIG_DECIMAL'], $f4=[_UTF-8'BYTES'])",
+          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "FIRST_WITH_TIME without a data type rejects a multi-value data argument",
+        "sql": "EXPLAIN PLAN FOR SELECT FIRST_WITH_TIME(e.mcol1, e.ts) FROM e",
+        "expectedException": ".*Unsupported data type for .*\\(dataColumn, timeColumn\\): .*ARRAY.*"
       },
       {
         "description": "MIN on STRING column rewritten to MINSTRING",
