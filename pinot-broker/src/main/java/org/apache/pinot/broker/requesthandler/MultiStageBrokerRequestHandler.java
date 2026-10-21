@@ -1276,13 +1276,27 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   /// Check if a server that was previously detected as unhealthy is now healthy.
   public FailureDetector.ServerState retryUnhealthyServer(String instanceId) {
     LOGGER.info("Checking gRPC connection to unhealthy server: {}", instanceId);
-    ServerInstance serverInstance = _routingManager.getEnabledServerInstanceMap().get(instanceId);
-    if (serverInstance == null) {
-      LOGGER.info("Failed to find enabled server: {} in routing manager, skipping the retry", instanceId);
-      return FailureDetector.ServerState.UNHEALTHY;
+    ServerInstance serverInstance = getEnabledServerInstance(instanceId);
+    if (serverInstance != null) {
+      return _queryDispatcher.checkConnectivityToInstance(serverInstance);
     }
+    // Queries are also dispatched to workers that no routing manager knows, for example workers that a custom worker
+    // manager picks. Check them at the address that a query was last dispatched to.
+    return _queryDispatcher.checkConnectivityToInstance(instanceId);
+  }
 
-    return _queryDispatcher.checkConnectivityToInstance(serverInstance);
+  /// Returns the enabled server with the given instance id: a server of this cluster, or with multi-cluster routing, a
+  /// server of a remote cluster.
+  @Nullable
+  private ServerInstance getEnabledServerInstance(String instanceId) {
+    ServerInstance serverInstance = _routingManager.getEnabledServerInstanceMap().get(instanceId);
+    if (serverInstance == null && _multiClusterRoutingContext != null) {
+      RoutingManager multiClusterRoutingManager = _multiClusterRoutingContext.getMultiClusterRoutingManager();
+      if (multiClusterRoutingManager != null) {
+        serverInstance = multiClusterRoutingManager.getEnabledServerInstanceMap().get(instanceId);
+      }
+    }
+    return serverInstance;
   }
 
   public static boolean isYellowError(QueryException e) {

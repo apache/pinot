@@ -184,6 +184,65 @@ public class QueryDispatcherTest extends QueryTestSet {
     }
   }
 
+  /// The failure detector checks an instance that the routing manager does not know, for example a server of a remote
+  /// cluster, at the address where a query was last dispatched to it.
+  @Test
+  public void testCheckConnectivityToInstanceAtLastDispatchAddress() {
+    QueryDispatcher dispatcher =
+        new QueryDispatcher(Mockito.mock(MailboxService.class), Mockito.mock(FailureDetector.class), null, false,
+            Duration.ofSeconds(1));
+    String instanceId = "Server_remote_8098";
+    // Nothing listens there until the server starts
+    int port = QueryTestUtils.getAvailablePort();
+    QueryServerInstance instance = new QueryServerInstance(instanceId, "localhost", port, 8101);
+    QueryServer queryServer = new QueryServer(port, Mockito.mock(QueryRunner.class));
+    try {
+      Assert.assertEquals(dispatcher.checkConnectivityToInstance(instanceId), FailureDetector.ServerState.UNKNOWN);
+
+      // What a dispatch does
+      dispatcher.recordDispatchAddress(instance);
+      ManagedChannel channel = dispatcher.getOrCreateDispatchClient(instance).getChannel();
+      Assert.assertEquals(dispatcher.checkConnectivityToInstance(instanceId), FailureDetector.ServerState.UNHEALTHY);
+      TestUtils.waitForCondition(aVoid -> channel.getState(false) == ConnectivityState.TRANSIENT_FAILURE, 10_000L,
+          "Connecting did not fail");
+      Assert.assertEquals(dispatcher.checkConnectivityToInstance(instanceId), FailureDetector.ServerState.UNHEALTHY);
+
+      queryServer.start();
+      TestUtils.waitForCondition(
+          aVoid -> dispatcher.checkConnectivityToInstance(instanceId) == FailureDetector.ServerState.HEALTHY, 10_000L,
+          "The instance did not become healthy after its server started");
+
+      // A request other than a dispatch, for example a cancel, does not change the address to check
+      QueryServerInstance movedInstance =
+          new QueryServerInstance(instanceId, "localhost", QueryTestUtils.getAvailablePort(), 8101);
+      dispatcher.getOrCreateDispatchClient(movedInstance);
+      Assert.assertEquals(dispatcher.checkConnectivityToInstance(instanceId), FailureDetector.ServerState.HEALTHY);
+
+      // A dispatch does: the instance moved to another port, where nothing listens
+      dispatcher.recordDispatchAddress(movedInstance);
+      Assert.assertEquals(dispatcher.checkConnectivityToInstance(instanceId), FailureDetector.ServerState.UNHEALTHY);
+    } finally {
+      dispatcher.shutdown();
+      queryServer.shutdown();
+    }
+  }
+
+  /// Each dispatch records the address of the instances it reaches, for the failure detector.
+  @Test
+  public void testDispatchRecordsInstanceAddress()
+      throws Exception {
+    Set<QueryServerInstance> servers = new HashSet<>();
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery("SELECT * FROM a");
+    try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
+      _queryDispatcher.submit(REQUEST_ID_GEN.getAndIncrement(), dispatchableSubPlan, 10_000L, servers, Map.of());
+    }
+    Assert.assertFalse(servers.isEmpty());
+    for (QueryServerInstance server : servers) {
+      Assert.assertEquals(_queryDispatcher.checkConnectivityToInstance(server.getInstanceId()),
+          FailureDetector.ServerState.HEALTHY);
+    }
+  }
+
   private static ServerInstance serverInstance(int queryServerPort) {
     InstanceConfig instanceConfig = new InstanceConfig("Server_localhost_8098");
     instanceConfig.setHostName("localhost");
