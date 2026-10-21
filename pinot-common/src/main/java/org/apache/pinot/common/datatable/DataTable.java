@@ -160,11 +160,16 @@ public interface DataTable {
     // inputs. How a downstream consumer reacts (skip, retry, accept with annotation) is the
     // consumer's policy.
     INCOMPLETE_MERGE(43, "incompleteMerge", MetadataValueType.STRING),
-    LITE_MODE_LEAF_STAGE_LIMIT_REACHED(44, "liteModeLeafStageLimitReached", MetadataValueType.STRING);
+    LITE_MODE_LEAF_STAGE_LIMIT_REACHED(44, "liteModeLeafStageLimitReached", MetadataValueType.STRING),
+    // Ids 45 to 48 belong to the remote access stats on master, which this release line does not have. The next key
+    // keeps its master id, so that both lines read it the same way.
+    // Set when an aggregation function that can answer exactly returned an approximate final result on the server,
+    // for example a SMART function that switched to a sketch.
+    APPROXIMATED_RESULT(49, "approximatedResult", MetadataValueType.STRING);
 
     // We keep this constant to track the max id added so far for backward compatibility.
     // Increase it when adding new keys, but NEVER DECREASE IT!!!
-    private static final int MAX_ID = LITE_MODE_LEAF_STAGE_LIMIT_REACHED.getId();
+    private static final int MAX_ID = APPROXIMATED_RESULT.getId();
 
     private static final MetadataKey[] ID_TO_ENUM_KEY_MAP = new MetadataKey[MAX_ID + 1];
     private static final Map<String, MetadataKey> NAME_TO_ENUM_KEY_MAP = new HashMap<>();

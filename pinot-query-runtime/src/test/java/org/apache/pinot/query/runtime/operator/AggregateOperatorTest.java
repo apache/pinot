@@ -26,6 +26,7 @@ import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.datatable.StatMap;
+import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
@@ -44,6 +45,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.mockito.Mock;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.BOOLEAN;
@@ -349,6 +351,41 @@ public class AggregateOperatorTest {
     OpChainExecutionContext context =
         OperatorTestUtil.getContext(Map.of(QueryOptionKey.MSE_MIN_GROUP_TRIM_SIZE, "100"));
     assertEquals(getAggregateOperator(context, nodeHint, 5, List.of(new RelFieldCollation(1))).getGroupTrimSize(), 30);
+  }
+
+  @DataProvider
+  public Object[][] approximatedResultCases() {
+    return new Object[][]{{true, 1, true}, {true, 10, false}, {false, 1, true}, {false, 10, false}};
+  }
+
+  /// A SMART function that switches to a sketch is reported in the operator stats, which the broker reads.
+  @Test(dataProvider = "approximatedResultCases")
+  public void testApproximatedResultStat(boolean groupBy, int threshold, boolean expected) {
+    OpChainExecutionContext context = OperatorTestUtil.getContext(Map.of());
+    List<RexExpression.FunctionCall> aggCalls = List.of(new RexExpression.FunctionCall(INT, "DISTINCTCOUNTSMARTHLL",
+        List.of(new RexExpression.InputRef(1), new RexExpression.Literal(STRING, "threshold=" + threshold))));
+    DataSchema inputSchema = new DataSchema(new String[]{"group", "value"}, new ColumnDataType[]{INT, INT});
+    BlockListMultiStageOperator.Builder input = new BlockListMultiStageOperator.Builder(context, inputSchema);
+    for (int value = 0; value < 3; value++) {
+      input.addRow(1, value);
+    }
+    List<Integer> groupKeys = groupBy ? List.of(0) : List.of();
+    DataSchema resultSchema = groupBy
+        ? new DataSchema(new String[]{"group", "distinctCount"}, new ColumnDataType[]{INT, INT})
+        : new DataSchema(new String[]{"distinctCount"}, new ColumnDataType[]{INT});
+    AggregateOperator operator = new AggregateOperator(context, input.buildWithEos(),
+        new AggregateNode(-1, resultSchema, PlanNode.NodeHint.EMPTY, List.of(), aggCalls, List.of(-1), groupKeys,
+            AggType.DIRECT, false, null, 0));
+
+    assertEquals(((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows().size(), 1);
+    assertTrue(operator.nextBlock().isSuccess());
+    StatMap<AggregateOperator.StatKey> statMap =
+        OperatorTestUtil.getStatMap(AggregateOperator.StatKey.class, operator.calculateStats());
+    assertEquals(statMap.getBoolean(AggregateOperator.StatKey.APPROXIMATED_RESULT), expected);
+
+    BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
+    MultiStageOperator.Type.AGGREGATE.mergeInto(brokerResponse, statMap);
+    assertEquals(brokerResponse.isApproximatedResult(), expected);
   }
 
   private AggregateOperator getAggregateOperator(OpChainExecutionContext context, PlanNode.NodeHint nodeHint, int limit,

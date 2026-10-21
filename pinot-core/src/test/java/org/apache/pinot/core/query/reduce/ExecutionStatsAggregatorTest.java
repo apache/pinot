@@ -29,6 +29,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
@@ -164,5 +165,21 @@ public class ExecutionStatsAggregatorTest {
     assertTrue(flags[0]);
     assertFalse(flags[1]);
     assertFalse(flags[2]);
+  }
+
+  @Test
+  public void testApproximatedResultIsOrReducedAndRoundTrips() {
+    DataTable table = emptyServerTable();
+    table.getMetadata().put(MetadataKey.APPROXIMATED_RESULT.getName(), "true");
+    ExecutionStatsAggregator aggregator = new ExecutionStatsAggregator(false);
+    aggregator.aggregate(SERVER, emptyServerTable());
+    aggregator.aggregate(SERVER, table);
+    BrokerResponseNative response = new BrokerResponseNative();
+    aggregator.setStats("testTable", response, mock(BrokerMetrics.class));
+    assertTrue(response.isApproximatedResult());
+
+    DataTable merged = emptyServerTable();
+    aggregator.setStatsOnMergedDataTable(merged);
+    assertEquals(merged.getMetadata().get(MetadataKey.APPROXIMATED_RESULT.getName()), "true");
   }
 }

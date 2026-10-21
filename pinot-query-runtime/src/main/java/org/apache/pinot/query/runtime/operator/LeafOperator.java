@@ -394,6 +394,9 @@ public class LeafOperator extends MultiStageOperator implements ExplainableOpera
         case LITE_MODE_LEAF_STAGE_LIMIT_REACHED:
           _statMap.merge(StatKey.LITE_MODE_LEAF_STAGE_LIMIT_REACHED, Boolean.parseBoolean(entry.getValue()));
           break;
+        case APPROXIMATED_RESULT:
+          _statMap.merge(StatKey.APPROXIMATED_RESULT, Boolean.parseBoolean(entry.getValue()));
+          break;
         case TIME_USED_MS:
           _statMap.merge(StatKey.SSE_EXECUTION_TIME_MS, Long.parseLong(entry.getValue()));
           break;
@@ -798,7 +801,16 @@ public class LeafOperator extends MultiStageOperator implements ExplainableOpera
     /// given something to read, which is the common case. A worker with no segment was given no work at all, which
     /// is different from a worker that read segments and produced nothing: compare this against the `parallelism`
     /// the stats tree renders on this node, and against what the operators above it report.
-    NON_ACTIVE_WORKERS(StatMap.Type.INT, null);
+    NON_ACTIVE_WORKERS(StatMap.Type.INT, null),
+    /// The remote access stats of master, which this release line does not report. They hold the same ordinals as
+    /// on master, so that the keys after them match it on the wire: StatMap identifies keys by their ordinal.
+    NUM_REMOTE_ACCESSES(StatMap.Type.LONG, null),
+    REMOTE_ACCESS_BYTES(StatMap.Type.LONG, null),
+    NUM_DIRECT_REMOTE_ACCESSES(StatMap.Type.LONG, null),
+    DIRECT_REMOTE_ACCESS_BYTES(StatMap.Type.LONG, null),
+    /// Whether a function that can answer exactly returned an approximate final result, when the leaf returns final
+    /// results.
+    APPROXIMATED_RESULT(StatMap.Type.BOOLEAN);
     // IMPORTANT: When adding new StatKeys, make sure to either create the same key in BrokerResponseNativeV2.StatKey or
     //  call the constructor that accepts a String as last argument and set it to null.
     //  Otherwise the constructor will fail with an IllegalArgumentException which will not be caught and will

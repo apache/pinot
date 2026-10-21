@@ -150,6 +150,20 @@ public class AggregationFunctionUtils {
     return aggregationFunction.mergeFinalResult(finalResult1, finalResult2);
   }
 
+  /// Returns whether any of the functions has returned an approximate final result, see
+  /// [AggregationFunction#hasApproximatedResult()].
+  public static boolean hasApproximatedResult(@Nullable AggregationFunction[] aggregationFunctions) {
+    if (aggregationFunctions == null) {
+      return false;
+    }
+    for (AggregationFunction aggregationFunction : aggregationFunctions) {
+      if (aggregationFunction.hasApproximatedResult()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   /// Creates a map from expression required by the [AggregationFunction] to [BlockValSet] fetched from the
   /// [ValueBlock].
   public static Map<ExpressionContext, BlockValSet> getBlockValSetMap(AggregationFunction aggregationFunction,

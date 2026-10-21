@@ -311,16 +311,13 @@ public interface BrokerResponse {
   /// @return true if RLS filters were applied, false otherwise
   boolean getRLSFiltersApplied();
 
-  /// Set whether the broker rewrote an exact aggregation into its approximate counterpart, for example
-  /// `DISTINCT_COUNT` into `DISTINCT_COUNT_SMART_HLL`. The result is then approximate, not exact.
-  /// The default is a no-op so that implementations which do not track this need no change.
-  /// @param approximateFunctionApplied true if at least one function was rewritten
-  default void setApproximateFunctionApplied(boolean approximateFunctionApplied) {
-  }
-
-  /// Get whether the broker rewrote an exact aggregation into its approximate counterpart.
-  /// @return true if at least one function was rewritten, false otherwise
-  default boolean isApproximateFunctionApplied() {
+  /// Get whether the result is approximated: a function that can return an exact result returned an approximate one.
+  /// For example, a SMART function such as `DISTINCT_COUNT_SMART_HLL` crossed its conversion threshold and switched to
+  /// a sketch, including the SMART functions that the broker rewrites exact `DISTINCT_COUNT` and `PERCENTILE` into.
+  /// Functions that are always approximate, such as `DISTINCT_COUNT_HLL`, do not set it.
+  /// The default returns `false` so that implementations which do not track this need no change.
+  /// @return true if at least one function returned an approximated result, false otherwise
+  default boolean isApproximatedResult() {
     return false;
   }
 

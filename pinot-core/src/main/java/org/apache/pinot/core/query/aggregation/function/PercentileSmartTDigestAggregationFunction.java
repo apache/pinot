@@ -58,6 +58,8 @@ public class PercentileSmartTDigestAggregationFunction extends BaseSingleInputAg
   private final double _percentile;
   private final int _threshold;
   private final int _compression;
+  /// Set by [#extractFinalResult] when it reads a digest, see [AggregationFunction#hasApproximatedResult()].
+  private volatile boolean _approximatedResult;
 
   public PercentileSmartTDigestAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
     super(arguments.get(0), nullHandlingEnabled);
@@ -88,6 +90,11 @@ public class PercentileSmartTDigestAggregationFunction extends BaseSingleInputAg
 
   public int getCompression() {
     return _compression;
+  }
+
+  @Override
+  public boolean hasApproximatedResult() {
+    return _approximatedResult;
   }
 
   @Override
@@ -367,6 +374,10 @@ public class PercentileSmartTDigestAggregationFunction extends BaseSingleInputAg
       // which one a query lands in depends only on whether the accumulator crossed the conversion threshold.
       if (_nullHandlingEnabled && tDigest.size() == 0L) {
         return null;
+      }
+      // Read first, so that the threads that extract many groups do not contend on the field
+      if (!_approximatedResult) {
+        _approximatedResult = true;
       }
       return tDigest.quantile(_percentile / 100.0);
     } else {

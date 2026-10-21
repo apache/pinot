@@ -263,6 +263,18 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
     throw new UnsupportedOperationException("Cannot merge final results for function: " + getType());
   }
 
+  /// Returns whether [#extractFinalResult] has returned an approximate result for a function that can also answer
+  /// exactly. The SMART functions start exact and switch a group to a sketch once it crosses their conversion
+  /// threshold. A merge with a sketch always returns a sketch, so the extraction sees the switch, and records it here.
+  /// Read it after extracting, to report the result as approximate.
+  ///
+  /// A function instance belongs to one query, and so does the flag. Group trimming also extracts final results, so a
+  /// group that is trimmed away can still set it. Functions that are always exact or always approximate keep the
+  /// default.
+  default boolean hasApproximatedResult() {
+    return false;
+  }
+
   /// Returns whether a star-tree index with the specified properties can be used for this aggregation function.
   default boolean canUseStarTree(Map<String, Object> functionParameters) {
     // Implementations can override this method to perform additional checks on the function parameters

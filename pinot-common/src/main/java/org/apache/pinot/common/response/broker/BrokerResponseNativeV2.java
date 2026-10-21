@@ -54,7 +54,7 @@ import org.apache.pinot.common.response.ProcessingException;
     "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tablesQueried",
     "offlineThreadMemAllocatedBytes", "realtimeThreadMemAllocatedBytes", "offlineResponseSerMemAllocatedBytes",
     "realtimeResponseSerMemAllocatedBytes", "offlineTotalMemAllocatedBytes", "realtimeTotalMemAllocatedBytes",
-    "pools", "rlsFiltersApplied", "approximateFunctionApplied", "groupsTrimmed",
+    "pools", "rlsFiltersApplied", "approximatedResult", "groupsTrimmed",
     "mseLiteLeafStageLimitReached", "mseLiteLeafStageEffectiveLimit", "mseLiteFanOutAdjustedLimitApplied",
     "responseMetadata"
 })
@@ -92,7 +92,6 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
 
   private Set<Integer> _pools = Set.of();
   private boolean _rlsFiltersApplied = false;
-  private boolean _approximateFunctionApplied = false;
   @Nullable
   private Integer _mseLiteLeafStageEffectiveLimit;
   @Nullable
@@ -182,6 +181,17 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
 
   public void mergeMseLiteLeafStageLimitReached(boolean mseLiteLeafStageLimitReached) {
     _brokerStats.merge(StatKey.LITE_MODE_LEAF_STAGE_LIMIT_REACHED, mseLiteLeafStageLimitReached);
+  }
+
+  /// Merged from the stats that the operators of every stage report.
+  @JsonProperty("approximatedResult")
+  @Override
+  public boolean isApproximatedResult() {
+    return _brokerStats.getBoolean(StatKey.APPROXIMATED_RESULT);
+  }
+
+  public void mergeApproximatedResult(boolean approximatedResult) {
+    _brokerStats.merge(StatKey.APPROXIMATED_RESULT, approximatedResult);
   }
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -522,18 +532,6 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
     return _rlsFiltersApplied;
   }
 
-  @JsonProperty("approximateFunctionApplied")
-  @Override
-  public void setApproximateFunctionApplied(boolean approximateFunctionApplied) {
-    _approximateFunctionApplied = approximateFunctionApplied;
-  }
-
-  @JsonProperty("approximateFunctionApplied")
-  @Override
-  public boolean isApproximateFunctionApplied() {
-    return _approximateFunctionApplied;
-  }
-
   public void addBrokerStats(StatMap<StatKey> brokerStats) {
     _brokerStats.merge(brokerStats);
   }
@@ -571,7 +569,8 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
       }
     },
     EARLY_TERMINATION_REASONS(StatMap.Type.STRING_SET),
-    LITE_MODE_LEAF_STAGE_LIMIT_REACHED(StatMap.Type.BOOLEAN);
+    LITE_MODE_LEAF_STAGE_LIMIT_REACHED(StatMap.Type.BOOLEAN),
+    APPROXIMATED_RESULT(StatMap.Type.BOOLEAN);
 
     private final StatMap.Type _type;
 

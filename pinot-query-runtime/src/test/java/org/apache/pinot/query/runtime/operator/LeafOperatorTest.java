@@ -546,6 +546,30 @@ public class LeafOperatorTest {
     operator.close();
   }
 
+  /// A leaf that returns final results reports a function that returned an approximate result.
+  @Test
+  public void shouldPropagateApproximatedResult() {
+    DataSchema schema = new DataSchema(new String[]{"intCol"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
+    InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
+    metadataBlock.getResponseMetadata().put(DataTable.MetadataKey.APPROXIMATED_RESULT.getName(), "true");
+    QueryExecutor queryExecutor = mockQueryExecutor(List.of(), metadataBlock);
+    LeafOperator operator =
+        new LeafOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema, queryExecutor,
+            _executorService);
+    _operatorRef.set(operator);
+
+    assertTrue(operator.nextBlock().isEos(), "Expected EOS after reading the metadata block");
+    StatMap<LeafOperator.StatKey> leafStats = operator.copyStatMaps();
+    assertTrue(leafStats.getBoolean(LeafOperator.StatKey.APPROXIMATED_RESULT));
+
+    BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
+    MultiStageOperator.Type.LEAF.mergeInto(brokerResponse, leafStats);
+    assertTrue(brokerResponse.isApproximatedResult());
+    assertTrue(JsonUtils.objectToJsonNode(brokerResponse).path("approximatedResult").asBoolean());
+    operator.close();
+  }
+
   @Test
   public void shouldSkipNoneEarlyTerminationReason() {
     assertSkippedEarlyTerminationReason(EarlyTerminationReason.NONE.name());

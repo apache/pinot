@@ -349,6 +349,7 @@ public class DistinctCountSmartHLLPlusAggregationFunction extends BaseDistinctCo
       return 0;
     }
     if (intermediateResult instanceof HyperLogLogPlus) {
+      markApproximatedResult();
       return (int) ((HyperLogLogPlus) intermediateResult).cardinality();
     } else {
       return ((Set) intermediateResult).size();

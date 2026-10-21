@@ -41,6 +41,7 @@ import org.apache.pinot.core.operator.docvalsets.FilteredRowBasedBlockValSet;
 import org.apache.pinot.core.operator.docvalsets.RowBasedBlockValSet;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.function.CountAggregationFunction;
 import org.apache.pinot.core.util.DataBlockExtractUtils;
 import org.apache.pinot.core.util.GroupByUtils;
@@ -240,7 +241,9 @@ public class AggregateOperator extends MultiStageOperator {
   private MseBlock produceAggregatedBlock() {
     if (!_isGroupBy) {
       assert _aggregationExecutor != null;
-      return new RowHeapDataBlock(_aggregationExecutor.getResult(), _resultSchema, _aggFunctions);
+      List<Object[]> rows = _aggregationExecutor.getResult();
+      recordApproximatedResult();
+      return new RowHeapDataBlock(rows, _resultSchema, _aggFunctions);
     } else {
       assert _groupByExecutor != null;
       List<Object[]> rows;
@@ -249,6 +252,7 @@ public class AggregateOperator extends MultiStageOperator {
       } else {
         rows = _groupByExecutor.getResult(_groupTrimSize);
       }
+      recordApproximatedResult();
 
       // Record stat before we check for limit so we can propagate to query response
       _statMap.merge(StatKey.NUM_GROUPS, _groupByExecutor.getNumGroups());
@@ -277,6 +281,14 @@ public class AggregateOperator extends MultiStageOperator {
         }
         return dataBlock;
       }
+    }
+  }
+
+  /// Records a function that returned an approximate final result while the executor extracted the results, see
+  /// [AggregationFunction#hasApproximatedResult()].
+  private void recordApproximatedResult() {
+    if (AggregationFunctionUtils.hasApproximatedResult(_aggFunctions)) {
+      _statMap.merge(StatKey.APPROXIMATED_RESULT, true);
     }
   }
 
@@ -502,7 +514,10 @@ public class AggregateOperator extends MultiStageOperator {
     /// Allocated memory in bytes for this operator or its children in the same stage.
     ALLOCATED_MEMORY_BYTES(StatMap.Type.LONG),
     /// Time spent on GC while this operator or its children in the same stage were running.
-    GC_TIME_MS(StatMap.Type.LONG);
+    GC_TIME_MS(StatMap.Type.LONG),
+    /// Whether a function that can answer exactly returned an approximate final result, for example a SMART function
+    /// that switched to a sketch.
+    APPROXIMATED_RESULT(StatMap.Type.BOOLEAN);
 
     private final StatMap.Type _type;
 

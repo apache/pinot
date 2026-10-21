@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -36,6 +37,19 @@ public class BrokerResponseNativeTest {
     Assert.assertEquals(actual.getNumDocsScanned(), expected.getNumDocsScanned());
     Assert.assertEquals(actual.getTimeUsedMs(), expected.getTimeUsedMs());
     Assert.assertEquals(actual.getResultTable(), expected.getResultTable());
+  }
+
+  /// The flag is serialized as `approximatedResult`, survives a round trip, and is carried into a cursor response.
+  @Test
+  public void testApproximatedResult()
+      throws IOException {
+    BrokerResponseNative response = new BrokerResponseNative();
+    Assert.assertFalse(JsonUtils.stringToJsonNode(response.toJsonString()).get("approximatedResult").asBoolean());
+
+    response.setApproximatedResult(true);
+    Assert.assertTrue(JsonUtils.stringToJsonNode(response.toJsonString()).get("approximatedResult").asBoolean());
+    Assert.assertTrue(BrokerResponseNative.fromJsonString(response.toJsonString()).isApproximatedResult());
+    Assert.assertTrue(new CursorResponseNative(response).isApproximatedResult());
   }
 
   @Test
