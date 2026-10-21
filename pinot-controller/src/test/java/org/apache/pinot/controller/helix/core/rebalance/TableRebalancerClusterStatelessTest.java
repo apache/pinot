@@ -48,6 +48,7 @@ import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.controller.validation.ResourceUtilizationInfo;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
+import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -680,6 +681,68 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
         stopAndDropFakeInstance(SERVER_INSTANCE_ID_PREFIX + (numServers + i));
       }
       executorService.shutdown();
+    }
+  }
+
+  /// Legacy OFFLINE table configs enable replica-group instance assignment only through the deprecated
+  /// `segmentsConfig.segmentAssignmentStrategy` key. Rebalancing such a table with `reassignInstances=true` (the
+  /// default of the REST endpoint, `pinot-admin RebalanceTable` and the UI) must keep its persisted instance
+  /// partitions instead of dropping them and reassigning every segment across the tenant with the default instance
+  /// partitions.
+  @Test
+  public void testRebalanceWithLegacySegmentAssignmentStrategy()
+      throws Exception {
+    int numServers = 6;
+    for (int i = 0; i < numServers; i++) {
+      addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + i, true);
+    }
+    TableRebalancer tableRebalancer = new TableRebalancer(_helixManager);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setNumReplicas(NUM_REPLICAS).setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(null, 2)).build();
+    tableConfig.getValidationConfig().setSegmentAssignmentStrategy(
+        CommonConstants.Segment.AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY);
+    assertNull(tableConfig.getInstanceAssignmentConfigMap());
+    assertNull(tableConfig.getSegmentAssignmentConfigMap());
+
+    // Instance partitions persisted by an older release: 3 replica-groups of 2 servers
+    // Math.abs("testTable_OFFLINE".hashCode()) % 6 = 2
+    // [i2, i3, i4, i5, i0, i1]
+    //  r0  r1  r2  r0  r1  r2
+    String instancePartitionsName = InstancePartitionsType.OFFLINE.getInstancePartitionsName(RAW_TABLE_NAME);
+    InstancePartitions existingInstancePartitions = new InstancePartitions(instancePartitionsName);
+    existingInstancePartitions.setInstances(0, 0,
+        List.of(SERVER_INSTANCE_ID_PREFIX + 2, SERVER_INSTANCE_ID_PREFIX + 5));
+    existingInstancePartitions.setInstances(0, 1,
+        List.of(SERVER_INSTANCE_ID_PREFIX + 3, SERVER_INSTANCE_ID_PREFIX + 0));
+    existingInstancePartitions.setInstances(0, 2,
+        List.of(SERVER_INSTANCE_ID_PREFIX + 4, SERVER_INSTANCE_ID_PREFIX + 1));
+    InstancePartitionsUtils.persistInstancePartitions(_propertyStore, existingInstancePartitions, null);
+
+    addDummySchema(RAW_TABLE_NAME);
+    _helixResourceManager.addTable(tableConfig);
+    int numSegments = 10;
+    for (int i = 0; i < numSegments; i++) {
+      _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
+          SegmentMetadataMockUtils.mockSegmentMetadata(RAW_TABLE_NAME, SEGMENT_NAME_PREFIX + i), null);
+    }
+    Map<String, Map<String, String>> oldSegmentAssignment =
+        _helixResourceManager.getTableIdealState(OFFLINE_TABLE_NAME).getRecord().getMapFields();
+
+    // Rebalance with instance reassignment must keep the persisted replica-group instance partitions and move nothing
+    RebalanceConfig rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setReassignInstances(true);
+    RebalanceResult rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.NO_OP);
+    assertEquals(InstancePartitionsUtils.fetchInstancePartitions(_propertyStore, instancePartitionsName),
+        existingInstancePartitions);
+    InstancePartitions instancePartitions = rebalanceResult.getInstanceAssignment().get(InstancePartitionsType.OFFLINE);
+    assertEquals(instancePartitions, existingInstancePartitions);
+    assertEquals(instancePartitions.getNumReplicaGroups(), NUM_REPLICAS);
+    assertEquals(rebalanceResult.getSegmentAssignment(), oldSegmentAssignment);
+
+    _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
+    for (int i = 0; i < numServers; i++) {
+      stopAndDropFakeInstance(SERVER_INSTANCE_ID_PREFIX + i);
     }
   }
 

@@ -414,6 +414,17 @@ public final class TableConfigUtils {
           "Dimension table must be of OFFLINE table type.");
       Preconditions.checkState(CollectionUtils.isNotEmpty(schema.getPrimaryKeyColumns()),
           "Dimension table must have primary key[s]");
+
+      // Also check the deprecated segmentsConfig.segmentAssignmentStrategy key; segmentAssignmentConfigMap is checked
+      // in validateSegmentAssignmentConfig()
+      String segmentAssignmentStrategy = validationConfig.getSegmentAssignmentStrategy();
+      if (segmentAssignmentStrategy != null
+          && !segmentAssignmentStrategy.equalsIgnoreCase(AssignmentStrategy.DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY)) {
+        throw new IllegalStateException(
+            String.format("Dimension table: %s can only use '%s' segment assignment strategy, found: %s",
+                tableConfig.getTableName(), AssignmentStrategy.DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY,
+                segmentAssignmentStrategy));
+      }
     }
 
     String peerSegmentDownloadScheme = validationConfig.getPeerSegmentDownloadScheme();

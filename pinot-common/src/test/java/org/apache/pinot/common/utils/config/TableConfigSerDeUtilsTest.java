@@ -165,6 +165,28 @@ public class TableConfigSerDeUtilsTest {
       checkSegmentAssignmentStrategyConfig(tableConfigToCompare);
     }
     {
+      // With the deprecated segmentsConfig.segmentAssignmentStrategy key only (legacy table configs)
+      TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+      String legacyStrategy = CommonConstants.Segment.AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY;
+      tableConfig.getValidationConfig().setSegmentAssignmentStrategy(legacyStrategy);
+      assertNull(tableConfig.getSegmentAssignmentConfigMap());
+
+      // Serialize then de-serialize
+      TableConfig tableConfigToCompare = JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class);
+      assertEquals(tableConfigToCompare, tableConfig);
+      checkLegacySegmentAssignmentStrategy(tableConfigToCompare, legacyStrategy);
+
+      tableConfigToCompare = TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfig));
+      assertEquals(tableConfigToCompare, tableConfig);
+      checkLegacySegmentAssignmentStrategy(tableConfigToCompare, legacyStrategy);
+
+      // De-serialize from JSON written by an older release
+      String legacyJson = "{\"tableName\":\"testTable\",\"tableType\":\"OFFLINE\",\"segmentsConfig\":{"
+          + "\"segmentAssignmentStrategy\":\"ReplicaGroup\",\"replication\":\"3\"},"
+          + "\"tenants\":{},\"tableIndexConfig\":{},\"metadata\":{}}";
+      checkLegacySegmentAssignmentStrategy(JsonUtils.stringToObject(legacyJson, TableConfig.class), "ReplicaGroup");
+    }
+    {
       // With completion config
       CompletionConfig completionConfig = new CompletionConfig("DEFAULT");
       TableConfig tableConfig = tableConfigBuilder.setCompletionConfig(completionConfig).build();
@@ -439,6 +461,11 @@ public class TableConfigSerDeUtilsTest {
     assertNotNull(tenantConfig.getTagOverrideConfig());
     assertEquals(tenantConfig.getTagOverrideConfig().getRealtimeConsuming(), "aRTConsumingTag_REALTIME");
     assertNull(tenantConfig.getTagOverrideConfig().getRealtimeCompleted());
+  }
+
+  private void checkLegacySegmentAssignmentStrategy(TableConfig tableConfig, String expectedStrategy) {
+    assertNull(tableConfig.getSegmentAssignmentConfigMap());
+    assertEquals(tableConfig.getValidationConfig().getSegmentAssignmentStrategy(), expectedStrategy);
   }
 
   private void checkSegmentAssignmentStrategyConfig(TableConfig tableConfig) {

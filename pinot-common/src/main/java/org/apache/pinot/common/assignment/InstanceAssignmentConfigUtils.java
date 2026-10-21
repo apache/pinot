@@ -66,7 +66,8 @@ public class InstanceAssignmentConfigUtils {
     Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = tableConfig.getInstanceAssignmentConfigMap();
     switch (instancePartitionsType) {
       // Allow OFFLINE instance assignment if the offline table has it configured or (for backward-compatibility) is
-      // using replica-group segment assignment
+      // using replica-group segment assignment, either via segmentAssignmentConfigMap or via the deprecated
+      // segmentsConfig.segmentAssignmentStrategy key
       case OFFLINE:
         Map<String, SegmentAssignmentConfig> segmentAssignmentConfigMap = tableConfig.getSegmentAssignmentConfigMap();
         boolean isSetReplicaGroupAssignmentStrategy = false;
@@ -78,7 +79,9 @@ public class InstanceAssignmentConfigUtils {
         }
         return tableType == TableType.OFFLINE && ((instanceAssignmentConfigMap != null
             && instanceAssignmentConfigMap.get(InstancePartitionsType.OFFLINE.toString()) != null)
-            || isSetReplicaGroupAssignmentStrategy);
+            || isSetReplicaGroupAssignmentStrategy
+            || AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY.equalsIgnoreCase(
+                tableConfig.getValidationConfig().getSegmentAssignmentStrategy()));
       // Allow CONSUMING/COMPLETED instance assignment if the real-time table has it configured
       case CONSUMING:
       case COMPLETED:

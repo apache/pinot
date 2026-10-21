@@ -35,6 +35,7 @@ import org.apache.pinot.spi.config.table.assignment.InstanceConstraintConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.AssignmentStrategy;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -91,6 +92,41 @@ public class InstanceAssignmentConfigUtilsTest {
         .setInstancePartitionsMap(instancePartitionsTypeStringMap).build();
     Assert.assertTrue(InstanceAssignmentConfigUtils
         .allowInstanceAssignment(tableConfig, InstancePartitionsType.OFFLINE));
+  }
+
+  // Legacy OFFLINE table configs enable replica-group instance assignment only through the deprecated
+  // segmentsConfig.segmentAssignmentStrategy key, without instanceAssignmentConfigMap or segmentAssignmentConfigMap
+  @Test
+  public void testAllowInstanceAssignmentWithLegacySegmentAssignmentStrategy() {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    Assert.assertFalse(
+        InstanceAssignmentConfigUtils.allowInstanceAssignment(tableConfig, InstancePartitionsType.OFFLINE));
+
+    tableConfig.getValidationConfig()
+        .setSegmentAssignmentStrategy(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY);
+    Assert.assertTrue(
+        InstanceAssignmentConfigUtils.allowInstanceAssignment(tableConfig, InstancePartitionsType.OFFLINE));
+
+    // The legacy key is matched case-insensitively
+    tableConfig.getValidationConfig()
+        .setSegmentAssignmentStrategy(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY.toUpperCase());
+    Assert.assertTrue(
+        InstanceAssignmentConfigUtils.allowInstanceAssignment(tableConfig, InstancePartitionsType.OFFLINE));
+
+    // Other legacy strategies do not enable instance assignment
+    tableConfig.getValidationConfig()
+        .setSegmentAssignmentStrategy(AssignmentStrategy.BALANCE_NUM_SEGMENT_ASSIGNMENT_STRATEGY);
+    Assert.assertFalse(
+        InstanceAssignmentConfigUtils.allowInstanceAssignment(tableConfig, InstancePartitionsType.OFFLINE));
+
+    // The legacy key only applies to OFFLINE tables
+    TableConfig realtimeTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testTable").build();
+    realtimeTableConfig.getValidationConfig()
+        .setSegmentAssignmentStrategy(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY);
+    Assert.assertFalse(
+        InstanceAssignmentConfigUtils.allowInstanceAssignment(realtimeTableConfig, InstancePartitionsType.OFFLINE));
+    Assert.assertFalse(
+        InstanceAssignmentConfigUtils.allowInstanceAssignment(realtimeTableConfig, InstancePartitionsType.CONSUMING));
   }
 
   //When instancePartitionsType is CONSUMING

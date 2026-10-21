@@ -41,6 +41,8 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   private String _timeColumnName;
   private TimeUnit _timeType;
   @Deprecated  // Use SegmentAssignmentConfig instead
+  private String _segmentAssignmentStrategy;
+  @Deprecated  // Use SegmentAssignmentConfig instead
   private ReplicaGroupStrategyConfig _replicaGroupStrategyConfig;
   private CompletionConfig _completionConfig;
   private String _crypterClassName;
@@ -54,6 +56,21 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   private String _untrackedSegmentsDeletionBatchSize;
   private String _untrackedSegmentsRetentionTimeUnit;
   private String _untrackedSegmentsRetentionTimeValue;
+
+  /// Legacy segment assignment strategy name from `segmentsConfig.segmentAssignmentStrategy`. It is still read for
+  /// backward-compatibility: an OFFLINE table that sets it to `replicagroup` (compared ignoring case) keeps using
+  /// replica-group instance assignment even without `segmentAssignmentConfigMap`.
+  ///
+  /// @deprecated Use `segmentAssignmentConfigMap` ([TableConfig#getSegmentAssignmentConfigMap()]) instead
+  @Deprecated(since = "1.1.0", forRemoval = true)
+  public String getSegmentAssignmentStrategy() {
+    return _segmentAssignmentStrategy;
+  }
+
+  @Deprecated
+  public void setSegmentAssignmentStrategy(String segmentAssignmentStrategy) {
+    _segmentAssignmentStrategy = segmentAssignmentStrategy;
+  }
 
   public String getTimeColumnName() {
     return _timeColumnName;

@@ -316,6 +316,22 @@ public class TableConfigUtilsTest {
       assertTrue(e.getMessage().contains("can only use '"
           + AssignmentStrategy.DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY + "' segment assignment strategy"));
     }
+
+    // Valid: allservers strategy via the deprecated segmentsConfig.segmentAssignmentStrategy key
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIsDimTable(true).build();
+    tableConfig.getValidationConfig()
+        .setSegmentAssignmentStrategy(AssignmentStrategy.DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY);
+    TableConfigUtils.validate(tableConfig, schema);
+
+    // Invalid: other strategy via the deprecated segmentsConfig.segmentAssignmentStrategy key
+    tableConfig.getValidationConfig().setSegmentAssignmentStrategy("replicaGroup");
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      fail("Should fail with invalid legacy segment assignment strategy for dimension table");
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("can only use '"
+          + AssignmentStrategy.DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY + "' segment assignment strategy"));
+    }
   }
 
   @Test
