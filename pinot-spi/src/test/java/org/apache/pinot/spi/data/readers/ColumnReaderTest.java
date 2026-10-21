@@ -39,54 +39,55 @@ import static org.testng.Assert.assertSame;
 import static org.testng.Assert.expectThrows;
 
 
-/// Tests the [ColumnReader] logical-type helpers and default JSON conversion contract.
+/// Tests the [ColumnReader] logical-type helpers and default transformation contract.
 public class ColumnReaderTest {
 
-  @DataProvider(name = "jsonValues")
-  public Object[][] jsonValues() {
+  @DataProvider(name = "transformedValues")
+  public Object[][] transformedValues() {
     return new Object[][]{
         {Map.of("key", "value"), "{\"key\":\"value\"}"},
-        {"{\"key\":\"value\"}", "{\"key\":\"value\"}"},
+        {42, "42"},
         {null, "null"},
         {Map.of(), null}
     };
   }
 
-  @Test(dataProvider = "jsonValues")
-  public void testGetJsonValue(Object rawValue, Object jsonValue)
+  @Test(dataProvider = "transformedValues")
+  public void testGetTransformedValue(Object rawValue, Object transformedValue)
       throws IOException {
     ColumnReader reader = mock(ColumnReader.class, CALLS_REAL_METHODS);
     ColumnTransformer transformer = mock(ColumnTransformer.class);
     when(reader.getValue(42)).thenReturn(rawValue);
-    when(transformer.transform(rawValue)).thenReturn(jsonValue);
+    when(transformer.transform(rawValue)).thenReturn(transformedValue);
 
-    assertEquals(reader.getJsonValue(42, transformer), jsonValue);
+    assertEquals(reader.getTransformedValue(42, transformer), transformedValue);
     verify(reader).getValue(42);
     verify(transformer).transform(same(rawValue));
   }
 
   @Test
-  public void testGetJsonValuePropagatesReadFailure()
+  public void testGetTransformedValuePropagatesReadFailure()
       throws IOException {
     ColumnReader reader = mock(ColumnReader.class, CALLS_REAL_METHODS);
     ColumnTransformer transformer = mock(ColumnTransformer.class);
     IOException failure = new IOException("read failed");
     when(reader.getValue(42)).thenThrow(failure);
 
-    assertSame(expectThrows(IOException.class, () -> reader.getJsonValue(42, transformer)), failure);
+    assertSame(expectThrows(IOException.class, () -> reader.getTransformedValue(42, transformer)), failure);
     verifyNoInteractions(transformer);
   }
 
   @Test
-  public void testGetJsonValuePropagatesConversionFailure()
+  public void testGetTransformedValuePropagatesConversionFailure()
       throws IOException {
     ColumnReader reader = mock(ColumnReader.class, CALLS_REAL_METHODS);
     ColumnTransformer transformer = mock(ColumnTransformer.class);
-    when(reader.getValue(42)).thenReturn("invalid JSON");
+    when(reader.getValue(42)).thenReturn("invalid value");
     IllegalArgumentException failure = new IllegalArgumentException("conversion failed");
-    when(transformer.transform("invalid JSON")).thenThrow(failure);
+    when(transformer.transform("invalid value")).thenThrow(failure);
 
-    assertSame(expectThrows(IllegalArgumentException.class, () -> reader.getJsonValue(42, transformer)), failure);
+    assertSame(expectThrows(IllegalArgumentException.class, () -> reader.getTransformedValue(42, transformer)),
+        failure);
   }
 
   @Test

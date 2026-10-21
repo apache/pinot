@@ -189,8 +189,8 @@ public interface ColumnReader extends Closeable, Serializable {
   Object getValue(int docId)
       throws IOException;
 
-  /// Applies the supplied deterministic JSON converter to the value at the given document id. By default, returns
-  /// `jsonTransformer.transform(getValue(docId))`, passing null values to the converter as well.
+  /// Applies the supplied deterministic transformer to the value at the given document id. By default, returns
+  /// `transformer.transform(getValue(docId))`, passing null values to the transformer as well.
   ///
   /// Readers may override this method to avoid materializing repeated raw values or to reuse immutable conversion
   /// results. Overrides must preserve the conversion result, including nulls and conversion failures; callers must not
@@ -198,12 +198,12 @@ public interface ColumnReader extends Closeable, Serializable {
   /// Callers remain responsible for applying this conversion in the correct order relative to other transformations.
   ///
   /// @param docId 0-based document id, from 0 (inclusive) to [#getTotalDocs()] (exclusive)
-  /// @param jsonTransformer deterministic converter to the column's JSON representation
+  /// @param transformer deterministic transformation to apply to the value
   /// @throws IOException if an I/O error occurs while reading
   @Nullable
-  default Object getJsonValue(int docId, ColumnTransformer jsonTransformer)
+  default Object getTransformedValue(int docId, ColumnTransformer transformer)
       throws IOException {
-    return jsonTransformer.transform(getValue(docId));
+    return transformer.transform(getValue(docId));
   }
 
   // Single-value accessors
