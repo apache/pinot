@@ -39,7 +39,6 @@ import org.apache.calcite.sql.type.ReturnTypes;
 import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.pinot.common.function.sql.PinotSqlAggFunction;
 import org.apache.pinot.query.QueryEnvironment;
-import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.PlannerRuleNames;
 
@@ -144,10 +143,6 @@ public class PinotApproximateAggregateRewriteRule extends RelOptRule {
       rewrittenAggCalls.add(rewrite(aggCall, target, argList, newInput, aggRel.getGroupCount()));
     }
 
-    PlannerContext plannerContext = call.getPlanner().getContext().unwrap(PlannerContext.class);
-    if (plannerContext != null) {
-      plannerContext.setApproximateFunctionApplied();
-    }
     call.transformTo(
         aggRel.copy(aggRel.getTraitSet(), newInput, aggRel.getGroupSet(), aggRel.getGroupSets(), rewrittenAggCalls));
   }
