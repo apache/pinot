@@ -39,7 +39,9 @@ public class AggregateFunctionRewriteOptimizerTest {
       .addSingleValueDimension("stringCol", DataType.STRING)
       .addSingleValueDimension("boolCol", DataType.BOOLEAN)
       .addSingleValueDimension("timestampCol", DataType.TIMESTAMP)
+      .addSingleValueDimension("jsonCol", DataType.JSON)
       .addSingleValueDimension("bytesCol", DataType.BYTES)
+      .addSingleValueDimension("uuidCol", DataType.UUID)
       .addMultiValueDimension("mvCol", DataType.INT)
       .addSingleValueDimension("timeCol", DataType.LONG)
       .build();
@@ -49,7 +51,7 @@ public class AggregateFunctionRewriteOptimizerTest {
   public Object[][] dataTypes() {
     return new Object[][]{
         {"intCol", "INT"}, {"longCol", "LONG"}, {"floatCol", "FLOAT"}, {"doubleCol", "DOUBLE"},
-        {"stringCol", "STRING"}, {"boolCol", "BOOLEAN"}, {"timestampCol", "TIMESTAMP"}
+        {"stringCol", "STRING"}, {"jsonCol", "STRING"}, {"boolCol", "BOOLEAN"}, {"timestampCol", "TIMESTAMP"}
     };
   }
 
@@ -64,7 +66,7 @@ public class AggregateFunctionRewriteOptimizerTest {
   @Test
   public void testValueWithTimeKeepsUnsupportedDataColumns() {
     // These keep the two-argument form, which fails with an error asking for the explicit data type.
-    for (String column : new String[]{"bytesCol", "mvCol", "missingCol", "trim(stringCol)"}) {
+    for (String column : new String[]{"bytesCol", "uuidCol", "mvCol", "missingCol", "trim(stringCol)"}) {
       assertUnchanged("SELECT FIRST_WITH_TIME(" + column + ", timeCol) FROM testTable");
     }
     assertUnchanged("SELECT FIRST_WITH_TIME(stringCol, timeCol, 'STRING'), LAST_WITH_TIME(intCol, timeCol, 'LONG') "

@@ -117,6 +117,10 @@ public class AggregateFunctionRewriteOptimizer implements StatementOptimizer {
       case TIMESTAMP:
         function.addToOperands(RequestUtils.getLiteralExpression(fieldSpec.getDataType().name()));
         break;
+      case JSON:
+        // Same as the multi-stage engine, which types a JSON column as VARCHAR.
+        function.addToOperands(RequestUtils.getLiteralExpression(FieldSpec.DataType.STRING.name()));
+        break;
       default:
         break;
     }
