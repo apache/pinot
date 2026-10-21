@@ -21,6 +21,7 @@ package org.apache.pinot.integration.tests;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
@@ -34,6 +35,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 
 
 /// End-to-end test of the cluster config that rewrites exact aggregations into their approximate counterparts. It
@@ -150,17 +152,20 @@ public class ApproximateFunctionOverrideIntegrationTest extends BaseClusterInteg
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     JsonNode exact = postQuery(CONDITIONAL_DISTINCT_COUNT_QUERY);
     assertApplied(exact, false);
-    if (useMultiStageQueryEngine) {
-      for (JsonNode row : rows(exact)) {
-        assertEquals(row.get(3).asLong(), 0L, exact.toString());
-      }
-    }
+    assertEquals(exact.get("exceptions").size(), 0, exact.toString());
+    assertFalse(rows(exact).isEmpty(), exact.toString());
 
     setApproximateFunctionOverride("threshold=1000000");
     waitForOverride(true);
     JsonNode approximate = postQuery(CONDITIONAL_DISTINCT_COUNT_QUERY);
     assertApplied(approximate, true);
+    assertEquals(approximate.get("exceptions").size(), 0, approximate.toString());
     assertSameResult(exact, approximate);
+    if (useMultiStageQueryEngine) {
+      for (JsonNode row : rows(approximate)) {
+        assertEquals(row.get(3).asLong(), 0L, approximate.toString());
+      }
+    }
   }
 
   /// Pins the one visible difference the rewrite makes to a single-stage response, so that changing it is a
@@ -204,10 +209,11 @@ public class ApproximateFunctionOverrideIntegrationTest extends BaseClusterInteg
     return response.get("resultTable").get("dataSchema").get("columnNames").get(1).asText();
   }
 
+  /// Writes all keys at once, so the broker cannot see the flag on before the parameters arrive.
   private void setApproximateFunctionOverride(String params) {
-    _helixManager.getConfigAccessor().set(_clusterScope, Broker.USE_APPROXIMATE_FUNCTION, "true");
-    _helixManager.getConfigAccessor().set(_clusterScope, Broker.APPROXIMATE_FUNCTION_DISTINCT_COUNT_PARAMS, params);
-    _helixManager.getConfigAccessor().set(_clusterScope, Broker.APPROXIMATE_FUNCTION_PERCENTILE_PARAMS, params);
+    _helixManager.getConfigAccessor().set(_clusterScope, Map.of(Broker.USE_APPROXIMATE_FUNCTION, "true",
+        Broker.APPROXIMATE_FUNCTION_DISTINCT_COUNT_PARAMS, params, Broker.APPROXIMATE_FUNCTION_PERCENTILE_PARAMS,
+        params));
   }
 
   /// Removes the keys, so the broker falls back to its own conf.

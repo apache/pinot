@@ -118,11 +118,14 @@ public class ApproximateAggregateRewriteTest extends QueryEnvironmentTestBase {
     QueryEnvironment exactEnv = newQueryEnvironment(false, "", "");
     QueryEnvironment approximateEnv = newQueryEnvironment(true, "", "");
     QueryEnvironment approximateWithParamsEnv = newQueryEnvironment(true, "threshold=17", "");
+    QueryEnvironment physicalOptimizerEnv = newQueryEnvironment(true, "threshold=17", "", true);
     for (String query : List.of(
         "SELECT COUNT(DISTINCT CASE WHEN col3 > 0 THEN col1 ELSE NULL END) FROM a",
         "SELECT col2, COUNT(DISTINCT CASE WHEN col3 > 0 THEN col1 ELSE NULL END) FROM a GROUP BY col2",
         "SELECT DISTINCTCOUNT(CASE WHEN col3 > 0 THEN col1 ELSE NULL END) FROM a",
-        "SELECT col2, DISTINCTCOUNT(CASE WHEN col3 > 0 THEN col1 END) FROM a GROUP BY col2")) {
+        "SELECT col2, DISTINCTCOUNT(CASE WHEN col3 > 0 THEN col1 END) FROM a GROUP BY col2",
+        // An explicit FILTER is combined with the CASE condition, and must survive the rewrite too.
+        "SELECT COUNT(DISTINCT CASE WHEN col3 > 0 THEN col1 END) FILTER (WHERE col2 = 'x') FROM a")) {
       String exact = explain(exactEnv, query);
       assertFilteredWithoutCase(exact);
 
@@ -136,6 +139,11 @@ public class ApproximateAggregateRewriteTest extends QueryEnvironmentTestBase {
       assertRewritten(approximateWithParams, "distinctcountsmarthll");
       assertTrue(approximateWithParams.contains("threshold=17"), approximateWithParams);
       assertFilteredWithoutCase(approximateWithParams);
+
+      String physicalOptimizer = explain(physicalOptimizerEnv, query);
+      assertRewritten(physicalOptimizer, "distinctcountsmarthll");
+      assertTrue(physicalOptimizer.contains("threshold=17"), physicalOptimizer);
+      assertFilteredWithoutCase(physicalOptimizer);
     }
   }
 
@@ -162,7 +170,7 @@ public class ApproximateAggregateRewriteTest extends QueryEnvironmentTestBase {
   }
 
   private static void assertFilteredWithoutCase(String plan) {
-    assertTrue(plan.contains("FILTER"), "Expected a filtered aggregate in:\n" + plan);
+    assertTrue(plan.contains(") FILTER $"), "Expected a filtered aggregate in:\n" + plan);
     assertFalse(plan.contains("CASE"), "Expected the CASE to be converted to a filter in:\n" + plan);
   }
 

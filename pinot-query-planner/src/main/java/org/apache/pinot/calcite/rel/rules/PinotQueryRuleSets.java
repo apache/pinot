@@ -177,14 +177,12 @@ public class PinotQueryRuleSets {
 
       // convert CASE-style filtered aggregates into true filtered aggregates
       // put it after AGGREGATE_REDUCE_FUNCTIONS where SUM is converted to SUM0
-      // put it before APPROXIMATE_AGGREGATE_REWRITE, which appends a parameter argument this rule cannot match
+      // put it before APPROXIMATE_AGGREGATE_REWRITE, see PinotApproximateAggregateRewriteRule
       AggregateCaseToFilterRule.Config.DEFAULT
           .withDescription(PlannerRuleNames.AGGREGATE_CASE_TO_FILTER).toRule(),
 
-      // Must run after AGGREGATE_CASE_TO_FILTER: once the parameter argument is appended, COUNT(DISTINCT CASE WHEN c
-      // THEN x END) is no longer converted to COUNT(DISTINCT x) FILTER (WHERE c), and the CASE's NULL counts as a
-      // value. Must stay ahead of PinotAggregateExchangeNodeInsertRule (POST_LOGICAL), which fixes the leaf-to-final
-      // intermediate result format from the function name.
+      // Must run after AGGREGATE_CASE_TO_FILTER and before PinotAggregateExchangeNodeInsertRule (POST_LOGICAL). The
+      // rule's class doc says why.
       PinotApproximateAggregateRewriteRule.INSTANCE
   );
 
