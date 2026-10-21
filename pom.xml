@@ -190,7 +190,7 @@
     <hive.version>4.2.1</hive.version>
     <helix.version>2.0.1</helix.version>
     <zkclient.version>0.11</zkclient.version>
-    <jackson.version>2.22.3</jackson.version>
+    <jackson.version>2.22.4</jackson.version>
     <opentelemetry.version>1.67.0</opentelemetry.version>
     <fory.version>1.7.7</fory.version>
     <zookeeper.version>3.9.6</zookeeper.version>
