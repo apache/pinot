@@ -91,6 +91,8 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.helix.zookeeper.impl.client.ZkClient;
+import org.apache.helix.zookeeper.zkclient.exception.ZkException;
+import org.apache.helix.zookeeper.zkclient.exception.ZkNoNodeException;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
@@ -211,6 +213,8 @@ import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.apache.pinot.spi.utils.retry.RetryPolicy;
+import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.Op;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -221,6 +225,7 @@ public class PinotHelixResourceManager {
   private static final long CACHE_ENTRY_EXPIRE_TIME_HOURS = 6L;
   private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 2.0f);
   private static final int DEFAULT_SEGMENT_LINEAGE_UPDATE_NUM_RETRY = 5;
+  private static final int MAX_SEGMENT_ZK_METADATA_REMOVAL_ATTEMPTS = 5;
   public static final String APPEND = "APPEND";
   private static final int DEFAULT_LINEAGE_UPDATER_LOCKERS_SIZE = 500;
   private static final String API_REQUEST_ID_PREFIX = "api-";
@@ -2275,6 +2280,80 @@ public class PinotHelixResourceManager {
         _zkClient = built;
       }
       return _zkClient;
+    }
+  }
+
+  /// Removes the ZK metadata of the given segments that are IN_PROGRESS and not in the IdealState of the table, i.e.
+  /// new consuming segments that were not added to the IdealState, and returns the segments whose ZK metadata was
+  /// removed.
+  ///
+  /// The removal is submitted in one ZK `multi()` transaction with version-checked deletes of the segment ZK metadata
+  /// read here, and a version-checked write of the unchanged IdealState:
+  /// - An IdealState update that read the IdealState before the transaction fails its version check. An updater that
+  ///   reads the segment ZK metadata again when it retries, like the one of RealtimeSegmentValidationManager, then no
+  ///   longer finds the removed segments.
+  /// - If the IdealState, or the ZK metadata of one of the segments, is updated after it was read here, the transaction
+  ///   fails and is retried.
+  ///
+  /// The data versions cannot tell a segment ZK metadata deleted and recreated with the same name since it was read,
+  /// e.g. by an upload under the same name, from the one that was read. As the IdealState is outside the property
+  /// store, the transaction uses the multi-write ZkClient directly instead of [ZkMultiWriteBuilder].
+  public Set<String> removeInProgressSegmentsZKMetadataNotInIdealState(String tableNameWithType,
+      Collection<String> segmentNames) {
+    return removeInProgressSegmentsZKMetadataNotInIdealState(tableNameWithType, segmentNames, () -> {
+    });
+  }
+
+  /// @param afterRead Runs after reading the IdealState and the segment ZK metadata, before removing it
+  @VisibleForTesting
+  Set<String> removeInProgressSegmentsZKMetadataNotInIdealState(String tableNameWithType,
+      Collection<String> segmentNames, Runnable afterRead) {
+    ZkClient zkClient = getOrBuildMultiWriteZkClient();
+    String idealStatePath = PropertyPathBuilder.idealState(_helixClusterName, tableNameWithType);
+    String propertyStoreRoot = PropertyPathBuilder.propertyStore(_helixClusterName);
+    for (int attempt = 1; ; attempt++) {
+      Stat idealStateStat = new Stat();
+      ZNRecord idealState = zkClient.readData(idealStatePath, idealStateStat);
+      List<Op> segmentDeletes = new ArrayList<>();
+      Set<String> segmentsToRemove = new HashSet<>();
+      for (String segmentName : segmentNames) {
+        if (idealState.getMapFields().containsKey(segmentName)) {
+          continue;
+        }
+        String segmentPath =
+            propertyStoreRoot + ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, segmentName);
+        Stat segmentStat = new Stat();
+        ZNRecord segmentRecord;
+        try {
+          segmentRecord = zkClient.readData(segmentPath, segmentStat);
+        } catch (ZkNoNodeException e) {
+          continue;
+        }
+        if (new SegmentZKMetadata(segmentRecord).getStatus() == CommonConstants.Segment.Realtime.Status.IN_PROGRESS) {
+          segmentDeletes.add(Op.delete(segmentPath, segmentStat.getVersion()));
+          segmentsToRemove.add(segmentName);
+        }
+      }
+      if (segmentsToRemove.isEmpty()) {
+        return segmentsToRemove;
+      }
+      afterRead.run();
+      List<Op> ops = new ArrayList<>(segmentDeletes.size() + 1);
+      ops.add(Op.setData(idealStatePath, zkClient.serialize(idealState, idealStatePath), idealStateStat.getVersion()));
+      ops.addAll(segmentDeletes);
+      try {
+        zkClient.multi(ops);
+        return segmentsToRemove;
+      } catch (ZkException e) {
+        // The IdealState or a segment ZK metadata changed concurrently
+        boolean concurrentChange = e.getCause() instanceof KeeperException.BadVersionException
+            || e.getCause() instanceof KeeperException.NoNodeException;
+        if (!concurrentChange || attempt == MAX_SEGMENT_ZK_METADATA_REMOVAL_ATTEMPTS) {
+          throw e;
+        }
+        LOGGER.info("Retrying to remove segment ZK metadata for segments: {} of table: {} after a concurrent change",
+            segmentsToRemove, tableNameWithType);
+      }
     }
   }
 
