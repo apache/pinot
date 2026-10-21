@@ -449,10 +449,10 @@ public class QueryLogger {
         builder.append(params._response.getRLSFiltersApplied());
       }
     },
-    APPROXIMATE_FUNCTION_APPLIED("approximateFunctionApplied") {
+    APPROXIMATED_RESULT("approximatedResult") {
       @Override
       void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
-        builder.append(params._response.isApproximateFunctionApplied());
+        builder.append(params._response.isApproximatedResult());
       }
     },
     WORKLOAD_NAME("workloadName") {

@@ -64,10 +64,6 @@ public class PlannerContext implements AutoCloseable, Context {
   @Nullable
   private final PhysicalPlannerContext _physicalPlannerContext;
   private final SearchSealer _searchSealer;
-  /// Set by the approximate aggregation rewrite rule when it rewrites at least one aggregation, so that the broker
-  /// can report on the response that the results are approximate. Written during planning, which is single threaded
-  /// for a query, and read after planning completes.
-  private boolean _approximateFunctionApplied;
 
   public PlannerContext(FrameworkConfig config, Prepare.CatalogReader catalogReader, RelDataTypeFactory typeFactory,
       HepProgram optProgram, HepProgram traitProgram, Map<String, String> options, QueryEnvironment.Config envConfig,
@@ -135,16 +131,6 @@ public class PlannerContext implements AutoCloseable, Context {
 
   public QueryEnvironment.Config getEnvConfig() {
     return _envConfig;
-  }
-
-  /// Records that an exact aggregation was rewritten into its approximate counterpart.
-  public void setApproximateFunctionApplied() {
-    _approximateFunctionApplied = true;
-  }
-
-  /// Returns whether any exact aggregation was rewritten into its approximate counterpart while planning this query.
-  public boolean isApproximateFunctionApplied() {
-    return _approximateFunctionApplied;
   }
 
   /// Unwraps this context. Returns `this` when asked for [PlannerContext] or
