@@ -486,21 +486,14 @@ public abstract class BaseBrokerRoutingManager
       }
     }
 
-    // Calculate the routable servers and the changed routable servers
+    // Calculate the routable servers and the changed servers
+    // NOTE: All new enabled servers are routable because they are removed from the excluded servers above. All new
+    //       disabled servers are counted as changed, even excluded ones whose routing does not change, so that the
+    //       early termination below cannot skip removing them from _enabledServerInstanceMap.
     List<String> changedServers = new ArrayList<>(newEnabledServers.size() + newDisabledServers.size());
-    if (_excludedServers.isEmpty()) {
-      changedServers.addAll(newEnabledServers);
-      changedServers.addAll(newDisabledServers);
-    } else {
-      enabledServers.removeAll(_excludedServers);
-      // NOTE: All new enabled servers are routable
-      changedServers.addAll(newEnabledServers);
-      for (String newDisabledServer : newDisabledServers) {
-        if (_excludedServers.contains(newDisabledServer)) {
-          changedServers.add(newDisabledServer);
-        }
-      }
-    }
+    changedServers.addAll(newEnabledServers);
+    changedServers.addAll(newDisabledServers);
+    enabledServers.removeAll(_excludedServers);
     _routableServerInstanceMap = buildRoutableServerInstanceMap(enabledServers);
     long calculateChangedServersEndTimeMs = System.currentTimeMillis();
 
