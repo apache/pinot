@@ -77,6 +77,9 @@ import org.slf4j.LoggerFactory;
 /// The data schema of the result expected from leaf stage might be different from the one returned from single-stage
 /// engine, thus the leaf stage operator needs to convert the data types of the result to conform with the expected
 /// data schema.
+///
+/// An empty request list represents a leaf whose output is known to be empty. It completes without scheduling SSE work,
+/// while retaining the normal MSE termination checks and upstream and assignment-based statistics.
 public class LeafOperator extends MultiStageOperator implements ExplainableOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(LeafOperator.class);
   private static final String EXPLAIN_NAME = "LEAF";
@@ -99,6 +102,7 @@ public class LeafOperator extends MultiStageOperator implements ExplainableOpera
   private final ResultsBlockStreamer _resultsBlockStreamer = this::addResultsBlock;
   @Nullable
   private final MultiStageQueryStats _pipelineBreakerStats;
+  private final boolean _hasSegmentsAssigned;
 
   // Use a limit-sized BlockingQueue to store the results blocks and apply back pressure to the single-stage threads
   @VisibleForTesting
@@ -122,7 +126,7 @@ public class LeafOperator extends MultiStageOperator implements ExplainableOpera
       @Nullable MultiStageQueryStats pipelineBreakerStats) {
     super(context);
     int numRequests = requests.size();
-    Preconditions.checkArgument(numRequests == 1 || numRequests == 2, "Expected 1 or 2 requests, got: %s", numRequests);
+    Preconditions.checkArgument(numRequests <= 2, "Expected at most 2 requests, got: %s", numRequests);
     _requests = requests;
     _dataSchema = dataSchema;
     _queryExecutor = queryExecutor;
@@ -134,6 +138,7 @@ public class LeafOperator extends MultiStageOperator implements ExplainableOpera
     _blockingQueue = new ArrayBlockingQueue<>(maxStreamingPendingBlocks != null ? maxStreamingPendingBlocks
         : QueryOptionValue.DEFAULT_MAX_STREAMING_PENDING_BLOCKS);
     _pipelineBreakerStats = pipelineBreakerStats;
+    _hasSegmentsAssigned = requests.isEmpty() ? hasSegmentsAssigned(context) : hasSegmentsAssigned(requests);
   }
 
   public List<ServerQueryRequest> getRequests() {
@@ -187,6 +192,10 @@ public class LeafOperator extends MultiStageOperator implements ExplainableOpera
 
   @Override
   protected MseBlock getNextBlock() {
+    if (_requests.isEmpty()) {
+      _terminated = true;
+      return SuccessMseBlock.INSTANCE;
+    }
     if (_executionFuture == null) {
       _executionFuture = startExecution();
     }
@@ -295,24 +304,27 @@ public class LeafOperator extends MultiStageOperator implements ExplainableOpera
   @Override
   public StatMap<StatKey> copyStatMaps() {
     StatMap<StatKey> statMap = new StatMap<>(_statMap);
-    if (!hasSegmentsAssigned()) {
+    if (!_hasSegmentsAssigned) {
       statMap.merge(StatKey.NON_ACTIVE_WORKERS, 1);
     }
     return statMap;
   }
 
-  /// Whether this worker was given at least one segment to read.
-  ///
-  /// Decided from the request rather than from anything the query produces, so that a worker whose segments are all
-  /// pruned, or all of whose rows are filtered out, still counts as having been given work. A hybrid table produces
-  /// one request per table type, and segments on either of them are enough.
-  private boolean hasSegmentsAssigned() {
-    for (ServerQueryRequest request : _requests) {
+  private static boolean hasSegmentsAssigned(List<ServerQueryRequest> requests) {
+    for (ServerQueryRequest request : requests) {
       if (request.hasSegmentsToQuery()) {
         return true;
       }
     }
     return false;
+  }
+
+  private static boolean hasSegmentsAssigned(OpChainExecutionContext context) {
+    Map<String, List<String>> tableSegmentsMap = context.getWorkerMetadata().getLogicalTableSegmentsMap();
+    if (tableSegmentsMap == null) {
+      tableSegmentsMap = context.getWorkerMetadata().getTableSegmentsMap();
+    }
+    return tableSegmentsMap != null && tableSegmentsMap.values().stream().anyMatch(segments -> !segments.isEmpty());
   }
 
   @Override
