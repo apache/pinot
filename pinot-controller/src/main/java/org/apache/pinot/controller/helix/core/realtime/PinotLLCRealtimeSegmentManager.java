@@ -673,9 +673,13 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
 
     // Step-2: Create new segment metadata if needed
     long startTimeNs2 = System.nanoTime();
+    // Another attempt of the same commit start might have created the new segment already. Find it before deciding
+    // whether the partition still needs a new segment, so that it can be removed when it is not used.
+    String newSegmentOfEarlierAttempt =
+        resumed ? findNewSegmentOfEarlierAttempt(realtimeTableName, new LLCSegmentName(committingSegmentName)) : null;
     String newConsumingSegmentName =
         createNewSegmentMetadata(tableConfig, committingSegmentDescriptor, committingSegmentZKMetadata,
-            instancePartitions, toCommitting, resumed);
+            instancePartitions, toCommitting, newSegmentOfEarlierAttempt);
 
     preProcessCommitIdealStateUpdate();
 
@@ -718,6 +722,15 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
         removeSegmentZKMetadataBestEffort(realtimeTableName, newConsumingSegmentName);
         newConsumingSegmentName = null;
       }
+    } else if (newSegmentOfEarlierAttempt != null
+        && !instanceStatesMapAfterStep3.containsKey(newSegmentOfEarlierAttempt)) {
+      // The committing segment is ONLINE now, so no attempt of the commit can add the new segment of the earlier
+      // attempt anymore. Remove it so that RealtimeSegmentValidationManager does not add it either.
+      LOGGER.info(
+          "Cleaning up segment ZK metadata for new segment {} of table {} created by an earlier attempt of the commit "
+              + "because it is not used. This can happen when table/topic consumption is paused, or the partition is "
+              + "no longer in the stream.", newSegmentOfEarlierAttempt, realtimeTableName);
+      removeSegmentZKMetadataBestEffort(realtimeTableName, newSegmentOfEarlierAttempt);
     }
 
     long endTimeNs = System.nanoTime();
@@ -875,10 +888,14 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
   }
 
   // Step 2: Create new segment metadata
+
+  /// Returns the new consuming segment of the partition of the committing segment, or `null` if the partition is no
+  /// longer in the stream, or the table/topic is paused. Uses `newSegmentOfEarlierAttempt` if not `null`, and creates
+  /// the new segment ZK metadata otherwise.
   @Nullable
   private String createNewSegmentMetadata(TableConfig tableConfig,
       CommittingSegmentDescriptor committingSegmentDescriptor, SegmentZKMetadata committingSegmentZKMetadata,
-      InstancePartitions instancePartitions, boolean createIfAbsent, boolean resumed) {
+      InstancePartitions instancePartitions, boolean createIfAbsent, @Nullable String newSegmentOfEarlierAttempt) {
     String committingSegmentName = committingSegmentDescriptor.getSegmentName();
 
     String realtimeTableName = tableConfig.getTableName();
@@ -904,14 +921,10 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
             + "paused.", committingSegmentName);
         return null;
       }
-      // Another attempt of the same commit start might have created the new segment already, and the segment might be
-      // consuming or even committed, so never overwrite its ZK metadata
-      if (resumed) {
-        String existingNewSegmentName = findNewSegmentOfEarlierAttempt(realtimeTableName, committingLLCSegment);
-        if (existingNewSegmentName != null) {
-          LOGGER.info("Using existing segment metadata for new segment: {}", existingNewSegmentName);
-          return existingNewSegmentName;
-        }
+      // The new segment of an earlier attempt might be consuming or even committed, so never overwrite its ZK metadata
+      if (newSegmentOfEarlierAttempt != null) {
+        LOGGER.info("Using existing segment metadata for new segment: {}", newSegmentOfEarlierAttempt);
+        return newSegmentOfEarlierAttempt;
       }
       String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
       long newSegmentCreationTimeMs = getCurrentTimeMs();
