@@ -23,6 +23,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -31,13 +32,19 @@ import org.apache.pinot.spi.utils.CommonConstants;
 
 /// Rewrites certain aggregation functions based on operand types to support polymorphic aggregations.
 ///
-/// Currently supported rewrites:
+/// Always applied:
+/// - FIRST_WITH_TIME(dataColumn, timeColumn) -> FIRST_WITH_TIME(dataColumn, timeColumn, 'dataType')
+/// - LAST_WITH_TIME(dataColumn, timeColumn) -> LAST_WITH_TIME(dataColumn, timeColumn, 'dataType')
+///
+/// Applied only when enabled through the `autoRewriteAggregationType` query option:
 /// - MIN(stringType) -> MINSTRING
 /// - MAX(stringType) -> MAXSTRING
 /// - MIN(longType) -> MINLONG
 /// - MAX(longType) -> MAXLONG
 /// - SUM(longType) -> SUMLONG
 /// - SUM(intType) -> SUMINT
+///
+/// Aggregations nested in other expressions, such as an alias, a FILTER clause or a transform, are rewritten as well.
 public class AggregateFunctionRewriteOptimizer implements StatementOptimizer {
 
   @Override
@@ -46,38 +53,24 @@ public class AggregateFunctionRewriteOptimizer implements StatementOptimizer {
       return;
     }
 
-    // Only perform auto rewrite when enabled through query option.
-    if (pinotQuery.getQueryOptions() == null || !Boolean.parseBoolean(pinotQuery.getQueryOptions().get(
-        CommonConstants.Broker.Request.QueryOptionKey.AUTO_REWRITE_AGGREGATION_TYPE))) {
-      return;
-    }
-
-    List<Expression> selectList = pinotQuery.getSelectList();
-    if (selectList != null) {
-      for (Expression expression : selectList) {
-        maybeRewriteAggregateFunction(expression, schema);
-      }
-    }
-
-    List<Expression> groupByList = pinotQuery.getGroupByList();
-    if (groupByList != null) {
-      for (Expression expression : groupByList) {
-        maybeRewriteAggregateFunction(expression, schema);
-      }
-    }
-
-    List<Expression> orderByList = pinotQuery.getOrderByList();
-    if (orderByList != null) {
-      for (Expression expression : orderByList) {
-        maybeRewriteAggregateFunction(expression, schema);
-      }
-    }
-
-    maybeRewriteAggregateFunction(pinotQuery.getFilterExpression(), schema);
-    maybeRewriteAggregateFunction(pinotQuery.getHavingExpression(), schema);
+    boolean rewriteToTypedVariants = pinotQuery.getQueryOptions() != null && Boolean.parseBoolean(
+        pinotQuery.getQueryOptions().get(CommonConstants.Broker.Request.QueryOptionKey.AUTO_REWRITE_AGGREGATION_TYPE));
+    rewrite(pinotQuery.getSelectList(), schema, rewriteToTypedVariants);
+    rewrite(pinotQuery.getGroupByList(), schema, rewriteToTypedVariants);
+    rewrite(pinotQuery.getOrderByList(), schema, rewriteToTypedVariants);
+    rewrite(pinotQuery.getFilterExpression(), schema, rewriteToTypedVariants);
+    rewrite(pinotQuery.getHavingExpression(), schema, rewriteToTypedVariants);
   }
 
-  private void maybeRewriteAggregateFunction(@Nullable Expression expression, Schema schema) {
+  private static void rewrite(@Nullable List<Expression> expressions, Schema schema, boolean rewriteToTypedVariants) {
+    if (expressions != null) {
+      for (Expression expression : expressions) {
+        rewrite(expression, schema, rewriteToTypedVariants);
+      }
+    }
+  }
+
+  private static void rewrite(@Nullable Expression expression, Schema schema, boolean rewriteToTypedVariants) {
     if (expression == null || !expression.isSetFunctionCall()) {
       return;
     }
@@ -85,23 +78,51 @@ public class AggregateFunctionRewriteOptimizer implements StatementOptimizer {
     Function function = expression.getFunctionCall();
     String functionName = function.getOperator();
     if (!AggregationFunctionType.isAggregationFunction(functionName)) {
+      rewrite(function.getOperands(), schema, rewriteToTypedVariants);
       return;
     }
 
-    Expression operand = function.getOperands().get(0);
-    FieldSpec.DataType operandType;
     // TODO: Handle more complex expressions (e.g. MIN(trim(stringCol)) )
-    if (operand.isSetIdentifier()) {
-      String columnName = operand.getIdentifier().getName();
-      FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
-      if (fieldSpec == null) {
-        return;
-      }
-      operandType = fieldSpec.getDataType().getStoredType();
-    } else {
+    if (function.getOperandsSize() == 0 || !function.getOperands().get(0).isSetIdentifier()) {
+      return;
+    }
+    FieldSpec fieldSpec = schema.getFieldSpecFor(function.getOperands().get(0).getIdentifier().getName());
+    if (fieldSpec == null) {
       return;
     }
 
+    String normalizedName = AggregationFunctionType.getNormalizedAggregationFunctionName(functionName);
+    if ((normalizedName.equals(AggregationFunctionType.FIRSTWITHTIME.name())
+        || normalizedName.equals(AggregationFunctionType.LASTWITHTIME.name())) && function.getOperandsSize() == 2) {
+      addDataTypeArgument(function, fieldSpec);
+      return;
+    }
+    if (rewriteToTypedVariants) {
+      rewriteToTypedVariant(function, functionName, fieldSpec.getDataType().getStoredType());
+    }
+  }
+
+  /// Appends the data column's logical type when the explicit form supports it.
+  private static void addDataTypeArgument(Function function, FieldSpec fieldSpec) {
+    if (!fieldSpec.isSingleValueField()) {
+      return;
+    }
+    switch (fieldSpec.getDataType()) {
+      case INT:
+      case LONG:
+      case FLOAT:
+      case DOUBLE:
+      case STRING:
+      case BOOLEAN:
+      case TIMESTAMP:
+        function.addToOperands(RequestUtils.getLiteralExpression(fieldSpec.getDataType().name()));
+        break;
+      default:
+        break;
+    }
+  }
+
+  private static void rewriteToTypedVariant(Function function, String functionName, FieldSpec.DataType operandType) {
     // Rewrite MIN(stringCol) and MAX(stringCol) to MINSTRING / MAXSTRING
     // Rewrite MIN(longCol) and MAX(longCol) to MINLONG / MAXLONG
     if ((functionName.equals(AggregationFunctionType.MIN.getName())

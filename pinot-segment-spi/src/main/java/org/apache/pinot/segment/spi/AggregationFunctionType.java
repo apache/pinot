@@ -65,10 +65,12 @@ public enum AggregationFunctionType {
   AVG("avg", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
   MODE("mode", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
   ANYVALUE("anyValue", ReturnTypes.ARG0, OperandTypes.ANY, SqlTypeName.OTHER),
-  FIRSTWITHTIME("firstWithTime", ReturnTypes.ARG0,
-      OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), SqlTypeName.OTHER),
-  LASTWITHTIME("lastWithTime", ReturnTypes.ARG0,
-      OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), SqlTypeName.OTHER),
+  FIRSTWITHTIME("firstWithTime", new ValueWithTimeReturnTypeInference(), OperandTypes.or(
+      OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY),
+      OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER)), SqlTypeName.OTHER),
+  LASTWITHTIME("lastWithTime", new ValueWithTimeReturnTypeInference(), OperandTypes.or(
+      OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY),
+      OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER)), SqlTypeName.OTHER),
   MINMAXRANGE("minMaxRange", ReturnTypes.DOUBLE, OperandTypes.ANY, SqlTypeName.OTHER, SqlTypeName.DOUBLE),
 
   /// for all distinct count family functions:
@@ -423,6 +425,25 @@ public enum AggregationFunctionType {
       } catch (IllegalArgumentException e) {
         throw new IllegalArgumentException("Invalid aggregation function name: " + functionName);
       }
+    }
+  }
+
+  /// Returns the type of the data argument. The two-argument form is limited to the types of the explicit form.
+  private static class ValueWithTimeReturnTypeInference implements SqlReturnTypeInference {
+    private static final Set<SqlTypeName> INFERRED_DATA_TYPES = Set.of(SqlTypeName.TINYINT, SqlTypeName.SMALLINT,
+        SqlTypeName.INTEGER, SqlTypeName.BIGINT, SqlTypeName.REAL, SqlTypeName.FLOAT, SqlTypeName.DOUBLE,
+        SqlTypeName.CHAR, SqlTypeName.VARCHAR, SqlTypeName.BOOLEAN, SqlTypeName.TIMESTAMP);
+
+    @Override
+    public RelDataType inferReturnType(SqlOperatorBinding opBinding) {
+      if (opBinding.getOperandCount() == 2) {
+        SqlTypeName dataType = opBinding.getOperandType(0).getSqlTypeName();
+        if (!INFERRED_DATA_TYPES.contains(dataType)) {
+          throw new IllegalArgumentException(String.format("Unsupported data type for %s(dataColumn, timeColumn): %s",
+              opBinding.getOperator().getName(), dataType));
+        }
+      }
+      return ReturnTypes.ARG0.inferReturnType(opBinding);
     }
   }
 

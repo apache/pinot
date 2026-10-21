@@ -1301,6 +1301,8 @@ public class CommonConstants {
       public static final String AGGREGATE_UNION_TRANSPOSE = "AggregateUnionTranspose";
       public static final String AGGREGATE_REDUCE_FUNCTIONS = "AggregateReduceFunctions";
       public static final String AGGREGATE_FUNCTION_REWRITE = "AggregateFunctionRewrite";
+      /// Supplies the data type argument of FIRST_WITH_TIME / LAST_WITH_TIME(dataColumn, timeColumn).
+      public static final String AGGREGATE_TYPE_ARGUMENT_REWRITE = "AggregateTypeArgumentRewrite";
       /// Inert unless [CommonConstants.Broker#USE_APPROXIMATE_FUNCTION] is on; name it here to switch it off entirely.
       public static final String APPROXIMATE_AGGREGATE_REWRITE = "ApproximateAggregateRewrite";
       public static final String AGGREGATE_CASE_TO_FILTER = "AggregateCaseToFilter";

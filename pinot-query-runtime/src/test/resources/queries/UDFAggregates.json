@@ -49,6 +49,35 @@
         "outputs": [["a", 400, 400, 2], ["b", 1, 1, 100], ["c", 1.01, 1.01, 175]]
       },
       {
+        "comment": "The data type argument of FIRST_WITH_TIME / LAST_WITH_TIME is inferred when omitted",
+        "sql": "SELECT FIRSTWITHTIME(int_col, timestamp_col), FIRSTWITHTIME(string_col, timestamp_col), first_with_time(bool_col, CAST(long_col AS TIMESTAMP)) FROM {tbl}",
+        "outputs": [[2, "a", true]]
+      },
+      {
+        "sql": "SELECT bool_col, FIRSTWITHTIME(float_col, timestamp_col), FIRSTWITHTIME(double_col, timestamp_col), first_with_time(long_col, CAST(long_col AS TIMESTAMP)) FROM {tbl} GROUP BY bool_col",
+        "outputs": [[false, 100, 100, 3], [true, 300, 300, 2]]
+      },
+      {
+        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ string_col, FIRSTWITHTIME(float_col, timestamp_col), FIRSTWITHTIME(double_col, timestamp_col), first_with_time(long_col, CAST(long_col AS TIMESTAMP)) FROM {tbl} GROUP BY string_col",
+        "outputs": [["a", 300, 300, 2], ["b", 100, 100, 3], ["c", 1.75, 1.75, 101]]
+      },
+      {
+        "sql": "SELECT LASTWITHTIME(int_col, timestamp_col), LASTWITHTIME(string_col, timestamp_col), last_with_time(bool_col, CAST(long_col AS TIMESTAMP)) FROM {tbl}",
+        "outputs": [[101, "c", true]]
+      },
+      {
+        "sql": "SELECT bool_col, LASTWITHTIME(float_col, timestamp_col), LASTWITHTIME(double_col, timestamp_col), last_with_time(long_col, CAST(long_col AS TIMESTAMP)) FROM {tbl} GROUP BY bool_col",
+        "outputs": [[false, 1.01, 1.01, 150], [true, 1.75, 1.75, 175]]
+      },
+      {
+        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ string_col, LASTWITHTIME(float_col, timestamp_col), LASTWITHTIME(double_col, timestamp_col), last_with_time(long_col, CAST(long_col AS TIMESTAMP)) FROM {tbl} GROUP BY string_col",
+        "outputs": [["a", 400, 400, 2], ["b", 1, 1, 100], ["c", 1.01, 1.01, 175]]
+      },
+      {
+        "sql": "SELECT FIRST_WITH_TIME(timestamp_col, timestamp_col), LAST_WITH_TIME(timestamp_col, timestamp_col), FIRST_WITH_TIME(timestamp_col, timestamp_col, 'TIMESTAMP') FROM {tbl}",
+        "outputs": [["2020-01-01 03:10:12.0", "2020-05-01 03:32:12.0", "2020-01-01 03:10:12.0"]]
+      },
+      {
         "sql": "SELECT SUMPRECISION(decimal_col) FROM {tbl}",
         "outputs": [["10000000000100000000110000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000.00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000011000000001"]]
       },

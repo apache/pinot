@@ -159,6 +159,37 @@
         ]
       },
       {
+        "description": "FIRST_WITH_TIME and LAST_WITH_TIME without a data type infer it from the data argument",
+        "sql": "EXPLAIN PLAN FOR SELECT FIRST_WITH_TIME(a.col1, a.ts), LAST_WITH_TIME(a.ts_timestamp, a.ts), FIRST_WITH_TIME(a.col5, a.ts), LAST_WITH_TIME(a.col1, a.ts) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{}], agg#0=[FIRSTWITHTIME($0, $0, _UTF-8'STRING')], agg#1=[LASTWITHTIME($1, $1, _UTF-8'TIMESTAMP')], agg#2=[FIRSTWITHTIME($2, $2, _UTF-8'BOOLEAN')], agg#3=[LASTWITHTIME($3, $3, _UTF-8'STRING')], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash])",
+          "\n    PinotLogicalAggregate(group=[{}], agg#0=[FIRSTWITHTIME($0, $1, _UTF-8'STRING')], agg#1=[LASTWITHTIME($2, $1, _UTF-8'TIMESTAMP')], agg#2=[FIRSTWITHTIME($3, $1, _UTF-8'BOOLEAN')], agg#3=[LASTWITHTIME($0, $1, _UTF-8'STRING')], aggType=[LEAF])",
+          "\n      LogicalProject($f0=[$0], $f1=[$7], $f2=[$8], $f3=[$4], $f4=[_UTF-8'STRING'], $f5=[_UTF-8'TIMESTAMP'], $f6=[_UTF-8'BOOLEAN'])",
+          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Inferred data type argument next to another literal argument in a grouped aggregate",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col2, FIRST_WITH_TIME(a.col3 + 1, a.ts), PERCENTILE(a.col3, 50) FROM a GROUP BY a.col2",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{0}], agg#0=[FIRSTWITHTIME($1, $1, _UTF-8'INT')], agg#1=[PERCENTILE($2, 50)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash[0]])",
+          "\n    PinotLogicalAggregate(group=[{0}], agg#0=[FIRSTWITHTIME($1, $2, _UTF-8'INT')], agg#1=[PERCENTILE($3, 50)], aggType=[LEAF])",
+          "\n      LogicalProject($f0=[$1], $f1=[+($2, 1)], $f2=[$7], $f3=[$2], $f4=[50], $f5=[_UTF-8'INT'])",
+          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "FIRST_WITH_TIME without a data type rejects an unsupported data argument",
+        "sql": "EXPLAIN PLAN FOR SELECT FIRST_WITH_TIME(a.col4, a.ts) FROM a",
+        "expectedException": ".*Unsupported data type for .*\\(dataColumn, timeColumn\\): DECIMAL.*"
+      },
+      {
         "description": "MIN on STRING column rewritten to MINSTRING",
         "sql": "SET autoRewriteAggregationType=true; EXPLAIN PLAN FOR SELECT MIN(a.col1) FROM a",
         "output": [

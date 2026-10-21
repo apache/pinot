@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -60,6 +61,9 @@ public final class FirstLastWithTimeAggregationFunctionProvider {
           return new FirstIntValueWithTimeAggregationFunction(dataCol, timeCol, nullHandlingEnabled, false);
         case LONG:
           return new FirstLongValueWithTimeAggregationFunction(dataCol, timeCol, nullHandlingEnabled);
+        case TIMESTAMP:
+          return new FirstLongValueWithTimeAggregationFunction(dataCol, timeCol, nullHandlingEnabled,
+              ColumnDataType.TIMESTAMP);
         case FLOAT:
           return new FirstFloatValueWithTimeAggregationFunction(dataCol, timeCol, nullHandlingEnabled);
         case DOUBLE:
@@ -100,6 +104,9 @@ public final class FirstLastWithTimeAggregationFunctionProvider {
           return new LastIntValueWithTimeAggregationFunction(dataCol, timeCol, nullHandlingEnabled, false);
         case LONG:
           return new LastLongValueWithTimeAggregationFunction(dataCol, timeCol, nullHandlingEnabled);
+        case TIMESTAMP:
+          return new LastLongValueWithTimeAggregationFunction(dataCol, timeCol, nullHandlingEnabled,
+              ColumnDataType.TIMESTAMP);
         case FLOAT:
           return new LastFloatValueWithTimeAggregationFunction(dataCol, timeCol, nullHandlingEnabled);
         case DOUBLE:
