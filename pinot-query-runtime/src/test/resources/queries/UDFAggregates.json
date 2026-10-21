@@ -79,6 +79,15 @@
         "outputs": [["2020-01-01 03:10:12.0", "2020-05-01 03:32:12.0", "2020-01-01 03:10:12.0"]]
       },
       {
+        "comment": "SMALLINT and TINYINT data arguments infer 'INT'",
+        "sql": "SELECT FIRST_WITH_TIME(CAST(int_col AS SMALLINT), timestamp_col), LAST_WITH_TIME(CAST(int_col AS SMALLINT), timestamp_col), LAST_WITH_TIME(CAST(int_col AS TINYINT), timestamp_col) FROM {tbl}",
+        "outputs": [[2, 101, 101]]
+      },
+      {
+        "sql": "SELECT string_col, FIRST_WITH_TIME(CAST(int_col AS SMALLINT), timestamp_col), LAST_WITH_TIME(CAST(int_col AS SMALLINT), timestamp_col) FROM {tbl} GROUP BY string_col",
+        "outputs": [["a", 2, 2], ["b", 3, 100], ["c", 175, 101]]
+      },
+      {
         "sql": "SELECT FIRST_WITH_TIME(decimal_col, timestamp_col), LAST_WITH_TIME(decimal_col, timestamp_col), FIRST_WITH_TIME(bytes_col, timestamp_col), LAST_WITH_TIME(bytes_col, timestamp_col, 'BYTES') FROM {tbl}",
         "outputs": [["1E-307", "1E-317", "deadbeef", "adbeefde"]]
       },

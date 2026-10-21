@@ -198,11 +198,6 @@
         ]
       },
       {
-        "description": "FIRST_WITH_TIME without a data type rejects a multi-value data argument",
-        "sql": "EXPLAIN PLAN FOR SELECT FIRST_WITH_TIME(e.mcol1, e.ts) FROM e",
-        "expectedException": ".*Unsupported data type for .*\\(dataColumn, timeColumn\\): .*ARRAY.*"
-      },
-      {
         "description": "MIN on STRING column rewritten to MINSTRING",
         "sql": "SET autoRewriteAggregationType=true; EXPLAIN PLAN FOR SELECT MIN(a.col1) FROM a",
         "output": [

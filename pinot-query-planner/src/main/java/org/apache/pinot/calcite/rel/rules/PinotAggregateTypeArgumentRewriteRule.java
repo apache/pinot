@@ -47,18 +47,17 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 /// The result type of the call is unchanged. The literal is projected directly beneath the aggregate, appended to the
 /// existing project when there is one, because [PinotAggregateExchangeNodeInsertRule] and `AggregatePushdownRule`
 /// inline literal arguments only from the immediate project.
+///
+/// The servers require the data type argument, so the rule is required rather than an optimization: `QueryEnvironment`
+/// always applies it, and `skipPlannerRules` cannot turn it off.
 public class PinotAggregateTypeArgumentRewriteRule extends RelOptRule {
   public static final PinotAggregateTypeArgumentRewriteRule INSTANCE =
-      new PinotAggregateTypeArgumentRewriteRule(PinotRuleUtils.PINOT_REL_FACTORY, null);
-
-  public static PinotAggregateTypeArgumentRewriteRule instanceWithDescription(String description) {
-    return new PinotAggregateTypeArgumentRewriteRule(PinotRuleUtils.PINOT_REL_FACTORY, description);
-  }
+      new PinotAggregateTypeArgumentRewriteRule(PinotRuleUtils.PINOT_REL_FACTORY);
 
   // Matches with RelOptRule operands, like the other aggregate rewrite rules, instead of a RelRule config.
   @SuppressWarnings("deprecation")
-  private PinotAggregateTypeArgumentRewriteRule(RelBuilderFactory factory, @Nullable String description) {
-    super(operand(LogicalAggregate.class, any()), factory, description);
+  private PinotAggregateTypeArgumentRewriteRule(RelBuilderFactory factory) {
+    super(operand(LogicalAggregate.class, any()), factory, null);
   }
 
   @Override

@@ -1814,6 +1814,17 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     assertTrue(exception.getMessage().contains(QueryOptionKey.INFER_PARTITION_HINT), exception.getMessage());
   }
 
+  @Test
+  public void testValueWithTimeRejectsUnsupportedDataArgument() {
+    // The two-argument form infers the data type from the data argument, which cannot be multi-value.
+    QueryException exception = expectThrows(QueryException.class, () -> _queryEnvironment.explainQuery(
+        "SELECT FIRST_WITH_TIME(mcol1, ts) FROM e", RANDOM_REQUEST_ID_GEN.nextLong()));
+    assertEquals(exception.getErrorCode(), QueryErrorCode.QUERY_VALIDATION);
+    assertTrue(exception.getMessage().contains(
+        "Cannot apply 'FIRSTWITHTIME' to arguments of type 'FIRSTWITHTIME(<VARCHAR ARRAY>, <BIGINT>)'"),
+        exception.getMessage());
+  }
+
   @DataProvider(name = "testQueryExceptionDataProvider")
   private Object[][] provideQueriesWithException() {
     return new Object[][]{

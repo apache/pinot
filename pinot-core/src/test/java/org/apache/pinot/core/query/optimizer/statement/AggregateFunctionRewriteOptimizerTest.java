@@ -101,6 +101,18 @@ public class AggregateFunctionRewriteOptimizerTest {
   }
 
   @Test
+  public void testTypedVariantsRewriteNestedAggregations() {
+    // Aggregations under an alias, a transform and HAVING are rewritten like top-level ones, so the select list and
+    // HAVING compute the same aggregation.
+    String query = "SELECT intCol, MIN(longCol) AS m, MAX(longCol) + 1 FROM testTable GROUP BY intCol "
+        + "HAVING MIN(longCol) > 5";
+    assertUnchanged(query);
+    assertRewrite(AUTO_REWRITE + query, AUTO_REWRITE
+        + "SELECT intCol, MINLONG(longCol) AS m, MAXLONG(longCol) + 1 FROM testTable GROUP BY intCol "
+        + "HAVING MINLONG(longCol) > 5");
+  }
+
+  @Test
   public void testNoSchema() {
     PinotQuery query =
         CalciteSqlParser.compileToPinotQuery("SELECT FIRST_WITH_TIME(stringCol, timeCol) FROM testTable");

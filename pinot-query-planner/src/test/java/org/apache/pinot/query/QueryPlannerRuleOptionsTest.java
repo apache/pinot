@@ -21,6 +21,7 @@ package org.apache.pinot.query;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.calcite.sql.SqlNode;
+import org.apache.pinot.calcite.rel.rules.PinotAggregateTypeArgumentRewriteRule;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.PlannerRuleNames;
@@ -91,6 +92,15 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
             + "        LogicalProject($f0=[CASE(=($0, _UTF-8'a'), 1, 0)])\n"
             + "          PinotLogicalTableScan(table=[[default, a]])\n");
     //@formatter:on
+  }
+
+  @Test
+  public void testTypeArgumentRewriteIgnoresSkipPlannerRules() {
+    // The servers require the data type argument, so naming the rule in skipPlannerRules does not turn it off.
+    String query = "EXPLAIN PLAN FOR SELECT FIRST_WITH_TIME(col1, ts) FROM a";
+    String explain = explainQueryWithRuleDisabled(query, PinotAggregateTypeArgumentRewriteRule.INSTANCE.toString());
+    assertEquals(explain, _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong()));
+    assertTrue(explain.contains("FIRSTWITHTIME($0, $1, _UTF-8'STRING')"), explain);
   }
 
   @Test
