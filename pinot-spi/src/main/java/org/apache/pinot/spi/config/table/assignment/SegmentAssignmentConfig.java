@@ -21,21 +21,39 @@ package org.apache.pinot.spi.config.table.assignment;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
+/// Config of how segments are assigned to the instance partitions of an instance partitions type (`OFFLINE` or
+/// `COMPLETED`) or a tier, keyed by its name in `segmentAssignmentConfigMap` of the table config. Both fields are
+/// optional: the strategy defaults to the one derived from the instance partitions, and the partition column defaults
+/// to the single column of the segment partition config.
 public class SegmentAssignmentConfig extends BaseJsonConfig {
 
-  @JsonPropertyDescription("Configuration for Segment Assignment Strategy")
+  @JsonPropertyDescription("Segment assignment strategy: balanced, replicagroup, roundrobin or roundrobinreplicagroup "
+      + "(allservers for a dimension table), derived from the instance partitions if not specified")
   @JsonProperty("segmentAssignmentStrategy")
   private final String _assignmentStrategy;
 
+  @JsonPropertyDescription("Column used to resolve the partition of a segment for partition based segment assignment, "
+      + "the single column of the segment partition config if not specified")
+  private final String _partitionColumn;
+
   @JsonCreator
-  public SegmentAssignmentConfig(@JsonProperty(value = "segmentAssignmentStrategy") String assignmentStrategy) {
+  public SegmentAssignmentConfig(@JsonProperty("segmentAssignmentStrategy") @Nullable String assignmentStrategy,
+      @JsonProperty("partitionColumn") @Nullable String partitionColumn) {
     _assignmentStrategy = assignmentStrategy;
+    _partitionColumn = partitionColumn;
   }
 
+  @Nullable
   public String getAssignmentStrategy() {
     return _assignmentStrategy;
+  }
+
+  @Nullable
+  public String getPartitionColumn() {
+    return _partitionColumn;
   }
 }

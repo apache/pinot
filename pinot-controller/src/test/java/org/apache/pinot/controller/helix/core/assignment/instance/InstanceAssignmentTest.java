@@ -81,7 +81,7 @@ public class InstanceAssignmentTest {
         .setServerTenant(TENANT_NAME)
         .setNumReplicas(numReplicas)
         .setSegmentAssignmentConfigMap(Map.of(InstancePartitionsType.OFFLINE.toString(),
-            new SegmentAssignmentConfig(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY)))
+            new SegmentAssignmentConfig(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY, null)))
         .build();
     int numInstancesPerPartition = 2;
     tableConfig.getValidationConfig()
@@ -2769,7 +2769,6 @@ public class InstanceAssignmentTest {
         .setInstanceAssignmentConfigMap(Map.of(InstancePartitionsType.OFFLINE.toString(),
             new InstanceAssignmentConfig(tagPoolConfig, null, replicaPartitionConfig,
                 InstanceAssignmentConfig.PartitionSelector.FD_AWARE_INSTANCE_PARTITION_SELECTOR.toString(), false)))
-        .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(partitionColumnName, numInstancesPerReplicaGroup))
         .setSegmentPartitionConfig(segmentPartitionConfig)
         .build();
 

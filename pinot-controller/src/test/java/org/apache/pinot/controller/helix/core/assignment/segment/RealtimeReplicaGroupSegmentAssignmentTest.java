@@ -32,13 +32,10 @@ import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.restlet.resources.RebalanceConfig;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
-import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
-import org.apache.pinot.spi.config.table.assignment.SegmentAssignmentConfig;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
-import org.apache.pinot.spi.utils.CommonConstants.Segment.AssignmentStrategy;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -55,7 +52,6 @@ import static org.testng.Assert.assertTrue;
 @SuppressWarnings("unchecked")
 public class RealtimeReplicaGroupSegmentAssignmentTest {
   private static final int NUM_REPLICAS = 3;
-  private static final String PARTITION_COLUMN = "partitionColumn";
   private static final int NUM_PARTITIONS = 4;
   private static final int NUM_SEGMENTS = 24;
   private static final String CONSUMING_INSTANCE_NAME_PREFIX = "consumingInstance_";
@@ -87,10 +83,7 @@ public class RealtimeReplicaGroupSegmentAssignmentTest {
     Map<String, String> streamConfigs = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap();
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS)
-            .setStreamConfigs(streamConfigs)
-            .setSegmentAssignmentConfigMap(Map.of(InstancePartitionsType.COMPLETED.toString(),
-                new SegmentAssignmentConfig(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY)))
-            .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(PARTITION_COLUMN, 1)).build();
+            .setStreamConfigs(streamConfigs).build();
     _segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(createHelixManager(), tableConfig, null);
 
     _instancePartitionsMap = new TreeMap<>();
@@ -654,8 +647,6 @@ public class RealtimeReplicaGroupSegmentAssignmentTest {
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(numReplicas)
             .setStreamConfigs(streamConfigs)
             .setInstancePartitionsMap(importedInstancePartitions)
-            .setSegmentAssignmentConfigMap(Map.of(InstancePartitionsType.COMPLETED.toString(),
-                new SegmentAssignmentConfig(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY)))
             .build();
     assertTrue(InstanceAssignmentConfigUtils.shouldRelocateCompletedSegments(tableConfig),
         "Imported COMPLETED instance partitions must trigger completed-segment relocation during rebalance");

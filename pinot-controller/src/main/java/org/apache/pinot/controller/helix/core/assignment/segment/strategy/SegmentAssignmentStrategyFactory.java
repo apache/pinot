@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.helix.core.assignment.segment.strategy;
 
 import com.google.common.base.Preconditions;
+import java.util.Locale;
 import java.util.Map;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.assignment.InstancePartitions;
@@ -30,58 +31,22 @@ import org.apache.pinot.spi.utils.CommonConstants.Segment.AssignmentStrategy;
 
 /// Factory for SegmentAssignmentStrategy
 public class SegmentAssignmentStrategyFactory {
-
   private SegmentAssignmentStrategyFactory() {
   }
 
-  /// Determine Segment Assignment strategy
+  /// Returns the segment assignment strategy for the given instance partitions type (`OFFLINE` or `COMPLETED`) or
+  /// tier: the strategy configured under that key in `segmentAssignmentConfigMap`, otherwise the one derived from the
+  /// instance partitions.
   public static SegmentAssignmentStrategy getSegmentAssignmentStrategy(HelixManager helixManager,
       TableConfig tableConfig, String assignmentType, InstancePartitions instancePartitions) {
-    String assignmentStrategy = null;
-
-    TableType currentTableType = tableConfig.getTableType();
-    // TODO: Handle segment assignment strategy in future for CONSUMING segments in follow up PR
-    // See https://github.com/apache/pinot/issues/9047
-    // Accommodate new changes for assignment strategy
-    Map<String, SegmentAssignmentConfig> segmentAssignmentConfigMap = tableConfig.getSegmentAssignmentConfigMap();
-
-    if (tableConfig.isDimTable()) {
-      // Segment Assignment Strategy for DIM tables
-      Preconditions.checkState(currentTableType == TableType.OFFLINE,
-          "All Servers Segment assignment Strategy is only applicable to Dim OfflineTables");
-      SegmentAssignmentStrategy segmentAssignmentStrategy = new AllServersSegmentAssignmentStrategy();
-      segmentAssignmentStrategy.init(helixManager, tableConfig);
-      return segmentAssignmentStrategy;
-    } else {
-      // Try to determine segment assignment strategy from table config
-      if (segmentAssignmentConfigMap != null) {
-        SegmentAssignmentConfig segmentAssignmentConfig;
-        // Use the pre-defined segment assignment strategy
-        segmentAssignmentConfig = segmentAssignmentConfigMap.get(assignmentType.toUpperCase());
-        // Segment assignment config is only applicable to offline tables and completed segments of realtime tables
-        if (segmentAssignmentConfig != null) {
-          assignmentStrategy = segmentAssignmentConfig.getAssignmentStrategy().toLowerCase();
-        }
-      }
-    }
-
-    // Use the existing information to determine segment assignment strategy
     SegmentAssignmentStrategy segmentAssignmentStrategy;
-    if (assignmentStrategy == null) {
-      // Calculate numReplicaGroups and numPartitions to determine segment assignment strategy
-      Preconditions
-          .checkState(instancePartitions != null, "Failed to find instance partitions for segment assignment strategy");
-      int numReplicaGroups = instancePartitions.getNumReplicaGroups();
-      int numPartitions = instancePartitions.getNumPartitions();
-
-      if (numReplicaGroups == 1 && numPartitions == 1) {
-        segmentAssignmentStrategy = new BalancedNumSegmentAssignmentStrategy();
-      } else {
-        segmentAssignmentStrategy = new ReplicaGroupSegmentAssignmentStrategy();
-      }
+    if (tableConfig.isDimTable()) {
+      // Dimension tables are always assigned to all servers
+      Preconditions.checkState(tableConfig.getTableType() == TableType.OFFLINE,
+          "All Servers Segment assignment Strategy is only applicable to Dim OfflineTables");
+      segmentAssignmentStrategy = new AllServersSegmentAssignmentStrategy();
     } else {
-      // Set segment assignment strategy depending on strategy set in table config
-      switch (assignmentStrategy) {
+      switch (getAssignmentStrategy(tableConfig, assignmentType, instancePartitions)) {
         case AssignmentStrategy.ROUND_ROBIN_SEGMENT_ASSIGNMENT_STRATEGY:
           segmentAssignmentStrategy = new RoundRobinSegmentAssignmentStrategy();
           break;
@@ -93,11 +58,32 @@ public class SegmentAssignmentStrategyFactory {
           break;
         case AssignmentStrategy.BALANCE_NUM_SEGMENT_ASSIGNMENT_STRATEGY:
         default:
+          // Existing tables may carry a strategy name that was never recognized, which has always run as balanced
           segmentAssignmentStrategy = new BalancedNumSegmentAssignmentStrategy();
           break;
       }
     }
     segmentAssignmentStrategy.init(helixManager, tableConfig);
     return segmentAssignmentStrategy;
+  }
+
+  /// Returns the strategy name configured under the instance partitions type or tier name, if any, otherwise the one
+  /// derived from the instance partitions: balanced unless they have multiple replica-groups or partitions.
+  private static String getAssignmentStrategy(TableConfig tableConfig, String assignmentType,
+      InstancePartitions instancePartitions) {
+    // TODO: Handle the segment assignment strategy for CONSUMING segments, see
+    //   https://github.com/apache/pinot/issues/9047
+    Map<String, SegmentAssignmentConfig> segmentAssignmentConfigMap = tableConfig.getSegmentAssignmentConfigMap();
+    if (segmentAssignmentConfigMap != null) {
+      SegmentAssignmentConfig segmentAssignmentConfig = segmentAssignmentConfigMap.get(assignmentType);
+      if (segmentAssignmentConfig != null && segmentAssignmentConfig.getAssignmentStrategy() != null) {
+        return segmentAssignmentConfig.getAssignmentStrategy().toLowerCase(Locale.ROOT);
+      }
+    }
+    Preconditions.checkState(instancePartitions != null,
+        "Failed to find instance partitions for segment assignment strategy");
+    return instancePartitions.getNumReplicaGroups() == 1 && instancePartitions.getNumPartitions() == 1
+        ? AssignmentStrategy.BALANCE_NUM_SEGMENT_ASSIGNMENT_STRATEGY
+        : AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY;
   }
 }
