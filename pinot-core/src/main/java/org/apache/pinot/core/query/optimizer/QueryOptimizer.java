@@ -22,6 +22,7 @@ import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.core.query.optimizer.filter.ArrayContainsFilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.FilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.FlattenAndOrFilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.IdenticalPredicateFilterOptimizer;
@@ -42,10 +43,12 @@ public class QueryOptimizer {
   //   be merged
   // - TimePredicateFilterOptimizer and MergeRangeFilterOptimizer relies on NumericalFilterOptimizer to convert the
   //   values to the proper format so that they can be properly parsed
+  // - ArrayContainsFilterOptimizer runs before MergeEqInFilterOptimizer and NumericalFilterOptimizer so that the
+  //   EQUALS predicates it produces can be merged and have their values converted
   private static final List<FilterOptimizer> FILTER_OPTIMIZERS =
-      List.of(new FlattenAndOrFilterOptimizer(), new IdenticalPredicateFilterOptimizer(),
-          new MergeEqInFilterOptimizer(), new NumericalFilterOptimizer(), new TimePredicateFilterOptimizer(),
-          new MergeRangeFilterOptimizer(), new TextMatchFilterOptimizer());
+      List.of(new FlattenAndOrFilterOptimizer(), new ArrayContainsFilterOptimizer(),
+          new IdenticalPredicateFilterOptimizer(), new MergeEqInFilterOptimizer(), new NumericalFilterOptimizer(),
+          new TimePredicateFilterOptimizer(), new MergeRangeFilterOptimizer(), new TextMatchFilterOptimizer());
 
   private static final List<StatementOptimizer> STATEMENT_OPTIMIZERS =
       List.of(new AggregateFunctionRewriteOptimizer());
