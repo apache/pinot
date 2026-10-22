@@ -53,6 +53,13 @@ jobs:
         run: |
           npm install -g npm@8.5.5
           npm --version
+      - name: Use repository Maven wrapper
+        run: |
+          mkdir -p "$RUNNER_TEMP/pinot-maven-bin"
+          printf '#!/bin/sh\nexec "$GITHUB_WORKSPACE/mvnw" "$@"\n' > "$RUNNER_TEMP/pinot-maven-bin/mvn"
+          chmod +x "$RUNNER_TEMP/pinot-maven-bin/mvn"
+          echo "$RUNNER_TEMP/pinot-maven-bin" >> "$GITHUB_PATH"
+          ./mvnw --version
       - name: Pinot Compatibility Regression Testing
         if : ${{github.event_name == 'workflow_dispatch'}}
         env:

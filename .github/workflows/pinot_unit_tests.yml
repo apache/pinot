@@ -20,6 +20,7 @@
 name: Pinot Unit Tests
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - master
@@ -60,6 +61,13 @@ jobs:
           java-version: 25
           distribution: 'temurin'
           cache: 'maven'
+      - name: Use repository Maven wrapper
+        run: |
+          mkdir -p "$RUNNER_TEMP/pinot-maven-bin"
+          printf '#!/bin/sh\nexec "$GITHUB_WORKSPACE/mvnw" "$@"\n' > "$RUNNER_TEMP/pinot-maven-bin/mvn"
+          chmod +x "$RUNNER_TEMP/pinot-maven-bin/mvn"
+          echo "$RUNNER_TEMP/pinot-maven-bin" >> "$GITHUB_PATH"
+          ./mvnw --version
       - name: Install pinot-dependency-verifier into repo
         timeout-minutes: 120
         run: |
@@ -111,6 +119,13 @@ jobs:
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             ${{ runner.os }}-maven-
+      - name: Use repository Maven wrapper
+        run: |
+          mkdir -p "$RUNNER_TEMP/pinot-maven-bin"
+          printf '#!/bin/sh\nexec "$GITHUB_WORKSPACE/mvnw" "$@"\n' > "$RUNNER_TEMP/pinot-maven-bin/mvn"
+          chmod +x "$RUNNER_TEMP/pinot-maven-bin/mvn"
+          echo "$RUNNER_TEMP/pinot-maven-bin" >> "$GITHUB_PATH"
+          ./mvnw --version
       - name: Build Project
         env:
           RUN_INTEGRATION_TESTS: false
