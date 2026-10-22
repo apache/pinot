@@ -706,9 +706,8 @@ public class HelixHelper {
           if (currentRecord == null) {
             return null;
           }
-          // Deep copy because mutators such as InstanceConfig.addTag() modify list and map fields in place.
-          ZNRecord originalRecord =
-              (ZNRecord) ZN_RECORD_SERIALIZER.deserialize(ZN_RECORD_SERIALIZER.serialize(currentRecord));
+          // Compare a deep copy of the stored fields, as for IdealState, because mutators change lists in place.
+          ZNRecord originalRecord = cloneIdealState(new IdealState(currentRecord)).getRecord();
           InstanceConfig instanceConfig = new InstanceConfig(currentRecord);
           try {
             mutator.accept(instanceConfig);
