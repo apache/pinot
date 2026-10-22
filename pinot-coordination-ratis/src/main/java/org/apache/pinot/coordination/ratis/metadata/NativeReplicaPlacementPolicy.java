@@ -70,7 +70,7 @@ public record NativeReplicaPlacementPolicy(Map<String, Server> servers) {
     }
   }
 
-  @SuppressWarnings("deprecation") // Legacy wire constraints must be rejected instead of silently ignored.
+  @SuppressWarnings({"deprecation", "removal"}) // Legacy wire constraints must be rejected instead of silently ignored.
   public static int validateTable(TableConfig table) {
     require(table != null && table.getTableType() == TableType.OFFLINE && !table.isDimTable()
         && !table.isUpsertEnabled() && table.getDedupConfig() == null
@@ -102,6 +102,7 @@ public record NativeReplicaPlacementPolicy(Map<String, Server> servers) {
     return tenant;
   }
 
+  @SuppressWarnings("removal") // Modern selector fields do not expose the legacy routing wire constraint.
   private static boolean ordinaryRouting(RoutingConfig routing) {
     return routing == null || routing.getRoutingTableBuilderName() == null
         && (routing.getInstanceSelectorType() == null
