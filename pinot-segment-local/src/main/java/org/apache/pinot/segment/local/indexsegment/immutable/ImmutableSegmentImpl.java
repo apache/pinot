@@ -331,7 +331,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
 
   @Override
   public Set<String> getColumnNames() {
-    return _indexContainerMap.keySet();
+    return _dataSources.keySet();
   }
 
   @Override

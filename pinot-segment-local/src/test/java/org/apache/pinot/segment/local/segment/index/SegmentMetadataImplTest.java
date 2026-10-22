@@ -205,6 +205,7 @@ public class SegmentMetadataImplTest {
         ColumnMetadata expected = eager.getColumnMetadataFor(column);
         ColumnMetadata actual = mapped.getColumnMetadataFor(column);
         assertTrue(actual instanceof MappedColumnMetadata);
+        assertSame(mapped.getColumnMetadataFor(column), actual);
         assertEquals(actual.getFieldSpec(), expected.getFieldSpec(), column);
         assertEquals(actual.getCardinality(), expected.getCardinality(), column);
         assertEquals(actual.getMinValue(), expected.getMinValue(), column);

@@ -42,6 +42,7 @@ import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReferenceArray;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.configuration2.PropertiesConfiguration;
@@ -81,6 +82,8 @@ public class SegmentMetadataImpl implements SegmentMetadata, Closeable {
   private final Schema _schema;
   @Nullable
   private MappedSegmentMetadataStore _mappedStore;
+  @Nullable
+  private AtomicReferenceArray<MappedColumnMetadata> _mappedColumnMetadata;
   private boolean _mappedStoreClosed;
   private final Map<String, ColumnMetadata> _virtualColumnMetadata = new HashMap<>();
   private final Set<String> _removedColumns = new HashSet<>();
@@ -177,6 +180,7 @@ public class SegmentMetadataImpl implements SegmentMetadata, Closeable {
         loadCreationMeta(creationMetaFile);
       }
       _mappedStore = store;
+      _mappedColumnMetadata = new AtomicReferenceArray<>(store.size());
       _physicalColumnNames = new AbstractSet<>() {
         @Override
         public int size() {
@@ -610,7 +614,17 @@ public class SegmentMetadataImpl implements SegmentMetadata, Closeable {
       return null;
     }
     int ordinal = _mappedStore.ordinal(column);
-    return ordinal >= 0 ? new MappedColumnMetadata(_mappedStore, ordinal) : null;
+    if (ordinal < 0) {
+      return null;
+    }
+    MappedColumnMetadata metadata = _mappedColumnMetadata.get(ordinal);
+    if (metadata == null) {
+      metadata = new MappedColumnMetadata(_mappedStore, ordinal);
+      if (!_mappedColumnMetadata.compareAndSet(ordinal, null, metadata)) {
+        metadata = _mappedColumnMetadata.get(ordinal);
+      }
+    }
+    return metadata;
   }
 
   /// Adds a virtual column generated during serving load without changing the on-disk physical-column directory.

@@ -398,14 +398,17 @@ public class TablesResource {
       @Nullable Set<String> columnFilter) {
     int additionalCount = 0;
     SegmentMetadata segmentMetadata = segment.getSegmentMetadata();
+    Set<String> physicalColumns = segmentMetadata instanceof SegmentMetadataImpl
+        ? segment.getPhysicalColumnNames()
+        : null;
     if (columnFilter == null) {
-      additionalCount = segmentMetadata instanceof SegmentMetadataImpl
-          ? segment.getColumnNames().size() : segmentMetadata.getColumnMetadataMap().size();
+      additionalCount = physicalColumns != null
+          ? physicalColumns.size()
+          : segmentMetadata.getColumnMetadataMap().size();
     } else {
       for (String column : columnFilter) {
-        if ((segmentMetadata instanceof SegmentMetadataImpl
-            ? segmentMetadata.getColumnMetadataFor(column) : segmentMetadata.getColumnMetadataMap().get(column))
-            != null) {
+        if (physicalColumns != null ? physicalColumns.contains(column)
+            : segmentMetadata.getColumnMetadataMap().containsKey(column)) {
           additionalCount++;
         }
       }

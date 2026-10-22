@@ -50,6 +50,8 @@ public final class MappedColumnMetadata implements ColumnMetadata {
   private volatile Set<Integer> _partitions;
   @Nullable
   private volatile Bounds _bounds;
+  @Nullable
+  private volatile IndexSize[] _indexes;
 
   private static final class Bounds {
     @Nullable
@@ -318,21 +320,29 @@ public final class MappedColumnMetadata implements ColumnMetadata {
   }
 
   private IndexSize indexAt(int position) {
-    if (position < 0 || position >= getNumIndexes()) {
+    int count = getNumIndexes();
+    if (position < 0 || position >= count) {
       throw new IndexOutOfBoundsException(position);
     }
-    byte[] bytes = _store.blob(_ordinal, MappedSegmentMetadataStore.INDEXES);
-    try (DataInputStream input = new DataInputStream(new ByteArrayInputStream(bytes))) {
-      String type = null;
-      long size = 0;
-      for (int i = 0; i <= position; i++) {
-        type = MappedSegmentMetadataStore.readString(input);
-        size = input.readLong();
+    IndexSize[] indexes = _indexes;
+    if (indexes == null) {
+      synchronized (this) {
+        indexes = _indexes;
+        if (indexes == null) {
+          byte[] bytes = _store.blob(_ordinal, MappedSegmentMetadataStore.INDEXES);
+          indexes = new IndexSize[count];
+          try (DataInputStream input = new DataInputStream(new ByteArrayInputStream(bytes))) {
+            for (int i = 0; i < count; i++) {
+              indexes[i] = new IndexSize(MappedSegmentMetadataStore.readString(input), input.readLong());
+            }
+          } catch (IOException e) {
+            throw new IllegalStateException("Cannot decode index sizes for " + getColumnName(), e);
+          }
+          _indexes = indexes;
+        }
       }
-      return new IndexSize(type, size);
-    } catch (IOException e) {
-      throw new IllegalStateException("Cannot decode index sizes for " + getColumnName(), e);
     }
+    return indexes[position];
   }
 
   private static final class IndexSize {

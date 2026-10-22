@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.indexsegment.immutable;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -28,7 +29,10 @@ import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.doAnswer;
@@ -38,6 +42,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
@@ -45,6 +50,22 @@ import static org.testng.Assert.assertTrue;
 
 /// Tests for the post-registration lifecycle hook of [ImmutableSegmentImpl].
 public class ImmutableSegmentImplTest {
+
+  @Test
+  public void testColumnNamesIncludeOpenStructParentInsteadOfMaterializedChild() {
+    SegmentMetadataImpl metadata = mock(SegmentMetadataImpl.class);
+    ColumnMetadata child = mock(ColumnMetadata.class);
+    when(child.isMaterializedChild()).thenReturn(true);
+    when(child.getParentColumn()).thenReturn("event");
+    when(metadata.getColumnMetadataFor("event$key")).thenReturn(child);
+    Schema schema = new Schema();
+    schema.addField(new ComplexFieldSpec("event", DataType.OPEN_STRUCT, true, Map.of()));
+    when(metadata.getSchema()).thenReturn(schema);
+
+    ImmutableSegmentImpl segment = new ImmutableSegmentImpl(mock(SegmentDirectory.class), metadata,
+        Map.of("event$key", mock(ColumnIndexContainer.class)), null);
+    assertEquals(segment.getColumnNames(), Set.of("event"));
+  }
 
   /// The hook must reach the directory at most once per segment instance: the same segment can be registered more than
   /// once (e.g. an upsert replacement with a consistency mode other than NONE registers it through a
