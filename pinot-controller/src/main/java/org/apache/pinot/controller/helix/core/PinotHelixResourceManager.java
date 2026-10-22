@@ -2313,7 +2313,16 @@ public class PinotHelixResourceManager {
     String propertyStoreRoot = PropertyPathBuilder.propertyStore(_helixClusterName);
     for (int attempt = 1; ; attempt++) {
       Stat idealStateStat = new Stat();
-      ZNRecord idealState = zkClient.readData(idealStatePath, idealStateStat);
+      ZNRecord idealState;
+      try {
+        idealState = zkClient.readData(idealStatePath, idealStateStat);
+      } catch (ZkNoNodeException e) {
+        idealState = null;
+      }
+      if (idealState == null) {
+        // The table was deleted
+        return Set.of();
+      }
       List<Op> segmentDeletes = new ArrayList<>();
       Set<String> segmentsToRemove = new HashSet<>();
       for (String segmentName : segmentNames) {
@@ -2345,7 +2354,8 @@ public class PinotHelixResourceManager {
         zkClient.multi(ops);
         return segmentsToRemove;
       } catch (ZkException e) {
-        // The IdealState or a segment ZK metadata changed concurrently
+        // As in ZkMultiWriteBuilder#execute(), the ZkClient wraps the KeeperException of an atomic rollback. A version
+        // mismatch or a missing node means that the IdealState or a segment ZK metadata changed concurrently.
         boolean concurrentChange = e.getCause() instanceof KeeperException.BadVersionException
             || e.getCause() instanceof KeeperException.NoNodeException;
         if (!concurrentChange || attempt == MAX_SEGMENT_ZK_METADATA_REMOVAL_ATTEMPTS) {

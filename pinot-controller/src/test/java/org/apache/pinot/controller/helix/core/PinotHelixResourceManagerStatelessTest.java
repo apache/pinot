@@ -1960,6 +1960,10 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
               .set(idealStatePath, idealStateBefore.getRecord(), idealStateBefore.getRecord().getVersion(),
                   AccessOption.PERSISTENT));
 
+      // The table was deleted
+      assertEquals(_helixResourceManager.removeInProgressSegmentsZKMetadataNotInIdealState("deletedTable_REALTIME",
+          segments), Set.of());
+
       // Nothing to remove: the IdealState is not written
       assertEquals(_helixResourceManager.removeInProgressSegmentsZKMetadataNotInIdealState(REMOVAL_TEST_TABLE,
           segmentsToRemove), Set.of());
