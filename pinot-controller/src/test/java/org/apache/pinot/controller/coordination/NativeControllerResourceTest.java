@@ -21,6 +21,7 @@ package org.apache.pinot.controller.coordination;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -131,6 +132,13 @@ public class NativeControllerResourceTest {
       HttpHeaders clusterHeaders = headers(null);
       when(clusterHeaders.getHeaderString(HttpHeaders.IF_MATCH)).thenReturn(clusterTag);
       assertStatus(501, () -> resource.updateClusterConfig("{}", clusterHeaders));
+      // Read-only endpoint approvals may rotate while segment state exists; loader settings still require reconcile.
+      Map<String, String> approved = new HashMap<>(fixture._metadata.snapshot().clusterConfig());
+      approved.put(NativeTableSizeMetadataProvider.ENDPOINT_APPROVAL_PREFIX + "Server_native", "https://host:8443");
+      fixture._metadata.validateClusterConfig(fixture._metadata.snapshot(), approved);
+      approved.put("loader.setting", "changed");
+      assertThrows(UnsupportedOperationException.class,
+          () -> fixture._metadata.validateClusterConfig(fixture._metadata.snapshot(), approved));
     }
   }
 

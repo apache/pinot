@@ -99,6 +99,8 @@ public final class RatisControllerRuntime implements AutoCloseable, ServiceStatu
   private ControllerAdminApiApplication _adminApp;
   @Nullable
   private NativeControllerMetadata _metadata;
+  @Nullable
+  private NativeControllerTableSizeResource _tableSizes;
   private volatile boolean _started;
   private volatile boolean _closed;
   private volatile String _status = "Native controller has not started";
@@ -182,6 +184,8 @@ public final class RatisControllerRuntime implements AutoCloseable, ServiceStatu
     _adminApp = new ControllerAdminApiApplication(_config, Set.of(NativeControllerResource.class,
         LandingPageHandler.class, PinotControllerAuthResource.class, PinotVersionRestletResource.class,
         PinotControllerAppConfigs.class, PinotControllerHealthCheck.class, WebApplicationExceptionMapper.class));
+    _tableSizes = new NativeControllerTableSizeResource(metadata, _config, accessControlFactory, metrics);
+    _adminApp.register(_tableSizes);
     Instant startTime = Instant.now();
     _adminApp.registerBinder(new AbstractBinder() {
       @Override
@@ -299,8 +303,9 @@ public final class RatisControllerRuntime implements AutoCloseable, ServiceStatu
     _closed = true;
     _started = false;
     Exception failure = null;
-    for (AutoCloseable resource : new AutoCloseable[]{_adminApp == null ? null : _adminApp::stop, _metadata,
-        _endpoint, _access, _store, _provider}) {
+    AutoCloseable[] resources = {_adminApp == null ? null : _adminApp::stop, _tableSizes, _metadata,
+        _endpoint, _access, _store, _provider};
+    for (AutoCloseable resource : resources) {
       if (resource != null) {
         try {
           resource.close();

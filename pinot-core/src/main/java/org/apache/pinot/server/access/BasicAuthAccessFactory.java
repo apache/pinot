@@ -19,6 +19,7 @@
 package org.apache.pinot.server.access;
 
 import io.netty.channel.ChannelHandlerContext;
+import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -48,6 +49,14 @@ public class BasicAuthAccessFactory implements AccessControlFactory {
   public void init(PinotConfiguration configuration) {
     _accessControl = new BasicAuthAccessControl(
         BasicAuthPrincipalUtils.extractBasicAuthPrincipals(configuration, PREFIX));
+  }
+
+  @Override
+  public void initWithoutHelix(PinotConfiguration configuration) throws IOException {
+    if (getClass() != BasicAuthAccessFactory.class) {
+      AccessControlFactory.super.initWithoutHelix(configuration);
+    }
+    init(configuration);
   }
 
   public AccessControl create() {

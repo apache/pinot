@@ -528,6 +528,18 @@ public final class NativeServerParticipant implements AutoCloseable {
     return _servingSettings == null ? Set.of() : Set.of(ReadOnlyCapability.SERVER_QUERY);
   }
 
+  /// Captures the coherent metadata revision used for local administrative observations. This permits no query
+  /// serving; callers and aggregators must compare the exact physical installation identities independently.
+  public MetadataRpc.Revision observationRevision() {
+    _admission.readLock().lock();
+    try {
+      checkState(isReadyForInstallations(), "Native server is not ready for observations");
+      return metadata().revision();
+    } finally {
+      _admission.readLock().unlock();
+    }
+  }
+
   public NativeInstanceDataManager dataManager() {
     return _manager;
   }

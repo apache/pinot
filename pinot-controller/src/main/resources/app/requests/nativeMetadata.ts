@@ -28,6 +28,7 @@ export type NativeWriteCapabilities = {
   schemaCreate: boolean; schemaUpdate: boolean; schemaDelete: boolean;
   tableCreate: boolean; tableUpdate: boolean; tableDelete: boolean;
   clusterConfigUpdate: boolean; clusterConfigDelete: boolean;
+  tableSize?: boolean; columnCompressionStats?: boolean;
 };
 export type NativeWriteMarker = { id: string; method: string; path: string };
 export type NativeWriteRequest = NativeWriteMarker & { method: 'POST' | 'PUT' | 'DELETE'; body?: string; etag?: string; create: boolean };

@@ -112,6 +112,19 @@ public class TableSizeResource {
       throw new WebApplicationException("Table: " + tableName + " is not found", Response.Status.NOT_FOUND);
     }
 
+    List<SegmentDataManager> segments = tableDataManager.acquireAllSegments();
+    try {
+      return ResourceUtils.convertToJsonString(readTableSize(tableDataManager, segments, detailed,
+          includeCompressionStats, includeColumnCompressionStats));
+    } finally {
+      segments.forEach(tableDataManager::releaseSegment);
+    }
+  }
+
+  /// Computes observations from caller-pinned handles. The caller owns their lifetime through serialization.
+  public static TableSizeInfo readTableSize(TableDataManager tableDataManager,
+      List<SegmentDataManager> segmentDataManagers, boolean detailed, boolean includeCompressionStats,
+      boolean includeColumnCompressionStats) {
     Pair<TableConfig, ?> cachedPair = tableDataManager.getCachedTableConfigAndSchema();
     boolean compressionStatsEnabled = detailed && (includeCompressionStats || includeColumnCompressionStats)
         && cachedPair != null && cachedPair.getLeft() != null
@@ -121,81 +134,68 @@ public class TableSizeResource {
     long tableSizeInBytes = 0L;
     int columnContributions = 0;
     List<SegmentSizeInfo> segmentSizeInfos = new ArrayList<>();
-    List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
-    try {
-      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-        long segmentSizeBytes = 0L;
-        boolean hasImmutable = false;
-        boolean compressionStatsComplete = true;
-        long uncompressedValueSizeInBytes = 0;
-        long compressionForwardIndexAndDictionaryStorageSizeInBytes = 0;
-        Map<String, ColumnCompressionStatsAccumulator> columnAccumulators =
-            compressionStatsEnabled && includeColumnCompressionStats ? new HashMap<>() : null;
-        for (IndexSegment segment : segmentDataManager.getReportableSegments()) {
-          if (segment instanceof ImmutableSegment immutableSegment) {
-            segmentSizeBytes += immutableSegment.getSegmentSizeBytes();
-            if (compressionStatsEnabled) {
-              if (includeColumnCompressionStats) {
-                columnContributions = TablesResource.addColumnContributions(columnContributions, immutableSegment,
-                    null);
-              }
-              SegmentCompressionStatsContribution contribution =
-                  SegmentCompressionStatsReader.read(immutableSegment.getSegmentMetadata(),
-                      includeColumnCompressionStats);
-              if (contribution.isComplete()) {
-                uncompressedValueSizeInBytes += contribution.getUncompressedValueSizeInBytes();
-                compressionForwardIndexAndDictionaryStorageSizeInBytes +=
-                    contribution.getForwardIndexAndDictionaryStorageSizeInBytes();
-              } else {
-                compressionStatsComplete = false;
-              }
-              if (columnAccumulators != null && contribution.getColumnCompressionStats() != null) {
-                for (Map.Entry<String, ColumnCompressionStatsContribution> entry
-                    : contribution.getColumnCompressionStats().entrySet()) {
-                  columnAccumulators.computeIfAbsent(entry.getKey(), ignored ->
-                          new ColumnCompressionStatsAccumulator())
-                      .add(entry.getValue());
-                }
-              }
+    for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+      long segmentSizeBytes = 0L;
+      boolean hasImmutable = false;
+      boolean compressionStatsComplete = true;
+      long uncompressedValueSizeInBytes = 0;
+      long compressionForwardIndexAndDictionaryStorageSizeInBytes = 0;
+      Map<String, ColumnCompressionStatsAccumulator> columnAccumulators =
+          compressionStatsEnabled && includeColumnCompressionStats ? new HashMap<>() : null;
+      for (IndexSegment segment : segmentDataManager.getReportableSegments()) {
+        if (segment instanceof ImmutableSegment immutableSegment) {
+          segmentSizeBytes += immutableSegment.getSegmentSizeBytes();
+          if (compressionStatsEnabled) {
+            if (includeColumnCompressionStats) {
+              columnContributions = TablesResource.addColumnContributions(columnContributions, immutableSegment,
+                  null);
             }
-            hasImmutable = true;
-          }
-        }
-        if (hasImmutable) {
-          if (detailed) {
-            if (compressionStatsEnabled) {
-              Map<String, ColumnCompressionStatsInfo> columnCompressionStats = null;
-              if (columnAccumulators != null && !columnAccumulators.isEmpty()) {
-                columnCompressionStats = new HashMap<>();
-                for (Map.Entry<String, ColumnCompressionStatsAccumulator> entry : columnAccumulators.entrySet()) {
-                  columnCompressionStats.put(entry.getKey(),
-                      entry.getValue().toColumnCompressionStatsInfo(entry.getKey()));
-                }
-              }
-              segmentSizeInfos.add(new SegmentSizeInfo(segmentDataManager.getSegmentName(), segmentSizeBytes,
-                  compressionStatsComplete ? uncompressedValueSizeInBytes : -1,
-                  compressionStatsComplete ? compressionForwardIndexAndDictionaryStorageSizeInBytes : -1,
-                  columnCompressionStats));
+            SegmentCompressionStatsContribution contribution =
+                SegmentCompressionStatsReader.read(immutableSegment.getSegmentMetadata(),
+                    includeColumnCompressionStats);
+            if (contribution.isComplete()) {
+              uncompressedValueSizeInBytes += contribution.getUncompressedValueSizeInBytes();
+              compressionForwardIndexAndDictionaryStorageSizeInBytes +=
+                  contribution.getForwardIndexAndDictionaryStorageSizeInBytes();
             } else {
-              segmentSizeInfos.add(new SegmentSizeInfo(segmentDataManager.getSegmentName(), segmentSizeBytes));
+              compressionStatsComplete = false;
+            }
+            if (columnAccumulators != null && contribution.getColumnCompressionStats() != null) {
+              for (Map.Entry<String, ColumnCompressionStatsContribution> entry
+                  : contribution.getColumnCompressionStats().entrySet()) {
+                columnAccumulators.computeIfAbsent(entry.getKey(), ignored ->
+                        new ColumnCompressionStatsAccumulator())
+                    .add(entry.getValue());
+              }
             }
           }
-          tableSizeInBytes += segmentSizeBytes;
+          hasImmutable = true;
         }
       }
-    } finally {
-      // we could release segmentDataManagers as we iterate in the loop above
-      // but this is cleaner with clear semantics of usage. Also, above loop
-      // executes fast so duration of holding segments is not a concern
-      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-        tableDataManager.releaseSegment(segmentDataManager);
+      if (hasImmutable) {
+        if (detailed) {
+          if (compressionStatsEnabled) {
+            Map<String, ColumnCompressionStatsInfo> columnCompressionStats = null;
+            if (columnAccumulators != null && !columnAccumulators.isEmpty()) {
+              columnCompressionStats = new HashMap<>();
+              for (Map.Entry<String, ColumnCompressionStatsAccumulator> entry : columnAccumulators.entrySet()) {
+                columnCompressionStats.put(entry.getKey(),
+                    entry.getValue().toColumnCompressionStatsInfo(entry.getKey()));
+              }
+            }
+            segmentSizeInfos.add(new SegmentSizeInfo(segmentDataManager.getSegmentName(), segmentSizeBytes,
+                compressionStatsComplete ? uncompressedValueSizeInBytes : -1,
+                compressionStatsComplete ? compressionForwardIndexAndDictionaryStorageSizeInBytes : -1,
+                columnCompressionStats));
+          } else {
+            segmentSizeInfos.add(new SegmentSizeInfo(segmentDataManager.getSegmentName(), segmentSizeBytes));
+          }
+        }
+        tableSizeInBytes += segmentSizeBytes;
       }
     }
-
-    TableSizeInfo tableSizeInfo = new TableSizeInfo(tableDataManager.getTableName(), tableSizeInBytes,
+    return new TableSizeInfo(tableDataManager.getTableName(), tableSizeInBytes,
         segmentSizeInfos, TableSizeInfo.CURRENT_METADATA_VERSION);
-    //invalid to use the segmentDataManagers below
-    return ResourceUtils.convertToJsonString(tableSizeInfo);
   }
 
   // same as above but with /tables (plural) path for consistency.

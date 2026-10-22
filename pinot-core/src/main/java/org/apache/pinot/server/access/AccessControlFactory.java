@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.server.access;
 
+import java.io.IOException;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
@@ -40,6 +41,13 @@ public interface AccessControlFactory {
   /// @param helixManager Helix Manager
   default void init(PinotConfiguration configuration, HelixManager helixManager) {
     init(configuration);
+  }
+
+  /// Initializes only factories that explicitly support operation without Helix metadata. A configuration-only
+  /// fallback could silently omit metadata-backed policies, so implementations must opt in.
+  default void initWithoutHelix(PinotConfiguration configuration) throws IOException {
+    throw new IOException("Access control factory does not support initialization without Helix: "
+        + getClass().getName());
   }
 
   AccessControl create();

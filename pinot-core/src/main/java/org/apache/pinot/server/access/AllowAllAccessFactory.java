@@ -19,9 +19,11 @@
 package org.apache.pinot.server.access;
 
 import io.netty.channel.ChannelHandlerContext;
+import java.io.IOException;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.BasicAuthorizationResultImpl;
 import org.apache.pinot.spi.auth.server.RequesterIdentity;
+import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 public class AllowAllAccessFactory implements AccessControlFactory {
@@ -41,6 +43,14 @@ public class AllowAllAccessFactory implements AccessControlFactory {
       return true;
     }
   };
+
+  @Override
+  public void initWithoutHelix(PinotConfiguration configuration) throws IOException {
+    if (getClass() != AllowAllAccessFactory.class) {
+      AccessControlFactory.super.initWithoutHelix(configuration);
+    }
+    init(configuration);
+  }
 
   @Override
   public AccessControl create() {
