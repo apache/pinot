@@ -745,7 +745,7 @@
           "\n└── [1]@localhost:1|[0] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]}",
           "\n    └── [1]@localhost:1|[0] PROJECT",
           "\n        └── [1]@localhost:1|[0] WINDOW",
-          "\n            └── [1]@localhost:1|[0] SORT",
+          "\n            └── [1]@localhost:1|[0] SORT LIMIT 2147483647",
           "\n                └── [1]@localhost:1|[0] MAIL_RECEIVE(HASH_DISTRIBUTED)",
           "\n                    ├── [2]@localhost:2|[1] MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost:1|[0],[1]@localhost:2|[1]} (Subtree Omitted)",
           "\n                    └── [2]@localhost:1|[0] MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost:1|[0],[1]@localhost:2|[1]}",
