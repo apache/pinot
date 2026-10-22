@@ -81,7 +81,7 @@ final class MappedSegmentMetadataStore implements Closeable {
   static final String FILE_NAME = "segment_metadata.bin";
 
   private static final int MAGIC = 0x504d4431; // PMD1
-  private static final int VERSION = 2;
+  private static final int VERSION = 3;
   private static final int HEADER_SIZE = 64;
   private static final int RECORD_SIZE = 180;
 
@@ -348,11 +348,7 @@ final class MappedSegmentMetadataStore implements Closeable {
       ColumnMetadata metadata = source.getColumnMetadataFor(column);
       int offset = ordinal * RECORD_SIZE;
       putRef(recordBuffer, offset + NAME, blobs.add(column));
-      FieldSpec fieldSpec = metadata.getFieldSpec();
-      ObjectNode fieldSpecJson = fieldSpec.toJsonObject();
-      // TimeFieldSpec omits the discriminator from its JSON, but FieldSpec deserialization requires it.
-      fieldSpecJson.put("fieldType", fieldSpec.getFieldType().toString());
-      putRef(recordBuffer, offset + FIELD_SPEC, blobs.add(fieldSpecJson.toString()));
+      putRef(recordBuffer, offset + FIELD_SPEC, blobs.add(fieldSpecJson(metadata.getFieldSpec()).toString()));
       recordBuffer.putInt(offset + TOTAL_DOCS, metadata.getTotalDocs());
       recordBuffer.putInt(offset + CARDINALITY, metadata.getCardinality());
       int flags = (metadata.hasDictionary() ? HAS_DICTIONARY : 0) | (metadata.isSorted() ? SORTED : 0)
@@ -420,6 +416,19 @@ final class MappedSegmentMetadataStore implements Closeable {
     System.arraycopy(blobBytes, 0, bytes, blobBase, blobBytes.length);
     header.putInt(40, crc(bytes, HEADER_SIZE, bytes.length - HEADER_SIZE));
     return bytes;
+  }
+
+  private static ObjectNode fieldSpecJson(FieldSpec fieldSpec) {
+    ObjectNode json = fieldSpec.toJsonObject();
+    // TimeFieldSpec omits the discriminator, including when nested in a ComplexFieldSpec.
+    json.put("fieldType", fieldSpec.getFieldType().toString());
+    if (fieldSpec instanceof ComplexFieldSpec) {
+      ObjectNode children = (ObjectNode) json.get("childFieldSpecs");
+      for (Map.Entry<String, FieldSpec> entry : ((ComplexFieldSpec) fieldSpec).getChildFieldSpecs().entrySet()) {
+        children.set(entry.getKey(), fieldSpecJson(entry.getValue()));
+      }
+    }
+    return json;
   }
 
   private static byte[] encodeSegmentConfiguration(PropertiesConfiguration config)

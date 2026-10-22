@@ -270,9 +270,17 @@ public class SegmentMetadataImplTest {
               + "segment.version = v1\n"
               + "segment.time.column.name = timestamp\n"
               + "segment.time.unit = MILLISECONDS\n"
+              + "segment.complex.column.names = parent\n"
               + "column.timestamp.columnType = TIME\n"
-              + "column.timestamp.dataType = LONG\n");
+              + "column.timestamp.dataType = LONG\n"
+              + "column.parent.columnType = COMPLEX\n"
+              + "column.parent.dataType = OPEN_STRUCT\n"
+              + "column.parent.complexChildFieldNames = ts\n"
+              + "column.parent$$ts.columnType = TIME\n"
+              + "column.parent$$ts.dataType = LONG\n");
       SegmentMetadataImpl eager = new SegmentMetadataImpl(segmentDir);
+      ComplexFieldSpec parent = (ComplexFieldSpec) eager.getColumnMetadataFor("parent").getFieldSpec();
+      assertEquals(parent.getChildFieldSpec("ts").getFieldType(), FieldSpec.FieldType.TIME);
       File sidecar = new File(segmentDir, "segment_metadata.bin");
       for (int i = 0; i < 2; i++) {
         try (SegmentMetadataImpl mapped = SegmentMetadataImpl.loadMapped(segmentDir)) {
@@ -281,14 +289,14 @@ public class SegmentMetadataImplTest {
           assertEquals(mapped.getSchema(), eager.getSchema());
         }
       }
-      // A checksum-valid v1 header must still trigger a rebuild from canonical metadata.
-      byte[] version1 = Files.readAllBytes(sidecar.toPath());
-      ByteBuffer.wrap(version1).order(ByteOrder.BIG_ENDIAN).putInt(4, 1);
-      Files.write(sidecar.toPath(), version1);
+      // A checksum-valid v2 header must still trigger a rebuild from canonical metadata.
+      byte[] version2 = Files.readAllBytes(sidecar.toPath());
+      ByteBuffer.wrap(version2).order(ByteOrder.BIG_ENDIAN).putInt(4, 2);
+      Files.write(sidecar.toPath(), version2);
       try (SegmentMetadataImpl mapped = SegmentMetadataImpl.loadMapped(segmentDir)) {
         assertEquals(mapped.getSchema(), eager.getSchema());
       }
-      assertEquals(ByteBuffer.wrap(Files.readAllBytes(sidecar.toPath())).order(ByteOrder.BIG_ENDIAN).getInt(4), 2);
+      assertEquals(ByteBuffer.wrap(Files.readAllBytes(sidecar.toPath())).order(ByteOrder.BIG_ENDIAN).getInt(4), 3);
     } finally {
       FileUtils.deleteQuietly(segmentDir);
     }
