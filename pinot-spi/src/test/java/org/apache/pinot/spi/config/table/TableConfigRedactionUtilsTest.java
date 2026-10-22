@@ -35,6 +35,8 @@ import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
+// Persisted legacy streamConfigs must remain covered by the redaction tests.
+@SuppressWarnings("removal")
 public class TableConfigRedactionUtilsTest {
   private static final String MARKER = TableConfigRedactionUtils.REDACTION_MARKER;
   private static final String STREAM_PASSWORD_KEY = "stream.kafka.consumer.prop.ssl.keystore.password";
