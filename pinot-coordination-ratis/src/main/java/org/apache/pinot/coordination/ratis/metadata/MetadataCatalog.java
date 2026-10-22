@@ -418,7 +418,7 @@ public final class MetadataCatalog {
           projection.add(record);
         } else if (record.kind() == RecordKind.OFFLINE_REPLICA_ASSIGNMENT) {
           Assignment assignment = OfflineSegmentProtocol.decodeAssignment(record.value());
-          if (assignment.server().equals(server)) {
+          if (assignment.desiredOnline() && assignment.server().equals(server)) {
             projection.add(record);
             projection.addReferenced(assignment.segmentObjectId(), RecordKind.OFFLINE_SEGMENT_CONTENT);
             projection.addReferenced(assignment.compatibility().table().objectId(), RecordKind.TABLE_CONFIG);
@@ -428,7 +428,7 @@ public final class MetadataCatalog {
           OperationState operation = OperationProtocol.decodeOperation(record.value());
           if ((operation.status() == State.ACCEPTED || operation.status() == State.RUNNING)
               && operation.input() instanceof AssignedOfflineSegmentReload assigned
-              && assigned.reload().targets().stream().anyMatch(target -> target.server().equals(server))) {
+              && OfflineInstallationCatalog.targetsCurrentAssignment(operation, server, view)) {
             projection.addOperation(operation.operationId());
           }
         }

@@ -54,6 +54,7 @@ import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Result;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Revision;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Status;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.StreamTipResult;
+import org.apache.pinot.coordination.ratis.metadata.NativeReplicaPlacementPolicy;
 import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol;
 import org.apache.pinot.coordination.ratis.metadata.OperationProtocol;
 import org.apache.pinot.coordination.ratis.transport.MetadataAccess;
@@ -334,6 +335,7 @@ public final class NativeControllerMetadata implements PinotClusterConfigProvide
     TableConfigUtils.ensureMinReplicas(table, _minReplicas);
     TableConfigUtils.validate(table, schema, null, previous, _disableGroovy, _enforcePoolBasedAssignment);
     TableConfigValidatorRegistry.validate(table, schema);
+    NativeReplicaPlacementPolicy.validateTable(table);
     checkArgument(previous == null || TableConfigUtils.validateBackwardCompatibility(table, previous).isEmpty(),
         "Table configuration update is not backward compatible");
   }
@@ -348,14 +350,19 @@ public final class NativeControllerMetadata implements PinotClusterConfigProvide
 
   public void validateClusterConfig(Snapshot snapshot, Map<String, String> values) throws IOException {
     requireLiteralConfig(values);
+    String placement = values.get(NativeReplicaPlacementPolicy.CONFIG_KEY);
+    if (placement != null) {
+      NativeReplicaPlacementPolicy.parse(placement);
+    }
     if (!snapshot.nativeTables().isEmpty()) {
       Set<String> changed = new HashSet<>(snapshot.clusterConfig().keySet());
       changed.addAll(values.keySet());
       changed.removeIf(key -> Objects.equals(snapshot.clusterConfig().get(key), values.get(key)));
-      // Endpoint approvals govern read-only controller fan-out and require no segment reconciliation. Their
-      // removal/change is rechecked before returning an observation; all other changes retain the lifecycle gate.
+      // Endpoint approvals are rechecked before observations return. The native output reconciler validates each
+      // placement policy change in replicated apply; unrelated settings retain the existing lifecycle gate.
       if (changed.isEmpty() || changed.stream().anyMatch(
-          key -> !key.startsWith(NativeTableSizeMetadataProvider.ENDPOINT_APPROVAL_PREFIX))) {
+          key -> !key.startsWith(NativeTableSizeMetadataProvider.ENDPOINT_APPROVAL_PREFIX)
+              && !NativeReplicaPlacementPolicy.CONFIG_KEY.equals(key))) {
         throw new UnsupportedOperationException("Cluster config changes require native table reconciliation");
       }
     }

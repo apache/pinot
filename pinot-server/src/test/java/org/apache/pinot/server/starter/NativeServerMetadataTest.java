@@ -282,6 +282,7 @@ public class NativeServerMetadataTest {
         .addOperationIds(operationId.toString()).build();
     metadata.apply(initial);
     assertTrue(metadata.isCurrent(captured));
+    assertEquals(metadata.observeInstalled(List.of(captured)).identities(), Set.of(captured));
     metadata.apply(initial);
     assertTrue(metadata.isCurrent(captured), "An identical snapshot must preserve current authority");
     MetadataRpc.InstallationSnapshot unrelated = fixture.snapshot(11, Map.of("unrelated", "value"), fixture.records())
@@ -308,6 +309,8 @@ public class NativeServerMetadataTest {
     records.replaceAll(record -> record.getObjectId().equals(reassigned.getObjectId()) ? reassigned : record);
     metadata.apply(fixture.snapshot(12, Map.of(), records).toBuilder().addOperationIds(operationId.toString()).build());
     assertFalse(metadata.isCurrent(captured), "A newer materialization must fence the old assignment");
+    assertTrue(metadata.observeInstalled(List.of(captured)).identities().isEmpty(),
+        "Superseded physical copies cannot contribute size observations");
     Identity next = fixture._orders.identity(fixture._server, operationId, reassigned);
     assertTrue(metadata.isCurrent(next));
 
@@ -319,6 +322,8 @@ public class NativeServerMetadataTest {
     metadata.apply(fixture.snapshot(13, Map.of(), records).toBuilder().addOperationIds(operationId.toString()).build());
     assertFalse(metadata.isCurrent(fixture._orders.identity(fixture._server, operationId, offline)),
         "An exact identity with desiredOnline=false cannot publish");
+    assertTrue(metadata.observeInstalled(List.of(next)).identities().isEmpty(),
+        "Released physical copies cannot contribute size observations");
 
     for (CatalogRecord changed : List.of(fixture._orders._table, fixture._orders._schema)) {
       NativeServerMetadata changedMetadata = new NativeServerMetadata(fixture._server,
@@ -335,6 +340,8 @@ public class NativeServerMetadataTest {
     assertTrue(completed.isCurrent(captured));
     completed.apply(fixture.snapshot(14, Map.of(), fixture.records()));
     assertFalse(completed.isCurrent(captured), "Completed operation discovery must revoke local admission");
+    assertEquals(completed.observeInstalled(List.of(captured)).identities(), Set.of(captured),
+        "Completed installations remain observable without active operation hints");
   }
 
   @Test

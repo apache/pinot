@@ -20,7 +20,11 @@ package org.apache.pinot.coordination.ratis.metadata;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.ControlState;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.ParticipantState;
@@ -29,7 +33,9 @@ import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.Role;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.CatalogRecord;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.ObjectVersion;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.RecordKind;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Revision;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Status;
+import org.apache.pinot.coordination.ratis.metadata.OfflineInstallationProtocol.InstallationSnapshot;
 import org.apache.pinot.coordination.ratis.metadata.OfflineInstallationProtocol.Materialization;
 import org.apache.pinot.coordination.ratis.metadata.OfflineInstallationProtocol.Receipt;
 import org.apache.pinot.coordination.ratis.metadata.OfflineInstallationProtocol.ReportInstallation;
@@ -48,6 +54,110 @@ import org.apache.pinot.coordination.ratis.metadata.OperationProtocol.TargetMate
 /// one operation attempt; current ownership, membership and desired materialization remain separate serving fences.
 final class OfflineInstallationCatalog {
   private OfflineInstallationCatalog() {
+  }
+
+  /// Omission from a complete image revokes released materializations. Operation hints cannot keep superseded
+  /// assignments alive or accumulate indefinitely; their durable receipts/outcomes remain separately addressable.
+  static boolean targetsCurrentAssignment(OperationState operation, ParticipantToken server, OperationCatalog.View view)
+      throws IOException {
+    if (!(operation.input() instanceof AssignedOfflineSegmentReload assigned)) {
+      return false;
+    }
+    CatalogRecord record = view.record(RecordKind.OFFLINE_REPLICA_ASSIGNMENT,
+        OfflineSegmentProtocol.assignmentName(assigned.reload().segmentObjectId(), server.participantId()));
+    if (record == null || record.deleted()) {
+      return false;
+    }
+    Assignment current = OfflineSegmentProtocol.decodeAssignment(record.value());
+    return current.desiredOnline() && current.server().equals(server)
+        && assigned.reload().targets().contains(new TargetMaterialization(server, current.assignmentEpoch(),
+            current.materializationId()));
+  }
+
+  /// Admission uses the same complete projection as discovery, including future membership-header growth. A
+  /// rejected placement publishes neither assignment nor intent, and cannot strand an already admitted server.
+  static void admitProjection(ParticipantToken server, OperationCatalog.View view) throws IOException {
+    Set<UUID> records = new HashSet<>();
+    long bytes = ProjectionReservation.HEADER_BYTES + ProjectionReservation.CLUSTER_BYTES + 1;
+    int operations = 0;
+    List<CatalogRecord> selected = new ArrayList<>();
+    int clusterRecords = 1; // Reserve the singleton even if cluster configuration is created after admission.
+    for (CatalogRecord record : view.records(RecordKind.OFFLINE_REPLICA_ASSIGNMENT)) {
+      Assignment assignment = OfflineSegmentProtocol.decodeAssignment(record.value());
+      if (assignment.desiredOnline() && assignment.server().equals(server)) {
+        selected.add(record);
+        selected.add(view.record(assignment.segmentObjectId()));
+        selected.add(view.record(assignment.compatibility().table().objectId()));
+        selected.add(view.record(assignment.compatibility().schema().objectId()));
+      }
+    }
+    for (CatalogRecord record : selected) {
+      require(record != null, Status.NOT_READY, "Placement projection dependency is unavailable");
+      if (records.add(record.objectId())) {
+        bytes += view.recordBytes(record) + 1;
+        projectionBounds(records.size() + clusterRecords, operations, bytes);
+      }
+    }
+    for (CatalogRecord record : view.records(RecordKind.CONTROLLER_OPERATION)) {
+      OperationState operation = OperationProtocol.decodeOperation(record.value());
+      if ((operation.status() == State.ACCEPTED || operation.status() == State.RUNNING)
+          && targetsCurrentAssignment(operation, server, view)) {
+        operations++;
+        bytes += 39; // A quoted UUID plus an array separator.
+        projectionBounds(records.size() + clusterRecords, operations, bytes);
+      }
+    }
+  }
+
+  private static void projectionBounds(int records, int operations, long bytes) {
+    require(records + operations <= OfflineInstallationProtocol.MAX_SNAPSHOT_RECORDS
+        && bytes <= OfflineInstallationProtocol.MAX_SNAPSHOT_BYTES, Status.NOT_READY,
+        "Server installation projection is full; placement cannot admit additional work");
+  }
+
+  /// Synthetic full-escape strings and widest counters bound the header independently of future endpoint renewals.
+  private static final class ProjectionReservation {
+    private static final long HEADER_BYTES = headerBytes();
+    private static final long CLUSTER_BYTES = clusterBytes();
+
+    private static long clusterBytes() {
+      try {
+        // Every config value must fit inside a MAX_COMMAND_BYTES mutation. Add the entire worst-case record
+        // envelope rather than assuming that command/record overhead or counter widths happen to cancel out.
+        CatalogRecord envelope = new CatalogRecord(RecordKind.CLUSTER_CONFIG, MetadataProtocol.CLUSTER_CONFIG_NAME,
+            new UUID(0, 0), Long.MAX_VALUE, MetadataProtocol.FORMAT_VERSION, Long.MAX_VALUE, false,
+            MetadataProtocol.toTree(Map.of()));
+        return MetadataProtocol.MAX_COMMAND_BYTES + MetadataProtocol.encodeValue(envelope).length;
+      } catch (IOException e) {
+        throw new ExceptionInInitializerError(e);
+      }
+    }
+
+    private static long headerBytes() {
+      UUID id = new UUID(0, 0);
+      String identifier = "\u0000".repeat(MembershipProtocol.MAX_IDENTIFIER_LENGTH);
+      Map<String, String> endpoints = new HashMap<>();
+      for (int ordinal = 0; ordinal < MembershipProtocol.MAX_ENDPOINTS; ordinal++) {
+        endpoints.put("\u0000".repeat(MembershipProtocol.MAX_IDENTIFIER_LENGTH - 1) + (char) (16 + ordinal),
+            "\u0000".repeat(MembershipProtocol.MAX_ENDPOINT_VALUE_LENGTH));
+      }
+      ParticipantToken token = new ParticipantToken(id, identifier, Role.SERVER, id, Long.MAX_VALUE);
+      ParticipantState participant = new ParticipantState(token, endpoints,
+          Set.of(MembershipProtocol.Capability.SERVER_QUERY), Long.MAX_VALUE, false, false, false,
+          new Revision(id, Long.MAX_VALUE), Long.MAX_VALUE, Long.MAX_VALUE);
+      MembershipProtocol.ControlToken control =
+          new MembershipProtocol.ControlToken(id, Long.MAX_VALUE, Long.MAX_VALUE, identifier, id);
+      MembershipProtocol.Policy policy = new MembershipProtocol.Policy(Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE,
+          Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE);
+      ControlState state = new ControlState(control, Long.MAX_VALUE, policy, Long.MAX_VALUE, Long.MAX_VALUE,
+          Long.MAX_VALUE);
+      try {
+        return MetadataProtocol.encodeValue(new InstallationSnapshot(Status.OK, new Revision(id, Long.MAX_VALUE),
+            "", participant, List.of(), List.of(), state)).length;
+      } catch (IOException e) {
+        throw new ExceptionInInitializerError(e);
+      }
+    }
   }
 
   static void validateSession(ParticipantToken server, OperationCatalog.View view) {

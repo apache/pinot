@@ -19,6 +19,7 @@
 package org.apache.pinot.server.starter;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -535,6 +536,18 @@ public final class NativeServerParticipant implements AutoCloseable {
     try {
       checkState(isReadyForInstallations(), "Native server is not ready for observations");
       return metadata().revision();
+    } finally {
+      _admission.readLock().unlock();
+    }
+  }
+
+  /// Filters pinned physical identities through one coherent current assignment image without requiring an active
+  /// installation operation. Released copies may remain on disk but must not inflate administrative observations.
+  public NativeServerMetadata.Observation observeInstalled(List<Identity> identities) {
+    _admission.readLock().lock();
+    try {
+      checkState(isReadyForInstallations(), "Native server is not ready for observations");
+      return metadata().observeInstalled(identities);
     } finally {
       _admission.readLock().unlock();
     }

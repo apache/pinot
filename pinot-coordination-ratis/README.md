@@ -197,15 +197,21 @@ accept requests up to 64 KiB and responses up to 2 MiB without occupying members
 requires resolving or retrying the same request identity; it does not undo installation or imply completion.
 
 `Snapshot` provides a complete own-session metadata projection after a committed read barrier, including before
-readiness. It captures current participant/control state, cluster configuration, assignments targeting that exact
-registration (including released assignments), their content and referenced table/schema records, plus IDs
-of nonterminal assigned operations targeting that registration. Other targets, operation payloads and receipts are
-omitted. Referenced config tombstones remain keyed by object identity after name recreation; they do not block
-unrelated tables. A server advances `applied_revision` only after applying the entire projection; a work lookup's
-revision does not certify metadata hydration. Requests bound the combined record/operation count to at most 4096
-and the response to 1 KiB–2 MiB. Oversized images return `RESPONSE_TOO_LARGE` without a partial image. Capture scans
-the current catalog; paged, indexed distribution for larger clusters remains future work. This projection creates
-no serving or query authority and does not change disk snapshot formats.
+readiness. It captures current participant/control state, cluster configuration and desired ONLINE assignments
+targeting that exact registration, with their content and referenced table/schema records. Nonterminal operation IDs
+are included only when their target matches the current desired assignment's exact registration, assignment epoch
+and materialization. Released assignment history remains in the durable catalog but is omitted from this projection;
+absence from a successfully applied complete image revokes its local authority. An operation hint cannot preserve a
+superseded materialization. Other targets, operation payloads and receipts are omitted. Referenced config tombstones
+remain keyed by object identity after name recreation; they do not block unrelated tables.
+
+A server advances `applied_revision` only after applying the entire projection; a work lookup's revision does not
+certify metadata hydration. Requests bound the combined record/operation count to at most 4096 and the response to
+1 KiB–2 MiB. Automatic placement admission reserves space for the maximum supported membership header and cluster
+configuration, so later dynamic configuration growth does not consume capacity already promised to admitted work.
+Oversized placements commit neither assignments nor intent; oversized reads return `RESPONSE_TOO_LARGE` without a
+partial image. Capture scans the current catalog; paged, indexed distribution for larger clusters remains future work.
+This projection creates no serving or query authority and does not change disk snapshot formats.
 
 ## Offline content and loading inputs
 
@@ -234,7 +240,8 @@ that lock until in-flight actions drain. The injected `ServerInstance` construct
 manager and access control without initializing Helix. It does not start query resources or grant query readiness.
 
 `NativeServerParticipant` owns a real server registration and its independent membership connection, periodically
-hydrates the complete own-session projection, and discovers durable operation IDs without relying on local wake-ups.
+hydrates the complete current desired-assignment projection, and discovers exact current operation hints without
+relying on local wake-ups. Released and superseded materializations lose local authority when that image is applied.
 Its bounded workers use `NativeOfflineSegmentWorker` from `pinot-common`; server runtime code has no dependency on
 Ratis consensus/model classes. Work is validated before creating a table manager. Cluster callbacks retain their
 last successful delivery so failed updates, including removed keys, can be retried without advancing applied metadata.
@@ -489,7 +496,8 @@ controller sends credentials, an operator must approve the advertised address in
 `pinot.coordination.ratis.server.admin.endpoint.<participantId>`. The value must exactly match the registered admin
 URI. HTTPS advertisements take precedence and never fall back to HTTP. Missing approvals leave that replica's size
 unknown. Approval changes are allowed with native table state and rechecked before replies; they do not require
-segment reconciliation. All other cluster changes retain their existing reconciliation gate.
+segment reconciliation. The explicit native task-output placement policy described below is also dynamically
+validated; other cluster changes retain their existing reconciliation gate.
 
 Outbound size collection disables redirects and automatic retries, caps each response at 2 MiB, and cancels queued
 and active work at one overall timeout. The controller owns a four-connection client with its own verified TLS context
@@ -504,7 +512,7 @@ reject oversized reads; they do not return partial catalog lists. Native compres
 supported. REST reads do not publish ownership-dependent table gauges.
 
 The Ratis metadata UI shows measured and estimated size on table details. This is an observability extension;
-segment publication/placement/replacement and the query-enablement gates remain outstanding. See
+general segment lifecycle/replacement and the query-enablement gates remain outstanding. See
 [controller API parity](CONTROLLER-API-PARITY.md) for the remaining implementation dependencies.
 
 ## Voter configuration and validation
@@ -542,11 +550,16 @@ Validate the shared query wire context and deadline/permit composition:
 ```
 
 The native minion execution slice adds bounded durable schedules, the normal `StartMinion` lifecycle and fenced
-publication for actual OFFLINE JSON-lines segment generation. Its explicit configuration, REST endpoints and remaining
-plugin/API gaps are documented in [MINION-TASK-PLAN.md](MINION-TASK-PLAN.md). Helix/ZK stays the default and native query
-listeners stay disabled.
+publication for actual OFFLINE JSON-lines segment generation. Published task outputs can be placed automatically
+using the explicit cluster key `pinot.coordination.ratis.offline.placement`. This strict policy maps approved stable
+SERVER IDs to tenant and failure-domain labels; no participant advertisement supplies placement authority. The
+controller reconciles desired replicas, installation operations and exact current server receipts while preserving
+owner and retry fences. Missing policy blocks automatic placement, and insufficient eligible domains remain visible.
+The task REST response distinguishes publication, desired replicas and observed installations; none enables query
+listeners. Configuration, status meanings and remaining plugin/API gaps are documented in
+[MINION-TASK-PLAN.md](MINION-TASK-PLAN.md). Helix/ZK stays the default and native query listeners stay disabled.
 
 Metadata durability, distribution, membership and starter wiring are parts of the replacement. Full role integration,
-qualified liveness and query fencing, automatic assignment and state transitions, realtime ingestion, general minion
+qualified liveness and query fencing, general assignment and state transitions, realtime ingestion, general minion
 plugin/API parity, migration and a standalone Ratis quickstart require their own integration and qualification before
 a supported replacement is claimed.

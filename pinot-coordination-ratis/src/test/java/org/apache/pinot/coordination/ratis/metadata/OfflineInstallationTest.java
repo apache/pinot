@@ -157,14 +157,13 @@ public class OfflineInstallationTest {
     InstallationSnapshot released = fixture._catalog.installationSnapshot(fixture._first, 128,
         OfflineInstallationProtocol.MAX_SNAPSHOT_BYTES);
     assertTrue(released.operationIds().isEmpty());
-    assertFalse(OfflineSegmentProtocol.decodeAssignment(released.records().stream()
-        .filter(record -> record.kind() == RecordKind.OFFLINE_REPLICA_ASSIGNMENT).findFirst().orElseThrow().value())
-        .desiredOnline(), "Released assignments must remain visible to their session");
+    assertTrue(released.records().stream().noneMatch(record -> record.kind() == RecordKind.OFFLINE_REPLICA_ASSIGNMENT),
+        "Complete-image omission revokes released assignments without retaining unbounded release history");
     assertEquals(fixture.controller(sequence -> new Transaction(fixture._history, "controller", 1, "coordination",
         sequence, List.of(Mutation.delete(RecordKind.TABLE_CONFIG, TABLE, work.target().compatibility().table()),
             Mutation.delete(RecordKind.SCHEMA, "orders", work.target().compatibility().schema())))).status(),
         Status.OK);
-    InstallationSnapshot deleted = fixture._catalog.installationSnapshot(fixture._first, 128,
+    InstallationSnapshot deleted = fixture._catalog.installationSnapshot(fixture._second, 128,
         OfflineInstallationProtocol.MAX_SNAPSHOT_BYTES);
     assertEquals(deleted.status(), Status.OK, "A deleted table cannot block unrelated server metadata hydration");
     assertEquals(deleted.records().size(), 5);
@@ -172,7 +171,7 @@ public class OfflineInstallationTest {
     assertTrue(deleted.records().stream().anyMatch(record -> record.objectId().equals(fixture._table)
         && record.deleted()), "The exact old table incarnation remains a visible fence");
     restored.restoreSnapshot(fixture._catalog.captureSnapshot());
-    assertEquals(restored.installationSnapshot(fixture._first, 128,
+    assertEquals(restored.installationSnapshot(fixture._second, 128,
         OfflineInstallationProtocol.MAX_SNAPSHOT_BYTES), deleted);
     UUID replacementTable = UUID.randomUUID();
     assertEquals(fixture.controller(sequence -> new Transaction(fixture._history, "controller", 1, "coordination",
@@ -180,7 +179,7 @@ public class OfflineInstallationTest {
                 new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE).build()),
             Mutation.createSchema(fixture._history, UUID.randomUUID(), new Schema.SchemaBuilder()
                 .setSchemaName("orders").addSingleValueDimension("id", DataType.INT).build())))).status(), Status.OK);
-    InstallationSnapshot recreated = fixture._catalog.installationSnapshot(fixture._first, 128,
+    InstallationSnapshot recreated = fixture._catalog.installationSnapshot(fixture._second, 128,
         OfflineInstallationProtocol.MAX_SNAPSHOT_BYTES);
     assertEquals(recreated.status(), Status.OK);
     assertTrue(recreated.records().stream().anyMatch(record -> record.objectId().equals(fixture._table)

@@ -25,8 +25,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
@@ -50,6 +52,8 @@ import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.CatalogRecord;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.RecordKind;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Result;
+import org.apache.pinot.coordination.ratis.metadata.OperationProtocol;
+import org.apache.pinot.coordination.ratis.metadata.OperationProtocol.AssignedOfflineSegmentReload;
 import org.apache.pinot.coordination.ratis.metadata.TaskProtocol;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
@@ -115,6 +119,10 @@ public final class NativeControllerTaskResource {
       List<CatalogRecord> tasks = new ArrayList<>();
       List<CatalogRecord> queues = new ArrayList<>();
       List<CatalogRecord> publications = new ArrayList<>();
+      List<NativeTaskPlacementStatus.Output> placements = new ArrayList<>();
+      List<CatalogRecord> placementOperations = new ArrayList<>();
+      Set<UUID> outputIds = new HashSet<>();
+      NativeTaskPlacementStatus placement = new NativeTaskPlacementStatus(image);
       long round = -1;
       boolean exists = false;
       for (CatalogRecord record : image.records()) {
@@ -144,6 +152,19 @@ public final class NativeControllerTaskResource {
           UUID taskId = TaskProtocol.decodePublication(record.value()).taskId();
           if (tasks.stream().anyMatch(task -> task.name().equals(taskId.toString()))) {
             publications.add(record);
+            for (var output : TaskProtocol.decodePublication(record.value()).outputs()) {
+              placements.add(placement.output(taskId, output));
+              outputIds.add(output.segmentObjectId());
+            }
+          }
+        }
+      }
+      for (CatalogRecord record : image.records()) {
+        if (record.kind() == RecordKind.CONTROLLER_OPERATION) {
+          var operation = OperationProtocol.decodeOperation(record.value());
+          if (operation.input() instanceof AssignedOfflineSegmentReload assigned && assigned.reload().reconcile()
+              && table.equals(assigned.tableName()) && outputIds.contains(assigned.reload().segmentObjectId())) {
+            placementOperations.add(record);
           }
         }
       }
@@ -151,7 +172,8 @@ public final class NativeControllerTaskResource {
         throw error(404, "Table not found");
       }
       return Response.ok(JsonUtils.objectToString(Map.of("round", round, "schedules", schedules, "tasks", tasks,
-          "queues", queues, "publications", publications, "schedulerFailure",
+          "queues", queues, "publications", publications, "placements", placements,
+          "placementOperations", placementOperations, "schedulerFailure",
           _tasks.failure() == null ? "" : "Native scheduler is unavailable")))
           .header(HttpHeaders.CACHE_CONTROL, "no-store")
           .header(NativeControllerResource.REVISION_HEADER,
