@@ -24,10 +24,12 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Literal;
+import org.apache.pinot.common.request.context.LiteralContext;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.PinotDataType;
 import org.apache.pinot.sql.FilterKind;
 
 
@@ -37,17 +39,25 @@ import org.apache.pinot.sql.FilterKind;
 ///
 /// On a multi-value column, `EQUALS` matches a document when any of its values equals the literal, which is exactly
 /// what `arrayContains*` evaluates. Unlike the scalar function (evaluated by scanning every document), the `EQUALS`
-/// predicate can be served by the dictionary / inverted index and used for segment pruning.
+/// predicate can be served by the dictionary / inverted index, and can be used by the segment pruners that run after
+/// the optimizer (on the broker for single-stage queries, on the server for both single-stage and multi-stage leaf
+/// queries).
 ///
 /// The rewrite is only applied when:
 /// - The first argument is an identifier of a multi-value column in the schema whose stored type matches the function
-///   (e.g. `arrayContainsInt` on an `INT` column), so that value conversion behaves identically
-/// - The second argument is a non-null literal
+///   parameter type (e.g. `arrayContainsInt` on an `INT` column)
+/// - The second argument is a non-null literal that can be converted to the function parameter type. The literal is
+///   converted with the same [PinotDataType] conversion the scalar function applies to its literal arguments (e.g.
+///   `5.5` is truncated to `5`, `' 5'` is trimmed), and the converted value is used in the `EQUALS` predicate, so both
+///   forms match the same values. If the conversion fails, the scalar function is kept.
 /// - The predicate is `= true`. Negations (`NOT`, `= false`, `!= true`) are left untouched because `!=` on a
 ///   multi-value column means "some value does not match", which differs from "no value matches"
+///
+/// NOTE: The rewrite runs before broker-side expression overrides are applied, so an expression override keyed on an
+///       `arrayContains*` predicate that gets rewritten no longer matches.
 public class ArrayContainsFilterOptimizer implements FilterOptimizer {
-  private static final Map<String, DataType> FUNCTION_DATA_TYPES =
-      Map.of("arraycontainsint", DataType.INT, "arraycontainsstring", DataType.STRING);
+  private static final Map<String, PinotDataType> FUNCTION_PARAMETER_TYPES =
+      Map.of("arraycontainsint", PinotDataType.INT, "arraycontainsstring", PinotDataType.STRING);
 
   @Override
   public Expression optimize(Expression filterExpression, @Nullable Schema schema) {
@@ -84,9 +94,9 @@ public class ArrayContainsFilterOptimizer implements FilterOptimizer {
     if (arrayContains == null) {
       return null;
     }
-    DataType functionDataType =
-        FUNCTION_DATA_TYPES.get(RequestUtils.canonicalizeFunctionName(arrayContains.getOperator()));
-    if (functionDataType == null) {
+    PinotDataType parameterType =
+        FUNCTION_PARAMETER_TYPES.get(RequestUtils.canonicalizeFunctionName(arrayContains.getOperator()));
+    if (parameterType == null) {
       return null;
     }
     List<Expression> arguments = arrayContains.getOperands();
@@ -94,14 +104,63 @@ public class ArrayContainsFilterOptimizer implements FilterOptimizer {
       return null;
     }
     Expression column = arguments.get(0);
-    Expression value = arguments.get(1);
-    if (column.getIdentifier() == null || value.getLiteral() == null || value.getLiteral().isSetNullValue()) {
+    Literal literal = arguments.get(1).getLiteral();
+    if (column.getIdentifier() == null || literal == null || literal.isSetNullValue()) {
       return null;
     }
     FieldSpec fieldSpec = schema.getFieldSpecFor(column.getIdentifier().getName());
-    if (fieldSpec == null || fieldSpec.isSingleValueField() || fieldSpec.getDataType() != functionDataType) {
+    if (fieldSpec == null || fieldSpec.isSingleValueField()
+        || fieldSpec.getDataType() != getColumnDataType(parameterType)) {
       return null;
     }
-    return RequestUtils.getFunctionExpression(FilterKind.EQUALS.name(), column, value);
+    Expression value = convertLiteral(literal, parameterType);
+    return value != null ? RequestUtils.getFunctionExpression(FilterKind.EQUALS.name(), column, value) : null;
+  }
+
+  private static DataType getColumnDataType(PinotDataType parameterType) {
+    return parameterType == PinotDataType.INT ? DataType.INT : DataType.STRING;
+  }
+
+  /// Converts the literal to the function parameter type the same way `ScalarTransformFunctionWrapper` converts a
+  /// literal argument, or returns `null` if it cannot be converted.
+  @Nullable
+  private static Expression convertLiteral(Literal literal, PinotDataType parameterType) {
+    Object value;
+    try {
+      LiteralContext literalContext = new LiteralContext(literal);
+      switch (literalContext.getType()) {
+        case BOOLEAN:
+          value = parameterType.convert(literalContext.getBooleanValue(), PinotDataType.BOOLEAN);
+          break;
+        case INT:
+          value = parameterType.convert(literalContext.getIntValue(), PinotDataType.INT);
+          break;
+        case LONG:
+          value = parameterType.convert(literalContext.getLongValue(), PinotDataType.LONG);
+          break;
+        case FLOAT:
+          value = parameterType.convert(literalContext.getFloatValue(), PinotDataType.FLOAT);
+          break;
+        case DOUBLE:
+          value = parameterType.convert(literalContext.getDoubleValue(), PinotDataType.DOUBLE);
+          break;
+        case BIG_DECIMAL:
+          value = parameterType == PinotDataType.STRING ? literalContext.getStringValue()
+              : parameterType.convert(literalContext.getBigDecimalValue(), PinotDataType.BIG_DECIMAL);
+          break;
+        case STRING:
+          value = parameterType.convert(literalContext.getStringValue(), PinotDataType.STRING);
+          break;
+        default:
+          return null;
+      }
+    } catch (Exception e) {
+      return null;
+    }
+    if (value == null) {
+      return null;
+    }
+    return parameterType == PinotDataType.INT ? RequestUtils.getLiteralExpression((int) (Integer) value)
+        : RequestUtils.getLiteralExpression((String) value);
   }
 }

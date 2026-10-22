@@ -43,8 +43,9 @@ public class QueryOptimizer {
   //   be merged
   // - TimePredicateFilterOptimizer and MergeRangeFilterOptimizer relies on NumericalFilterOptimizer to convert the
   //   values to the proper format so that they can be properly parsed
-  // - ArrayContainsFilterOptimizer runs before MergeEqInFilterOptimizer and NumericalFilterOptimizer so that the
-  //   EQUALS predicates it produces can be merged and have their values converted
+  // - ArrayContainsFilterOptimizer runs before MergeEqInFilterOptimizer so that the EQUALS predicates it produces can
+  //   be merged. It converts the literal to the column type itself because NumericalFilterOptimizer only handles
+  //   single-value columns
   private static final List<FilterOptimizer> FILTER_OPTIMIZERS =
       List.of(new FlattenAndOrFilterOptimizer(), new ArrayContainsFilterOptimizer(),
           new IdenticalPredicateFilterOptimizer(), new MergeEqInFilterOptimizer(), new NumericalFilterOptimizer(),

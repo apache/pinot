@@ -396,6 +396,17 @@ public class QueryOptimizerTest {
     testQuery("SELECT * FROM testTable WHERE arrayContainsString(mvString, 'foo') OR mvString = 'bar'",
         "SELECT * FROM testTable WHERE mvString IN ('foo', 'bar')");
 
+    // The literal is converted to the function parameter type the same way the scalar function does it
+    testQuery("SELECT * FROM testTable WHERE arrayContainsInt(mvInt, 5.0)", "SELECT * FROM testTable WHERE mvInt = 5");
+    testQuery("SELECT * FROM testTable WHERE arrayContainsInt(mvInt, 5.5)", "SELECT * FROM testTable WHERE mvInt = 5");
+    testQuery("SELECT * FROM testTable WHERE arrayContainsInt(mvInt, ' 5')", "SELECT * FROM testTable WHERE mvInt = 5");
+    testQuery("SELECT * FROM testTable WHERE arrayContainsInt(mvInt, 4294967301)",
+        "SELECT * FROM testTable WHERE mvInt = 5");
+    testQuery("SELECT * FROM testTable WHERE arrayContainsString(mvString, 5)",
+        "SELECT * FROM testTable WHERE mvString = '5'");
+    // Literal that cannot be converted keeps the scalar function
+    testCannotOptimizeQuery("SELECT * FROM testTable WHERE arrayContainsInt(mvInt, 'foo')");
+
     // NOT arrayContains means "no element matches", while `!=` on an MV column means "some element does not
     // match", so negations must not be rewritten
     testCannotOptimizeQuery("SELECT * FROM testTable WHERE NOT arrayContainsString(mvString, 'foo')");

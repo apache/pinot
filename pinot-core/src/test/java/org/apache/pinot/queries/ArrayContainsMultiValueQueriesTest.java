@@ -69,6 +69,46 @@ public class ArrayContainsMultiValueQueriesTest extends BaseMultiValueQueriesTes
     assertEquals(notContainsCount, TOTAL_DOCS - containsCount);
   }
 
+  @Test
+  public void testArrayContainsLiteralConversion() {
+    // Literals are converted to int the same way the scalar function converts them (truncate / cast / trim)
+    long expectedCount = getCount(getBrokerResponse("SELECT COUNT(*) FROM testTable WHERE column7 = 225"));
+    assertTrue(expectedCount > 0);
+    for (String literal : new String[]{"225.0", "225.5", "' 225'", "4294967521"}) {
+      String filter = "arrayContainsInt(column7, " + literal + ")";
+      BrokerResponseNative brokerResponse = assertSameAsScalar(filter);
+      assertEquals(getCount(brokerResponse), expectedCount, filter);
+      assertEquals(brokerResponse.getNumEntriesScannedInFilter(), 0L, filter);
+    }
+  }
+
+  @Test
+  public void testArrayContainsCombinedPredicates() {
+    String[] filters = {
+        "arrayContainsInt(column7, 225) OR arrayContainsInt(column7, 407)",
+        "arrayContainsInt(column7, 225) AND arrayContainsInt(column7, 407)",
+        "(arrayContainsInt(column7, 225) AND column3 <> 'w') OR (arrayContainsInt(column7, 407) "
+            + "AND NOT arrayContainsInt(column7, 225))",
+        "arrayContainsInt(column7, 225) AND (arrayContainsInt(column7, 407) OR column8 > 500000)"
+    };
+    for (String filter : filters) {
+      assertSameAsScalar(filter);
+    }
+    // Both predicates on the same MV column must stay independent (any value matches each), not collapse to empty
+    assertTrue(getCount(assertSameAsScalar("arrayContainsInt(column7, 225) OR arrayContainsInt(column7, 407)")) > 0);
+  }
+
+  /// Runs the filter both through the optimizer and as the plain scalar function, asserts the counts match, and
+  /// returns the optimized response.
+  private BrokerResponseNative assertSameAsScalar(String filter) {
+    String query = "SELECT COUNT(*) FROM testTable WHERE " + filter;
+    BrokerResponseNative scalarResponse = getBrokerResponse(query);
+    BrokerResponseNative optimizedResponse = getBrokerResponseForOptimizedQuery(query, SCHEMA);
+    assertTrue(optimizedResponse.getExceptions().isEmpty(), filter + ": " + optimizedResponse.getExceptions());
+    assertEquals(getCount(optimizedResponse), getCount(scalarResponse), filter);
+    return optimizedResponse;
+  }
+
   private static long getCount(BrokerResponseNative brokerResponse) {
     return (long) brokerResponse.getResultTable().getRows().get(0)[0];
   }
