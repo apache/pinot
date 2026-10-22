@@ -23,6 +23,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardOpenOption;
@@ -254,6 +256,42 @@ public class SegmentMetadataImplTest {
       FileUtils.deleteQuietly(staging);
     }
     assertEquals(PinotDataBuffer.getMmapBufferCount(), mappings);
+  }
+
+  @Test
+  public void testMappedLegacyTimeFieldSpecAndVersionRebuild()
+      throws Exception {
+    File segmentDir = Files.createTempDirectory("mapped-legacy-time").toFile();
+    try {
+      Files.writeString(new File(segmentDir, "metadata.properties").toPath(),
+          "segment.name = legacyTime\n"
+              + "segment.table.name = testTable\n"
+              + "segment.total.docs = 0\n"
+              + "segment.version = v1\n"
+              + "segment.time.column.name = timestamp\n"
+              + "segment.time.unit = MILLISECONDS\n"
+              + "column.timestamp.columnType = TIME\n"
+              + "column.timestamp.dataType = LONG\n");
+      SegmentMetadataImpl eager = new SegmentMetadataImpl(segmentDir);
+      File sidecar = new File(segmentDir, "segment_metadata.bin");
+      for (int i = 0; i < 2; i++) {
+        try (SegmentMetadataImpl mapped = SegmentMetadataImpl.loadMapped(segmentDir)) {
+          assertEquals(mapped.getColumnMetadataFor("timestamp").getFieldSpec().getFieldType(),
+              FieldSpec.FieldType.TIME);
+          assertEquals(mapped.getSchema(), eager.getSchema());
+        }
+      }
+      // A checksum-valid v1 header must still trigger a rebuild from canonical metadata.
+      byte[] version1 = Files.readAllBytes(sidecar.toPath());
+      ByteBuffer.wrap(version1).order(ByteOrder.BIG_ENDIAN).putInt(4, 1);
+      Files.write(sidecar.toPath(), version1);
+      try (SegmentMetadataImpl mapped = SegmentMetadataImpl.loadMapped(segmentDir)) {
+        assertEquals(mapped.getSchema(), eager.getSchema());
+      }
+      assertEquals(ByteBuffer.wrap(Files.readAllBytes(sidecar.toPath())).order(ByteOrder.BIG_ENDIAN).getInt(4), 2);
+    } finally {
+      FileUtils.deleteQuietly(segmentDir);
+    }
   }
 
   /// A server holds one column-metadata graph per loaded segment, so the per-column strings and default null values

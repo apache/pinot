@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.spi.index.metadata;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.Interner;
 import com.google.common.collect.Interners;
 import java.io.ByteArrayInputStream;
@@ -80,7 +81,7 @@ final class MappedSegmentMetadataStore implements Closeable {
   static final String FILE_NAME = "segment_metadata.bin";
 
   private static final int MAGIC = 0x504d4431; // PMD1
-  private static final int VERSION = 1;
+  private static final int VERSION = 2;
   private static final int HEADER_SIZE = 64;
   private static final int RECORD_SIZE = 180;
 
@@ -347,7 +348,11 @@ final class MappedSegmentMetadataStore implements Closeable {
       ColumnMetadata metadata = source.getColumnMetadataFor(column);
       int offset = ordinal * RECORD_SIZE;
       putRef(recordBuffer, offset + NAME, blobs.add(column));
-      putRef(recordBuffer, offset + FIELD_SPEC, blobs.add(metadata.getFieldSpec().toJsonObject().toString()));
+      FieldSpec fieldSpec = metadata.getFieldSpec();
+      ObjectNode fieldSpecJson = fieldSpec.toJsonObject();
+      // TimeFieldSpec omits the discriminator from its JSON, but FieldSpec deserialization requires it.
+      fieldSpecJson.put("fieldType", fieldSpec.getFieldType().toString());
+      putRef(recordBuffer, offset + FIELD_SPEC, blobs.add(fieldSpecJson.toString()));
       recordBuffer.putInt(offset + TOTAL_DOCS, metadata.getTotalDocs());
       recordBuffer.putInt(offset + CARDINALITY, metadata.getCardinality());
       int flags = (metadata.hasDictionary() ? HAS_DICTIONARY : 0) | (metadata.isSorted() ? SORTED : 0)
