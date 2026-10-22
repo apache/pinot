@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -33,6 +34,8 @@ import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryServerEnclosure;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
+import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
+import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.runtime.MultiStageStatsTreeBuilder;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
@@ -96,6 +99,13 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     return rows;
   }
 
+  /// [#buildRows] ordered on col3, so the segment metadata marks col3 sorted.
+  public static List<GenericRow> buildRowsSortedOnCol3(String tableName) {
+    List<GenericRow> rows = buildRows(tableName);
+    rows.sort(Comparator.comparingInt(row -> (Integer) row.getValue("col3")));
+    return rows;
+  }
+
   protected Map<String, Object> getConfiguration() {
     return Map.of();
   }
@@ -108,28 +118,33 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     factory1.registerTable(SCHEMA_BUILDER.setSchemaName("b").build(), "b_REALTIME");
     factory1.registerTable(SCHEMA_BUILDER.setSchemaName("c").build(), "c_OFFLINE");
     factory1.registerTable(SCHEMA_BUILDER.setSchemaName("d").build(), "d");
+    factory1.registerTable(SCHEMA_BUILDER.setSchemaName("e").build(), "e_OFFLINE");
     factory1.registerTable(SCHEMA_BUILDER.setSchemaName("tbl-escape-naming").build(), "tbl-escape-naming_OFFLINE");
     factory1.addSegment("a_REALTIME", buildRows("a_REALTIME"));
     factory1.addSegment("a_REALTIME", buildRows("a_REALTIME"));
     factory1.addSegment("b_REALTIME", buildRows("b_REALTIME"));
     factory1.addSegment("c_OFFLINE", buildRows("c_OFFLINE"));
     factory1.addSegment("d_OFFLINE", buildRows("d_OFFLINE"));
+    factory1.addSegment("e_OFFLINE", buildRowsSortedOnCol3("e_OFFLINE"));
     factory1.addSegment("tbl-escape-naming_OFFLINE", buildRows("tbl-escape-naming_OFFLINE"));
 
     MockInstanceDataManagerFactory factory2 = new MockInstanceDataManagerFactory("server2");
     factory2.registerTable(SCHEMA_BUILDER.setSchemaName("a").build(), "a_REALTIME");
     factory2.registerTable(SCHEMA_BUILDER.setSchemaName("c").build(), "c_OFFLINE");
     factory2.registerTable(SCHEMA_BUILDER.setSchemaName("d").build(), "d");
+    factory2.registerTable(SCHEMA_BUILDER.setSchemaName("e").build(), "e_OFFLINE");
     factory2.addSegment("a_REALTIME", buildRows("a_REALTIME"));
     factory2.addSegment("c_OFFLINE", buildRows("c_OFFLINE"));
     factory2.addSegment("c_OFFLINE", buildRows("c_OFFLINE"));
     factory2.addSegment("d_OFFLINE", buildRows("d_OFFLINE"));
     factory2.addSegment("d_REALTIME", buildRows("d_REALTIME"));
+    factory2.addSegment("e_OFFLINE", buildRowsSortedOnCol3("e_OFFLINE"));
+    factory2.addSegment("e_OFFLINE", buildRowsSortedOnCol3("e_OFFLINE"));
 
     // Setting up H2 for validation
     setH2Connection();
     Schema schema = SCHEMA_BUILDER.build();
-    for (String tableName : Arrays.asList("a", "b", "c", "d")) {
+    for (String tableName : Arrays.asList("a", "b", "c", "d", "e")) {
       addTableToH2(tableName, schema);
       addDataToH2(tableName, schema, factory1.buildTableRowsMap().get(tableName));
       addDataToH2(tableName, schema, factory2.buildTableRowsMap().get(tableName));
@@ -158,7 +173,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
 
     _queryEnvironment = QueryEnvironmentTestBase.getQueryEnvironment(_reducerPort, server1.getPort(), server2.getPort(),
         factory1.getRegisteredSchemaMap(), factory1.buildTableSegmentNameMap(), factory2.buildTableSegmentNameMap(),
-        null);
+        null, true);
   }
 
   @AfterClass
@@ -331,6 +346,139 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
       multiWorker += assertSendStats(child);
     }
     return multiWorker;
+  }
+
+  /// A global ordered window with `windowKWayMerge` sorts each sender and merges the sorted streams. With
+  /// `sortedSelectionMergeMode` enabled, a leaf over a single-type table folds that sender sort into its V1 request,
+  /// so no MSE sort is left on the leaf. A hybrid table keeps the MSE sort on every worker, including server1 which
+  /// only holds d_OFFLINE, so the stage's workers report mergeable stats. Results must match H2 either way.
+  @Test(dataProvider = "orderedWindowLeafPushdown")
+  public void testOrderedWindowLeafSortPushdown(String tableName, String orderBy, String mergeMode,
+      boolean expectMseSort)
+      throws Exception {
+    String baseSql = "SELECT col1, col3, ROW_NUMBER() OVER (ORDER BY " + orderBy + ") FROM " + tableName;
+    String sql = "SET " + QueryOptionKey.WINDOW_K_WAY_MERGE + " = true; SET "
+        + QueryOptionKey.SORTED_SELECTION_MERGE_MODE + " = '" + mergeMode + "'; " + baseSql;
+    ObjectNode statsTree = runOrderedWindow(sql, baseSql);
+    Assert.assertTrue(containsOperatorType(statsTree, "LEAF"), statsTree.toString());
+    Assert.assertEquals(containsOperatorType(statsTree, "SORT_OR_LIMIT"), expectMseSort, statsTree.toString());
+    // Each table is on both servers. A worker whose op-chain differs from the others has its stats dropped when the
+    // stage stats are merged, and the leaf stage then reports fewer workers.
+    ObjectNode leafStageSend = findLeafStageSend(statsTree);
+    Assert.assertNotNull(leafStageSend, statsTree.toString());
+    Assert.assertEquals(leafStageSend.path("parallelism").asInt(), 2, statsTree.toString());
+  }
+
+  @DataProvider(name = "orderedWindowLeafPushdown")
+  public Object[][] orderedWindowLeafPushdown() {
+    return new Object[][]{
+        // c is OFFLINE only: every leaf worker runs one physical request.
+        {"c", "col3, col1", "ON", false},
+        {"c", "col3, col1", "OFF", true},
+        // AUTO also pushes the sort; V1 then picks the regular combine because c is not sorted on col3.
+        {"c", "col3, col1", "AUTO", false},
+        // e is OFFLINE only and sorted on col3.
+        {"e", "col3, col1", "ON", false},
+        {"e", "col3, col1", "AUTO", false},
+        // A sort key computed in the leaf is not a plain column, so the sort stays in MSE.
+        {"e", "col3 + 1, col1", "ON", true},
+        // d is hybrid (server2 reads both d_OFFLINE and d_REALTIME), so no leaf pushes the sort.
+        {"d", "col3, col1", "ON", true},
+    };
+  }
+
+  /// The pushed sort runs as the streaming sorted-selection combine only over segments sorted on the leading column.
+  /// With a block size of one row, that combine sends each row in its own block, while the regular combine sends one
+  /// block per worker. The merge receive (reported as MAILBOX_RECEIVE) counts the blocks it gets, so the count tells
+  /// the two combines apart.
+  @Test(dataProvider = "orderedWindowLeafStreaming")
+  public void testOrderedWindowLeafStreamsSortedSegments(String tableName, String mergeMode, boolean expectStreaming)
+      throws Exception {
+    String baseSql = "SELECT col1, col3, ROW_NUMBER() OVER (ORDER BY col3, col1) FROM " + tableName;
+    String sql = "SET " + QueryOptionKey.WINDOW_K_WAY_MERGE + " = true; SET "
+        + QueryOptionKey.SORTED_SELECTION_MERGE_MODE + " = '" + mergeMode + "'; SET "
+        + QueryOptionKey.SORTED_SELECTION_MERGE_BLOCK_SIZE + " = 1; " + baseSql;
+    ObjectNode statsTree = runOrderedWindow(sql, baseSql);
+    Assert.assertFalse(containsOperatorType(statsTree, "SORT_OR_LIMIT"), statsTree.toString());
+    JsonNode receive = findNodeOfType(statsTree, "MAILBOX_RECEIVE");
+    Assert.assertNotNull(receive, statsTree.toString());
+    long numRows = receive.path("emittedRows").asLong();
+    long numMessages = receive.path("rawMessages").asLong() + receive.path("inMemoryMessages").asLong();
+    if (expectStreaming) {
+      // One block per row, plus one end-of-stream block from each of the two workers.
+      Assert.assertEquals(numMessages, numRows + 2, statsTree.toString());
+    } else {
+      Assert.assertTrue(numMessages < numRows, statsTree.toString());
+    }
+  }
+
+  @DataProvider(name = "orderedWindowLeafStreaming")
+  public Object[][] orderedWindowLeafStreaming() {
+    return new Object[][]{
+        {"e", "ON", true},
+        {"e", "AUTO", true},
+        {"c", "AUTO", false},
+    };
+  }
+
+  private ObjectNode runOrderedWindow(String sql, String baseSql)
+      throws Exception {
+    Map<Integer, DispatchablePlanFragment> stages = planQuery(sql).getQueryPlan().getQueryStageMap();
+    Assert.assertTrue(stages.values().stream()
+            .anyMatch(stage -> containsMergeReceive(stage.getPlanFragment().getFragmentRoot())),
+        "expected a merge receive in the plan of: " + sql);
+    QueryDispatcher.QueryResult queryResult = queryRunner(sql, true);
+    compareRowEquals(queryResult.getResultTable(), queryH2(baseSql));
+    return new MultiStageStatsTreeBuilder(stages, queryResult.getQueryStats()).jsonStatsByStage(1);
+  }
+
+  /// Returns the send at the root of the stage that holds the leaf, also when an MSE operator runs between them.
+  private static ObjectNode findLeafStageSend(JsonNode node) {
+    if ("MAILBOX_SEND".equals(node.path("type").asText()) && stageContainsLeaf(node)) {
+      return (ObjectNode) node;
+    }
+    for (JsonNode child : node.path("children")) {
+      ObjectNode found = findLeafStageSend(child);
+      if (found != null) {
+        return found;
+      }
+    }
+    return null;
+  }
+
+  /// Returns true when the stage below the given node holds the leaf. A receive ends the stage.
+  private static boolean stageContainsLeaf(JsonNode node) {
+    for (JsonNode child : node.path("children")) {
+      String type = child.path("type").asText();
+      if ("LEAF".equals(type) || (!"MAILBOX_RECEIVE".equals(type) && stageContainsLeaf(child))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static boolean containsMergeReceive(PlanNode node) {
+    if (node instanceof MailboxMergeReceiveNode) {
+      return true;
+    }
+    for (PlanNode input : node.getInputs()) {
+      if (containsMergeReceive(input)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static boolean containsOperatorType(JsonNode node, String type) {
+    if (type.equals(node.path("type").asText())) {
+      return true;
+    }
+    for (JsonNode child : node.path("children")) {
+      if (containsOperatorType(child, type)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /// Test compares with expected row count only.

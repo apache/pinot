@@ -18,25 +18,20 @@
  */
 package org.apache.pinot.query.runtime;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
-import javax.annotation.Nullable;
-import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.api.listeners.BatchMode;
 import org.apache.helix.api.listeners.InstanceConfigChangeListener;
+import org.apache.helix.api.listeners.LiveInstanceChangeListener;
 import org.apache.helix.api.listeners.PreFetch;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.helix.model.LiveInstance;
+import org.apache.pinot.common.utils.helix.ClusterVersionTracker;
 import org.apache.pinot.common.version.PinotVersion;
-import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.InstanceTypeUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /// A class used to determine whether MSE should to send stats or not.
 ///
@@ -53,15 +48,20 @@ import org.slf4j.LoggerFactory;
 ///  cluster.
 /// - SAFE: In this mode, we will send stats unless we detect a problematic version in the cluster, which means any
 ///  instance reporting a version other than this one. This doesn't require human intervention, and is the mode to
-///  use for a cluster that may still run versions older than 1.4.
+///  use for a cluster that may still run versions older than 1.4. SAFE waits for an initial live-version snapshot
+///  and disables stats after Helix FINALIZE until tracking is initialized again.
 /// - NEVER: In this mode, we will never send stats, regardless of the version of the cluster. This is useful for
 /// testing purposes or if for whatever reason you want to disable stats.
-public abstract class SendStatsPredicate implements InstanceConfigChangeListener {
-  private static final Logger LOGGER = LoggerFactory.getLogger(SendStatsPredicate.class);
+public abstract class SendStatsPredicate implements InstanceConfigChangeListener, LiveInstanceChangeListener {
 
   public abstract boolean isSendStats();
 
   public abstract boolean needWatchForInstanceConfigChange();
+
+  @Override
+  public void onLiveInstanceChange(List<LiveInstance> instances, NotificationContext context) {
+    throw new UnsupportedOperationException("Should not be invoked");
+  }
 
   // NOTE: When this method is called, the helix manager is not yet connected.
   public static SendStatsPredicate create(PinotConfiguration serverConf, HelixManager helixManager) {
@@ -136,21 +136,16 @@ public abstract class SendStatsPredicate implements InstanceConfigChangeListener
   @BatchMode(enabled = false)
   @PreFetch(enabled = false)
   private static class Safe extends SendStatsPredicate {
-    private final HelixManager _helixManager;
-    private final String _clusterName;
-    private final Map<String, String> _problematicVersionsById = new HashMap<>();
-
-    private HelixAdmin _helixAdmin;
-    private volatile boolean _sendStats = true;
+    private final ClusterVersionTracker _versionTracker;
 
     public Safe(HelixManager helixManager) {
-      _helixManager = helixManager;
-      _clusterName = helixManager.getClusterName();
+      // SAFE stats permits homogeneous SNAPSHOT versions and does not require either instance role to be present.
+      _versionTracker = new ClusterVersionTracker(helixManager, PinotVersion.VERSION, true, false);
     }
 
     @Override
     public boolean isSendStats() {
-      return _sendStats;
+      return _versionTracker.getAsBoolean();
     }
 
     @Override
@@ -159,83 +154,13 @@ public abstract class SendStatsPredicate implements InstanceConfigChangeListener
     }
 
     @Override
-    public synchronized void onInstanceConfigChange(List<InstanceConfig> instanceConfigs, NotificationContext context) {
-      if (_helixAdmin == null) {
-        _helixAdmin = _helixManager.getClusterManagmentTool();
-      }
-      NotificationContext.Type type = context.getType();
-      if (type != NotificationContext.Type.INIT && type != NotificationContext.Type.CALLBACK) {
-        LOGGER.warn("Ignoring notification type: {} for instance config change", type);
-        return;
-      }
-      if (type == NotificationContext.Type.INIT || context.getIsChildChange()) {
-        _problematicVersionsById.clear();
-        for (String instance : _helixAdmin.getInstancesInCluster(_clusterName)) {
-          if (needVersionCheck(instance)) {
-            InstanceConfig instanceConfig;
-            try {
-              instanceConfig = _helixAdmin.getInstanceConfig(_clusterName, instance);
-            } catch (Exception e) {
-              LOGGER.warn("Failed to get instance config for instance: {}, continue", instance, e);
-              continue;
-            }
-            String version = getVersion(instanceConfig);
-            if (isProblematicVersion(version)) {
-              _problematicVersionsById.put(instance, version);
-            }
-          }
-        }
-      } else {
-        String pathChanged = context.getPathChanged();
-        String instanceName = pathChanged.substring(pathChanged.lastIndexOf('/') + 1);
-        if (needVersionCheck(instanceName)) {
-          InstanceConfig instanceConfig;
-          try {
-            instanceConfig = _helixAdmin.getInstanceConfig(_clusterName, instanceName);
-            String version = getVersion(instanceConfig);
-            if (isProblematicVersion(version)) {
-              _problematicVersionsById.put(instanceName, version);
-            } else {
-              _problematicVersionsById.remove(instanceName);
-            }
-          } catch (Exception e) {
-            LOGGER.warn("Failed to get instance config for instance: {}, treating it as non-problematic", instanceName,
-                e);
-            _problematicVersionsById.remove(instanceName);
-          }
-        }
-      }
-      boolean sendStats = _problematicVersionsById.isEmpty();
-      if (_sendStats != sendStats) {
-        _sendStats = sendStats;
-        if (sendStats) {
-          LOGGER.warn("Send MSE stats is now enabled");
-        } else {
-          LOGGER.warn("Send MSE stats is now disabled (problematic versions: {})", _problematicVersionsById);
-        }
-      } else if (!_sendStats) {
-        LOGGER.info("Send MSE stats is still disabled (problematic versions: {})", _problematicVersionsById);
-      }
+    public void onInstanceConfigChange(List<InstanceConfig> configs, NotificationContext context) {
+      _versionTracker.onInstanceConfigChange(configs, context);
     }
 
-    private boolean needVersionCheck(String instanceName) {
-      InstanceType instanceType = InstanceTypeUtils.getInstanceType(instanceName);
-      return instanceType == InstanceType.BROKER || instanceType == InstanceType.SERVER;
-    }
-
-    @Nullable
-    private String getVersion(InstanceConfig instanceConfig) {
-      return instanceConfig.getRecord().getStringField(CommonConstants.Helix.Instance.PINOT_VERSION_KEY, null);
-    }
-
-    private boolean isProblematicVersion(@Nullable String versionStr) {
-      if (versionStr == null) {
-        return true;
-      }
-      if (versionStr.equals(PinotVersion.UNKNOWN)) {
-        return true;
-      }
-      return !versionStr.equals(PinotVersion.VERSION);
+    @Override
+    public void onLiveInstanceChange(List<LiveInstance> instances, NotificationContext context) {
+      _versionTracker.onLiveInstanceChange(instances, context);
     }
   }
 }

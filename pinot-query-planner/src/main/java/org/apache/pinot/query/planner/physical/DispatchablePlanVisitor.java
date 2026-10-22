@@ -30,11 +30,13 @@ import org.apache.pinot.core.routing.LogicalTableRouteInfo;
 import org.apache.pinot.core.routing.LogicalTableRouteProvider;
 import org.apache.pinot.core.routing.MultiClusterRoutingContext;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.BaseMailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -132,6 +134,13 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
   }
 
   @Override
+  public Void visitMailboxMergeReceive(MailboxMergeReceiveNode node, DispatchablePlanContext context) {
+    node.getSender().visit(this, context);
+    getOrCreateDispatchablePlanMetadata(node, context);
+    return null;
+  }
+
+  @Override
   public Void visitMailboxSend(MailboxSendNode node, DispatchablePlanContext context) {
     if (_visited.add(node)) {
       node.getInputs().get(0).visit(this, context);
@@ -162,13 +171,16 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
   /// orders each partition only - it feeds a `PARTITION BY ... ORDER BY` window or a `WITHIN GROUP` aggregate - so it
   /// keeps the partitioned worker assignment.
   private static boolean isFinalSort(SortNode node) {
-    if (!(node.getInputs().get(0) instanceof MailboxReceiveNode)) {
+    if (!(node.getInputs().get(0) instanceof BaseMailboxReceiveNode)) {
       return false;
     }
-    if (node.getFetch() >= 0 || node.getOffset() >= 0) {
+    // Complete-input window sorts encode MAX_VALUE for older servers; their explicit marker is not a row limit.
+    boolean hasFetch = node.getFetch() >= 0
+        && !(node.getFetch() == Integer.MAX_VALUE && node.isSingleRunRequired());
+    if (hasFetch || node.getOffset() >= 0) {
       return true;
     }
-    MailboxReceiveNode receiveNode = (MailboxReceiveNode) node.getInputs().get(0);
+    BaseMailboxReceiveNode receiveNode = (BaseMailboxReceiveNode) node.getInputs().get(0);
     return receiveNode.getDistributionType() != RelDistribution.Type.HASH_DISTRIBUTED
         || receiveNode.getKeys().isEmpty();
   }

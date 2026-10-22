@@ -123,7 +123,7 @@ public class MailboxSendNode extends BasePlanNode {
     return _receiverStages.nextSetBit(0);
   }
 
-  public void addReceiver(MailboxReceiveNode node) {
+  public void addReceiver(BaseMailboxReceiveNode node) {
     if (_receiverStages.get(node.getStageId())) {
       throw new IllegalStateException("Receiver already added: " + node.getStageId());
     }
@@ -154,6 +154,8 @@ public class MailboxSendNode extends BasePlanNode {
     return _collations;
   }
 
+  /// @deprecated Current senders transport the ordering established by upstream plan nodes.
+  @Deprecated(since = "1.6.0")
   public boolean isSort() {
     return _sort;
   }

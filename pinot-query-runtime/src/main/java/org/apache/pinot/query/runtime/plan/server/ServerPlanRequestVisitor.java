@@ -25,6 +25,7 @@ import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.DataSchema;
@@ -36,6 +37,7 @@ import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -51,6 +53,7 @@ import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
 
 
 /// Plan visitor for direct leaf-stage server request.
@@ -258,6 +261,11 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
   }
 
   @Override
+  public Void visitMailboxMergeReceive(MailboxMergeReceiveNode node, ServerPlanRequestContext context) {
+    throw new UnsupportedOperationException("Leaf stage should not visit MailboxReceiveNode!");
+  }
+
+  @Override
   public Void visitMailboxSend(MailboxSendNode node, ServerPlanRequestContext context) {
     if (visit(node.getInputs().get(0), context)) {
       context.setLeafStageBoundaryNode(node.getInputs().get(0));
@@ -283,6 +291,13 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
   public Void visitSort(SortNode node, ServerPlanRequestContext context) {
     if (visit(node.getInputs().get(0), context)) {
       PinotQuery pinotQuery = context.getPinotQuery();
+      if (node.isSingleRunRequired() && !canPushUnboundedSort(node, pinotQuery, context)) {
+        // An unbounded sort must cover the complete MSE input. Sorting each V1 physical request separately can
+        // interleave multiple runs (hybrid and logical tables), violating downstream ordered-input requirements. It
+        // is folded into V1 only when the leaf runs one request; see canPushUnboundedSort.
+        context.setLeafStageBoundaryNode(node.getInputs().get(0));
+        return null;
+      }
       if (pinotQuery.getOrderByList() == null) {
         List<RelFieldCollation> collations = node.getCollations();
         if (!collations.isEmpty()) {
@@ -335,6 +350,41 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
       context.setLeafStageBoundaryNode(node.getInputs().get(0));
     }
     return null;
+  }
+
+  /// An unbounded sort can be folded into the V1 request only when the leaf runs exactly one physical request: a V1
+  /// ORDER BY then yields one sorted run per worker, whichever combine V1 picks. `sortedSelectionMergeMode` does not
+  /// affect that ordering; it is the opt-in, and when it streams (ON, or AUTO resolving to ON over sorted segments) the
+  /// leaf no longer materializes every row. The sort itself must have no offset, every sort key must be a plain column
+  /// (so the leaf's conversion to the MSE type cannot reorder V1's output), and nothing below the sort may already have
+  /// set an ORDER BY, OFFSET or a narrower LIMIT, which the pushed sort would overwrite.
+  private static boolean canPushUnboundedSort(SortNode node, PinotQuery pinotQuery,
+      ServerPlanRequestContext context) {
+    if (!context.isSinglePhysicalRequest() || !context.isSortedSelectionMergeRequested() || node.getOffset() > 0
+        || pinotQuery.getOrderByList() != null || pinotQuery.getOffset() != 0
+        || pinotQuery.getLimit() != Integer.MAX_VALUE) {
+      return false;
+    }
+    List<Expression> selectList = pinotQuery.getSelectList();
+    for (RelFieldCollation collation : node.getCollations()) {
+      int fieldIndex = collation.getFieldIndex();
+      if (selectList == null || fieldIndex >= selectList.size()
+          || selectList.get(fieldIndex).getType() != ExpressionType.IDENTIFIER) {
+        return false;
+      }
+    }
+    // Defensive: visitAggregate sets the leaf boundary, so an aggregating leaf does not reach here today.
+    if (pinotQuery.getGroupByList() != null) {
+      return false;
+    }
+    if (selectList != null) {
+      for (Expression expression : selectList) {
+        if (CalciteSqlParser.isAggregateExpression(expression)) {
+          return false;
+        }
+      }
+    }
+    return true;
   }
 
   private boolean visit(PlanNode node, ServerPlanRequestContext context) {
