@@ -38,6 +38,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.RowBasedBlockValueFetcher;
 import org.apache.pinot.core.operator.BaseOperator;
@@ -67,6 +68,9 @@ import org.roaringbitmap.RoaringBitmap;
 /// or: SELECT ... FROM Table WHERE predicates ORDER BY sorted_column, not_sorted LIMIT 10 OFFSET 5
 /// but not SELECT ... FROM Table WHERE predicates ORDER BY not_sorted, sorted_column LIMIT 10 OFFSET 5
 ///
+/// Only order-by expressions are fetched during selection. Any remaining output expressions are fetched for the
+/// surviving rows after selection, as in [SelectionOrderByOperator].
+///
 /// Operators that derives from this class are going to have an almost linear cost instead of the usual NlogN when
 /// actual sorting must be done, where N is the number of rows in the segment. There is a degraded scenario when the
 /// cost is actually NlogL (where L is the limit of the query) when all the first L rows have the exact same value for
@@ -88,24 +92,12 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
   protected final Comparator<Object[]> _comparator;
   protected final Supplier<ListBuilder> _listBuilderSupplier;
   protected final int _numOrderByExpressions;
-  /// When true the project operator only produces the order-by expressions, and the remaining output expressions are
-  /// fetched for the rows that survive the limit. Rows carry their doc id at index [#_numOrderByExpressions] until
-  /// that fetch overwrites it.
-  protected final boolean _lateMaterialize;
   private long _numEntriesScannedPostFilterLate;
 
   /// @param expressions          Order-by expressions must be at the head of the list.
   /// @param numSortedExpressions Number of expressions in the order-by expressions that are sorted.
   public LinearSelectionOrderByOperator(IndexSegment indexSegment, QueryContext queryContext,
       List<ExpressionContext> expressions, BaseProjectOperator<?> projectOperator, int numSortedExpressions) {
-    this(indexSegment, queryContext, expressions, projectOperator, numSortedExpressions, false);
-  }
-
-  /// @param lateMaterialize whether `projectOperator` produces only the order-by expressions, leaving the remaining
-  ///                        output expressions to be fetched once the limit has been applied.
-  public LinearSelectionOrderByOperator(IndexSegment indexSegment, QueryContext queryContext,
-      List<ExpressionContext> expressions, BaseProjectOperator<?> projectOperator, int numSortedExpressions,
-      boolean lateMaterialize) {
     _indexSegment = indexSegment;
     _queryContext = queryContext;
     _nullHandlingEnabled = queryContext.isNullHandlingEnabled();
@@ -117,19 +109,12 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
     int numOrderByExpressions = _orderByExpressions.size();
 
     _numOrderByExpressions = numOrderByExpressions;
-    _lateMaterialize = lateMaterialize;
-    // Rows carry the doc id at index numOrderByExpressions, so there must be at least one expression after the
-    // order-by ones for that slot to exist (and something worth deferring).
-    Preconditions.checkArgument(!lateMaterialize || expressions.size() > numOrderByExpressions,
-        "Late materialization requires output expressions beyond the %s order-by ones, got %s",
-        numOrderByExpressions, expressions.size());
 
     _alreadySorted = expressions.subList(0, numSortedExpressions);
     _toSort = expressions.subList(numSortedExpressions, numOrderByExpressions);
 
-    // Only the projected expressions can be resolved against the project operator. When materialising late it holds
-    // the order-by expressions alone, which is also all the comparator needs.
-    _columnContexts = new ColumnContext[lateMaterialize ? numOrderByExpressions : _expressions.size()];
+    // Only order-by expressions are projected during selection; the remaining expressions are fetched afterwards.
+    _columnContexts = new ColumnContext[numOrderByExpressions];
     for (int i = 0; i < _columnContexts.length; i++) {
       ExpressionContext expression = _expressions.get(i);
       _columnContexts[i] = _projectOperator.getResultColumnContext(expression);
@@ -167,16 +152,8 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
         numTotalDocs);
   }
 
-  /// Number of expressions the project operator actually produces: all of them, or just the order-by prefix when
-  /// materialising late.
-  protected int getNumProjectedExpressions() {
-    return _columnContexts.length;
-  }
-
   protected IntFunction<Object[]> fetchBlock(ValueBlock valueBlock, BlockValSet[] blockValSets) {
-    int numProjected = getNumProjectedExpressions();
-
-    for (int i = 0; i < numProjected; i++) {
+    for (int i = 0; i < _numOrderByExpressions; i++) {
       ExpressionContext expression = _expressions.get(i);
       blockValSets[i] = valueBlock.getBlockValueSet(expression);
     }
@@ -184,21 +161,21 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
 
     RoaringBitmap[] nullBitmaps;
     if (_nullHandlingEnabled) {
-      nullBitmaps = new RoaringBitmap[numProjected];
-      for (int i = 0; i < numProjected; i++) {
+      nullBitmaps = new RoaringBitmap[_numOrderByExpressions];
+      for (int i = 0; i < _numOrderByExpressions; i++) {
         nullBitmaps[i] = blockValSets[i].getNullBitmap();
       }
     } else {
       nullBitmaps = null;
     }
 
-    if (!_lateMaterialize) {
+    if (_expressions.size() == _numOrderByExpressions) {
       if (nullBitmaps == null) {
         return blockValueFetcher::getRow;
       }
       return (rowIdInBlock) -> {
         Object[] row = blockValueFetcher.getRow(rowIdInBlock);
-        applyNulls(row, nullBitmaps, rowIdInBlock);
+        applyNulls(row, nullBitmaps, rowIdInBlock, 0);
         return row;
       };
     }
@@ -211,17 +188,17 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
       Object[] row = new Object[numExpressions];
       blockValueFetcher.getRow(rowIdInBlock, row, 0);
       if (nullBitmaps != null) {
-        applyNulls(row, nullBitmaps, rowIdInBlock);
+        applyNulls(row, nullBitmaps, rowIdInBlock, 0);
       }
       row[_numOrderByExpressions] = docIds[rowIdInBlock];
       return row;
     };
   }
 
-  private static void applyNulls(Object[] row, RoaringBitmap[] nullBitmaps, int rowIdInBlock) {
+  private static void applyNulls(Object[] row, RoaringBitmap[] nullBitmaps, int rowIdInBlock, int columnOffset) {
     for (int colId = 0; colId < nullBitmaps.length; colId++) {
       if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowIdInBlock)) {
-        row[colId] = null;
+        row[columnOffset + colId] = null;
       }
     }
   }
@@ -267,9 +244,6 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
 
     sb.append(", unsortedList: ");
     concatList(sb, _toSort);
-    if (_lateMaterialize) {
-      sb.append(", lateMaterialized: true");
-    }
 
     sb.append(", rest: ");
     concatList(sb, _expressions.subList(_alreadySorted.size() + _toSort.size(), _expressions.size()));
@@ -287,9 +261,6 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
     List<String> toSort = _toSort.stream().map(ExpressionContext::toString).collect(Collectors.toList());
     List<String> restStr = rest.stream().map(ExpressionContext::toString).collect(Collectors.toList());
 
-    if (_lateMaterialize) {
-      attributeBuilder.putString("lateMaterialized", "true");
-    }
     attributeBuilder.putStringList("sortedList", sortedList)
         .putStringList("unsortedList", toSort)
         .putStringList("rest", restStr);
@@ -310,8 +281,8 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
   @Override
   protected SelectionResultsBlock getNextBlock() {
     List<Object[]> rows = fetch(_listBuilderSupplier);
-    if (!_lateMaterialize) {
-      return new SelectionResultsBlock(createDataSchema(), rows, _comparator, _queryContext);
+    if (_expressions.size() == _numOrderByExpressions) {
+      return new SelectionResultsBlock(createDataSchema(null), rows, _comparator, _queryContext);
     }
     return fetchRemainingExpressions(rows);
   }
@@ -332,14 +303,10 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
     for (Object[] row : rowsByDocId) {
       docIds.add((int) row[_numOrderByExpressions]);
     }
-    // rowsByDocId is filled by walking the bitmap in ascending order, so the two must line up one for one.
-    // They do only because surviving rows have distinct doc ids. If that ever stopped holding, the bitmap would
-    // dedupe and the trailing rows would keep their unfilled values instead of failing -- wrong data returned,
-    // not an error. Checked rather than asserted because this build never runs with -ea, and the cost is one
-    // cardinality read per query against a projection pass over every surviving row.
-    Preconditions.checkState(docIds.getCardinality() == numRows,
-        "Expected one distinct doc id per surviving row, got %s doc ids for %s rows", docIds.getCardinality(),
-        numRows);
+    // Surviving doc ids must be unique so the bitmap and rowsByDocId stay aligned.
+    int numDocIds = docIds.getCardinality();
+    Preconditions.checkState(numDocIds == numRows,
+        "Expected one distinct doc id per surviving row, got %s doc ids for %s rows", numDocIds, numRows);
 
     Set<String> columns = new HashSet<>();
     for (ExpressionContext expression : nonOrderByExpressions) {
@@ -347,13 +314,9 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
     }
     Map<String, DataSource> dataSourceMap = new HashMap<>();
     for (String column : columns) {
-      // Same resolution the eager path uses: ProjectPlanNode resolves every selected column through this exact
-      // call, including the ones fetched here. The schema is only dereferenced for a column the segment does not
-      // physically have, and it is set for every server query in ServerQueryExecutorV1Impl.
       dataSourceMap.put(column, _indexSegment.getDataSource(column, _queryContext.getSchema()));
     }
-    // Distinct physical columns. A column that is both an order-by column and referenced by a non-order-by
-    // expression is read again here and counted again, which slightly over-reports entries scanned.
+    // The scan count includes columns reread from the order-by pass.
     int numColumns = columns.size();
 
     BitmapDocIdSetOperator docIdSetOperator = BitmapDocIdSetOperator.ascending(docIds, numRows);
@@ -380,12 +343,7 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
             nullBitmaps[i] = blockValSets[i].getNullBitmap();
           }
           for (int i = 0; i < numDocsFetched; i++) {
-            Object[] row = rowsByDocId[rowBaseId + i];
-            for (int colId = 0; colId < numNonOrderByExpressions; colId++) {
-              if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(i)) {
-                row[_numOrderByExpressions + colId] = null;
-              }
-            }
+            applyNulls(rowsByDocId[rowBaseId + i], nullBitmaps, i, _numOrderByExpressions);
           }
         }
         long entriesScanned = (long) numDocsFetched * numColumns;
@@ -396,33 +354,24 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
         }
         rowBaseId += numDocsFetched;
       }
-      return new SelectionResultsBlock(createDataSchema(transformOperator, nonOrderByExpressions), rows, _comparator,
+      return new SelectionResultsBlock(createDataSchema(transformOperator), rows, _comparator,
           _queryContext);
     }
   }
 
-  /// Data schema covering both cases. Types for the expressions the scan projected come from the project
-  /// operator's column contexts; types for any expressions fetched late come from the transform operator built
-  /// for that fetch. `lateExpressions` is empty when nothing was materialised late, which leaves the first
-  /// branch covering every expression.
-  private DataSchema createDataSchema(@Nullable TransformOperator lateTransformOperator,
-      List<ExpressionContext> lateExpressions) {
+  /// Resolves order-by types from the initial projection and remaining types from the late transform operator.
+  private DataSchema createDataSchema(@Nullable TransformOperator lateTransformOperator) {
     int numExpressions = _expressions.size();
-    int numProjected = numExpressions - lateExpressions.size();
     String[] columnNames = new String[numExpressions];
-    DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numExpressions];
+    ColumnDataType[] columnDataTypes = new ColumnDataType[numExpressions];
     for (int i = 0; i < numExpressions; i++) {
       columnNames[i] = _expressions.get(i).toString();
-      ColumnContext columnContext = i < numProjected ? _columnContexts[i]
-          : lateTransformOperator.getResultColumnContext(lateExpressions.get(i - numProjected));
-      columnDataTypes[i] =
-          DataSchema.ColumnDataType.fromDataType(columnContext.getDataType(), columnContext.isSingleValue());
+      ColumnContext columnContext = i < _numOrderByExpressions
+          ? _columnContexts[i]
+          : lateTransformOperator.getResultColumnContext(_expressions.get(i));
+      columnDataTypes[i] = ColumnDataType.fromDataType(columnContext.getDataType(), columnContext.isSingleValue());
     }
     return new DataSchema(columnNames, columnDataTypes);
-  }
-
-  protected DataSchema createDataSchema() {
-    return createDataSchema(null, List.of());
   }
 
   /// A private class used to build a partially sorted list by adding partially sorted data.
