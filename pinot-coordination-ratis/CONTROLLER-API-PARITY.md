@@ -39,8 +39,9 @@ The standard resource package has **264 annotated HTTP methods across 43 resourc
 - Native broker routing: authenticated, tenant-scoped table discovery and complete OFFLINE routing observations,
   immutable broker images and query-identity construction. Typed broker certificate/session/tenant grants now support
   local server admission and guarded gRPC delivery. Coherent table/schema planning inputs and a captured environment
-  in the shared single-stage compiler are available. Normal broker admission, dispatch and serving activation remain
-  outstanding; installed replicas without query authority are not selectable.
+  in the shared single-stage compiler are available. Optional broker admission now binds finite own/server leases,
+  deadlines and invalidation generations. Authenticated request-entry wiring, dispatch, final HTTP delivery fencing
+  and serving activation remain outstanding; installed replicas without query authority are not selectable.
 - Outstanding: remaining offline lifecycle, full existing task API/plugin parity, realtime,
   remaining feature families and query-serving qualification. A full replacement is not yet implemented.
 - ZooKeeper tree APIs are not applicable to the replacement; a mutable compatibility tree will not be introduced.

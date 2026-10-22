@@ -433,9 +433,34 @@ passes its table cache and routing manager through optimization, route construct
 environment uses the existing providers. Native callers can supply one captured image without replacing global
 cache state or copying the SQL compiler.
 
-This is planning infrastructure, not a native query listener. Normal broker admission/deadline origination,
-authenticated dispatch, receiving and final-response fences, quotas and qualified clock integration remain
-required before activation. Unsupported native query forms must be rejected explicitly by that integration.
+This is planning infrastructure, not a native query listener. Connecting authenticated request entry, dispatch,
+receiving and final-response fences, quotas and qualified clock providers remains required before activation.
+Unsupported native query forms must be rejected explicitly by that integration.
+
+## Broker admission lifecycle
+
+The broker participant accepts optional explicit serving settings with qualified local and shared clocks.
+Its existing constructor and normal starters remain membership-only, without readiness, query endpoints or
+query listeners. Supplying settings commits readiness but does not start a listener or manufacture a capability:
+the authenticated participant policy must grant `BROKER_QUERY`.
+
+Each known renewal is followed by a coherent own-membership read before its grant can authorize work. The renewal
+reply raises a minimum serving revision immediately; the earlier view cannot authorize delivery while that read is
+outstanding. An unknown outcome retains the exact request and original first-send time. A consumed renewal keeps
+its sequence even if the follow-up read fails.
+
+An admission retains its immutable table image, exact per-server identity envelopes, original query deadline,
+finite broker ticket and selected-server lease bounds. Server bounds start before the table snapshot RPC, so network
+delay consumes their budget. Renewals cannot extend an admitted attempt. Routing changes, removal, failed refreshes
+and authority revocation invalidate older attempts permanently, including after equal-looking metadata returns.
+Draining rejects new work while preserving already admitted work within its original bounds.
+
+Admission and delivery use a separate local lock and perform no metadata RPCs. A bounded delivery callback runs
+under that lock, serialized with local invalidation; it must not call lifecycle operations or acquire their locks.
+Shutdown fences locally before waiting for an in-flight membership RPC or unregistering.
+
+These APIs are not yet connected to authenticated query entry, normal network dispatch or final HTTP serialization.
+Synthetic clocks in the focused tests establish lifecycle behavior, not production clock qualification.
 
 ## Authenticated native query admission
 
