@@ -596,6 +596,7 @@ public class SegmentMetadataImpl implements SegmentMetadata, Closeable {
     return _mappedStore != null;
   }
 
+  @Nullable
   @Override
   public ColumnMetadata getColumnMetadataFor(String column) {
     if (_mappedStore == null) {

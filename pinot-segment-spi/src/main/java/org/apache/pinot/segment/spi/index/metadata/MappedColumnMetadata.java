@@ -70,6 +70,7 @@ public final class MappedColumnMetadata implements ColumnMetadata {
 
   @Override
   public FieldSpec getFieldSpec() {
+    // Field specs are shared across mapped segments; callers must treat the returned spec as read-only.
     return _store.fieldSpec(_ordinal);
   }
 
