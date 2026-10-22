@@ -90,7 +90,7 @@ public class NodeEquivalenceFieldCoverageTest {
           "_fetch", "_offset")),
       Map.entry(BaseMailboxReceiveNode.class, List.of("_senderStageId", "_exchangeType", "_distributionType", "_keys",
           "_sender")),
-      Map.entry(MailboxReceiveNode.class, List.of("_collations", "_sort", "_sortedOnSender")),
+      Map.entry(MailboxReceiveNode.class, List.of("_collations", "_sort", "_sortedOnSender", "_autoProfile")),
       Map.entry(MailboxMergeReceiveNode.class, List.of("_collations", "_fetch", "_offset")),
       Map.entry(MailboxSendNode.class, List.of("_receiverStages", "_exchangeType", "_distributionType", "_keys",
           "_prePartitioned", "_collations", "_sort", "_hashFunction")),
