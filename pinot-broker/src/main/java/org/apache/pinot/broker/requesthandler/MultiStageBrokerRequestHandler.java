@@ -801,7 +801,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(subquery);
       RequestUtils.setOptions(sqlNodeAndOptions, queryOptions);
       QueryEnvironment queryEnv = new QueryEnvironment(
-          getQueryEnvConf(httpHeaders, sqlNodeAndOptions.getOptions(), requestId), _multiClusterRoutingContext);
+          getQueryEnvConf(httpHeaders, sqlNodeAndOptions.getOptions(), requestId,
+              hasSortedMergeJoinHint(sqlNodeAndOptions.getSqlNode())), _multiClusterRoutingContext);
       queryEnv.validate(sqlNodeAndOptions);
       return true;
     } catch (RuntimeException e) {
