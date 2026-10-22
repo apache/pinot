@@ -403,7 +403,8 @@ public class PinotEvaluateLiteralRule {
       return rexLiteral.getValue();
     }
     if (canExceedArgumentType(rexLiteral, argumentType)) {
-      // Keep the exact value, which the conversion to INT or LONG can wrap around
+      // Keep the exact value, which the conversion to INT or LONG can wrap around. A value that fits (for example
+      // CAST(5 AS DECIMAL(10, 0))) then stays a BigDecimal, unlike at runtime, but no value wraps around.
       return rexLiteral.getValue();
     }
     RexExpression.Literal literal = RexExpressionUtils.fromRexLiteral(rexLiteral);

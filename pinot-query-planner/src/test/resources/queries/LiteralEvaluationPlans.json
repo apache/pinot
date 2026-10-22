@@ -311,6 +311,16 @@
         ]
       },
       {
+        "description": "a DECIMAL literal with a scale is evaluated as a DOUBLE value, as at runtime, so jsonFormat drops the trailing zero",
+        "sql": "EXPLAIN PLAN FOR SELECT jsonFormat(1.50) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[_UTF-8'1.5':VARCHAR CHARACTER SET \"UTF-8\"])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
         "description": "a function on an interval literal gets the value that Calcite stores, because the runtime cannot represent an interval",
         "sql": "EXPLAIN PLAN FOR SELECT TIMESTAMP '2019-01-01 00:00:00' + ABS(INTERVAL '-1' DAY), TIMESTAMP '2019-01-01 00:00:00' + ABS(INTERVAL '-1' MONTH) FROM a",
         "output": [
@@ -635,6 +645,11 @@
           "\n  PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
+      },
+      {
+        "description": "a TIMESTAMP literal is evaluated as a Timestamp value, as at runtime, which toThetaSketch does not accept",
+        "sql": "EXPLAIN PLAN FOR SELECT toThetaSketch(TIMESTAMP '2019-01-01 00:00:00') FROM a",
+        "expectedException": ".*Unrecognised input type for Theta sketch: Timestamp"
       },
       {
         "description": "select non-exist literal function",
