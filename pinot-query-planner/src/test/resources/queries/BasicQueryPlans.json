@@ -109,6 +109,17 @@
           "\n          PinotLogicalTableScan(table=[[default, e]])",
           "\n"
         ]
+      },
+      {
+        "description": "Comparing an MV column to a value is planned as a comparison on ARRAY_TO_MV",
+        "sql": "EXPLAIN PLAN FOR SELECT col1 FROM e WHERE mcol1 = 'a' AND mcol2 IN (1, 2)",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0])",
+          "\n  LogicalFilter(condition=[AND(=(ARRAY_TO_MV($7), _UTF-8'a'), OR(=(ARRAY_TO_MV($8), 1), =(ARRAY_TO_MV($8), 2)))])",
+          "\n    PinotLogicalTableScan(table=[[default, e]])",
+          "\n"
+        ]
       }
     ]
   }

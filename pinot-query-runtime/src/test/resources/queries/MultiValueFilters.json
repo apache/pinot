@@ -1,6 +1,6 @@
 {
   "mv_filter": {
-    "comment": "Filters on a multi-value column compared to a scalar value. They match a row if any value matches, as in the single-stage engine. They are pushed to the leaf stage, the only stage that can run them.",
+    "comment": "Comparisons of a multi-value column to a value. As in the single-stage engine, = and IN match a row if any value matches, <> and NOT IN if no value matches. They are only supported in filters pushed down to the leaf stage.",
     "tables": {
       "orders": {
         "schema": [
@@ -222,16 +222,148 @@
         ]
       },
       {
+        "description": "Not-equals on an MV column matches rows with no equal value",
+        "sql": "SELECT order_id FROM {orders} WHERE tags <> 'urgent' ORDER BY order_id",
+        "outputs": [
+          [
+            "o4"
+          ],
+          [
+            "o5"
+          ]
+        ]
+      },
+      {
+        "description": "NOT of an MV equality is the complement",
+        "sql": "SELECT order_id FROM {orders} WHERE NOT (tags = 'urgent') ORDER BY order_id",
+        "outputs": [
+          [
+            "o4"
+          ],
+          [
+            "o5"
+          ]
+        ]
+      },
+      {
+        "description": "NOT IN on an MV column matches rows with no value in the list",
+        "sql": "SELECT order_id FROM {orders} WHERE tags NOT IN ('urgent', 'normal') ORDER BY order_id",
+        "outputs": [
+          [
+            "o4"
+          ]
+        ]
+      },
+      {
+        "description": "NOT of an equality on an INT MV column",
+        "sql": "SELECT order_id FROM {orders} WHERE NOT (codes = 5) ORDER BY order_id",
+        "outputs": [
+          [
+            "o1"
+          ],
+          [
+            "o2"
+          ],
+          [
+            "o3"
+          ]
+        ]
+      },
+      {
+        "description": "String value compared to an INT MV column",
+        "sql": "SELECT order_id FROM {orders} WHERE codes = '5' ORDER BY order_id",
+        "outputs": [
+          [
+            "o4"
+          ],
+          [
+            "o5"
+          ]
+        ]
+      },
+      {
+        "description": "MV equality in a LEFT JOIN condition is pushed to the leaf stage",
+        "sql": "SELECT c.name, o.order_id FROM {customers} c LEFT JOIN {orders} o ON c.customer_id = o.customer_id AND o.tags = 'vip' ORDER BY c.name",
+        "outputs": [
+          [
+            "Alice",
+            "o1"
+          ],
+          [
+            "Bob",
+            "o4"
+          ],
+          [
+            "Charlie",
+            null
+          ]
+        ]
+      },
+      {
+        "description": "MV equality in an aggregate FILTER clause",
+        "sql": "SELECT COUNT(*) FILTER (WHERE tags = 'urgent') FROM {orders}",
+        "outputs": [
+          [
+            3
+          ]
+        ]
+      },
+      {
+        "description": "Range comparison on an MV column is not supported",
+        "sql": "SELECT order_id FROM {orders} WHERE NOT (codes > 4)",
+        "expectedException": ".*Cannot apply '>' to arguments of type '<INTEGER ARRAY> > <INTEGER>'.*",
+        "outputs": []
+      },
+      {
+        "description": "Range comparison on a STRING MV column is not supported",
+        "sql": "SELECT order_id FROM {orders} WHERE tags > 'u'",
+        "expectedException": ".*Cannot apply '>' to arguments of type '<VARCHAR ARRAY> > <CHAR\\(1\\)>'.*",
+        "outputs": []
+      },
+      {
+        "description": "Value that needs a cast of the MV column is not supported",
+        "sql": "SELECT order_id FROM {orders} WHERE tags = 5",
+        "expectedException": ".*Cannot apply '=' to arguments of type '<VARCHAR ARRAY> = <INTEGER>'.*",
+        "outputs": []
+      },
+      {
+        "description": "NULL in an IN list on an MV column is rejected",
+        "sql": "SELECT order_id FROM {orders} WHERE tags IN ('vip', NULL)",
+        "expectedException": ".*NULL is not supported in an IN list compared to multi-value column.*",
+        "outputs": []
+      },
+      {
         "description": "MV filter that cannot be pushed to the leaf stage",
         "sql": "SELECT order_id FROM (SELECT order_id, tags FROM {orders} ORDER BY order_id LIMIT 10) t WHERE t.tags = 'urgent'",
-        "expectedException": ".*Function 'ArrayToMv' is not supported.*",
+        "expectedException": ".*Comparing a multi-value column to a value.*FILTER Intermediate Stage.*arrayContainsString.*",
         "outputs": []
       },
       {
         "description": "MV filter in a disjunction across both sides of a join",
         "sql": "SELECT o.order_id FROM {orders} o JOIN {customers} c ON o.customer_id = c.customer_id WHERE o.tags IN ('vip', 'normal') OR c.name = 'Alice'",
-        "expectedException": ".*Function 'ArrayToMv' is not supported.*",
+        "expectedException": ".*Comparing a multi-value column to a value.*arrayContainsString.*",
         "outputs": []
+      },
+      {
+        "description": "MV comparison in a projection",
+        "sql": "SELECT order_id, CASE WHEN tags = 'urgent' THEN 1 ELSE 0 END FROM {orders}",
+        "expectedException": ".*Comparing a multi-value column to a value.*PROJECT Leaf Stage.*arrayContainsString.*",
+        "outputs": []
+      },
+      {
+        "description": "arrayContainsString works where an MV comparison is not supported",
+        "sql": "SELECT order_id FROM (SELECT order_id, tags FROM {orders} ORDER BY order_id LIMIT 10) t WHERE arrayContainsString(t.tags, 'urgent') ORDER BY order_id",
+        "outputs": [
+          [
+            "o1"
+          ],
+          [
+            "o2"
+          ],
+          [
+            "o3"
+          ]
+        ]
       }
     ]
   }
