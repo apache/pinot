@@ -38,11 +38,13 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.converter.SegmentV1V2ToV3FormatConverter;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
@@ -67,6 +69,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
@@ -75,6 +78,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNotSame;
 import static org.testng.Assert.assertNull;
@@ -178,6 +182,32 @@ public class SegmentMetadataImplTest {
       assertEquals(streamColumn.getIndexSizeFor(StandardIndexes.forward()), ColumnMetadata.UNAVAILABLE,
           entry.getKey());
       assertTrue(((ColumnMetadataImpl) streamColumn).getIndexSizeMap().isEmpty(), entry.getKey());
+    }
+  }
+
+  @Test
+  public void testServingLoadFallsBackWhenMappedMetadataCannotBeWritten()
+      throws Exception {
+    File sidecar = new File(_segmentDirectory, "segment_metadata.bin");
+    assertTrue(sidecar.mkdir());
+    Files.writeString(new File(sidecar, "blocker").toPath(), "keep directory non-empty");
+    try {
+      ImmutableSegment segment = ImmutableSegmentLoader.load(_segmentDirectory, ReadMode.mmap);
+      try {
+        assertFalse(((SegmentMetadataImpl) segment.getSegmentMetadata()).isMapped());
+        assertTrue(segment.getColumnNames().contains("daysSinceEpoch"));
+      } finally {
+        segment.destroy();
+      }
+    } finally {
+      FileUtils.deleteQuietly(sidecar);
+    }
+
+    ImmutableSegment segment = ImmutableSegmentLoader.load(_segmentDirectory, ReadMode.mmap);
+    try {
+      assertTrue(((SegmentMetadataImpl) segment.getSegmentMetadata()).isMapped());
+    } finally {
+      segment.destroy();
     }
   }
 

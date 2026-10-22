@@ -21,10 +21,12 @@ package org.apache.pinot.segment.local.indexsegment.immutable;
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import java.io.File;
+import java.io.IOException;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.segment.local.segment.index.column.PhysicalColumnIndexContainer;
 import org.apache.pinot.segment.local.segment.index.converter.SegmentFormatConverterFactory;
@@ -125,7 +127,12 @@ public class ImmutableSegmentLoader {
 
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
     if (segmentMetadata.getTotalDocs() == 0) {
-      return new EmptyIndexSegment(SegmentMetadataImpl.loadMapped(indexDir));
+      try {
+        return new EmptyIndexSegment(SegmentMetadataImpl.loadMapped(indexDir));
+      } catch (IOException | ConfigurationException e) {
+        LOGGER.warn("Failed to load mapped metadata for empty segment: {}. Using eager metadata.", indexDir, e);
+        return new EmptyIndexSegment(segmentMetadata);
+      }
     }
     indexLoadingConfig = indexLoadingConfig.withOpenStructChildConfigs(segmentMetadata);
     String segmentName = segmentMetadata.getName();

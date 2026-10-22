@@ -159,7 +159,13 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
     if (_segmentMetadata.isMapped()) {
       return;
     }
-    SegmentMetadataImpl metadata = SegmentMetadataImpl.loadMapped(_indexDir);
+    SegmentMetadataImpl metadata;
+    try {
+      metadata = SegmentMetadataImpl.loadMapped(_indexDir);
+    } catch (IOException | ConfigurationException e) {
+      LOGGER.warn("Failed to load mapped metadata for segment: {}. Using eager metadata.", _indexDir, e);
+      return;
+    }
     _columnIndexDirectory.setSegmentMetadata(metadata);
     SegmentMetadataImpl previous = _segmentMetadata;
     _segmentMetadata = metadata;

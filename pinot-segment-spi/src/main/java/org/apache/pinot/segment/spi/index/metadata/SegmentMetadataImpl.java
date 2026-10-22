@@ -38,6 +38,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeMap;
@@ -209,7 +210,7 @@ public class SegmentMetadataImpl implements SegmentMetadata, Closeable {
             @Override
             public String next() {
               if (!hasNext()) {
-                throw new java.util.NoSuchElementException();
+                throw new NoSuchElementException();
               }
               return store.name(_index++);
             }
