@@ -24,19 +24,26 @@ import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
+import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.BasePinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.utils.StringUtil;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.util.TestUtils;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
@@ -56,10 +63,25 @@ public class PinotFSSegmentUploaderTest {
         "org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploaderTest$AlwaysTimeoutPinotFS");
     properties.put("class.existing",
         "org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploaderTest$AlwaysExistPinotFS");
+    properties.put("class.recording",
+        "org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploaderTest$RecordingPinotFS");
+    properties.put("class.failingcopy",
+        "org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploaderTest$FailingCopyPinotFS");
     PinotFSFactory.init(new PinotConfiguration(properties));
     _file = FileUtils.getFile(FileUtils.getTempDirectory(), UUID.randomUUID().toString());
     _file.deleteOnExit();
     _llcSegmentName = new LLCSegmentName("test_REALTIME", 1, 0, System.currentTimeMillis());
+  }
+
+  @BeforeMethod
+  public void resetMetrics() {
+    Mockito.reset(_serverMetrics);
+  }
+
+  @Test
+  public void testMetadataTarUploadSupported() {
+    Assert.assertTrue(new PinotFSSegmentUploader("hdfs://root", TIMEOUT_IN_MS, _serverMetrics)
+        .isMetadataTarUploadSupported());
   }
 
   @Test
@@ -90,6 +112,66 @@ public class PinotFSSegmentUploaderTest {
     SegmentUploader segmentUploader = new PinotFSSegmentUploader("", TIMEOUT_IN_MS, _serverMetrics);
     URI segmentURI = segmentUploader.uploadSegment(_file, _llcSegmentName);
     Assert.assertNull(segmentURI);
+  }
+
+  @Test
+  public void testMetadataTarUploadUsesTmpName() {
+    RecordingPinotFS.reset();
+    SegmentUploader segmentUploader = new PinotFSSegmentUploader("recording://root", TIMEOUT_IN_MS, _serverMetrics);
+    URI uri = segmentUploader.uploadMetadataTar(_file, _llcSegmentName, TIMEOUT_IN_MS);
+    String tmpPrefix = StringUtil.join(File.separator, "recording://root", _llcSegmentName.getTableName(),
+        _llcSegmentName.getSegmentName() + Constants.METADATA_TAR_GZ_FILE_EXT + ".tmp.");
+    Assert.assertTrue(uri.toString().startsWith(tmpPrefix), uri.toString());
+    // The tmp name must be swept by the controller's tmp file cleanup if a commit never completes.
+    Assert.assertTrue(SegmentCompletionUtils.isTmpFile(uri.toString()));
+    Assert.assertEquals(RecordingPinotFS.COPIED, List.of(uri));
+    // The unique tmp name makes a pre-delete unnecessary, and the final object is never touched.
+    Assert.assertTrue(RecordingPinotFS.DELETED.isEmpty());
+    Mockito.verify(_serverMetrics, Mockito.atLeastOnce()).addMeteredTableValue(
+        TableNameBuilder.extractRawTableName(_llcSegmentName.getTableName()),
+        ServerMeter.METADATA_TAR_UPLOAD_SUCCESS, 1);
+  }
+
+  @Test
+  public void testMetadataTarUploadFailureDeletesOnlyTmpObject() {
+    RecordingPinotFS.reset();
+    SegmentUploader segmentUploader = new PinotFSSegmentUploader("failingcopy://root", TIMEOUT_IN_MS, _serverMetrics);
+    Assert.assertNull(segmentUploader.uploadMetadataTar(_file, _llcSegmentName, TIMEOUT_IN_MS));
+    TestUtils.waitForCondition(aVoid -> RecordingPinotFS.DELETED.size() == 1, 10L, 5_000L,
+        "Timed out waiting for the tmp object to be deleted");
+    String deleted = RecordingPinotFS.DELETED.get(0).toString();
+    Assert.assertTrue(SegmentCompletionUtils.isTmpFile(deleted), deleted);
+    Assert.assertFalse(deleted.endsWith(Constants.METADATA_TAR_GZ_FILE_EXT), deleted);
+    Mockito.verify(_serverMetrics, Mockito.atLeastOnce()).addMeteredTableValue(
+        TableNameBuilder.extractRawTableName(_llcSegmentName.getTableName()),
+        ServerMeter.METADATA_TAR_UPLOAD_FAILURE, 1);
+  }
+
+  @Test
+  public void testMetadataTarUploadInvalidSegmentStoreUri() {
+    SegmentUploader segmentUploader = new PinotFSSegmentUploader("hdfs://ro ot", TIMEOUT_IN_MS, _serverMetrics);
+    Assert.assertNull(segmentUploader.uploadMetadataTar(_file, _llcSegmentName, TIMEOUT_IN_MS));
+    Mockito.verify(_serverMetrics, Mockito.times(1)).addMeteredTableValue(
+        TableNameBuilder.extractRawTableName(_llcSegmentName.getTableName()),
+        ServerMeter.METADATA_TAR_UPLOAD_FAILURE, 1);
+  }
+
+  @Test
+  public void testMetadataTarUploadTimeOut() {
+    SegmentUploader segmentUploader = new PinotFSSegmentUploader("timeout://root", TIMEOUT_IN_MS, _serverMetrics);
+    Assert.assertNull(segmentUploader.uploadMetadataTar(_file, _llcSegmentName, TIMEOUT_IN_MS));
+    Mockito.verify(_serverMetrics, Mockito.atLeastOnce()).addMeteredTableValue(
+        TableNameBuilder.extractRawTableName(_llcSegmentName.getTableName()),
+        ServerMeter.METADATA_TAR_UPLOAD_TIMEOUT, 1);
+    Mockito.verify(_serverMetrics, Mockito.atLeastOnce()).addMeteredTableValue(
+        TableNameBuilder.extractRawTableName(_llcSegmentName.getTableName()),
+        ServerMeter.METADATA_TAR_UPLOAD_FAILURE, 1);
+  }
+
+  @Test
+  public void testMetadataTarUploadNoSegmentStoreConfigured() {
+    SegmentUploader segmentUploader = new PinotFSSegmentUploader("", TIMEOUT_IN_MS, _serverMetrics);
+    Assert.assertNull(segmentUploader.uploadMetadataTar(_file, _llcSegmentName, TIMEOUT_IN_MS));
   }
 
   public static class AlwaysSucceedPinotFS extends BasePinotFS {
@@ -184,11 +266,44 @@ public class PinotFSSegmentUploaderTest {
     }
   }
 
+  public static class FailingCopyPinotFS extends RecordingPinotFS {
+    @Override
+    public void copyFromLocalFile(File srcFile, URI dstUri) {
+      throw new RuntimeException("simulated copy failure");
+    }
+  }
+
   public static class AlwaysExistPinotFS extends AlwaysSucceedPinotFS {
     @Override
     public boolean exists(URI fileUri)
         throws IOException {
       return true;
+    }
+  }
+
+  public static class RecordingPinotFS extends AlwaysSucceedPinotFS {
+    static final List<URI> DELETED = new CopyOnWriteArrayList<>();
+    static final List<URI> COPIED = new CopyOnWriteArrayList<>();
+
+    static void reset() {
+      DELETED.clear();
+      COPIED.clear();
+    }
+
+    @Override
+    public boolean exists(URI fileUri) {
+      return true;
+    }
+
+    @Override
+    public boolean delete(URI segmentUri, boolean forceDelete) {
+      DELETED.add(segmentUri);
+      return true;
+    }
+
+    @Override
+    public void copyFromLocalFile(File srcFile, URI dstUri) {
+      COPIED.add(dstUri);
     }
   }
 }

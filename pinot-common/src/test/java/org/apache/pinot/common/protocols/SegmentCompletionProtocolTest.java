@@ -218,4 +218,23 @@ public class SegmentCompletionProtocolTest {
         SegmentCompletionProtocol.REASON_ROW_LIMIT);
     Assert.assertEquals(paramsMap.get(SegmentCompletionProtocol.PARAM_REASON_CODE), "100");
   }
+
+  @Test
+  public void testSegmentCommitEndWithMetadataRequestMetadataTarLocation()
+      throws Exception {
+    SegmentCompletionProtocol.Request.Params params =
+        new SegmentCompletionProtocol.Request.Params().withSegmentName("seg").withInstanceId("Server_1");
+    String urlWithoutParam =
+        new SegmentCompletionProtocol.SegmentCommitEndWithMetadataRequest(params).getUrl("localhost:8080", "http");
+    Assert.assertFalse(urlWithoutParam.contains(SegmentCompletionProtocol.PARAM_METADATA_TAR_LOCATION));
+
+    String location = "hdfs://root/table/seg.metadata.tar.gz.tmp.123";
+    params.withMetadataTarLocation(location);
+    Assert.assertEquals(params.getMetadataTarLocation(), location);
+    Assert.assertEquals(new SegmentCompletionProtocol.Request.Params(params).getMetadataTarLocation(), location);
+    URI uri = new URI(
+        new SegmentCompletionProtocol.SegmentCommitEndWithMetadataRequest(params).getUrl("localhost:8080", "http"));
+    Assert.assertTrue(uri.getQuery().contains(SegmentCompletionProtocol.PARAM_METADATA_TAR_LOCATION + "=" + location),
+        uri.getQuery());
+  }
 }

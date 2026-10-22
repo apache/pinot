@@ -121,6 +121,9 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   public static final String UPLOAD_SEGMENT_TO_DEEP_STORE = "segment.upload.to.deep.store";
   public static final boolean DEFAULT_UPLOAD_SEGMENT_TO_DEEP_STORE = false;
 
+  public static final String UPLOAD_SEGMENT_METADATA_TAR = "segment.upload.metadata.tar";
+  public static final boolean DEFAULT_UPLOAD_SEGMENT_METADATA_TAR = false;
+
   private final static String[] REQUIRED_KEYS = {INSTANCE_ID};
   private static final long DEFAULT_ERROR_CACHE_SIZE = 100L;
   private static final int DEFAULT_DELETED_TABLES_CACHE_TTL_MINUTES = 60;
@@ -356,5 +359,10 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   public boolean isDimensionTablePreloadDisabled() {
     return _serverConfig.getProperty(DISABLE_DIMENSION_TABLE_PRELOAD,
         DEFAULT_DISABLE_DIMENSION_TABLE_PRELOAD);
+  }
+
+  @Override
+  public boolean isUploadSegmentMetadataTar() {
+    return _serverConfig.getProperty(UPLOAD_SEGMENT_METADATA_TAR, DEFAULT_UPLOAD_SEGMENT_METADATA_TAR);
   }
 }

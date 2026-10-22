@@ -21,16 +21,17 @@ package org.apache.pinot.controller.helix.core;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.text.SimpleDateFormat;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Date;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TimeZone;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
@@ -77,18 +78,16 @@ public class SegmentDeletionManager {
   // file will be permanently deleted after Feb 2nd 2022 12PM.
   public static final String DELETED_SEGMENTS = "Deleted_Segments";
   private static final String RETENTION_UNTIL_SEPARATOR = "__RETENTION_UNTIL__";
-  private static final String RETENTION_DATE_FORMAT_STR = "yyyyMMddHHmm";
-  private static final SimpleDateFormat RETENTION_DATE_FORMAT;
+  private static final String DELETED_METADATA_FILE_SUFFIX = ".metadata";
+  // DateTimeFormatter is immutable and thread-safe; this is shared by the deletion executor, table deletion and the
+  // RetentionManager sweep.
+  private static final DateTimeFormatter RETENTION_DATE_FORMAT =
+      DateTimeFormatter.ofPattern("yyyyMMddHHmm").withZone(ZoneOffset.UTC);
   private static final String DELIMITER = "/";
 
   public static final int NUM_AGED_SEGMENTS_TO_DELETE_PER_ATTEMPT = 1000;
   private static final int OBJECT_DELETION_TIMEOUT = 5;
   private static final int MAX_BATCH_DELETION_TIMEOUT_SECONDS = 600; // 10 minutes
-
-  static {
-    RETENTION_DATE_FORMAT = new SimpleDateFormat(RETENTION_DATE_FORMAT_STR);
-    RETENTION_DATE_FORMAT.setTimeZone(TimeZone.getTimeZone("UTC"));
-  }
 
   private final ScheduledExecutorService _executorService;
   private final String _dataDir;
@@ -314,15 +313,15 @@ public class SegmentDeletionManager {
       if (fileToDeleteURI == null) {
         continue;
       }
-      try {
-        URI segmentMetadataUri = SegmentPushUtils.generateSegmentMetadataURI(fileToDeleteURI.toString(), segmentId);
-        metadataFilesToDelete.add(segmentMetadataUri);
-      } catch (URISyntaxException e) {
-        LOGGER.warn("Could not generate segment metadata URI for segment: {}", segmentId, e);
-      }
-
       if (retentionMs <= 0) {
         filesToDelete.add(fileToDeleteURI);
+        // Segment metadata in deep store is an optimization, to avoid downloading the segment to parse its metadata.
+        // With retention > 0 it is preserved together with the segment instead (see moveSegmentsToDeletedDir).
+        try {
+          metadataFilesToDelete.add(SegmentPushUtils.generateSegmentMetadataURI(fileToDeleteURI.toString(), segmentId));
+        } catch (URISyntaxException e) {
+          LOGGER.warn("Could not generate segment metadata URI for segment: {}", segmentId, e);
+        }
       } else {
         moveSegmentsToDeletedDir(segmentId, deletedSegmentsRetentionMs, rawTableName, pinotFS, fileToDeleteURI);
       }
@@ -346,8 +345,10 @@ public class SegmentDeletionManager {
       PinotFS pinotFS,
       URI fileToDeleteURI) {
     // move the segment file to deleted segments first and let retention manager handler the deletion
-    String deletedFileName = deletedSegmentsRetentionMs == null ? URIUtils.encode(segmentId)
-        : getDeletedSegmentFileName(URIUtils.encode(segmentId), deletedSegmentsRetentionMs);
+    // The retention suffix is computed once (it is minute granular) so the segment and its metadata expire in the same
+    // sweep. No suffix when deletedSegmentsRetentionMs is null: expiry then falls back to lastModified.
+    String retentionSuffix = deletedSegmentsRetentionMs == null ? "" : getRetentionSuffix(deletedSegmentsRetentionMs);
+    String deletedFileName = URIUtils.encode(segmentId) + retentionSuffix;
     URI deletedSegmentMoveDestURI = URIUtils.getUri(_dataDir, DELETED_SEGMENTS, rawTableName, deletedFileName);
     try {
       if (pinotFS.exists(fileToDeleteURI)) {
@@ -368,6 +369,33 @@ public class SegmentDeletionManager {
     } catch (IOException e) {
       LOGGER.warn("Could not move segment {} from {} to {}", segmentId, fileToDeleteURI.toString(),
           deletedSegmentMoveDestURI.toString(), e);
+    }
+    // Independent of whether the segment object existed, so no orphan sidecar is left in the live directory.
+    moveSegmentMetadataToDeletedDir(pinotFS, fileToDeleteURI, segmentId, rawTableName, retentionSuffix);
+  }
+
+  private void moveSegmentMetadataToDeletedDir(PinotFS pinotFS, URI segmentFileUri, String segmentId,
+      String rawTableName, String retentionSuffix) {
+    // Live sidecar is <segment>.metadata.tar.gz; in Deleted_Segments it is renamed to <segment>.metadata<suffix> so
+    // that, like the segment object, it carries no .tar.gz extension and the retention suffix stays last.
+    try {
+      URI segmentMetadataUri = SegmentPushUtils.generateSegmentMetadataURI(segmentFileUri.toString(), segmentId);
+      if (!pinotFS.exists(segmentMetadataUri)) {
+        return;
+      }
+      URI deletedMetadataUri = URIUtils.getUri(_dataDir, DELETED_SEGMENTS, rawTableName,
+          URIUtils.encode(segmentId) + DELETED_METADATA_FILE_SUFFIX + retentionSuffix);
+      if (pinotFS.move(segmentMetadataUri, deletedMetadataUri, true)) {
+        pinotFS.touch(deletedMetadataUri);
+        LOGGER.info("Moved segment metadata {} from {} to {}", segmentId, segmentMetadataUri, deletedMetadataUri);
+      } else {
+        LOGGER.warn("Failed to move segment metadata {} from {} to {}", segmentId, segmentMetadataUri,
+            deletedMetadataUri);
+      }
+    } catch (IOException e) {
+      LOGGER.warn("Could not move segment metadata {} from {}", segmentId, segmentFileUri, e);
+    } catch (URISyntaxException e) {
+      LOGGER.warn("Could not parse segment uri {}", segmentFileUri, e);
     }
   }
 
@@ -561,16 +589,16 @@ public class SegmentDeletionManager {
   }
 
 
-  private String getDeletedSegmentFileName(String fileName, long deletedSegmentsRetentionMs) {
-    return fileName + RETENTION_UNTIL_SEPARATOR + RETENTION_DATE_FORMAT.format(new Date(
-        System.currentTimeMillis() + deletedSegmentsRetentionMs));
+  private String getRetentionSuffix(long deletedSegmentsRetentionMs) {
+    return RETENTION_UNTIL_SEPARATOR + RETENTION_DATE_FORMAT.format(
+        Instant.ofEpochMilli(System.currentTimeMillis() + deletedSegmentsRetentionMs));
   }
 
   private long getDeletionTimeMsFromFile(String targetFile, long lastModifiedTime) {
     String[] split = StringUtils.splitByWholeSeparator(targetFile, RETENTION_UNTIL_SEPARATOR);
     if (split.length == 2) {
       try {
-        return RETENTION_DATE_FORMAT.parse(split[1]).getTime();
+        return LocalDateTime.parse(split[1], RETENTION_DATE_FORMAT).toInstant(ZoneOffset.UTC).toEpochMilli();
       } catch (Exception e) {
         LOGGER.warn("No retention suffix found for file: {}", targetFile);
       }
