@@ -73,10 +73,11 @@ import org.apache.pinot.spi.utils.JsonUtils;
 /// `metadata.properties` and `index_map` length/CRC fingerprints, payload CRC, segment-property blob reference,
 /// column count, and record-table bounds. Sorted columns occupy fixed 180-byte records, followed by variable blobs;
 /// each blob reference is an absolute 32-bit offset and length. Numeric column statistics are read directly from the
-/// mapping. Only column names and shared [FieldSpec] references are retained on heap.
+/// mapping. The column layout retains names and reusable [FieldSpec] references on heap.
 ///
-/// A stale or corrupt sidecar is rebuilt from the canonical source and installed by atomic rename. Change `VERSION`
-/// whenever the header, record, or blob encoding changes; old versions are rebuilt rather than migrated.
+/// A stale or corrupt sidecar is rebuilt from the canonical source and replaced locally, using atomic rename where
+/// supported. Change `VERSION` whenever the header, record, or blob encoding changes; old versions are rebuilt rather
+/// than migrated.
 final class MappedSegmentMetadataStore implements Closeable {
   static final String FILE_NAME = "segment_metadata.bin";
 

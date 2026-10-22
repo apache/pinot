@@ -24,7 +24,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
@@ -200,7 +199,8 @@ public class IndexLoadingConfigTest {
     ColumnMetadata child = mock(ColumnMetadata.class);
     when(child.getFieldSpec()).thenReturn(new DimensionFieldSpec("event$key", DataType.INT, true));
     SegmentMetadataImpl metadata = mock(SegmentMetadataImpl.class);
-    when(metadata.getColumnMetadataMap()).thenReturn(new TreeMap<>(Map.of("event$key", child)));
+    when(metadata.getPhysicalColumnNames()).thenReturn(Set.of("event$key"));
+    when(metadata.getColumnMetadataFor("event$key")).thenReturn(child);
 
     IndexLoadingConfig derived = base.withOpenStructChildConfigs(metadata);
     assertNotSame(derived, base);

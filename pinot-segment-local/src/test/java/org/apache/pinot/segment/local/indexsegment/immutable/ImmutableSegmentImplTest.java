@@ -19,15 +19,16 @@
 package org.apache.pinot.segment.local.indexsegment.immutable;
 
 import java.util.Map;
-import java.util.TreeMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.doAnswer;
@@ -170,8 +171,11 @@ public class ImmutableSegmentImplTest {
       Map<String, ColumnIndexContainer> columnIndexContainerMap) {
     SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
     when(segmentMetadata.getName()).thenReturn("seg");
-    // getColumnMetadataMap() is declared as a TreeMap, so an immutable Map.of() will not do here.
-    when(segmentMetadata.getColumnMetadataMap()).thenReturn(new TreeMap<>());
+    for (String column : columnIndexContainerMap.keySet()) {
+      ColumnMetadata columnMetadata = mock(ColumnMetadata.class);
+      when(columnMetadata.getFieldSpec()).thenReturn(mock(FieldSpec.class));
+      when(segmentMetadata.getColumnMetadataFor(column)).thenReturn(columnMetadata);
+    }
     return new ImmutableSegmentImpl(segmentDirectory, segmentMetadata, columnIndexContainerMap, null);
   }
 }
