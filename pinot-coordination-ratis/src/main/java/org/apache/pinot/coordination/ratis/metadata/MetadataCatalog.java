@@ -56,6 +56,7 @@ import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.MembershipQ
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Mutation;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.NativeInstallationCommand;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.NativeOperationCommand;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.NativeTaskCommand;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.ObjectVersion;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.OfflineSegmentCommand;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.OperationCommand;
@@ -71,6 +72,8 @@ import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Revision;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.SequencedCommand;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Status;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.StreamTipResult;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.TaskCommand;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.TaskSessionCommand;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Transaction;
 import org.apache.pinot.coordination.ratis.metadata.OfflineInstallationProtocol.InstallationSnapshot;
 import org.apache.pinot.coordination.ratis.metadata.OfflineInstallationProtocol.WorkResult;
@@ -94,7 +97,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 public final class MetadataCatalog {
   private static final int MAX_IDENTIFIER_LENGTH = 1024;
   private static final int MAX_RESULT_BYTES = 2 * MetadataProtocol.MAX_COMMAND_BYTES;
-  private static final int SNAPSHOT_FORMAT_VERSION = 8;
+  private static final int SNAPSHOT_FORMAT_VERSION = 9;
   private static final int JOURNAL_POLICY_VERSION = 1;
   static final int MAX_JOURNAL_TRANSACTIONS = 1024;
   static final int MAX_JOURNAL_BYTES = 16 * MetadataProtocol.MAX_COMMAND_BYTES;
@@ -154,6 +157,9 @@ public final class MetadataCatalog {
         case RegisterClient registration -> register(registration, committedIndex);
         case RetireClient retirement -> retire(retirement, committedIndex);
         case InstallationSessionCommand session -> executeInstallationSession(session, actualRaftTerm, committedIndex);
+        case TaskSessionCommand session -> executeTaskSession(session, actualRaftTerm, committedIndex);
+        case NativeTaskCommand ignored -> throw new Rejection(Status.INVALID_REQUEST,
+            "Worker task commands require an authenticated session envelope");
         case NativeInstallationCommand ignored -> throw new Rejection(Status.INVALID_REQUEST,
             "Installation reports require an authenticated session envelope");
         case SequencedCommand sequenced -> transact(sequenced, actualRaftTerm, committedIndex);
@@ -191,6 +197,26 @@ public final class MetadataCatalog {
         yield transact(installation, term, index);
       }
       default -> throw new Rejection(Status.INVALID_REQUEST, "Unsupported participant installation command");
+    };
+  }
+
+  private Result executeTaskSession(TaskSessionCommand session, long term, long index) throws IOException {
+    TaskCatalog.validateSession(session.minion(), coordinationView());
+    require(session.request() != null && TaskProtocol.clientId(session.minion()).equals(session.request().clientId()),
+        Status.FENCED, "Task request belongs to another participant session");
+    return switch (session.request()) {
+      case RegisterClient registration -> {
+        require(session.minion().incarnation().equals(registration.incarnation()), Status.FENCED,
+            "Task request client incarnation differs from its participant");
+        yield register(registration, index);
+      }
+      case Acknowledge acknowledgement -> acknowledge(acknowledgement, index);
+      case NativeTaskCommand task -> {
+        require(session.minion().equals(task.minion()), Status.FENCED,
+            "Task report belongs to another participant session");
+        yield transact(task, term, index);
+      }
+      default -> throw new Rejection(Status.INVALID_REQUEST, "Unsupported participant task command");
     };
   }
 
@@ -414,6 +440,11 @@ public final class MetadataCatalog {
 
   private OperationCatalog.View coordinationView(Map<UUID, CatalogRecord> records, Map<RecordKey, UUID> names,
       MembershipState membership) {
+    return coordinationView(records, names, membership, Map.of());
+  }
+
+  private OperationCatalog.View coordinationView(Map<UUID, CatalogRecord> records, Map<RecordKey, UUID> names,
+      MembershipState membership, Map<ObjectVersion, CatalogRecord> retainedVersions) {
     return new OperationCatalog.View() {
       @Override
       public CatalogRecord record(RecordKind kind, String name) {
@@ -423,6 +454,12 @@ public final class MetadataCatalog {
       @Override
       public CatalogRecord record(UUID objectId) {
         return records.get(objectId);
+      }
+
+      @Override
+      public CatalogRecord retainedRecord(ObjectVersion version) {
+        CatalogRecord current = records.get(version.objectId());
+        return current != null && current.version() == version.version() ? current : retainedVersions.get(version);
       }
 
       @Override
@@ -719,7 +756,12 @@ public final class MetadataCatalog {
             legacy.lastAppliedIndex(), legacy.records(), legacy.clients(), legacy.journalPolicyVersion(),
             legacy.journalFloor(), legacy.journal(), new MembershipState(_historyId).snapshot());
       } else {
-        restored = MetadataProtocol.fromTree(detached, Snapshot.class);
+        Snapshot decoded = MetadataProtocol.fromTree(detached, Snapshot.class);
+        restored = decoded.formatVersion() == 8
+            ? new Snapshot(SNAPSHOT_FORMAT_VERSION, decoded.clusterId(), decoded.historyId(),
+                decoded.lastAppliedIndex(), decoded.records(), decoded.clients(), decoded.journalPolicyVersion(),
+                decoded.journalFloor(), decoded.journal(), decoded.membership())
+            : decoded;
       }
       require(restored != null && restored.formatVersion() == SNAPSHOT_FORMAT_VERSION
           && restored.journalPolicyVersion() == JOURNAL_POLICY_VERSION,
@@ -767,14 +809,18 @@ public final class MetadataCatalog {
             client.retired(), streams)) == null, Status.INVALID_REQUEST, "Duplicate client in snapshot");
       }
       ArrayDeque<JournalEntry> journal = validateJournal(restored, records);
+      Map<ObjectVersion, CatalogRecord> retainedVersions = new HashMap<>();
       long journalBytes = 0;
       for (JournalEntry entry : journal) {
         journalBytes += entry.encodedBytes();
+        for (CatalogRecord record : entry.transaction().records()) {
+          retainedVersions.put(new ObjectVersion(_historyId, record.objectId(), record.version()), record);
+        }
       }
       MembershipState membership = MembershipState.restore(_historyId, restored.membership(),
           restored.lastAppliedIndex());
       validateMembershipMirror(membership.snapshot(), records, names);
-      OperationCatalog.View view = coordinationView(records, names, membership);
+      OperationCatalog.View view = coordinationView(records, names, membership, retainedVersions);
       for (CatalogRecord record : records.values()) {
         validateCoordinationReferences(record, view);
       }
@@ -800,7 +846,9 @@ public final class MetadataCatalog {
 
   private static void validateCoordinationReferences(CatalogRecord record, OperationCatalog.View view)
       throws IOException {
-    if (record.kind() == RecordKind.OWNER_LAYOUT || record.kind() == RecordKind.OWNER_ASSIGNMENT) {
+    if (TaskCatalog.taskKind(record.kind())) {
+      TaskCatalog.validateReferences(record, view);
+    } else if (record.kind() == RecordKind.OWNER_LAYOUT || record.kind() == RecordKind.OWNER_ASSIGNMENT) {
       OwnershipCatalog.validateReferences(record, view);
     } else if (record.kind() == RecordKind.CONTROLLER_OPERATION) {
       OperationCatalog.validateReferences(record, view);
@@ -913,6 +961,9 @@ public final class MetadataCatalog {
             OfflineSegmentCatalog.stage(segment.request(), coordinationView(), index));
         case NativeInstallationCommand installation -> staged.addAll(
             OfflineInstallationCatalog.stage(installation.request(), coordinationView(), index));
+        case TaskCommand task -> staged.addAll(TaskCatalog.stage(task.request(), coordinationView(), index));
+        case NativeTaskCommand task -> staged.addAll(
+            TaskCatalog.stage(task.request(), task.minion(), coordinationView(), index));
       }
       require(staged.size() <= MetadataProtocol.MAX_MUTATIONS, Status.LIMIT_EXCEEDED,
           "Controller transaction exceeds the supported record count");
@@ -1106,6 +1157,10 @@ public final class MetadataCatalog {
         && record.schemaVersion() == MetadataProtocol.FORMAT_VERSION && record.lastModifiedIndex() > 0
         && record.lastModifiedIndex() <= snapshotIndex, Status.INVALID_REQUEST, "Invalid snapshot record");
     identifier(record.name());
+    if (TaskCatalog.taskKind(record.kind())) {
+      TaskCatalog.validateRecord(record, _historyId, snapshotIndex);
+      return;
+    }
     if (record.kind() == RecordKind.OWNER_LAYOUT || record.kind() == RecordKind.OWNER_ASSIGNMENT) {
       OwnershipCatalog.validateRecord(record, _historyId, snapshotIndex);
       return;
@@ -1159,6 +1214,7 @@ public final class MetadataCatalog {
       }
       case OFFLINE_SEGMENT_CONTENT, OFFLINE_REPLICA_ASSIGNMENT -> 5;
       case OFFLINE_INSTALLATION -> 6;
+      case TASK_QUEUE, TASK, TASK_ATTEMPT -> 9;
     };
   }
 

@@ -62,6 +62,9 @@ enum RecordKind {
   OFFLINE_SEGMENT_CONTENT = 9;
   OFFLINE_REPLICA_ASSIGNMENT = 10;
   OFFLINE_INSTALLATION = 11;
+  TASK_QUEUE = 12;
+  TASK = 13;
+  TASK_ATTEMPT = 14;
 }
 
 enum ResultStatus {
@@ -100,6 +103,9 @@ message CatalogValue {
     OfflineSegmentContent offline_segment_content = 9;
     OfflineReplicaAssignment offline_replica_assignment = 10;
     InstallationReceipt offline_installation = 11;
+    TaskQueueState task_queue = 12;
+    TaskExecutionState task = 13;
+    TaskAttemptState task_attempt = 14;
   }
 }
 
@@ -560,4 +566,56 @@ message InstallationWorkResult {
   Revision revision = 2;
   string detail = 3;
   InstallationWork work = 4;
+}
+
+// Read/feed projections only. No task command or execution service is exposed by this protocol.
+message TaskQueueKey { string table_name = 1; string table_object_id = 2; string task_type = 3; }
+message TaskInput {
+  TaskQueueKey queue = 1;
+  string minion_id = 2;
+  map<string, string> configs = 3;
+  int32 max_attempts = 4;
+}
+message TaskQueueState {
+  string history_id = 1;
+  TaskQueueKey queue = 2;
+  bool paused = 3;
+  OwnerToken controller = 4;
+}
+message TaskExecutionState {
+  enum State {
+    STATE_UNSPECIFIED = 0;
+    READY = 1;
+    RUNNING = 2;
+    EXECUTION_FINISHED = 3;
+    RETRYABLE_FAILED = 4;
+    FATAL_FAILED = 5;
+    CANCELLED = 6;
+  }
+  string history_id = 1;
+  string task_id = 2;
+  TaskInput input = 3;
+  repeated ObjectVersion dependencies = 4;
+  OwnerToken controller = 5;
+  State state = 6;
+  int64 attempt = 7;
+}
+message TaskProgress { int64 completed_units = 1; string detail = 2; }
+message TaskAttemptState {
+  enum State {
+    STATE_UNSPECIFIED = 0;
+    RUNNING = 1;
+    EXECUTION_FINISHED = 2;
+    RETRYABLE_FAILED = 3;
+    FATAL_FAILED = 4;
+    FENCED = 5;
+  }
+  string history_id = 1;
+  string task_id = 2;
+  int64 attempt = 3;
+  ParticipantState participant_at_claim = 4;
+  ObjectVersion participant_version = 5;
+  int64 claimed_index = 6;
+  State state = 7;
+  TaskProgress progress = 8;
 }

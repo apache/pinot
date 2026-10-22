@@ -82,7 +82,8 @@ public final class MetadataProtocol {
 
   public enum RecordKind {
     CLUSTER_CONFIG, SCHEMA, TABLE_CONFIG, MEMBERSHIP_CONTROL, PARTICIPANT, OWNER_LAYOUT, OWNER_ASSIGNMENT,
-    CONTROLLER_OPERATION, OFFLINE_SEGMENT_CONTENT, OFFLINE_REPLICA_ASSIGNMENT, OFFLINE_INSTALLATION
+    CONTROLLER_OPERATION, OFFLINE_SEGMENT_CONTENT, OFFLINE_REPLICA_ASSIGNMENT, OFFLINE_INSTALLATION,
+    TASK_QUEUE, TASK, TASK_ATTEMPT
   }
 
   public enum Action {
@@ -241,9 +242,12 @@ public final class MetadataProtocol {
       @JsonSubTypes.Type(value = OfflineSegmentCommand.class, name = "OFFLINE_SEGMENT"),
       @JsonSubTypes.Type(value = NativeInstallationCommand.class, name = "NATIVE_INSTALLATION"),
       @JsonSubTypes.Type(value = InstallationSessionCommand.class, name = "INSTALLATION_SESSION"),
+      @JsonSubTypes.Type(value = TaskCommand.class, name = "TASK"),
+      @JsonSubTypes.Type(value = NativeTaskCommand.class, name = "NATIVE_TASK"),
+      @JsonSubTypes.Type(value = TaskSessionCommand.class, name = "TASK_SESSION"),
       @JsonSubTypes.Type(value = ReadBarrier.class, name = "READ_BARRIER")})
   public sealed interface Command permits RegisterClient, RetireClient, SequencedCommand, Acknowledge,
-      MembershipCommand, ReadBarrier, InstallationSessionCommand {
+      MembershipCommand, ReadBarrier, InstallationSessionCommand, TaskSessionCommand {
     UUID historyId();
 
     String clientId();
@@ -251,7 +255,8 @@ public final class MetadataProtocol {
 
   /// All effect-producing controller commands share the same durable request stream and retained outcome contract.
   public sealed interface SequencedCommand extends Command permits Transaction, ConfigTransaction, OwnershipCommand,
-      OperationCommand, OfflineSegmentCommand, NativeOperationCommand, NativeInstallationCommand {
+      OperationCommand, OfflineSegmentCommand, NativeOperationCommand, NativeInstallationCommand, TaskCommand,
+      NativeTaskCommand {
     long clientEpoch();
 
     String streamId();
@@ -280,6 +285,31 @@ public final class MetadataProtocol {
   public record NativeInstallationCommand(UUID historyId, String clientId, long clientEpoch, String streamId,
                                           long sequence, OfflineInstallationProtocol.ReportInstallation request)
       implements SequencedCommand {
+  }
+
+  /// Controller-only task queue, submission and attempt-recovery operations.
+  public record TaskCommand(UUID historyId, String clientId, long clientEpoch, String streamId, long sequence,
+                            TaskProtocol.ControllerOperation request) implements SequencedCommand {
+  }
+
+  /// Worker execution reports require the matching outer task-session envelope; they cannot publish domain effects.
+  public record NativeTaskCommand(UUID historyId, String clientId, long clientEpoch, String streamId, long sequence,
+                                  MembershipProtocol.ParticipantToken minion, TaskProtocol.WorkerOperation request)
+      implements SequencedCommand {
+  }
+
+  /// Internal session boundary for the future authenticated MINION transport. A caller-supplied token is not a
+  /// credential. Only registration, acknowledgment and worker task commands are accepted by the catalog.
+  public record TaskSessionCommand(MembershipProtocol.ParticipantToken minion, Command request) implements Command {
+    @Override
+    public UUID historyId() {
+      return request == null ? null : request.historyId();
+    }
+
+    @Override
+    public String clientId() {
+      return request == null ? null : request.clientId();
+    }
   }
 
   /// The catalog validates the participant session atomically with registration, acknowledgement or reporting.
