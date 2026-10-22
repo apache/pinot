@@ -443,10 +443,17 @@ public final class NativeServerParticipant implements AutoCloseable {
 
   private void failed(String operation, Exception e) {
     String failure = operation + ": " + e.getClass().getSimpleName() + ": " + e.getMessage();
-    if (!failure.equals(_failure)) {
+    _admission.writeLock().lock();
+    try {
+      // A request already in flight must not replace the terminal fencing reason.
+      if (_fenced || failure.equals(_failure)) {
+        return;
+      }
       _failure = failure;
-      LOGGER.warn("Native server {} failed", operation, e);
+    } finally {
+      _admission.writeLock().unlock();
     }
+    LOGGER.warn("Native server {} failed", operation, e);
   }
 
   @Override
