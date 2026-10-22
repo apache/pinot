@@ -189,12 +189,16 @@ public interface ColumnReader extends Closeable, Serializable {
   Object getValue(int docId)
       throws IOException;
 
-  /// Applies the supplied deterministic transformer to the value at the given document id. By default, returns
+  /// Applies the supplied transformer to the value at the given document id. By default, returns
   /// `transformer.transform(getValue(docId))`, passing null values to the transformer as well.
+  /// The default invokes [ColumnTransformer#transform(Object)] even when [ColumnTransformer#isNoOp()] returns `true`.
   ///
-  /// Readers may override this method to avoid materializing repeated raw values or to reuse immutable conversion
-  /// results. Overrides must preserve the conversion result, including nulls and conversion failures; callers must not
-  /// depend on the converter's invocation count. This method does not change [#getValue(int)] or the typed accessors.
+  /// Callers must supply a deterministic transformer: repeated transformations of the same value must produce
+  /// equivalent results. Callers must not depend on invocation counts or transformer side effects.
+  ///
+  /// Readers may override this method to avoid materializing repeated raw values, reuse immutable conversion results,
+  /// or skip no-op transformations. Overrides must preserve the conversion result, including nulls and conversion
+  /// failures. This method does not change [#getValue(int)] or the typed accessors.
   /// Callers remain responsible for applying this conversion in the correct order relative to other transformations.
   ///
   /// @param docId 0-based document id, from 0 (inclusive) to [#getTotalDocs()] (exclusive)
