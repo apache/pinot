@@ -305,7 +305,13 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
 
   @VisibleForTesting
   NativeBrokerParticipant createNativeParticipant(NativeMetadataConfig config) throws IOException {
-    return new NativeBrokerParticipant(config, config.openConnection());
+    var membership = config.openConnection();
+    try {
+      return new NativeBrokerParticipant(config, membership, config.openConnection());
+    } catch (IOException | RuntimeException e) {
+      membership.close();
+      throw e;
+    }
   }
 
   /// Can be overridden to apply custom configs to the broker conf.

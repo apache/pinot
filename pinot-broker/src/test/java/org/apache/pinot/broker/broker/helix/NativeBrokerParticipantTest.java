@@ -28,6 +28,9 @@ import java.util.Deque;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.coordination.MetadataRpcConnection;
 import org.apache.pinot.common.coordination.NativeMetadataConfig;
 import org.apache.pinot.common.utils.ServiceStatus;
@@ -38,6 +41,7 @@ import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -49,7 +53,7 @@ import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
-/// Covers membership-only broker startup and exact renewal recovery without opening query or metadata listeners.
+/// Covers isolated membership/routing lanes and exact renewal recovery without opening query or metadata listeners.
 public class NativeBrokerParticipantTest {
   @Test(timeOut = 10_000)
   public void testNormalStarterBypassesZookeeperAndLeavesQueriesUnavailable() throws Exception {
@@ -189,11 +193,68 @@ public class NativeBrokerParticipantTest {
     }
   }
 
+  @Test(timeOut = 10_000)
+  public void testRoutingFailureInvalidatesImagesWithoutClaimingGlobalApplication() throws Exception {
+    try (Fixture fixture = new Fixture()) {
+      fixture._participant.start();
+      fixture._participant.refreshRouting();
+      long routingIndex = fixture._participant.routingImage("orders_OFFLINE").revision().getIndex();
+      fixture._participant.heartbeat();
+      var renewal = fixture._requests.getLast().getRenew();
+      assertTrue(renewal.getAppliedRevision().getIndex() < routingIndex,
+          "Per-table routing captures must not advance the membership-only applied revision");
+      fixture._routingFailure = true;
+      fixture._participant.refreshRouting();
+      assertThrows(IllegalStateException.class, () -> fixture._participant.routingImage("orders_OFFLINE"));
+      fixture._routingFailure = false;
+      fixture._participant.refreshRouting();
+      assertTrue(fixture._participant.routingImage("orders_OFFLINE").revision().getIndex() > routingIndex);
+      fixture._routingTables = List.of();
+      fixture._participant.refreshRouting();
+      assertThrows(IllegalStateException.class, () -> fixture._participant.routingImage("orders_OFFLINE"));
+      assertEquals(fixture._participant.getServiceStatus(), ServiceStatus.Status.BAD);
+      assertTrue(fixture._requests.stream().noneMatch(MetadataRpc.MembershipCommandRequest::hasReady));
+    }
+  }
+
+  @Test(timeOut = 10_000)
+  public void testSlowRoutingCannotBlockHeartbeatOrRepublishAnInvalidatedImage() throws Exception {
+    try (Fixture fixture = new Fixture(); var executor = Executors.newFixedThreadPool(2)) {
+      fixture._participant.start();
+      fixture._participant.refreshRouting();
+      CountDownLatch entered = new CountDownLatch(1);
+      CountDownLatch release = new CountDownLatch(1);
+      doAnswer(invocation -> {
+        MetadataRpc.RoutingSnapshotRequest request = invocation.getArgument(0);
+        if (!request.getTableName().isEmpty()) {
+          entered.countDown();
+          assertTrue(release.await(3, TimeUnit.SECONDS));
+        }
+        return fixture.routingResponse(request);
+      }).when(fixture._routingConnection).routingSnapshot(any(), anyLong());
+      var refresh = executor.submit(fixture._participant::refreshRouting);
+      try {
+        assertTrue(entered.await(1, TimeUnit.SECONDS));
+        fixture._renewals.add("outer-not-ready");
+        executor.submit(fixture._participant::heartbeat).get(1, TimeUnit.SECONDS);
+        assertThrows(IllegalStateException.class, () -> fixture._participant.routingImage("orders_OFFLINE"));
+      } finally {
+        release.countDown();
+      }
+      refresh.get(1, TimeUnit.SECONDS);
+      assertThrows(IllegalStateException.class, () -> fixture._participant.routingImage("orders_OFFLINE"));
+      fixture._participant.heartbeat();
+      fixture._participant.refreshRouting();
+      assertEquals(fixture._participant.routingImage("orders_OFFLINE").segmentCount(), 0);
+    }
+  }
+
   private static final class Fixture implements AutoCloseable {
     private final String _history = UUID.randomUUID().toString();
     private final String _id = "Broker_native_" + UUID.randomUUID();
     private final Path _tls = Files.createTempFile("native-broker-test-", ".pem");
     private final MetadataRpcConnection _connection = mock(MetadataRpcConnection.class);
+    private final MetadataRpcConnection _routingConnection = mock(MetadataRpcConnection.class);
     private final PinotConfiguration _configuration;
     private final NativeBrokerParticipant _participant;
     private final List<MetadataRpc.MembershipCommandRequest> _requests = new ArrayList<>();
@@ -201,6 +262,9 @@ public class NativeBrokerParticipantTest {
     private final MetadataRpc.MembershipControl _control;
     private MetadataRpc.ParticipantToken _token;
     private long _index;
+    private long _routingIndex = 100;
+    private List<String> _routingTables = List.of("orders_OFFLINE");
+    private boolean _routingFailure;
     private boolean _grantCapabilities;
 
     private Fixture() throws Exception {
@@ -256,7 +320,33 @@ public class NativeBrokerParticipantTest {
         assertTrue(request.hasUnregister(), "Membership-only brokers must never set ready or advertise endpoints");
         return response(ResultStatus.OK).build();
       });
-      _participant = new NativeBrokerParticipant(new NativeMetadataConfig(_configuration), _connection);
+      when(_routingConnection.routingSnapshot(any(), anyLong())).thenAnswer(invocation -> {
+        if (_routingFailure) {
+          throw Status.UNAVAILABLE.asRuntimeException();
+        }
+        return routingResponse(invocation.getArgument(0));
+      });
+      _participant = new NativeBrokerParticipant(new NativeMetadataConfig(_configuration), _connection,
+          _routingConnection);
+    }
+
+    private MetadataRpc.RoutingSnapshot routingResponse(MetadataRpc.RoutingSnapshotRequest request) {
+      assertEquals(request.getSession().getIncarnation(), _token.getIncarnation());
+      assertEquals(request.getSession().getRegistrationEpoch(), _token.getRegistrationEpoch());
+      var response = MetadataRpc.RoutingSnapshot.newBuilder().setStatus(ResultStatus.OK).setControl(_control)
+          .setParticipant(state()).setRevision(MetadataRpc.Revision.newBuilder().setHistoryId(_history)
+              .setIndex(++_routingIndex));
+      if (request.getTableName().isEmpty()) {
+        response.addAllTables(_routingTables);
+      } else {
+        response.setTable(MetadataRpc.TableRouting.newBuilder().setTableName(request.getTableName())
+            .setSchemaName("orders")
+            .setTable(MetadataRpc.ObjectVersion.newBuilder().setHistoryId(_history)
+                .setObjectId(UUID.randomUUID().toString()).setVersion(1))
+            .setSchema(MetadataRpc.ObjectVersion.newBuilder().setHistoryId(_history)
+                .setObjectId(UUID.randomUUID().toString()).setVersion(1)));
+      }
+      return response.build();
     }
 
     private MetadataRpc.MembershipResponse.Builder response(ResultStatus status) {

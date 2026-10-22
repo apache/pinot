@@ -33,7 +33,11 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import javax.annotation.Nullable;
+import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.ControlState;
+import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.ParticipantState;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.ParticipantToken;
+import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.Role;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Acknowledge;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Action;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.CatalogImage;
@@ -78,7 +82,12 @@ import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.TaskSession
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Transaction;
 import org.apache.pinot.coordination.ratis.metadata.OfflineInstallationProtocol.InstallationSnapshot;
 import org.apache.pinot.coordination.ratis.metadata.OfflineInstallationProtocol.WorkResult;
+import org.apache.pinot.coordination.ratis.metadata.OfflineRoutingProtocol.ReplicaRouting;
+import org.apache.pinot.coordination.ratis.metadata.OfflineRoutingProtocol.RoutingSnapshot;
+import org.apache.pinot.coordination.ratis.metadata.OfflineRoutingProtocol.SegmentRouting;
+import org.apache.pinot.coordination.ratis.metadata.OfflineRoutingProtocol.TableRouting;
 import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.Assignment;
+import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.Content;
 import org.apache.pinot.coordination.ratis.metadata.OperationProtocol.AssignedOfflineSegmentReload;
 import org.apache.pinot.coordination.ratis.metadata.OperationProtocol.OperationState;
 import org.apache.pinot.coordination.ratis.metadata.OperationProtocol.State;
@@ -395,6 +404,242 @@ public final class MetadataCatalog {
         "Assigned task image exceeds its record or byte bound");
     selected.put(record.objectId(), record);
     return nextBytes;
+  }
+
+  /// A complete table observation at one committed revision. Discovery is broker-tenant scoped; individual images
+  /// retain segments without replicas so missing installations cannot silently remove data from a query plan.
+  public synchronized RoutingSnapshot routingSnapshot(ParticipantToken broker, String tableName, int maxRecords,
+      int maxBytes) throws IOException {
+    try {
+      require(tableName != null && maxRecords > 0 && maxRecords <= OfflineRoutingProtocol.MAX_SNAPSHOT_RECORDS
+          && maxBytes >= OfflineRoutingProtocol.MIN_SNAPSHOT_BYTES
+          && maxBytes <= OfflineRoutingProtocol.MAX_SNAPSHOT_BYTES, Status.INVALID_REQUEST,
+          "Invalid routing snapshot bounds or table name");
+      if (!tableName.isEmpty()) {
+        validateRoutingTableName(tableName);
+      }
+      OperationCatalog.View view = coordinationView();
+      require(broker != null && _historyId.equals(broker.historyId()), Status.HISTORY_MISMATCH,
+          "Routing participant history differs");
+      require(broker.role() == Role.BROKER && broker.incarnation() != null && broker.registrationEpoch() > 0,
+          Status.FENCED, "Routing requires a complete BROKER registration");
+      OfflineSegmentCatalog.identifier(broker.participantId(), 1024);
+      ParticipantState participant = view.participant(broker.participantId());
+      ControlState control = view.control();
+      require(participant != null && participant.participant().equals(broker) && !participant.retired()
+          && !participant.draining() && control != null && control.controlEpoch() != null && control.policy() != null
+          && participant.expiryRound() > control.round(), Status.FENCED,
+          "Routing participant is replaced, retired or expired");
+      CatalogRecord cluster = view.record(RecordKind.CLUSTER_CONFIG, MetadataProtocol.CLUSTER_CONFIG_NAME);
+      NativeBrokerRoutingPolicy policy;
+      try {
+        policy = NativeBrokerRoutingPolicy.parse(routingPolicyValue(cluster, NativeBrokerRoutingPolicy.CONFIG_KEY));
+      } catch (IllegalArgumentException e) {
+        throw new Rejection(Status.NOT_READY, "Native broker routing policy is absent or invalid");
+      }
+      require(policy.brokers().containsKey(broker.participantId()), Status.FENCED,
+          "Broker has no routing tenant grant");
+      RoutingSnapshot header = new RoutingSnapshot(Status.OK, revision(_lastAppliedIndex), "", participant, control,
+          List.of(), null);
+      RoutingProjection projection = new RoutingProjection(header, maxRecords, maxBytes);
+      if (tableName.isEmpty()) {
+        List<String> tables = new ArrayList<>();
+        for (UUID objectId : _names.values()) {
+          CatalogRecord record = _records.get(objectId);
+          if (record.kind() == RecordKind.TABLE_CONFIG) {
+            TableConfig table = JsonUtils.jsonNodeToObject(record.value(), TableConfig.class);
+            if (table.getTableType() == TableType.OFFLINE && policy.permits(broker.participantId(), table)) {
+              validateRoutingTableName(record.name());
+              projection.add(record.name(), 1);
+              tables.add(record.name());
+            }
+          }
+        }
+        tables.sort(Comparator.naturalOrder());
+        return new RoutingSnapshot(Status.OK, header.revision(), "", participant, control, tables, null);
+      }
+      CatalogRecord table = view.record(RecordKind.TABLE_CONFIG, tableName);
+      require(table != null && !table.deleted(), Status.NOT_FOUND, "Routing table is absent");
+      TableConfig config = JsonUtils.jsonNodeToObject(table.value(), TableConfig.class);
+      require(policy.permits(broker.participantId(), config), Status.FENCED, "Broker lacks the table tenant grant");
+      NativeReplicaPlacementPolicy placement;
+      try {
+        NativeReplicaPlacementPolicy.validateTable(config);
+        placement = NativeReplicaPlacementPolicy.parse(routingPolicyValue(cluster,
+            NativeReplicaPlacementPolicy.CONFIG_KEY));
+      } catch (IllegalArgumentException e) {
+        throw new Rejection(Status.NOT_READY, "Native table placement or its policy is unsupported or unavailable");
+      }
+      String schemaName = TableNameBuilder.extractRawTableName(tableName);
+      CatalogRecord schema = view.record(RecordKind.SCHEMA, schemaName);
+      require(schema != null && !schema.deleted(), Status.NOT_READY, "Routing schema is absent");
+      TableRouting tableHeader = new TableRouting(tableName, routingVersion(table), schemaName,
+          routingVersion(schema), List.of());
+      projection.add(tableHeader, 2);
+      List<SegmentRouting> segments = new ArrayList<>();
+      String contentPrefix = table.objectId() + "/";
+      String serverTenant = NativeReplicaPlacementPolicy.tenant(config);
+      List<String> approvedServers = placement.servers().keySet().stream().sorted().toList();
+      for (UUID objectId : _names.values()) {
+        CatalogRecord record = _records.get(objectId);
+        if (record.kind() != RecordKind.OFFLINE_SEGMENT_CONTENT || !record.name().startsWith(contentPrefix)) {
+          continue;
+        }
+        Content content = OfflineSegmentProtocol.decodeContent(record.value());
+        if (!content.tableObjectId().equals(table.objectId())) {
+          continue;
+        }
+        require(content.tableName().equals(tableName) && content.segmentObjectId().equals(record.objectId()),
+            Status.NOT_READY, "Routing content identity differs from its table");
+        SegmentRouting segment = new SegmentRouting(content.segmentName(), routingVersion(record),
+            content.contentSha256(), List.of());
+        projection.add(segment, 1);
+        List<ReplicaRouting> replicas = new ArrayList<>();
+        for (String serverId : approvedServers) {
+          if (!placement.servers().get(serverId).tenant().equals(serverTenant)) {
+            continue;
+          }
+          ReplicaRouting replica = routingReplica(view, policy, content, record, table, schema, serverId);
+          if (replica != null) {
+            projection.add(replica, 1);
+            replicas.add(replica);
+          }
+        }
+        segments.add(new SegmentRouting(segment.name(), segment.content(), segment.contentSha256(), replicas));
+      }
+      segments.sort(Comparator.comparing(SegmentRouting::name));
+      return new RoutingSnapshot(Status.OK, header.revision(), "", participant, control, List.of(),
+          new TableRouting(tableName, tableHeader.table(), schemaName, tableHeader.schema(), segments));
+    } catch (Rejection e) {
+      return routingSnapshotError(e._status, e.getMessage());
+    } catch (CoordinationRejection e) {
+      return routingSnapshotError(e.status(), e.getMessage());
+    }
+  }
+
+  private static void validateRoutingTableName(String tableName) {
+    OfflineSegmentCatalog.identifier(tableName, 1024);
+    String raw = TableNameBuilder.extractRawTableName(tableName);
+    int separator = raw.indexOf('.');
+    require(TableNameBuilder.getTableTypeFromTableName(tableName) == TableType.OFFLINE
+        && TableNameBuilder.getTableTypeFromTableName(raw) == null
+        && tableName.chars().noneMatch(Character::isWhitespace) && !raw.isEmpty()
+        && (separator < 0 || separator > 0 && separator < raw.length() - 1 && separator == raw.lastIndexOf('.')),
+        Status.INVALID_REQUEST, "Routing requires a canonical database-qualified OFFLINE table name");
+  }
+
+  @Nullable
+  private static String routingPolicyValue(@Nullable CatalogRecord cluster, String key) {
+    JsonNode value = cluster == null ? null : cluster.value().get(key);
+    return value != null && value.isTextual() ? value.textValue() : null;
+  }
+
+  private ObjectVersion routingVersion(CatalogRecord record) {
+    return new ObjectVersion(_historyId, record.objectId(), record.version());
+  }
+
+  private RoutingSnapshot routingSnapshotError(Status status, String detail) {
+    return new RoutingSnapshot(status, revision(_lastAppliedIndex), detail, null, null, List.of(), null);
+  }
+
+  @Nullable
+  private ReplicaRouting routingReplica(OperationCatalog.View view, NativeBrokerRoutingPolicy policy, Content content,
+      CatalogRecord contentRecord, CatalogRecord table, CatalogRecord schema, String serverId) throws IOException {
+    ParticipantState server = view.participant(serverId);
+    if (server == null || server.participant().role() != Role.SERVER || !server.ready() || server.draining()
+        || server.retired() || server.expiryRound() <= view.control().round()) {
+      return null;
+    }
+    CatalogRecord assignmentRecord = view.record(RecordKind.OFFLINE_REPLICA_ASSIGNMENT,
+        OfflineSegmentProtocol.assignmentName(content.segmentObjectId(), serverId));
+    if (assignmentRecord == null || assignmentRecord.deleted()) {
+      return null;
+    }
+    Assignment assignment = OfflineSegmentProtocol.decodeAssignment(assignmentRecord.value());
+    if (!assignment.desiredOnline() || !assignment.server().equals(server.participant())
+        || !assignment.tableName().equals(content.tableName())
+        || !assignment.tableObjectId().equals(content.tableObjectId())
+        || !assignment.segmentName().equals(content.segmentName())
+        || !assignment.segmentObjectId().equals(content.segmentObjectId())
+        || !assignment.contentSha256().equals(content.contentSha256())
+        || !assignment.compatibility().table().equals(routingVersion(table))
+        || !assignment.compatibility().schema().equals(routingVersion(schema))) {
+      return null;
+    }
+    // This slice recognizes the durable normal-placement reconcile intent only. Arbitrary retained reload receipts
+    // cannot introduce routing candidates; future lifecycle work must define its authoritative proof selection.
+    UUID operationId = NativeReplicaPlacementPolicy.operationId(_historyId, assignment.materializationId());
+    CatalogRecord operationRecord = view.record(RecordKind.CONTROLLER_OPERATION, operationId.toString());
+    if (operationRecord == null || operationRecord.deleted()) {
+      return null;
+    }
+    OperationState operation = OperationProtocol.decodeOperation(operationRecord.value());
+    if (!(operation.input() instanceof AssignedOfflineSegmentReload assigned)
+        || (operation.status() != State.RUNNING && operation.status() != State.SUCCEEDED)
+        || operation.owner() == null || operation.attempt() <= 0) {
+      return null;
+    }
+    var reload = assigned.reload();
+    var target = new OperationProtocol.TargetMaterialization(assignment.server(), assignment.assignmentEpoch(),
+        assignment.materializationId());
+    List<ObjectVersion> dependencies = List.of(routingVersion(contentRecord), routingVersion(table),
+        routingVersion(schema), routingVersion(assignmentRecord));
+    if (!reload.reconcile() || !reload.tableName().equals(content.tableName())
+        || !reload.tableObjectId().equals(content.tableObjectId())
+        || !reload.segmentName().equals(content.segmentName())
+        || !reload.segmentObjectId().equals(content.segmentObjectId())
+        || !reload.contentSha256().equals(content.contentSha256()) || !reload.targets().equals(List.of(target))
+        || !assigned.dependencies().containsAll(dependencies) || !operation.dependencies().containsAll(dependencies)) {
+      return null;
+    }
+    CatalogRecord receiptRecord = view.record(RecordKind.OFFLINE_INSTALLATION,
+        OfflineInstallationProtocol.recordName(operationId, operation.attempt(), serverId));
+    if (receiptRecord == null || receiptRecord.deleted()) {
+      return null;
+    }
+    var receipt = OfflineInstallationProtocol.decodeReceipt(receiptRecord.value());
+    var report = receipt.installation();
+    var expected = new OfflineInstallationProtocol.Materialization(content.tableName(), content.tableObjectId(),
+        content.segmentName(), content.segmentObjectId(), content.contentSha256(), server.participant(),
+        routingVersion(assignmentRecord), assignment.materializationId(), assignment.compatibility());
+    if (!_historyId.equals(receipt.historyId()) || !operationId.equals(report.operationId())
+        || operation.attempt() != report.attempt() || !operation.owner().equals(report.owner())
+        || !expected.equals(report.installed()) || operation.status() == State.SUCCEEDED
+        && (operation.completionProof() == null
+            || !operation.completionProof().installations().contains(routingVersion(receiptRecord)))) {
+      return null;
+    }
+    // A completed proof outlives the former controller owner's lease. Current assignment/server fences still apply.
+    return new ReplicaRouting(server.participant(), routingVersion(assignmentRecord), assignment.assignmentEpoch(),
+        assignment.materializationId(), report.installationId(), policy.endpoint(server));
+  }
+
+  /// Only bounded identity DTOs are encoded while holding apply. Config and archive payloads never enter this image;
+  /// reject before retaining each additional element and let transport separately check the final protobuf size.
+  private static final class RoutingProjection {
+    private final int _maxRecords;
+    private final int _maxBytes;
+    private int _records = 2; // Own participant and committed control.
+    private long _bytes;
+
+    private RoutingProjection(RoutingSnapshot header, int maxRecords, int maxBytes) throws IOException {
+      _maxRecords = maxRecords;
+      _maxBytes = maxBytes;
+      _bytes = MetadataProtocol.encodeValue(header).length;
+      checkBounds();
+    }
+
+    private void add(Object value, int records) throws IOException {
+      _records += records;
+      // Empty arrays/nulls in the skeleton remain charged, conservatively covering replacement and separators.
+      _bytes += MetadataProtocol.encodeValue(value).length + 1;
+      checkBounds();
+    }
+
+    private void checkBounds() {
+      require(_records <= _maxRecords && _bytes <= _maxBytes, Status.RESPONSE_TOO_LARGE,
+          "Routing snapshot exceeds its record or byte bound");
+    }
   }
 
   /// Captures one complete own-session projection after the caller's consensus read barrier. Readiness is not

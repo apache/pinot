@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import org.apache.pinot.coordination.ratis.rpc.BrokerRoutingServiceGrpc;
 import org.apache.pinot.coordination.ratis.rpc.MetadataRpc;
 import org.apache.pinot.coordination.ratis.rpc.MetadataServiceGrpc;
 import org.apache.pinot.coordination.ratis.rpc.MinionTaskServiceGrpc;
@@ -45,11 +46,13 @@ public class MetadataRpcClient implements AutoCloseable {
   public static final int MAX_MEMBERSHIP_BYTES = 64 * 1024;
   public static final int MAX_INSTALLATION_REQUEST_BYTES = 64 * 1024;
   public static final int MAX_TASK_REQUEST_BYTES = 64 * 1024;
+  public static final int MAX_ROUTING_REQUEST_BYTES = 64 * 1024;
   private final ManagedChannel _channel;
   private final MetadataServiceGrpc.MetadataServiceBlockingStub _stub;
   private final ParticipantMembershipServiceGrpc.ParticipantMembershipServiceBlockingStub _membership;
   private final ServerInstallationServiceGrpc.ServerInstallationServiceBlockingStub _installation;
   private final MinionTaskServiceGrpc.MinionTaskServiceBlockingStub _task;
+  private final BrokerRoutingServiceGrpc.BrokerRoutingServiceBlockingStub _routing;
   private final long _timeoutMillis;
 
   public MetadataRpcClient(String host, int port, Path certificateChain, Path privateKey, Path trustCertificates,
@@ -67,6 +70,22 @@ public class MetadataRpcClient implements AutoCloseable {
     _membership = ParticipantMembershipServiceGrpc.newBlockingStub(_channel);
     _installation = ServerInstallationServiceGrpc.newBlockingStub(_channel);
     _task = MinionTaskServiceGrpc.newBlockingStub(_channel);
+    _routing = BrokerRoutingServiceGrpc.newBlockingStub(_channel);
+  }
+
+  public MetadataRpc.RoutingSnapshot routingSnapshot(MetadataRpc.RoutingSnapshotRequest request) {
+    return routingSnapshot(request, _timeoutMillis);
+  }
+
+  public MetadataRpc.RoutingSnapshot routingSnapshot(MetadataRpc.RoutingSnapshotRequest request, long timeoutMillis) {
+    if (request == null || request.getSerializedSize() > MAX_ROUTING_REQUEST_BYTES) {
+      throw Status.RESOURCE_EXHAUSTED.withDescription("Routing request exceeds transport byte limit")
+          .asRuntimeException();
+    }
+    if (timeoutMillis <= 0) {
+      throw Status.DEADLINE_EXCEEDED.withDescription("Routing request deadline expired").asRuntimeException();
+    }
+    return _routing.withDeadlineAfter(Math.min(_timeoutMillis, timeoutMillis), TimeUnit.MILLISECONDS).snapshot(request);
   }
 
   public MetadataRpc.CommandResult taskExecute(MetadataRpc.TaskCommandRequest request, long timeoutMillis) {

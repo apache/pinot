@@ -40,10 +40,12 @@ import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Status;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.StreamTipResult;
 import org.apache.pinot.coordination.ratis.metadata.OfflineInstallationProtocol;
 import org.apache.pinot.coordination.ratis.metadata.OfflineInstallationProtocol.InstallationSnapshot;
+import org.apache.pinot.coordination.ratis.metadata.OfflineRoutingProtocol.RoutingSnapshot;
 import org.apache.pinot.coordination.ratis.metadata.TaskProtocol.WorkSnapshot;
 import org.apache.pinot.coordination.ratis.transport.InstallationAccess;
 import org.apache.pinot.coordination.ratis.transport.MembershipAccess;
 import org.apache.pinot.coordination.ratis.transport.MetadataAccess;
+import org.apache.pinot.coordination.ratis.transport.RoutingAccess;
 import org.apache.pinot.coordination.ratis.transport.TaskAccess;
 
 
@@ -51,7 +53,7 @@ import org.apache.pinot.coordination.ratis.transport.TaskAccess;
 /// coherent capture; no full catalog image crosses the Raft client transport. The enclosing service authorizes actors.
 /// This class is thread-safe and owns its clients, but does not own the voter.
 public final class RatisMetadataAccess
-    implements MetadataAccess, MembershipAccess, InstallationAccess, TaskAccess, AutoCloseable {
+    implements MetadataAccess, MembershipAccess, InstallationAccess, TaskAccess, RoutingAccess, AutoCloseable {
   private final MetadataStateMachine _stateMachine;
   private final RatisMetadataStore.Client _client;
   private final RatisMetadataStore.Client _membershipClient;
@@ -126,6 +128,14 @@ public final class RatisMetadataAccess
     long deadline = deadline(timeoutMillis);
     long index = readBarrier(deadline);
     return _stateMachine.installationSnapshot(server, maxRecords, maxBytes, index, deadline);
+  }
+
+  @Override
+  public RoutingSnapshot routingSnapshot(ParticipantToken broker, String tableName, int maxRecords, int maxBytes,
+      long timeoutMillis) throws IOException {
+    long deadline = deadline(timeoutMillis);
+    long index = readBarrier(deadline);
+    return _stateMachine.routingSnapshot(broker, tableName, maxRecords, maxBytes, index, deadline);
   }
 
   @Override
