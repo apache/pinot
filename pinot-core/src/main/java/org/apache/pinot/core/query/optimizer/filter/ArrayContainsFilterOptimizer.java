@@ -145,8 +145,7 @@ public class ArrayContainsFilterOptimizer implements FilterOptimizer {
           value = parameterType.convert(literalContext.getDoubleValue(), PinotDataType.DOUBLE);
           break;
         case BIG_DECIMAL:
-          value = parameterType == PinotDataType.STRING ? literalContext.getStringValue()
-              : parameterType.convert(literalContext.getBigDecimalValue(), PinotDataType.BIG_DECIMAL);
+          value = parameterType.convert(literalContext.getBigDecimalValue(), PinotDataType.BIG_DECIMAL);
           break;
         case STRING:
           value = parameterType.convert(literalContext.getStringValue(), PinotDataType.STRING);
@@ -155,6 +154,7 @@ public class ArrayContainsFilterOptimizer implements FilterOptimizer {
           return null;
       }
     } catch (Exception e) {
+      // Any literal that does not convert keeps the scalar function, which reports or handles it as before.
       return null;
     }
     if (value == null) {
