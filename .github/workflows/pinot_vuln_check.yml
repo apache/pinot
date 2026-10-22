@@ -26,6 +26,7 @@ on:
     branches:
       - master
       - 'xiangfu0/codex1/sorted-exchange-core'
+      - 'xiangfu0/codex1/sorted-exchange-ordering'
     paths:
       - "**/pom.xml"
       - "**/package.json"
