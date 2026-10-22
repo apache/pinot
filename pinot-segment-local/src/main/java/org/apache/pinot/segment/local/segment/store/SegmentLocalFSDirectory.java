@@ -141,6 +141,8 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
     return _segmentMetadata;
   }
 
+  /// Called only during preprocessing, before the segment is queryable; replacing and closing metadata is not
+  /// synchronized with serving readers.
   @Override
   public void reloadMetadata()
       throws Exception {
@@ -151,7 +153,7 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
     previous.close();
   }
 
-  /// Replaces mutable metadata with the mapped representation after all segment preprocessing has finished.
+  /// Replaces mutable metadata with the mapped representation after preprocessing and before the segment is queryable.
   public void loadMappedMetadata()
       throws IOException, ConfigurationException {
     if (_segmentMetadata.isMapped()) {

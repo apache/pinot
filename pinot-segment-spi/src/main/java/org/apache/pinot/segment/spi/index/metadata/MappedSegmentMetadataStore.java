@@ -160,6 +160,7 @@ final class MappedSegmentMetadataStore implements Closeable {
     for (int attempt = 0; attempt < 3; attempt++) {
       Fingerprint propertiesFingerprint = Fingerprint.of(source);
       Fingerprint indexMapFingerprint = Fingerprint.of(findIndexMap(indexDir));
+      // The validated heap copy is transient; the store retains only the mapping and shared column layout.
       byte[] bytes = readValid(sidecar, propertiesFingerprint, indexMapFingerprint);
       if (bytes == null) {
         writeAtomically(sidecar, build(indexDir, propertiesFingerprint, indexMapFingerprint));
@@ -173,7 +174,8 @@ final class MappedSegmentMetadataStore implements Closeable {
       boolean keepBuffer = false;
       try {
         // Another loader may atomically replace the sidecar between validation and mapFile(). Check the exact mapped
-        // bytes and the canonical inputs before publishing a view over this mapping.
+        // bytes and the canonical inputs before publishing a view over this mapping. The header alone cannot prove
+        // that the mapped payload is the same bytes we validated.
         if (!matchesMapped(buffer, bytes) || !propertiesFingerprint.sameAs(Fingerprint.of(source))
             || !indexMapFingerprint.sameAs(Fingerprint.of(findIndexMap(indexDir)))) {
           continue;

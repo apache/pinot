@@ -85,6 +85,7 @@ public class SegmentMetadataImpl implements SegmentMetadata, Closeable {
   @Nullable
   private AtomicReferenceArray<MappedColumnMetadata> _mappedColumnMetadata;
   private boolean _mappedStoreClosed;
+  // These overlays are mutated only during segment load, before metadata is published to query threads.
   private final Map<String, ColumnMetadata> _virtualColumnMetadata = new HashMap<>();
   private final Set<String> _removedColumns = new HashSet<>();
   @Nullable
