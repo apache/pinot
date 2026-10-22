@@ -29,6 +29,8 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.context.PlannerContext;
+import org.apache.pinot.query.planner.plannode.BaseMailboxReceiveNode;
+import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -56,20 +58,33 @@ public class DispatchablePlanVisitorTest {
     MailboxSendNode sender = new MailboxSendNode(SENDER_STAGE, DATA_SCHEMA,
         List.of(new ValueNode(SENDER_STAGE, DATA_SCHEMA, PlanNode.NodeHint.EMPTY, List.of(), List.of())), SORT_STAGE,
         PinotRelExchangeType.STREAMING, distributionType, keys, false, COLLATIONS, false, "absHashCode");
-    MailboxReceiveNode receive = new MailboxReceiveNode(SORT_STAGE, DATA_SCHEMA, SENDER_STAGE,
-        PinotRelExchangeType.STREAMING, distributionType, keys, COLLATIONS, false, false, sender);
-    SortNode sort =
-        new SortNode(SORT_STAGE, DATA_SCHEMA, PlanNode.NodeHint.EMPTY, List.of(receive), COLLATIONS, fetch, offset);
+    List<BaseMailboxReceiveNode> receives = List.of(
+        new MailboxReceiveNode(SORT_STAGE, DATA_SCHEMA, SENDER_STAGE, PinotRelExchangeType.STREAMING,
+            distributionType, keys, COLLATIONS, false, false, sender),
+        new MailboxMergeReceiveNode(SORT_STAGE, DATA_SCHEMA, SENDER_STAGE, PinotRelExchangeType.STREAMING,
+            distributionType, keys, COLLATIONS, sender));
+    for (BaseMailboxReceiveNode receive : receives) {
+      SortNode sort =
+          new SortNode(SORT_STAGE, DATA_SCHEMA, PlanNode.NodeHint.EMPTY, List.of(receive), COLLATIONS, fetch, offset);
 
-    PlannerContext plannerContext = Mockito.mock(PlannerContext.class);
-    Mockito.when(plannerContext.getOptions()).thenReturn(Map.of());
-    Mockito.when(plannerContext.getEnvConfig()).thenReturn(Mockito.mock(QueryEnvironment.Config.class));
-    DispatchablePlanContext context =
-        new DispatchablePlanContext(null, 0, plannerContext, PairList.of(0, "col"), Set.of());
-    sort.visit(new DispatchablePlanVisitor(null, null), context);
+      PlannerContext plannerContext = Mockito.mock(PlannerContext.class);
+      Mockito.when(plannerContext.getOptions()).thenReturn(Map.of());
+      Mockito.when(plannerContext.getEnvConfig()).thenReturn(Mockito.mock(QueryEnvironment.Config.class));
+      DispatchablePlanContext context =
+          new DispatchablePlanContext(null, 0, plannerContext, PairList.of(0, "col"), Set.of());
+      sort.visit(new DispatchablePlanVisitor(null, null), context);
 
-    assertEquals(context.getDispatchablePlanMetadataMap().get(SORT_STAGE).isRequiresSingletonInstance(),
-        expectedSingleton);
+      assertEquals(context.getDispatchablePlanMetadataMap().get(SORT_STAGE).isRequiresSingletonInstance(),
+          expectedSingleton, receive.getClass().getSimpleName());
+      if (fetch < 0 && offset < 0) {
+        // A compatibility-encoded complete-input sort must make the same worker decision as an unbounded sort.
+        SortNode completeInputSort = new SortNode(SORT_STAGE, DATA_SCHEMA, PlanNode.NodeHint.EMPTY,
+            List.of(receive), COLLATIONS, Integer.MAX_VALUE, -1).requiringSingleRun();
+        completeInputSort.visit(new DispatchablePlanVisitor(null, null), context);
+        assertEquals(context.getDispatchablePlanMetadataMap().get(SORT_STAGE).isRequiresSingletonInstance(),
+            expectedSingleton, receive.getClass().getSimpleName());
+      }
+    }
   }
 
   @DataProvider(name = "sortsOverReceive")
@@ -79,6 +94,7 @@ public class DispatchablePlanVisitorTest {
         {RelDistribution.Type.HASH_DISTRIBUTED, List.of(0), -1, -1, false},
         // Trimming a partitioned exchange still needs every row in one place
         {RelDistribution.Type.HASH_DISTRIBUTED, List.of(0), 10, -1, true},
+        {RelDistribution.Type.HASH_DISTRIBUTED, List.of(0), Integer.MAX_VALUE, -1, true},
         {RelDistribution.Type.HASH_DISTRIBUTED, List.of(0), -1, 5, true},
         {RelDistribution.Type.HASH_DISTRIBUTED, List.of(0), 10, 0, true},
         // Final ORDER BY: keyless exchange

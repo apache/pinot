@@ -174,7 +174,10 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
     if (!(node.getInputs().get(0) instanceof BaseMailboxReceiveNode)) {
       return false;
     }
-    if (node.getFetch() >= 0 || node.getOffset() >= 0) {
+    // Complete-input window sorts encode MAX_VALUE for older servers; their explicit marker is not a row limit.
+    boolean hasFetch = node.getFetch() >= 0
+        && !(node.getFetch() == Integer.MAX_VALUE && node.isSingleRunRequired());
+    if (hasFetch || node.getOffset() >= 0) {
       return true;
     }
     BaseMailboxReceiveNode receiveNode = (BaseMailboxReceiveNode) node.getInputs().get(0);
