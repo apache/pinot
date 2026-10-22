@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
@@ -50,8 +49,10 @@ import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Command;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.FeedScope;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.MembershipCommand;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.MembershipQuery;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.ObjectVersion;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.RecordKind;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Result;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Revision;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Status;
 import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol;
 import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.Content;
@@ -67,15 +68,16 @@ import org.apache.pinot.coordination.ratis.metadata.TaskProtocol.TaskState;
 import org.apache.pinot.coordination.ratis.metadata.TaskProtocol.TaskStatus;
 import org.apache.pinot.coordination.ratis.transport.MembershipAccess;
 import org.apache.pinot.coordination.ratis.transport.MetadataAccess;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
 
-/// Bounded native task scheduling using committed membership rounds, never local wall-clock authority. A controller
+/// Bounded native task scheduling and OFFLINE content reconciliation using committed membership rounds. A controller
 /// claims only unowned or expired table shards. Commands and heartbeats retain their identity across unknown replies.
-/// Methods serialize the controller request stream; immutable schedule identities survive process restart.
+/// Methods serialize the controller request stream; immutable schedule and content identities survive process restart.
 public final class NativeControllerTasks implements AutoCloseable {
   private static final Logger LOGGER = LoggerFactory.getLogger(NativeControllerTasks.class);
   private static final FeedScope SCOPE = new FeedScope(EnumSet.of(RecordKind.TABLE_CONFIG, RecordKind.SCHEMA,
@@ -166,28 +168,18 @@ public final class NativeControllerTasks implements AutoCloseable {
     Map<UUID, CatalogRecord> records = image.records().stream()
         .collect(Collectors.toMap(CatalogRecord::objectId, record -> record));
     NativeTaskPlacementStatus placement = new NativeTaskPlacementStatus(image);
-    List<Candidate> candidates = new ArrayList<>();
-    for (CatalogRecord record : image.records()) {
-      if (record.kind() == RecordKind.TASK_SCHEDULE || record.kind() == RecordKind.TASK) {
-        candidates.add(new Candidate(record, null));
-      } else if (record.kind() == RecordKind.TASK_PUBLICATION) {
-        for (Content output : TaskProtocol.decodePublication(record.value()).outputs()) {
-          candidates.add(new Candidate(record, output));
-        }
-      }
-    }
-    candidates.sort(Comparator.comparing(candidate -> candidate.record().objectId() + "/"
-        + (candidate.output() == null ? "" : candidate.output().segmentObjectId())));
+    List<CatalogRecord> candidates = image.records().stream()
+        .filter(record -> record.kind() == RecordKind.TASK_SCHEDULE || record.kind() == RecordKind.TASK
+            || record.kind() == RecordKind.OFFLINE_SEGMENT_CONTENT)
+        .sorted(Comparator.comparing(record -> record.objectId().toString())).toList();
     int start = candidates.isEmpty() ? 0 : _scanCursor % candidates.size();
     for (int offset = 0; offset < candidates.size(); offset++) {
       int position = (start + offset) % candidates.size();
       _scanCursor = (position + 1) % candidates.size();
-      Candidate candidate = candidates.get(position);
-      CatalogRecord record = candidate.record();
-      if (candidate.output() != null) {
-        var publication = TaskProtocol.decodePublication(record.value());
-        Content output = candidate.output();
-        NativeTaskPlacementStatus.Output status = placement.output(publication.taskId(), output);
+      CatalogRecord record = candidates.get(position);
+      if (record.kind() == RecordKind.OFFLINE_SEGMENT_CONTENT) {
+        Content output = OfflineSegmentProtocol.decodeContent(record.value());
+        NativeTaskPlacementStatus.Output status = placement.output(null, output);
         if (!status.needsReconciliation()) {
           continue;
         }
@@ -195,7 +187,7 @@ public final class NativeControllerTasks implements AutoCloseable {
         if (owner != null) {
           Result reconciled = command(sequence -> new MetadataProtocol.OfflineSegmentCommand(
               _history, _clientId, 1, "tasks", sequence,
-              new OfflineSegmentProtocol.ReconcileTaskOutput(owner, publication.taskId(), output.segmentObjectId())));
+              new OfflineSegmentProtocol.ReconcileContent(owner, output.segmentObjectId())));
           require(reconciled.status() == Status.OK,
               "Native output reconciliation did not commit: " + reconciled.status());
           return;
@@ -252,7 +244,46 @@ public final class NativeControllerTasks implements AutoCloseable {
     }
   }
 
-  private record Candidate(CatalogRecord record, @Nullable Content output) {
+  /// Publishes a validated immutable archive using the same fenced owner and durable request stream as reconciliation.
+  /// Archive validation and file I/O must finish outside this monitor; replicated apply checks both captured versions.
+  public synchronized Result publish(Content content, ObjectVersion expectedTable, ObjectVersion expectedSchema)
+      throws IOException {
+    ensureOpen();
+    checkArgument(content != null && expectedTable != null && expectedSchema != null,
+        "Content and validated table/schema versions are required");
+    resolvePending();
+    heartbeat();
+    CatalogImage image = image();
+    Revision revision = new Revision(_history, image.cursor().index());
+    CatalogRecord table = record(image, RecordKind.TABLE_CONFIG, content.tableName());
+    CatalogRecord schema = record(image, RecordKind.SCHEMA,
+        TableNameBuilder.extractRawTableName(content.tableName()));
+    if (!matches(table, expectedTable) || !matches(schema, expectedSchema)
+        || !content.tableObjectId().equals(expectedTable.objectId())) {
+      return new Result(Status.CONFLICT, revision, "Upload validation dependencies changed", null, null, null);
+    }
+    CatalogRecord existing = record(image, RecordKind.OFFLINE_SEGMENT_CONTENT,
+        OfflineSegmentProtocol.contentName(content.tableObjectId(), content.segmentName()));
+    if (existing != null) {
+      boolean identical = !existing.deleted() && existing.objectId().equals(content.segmentObjectId())
+          && content.equals(OfflineSegmentProtocol.decodeContent(existing.value()));
+      // Any controller can resolve an existing immutable publication through a committed read barrier. This
+      // does not create new content or acquire another controller's live shard ownership.
+      return new Result(identical ? Status.OK : Status.CONFLICT, revision,
+          identical ? "Immutable content already published" : "Segment name identifies different immutable content",
+          null, null, existing);
+    }
+    OwnerToken owner = owner(image, content.tableName());
+    if (owner == null) {
+      throw new IOException("Segment table is owned by another controller; submit to that controller");
+    }
+    return command(sequence -> new MetadataProtocol.OfflineSegmentCommand(_history, _clientId, 1, "tasks", sequence,
+        new OfflineSegmentProtocol.PublishValidatedContent(owner, expectedTable, expectedSchema, content)));
+  }
+
+  private boolean matches(@Nullable CatalogRecord record, ObjectVersion version) {
+    return record != null && !record.deleted() && _history.equals(version.historyId())
+        && record.objectId().equals(version.objectId()) && record.version() == version.version();
   }
 
   public synchronized Result schedule(String tableName, UUID scheduleId, ScheduleRequest request) throws IOException {

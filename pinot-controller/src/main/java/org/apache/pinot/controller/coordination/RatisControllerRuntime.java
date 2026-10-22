@@ -196,6 +196,7 @@ public final class RatisControllerRuntime implements AutoCloseable, ServiceStatu
     _tasks =
         new NativeControllerTasks(requireNonNull(_access), requireNonNull(_access), _history, _instanceId, _config);
     _adminApp.register(new NativeControllerTaskResource(_tasks, accessControlFactory));
+    _adminApp.register(new NativeControllerSegmentResource(metadata, _tasks, _config, accessControlFactory));
     Instant startTime = Instant.now();
     _adminApp.registerBinder(new AbstractBinder() {
       @Override

@@ -58,8 +58,8 @@ final class NativeTaskPlacementStatus {
     BLOCKED, UNSUPPORTED, WAITING_FOR_SERVERS, UNDER_REPLICATED, INSTALLING, RECONCILING, INSTALLED, FAILED
   }
 
-  record Output(UUID taskId, String segmentName, UUID segmentObjectId, int requestedReplicas, int desiredReplicas,
-                int installedReplicas, int eligibleServers, State state, String detail) {
+  record Output(@Nullable UUID taskId, String segmentName, UUID segmentObjectId, int requestedReplicas,
+                int desiredReplicas, int installedReplicas, int eligibleServers, State state, String detail) {
     boolean needsReconciliation() {
       return state != State.BLOCKED && state != State.UNSUPPORTED && state != State.INSTALLED && state != State.FAILED;
     }
@@ -104,7 +104,7 @@ final class NativeTaskPlacementStatus {
     _policy = policy;
   }
 
-  Output output(UUID taskId, Content content) throws IOException {
+  Output output(@Nullable UUID taskId, Content content) throws IOException {
     if (content.loader().tier() != null) {
       return result(taskId, content, -1, -1, -1, -1, State.UNSUPPORTED,
           "Tiered output placement is not supported");
@@ -249,8 +249,8 @@ final class NativeTaskPlacementStatus {
     return _records.getOrDefault(kind, Map.of()).get(name);
   }
 
-  private static Output result(UUID taskId, Content content, int requested, int desired, int installed, int eligible,
-      State state, String detail) {
+  private static Output result(@Nullable UUID taskId, Content content, int requested, int desired, int installed,
+      int eligible, State state, String detail) {
     return new Output(taskId, content.segmentName(), content.segmentObjectId(), requested, desired, installed, eligible,
         state, detail);
   }

@@ -68,6 +68,8 @@ import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.Assig
 import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.Content;
 import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.LoaderDescriptor;
 import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.PublishContent;
+import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.PublishValidatedContent;
+import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.ReconcileContent;
 import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.ReconcileTaskOutput;
 import org.apache.pinot.coordination.ratis.metadata.OperationProtocol.OperationState;
 import org.apache.pinot.coordination.ratis.metadata.OperationProtocol.State;
@@ -638,6 +640,84 @@ public class TaskCatalogTest {
     assertEquals(f._catalog.installationSnapshot(admitted.server(), 128,
         OfflineInstallationProtocol.MAX_SNAPSHOT_BYTES).status(), Status.OK,
         "A later legal cluster config expansion must fit the reserved projection budget");
+    f.restore();
+  }
+
+  @Test
+  public void testValidatedPublicationFencesSchemaTableAndImmutableRetry() throws Exception {
+    Fixture f = new Fixture(true);
+    Content content = f.output(f._task, 1);
+    ObjectVersion table = f.objectVersion(f.record(RecordKind.TABLE_CONFIG, TABLE));
+    ObjectVersion schema = f.objectVersion(f.record(RecordKind.SCHEMA, "orders"));
+    PublishValidatedContent original = new PublishValidatedContent(f._owner, table, schema, content);
+    Schema changedSchema = new Schema.SchemaBuilder().setSchemaName("orders")
+        .addSingleValueDimension("id", DataType.INT).addSingleValueDimension("extra", DataType.STRING).build();
+    assertEquals(f.mutate(Mutation.updateSchema(schema, changedSchema)).status(), Status.OK);
+    assertEquals(f.segment(original).status(), Status.CONFLICT,
+        "Schema changes after validation must fence publication");
+    schema = f.objectVersion(f.record(RecordKind.SCHEMA, "orders"));
+    assertEquals(f.mutate(Mutation.updateTableConfig(table, f.table())).status(), Status.OK);
+    assertEquals(f.segment(new PublishValidatedContent(f._owner, table, schema, content)).status(), Status.CONFLICT,
+        "Table changes after validation must fence publication");
+    table = f.objectVersion(f.record(RecordKind.TABLE_CONFIG, TABLE));
+    UUID unrelated = UUID.randomUUID();
+    assertEquals(f.mutate(Mutation.createSchema(f._history, unrelated, new Schema.SchemaBuilder().setSchemaName("other")
+        .addSingleValueDimension("id", DataType.INT).build())).status(), Status.OK);
+    assertEquals(f.segment(new PublishValidatedContent(f._owner, table, new ObjectVersion(f._history, unrelated, 1),
+        content)).status(), Status.CONFLICT, "A different active schema cannot validate this table's upload");
+    PublishValidatedContent current = new PublishValidatedContent(f._owner, table, schema, content);
+    Result published = f.segment(current);
+    assertEquals(published.status(), Status.OK);
+    assertEquals(published.versions().size(), 1);
+    CatalogRecord immutable = f.record(RecordKind.OFFLINE_SEGMENT_CONTENT,
+        OfflineSegmentProtocol.contentName(content.tableObjectId(), content.segmentName()));
+    assertEquals(f.segment(current).status(), Status.OK);
+    assertTrue(f.segment(current).versions().isEmpty(), "An exact retry must not advance immutable content");
+    assertEquals(f.record(RecordKind.OFFLINE_SEGMENT_CONTENT, immutable.name()), immutable);
+    for (Content conflict : List.of(
+        new Content(TABLE, f._table, content.segmentName(), content.segmentObjectId(), "b".repeat(64),
+            content.downloadUri(), content.loader()),
+        new Content(TABLE, f._table, content.segmentName(), UUID.randomUUID(), content.contentSha256(),
+            content.downloadUri(), content.loader()),
+        new Content(TABLE, f._table, "other-segment", content.segmentObjectId(), content.contentSha256(),
+            content.downloadUri(), content.loader()))) {
+      assertEquals(f.segment(new PublishValidatedContent(f._owner, table, schema, conflict)).status(), Status.CONFLICT);
+    }
+    assertEquals(f.segment(new PublishContent(f._owner, table, content)).status(), Status.CONFLICT,
+        "The legacy publication command must retain its original duplicate behavior");
+    f.restore();
+    assertTrue(f.segment(current).versions().isEmpty());
+    assertEquals(f.record(RecordKind.OFFLINE_SEGMENT_CONTENT, immutable.name()), immutable);
+  }
+
+  @Test
+  public void testValidatedContentAutomaticallyReconcilesWithoutTaskRecords() throws Exception {
+    Fixture f = new Fixture();
+    Content content = new Content(TABLE, f._table, "uploaded-segment", UUID.randomUUID(), "c".repeat(64),
+        "file:///uploads/immutable.tar.gz", new LoaderDescriptor(1, 0, false, null, null, 1, 1, Map.of()));
+    assertEquals(f.segment(new PublishValidatedContent(f._owner,
+        f.objectVersion(f.record(RecordKind.TABLE_CONFIG, TABLE)),
+        f.objectVersion(f.record(RecordKind.SCHEMA, "orders")), content)).status(), Status.OK);
+    f.register("server", Role.SERVER, 0);
+    f.placementPolicy(Map.of("server", new NativeReplicaPlacementPolicy.Server("DefaultTenant", "zone-a")));
+    ReconcileContent reconcile = new ReconcileContent(f._owner, content.segmentObjectId());
+    Result accepted = f.segment(reconcile);
+    assertEquals(accepted.status(), Status.OK);
+    assertEquals(accepted.versions().size(), 2, "Direct content also atomically creates assignment and install intent");
+    Assignment assignment = f.assignments(content).getFirst();
+    assertEquals(f.operation(assignment).status(), State.ACCEPTED);
+    assertEquals(f.segment(new ReconcileTaskOutput(f._owner, f._task, content.segmentObjectId())).status(),
+        Status.NOT_FOUND, "The task-specific command must still require a successful task publication");
+    f.restore();
+    assertEquals(f.segment(reconcile).status(), Status.OK);
+    assertEquals(f.operation(assignment).status(), State.RUNNING);
+    f.install(assignment);
+    assertEquals(f.segment(reconcile).status(), Status.OK);
+    assertEquals(f.operation(assignment).status(), State.SUCCEEDED);
+    assertEquals(f.operation(assignment).completionProof().installations().size(), 1);
+    assertTrue(f.segment(reconcile).versions().isEmpty());
+    assertTrue(f._catalog.captureImage(new FeedScope(Set.of(RecordKind.TASK, RecordKind.TASK_PUBLICATION), "no-task"))
+        .records().isEmpty(), "Direct publication must not manufacture task records");
     f.restore();
   }
 

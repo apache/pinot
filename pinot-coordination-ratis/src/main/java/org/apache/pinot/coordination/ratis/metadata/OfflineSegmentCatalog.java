@@ -40,6 +40,8 @@ import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.Conte
 import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.LoaderDescriptor;
 import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.Operation;
 import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.PublishContent;
+import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.PublishValidatedContent;
+import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.ReconcileContent;
 import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.ReconcileTaskOutput;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -61,8 +63,10 @@ final class OfflineSegmentCatalog {
         "Offline operation and committed index are required");
     return switch (operation) {
       case PublishContent publish -> publish(publish, view, index);
+      case PublishValidatedContent publish -> publishValidated(publish, view, index);
       case AssignReplica assign -> assign(assign, view, index);
-      case ReconcileTaskOutput reconcile -> TaskOutputPlacementCatalog.stage(reconcile, view, index);
+      case ReconcileTaskOutput reconcile -> OfflineContentPlacementCatalog.stage(reconcile, view, index);
+      case ReconcileContent reconcile -> OfflineContentPlacementCatalog.stage(reconcile, view, index);
     };
   }
 
@@ -79,6 +83,30 @@ final class OfflineSegmentCatalog {
     require(view.record(RecordKind.OFFLINE_SEGMENT_CONTENT, name) == null
         && view.record(content.segmentObjectId()) == null, Status.CONFLICT,
         "Offline segment content names and object IDs cannot be overwritten or reused");
+    return List.of(new CatalogRecord(RecordKind.OFFLINE_SEGMENT_CONTENT, name, content.segmentObjectId(), 1,
+        MetadataProtocol.FORMAT_VERSION, index, false, MetadataProtocol.toTree(content)));
+  }
+
+  private static List<CatalogRecord> publishValidated(PublishValidatedContent request, View view, long index)
+      throws IOException {
+    Content content = request.content();
+    validateContent(content);
+    OwnershipCatalog.validateTableOwner(request.owner(), content.tableName(), view);
+    Compatibility compatibility = new Compatibility(request.expectedTable(), request.expectedSchema());
+    validateCompatibility(compatibility, content.tableObjectId(), view.historyId());
+    currentCompatibility(compatibility, content, view);
+    String name = OfflineSegmentProtocol.contentName(content.tableObjectId(), content.segmentName());
+    CatalogRecord named = view.record(RecordKind.OFFLINE_SEGMENT_CONTENT, name);
+    CatalogRecord identified = view.record(content.segmentObjectId());
+    if (named != null || identified != null) {
+      require(named != null && identified != null && !named.deleted() && !identified.deleted()
+          && named.objectId().equals(content.segmentObjectId())
+          && identified.kind() == RecordKind.OFFLINE_SEGMENT_CONTENT
+          && identified.name().equals(name) && content.equals(OfflineSegmentProtocol.decodeContent(named.value()))
+          && content.equals(OfflineSegmentProtocol.decodeContent(identified.value())), Status.CONFLICT,
+          "Offline content name or object ID already identifies a different immutable manifest");
+      return List.of();
+    }
     return List.of(new CatalogRecord(RecordKind.OFFLINE_SEGMENT_CONTENT, name, content.segmentObjectId(), 1,
         MetadataProtocol.FORMAT_VERSION, index, false, MetadataProtocol.toTree(content)));
   }

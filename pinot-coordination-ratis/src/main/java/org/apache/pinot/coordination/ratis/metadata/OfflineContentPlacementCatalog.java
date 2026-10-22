@@ -42,12 +42,14 @@ import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.Assig
 import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.Assignment;
 import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.Compatibility;
 import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.Content;
+import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.ReconcileContent;
 import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.ReconcileTaskOutput;
 import org.apache.pinot.coordination.ratis.metadata.OperationProtocol.AssignedOfflineSegmentReload;
 import org.apache.pinot.coordination.ratis.metadata.OperationProtocol.OfflineSegmentReload;
 import org.apache.pinot.coordination.ratis.metadata.OperationProtocol.OperationState;
 import org.apache.pinot.coordination.ratis.metadata.OperationProtocol.State;
 import org.apache.pinot.coordination.ratis.metadata.OperationProtocol.TargetMaterialization;
+import org.apache.pinot.coordination.ratis.metadata.OwnershipProtocol.OwnerToken;
 import org.apache.pinot.coordination.ratis.metadata.TaskProtocol.PublicationState;
 import org.apache.pinot.coordination.ratis.metadata.TaskProtocol.TaskState;
 import org.apache.pinot.coordination.ratis.metadata.TaskProtocol.TaskStatus;
@@ -56,10 +58,11 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
-/// Reconciles one published task output against one committed image. New assignments and their installation intent
-/// commit together; subsequent commands claim and complete that intent. No external I/O or clocks affect placement.
-final class TaskOutputPlacementCatalog {
-  private TaskOutputPlacementCatalog() {
+/// Reconciles one published immutable OFFLINE segment against one committed image. New assignments and their
+/// installation intent commit together; subsequent commands claim and complete that intent. No external I/O or
+/// clocks affect placement.
+final class OfflineContentPlacementCatalog {
+  private OfflineContentPlacementCatalog() {
   }
 
   static List<CatalogRecord> stage(ReconcileTaskOutput request, OperationCatalog.View view, long index)
@@ -79,7 +82,20 @@ final class TaskOutputPlacementCatalog {
         "Segment is not an immutable output of this task publication");
     require(content.loader().tier() == null, Status.INVALID_REQUEST,
         "Native task output placement does not support tiered content");
-    OwnershipCatalog.validateTableOwner(request.owner(), content.tableName(), view);
+    return reconcile(request.owner(), content, view, index);
+  }
+
+  static List<CatalogRecord> stage(ReconcileContent request, OperationCatalog.View view, long index)
+      throws IOException {
+    Content content = OfflineSegmentCatalog.currentContent(request.segmentObjectId(), view);
+    require(content.loader().tier() == null, Status.INVALID_REQUEST,
+        "Native content placement does not support tiered content");
+    return reconcile(request.owner(), content, view, index);
+  }
+
+  private static List<CatalogRecord> reconcile(OwnerToken owner, Content content, OperationCatalog.View view,
+      long index) throws IOException {
+    OwnershipCatalog.validateTableOwner(owner, content.tableName(), view);
     CatalogRecord tableRecord = view.record(content.tableObjectId());
     CatalogRecord schemaRecord = view.record(RecordKind.SCHEMA,
         TableNameBuilder.extractRawTableName(content.tableName()));
@@ -131,7 +147,7 @@ final class TaskOutputPlacementCatalog {
     for (var entry : previous.entrySet()) {
       Assignment assignment = entry.getValue();
       if (assignment.desiredOnline() && !selected.contains(entry.getKey())) {
-        staged.add(OfflineSegmentCatalog.stage(new AssignReplica(request.owner(), content.segmentObjectId(),
+        staged.add(OfflineSegmentCatalog.stage(new AssignReplica(owner, content.segmentObjectId(),
             assignment.assignmentEpoch(), assignment.server(), assignment.compatibility(), false), staged, index));
       }
     }
@@ -140,7 +156,7 @@ final class TaskOutputPlacementCatalog {
       ParticipantState server = eligible.get(id);
       if (assignment == null || !assignment.desiredOnline() || !assignment.server().equals(server.participant())
           || !assignment.compatibility().equals(compatibility)) {
-        staged.add(OfflineSegmentCatalog.stage(new AssignReplica(request.owner(), content.segmentObjectId(),
+        staged.add(OfflineSegmentCatalog.stage(new AssignReplica(owner, content.segmentObjectId(),
             assignment == null ? 0 : assignment.assignmentEpoch(), server.participant(), compatibility, true),
             staged, index));
         increased.add(id);
@@ -158,13 +174,13 @@ final class TaskOutputPlacementCatalog {
         OperationCatalog.currentAssigned(assigned, staged);
       } catch (CoordinationRejection e) {
         staged.add(OperationCatalog.stageNative(new OperationProtocol.Cancel(operation.operationId(),
-            record.version(), request.owner(), "Replica assignment superseded"), staged, index));
+            record.version(), owner, "Replica assignment superseded"), staged, index));
       }
     }
     for (String id : selected.stream().sorted().toList()) {
       Assignment assignment = OfflineSegmentCatalog.currentAssignment(content.segmentObjectId(),
           eligible.get(id).participant(), staged);
-      if (reconcileOperation(request, content, assignment, staged, index)) {
+      if (reconcileOperation(owner, content, assignment, staged, index)) {
         increased.add(id);
       }
     }
@@ -174,7 +190,7 @@ final class TaskOutputPlacementCatalog {
     return List.copyOf(staged._staged.values());
   }
 
-  private static boolean reconcileOperation(ReconcileTaskOutput request, Content content, Assignment assignment,
+  private static boolean reconcileOperation(OwnerToken owner, Content content, Assignment assignment,
       Overlay view, long index) throws IOException {
     UUID operationId = NativeReplicaPlacementPolicy.operationId(view.historyId(), assignment.materializationId());
     CatalogRecord record = view.record(RecordKind.CONTROLLER_OPERATION, OperationProtocol.recordName(operationId));
@@ -193,15 +209,15 @@ final class TaskOutputPlacementCatalog {
       // A terminal failure is visible for operator intervention; never manufacture endless new epochs or retries.
       return false;
     }
-    if (operation.status() == State.ACCEPTED || !operation.owner().equals(request.owner())) {
+    if (operation.status() == State.ACCEPTED || !operation.owner().equals(owner)) {
       AssignedOfflineSegmentReload assigned = (AssignedOfflineSegmentReload) operation.input();
-      view.add(OperationCatalog.stageNative(new OperationProtocol.Claim(operationId, record.version(), request.owner(),
+      view.add(OperationCatalog.stageNative(new OperationProtocol.Claim(operationId, record.version(), owner,
           assigned.dependencies()), view, index));
       return false;
     }
     try {
       view.add(OperationCatalog.stageNative(new OperationProtocol.CompleteInstalled(operationId, record.version(),
-          request.owner(), operation.attempt()), view, index));
+          owner, operation.attempt()), view, index));
     } catch (CoordinationRejection e) {
       if (e.status() != Status.NOT_READY) {
         throw e;

@@ -120,7 +120,8 @@ qualification remain outstanding. Input files default to 16 MiB and 100,000 rows
 of 64 MiB and 1,000,000 rows.
 
 Publication means committed content, not replica installation or query availability. The controller now reconciles
-published task outputs through the existing native installation protocol. Its normal task scan shares one live
+all published immutable OFFLINE content, including task outputs and validated controller uploads, through the existing
+native installation protocol. Its normal task scan shares one live
 controller registration, table ownership and durable request stream with scheduling; each cycle attempts at most one
 schedule, retry or output reconciliation, rotating fairly over all candidates. Unknown replies retain their request
 identity. Controller replacement reclaims unfinished operations; completed current installations do not churn.
