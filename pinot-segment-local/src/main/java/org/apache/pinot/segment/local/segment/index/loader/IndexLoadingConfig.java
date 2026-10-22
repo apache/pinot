@@ -51,6 +51,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.OpenStructNaming;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
@@ -58,6 +59,8 @@ import org.apache.pinot.spi.utils.TimestampIndexUtils;
 
 /// Index loading config with shared table-level state and segment-local mutable overrides.
 public class IndexLoadingConfig {
+  /// Instance config key, relative to `pinot.server.instance`, for reverting to eager serving metadata.
+  public static final String MAPPED_SEGMENT_METADATA_ENABLED = "segment.metadata.mmap.enabled";
   private static final int DEFAULT_REALTIME_AVG_MULTI_VALUE_COUNT = 2;
   public static final String READ_MODE_KEY = "readMode";
 
@@ -100,12 +103,17 @@ public class IndexLoadingConfig {
     private final List<String> _sortedColumns;
     private final ColumnMinMaxValueGeneratorMode _columnMinMaxValueGeneratorMode;
     private final boolean _hasOpenStructColumns;
+    private final boolean _mappedSegmentMetadataEnabled;
 
     private ImmutableState(@Nullable InstanceDataManagerConfig instanceDataManagerConfig,
         @Nullable TableConfig tableConfig, @Nullable Schema schema) {
       _instanceDataManagerConfig = instanceDataManagerConfig;
       _tableConfig = tableConfig;
       _schema = schema;
+      PinotConfiguration instanceConfig =
+          instanceDataManagerConfig != null ? instanceDataManagerConfig.getConfig() : null;
+      _mappedSegmentMetadataEnabled =
+          instanceConfig == null || instanceConfig.getProperty(MAPPED_SEGMENT_METADATA_ENABLED, true);
 
       String instanceId = null;
       boolean isRealtimeOffHeapAllocation = false;
@@ -260,6 +268,10 @@ public class IndexLoadingConfig {
   @Nullable
   public InstanceDataManagerConfig getInstanceDataManagerConfig() {
     return _immutableState._instanceDataManagerConfig;
+  }
+
+  public boolean isMappedSegmentMetadataEnabled() {
+    return _immutableState._mappedSegmentMetadataEnabled;
   }
 
   @Nullable

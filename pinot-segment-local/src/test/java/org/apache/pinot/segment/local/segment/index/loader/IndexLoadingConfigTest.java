@@ -54,6 +54,21 @@ public class IndexLoadingConfigTest {
   private static final String TABLE_NAME = "table01";
 
   @Test
+  public void testMappedSegmentMetadataInstanceSetting() {
+    InstanceDataManagerConfig instanceConfig = mock(InstanceDataManagerConfig.class);
+    PinotConfiguration config = new PinotConfiguration();
+    when(instanceConfig.getConfig()).thenReturn(config);
+
+    IndexLoadingConfig enabled = new IndexLoadingConfig(instanceConfig, null, null);
+    assertTrue(enabled.isMappedSegmentMetadataEnabled());
+    config.setProperty(IndexLoadingConfig.MAPPED_SEGMENT_METADATA_ENABLED, false);
+    IndexLoadingConfig disabled = new IndexLoadingConfig(instanceConfig, null, null);
+    assertFalse(disabled.isMappedSegmentMetadataEnabled());
+    assertFalse(disabled.withSegmentTier("coldTier").isMappedSegmentMetadataEnabled());
+    assertTrue(enabled.isMappedSegmentMetadataEnabled());
+  }
+
+  @Test
   public void testReadModePrecedenceAndOverrideIsolation() {
     InstanceDataManagerConfig instanceConfig = mock(InstanceDataManagerConfig.class);
     when(instanceConfig.getReadMode()).thenReturn(ReadMode.heap);

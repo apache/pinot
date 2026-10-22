@@ -42,6 +42,7 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.converter.SegmentV1V2ToV3FormatConverter;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
@@ -57,6 +58,7 @@ import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.ColumnIndexUtils;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
+import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.OpenStructIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -68,6 +70,7 @@ import org.apache.pinot.spi.data.OpenStructNaming;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -77,6 +80,8 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
@@ -186,7 +191,7 @@ public class SegmentMetadataImplTest {
   }
 
   @Test
-  public void testServingLoadFallsBackWhenMappedMetadataCannotBeWritten()
+  public void testServingLoadFallsBackOrMappingIsDisabled()
       throws Exception {
     File sidecar = new File(_segmentDirectory, "segment_metadata.bin");
     assertTrue(sidecar.mkdir());
@@ -201,6 +206,19 @@ public class SegmentMetadataImplTest {
       }
     } finally {
       FileUtils.deleteQuietly(sidecar);
+    }
+
+    InstanceDataManagerConfig instanceConfig = mock(InstanceDataManagerConfig.class);
+    PinotConfiguration config = new PinotConfiguration();
+    config.setProperty(IndexLoadingConfig.MAPPED_SEGMENT_METADATA_ENABLED, false);
+    when(instanceConfig.getConfig()).thenReturn(config);
+    ImmutableSegment disabled =
+        ImmutableSegmentLoader.load(_segmentDirectory, new IndexLoadingConfig(instanceConfig, null, null), false);
+    try {
+      assertFalse(((SegmentMetadataImpl) disabled.getSegmentMetadata()).isMapped());
+      assertFalse(sidecar.exists());
+    } finally {
+      disabled.destroy();
     }
 
     ImmutableSegment segment = ImmutableSegmentLoader.load(_segmentDirectory, ReadMode.mmap);

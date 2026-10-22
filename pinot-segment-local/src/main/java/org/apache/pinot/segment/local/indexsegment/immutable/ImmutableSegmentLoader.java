@@ -127,12 +127,14 @@ public class ImmutableSegmentLoader {
 
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
     if (segmentMetadata.getTotalDocs() == 0) {
-      try {
-        return new EmptyIndexSegment(SegmentMetadataImpl.loadMapped(indexDir));
-      } catch (IOException | ConfigurationException e) {
-        LOGGER.warn("Failed to load mapped metadata for empty segment: {}. Using eager metadata.", indexDir, e);
-        return new EmptyIndexSegment(segmentMetadata);
+      if (indexLoadingConfig.isMappedSegmentMetadataEnabled()) {
+        try {
+          return new EmptyIndexSegment(SegmentMetadataImpl.loadMapped(indexDir));
+        } catch (IOException | ConfigurationException e) {
+          LOGGER.warn("Failed to load mapped metadata for empty segment: {}. Using eager metadata.", indexDir, e);
+        }
       }
+      return new EmptyIndexSegment(segmentMetadata);
     }
     indexLoadingConfig = indexLoadingConfig.withOpenStructChildConfigs(segmentMetadata);
     String segmentName = segmentMetadata.getName();
@@ -209,7 +211,8 @@ public class ImmutableSegmentLoader {
       @Nullable Schema schema)
       throws Exception {
     // Preprocessing uses mutable metadata. Only the final immutable serving path uses the mapped representation.
-    if (segmentDirectory instanceof SegmentLocalFSDirectory localDirectory) {
+    if (indexLoadingConfig.isMappedSegmentMetadataEnabled()
+        && segmentDirectory instanceof SegmentLocalFSDirectory localDirectory) {
       localDirectory.loadMappedMetadata();
     }
     SegmentMetadataImpl segmentMetadata = segmentDirectory.getSegmentMetadata();

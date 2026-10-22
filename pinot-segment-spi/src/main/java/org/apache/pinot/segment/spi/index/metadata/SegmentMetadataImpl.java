@@ -638,7 +638,8 @@ public class SegmentMetadataImpl implements SegmentMetadata, Closeable {
     }
   }
 
-  /// Releases the metadata mapping. The owning segment directory closes it after all serving readers are retired.
+  /// Releases the metadata mapping. Managed serving directories close after readers retire; other callers must
+  /// keep the mapping open while it is in use. Synchronization prevents duplicate closes, not concurrent reads.
   public synchronized void close()
       throws IOException {
     if (_mappedStore != null && !_mappedStoreClosed) {

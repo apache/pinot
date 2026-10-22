@@ -619,8 +619,7 @@ public class TablesResource {
           tableNameWithType + "_" + segmentName + "_" + UUID.randomUUID() + TarCompressionUtils.TAR_GZ_FILE_EXTENSION,
           "Invalid table / segment name: %s , %s", tableNameWithType, segmentName);
 
-      TarCompressionUtils.createCompressedTarFile(new File(tableDataManager.getTableDataDir(), segmentName),
-          segmentTarFile);
+      createSegmentTransferTarFile(new File(tableDataManager.getTableDataDir(), segmentName), segmentTarFile);
       Response.ResponseBuilder builder = Response.ok();
       builder.entity((StreamingOutput) output -> {
         try {
@@ -1109,9 +1108,21 @@ public class TablesResource {
     File segmentTarFile = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(segmentTarUploadDir,
         tableNameWithType + "_" + segmentName + "_" + UUID.randomUUID() + TarCompressionUtils.TAR_GZ_FILE_EXTENSION,
         "Invalid table / segment name: %s, %s", tableNameWithType, segmentName);
-    TarCompressionUtils.createCompressedTarFile(new File(tableDataManager.getTableDataDir(), segmentName),
-        segmentTarFile);
+    createSegmentTransferTarFile(new File(tableDataManager.getTableDataDir(), segmentName), segmentTarFile);
     return segmentTarFile;
+  }
+
+  private static void createSegmentTransferTarFile(File segmentDir, File segmentTarFile)
+      throws IOException {
+    TarCompressionUtils.createFilteredCompressedTarFile(segmentDir, segmentTarFile, file -> {
+      if (!segmentDir.equals(file.getParentFile())) {
+        return true;
+      }
+      // These files are local serving artifacts, rebuilt from metadata.properties on the receiving server.
+      String name = file.getName();
+      return !name.equals("segment_metadata.bin")
+          && !(name.startsWith(".segment_metadata.") && name.endsWith(".tmp"));
+    });
   }
 
   /// Uploads a segment tar file to the segment store and returns the segment download url.
