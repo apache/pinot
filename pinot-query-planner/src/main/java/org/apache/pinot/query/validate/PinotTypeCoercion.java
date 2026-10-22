@@ -138,7 +138,8 @@ public class PinotTypeCoercion extends TypeCoercionImpl {
   public boolean inOperationCoercion(SqlCallBinding binding) {
     SqlKind kind = binding.getOperator().getKind();
     if ((kind == SqlKind.IN || kind == SqlKind.NOT_IN) && binding.operand(1) instanceof SqlNodeList
-        && isMultiValueColumn(binding, 0) && isScalarValueList(binding, (SqlNodeList) binding.operand(1))) {
+        && isMultiValueColumn(binding, 0)
+        && isScalarValueListRejectingNull(binding, (SqlNodeList) binding.operand(1))) {
       return coerceMultiValueComparison(binding, 0, () -> inOperationCoercion(binding));
     }
     return super.inOperationCoercion(binding);
@@ -149,9 +150,9 @@ public class PinotTypeCoercion extends TypeCoercionImpl {
     return SqlTypeUtil.isArray(binding.getOperandType(index)) && isColumnReference(binding.operand(index));
   }
 
-  /// Returns whether all values of the `IN` list are non-array values. A `NULL` value is rejected: Calcite types it
+  /// Returns whether all values of the `IN` list are non-array values, and throws on a `NULL` value: Calcite types it
   /// as the array type of the column, and the leaf stage cannot evaluate it in a multi-value predicate.
-  private static boolean isScalarValueList(SqlCallBinding binding, SqlNodeList values) {
+  private static boolean isScalarValueListRejectingNull(SqlCallBinding binding, SqlNodeList values) {
     for (SqlNode value : values) {
       if (SqlUtil.isNullLiteral(value, false)) {
         throw QueryErrorCode.QUERY_VALIDATION.asException(
