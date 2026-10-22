@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query;
 
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.routing.MockRoutingManagerFactory;
 import org.apache.pinot.core.routing.RoutingManager;
@@ -26,6 +27,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
@@ -108,6 +110,43 @@ public class ApproximateAggregateRewriteTest extends QueryEnvironmentTestBase {
     assertTrue(subquery.contains("threshold=23"), subquery);
   }
 
+  /// `AggregateCaseToFilterRule` turns `COUNT(DISTINCT CASE WHEN c THEN x END)` into `COUNT(DISTINCT x) FILTER (WHERE
+  /// c)`, so the rows that fail `c` add nothing to the count. It only matches a single-argument call, so the rewrite
+  /// has to run after it: with the parameters appended first, the CASE stays and its NULL counts as one more value.
+  @Test
+  public void testKeepsCaseToFilterConversion() {
+    QueryEnvironment exactEnv = newQueryEnvironment(false, "", "");
+    QueryEnvironment approximateEnv = newQueryEnvironment(true, "", "");
+    QueryEnvironment approximateWithParamsEnv = newQueryEnvironment(true, "threshold=17", "");
+    QueryEnvironment physicalOptimizerEnv = newQueryEnvironment(true, "threshold=17", "", true);
+    for (String query : List.of(
+        "SELECT COUNT(DISTINCT CASE WHEN col3 > 0 THEN col1 ELSE NULL END) FROM a",
+        "SELECT col2, COUNT(DISTINCT CASE WHEN col3 > 0 THEN col1 ELSE NULL END) FROM a GROUP BY col2",
+        "SELECT DISTINCTCOUNT(CASE WHEN col3 > 0 THEN col1 ELSE NULL END) FROM a",
+        "SELECT col2, DISTINCTCOUNT(CASE WHEN col3 > 0 THEN col1 END) FROM a GROUP BY col2",
+        // An explicit FILTER is combined with the CASE condition, and must survive the rewrite too.
+        "SELECT COUNT(DISTINCT CASE WHEN col3 > 0 THEN col1 END) FILTER (WHERE col2 = 'x') FROM a")) {
+      String exact = explain(exactEnv, query);
+      assertFilteredWithoutCase(exact);
+
+      // Without parameters the only difference from the exact plan is the function name.
+      String approximate = explain(approximateEnv, query);
+      assertRewritten(approximate, "distinctcountsmarthll");
+      assertEquals(approximate.replace("DISTINCTCOUNTSMARTHLL", "DISTINCTCOUNT"), exact);
+
+      // This is the case that kept the CASE, because the parameter makes it a two-argument call.
+      String approximateWithParams = explain(approximateWithParamsEnv, query);
+      assertRewritten(approximateWithParams, "distinctcountsmarthll");
+      assertTrue(approximateWithParams.contains("threshold=17"), approximateWithParams);
+      assertFilteredWithoutCase(approximateWithParams);
+
+      String physicalOptimizer = explain(physicalOptimizerEnv, query);
+      assertRewritten(physicalOptimizer, "distinctcountsmarthll");
+      assertTrue(physicalOptimizer.contains("threshold=17"), physicalOptimizer);
+      assertFilteredWithoutCase(physicalOptimizer);
+    }
+  }
+
   /// The physical optimizer splits aggregates in its own rule, which also keys the leaf-to-final intermediate format
   /// off the function name, so the rewrite has to hold on that path too.
   @Test
@@ -128,6 +167,11 @@ public class ApproximateAggregateRewriteTest extends QueryEnvironmentTestBase {
 
   private static void assertNotRewritten(String plan) {
     assertFalse(plan.toLowerCase().contains("smart"), "Unexpected rewrite in:\n" + plan);
+  }
+
+  private static void assertFilteredWithoutCase(String plan) {
+    assertTrue(plan.contains(") FILTER $"), "Expected a filtered aggregate in:\n" + plan);
+    assertFalse(plan.contains("CASE"), "Expected the CASE to be converted to a filter in:\n" + plan);
   }
 
   private static String explain(QueryEnvironment env, String query) {
