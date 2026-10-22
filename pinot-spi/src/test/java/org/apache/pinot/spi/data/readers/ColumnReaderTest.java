@@ -27,11 +27,12 @@ import org.apache.pinot.spi.utils.PinotDataType;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
@@ -66,6 +67,19 @@ public class ColumnReaderTest {
   }
 
   @Test
+  public void testGetTransformedValueRejectsNoOpTransformer()
+      throws IOException {
+    ColumnReader reader = mock(ColumnReader.class, CALLS_REAL_METHODS);
+    ColumnTransformer transformer = mock(ColumnTransformer.class);
+    when(transformer.isNoOp()).thenReturn(true);
+
+    AssertionError failure = expectThrows(AssertionError.class, () -> reader.getTransformedValue(42, transformer));
+    assertEquals(failure.getMessage(), "No-op transformers must be filtered by the caller");
+    verify(reader, never()).getValue(42);
+    verify(transformer, never()).transform(any());
+  }
+
+  @Test
   public void testGetTransformedValuePropagatesReadFailure()
       throws IOException {
     ColumnReader reader = mock(ColumnReader.class, CALLS_REAL_METHODS);
@@ -74,7 +88,7 @@ public class ColumnReaderTest {
     when(reader.getValue(42)).thenThrow(failure);
 
     assertSame(expectThrows(IOException.class, () -> reader.getTransformedValue(42, transformer)), failure);
-    verifyNoInteractions(transformer);
+    verify(transformer, never()).transform(any());
   }
 
   @Test

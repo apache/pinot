@@ -191,22 +191,25 @@ public interface ColumnReader extends Closeable, Serializable {
 
   /// Applies the supplied transformer to the value at the given document id. By default, returns
   /// `transformer.transform(getValue(docId))`, passing null values to the transformer as well.
-  /// The default invokes [ColumnTransformer#transform(Object)] even when [ColumnTransformer#isNoOp()] returns `true`.
   ///
+  /// Callers must filter out no-op transformers during pipeline setup, before traversing documents. The supplied
+  /// transformer's [ColumnTransformer#isNoOp()] must return `false`; an assertion checks this precondition.
   /// Callers must supply a deterministic transformer: repeated transformations of the same value must produce
   /// equivalent results. Callers must not depend on invocation counts or transformer side effects.
   ///
-  /// Readers may override this method to avoid materializing repeated raw values, reuse immutable conversion results,
-  /// or skip no-op transformations. Overrides must preserve the conversion result, including nulls and conversion
-  /// failures. This method does not change [#getValue(int)] or the typed accessors.
+  /// Readers may override this method to avoid materializing repeated raw values or reuse immutable conversion results.
+  /// Overrides must preserve the conversion result, including nulls and conversion failures.
+  /// This method does not change [#getValue(int)] or the typed accessors.
   /// Callers remain responsible for applying this conversion in the correct order relative to other transformations.
   ///
   /// @param docId 0-based document id, from 0 (inclusive) to [#getTotalDocs()] (exclusive)
-  /// @param transformer deterministic transformation to apply to the value
+  /// @param transformer deterministic transformation whose [ColumnTransformer#isNoOp()] returns `false`
   /// @throws IOException if an I/O error occurs while reading
+  /// @throws AssertionError if assertions are enabled and the transformer is a no-op
   @Nullable
   default Object getTransformedValue(int docId, ColumnTransformer transformer)
       throws IOException {
+    assert !transformer.isNoOp() : "No-op transformers must be filtered by the caller";
     return transformer.transform(getValue(docId));
   }
 
