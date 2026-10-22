@@ -266,6 +266,27 @@ public class SortOperatorTest {
     assertTrue(operator.nextBlock().isSuccess(), "expected EOS block to propagate");
   }
 
+  /// `fetch + offset` can exceed the int range. Wrapping to a negative number of rows to keep reaches
+  /// `new PriorityQueue<>(negative)`, which fails the query instead of answering it.
+  @Test
+  public void shouldSaturateFetchPlusOffsetOnOverflow() {
+    // Given:
+    DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
+    when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}, new Object[]{3}))
+        .thenReturn(SuccessMseBlock.INSTANCE);
+    List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
+    SortOperator operator = getOperator(schema, collations, Integer.MAX_VALUE, 1);
+
+    // When:
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+
+    // Then:
+    assertEquals(resultRows.size(), 2);
+    assertEquals(resultRows.get(0), new Object[]{2});
+    assertEquals(resultRows.get(1), new Object[]{3});
+    assertTrue(operator.nextBlock().isSuccess(), "expected EOS block to propagate");
+  }
+
   @Test
   public void shouldFetchAllWithNegativeFetch() {
     // Given:

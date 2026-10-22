@@ -71,7 +71,7 @@ public class SelectionOperatorService {
     // Select rows from offset to offset + limit.
     _offset = queryContext.getOffset();
     _limit = queryContext.getLimit();
-    _numRowsToKeep = _offset + _limit;
+    _numRowsToKeep = queryContext.getLimitPlusOffset();
     assert queryContext.getOrderByExpressions() != null;
   }
 
@@ -157,7 +157,7 @@ public class SelectionOperatorService {
     }
 
     int start = _offset;
-    int end = Math.min(numRows, _offset + _limit);
+    int end = Math.min(numRows, _numRowsToKeep);
 
     if (_queryContext.isNullHandlingEnabled()) {
       RoaringBitmap[] nullBitmaps = getNullBitmap(dataTable);

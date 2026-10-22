@@ -205,6 +205,15 @@ public class SelectionQuerySegmentPrunerTest {
     assertSame(result.get(7), indexSegments.get(1));  // [-5, 5], 15
   }
 
+  /// `LIMIT` plus `OFFSET` can exceed the int range. Wrapping to a negative remaining-doc budget makes the pruner
+  /// believe it already has enough documents before looking at a single segment.
+  @Test
+  public void testSelectionOrderByWithLimitPlusOffsetOverflow() {
+    List<IndexSegment> segments = rangePartitionedSegments();
+    List<IndexSegment> result = prune(segments, "SELECT * FROM testTable ORDER BY testColumn LIMIT 2147483647, 10");
+    assertEquals(result.size(), segments.size());
+  }
+
   @Test
   public void testUpsertTable() {
     List<IndexSegment> indexSegments = Arrays

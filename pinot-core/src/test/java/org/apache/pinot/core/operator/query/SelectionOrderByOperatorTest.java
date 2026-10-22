@@ -49,6 +49,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 
@@ -127,6 +128,20 @@ public class SelectionOrderByOperatorTest {
     List<Object[]> rows = executeQuery(queryContext);
     assertNotNull(rows.get(0)[0], "Column 'col1' value should not be 'null' when null handling is disabled");
     assertNotNull(rows.get(0)[1], "Column 'col2' value should not be 'null' when null handling is disabled");
+  }
+
+  /// `LIMIT` plus `OFFSET` can exceed the int range. Wrapping to a negative number of rows to keep reaches
+  /// `new PriorityQueue<>(negative)`, which fails the query instead of answering it.
+  @Test
+  public void testLargeLimitPlusOffsetDoesNotOverflow() {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT col1, col2 "
+            + "FROM testTable "
+            + "ORDER BY col1, col2 "
+            + "LIMIT 2147483647 "
+            + "OFFSET 2147483647");
+    assertEquals(queryContext.getLimitPlusOffset(), Integer.MAX_VALUE);
+    assertEquals(executeQuery(queryContext).size(), 1);
   }
 
   private List<Object[]> executeQuery(QueryContext queryContext) {

@@ -135,7 +135,7 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
       _columnContexts[i] = _projectOperator.getResultColumnContext(expression);
     }
 
-    _numRowsToKeep = queryContext.getOffset() + queryContext.getLimit();
+    _numRowsToKeep = queryContext.getLimitPlusOffset();
     _comparator = OrderByComparatorFactory.getComparator(_orderByExpressions, _columnContexts, _nullHandlingEnabled);
 
     if (_toSort.isEmpty()) {
