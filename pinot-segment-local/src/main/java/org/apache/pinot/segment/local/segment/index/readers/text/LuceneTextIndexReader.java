@@ -244,7 +244,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
   public ImmutableRoaringBitmap getDictIds(String searchQuery) {
     if (_buildOnDictionary) {
       // In dictionary mode the Lucene docId equals the dictId, so the matching "doc ids" are the matching dict ids.
-      return getDocIdsWithoutOptions(searchQuery);
+      return getDocIds(searchQuery, null, null);
     }
     throw new UnsupportedOperationException(
         "getDictIds is only supported when the text index is built on the dictionary for column: " + _column);
