@@ -24,8 +24,10 @@ import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.ChangePage;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Command;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.FeedCursor;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.FeedScope;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.GetStreamTip;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Query;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Result;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.StreamTipResult;
 
 
 /// Typed authoritative metadata boundary. Implementations provide committed writes and linearizable read barriers;
@@ -34,6 +36,11 @@ public interface MetadataAccess {
   Result execute(Command command, long timeoutMillis) throws IOException;
 
   Result query(Query query, long timeoutMillis) throws IOException;
+
+  /// Internal controller stream recovery; transports must authorize the requested client identity.
+  default StreamTipResult query(GetStreamTip query, long timeoutMillis) throws IOException {
+    throw new IOException("Stream recovery is not supported by this metadata access implementation");
+  }
 
   CatalogImage image(FeedScope scope, int maxRecords, int maxBytes, long timeoutMillis) throws IOException;
 

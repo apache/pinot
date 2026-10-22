@@ -43,5 +43,12 @@ public interface AccessControlFactory {
     init(configuration);
   }
 
+  /// Initializes a factory that explicitly supports operation without Helix services. Implementations must opt in;
+  /// falling back to the configuration-only initializer could silently omit a factory's metadata-backed policies.
+  default void initWithoutHelix(PinotConfiguration configuration) throws IOException {
+    throw new IOException("Access control factory does not support initialization without Helix: "
+        + getClass().getName());
+  }
+
   AccessControl create();
 }

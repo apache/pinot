@@ -108,6 +108,34 @@ public class TableConfigUtilsTest {
       new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false);
 
   @Test
+  public void validateControllerScopedPolicy() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("value", DataType.LONG).build();
+    IngestionConfig ingestion = new IngestionConfig();
+    ingestion.setTransformConfigs(List.of(new TransformConfig("value", "Groovy({x + 1}, x)")));
+    TableConfig table = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setIngestionConfig(ingestion).build();
+    try {
+      TableConfigUtils.setDisableGroovy(false);
+      expectThrows(IllegalStateException.class,
+          () -> TableConfigUtils.validate(table, schema, null, null, true, false));
+      TableConfigUtils.validate(table, schema);
+
+      TableConfigUtils.setDisableGroovy(true);
+      TableConfigUtils.validate(table, schema, null, null, false, false);
+      expectThrows(IllegalStateException.class, () -> TableConfigUtils.validate(table, schema));
+
+      ingestion.setTransformConfigs(null);
+      TableConfigUtils.setEnforcePoolBasedAssignment(true);
+      TableConfigUtils.validate(table, schema, null, null, true, false);
+      expectThrows(IllegalStateException.class, () -> TableConfigUtils.validate(table, schema));
+    } finally {
+      TableConfigUtils.setDisableGroovy(false);
+      TableConfigUtils.setEnforcePoolBasedAssignment(false);
+    }
+  }
+
+  @Test
   public void validateTimeColumnValidationConfig() {
     // REALTIME table
 

@@ -43,7 +43,7 @@ public final class AuditConfigManager implements PinotClusterConfigChangeListene
       Map.of(ServiceRole.CONTROLLER, "controller", ServiceRole.SERVER, "server", ServiceRole.BROKER, "broker");
 
   private final String _configPrefix;
-  private AuditConfig _currentConfig = new AuditConfig();
+  private volatile AuditConfig _currentConfig = new AuditConfig();
 
   @Inject
   public AuditConfigManager(ServiceRole serviceRole) {

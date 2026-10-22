@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.api.access;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import javax.ws.rs.NotAuthorizedException;
@@ -147,6 +148,32 @@ public class BasicAuthAccessControlFactoryTest {
   public void testBasicAuthWorkflow(AccessControl accessControl) {
     assertFalse(accessControl.protectAnnotatedOnly());
     assertEquals(accessControl.getAuthWorkflowInfo().getWorkflow(), AccessControl.WORKFLOW_BASIC);
+  }
+
+  @Test
+  public void testInitializationWithoutHelixRequiresExplicitSupport() throws Exception {
+    PinotConfiguration configuration = new PinotConfiguration(Map.of(
+        "controller.admin.access.control.principals", FULL_USER,
+        "controller.admin.access.control.principals." + FULL_USER + ".password", FULL_PASSWORD));
+    expectThrows(IOException.class, () -> new ZkBasicAuthAccessControlFactory().initWithoutHelix(configuration));
+    BasicAuthAccessControlFactory custom = new BasicAuthAccessControlFactory() {
+      @Override
+      public void init(PinotConfiguration config, PinotHelixResourceManager manager) {
+        throw new IllegalStateException("Custom policy requires Helix metadata");
+      }
+    };
+    expectThrows(IOException.class, () -> custom.initWithoutHelix(configuration));
+    expectThrows(IOException.class, () -> new AllowAllAccessFactory() { }.initWithoutHelix(configuration));
+    AllowAllAccessFactory allowAll = new AllowAllAccessFactory();
+    allowAll.initWithoutHelix(configuration);
+    assertEquals(allowAll.create().getAuthWorkflowInfo().getWorkflow(), AccessControl.WORKFLOW_NONE);
+    BasicAuthAccessControlFactory basicAuth = new BasicAuthAccessControlFactory();
+    basicAuth.initWithoutHelix(configuration);
+    AccessControlUtils.validatePermission(null, AccessType.READ, headers(FULL_USER, FULL_PASSWORD), ENDPOINT_URL,
+        basicAuth.create());
+    expectThrows(NotAuthorizedException.class,
+        () -> AccessControlUtils.validatePermission(null, AccessType.READ, headers(FULL_USER, "wrong"), ENDPOINT_URL,
+            basicAuth.create()));
   }
 
   @Test(dataProvider = "accessControls")

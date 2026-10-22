@@ -232,6 +232,7 @@ public final class MetadataProtocol {
   @JsonSubTypes({@JsonSubTypes.Type(value = RegisterClient.class, name = "REGISTER_CLIENT"),
       @JsonSubTypes.Type(value = RetireClient.class, name = "RETIRE_CLIENT"),
       @JsonSubTypes.Type(value = Transaction.class, name = "TRANSACTION"),
+      @JsonSubTypes.Type(value = ConfigTransaction.class, name = "CONFIG_TRANSACTION"),
       @JsonSubTypes.Type(value = Acknowledge.class, name = "ACKNOWLEDGE"),
       @JsonSubTypes.Type(value = MembershipCommand.class, name = "MEMBERSHIP"),
       @JsonSubTypes.Type(value = OwnershipCommand.class, name = "OWNERSHIP"),
@@ -249,8 +250,8 @@ public final class MetadataProtocol {
   }
 
   /// All effect-producing controller commands share the same durable request stream and retained outcome contract.
-  public sealed interface SequencedCommand extends Command permits Transaction, OwnershipCommand, OperationCommand,
-      OfflineSegmentCommand, NativeOperationCommand, NativeInstallationCommand {
+  public sealed interface SequencedCommand extends Command permits Transaction, ConfigTransaction, OwnershipCommand,
+      OperationCommand, OfflineSegmentCommand, NativeOperationCommand, NativeInstallationCommand {
     long clientEpoch();
 
     String streamId();
@@ -333,6 +334,16 @@ public final class MetadataProtocol {
     }
   }
 
+  /// Config changes validated against a coherent image must fail if any non-membership catalog record changed
+  /// afterward. The distinct command tag preserves legacy transaction replay; older decoders reject this command.
+  /// Validation and authorization remain the caller's responsibility; the catalog atomically fences their read image.
+  public record ConfigTransaction(UUID historyId, String clientId, long clientEpoch, String streamId, long sequence,
+                                  Revision validatedSnapshot, List<Mutation> mutations) implements SequencedCommand {
+    public ConfigTransaction {
+      mutations = mutations == null ? null : List.copyOf(mutations);
+    }
+  }
+
   public record Acknowledge(UUID historyId, String clientId, long clientEpoch, String streamId, long throughSequence)
       implements Command {
   }
@@ -340,12 +351,13 @@ public final class MetadataProtocol {
   @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "operation")
   @JsonSubTypes({@JsonSubTypes.Type(value = GetRecord.class, name = "GET_RECORD"),
       @JsonSubTypes.Type(value = GetOutcome.class, name = "GET_OUTCOME"),
+      @JsonSubTypes.Type(value = GetStreamTip.class, name = "GET_STREAM_TIP"),
       @JsonSubTypes.Type(value = GetRevision.class, name = "GET_REVISION"),
       @JsonSubTypes.Type(value = InstallationSessionQuery.class, name = "INSTALLATION_SESSION"),
       @JsonSubTypes.Type(value = GetInstallationWork.class, name = "GET_INSTALLATION_WORK"),
       @JsonSubTypes.Type(value = MembershipQuery.class, name = "MEMBERSHIP")})
-  public sealed interface Query permits GetRecord, GetOutcome, GetRevision, MembershipQuery, InstallationSessionQuery,
-      GetInstallationWork {
+  public sealed interface Query permits GetRecord, GetOutcome, GetStreamTip, GetRevision, MembershipQuery,
+      InstallationSessionQuery, GetInstallationWork {
     UUID historyId();
   }
 
@@ -362,6 +374,16 @@ public final class MetadataProtocol {
   /// Lookup authority must be checked by the transport; possession of the identity is not an authorization grant.
   public record GetOutcome(UUID historyId, String clientId, long clientEpoch, String streamId, long sequence)
       implements Query {
+  }
+
+  /// Internal authenticated controller recovery; this does not register a stream or acknowledge an outcome.
+  public record GetStreamTip(UUID historyId, String clientId, long clientEpoch, String streamId) implements Query {
+  }
+
+  /// A missing stream has sequence and floor zero. A pending result retains its original revision and digest;
+  /// acknowledged results have no digest/outcome. This response is separate from catalog values.
+  public record StreamTipResult(Status status, Revision revision, String detail, long clientEpoch, long sequence,
+                                long floor, String digest, Result outcome) {
   }
 
   public record InstallationSessionQuery(MembershipProtocol.ParticipantToken server, GetOutcome request)
@@ -414,6 +436,11 @@ public final class MetadataProtocol {
       throw new IOException("Metadata result exceeds the supported size");
     }
     return MAPPER.readValue(bytes, Result.class);
+  }
+
+  public static StreamTipResult decodeStreamTipResult(byte[] bytes)
+      throws IOException {
+    return decodeValue(bytes, StreamTipResult.class);
   }
 
   static <T> T decodeValue(byte[] bytes, Class<T> type)

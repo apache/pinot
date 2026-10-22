@@ -48,6 +48,7 @@ import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Acknowledge
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.CatalogRecord;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.ChangePage;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Command;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.ConfigTransaction;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.FeedCursor;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.FeedScope;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.GetOutcome;
@@ -179,7 +180,11 @@ public class ControllerCoordinationTest {
   public void testAttemptFenceAndAtomicTerminalPublication()
       throws Exception {
     Fixture fixture = new Fixture();
+    Revision beforeOwnership = fixture.revision();
     OwnerToken owner = fixture.assign(fixture._first, 0);
+    Mutation cluster = Mutation.createClusterConfig(fixture._history, UUID.randomUUID(), Map.of());
+    assertEquals(fixture.apply(new ConfigTransaction(fixture._history, "controller", 1, "config-owner", 1,
+        beforeOwnership, List.of(cluster))).status(), Status.CONFLICT);
     UUID id = UUID.randomUUID();
     assertEquals(fixture.operation(new Submit(id, fixture.input())).status(), Status.OK);
     assertEquals(fixture.claim(id, owner).status(), Status.OK);
@@ -210,6 +215,7 @@ public class ControllerCoordinationTest {
     OperationCommand complete = fixture.command(new Complete(id, beforeOperation.version(), owner, attempt,
         State.SUCCEEDED, new Progress(1, 0, "done"), List.of(effect)));
     FeedCursor cursor = fixture._catalog.captureImage(ALL).cursor();
+    Revision beforeEffects = fixture.revision();
     Result outcome = fixture.apply(complete);
     assertEquals(outcome.status(), Status.OK);
     assertEquals(fixture.operationState(id).status(), State.SUCCEEDED);
@@ -221,6 +227,8 @@ public class ControllerCoordinationTest {
     assertEquals(publication.transactions().getFirst().records().stream().map(CatalogRecord::kind)
         .collect(Collectors.toSet()), Set.of(RecordKind.TABLE_CONFIG, RecordKind.CONTROLLER_OPERATION));
     assertEquals(publication.transactions().getFirst().records().size(), 2);
+    assertEquals(fixture.apply(new ConfigTransaction(fixture._history, "controller", 1, "config-effects", 1,
+        beforeEffects, List.of(cluster))).status(), Status.CONFLICT);
     assertEquals(fixture.apply(complete), outcome);
     assertEquals(fixture.record(RecordKind.TABLE_CONFIG, TABLE).version(), beforeTable.version() + 1);
     assertEquals(fixture.operation(new Submit(id, fixture.input())).status(), Status.CONFLICT);

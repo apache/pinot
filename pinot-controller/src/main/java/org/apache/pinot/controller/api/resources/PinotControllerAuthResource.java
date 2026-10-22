@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
@@ -34,15 +35,19 @@ import javax.ws.rs.NotAuthorizedException;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Application;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
+import org.apache.pinot.common.coordination.CoordinationBackend;
+import org.apache.pinot.controller.api.ControllerAdminApiApplication;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
@@ -59,6 +64,9 @@ public class PinotControllerAuthResource {
 
   @Context
   HttpHeaders _httpHeaders;
+
+  @Context
+  private Application _application;
 
   /// Verify a token is both authenticated and authorized to perform an operation.
   ///
@@ -113,7 +121,8 @@ public class PinotControllerAuthResource {
   }
 
   /// Provide the auth workflow configuration for the Pinot UI to perform user authentication. Currently supports NONE
-  /// (no auth) and BASIC (basic auth with username and password)
+  /// (no auth) and BASIC (basic auth with username and password). The backend is captured from startup configuration,
+  /// independently of mutable cluster configuration and authentication-provider extensions.
   ///
   /// @return auth workflow info/configuration
   @GET
@@ -122,7 +131,11 @@ public class PinotControllerAuthResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Retrieve auth workflow info")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Auth workflow info provided")})
-  public AccessControl.AuthWorkflowInfo info() {
-    return _accessControlFactory.create().getAuthWorkflowInfo();
+  public ObjectNode info() {
+    ObjectNode info = (ObjectNode) JsonUtils.objectToJsonNode(_accessControlFactory.create().getAuthWorkflowInfo());
+    CoordinationBackend backend =
+        (CoordinationBackend) _application.getProperties().get(ControllerAdminApiApplication.COORDINATION_BACKEND);
+    info.put("coordinationBackend", backend.name());
+    return info;
   }
 }

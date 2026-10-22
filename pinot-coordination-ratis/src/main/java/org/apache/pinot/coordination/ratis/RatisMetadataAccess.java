@@ -31,11 +31,13 @@ import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.FeedCursor;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.FeedScope;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.GetInstallationWork;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.GetRevision;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.GetStreamTip;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.MembershipCommand;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.MembershipQuery;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Query;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Result;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Status;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.StreamTipResult;
 import org.apache.pinot.coordination.ratis.metadata.OfflineInstallationProtocol;
 import org.apache.pinot.coordination.ratis.metadata.OfflineInstallationProtocol.InstallationSnapshot;
 import org.apache.pinot.coordination.ratis.transport.InstallationAccess;
@@ -74,10 +76,16 @@ public final class RatisMetadataAccess implements MetadataAccess, MembershipAcce
   @Override
   public Result query(Query query, long timeoutMillis)
       throws IOException {
-    if (query instanceof MembershipQuery || query instanceof GetInstallationWork) {
-      throw new IOException("Membership and installation work queries require their typed access method");
+    if (query instanceof MembershipQuery || query instanceof GetInstallationWork || query instanceof GetStreamTip) {
+      throw new IOException("Membership, installation work and stream queries require their typed access method");
     }
     return MetadataProtocol.decodeResult(_client.query(MetadataProtocol.encode(query), timeoutMillis));
+  }
+
+  @Override
+  public StreamTipResult query(GetStreamTip query, long timeoutMillis)
+      throws IOException {
+    return MetadataProtocol.decodeStreamTipResult(_client.query(MetadataProtocol.encode(query), timeoutMillis));
   }
 
   @Override

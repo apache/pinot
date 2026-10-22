@@ -18,9 +18,21 @@
  */
 package org.apache.pinot.controller.api.access;
 
+import java.io.IOException;
+import org.apache.pinot.spi.env.PinotConfiguration;
+
+
 public class AllowAllAccessFactory implements AccessControlFactory {
   private static final AccessControl ALLOW_ALL_ACCESS = new AccessControl() {
   };
+
+  @Override
+  public void initWithoutHelix(PinotConfiguration configuration) throws IOException {
+    if (getClass() != AllowAllAccessFactory.class) {
+      AccessControlFactory.super.initWithoutHelix(configuration);
+    }
+    init(configuration);
+  }
 
   @Override
   public AccessControl create() {

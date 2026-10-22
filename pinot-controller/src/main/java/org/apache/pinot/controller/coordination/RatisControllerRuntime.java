@@ -21,12 +21,28 @@ package org.apache.pinot.controller.coordination;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.file.Path;
+import java.time.Instant;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.audit.AuditServiceBinder;
 import org.apache.pinot.common.coordination.NativeMetadataConfig;
+import org.apache.pinot.common.metrics.ControllerGauge;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.ServiceStatus;
+import org.apache.pinot.common.version.PinotVersion;
+import org.apache.pinot.controller.BaseControllerStarter;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.api.ControllerAdminApiApplication;
+import org.apache.pinot.controller.api.access.AccessControlFactory;
+import org.apache.pinot.controller.api.resources.LandingPageHandler;
+import org.apache.pinot.controller.api.resources.PinotControllerAppConfigs;
+import org.apache.pinot.controller.api.resources.PinotControllerAuthResource;
+import org.apache.pinot.controller.api.resources.PinotControllerHealthCheck;
+import org.apache.pinot.controller.api.resources.PinotVersionRestletResource;
+import org.apache.pinot.controller.api.resources.WebApplicationExceptionMapper;
 import org.apache.pinot.coordination.ratis.RatisMetadataAccess;
 import org.apache.pinot.coordination.ratis.RatisMetadataStore;
 import org.apache.pinot.coordination.ratis.RatisMetadataStore.MembershipClockSettings;
@@ -43,8 +59,13 @@ import org.apache.pinot.coordination.ratis.transport.MetadataGrpcServer;
 import org.apache.pinot.coordination.ratis.transport.MetadataGrpcService.Limits;
 import org.apache.pinot.coordination.ratis.transport.ParticipantAccessPolicy;
 import org.apache.pinot.coordination.ratis.transport.ParticipantAccessPolicy.ParticipantIdentity;
-import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.core.transport.ListenerConfig;
+import org.apache.pinot.core.util.ListenerConfigUtil;
+import org.apache.pinot.spi.metrics.PinotMetricUtils;
+import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.plugin.PluginManager;
+import org.apache.pinot.spi.services.ServiceRole;
+import org.glassfish.hk2.utilities.binding.AbstractBinder;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -52,10 +73,12 @@ import static java.util.Objects.requireNonNull;
 
 
 /// Owns one embedded voter, its qualified membership clock and authenticated metadata endpoint. Lifecycle methods
-/// are serialized; health checks use a bounded consensus read and do not claim HTTP, scheduling or query readiness.
+/// are serialized; the normal HTTP/UI shell exposes committed metadata management, without scheduling or query
+/// readiness.
 /// The current voter transport remains restricted to three loopback peers. No Helix resources are constructed.
 public final class RatisControllerRuntime implements AutoCloseable, ServiceStatus.ServiceStatusCallback {
-  private final PinotConfiguration _config;
+  private final ControllerConf _config;
+  private final List<ListenerConfig> _listeners;
   private final UUID _history;
   private final String _instanceId;
   private final String _providerClass;
@@ -72,12 +95,16 @@ public final class RatisControllerRuntime implements AutoCloseable, ServiceStatu
   private volatile RatisMetadataStore _store;
   @Nullable
   private volatile RatisMetadataAccess _access;
+  @Nullable
+  private ControllerAdminApiApplication _adminApp;
+  @Nullable
+  private NativeControllerMetadata _metadata;
   private volatile boolean _started;
   private volatile boolean _closed;
   private volatile String _status = "Native controller has not started";
 
   public RatisControllerRuntime(ControllerConf config) {
-    _config = new PinotConfiguration(config.toMap());
+    _config = new ControllerConf(config.toMap());
     _history = UUID.fromString(NativeMetadataConfig.required(config, "historyId"));
     String voter = NativeMetadataConfig.required(config, "id");
     _instanceId = config.getInstanceId() == null ? "Controller_ratis_" + voter : config.getInstanceId();
@@ -90,6 +117,7 @@ public final class RatisControllerRuntime implements AutoCloseable, ServiceStatu
     _certificate = NativeMetadataConfig.readableFile(config, "tls.certChain");
     _privateKey = NativeMetadataConfig.readableFile(config, "tls.privateKey");
     _trust = NativeMetadataConfig.readableFile(config, "tls.trustCerts");
+    _listeners = ListenerConfigUtil.buildControllerConfigs(_config);
     _startupMillis = config.getProperty(NativeMetadataConfig.PREFIX + "controller.startup.timeoutMs", 30_000L);
     checkArgument(_startupMillis > 0 && _startupMillis <= 300_000,
         "Native controller startup timeout must be between 1 and 300000 milliseconds");
@@ -102,6 +130,9 @@ public final class RatisControllerRuntime implements AutoCloseable, ServiceStatu
   public synchronized void start() throws Exception {
     checkState(!_started && !_closed && _provider == null, "Native controller is already started or closed");
     try {
+      AccessControlFactory accessControlFactory =
+          PluginManager.get().createInstance(_config.getAccessControlFactoryClass());
+      accessControlFactory.initWithoutHelix(_config);
       _provider = PluginManager.get().createInstance(_providerClass);
       _provider.init(_config);
       MembershipClockSettings clock = requireNonNull(_provider.membershipClockSettings(), "membershipClockSettings");
@@ -120,9 +151,10 @@ public final class RatisControllerRuntime implements AutoCloseable, ServiceStatu
             ParticipantIdentity identity = participants.authorize(fingerprint);
             return identity != null && identity.capabilities().isEmpty() ? identity : null;
           }, audit, Limits.defaults());
+      startHttp(accessControlFactory);
       checkClock();
       _started = true;
-      _status = "Native metadata endpoint and membership initialized; controller HTTP and query serving are disabled";
+      _status = "Native metadata and controller HTTP initialized; query serving is disabled";
     } catch (Exception | Error e) {
       _status = "Native controller startup failed: " + e.getMessage();
       try {
@@ -135,6 +167,35 @@ public final class RatisControllerRuntime implements AutoCloseable, ServiceStatu
       }
       throw e;
     }
+  }
+
+  private void startHttp(AccessControlFactory accessControlFactory) throws IOException {
+    NativeControllerMetadata metadata = new NativeControllerMetadata(requireNonNull(_access), _history, _config);
+    _metadata = metadata;
+    metadata.start();
+    // The metrics factory owns its process-wide registry; a controller must not shut it down on restart.
+    PinotMetricsRegistry registry =
+        PinotMetricUtils.getPinotMetricsRegistry(_config.subset("pinot.controller.metrics"));
+    ControllerMetrics metrics = new ControllerMetrics(_config.getMetricsPrefix(), registry);
+    metrics.initializeGlobalMeters();
+    metrics.setValueOfGlobalGauge(ControllerGauge.VERSION, PinotVersion.VERSION_METRIC_NAME, 1);
+    _adminApp = new ControllerAdminApiApplication(_config, Set.of(NativeControllerResource.class,
+        LandingPageHandler.class, PinotControllerAuthResource.class, PinotVersionRestletResource.class,
+        PinotControllerAppConfigs.class, PinotControllerHealthCheck.class, WebApplicationExceptionMapper.class));
+    Instant startTime = Instant.now();
+    _adminApp.registerBinder(new AbstractBinder() {
+      @Override
+      protected void configure() {
+        bind(_config).to(ControllerConf.class);
+        bind(_instanceId).named(BaseControllerStarter.CONTROLLER_INSTANCE_ID);
+        bind(startTime).named(ControllerAdminApiApplication.START_TIME);
+        bind(metrics).to(ControllerMetrics.class);
+        bind(accessControlFactory).to(AccessControlFactory.class);
+        bind(metadata).to(NativeControllerMetadata.class);
+      }
+    });
+    _adminApp.registerBinder(new AuditServiceBinder(metadata, ServiceRole.CONTROLLER, metrics));
+    _adminApp.start(_listeners, metrics);
   }
 
   private static void validateBootstrapPolicy(Policy policy) {
@@ -210,7 +271,14 @@ public final class RatisControllerRuntime implements AutoCloseable, ServiceStatu
       if (response.status() != Status.OK || response.control() == null || response.control().policy() == null) {
         throw new IOException("Committed membership policy is unavailable");
       }
-      _status = "Native metadata endpoint and membership initialized; controller HTTP and query serving are disabled";
+      String configFailure = requireNonNull(_metadata).clusterConfigFailure();
+      if (configFailure != null) {
+        throw new IOException("Native cluster configuration refresh failed: " + configFailure);
+      }
+      if (_adminApp == null || _adminApp.getHttpServer() == null || !_adminApp.getHttpServer().isStarted()) {
+        throw new IOException("Native controller HTTP is not running");
+      }
+      _status = "Native metadata and controller HTTP initialized; query serving is disabled";
       return ServiceStatus.Status.GOOD;
     } catch (Exception e) {
       _status = "Native metadata is unavailable: " + e.getMessage();
@@ -231,7 +299,8 @@ public final class RatisControllerRuntime implements AutoCloseable, ServiceStatu
     _closed = true;
     _started = false;
     Exception failure = null;
-    for (AutoCloseable resource : new AutoCloseable[]{_endpoint, _access, _store, _provider}) {
+    for (AutoCloseable resource : new AutoCloseable[]{_adminApp == null ? null : _adminApp::stop, _metadata,
+        _endpoint, _access, _store, _provider}) {
       if (resource != null) {
         try {
           resource.close();

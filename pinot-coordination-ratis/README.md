@@ -324,7 +324,8 @@ selection, process identity, peers, TLS and local storage are bootstrap settings
 
 - Controller starts one embedded voter, its explicitly qualified membership clock and the mutually authenticated
   metadata/membership/installation endpoint. It initializes an absent membership policy with expected version zero;
-  restart or a competing controller cannot overwrite an existing committed policy.
+  restart or a competing controller cannot overwrite an existing committed policy. The normal controller HTTP/UI shell
+  serves authenticated metadata reads and conditional configuration writes through an explicit native resource set.
 - Server starts the existing native offline participant with independent membership/work connections, a locked durable
   data directory, metadata hydration and installation reconciliation. It requests no query capabilities and advertises
   no query endpoints. The existing server query-start gate stays closed.
@@ -333,9 +334,9 @@ selection, process identity, peers, TLS and local storage are bootstrap settings
   membership/control projection, not a routing image.
 
 No broker HTTP/gRPC/MSE or server Netty/TLS/gRPC/MSE query listeners are allocated, even if legacy query-port settings
-are present. Helix-dependent controller HTTP/UI resources and server admin resources are not started on the native
-path. Minions and multi-cluster brokers are unsupported. These entry points exercise coordination and offline
-installation; they do not yet provide a queryable replacement cluster or the normal controller UI.
+are present. Helix-dependent REST resources and server admin resources are not started on the native path. Minions
+and multi-cluster brokers are unsupported. These entry points exercise coordination and offline installation; they
+do not yet provide a queryable replacement cluster.
 
 All native components need `pinot.coordination.ratis.historyId`. Controllers retain the voter settings in the next
 section and additionally require:
@@ -344,6 +345,7 @@ section and additionally require:
 pinot.coordination.backend=RATIS
 pinot.coordination.ratis.metadata.host=127.0.0.1
 pinot.coordination.ratis.metadata.port=24001
+controller.port=9000
 pinot.coordination.ratis.tls.certChain=/absolute/path/controller.pem
 pinot.coordination.ratis.tls.privateKey=/absolute/path/controller-key.pem
 pinot.coordination.ratis.tls.trustCerts=/absolute/path/trust.pem
@@ -390,6 +392,82 @@ bin/pinot-admin.sh StartServer -configFileName server.conf
 
 Startup failure closes owned channels, voters and directory ownership. Shutdown retires only the process's confirmed
 registration; unknown remote outcomes rely on lease expiry. The existing Helix/ZK quickstarts are unchanged.
+
+## Controller REST and UI
+
+The native controller reuses `ControllerAdminApiApplication`, the normal static UI, login, HTTP/HTTPS listener
+configuration, authentication filter, and audit services. Configure `controller.port` or `controller.access.protocols`
+and the normal protocol listener settings; each controller process needs its own ports. HTTP TLS continues to use
+`controller.tls.*`, separately from the metadata endpoint's mandatory mutual TLS configuration.
+
+The default access control remains allow-all, as on Helix. Configuration-based `BasicAuthAccessControlFactory` is
+supported. Other factories must explicitly implement `AccessControlFactory.initWithoutHelix`; ZK Basic Auth and
+factories that do not opt in fail startup. No null Helix manager or substitute Helix state is supplied.
+
+Supported read endpoints are `/cluster/info`, `/cluster/configs`, `/schemas`, `/schemas/info`,
+`/schemas/{schemaName}`, `/tables`, `/tables/{tableName}`, `/tables/{tableName}/schema`, and
+`/metadata/participants`, alongside normal health, version, auth, uptime and app-config reads. Catalog responses use
+bounded fresh quorum reads; unavailable quorum returns 503, never a successful stale cached image. Native responses
+include `X-Pinot-Metadata-Revision`. Schema/table reads retain database scoping and permission filtering.
+Membership views distinguish active, expired, retired and draining registrations; a member's readiness does not
+claim query-serving authority. Embedded controller voters are not fabricated as participant registrations.
+
+The following conditional JSON mutations are available; `/metadata/capabilities` identifies this supported surface:
+
+| Method and path | Behavior |
+| --- | --- |
+| `POST /schemas` | Create a validated schema |
+| `PUT /schemas/{schemaName}` | Publish a compatible schema update |
+| `DELETE /schemas/{schemaName}` | Delete an unreferenced schema |
+| `POST /tables` | Create an ordinary OFFLINE table configuration |
+| `PUT /tables/{tableName}` | Publish a compatible OFFLINE table configuration update |
+| `POST /cluster/configs` | Merge string values; null values remove keys |
+| `DELETE /cluster/configs/{configName}` | Remove a cluster configuration key |
+
+Creation requires `If-None-Match: *` and a canonical UUID `Idempotency-Key`. Object IDs are derived from the history,
+record kind, name and key; retained tombstones prevent a retry from recreating an object that has since been deleted.
+Updates and deletes require the exact quoted `If-Match` ETag returned by the object's GET. ETags contain history,
+object ID and version; neither an old version nor a recreated name can be overwritten. An absent cluster config
+returns an `:absent` ETag and must be created with creation headers. A create retry can return conflict after an
+original success; conflict alone does not establish the outcome of an earlier uncertain attempt.
+
+Validation uses one fresh catalog image. The sequenced `ConfigTransaction` checks an atomic catalog mutation
+watermark before publishing: intervening configuration, ownership, operation or offline lifecycle changes invalidate
+validation, including writes from legacy internal transactions. Membership heartbeats, read barriers and request
+acknowledgments do not invalidate it. Retained records and tombstones reconstruct this watermark on snapshot restore.
+Each controller uses one bounded durable request stream and recovers its sequence and retained result after restart.
+No public session or acknowledgment API is exposed, and there is no automatic mutation retry or precondition rebase.
+
+A successful write returns `status: "OK"`, its committed revision and resulting ETag. Missing preconditions return
+428, stale ETags 412, catalog conflicts 409, invalid configurations 400, and unsupported lifecycle operations 501.
+A transport failure during submission returns 503 with `outcomeUnknown: true`. Keep the original body, precondition
+and creation key for any retry. A subsequent absent read does not prove that an earlier pending write failed.
+Authorization is checked before submission and again before response; losing permission after submission cannot
+undo an already committed mutation.
+
+Schema and table validation reuse Pinot validators with explicit controller-scoped Groovy and assignment policies.
+This surface rejects unknown properties, forced updates, skipped validation and host-local environment/system-property
+templates.
+Schema names must be raw names without a table type suffix; a table name may carry one suffix, preventing repeated
+normalization from changing its authorization identity. Table deletion, REALTIME/hybrid tables, tasks, tiers,
+upsert/dedup, tuning and Helix assignment settings remain unsupported. Changes to a table or schema with native
+segment, assignment or operation state are rejected because those records need lifecycle reconciliation; cluster
+config changes are also rejected while such native state exists. Publishing a table config does not assign segments
+or enable querying.
+
+`/auth/info` identifies the startup-selected backend. The same UI provides native metadata browsing and JSON editing,
+without issuing ZK, task, tenant, segment-status or query requests. Discovery failures block the console rather than
+enabling query routes. Pending edits keep their original body and conditions in memory; only a nonsecret request marker
+survives page reload. An uncertain result requires an explicit retry or fresh inspection and acknowledgment before
+preparing a distinct write. Uploads, rebalance, query execution, IdealState/ExternalView, ZK browsing and minion APIs
+are absent from the native resource set. Swagger is also unavailable on this path because its current shared global
+scanner cannot safely describe the isolated native resource set. Native query listeners stay disabled.
+
+Audit configuration is initialized from committed cluster configuration and refreshed with the existing recoverable
+listener cache. A refresh failure retains the last listener value and makes health unhealthy until recovery; this
+cache is never used to answer REST reads. Under `pinot.coordination.ratis.controller.http.`, `timeoutMs` defaults to
+5000, `configRefreshMs` to 1000 (both bounded to 1–60000), `maxRecords` to 4096, and `maxBytes` to 2097152. Image limits
+bound full reads; oversized images fail rather than returning partial lists. These are component bootstrap limits.
 
 ## Voter configuration and validation
 
