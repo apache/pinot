@@ -21,7 +21,9 @@ package org.apache.pinot.plugin.inputformat.parquet;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.Path;
@@ -35,6 +37,7 @@ import org.apache.parquet.io.api.Binary;
 import org.apache.parquet.schema.MessageType;
 import org.apache.parquet.schema.MessageTypeParser;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordReader;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -89,6 +92,57 @@ public class ParquetReaderLogicalTypesTest {
       if (outputPath != null) {
         FileUtils.deleteQuietly(new File(outputPath));
       }
+    }
+  }
+
+  /// Unsigned 32-bit integers (`INT32` annotated `INTEGER(32, false)` / legacy `UINT_32`) can exceed
+  /// `Integer.MAX_VALUE`, so every reader must widen them to `Long` instead of returning the signed bit pattern.
+  @Test
+  public void testUnsignedInt32Type()
+      throws IOException {
+    String schemaStr = "message UnsignedExample {"
+        + "required int32 uint32_new (INTEGER(32, false));"
+        + "required int32 uint32_legacy (UINT_32);"
+        + "required int32 uint16 (INTEGER(16, false));"
+        + "}";
+    long largeUnsigned = 3540738458L;
+    long smallUnsigned = 7L;
+    File dataFile = new File(FileUtils.getTempDirectory(), "unsigned-int32-" + System.nanoTime() + ".parquet");
+    MessageType schema = MessageTypeParser.parseMessageType(schemaStr);
+    try (ParquetWriter<Group> writer = ExampleParquetWriter.builder(new Path(dataFile.getAbsolutePath()))
+        .withType(schema)
+        .build()) {
+      SimpleGroupFactory groupFactory = new SimpleGroupFactory(schema);
+      for (long value : new long[]{largeUnsigned, smallUnsigned}) {
+        Group group = groupFactory.newGroup();
+        group.append("uint32_new", (int) value);
+        group.append("uint32_legacy", (int) value);
+        group.append("uint16", 65535);
+        writer.write(group);
+      }
+    }
+    try {
+      List<RecordReader> recordReaders =
+          List.of(new ParquetNativeRecordReader(), new ParquetAvroRecordReader(), new ParquetRecordReader());
+      for (RecordReader recordReader : recordReaders) {
+        String readerName = recordReader.getClass().getSimpleName();
+        try (recordReader) {
+          recordReader.init(dataFile, null, null);
+          List<GenericRow> rows = new ArrayList<>();
+          while (recordReader.hasNext()) {
+            rows.add(recordReader.next());
+          }
+          assertEquals(rows.size(), 2, readerName);
+          assertEquals(rows.get(0).getValue("uint32_new"), largeUnsigned, readerName);
+          assertEquals(rows.get(0).getValue("uint32_legacy"), largeUnsigned, readerName);
+          assertEquals(rows.get(1).getValue("uint32_new"), smallUnsigned, readerName);
+          assertEquals(rows.get(1).getValue("uint32_legacy"), smallUnsigned, readerName);
+          // Narrower unsigned widths always fit in a signed int.
+          assertEquals(rows.get(0).getValue("uint16"), 65535, readerName);
+        }
+      }
+    } finally {
+      FileUtils.deleteQuietly(dataFile);
     }
   }
 
