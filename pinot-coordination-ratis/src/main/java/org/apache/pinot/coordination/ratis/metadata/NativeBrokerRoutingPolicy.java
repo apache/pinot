@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.coordination.ratis.metadata;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.net.URI;
@@ -37,8 +38,10 @@ import org.apache.pinot.spi.config.table.TableConfig;
 
 /// Administrator-owned broker tenant access and query endpoint approval. Participant advertisements cannot create
 /// these grants; both policy and advertisements must agree in the same committed routing observation.
-public record NativeBrokerRoutingPolicy(Map<String, Set<String>> brokers, Map<String, String> servers) {
+public record NativeBrokerRoutingPolicy(Map<String, Set<String>> brokers, Map<String, String> servers,
+                                       @JsonInclude(JsonInclude.Include.NON_EMPTY) Map<String, String> principals) {
   public static final String CONFIG_KEY = "pinot.coordination.ratis.broker.routing";
+  public static final int MAX_PRINCIPALS = 64;
   private static final int MAX_IDENTITIES = 64;
   private static final int MAX_TENANTS = 64;
 
@@ -47,14 +50,21 @@ public record NativeBrokerRoutingPolicy(Map<String, Set<String>> brokers, Map<St
     brokers.forEach((id, tenants) -> copy.put(id, Set.copyOf(tenants)));
     brokers = Map.copyOf(copy);
     servers = Map.copyOf(servers);
+    principals = Map.copyOf(principals);
+  }
+
+  /// Legacy routing policy can discover installed replicas but grants no certificate-bound query authority.
+  public NativeBrokerRoutingPolicy(Map<String, Set<String>> brokers, Map<String, String> servers) {
+    this(brokers, servers, Map.of());
   }
 
   public static NativeBrokerRoutingPolicy parse(String json) {
     require(json != null && !json.isBlank(), "Native broker routing policy is not configured");
     try {
       JsonNode root = MetadataProtocol.decodeValue(json.getBytes(StandardCharsets.UTF_8), JsonNode.class);
-      require(root.isObject() && root.size() == 2 && root.path("brokers").isObject()
-          && root.path("servers").isObject(), "Routing policy requires only brokers and servers objects");
+      require(root.isObject() && root.path("brokers").isObject() && root.path("servers").isObject()
+          && (root.size() == 2 || root.size() == 3 && root.path("principals").isObject()),
+          "Routing policy requires brokers, servers and an optional principals object");
       require(root.path("brokers").size() <= MAX_IDENTITIES && root.path("servers").size() <= MAX_IDENTITIES,
           "Routing policy exceeds its identity bound");
       Map<String, Set<String>> brokers = new TreeMap<>();
@@ -81,7 +91,19 @@ public record NativeBrokerRoutingPolicy(Map<String, Set<String>> brokers, Map<St
         require(endpoints.add(endpoint), "Query endpoint cannot identify multiple servers");
         servers.put(entry.getKey(), endpoint);
       }
-      return new NativeBrokerRoutingPolicy(brokers, servers);
+      Map<String, String> principals = new TreeMap<>();
+      if (root.has("principals")) {
+        JsonNode values = root.path("principals");
+        require(values.isObject() && values.size() <= MAX_PRINCIPALS, "Query principals exceed their bound");
+        for (var entry : values.properties()) {
+          require(entry.getKey().matches("[0-9a-f]{64}") && entry.getValue().isTextual(),
+              "Query principals require lowercase SHA-256 certificate fingerprints and broker IDs");
+          String broker = entry.getValue().textValue();
+          require(brokers.containsKey(broker), "Query principal references an unapproved broker");
+          principals.put(entry.getKey(), broker);
+        }
+      }
+      return new NativeBrokerRoutingPolicy(brokers, servers, principals);
     } catch (IOException e) {
       throw new CoordinationRejection(Status.INVALID_REQUEST, "Invalid native broker routing policy JSON");
     }

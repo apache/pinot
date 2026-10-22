@@ -78,18 +78,38 @@ public final class OfflineInstallationProtocol {
   public record WorkResult(Status status, Revision revision, String detail, @Nullable Work work) {
   }
 
+  /// Query peer authority for one exact BROKER session and the receiving server's assigned broker tenants. Public
+  /// fingerprints identify authenticated certificates; they are not credentials or proof of possession.
+  public record QueryBrokerAuthority(ParticipantState participant, List<String> certificateSha256,
+                                     List<String> brokerTenants) {
+    public QueryBrokerAuthority {
+      certificateSha256 = List.copyOf(certificateSha256);
+      brokerTenants = List.copyOf(brokerTenants);
+    }
+  }
+
   /// Complete metadata projection for one exact SERVER registration, captured atomically with membership/control.
   /// Records contain cluster configuration and this registration's assignments, content and current referenced
   /// table/schema records, including referenced tombstones that fence deleted incarnations. Only nonterminal
-  /// assigned-operation IDs are disclosed, never other targets or receipts.
+  /// assigned-operation IDs are disclosed, never other targets or receipts. Typed query broker grants are scoped
+  /// to assigned current table tenants. Existing cluster configuration remains complete; its public policy settings
+  /// do not themselves authorize query peers. Optional oversized authority sets reject the entire image and can
+  /// prevent hydration; historical installation admission reservations do not cover this additional opt-in payload.
   /// A consumer may advertise this revision only after atomically installing the entire successful projection;
   /// a work lookup revision is not evidence of applying this metadata. Oversized projections fail without a prefix.
   public record InstallationSnapshot(Status status, Revision revision, String detail,
                                      @Nullable ParticipantState participant, List<CatalogRecord> records,
-                                     List<UUID> operationIds, @Nullable ControlState control) {
+                                     List<UUID> operationIds, @Nullable ControlState control,
+                                     List<QueryBrokerAuthority> queryBrokers) {
     public InstallationSnapshot {
       records = List.copyOf(records);
       operationIds = List.copyOf(operationIds);
+      queryBrokers = List.copyOf(queryBrokers);
+    }
+
+    public InstallationSnapshot(Status status, Revision revision, String detail, @Nullable ParticipantState participant,
+        List<CatalogRecord> records, List<UUID> operationIds, @Nullable ControlState control) {
+      this(status, revision, detail, participant, records, operationIds, control, List.of());
     }
   }
 

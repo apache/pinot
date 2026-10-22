@@ -62,6 +62,91 @@ import static org.testng.Assert.assertTrue;
 
 /// Exercises complete-image recovery and per-incarnation metadata fencing for the native installation runtime.
 public class NativeServerMetadataTest {
+  private static final String PEER_FINGERPRINT = "a".repeat(64);
+
+  @Test
+  public void testBrokerAuthorityRequiresExactSessionCertificateAndCurrentTenant() throws Exception {
+    Fixture fixture = new Fixture();
+    NativeServerMetadata metadata = new NativeServerMetadata(fixture._server, new RecoverableClusterConfigCache());
+    NativeQueryContext query = query(fixture._orders.identity(fixture._server, UUID.randomUUID(),
+        fixture._orders._assignment), false);
+    MetadataRpc.InstallationSnapshot initial = fixture.snapshot(10, Map.of(), fixture.records());
+    metadata.apply(initial);
+    assertFalse(metadata.isAuthorizedQuery(query, PEER_FINGERPRINT));
+    MetadataRpc.ParticipantState broker = initial.getParticipant().toBuilder()
+        .setParticipant(initial.getParticipant().getParticipant().toBuilder()
+            .setRole(MetadataRpc.ParticipantRole.BROKER)
+            .setParticipantId(query.broker().participantId()).setIncarnation(query.broker().incarnation().toString())
+            .setRegistrationEpoch(query.broker().registrationEpoch()))
+        .addCapabilities(MetadataRpc.ServingCapability.BROKER_QUERY).build();
+    MetadataRpc.QueryBrokerAuthority authority = MetadataRpc.QueryBrokerAuthority.newBuilder().setParticipant(broker)
+        .addCertificateSha256(PEER_FINGERPRINT).addBrokerTenants("DefaultTenant").build();
+    MetadataRpc.InstallationSnapshot granted = initial.toBuilder().setRevision(initial.getRevision().toBuilder()
+        .setIndex(11)).addQueryBrokers(authority).build();
+    metadata.apply(granted);
+    long generation = metadata.authorizationGeneration();
+    assertTrue(metadata.isAuthorizedQuery(query, PEER_FINGERPRINT));
+    assertFalse(metadata.isAuthorizedQuery(query, "b".repeat(64)));
+    assertFalse(metadata.isAuthorizedQuery(query, null));
+    for (Server.NativeQueryProcess changed : List.of(
+        query.toProto().getBroker().toBuilder().setParticipantId("another-broker").build(),
+        query.toProto().getBroker().toBuilder().setIncarnation(UUID.randomUUID().toString()).build(),
+        query.toProto().getBroker().toBuilder().setRegistrationEpoch(2).build())) {
+      assertFalse(metadata.isAuthorizedQuery(NativeQueryContext.fromProto(query.toProto().toBuilder()
+          .setBroker(changed).build()), PEER_FINGERPRINT));
+    }
+    for (MetadataRpc.QueryBrokerAuthority invalid : List.of(
+        authority.toBuilder().setParticipant(broker.toBuilder().setReady(false)).build(),
+        authority.toBuilder().setParticipant(broker.toBuilder().setDraining(true)).build(),
+        authority.toBuilder().setParticipant(broker.toBuilder().setRetired(true)).build(),
+        authority.toBuilder().setParticipant(broker.toBuilder().setExpiryRound(1)).build(),
+        authority.toBuilder().setParticipant(broker.toBuilder().clearCapabilities()).build(),
+        authority.toBuilder().setParticipant(broker.toBuilder().setLastModifiedIndex(100)).build(),
+        authority.toBuilder().setParticipant(broker.toBuilder().setParticipant(broker.getParticipant().toBuilder()
+            .setHistoryId(UUID.randomUUID().toString()))).build(),
+        authority.toBuilder().setParticipant(broker.toBuilder().setParticipant(broker.getParticipant().toBuilder()
+            .setRole(MetadataRpc.ParticipantRole.SERVER))).build(),
+        authority.toBuilder().setCertificateSha256(0, "A".repeat(64)).build(),
+        authority.toBuilder().addCertificateSha256(PEER_FINGERPRINT).build(),
+        authority.toBuilder().clearBrokerTenants().build(),
+        authority.toBuilder().addBrokerTenants("other-tenant").build(),
+        authority.toBuilder().addBrokerTenants("DefaultTenant").build())) {
+      assertThrows(IOException.class, () -> metadata.apply(granted.toBuilder()
+          .setRevision(granted.getRevision().toBuilder().setIndex(12)).setQueryBrokers(0, invalid).build()));
+    }
+    assertThrows(IOException.class, () -> metadata.apply(granted.toBuilder()
+        .setRevision(granted.getRevision().toBuilder().setIndex(12)).addQueryBrokers(authority).build()));
+
+    MetadataRpc.InstallationSnapshot renewed = granted.toBuilder().setRevision(granted.getRevision().toBuilder()
+        .setIndex(12)).setQueryBrokers(0, authority.toBuilder().setParticipant(broker.toBuilder()
+            .setLastRenewalSequence(2).setExpiryRound(110).setLastModifiedIndex(12))).build();
+    metadata.apply(renewed);
+    assertEquals(metadata.authorizationGeneration(), generation, "Renewals do not revoke admitted query authority");
+    List<CatalogRecord> changedRecords = new ArrayList<>(fixture.records());
+    changedRecords.replaceAll(record -> record.equals(fixture._orders._table)
+        ? record.toBuilder().setVersion(2).setLastModifiedIndex(13).build() : record);
+    metadata.apply(fixture.snapshot(13, Map.of(), changedRecords).toBuilder().addQueryBrokers(authority).build());
+    assertTrue(metadata.isAuthorizedQuery(query, PEER_FINGERPRINT));
+    assertEquals(metadata.authorizationGeneration(), generation,
+        "A compatible configuration version change does not revoke held query authority");
+    TableConfig changedTable = new TableConfigBuilder(TableType.OFFLINE).setTableName("db.orders")
+        .setBrokerTenant("other-tenant").build();
+    ByteString changedJson = ByteString.copyFrom(JsonUtils.objectToBytes(changedTable));
+    changedRecords.replaceAll(record -> record.getObjectId().equals(fixture._orders._table.getObjectId())
+        ? record.toBuilder().setVersion(3).setLastModifiedIndex(14).setValue(MetadataRpc.CatalogValue.newBuilder()
+            .setTableConfigJson(changedJson)).build() : record);
+    // Another assigned table still grants DefaultTenant, so the broker authority remains valid in the image.
+    metadata.apply(fixture.snapshot(14, Map.of(), changedRecords).toBuilder().addQueryBrokers(authority).build());
+    assertFalse(metadata.isAuthorizedQuery(query, PEER_FINGERPRINT), "Current tenant controls held query delivery");
+    assertTrue(metadata.authorizationGeneration() > generation);
+    metadata.apply(granted.toBuilder().setRevision(granted.getRevision().toBuilder().setIndex(15)).build());
+    assertTrue(metadata.isAuthorizedQuery(query, PEER_FINGERPRINT));
+    assertTrue(metadata.authorizationGeneration() > generation, "Restoring a grant cannot revive its old generation");
+    metadata.apply(granted.toBuilder().setRevision(granted.getRevision().toBuilder().setIndex(16))
+        .clearQueryBrokers().build());
+    assertFalse(metadata.isAuthorizedQuery(query, PEER_FINGERPRINT));
+  }
+
   @Test
   public void testCoherentMembershipViewRequiresExplicitServerCapability()
       throws Exception {

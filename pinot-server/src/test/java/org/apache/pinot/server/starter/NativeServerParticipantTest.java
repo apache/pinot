@@ -33,6 +33,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.config.provider.NativeOfflineSegmentAction.ObjectVersion;
 import org.apache.pinot.common.config.provider.NativeOfflineSegmentAction.Participant;
@@ -45,6 +46,7 @@ import org.apache.pinot.common.coordination.ServingPermitGuard.ServingDeniedExce
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.context.NativeQueryContext;
 import org.apache.pinot.common.request.context.NativeQueryContext.ProcessIdentity;
+import org.apache.pinot.common.request.context.NativeQueryGate;
 import org.apache.pinot.coordination.ratis.rpc.MetadataRpc;
 import org.apache.pinot.coordination.ratis.rpc.MetadataRpc.MembershipCommandRequest;
 import org.apache.pinot.coordination.ratis.rpc.MetadataRpc.MembershipResponse;
@@ -76,6 +78,8 @@ import static org.testng.Assert.expectThrows;
 /// Exercises asynchronous participant retry, session fencing and independent renewal admission with real local
 /// directory ownership. Controlled wire responses distinguish unknown outcomes from consumed renewal sequences.
 public class NativeServerParticipantTest {
+  private static final String PEER_FINGERPRINT = "a".repeat(64);
+
   @Test(timeOut = 15_000)
   public void testRenewalRetriesExactRequestUntilOutcomeIsConsumed() throws Exception {
     try (Fixture fixture = new Fixture(false)) {
@@ -186,7 +190,7 @@ public class NativeServerParticipantTest {
       assertEquals(lost._request.getRenew().getSequence(), 3, "Known outcome must have been consumed");
       assertTrue(consumed.getRevision().getIndex() > lost._request.getRenew().getAppliedRevision().getIndex());
       expectThrows(ServingDeniedException.class, () -> fixture._server.checkQueryDelivery(prior));
-      expectThrows(ServingDeniedException.class, () -> fixture._server.admitQuery(fixture.query()));
+      expectThrows(ServingDeniedException.class, () -> fixture._server.admitQuery(fixture.query(), PEER_FINGERPRINT));
 
       fixture.resumeSnapshots();
       fixture.admission();
@@ -208,7 +212,7 @@ public class NativeServerParticipantTest {
       fixture._server.checkQueryDelivery(renewed);
       fixture._clockNanos.set(TimeUnit.MILLISECONDS.toNanos(101));
       expectThrows(ServingDeniedException.class, () -> fixture._server.checkQueryDelivery(renewed));
-      expectThrows(ServingDeniedException.class, () -> fixture._server.admitQuery(fixture.query()));
+      expectThrows(ServingDeniedException.class, () -> fixture._server.admitQuery(fixture.query(), PEER_FINGERPRINT));
     }
   }
 
@@ -240,7 +244,7 @@ public class NativeServerParticipantTest {
           .addAllRenewals(committed.getRenewalsList()).build());
       RenewalCall current = fixture.nextRenewal();
       assertEquals(current._request.getRenew().getSequence(), lost._request.getRenew().getSequence() + 1);
-      expectThrows(ServingDeniedException.class, () -> fixture._server.admitQuery(fixture.query()));
+      expectThrows(ServingDeniedException.class, () -> fixture._server.admitQuery(fixture.query(), PEER_FINGERPRINT));
       current._response.complete(fixture.renewed(current._request, ResultStatus.OK));
       fixture.resumeSnapshots();
       QueryAdmission admitted = fixture.admission();
@@ -276,18 +280,119 @@ public class NativeServerParticipantTest {
       first._response.complete(fixture.renewed(first._request, ResultStatus.OK));
       fixture.admission();
       fixture.freezeSnapshots();
-      expectThrows(IllegalStateException.class, () -> fixture._server.admitQuery(fixture.identity()));
+      expectThrows(IllegalStateException.class, () -> fixture._server.admitQuery(fixture.identity(), PEER_FINGERPRINT));
+      expectThrows(IllegalStateException.class, () -> fixture._server.admitQuery(fixture.query()));
+      expectThrows(IllegalStateException.class, () -> fixture._server.admitQuery(fixture.query(), "b".repeat(64)));
 
       NativeQueryContext context = fixture.identity().withDeadline(fixture._queryDeadlines.originate(10));
-      QueryAdmission admitted = fixture._server.admitQuery(context);
+      QueryAdmission admitted = fixture._server.admitQuery(context, PEER_FINGERPRINT);
       fixture._wallMillis.addAndGet(11);
       fixture._clockNanos.set(TimeUnit.MILLISECONDS.toNanos(11));
-      expectThrows(ServingDeniedException.class, () -> fixture._server.admitQuery(context));
+      expectThrows(ServingDeniedException.class, () -> fixture._server.admitQuery(context, PEER_FINGERPRINT));
       expectThrows(ServingDeniedException.class, () -> fixture._server.checkQueryDelivery(admitted));
 
       // A fresh query can use the still-valid permit, but retries of the expired query cannot reset its deadline.
-      fixture._server.checkQueryDelivery(fixture._server.admitQuery(fixture.query()));
-      expectThrows(ServingDeniedException.class, () -> fixture._server.admitQuery(context));
+      fixture._server.checkQueryDelivery(fixture._server.admitQuery(fixture.query(), PEER_FINGERPRINT));
+      expectThrows(ServingDeniedException.class, () -> fixture._server.admitQuery(context, PEER_FINGERPRINT));
+    }
+  }
+
+  @Test(timeOut = 15_000)
+  public void testQueryDeliverySerializesRevocationAndCannotReviveAfterRegrant() throws Exception {
+    try (Fixture fixture = new Fixture(true, true)) {
+      fixture.start();
+      RenewalCall first = fixture.nextRenewal();
+      first._response.complete(fixture.renewed(first._request, ResultStatus.OK));
+      QueryAdmission prior = fixture.admission();
+      fixture.freezeSnapshots();
+      NativeQueryGate.Delivery gate = fixture._server.queryGate().admit(fixture.query(), PEER_FINGERPRINT);
+      CountDownLatch entered = new CountDownLatch(1);
+      CountDownLatch release = new CountDownLatch(1);
+      CountDownLatch publication = new CountDownLatch(1);
+      AtomicBoolean armed = new AtomicBoolean();
+      fixture._server.clusterConfig().registerClusterConfigChangeListener((changed, values) -> {
+        if (armed.get()) {
+          publication.countDown();
+        }
+      });
+      CompletableFuture<Void> delivery = CompletableFuture.runAsync(() -> gate.deliver(() -> {
+        entered.countDown();
+        try {
+          assertTrue(release.await(5, TimeUnit.SECONDS), "Query delivery was not released");
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          throw new IllegalStateException(e);
+        }
+      }));
+      MetadataRpc.QueryBrokerAuthority authority = fixture._brokerAuthority;
+      try {
+        assertTrue(entered.await(5, TimeUnit.SECONDS));
+        armed.set(true);
+        fixture._brokerAuthority = null;
+        long snapshots = fixture._snapshotCount.get();
+        fixture.resumeSnapshots();
+        await(() -> fixture._snapshotCount.get() > snapshots);
+        assertFalse(publication.await(100, TimeUnit.MILLISECONDS),
+            "Revocation publication cannot pass a callback holding the admission lock");
+      } finally {
+        release.countDown();
+      }
+      delivery.get(5, TimeUnit.SECONDS);
+      assertTrue(publication.await(5, TimeUnit.SECONDS));
+      fixture.freezeSnapshots();
+      expectThrows(IllegalStateException.class, () -> fixture._server.checkQueryDelivery(prior));
+      AtomicBoolean leaked = new AtomicBoolean();
+      expectThrows(IllegalStateException.class, () -> gate.deliver(() -> leaked.set(true)));
+      assertFalse(leaked.get(), "No result callback may run after certificate authority is revoked");
+
+      fixture._brokerAuthority = authority;
+      fixture.resumeSnapshots();
+      QueryAdmission fresh = fixture.admission();
+      fixture.freezeSnapshots();
+      fixture._server.checkQueryDelivery(fresh);
+      expectThrows(IllegalStateException.class, () -> fixture._server.checkQueryDelivery(prior));
+      expectThrows(IllegalStateException.class, () -> gate.deliver(() -> leaked.set(true)));
+      assertFalse(leaked.get(), "Restoring the grant cannot revive a prior delivery attempt");
+      expectThrows(IllegalArgumentException.class, () -> fixture._server.deliverQuery(fresh, () -> {
+        throw new IllegalArgumentException("Callback failure");
+      }));
+      fixture._server.checkQueryDelivery(fresh);
+    }
+  }
+
+  @Test(timeOut = 15_000)
+  public void testPeerLeaseConsumesSnapshotTransitAndRemainsBoundAcrossRenewal() throws Exception {
+    try (Fixture fixture = new Fixture(true, true)) {
+      fixture._round = 9;
+      fixture._minTickMillis = 10;
+      fixture._brokerAuthority = fixture._brokerAuthority.toBuilder().setParticipant(
+          fixture._brokerAuthority.getParticipant().toBuilder().setExpiryRound(11)).build();
+      fixture.start();
+      RenewalCall first = fixture.nextRenewal();
+      first._response.complete(fixture.renewed(first._request, ResultStatus.OK));
+      QueryAdmission original = fixture.admission();
+      fixture.freezeSnapshots();
+      // The request is already in flight. Its response leaves one full 10ms tick interval at the captured round.
+      fixture._clockNanos.set(TimeUnit.MILLISECONDS.toNanos(11));
+      fixture._wallMillis.addAndGet(11);
+      assertTrue(fixture.resumeOneSnapshot().await(5, TimeUnit.SECONDS));
+      assertTrue(fixture._server.isReadyForInstallations(), "Peer expiry must not break installation hydration");
+      ServingDeniedException expired = expectThrows(ServingDeniedException.class,
+          () -> fixture._server.admitQuery(fixture.query(), PEER_FINGERPRINT));
+      assertTrue(expired.getMessage().contains("Peer membership lease"));
+      expectThrows(ServingDeniedException.class, () -> fixture._server.checkQueryDelivery(original));
+
+      fixture._brokerAuthority = fixture._brokerAuthority.toBuilder().setParticipant(
+          fixture._brokerAuthority.getParticipant().toBuilder().setExpiryRound(100).setLastRenewalSequence(1)).build();
+      assertTrue(fixture.resumeOneSnapshot().await(5, TimeUnit.SECONDS));
+      QueryAdmission renewed = fixture._server.admitQuery(fixture.query(), PEER_FINGERPRINT);
+      fixture._server.checkQueryDelivery(renewed);
+      expectThrows(ServingDeniedException.class, () -> fixture._server.checkQueryDelivery(original));
+      // No further snapshot or heartbeat response arrives; only the peer's original local bound expires.
+      fixture._clockNanos.set(TimeUnit.MILLISECONDS.toNanos(21));
+      fixture._wallMillis.addAndGet(10);
+      fixture._server.checkQueryDelivery(renewed);
+      expectThrows(ServingDeniedException.class, () -> fixture._server.checkQueryDelivery(original));
     }
   }
 
@@ -314,6 +419,7 @@ public class NativeServerParticipantTest {
     private final UUID _activation = UUID.randomUUID();
     private final UUID _tableId = UUID.randomUUID();
     private final UUID _schemaId = UUID.randomUUID();
+    private final UUID _brokerIncarnation = UUID.randomUUID();
     private final Path _directory = Files.createTempDirectory("native-participant-");
     private final NativeServerParticipant.Rpc _membership = mock(NativeServerParticipant.Rpc.class);
     private final NativeServerParticipant.Rpc _work = mock(NativeServerParticipant.Rpc.class);
@@ -339,7 +445,12 @@ public class NativeServerParticipantTest {
     private volatile boolean _ready;
     private volatile MetadataRpc.Revision _applied;
     private boolean _freezeSnapshots;
+    private boolean _freezeAfterSnapshot;
     private CountDownLatch _snapshotBlocked;
+    private long _round;
+    private long _minTickMillis = 100;
+    @Nullable
+    private volatile MetadataRpc.QueryBrokerAuthority _brokerAuthority;
 
     private Fixture(boolean queryCapability) throws Exception {
       this(queryCapability, false);
@@ -349,6 +460,14 @@ public class NativeServerParticipantTest {
       _queryCapability = queryCapability;
       _records = serving ? queryRecords() : List.of();
       _applied = revision(0);
+      _brokerAuthority = MetadataRpc.QueryBrokerAuthority.newBuilder()
+          .setParticipant(MetadataRpc.ParticipantState.newBuilder()
+              .setParticipant(MetadataRpc.ParticipantToken.newBuilder().setHistoryId(_history.toString())
+                  .setParticipantId("broker").setRole(MetadataRpc.ParticipantRole.BROKER)
+                  .setIncarnation(_brokerIncarnation.toString()).setRegistrationEpoch(1))
+              .setExpiryRound(100).setReady(true).setAppliedRevision(revision(1)).setLastModifiedIndex(1)
+              .addCapabilities(MetadataRpc.ServingCapability.BROKER_QUERY))
+          .addCertificateSha256(PEER_FINGERPRINT).addBrokerTenants("DefaultTenant").build();
       when(_membership.membershipRead(any(), anyLong())).thenAnswer(ignored -> response(ResultStatus.NOT_FOUND));
       when(_membership.membershipExecute(any(), anyLong())).thenAnswer(invocation ->
           membership(invocation.getArgument(0)));
@@ -443,16 +562,24 @@ public class NativeServerParticipantTest {
         wait();
       }
       long index = _index.incrementAndGet();
-      MetadataRpc.InstallationSnapshot snapshot = MetadataRpc.InstallationSnapshot.newBuilder()
+      MetadataRpc.InstallationSnapshot.Builder snapshot = MetadataRpc.InstallationSnapshot.newBuilder()
           .setStatus(ResultStatus.OK).setRevision(revision(index)).setParticipant(participant()).addAllRecords(_records)
           .setControl(MetadataRpc.MembershipControl.newBuilder().setClockBarrierIndex(control().getBarrierIndex())
-              .setMinimumTickDelayMillis(100).setMaxConfiguredPermitLifetimeMillis(100)
+              .setRound(_round).setMinimumTickDelayMillis(_minTickMillis).setMaxConfiguredPermitLifetimeMillis(100)
               .setControlEpoch(control())
-              .setPolicy(MetadataRpc.MembershipPolicy.newBuilder().setVersion(1).setMinTickIntervalMillis(100)
+              .setPolicy(MetadataRpc.MembershipPolicy.newBuilder().setVersion(1)
+                  .setMinTickIntervalMillis(_minTickMillis)
                   .setLeaseRounds(100).setPermitLifetimeMillis(100).setMaxQueryLifetimeMillis(100)
-                  .setMaxRevisionLag(1000))).build();
+                  .setMaxRevisionLag(1000)));
+      if (!_records.isEmpty() && _brokerAuthority != null) {
+        snapshot.addQueryBrokers(_brokerAuthority);
+      }
       _snapshotCount.incrementAndGet();
-      return snapshot;
+      if (_freezeAfterSnapshot) {
+        _freezeAfterSnapshot = false;
+        _freezeSnapshots = true;
+      }
+      return snapshot.build();
     }
 
     private void freezeSnapshots() throws InterruptedException {
@@ -467,7 +594,16 @@ public class NativeServerParticipantTest {
 
     private synchronized void resumeSnapshots() {
       _freezeSnapshots = false;
+      _freezeAfterSnapshot = false;
       notifyAll();
+    }
+
+    private synchronized CountDownLatch resumeOneSnapshot() {
+      _freezeSnapshots = false;
+      _freezeAfterSnapshot = true;
+      _snapshotBlocked = new CountDownLatch(1);
+      notifyAll();
+      return _snapshotBlocked;
     }
 
     private QueryAdmission admission() throws InterruptedException {
@@ -477,7 +613,7 @@ public class NativeServerParticipantTest {
           return true;
         }
         try {
-          admitted.set(_server.admitQuery(query()));
+          admitted.set(_server.admitQuery(query(), PEER_FINGERPRINT));
           return true;
         } catch (IllegalStateException e) {
           return false;
@@ -492,7 +628,7 @@ public class NativeServerParticipantTest {
 
     private NativeQueryContext identity() {
       // Only exercises local admission; no loaded segment or normal query execution is claimed by this fixture.
-      return new NativeQueryContext(1, _history, new ProcessIdentity("broker", UUID.randomUUID(), 1),
+      return new NativeQueryContext(1, _history, new ProcessIdentity("broker", _brokerIncarnation, 1),
           new Participant(SERVER, Role.SERVER, UUID.fromString(_token.getIncarnation()), _token.getRegistrationEpoch()),
           UUID.randomUUID(), UUID.randomUUID(), "nativeQuery_OFFLINE", new ObjectVersion(_tableId, 1), "nativeQuery",
           new ObjectVersion(_schemaId, 1), List.of(), List.of());

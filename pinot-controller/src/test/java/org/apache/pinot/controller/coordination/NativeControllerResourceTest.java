@@ -140,12 +140,21 @@ public class NativeControllerResourceTest {
       approved.put(NativeBrokerRoutingPolicy.CONFIG_KEY,
           "{\"brokers\":{\"Broker_native\":[\"DefaultTenant\"]},\"servers\":{}}");
       fixture._metadata.validateClusterConfig(fixture._metadata.snapshot(), approved);
+      approved.put(NativeBrokerRoutingPolicy.CONFIG_KEY,
+          "{\"brokers\":{\"Broker_native\":[\"DefaultTenant\"]},\"servers\":{},\"principals\":{\""
+              + "a".repeat(64) + "\":\"Broker_native\"}}");
+      fixture._metadata.validateClusterConfig(fixture._metadata.snapshot(), approved);
       fixture.config(approved, 11);
       Map<String, String> revoked = new HashMap<>(approved);
       revoked.put(NativeBrokerRoutingPolicy.CONFIG_KEY, "{\"brokers\":{},\"servers\":{}}");
       fixture._metadata.validateClusterConfig(fixture._metadata.snapshot(), revoked);
       Map<String, String> malformed = new HashMap<>(revoked);
       malformed.put(NativeBrokerRoutingPolicy.CONFIG_KEY, "{}");
+      assertThrows(IllegalArgumentException.class,
+          () -> fixture._metadata.validateClusterConfig(fixture._metadata.snapshot(), malformed));
+      malformed.put(NativeBrokerRoutingPolicy.CONFIG_KEY,
+          "{\"brokers\":{\"Broker_native\":[\"DefaultTenant\"]},\"servers\":{},\"principals\":{\""
+              + "a".repeat(64) + "\":\"Broker_missing\"}}");
       assertThrows(IllegalArgumentException.class,
           () -> fixture._metadata.validateClusterConfig(fixture._metadata.snapshot(), malformed));
       fixture.config(revoked, 12);

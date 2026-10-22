@@ -123,6 +123,12 @@ final class InstallationRpcCodec {
       result.addRecords(MetadataRpcCodec.record(record));
     }
     snapshot.operationIds().forEach(operation -> result.addOperationIds(operation.toString()));
+    for (var authority : snapshot.queryBrokers()) {
+      result.addQueryBrokers(MetadataRpc.QueryBrokerAuthority.newBuilder()
+          .setParticipant(MembershipRpcCodec.participant(authority.participant()))
+          .addAllCertificateSha256(authority.certificateSha256())
+          .addAllBrokerTenants(authority.brokerTenants()));
+    }
     return result.build();
   }
 

@@ -64,6 +64,7 @@ import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Status;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.TaskCommand;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.TaskSessionCommand;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Transaction;
+import org.apache.pinot.coordination.ratis.metadata.OfflineInstallationProtocol.InstallationSnapshot;
 import org.apache.pinot.coordination.ratis.metadata.OfflineRoutingProtocol.RoutingSnapshot;
 import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.Assignment;
 import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.Content;
@@ -852,6 +853,107 @@ public class TaskCatalogTest {
     }
   }
 
+  @Test
+  public void testInstallationQueryAuthorityScopeBoundsAndSessionFences() throws Exception {
+    Fixture f = new Fixture();
+    ParticipantToken server = f.routingServer(Set.of());
+    f.queryPolicies(Map.of("query-broker", Set.of("DefaultTenant", "OtherTenant"),
+        "other-broker", Set.of("OtherTenant"), "routing-broker", Set.of("DefaultTenant")),
+        Map.of("a".repeat(64), "query-broker", "b".repeat(64), "other-broker",
+            "c".repeat(64), "routing-broker"));
+    Content content = f.publishRoutingContent("authority");
+    assertEquals(f.segment(new ReconcileContent(f._owner, content.segmentObjectId())).status(), Status.OK);
+    ParticipantToken broker = f.queryBroker("query-broker", 0);
+    ParticipantToken other = f.queryBroker("other-broker", 0);
+    ParticipantToken membershipOnly = f.routingBroker(0);
+    assertEquals(f.member(new SetReady(membershipOnly, new Revision(f._history, f._index), true)).status(), Status.OK);
+    assertEquals(f.member(new SetReady(other, new Revision(f._history, f._index), true)).status(), Status.OK);
+    assertTrue(f.installationImage(server).queryBrokers().isEmpty(),
+        "Unready brokers, absent query capability and unrelated tenants must not receive authority");
+    assertEquals(f.member(new SetReady(broker, new Revision(f._history, f._index), true)).status(), Status.OK);
+    InstallationSnapshot image = f.installationImage(server);
+    assertEquals(image.status(), Status.OK);
+    assertEquals(image.revision(), new Revision(f._history, f._index));
+    assertEquals(image.queryBrokers().size(), 1);
+    var grant = image.queryBrokers().getFirst();
+    assertEquals(grant.participant().participant(), broker);
+    assertEquals(grant.certificateSha256(), List.of("a".repeat(64)));
+    assertEquals(grant.brokerTenants(), List.of("DefaultTenant"));
+    int records = image.records().size() + image.operationIds().size() + image.queryBrokers().size();
+    int bytes = MetadataProtocol.encodeValue(image).length;
+    assertEquals(f._catalog.installationSnapshot(server, records, bytes), image);
+    for (InstallationSnapshot rejected : List.of(f._catalog.installationSnapshot(server, records - 1, bytes),
+        f._catalog.installationSnapshot(server, records, bytes - 1))) {
+      assertEquals(rejected.status(), Status.RESPONSE_TOO_LARGE);
+      assertTrue(rejected.records().isEmpty());
+      assertTrue(rejected.operationIds().isEmpty());
+      assertTrue(rejected.queryBrokers().isEmpty());
+      assertEquals(rejected.participant(), null);
+    }
+    f.restore();
+    assertEquals(f.installationImage(server), image);
+    assertEquals(f.member(new BeginDrain(broker)).status(), Status.OK);
+    assertTrue(f.installationImage(server).queryBrokers().isEmpty());
+    assertEquals(f.member(new Unregister(broker)).status(), Status.OK);
+    ParticipantToken replacement = f.queryBroker("query-broker", 1);
+    assertTrue(f.installationImage(server).queryBrokers().isEmpty(), "Replacement session starts unready");
+    assertEquals(f.member(new SetReady(replacement, new Revision(f._history, f._index), true)).status(), Status.OK);
+    assertEquals(f.installationImage(server).queryBrokers().getFirst().participant().participant(), replacement);
+    assertEquals(f.member(new Unregister(replacement)).status(), Status.OK);
+    assertTrue(f.installationImage(server).queryBrokers().isEmpty());
+  }
+
+  @Test
+  public void testQueryPrincipalPolicyRevocationAndInvalidPolicyPreserveInstallationHydration() throws Exception {
+    Fixture f = new Fixture();
+    ParticipantToken server = f.routingServer(Set.of());
+    f.queryPolicies(Map.of("query-broker", Set.of("DefaultTenant")), Map.of("a".repeat(64), "query-broker"));
+    Content content = f.publishRoutingContent("authority");
+    assertEquals(f.segment(new ReconcileContent(f._owner, content.segmentObjectId())).status(), Status.OK);
+    ParticipantToken broker = f.queryBroker("query-broker", 0);
+    assertEquals(f.member(new SetReady(broker, new Revision(f._history, f._index), true)).status(), Status.OK);
+    assertEquals(f.installationImage(server).queryBrokers().size(), 1);
+    f.queryPolicies(Map.of("query-broker", Set.of("DefaultTenant")), Map.of("c".repeat(64), "query-broker"));
+    assertEquals(f.installationImage(server).queryBrokers().getFirst().certificateSha256(), List.of("c".repeat(64)));
+    f.queryPolicies(Map.of("query-broker", Set.of("OtherTenant")), Map.of("c".repeat(64), "query-broker"));
+    assertTrue(f.installationImage(server).queryBrokers().isEmpty(),
+        "Tenant revocation takes effect in the next image");
+    f.queryPolicies(Map.of("query-broker", Set.of("DefaultTenant")), Map.of());
+    assertTrue(f.installationImage(server).queryBrokers().isEmpty(),
+        "Legacy two-key policy grants no query principals");
+    String policyPrefix = "{\"brokers\":{\"query-broker\":[\"DefaultTenant\"]},\"servers\":{},";
+    List<String> invalid = new ArrayList<>(List.of("{}", policyPrefix + "\"principals\":null}",
+        policyPrefix + "\"principals\":{\"" + "A".repeat(64) + "\":\"query-broker\"}}",
+        policyPrefix + "\"principals\":{\"" + "a".repeat(64) + "\":\"missing-broker\"}}",
+        policyPrefix + "\"principals\":{},\"unknown\":true}",
+        policyPrefix + "\"principals\":{\"" + "a".repeat(64) + "\":\"query-broker\",\""
+            + "a".repeat(64) + "\":\"query-broker\"}}"));
+    Map<String, String> tooMany = new HashMap<>();
+    for (int i = 0; i <= NativeBrokerRoutingPolicy.MAX_PRINCIPALS; i++) {
+      tooMany.put(String.format("%064x", i), "query-broker");
+    }
+    invalid.add(JsonUtils.objectToString(new NativeBrokerRoutingPolicy(
+        Map.of("query-broker", Set.of("DefaultTenant")), Map.of(), tooMany)));
+    for (String policy : invalid) {
+      f.cluster(Map.of(NativeBrokerRoutingPolicy.CONFIG_KEY, policy));
+      InstallationSnapshot image = f.installationImage(server);
+      assertEquals(image.status(), Status.OK, "Invalid optional query policy must not block installation metadata");
+      assertTrue(image.queryBrokers().isEmpty());
+      assertFalse(image.records().isEmpty());
+    }
+    f.cluster(Map.of());
+    assertEquals(f.installationImage(server).status(), Status.OK);
+    assertTrue(f.installationImage(server).queryBrokers().isEmpty());
+    f.queryPolicies(Map.of("query-broker", Set.of("DefaultTenant")), Map.of("a".repeat(64), "query-broker"));
+    assertEquals(f.installationImage(server).queryBrokers().size(), 1);
+    CatalogRecord schema = f.record(RecordKind.SCHEMA, "orders");
+    assertEquals(f.mutate(Mutation.updateSchema(f.objectVersion(schema), new Schema.SchemaBuilder()
+        .setSchemaName("orders").addSingleValueDimension("id", DataType.INT)
+        .addSingleValueDimension("changed", DataType.STRING).build())).status(), Status.OK);
+    assertTrue(f.installationImage(server).queryBrokers().isEmpty(),
+        "An assignment against stale configuration must not supply a query tenant grant");
+  }
+
   private static final class Fixture {
     private final boolean _nativeTask;
     private final UUID _cluster = UUID.randomUUID();
@@ -889,6 +991,26 @@ public class TaskCatalogTest {
       assertEquals(mutate(Mutation.createTableConfig(_history, _table, table()),
           Mutation.createSchema(_history, UUID.randomUUID(), new Schema.SchemaBuilder().setSchemaName("orders")
               .addSingleValueDimension("id", DataType.INT).build())).status(), Status.OK);
+    }
+
+    private ParticipantToken queryBroker(String id, long epoch) throws IOException {
+      var response = member(new Register(id, Role.BROKER, UUID.randomUUID(), epoch, Map.of(),
+          Set.of(Capability.BROKER_QUERY)));
+      assertEquals(response.status(), Status.OK);
+      return response.participant().participant();
+    }
+
+    private void queryPolicies(Map<String, Set<String>> brokers, Map<String, String> principals) throws IOException {
+      cluster(Map.of(NativeReplicaPlacementPolicy.CONFIG_KEY, JsonUtils.objectToString(
+              new NativeReplicaPlacementPolicy(
+                  Map.of("routing-server", new NativeReplicaPlacementPolicy.Server("DefaultTenant", "zone-a")))),
+          NativeBrokerRoutingPolicy.CONFIG_KEY,
+          JsonUtils.objectToString(new NativeBrokerRoutingPolicy(brokers, Map.of(), principals))));
+    }
+
+    private InstallationSnapshot installationImage(ParticipantToken server) throws IOException {
+      return _catalog.installationSnapshot(server, OfflineInstallationProtocol.MAX_SNAPSHOT_RECORDS,
+          OfflineInstallationProtocol.MAX_SNAPSHOT_BYTES);
     }
 
     private ParticipantToken routingBroker(long epoch) throws IOException {

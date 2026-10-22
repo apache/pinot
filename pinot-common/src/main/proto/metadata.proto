@@ -611,6 +611,14 @@ message InstallationSnapshot {
   repeated CatalogRecord records = 5;
   repeated string operation_ids = 6;
   MembershipControl control = 7;
+  repeated QueryBrokerAuthority query_brokers = 8;
+}
+// The complete current broker authority relevant to this server's assigned tables. Certificate bindings come
+// exclusively from committed administrator policy; participant advertisements cannot create query authority.
+message QueryBrokerAuthority {
+  ParticipantState participant = 1;
+  repeated string certificate_sha256 = 2;
+  repeated string broker_tenants = 3;
 }
 message InstallationWork {
   string operation_id = 1;

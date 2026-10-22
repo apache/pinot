@@ -18,9 +18,12 @@
  */
 package org.apache.pinot.core.transport.grpc;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Supplier;
 import io.grpc.Attributes;
 import io.grpc.Grpc;
 import io.grpc.Server;
+import io.grpc.ServerInterceptors;
 import io.grpc.ServerTransportFilter;
 import io.grpc.Status;
 import io.grpc.netty.shaded.io.grpc.netty.GrpcSslContexts;
@@ -40,6 +43,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import nl.altindag.ssl.SSLFactory;
 import org.apache.pinot.common.config.GrpcConfig;
 import org.apache.pinot.common.config.TlsConfig;
@@ -51,6 +55,7 @@ import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.proto.PinotQueryServerGrpc;
 import org.apache.pinot.common.proto.Server.ServerRequest;
 import org.apache.pinot.common.proto.Server.ServerResponse;
+import org.apache.pinot.common.request.context.NativeQueryGate;
 import org.apache.pinot.common.utils.tls.PinotInsecureMode;
 import org.apache.pinot.common.utils.tls.RenewableTlsUtils;
 import org.apache.pinot.common.utils.tls.TlsUtils;
@@ -70,6 +75,8 @@ import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 
 // TODO: Plug in QueryScheduler
 public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBase {
@@ -88,6 +95,8 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
   private final ExecutorService _executorService;
   private final AccessControl _accessControl;
   private final ThreadAccountant _threadAccountant;
+  @Nullable
+  private final NativeQueryGate _nativeQueryGate;
   // Memory allocator and throttling configuration
   private final PooledByteBufAllocator _bufAllocator;
   private final long _memoryThresholdBytes;
@@ -117,6 +126,21 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
 
   public GrpcQueryServer(String instanceId, int port, GrpcConfig config, TlsConfig tlsConfig,
       QueryExecutor queryExecutor, AccessControl accessControl, ThreadAccountant threadAccountant) {
+    this(instanceId, port, config, tlsConfig, queryExecutor, accessControl, threadAccountant, null);
+  }
+
+  /// Explicit native transport wiring. This does not activate any normal starter or grant query capability.
+  /// A native gate requires strict mutual TLS; legacy construction keeps its existing listener behavior.
+  public GrpcQueryServer(String instanceId, int port, GrpcConfig config, TlsConfig tlsConfig,
+      QueryExecutor queryExecutor, AccessControl accessControl, ThreadAccountant threadAccountant,
+      @Nullable NativeQueryGate nativeQueryGate) {
+    if (nativeQueryGate != null && tlsConfig != null) {
+      tlsConfig = new TlsConfig(tlsConfig);
+    }
+    checkArgument(nativeQueryGate == null || tlsConfig != null && tlsConfig.isClientAuthEnabled()
+        && !tlsConfig.isInsecure() && !PinotInsecureMode.isPinotInInsecureMode(),
+        "Native queries require mutual TLS with certificate verification");
+    _nativeQueryGate = nativeQueryGate;
     _instanceId = instanceId;
     _executorService = QueryThreadContext.contextAwareExecutorService(
         Executors.newFixedThreadPool(config.isQueryWorkerThreadsSet()
@@ -136,7 +160,9 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
     try {
       NettyServerBuilder builder = NettyServerBuilder.forPort(port);
       if (tlsConfig != null) {
-        builder.sslContext(buildGrpcSslContext(tlsConfig));
+        // Never reuse a legacy cached context which may have been built with a process-wide insecure fallback.
+        builder.sslContext(nativeQueryGate == null ? buildGrpcSslContext(tlsConfig)
+            : buildNativeGrpcSslContext(tlsConfig));
       }
 
       // Add metrics for Netty buffer allocator
@@ -162,12 +188,14 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
 
       _server = builder
           .maxInboundMessageSize(config.getMaxInboundMessageSizeBytes())
-          .addService(this)
+          .addService(nativeQueryGate == null ? bindService()
+              : ServerInterceptors.intercept(this, new NativeGrpcQueryGuard()))
           .addTransportFilter(new GrpcQueryTransportFilter())
           .withOption(ChannelOption.ALLOCATOR, _bufAllocator)
           .withChildOption(ChannelOption.ALLOCATOR, _bufAllocator)
           .build();
     } catch (Exception e) {
+      _executorService.shutdownNow();
       throw new RuntimeException("Failed to start secure grpcQueryServer", e);
     }
 
@@ -183,30 +211,48 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
     if (tlsConfig.getKeyStorePath() == null) {
       throw new IllegalArgumentException("Must provide key store path for secured gRPC server");
     }
-    return SERVER_SSL_CONTEXTS_CACHE.computeIfAbsent(tlsConfig.hashCode(), tlsConfigHashCode -> {
-      try {
-        SSLFactory sslFactory =
-            RenewableTlsUtils.createSSLFactoryAndEnableAutoRenewalWhenUsingFileStores(
-                tlsConfig, PinotInsecureMode::isPinotInInsecureMode);
-        // Runtime visibility for Platform-FIPS-JDK deployments: log the actual JSSE provider/protocol once.
-        TlsUtils.warnIfNonJdkProviderConfigured("grpc.query.server", tlsConfig);
-        TlsUtils.logJsseDiagnosticsOnce("grpc.query.server", sslFactory, tlsConfig);
-        SslContextBuilder sslContextBuilder = SslContextBuilder.forServer(sslFactory.getKeyManagerFactory().get());
-        sslFactory.getTrustManagerFactory().ifPresent(sslContextBuilder::trustManager);
-        if (tlsConfig.isClientAuthEnabled()) {
-          sslContextBuilder.clientAuth(ClientAuth.REQUIRE);
-        }
-        if (tlsConfig.getSslProvider() != null) {
-          sslContextBuilder =
-              GrpcSslContexts.configure(sslContextBuilder, SslProvider.valueOf(tlsConfig.getSslProvider()));
-        } else {
-          sslContextBuilder = GrpcSslContexts.configure(sslContextBuilder);
-        }
-        return sslContextBuilder.build();
-      } catch (Exception e) {
-        throw new RuntimeException("Failed to build gRPC server SSL context", e);
+    return SERVER_SSL_CONTEXTS_CACHE.computeIfAbsent(tlsConfig.hashCode(),
+        tlsConfigHashCode -> createGrpcSslContext(tlsConfig, PinotInsecureMode::isPinotInInsecureMode));
+  }
+
+  private static SslContext createGrpcSslContext(TlsConfig tlsConfig, Supplier<Boolean> insecureFallback) {
+    try {
+      SSLFactory sslFactory =
+          RenewableTlsUtils.createSSLFactoryAndEnableAutoRenewalWhenUsingFileStores(tlsConfig, insecureFallback);
+      // Runtime visibility for Platform-FIPS-JDK deployments: log the actual JSSE provider/protocol once.
+      TlsUtils.warnIfNonJdkProviderConfigured("grpc.query.server", tlsConfig);
+      TlsUtils.logJsseDiagnosticsOnce("grpc.query.server", sslFactory, tlsConfig);
+      SslContextBuilder sslContextBuilder = SslContextBuilder.forServer(sslFactory.getKeyManagerFactory().get());
+      sslFactory.getTrustManagerFactory().ifPresent(sslContextBuilder::trustManager);
+      if (tlsConfig.isClientAuthEnabled()) {
+        sslContextBuilder.clientAuth(ClientAuth.REQUIRE);
       }
-    });
+      if (tlsConfig.getSslProvider() != null) {
+        sslContextBuilder =
+            GrpcSslContexts.configure(sslContextBuilder, SslProvider.valueOf(tlsConfig.getSslProvider()));
+      } else {
+        sslContextBuilder = GrpcSslContexts.configure(sslContextBuilder);
+      }
+      return sslContextBuilder.build();
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to build gRPC server SSL context", e);
+    }
+  }
+
+  /// Native listener credentials are fixed for its lifetime; rotation requires recreating the listener.
+  /// Keep reload executors out of this opt-in transport until they have an owned shutdown lifecycle.
+  private static SslContext buildNativeGrpcSslContext(TlsConfig tlsConfig) throws Exception {
+    checkArgument(tlsConfig.getKeyStorePath() != null && tlsConfig.getTrustStorePath() != null,
+        "Native query TLS requires explicit identity and trust stores");
+    SslContextBuilder builder = SslContextBuilder.forServer(TlsUtils.createKeyManagerFactory(tlsConfig))
+        .trustManager(TlsUtils.createTrustManagerFactory(tlsConfig)).clientAuth(ClientAuth.REQUIRE);
+    return (tlsConfig.getSslProvider() == null ? GrpcSslContexts.configure(builder)
+        : GrpcSslContexts.configure(builder, SslProvider.valueOf(tlsConfig.getSslProvider()))).build();
+  }
+
+  @VisibleForTesting
+  int port() {
+    return _server.getPort();
   }
 
   public void start() {
@@ -223,7 +269,10 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
     try {
       _server.shutdown().awaitTermination();
     } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
       throw new RuntimeException(e);
+    } finally {
+      _executorService.shutdownNow();
     }
   }
 
@@ -232,6 +281,11 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
     long startTime = System.nanoTime();
     _serverMetrics.addMeteredGlobalValue(ServerMeter.GRPC_QUERIES, 1);
     _serverMetrics.addMeteredGlobalValue(ServerMeter.GRPC_BYTES_RECEIVED, request.getSerializedSize());
+    if (request.hasNativeQueryContext() != (_nativeQueryGate != null)) {
+      responseObserver.onError(Status.FAILED_PRECONDITION
+          .withDescription("Native query context and authenticated admission must both be configured").asException());
+      return;
+    }
 
     // Check memory usage before processing the request
     long usedDirectMemory = _bufAllocator.metric().usedDirectMemory();
@@ -272,6 +326,17 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
       responseObserver.onError(
           Status.NOT_FOUND.withDescription(exceptionMsg).withCause(unsupportedOperationException).asException());
       return;
+    }
+
+    if (_nativeQueryGate != null) {
+      try {
+        responseObserver = NativeGrpcQueryGuard.admit(_nativeQueryGate, queryRequest.getNativeQueryContext(),
+            responseObserver);
+      } catch (RuntimeException e) {
+        responseObserver.onError(Status.PERMISSION_DENIED.withDescription("Native query admission rejected")
+            .asException());
+        return;
+      }
     }
 
     // Process the query

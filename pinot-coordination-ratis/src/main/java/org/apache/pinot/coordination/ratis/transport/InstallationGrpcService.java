@@ -94,13 +94,21 @@ final class InstallationGrpcService extends ServerInstallationServiceGrpc.Server
       InstallationSnapshot snapshot = _installation.installationSnapshot(server, request.getMaxRecords(),
           request.getMaxBytes(), remainingMillis());
       if (snapshot.status() == MetadataProtocol.Status.OK && (snapshot.participant() == null
-          || !snapshot.participant().participant().equals(server) || snapshot.control() == null)) {
+          || !snapshot.participant().participant().equals(server) || snapshot.control() == null
+          || !snapshot.revision().historyId().equals(server.historyId()))) {
         throw Status.INTERNAL.withDescription("Installation snapshot identity differs").asRuntimeException();
       }
+      if (snapshot.status() != MetadataProtocol.Status.OK && (snapshot.participant() != null
+          || snapshot.control() != null || !snapshot.records().isEmpty() || !snapshot.operationIds().isEmpty()
+          || !snapshot.queryBrokers().isEmpty())) {
+        throw Status.INTERNAL.withDescription("Failed installation snapshot contains data").asRuntimeException();
+      }
       MetadataRpc.InstallationSnapshot response = InstallationRpcCodec.snapshot(snapshot);
-      if (response.getSerializedSize() > request.getMaxBytes()) {
+      if (response.getSerializedSize() > request.getMaxBytes()
+          || (long) snapshot.records().size() + snapshot.operationIds().size() + snapshot.queryBrokers().size()
+              > request.getMaxRecords()) {
         return MetadataRpc.InstallationSnapshot.newBuilder().setStatus(MetadataRpc.ResultStatus.RESPONSE_TOO_LARGE)
-            .setRevision(response.getRevision()).setDetail("Installation snapshot exceeds its wire byte bound")
+            .setRevision(response.getRevision()).setDetail("Installation snapshot exceeds its wire bounds")
             .build();
       }
       return response;
