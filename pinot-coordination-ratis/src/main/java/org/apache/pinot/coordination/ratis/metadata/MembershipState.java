@@ -489,7 +489,7 @@ final class MembershipState {
         "Participant endpoints exceed the supported bound");
     endpoints.forEach((name, value) -> {
       identifier(name);
-      check(value != null && !value.isBlank() && value.length() <= 2048
+      check(value != null && !value.isBlank() && value.length() <= MembershipProtocol.MAX_ENDPOINT_VALUE_LENGTH
           && value.chars().noneMatch(Character::isISOControl), Status.INVALID_REQUEST, "Invalid participant endpoint");
     });
   }
@@ -498,13 +498,14 @@ final class MembershipState {
     check(role != null && capabilities != null, Status.INVALID_REQUEST, "Participant role/capabilities are required");
     for (Capability capability : capabilities) {
       check((role == Role.BROKER && capability == Capability.BROKER_QUERY)
-          || (role == Role.SERVER && capability == Capability.SERVER_QUERY), Status.INVALID_REQUEST,
+          || (role == Role.SERVER && capability == Capability.SERVER_QUERY)
+          || (role == Role.MINION && capability == Capability.MINION_TASK), Status.INVALID_REQUEST,
           "Capability is incompatible with participant role");
     }
   }
 
   private static void identifier(String value) {
-    check(value != null && !value.isBlank() && value.length() <= 1024
+    check(value != null && !value.isBlank() && value.length() <= MembershipProtocol.MAX_IDENTIFIER_LENGTH
         && value.chars().noneMatch(Character::isISOControl), Status.INVALID_REQUEST, "Invalid membership identifier");
   }
 

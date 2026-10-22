@@ -261,7 +261,7 @@ final class OfflineSegmentCatalog {
         "Offline catalog references an absent, mismatched or future dependency");
   }
 
-  private static void validateContent(Content content) {
+  static void validateContent(Content content) {
     require(content != null && content.tableObjectId() != null && content.segmentObjectId() != null,
         Status.INVALID_REQUEST, "Offline content requires complete table and segment identities");
     tableName(content.tableName());

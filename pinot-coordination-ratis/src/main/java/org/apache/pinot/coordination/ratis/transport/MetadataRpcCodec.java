@@ -184,6 +184,9 @@ final class MetadataRpcCodec {
         case TASK_QUEUE -> value.setTaskQueue(TaskRpcCodec.queue(TaskProtocol.decodeQueue(record.value())));
         case TASK -> value.setTask(TaskRpcCodec.task(TaskProtocol.decodeTask(record.value())));
         case TASK_ATTEMPT -> value.setTaskAttempt(TaskRpcCodec.attempt(TaskProtocol.decodeAttempt(record.value())));
+        case TASK_SCHEDULE -> value.setTaskSchedule(TaskRpcCodec.schedule(TaskProtocol.decodeSchedule(record.value())));
+        case TASK_PUBLICATION -> value.setTaskPublication(
+            TaskRpcCodec.publication(TaskProtocol.decodePublication(record.value())));
         default -> throw new IOException("Unsupported catalog record kind");
       }
       builder.setValue(value);
@@ -207,6 +210,8 @@ final class MetadataRpcCodec {
       case TASK_QUEUE -> RecordKind.TASK_QUEUE;
       case TASK -> RecordKind.TASK;
       case TASK_ATTEMPT -> RecordKind.TASK_ATTEMPT;
+      case TASK_SCHEDULE -> RecordKind.TASK_SCHEDULE;
+      case TASK_PUBLICATION -> RecordKind.TASK_PUBLICATION;
       default -> throw new IllegalArgumentException("Unknown catalog record kind");
     };
   }
@@ -335,6 +340,16 @@ final class MetadataRpcCodec {
       case TASK_ATTEMPT:
         if (kind == RecordKind.TASK_ATTEMPT) {
           return typedValue(TaskRpcCodec.attempt(value.getTaskAttempt()));
+        }
+        break;
+      case TASK_SCHEDULE:
+        if (kind == RecordKind.TASK_SCHEDULE) {
+          return typedValue(TaskRpcCodec.schedule(value.getTaskSchedule()));
+        }
+        break;
+      case TASK_PUBLICATION:
+        if (kind == RecordKind.TASK_PUBLICATION) {
+          return typedValue(TaskRpcCodec.publication(value.getTaskPublication()));
         }
         break;
       default:

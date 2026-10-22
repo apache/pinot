@@ -26,7 +26,7 @@ import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.Role;
 
 /// Current certificate-to-participant authority, separate from full controller metadata access. Implementations must
 /// be thread-safe, nonblocking and return null to deny access. Every operation rechecks the current binding; a prior
-/// token cannot supply its own identity, role or capabilities. Minion membership is outside this implementation slice.
+/// token cannot supply its own identity, role or capabilities.
 @FunctionalInterface
 public interface ParticipantAccessPolicy {
   @Nullable
@@ -37,9 +37,10 @@ public interface ParticipantAccessPolicy {
   record ParticipantIdentity(String participantId, Role role, Set<Capability> capabilities) {
     public ParticipantIdentity {
       if (participantId == null || participantId.isBlank() || participantId.length() > 128 || role == null
-          || role == Role.MINION || capabilities == null
+          || capabilities == null
           || (role != Role.BROKER && capabilities.contains(Capability.BROKER_QUERY))
-          || (role != Role.SERVER && capabilities.contains(Capability.SERVER_QUERY))) {
+          || (role != Role.SERVER && capabilities.contains(Capability.SERVER_QUERY))
+          || (role != Role.MINION && capabilities.contains(Capability.MINION_TASK))) {
         throw new IllegalArgumentException("Invalid supported participant identity, role or capabilities");
       }
       capabilities = Set.copyOf(capabilities);

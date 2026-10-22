@@ -174,14 +174,12 @@ public class PinotServiceManager {
 
   public String startMinion(String minionStarterClassName, PinotConfiguration minionConf)
       throws Exception {
-    if (CoordinationBackend.from(minionConf) == CoordinationBackend.RATIS) {
-      throw new IllegalArgumentException("Ratis minion startup is not supported");
-    }
     LOGGER.info("Trying to start Pinot Minion...");
     if (!minionConf.containsKey(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME)) {
       minionConf.setProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, _clusterName);
     }
-    if (!minionConf.containsKey(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER)) {
+    if (CoordinationBackend.from(minionConf) == CoordinationBackend.HELIX
+        && !minionConf.containsKey(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER)) {
       minionConf.setProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER, _zkAddress);
     }
     ServiceStartable minionStarter = getServiceStartable(minionStarterClassName);

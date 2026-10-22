@@ -40,6 +40,7 @@ import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
 import org.apache.pinot.common.config.TlsConfig;
+import org.apache.pinot.common.coordination.CoordinationBackend;
 import org.apache.pinot.common.metrics.MinionGauge;
 import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.metrics.MinionMetrics;
@@ -56,6 +57,7 @@ import org.apache.pinot.common.version.PinotVersion;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.core.util.trace.ContinuousJfrStarter;
+import org.apache.pinot.minion.coordination.NativeMinionRuntime;
 import org.apache.pinot.minion.event.DefaultMinionTaskObserverStorageManager;
 import org.apache.pinot.minion.event.EventObserverFactoryRegistry;
 import org.apache.pinot.minion.event.MinionEventObserverFactory;
@@ -88,6 +90,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
 
   private static final String HTTPS_ENABLED = "enabled";
 
+  private NativeMinionRuntime _nativeRuntime;
   protected MinionConf _config;
   protected String _hostname;
   protected int _port;
@@ -105,6 +108,12 @@ public abstract class BaseMinionStarter implements ServiceStartable {
   public void init(PinotConfiguration config)
       throws Exception {
     _config = new MinionConf(config.toMap());
+    if (CoordinationBackend.from(_config) == CoordinationBackend.RATIS) {
+      applyCustomConfigs(_config);
+      _nativeRuntime = new NativeMinionRuntime(_config);
+      _instanceId = _nativeRuntime.instanceId();
+      return;
+    }
     String zkAddress = _config.getZkAddress();
     String helixClusterName = _config.getHelixClusterName();
     ServiceStartableUtils.applyClusterConfig(_config, zkAddress, helixClusterName, ServiceRole.MINION);
@@ -161,6 +170,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
   ///
   /// This is for pluggable task executor factories.
   public void registerTaskExecutorFactory(PinotTaskExecutorFactory taskExecutorFactory) {
+    Preconditions.checkState(_nativeRuntime == null, "Native minions require qualified fenced task adapters");
     _taskExecutorFactoryRegistry.registerTaskExecutorFactory(taskExecutorFactory);
   }
 
@@ -168,6 +178,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
   ///
   /// This is for pluggable event observer factories.
   public void registerEventObserverFactory(MinionEventObserverFactory eventObserverFactory) {
+    Preconditions.checkState(_nativeRuntime == null, "Native minions do not register legacy task observers");
     _eventObserverFactoryRegistry.registerEventObserverFactory(eventObserverFactory);
   }
 
@@ -212,6 +223,10 @@ public abstract class BaseMinionStarter implements ServiceStartable {
   @Override
   public void start()
       throws Exception {
+    if (_nativeRuntime != null) {
+      _nativeRuntime.start();
+      return;
+    }
     LOGGER.info("Starting Pinot minion: {} (Version: {})", _instanceId, PinotVersion.VERSION);
     LOGGER.info("Minion configs: {}", new PinotAppConfigs(getConfig()).toJSONString());
     long startTimeMs = System.currentTimeMillis();
@@ -373,6 +388,14 @@ public abstract class BaseMinionStarter implements ServiceStartable {
   /// Stops the Pinot Minion instance.
   @Override
   public void stop() {
+    if (_nativeRuntime != null) {
+      try {
+        _nativeRuntime.close();
+      } catch (Exception e) {
+        throw new IllegalStateException("Failed to stop native minion", e);
+      }
+      return;
+    }
     try {
       LOGGER.info("Closing PinotFS classes");
       PinotFSFactory.shutdown();

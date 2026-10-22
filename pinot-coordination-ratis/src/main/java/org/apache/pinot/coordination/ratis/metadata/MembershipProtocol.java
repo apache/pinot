@@ -38,6 +38,8 @@ public final class MembershipProtocol {
   public static final String CONTROL_NAME = "control";
   public static final int MAX_RENEWALS = MetadataProtocol.MAX_MUTATIONS;
   public static final int MAX_ENDPOINTS = 16;
+  public static final int MAX_IDENTIFIER_LENGTH = 1024;
+  public static final int MAX_ENDPOINT_VALUE_LENGTH = 2048;
 
   private MembershipProtocol() {
   }
@@ -46,9 +48,9 @@ public final class MembershipProtocol {
     CONTROLLER, BROKER, SERVER, MINION
   }
 
-  /// These capabilities never authorize ingestion, ownership, publication or destructive cleanup.
+  /// Capabilities select a protocol lane; task publication additionally requires exact task/attempt and output grants.
   public enum Capability {
-    BROKER_QUERY, SERVER_QUERY
+    BROKER_QUERY, SERVER_QUERY, MINION_TASK
   }
 
   public record ParticipantToken(UUID historyId, String participantId, Role role, UUID incarnation,

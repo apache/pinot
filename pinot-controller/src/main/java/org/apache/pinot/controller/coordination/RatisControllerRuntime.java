@@ -46,10 +46,12 @@ import org.apache.pinot.controller.api.resources.WebApplicationExceptionMapper;
 import org.apache.pinot.coordination.ratis.RatisMetadataAccess;
 import org.apache.pinot.coordination.ratis.RatisMetadataStore;
 import org.apache.pinot.coordination.ratis.RatisMetadataStore.MembershipClockSettings;
+import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.Capability;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.ConfigurePolicy;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.GetControl;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.Policy;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.Response;
+import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.Role;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.MembershipCommand;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.MembershipQuery;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Status;
@@ -73,8 +75,8 @@ import static java.util.Objects.requireNonNull;
 
 
 /// Owns one embedded voter, its qualified membership clock and authenticated metadata endpoint. Lifecycle methods
-/// are serialized; the normal HTTP/UI shell exposes committed metadata management, without scheduling or query
-/// readiness.
+/// are serialized; the normal HTTP/UI shell exposes committed metadata management and bounded native task scheduling.
+/// Query readiness remains disabled.
 /// The current voter transport remains restricted to three loopback peers. No Helix resources are constructed.
 public final class RatisControllerRuntime implements AutoCloseable, ServiceStatus.ServiceStatusCallback {
   private final ControllerConf _config;
@@ -101,6 +103,8 @@ public final class RatisControllerRuntime implements AutoCloseable, ServiceStatu
   private NativeControllerMetadata _metadata;
   @Nullable
   private NativeControllerTableSizeResource _tableSizes;
+  @Nullable
+  private NativeControllerTasks _tasks;
   private volatile boolean _started;
   private volatile boolean _closed;
   private volatile String _status = "Native controller has not started";
@@ -151,7 +155,10 @@ public final class RatisControllerRuntime implements AutoCloseable, ServiceStatu
       _endpoint = new MetadataGrpcServer(_address, _certificate, _privateKey, _trust, _access, controllers, _access,
           fingerprint -> {
             ParticipantIdentity identity = participants.authorize(fingerprint);
-            return identity != null && identity.capabilities().isEmpty() ? identity : null;
+            return identity != null && (identity.capabilities().isEmpty()
+                || identity.role() == Role.MINION
+                && identity.capabilities().equals(Set.of(Capability.MINION_TASK)))
+                ? identity : null;
           }, audit, Limits.defaults());
       startHttp(accessControlFactory);
       checkClock();
@@ -186,6 +193,9 @@ public final class RatisControllerRuntime implements AutoCloseable, ServiceStatu
         PinotControllerAppConfigs.class, PinotControllerHealthCheck.class, WebApplicationExceptionMapper.class));
     _tableSizes = new NativeControllerTableSizeResource(metadata, _config, accessControlFactory, metrics);
     _adminApp.register(_tableSizes);
+    _tasks =
+        new NativeControllerTasks(requireNonNull(_access), requireNonNull(_access), _history, _instanceId, _config);
+    _adminApp.register(new NativeControllerTaskResource(_tasks, accessControlFactory));
     Instant startTime = Instant.now();
     _adminApp.registerBinder(new AbstractBinder() {
       @Override
@@ -200,6 +210,7 @@ public final class RatisControllerRuntime implements AutoCloseable, ServiceStatu
     });
     _adminApp.registerBinder(new AuditServiceBinder(metadata, ServiceRole.CONTROLLER, metrics));
     _adminApp.start(_listeners, metrics);
+    _tasks.start();
   }
 
   private static void validateBootstrapPolicy(Policy policy) {
@@ -303,7 +314,7 @@ public final class RatisControllerRuntime implements AutoCloseable, ServiceStatu
     _closed = true;
     _started = false;
     Exception failure = null;
-    AutoCloseable[] resources = {_adminApp == null ? null : _adminApp::stop, _tableSizes, _metadata,
+    AutoCloseable[] resources = {_adminApp == null ? null : _adminApp::stop, _tasks, _tableSizes, _metadata,
         _endpoint, _access, _store, _provider};
     for (AutoCloseable resource : resources) {
       if (resource != null) {

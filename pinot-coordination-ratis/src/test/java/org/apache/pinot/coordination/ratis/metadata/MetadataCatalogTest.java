@@ -497,7 +497,7 @@ public class MetadataCatalogTest {
     assertEquals(catalog.captureSnapshot(), before, "A rejected old membership log cannot advance apply");
     assertEquals(MembershipProtocol.decodeResponse(catalog.execute(current, 1, 2)).status(), Status.OK);
     JsonNode initialized = catalog.captureSnapshot();
-    assertEquals(initialized.path("formatVersion").asInt(), 9);
+    assertEquals(initialized.path("formatVersion").asInt(), 10);
     for (int version = 3; version <= 7; version++) {
       ObjectNode legacy = initialized.deepCopy();
       legacy.put("formatVersion", version);

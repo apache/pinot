@@ -541,7 +541,12 @@ Validate the shared query wire context and deadline/permit composition:
   -Dsurefire.failIfNoSpecifiedTests=false test
 ```
 
+The native minion execution slice adds bounded durable schedules, the normal `StartMinion` lifecycle and fenced
+publication for actual OFFLINE JSON-lines segment generation. Its explicit configuration, REST endpoints and remaining
+plugin/API gaps are documented in [MINION-TASK-PLAN.md](MINION-TASK-PLAN.md). Helix/ZK stays the default and native query
+listeners stay disabled.
+
 Metadata durability, distribution, membership and starter wiring are parts of the replacement. Full role integration,
-qualified liveness and query fencing, controller ownership integration, assignment and state transitions, realtime
-ingestion, minion tasks, migration and a standalone Ratis quickstart require their own integration and qualification
-before a supported replacement is claimed.
+qualified liveness and query fencing, automatic assignment and state transitions, realtime ingestion, general minion
+plugin/API parity, migration and a standalone Ratis quickstart require their own integration and qualification before
+a supported replacement is claimed.

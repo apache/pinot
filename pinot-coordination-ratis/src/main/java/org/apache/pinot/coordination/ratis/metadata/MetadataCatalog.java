@@ -74,6 +74,7 @@ import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Status;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.StreamTipResult;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.TaskCommand;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.TaskSessionCommand;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.TaskSessionQuery;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Transaction;
 import org.apache.pinot.coordination.ratis.metadata.OfflineInstallationProtocol.InstallationSnapshot;
 import org.apache.pinot.coordination.ratis.metadata.OfflineInstallationProtocol.WorkResult;
@@ -81,6 +82,7 @@ import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.Assig
 import org.apache.pinot.coordination.ratis.metadata.OperationProtocol.AssignedOfflineSegmentReload;
 import org.apache.pinot.coordination.ratis.metadata.OperationProtocol.OperationState;
 import org.apache.pinot.coordination.ratis.metadata.OperationProtocol.State;
+import org.apache.pinot.coordination.ratis.metadata.TaskProtocol.WorkSnapshot;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
@@ -97,7 +99,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 public final class MetadataCatalog {
   private static final int MAX_IDENTIFIER_LENGTH = 1024;
   private static final int MAX_RESULT_BYTES = 2 * MetadataProtocol.MAX_COMMAND_BYTES;
-  private static final int SNAPSHOT_FORMAT_VERSION = 9;
+  private static final int SNAPSHOT_FORMAT_VERSION = 10;
   private static final int JOURNAL_POLICY_VERSION = 1;
   static final int MAX_JOURNAL_TRANSACTIONS = 1024;
   static final int MAX_JOURNAL_BYTES = 16 * MetadataProtocol.MAX_COMMAND_BYTES;
@@ -266,6 +268,13 @@ public final class MetadataCatalog {
               Status.FENCED, "Installation outcome belongs to another participant session");
           yield readOutcome(session.request());
         }
+        case TaskSessionQuery session -> {
+          TaskCatalog.validateSession(session.minion(), coordinationView());
+          require(session.request() != null
+              && TaskProtocol.clientId(session.minion()).equals(session.request().clientId()),
+              Status.FENCED, "Task outcome belongs to another participant session");
+          yield readOutcome(session.request());
+        }
         case GetInstallationWork ignored -> throw new IllegalStateException("Installation work dispatch failed");
         case GetStreamTip ignored -> throw new IllegalStateException("Stream tip dispatch failed");
         case MembershipQuery ignored -> throw new IllegalStateException("Membership dispatch failed");
@@ -322,6 +331,70 @@ public final class MetadataCatalog {
   /// Returns immutable committed control state for the local leader clock. This is not a linearizable remote read.
   public synchronized MembershipProtocol.ControlState membershipControl() {
     return _membership.control();
+  }
+
+  /// One complete actionable own-minion image at the read barrier. Terminal history is resolved through outcomes;
+  /// it does not consume the work image bound. Absence revokes work, never certifies successful completion.
+  public synchronized WorkSnapshot taskSnapshot(ParticipantToken minion, int maxRecords, int maxBytes)
+      throws IOException {
+    try {
+      require(maxRecords > 0 && maxRecords <= TaskProtocol.MAX_SNAPSHOT_RECORDS
+          && maxBytes >= TaskProtocol.MIN_SNAPSHOT_BYTES && maxBytes <= TaskProtocol.MAX_SNAPSHOT_BYTES,
+          Status.INVALID_REQUEST, "Invalid task snapshot bounds");
+      OperationCatalog.View view = coordinationView();
+      TaskCatalog.validateSession(minion, view);
+      WorkSnapshot header = new WorkSnapshot(Status.OK, revision(_lastAppliedIndex), "",
+          view.participant(minion.participantId()), List.of(), view.control());
+      long bytes = MetadataProtocol.encodeValue(header).length;
+      require(bytes <= maxBytes, Status.RESPONSE_TOO_LARGE, "Task snapshot header exceeds its byte bound");
+      Map<UUID, CatalogRecord> selected = new HashMap<>();
+      for (CatalogRecord record : _records.values()) {
+        if (record.kind() != RecordKind.TASK || record.deleted()) {
+          continue;
+        }
+        TaskProtocol.TaskState task = TaskProtocol.decodeTask(record.value());
+        if (!task.input().minionId().equals(minion.participantId())
+            || (task.status() != TaskProtocol.TaskStatus.READY && task.status() != TaskProtocol.TaskStatus.RUNNING)) {
+          continue;
+        }
+        bytes = addTaskRecord(selected, record, bytes, maxRecords, maxBytes);
+        CatalogRecord queue = view.record(RecordKind.TASK_QUEUE, TaskProtocol.queueName(task.input().queue()));
+        require(queue != null, Status.NOT_READY, "Assigned task queue is absent");
+        bytes = addTaskRecord(selected, queue, bytes, maxRecords, maxBytes);
+        for (ObjectVersion dependency : task.dependencies()) {
+          CatalogRecord input = view.record(dependency.objectId());
+          require(input != null, Status.NOT_READY, "Assigned task dependency is absent");
+          bytes = addTaskRecord(selected, input, bytes, maxRecords, maxBytes);
+        }
+        if (task.status() == TaskProtocol.TaskStatus.RUNNING) {
+          CatalogRecord attempt = view.record(RecordKind.TASK_ATTEMPT,
+              TaskProtocol.attemptName(task.taskId(), task.attempt()));
+          require(attempt != null, Status.NOT_READY, "Assigned task attempt is absent");
+          bytes = addTaskRecord(selected, attempt, bytes, maxRecords, maxBytes);
+        }
+      }
+      List<CatalogRecord> records = selected.values().stream().sorted(Comparator.comparing(CatalogRecord::kind)
+          .thenComparing(CatalogRecord::name)).toList();
+      return new WorkSnapshot(Status.OK, header.revision(), "", header.participant(), records, header.control());
+    } catch (Rejection e) {
+      return new WorkSnapshot(e._status, revision(_lastAppliedIndex), e.getMessage(), null, List.of(), null);
+    } catch (CoordinationRejection e) {
+      return new WorkSnapshot(e.status(), revision(_lastAppliedIndex), e.getMessage(), null, List.of(), null);
+    }
+  }
+
+  /// Use maintained canonical sizes before adding records, so oversized work cannot force large serialization
+  /// while holding the Raft apply monitor. The transport separately enforces its protobuf byte budget.
+  private long addTaskRecord(Map<UUID, CatalogRecord> selected, CatalogRecord record, long bytes, int maxRecords,
+      int maxBytes) {
+    if (selected.containsKey(record.objectId())) {
+      return bytes;
+    }
+    long nextBytes = bytes + _recordBytes.get(record.objectId()) + (selected.isEmpty() ? 0 : 1);
+    require(selected.size() < maxRecords && nextBytes <= maxBytes, Status.RESPONSE_TOO_LARGE,
+        "Assigned task image exceeds its record or byte bound");
+    selected.put(record.objectId(), record);
+    return nextBytes;
   }
 
   /// Captures one complete own-session projection after the caller's consensus read barrier. Readiness is not
@@ -454,6 +527,17 @@ public final class MetadataCatalog {
       @Override
       public CatalogRecord record(UUID objectId) {
         return records.get(objectId);
+      }
+
+      @Override
+      public List<CatalogRecord> records(RecordKind kind) {
+        return records.values().stream().filter(record -> record.kind() == kind && !record.deleted()).toList();
+      }
+
+      @Override
+      public long recordBytes(CatalogRecord record) throws IOException {
+        Integer known = _records.get(record.objectId()) == record ? _recordBytes.get(record.objectId()) : null;
+        return known == null ? MetadataProtocol.encodeValue(record).length : known;
       }
 
       @Override
@@ -757,7 +841,7 @@ public final class MetadataCatalog {
             legacy.journalFloor(), legacy.journal(), new MembershipState(_historyId).snapshot());
       } else {
         Snapshot decoded = MetadataProtocol.fromTree(detached, Snapshot.class);
-        restored = decoded.formatVersion() == 8
+        restored = decoded.formatVersion() == 8 || decoded.formatVersion() == 9
             ? new Snapshot(SNAPSHOT_FORMAT_VERSION, decoded.clusterId(), decoded.historyId(),
                 decoded.lastAppliedIndex(), decoded.records(), decoded.clients(), decoded.journalPolicyVersion(),
                 decoded.journalFloor(), decoded.journal(), decoded.membership())
@@ -1196,7 +1280,8 @@ public final class MetadataCatalog {
   private static int minimumSnapshotFormat(CatalogRecord record) {
     return switch (record.kind()) {
       case CLUSTER_CONFIG, SCHEMA, TABLE_CONFIG -> 1;
-      case MEMBERSHIP_CONTROL, PARTICIPANT -> 8;
+      case MEMBERSHIP_CONTROL -> 8;
+      case PARTICIPANT -> record.value().path("capabilities").toString().contains("MINION_TASK") ? 10 : 8;
       case OWNER_LAYOUT, OWNER_ASSIGNMENT -> 4;
       case CONTROLLER_OPERATION -> {
         JsonNode value = record.value();
@@ -1214,7 +1299,10 @@ public final class MetadataCatalog {
       }
       case OFFLINE_SEGMENT_CONTENT, OFFLINE_REPLICA_ASSIGNMENT -> 5;
       case OFFLINE_INSTALLATION -> 6;
-      case TASK_QUEUE, TASK, TASK_ATTEMPT -> 9;
+      case TASK_SCHEDULE, TASK_PUBLICATION -> 10;
+      case TASK_QUEUE -> 9;
+      case TASK, TASK_ATTEMPT -> record.value().at("/input/outputPolicy").isObject()
+          || "SUCCEEDED".equals(record.value().path("status").asText()) ? 10 : 9;
     };
   }
 

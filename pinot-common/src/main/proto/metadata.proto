@@ -49,6 +49,14 @@ service ServerInstallationService {
   rpc Snapshot(InstallationSnapshotRequest) returns (InstallationSnapshot);
 }
 
+// A separate bounded lane for a MINION's own tasks. Identity and capability come exclusively from current TLS
+// policy. These requests cannot access another minion's input metadata or perform generic catalog mutations.
+service MinionTaskService {
+  rpc Execute(TaskCommandRequest) returns (CommandResult);
+  rpc Work(TaskWorkRequest) returns (TaskWorkResult);
+  rpc Outcome(TaskOutcomeRequest) returns (CommandResult);
+}
+
 enum RecordKind {
   RECORD_KIND_UNSPECIFIED = 0;
   CLUSTER_CONFIG = 1;
@@ -65,6 +73,8 @@ enum RecordKind {
   TASK_QUEUE = 12;
   TASK = 13;
   TASK_ATTEMPT = 14;
+  TASK_SCHEDULE = 15;
+  TASK_PUBLICATION = 16;
 }
 
 enum ResultStatus {
@@ -106,6 +116,8 @@ message CatalogValue {
     TaskQueueState task_queue = 12;
     TaskExecutionState task = 13;
     TaskAttemptState task_attempt = 14;
+    TaskScheduleState task_schedule = 15;
+    TaskPublicationState task_publication = 16;
   }
 }
 
@@ -218,6 +230,7 @@ enum ServingCapability {
   SERVING_CAPABILITY_UNSPECIFIED = 0;
   BROKER_QUERY = 1;
   SERVER_QUERY = 2;
+  MINION_TASK = 3;
 }
 
 message ParticipantToken {
@@ -568,14 +581,16 @@ message InstallationWorkResult {
   InstallationWork work = 4;
 }
 
-// Read/feed projections only. No task command or execution service is exposed by this protocol.
+// Typed task state and execution projection. Worker requests omit participant and durable client identities.
 message TaskQueueKey { string table_name = 1; string table_object_id = 2; string task_type = 3; }
 message TaskInput {
   TaskQueueKey queue = 1;
   string minion_id = 2;
   map<string, string> configs = 3;
   int32 max_attempts = 4;
+  TaskOutputPolicy output_policy = 5;
 }
+message TaskOutputPolicy { string root_uri = 1; int32 max_outputs = 2; }
 message TaskQueueState {
   string history_id = 1;
   TaskQueueKey queue = 2;
@@ -591,6 +606,7 @@ message TaskExecutionState {
     RETRYABLE_FAILED = 4;
     FATAL_FAILED = 5;
     CANCELLED = 6;
+    SUCCEEDED = 7;
   }
   string history_id = 1;
   string task_id = 2;
@@ -609,6 +625,7 @@ message TaskAttemptState {
     RETRYABLE_FAILED = 3;
     FATAL_FAILED = 4;
     FENCED = 5;
+    SUCCEEDED = 6;
   }
   string history_id = 1;
   string task_id = 2;
@@ -618,4 +635,88 @@ message TaskAttemptState {
   int64 claimed_index = 6;
   State state = 7;
   TaskProgress progress = 8;
+}
+message TaskScheduleState {
+  string history_id = 1;
+  string schedule_id = 2;
+  TaskInput input = 3;
+  repeated ObjectVersion dependencies = 4;
+  OwnerToken controller = 5;
+  int64 first_round = 6;
+  int64 interval_rounds = 7;
+  int64 max_occurrences = 8;
+  int64 fired_occurrences = 9;
+  int64 policy_version = 10;
+}
+message TaskPublicationState {
+  string history_id = 1;
+  string task_id = 2;
+  int64 attempt = 3;
+  ParticipantToken minion = 4;
+  repeated OfflineSegmentContent outputs = 5;
+  int64 committed_index = 6;
+}
+message TaskClaim { string task_id = 1; int64 expected_version = 2; }
+message TaskCheckpoint {
+  string task_id = 1;
+  int64 expected_version = 2;
+  int64 attempt = 3;
+  TaskProgress progress = 4;
+}
+message TaskComplete {
+  string task_id = 1;
+  int64 expected_version = 2;
+  int64 attempt = 3;
+  TaskAttemptState.State result = 4;
+  TaskProgress progress = 5;
+}
+// Publication is constrained by the captured task output policy and exact active attempt. It is never a generic
+// metadata mutation; the consensus transition commits content, provenance and terminal task outcome atomically.
+message TaskPublishOfflineOutputs {
+  string task_id = 1;
+  int64 expected_version = 2;
+  int64 attempt = 3;
+  repeated OfflineSegmentContent outputs = 4;
+  TaskProgress progress = 5;
+}
+message SequencedTaskOperation {
+  int64 client_epoch = 1;
+  string stream_id = 2;
+  int64 sequence = 3;
+  oneof operation {
+    TaskClaim claim = 4;
+    TaskCheckpoint checkpoint = 5;
+    TaskComplete complete = 6;
+    TaskPublishOfflineOutputs publish = 7;
+  }
+}
+message TaskCommandRequest {
+  string history_id = 1;
+  ParticipantSession session = 2;
+  oneof command {
+    RegisterClient register = 3;
+    Acknowledge acknowledge = 4;
+    SequencedTaskOperation operation = 5;
+  }
+}
+// The complete own-session projection includes dependencies for precisely the tasks assigned to this MINION.
+// Oversize returns RESPONSE_TOO_LARGE without partial records. This image can advance its applied revision.
+message TaskWorkRequest {
+  string history_id = 1;
+  ParticipantSession session = 2;
+  int32 max_records = 3;
+  int32 max_bytes = 4;
+}
+message TaskWorkResult {
+  ResultStatus status = 1;
+  Revision revision = 2;
+  string detail = 3;
+  ParticipantState participant = 4;
+  repeated CatalogRecord records = 5;
+  MembershipControl control = 6;
+}
+message TaskOutcomeRequest {
+  string history_id = 1;
+  ParticipantSession session = 2;
+  OutcomeQuery outcome = 3;
 }

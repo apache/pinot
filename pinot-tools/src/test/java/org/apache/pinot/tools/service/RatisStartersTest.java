@@ -58,6 +58,7 @@ import org.apache.pinot.controller.coordination.RatisControllerProvider;
 import org.apache.pinot.coordination.ratis.RatisMetadataStore;
 import org.apache.pinot.coordination.ratis.RatisMetadataStore.MembershipClockSettings;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol;
+import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.Capability;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.Policy;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.Role;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol;
@@ -173,9 +174,11 @@ public class RatisStartersTest {
       CertificateFiles controller = certificate(directory, "controller");
       CertificateFiles broker = certificate(directory, "broker");
       CertificateFiles server = certificate(directory, "server");
+      CertificateFiles minion = certificate(directory, "minion");
       Path trust = directory.resolve("clients.pem");
       Files.writeString(trust, Files.readString(controller.certificate()) + Files.readString(broker.certificate())
-          + Files.readString(server.certificate()));
+          + Files.readString(server.certificate()) + Files.readString(minion.certificate()));
+      Path taskOutput = Files.createDirectories(directory.resolve("task-output"));
       int[] ports = ports(12);
       String history = UUID.randomUUID().toString();
       String cluster = UUID.randomUUID().toString();
@@ -215,6 +218,9 @@ public class RatisStartersTest {
         config.put("test.controllerFingerprint", controller.fingerprint());
         config.put("test.brokerFingerprint", broker.fingerprint());
         config.put("test.serverFingerprint", server.fingerprint());
+        config.put("test.minionFingerprint", minion.fingerprint());
+        config.put(PREFIX + "controller.tasks.outputRoot", taskOutput.toString());
+        config.put(PREFIX + "controller.tasks.pollMillis", 100L);
         controllers.add(config);
         starts.add(starters.submit(() -> manager.startRole(ServiceRole.CONTROLLER, config)));
       }
@@ -412,6 +418,8 @@ public class RatisStartersTest {
         awaitSize(http, controllerUrl + "/tables/orders/size", "reportedSizeInBytes", expectedBytes);
         assertEquals(ServiceStatus.getServiceStatus(BROKER), ServiceStatus.Status.BAD);
         assertEquals(ServiceStatus.getServiceStatus(SERVER), ServiceStatus.Status.GOOD);
+        runNativeTask(manager, directory, history, endpoints, minion, controller, http, controllerUrl, taskOutput,
+            new PinotConfiguration(controllers.getFirst()), serverState.getParticipant(), serverAdmin);
         for (int i = 6; i < 8; i++) {
           try (ServerSocket unused = new ServerSocket(ports[i])) {
             assertTrue(unused.isBound(), "Native query listener must remain closed");
@@ -466,8 +474,129 @@ public class RatisStartersTest {
       // Participants retire while a quorum remains available; the manager's arbitrary iteration order is unsuitable.
       manager.stopPinotInstanceById(BROKER);
       manager.stopPinotInstanceById(SERVER);
+      manager.stopPinotInstanceById("Minion_native_test");
       manager.stopAll();
       FileUtils.deleteDirectory(directory.toFile());
+    }
+  }
+
+  private static void runNativeTask(PinotServiceManager manager, Path directory, String history, String endpoints,
+      CertificateFiles minion, CertificateFiles controller, HttpClient http, String controllerUrl, Path output,
+      PinotConfiguration voterConfig, MetadataRpc.ParticipantToken server, String serverAdmin) throws Exception {
+    Path sourceRoot = Files.createDirectories(directory.resolve("task-source"));
+    Path source = sourceRoot.resolve("rows.json");
+    Files.writeString(source, "{\"id\":1}\n{\"id\":2}\n");
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("nativeTasks")
+        .addSingleValueDimension("id", DataType.LONG).build();
+    Map<String, String> headers = Map.of("If-None-Match", "*", "Idempotency-Key", UUID.randomUUID().toString());
+    HttpResponse<String> created = write(http, controllerUrl + "/schemas", "POST", schema.toSingleLineJsonString(),
+        headers);
+    assertEquals(created.statusCode(), 200, created.body());
+    TableConfig table = new TableConfigBuilder(TableType.OFFLINE).setTableName("nativeTasks").setNumReplicas(1).build();
+    created = write(http, controllerUrl + "/tables", "POST", JsonUtils.objectToString(table),
+        Map.of("If-None-Match", "*", "Idempotency-Key", UUID.randomUUID().toString()));
+    assertEquals(created.statusCode(), 200, created.body());
+    Map<String, Object> config = tls(history, minion, controller.certificate());
+    config.put(PREFIX + "participantId", "Minion_native_test");
+    config.put(PREFIX + "metadata.endpoints", endpoints);
+    config.put("pinot.minion.instance.id", "Minion_native_test");
+    config.put("dataDir", directory.resolve("minion-data").toString());
+    config.put(PREFIX + "minion.sourceRoot", sourceRoot.toString());
+    config.put(PREFIX + "minion.outputRoot", output.toString());
+    config.put(PREFIX + "minion.pollMillis", 100L);
+    config.put(PREFIX + "heartbeatMillis", 100L);
+    assertEquals(manager.startRole(ServiceRole.MINION, config), "Minion_native_test");
+    try {
+      String url = controllerUrl + "/tasks/native/nativeTasks";
+      String schedule = url + "/schedules/" + UUID.randomUUID();
+      String sourceSha256 = HexFormat.of().formatHex(
+          MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(source)));
+      String body = JsonUtils.objectToString(Map.of("minionId", "Minion_native_test", "sourceUri", source.toUri(),
+          "sourceSha256", sourceSha256,
+          "firstRound", 0, "intervalRounds", 0, "occurrences", 1, "maxAttempts", 2));
+      HttpResponse<String> submitted = write(http, schedule, "PUT", body, Map.of());
+      assertEquals(submitted.statusCode(), 200, submitted.body());
+      submitted = write(http, schedule, "PUT", body, Map.of());
+      assertEquals(submitted.statusCode(), 200, "Repeating the immutable schedule must not create another occurrence");
+      long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+      HttpResponse<String> state;
+      do {
+        state = get(http, url, true);
+        if (state.statusCode() == 200
+            && JsonUtils.stringToJsonNode(state.body()).path("publications").size() == 1) {
+          break;
+        }
+        Thread.sleep(100);
+      } while (System.nanoTime() < deadline);
+      assertEquals(state.statusCode(), 200, state.body());
+      var snapshot = JsonUtils.stringToJsonNode(state.body());
+      assertEquals(snapshot.path("tasks").size(), 1, state.body());
+      assertEquals(snapshot.path("tasks").get(0).path("value").path("status").asText(), "SUCCEEDED", state.body());
+      assertEquals(snapshot.path("schedules").get(0).path("value").path("firedOccurrences").asLong(), 1L);
+      var content = snapshot.path("publications").get(0).path("value").path("outputs").get(0);
+      Path archive = Path.of(URI.create(content.path("downloadUri").asText()));
+      assertTrue(archive.toRealPath().startsWith(output.toRealPath()));
+      assertTrue(Files.size(archive) > 0);
+      assertEquals(HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(archive))),
+          content.path("contentSha256").asText());
+      Path unpacked = Files.createDirectories(directory.resolve("task-unpacked"));
+      TarCompressionUtils.untar(archive.toFile(), unpacked.toFile());
+      SegmentMetadataImpl generated = new SegmentMetadataImpl(unpacked.resolve(content.path("segmentName").asText())
+          .toFile());
+      assertEquals(generated.getTotalDocs(), 2);
+      installTaskOutput(voterConfig, server, OfflineSegmentProtocol.decodeContent(content));
+      long bytes = FileUtils.sizeOfDirectory(unpacked.resolve(content.path("segmentName").asText()).resolve("v3")
+          .toFile());
+      awaitSize(http, serverAdmin + "/tables/nativeTasks_OFFLINE/size", "diskSizeInBytes", bytes);
+      assertTrue(manager.stopPinotInstanceById("Minion_native_test"));
+      assertEquals(manager.startRole(ServiceRole.MINION, config), "Minion_native_test");
+      snapshot = JsonUtils.stringToJsonNode(get(http, url, true).body());
+      assertEquals(snapshot.path("tasks").size(), 1);
+      assertEquals(snapshot.path("publications").size(), 1);
+    } finally {
+      manager.stopPinotInstanceById("Minion_native_test");
+    }
+  }
+
+  /// Placement uses the existing trusted test protocol; the minion publishes content without acquiring controller
+  /// ownership or installation authority. This verifies the output is installable by the normal native server.
+  private static void installTaskOutput(PinotConfiguration config, MetadataRpc.ParticipantToken serverSession,
+      OfflineSegmentProtocol.Content content) throws Exception {
+    UUID history = UUID.fromString(serverSession.getHistoryId());
+    try (RatisMetadataStore.Client client = RatisMetadataStore.connect(config)) {
+      assertEquals(MetadataProtocol.decodeResult(client.execute(MetadataProtocol.encode(
+          new MetadataProtocol.RegisterClient(history, "task-install-test", UUID.randomUUID(), 0)))).status(),
+          MetadataProtocol.Status.OK);
+      CatalogRecord table = record(client, history, MetadataProtocol.RecordKind.TABLE_CONFIG, content.tableName());
+      CatalogRecord schema = record(client, history, MetadataProtocol.RecordKind.SCHEMA, "nativeTasks");
+      var layout = OwnershipProtocol.decodeLayout(record(client, history, MetadataProtocol.RecordKind.OWNER_LAYOUT,
+          OwnershipProtocol.LAYOUT_NAME).value());
+      var scope = OwnershipProtocol.tableScope(layout, content.tableName());
+      var owner = OwnershipProtocol.decodeAssignment(record(client, history,
+          MetadataProtocol.RecordKind.OWNER_ASSIGNMENT, OwnershipProtocol.name(scope)).value());
+      var token =
+          new OwnershipProtocol.OwnerToken(history, layout.generation(), scope, owner.ownerEpoch(), owner.owner());
+      var server = new MembershipProtocol.ParticipantToken(history, serverSession.getParticipantId(), Role.SERVER,
+          UUID.fromString(serverSession.getIncarnation()), serverSession.getRegistrationEpoch());
+      commit(client, new MetadataProtocol.OfflineSegmentCommand(history, "task-install-test", 1, "segments", 1,
+          new OfflineSegmentProtocol.AssignReplica(token, content.segmentObjectId(), 0, server,
+              new OfflineSegmentProtocol.Compatibility(new ObjectVersion(history, table.objectId(), table.version()),
+                  new ObjectVersion(history, schema.objectId(), schema.version())), true)));
+      var assignment = OfflineSegmentProtocol.decodeAssignment(record(client, history,
+          MetadataProtocol.RecordKind.OFFLINE_REPLICA_ASSIGNMENT,
+          OfflineSegmentProtocol.assignmentName(content.segmentObjectId(), serverSession.getParticipantId())).value());
+      UUID operationId = UUID.randomUUID();
+      var intent = new OperationProtocol.OfflineSegmentReload(content.tableName(), content.tableObjectId(),
+          content.segmentName(), content.segmentObjectId(), content.contentSha256(),
+          List.of(new OperationProtocol.TargetMaterialization(server, assignment.assignmentEpoch(),
+              assignment.materializationId())), true, true, false);
+      commit(client, new MetadataProtocol.NativeOperationCommand(history, "task-install-test", 1, "load", 1,
+          new OperationProtocol.Submit(operationId, intent)));
+      var operation = OperationProtocol.decodeOperation(record(client, history,
+          MetadataProtocol.RecordKind.CONTROLLER_OPERATION, operationId.toString()).value());
+      commit(client, new MetadataProtocol.NativeOperationCommand(history, "task-install-test", 1, "load", 2,
+          new OperationProtocol.Claim(operationId, 1, token,
+              ((OperationProtocol.AssignedOfflineSegmentReload) operation.input()).dependencies())));
     }
   }
 
@@ -700,6 +829,7 @@ public class RatisStartersTest {
     private String _controller;
     private String _broker;
     private String _server;
+    private String _minion;
     private long _permitMillis;
 
     @Override
@@ -707,6 +837,7 @@ public class RatisStartersTest {
       _controller = config.getProperty("test.controllerFingerprint");
       _broker = config.getProperty("test.brokerFingerprint");
       _server = config.getProperty("test.serverFingerprint");
+      _minion = config.getProperty("test.minionFingerprint");
       _permitMillis = config.getProperty("test.bootstrapPermitMillis", 1000L);
     }
 
@@ -729,6 +860,10 @@ public class RatisStartersTest {
         }
         if (fingerprint.equals(_server)) {
           return new ParticipantIdentity(SERVER, Role.SERVER, Set.of());
+        }
+        if (fingerprint.equals(_minion)) {
+          return new ParticipantIdentity("Minion_native_test", Role.MINION,
+              Set.of(Capability.MINION_TASK));
         }
         return fingerprint.equals(_controller) ? new ParticipantIdentity("Controller_test", Role.CONTROLLER, Set.of())
             : null;
