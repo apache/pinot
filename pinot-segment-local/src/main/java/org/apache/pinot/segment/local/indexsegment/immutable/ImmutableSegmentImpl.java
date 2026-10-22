@@ -56,7 +56,6 @@ import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
-import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
@@ -115,19 +114,18 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     _segmentMetadata = segmentMetadata;
     _indexContainerMap = columnIndexContainerMap;
     _starTreeIndexContainer = starTreeIndexContainer;
-    _dataSources =
-        new Object2ObjectOpenHashMap<>(segmentMetadata.getColumnMetadataMap().size());
+    _dataSources = new Object2ObjectOpenHashMap<>(columnIndexContainerMap.size());
 
     Map<String, Map<String, DataSource>> openStructDenseChildren = new HashMap<>();
     Map<String, DataSource> openStructSparseChildren = new HashMap<>();
     Set<String> openStructParents = new HashSet<>();
 
-    for (Map.Entry<String, ColumnMetadata> entry : segmentMetadata.getColumnMetadataMap().entrySet()) {
+    for (Map.Entry<String, ColumnIndexContainer> entry : columnIndexContainerMap.entrySet()) {
       String colName = entry.getKey();
-      ColumnMetadata columnMetadata = entry.getValue();
+      ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(colName);
 
-      if (columnMetadata instanceof ColumnMetadataImpl && ((ColumnMetadataImpl) columnMetadata).isMaterializedChild()) {
-        String parent = ((ColumnMetadataImpl) columnMetadata).getParentColumn();
+      if (columnMetadata.isMaterializedChild()) {
+        String parent = columnMetadata.getParentColumn();
         openStructParents.add(parent);
         DataSource childDs = new ImmutableDataSource(columnMetadata, _indexContainerMap.get(colName));
         if (OpenStructNaming.isSparseColumn(colName)) {
@@ -161,14 +159,14 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
               segmentMetadata.getName(), parent, fieldSpec != null ? fieldSpec.getClass().getSimpleName() : "null");
           continue;
         }
-        ColumnMetadata parentMetadata = segmentMetadata.getColumnMetadataMap().get(parent);
+        ColumnMetadata parentMetadata = segmentMetadata.getColumnMetadataFor(parent);
         List<String> sparseKeys = null;
         Map<String, Integer> sparseMultiValueKeys = null;
         Map<String, DataType> sparseKeyTypes = null;
-        if (parentMetadata instanceof ColumnMetadataImpl impl) {
-          sparseKeys = impl.getSparseKeys();
-          sparseMultiValueKeys = impl.getSparseMultiValueKeys();
-          sparseKeyTypes = impl.getSparseKeyTypes();
+        if (parentMetadata != null) {
+          sparseKeys = parentMetadata.getSparseKeys();
+          sparseMultiValueKeys = parentMetadata.getSparseMultiValueKeys();
+          sparseKeyTypes = parentMetadata.getSparseKeyTypes();
         }
         _dataSources.put(parent, new ImmutableOpenStructDataSource((ComplexFieldSpec) fieldSpec,
             openStructDenseChildren.getOrDefault(parent, Map.of()),
@@ -333,12 +331,12 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
 
   @Override
   public Set<String> getColumnNames() {
-    return _segmentMetadata.getSchema().getColumnNames();
+    return _indexContainerMap.keySet();
   }
 
   @Override
   public Set<String> getPhysicalColumnNames() {
-    return _segmentMetadata.getSchema().getPhysicalColumnNames();
+    return _segmentMetadata.getPhysicalColumnNames();
   }
 
   @Override

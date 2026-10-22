@@ -144,8 +144,24 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
   @Override
   public void reloadMetadata()
       throws Exception {
-    _segmentMetadata = new SegmentMetadataImpl(_indexDir);
-    _columnIndexDirectory.setSegmentMetadata(_segmentMetadata);
+    SegmentMetadataImpl metadata = new SegmentMetadataImpl(_indexDir);
+    _columnIndexDirectory.setSegmentMetadata(metadata);
+    SegmentMetadataImpl previous = _segmentMetadata;
+    _segmentMetadata = metadata;
+    previous.close();
+  }
+
+  /// Replaces mutable metadata with the mapped representation after all segment preprocessing has finished.
+  public void loadMappedMetadata()
+      throws IOException, ConfigurationException {
+    if (_segmentMetadata.isMapped()) {
+      return;
+    }
+    SegmentMetadataImpl metadata = SegmentMetadataImpl.loadMapped(_indexDir);
+    _columnIndexDirectory.setSegmentMetadata(metadata);
+    SegmentMetadataImpl previous = _segmentMetadata;
+    _segmentMetadata = metadata;
+    previous.close();
   }
 
   private File getSegmentPath(File segmentDirectory, SegmentVersion segmentVersion) {
@@ -286,15 +302,24 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
   @Override
   public void close()
       throws IOException {
-    _segmentLock.close();
-    synchronized (this) {
-      if (_columnIndexDirectory != null) {
-        _columnIndexDirectory.close();
-        _columnIndexDirectory = null;
+    try {
+      try {
+        _segmentLock.close();
+      } finally {
+        synchronized (this) {
+          if (_columnIndexDirectory != null) {
+            _columnIndexDirectory.close();
+            _columnIndexDirectory = null;
+          }
+          if (_starTreeIndexReader != null) {
+            _starTreeIndexReader.close();
+            _starTreeIndexReader = null;
+          }
+        }
       }
-      if (_starTreeIndexReader != null) {
-        _starTreeIndexReader.close();
-        _starTreeIndexReader = null;
+    } finally {
+      if (_segmentMetadata != null) {
+        _segmentMetadata.close();
       }
     }
   }

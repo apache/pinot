@@ -110,6 +110,7 @@ import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager.Snap
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.IndexService;
@@ -265,7 +266,7 @@ public class TablesResource {
 
             // Column stats are scoped to the caller's column filter.
             for (String column : columnSet) {
-              ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataMap().get(column);
+              ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);
               int columnLength = columnMetadata.getLengthOfLongestElement();
               if (columnLength < 0) {
                 // For raw STRING/BYTES/BIG_DECIMAL column, set the columnLength as the length of the max value.
@@ -396,11 +397,15 @@ public class TablesResource {
   static int addColumnContributions(int currentCount, ImmutableSegment segment,
       @Nullable Set<String> columnFilter) {
     int additionalCount = 0;
+    SegmentMetadata segmentMetadata = segment.getSegmentMetadata();
     if (columnFilter == null) {
-      additionalCount = segment.getSegmentMetadata().getColumnMetadataMap().size();
+      additionalCount = segmentMetadata instanceof SegmentMetadataImpl
+          ? segment.getColumnNames().size() : segmentMetadata.getColumnMetadataMap().size();
     } else {
       for (String column : columnFilter) {
-        if (segment.getSegmentMetadata().getColumnMetadataMap().containsKey(column)) {
+        if ((segmentMetadata instanceof SegmentMetadataImpl
+            ? segmentMetadata.getColumnMetadataFor(column) : segmentMetadata.getColumnMetadataMap().get(column))
+            != null) {
           additionalCount++;
         }
       }

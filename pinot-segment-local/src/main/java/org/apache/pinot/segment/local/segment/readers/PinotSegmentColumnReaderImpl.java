@@ -61,7 +61,7 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
       boolean skipDefaultNullValues) {
     this(new PinotSegmentColumnReader(indexSegment, columnName), columnName,
         indexSegment.getSegmentMetadata().getTotalDocs(),
-        indexSegment.getSegmentMetadata().getSchema().getFieldSpecFor(columnName).getDataType(),
+        indexSegment.getSegmentMetadata().getColumnMetadataFor(columnName).getFieldSpec().getDataType(),
         skipDefaultNullValues);
   }
 
