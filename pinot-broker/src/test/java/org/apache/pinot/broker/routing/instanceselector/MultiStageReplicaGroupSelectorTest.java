@@ -48,6 +48,8 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
@@ -289,6 +291,35 @@ public class MultiStageReplicaGroupSelectorTest {
     assertTrue(selectionResult.getOptionalSegmentToInstanceMap().isEmpty());
     // Old segments are available in IS/EV, so they should not be marked as unavailable; they are effectively dropped.
     assertTrue(selectionResult.getUnavailableSegments().isEmpty());
+  }
+
+  @Test
+  public void testInstancesChangeRefreshesInstancePartitionsForBothOverloads() {
+    List<String> replicaGroup0 = List.of("instance-0", "instance-1");
+    List<String> replicaGroup1 = List.of("instance-2", "instance-3");
+    InstancePartitions instancePartitions = createInstancePartitions(replicaGroup0, replicaGroup1);
+    MultiStageReplicaGroupSelector multiStageSelector = createMultiStageSelector(instancePartitions);
+
+    List<String> enabledInstances = createEnabledInstances(4);
+    IdealState idealState = new IdealState(TABLE_NAME);
+    ExternalView externalView = new ExternalView(TABLE_NAME);
+    Set<String> onlineSegments = new HashSet<>();
+    setupBasicTestEnvironment(enabledInstances, idealState, externalView, onlineSegments);
+
+    multiStageSelector.init(_tableConfig, _propertyStore, _brokerMetrics, null, Clock.systemUTC(),
+        INSTANCE_SELECTOR_CONFIG, new HashSet<>(enabledInstances), EMPTY_SERVER_MAP, idealState, externalView,
+        onlineSegments);
+    verify(multiStageSelector, times(1)).getInstancePartitions();
+
+    // Direct callers of the legacy two-argument overload must still refresh _instancePartitions.
+    multiStageSelector.onInstancesChange(new HashSet<>(enabledInstances), enabledInstances);
+    verify(multiStageSelector, times(2)).getInstancePartitions();
+
+    // The three-argument overload (used by the routing manager) dispatches through the two-argument override, so it
+    // must also refresh _instancePartitions.
+    multiStageSelector.onInstancesChange(new HashSet<>(enabledInstances), new HashSet<>(enabledInstances),
+        enabledInstances);
+    verify(multiStageSelector, times(3)).getInstancePartitions();
   }
 
   private MultiStageReplicaGroupSelector createMultiStageSelector(InstancePartitions instancePartitions) {

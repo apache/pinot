@@ -27,6 +27,9 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
+import org.apache.pinot.broker.routing.FailOpenPolicy;
+import org.apache.pinot.common.failuredetector.FailureDetector;
+import org.apache.pinot.common.failuredetector.NoOpFailureDetector;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerTimer;
@@ -50,7 +53,14 @@ public class RemoteClusterBrokerRoutingManager extends BaseBrokerRoutingManager 
 
   public RemoteClusterBrokerRoutingManager(String remoteClusterName, BrokerMetrics brokerMetrics,
       ServerRoutingStatsManager serverRoutingStatsManager, PinotConfiguration pinotConfig) {
-    super(brokerMetrics, serverRoutingStatsManager, pinotConfig);
+    this(remoteClusterName, brokerMetrics, serverRoutingStatsManager, pinotConfig, FailOpenPolicy.disabled(),
+        new NoOpFailureDetector());
+  }
+
+  public RemoteClusterBrokerRoutingManager(String remoteClusterName, BrokerMetrics brokerMetrics,
+      ServerRoutingStatsManager serverRoutingStatsManager, PinotConfiguration pinotConfig,
+      FailOpenPolicy failOpenPolicy, FailureDetector failureDetector) {
+    super(brokerMetrics, serverRoutingStatsManager, pinotConfig, failOpenPolicy, failureDetector);
     _remoteClusterName = remoteClusterName;
     _routingChangeExecutor = Executors.newSingleThreadScheduledExecutor();
     _routingChangeExecutor.scheduleAtFixedRate(this::determineRoutingChangeForTables, 0,

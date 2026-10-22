@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.broker.routing.manager;
 
+import org.apache.pinot.broker.routing.FailOpenPolicy;
+import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -33,5 +35,10 @@ public class BrokerRoutingManager extends BaseBrokerRoutingManager {
   public BrokerRoutingManager(BrokerMetrics brokerMetrics, ServerRoutingStatsManager serverRoutingStatsManager,
       PinotConfiguration pinotConfig) {
     super(brokerMetrics, serverRoutingStatsManager, pinotConfig);
+  }
+
+  public BrokerRoutingManager(BrokerMetrics brokerMetrics, ServerRoutingStatsManager serverRoutingStatsManager,
+      PinotConfiguration pinotConfig, FailOpenPolicy failOpenPolicy, FailureDetector failureDetector) {
+    super(brokerMetrics, serverRoutingStatsManager, pinotConfig, failOpenPolicy, failureDetector);
   }
 }

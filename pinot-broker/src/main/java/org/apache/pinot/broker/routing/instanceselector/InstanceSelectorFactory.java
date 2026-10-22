@@ -27,7 +27,10 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.broker.routing.FailOpenPolicy;
 import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelector;
+import org.apache.pinot.common.failuredetector.FailureDetector;
+import org.apache.pinot.common.failuredetector.NoOpFailureDetector;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.config.table.RoutingConfig;
@@ -55,7 +58,8 @@ public class InstanceSelectorFactory {
       Set<String> enabledInstances, Map<String, ServerInstance> enabledServerMap, IdealState idealState,
       ExternalView externalView, Set<String> onlineSegments) {
     return getInstanceSelector(tableConfig, propertyStore, brokerMetrics, null, Clock.systemUTC(), brokerConfig,
-        enabledInstances, enabledServerMap, idealState, externalView, onlineSegments);
+        enabledInstances, enabledServerMap, idealState, externalView, onlineSegments, FailOpenPolicy.disabled(),
+        new NoOpFailureDetector());
   }
 
   public static InstanceSelector getInstanceSelector(TableConfig tableConfig,
@@ -64,7 +68,19 @@ public class InstanceSelectorFactory {
       Set<String> enabledInstances, Map<String, ServerInstance> enabledServerMap, IdealState idealState,
       ExternalView externalView, Set<String> onlineSegments) {
     return getInstanceSelector(tableConfig, propertyStore, brokerMetrics, adaptiveServerSelector, Clock.systemUTC(),
-        brokerConfig, enabledInstances, enabledServerMap, idealState, externalView, onlineSegments);
+        brokerConfig, enabledInstances, enabledServerMap, idealState, externalView, onlineSegments,
+        FailOpenPolicy.disabled(), new NoOpFailureDetector());
+  }
+
+  public static InstanceSelector getInstanceSelector(TableConfig tableConfig,
+      ZkHelixPropertyStore<ZNRecord> propertyStore, BrokerMetrics brokerMetrics,
+      @Nullable AdaptiveServerSelector adaptiveServerSelector, PinotConfiguration brokerConfig,
+      Set<String> enabledInstances, Map<String, ServerInstance> enabledServerMap, IdealState idealState,
+      ExternalView externalView, Set<String> onlineSegments, FailOpenPolicy failOpenPolicy,
+      FailureDetector failureDetector) {
+    return getInstanceSelector(tableConfig, propertyStore, brokerMetrics, adaptiveServerSelector, Clock.systemUTC(),
+        brokerConfig, enabledInstances, enabledServerMap, idealState, externalView, onlineSegments, failOpenPolicy,
+        failureDetector);
   }
 
   public static InstanceSelector getInstanceSelector(TableConfig tableConfig,
@@ -72,6 +88,17 @@ public class InstanceSelectorFactory {
       @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock, PinotConfiguration brokerConfig,
       Set<String> enabledInstances, Map<String, ServerInstance> enabledServerMap, IdealState idealState,
       ExternalView externalView, Set<String> onlineSegments) {
+    return getInstanceSelector(tableConfig, propertyStore, brokerMetrics, adaptiveServerSelector, clock, brokerConfig,
+        enabledInstances, enabledServerMap, idealState, externalView, onlineSegments, FailOpenPolicy.disabled(),
+        new NoOpFailureDetector());
+  }
+
+  public static InstanceSelector getInstanceSelector(TableConfig tableConfig,
+      ZkHelixPropertyStore<ZNRecord> propertyStore, BrokerMetrics brokerMetrics,
+      @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock, PinotConfiguration brokerConfig,
+      Set<String> enabledInstances, Map<String, ServerInstance> enabledServerMap, IdealState idealState,
+      ExternalView externalView, Set<String> onlineSegments, FailOpenPolicy failOpenPolicy,
+      FailureDetector failureDetector) {
     String tableNameWithType = tableConfig.getTableName();
     RoutingConfig routingConfig = tableConfig.getRoutingConfig();
     AdaptiveServerSelector effectiveAdaptiveServerSelector = adaptiveServerSelector;
@@ -160,6 +187,7 @@ public class InstanceSelectorFactory {
 
     instanceSelector.init(tableConfig, propertyStore, brokerMetrics, effectiveAdaptiveServerSelector, clock,
         config, enabledInstances, enabledServerMap, idealState, externalView, onlineSegments);
+    instanceSelector.setFailOpenRouting(failOpenPolicy, failureDetector);
     return instanceSelector;
   }
 }

@@ -114,6 +114,12 @@ public class MultiClusterRoutingManagerTest {
 
     assertNotNull(result);
     assertEquals(result.getServerInstanceToSegmentsMap().size(), 2);
+    assertTrue(result.getUnavailableSegments().isEmpty());
+    Set<String> routedSegments = new HashSet<>();
+    for (SegmentsToQuery segmentsToQuery : result.getServerInstanceToSegmentsMap().values()) {
+      routedSegments.addAll(segmentsToQuery.getSegments());
+    }
+    assertEquals(routedSegments, Set.of("seg1", "seg2"));
   }
 
   @Test
