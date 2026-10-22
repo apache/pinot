@@ -38,6 +38,7 @@ import org.apache.pinot.spi.utils.UuidUtils;
 ///   take precedence over scalar functions.
 /// - In the single-stage engine, after aggregation, e.g. in `HAVING`. Aggregations such as `MAX` return DOUBLE there,
 ///   so cast them to the type the IdSet was built from.
+/// - In both engines, for a call on a literal value, which is evaluated when the query is compiled.
 ///
 /// The method is not static, so each call site gets its own instance (see `FunctionInvoker`), which caches the last
 /// deserialized IdSet:
@@ -60,21 +61,13 @@ public class IdSetFunctions {
   /// IdSet over zero rows when null handling is enabled.
   ///
   /// Values arrive as their external Java types. BOOLEAN, TIMESTAMP and UUID values are looked up through their
-  /// stored INT, LONG and BYTES values, as the transform function does.
+  /// stored INT, LONG and BYTES values, as the transform function does. Compile-time evaluation passes a literal value
+  /// with the same Java type as the runtime, for example an Integer for an INT literal.
   ///
-  /// `isDeterministic = false` keeps all-literal calls out of compile-time evaluation, which passes literals as Java
-  /// types the lookup cannot map to a value type (e.g. BigDecimal for an INT literal). The runtime evaluates them
-  /// instead, as before this function existed. The flag also marks the function VOLATILE, so ingestion transforms
-  /// cannot use it.
-  ///
-  /// The flag does not stop the multi-stage planner from pushing `IN_ID_SET` below a join into a leaf stage, because
-  /// the planner uses the operator of the `IN_ID_SET` transform function, which is deterministic. The operator table
-  /// registers transform functions before scalar functions, and skips this function because its name is taken. If
-  /// the transform function's operator is removed, this function's volatile operator takes its place, and
-  /// `PinotRuleUtils.isRelocatable` then keeps `IN_ID_SET` above joins. Tests in `JoinPlans.json` and
-  /// `PhysicalOptimizerPlans.json` pin the push-down.
+  /// The multi-stage planner uses the operator of the `IN_ID_SET` transform function for this function: the operator
+  /// table registers transform functions first, and skips this function because its name is taken.
   @Nullable
-  @ScalarFunction(nullableParameters = true, isDeterministic = false)
+  @ScalarFunction(nullableParameters = true)
   public Boolean inIdSet(@Nullable Object value, @Nullable String serializedIdSet) {
     if (serializedIdSet == null) {
       return false;
