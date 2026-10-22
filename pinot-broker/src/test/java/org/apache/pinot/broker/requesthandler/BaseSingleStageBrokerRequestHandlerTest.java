@@ -31,6 +31,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
@@ -101,6 +102,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertSame;
 
 
 public class BaseSingleStageBrokerRequestHandlerTest {
@@ -191,12 +194,16 @@ public class BaseSingleStageBrokerRequestHandlerTest {
   /// it continue to link.  Invokes the 9-arg constructor (no trailing `MaterializedViewHandler`
   /// parameter) and asserts it instantiates cleanly — and that
   /// `processMaterializedViewSplitBrokerRequest` is a concrete method on the base class (would
-  /// fail to compile this anonymous subclass if it were abstract).
+  /// fail to compile this anonymous subclass if it were abstract). Captured-environment overloads must
+  /// continue to invoke the existing validation and dispatch overrides for the default backend.
   @Test
-  public void testLegacyConstructorIsAvailableForCustomSubclasses() {
+  public void testLegacyConstructorIsAvailableForCustomSubclasses()
+      throws Exception {
     PinotConfiguration config = new PinotConfiguration();
     QueryQuotaManager queryQuotaManager = mock(QueryQuotaManager.class);
     TableCache tableCache = mock(TableCache.class);
+    AtomicInteger validationCalls = new AtomicInteger();
+    BrokerResponseNative response = new BrokerResponseNative();
 
     BaseSingleStageBrokerRequestHandler handler =
         new BaseSingleStageBrokerRequestHandler(config, "testBrokerId", new BrokerRequestIdGenerator(),
@@ -211,14 +218,24 @@ public class BaseSingleStageBrokerRequestHandlerTest {
           }
 
           @Override
+          protected void validatePhysicalTablesWithMultiClusterRouting(Set<String> tableNames,
+              Map<String, String> queryOptions) {
+            validationCalls.incrementAndGet();
+          }
+
+          @Override
           protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
               BrokerRequest serverBrokerRequest, TableRouteInfo route, long timeoutMs, ServerStats serverStats,
               RequestContext requestContext) {
-            return new BrokerResponseNative();
+            return response;
           }
         };
 
     Assert.assertNotNull(handler);
+    handler.validatePhysicalTablesWithMultiClusterRouting(Set.of("testTable"), Map.of(), tableCache);
+    assertEquals(validationCalls.get(), 1);
+    assertSame(handler.processBrokerRequest(1, null, null, null, 1000, null, null,
+        new BaseSingleStageBrokerRequestHandler.RequestEnvironment(tableCache, null)), response);
   }
 
   @Test

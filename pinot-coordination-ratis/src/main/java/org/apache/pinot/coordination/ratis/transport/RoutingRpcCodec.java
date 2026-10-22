@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.coordination.ratis.transport;
 
+import java.io.IOException;
 import java.util.UUID;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.ParticipantToken;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.Role;
@@ -29,7 +30,7 @@ import org.apache.pinot.coordination.ratis.transport.ParticipantAccessPolicy.Par
 import static com.google.common.base.Preconditions.checkArgument;
 
 
-/// Closed, identity-only broker routing vocabulary. The authenticated certificate supplies the stable broker ID;
+/// Closed, table-scoped broker planning vocabulary. The authenticated certificate supplies the stable broker ID;
 /// the request can select only its session and one table or authorized discovery.
 final class RoutingRpcCodec {
   private RoutingRpcCodec() {
@@ -48,7 +49,7 @@ final class RoutingRpcCodec {
         UUID.fromString(request.getSession().getIncarnation()), request.getSession().getRegistrationEpoch());
   }
 
-  static MetadataRpc.RoutingSnapshot snapshot(RoutingSnapshot snapshot) {
+  static MetadataRpc.RoutingSnapshot snapshot(RoutingSnapshot snapshot) throws IOException {
     var response = MetadataRpc.RoutingSnapshot.newBuilder()
         .setStatus(MetadataRpc.ResultStatus.valueOf(snapshot.status().name())).setDetail(snapshot.detail())
         .setRevision(MetadataRpc.Revision.newBuilder().setHistoryId(snapshot.revision().historyId().toString())
@@ -64,6 +65,15 @@ final class RoutingRpcCodec {
       var encodedTable = MetadataRpc.TableRouting.newBuilder().setTableName(table.tableName())
           .setTable(OfflineSegmentRpcCodec.version(table.table())).setSchemaName(table.schemaName())
           .setSchema(OfflineSegmentRpcCodec.version(table.schema()));
+      if (table.tableConfig() != null) {
+        encodedTable.setTableConfig(MetadataRpcCodec.record(table.tableConfig()));
+      }
+      if (table.schemaRecord() != null) {
+        encodedTable.setSchemaRecord(MetadataRpcCodec.record(table.schemaRecord()));
+      }
+      for (var server : table.serverAuthorities()) {
+        encodedTable.addServerAuthorities(MembershipRpcCodec.participant(server));
+      }
       for (var segment : table.segments()) {
         var encodedSegment = MetadataRpc.SegmentRouting.newBuilder().setName(segment.name())
             .setContent(OfflineSegmentRpcCodec.version(segment.content())).setContentSha256(segment.contentSha256());

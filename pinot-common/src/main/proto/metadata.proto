@@ -57,8 +57,8 @@ service MinionTaskService {
   rpc Outcome(TaskOutcomeRequest) returns (CommandResult);
 }
 
-// BROKER-only complete routing observations. TLS policy selects the stable identity; committed policy authorizes
-// its table tenants. Responses contain identities and installation evidence, never catalog records or storage URIs.
+// BROKER-only complete planning observations. TLS policy selects the stable identity; committed policy authorizes
+// its table tenants. Only the requested table/schema and installed candidates accompany routing evidence.
 service BrokerRoutingService {
   rpc Snapshot(RoutingSnapshotRequest) returns (RoutingSnapshot);
 }
@@ -88,6 +88,11 @@ message TableRouting {
   string schema_name = 3;
   ObjectVersion schema = 4;
   repeated SegmentRouting segments = 5;
+  // Exact current planning records at the same revision as the routes. Absent in legacy observations.
+  CatalogRecord table_config = 6;
+  CatalogRecord schema_record = 7;
+  // One exact current membership state per distinct installed replica candidate, ordered by stable server ID.
+  repeated ParticipantState server_authorities = 8;
 }
 
 message SegmentRouting {

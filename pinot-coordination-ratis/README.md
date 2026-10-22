@@ -392,11 +392,12 @@ There are no wildcard or implicit policy grants. Normal omitted table tenants re
 convention. Policy changes take effect through subsequent committed reads; participant advertisements cannot grant
 tenant access or destination approval.
 
-Each table image carries exact table/schema versions and every published immutable segment, including segments
-with zero installed replicas. Installed candidates require current configuration and assignment identities, a live
+Each table image carries exact table/schema records and versions and every published immutable segment, including
+segments with zero installed replicas. Installed candidates require current configuration and assignment identities, a live
 ready server incarnation, placement-policy eligibility and matching installation evidence from the durable
 reconciliation operation. A completed proof does not expire merely because its former controller owner expires.
-Archive locations, loader configuration, task configuration and unrelated cluster metadata are not exposed.
+The full authorized table configuration and schema are included, preserving their committed record identities.
+Segment archive locations, standalone task records and unrelated cluster metadata are not exposed.
 
 A candidate includes a query destination only if its server also has `SERVER_QUERY`, advertises the exact approved
 `queryGrpc` address and declares `nativeQueryVersion=2`. This is routing metadata, not a serving grant or an
@@ -413,6 +414,28 @@ unsupported; no fallback can silently turn required segments into optional ones.
 
 These observations and contexts do not authorize queries. Connecting the normal query handlers requires the
 remaining serving-permit, routing-revision, transport-identity, clock and response-delivery checks together.
+
+## Captured broker planning inputs
+
+The table configuration, schema, segment identities, installed candidates and deduplicated candidate membership
+states are captured under the same catalog lock and consensus read barrier. They share the existing whole-image
+record and byte limits; an oversized configuration cannot produce a truncated routing image. Discovery still
+exposes only table names, and this projection does not grant access to generic metadata APIs.
+
+`NativeBrokerRoutingImage` verifies the supplied planning records against their kind, name, incarnation, version
+and snapshot revision. Identity-only legacy observations remain readable but cannot provide planning inputs.
+Each planning capture decodes its own table/schema objects and derives Pinot's normal `TableCache` maps, keeping
+compiler mutations separate from the immutable protobuf image. Its `RoutingManager` adapter uses the same
+deterministic, complete replica selection as the native identity envelopes without constructing Helix records.
+
+The normal single-stage handler now captures a request environment before metadata-dependent compilation and
+passes its table cache and routing manager through optimization, route construction and dispatch. The default
+environment uses the existing providers. Native callers can supply one captured image without replacing global
+cache state or copying the SQL compiler.
+
+This is planning infrastructure, not a native query listener. Normal broker admission/deadline origination,
+authenticated dispatch, receiving and final-response fences, quotas and qualified clock integration remain
+required before activation. Unsupported native query forms must be rejected explicitly by that integration.
 
 ## Authenticated native query admission
 

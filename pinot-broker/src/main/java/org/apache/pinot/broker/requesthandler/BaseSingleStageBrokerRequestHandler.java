@@ -253,6 +253,41 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         _enableQueryCancellation);
   }
 
+  /// Providers captured once before metadata-dependent compilation. Legacy requests retain their existing live
+  /// providers; a backend can supply immutable providers and retain additional per-request identity in a subclass.
+  protected static class RequestEnvironment {
+    private final TableCache _tableCache;
+    @Nullable
+    private final RoutingManager _routingManager;
+
+    public RequestEnvironment(TableCache tableCache, @Nullable RoutingManager routingManager) {
+      _tableCache = Preconditions.checkNotNull(tableCache);
+      _routingManager = routingManager;
+    }
+
+    public final TableCache tableCache() {
+      return _tableCache;
+    }
+
+    @Nullable
+    public final RoutingManager routingManager() {
+      return _routingManager;
+    }
+  }
+
+  /// Captures metadata before subquery execution, case/database resolution, and schema/config reads. Implementations
+  /// can reject unsupported query forms here; no later planning phase substitutes another environment. A recursive
+  /// subquery captures its own environment; backends requiring a single physical image must reject such forms here.
+  protected RequestEnvironment captureRequestEnvironment(PinotQuery query, @Nullable HttpHeaders httpHeaders) {
+    return new RequestEnvironment(_tableCache, _routingManager);
+  }
+
+  /// Diagnostic fallback for syntax unsupported by SSE, before a request environment can be captured. A backend
+  /// without multistage metadata can disable this diagnostic instead of consulting unrelated live metadata.
+  protected boolean canCompileWithMultiStageEngine(String query, String database) {
+    return ParserUtils.canCompileWithMultiStageEngine(query, database, _tableCache);
+  }
+
   @Override
   public void start() {
     if (_enableMultistageMigrationMetric) {
@@ -271,7 +306,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           String database = query.getRight();
 
           // Check if the query is a v2 supported query
-          if (!ParserUtils.canCompileWithMultiStageEngine(queryString, database, _tableCache)) {
+          if (!canCompileWithMultiStageEngine(queryString, database)) {
             _brokerMetrics.addMeteredGlobalValue(BrokerMeter.SINGLE_STAGE_QUERIES_INVALID_MULTI_STAGE, 1);
           }
         }
@@ -413,6 +448,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     final PinotQuery _pinotQuery;
     final PinotQuery _serverPinotQuery;
     final Schema _schema;
+    final RequestEnvironment _environment;
     final String _tableName;
     final String _rawTableName;
     /// Dimension tables read by `lookup()` calls, which are not part of the data source
@@ -420,13 +456,14 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     final BrokerResponse _errorOrLiteralOnlyBrokerResponse;
 
     public CompileResult(PinotQuery pinotQuery, PinotQuery serverPinotQuery, Schema schema, String tableName,
-        String rawTableName, Set<String> lookupTableNames) {
+        String rawTableName, Set<String> lookupTableNames, RequestEnvironment environment) {
       _pinotQuery = pinotQuery;
       _serverPinotQuery = serverPinotQuery;
       _schema = schema;
       _tableName = tableName;
       _rawTableName = rawTableName;
       _lookupTableNames = lookupTableNames;
+      _environment = environment;
       _errorOrLiteralOnlyBrokerResponse = null;
     }
 
@@ -437,6 +474,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       _tableName = null;
       _rawTableName = null;
       _lookupTableNames = Set.of();
+      _environment = null;
       _errorOrLiteralOnlyBrokerResponse = errorOrLiteralOnlyBrokerResponse;
     }
   }
@@ -469,12 +507,14 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       return compileResult._errorOrLiteralOnlyBrokerResponse;
     }
 
+    RequestEnvironment environment = compileResult._environment;
+    TableCache tableCache = environment.tableCache();
     Schema schema = compileResult._schema;
     String tableName = compileResult._tableName;
     String rawTableName = compileResult._rawTableName;
     PinotQuery pinotQuery = compileResult._pinotQuery;
     PinotQuery serverPinotQuery = compileResult._serverPinotQuery;
-    LogicalTableConfig logicalTableConfig = _tableCache.getLogicalTableConfig(rawTableName);
+    LogicalTableConfig logicalTableConfig = tableCache.getLogicalTableConfig(rawTableName);
     String database = DatabaseUtils.extractDatabaseFromFullyQualifiedTableName(tableName);
     String workloadName = QueryOptionsUtils.getWorkloadName(sqlNodeAndOptions.getOptions());
     long compilationEndTimeNs = System.nanoTime();
@@ -483,7 +523,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     // Unlike the MSE, the SSE has no centralized exception handler that converts QueryException into
     // BrokerResponseNative, so we must catch and convert here to return a proper JSON error response.
     try {
-      validatePhysicalTablesWithMultiClusterRouting(Set.of(tableName), sqlNodeAndOptions.getOptions());
+      validatePhysicalTablesWithMultiClusterRouting(Set.of(tableName), sqlNodeAndOptions.getOptions(), tableCache);
     } catch (QueryException e) {
       LOGGER.warn("Request {}: {}", requestId, e.getMessage());
       requestContext.setErrorCode(e.getErrorCode());
@@ -637,7 +677,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     if (_materializedViewHandler != null
         && QueryOptionsUtils.isMaterializedViewRewriteEnabled(serverPinotQuery.getQueryOptions())) {
       MaterializedViewCompileOutcome outcome = applyMaterializedViewRewriteAtCompile(
-          requestId, serverPinotQuery, tableName, rawTableName, schema, _tableCache.isIgnoreCase());
+          requestId, serverPinotQuery, tableName, rawTableName, schema, tableCache.isIgnoreCase(), tableCache);
       materializedViewContext = outcome._materializedViewContext;
       if (outcome._serverPinotQuery != serverPinotQuery) {
         /// FULL_REWRITE — pick up the swapped state and recompute `serverBrokerRequest`.
@@ -654,9 +694,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     // Get the appropriate routing manager based on query options
     RoutingManager selectedRoutingManager = _multiClusterRoutingContext != null && logicalTableConfig != null
         ? _multiClusterRoutingContext.getRoutingManager(pinotQuery.getQueryOptions())
-        : _routingManager;
+        : environment.routingManager();
     // Get the tables hit by the request
-    TableRouteInfo routeInfo = routeProvider.getTableRouteInfo(tableName, _tableCache, selectedRoutingManager);
+    TableRouteInfo routeInfo = routeProvider.getTableRouteInfo(tableName, tableCache, selectedRoutingManager);
 
     if (!routeInfo.isExists()) {
       LOGGER.info("Table not found for request {}: {}", requestId,
@@ -724,8 +764,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       offlinePinotQuery.getDataSource().setTableName(offlineTableName);
       assert timeBoundaryInfo != null;
       attachTimeBoundary(offlinePinotQuery, timeBoundaryInfo, true);
-      handleExpressionOverride(offlinePinotQuery, _tableCache.getExpressionOverrideMap(offlineTableName));
-      handleTimestampIndexOverride(offlinePinotQuery, offlineTableConfig);
+      handleExpressionOverride(offlinePinotQuery, tableCache.getExpressionOverrideMap(offlineTableName));
+      handleTimestampIndexOverride(offlinePinotQuery, offlineTableConfig, tableCache);
       // Re-optimize after attaching the time boundary filter so that filter optimizers (e.g. NumericalFilterOptimizer,
       // FlattenAndOrFilterOptimizer, MergeRangeFilterOptimizer) are applied to the time boundary predicate.
       _queryOptimizer.optimize(offlinePinotQuery, schema);
@@ -734,8 +774,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       PinotQuery realtimePinotQuery = serverPinotQuery.deepCopy();
       realtimePinotQuery.getDataSource().setTableName(realtimeTableName);
       attachTimeBoundary(realtimePinotQuery, timeBoundaryInfo, false);
-      handleExpressionOverride(realtimePinotQuery, _tableCache.getExpressionOverrideMap(realtimeTableName));
-      handleTimestampIndexOverride(realtimePinotQuery, realtimeTableConfig);
+      handleExpressionOverride(realtimePinotQuery, tableCache.getExpressionOverrideMap(realtimeTableName));
+      handleTimestampIndexOverride(realtimePinotQuery, realtimeTableConfig, tableCache);
       _queryOptimizer.optimize(realtimePinotQuery, schema);
       realtimeBrokerRequest = CalciteSqlCompiler.convertToBrokerRequest(realtimePinotQuery);
 
@@ -745,8 +785,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     } else if (routeInfo.isOffline()) {
       // OFFLINE only
       setTableName(serverBrokerRequest, offlineTableName);
-      handleExpressionOverride(serverPinotQuery, _tableCache.getExpressionOverrideMap(offlineTableName));
-      handleTimestampIndexOverride(serverPinotQuery, offlineTableConfig);
+      handleExpressionOverride(serverPinotQuery, tableCache.getExpressionOverrideMap(offlineTableName));
+      handleTimestampIndexOverride(serverPinotQuery, offlineTableConfig, tableCache);
       offlineBrokerRequest = serverBrokerRequest;
 
       requestContext.setFanoutType(RequestContext.FanoutType.OFFLINE);
@@ -754,8 +794,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     } else {
       // REALTIME only
       setTableName(serverBrokerRequest, realtimeTableName);
-      handleExpressionOverride(serverPinotQuery, _tableCache.getExpressionOverrideMap(realtimeTableName));
-      handleTimestampIndexOverride(serverPinotQuery, realtimeTableConfig);
+      handleExpressionOverride(serverPinotQuery, tableCache.getExpressionOverrideMap(realtimeTableName));
+      handleTimestampIndexOverride(serverPinotQuery, realtimeTableConfig, tableCache);
       realtimeBrokerRequest = serverBrokerRequest;
 
       requestContext.setFanoutType(RequestContext.FanoutType.REALTIME);
@@ -774,7 +814,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
     if (offlineBrokerRequest == null && realtimeBrokerRequest == null) {
       return getEmptyBrokerOnlyResponse(pinotQuery, serverPinotQuery, requestContext, tableName, requesterIdentity,
-          schema, query, database, workloadName, queryWasLogged);
+          schema, query, database, workloadName, queryWasLogged, tableCache);
     }
 
     if (offlineBrokerRequest != null && isFilterAlwaysTrue(offlineBrokerRequest.getPinotQuery())) {
@@ -853,7 +893,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       } else {
         // If no route is found, send an empty response
         return getEmptyBrokerOnlyResponse(pinotQuery, serverPinotQuery, requestContext, tableName, requesterIdentity,
-            schema, query, database, workloadName, queryWasLogged);
+            schema, query, database, workloadName, queryWasLogged, tableCache);
       }
     }
     long routingEndTimeNs = System.nanoTime();
@@ -878,11 +918,11 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           .getTimeoutMs() : null;
       if (offlineBrokerRequest != null) {
         remainingTimeMs = setQueryTimeout(offlineTableName, logicalTableQueryTimeout,
-            offlineBrokerRequest.getPinotQuery().getQueryOptions(), timeSpentMs);
+            offlineBrokerRequest.getPinotQuery().getQueryOptions(), timeSpentMs, tableCache);
       }
       if (realtimeBrokerRequest != null) {
         remainingTimeMs = Math.max(remainingTimeMs, setQueryTimeout(realtimeTableName, logicalTableQueryTimeout,
-            realtimeBrokerRequest.getPinotQuery().getQueryOptions(), timeSpentMs));
+            realtimeBrokerRequest.getPinotQuery().getQueryOptions(), timeSpentMs, tableCache));
       }
     } catch (TimeoutException e) {
       String errorMessage = e.getMessage();
@@ -948,7 +988,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       BrokerResponseNative viewSplitResponse = tryExecuteMaterializedViewSplit(requestId, query, sqlNodeAndOptions,
           requesterIdentity, requestContext, brokerRequest, serverPinotQuery, schema, materializedViewContext,
           routeInfo, remainingTimeMs, errorMsgs, numPrunedSegmentsTotal, database, tableName, userRawTableName,
-          rlsFiltersApplied.get(), serverStats, selectedRoutingManager, routeProvider, queryWasLogged);
+          rlsFiltersApplied.get(), serverStats, selectedRoutingManager, routeProvider, queryWasLogged, tableCache);
       if (viewSplitResponse != null) {
         return viewSplitResponse;
       }
@@ -961,7 +1001,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       /// `processBrokerRequest` would dispatch the user's "base table" query with
       /// `ts >= boundary` baked in, silently dropping the historical half of the timeline.
       materializedViewContext = MaterializedViewContext.empty();
-      routeInfo = routeProvider.getTableRouteInfo(tableName, _tableCache, selectedRoutingManager);
+      routeInfo = routeProvider.getTableRouteInfo(tableName, tableCache, selectedRoutingManager);
       if (routeInfo instanceof ImplicitHybridTableRouteInfo) {
         ((ImplicitHybridTableRouteInfo) routeInfo).setOfflineBrokerRequest(offlineBrokerRequest);
         ((ImplicitHybridTableRouteInfo) routeInfo).setRealtimeBrokerRequest(realtimeBrokerRequest);
@@ -1010,7 +1050,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           new QueryServers(query, offlineExecutionServers, realtimeExecutionServers));
       try {
         brokerResponse = processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, routeInfo,
-            remainingTimeMs, serverStats, requestContext);
+            remainingTimeMs, serverStats, requestContext, environment);
         brokerResponse.setClientRequestId(clientRequestId);
       } finally {
         onQueryFinish(requestId);
@@ -1018,7 +1058,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       }
     } else {
       brokerResponse = processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, routeInfo,
-          remainingTimeMs, serverStats, requestContext);
+          remainingTimeMs, serverStats, requestContext, environment);
     }
     brokerResponse.setTablesQueried(Set.of(userRawTableName));
     if (_materializedViewHandler != null) {
@@ -1061,7 +1101,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
     // server returns STRING as default dataType for all columns in (some) scenarios where no rows are returned
     // this is an attempt to return more faithful information based on other sources
-    fillEmptyResponseSchema(pinotQuery, brokerResponse, schema, database, query);
+    fillEmptyResponseSchema(pinotQuery, brokerResponse, schema, database, query, tableCache);
 
     // Set total query processing time
     long totalTimeMs = System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis();
@@ -1121,7 +1161,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       requestContext.setErrorCode(QueryErrorCode.SQL_PARSING);
       // Check if the query is a v2 supported query
       String database = DatabaseUtils.extractDatabaseFromQueryRequest(sqlNodeAndOptions.getOptions(), httpHeaders);
-      if (ParserUtils.canCompileWithMultiStageEngine(query, database, _tableCache)) {
+      if (canCompileWithMultiStageEngine(query, database)) {
         return new CompileResult(new BrokerResponseNative(QueryErrorCode.SQL_PARSING,
             "It seems that the query is only supported by the multi-stage query engine, please retry the query "
                 + "using "
@@ -1185,6 +1225,16 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       return new CompileResult(new BrokerResponseNative(QueryErrorCode.QUERY_VALIDATION, "Table name not found"));
     }
 
+    RequestEnvironment environment;
+    try {
+      environment = Preconditions.checkNotNull(captureRequestEnvironment(serverPinotQuery, httpHeaders));
+    } catch (Exception e) {
+      QueryErrorCode errorCode = QueryErrorCode.fromThrowable(e, QueryErrorCode.QUERY_VALIDATION);
+      requestContext.setErrorCode(errorCode);
+      return new CompileResult(new BrokerResponseNative(errorCode, e.getMessage()));
+    }
+    TableCache tableCache = environment.tableCache();
+
     try {
       handleSubquery(serverPinotQuery, requestId, request, requesterIdentity, requestContext, httpHeaders,
           accessControl);
@@ -1196,12 +1246,12 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       return new CompileResult(new BrokerResponseNative(errorCode, e.getMessage()));
     }
 
-    boolean ignoreCase = _tableCache.isIgnoreCase();
+    boolean ignoreCase = tableCache.isIgnoreCase();
     String tableName;
     try {
       tableName =
           getActualTableName(DatabaseUtils.translateTableName(dataSource.getTableName(), httpHeaders, ignoreCase),
-              _tableCache);
+              tableCache);
     } catch (DatabaseConflictException e) {
       LOGGER.info("{}. Request {}: {}", e.getMessage(), requestId,
           _queryLogger.redactQuery(query, requestContext.getQueryFingerprint()));
@@ -1230,7 +1280,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
 
     try {
-      Map<String, String> columnNameMap = _tableCache.getColumnNameMap(rawTableName);
+      Map<String, String> columnNameMap = tableCache.getColumnNameMap(rawTableName);
       if (columnNameMap != null) {
         updateColumnNames(rawTableName, serverPinotQuery, ignoreCase, columnNameMap);
       }
@@ -1255,15 +1305,16 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       handleQueryLimitOverride(serverPinotQuery, _queryResponseLimit);
     }
     handleSegmentPartitionedDistinctCountOverride(serverPinotQuery,
-        getSegmentPartitionedColumns(_tableCache, tableName));
+        getSegmentPartitionedColumns(tableCache, tableName));
     if (_enableDistinctCountBitmapOverride) {
       handleDistinctCountBitmapOverride(serverPinotQuery);
     }
 
-    Schema schema = _tableCache.getSchema(rawTableName);
+    Schema schema = tableCache.getSchema(rawTableName);
     _queryOptimizer.optimize(serverPinotQuery, schema);
 
-    return new CompileResult(pinotQuery, serverPinotQuery, schema, tableName, rawTableName, lookupTableNames);
+    return new CompileResult(pinotQuery, serverPinotQuery, schema, tableName, rawTableName, lookupTableNames,
+        environment);
   }
 
   /// Mutable holder returned from [#applyMaterializedViewRewriteAtCompile] — Java has no out
@@ -1295,7 +1346,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   /// query — fall back to the base-table path and surface the failure via
   /// `QUERY_REWRITE_EXCEPTIONS`.
   private MaterializedViewCompileOutcome applyMaterializedViewRewriteAtCompile(long requestId,
-      PinotQuery serverPinotQuery, String tableName, String rawTableName, Schema schema, boolean ignoreCase) {
+      PinotQuery serverPinotQuery, String tableName, String rawTableName, Schema schema, boolean ignoreCase,
+      TableCache tableCache) {
     /// Skip rewrite when the user enabled multi-cluster routing — the broker's
     /// `validatePhysicalTablesWithMultiClusterRouting` check (in `doHandleRequest`) inspects the
     /// post-rewrite table name and hard-rejects MV tables that aren't registered in the
@@ -1322,7 +1374,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     /// per `validateMaterializedViewInvariants`.
     String mvLookupTableNameWithType = TableNameBuilder.getTableTypeFromTableName(tableName) != null
         ? tableName : TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
-    TableConfig userTableConfig = _tableCache.getTableConfig(mvLookupTableNameWithType);
+    TableConfig userTableConfig = tableCache.getTableConfig(mvLookupTableNameWithType);
     if (userTableConfig != null && userTableConfig.isMaterializedView()) {
       return new MaterializedViewCompileOutcome(
           serverPinotQuery, tableName, rawTableName, schema, MaterializedViewContext.empty());
@@ -1331,7 +1383,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     MaterializedViewContext materializedViewContext;
     try {
       materializedViewContext = _materializedViewHandler.compile(new MaterializedViewCompileContext(
-          serverPinotQuery, tableName, rawTableName, _tableCache));
+          serverPinotQuery, tableName, rawTableName, tableCache));
     } catch (Exception e) {
       LOGGER.error("Materialized view rewrite failed for request {} on table {}; "
           + "falling back to base-table query path", requestId, rawTableName, e);
@@ -1352,7 +1404,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     /// rewrite engine does not have access to the table cache) so the broker emits the matching
     /// observability signal and continues against the base table unchanged.
     String baseRawTableName = TableNameBuilder.extractRawTableName(tableName);
-    if (_tableCache.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(baseRawTableName)) != null) {
+    if (tableCache.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(baseRawTableName)) != null) {
       LOGGER.warn("FULL_REWRITE skipped for request {} on hybrid base table {}: MV would drop "
               + "realtime data; falling back to base-table query path", requestId, baseRawTableName);
       _brokerMetrics.addMeteredTableValue(baseRawTableName, BrokerMeter.QUERY_REWRITE_EXCEPTIONS, 1);
@@ -1379,7 +1431,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     serverQueryOptions.put(QueryOptionKey.MATERIALIZED_VIEW_REWRITE, "true");
     String rewrittenTableName = plan.getMaterializedViewTableNameWithType();
     String rewrittenRawTableName = TableNameBuilder.extractRawTableName(rewrittenTableName);
-    Schema rewrittenSchema = _tableCache.getSchema(rewrittenRawTableName);
+    Schema rewrittenSchema = tableCache.getSchema(rewrittenRawTableName);
     /// The handler's `compile()` already null-checks the MV schema before returning a plan, but
     /// the broker re-reads the schema here on a fresh `TableCache` query — between those two
     /// reads a concurrent MV drop or zk listener-driven eviction can leave the second lookup
@@ -1401,7 +1453,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     /// rewritten MV query may reference columns whose case differs from the MV schema's
     /// canonical case.  Wrap in try/catch so a case-sensitive cluster with a case-different MV
     /// column name falls back to the base-table path instead of failing the query.
-    Map<String, String> mvColumnNameMap = _tableCache.getColumnNameMap(rewrittenRawTableName);
+    Map<String, String> mvColumnNameMap = tableCache.getColumnNameMap(rewrittenRawTableName);
     if (mvColumnNameMap != null) {
       try {
         updateColumnNames(rewrittenRawTableName, rewrittenServerQuery, ignoreCase, mvColumnNameMap);
@@ -1496,7 +1548,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
   private BrokerResponseNative getEmptyBrokerOnlyResponse(PinotQuery pinotQuery, PinotQuery serverPinotQuery,
       RequestContext requestContext, String tableName, @Nullable RequesterIdentity requesterIdentity, Schema schema,
-      String query, String database, String workloadName, boolean queryWasLogged) {
+      String query, String database, String workloadName, boolean queryWasLogged, TableCache tableCache) {
     if (pinotQuery.isExplain()) {
       // EXPLAIN PLAN results to show that query is evaluated exclusively by Broker.
       return BrokerResponseNative.BROKER_ONLY_EXPLAIN_PLAN_OUTPUT;
@@ -1532,7 +1584,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           }
         }
       }
-      fillEmptyResponseSchema(pinotQuery, brokerResponse, schema, database, query);
+      fillEmptyResponseSchema(pinotQuery, brokerResponse, schema, database, query, tableCache);
     } catch (Exception e) {
       LOGGER.warn("Caught exception while building empty response for request {}: {}, {}",
           requestContext.getRequestId(), query, e.getMessage());
@@ -1545,20 +1597,21 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   }
 
   private void fillEmptyResponseSchema(PinotQuery pinotQuery, BrokerResponse brokerResponse, Schema schema,
-      String database, String query) {
+      String database, String query, TableCache tableCache) {
     if (brokerResponse.getNumRowsResultSet() == 0) {
       boolean useMSE =
           QueryOptionsUtils.isUseMSEToFillEmptySchema(pinotQuery.getQueryOptions(), _useMSEToFillEmptyResponseSchema);
-      EmptyResponseUtils.fillEmptyResponseSchema(useMSE, brokerResponse, _tableCache, schema, database, query);
+      EmptyResponseUtils.fillEmptyResponseSchema(useMSE, brokerResponse, tableCache, schema, database, query);
     }
   }
 
-  private void handleTimestampIndexOverride(PinotQuery pinotQuery, @Nullable TableConfig tableConfig) {
+  private void handleTimestampIndexOverride(PinotQuery pinotQuery, @Nullable TableConfig tableConfig,
+      TableCache tableCache) {
     if (tableConfig == null || tableConfig.getFieldConfigList() == null) {
       return;
     }
 
-    Set<String> timestampIndexColumns = _tableCache.getTimestampIndexColumns(tableConfig.getTableName());
+    Set<String> timestampIndexColumns = tableCache.getTimestampIndexColumns(tableConfig.getTableName());
     if (CollectionUtils.isEmpty(timestampIndexColumns)) {
       return;
     }
@@ -2368,7 +2421,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   /// For the overall query timeout, use query-level timeout (in the query options) if exists, or use table-level
   /// timeout (in the table config) if exists, or use instance-level timeout (in the broker config).
   private long setQueryTimeout(String tableNameWithType, Long logicalTableQueryTimeout,
-      Map<String, String> queryOptions, long timeSpentMs)
+      Map<String, String> queryOptions, long timeSpentMs, TableCache tableCache)
       throws TimeoutException {
     long queryTimeoutMs;
     Long queryLevelTimeoutMs = QueryOptionsUtils.getTimeoutMs(queryOptions);
@@ -2376,7 +2429,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       // Use query-level timeout if exists
       queryTimeoutMs = queryLevelTimeoutMs;
     } else {
-      TableConfig tableConfig = _tableCache.getTableConfig(tableNameWithType);
+      TableConfig tableConfig = tableCache.getTableConfig(tableNameWithType);
       if (tableConfig != null
           && tableConfig.getQueryConfig() != null
           && tableConfig.getQueryConfig().getTimeoutMs() != null) {
@@ -2579,13 +2632,14 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       MaterializedViewContext materializedViewContext, TableRouteInfo routeInfo, long remainingTimeMs,
       List<QueryProcessingException> errorMsgs, int numPrunedSegmentsTotal, String database,
       String tableName, String userRawTableName, boolean rlsFiltersApplied, ServerStats serverStats,
-      RoutingManager selectedRoutingManager, TableRouteProvider routeProvider, boolean queryWasLogged) {
+      RoutingManager selectedRoutingManager, TableRouteProvider routeProvider, boolean queryWasLogged,
+      TableCache tableCache) {
     String clientRequestId = extractClientRequestId(sqlNodeAndOptions);
     MaterializedViewSplitDispatcher dispatcher =
         (originalReq, baseQ, baseRoute, baseSch, viewQ, viewTable, viewSch, timeoutMs) ->
             dispatchMaterializedViewSplit(requestId, originalReq, baseQ, baseRoute, baseSch, viewQ, viewTable,
                 viewSch, timeoutMs, serverStats, requestContext, selectedRoutingManager, routeProvider,
-                clientRequestId, query);
+                clientRequestId, query, tableCache);
     MaterializedViewSplitExecutionContext splitCtx = MaterializedViewSplitExecutionContext.builder()
         .originalBrokerRequest(brokerRequest)
         .baseServerPinotQuery(serverPinotQuery)
@@ -2615,7 +2669,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       viewSplitResponse.addException(errorMsg);
     }
     viewSplitResponse.setNumSegmentsPrunedByBroker(numPrunedSegmentsTotal);
-    fillEmptyResponseSchema(brokerRequest.getPinotQuery(), viewSplitResponse, schema, database, query);
+    fillEmptyResponseSchema(brokerRequest.getPinotQuery(), viewSplitResponse, schema, database, query, tableCache);
     long totalTimeMs = System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis();
     viewSplitResponse.setTimeUsedMs(totalTimeMs);
     augmentStatistics(requestContext, viewSplitResponse);
@@ -2638,12 +2692,13 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       BrokerRequest originalBrokerRequest, PinotQuery baseQueryWithTimeFilter, TableRouteInfo baseRouteInfo,
       Schema baseSchema, PinotQuery viewQueryWithTimeFilter, String viewTableNameWithType, Schema viewSchema,
       long timeoutMs, ServerStats serverStats, RequestContext requestContext, RoutingManager routingManager,
-      TableRouteProvider routeProvider, @Nullable String clientRequestId, String query) throws Exception {
+      TableRouteProvider routeProvider, @Nullable String clientRequestId, String query, TableCache tableCache)
+      throws Exception {
     /// 1. Optimize and route the base-table side (handles hybrid offline/realtime split).
     _queryOptimizer.optimize(baseQueryWithTimeFilter, baseSchema);
     BrokerRequest baseBrokerRequest = CalciteSqlCompiler.convertToBrokerRequest(baseQueryWithTimeFilter);
     ImplicitHybridTableRouteInfo hybridBaseRoute =
-        prepareBaseTableHybridRoute(baseBrokerRequest, baseRouteInfo, baseSchema);
+        prepareBaseTableHybridRoute(baseBrokerRequest, baseRouteInfo, baseSchema, tableCache);
 
     BrokerRequest baseOfflineBrokerRequest = hybridBaseRoute.getOfflineBrokerRequest();
     BrokerRequest baseRealtimeBrokerRequest = hybridBaseRoute.getRealtimeBrokerRequest();
@@ -2662,11 +2717,11 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     /// Apply MV-table expression overrides and `$ts$DAY` timestamp-index hints before
     /// optimization, mirroring the non-split path.  Without this, overrides configured on the
     /// MV table would be silently dropped on the SPLIT path.
-    handleExpressionOverride(viewQueryWithTimeFilter, _tableCache.getExpressionOverrideMap(viewTableNameWithType));
-    handleTimestampIndexOverride(viewQueryWithTimeFilter, _tableCache.getTableConfig(viewTableNameWithType));
+    handleExpressionOverride(viewQueryWithTimeFilter, tableCache.getExpressionOverrideMap(viewTableNameWithType));
+    handleTimestampIndexOverride(viewQueryWithTimeFilter, tableCache.getTableConfig(viewTableNameWithType), tableCache);
     _queryOptimizer.optimize(viewQueryWithTimeFilter, viewSchema);
     BrokerRequest viewBrokerRequest = CalciteSqlCompiler.convertToBrokerRequest(viewQueryWithTimeFilter);
-    TableRouteInfo viewRouteInfo = routeProvider.getTableRouteInfo(viewTableNameWithType, _tableCache, routingManager);
+    TableRouteInfo viewRouteInfo = routeProvider.getTableRouteInfo(viewTableNameWithType, tableCache, routingManager);
     /// The MV table can disappear between compile (broker MV cache) and execute (route lookup)
     /// — operator dropped it, controller mid-state-transition, etc.  Treat missing-route the
     /// same way the base path does (`BROKER_RESOURCE_MISSING` with a graceful message); the
@@ -2756,7 +2811,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   /// without these, table-level overrides configured on the base table would be silently
   /// dropped on the SPLIT path, producing divergent results vs. the base fallback path.
   private ImplicitHybridTableRouteInfo prepareBaseTableHybridRoute(BrokerRequest baseBrokerRequest,
-      TableRouteInfo baseRouteInfo, Schema schema) {
+      TableRouteInfo baseRouteInfo, Schema schema, TableCache tableCache) {
     Preconditions.checkState(baseRouteInfo instanceof ImplicitHybridTableRouteInfo,
         "MV split execution requires ImplicitHybridTableRouteInfo but got: %s",
         baseRouteInfo.getClass().getSimpleName());
@@ -2776,8 +2831,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       if (timeBoundaryInfo != null) {
         attachTimeBoundary(offlinePinotQuery, timeBoundaryInfo, true);
       }
-      handleExpressionOverride(offlinePinotQuery, _tableCache.getExpressionOverrideMap(offlineTableName));
-      handleTimestampIndexOverride(offlinePinotQuery, offlineTableConfig);
+      handleExpressionOverride(offlinePinotQuery, tableCache.getExpressionOverrideMap(offlineTableName));
+      handleTimestampIndexOverride(offlinePinotQuery, offlineTableConfig, tableCache);
       _queryOptimizer.optimize(offlinePinotQuery, schema);
       BrokerRequest offlineBrokerRequest = CalciteSqlCompiler.convertToBrokerRequest(offlinePinotQuery);
 
@@ -2786,8 +2841,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       if (timeBoundaryInfo != null) {
         attachTimeBoundary(realtimePinotQuery, timeBoundaryInfo, false);
       }
-      handleExpressionOverride(realtimePinotQuery, _tableCache.getExpressionOverrideMap(realtimeTableName));
-      handleTimestampIndexOverride(realtimePinotQuery, realtimeTableConfig);
+      handleExpressionOverride(realtimePinotQuery, tableCache.getExpressionOverrideMap(realtimeTableName));
+      handleTimestampIndexOverride(realtimePinotQuery, realtimeTableConfig, tableCache);
       _queryOptimizer.optimize(realtimePinotQuery, schema);
       BrokerRequest realtimeBrokerRequest = CalciteSqlCompiler.convertToBrokerRequest(realtimePinotQuery);
 
@@ -2796,14 +2851,14 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     } else if (baseRouteInfo.isOffline()) {
       setTableName(baseBrokerRequest, offlineTableName);
       handleExpressionOverride(baseBrokerRequest.getPinotQuery(),
-          _tableCache.getExpressionOverrideMap(offlineTableName));
-      handleTimestampIndexOverride(baseBrokerRequest.getPinotQuery(), offlineTableConfig);
+          tableCache.getExpressionOverrideMap(offlineTableName));
+      handleTimestampIndexOverride(baseBrokerRequest.getPinotQuery(), offlineTableConfig, tableCache);
       hybridRoute.setOfflineBrokerRequest(baseBrokerRequest);
     } else {
       setTableName(baseBrokerRequest, realtimeTableName);
       handleExpressionOverride(baseBrokerRequest.getPinotQuery(),
-          _tableCache.getExpressionOverrideMap(realtimeTableName));
-      handleTimestampIndexOverride(baseBrokerRequest.getPinotQuery(), realtimeTableConfig);
+          tableCache.getExpressionOverrideMap(realtimeTableName));
+      handleTimestampIndexOverride(baseBrokerRequest.getPinotQuery(), realtimeTableConfig, tableCache);
       hybridRoute.setRealtimeBrokerRequest(baseBrokerRequest);
     }
     return hybridRoute;
@@ -2830,6 +2885,15 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
   }
 
+
+  /// Dispatch seam retaining the exact providers used during compilation and routing. Existing transports keep
+  /// their implementation; a backend requiring captured identities can override this overload explicitly.
+  protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
+      BrokerRequest serverBrokerRequest, TableRouteInfo route, long timeoutMs, ServerStats serverStats,
+      RequestContext requestContext, RequestEnvironment environment) throws Exception {
+    return processBrokerRequest(requestId, originalBrokerRequest, serverBrokerRequest, route, timeoutMs, serverStats,
+        requestContext);
+  }
 
   /// Processes the optimized broker requests for both OFFLINE and REALTIME table.
   /// TODO: Directly take PinotQuery

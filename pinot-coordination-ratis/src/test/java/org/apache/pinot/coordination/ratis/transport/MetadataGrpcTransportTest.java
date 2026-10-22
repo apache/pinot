@@ -1625,12 +1625,13 @@ public class MetadataGrpcTransportTest {
         assertStatus(Status.Code.PERMISSION_DENIED, () -> worker.openSnapshot(fixture.open()));
         assertEquals(quorum._access.execute(new MetadataProtocol.RegisterClient(history, "native-test",
             UUID.randomUUID(), 0), 5000).status(), MetadataProtocol.Status.OK);
+        TableConfig plannedTable = new TableConfigBuilder(TableType.OFFLINE).setTableName("routes")
+            .setNumReplicas(1).build();
+        Schema plannedSchema = new Schema.SchemaBuilder().setSchemaName("routes")
+            .addSingleValueDimension("id", DataType.INT).build();
         commitNativeTest(quorum, new MetadataProtocol.Transaction(history, "native-test", 1, "config", 1,
-            List.of(MetadataProtocol.Mutation.createTableConfig(history, UUID.randomUUID(),
-                    new TableConfigBuilder(TableType.OFFLINE).setTableName("routes").setNumReplicas(1).build()),
-                MetadataProtocol.Mutation.createSchema(history, UUID.randomUUID(),
-                    new Schema.SchemaBuilder().setSchemaName("routes").addSingleValueDimension("id", DataType.INT)
-                        .build()),
+            List.of(MetadataProtocol.Mutation.createTableConfig(history, UUID.randomUUID(), plannedTable),
+                MetadataProtocol.Mutation.createSchema(history, UUID.randomUUID(), plannedSchema),
                 MetadataProtocol.Mutation.createClusterConfig(history, UUID.randomUUID(), Map.of(
                     NativeBrokerRoutingPolicy.CONFIG_KEY,
                     "{\"brokers\":{\"Broker_worker\":[\"DefaultTenant\"]},\"servers\":{}}",
@@ -1651,6 +1652,50 @@ public class MetadataGrpcTransportTest {
         assertTrue(table.getTable().hasSchema());
         assertEquals(table.getTable().getTableName(), "routes_OFFLINE");
         assertEquals(table.getTable().getSegmentsCount(), 0);
+        MetadataRpc.CatalogRecord tableConfig = table.getTable().getTableConfig();
+        MetadataRpc.CatalogRecord schemaRecord = table.getTable().getSchemaRecord();
+        assertEquals(tableConfig.getKind(), MetadataRpc.RecordKind.TABLE_CONFIG);
+        assertEquals(tableConfig.getName(), "routes_OFFLINE");
+        assertEquals(tableConfig.getObjectId(), table.getTable().getTable().getObjectId());
+        assertEquals(tableConfig.getVersion(), table.getTable().getTable().getVersion());
+        // The catalog canonicalizes numeric JSON (e.g. 0.0 to 0); preserve the committed value exactly on the wire.
+        var committedTable = quorum._access.query(new MetadataProtocol.GetRecord(history,
+            MetadataProtocol.RecordKind.TABLE_CONFIG, "routes_OFFLINE"), 5000).record();
+        assertEquals(tableConfig.getValue().getTableConfigJson().toByteArray(),
+            JsonUtils.objectToBytes(committedTable.value()));
+        assertEquals(schemaRecord.getKind(), MetadataRpc.RecordKind.SCHEMA);
+        assertEquals(schemaRecord.getName(), "routes");
+        assertEquals(schemaRecord.getObjectId(), table.getTable().getSchema().getObjectId());
+        assertEquals(schemaRecord.getVersion(), table.getTable().getSchema().getVersion());
+        var committedSchema = quorum._access.query(new MetadataProtocol.GetRecord(history,
+            MetadataProtocol.RecordKind.SCHEMA, "routes"), 5000).record();
+        assertEquals(schemaRecord.getValue().getSchemaJson().toByteArray(),
+            JsonUtils.objectToBytes(committedSchema.value()));
+        assertTrue(tableConfig.getLastModifiedIndex() <= table.getRevision().getIndex());
+        assertTrue(schemaRecord.getLastModifiedIndex() <= table.getRevision().getIndex());
+        assertEquals(tableConfig.getLastModifiedIndex(), schemaRecord.getLastModifiedIndex());
+        assertEquals(table.getTable().getServerAuthoritiesCount(), 0);
+        MetadataRpc.RoutingSnapshot tableBound = worker.routingSnapshot(request.toBuilder()
+            .setTableName("routes_OFFLINE").setMaxRecords(3).build());
+        assertEquals(tableBound.getStatus(), MetadataRpc.ResultStatus.RESPONSE_TOO_LARGE);
+        assertFalse(tableBound.hasTable(), "A bound failure must not expose partial planning records");
+        access._routingResult.set(image -> {
+          var routed = image.table();
+          var record = routed.tableConfig();
+          var wrongKind = new MetadataProtocol.CatalogRecord(MetadataProtocol.RecordKind.CLUSTER_CONFIG,
+              record.name(), record.objectId(), record.version(), record.schemaVersion(), record.lastModifiedIndex(),
+              false, record.value());
+          return new OfflineRoutingProtocol.RoutingSnapshot(image.status(), image.revision(), image.detail(),
+              image.participant(), image.control(), image.tables(), new OfflineRoutingProtocol.TableRouting(
+                  routed.tableName(), routed.table(), routed.schemaName(), routed.schema(), routed.segments(),
+                  wrongKind, routed.schemaRecord(), routed.serverAuthorities()));
+        });
+        try {
+          assertStatus(Status.Code.INTERNAL, () -> worker.routingSnapshot(
+              request.toBuilder().setTableName("routes_OFFLINE").build()));
+        } finally {
+          access._routingResult.set(UnaryOperator.identity());
+        }
         assertEquals(other.routingSnapshot(request).getStatus(), MetadataRpc.ResultStatus.FENCED);
         assertStatus(Status.Code.PERMISSION_DENIED, () -> controller.routingSnapshot(request));
         assertEquals(worker.routingSnapshot(request.toBuilder().setHistoryId(UUID.randomUUID().toString()).build())
@@ -2000,6 +2045,8 @@ public class MetadataGrpcTransportTest {
     private final AtomicReference<Runnable> _beforeRouting = new AtomicReference<>(() -> { });
     private final AtomicReference<UnaryOperator<OfflineInstallationProtocol.InstallationSnapshot>> _installationResult =
         new AtomicReference<>(UnaryOperator.identity());
+    private final AtomicReference<UnaryOperator<OfflineRoutingProtocol.RoutingSnapshot>> _routingResult =
+        new AtomicReference<>(UnaryOperator.identity());
     private final CountDownLatch _entered = new CountDownLatch(4);
     private final CountDownLatch _release = new CountDownLatch(1);
     private volatile boolean _block;
@@ -2034,7 +2081,8 @@ public class MetadataGrpcTransportTest {
     public OfflineRoutingProtocol.RoutingSnapshot routingSnapshot(MembershipProtocol.ParticipantToken broker,
         String tableName, int maxRecords, int maxBytes, long timeoutMillis) throws IOException {
       _beforeRouting.get().run();
-      return ((RoutingAccess) _delegate).routingSnapshot(broker, tableName, maxRecords, maxBytes, timeoutMillis);
+      return _routingResult.get().apply(
+          ((RoutingAccess) _delegate).routingSnapshot(broker, tableName, maxRecords, maxBytes, timeoutMillis));
     }
 
     @Override
