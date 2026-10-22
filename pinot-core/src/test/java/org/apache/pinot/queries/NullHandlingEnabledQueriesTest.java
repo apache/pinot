@@ -2102,4 +2102,38 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
   public void destroySegments() {
     _indexSegment.destroy();
   }
+
+  /// Late materialisation fetches the non-order-by columns in a second pass, so their null bitmaps come from a
+  /// different block than the order-by column's. An off-by-one there would silently drop or invent nulls, and the
+  /// answer must not depend on whether the optimization ran.
+  @Test
+  public void testLateMaterializationPreservesNullsInDeferredColumns()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(1, null);
+    insertRowWithTwoColumns(2, 20);
+    insertRowWithTwoColumns(3, null);
+    insertRowWithTwoColumns(4, 40);
+    Schema schema = schemaBuilder()
+        .addSingleValueDimension(COLUMN1, DataType.INT)
+        .addSingleValueDimension(COLUMN2, DataType.INT)
+        .build();
+    // column1 is sorted and has no nulls, so the sorted-prefix path is used; column2 is the deferred column
+    setUpSegments(TABLE_CONFIG_WITH_SORTED_COLUMN, schema);
+
+    String query =
+        String.format("SELECT %s, %s FROM testTable ORDER BY %s DESC LIMIT 8", COLUMN1, COLUMN2, COLUMN1);
+    List<Object[]> lateRows = getRows("SET lateMaterializeSortedOrderBy = true; " + query);
+    List<Object[]> eagerRows = getRows("SET lateMaterializeSortedOrderBy = false; " + query);
+
+    assertEquals(lateRows.size(), eagerRows.size());
+    for (int i = 0; i < lateRows.size(); i++) {
+      assertEquals(lateRows.get(i), eagerRows.get(i), "row " + i + " differs");
+    }
+    // The top rows are column1=4 (column2=40) across the segment copies, then column1=3, whose column2 is null
+    assertEquals(lateRows.get(0)[0], 4);
+    assertEquals(lateRows.get(0)[1], 40);
+    assertEquals(lateRows.get(lateRows.size() - 1)[0], 3);
+    assertNull(lateRows.get(lateRows.size() - 1)[1], "the deferred column must keep its null");
+  }
 }

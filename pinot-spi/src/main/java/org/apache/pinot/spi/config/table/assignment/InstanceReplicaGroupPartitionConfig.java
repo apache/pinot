@@ -52,8 +52,9 @@ public class InstanceReplicaGroupPartitionConfig extends BaseJsonConfig {
           + "instances if not " + "specified")
   private final int _numInstancesPerPartition;
 
-  @JsonPropertyDescription(
-      "Name of the column used for partition, if not provided table level replica group will be used")
+  // Superseded by the partition column of the segment assignment config, still accepted and honored
+  @Deprecated(since = "1.7.0", forRemoval = true)
+  @JsonPropertyDescription("Deprecated, configure the partition column in the segment assignment config instead")
   private final String _partitionColumn;
 
   // TODO: remove this config in the next official release
@@ -108,6 +109,10 @@ public class InstanceReplicaGroupPartitionConfig extends BaseJsonConfig {
     return _minimizeDataMovement;
   }
 
+  /// @deprecated Configure the partition column in `segmentAssignmentConfigMap` with [SegmentAssignmentConfig]
+  /// instead, which is where the segment assignment reads it from. This column is still accepted and honored, and the
+  /// segment assignment config takes precedence when both are configured.
+  @Deprecated(since = "1.7.0", forRemoval = true)
   @Nullable
   public String getPartitionColumn() {
     return _partitionColumn;

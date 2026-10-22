@@ -1058,6 +1058,16 @@ public class CommonConstants {
 
         public static final String ALLOW_REVERSE_ORDER = "allowReverseOrder";
         public static final boolean DEFAULT_ALLOW_REVERSE_ORDER = false;
+        /// Selection with an order-by prefix on a sorted column: project only the order-by expressions during the
+        /// scan and fetch the remaining output expressions for the rows that survive the limit. Enabling it
+        /// avoids reading every selected column for the whole match set.
+        ///
+        /// Off by default while the optimization bakes, following `allowReverseOrder` and
+        /// `usePhysicalOptimizer`. It also changes the observable `numEntriesScannedPostFilter` on the queries it
+        /// applies to, so turning it on is a deliberate choice. Note the win shrinks as `limit + offset`
+        /// approaches the match-set size, where the second pass reads what the scan would have read anyway.
+        public static final String LATE_MATERIALIZE_SORTED_ORDER_BY = "lateMaterializeSortedOrderBy";
+        public static final boolean DEFAULT_LATE_MATERIALIZE_SORTED_ORDER_BY = false;
 
         public static final String MULTI_STAGE_LEAF_LIMIT = "multiStageLeafLimit";
 
@@ -2526,6 +2536,19 @@ public class CommonConstants {
       public static final String REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY = "replicagroup";
       public static final String ROUND_ROBIN_REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY = "roundrobinreplicagroup";
       public static final String DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY = "allservers";
+
+      // Strategies that can be configured for a table other than a dimension table
+      public static final Set<String> CONFIGURABLE_STRATEGIES = Set.of(
+          BALANCE_NUM_SEGMENT_ASSIGNMENT_STRATEGY,
+          ROUND_ROBIN_SEGMENT_ASSIGNMENT_STRATEGY,
+          REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY,
+          ROUND_ROBIN_REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY
+      );
+      // Strategies that place a segment by its partition, the only ones the partition column applies to
+      public static final Set<String> PARTITION_BASED_STRATEGIES = Set.of(
+          REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY,
+          ROUND_ROBIN_REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY
+      );
     }
 
     public static class BuiltInVirtualColumn {

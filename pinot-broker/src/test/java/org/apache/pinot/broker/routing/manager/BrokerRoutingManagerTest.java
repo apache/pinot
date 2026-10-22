@@ -861,6 +861,36 @@ public class BrokerRoutingManagerTest {
   }
 
   @Test
+  public void testShuttingDownServerRemovedFromRoutingWhileAnotherServerIsExcluded()
+      throws Exception {
+    // Enable three servers, then exclude one of them (simulating FailureDetector marking it unhealthy)
+    String excludedServer = "Server_excludedhost_8000";
+    String healthyServer = "Server_healthyhost_8000";
+    ZNRecord serverConfig = createEnabledServerZNRecord(SERVER_INSTANCE_ID);
+    ZNRecord excludedServerConfig = createEnabledServerZNRecord(excludedServer);
+    ZNRecord healthyServerConfig = createEnabledServerZNRecord(healthyServer);
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT), anyInt(), anyInt()))
+        .thenReturn(List.of(serverConfig, excludedServerConfig, healthyServerConfig));
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    _routingManager.excludeServerFromRouting(excludedServer);
+    InstanceSelector instanceSelector = mock(InstanceSelector.class);
+    putRoutingEntry(TEST_TABLE, createRoutingEntry(TEST_TABLE, null, null, Map.of(), instanceSelector, false));
+
+    // The server starts shutting down while the other server is still excluded
+    ZNRecord shuttingDownServerConfig = createEnabledServerZNRecord(SERVER_INSTANCE_ID);
+    shuttingDownServerConfig.setSimpleField(Helix.IS_SHUTDOWN_IN_PROGRESS, "true");
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT), anyInt(), anyInt()))
+        .thenReturn(List.of(shuttingDownServerConfig, excludedServerConfig, healthyServerConfig));
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+
+    // The routing entry must stop selecting the shutting down server, and only the healthy server stays routable
+    verify(instanceSelector).onInstancesChange(Set.of(healthyServer), List.of(SERVER_INSTANCE_ID));
+    assertEquals(_routingManager.getRoutableServerInstanceMap().keySet(), Set.of(healthyServer));
+    // The excluded server stays enabled
+    assertEquals(_routingManager.getEnabledServerInstanceMap().keySet(), Set.of(excludedServer, healthyServer));
+  }
+
+  @Test
   public void testPartitionPruningThresholdUpdates()
       throws Exception {
     String key = CONFIG_OF_PARTITION_PRUNING_PREPARATION_THRESHOLD;
