@@ -146,6 +146,37 @@ public class ParquetReaderLogicalTypesTest {
     }
   }
 
+  /// The native reader widens unsigned 32-bit values at every nesting level: in a list and in a struct.
+  @Test
+  public void testNestedUnsignedInt32TypeWithNativeReader()
+      throws IOException {
+    String schemaStr = "message NestedUnsignedExample {"
+        + "required group uint32_list (LIST) { repeated group list { required int32 element (INTEGER(32, false)); } }"
+        + "required group uint32_struct { required int32 value (UINT_32); }"
+        + "}";
+    long largeUnsigned = 3540738458L;
+    File dataFile = new File(FileUtils.getTempDirectory(), "nested-unsigned-int32-" + System.nanoTime() + ".parquet");
+    MessageType schema = MessageTypeParser.parseMessageType(schemaStr);
+    try (ParquetWriter<Group> writer = ExampleParquetWriter.builder(new Path(dataFile.getAbsolutePath()))
+        .withType(schema)
+        .build()) {
+      Group group = new SimpleGroupFactory(schema).newGroup();
+      Group list = group.addGroup("uint32_list");
+      list.addGroup("list").append("element", (int) largeUnsigned);
+      list.addGroup("list").append("element", 7);
+      group.addGroup("uint32_struct").append("value", (int) largeUnsigned);
+      writer.write(group);
+    }
+    try (ParquetNativeRecordReader recordReader = new ParquetNativeRecordReader()) {
+      recordReader.init(dataFile, null, null);
+      GenericRow row = recordReader.next();
+      assertEquals((Object[]) row.getValue("uint32_list"), new Object[]{largeUnsigned, 7L});
+      assertEquals(((Map<?, ?>) row.getValue("uint32_struct")).get("value"), largeUnsigned);
+    } finally {
+      FileUtils.deleteQuietly(dataFile);
+    }
+  }
+
   /// Write the given row object to a random parquet file and return the path of the file
   private String writeToFile(String schemaStr, Map<String, Object> rowObject)
       throws IOException {

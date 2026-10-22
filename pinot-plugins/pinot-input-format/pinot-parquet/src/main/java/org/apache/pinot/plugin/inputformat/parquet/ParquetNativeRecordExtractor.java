@@ -140,7 +140,8 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
             // `TIME_MILLIS` (int32 millis-since-midnight) → [LocalTime], or raw ms when configured.
             return _extractRawTimeValues ? intValue : LocalTime.ofNanoOfDay(intValue * 1_000_000L);
           }
-          if (ParquetUtils.isUnsignedInt32(fieldType)) {
+          if (logicalTypeAnnotation instanceof LogicalTypeAnnotation.IntLogicalTypeAnnotation intLogicalTypeAnnotation
+              && intLogicalTypeAnnotation.getBitWidth() == 32 && !intLogicalTypeAnnotation.isSigned()) {
             // Unsigned 32-bit values are stored as the signed int bit pattern; widen to `Long` so values above
             // `Integer.MAX_VALUE` are not read as negatives.
             return Integer.toUnsignedLong(intValue);

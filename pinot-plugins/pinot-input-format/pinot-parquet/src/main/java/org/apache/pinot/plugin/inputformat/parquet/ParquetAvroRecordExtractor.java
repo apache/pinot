@@ -33,7 +33,9 @@ import org.apache.pinot.spi.utils.TimestampUtils;
 ///   [ParquetUtils#convertInt96ToEpochNanos].
 /// - Top-level unsigned 32-bit integer fields (`INTEGER(32, false)` / legacy `UINT_32`), which parquet-avro surfaces
 ///   as a signed Avro `int` → `Long` via [Integer#toUnsignedLong]. The field names come from the Parquet file schema
-///   (see [ParquetUtils#getUnsignedInt32FieldNames]) since the Avro schema carries no signedness.
+///   (see [ParquetUtils#getUnsignedInt32FieldNames]) since the Avro schema carries no signedness. Unsigned values
+///   nested in a struct, list or map are still read as signed ints by this reader; [ParquetNativeRecordReader]
+///   widens them at every level.
 public class ParquetAvroRecordExtractor extends AvroRecordExtractor {
   private static final int INT96_BYTE_SIZE = 12;
   private static final String INT96_DOC = "INT96 represented as byte[12]";
