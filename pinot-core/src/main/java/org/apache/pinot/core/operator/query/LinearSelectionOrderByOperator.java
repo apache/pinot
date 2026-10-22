@@ -71,11 +71,8 @@ import org.roaringbitmap.RoaringBitmap;
 /// Only order-by expressions are fetched during selection. Any remaining output expressions are fetched for the
 /// surviving rows after selection, as in [SelectionOrderByOperator].
 ///
-/// Operators that derives from this class are going to have an almost linear cost instead of the usual NlogN when
-/// actual sorting must be done, where N is the number of rows in the segment. There is a degraded scenario when the
-/// cost is actually NlogL (where L is the limit of the query) when all the first L rows have the exact same value for
-/// the prefix of the sorted columns. Even in that case, L should be quite smaller than N, so this implementation is
-/// algorithmically better than the normal solution.
+/// These operators reuse the segment's sorted prefix. Rows tied on that prefix are ordered by the remaining
+/// expressions.
 public abstract class LinearSelectionOrderByOperator extends BaseOperator<SelectionResultsBlock> {
   protected final IndexSegment _indexSegment;
   protected final QueryContext _queryContext;
@@ -86,9 +83,7 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
   protected final List<ExpressionContext> _toSort;
 
   protected final BaseProjectOperator<?> _projectOperator;
-  protected final List<OrderByExpressionContext> _orderByExpressions;
   protected final ColumnContext[] _columnContexts;
-  protected final int _numRowsToKeep;
   protected final Comparator<Object[]> _comparator;
   protected final Supplier<ListBuilder> _listBuilderSupplier;
   protected final int _numOrderByExpressions;
@@ -104,35 +99,33 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
     _expressions = expressions;
     _projectOperator = projectOperator;
 
-    _orderByExpressions = queryContext.getOrderByExpressions();
-    assert _orderByExpressions != null;
-    int numOrderByExpressions = _orderByExpressions.size();
-
-    _numOrderByExpressions = numOrderByExpressions;
+    List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
+    assert orderByExpressions != null;
+    _numOrderByExpressions = orderByExpressions.size();
 
     _alreadySorted = expressions.subList(0, numSortedExpressions);
-    _toSort = expressions.subList(numSortedExpressions, numOrderByExpressions);
+    _toSort = expressions.subList(numSortedExpressions, _numOrderByExpressions);
 
     // Only order-by expressions are projected during selection; the remaining expressions are fetched afterwards.
-    _columnContexts = new ColumnContext[numOrderByExpressions];
+    _columnContexts = new ColumnContext[_numOrderByExpressions];
     for (int i = 0; i < _columnContexts.length; i++) {
       ExpressionContext expression = _expressions.get(i);
       _columnContexts[i] = _projectOperator.getResultColumnContext(expression);
     }
 
-    _numRowsToKeep = queryContext.getOffset() + queryContext.getLimit();
-    _comparator = OrderByComparatorFactory.getComparator(_orderByExpressions, _columnContexts, _nullHandlingEnabled);
+    int numRowsToKeep = queryContext.getOffset() + queryContext.getLimit();
+    _comparator = OrderByComparatorFactory.getComparator(orderByExpressions, _columnContexts, _nullHandlingEnabled);
 
     if (_toSort.isEmpty()) {
-      _listBuilderSupplier = () -> new TotallySortedListBuilder(_numRowsToKeep);
+      _listBuilderSupplier = () -> new TotallySortedListBuilder(numRowsToKeep);
     } else {
       Comparator<Object[]> sortedComparator =
-          OrderByComparatorFactory.getComparator(_orderByExpressions, _columnContexts, _nullHandlingEnabled, 0,
+          OrderByComparatorFactory.getComparator(orderByExpressions, _columnContexts, _nullHandlingEnabled, 0,
               numSortedExpressions);
       Comparator<Object[]> unsortedComparator =
-          OrderByComparatorFactory.getComparator(_orderByExpressions, _columnContexts, _nullHandlingEnabled,
-              numSortedExpressions, numOrderByExpressions);
-      _listBuilderSupplier = () -> new PartiallySortedListBuilder(_numRowsToKeep, sortedComparator, unsortedComparator);
+          OrderByComparatorFactory.getComparator(orderByExpressions, _columnContexts, _nullHandlingEnabled,
+              numSortedExpressions, _numOrderByExpressions);
+      _listBuilderSupplier = () -> new PartiallySortedListBuilder(numRowsToKeep, sortedComparator, unsortedComparator);
     }
   }
 
@@ -234,7 +227,7 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
     return CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, getUpperCaseExplainName());
   }
 
-  // remember this ist he single-stage explain string
+  // Used by the single-stage explain string.
   @Override
   public String toExplainString() {
     StringBuilder sb = new StringBuilder(getUpperCaseExplainName());
@@ -246,7 +239,7 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
     concatList(sb, _toSort);
 
     sb.append(", rest: ");
-    concatList(sb, _expressions.subList(_alreadySorted.size() + _toSort.size(), _expressions.size()));
+    concatList(sb, _expressions.subList(_numOrderByExpressions, _expressions.size()));
 
     sb.append(')');
     return sb.toString();
@@ -255,7 +248,7 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
   @Override
   protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
     super.explainAttributes(attributeBuilder);
-    List<ExpressionContext> rest = _expressions.subList(_alreadySorted.size() + _toSort.size(), _expressions.size());
+    List<ExpressionContext> rest = _expressions.subList(_numOrderByExpressions, _expressions.size());
 
     List<String> sortedList = _alreadySorted.stream().map(ExpressionContext::toString).collect(Collectors.toList());
     List<String> toSort = _toSort.stream().map(ExpressionContext::toString).collect(Collectors.toList());
@@ -292,8 +285,7 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
   /// The rows are visited in doc-id order because that is the order [BitmapDocIdSetOperator#ascending] returns, while
   /// `rows` keeps the result order. Both views hold the same row arrays, so filling one fills the other.
   private SelectionResultsBlock fetchRemainingExpressions(List<Object[]> rows) {
-    int numExpressions = _expressions.size();
-    List<ExpressionContext> nonOrderByExpressions = _expressions.subList(_numOrderByExpressions, numExpressions);
+    List<ExpressionContext> nonOrderByExpressions = _expressions.subList(_numOrderByExpressions, _expressions.size());
     int numNonOrderByExpressions = nonOrderByExpressions.size();
 
     int numRows = rows.size();
@@ -354,8 +346,7 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
         }
         rowBaseId += numDocsFetched;
       }
-      return new SelectionResultsBlock(createDataSchema(transformOperator), rows, _comparator,
-          _queryContext);
+      return new SelectionResultsBlock(createDataSchema(transformOperator), rows, _comparator, _queryContext);
     }
   }
 
