@@ -74,4 +74,19 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
     }
     return selectWithContext(segments, requestId, segmentStates, ctx);
   }
+
+  // Same-partition old segments share one identical, identically-ordered candidate list by construction
+  // (updateSegmentMapsForUpsertTable), so they are either all healthy or all unavailable, and selectServers() picks
+  // the same index into that list for every segment of a request. During fail-open, healthy segments keep their
+  // normal candidates (selectServers() never reads the fallback candidates), so a healthy partition is never routed
+  // onto an unhealthy server, and is routed exactly as in the normal pass under round robin or fixed-replica routing.
+  // (With adaptive selection, fail-open falls back to round robin; with numReplicaGroupsToQuery, the now-routed
+  // unavailable segments shift the replica offset. Either can move a healthy partition to another healthy server.)
+  // This flag is only needed for new segments of an unavailable partition: they have no enabled candidates and aren't
+  // counted as unavailable, so tracking their fail-open candidates lets them follow their old siblings onto the same
+  // fail-open instance instead of being skipped.
+  @Override
+  protected boolean shouldTrackFailOpenCandidatesForHealthySegments() {
+    return true;
+  }
 }

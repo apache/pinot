@@ -217,6 +217,18 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   public static final BrokerMeter ROUTING_TABLE_UPDATE_FAILURE =
       create("ROUTING_TABLE_UPDATE_FAILURE", "failures", false);
 
+  // Panic routing metrics
+  public static final BrokerMeter FAIL_OPEN_ELIGIBLE_REQUESTS =
+      create("FAIL_OPEN_ELIGIBLE_REQUESTS", "failOpenEligibleRequests", true);
+  public static final BrokerMeter FAIL_OPEN_ROUTING_SUCCESSES =
+      create("FAIL_OPEN_ROUTING_SUCCESSES", "failOpenRoutingSuccesses", true);
+  public static final BrokerMeter FAIL_OPEN_ROUTING_FAILURES =
+      create("FAIL_OPEN_ROUTING_FAILURES", "failOpenRoutingFailures", true);
+
+  // Tracks segments that become eligible for fail-open routing.
+  public static final BrokerMeter FAIL_OPEN_ELIGIBLE_SEGMENTS =
+      create("FAIL_OPEN_ELIGIBLE_SEGMENTS", "failOpenEligibleSegments", false);
+
   // Netty connection metrics
   public static final BrokerMeter NETTY_CONNECTION_REQUESTS_SENT = create(
       "NETTY_CONNECTION_REQUESTS_SENT", "nettyConnection", true);

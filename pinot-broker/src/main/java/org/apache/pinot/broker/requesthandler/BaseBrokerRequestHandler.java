@@ -54,6 +54,7 @@ import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.routing.MultiClusterRoutingContext;
 import org.apache.pinot.core.routing.RoutingManager;
+import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
@@ -474,5 +475,23 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   protected boolean isQueryCancellationEnabled() {
     return _enableQueryCancellation;
+  }
+
+  /// Looks up the [ServerInstance] for a server that the [org.apache.pinot.common.failuredetector.FailureDetector] is
+  /// retrying. Checks the local routing manager first, then falls back to the federated multi-cluster routing manager
+  /// so that servers owned only by a remote cluster can still be probed and recovered instead of being stuck as
+  /// unhealthy (or blindly marked healthy once retries are exhausted).
+  @Nullable
+  protected ServerInstance getServerInstanceForRetry(String instanceId) {
+    ServerInstance serverInstance = _routingManager.getEnabledServerInstanceMap().get(instanceId);
+    if (serverInstance != null) {
+      return serverInstance;
+    }
+    if (_multiClusterRoutingContext == null) {
+      return null;
+    }
+    RoutingManager multiClusterRoutingManager = _multiClusterRoutingContext.getMultiClusterRoutingManager();
+    return multiClusterRoutingManager != null ? multiClusterRoutingManager.getEnabledServerInstanceMap()
+        .get(instanceId) : null;
   }
 }

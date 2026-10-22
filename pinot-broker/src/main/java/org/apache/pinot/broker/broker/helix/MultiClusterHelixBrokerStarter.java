@@ -110,6 +110,22 @@ public class MultiClusterHelixBrokerStarter extends BaseBrokerStarter {
   }
 
   @Override
+  protected void includeServerToRouting(String instanceId) {
+    super.includeServerToRouting(instanceId);
+    if (_remoteRoutingManagers != null) {
+      _remoteRoutingManagers.values().forEach(manager -> manager.includeServerToRouting(instanceId));
+    }
+  }
+
+  @Override
+  protected void excludeServerFromRouting(String instanceId) {
+    super.excludeServerFromRouting(instanceId);
+    if (_remoteRoutingManagers != null) {
+      _remoteRoutingManagers.values().forEach(manager -> manager.excludeServerFromRouting(instanceId));
+    }
+  }
+
+  @Override
   protected void initClusterChangeMediator() throws Exception {
     super.initClusterChangeMediator();
     try {
@@ -227,7 +243,8 @@ public class MultiClusterHelixBrokerStarter extends BaseBrokerStarter {
       String clusterName = entry.getKey();
       try {
         RemoteClusterBrokerRoutingManager routingManager =
-            new RemoteClusterBrokerRoutingManager(clusterName, _brokerMetrics, _serverRoutingStatsManager, _brokerConf);
+            new RemoteClusterBrokerRoutingManager(clusterName, _brokerMetrics, _serverRoutingStatsManager, _brokerConf,
+                _failOpenPolicy, _failureDetector);
         routingManager.init(entry.getValue());
         _clusterConfigChangeHandler.registerClusterConfigChangeListener(routingManager);
         _remoteRoutingManagers.put(clusterName, routingManager);

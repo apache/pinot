@@ -27,7 +27,9 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.broker.routing.FailOpenPolicy;
 import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelector;
+import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.transport.ServerInstance;
@@ -49,9 +51,25 @@ public interface InstanceSelector {
       InstanceSelectorConfig config, Set<String> enabledInstances, Map<String, ServerInstance> enabledServerMap,
       IdealState idealState, ExternalView externalView, Set<String> onlineSegments);
 
+  /// Configures optional fail-open routing after initialization.
+  default void setFailOpenRouting(FailOpenPolicy failOpenPolicy, FailureDetector failureDetector) {
+  }
+
   /// Processes the instances change. Changed instances are pre-computed based on the current and previous enabled
   /// instances only once on the caller side and passed to all the instance selectors.
   void onInstancesChange(Set<String> enabledInstances, List<String> changedInstances);
+
+  /// Processes an instance change with separate snapshots of instances currently available for normal routing and
+  /// instances eligible to be used as fail-open candidates. The latter includes instances excluded from normal
+  /// routing by failure detection (but not administratively disabled), so they remain eligible for fail-open
+  /// routing. Both arguments are immutable snapshots and may be retained by implementations. `changedInstances`
+  /// contains the union of instances whose routable or fail-open-eligible membership changed. The default
+  /// implementation preserves legacy behavior and ignores administrative membership. Implementations supporting
+  /// fail-open routing must override this method.
+  default void onInstancesChange(Set<String> routableInstances, Set<String> failOpenEligibleInstances,
+      List<String> changedInstances) {
+    onInstancesChange(routableInstances, changedInstances);
+  }
 
   /// Processes the segment assignment (ideal state or external view) change based on the given online segments
   /// (segments with ONLINE/CONSUMING instances in the ideal state and pre-selected by the

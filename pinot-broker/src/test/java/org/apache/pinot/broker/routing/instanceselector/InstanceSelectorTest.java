@@ -43,7 +43,9 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.broker.routing.FailOpenPolicy;
 import org.apache.pinot.broker.routing.adaptiveserverselector.HybridSelector;
+import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.BrokerGauge;
@@ -51,6 +53,7 @@ import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.TestClock;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.config.table.RoutingConfig;
@@ -59,6 +62,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
@@ -66,7 +70,10 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.config.table.RoutingConfig.REPLICA_GROUP_INSTANCE_SELECTOR_TYPE;
 import static org.apache.pinot.spi.config.table.RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE;
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey.NUM_REPLICA_GROUPS_TO_QUERY;
 import static org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey.ORDERED_PREFERRED_POOLS;
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey.USE_FIXED_REPLICA;
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey.USE_MULTISTAGE_ENGINE;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ERROR;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE;
@@ -74,11 +81,16 @@ import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.Segmen
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
@@ -182,6 +194,16 @@ public class InstanceSelectorTest {
     return InstanceSelectorFactory.getInstanceSelector(_tableConfig, _propertyStore, _brokerMetrics, null,
         _mutableClock, new PinotConfiguration(), enabledInstances, EMPTY_SERVER_MAP, idealState, externalView,
         onlineSegments);
+  }
+
+  private InstanceSelector createTestInstanceSelector(String selectorType, Set<String> enabledInstances,
+      Map<String, ServerInstance> enabledServerMap, IdealState idealState, ExternalView externalView,
+      Set<String> onlineSegments, FailOpenPolicy failOpenPolicy, FailureDetector failureDetector) {
+    RoutingConfig config = new RoutingConfig(null, null, selectorType, false);
+    when(_tableConfig.getRoutingConfig()).thenReturn(config);
+    return InstanceSelectorFactory.getInstanceSelector(_tableConfig, _propertyStore, _brokerMetrics, null,
+        _mutableClock, new PinotConfiguration(), enabledInstances, enabledServerMap, idealState, externalView,
+        onlineSegments, failOpenPolicy, failureDetector);
   }
 
   @DataProvider(name = "selectorType")
@@ -1063,6 +1085,8 @@ public class InstanceSelectorTest {
     onlineSegments.add(segment0);
     onlineSegments.add(segment1);
     List<String> segments = Arrays.asList(segment0, segment1);
+    Map<String, ServerInstance> failOpenEligibleServers =
+        Map.of(instance, mock(ServerInstance.class), errorInstance, mock(ServerInstance.class));
 
     // Initialize with no enabled instance, both segments should be unavailable
     // {
@@ -1076,9 +1100,11 @@ public class InstanceSelectorTest {
     //   }
     // }
     balancedInstanceSelector.init(_tableConfig, propertyStore, brokerMetrics, null, Clock.systemUTC(),
-        INSTANCE_SELECTOR_CONFIG, enabledInstances, EMPTY_SERVER_MAP, idealState, externalView, onlineSegments);
+        INSTANCE_SELECTOR_CONFIG, enabledInstances, failOpenEligibleServers, idealState, externalView,
+        onlineSegments);
     strictReplicaGroupInstanceSelector.init(_tableConfig, propertyStore, brokerMetrics, null, Clock.systemUTC(),
-        INSTANCE_SELECTOR_CONFIG, enabledInstances, EMPTY_SERVER_MAP, idealState, externalView, onlineSegments);
+        INSTANCE_SELECTOR_CONFIG, enabledInstances, failOpenEligibleServers, idealState, externalView,
+        onlineSegments);
     BrokerRequest brokerRequest = mock(BrokerRequest.class);
     PinotQuery pinotQuery = mock(PinotQuery.class);
     when(brokerRequest.getPinotQuery()).thenReturn(pinotQuery);
@@ -1089,6 +1115,17 @@ public class InstanceSelectorTest {
     selectionResult = strictReplicaGroupInstanceSelector.select(brokerRequest, segments, 0);
     assertTrue(selectionResult.getSegmentToInstanceMap().isEmpty());
     assertEquals(selectionResult.getUnavailableSegments(), Arrays.asList(segment0, segment1));
+    verify(brokerMetrics, times(2)).addMeteredGlobalValue(BrokerMeter.FAIL_OPEN_ELIGIBLE_REQUESTS, 1);
+    // Both selectors transition segment0 and segment1 into the unavailable-with-candidates state on init.
+    verify(brokerMetrics, times(4))
+        .addMeteredTableValue(offlineTableName, BrokerMeter.FAIL_OPEN_ELIGIBLE_SEGMENTS, 1);
+
+    // An unchanged routing refresh should not re-count the transition meter since the segments were already
+    // unavailable with candidates.
+    balancedInstanceSelector.onInstancesChange(enabledInstances, List.of());
+    strictReplicaGroupInstanceSelector.onInstancesChange(enabledInstances, List.of());
+    verify(brokerMetrics, times(4))
+        .addMeteredTableValue(offlineTableName, BrokerMeter.FAIL_OPEN_ELIGIBLE_SEGMENTS, 1);
 
     // Iterate 5 times
     for (int i = 0; i < 5; i++) {
@@ -1566,6 +1603,846 @@ public class InstanceSelectorTest {
     selectionResult = selector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedResult);
     assertTrue(selectionResult.getUnavailableSegments().isEmpty());
+  }
+
+  @Test(dataProvider = "selectorType")
+  public void testFailOpenEligibleSegmentsMeter(String selectorType) {
+    String segment = "segment0";
+    String instance = "instance0";
+    Set<String> onlineSegments = Set.of(segment);
+    IdealState idealState = createIdealState(Map.of(segment, List.of(Pair.of(instance, ONLINE))));
+    ExternalView externalView = createExternalView(Map.of(segment, List.of()));
+    FailureDetector failureDetector = mock(FailureDetector.class);
+    when(failureDetector.getUnhealthyServers()).thenReturn(Set.of(instance));
+    InstanceSelector selector = createTestInstanceSelector(selectorType, Set.of(),
+        Map.of(instance, mock(ServerInstance.class)), idealState, externalView, onlineSegments,
+        new FailOpenPolicy(false, true), failureDetector);
+
+    // Segment has no candidates at all yet, so it is not a transition into the unavailable-with-candidates state.
+    verify(_brokerMetrics, never())
+        .addMeteredTableValue(TABLE_NAME, BrokerMeter.FAIL_OPEN_ELIGIBLE_SEGMENTS, 1);
+
+    selector.select(_brokerRequest, List.of(segment), 0);
+    selector.select(_brokerRequest, List.of(segment), 1);
+    verify(_brokerMetrics, never()).addMeteredGlobalValue(BrokerMeter.FAIL_OPEN_ELIGIBLE_REQUESTS, 1);
+
+    externalView = createExternalView(Map.of(segment, List.of(Pair.of(instance, ONLINE))));
+    selector.onAssignmentChange(idealState, externalView, onlineSegments);
+
+    // Segment transitioned from "no candidates" to "unavailable with a disabled candidate".
+    verify(_brokerMetrics)
+        .addMeteredTableValue(TABLE_NAME, BrokerMeter.FAIL_OPEN_ELIGIBLE_SEGMENTS, 1);
+
+    selector.select(_brokerRequest, List.of(segment), 2);
+    selector.select(_brokerRequest, List.of(segment), 3);
+    verify(_brokerMetrics, times(2)).addMeteredGlobalValue(BrokerMeter.FAIL_OPEN_ELIGIBLE_REQUESTS, 1);
+
+    // An unchanged refresh must not re-count the transition meter since the segment was already unavailable with a
+    // candidate.
+    selector.onAssignmentChange(idealState, externalView, onlineSegments);
+
+    verify(_brokerMetrics, times(1))
+        .addMeteredTableValue(TABLE_NAME, BrokerMeter.FAIL_OPEN_ELIGIBLE_SEGMENTS, 1);
+
+    selector.onInstancesChange(Set.of(instance), List.of(instance));
+
+    // Recovery is not a transition into the unhealthy state, so the meter must not increment.
+    verify(_brokerMetrics, times(1))
+        .addMeteredTableValue(TABLE_NAME, BrokerMeter.FAIL_OPEN_ELIGIBLE_SEGMENTS, 1);
+
+    selector.select(_brokerRequest, List.of(segment), 4);
+    verify(_brokerMetrics, times(2)).addMeteredGlobalValue(BrokerMeter.FAIL_OPEN_ELIGIBLE_REQUESTS, 1);
+
+    // Disable the instance again to re-enter the unavailable-with-candidates state after recovery; the meter must
+    // fire again since this is a fresh transition, not a repeat of the earlier one.
+    selector.onInstancesChange(Set.of(), List.of(instance));
+
+    verify(_brokerMetrics, times(2))
+        .addMeteredTableValue(TABLE_NAME, BrokerMeter.FAIL_OPEN_ELIGIBLE_SEGMENTS, 1);
+  }
+
+  @Test(dataProvider = "selectorType")
+  public void testFailOpenUsesRequestIdDeterministically(String selectorType) {
+    String segment = "segment0";
+    String instance0 = "instance0";
+    String instance1 = "instance1";
+    Set<String> onlineSegments = Set.of(segment);
+    IdealState idealState = createIdealState(Map.of(segment,
+        List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE))));
+    ExternalView externalView = createExternalView(Map.of(segment,
+        List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE))));
+    FailureDetector failureDetector = mock(FailureDetector.class);
+    when(failureDetector.getUnhealthyServers()).thenReturn(Set.of(instance0, instance1));
+    Map<String, ServerInstance> enabledServerMap =
+        Map.of(instance0, mock(ServerInstance.class), instance1, mock(ServerInstance.class));
+    InstanceSelector selector = createTestInstanceSelector(selectorType, Set.of(), enabledServerMap, idealState,
+        externalView, onlineSegments, new FailOpenPolicy(false, true), failureDetector);
+
+    InstanceSelector.SelectionResult first = selector.select(_brokerRequest, List.of(segment), 0);
+    InstanceSelector.SelectionResult repeated = selector.select(_brokerRequest, List.of(segment), 0);
+    InstanceSelector.SelectionResult second = selector.select(_brokerRequest, List.of(segment), 1);
+
+    assertEquals(first.getSegmentToInstanceMap(), Map.of(segment, instance0));
+    assertEquals(repeated.getSegmentToInstanceMap(), first.getSegmentToInstanceMap());
+    assertEquals(second.getSegmentToInstanceMap(), Map.of(segment, instance1));
+    assertTrue(first.getUnavailableSegments().isEmpty());
+    // All three select() calls above found a fail-open candidate.
+    verify(_brokerMetrics, times(3)).addMeteredGlobalValue(BrokerMeter.FAIL_OPEN_ROUTING_SUCCESSES, 1);
+    verify(_brokerMetrics, never()).addMeteredGlobalValue(BrokerMeter.FAIL_OPEN_ROUTING_FAILURES, 1);
+  }
+
+  // Fixed-replica ("sticky") routing uses a deterministic formula over whatever candidate list it's given, so it
+  // works correctly over the fail-open-expanded pool exactly as it does over the normal pool. Fail-open must not
+  // disable it: both calls below must resolve to the exact same instance, not alternate via round robin.
+  @Test
+  public void testReplicaGroupFailOpenPreservesFixedReplicaQueryOption() {
+    String segment = "segment0";
+    String instance0 = "instance0";
+    String instance1 = "instance1";
+    List<Pair<String, String>> assignments =
+        List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE));
+    IdealState idealState = createIdealState(Map.of(segment, assignments));
+    ExternalView externalView = createExternalView(Map.of(segment, assignments));
+    FailureDetector failureDetector = mock(FailureDetector.class);
+    when(failureDetector.getUnhealthyServers()).thenReturn(Set.of(instance0, instance1));
+    InstanceSelector selector = createTestInstanceSelector(REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, Set.of(),
+        Map.of(instance0, mock(ServerInstance.class), instance1, mock(ServerInstance.class)), idealState, externalView,
+        Set.of(segment), new FailOpenPolicy(false, true), failureDetector);
+    when(_pinotQuery.getQueryOptions()).thenReturn(Map.of(USE_FIXED_REPLICA, Boolean.TRUE.toString()));
+
+    InstanceSelector.SelectionResult first = selector.select(_brokerRequest, List.of(segment), 0);
+    InstanceSelector.SelectionResult second = selector.select(_brokerRequest, List.of(segment), 1);
+
+    assertEquals(first.getSegmentToInstanceMap(), second.getSegmentToInstanceMap());
+  }
+
+  // segment0 is healthy (candidates [instance0, instance1]); segment1 is unavailable and needs fail-open (candidates
+  // [instance2, instance3]). Fail-open reselects both segments together over the full per-query segment list, so the
+  // shared round-robin counter visits segment0 first (consuming index 0) and segment1 second (consuming index 1) -
+  // exactly as the ideal single pass over the full list would have. If fail-open instead restarted its own counter
+  // from scratch for just the unavailable subset (the pre-fix behavior), segment1 would land on index 0
+  // (instance2) instead of index 1 (instance3).
+  @Test
+  public void testBalancedFailOpenContinuesRoundRobinSequence() {
+    String segment0 = "segment0";
+    String segment1 = "segment1";
+    String instance0 = "instance0";
+    String instance1 = "instance1";
+    String instance2 = "instance2";
+    String instance3 = "instance3";
+    Set<String> onlineSegments = Set.of(segment0, segment1);
+    IdealState idealState = createIdealState(Map.of(
+        segment0, List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)),
+        segment1, List.of(Pair.of(instance2, ONLINE), Pair.of(instance3, ONLINE))));
+    ExternalView externalView = createExternalView(Map.of(
+        segment0, List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)),
+        segment1, List.of(Pair.of(instance2, ONLINE), Pair.of(instance3, ONLINE))));
+    FailureDetector failureDetector = mock(FailureDetector.class);
+    when(failureDetector.getUnhealthyServers()).thenReturn(Set.of(instance2, instance3));
+    Map<String, ServerInstance> enabledServerMap = Map.of(
+        instance0, mock(ServerInstance.class), instance1, mock(ServerInstance.class),
+        instance2, mock(ServerInstance.class), instance3, mock(ServerInstance.class));
+    // Only instance0/instance1 (segment0's instances) are routable; segment1's instances are excluded from normal
+    // routing (so segment1 needs fail-open) but remain fail-open eligible via enabledServerMap.
+    InstanceSelector selector = createTestInstanceSelector(BALANCED_INSTANCE_SELECTOR, Set.of(instance0, instance1),
+        enabledServerMap, idealState, externalView, onlineSegments, new FailOpenPolicy(false, true),
+        failureDetector);
+
+    InstanceSelector.SelectionResult result = selector.select(_brokerRequest, List.of(segment0, segment1), 0);
+
+    assertEquals(result.getSegmentToInstanceMap(), Map.of(segment0, instance0, segment1, instance3));
+    assertTrue(result.getUnavailableSegments().isEmpty());
+  }
+
+  // 4-segment query with NUM_REPLICA_GROUPS_TO_QUERY=2; segment2 is unavailable (its instances are fail-open
+  // eligible but not routable) and needs fail-open, while segment0/1/3 share a separate, healthy instance pool.
+  // The ideal pass walks replicaOffset 0,1,0,1 across the 4 segments (2-and-2 split). Fail-open reselects the full
+  // list together, so segment2 lands in its rightful replicaOffset=0 slot (continuing the sequence) rather than
+  // restarting its own 0..1 sequence over just the unavailable subset (the pre-fix behavior), which would have
+  // broken the requested 2-and-2 split.
+  @Test
+  public void testReplicaGroupFailOpenContinuesNumReplicaGroupsToQuerySequence() {
+    String segment0 = "segment0";
+    String segment1 = "segment1";
+    String segment2 = "segment2";
+    String segment3 = "segment3";
+    String instance0 = "instance0";
+    String instance1 = "instance1";
+    String instance2 = "instance2";
+    String instance3 = "instance3";
+    List<Pair<String, String>> healthyAssignments =
+        List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE));
+    List<Pair<String, String>> failOpenAssignments =
+        List.of(Pair.of(instance2, ONLINE), Pair.of(instance3, ONLINE));
+    Set<String> onlineSegments = Set.of(segment0, segment1, segment2, segment3);
+    IdealState idealState = createIdealState(Map.of(
+        segment0, healthyAssignments, segment1, healthyAssignments, segment2, failOpenAssignments, segment3,
+        healthyAssignments));
+    ExternalView externalView = createExternalView(Map.of(
+        segment0, healthyAssignments, segment1, healthyAssignments, segment2, failOpenAssignments, segment3,
+        healthyAssignments));
+    FailureDetector failureDetector = mock(FailureDetector.class);
+    when(failureDetector.getUnhealthyServers()).thenReturn(Set.of(instance2, instance3));
+    Map<String, ServerInstance> enabledServerMap = Map.of(
+        instance0, mock(ServerInstance.class), instance1, mock(ServerInstance.class),
+        instance2, mock(ServerInstance.class), instance3, mock(ServerInstance.class));
+    // Only instance0/instance1 are routable; segment2's instances (instance2/instance3) are excluded from normal
+    // routing (so segment2 needs fail-open) but remain fail-open eligible via enabledServerMap.
+    InstanceSelector selector = createTestInstanceSelector(REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
+        Set.of(instance0, instance1), enabledServerMap, idealState, externalView, onlineSegments,
+        new FailOpenPolicy(false, true), failureDetector);
+    when(_pinotQuery.getQueryOptions()).thenReturn(Map.of(NUM_REPLICA_GROUPS_TO_QUERY, "2"));
+
+    InstanceSelector.SelectionResult result =
+        selector.select(_brokerRequest, List.of(segment0, segment1, segment2, segment3), 0);
+
+    // replicaOffset sequence across the full list is 0,1,0,1: segment0 (offset0->instance0), segment1
+    // (offset1->instance1), segment2 (offset0->instance2, continuing the sequence despite needing fail-open),
+    // segment3 (offset1->instance1).
+    assertEquals(result.getSegmentToInstanceMap(),
+        Map.of(segment0, instance0, segment1, instance1, segment2, instance2, segment3, instance1));
+    assertTrue(result.getUnavailableSegments().isEmpty());
+  }
+
+  // Fail-open recomputes healthy segments too (to preserve round-robin/fan-out sequencing continuity), but pool
+  // metrics are only recorded once per query - centrally, from the final mapping that is actually returned to the
+  // caller - so this must not double-count the healthy segment's pool.
+  @Test
+  public void testBalancedFailOpenDoesNotDoubleCountPoolMetrics() {
+    String healthySegment = "segment0";
+    String failOpenSegment = "segment1";
+    String healthyInstance = "instance0";
+    String unhealthyInstance = "instance1";
+    Set<String> onlineSegments = Set.of(healthySegment, failOpenSegment);
+    IdealState idealState = createIdealState(Map.of(healthySegment, List.of(Pair.of(healthyInstance, ONLINE)),
+        failOpenSegment, List.of(Pair.of(unhealthyInstance, ONLINE))));
+    ExternalView externalView = createExternalView(Map.of(healthySegment, List.of(Pair.of(healthyInstance, ONLINE)),
+        failOpenSegment, List.of(Pair.of(unhealthyInstance, ONLINE))));
+    FailureDetector failureDetector = mock(FailureDetector.class);
+    when(failureDetector.getUnhealthyServers()).thenReturn(Set.of(unhealthyInstance));
+    ServerInstance healthyServer = mock(ServerInstance.class);
+    when(healthyServer.getPool()).thenReturn(1);
+    ServerInstance unhealthyServer = mock(ServerInstance.class);
+    when(unhealthyServer.getPool()).thenReturn(2);
+    InstanceSelector selector = createTestInstanceSelector(BALANCED_INSTANCE_SELECTOR, Set.of(healthyInstance),
+        Map.of(healthyInstance, healthyServer, unhealthyInstance, unhealthyServer), idealState, externalView,
+        onlineSegments, new FailOpenPolicy(false, true), failureDetector);
+    clearInvocations(_brokerMetrics);
+
+    selector.select(_brokerRequest, List.of(healthySegment, failOpenSegment), 0);
+
+    verify(_brokerMetrics, times(1)).addMeteredValue(BrokerMeter.POOL_SEG_QUERIES, 1L,
+        BrokerMetrics.getTagForPreferredPool(null), "1");
+    verify(_brokerMetrics, times(1)).addMeteredValue(BrokerMeter.POOL_SEG_QUERIES, 1L,
+        BrokerMetrics.getTagForPreferredPool(null), "2");
+  }
+
+  @Test(dataProvider = "selectorType")
+  public void testFailOpenExcludesAdministrativelyDisabledServer(String selectorType) {
+    String segment = "segment0";
+    String instance = "instance0";
+    Set<String> onlineSegments = Set.of(segment);
+    IdealState idealState = createIdealState(Map.of(segment, List.of(Pair.of(instance, ONLINE))));
+    ExternalView externalView = createExternalView(Map.of(segment, List.of(Pair.of(instance, ONLINE))));
+    FailureDetector failureDetector = mock(FailureDetector.class);
+    when(failureDetector.getUnhealthyServers()).thenReturn(Set.of(instance));
+    InstanceSelector selector = createTestInstanceSelector(selectorType, Set.of(),
+        Map.of(instance, mock(ServerInstance.class)), idealState, externalView, onlineSegments,
+        new FailOpenPolicy(false, true), failureDetector);
+
+    selector.onInstancesChange(Set.of(), Set.of(), List.of(instance));
+    InstanceSelector.SelectionResult result = selector.select(_brokerRequest, List.of(segment), 0);
+
+    assertTrue(result.getSegmentToInstanceMap().isEmpty());
+    assertEquals(result.getUnavailableSegments(), List.of(segment));
+  }
+
+  @Test
+  public void testInstanceChangePreservesLegacyOverrideDispatch() {
+    BaseInstanceSelector selector = spy((BaseInstanceSelector) createTestInstanceSelector(BALANCED_INSTANCE_SELECTOR,
+        Set.of(), new IdealState(TABLE_NAME), new ExternalView(TABLE_NAME), Set.of()));
+    Set<String> routableInstances = Set.of("instance0");
+    List<String> changedInstances = List.of("instance0");
+
+    selector.onInstancesChange(routableInstances, routableInstances, changedInstances);
+
+    verify(selector).onInstancesChange(routableInstances, changedInstances);
+  }
+
+  @Test
+  public void testFailOpenDoesNotSuppressUnexpectedSelectionFailure() {
+    String segment = "segment0";
+    String instance = "instance0";
+    IdealState idealState = createIdealState(Map.of(segment, List.of(Pair.of(instance, ONLINE))));
+    ExternalView externalView = createExternalView(Map.of(segment, List.of(Pair.of(instance, ONLINE))));
+    FailureDetector failureDetector = mock(FailureDetector.class);
+    when(failureDetector.getUnhealthyServers()).thenReturn(Set.of(instance));
+    BaseInstanceSelector selector = spy((BaseInstanceSelector) createTestInstanceSelector(BALANCED_INSTANCE_SELECTOR,
+        Set.of(), Map.of(instance, mock(ServerInstance.class)), idealState, externalView, Set.of(segment),
+        new FailOpenPolicy(false, true), failureDetector));
+    RuntimeException failure = new RuntimeException("Unexpected selector failure");
+    doThrow(failure).when(selector).select(anyList(), anyInt(), any(SegmentStates.class), anyMap());
+
+    RuntimeException thrown = Assert.expectThrows(RuntimeException.class,
+        () -> selector.select(_brokerRequest, List.of(segment), 0));
+
+    Assert.assertSame(thrown, failure);
+  }
+
+  // Scenario: both segments of a single partition share two fail-open-eligible instances. Verifies that fail-open
+  // selection moves the whole partition together as requestId changes (segment0 and segment1 always land on the
+  // same instance as each other), rather than reselecting each segment independently.
+  @Test
+  public void testStrictReplicaGroupFailOpenPreservesReplicaGroup() {
+    String segment0 = "segment0";
+    String segment1 = "segment1";
+    String instance0 = "instance0";
+    String instance1 = "instance1";
+    Set<String> onlineSegments = Set.of(segment0, segment1);
+    List<Pair<String, String>> assignments =
+        List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE));
+    IdealState idealState = createIdealState(Map.of(segment0, assignments, segment1, assignments));
+    ExternalView externalView = createExternalView(Map.of(segment0, assignments, segment1, assignments));
+    FailureDetector failureDetector = mock(FailureDetector.class);
+    when(failureDetector.getUnhealthyServers()).thenReturn(Set.of(instance0, instance1));
+    Map<String, ServerInstance> enabledServerMap =
+        Map.of(instance0, mock(ServerInstance.class), instance1, mock(ServerInstance.class));
+    InstanceSelector selector = createTestInstanceSelector(STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, Set.of(),
+        enabledServerMap, idealState, externalView, onlineSegments, new FailOpenPolicy(false, true), failureDetector);
+
+    InstanceSelector.SelectionResult first = selector.select(_brokerRequest, List.of(segment0, segment1), 0);
+    InstanceSelector.SelectionResult second = selector.select(_brokerRequest, List.of(segment0, segment1), 1);
+
+    assertEquals(first.getSegmentToInstanceMap(), Map.of(segment0, instance0, segment1, instance0));
+    assertEquals(second.getSegmentToInstanceMap(), Map.of(segment0, instance1, segment1, instance1));
+    assertTrue(first.getUnavailableSegments().isEmpty());
+    assertTrue(second.getUnavailableSegments().isEmpty());
+  }
+
+  // Scenario: three segments of a single partition share three fail-open-eligible instances. Extends
+  // testStrictReplicaGroupFailOpenPreservesReplicaGroup beyond a 2-instance pool (where a same-instance match across
+  // segments has a 50% chance of being coincidental) to a 3-instance pool, where every one of the 3 segments landing
+  // on the identical instance for every requestId is overwhelmingly unlikely unless the selector is deliberately
+  // picking one instance for the whole partition rather than independently "best attempt" redirecting each segment.
+  @Test
+  public void testStrictReplicaGroupFailOpenNeverSplitsAcrossMultipleCandidates() {
+    String segment0 = "segment0";
+    String segment1 = "segment1";
+    String segment2 = "segment2";
+    String instance0 = "instance0";
+    String instance1 = "instance1";
+    String instance2 = "instance2";
+    List<String> segments = List.of(segment0, segment1, segment2);
+    Set<String> onlineSegments = Set.copyOf(segments);
+    List<Pair<String, String>> assignments =
+        List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE), Pair.of(instance2, ONLINE));
+    Map<String, List<Pair<String, String>>> assignmentsBySegment =
+        Map.of(segment0, assignments, segment1, assignments, segment2, assignments);
+    IdealState idealState = createIdealState(assignmentsBySegment);
+    ExternalView externalView = createExternalView(assignmentsBySegment);
+    FailureDetector failureDetector = mock(FailureDetector.class);
+    when(failureDetector.getUnhealthyServers()).thenReturn(Set.of(instance0, instance1, instance2));
+    Map<String, ServerInstance> enabledServerMap = Map.of(instance0, mock(ServerInstance.class), instance1,
+        mock(ServerInstance.class), instance2, mock(ServerInstance.class));
+    InstanceSelector selector = createTestInstanceSelector(STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, Set.of(),
+        enabledServerMap, idealState, externalView, onlineSegments, new FailOpenPolicy(false, true), failureDetector);
+
+    for (int requestId = 0; requestId < 3; requestId++) {
+      InstanceSelector.SelectionResult result = selector.select(_brokerRequest, segments, requestId);
+      Map<String, String> segmentToInstanceMap = result.getSegmentToInstanceMap();
+      String selectedInstance = segmentToInstanceMap.get(segment0);
+      assertTrue(Set.of(instance0, instance1, instance2).contains(selectedInstance));
+      assertEquals(segmentToInstanceMap.get(segment1), selectedInstance);
+      assertEquals(segmentToInstanceMap.get(segment2), selectedInstance);
+      assertTrue(result.getUnavailableSegments().isEmpty());
+    }
+  }
+
+  // Scenario: segment0 is online on both instances, but segment1 (same partition) is online only on instance1.
+  // Verifies fail-open finds the single instance common to every segment's candidate set when one exists, and
+  // rejects the whole partition (no partial/per-segment selection) when the only fail-open-eligible instance isn't
+  // common to all segments.
+  @Test
+  public void testStrictReplicaGroupFailOpenUsesCommonEligibleReplica() {
+    String segment0 = "segment0";
+    String segment1 = "segment1";
+    String instance0 = "instance0";
+    String instance1 = "instance1";
+    Set<String> onlineSegments = Set.of(segment0, segment1);
+    List<Pair<String, String>> idealAssignments =
+        List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE));
+    IdealState idealState = createIdealState(Map.of(segment0, idealAssignments, segment1, idealAssignments));
+    ExternalView externalView = createExternalView(Map.of(segment0, idealAssignments, segment1,
+        List.of(Pair.of(instance1, ONLINE))));
+    FailureDetector failureDetector = mock(FailureDetector.class);
+    Map<String, ServerInstance> enabledServerMap =
+        Map.of(instance0, mock(ServerInstance.class), instance1, mock(ServerInstance.class));
+    InstanceSelector selector = createTestInstanceSelector(STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, Set.of(),
+        enabledServerMap, idealState, externalView, onlineSegments, new FailOpenPolicy(false, true), failureDetector);
+
+    when(failureDetector.getUnhealthyServers()).thenReturn(Set.of(instance1));
+    InstanceSelector.SelectionResult selected = selector.select(_brokerRequest, List.of(segment0, segment1), 0);
+    assertEquals(selected.getSegmentToInstanceMap(), Map.of(segment0, instance1, segment1, instance1));
+    assertTrue(selected.getUnavailableSegments().isEmpty());
+
+    when(failureDetector.getUnhealthyServers()).thenReturn(Set.of(instance0));
+    InstanceSelector.SelectionResult rejected = selector.select(_brokerRequest, List.of(segment0, segment1), 0);
+    assertTrue(rejected.getSegmentToInstanceMap().isEmpty());
+    assertEquals(Set.copyOf(rejected.getUnavailableSegments()), onlineSegments);
+    // The first select() above found a fail-open candidate (success); the second could not (failure).
+    verify(_brokerMetrics).addMeteredGlobalValue(BrokerMeter.FAIL_OPEN_ROUTING_SUCCESSES, 1);
+    verify(_brokerMetrics).addMeteredGlobalValue(BrokerMeter.FAIL_OPEN_ROUTING_FAILURES, 1);
+  }
+
+  // Scenario: a brand-new segment with no external-view entries yet shares a partition (same ideal-state instance
+  // set) with an already-healthy sibling segment. Verifies the new segment is pulled into fail-open reselection
+  // alongside its healthy sibling and resolves to the exact same instance, so the strict guarantee holds even for
+  // segments that haven't finished propagating.
+  @Test
+  public void testStrictReplicaGroupFailOpenCoversSiblingNewSegment() {
+    String oldSegment = "segment0";
+    String newSegment = "segment1";
+    String instance0 = "instance0";
+    String instance1 = "instance1";
+    List<Pair<String, String>> idealAssignments =
+        List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE));
+    createSegments(List.of(Pair.of(newSegment, _mutableClock.millis())));
+    Set<String> onlineSegments = Set.of(oldSegment, newSegment);
+    IdealState idealState = createIdealState(Map.of(oldSegment, idealAssignments, newSegment, idealAssignments));
+    // oldSegment is healthy; newSegment (same partition/instance set) has no online instances yet, as expected for a
+    // brand-new segment that hasn't finished propagating.
+    ExternalView externalView =
+        createExternalView(Map.of(oldSegment, idealAssignments, newSegment, List.of()));
+    FailureDetector failureDetector = mock(FailureDetector.class);
+    when(failureDetector.getUnhealthyServers()).thenReturn(Set.of(instance0, instance1));
+    Map<String, ServerInstance> enabledServerMap =
+        Map.of(instance0, mock(ServerInstance.class), instance1, mock(ServerInstance.class));
+    InstanceSelector selector = createTestInstanceSelector(STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, Set.of(),
+        enabledServerMap, idealState, externalView, onlineSegments, new FailOpenPolicy(false, true), failureDetector);
+
+    InstanceSelector.SelectionResult first = selector.select(_brokerRequest, List.of(oldSegment, newSegment), 0);
+    InstanceSelector.SelectionResult second = selector.select(_brokerRequest, List.of(oldSegment, newSegment), 1);
+
+    // The healthy oldSegment and its brand-new partition sibling must resolve to the same fail-open instance;
+    // otherwise the strict replica-group guarantee is silently broken for this partition.
+    assertEquals(first.getSegmentToInstanceMap(), Map.of(oldSegment, instance0));
+    assertEquals(first.getOptionalSegmentToInstanceMap(), Map.of(newSegment, instance0));
+    assertEquals(second.getSegmentToInstanceMap(), Map.of(oldSegment, instance1));
+    assertEquals(second.getOptionalSegmentToInstanceMap(), Map.of(newSegment, instance1));
+    assertTrue(first.getUnavailableSegments().isEmpty());
+    assertTrue(second.getUnavailableSegments().isEmpty());
+  }
+
+  // Scenario: segment0 is fully unavailable (its only ideal-state instance, instanceA, is unhealthy), forcing fail-open
+  // to fire. segment1 also lists unhealthy instanceA, but still has healthy instanceB and instanceC. Verifies that
+  // fail-open keeps segment1 on the instance the ideal pass picked (it has a healthy route, so it must not be moved
+  // onto the unhealthy server), and that POOL_SEG_QUERIES reflects each segment's final instance/pool.
+  @Test
+  public void testStrictReplicaGroupFailOpenKeepsHealthySegmentOnHealthyServer() {
+    String unavailableSegment = "segment0";
+    String healthySegment = "segment1";
+    String instanceA = "instanceA";
+    String instanceB = "instanceB";
+    String instanceC = "instanceC";
+    IdealState idealState = createIdealState(Map.of(
+        unavailableSegment, List.of(Pair.of(instanceA, ONLINE)),
+        healthySegment, List.of(Pair.of(instanceA, ONLINE), Pair.of(instanceB, ONLINE), Pair.of(instanceC, ONLINE))));
+    ExternalView externalView = createExternalView(Map.of(
+        unavailableSegment, List.of(Pair.of(instanceA, ONLINE)),
+        healthySegment, List.of(Pair.of(instanceA, ONLINE), Pair.of(instanceB, ONLINE), Pair.of(instanceC, ONLINE))));
+    Set<String> onlineSegments = Set.of(unavailableSegment, healthySegment);
+    // instanceA is fail-open eligible (present in enabledServerMap, i.e. not disabled by an operator) but not routable
+    // (excluded from enabledInstances, simulating failure-detection exclusion) and reported unhealthy, so it's a valid
+    // fail-open target.
+    FailureDetector failureDetector = mock(FailureDetector.class);
+    when(failureDetector.getUnhealthyServers()).thenReturn(Set.of(instanceA));
+    ServerInstance serverA = mock(ServerInstance.class);
+    when(serverA.getPool()).thenReturn(1);
+    ServerInstance serverB = mock(ServerInstance.class);
+    when(serverB.getPool()).thenReturn(2);
+    ServerInstance serverC = mock(ServerInstance.class);
+    when(serverC.getPool()).thenReturn(3);
+    Map<String, ServerInstance> enabledServerMap =
+        Map.of(instanceA, serverA, instanceB, serverB, instanceC, serverC);
+    InstanceSelector selector = createTestInstanceSelector(STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
+        Set.of(instanceB, instanceC), enabledServerMap, idealState, externalView, onlineSegments,
+        new FailOpenPolicy(false, true), failureDetector);
+    clearInvocations(_brokerMetrics);
+
+    // requestId=0: the ideal pass picks instanceB (pool2) for healthySegment from its 2 enabled candidates
+    // [instanceB, instanceC]. Fail-open only routes unavailableSegment to instanceA (pool1).
+    InstanceSelector.SelectionResult result =
+        selector.select(_brokerRequest, List.of(unavailableSegment, healthySegment), 0);
+
+    assertEquals(result.getSegmentToInstanceMap(), Map.of(unavailableSegment, instanceA, healthySegment, instanceB));
+    assertTrue(result.getUnavailableSegments().isEmpty());
+    verify(_brokerMetrics).addMeteredValue(BrokerMeter.POOL_SEG_QUERIES, 1L,
+        BrokerMetrics.getTagForPreferredPool(null), "1");
+    verify(_brokerMetrics).addMeteredValue(BrokerMeter.POOL_SEG_QUERIES, 1L,
+        BrokerMetrics.getTagForPreferredPool(null), "2");
+  }
+
+  // Scenario: healthySegment's group {instanceA, instanceB} has unhealthy instanceB, while unavailableSegment's group
+  // {instanceC, instanceD} is entirely unhealthy, forcing fail-open. Verifies that across request ids, with both round
+  // robin and fixed-replica routing, healthySegment stays on its only healthy server instanceA instead of being moved
+  // onto unhealthy instanceB, and unavailableSegment still fails open.
+  @Test
+  public void testStrictReplicaGroupFailOpenDoesNotMoveHealthyGroupOntoUnhealthyServer() {
+    String healthySegment = "segment0";
+    String unavailableSegment = "segment1";
+    String instanceA = "instanceA";
+    String instanceB = "instanceB";
+    String instanceC = "instanceC";
+    String instanceD = "instanceD";
+    Map<String, List<Pair<String, String>>> assignment = Map.of(
+        healthySegment, List.of(Pair.of(instanceA, ONLINE), Pair.of(instanceB, ONLINE)),
+        unavailableSegment, List.of(Pair.of(instanceC, ONLINE), Pair.of(instanceD, ONLINE)));
+    FailureDetector failureDetector = mock(FailureDetector.class);
+    when(failureDetector.getUnhealthyServers()).thenReturn(Set.of(instanceB, instanceC, instanceD));
+    Map<String, ServerInstance> enabledServerMap = Map.of(instanceA, mock(ServerInstance.class), instanceB,
+        mock(ServerInstance.class), instanceC, mock(ServerInstance.class), instanceD, mock(ServerInstance.class));
+    InstanceSelector selector = createTestInstanceSelector(STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
+        Set.of(instanceA), enabledServerMap, createIdealState(assignment), createExternalView(assignment),
+        Set.of(healthySegment, unavailableSegment), new FailOpenPolicy(false, true), failureDetector);
+
+    for (boolean useFixedReplica : new boolean[]{false, true}) {
+      when(_pinotQuery.getQueryOptions()).thenReturn(
+          useFixedReplica ? Map.of(USE_FIXED_REPLICA, Boolean.TRUE.toString()) : null);
+      String fixedReplicaFailOpenInstance = null;
+      for (int requestId = 0; requestId < 4; requestId++) {
+        InstanceSelector.SelectionResult result =
+            selector.select(_brokerRequest, List.of(healthySegment, unavailableSegment), requestId);
+
+        String context = "useFixedReplica=" + useFixedReplica + ", requestId=" + requestId;
+        assertEquals(result.getSegmentToInstanceMap().get(healthySegment), instanceA, context);
+        String failOpenInstance = result.getSegmentToInstanceMap().get(unavailableSegment);
+        if (useFixedReplica) {
+          // Fixed-replica routing must stick to one fail-open instance across requests.
+          if (fixedReplicaFailOpenInstance == null) {
+            fixedReplicaFailOpenInstance = failOpenInstance;
+          }
+          assertEquals(failOpenInstance, fixedReplicaFailOpenInstance, context);
+        } else {
+          // Round robin over the fail-open candidates [instanceC, instanceD], in sorted ideal-state order.
+          assertEquals(failOpenInstance, requestId % 2 == 0 ? instanceC : instanceD, context);
+        }
+        assertTrue(Set.of(instanceC, instanceD).contains(failOpenInstance), context);
+        assertTrue(result.getUnavailableSegments().isEmpty());
+      }
+    }
+  }
+
+  // Scenario: fail-open is enabled on the selector, but nothing is actually unhealthy. Verifies that merely having
+  // fail-open configured doesn't change routing versus a selector with fail-open disabled entirely - fail-open must
+  // be a no-op when it's never needed, across multiple requestIds.
+  @Test
+  public void testStrictReplicaGroupFailOpenMatchesIdealWhenAllHealthy() {
+    String segment0 = "segment0";
+    String segment1 = "segment1";
+    String instance0 = "instance0";
+    String instance1 = "instance1";
+    Set<String> onlineSegments = Set.of(segment0, segment1);
+    List<Pair<String, String>> assignments =
+        List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE));
+    IdealState idealState = createIdealState(Map.of(segment0, assignments, segment1, assignments));
+    ExternalView externalView = createExternalView(Map.of(segment0, assignments, segment1, assignments));
+    Map<String, ServerInstance> enabledServerMap =
+        Map.of(instance0, mock(ServerInstance.class), instance1, mock(ServerInstance.class));
+
+    // Nothing is unhealthy, so the fail-open-enabled selector must produce exactly the same mapping as a selector
+    // with fail-open disabled: enabling fail-open must not perturb routing when it is never actually needed.
+    FailureDetector failureDetector = mock(FailureDetector.class);
+    when(failureDetector.getUnhealthyServers()).thenReturn(Set.of());
+    InstanceSelector failOpenSelector = createTestInstanceSelector(STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
+        Set.of(instance0, instance1), enabledServerMap, idealState, externalView, onlineSegments,
+        new FailOpenPolicy(false, true), failureDetector);
+    InstanceSelector idealSelector = createTestInstanceSelector(STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
+        Set.of(instance0, instance1), idealState, externalView, onlineSegments);
+
+    for (int requestId = 0; requestId < 4; requestId++) {
+      InstanceSelector.SelectionResult failOpenResult =
+          failOpenSelector.select(_brokerRequest, List.of(segment0, segment1), requestId);
+      InstanceSelector.SelectionResult idealResult =
+          idealSelector.select(_brokerRequest, List.of(segment0, segment1), requestId);
+      assertEquals(failOpenResult.getSegmentToInstanceMap(), idealResult.getSegmentToInstanceMap());
+      assertTrue(failOpenResult.getUnavailableSegments().isEmpty());
+      assertTrue(idealResult.getUnavailableSegments().isEmpty());
+    }
+  }
+
+  // Scenario: two independent partitions (disjoint ideal-state instance sets) in the same request - one fully
+  // healthy, one fully degraded and relying on fail-open. Verifies the degraded partition's fail-open reselection
+  // obeys the strict guarantee (both its segments land on the same instance) without leaking into or perturbing the
+  // healthy partition's normal, non-fail-open mapping.
+  @Test
+  public void testStrictReplicaGroupFailOpenIsolatedToHealthyPartition() {
+    String healthySegment0 = "healthySegment0";
+    String healthySegment1 = "healthySegment1";
+    String degradedSegment0 = "degradedSegment0";
+    String degradedSegment1 = "degradedSegment1";
+    String healthyInstance0 = "healthyInstance0";
+    String healthyInstance1 = "healthyInstance1";
+    String degradedInstance0 = "degradedInstance0";
+    String degradedInstance1 = "degradedInstance1";
+    Set<String> onlineSegments =
+        Set.of(healthySegment0, healthySegment1, degradedSegment0, degradedSegment1);
+    // Two independent partitions: segments are grouped by their ideal-state instance set, not by name, so giving
+    // each pair a disjoint instance set makes them independent partitions for strict routing purposes.
+    List<Pair<String, String>> healthyAssignments =
+        List.of(Pair.of(healthyInstance0, ONLINE), Pair.of(healthyInstance1, ONLINE));
+    List<Pair<String, String>> degradedAssignments =
+        List.of(Pair.of(degradedInstance0, ONLINE), Pair.of(degradedInstance1, ONLINE));
+    IdealState idealState = createIdealState(Map.of(
+        healthySegment0, healthyAssignments, healthySegment1, healthyAssignments,
+        degradedSegment0, degradedAssignments, degradedSegment1, degradedAssignments));
+    ExternalView externalView = createExternalView(Map.of(
+        healthySegment0, healthyAssignments, healthySegment1, healthyAssignments,
+        degradedSegment0, degradedAssignments, degradedSegment1, degradedAssignments));
+    Map<String, ServerInstance> enabledServerMap = Map.of(
+        healthyInstance0, mock(ServerInstance.class), healthyInstance1, mock(ServerInstance.class),
+        degradedInstance0, mock(ServerInstance.class), degradedInstance1, mock(ServerInstance.class));
+    // Only the healthy partition's instances are "enabled" (routable), so its segments are always served by normal,
+    // non-fail-open selection. The degraded partition's instances are never enabled, so its segments always need
+    // fail-open; only degradedInstance1 is reported as a usable fail-open target, so it must be the only candidate
+    // the degraded partition can resolve to.
+    FailureDetector failureDetector = mock(FailureDetector.class);
+    when(failureDetector.getUnhealthyServers()).thenReturn(Set.of(degradedInstance1));
+    InstanceSelector selector = createTestInstanceSelector(STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
+        Set.of(healthyInstance0, healthyInstance1), enabledServerMap, idealState, externalView, onlineSegments,
+        new FailOpenPolicy(false, true), failureDetector);
+
+    List<String> allSegments =
+        List.of(healthySegment0, healthySegment1, degradedSegment0, degradedSegment1);
+    InstanceSelector.SelectionResult result = selector.select(_brokerRequest, allSegments, 0);
+
+    // The healthy partition is served normally (no fail-open needed) and consistently within its own partition,
+    // exactly as the ideal condition would select it.
+    String healthyInstanceSelected = result.getSegmentToInstanceMap().get(healthySegment0);
+    assertTrue(Set.of(healthyInstance0, healthyInstance1).contains(healthyInstanceSelected));
+    assertEquals(result.getSegmentToInstanceMap().get(healthySegment1), healthyInstanceSelected);
+    // The degraded partition still obeys the strict guarantee: both its segments resolve to the same fail-open
+    // instance, and fail-open on the degraded partition never leaks into or alters the healthy partition's mapping.
+    assertEquals(result.getSegmentToInstanceMap().get(degradedSegment0), degradedInstance1);
+    assertEquals(result.getSegmentToInstanceMap().get(degradedSegment1), degradedInstance1);
+    assertTrue(result.getUnavailableSegments().isEmpty());
+  }
+
+  @Test(dataProvider = "selectorType")
+  public void testFailOpenPreservesHealthyMappingsAndPoolMetrics(String selectorType) {
+    String healthySegment = "segment0";
+    String failOpenSegment = "segment1";
+    String healthyInstance = "instance0";
+    String unhealthyInstance = "instance1";
+    Set<String> onlineSegments = Set.of(healthySegment, failOpenSegment);
+    IdealState idealState = createIdealState(Map.of(healthySegment, List.of(Pair.of(healthyInstance, ONLINE)),
+        failOpenSegment, List.of(Pair.of(unhealthyInstance, ONLINE))));
+    ExternalView externalView = createExternalView(Map.of(healthySegment, List.of(Pair.of(healthyInstance, ONLINE)),
+        failOpenSegment, List.of(Pair.of(unhealthyInstance, ONLINE))));
+    FailureDetector failureDetector = mock(FailureDetector.class);
+    when(failureDetector.getUnhealthyServers()).thenReturn(Set.of(unhealthyInstance));
+    ServerInstance healthyServer = mock(ServerInstance.class);
+    when(healthyServer.getPool()).thenReturn(1);
+    ServerInstance unhealthyServer = mock(ServerInstance.class);
+    when(unhealthyServer.getPool()).thenReturn(2);
+    BaseInstanceSelector selector = spy((BaseInstanceSelector) createTestInstanceSelector(selectorType,
+        Set.of(healthyInstance), Map.of(healthyInstance, healthyServer, unhealthyInstance, unhealthyServer), idealState,
+        externalView, onlineSegments, new FailOpenPolicy(false, true), failureDetector));
+    clearInvocations(_brokerMetrics);
+
+    InstanceSelector.SelectionResult result =
+        selector.select(_brokerRequest, List.of(healthySegment, failOpenSegment), 0);
+
+    assertEquals(result.getSegmentToInstanceMap(),
+        Map.of(healthySegment, healthyInstance, failOpenSegment, unhealthyInstance));
+    // Fail-open always recomputes over the full, original per-query segment list (not just the unavailable subset),
+    // so that every selector type sees the exact same iteration order/positions the ideal select() call used.
+    verify(selector).selectForFailOpen(eq(List.of(healthySegment, failOpenSegment)), anyInt(),
+        any(SegmentStates.class), anyMap());
+    verify(_brokerMetrics).addMeteredValue(BrokerMeter.POOL_SEG_QUERIES, 1L,
+        BrokerMetrics.getTagForPreferredPool(null), "1");
+    verify(_brokerMetrics).addMeteredValue(BrokerMeter.POOL_SEG_QUERIES, 1L,
+        BrokerMetrics.getTagForPreferredPool(null), "2");
+  }
+
+  @Test(dataProvider = "selectorType")
+  public void testOptionalSegmentIncludedInPoolMetrics(String selectorType) {
+    String segment = "segment0";
+    String instance = "instance0";
+    createSegments(List.of(Pair.of(segment, _mutableClock.millis())));
+    IdealState idealState = createIdealState(Map.of(segment, List.of(Pair.of(instance, ONLINE))));
+    ExternalView externalView = createExternalView(Map.of(segment, List.of()));
+    ServerInstance server = mock(ServerInstance.class);
+    when(server.getPool()).thenReturn(3);
+    InstanceSelector selector = createTestInstanceSelector(selectorType, Set.of(instance), Map.of(instance, server),
+        idealState, externalView, Set.of(segment), FailOpenPolicy.disabled(), mock(FailureDetector.class));
+    clearInvocations(_brokerMetrics);
+
+    InstanceSelector.SelectionResult result = selector.select(_brokerRequest, List.of(segment), 0);
+
+    assertEquals(result.getOptionalSegmentToInstanceMap(), Map.of(segment, instance));
+    verify(_brokerMetrics).addMeteredValue(BrokerMeter.POOL_SEG_QUERIES, 1L,
+        BrokerMetrics.getTagForPreferredPool(null), "3");
+  }
+
+  @Test(dataProvider = "selectorType")
+  public void testFailOpenDisabled(String selectorType) {
+    String segment = "segment0";
+    String instance = "instance0";
+    Set<String> onlineSegments = Set.of(segment);
+    IdealState idealState = createIdealState(Map.of(segment, List.of(Pair.of(instance, ONLINE))));
+    ExternalView externalView = createExternalView(Map.of(segment, List.of(Pair.of(instance, ONLINE))));
+    FailureDetector failureDetector = mock(FailureDetector.class);
+    when(failureDetector.getUnhealthyServers()).thenReturn(Set.of(instance));
+    InstanceSelector selector = createTestInstanceSelector(selectorType, Set.of(),
+        Map.of(instance, mock(ServerInstance.class)), idealState, externalView, onlineSegments,
+        FailOpenPolicy.disabled(), failureDetector);
+
+    InstanceSelector.SelectionResult result = selector.select(_brokerRequest, List.of(segment), 0);
+
+    assertTrue(result.getSegmentToInstanceMap().isEmpty());
+    assertEquals(result.getUnavailableSegments(), List.of(segment));
+    verify(_brokerMetrics).addMeteredGlobalValue(BrokerMeter.FAIL_OPEN_ELIGIBLE_REQUESTS, 1);
+    verify(_brokerMetrics, never()).addMeteredGlobalValue(BrokerMeter.FAIL_OPEN_ROUTING_SUCCESSES, 1);
+    verify(_brokerMetrics, never()).addMeteredGlobalValue(BrokerMeter.FAIL_OPEN_ROUTING_FAILURES, 1);
+    verify(failureDetector, never()).getUnhealthyServers();
+  }
+
+  @Test(dataProvider = "selectorType")
+  public void testFailOpenEnabledForMultiStageQuery(String selectorType) {
+    String segment = "segment0";
+    String instance = "instance0";
+    Set<String> onlineSegments = Set.of(segment);
+    IdealState idealState = createIdealState(Map.of(segment, List.of(Pair.of(instance, ONLINE))));
+    ExternalView externalView = createExternalView(Map.of(segment, List.of(Pair.of(instance, ONLINE))));
+    FailureDetector failureDetector = mock(FailureDetector.class);
+    when(failureDetector.getUnhealthyServers()).thenReturn(Set.of(instance));
+    InstanceSelector selector = createTestInstanceSelector(selectorType, Set.of(),
+        Map.of(instance, mock(ServerInstance.class)), idealState, externalView, onlineSegments,
+        new FailOpenPolicy(false, true), failureDetector);
+    when(_pinotQuery.getQueryOptions()).thenReturn(Map.of(USE_MULTISTAGE_ENGINE, Boolean.TRUE.toString()));
+
+    InstanceSelector.SelectionResult result = selector.select(_brokerRequest, List.of(segment), 0);
+
+    assertEquals(result.getSegmentToInstanceMap(), Map.of(segment, instance));
+    assertTrue(result.getUnavailableSegments().isEmpty());
+    verify(failureDetector).getUnhealthyServers();
+    verify(failureDetector, never()).markServerHealthy(anyString(), any());
+    verify(failureDetector, never()).markServerUnhealthy(anyString(), any());
+  }
+
+  @Test(dataProvider = "selectorType")
+  public void testMultiStageFailOpenSkipsCandidateLessNewLLCSegment(String selectorType) {
+    String oldSegment = "segment0";
+    String newSegment = new LLCSegmentName("testTable", 0, 1, _mutableClock.millis()).getSegmentName();
+    String unhealthyInstance = "instance0";
+    String administrativelyDisabledInstance = "instance1";
+    createSegments(List.of(Pair.of(newSegment, _mutableClock.millis())));
+    Set<String> onlineSegments = Set.of(oldSegment, newSegment);
+    IdealState idealState = createIdealState(Map.of(oldSegment, List.of(Pair.of(unhealthyInstance, ONLINE)),
+        newSegment, List.of(Pair.of(administrativelyDisabledInstance, CONSUMING))));
+    ExternalView externalView = createExternalView(Map.of(oldSegment, List.of(Pair.of(unhealthyInstance, ONLINE)),
+        newSegment, List.of()));
+    FailureDetector failureDetector = mock(FailureDetector.class);
+    when(failureDetector.getUnhealthyServers()).thenReturn(Set.of(unhealthyInstance));
+    InstanceSelector selector = createTestInstanceSelector(selectorType, Set.of(),
+        Map.of(unhealthyInstance, mock(ServerInstance.class)), idealState, externalView, onlineSegments,
+        new FailOpenPolicy(false, true), failureDetector);
+    when(_pinotQuery.getQueryOptions()).thenReturn(Map.of(USE_MULTISTAGE_ENGINE, Boolean.TRUE.toString()));
+
+    InstanceSelector.SelectionResult result =
+        selector.select(_brokerRequest, List.of(oldSegment, newSegment), 0);
+
+    assertEquals(result.getSegmentToInstanceMap(), Map.of(oldSegment, unhealthyInstance));
+    assertTrue(result.getUnavailableSegments().isEmpty());
+  }
+
+  @Test(dataProvider = "selectorType")
+  public void testFailOpenRequiresFullCoverage(String selectorType) {
+    String segment0 = "segment0";
+    String segment1 = "segment1";
+    String instance0 = "instance0";
+    String instance1 = "instance1";
+    Set<String> onlineSegments = Set.of(segment0, segment1);
+    IdealState idealState = createIdealState(Map.of(segment0, List.of(Pair.of(instance0, ONLINE)), segment1,
+        List.of(Pair.of(instance1, ONLINE))));
+    ExternalView externalView = createExternalView(Map.of(segment0, List.of(Pair.of(instance0, ONLINE)), segment1,
+        List.of(Pair.of(instance1, ONLINE))));
+    FailureDetector failureDetector = mock(FailureDetector.class);
+    when(failureDetector.getUnhealthyServers()).thenReturn(Set.of(instance0));
+    InstanceSelector selector = createTestInstanceSelector(selectorType, Set.of(),
+        Map.of(instance0, mock(ServerInstance.class)), idealState, externalView, onlineSegments,
+        new FailOpenPolicy(false, true), failureDetector);
+
+    InstanceSelector.SelectionResult result = selector.select(_brokerRequest, List.of(segment0, segment1), 0);
+
+    assertTrue(result.getSegmentToInstanceMap().isEmpty());
+    assertEquals(Set.copyOf(result.getUnavailableSegments()), onlineSegments);
+    // Fail-open was attempted (eligible and enabled) but could not cover every segment.
+    verify(_brokerMetrics, never()).addMeteredGlobalValue(BrokerMeter.FAIL_OPEN_ROUTING_SUCCESSES, 1);
+    verify(_brokerMetrics).addMeteredGlobalValue(BrokerMeter.FAIL_OPEN_ROUTING_FAILURES, 1);
+  }
+
+  @Test(dataProvider = "selectorType")
+  public void testFailOpenRejectsAdministrativelyDisabledServer(String selectorType) {
+    String segment = "segment0";
+    String instance = "instance0";
+    Set<String> onlineSegments = Set.of(segment);
+    IdealState idealState = createIdealState(Map.of(segment, List.of(Pair.of(instance, ONLINE))));
+    ExternalView externalView = createExternalView(Map.of(segment, List.of(Pair.of(instance, ONLINE))));
+    FailureDetector failureDetector = mock(FailureDetector.class);
+    when(failureDetector.getUnhealthyServers()).thenReturn(Set.of(instance));
+    InstanceSelector selector = createTestInstanceSelector(selectorType, Set.of(), Map.of(), idealState, externalView,
+        onlineSegments, new FailOpenPolicy(false, true), failureDetector);
+
+    InstanceSelector.SelectionResult result = selector.select(_brokerRequest, List.of(segment), 0);
+
+    assertTrue(result.getSegmentToInstanceMap().isEmpty());
+    assertEquals(result.getUnavailableSegments(), List.of(segment));
+  }
+
+  @Test(dataProvider = "selectorType")
+  public void testFailOpenRejectsUnassignedUnhealthyServer(String selectorType) {
+    String segment = "segment0";
+    String assignedInstance = "instance0";
+    String unassignedInstance = "instance1";
+    Set<String> onlineSegments = Set.of(segment);
+    IdealState idealState = createIdealState(Map.of(segment, List.of(Pair.of(assignedInstance, ONLINE))));
+    ExternalView externalView = createExternalView(Map.of(segment, List.of(Pair.of(assignedInstance, ONLINE))));
+    FailureDetector failureDetector = mock(FailureDetector.class);
+    when(failureDetector.getUnhealthyServers()).thenReturn(Set.of(unassignedInstance));
+    Map<String, ServerInstance> enabledServerMap = Map.of(assignedInstance, mock(ServerInstance.class),
+        unassignedInstance, mock(ServerInstance.class));
+    InstanceSelector selector = createTestInstanceSelector(selectorType, Set.of(), enabledServerMap, idealState,
+        externalView, onlineSegments, new FailOpenPolicy(false, true), failureDetector);
+
+    InstanceSelector.SelectionResult result = selector.select(_brokerRequest, List.of(segment), 0);
+
+    assertTrue(result.getSegmentToInstanceMap().isEmpty());
+    assertEquals(result.getUnavailableSegments(), List.of(segment));
+  }
+
+  @Test(dataProvider = "selectorType")
+  public void testFailOpenDoesNotOverrideHealthyRoutingOrDetectorHealth(String selectorType) {
+    String segment = "segment0";
+    String healthyInstance = "instance0";
+    String unhealthyInstance = "instance1";
+    Set<String> onlineSegments = Set.of(segment);
+    IdealState idealState = createIdealState(Map.of(segment,
+        List.of(Pair.of(healthyInstance, ONLINE), Pair.of(unhealthyInstance, ONLINE))));
+    ExternalView externalView = createExternalView(Map.of(segment,
+        List.of(Pair.of(healthyInstance, ONLINE), Pair.of(unhealthyInstance, ONLINE))));
+    FailureDetector failureDetector = mock(FailureDetector.class);
+    when(failureDetector.getUnhealthyServers()).thenReturn(Set.of(unhealthyInstance));
+    Map<String, ServerInstance> enabledServerMap = Map.of(healthyInstance, mock(ServerInstance.class),
+        unhealthyInstance, mock(ServerInstance.class));
+    InstanceSelector selector = createTestInstanceSelector(selectorType, Set.of(healthyInstance), enabledServerMap,
+        idealState, externalView, onlineSegments, new FailOpenPolicy(false, true), failureDetector);
+
+    InstanceSelector.SelectionResult result = selector.select(_brokerRequest, List.of(segment), 0);
+
+    assertEquals(result.getSegmentToInstanceMap(), Map.of(segment, healthyInstance));
+    assertTrue(result.getUnavailableSegments().isEmpty());
+    verify(failureDetector, never()).markServerHealthy(eq(unhealthyInstance), any());
   }
 
   // Test that we mark new segment as old when external view state converges with ideal state.
@@ -2367,9 +3244,15 @@ public class InstanceSelectorTest {
     Map<String, List<SegmentInstanceCandidate>> candidates = new HashMap<>();
     Map<String, String> expectedInstances = new HashMap<>();
     List<String> segments = new ArrayList<>();
-    // Exercise the fallback pool, the primitive-map zero key, and IDs/counts outside the Integer cache.
+    // Pool metrics are recorded from the final mapping, resolving each instance's pool through the server store.
+    Map<String, ServerInstance> serverStore = new HashMap<>();
+    selector._enabledServerStore = serverStore;
+    // Exercise the fallback pool, the zero key, and IDs/counts outside the Integer cache.
     for (int pool : new int[]{-1, 0, 128}) {
       String instance = "instance" + pool;
+      ServerInstance server = mock(ServerInstance.class);
+      when(server.getPool()).thenReturn(pool);
+      serverStore.put(instance, server);
       for (int i = 0; i < 129; i++) {
         String segment = "segment_" + pool + "_" + i;
         candidates.put(segment, List.of(new SegmentInstanceCandidate(instance, true, pool, 0)));
@@ -2606,5 +3489,199 @@ public class InstanceSelectorTest {
       descriptions.add(candidate.getInstance() + "/" + candidate.getIdealStateReplicaId() + "/" + candidate.isOnline());
     }
     return descriptions;
+  }
+
+  // Scenario: a second, uncached segment is unavailable and fail-open-eligible, but the request only asks for a
+  // separate, fully healthy segment. Expected: fail-open must only engage for segments that are actually part of the
+  // current request - the unrequested unavailable segment must not trigger a FailureDetector lookup or any fail-open
+  // bookkeeping, and the result must be the plain healthy mapping.
+  @Test(dataProvider = "selectorType")
+  public void testFailOpenNotInvokedForUnavailableSegmentOutsideRequest(String selectorType) {
+    String requestedSegment = "segment0";
+    String unrequestedSegment = "segment1";
+    String healthyInstance = "instance0";
+    String unavailableInstance = "instance1";
+    Set<String> onlineSegments = Set.of(requestedSegment, unrequestedSegment);
+    IdealState idealState = createIdealState(Map.of(
+        requestedSegment, List.of(Pair.of(healthyInstance, ONLINE)),
+        unrequestedSegment, List.of(Pair.of(unavailableInstance, ONLINE))));
+    ExternalView externalView = createExternalView(Map.of(
+        requestedSegment, List.of(Pair.of(healthyInstance, ONLINE)),
+        unrequestedSegment, List.of(Pair.of(unavailableInstance, ONLINE))));
+    FailureDetector failureDetector = mock(FailureDetector.class);
+    when(failureDetector.getUnhealthyServers()).thenReturn(Set.of(unavailableInstance));
+    Map<String, ServerInstance> enabledServerMap = Map.of(
+        healthyInstance, mock(ServerInstance.class), unavailableInstance, mock(ServerInstance.class));
+    InstanceSelector selector = createTestInstanceSelector(selectorType, Set.of(healthyInstance), enabledServerMap,
+        idealState, externalView, onlineSegments, new FailOpenPolicy(false, true), failureDetector);
+
+    InstanceSelector.SelectionResult result = selector.select(_brokerRequest, List.of(requestedSegment), 0);
+
+    assertEquals(result.getSegmentToInstanceMap(), Map.of(requestedSegment, healthyInstance));
+    assertTrue(result.getUnavailableSegments().isEmpty());
+    verify(failureDetector, never()).getUnhealthyServers();
+    verify(_brokerMetrics, never()).addMeteredGlobalValue(BrokerMeter.FAIL_OPEN_ROUTING_SUCCESSES, 1);
+    verify(_brokerMetrics, never()).addMeteredGlobalValue(BrokerMeter.FAIL_OPEN_ROUTING_FAILURES, 1);
+  }
+
+  // Scenario: fixed-replica ("sticky") routing on BalancedInstanceSelector during fail-open. Mirrors
+  // testReplicaGroupFailOpenPreservesFixedReplicaQueryOption but exercises BalancedInstanceSelector's own
+  // _tableNameHashForFixedReplicaRouting-based fixed-replica formula. Expected: both calls resolve to the exact
+  // same instance - fixed-replica stickiness holds over the fail-open-expanded candidate pool exactly as it does
+  // over the normal pool, instead of alternating via round robin.
+  @Test
+  public void testBalancedFailOpenPreservesFixedReplicaQueryOption() {
+    String segment = "segment0";
+    String instance0 = "instance0";
+    String instance1 = "instance1";
+    List<Pair<String, String>> assignments = List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE));
+    IdealState idealState = createIdealState(Map.of(segment, assignments));
+    ExternalView externalView = createExternalView(Map.of(segment, assignments));
+    FailureDetector failureDetector = mock(FailureDetector.class);
+    when(failureDetector.getUnhealthyServers()).thenReturn(Set.of(instance0, instance1));
+    InstanceSelector selector = createTestInstanceSelector(BALANCED_INSTANCE_SELECTOR, Set.of(),
+        Map.of(instance0, mock(ServerInstance.class), instance1, mock(ServerInstance.class)), idealState,
+        externalView, Set.of(segment), new FailOpenPolicy(false, true), failureDetector);
+    when(_pinotQuery.getQueryOptions()).thenReturn(Map.of(USE_FIXED_REPLICA, Boolean.TRUE.toString()));
+
+    InstanceSelector.SelectionResult first = selector.select(_brokerRequest, List.of(segment), 0);
+    InstanceSelector.SelectionResult second = selector.select(_brokerRequest, List.of(segment), 1);
+
+    assertEquals(first.getSegmentToInstanceMap(), second.getSegmentToInstanceMap());
+    assertTrue(first.getUnavailableSegments().isEmpty());
+  }
+
+  // Scenario: fixed-replica routing on StrictReplicaGroupInstanceSelector during fail-open, across a 2-segment
+  // partition that shares both fail-open-eligible instances. Expected: both segments resolve to the same instance
+  // as each other (strict colocation) on every call, and that instance does not change across requestIds
+  // (fixed-replica stickiness), proving the two guarantees compose correctly during fail-open.
+  @Test
+  public void testStrictReplicaGroupFailOpenPreservesFixedReplicaQueryOption() {
+    String segment0 = "segment0";
+    String segment1 = "segment1";
+    String instance0 = "instance0";
+    String instance1 = "instance1";
+    Set<String> onlineSegments = Set.of(segment0, segment1);
+    List<Pair<String, String>> assignments = List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE));
+    IdealState idealState = createIdealState(Map.of(segment0, assignments, segment1, assignments));
+    ExternalView externalView = createExternalView(Map.of(segment0, assignments, segment1, assignments));
+    FailureDetector failureDetector = mock(FailureDetector.class);
+    when(failureDetector.getUnhealthyServers()).thenReturn(Set.of(instance0, instance1));
+    Map<String, ServerInstance> enabledServerMap =
+        Map.of(instance0, mock(ServerInstance.class), instance1, mock(ServerInstance.class));
+    InstanceSelector selector = createTestInstanceSelector(STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, Set.of(),
+        enabledServerMap, idealState, externalView, onlineSegments, new FailOpenPolicy(false, true),
+        failureDetector);
+    when(_pinotQuery.getQueryOptions()).thenReturn(Map.of(USE_FIXED_REPLICA, Boolean.TRUE.toString()));
+
+    InstanceSelector.SelectionResult first = selector.select(_brokerRequest, List.of(segment0, segment1), 0);
+    InstanceSelector.SelectionResult second = selector.select(_brokerRequest, List.of(segment0, segment1), 1);
+
+    String firstInstance = first.getSegmentToInstanceMap().get(segment0);
+    assertEquals(first.getSegmentToInstanceMap(), Map.of(segment0, firstInstance, segment1, firstInstance));
+    assertEquals(second.getSegmentToInstanceMap(), first.getSegmentToInstanceMap());
+    assertTrue(first.getUnavailableSegments().isEmpty());
+    assertTrue(second.getUnavailableSegments().isEmpty());
+  }
+
+  // Scenario: NUM_REPLICA_GROUPS_TO_QUERY (5) exceeds the number of fail-open candidates available (2). Mirrors
+  // ReplicaGroupSelectorTest#testReplicaGroupInstanceSelectorNumReplicaGroupsToQueryGreaterThanReplicas, but under
+  // fail-open. Expected: selectServers() clamps numReplicaGroups down to the candidate count (2) instead of trying
+  // to cycle through replicaOffsets the candidate list can't satisfy, so the two segments still fan out across
+  // exactly the two available instances (offset 0 then 1), the same as if NUM_REPLICA_GROUPS_TO_QUERY had been
+  // requested as 2.
+  @Test
+  public void testReplicaGroupFailOpenNumReplicaGroupsToQueryGreaterThanReplicas() {
+    String segment0 = "segment0";
+    String segment1 = "segment1";
+    String instance0 = "instance0";
+    String instance1 = "instance1";
+    Set<String> onlineSegments = Set.of(segment0, segment1);
+    List<Pair<String, String>> assignments = List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE));
+    IdealState idealState = createIdealState(Map.of(segment0, assignments, segment1, assignments));
+    ExternalView externalView = createExternalView(Map.of(segment0, assignments, segment1, assignments));
+    FailureDetector failureDetector = mock(FailureDetector.class);
+    when(failureDetector.getUnhealthyServers()).thenReturn(Set.of(instance0, instance1));
+    Map<String, ServerInstance> enabledServerMap =
+        Map.of(instance0, mock(ServerInstance.class), instance1, mock(ServerInstance.class));
+    InstanceSelector selector = createTestInstanceSelector(REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, Set.of(),
+        enabledServerMap, idealState, externalView, onlineSegments, new FailOpenPolicy(false, true),
+        failureDetector);
+    when(_pinotQuery.getQueryOptions()).thenReturn(Map.of(NUM_REPLICA_GROUPS_TO_QUERY, "5"));
+
+    InstanceSelector.SelectionResult result = selector.select(_brokerRequest, List.of(segment0, segment1), 0);
+
+    assertEquals(result.getSegmentToInstanceMap(), Map.of(segment0, instance0, segment1, instance1));
+    assertTrue(result.getUnavailableSegments().isEmpty());
+  }
+
+  // Scenario: NUM_REPLICA_GROUPS_TO_QUERY is set on a strict replica-group selector whose whole partition needs
+  // fail-open. As StrictReplicaGroupInstanceSelector#select() documents, this option forces the non-adaptive
+  // selectServers() path - the same path selectForFailOpen() already uses - but that path also advances
+  // replicaOffset once per segment, which intentionally contradicts the strict same-instance-per-partition
+  // guarantee. Expected: with 2 candidates and NUM_REPLICA_GROUPS_TO_QUERY=2, the two same-partition segments land
+  // on different instances (offset 0 then 1) during fail-open, documenting this known, intentional contradiction
+  // rather than silently masking it.
+  @Test
+  public void testStrictReplicaGroupFailOpenWithNumReplicaGroupsToQuery() {
+    String segment0 = "segment0";
+    String segment1 = "segment1";
+    String instance0 = "instance0";
+    String instance1 = "instance1";
+    Set<String> onlineSegments = Set.of(segment0, segment1);
+    List<Pair<String, String>> assignments = List.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE));
+    IdealState idealState = createIdealState(Map.of(segment0, assignments, segment1, assignments));
+    ExternalView externalView = createExternalView(Map.of(segment0, assignments, segment1, assignments));
+    FailureDetector failureDetector = mock(FailureDetector.class);
+    when(failureDetector.getUnhealthyServers()).thenReturn(Set.of(instance0, instance1));
+    Map<String, ServerInstance> enabledServerMap =
+        Map.of(instance0, mock(ServerInstance.class), instance1, mock(ServerInstance.class));
+    InstanceSelector selector = createTestInstanceSelector(STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, Set.of(),
+        enabledServerMap, idealState, externalView, onlineSegments, new FailOpenPolicy(false, true),
+        failureDetector);
+    when(_pinotQuery.getQueryOptions()).thenReturn(Map.of(NUM_REPLICA_GROUPS_TO_QUERY, "2"));
+
+    InstanceSelector.SelectionResult result = selector.select(_brokerRequest, List.of(segment0, segment1), 0);
+
+    assertEquals(result.getSegmentToInstanceMap(), Map.of(segment0, instance0, segment1, instance1));
+    assertTrue(result.getUnavailableSegments().isEmpty());
+  }
+
+  // Scenario: segment0 is normally routable (healthy); segment1 is unavailable, and its only fail-open-eligible
+  // candidate is never reported unhealthy by the FailureDetector, so fail-open cannot find an eligible replacement
+  // for it. Expected: fail-open fails safely for the whole query (selectFailOpen returns null internally), so the
+  // final result falls back to the original ideal mapping - segment0's normal, healthy assignment is preserved -
+  // rather than being wiped out just because segment1 could not be fail-opened. Only segment1 is reported
+  // unavailable, and FAIL_OPEN_ROUTING_FAILURES increments while FAIL_OPEN_ROUTING_SUCCESSES does not. The two
+  // segments use disjoint instance sets (independent partitions), so retaining the healthy segment is legal even
+  // for the strict replica-group parameterization.
+  @Test(dataProvider = "selectorType")
+  public void testFailedFailOpenPreservesPartialNormalAssignment(String selectorType) {
+    String healthySegment = "segment0";
+    String failedSegment = "segment1";
+    String healthyInstance = "instance0";
+    String failOpenEligibleInstance = "instance1";
+    Set<String> onlineSegments = Set.of(healthySegment, failedSegment);
+    IdealState idealState = createIdealState(Map.of(
+        healthySegment, List.of(Pair.of(healthyInstance, ONLINE)),
+        failedSegment, List.of(Pair.of(failOpenEligibleInstance, ONLINE))));
+    ExternalView externalView = createExternalView(Map.of(
+        healthySegment, List.of(Pair.of(healthyInstance, ONLINE)),
+        failedSegment, List.of(Pair.of(failOpenEligibleInstance, ONLINE))));
+    // failOpenEligibleInstance is never reported unhealthy, so fail-open has no eligible candidate for failedSegment.
+    FailureDetector failureDetector = mock(FailureDetector.class);
+    when(failureDetector.getUnhealthyServers()).thenReturn(Set.of());
+    Map<String, ServerInstance> enabledServerMap = Map.of(
+        healthyInstance, mock(ServerInstance.class), failOpenEligibleInstance, mock(ServerInstance.class));
+    InstanceSelector selector = createTestInstanceSelector(selectorType, Set.of(healthyInstance), enabledServerMap,
+        idealState, externalView, onlineSegments, new FailOpenPolicy(false, true), failureDetector);
+
+    InstanceSelector.SelectionResult result =
+        selector.select(_brokerRequest, List.of(healthySegment, failedSegment), 0);
+
+    assertEquals(result.getSegmentToInstanceMap(), Map.of(healthySegment, healthyInstance));
+    assertEquals(result.getUnavailableSegments(), List.of(failedSegment));
+    verify(_brokerMetrics, never()).addMeteredGlobalValue(BrokerMeter.FAIL_OPEN_ROUTING_SUCCESSES, 1);
+    verify(_brokerMetrics).addMeteredGlobalValue(BrokerMeter.FAIL_OPEN_ROUTING_FAILURES, 1);
   }
 }

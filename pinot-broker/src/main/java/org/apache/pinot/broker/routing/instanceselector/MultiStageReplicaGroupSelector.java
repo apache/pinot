@@ -35,9 +35,11 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelector;
 import org.apache.pinot.broker.routing.adaptiveserverselector.ServerSelectionContext;
+import org.apache.pinot.broker.routing.instanceselector.InstanceSelector.SelectionResult;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -59,6 +61,20 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiStageReplicaGroupSelector.class);
 
   private volatile InstancePartitions _instancePartitions;
+
+  // Carries the InstancePartitions snapshot used by select() into the selectForFailOpen() call that follows it on the
+  // same thread for the same query, so fail-open reselection stays consistent with normal selection even if
+  // onAssignmentChange() publishes a new snapshot in between.
+  @VisibleForTesting
+  final ThreadLocal<InstancePartitions> _instancePartitionsForFailOpen = new ThreadLocal<>();
+
+  // Segments whose partition couldn't be assigned a single consistent replica group during normal selection, but
+  // were deferred (not thrown) so fail-open gets a chance to rebuild the partition. Populated by the normal
+  // select()'s assign() call and consulted after fail-open runs: if fail-open doesn't end up covering every one of
+  // these segments, the query must fail loudly rather than silently serve the partition with these segments simply
+  // missing (see select(BrokerRequest, ...) override below).
+  @VisibleForTesting
+  final ThreadLocal<Set<String>> _segmentsDeferredToFailOpen = new ThreadLocal<>();
 
   @Override
   public void init(TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore,
@@ -85,9 +101,74 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
   @Override
   public InstanceMapping select(List<String> segments, int requestId,
       SegmentStates segmentStates, Map<String, String> queryOptions) {
+    return select(segments, requestId, segmentStates, queryOptions, _failOpenPolicy.isEnabled());
+  }
+
+  @Override
+  public SelectionResult select(BrokerRequest brokerRequest, List<String> segments, long requestId) {
+    // Clear on every exit from this query's selection flow (healthy, disabled, ineligible, or fail-open), not just
+    // when selectForFailOpen() runs, so a pooled thread never retains a stale snapshot.
+    try {
+      SelectionResult result = super.select(brokerRequest, segments, requestId);
+      // A partition can be deferred to fail-open (see assign()'s canDeferToFailOpen) without assign() throwing, so
+      // that fail-open gets a chance to rebuild it from one consistent replica group. If fail-open then also fails
+      // (BaseInstanceSelector.select() falls back to the original, incomplete mapping), the deferred partition's
+      // healthy segments end up neither assigned nor reported unavailable. Serving the query with those segments
+      // silently missing is just as unsafe for colocated joins (and MSE/SSE query correctness in general) as
+      // serving them from a mismatched replica group, so fail loudly instead.
+      Set<String> deferredSegments = _segmentsDeferredToFailOpen.get();
+      if (deferredSegments != null && !deferredSegments.isEmpty()) {
+        Set<String> accounted = new HashSet<>(result.getSegmentToInstanceMap().keySet());
+        accounted.addAll(result.getOptionalSegmentToInstanceMap().keySet());
+        accounted.addAll(result.getUnavailableSegments());
+        for (String segment : deferredSegments) {
+          if (!accounted.contains(segment)) {
+            throw new RuntimeException(String.format(
+                "Segment: %s for table: %s was dropped from the selection because fail-open could not rebuild a "
+                    + "single consistent replica group for its partition", segment, _tableNameWithType));
+          }
+        }
+      }
+      return result;
+    } finally {
+      _instancePartitionsForFailOpen.remove();
+      _segmentsDeferredToFailOpen.remove();
+    }
+  }
+
+  @Override
+  protected InstanceMapping select(List<String> segments, int requestId, SegmentStates segmentStates,
+      Map<String, String> queryOptions, boolean failOpenEnabled) {
     // Create a copy of InstancePartitions to avoid race-condition with event-listeners above.
     InstancePartitions instancePartitions = _instancePartitions;
-    int replicaGroupSelected;
+    _instancePartitionsForFailOpen.set(instancePartitions);
+    int replicaGroupSelected = resolvePreferredReplicaGroup(requestId, instancePartitions, queryOptions);
+
+    // assign() already skips unavailable segments (when fail-open is enabled) while building the normal mapping, so
+    // this mapping remains a valid fallback if fail-open selection later fails to find a candidate for a segment.
+    return assign(Sets.newHashSet(segments), segmentStates, instancePartitions, replicaGroupSelected, true,
+        failOpenEnabled);
+  }
+
+  @Override
+  protected InstanceMapping selectForFailOpen(List<String> segments, int requestId, SegmentStates segmentStates,
+      Map<String, String> queryOptions) {
+    // Reuse the snapshot from the normal selection that just ran on this thread for this query, falling back to the
+    // latest snapshot if selectForFailOpen() is ever invoked without a preceding select() call. The outer select()
+    // clears this ThreadLocal in a finally block, so no cleanup is needed here.
+    InstancePartitions instancePartitions = _instancePartitionsForFailOpen.get();
+    if (instancePartitions == null) {
+      instancePartitions = _instancePartitions;
+    }
+    int replicaGroupSelected = resolvePreferredReplicaGroup(requestId, instancePartitions, queryOptions);
+    return assign(Sets.newHashSet(segments), segmentStates, instancePartitions, replicaGroupSelected, false, true);
+  }
+
+  // Shared by select() and selectForFailOpen() so fixed-replica/sticky routing is honored identically on both the
+  // normal and fail-open reselection paths: a query's healthy partitions must not get bounced to a different
+  // replica group just because another partition in the same query needed fail-open.
+  private int resolvePreferredReplicaGroup(int requestId, InstancePartitions instancePartitions,
+      Map<String, String> queryOptions) {
     ServerSelectionContext ctx = new ServerSelectionContext(queryOptions, _config);
     if (ctx.isUseFixedReplica()) {
       // When using sticky routing, we want to iterate over the instancePartitions in order to ensure deterministic
@@ -95,12 +176,37 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
       // Since the instances within a selected replica group are iterated in order, the assignment within a selected
       // replica group is guaranteed to be deterministic.
       // Note: This can cause major hotspots in the cluster.
-      replicaGroupSelected = 0;
-    } else {
-      replicaGroupSelected = requestId % instancePartitions.getNumReplicaGroups();
+      return 0;
     }
+    return requestId % instancePartitions.getNumReplicaGroups();
+  }
 
-    return assign(Sets.newHashSet(segments), segmentStates, instancePartitions, replicaGroupSelected);
+  // Segments in a partition must stay within one replica group (for colocated joins), so a partial fail-open patch
+  // could break that: e.g. segment1 is only healthy on RG1 (its RG0 replica is unhealthy), while unavailable segment2
+  // only has a fail-open candidate in RG0. This flag exposes healthy segments' unhealthy servers as fallback
+  // candidates, which assign() only uses for a partition that no replica group can serve otherwise. Partitions with
+  // a healthy route (including ones whose preferred replica group contains an unhealthy server) are routed exactly
+  // as in the normal pass.
+  @Override
+  protected boolean shouldTrackFailOpenCandidatesForHealthySegments() {
+    return true;
+  }
+
+  // The normal pass skips a segment that isn't unavailable but has no healthy candidates (e.g. a new segment whose
+  // servers are all unhealthy), so fail-open skips it too. Otherwise it would become a required segment of its
+  // partition and could force the partition onto a different (possibly unhealthy) replica group, or leave the
+  // partition unassignable and fail fail-open for the whole query.
+  @Override
+  protected boolean shouldFailOpenSegmentsWithoutHealthyCandidates() {
+    return false;
+  }
+
+  // A brand-new real-time segment may not have any fail-open candidates yet simply because it hasn't finished
+  // propagating; skip it instead of failing the whole reselection. E.g. segment1 (new, no candidates) and
+  // segment2 (unavailable, has candidates) both need fail-open: segment1 is skipped, segment2 is still reselected.
+  @Override
+  protected boolean canSkipSegmentForFailOpen(String segment, SegmentStates segmentStates) {
+    return isNewLLCSegment(segment);
   }
 
   /// Returns a map from the segmentName to the corresponding server. It tries to select all servers from the
@@ -120,17 +226,44 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
   ///     "segment4": "server4"
   ///   }
   /// }
-  private InstanceMapping assign(Set<String> segments,
-      SegmentStates segmentStates, InstancePartitions instancePartitions, int preferredReplicaId) {
+  private InstanceMapping assign(Set<String> segments, SegmentStates segmentStates,
+      InstancePartitions instancePartitions, int preferredReplicaId, boolean requireCompleteAssignment,
+      boolean failOpenEnabled) {
     Map<String, Integer> instanceToPartitionMap = instancePartitions.getInstanceToPartitionIdMap();
     Map<String, Set<String>> instanceToSegmentsMap = new HashMap<>();
+    // Only the fail-open reselection (requireCompleteAssignment == false) may route healthy segments onto their
+    // unhealthy fallback servers, and only for a partition that no replica group can serve with instanceToSegmentsMap
+    // alone. The normal pass' segmentStates carry unfiltered fail-open candidates that must not be used for routing.
+    boolean isFailOpenReselection = !requireCompleteAssignment;
+    Map<String, Set<String>> expandedInstanceToSegmentsMap = isFailOpenReselection ? new HashMap<>() : null;
+    // Partitions containing an unavailable segment that still has fail-open candidates, i.e. selectFailOpen() has a
+    // real chance to rebuild a complete replica group for them. Unavailable segments are skipped below and never
+    // make it into partitionToRequiredSegmentsMap, so this must be tracked separately from requiredSegments.
+    Set<Integer> partitionsWithFailOpenEligibleUnavailableSegment = new HashSet<>();
 
     // instanceToSegmentsMap stores the mapping from instance to the active segments it can serve.
     for (String segment : segments) {
       List<SegmentInstanceCandidate> candidates = segmentStates.getCandidates(segment);
       if (CollectionUtils.isEmpty(candidates)) {
-        if (isNewLLCSegment(segment)) {
-          // New segments might not be tracked in segmentStates yet.
+        // During fail-open reselection, BaseInstanceSelector only leaves a segment without candidates if it decided to
+        // skip it.
+        if (isFailOpenReselection || isNewLLCSegment(segment) || (failOpenEnabled
+            && (segmentStates.getUnavailableSegments().contains(segment)
+                || segmentStates.getFailOpenCandidates(segment) != null))) {
+          // New segments might not be tracked in segmentStates yet; unavailable segments, and new segments whose only
+          // candidates are disabled (tracked via fail-open candidates instead of the unavailable set), are deferred
+          // so fail-open routing can attempt selection.
+          if (segmentStates.getUnavailableSegments().contains(segment)) {
+            List<SegmentInstanceCandidate> failOpenCandidates = segmentStates.getFailOpenCandidates(segment);
+            if (failOpenCandidates != null) {
+              for (SegmentInstanceCandidate failOpenCandidate : failOpenCandidates) {
+                Integer partitionId = instanceToPartitionMap.get(failOpenCandidate.getInstance());
+                if (partitionId != null) {
+                  partitionsWithFailOpenEligibleUnavailableSegment.add(partitionId);
+                }
+              }
+            }
+          }
           continue;
         } else {
           throw new IllegalStateException(String.format("Failed to find servers for segment: %s", segment));
@@ -141,10 +274,25 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
           .computeIfAbsent(candidate.getInstance(), k -> new HashSet<>())
             .add(segment);
       }
+      if (expandedInstanceToSegmentsMap != null) {
+        for (SegmentInstanceCandidate candidate : candidates) {
+          expandedInstanceToSegmentsMap.computeIfAbsent(candidate.getInstance(), k -> new HashSet<>()).add(segment);
+        }
+        List<SegmentInstanceCandidate> fallbackCandidates = segmentStates.getFailOpenCandidates(segment);
+        if (fallbackCandidates != null) {
+          for (SegmentInstanceCandidate candidate : fallbackCandidates) {
+            expandedInstanceToSegmentsMap.computeIfAbsent(candidate.getInstance(), k -> new HashSet<>())
+                .add(segment);
+          }
+        }
+      }
     }
 
     // partitionToRequiredSegmentsMap stores the mapping from partition to the segments that need to be served. This
     // is necessary to select appropriate replica group at the instance partition level.
+    // Built from the healthy map only, in both passes and for both tiers below: every segment here has at least one
+    // candidate in it, and a fallback server that sits in a different instance partition (e.g. mid-rebalance) must not
+    // make the segment required there too.
     Map<Integer, Set<String>> partitionToRequiredSegmentsMap = new HashMap<>();
     for (Map.Entry<String, Set<String>> entry : instanceToSegmentsMap.entrySet()) {
       Integer partitionId = instanceToPartitionMap.get(entry.getKey());
@@ -156,16 +304,49 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
     // Assign segments to instances based on the partitionToRequiredSegmentsMap. This ensures that we select the
     // appropriate replica group for each set of segments belonging to the same instance partition.
     Map<String, String> segmentToSelectedInstanceMap = new HashMap<>();
+    // Required segments of partitions deferred to fail-open below. Recorded here (rather than solely relying on
+    // selectFailOpen()'s own completeness check) because that check only verifies the *unavailable* segment got a
+    // replacement; it doesn't catch this partition's other, healthy-but-unassigned segments if the caller ends up
+    // falling back to this (incomplete) mapping. See select(BrokerRequest, ...) for how this is used.
+    Set<String> segmentsDeferredToFailOpen = new HashSet<>();
     int numPartitions = instancePartitions.getNumPartitions();
     for (int partition = 0; partition < numPartitions; partition++) {
       Set<String> requiredSegments = partitionToRequiredSegmentsMap.get(partition);
       if (requiredSegments != null) {
-        getSelectedInstancesForPartition(instanceToSegmentsMap, requiredSegments, partition, preferredReplicaId,
-            segmentToSelectedInstanceMap);
+        boolean assigned = getSelectedInstancesForPartition(instanceToSegmentsMap, null, requiredSegments, partition,
+            preferredReplicaId, instancePartitions, segmentToSelectedInstanceMap);
+        if (!assigned && isFailOpenReselection) {
+          // No replica group can serve this partition without moving a healthy segment onto an unhealthy server, so
+          // fall back to that as a last resort to keep the partition on one consistent replica group.
+          assigned = getSelectedInstancesForPartition(expandedInstanceToSegmentsMap, instanceToSegmentsMap,
+              requiredSegments, partition, preferredReplicaId, instancePartitions, segmentToSelectedInstanceMap);
+        }
+        // Only suppress the throw when fail-open will actually be attempted for this partition, i.e. it contains an
+        // unavailable segment with fail-open candidates; otherwise the caller's fail-open trigger
+        // (BaseInstanceSelector.select()) never invokes selectFailOpen() and this partition's segments would be
+        // silently dropped instead of served. If fail-open subsequently also fails to rebuild a complete replica
+        // group for this partition, selectFailOpen() returns null and BaseInstanceSelector falls back to the
+        // original (incomplete) mapping. Correctness (one consistent replica group per partition, for both MSE and
+        // SSE queries) must fail loudly in that case, not silently serve the partition with these segments missing;
+        // select(BrokerRequest, ...) enforces that using segmentsDeferredToFailOpen below.
+        boolean canDeferToFailOpen = failOpenEnabled
+            && partitionsWithFailOpenEligibleUnavailableSegment.contains(partition);
+        if (!assigned) {
+          if (requireCompleteAssignment && canDeferToFailOpen) {
+            segmentsDeferredToFailOpen.addAll(requiredSegments);
+          } else if (requireCompleteAssignment) {
+            throw new RuntimeException(
+                String.format("Unable to find any replica-group to serve segments in the instance-partition %s for "
+                    + "table: %s", partition, _tableNameWithType));
+          }
+        }
       }
     }
+    if (requireCompleteAssignment) {
+      _segmentsDeferredToFailOpen.set(segmentsDeferredToFailOpen);
+    }
 
-    return computeOptionalSegments(segmentToSelectedInstanceMap, segmentStates);
+    return computeOptionalSegments(segmentToSelectedInstanceMap, segmentStates, isFailOpenReselection);
   }
 
   private boolean isNewLLCSegment(String segmentName) {
@@ -180,15 +361,22 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
   /// This method selects the instances for the given partition and segments. It iterates over the replica groups
   /// in a round-robin fashion, starting from the preferred replica group. It only selects the replica group if all
   /// the segments are available in the selected instances.
-  /// If no replica group is found, it throws an exception.
-  private void getSelectedInstancesForPartition(Map<String, Set<String>> instanceToSegmentsMap,
-      Set<String> requiredSegments, int partitionId, int preferredReplicaId,
+  ///
+  /// When `preferredInstanceToSegmentsMap` is provided, a segment served by one of its instances in the selected
+  /// replica group is assigned to that instance, and only the remaining segments fall back to
+  /// `instanceToSegmentsMap`. Fail-open uses this so a segment with both a healthy and an unhealthy replica in the
+  /// selected replica group stays on the healthy one.
+  ///
+  /// @return `true` when a complete replica group is found, `false` otherwise
+  private boolean getSelectedInstancesForPartition(Map<String, Set<String>> instanceToSegmentsMap,
+      @Nullable Map<String, Set<String>> preferredInstanceToSegmentsMap, Set<String> requiredSegments, int partitionId,
+      int preferredReplicaId, InstancePartitions instancePartitions,
       Map<String, String> segmentToSelectedInstanceMapSink) {
-    int numReplicaGroups = _instancePartitions.getNumReplicaGroups();
+    int numReplicaGroups = instancePartitions.getNumReplicaGroups();
 
     for (int replicaGroupOffset = 0; replicaGroupOffset < numReplicaGroups; replicaGroupOffset++) {
       int selectedReplicaGroup = (replicaGroupOffset + preferredReplicaId) % numReplicaGroups;
-      List<String> selectedInstances = _instancePartitions.getInstances(partitionId, selectedReplicaGroup);
+      List<String> selectedInstances = instancePartitions.getInstances(partitionId, selectedReplicaGroup);
 
       Set<String> segmentsFromSelectedInstances = new HashSet<>();
       for (String instance : selectedInstances) {
@@ -199,30 +387,42 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
       }
 
       if (segmentsFromSelectedInstances.containsAll(requiredSegments)) {
+        Set<String> preferredAssignedSegments = new HashSet<>();
+        if (preferredInstanceToSegmentsMap != null) {
+          for (String instance : selectedInstances) {
+            Set<String> servedSegments = preferredInstanceToSegmentsMap.get(instance);
+            if (servedSegments == null) {
+              continue;
+            }
+            for (String segment : servedSegments) {
+              if (requiredSegments.contains(segment)) {
+                segmentToSelectedInstanceMapSink.put(segment, instance);
+                preferredAssignedSegments.add(segment);
+              }
+            }
+          }
+        }
         for (String instance: selectedInstances) {
           Set<String> servedSegments = instanceToSegmentsMap.get(instance);
           if (servedSegments == null || servedSegments.isEmpty()) {
             continue;
           }
           for (String segment : servedSegments) {
-            if (requiredSegments.contains(segment)) {
+            if (requiredSegments.contains(segment) && !preferredAssignedSegments.contains(segment)) {
               segmentToSelectedInstanceMapSink.put(segment, instance);
             }
           }
         }
-        return; // Successfully selected instances for the partition.
+        return true;
       }
     }
-
-    throw new RuntimeException(
-      String.format("Unable to find any replica-group to serve segments in the instance-partition %s for table: %s",
-        partitionId, _tableNameWithType));
+    return false;
   }
 
   /// Based on whether the selected instance for the segment is online to serve that segment or not,
   /// this method computes the segments that are optional and the segments that are not.
   private InstanceMapping computeOptionalSegments(
-      Map<String, String> segmentToSelectedInstanceMap, SegmentStates segmentStates) {
+      Map<String, String> segmentToSelectedInstanceMap, SegmentStates segmentStates, boolean isFailOpenReselection) {
 
     Map<String, String> segmentsToInstanceMap = new HashMap<>();
     Map<String, String> optionalSegmentToInstanceMap = new HashMap<>();
@@ -236,21 +436,37 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
       Preconditions.checkState(candidates != null && !candidates.isEmpty(),
           "Failed to find servers for segment: %s", segment);
 
-      for (SegmentInstanceCandidate candidate : candidates) {
-        if (selectedInstance.equals(candidate.getInstance())) {
-          // This can only be offline when it is a new segment. And such segment is marked as optional segment so that
-          // broker or server can skip it upon any issue to process it.
-          if (candidate.isOnline()) {
-            segmentsToInstanceMap.put(segment, selectedInstance);
-          } else {
-            optionalSegmentToInstanceMap.put(segment, selectedInstance);
-          }
-          break;
+      SegmentInstanceCandidate selectedCandidate = findCandidate(candidates, selectedInstance);
+      if (selectedCandidate == null && isFailOpenReselection) {
+        // During fail-open reselection, the instance can come from the segment's fallback candidates instead. The
+        // normal pass' segmentStates carry unfiltered fail-open candidates, so they must not be consulted there.
+        selectedCandidate = findCandidate(segmentStates.getFailOpenCandidates(segment), selectedInstance);
+      }
+      if (selectedCandidate != null) {
+        // This can only be offline when it is a new segment. And such segment is marked as optional segment so that
+        // broker or server can skip it upon any issue to process it.
+        if (selectedCandidate.isOnline()) {
+          segmentsToInstanceMap.put(segment, selectedInstance);
+        } else {
+          optionalSegmentToInstanceMap.put(segment, selectedInstance);
         }
       }
     }
 
     return new InstanceMapping(segmentsToInstanceMap, optionalSegmentToInstanceMap);
+  }
+
+  @Nullable
+  private static SegmentInstanceCandidate findCandidate(@Nullable List<SegmentInstanceCandidate> candidates,
+      String instance) {
+    if (candidates != null) {
+      for (SegmentInstanceCandidate candidate : candidates) {
+        if (instance.equals(candidate.getInstance())) {
+          return candidate;
+        }
+      }
+    }
+    return null;
   }
 
   @VisibleForTesting

@@ -56,6 +56,7 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.broker.helix.ClusterChangeHandler;
+import org.apache.pinot.broker.routing.FailOpenPolicy;
 import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelector;
 import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelectorFactory;
 import org.apache.pinot.broker.routing.instanceselector.InstanceSelector;
@@ -73,6 +74,8 @@ import org.apache.pinot.broker.routing.segmentselector.SegmentSelectorFactory;
 import org.apache.pinot.broker.routing.tablesampler.TableSampler;
 import org.apache.pinot.broker.routing.tablesampler.TableSamplerFactory;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryManager;
+import org.apache.pinot.common.failuredetector.FailureDetector;
+import org.apache.pinot.common.failuredetector.NoOpFailureDetector;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
@@ -141,6 +144,8 @@ public abstract class BaseBrokerRoutingManager
   private final Set<String> _excludedServers = new HashSet<>();
   private final ServerRoutingStatsManager _serverRoutingStatsManager;
   private final PinotConfiguration _pinotConfig;
+  private final FailOpenPolicy _failOpenPolicy;
+  private final FailureDetector _failureDetector;
   private final boolean _enablePartitionMetadataManager;
   private final long _newSegmentExpirationMs;
   private final ExecutorService _executorService;
@@ -190,9 +195,16 @@ public abstract class BaseBrokerRoutingManager
 
   public BaseBrokerRoutingManager(BrokerMetrics brokerMetrics, ServerRoutingStatsManager serverRoutingStatsManager,
       PinotConfiguration pinotConfig) {
+    this(brokerMetrics, serverRoutingStatsManager, pinotConfig, FailOpenPolicy.disabled(), new NoOpFailureDetector());
+  }
+
+  public BaseBrokerRoutingManager(BrokerMetrics brokerMetrics, ServerRoutingStatsManager serverRoutingStatsManager,
+      PinotConfiguration pinotConfig, FailOpenPolicy failOpenPolicy, FailureDetector failureDetector) {
     _brokerMetrics = brokerMetrics;
     _serverRoutingStatsManager = serverRoutingStatsManager;
     _pinotConfig = pinotConfig;
+    _failOpenPolicy = failOpenPolicy;
+    _failureDetector = failureDetector;
     _enablePartitionMetadataManager =
         pinotConfig.getProperty(CommonConstants.Broker.CONFIG_OF_ENABLE_PARTITION_METADATA_MANAGER,
             CommonConstants.Broker.DEFAULT_ENABLE_PARTITION_METADATA_MANAGER);
@@ -486,22 +498,16 @@ public abstract class BaseBrokerRoutingManager
       }
     }
 
-    // Calculate the routable servers and the changed routable servers
+    // Calculate the routable servers and all fail-open-eligible membership changes
     List<String> changedServers = new ArrayList<>(newEnabledServers.size() + newDisabledServers.size());
-    if (_excludedServers.isEmpty()) {
-      changedServers.addAll(newEnabledServers);
-      changedServers.addAll(newDisabledServers);
-    } else {
+    changedServers.addAll(newEnabledServers);
+    changedServers.addAll(newDisabledServers);
+    Set<String> failOpenEligibleServers = Set.copyOf(enabledServers);
+    if (!_excludedServers.isEmpty()) {
       enabledServers.removeAll(_excludedServers);
-      // NOTE: All new enabled servers are routable
-      changedServers.addAll(newEnabledServers);
-      for (String newDisabledServer : newDisabledServers) {
-        if (_excludedServers.contains(newDisabledServer)) {
-          changedServers.add(newDisabledServer);
-        }
-      }
     }
     _routableServerInstanceMap = buildRoutableServerInstanceMap(enabledServers);
+    Set<String> routableServers = Set.copyOf(_routableServerInstanceMap.keySet());
     long calculateChangedServersEndTimeMs = System.currentTimeMillis();
 
     // Early terminate if there is no changed servers
@@ -520,7 +526,7 @@ public abstract class BaseBrokerRoutingManager
       try {
         Object tableLock = getRoutingTableBuildLock(tableNameWithType);
         synchronized (tableLock) {
-          updateRoutingEntryOnInstancesChange(routingEntry, _routableServerInstanceMap.keySet(), changedServers);
+          updateRoutingEntryOnInstancesChange(routingEntry, routableServers, failOpenEligibleServers, changedServers);
         }
       } catch (Exception e) {
         LOGGER.error("Caught unexpected exception while updating routing entry on instances change for table: {}",
@@ -590,12 +596,14 @@ public abstract class BaseBrokerRoutingManager
     routableServerInstanceMap.remove(instanceId);
     _routableServerInstanceMap = routableServerInstanceMap;
     List<String> changedServers = List.of(instanceId);
+    Set<String> routableServers = Set.copyOf(_routableServerInstanceMap.keySet());
+    Set<String> failOpenEligibleServers = Set.copyOf(_enabledServerInstanceMap.keySet());
     for (RoutingEntry routingEntry : _routingEntryMap.values()) {
       String tableNameWithType = routingEntry.getTableNameWithType();
       try {
         Object tableLock = getRoutingTableBuildLock(tableNameWithType);
         synchronized (tableLock) {
-          updateRoutingEntryOnInstancesChange(routingEntry, _routableServerInstanceMap.keySet(), changedServers);
+          updateRoutingEntryOnInstancesChange(routingEntry, routableServers, failOpenEligibleServers, changedServers);
         }
       } catch (Exception e) {
         LOGGER.error("Caught unexpected exception while updating routing entry when excluding server: {} for table: {}",
@@ -637,12 +645,14 @@ public abstract class BaseBrokerRoutingManager
     routableServerInstanceMap.put(instanceId, serverInstance);
     _routableServerInstanceMap = routableServerInstanceMap;
     List<String> changedServers = List.of(instanceId);
+    Set<String> routableServers = Set.copyOf(_routableServerInstanceMap.keySet());
+    Set<String> failOpenEligibleServers = Set.copyOf(_enabledServerInstanceMap.keySet());
     for (RoutingEntry routingEntry : _routingEntryMap.values()) {
       String tableNameWithType = routingEntry.getTableNameWithType();
       try {
         Object tableLock = getRoutingTableBuildLock(tableNameWithType);
         synchronized (tableLock) {
-          updateRoutingEntryOnInstancesChange(routingEntry, _routableServerInstanceMap.keySet(), changedServers);
+          updateRoutingEntryOnInstancesChange(routingEntry, routableServers, failOpenEligibleServers, changedServers);
         }
       } catch (Exception e) {
         LOGGER.error("Caught unexpected exception while updating routing entry when including server: {} for table: {}",
@@ -744,10 +754,10 @@ public abstract class BaseBrokerRoutingManager
   ///
   /// The single entry point for the instance change paths, so that none of them can apply the change without
   /// refreshing the gauges it moves. Callers must hold the table's routing build lock.
-  private void updateRoutingEntryOnInstancesChange(RoutingEntry routingEntry, Set<String> enabledInstances,
-      List<String> changedInstances) {
+  private void updateRoutingEntryOnInstancesChange(RoutingEntry routingEntry, Set<String> routableInstances,
+      Set<String> failOpenEligibleInstances, List<String> changedInstances) {
     try {
-      routingEntry.onInstancesChange(enabledInstances, changedInstances);
+      routingEntry.onInstancesChange(routableInstances, failOpenEligibleInstances, changedInstances);
     } finally {
       // See processAssignmentChangeForTable for why the report is in a finally block. It cannot be folded into
       // the callers' own try/catch the way it is there: theirs wraps the synchronized block rather than sitting
@@ -865,7 +875,7 @@ public abstract class BaseBrokerRoutingManager
       InstanceSelector instanceSelector =
           InstanceSelectorFactory.getInstanceSelector(tableConfig, _propertyStore, _brokerMetrics,
               adaptiveServerSelector, _pinotConfig, _routableServerInstanceMap.keySet(), _enabledServerInstanceMap,
-              idealState, externalView, preSelectedOnlineSegments);
+              idealState, externalView, preSelectedOnlineSegments, _failOpenPolicy, _failureDetector);
 
       // Add time boundary manager if both offline and real-time part exist for a hybrid table
       TimeBoundaryManager timeBoundaryManager = null;
@@ -982,7 +992,8 @@ public abstract class BaseBrokerRoutingManager
             InstanceSelector samplerInstanceSelector =
                 InstanceSelectorFactory.getInstanceSelector(tableConfig, _propertyStore, _brokerMetrics,
                     adaptiveServerSelector, _pinotConfig, _routableServerInstanceMap.keySet(),
-                    _enabledServerInstanceMap, idealState, externalView, samplerPreSelectedOnlineSegments);
+                    _enabledServerInstanceMap, idealState, externalView, samplerPreSelectedOnlineSegments,
+                    _failOpenPolicy, _failureDetector);
             configuredSamplerInfos.put(normalizedSamplerName,
                 new SamplerInfo(sampler, samplerSegmentSelector, samplerInstanceSelector));
           } catch (Exception e) {
@@ -1569,11 +1580,13 @@ public abstract class BaseBrokerRoutingManager
       _lastUpdateExternalViewVersion = externalView.getStat().getVersion();
     }
 
-    void onInstancesChange(Set<String> enabledInstances, List<String> changedInstances) {
-      _instanceSelector.onInstancesChange(enabledInstances, changedInstances);
+    void onInstancesChange(Set<String> routableInstances, Set<String> failOpenEligibleInstances,
+        List<String> changedInstances) {
+      _instanceSelector.onInstancesChange(routableInstances, failOpenEligibleInstances, changedInstances);
       if (!_samplerInfos.isEmpty()) {
         for (SamplerInfo samplerInfo : _samplerInfos.values()) {
-          samplerInfo._instanceSelector.onInstancesChange(enabledInstances, changedInstances);
+          samplerInfo._instanceSelector.onInstancesChange(routableInstances, failOpenEligibleInstances,
+              changedInstances);
         }
       }
     }
