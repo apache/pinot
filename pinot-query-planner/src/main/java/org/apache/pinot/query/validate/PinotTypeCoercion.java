@@ -20,16 +20,19 @@ package org.apache.pinot.query.validate;
 
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
+import org.apache.calcite.sql.SqlCall;
 import org.apache.calcite.sql.SqlCallBinding;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.SqlNodeList;
 import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.type.SqlTypeFamily;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.type.SqlTypeUtil;
 import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.sql.validate.implicit.TypeCoercionImpl;
+import org.apache.pinot.calcite.sql.fun.PinotOperatorTable;
 
 
 /// Custom implementation of Calcite's default type coercion implementation to add Pinot specific type coercion rules.
@@ -48,6 +51,10 @@ import org.apache.calcite.sql.validate.implicit.TypeCoercionImpl;
 /// avoids wrapping the column in a per-row CAST (which is expensive on the query path and breaks index applicability)
 /// while remaining semantically equivalent. If both sides are column references (or neither is), we fall back to
 /// casting the TIMESTAMP side to BIGINT to preserve the long-standing default behavior.
+///
+/// A multi-value column (ARRAY type) compared against a non-array value, e.g. `mvCol = 'a'` or `mvCol IN ('a', 'b')`,
+/// is wrapped in [PinotOperatorTable#ARRAY_TO_MV] so the predicate keeps the single-stage engine semantics (true if
+/// any value matches). Without this, Calcite casts the value to an array, which the leaf stage cannot evaluate.
 public class PinotTypeCoercion extends TypeCoercionImpl {
   public PinotTypeCoercion(RelDataTypeFactory typeFactory,
       SqlValidator validator) {
@@ -80,6 +87,13 @@ public class PinotTypeCoercion extends TypeCoercionImpl {
     SqlKind kind = operator.getKind();
 
     if (binding.getOperandCount() == 2 && kind.belongsTo(SqlKind.BINARY_COMPARISON)) {
+      boolean firstIsArray = SqlTypeUtil.isArray(binding.getOperandType(0));
+      boolean secondIsArray = SqlTypeUtil.isArray(binding.getOperandType(1));
+      if (firstIsArray != secondIsArray && wrapMultiValueColumn(binding, firstIsArray ? 0 : 1)) {
+        super.binaryComparisonCoercion(binding);
+        return true;
+      }
+
       final RelDataType type1 = binding.getOperandType(0);
       final RelDataType type2 = binding.getOperandType(1);
 
@@ -106,6 +120,31 @@ public class PinotTypeCoercion extends TypeCoercionImpl {
     }
 
     return super.binaryComparisonCoercion(binding);
+  }
+
+  @Override
+  public boolean inOperationCoercion(SqlCallBinding binding) {
+    SqlKind kind = binding.getOperator().getKind();
+    if ((kind == SqlKind.IN || kind == SqlKind.NOT_IN) && binding.operand(1) instanceof SqlNodeList
+        && !SqlTypeUtil.isArray(binding.getOperandType(1)) && wrapMultiValueColumn(binding, 0)) {
+      super.inOperationCoercion(binding);
+      return true;
+    }
+    return super.inOperationCoercion(binding);
+  }
+
+  /// Wraps the operand at the given index in `ARRAY_TO_MV` if it is a reference to a multi-value column.
+  private boolean wrapMultiValueColumn(SqlCallBinding binding, int index) {
+    SqlNode operand = binding.operand(index);
+    RelDataType type = binding.getOperandType(index);
+    if (!SqlTypeUtil.isArray(type) || !isColumnReference(operand)) {
+      return false;
+    }
+    SqlCall arrayToMv = PinotOperatorTable.ARRAY_TO_MV.createCall(operand.getParserPosition(), operand);
+    binding.getCall().setOperand(index, arrayToMv);
+    updateInferredType(arrayToMv,
+        factory.createTypeWithNullability(type.getComponentType(), type.isNullable()));
+    return true;
   }
 
   private static boolean isColumnReference(SqlNode node) {
