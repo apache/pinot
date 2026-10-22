@@ -107,13 +107,8 @@ public class SelectionPlanNode implements PlanNode {
       boolean lateMaterialize = expressions.size() > numOrderByExpressions && !scanBoundedByLimit
           && QueryOptionsUtils.isLateMaterializeSortedOrderByEnabled(_queryContext.getQueryOptions());
 
-      // Build the project operator once. Constructing one is not free -- it resolves a DataSource and a
-      // ColumnContext per selected column, and some implementations start prefetching those columns -- so a
-      // build-and-discard probe would read exactly the columns this is trying to avoid reading.
       List<ExpressionContext> expressionsToProject =
           lateMaterialize ? expressions.subList(0, numOrderByExpressions) : expressions;
-      BaseProjectOperator<?> projectOperator =
-          getSortedByProject(expressionsToProject, maxDocsPerCall, orderByExpressions);
       // Remember that we cannot use asc == projectOperator.isAscending() because empty operators are considered
       // both ascending and descending
       DocIdOrderedOperator.DocIdOrder queryOrder = DocIdOrderedOperator.DocIdOrder.fromAsc(asc);
@@ -158,7 +153,7 @@ public class SelectionPlanNode implements PlanNode {
 
       BaseProjectOperator<?> projectOperator = reusableSortedByProject != null
           ? reusableSortedByProject
-          : getSortedByProject(expressions, maxDocsPerCall, orderByExpressions);
+          : getSortedByProject(expressionsToProject, maxDocsPerCall, orderByExpressions);
       if (projectOperator.isCompatibleWith(queryOrder)) {
         return new SelectionPartiallyOrderedByLinearOperator(_indexSegment, _queryContext, expressions, projectOperator,
             sortedColumnsPrefixSize, lateMaterialize);
