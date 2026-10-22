@@ -60,6 +60,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
 import org.apache.pinot.common.config.TlsConfig;
+import org.apache.pinot.common.coordination.CoordinationBackend;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.MseMetrics;
 import org.apache.pinot.common.metrics.ServerGauge;
@@ -75,7 +76,6 @@ import org.apache.pinot.common.utils.ServiceStatus.Status;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.config.QueryWorkloadConfigUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
-import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.regex.PatternFactory;
 import org.apache.pinot.common.utils.tls.PinotInsecureMode;
@@ -115,6 +115,7 @@ import org.apache.pinot.server.api.resources.ReingestionConsumptionTimeout;
 import org.apache.pinot.server.conf.ServerConf;
 import org.apache.pinot.server.realtime.ControllerLeaderLocator;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
+import org.apache.pinot.server.starter.NativeServerStarterLifecycle;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.server.starter.ServerMetricsInitUtils;
 import org.apache.pinot.server.starter.ServerQueriesDisabledTracker;
@@ -124,7 +125,6 @@ import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.accounting.WorkloadBudgetManagerFactory;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
-import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.environmentprovider.PinotEnvironmentProvider;
 import org.apache.pinot.spi.environmentprovider.PinotEnvironmentProviderFactory;
@@ -188,6 +188,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
   protected ScheduledExecutorService _helixMessageCountScheduler;
   protected ServerReloadJobStatusCache _reloadJobStatusCache;
   protected ReingestionConsumptionTimeout _reingestionConsumptionTimeout;
+  @Nullable
+  private NativeServerStarterLifecycle _nativeLifecycle;
+  private boolean _nativeBackend;
   // Override this to provide custom thread pool for Helix state transitions. Null means using Helix's default
   @Nullable
   protected StateTransitionThreadPoolManager _transitionThreadPoolManager;
@@ -197,6 +200,13 @@ public abstract class BaseServerStarter implements ServiceStartable {
       throws Exception {
     // Make a clone so that changes to the config won't propagate to the caller
     _serverConf = serverConf.clone();
+    _nativeBackend = CoordinationBackend.from(_serverConf) == CoordinationBackend.RATIS;
+    if (_nativeBackend) {
+      applyCustomConfigs(_serverConf);
+      _nativeLifecycle = new NativeServerStarterLifecycle(_serverConf);
+      _instanceId = _nativeLifecycle.instanceId();
+      return;
+    }
     _zkAddress = _serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER);
     _helixClusterName = _serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME);
     ServiceStartableUtils.applyClusterConfig(_serverConf, _zkAddress, _helixClusterName, ServiceRole.SERVER);
@@ -659,6 +669,18 @@ public abstract class BaseServerStarter implements ServiceStartable {
   @Override
   public void start()
       throws Exception {
+    if (_nativeBackend) {
+      Preconditions.checkState(_nativeLifecycle != null, "Native server initialization did not complete");
+      if (_segmentOperationsThrottlerSet == null) {
+        _segmentOperationsThrottlerSet = new SegmentOperationsThrottlerSet(createSegmentAllIndexPreprocessThrottler(),
+            createSegmentStarTreePreprocessThrottler(), createSegmentDownloadThrottler(),
+            createMultiColumnIndexPreprocessThrottler());
+      }
+      _nativeLifecycle.start(_segmentOperationsThrottlerSet);
+      _serverInstance = _nativeLifecycle.serverInstance();
+      _serverMetrics = _serverInstance.getServerMetrics();
+      return;
+    }
     LOGGER.info("Starting Pinot server (Version: {})", PinotVersion.VERSION);
     LOGGER.info("Server configs: {}", new PinotAppConfigs(getConfig()).toJSONString());
     long startTimeMs = System.currentTimeMillis();
@@ -1056,6 +1078,12 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
   @Override
   public void stop() {
+    if (_nativeBackend) {
+      if (_nativeLifecycle != null) {
+        _nativeLifecycle.close();
+      }
+      return;
+    }
     LOGGER.info("Shutting down Pinot server");
     long startTimeMs = System.currentTimeMillis();
 
@@ -1274,15 +1302,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
   /// components are initialized where SegmentFetcherAndLoader was initialized.
   private void initSegmentFetcher(PinotConfiguration config)
       throws Exception {
-    PinotConfiguration pinotFSConfig = config.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY);
-    PinotFSFactory.init(pinotFSConfig);
-
-    PinotConfiguration segmentFetcherFactoryConfig =
-        config.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY);
-    SegmentFetcherFactory.init(segmentFetcherFactoryConfig);
-
-    PinotConfiguration pinotCrypterConfig = config.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER);
-    PinotCrypterFactory.init(pinotCrypterConfig);
+    NativeServerStarterLifecycle.initializeSegmentFetching(config);
   }
 
   protected AdminApiApplication createServerAdminApp() {

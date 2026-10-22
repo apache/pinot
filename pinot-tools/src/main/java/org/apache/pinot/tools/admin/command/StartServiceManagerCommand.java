@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.tools.admin.command;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.net.SocketException;
 import java.net.UnknownHostException;
@@ -30,7 +31,9 @@ import java.util.Map.Entry;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.pinot.common.coordination.CoordinationBackend;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.tools.Command;
@@ -46,7 +49,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.Helix.PINOT_SERVICE_ROL
 /// Starts services in the following order, and returns false on any startup failure:
 ///
 /// 1. [PinotServiceManager]
-/// 2. Bootstrap services in role [ServiceRole#CONTROLLER]
+/// 2. Helix controllers sequentially, then native controllers concurrently so their voters can form a quorum
 /// 3. All remaining bootstrap services in parallel
 @CommandLine.Command(name = "StartServiceManager", mixinStandardHelpOptions = true)
 public class StartServiceManagerCommand extends AbstractBaseAdminCommand implements Command {
@@ -218,22 +221,29 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
     }
   }
 
-  /// Starts a controller synchronously unless the cluster already exists. Other services start in parallel.
+  /// Completes controller bootstrap before starting other roles.
   private boolean startBootstrapServices() {
-    if (_bootstrapConfigurations.isEmpty()) {
+    return startBootstrapServices(_pinotServiceManager, _bootstrapConfigurations);
+  }
+
+  @VisibleForTesting
+  static boolean startBootstrapServices(PinotServiceManager pinotServiceManager,
+      List<Entry<ServiceRole, Map<String, Object>>> bootstrapConfigurations) {
+    if (bootstrapConfigurations.isEmpty()) {
       return true;
     }
 
+    List<Entry<ServiceRole, Map<String, Object>>> nativeControllers = new ArrayList<>();
     List<Entry<ServiceRole, Map<String, Object>>> parallelConfigs = new ArrayList<>();
 
-    // Start controller(s) synchronously so that other services don't fail
-    //
-    // Note: Technically, we don't need to do this if the cluster already exists, but checking the
-    // cluster takes time and clutters logs with errors when it doesn't exist.
-    for (Entry<ServiceRole, Map<String, Object>> roleToConfig : _bootstrapConfigurations) {
+    // Preserve sequential Helix bootstrap. Native controllers wait for quorum during start(), so their voters
+    // must start together and complete before dependent broker/server roles are admitted.
+    for (Entry<ServiceRole, Map<String, Object>> roleToConfig : bootstrapConfigurations) {
       if (roleToConfig.getKey() == ServiceRole.CONTROLLER) {
-        if (!startPinotService(ServiceRole.CONTROLLER,
-            () -> _pinotServiceManager.startRole(ServiceRole.CONTROLLER, roleToConfig.getValue()))) {
+        if (CoordinationBackend.from(new PinotConfiguration(roleToConfig.getValue())) == CoordinationBackend.RATIS) {
+          nativeControllers.add(roleToConfig);
+        } else if (!startPinotService(ServiceRole.CONTROLLER,
+            () -> pinotServiceManager.startRole(ServiceRole.CONTROLLER, roleToConfig.getValue()))) {
           return false;
         }
       } else {
@@ -241,7 +251,8 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
       }
     }
 
-    return startBootstrapServicesInParallel(_pinotServiceManager, parallelConfigs);
+    return startBootstrapServicesInParallel(pinotServiceManager, nativeControllers)
+        && startBootstrapServicesInParallel(pinotServiceManager, parallelConfigs);
   }
 
   static boolean startBootstrapServicesInParallel(PinotServiceManager pinotServiceManager,

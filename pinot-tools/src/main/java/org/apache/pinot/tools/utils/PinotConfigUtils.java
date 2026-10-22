@@ -31,6 +31,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.configuration2.builder.fluent.Configurations;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.coordination.CoordinationBackend;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerConf.ControllerPeriodicTasksConf;
 import org.apache.pinot.core.accounting.ResourceUsageAccountantFactory;
@@ -130,6 +131,12 @@ public class PinotConfigUtils {
     if (conf == null) {
       throw new ConfigurationException(
           String.format(CONTROLLER_CONFIG_VALIDATION_ERROR_MESSAGE_FORMAT, "null conf object."));
+    }
+
+    if (CoordinationBackend.from(conf) == CoordinationBackend.RATIS) {
+      // The native starter validates voter identity, qualified providers and TLS before opening any resources.
+      // Its metadata endpoint does not use the legacy controller HTTP listener or Helix cluster settings.
+      return true;
     }
 
     List<String> protocols = validateControllerAccessProtocols(conf);

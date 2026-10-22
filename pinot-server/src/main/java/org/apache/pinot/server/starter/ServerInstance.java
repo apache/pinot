@@ -115,6 +115,15 @@ public class ServerInstance {
         sendStatsPredicate, keepPipelineBreakerStatsPredicate, reloadJobStatusCache);
   }
 
+  /// Wraps an initialized native installation manager without allocating query or access-control resources.
+  /// The participant that initialized the manager owns its start, drain, and close lifecycle.
+  public ServerInstance(ServerConf serverConf, String instanceId, NativeInstanceDataManager initializedDataManager,
+      ServerReloadJobStatusCache reloadJobStatusCache)
+      throws Exception {
+    this(serverConf, instanceId, null, requireNonNull(initializedDataManager, "initializedDataManager"), null, null,
+        null, null, null, null, reloadJobStatusCache);
+  }
+
   private ServerInstance(ServerConf serverConf, String instanceId, @Nullable HelixManager helixManager,
       @Nullable InstanceDataManager initializedDataManager, @Nullable AccessControlFactory accessControlFactory,
       @Nullable AccessControl initializedAccessControl,

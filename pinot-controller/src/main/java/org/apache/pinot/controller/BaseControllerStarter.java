@@ -37,6 +37,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import javax.inject.Singleton;
 import javax.net.ssl.SSLContext;
 import nl.altindag.ssl.SSLFactory;
@@ -68,6 +69,7 @@ import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.audit.AuditServiceBinder;
 import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
 import org.apache.pinot.common.config.TlsConfig;
+import org.apache.pinot.common.coordination.CoordinationBackend;
 import org.apache.pinot.common.evaluator.GroovyFunctionEvaluator;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.http.PoolingHttpClientConnectionManagerHelper;
@@ -101,6 +103,7 @@ import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.events.MetadataEventNotifierFactory;
 import org.apache.pinot.controller.api.resources.ControllerFilePathProvider;
 import org.apache.pinot.controller.api.resources.InvalidControllerConfigException;
+import org.apache.pinot.controller.coordination.RatisControllerRuntime;
 import org.apache.pinot.controller.helix.RealtimeConsumerMonitor;
 import org.apache.pinot.controller.helix.SegmentStatusChecker;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -242,11 +245,23 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected TableRebalanceManager _tableRebalanceManager;
   protected DefaultClusterConfigChangeHandler _clusterConfigChangeHandler;
   protected MaterializedViewConsistencyManager _materializedViewConsistencyManager;
+  @Nullable
+  private RatisControllerRuntime _ratisRuntime;
+  private boolean _ratisSelected;
+  private boolean _ratisStatusRegistered;
+  private final Object _ratisLifecycleLock = new Object();
 
   @Override
   public void init(PinotConfiguration pinotConfiguration)
       throws Exception {
     _config = new ControllerConf(pinotConfiguration.toMap());
+    _ratisSelected = CoordinationBackend.from(_config) == CoordinationBackend.RATIS;
+    if (_ratisSelected) {
+      applyCustomConfigs(_config);
+      _ratisRuntime = new RatisControllerRuntime(_config);
+      _helixParticipantInstanceId = _ratisRuntime.instanceId();
+      return;
+    }
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(_config.getZkStr());
     _helixClusterName = _config.getHelixClusterName();
     _controllerMode = _config.getControllerMode();
@@ -481,6 +496,15 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   @Override
   public void start()
       throws Exception {
+    if (_ratisSelected) {
+      synchronized (_ratisLifecycleLock) {
+        Preconditions.checkState(_ratisRuntime != null, "Native controller initialization did not complete");
+        _ratisRuntime.start();
+        ServiceStatus.setServiceStatusCallback(_helixParticipantInstanceId, _ratisRuntime);
+        _ratisStatusRegistered = true;
+      }
+      return;
+    }
     LOGGER.info("Starting Pinot controller in mode: {}. (Version: {})", _controllerMode.name(), PinotVersion.VERSION);
     LOGGER.info("Controller configs: {}", new PinotAppConfigs(getConfig()).toJSONString());
     long startTimeMs = System.currentTimeMillis();
@@ -1186,6 +1210,22 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
   @Override
   public void stop() {
+    if (_ratisSelected) {
+      synchronized (_ratisLifecycleLock) {
+        if (_ratisStatusRegistered) {
+          ServiceStatus.removeServiceStatusCallback(_helixParticipantInstanceId, _ratisRuntime);
+          _ratisStatusRegistered = false;
+        }
+        try {
+          if (_ratisRuntime != null) {
+            _ratisRuntime.close();
+          }
+        } catch (Exception e) {
+          LOGGER.error("Failed to close native controller", e);
+        }
+      }
+      return;
+    }
     switch (_controllerMode) {
       case DUAL:
         stopPinotController();

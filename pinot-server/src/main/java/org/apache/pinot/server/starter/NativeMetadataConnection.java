@@ -18,109 +18,16 @@
  */
 package org.apache.pinot.server.starter;
 
-import io.grpc.Status;
-import io.grpc.StatusRuntimeException;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.BiFunction;
-import org.apache.pinot.common.coordination.MetadataRpcClient;
-import org.apache.pinot.coordination.ratis.rpc.MetadataRpc;
-
-import static com.google.common.base.Preconditions.checkArgument;
+import org.apache.pinot.common.coordination.MetadataRpcConnection;
 
 
-/// Bounded endpoint failover that resends the identical application request after an unknown transport outcome.
-/// Instances own their channels; membership uses a separate instance from metadata hydration and installation.
-public final class NativeMetadataConnection implements NativeServerParticipant.Rpc {
-  private final List<MetadataRpcClient> _clients;
-  private final AtomicInteger _preferred = new AtomicInteger();
-
-  public record Endpoint(String host, int port) {
-    public Endpoint {
-      checkArgument(host != null && !host.isBlank() && port > 0 && port <= 65535, "Invalid metadata endpoint");
-    }
-  }
-
+/// Server installation adapter for the shared bounded metadata transport. Each instance owns its TLS channels.
+public final class NativeMetadataConnection extends MetadataRpcConnection implements NativeServerParticipant.Rpc {
   public NativeMetadataConnection(List<Endpoint> endpoints, Path certificate, Path key, Path trust,
       long timeoutMillis) throws IOException {
-    checkArgument(endpoints != null && !endpoints.isEmpty() && endpoints.size() <= 16,
-        "Between one and sixteen metadata endpoints are required");
-    List<MetadataRpcClient> clients = new ArrayList<>();
-    try {
-      for (Endpoint endpoint : List.copyOf(endpoints)) {
-        clients.add(new MetadataRpcClient(endpoint.host(), endpoint.port(), certificate, key, trust, timeoutMillis));
-      }
-    } catch (IOException | RuntimeException e) {
-      clients.forEach(MetadataRpcClient::close);
-      throw e;
-    }
-    _clients = List.copyOf(clients);
-  }
-
-  public MetadataRpc.MembershipResponse membershipRead(MetadataRpc.MembershipReadRequest request, long timeoutMillis) {
-    return call(timeoutMillis, (client, timeout) -> client.membershipRead(request, timeout));
-  }
-
-  public MetadataRpc.MembershipResponse membershipExecute(MetadataRpc.MembershipCommandRequest request,
-      long timeoutMillis) {
-    return call(timeoutMillis, (client, timeout) -> client.membershipExecute(request, timeout));
-  }
-
-  public MetadataRpc.InstallationSnapshot snapshot(MetadataRpc.InstallationSnapshotRequest request,
-      long timeoutMillis) {
-    return call(timeoutMillis, (client, timeout) -> client.installationSnapshot(request, timeout));
-  }
-
-  public MetadataRpc.InstallationWorkResult lookup(MetadataRpc.InstallationLookupRequest request, long timeoutMillis) {
-    return call(timeoutMillis, (client, timeout) -> client.installationLookup(request, timeout));
-  }
-
-  @Override
-  public MetadataRpc.CommandResult execute(MetadataRpc.InstallationCommandRequest request, long timeoutMillis) {
-    return call(timeoutMillis, (client, timeout) -> client.installationExecute(request, timeout));
-  }
-
-  @Override
-  public MetadataRpc.CommandResult outcome(MetadataRpc.InstallationOutcomeRequest request, long timeoutMillis) {
-    return call(timeoutMillis, (client, timeout) -> client.installationOutcome(request, timeout));
-  }
-
-  private <T> T call(long timeoutMillis, BiFunction<MetadataRpcClient, Long, T> operation) {
-    checkArgument(timeoutMillis > 0 && timeoutMillis <= 30_000, "Metadata deadline must be between 1 and 30000 ms");
-    long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis);
-    int first = _preferred.get();
-    StatusRuntimeException failure = null;
-    for (int attempt = 0; attempt < _clients.size(); attempt++) {
-      long remaining = TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime());
-      if (remaining <= 0) {
-        break;
-      }
-      int selected = (first + attempt) % _clients.size();
-      try {
-        // Reserve time for the other configured endpoints instead of spending the whole deadline on a dead peer.
-        T result = operation.apply(_clients.get(selected), Math.max(1, remaining / (_clients.size() - attempt)));
-        _preferred.set(selected);
-        return result;
-      } catch (StatusRuntimeException e) {
-        if (e.getStatus().getCode() != Status.Code.UNAVAILABLE
-            && e.getStatus().getCode() != Status.Code.DEADLINE_EXCEEDED) {
-          throw e;
-        }
-        failure = e;
-      }
-    }
-    if (failure != null) {
-      throw failure;
-    }
-    throw Status.DEADLINE_EXCEEDED.withDescription("Metadata endpoint deadline expired").asRuntimeException();
-  }
-
-  @Override
-  public void close() {
-    _clients.forEach(MetadataRpcClient::close);
+    super(endpoints, certificate, key, trust, timeoutMillis);
   }
 }

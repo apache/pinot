@@ -26,6 +26,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.coordination.CoordinationBackend;
 import org.apache.pinot.controller.ControllerConf;
 import org.testng.annotations.Test;
 
@@ -33,6 +34,25 @@ import static org.testng.Assert.*;
 
 
 public class PinotConfigUtilsTest {
+
+  @Test
+  public void testNativeControllerConfigDoesNotRequireHelixOrHttpSettings()
+      throws Exception {
+    File file = File.createTempFile("native-controller", ".properties");
+    try {
+      FileUtils.writeStringToFile(file, CoordinationBackend.CONFIG_KEY + "=RATIS\n", StandardCharsets.UTF_8);
+      Map<String, Object> properties = PinotConfigUtils.generateControllerConf(file.getAbsolutePath());
+      ControllerConf config = new ControllerConf(properties);
+      assertEquals(CoordinationBackend.from(config), CoordinationBackend.RATIS);
+      assertThrows(IllegalStateException.class, config::getZkStr);
+      assertNull(config.getHelixClusterName());
+      assertThrows(ConfigurationException.class, () -> PinotConfigUtils.validateControllerConfig(new ControllerConf()));
+      config.setProperty(CoordinationBackend.CONFIG_KEY, "unknown");
+      assertThrows(IllegalArgumentException.class, () -> PinotConfigUtils.validateControllerConfig(config));
+    } finally {
+      FileUtils.deleteQuietly(file);
+    }
+  }
 
   @Test
   public void testGenerateControllerConf()
