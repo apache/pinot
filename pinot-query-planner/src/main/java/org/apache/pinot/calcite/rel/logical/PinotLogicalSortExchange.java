@@ -43,6 +43,7 @@ public class PinotLogicalSortExchange extends SortExchange {
 
   protected final boolean _isSortOnSender;
   protected final boolean _isSortOnReceiver;
+  protected final boolean _autoWindowSort;
   protected final PinotRelExchangeType _exchangeType;
   // Can be used to override the partitioning info calculated from the distribution trait.
   @Nullable
@@ -50,11 +51,12 @@ public class PinotLogicalSortExchange extends SortExchange {
 
   private PinotLogicalSortExchange(RelOptCluster cluster, RelTraitSet traitSet, RelNode input,
       RelDistribution distribution, PinotRelExchangeType exchangeType, RelCollation collation, boolean isSortOnSender,
-      boolean isSortOnReceiver, @Nullable Boolean prePartitioned) {
+      boolean isSortOnReceiver, boolean autoWindowSort, @Nullable Boolean prePartitioned) {
     super(cluster, traitSet, input, distribution, collation);
     _exchangeType = exchangeType;
     _isSortOnSender = isSortOnSender;
     _isSortOnReceiver = isSortOnReceiver;
+    _autoWindowSort = autoWindowSort;
     _prePartitioned = prePartitioned;
   }
 
@@ -64,6 +66,7 @@ public class PinotLogicalSortExchange extends SortExchange {
     _exchangeType = PinotRelExchangeType.STREAMING;
     _isSortOnSender = false;
     _isSortOnReceiver = true;
+    _autoWindowSort = false;
     _prePartitioned = null;
   }
 
@@ -71,6 +74,13 @@ public class PinotLogicalSortExchange extends SortExchange {
       boolean isSortOnSender, boolean isSortOnReceiver) {
     return create(input, distribution, PinotRelExchangeType.getDefaultExchangeType(), collation, isSortOnSender,
         isSortOnReceiver, null);
+  }
+
+  /// Marks an AUTO exchange for resolution on the finalized logical tree, before stage allocation.
+  public static PinotLogicalSortExchange createWindowAuto(RelNode input, RelDistribution distribution,
+      RelCollation collation) {
+    return create(input, distribution, PinotRelExchangeType.getDefaultExchangeType(), collation, false, true, true,
+        null);
   }
 
   public static PinotLogicalSortExchange create(RelNode input, RelDistribution distribution, RelCollation collation,
@@ -91,12 +101,19 @@ public class PinotLogicalSortExchange extends SortExchange {
   public static PinotLogicalSortExchange create(RelNode input, RelDistribution distribution,
       PinotRelExchangeType exchangeType, RelCollation collation, boolean isSortOnSender, boolean isSortOnReceiver,
       @Nullable Boolean prePartitioned) {
+    return create(input, distribution, exchangeType, collation, isSortOnSender, isSortOnReceiver, false,
+        prePartitioned);
+  }
+
+  private static PinotLogicalSortExchange create(RelNode input, RelDistribution distribution,
+      PinotRelExchangeType exchangeType, RelCollation collation, boolean isSortOnSender, boolean isSortOnReceiver,
+      boolean autoWindowSort, @Nullable Boolean prePartitioned) {
     RelOptCluster cluster = input.getCluster();
     collation = RelCollationTraitDef.INSTANCE.canonize(collation);
     distribution = RelDistributionTraitDef.INSTANCE.canonize(distribution);
     RelTraitSet traitSet = input.getTraitSet().replace(Convention.NONE).replace(distribution).replace(collation);
     return new PinotLogicalSortExchange(cluster, traitSet, input, distribution, exchangeType, collation, isSortOnSender,
-        isSortOnReceiver, prePartitioned);
+        isSortOnReceiver, autoWindowSort, prePartitioned);
   }
 
   //~ Methods ----------------------------------------------------------------
@@ -105,13 +122,16 @@ public class PinotLogicalSortExchange extends SortExchange {
   public SortExchange copy(RelTraitSet traitSet, RelNode newInput, RelDistribution newDistribution,
       RelCollation newCollation) {
     return new PinotLogicalSortExchange(this.getCluster(), traitSet, newInput, newDistribution, _exchangeType,
-        newCollation, _isSortOnSender, _isSortOnReceiver, _prePartitioned);
+        newCollation, _isSortOnSender, _isSortOnReceiver, _autoWindowSort, _prePartitioned);
   }
 
   @Override
   public RelWriter explainTerms(RelWriter pw) {
     RelWriter relWriter =
         super.explainTerms(pw).item("isSortOnSender", _isSortOnSender).item("isSortOnReceiver", _isSortOnReceiver);
+    if (_autoWindowSort) {
+      relWriter.item("autoWindowSort", true);
+    }
     if (_exchangeType != PinotRelExchangeType.getDefaultExchangeType()) {
       relWriter.item("relExchangeType", _exchangeType);
     }
@@ -128,6 +148,10 @@ public class PinotLogicalSortExchange extends SortExchange {
   @Deprecated(since = "1.6.0")
   public boolean isSortOnReceiver() {
     return _isSortOnReceiver;
+  }
+
+  public boolean isAutoWindowSort() {
+    return _autoWindowSort;
   }
 
   public PinotRelExchangeType getExchangeType() {

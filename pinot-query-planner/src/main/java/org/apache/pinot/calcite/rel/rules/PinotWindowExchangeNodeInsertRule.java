@@ -23,7 +23,6 @@ import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import org.apache.calcite.plan.Context;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelOptRule;
@@ -130,8 +129,11 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
         // When enabled, sort each sender explicitly and merge the sorted mailbox streams at the receiver. Otherwise,
         // retain the legacy post-exchange full-sort path. This switch supports rolling upgrades and rapid rollback.
         // TODO: Revisit whether we should use hash distribution
-        boolean sortOnSender = isWindowKWayMergeEnabled(call);
-        if (sortOnSender) {
+        String mode = getWindowSortMode(call);
+        if ("auto".equals(mode)) {
+          exchange = PinotLogicalSortExchange.createWindowAuto(input, RelDistributions.hash(List.of()),
+              windowGroup.orderKeys);
+        } else if ("true".equals(mode)) {
           // An unbounded sender sort retains every row, independent of the broker response limit.
           RelNode orderedInput = LogicalSort.create(input, windowGroup.orderKeys, null, null);
           exchange = PinotKWayMergeSortExchange.create(orderedInput, RelDistributions.hash(List.of()),
@@ -161,29 +163,27 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
             windowGroup.orderKeys, false, false, prePartitioned);
       }
     }
-    // An ordinary sort exchange only transports data; its downstream explicit Sort establishes window ordering.
-    // The merge exchange instead preserves the ordering guaranteed by its sender's explicit Sort.
+    // Ordinary sort exchanges transport data; explicit receiver sorts establish window ordering.
+    // AUTO is resolved after optimization and creates its own sender or receiver sort.
     RelNode windowInput = exchange instanceof PinotLogicalSortExchange
+        && !((PinotLogicalSortExchange) exchange).isAutoWindowSort()
         ? LogicalSort.create(exchange, ((PinotLogicalSortExchange) exchange).getCollation(), null, null) : exchange;
     // NOTE: Need to create a new LogicalWindow to use the modified window group.
     call.transformTo(LogicalWindow.create(window.getTraitSet(), windowInput, window.constants, window.getRowType(),
         List.of(windowGroup)));
   }
 
-  private static boolean isWindowKWayMergeEnabled(RelOptRuleCall call) {
+  private static String getWindowSortMode(RelOptRuleCall call) {
     RelOptPlanner planner = call.getPlanner();
-    if (planner != null) {
-      Context context = planner.getContext();
+    if (planner != null && planner.getContext() != null) {
+      PlannerContext context = planner.getContext().unwrap(PlannerContext.class);
       if (context != null) {
-        PlannerContext plannerContext = context.unwrap(PlannerContext.class);
-        if (plannerContext != null) {
-          return plannerContext.getEnvConfig().isKWayMergeSupported()
-              && QueryOptionsUtils.isWindowKWayMerge(plannerContext.getOptions(),
-              plannerContext.getEnvConfig().defaultWindowKWayMerge());
-        }
+        String mode = QueryOptionsUtils.getWindowKWayMergeMode(context.getOptions(),
+            context.getEnvConfig().defaultWindowKWayMergeMode());
+        return context.getEnvConfig().isKWayMergeSupported() && !context.isUsePhysicalOptimizer() ? mode : "false";
       }
     }
-    return CommonConstants.Broker.DEFAULT_WINDOW_K_WAY_MERGE;
+    return CommonConstants.Broker.DEFAULT_WINDOW_K_WAY_MERGE_MODE;
   }
 
   private boolean isPartitionByOnlyQuery(Window.Group windowGroup) {

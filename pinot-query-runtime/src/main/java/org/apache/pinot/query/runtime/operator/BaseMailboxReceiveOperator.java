@@ -278,7 +278,13 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
     /// can fail in two corner cases, where rows are read but never emitted: after the downstream operator has
     /// early terminated, and when a sorted receive buffers its rows and then ends in error. Such a worker is
     /// reported as idle despite having been given data.
-    NON_ACTIVE_WORKERS(StatMap.Type.INT);
+    NON_ACTIVE_WORKERS(StatMap.Type.INT),
+    /// Number of sender streams with 64 adjacent order-key comparisons in the AUTO baseline sample.
+    AUTO_SAMPLE_STREAMS(StatMap.Type.INT),
+    /// Sampled streams with 16 to 48 inversions and at most 4 ties among 64 adjacent comparisons.
+    AUTO_CANDIDATE_STREAMS(StatMap.Type.INT),
+    /// Number of rows inspected for AUTO order profiling, capped at 65 per sender stream.
+    AUTO_SAMPLED_ROWS(StatMap.Type.LONG);
 
     private final StatMap.Type _type;
 
