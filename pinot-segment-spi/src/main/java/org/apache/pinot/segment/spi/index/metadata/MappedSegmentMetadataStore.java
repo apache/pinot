@@ -42,7 +42,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.stream.Collectors;
 import java.util.zip.CRC32C;
 import javax.annotation.Nullable;
@@ -132,19 +131,18 @@ final class MappedSegmentMetadataStore implements Closeable {
   private static final int BYTES_VALUE = 7;
 
   private static final Interner<FieldSpec> FIELD_SPECS = Interners.newWeakInterner();
+  private static final Interner<ColumnLayout> COLUMN_LAYOUTS = Interners.newWeakInterner();
 
   private final PinotDataBuffer _buffer;
-  private final String[] _columnNames;
-  private final AtomicReferenceArray<FieldSpec> _fieldSpecs;
+  private final ColumnLayout _columns;
   private final int _tableOffset;
   private final int _segmentConfigOffset;
   private final int _segmentConfigLength;
 
-  private MappedSegmentMetadataStore(PinotDataBuffer buffer, String[] columnNames, int tableOffset,
+  private MappedSegmentMetadataStore(PinotDataBuffer buffer, ColumnLayout columns, int tableOffset,
       int segmentConfigOffset, int segmentConfigLength) {
     _buffer = buffer;
-    _columnNames = columnNames;
-    _fieldSpecs = new AtomicReferenceArray<>(columnNames.length);
+    _columns = columns;
     _tableOffset = tableOffset;
     _segmentConfigOffset = segmentConfigOffset;
     _segmentConfigLength = segmentConfigLength;
@@ -182,19 +180,21 @@ final class MappedSegmentMetadataStore implements Closeable {
         int count = header.getInt(52);
         int tableOffset = header.getInt(56);
         String[] names = new String[count];
+        FieldSpec[] fieldSpecs = new FieldSpec[count];
         for (int i = 0; i < count; i++) {
           int record = tableOffset + i * RECORD_SIZE;
           names[i] = ColumnNameInterner.intern(readString(bytes, header.getInt(record + NAME),
               header.getInt(record + NAME + 4)));
+          FieldSpec parsed = JsonUtils.stringToObject(readString(bytes, header.getInt(record + FIELD_SPEC),
+              header.getInt(record + FIELD_SPEC + 4)), FieldSpec.class);
+          fieldSpecs[i] = parsed instanceof ComplexFieldSpec ? parsed : FIELD_SPECS.intern(parsed);
         }
-        MappedSegmentMetadataStore store = new MappedSegmentMetadataStore(buffer, names, tableOffset,
+        ColumnLayout columns = COLUMN_LAYOUTS.intern(new ColumnLayout(names, fieldSpecs));
+        MappedSegmentMetadataStore store = new MappedSegmentMetadataStore(buffer, columns, tableOffset,
             header.getInt(44), header.getInt(48));
-        for (int i = 0; i < count; i++) {
-          store.fieldSpec(i);
-        }
         keepBuffer = true;
         return store;
-      } catch (RuntimeException e) {
+      } catch (IOException | RuntimeException e) {
         throw new IOException("Invalid field specs in mapped segment metadata: " + sidecar, e);
       } finally {
         if (!keepBuffer) {
@@ -223,15 +223,15 @@ final class MappedSegmentMetadataStore implements Closeable {
   }
 
   int size() {
-    return _columnNames.length;
+    return _columns._names.length;
   }
 
   String name(int ordinal) {
-    return _columnNames[ordinal];
+    return _columns._names[ordinal];
   }
 
   int ordinal(String column) {
-    return Arrays.binarySearch(_columnNames, column);
+    return Arrays.binarySearch(_columns._names, column);
   }
 
   int getInt(int ordinal, int offset) {
@@ -265,22 +265,7 @@ final class MappedSegmentMetadataStore implements Closeable {
   }
 
   FieldSpec fieldSpec(int ordinal) {
-    FieldSpec fieldSpec = _fieldSpecs.get(ordinal);
-    if (fieldSpec != null) {
-      return fieldSpec;
-    }
-    try {
-      FieldSpec parsed = JsonUtils.stringToObject(string(ordinal, FIELD_SPEC), FieldSpec.class);
-      if (!(parsed instanceof ComplexFieldSpec)) {
-        parsed = FIELD_SPECS.intern(parsed);
-      }
-      if (_fieldSpecs.compareAndSet(ordinal, null, parsed)) {
-        return parsed;
-      }
-      return _fieldSpecs.get(ordinal);
-    } catch (IOException e) {
-      throw new IllegalStateException("Cannot decode field spec for " + name(ordinal), e);
-    }
+    return _columns._fieldSpecs[ordinal];
   }
 
   @Nullable
@@ -759,6 +744,50 @@ final class MappedSegmentMetadataStore implements Closeable {
       }
     } finally {
       Files.deleteIfExists(temp);
+    }
+  }
+
+  /// Shares an identical column directory across segments while each segment retains its own mapped statistics.
+  /// Field specs are mutable, so identity keeps the interner hash stable even if a caller changes a shared spec.
+  private static final class ColumnLayout {
+    private final String[] _names;
+    private final FieldSpec[] _fieldSpecs;
+    private final int _hashCode;
+
+    private ColumnLayout(String[] names, FieldSpec[] fieldSpecs) {
+      _names = names;
+      _fieldSpecs = fieldSpecs;
+      int hashCode = names.length;
+      for (int i = 0; i < names.length; i++) {
+        hashCode = 31 * (31 * hashCode + System.identityHashCode(names[i]))
+            + System.identityHashCode(fieldSpecs[i]);
+      }
+      _hashCode = hashCode;
+    }
+
+    @Override
+    public int hashCode() {
+      return _hashCode;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      if (this == other) {
+        return true;
+      }
+      if (!(other instanceof ColumnLayout)) {
+        return false;
+      }
+      ColumnLayout that = (ColumnLayout) other;
+      if (_hashCode != that._hashCode || _names.length != that._names.length) {
+        return false;
+      }
+      for (int i = 0; i < _names.length; i++) {
+        if (_names[i] != that._names[i] || _fieldSpecs[i] != that._fieldSpecs[i]) {
+          return false;
+        }
+      }
+      return true;
     }
   }
 
