@@ -1438,18 +1438,23 @@ public class MutableSegmentImpl implements MutableSegment {
   /// Called only by realtime record reader.
   ///
   /// When the column has a dictionary and an inverted index (the common case for sorted columns), delegates to
-  /// [#getSortedDocIdsWithInvertedIndex]. When the column is configured as no-dictionary (raw forward index),
-  /// delegates to [#getSortedDocIdsWithRawForwardIndex].
+  /// [#getSortedDocIdsWithInvertedIndex]. When the column has a dictionary but no inverted index, delegates to
+  /// [#getSortedDocIdsWithDictIdForwardIndex]. For example, this happens when the table config marks the column as
+  /// no-dictionary (so no inverted index is created for it) but ingestion aggregation forces a dictionary on it in the
+  /// consuming segment because it is part of the aggregation key. When the column has no dictionary (raw forward
+  /// index), delegates to [#getSortedDocIdsWithRawForwardIndex].
   ///
   /// @param column The column to use for sorting
   /// @return The docIds to use for iteration
   public int[] getSortedDocIdIterationOrderWithSortedColumn(String column) {
     IndexContainer indexContainer = _indexContainerMap.get(column);
-    if (indexContainer._dictionary != null) {
-      return getSortedDocIdsWithInvertedIndex(indexContainer);
-    } else {
+    if (indexContainer._dictionary == null) {
       return getSortedDocIdsWithRawForwardIndex(column, indexContainer);
     }
+    if (indexContainer._mutableIndexes.containsKey(StandardIndexes.inverted())) {
+      return getSortedDocIdsWithInvertedIndex(indexContainer);
+    }
+    return getSortedDocIdsWithDictIdForwardIndex(indexContainer);
   }
 
   /// Returns sorted docIds for a dictionary-encoded sorted column by sorting dictionary ids and re-ordering documents
@@ -1487,6 +1492,42 @@ public class MutableSegmentImpl implements MutableSegment {
         "The number of documents indexed: %s is not equal to the number of sorted documents: %s", numDocsIndexed,
         docIdIndex);
 
+    return docIds;
+  }
+
+  /// Returns sorted docIds for a dictionary-encoded sorted column without an inverted index. Sorts the dictionary
+  /// ids, ranks each dictionary id by its value order, then places the documents by rank with a counting sort that
+  /// reads the dictionary ids from the forward index. Runs in O(n + k log k) for n documents and k distinct values.
+  private int[] getSortedDocIdsWithDictIdForwardIndex(IndexContainer indexContainer) {
+    MutableDictionary dictionary = indexContainer._dictionary;
+    MutableForwardIndex forwardIndex =
+        (MutableForwardIndex) indexContainer._mutableIndexes.get(StandardIndexes.forward());
+    int numDocsIndexed = _numDocsIndexed;
+
+    // Sort all values in the dictionary, then compute the rank of each dictionary id
+    int numValues = dictionary.length();
+    int[] sortedDictIds = new int[numValues];
+    for (int i = 0; i < numValues; i++) {
+      sortedDictIds[i] = i;
+    }
+    IntArrays.quickSort(sortedDictIds, dictionary::compare);
+    int[] ranks = new int[numValues];
+    for (int rank = 0; rank < numValues; rank++) {
+      ranks[sortedDictIds[rank]] = rank;
+    }
+
+    // Counting sort of the documents by rank. offsets[rank] is the next position for a document with that rank.
+    int[] offsets = new int[numValues + 1];
+    for (int docId = 0; docId < numDocsIndexed; docId++) {
+      offsets[ranks[forwardIndex.getDictId(docId)] + 1]++;
+    }
+    for (int rank = 0; rank < numValues; rank++) {
+      offsets[rank + 1] += offsets[rank];
+    }
+    int[] docIds = new int[numDocsIndexed];
+    for (int docId = 0; docId < numDocsIndexed; docId++) {
+      docIds[offsets[ranks[forwardIndex.getDictId(docId)]]++] = docId;
+    }
     return docIds;
   }
 
