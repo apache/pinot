@@ -48,6 +48,14 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
   protected long _threadMemAllocatedBytes;
   protected long _systemActivitiesCpuTimeNs;
 
+  // Main thread usage summed over every getBaseBlock() call. A streaming response calls it once per streamed block,
+  // and a combine that runs on the main thread does its work in those calls, not only in the last one. The wall clock
+  // excludes the time spent sending blocks between calls, while worker threads may keep running then, so the derived
+  // system activities time can only be under-reported (it is clamped at 0).
+  private long _mainThreadCpuTimeNs;
+  private long _mainThreadMemAllocatedBytes;
+  private long _mainThreadWallClockTimeNs;
+
   public InstanceResponseOperator(BaseCombineOperator<?> combineOperator, List<SegmentContext> segmentContexts,
       List<FetchContext> fetchContexts, QueryContext queryContext) {
     _combineOperator = combineOperator;
@@ -116,14 +124,14 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
 
     BaseResultsBlock resultsBlock = getCombinedResults();
 
-    long mainThreadCpuTimeNs = resourceSnapshot.getCpuTimeNs();
-    long mainThreadMemAllocatedBytes = resourceSnapshot.getAllocatedBytes();
+    _mainThreadCpuTimeNs += resourceSnapshot.getCpuTimeNs();
+    _mainThreadMemAllocatedBytes += resourceSnapshot.getAllocatedBytes();
+    _mainThreadWallClockTimeNs += System.nanoTime() - startWallClockTimeNs;
 
-    long totalWallClockTimeNs = System.nanoTime() - startWallClockTimeNs;
-
+    // The worker totals are not summed: they are running totals for the whole query, complete on the last block.
     calculateResourceUsage(resultsBlock.getNumServerThreads(), resultsBlock.getExecutionThreadCpuTimeNs(),
-        mainThreadCpuTimeNs, resultsBlock.getExecutionThreadMemAllocatedBytes(), mainThreadMemAllocatedBytes,
-        totalWallClockTimeNs);
+        _mainThreadCpuTimeNs, resultsBlock.getExecutionThreadMemAllocatedBytes(), _mainThreadMemAllocatedBytes,
+        _mainThreadWallClockTimeNs);
 
     return resultsBlock;
   }
