@@ -290,15 +290,16 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
   public void testSelectionOrderBySingleSortedColumnDescDidOrder() {
     String orderBy = " ORDER BY column5 DESC";
     BaseOperator<SelectionResultsBlock> selectionOrderByOperator = getOperator(
-        "SET allowReverseOrder = false; " + SELECTION_QUERY + orderBy);
+        "SET allowReverseOrder = false; SET lateMaterializeSortedOrderBy = true; " + SELECTION_QUERY + orderBy);
     assertTrue(selectionOrderByOperator instanceof SelectionPartiallyOrderedByDescOperation, "Expected: "
         + SelectionPartiallyOrderedByLinearOperator.class + ", found: " + selectionOrderByOperator.getClass());
     SelectionResultsBlock resultsBlock = selectionOrderByOperator.nextBlock();
     ExecutionStatistics executionStatistics = selectionOrderByOperator.getExecutionStatistics();
     assertEquals(executionStatistics.getNumDocsScanned(), 30000L);
     assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
-    // 30000 * (3 columns)
-    assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 90000L);
+    // The scan reads only the order-by column (30000 * 1); column1 and column11 are fetched just for the
+    // 10 rows that survive the limit (10 * 2). Before late materialisation this was 30000 * 3.
+    assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 30000L + 20L);
     assertEquals(executionStatistics.getNumTotalDocs(), 30000L);
     DataSchema dataSchema = resultsBlock.getDataSchema();
     assertEquals(dataSchema.getColumnNames(), new String[]{"column5", "column1", "column11"});
@@ -309,6 +310,17 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     Object[] lastRow = selectionResult.get(9);
     assertEquals(lastRow.length, 3);
     assertEquals(lastRow[0], "gFuH");
+  }
+
+  /// The optimization is opt-in, so the same query without the option must still read every selected column
+  /// for the whole match set. Pins the default; delete or invert this when the default flips.
+  @Test
+  public void testSelectionOrderBySingleSortedColumnDescIsEagerByDefault() {
+    BaseOperator<SelectionResultsBlock> operator =
+        getOperator("SET allowReverseOrder = false; " + SELECTION_QUERY + " ORDER BY column5 DESC");
+    operator.nextBlock();
+    // 30000 docs * 3 selected columns, as before late materialisation existed.
+    assertEquals(operator.getExecutionStatistics().getNumEntriesScannedPostFilter(), 90000L);
   }
 
   @Test
@@ -724,5 +736,81 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
     assertEquals(brokerResponse.getOfflineThreadMemAllocatedBytes(), 0);
     assertEquals(brokerResponse.getRealtimeThreadMemAllocatedBytes(), 0);
+  }
+
+  /// Runs `query` with late materialisation on and off and asserts the answers are identical. column5 is the sorted
+  /// column in this fixture.
+  ///
+  /// @param expectFewerEntries whether late materialisation should read fewer entries post-filter. It should not when
+  ///                           the scan already stops at the limit, which is the case for the linear operator with a
+  ///                           fully sorted order-by prefix.
+  private void assertSameAnswerWithAndWithoutLateMaterialization(String query, boolean expectFewerEntries) {
+    BaseOperator<SelectionResultsBlock> lateOperator = getOperator("SET lateMaterializeSortedOrderBy = true; " + query);
+    SelectionResultsBlock lateBlock = lateOperator.nextBlock();
+    ExecutionStatistics lateStats = lateOperator.getExecutionStatistics();
+
+    BaseOperator<SelectionResultsBlock> eagerOperator =
+        getOperator("SET lateMaterializeSortedOrderBy = false; " + query);
+    SelectionResultsBlock eagerBlock = eagerOperator.nextBlock();
+    ExecutionStatistics eagerStats = eagerOperator.getExecutionStatistics();
+
+    DataSchema lateSchema = lateBlock.getDataSchema();
+    DataSchema eagerSchema = eagerBlock.getDataSchema();
+    assertEquals(lateSchema.getColumnNames(), eagerSchema.getColumnNames());
+    assertEquals(lateSchema.getColumnDataTypes(), eagerSchema.getColumnDataTypes());
+
+    List<Object[]> lateRows = lateBlock.getRows();
+    List<Object[]> eagerRows = eagerBlock.getRows();
+    assertEquals(lateRows.size(), eagerRows.size());
+    for (int i = 0; i < lateRows.size(); i++) {
+      assertEquals(lateRows.get(i), eagerRows.get(i), "row " + i + " differs for query: " + query);
+    }
+    assertEquals(lateStats.getNumDocsScanned(), eagerStats.getNumDocsScanned());
+
+    long late = lateStats.getNumEntriesScannedPostFilter();
+    long eager = eagerStats.getNumEntriesScannedPostFilter();
+    if (expectFewerEntries) {
+      assertTrue(late < eager, "expected fewer entries post-filter, but read " + late + " vs " + eager
+          + " for query: " + query);
+    } else {
+      assertEquals(late, eager, "expected the same entries post-filter for query: " + query);
+    }
+  }
+
+  /// The linear operator stops at the limit, so there is nothing to defer and the plan keeps projecting everything.
+  @Test
+  public void testLateMaterializationSkippedWhenScanStopsAtLimit() {
+    assertSameAnswerWithAndWithoutLateMaterialization(SELECTION_QUERY + " ORDER BY column5", false);
+    assertSameAnswerWithAndWithoutLateMaterialization(
+        "SET allowReverseOrder = true; " + SELECTION_QUERY + " ORDER BY column5 DESC", false);
+  }
+
+  /// Descending without a reverse cursor reads the whole match set, so deferring the other columns is a real saving.
+  @Test
+  public void testLateMaterializationSortedColumnDesc() {
+    assertSameAnswerWithAndWithoutLateMaterialization(
+        "SET allowReverseOrder = false; " + SELECTION_QUERY + " ORDER BY column5 DESC", true);
+  }
+
+  @Test
+  public void testLateMaterializationWithOffsetAndLimit() {
+    assertSameAnswerWithAndWithoutLateMaterialization(
+        "SET allowReverseOrder = false; " + SELECTION_QUERY + " ORDER BY column5 DESC LIMIT 5 OFFSET 3", true);
+  }
+
+  /// An unsorted tail in the order-by removes the limit bound on the scan, so the linear operator benefits too. The
+  /// unsorted order-by column is still projected during the scan; only the remaining output columns are deferred.
+  @Test
+  public void testLateMaterializationWithUnsortedOrderBySuffix() {
+    assertSameAnswerWithAndWithoutLateMaterialization(SELECTION_QUERY + " ORDER BY column5, column6", true);
+  }
+
+  /// The late fetch builds its own TransformOperator, so a non-order-by expression that is a function must resolve,
+  /// both for its values and for its data type in the schema.
+  @Test
+  public void testLateMaterializationWithTransformProjection() {
+    assertSameAnswerWithAndWithoutLateMaterialization(
+        "SET allowReverseOrder = false; SELECT column5, ADD(column1, 1), column11 FROM testTable "
+            + "ORDER BY column5 DESC", true);
   }
 }

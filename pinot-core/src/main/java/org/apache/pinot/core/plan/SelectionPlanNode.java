@@ -88,17 +88,38 @@ public class SelectionPlanNode implements PlanNode {
         maxDocsPerCall = Math.min(limit + _queryContext.getOffset(), DocIdSetPlanNode.MAX_DOC_PER_CALL);
       }
 
-      BaseProjectOperator<?> projectOperator = getSortedByProject(expressions, maxDocsPerCall, orderByExpressions);
+      // Whether the scan can iterate in query order, and so stop once the list builder is full. Ascending always
+      // can; descending only when reverse iteration is permitted, because DocIdSetPlanNode only produces an
+      // ascending DocIdSetOperator. getSortedByProject below performs the actual switch and decides for real; this
+      // is a conservative prediction, and being wrong only costs the optimization, never correctness.
       boolean asc = orderByExpressions.get(0).isAsc();
+      boolean canIterateInQueryOrder =
+          asc || QueryOptionsUtils.isReverseOrderAllowed(_queryContext.getQueryOptions());
+
+      // Projecting only the order-by expressions and fetching the rest for the rows that survive the limit pays off
+      // only when the scan cannot stop at the limit. The linear operator stops as soon as the list builder is full,
+      // which with a fully sorted order-by prefix is after limit+offset documents, so there is nothing to save
+      // there. The descending operator has to read the whole match set because there is no descending cursor.
+      boolean scanBoundedByLimit = canIterateInQueryOrder && sortedColumnsPrefixSize == orderByExpressions.size();
+      boolean lateMaterialize = expressions.size() > numOrderByExpressions && !scanBoundedByLimit
+          && QueryOptionsUtils.isLateMaterializeSortedOrderByEnabled(_queryContext.getQueryOptions());
+
+      // Build the project operator once. Constructing one is not free -- it resolves a DataSource and a
+      // ColumnContext per selected column, and some implementations start prefetching those columns -- so a
+      // build-and-discard probe would read exactly the columns this is trying to avoid reading.
+      List<ExpressionContext> expressionsToProject =
+          lateMaterialize ? expressions.subList(0, numOrderByExpressions) : expressions;
+      BaseProjectOperator<?> projectOperator =
+          getSortedByProject(expressionsToProject, maxDocsPerCall, orderByExpressions);
       // Remember that we cannot use asc == projectOperator.isAscending() because empty operators are considered
       // both ascending and descending
       DocIdOrderedOperator.DocIdOrder queryOrder = DocIdOrderedOperator.DocIdOrder.fromAsc(asc);
       if (projectOperator.isCompatibleWith(queryOrder)) {
         return new SelectionPartiallyOrderedByLinearOperator(_indexSegment, _queryContext, expressions, projectOperator,
-            sortedColumnsPrefixSize);
+            sortedColumnsPrefixSize, lateMaterialize);
       } else {
         return new SelectionPartiallyOrderedByDescOperation(_indexSegment, _queryContext, expressions, projectOperator,
-            sortedColumnsPrefixSize);
+            sortedColumnsPrefixSize, lateMaterialize);
       }
     }
     if (numOrderByExpressions == expressions.size()) {

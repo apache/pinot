@@ -46,7 +46,13 @@ public class SelectionPartiallyOrderedByLinearOperator extends LinearSelectionOr
 
   public SelectionPartiallyOrderedByLinearOperator(IndexSegment indexSegment, QueryContext queryContext,
       List<ExpressionContext> expressions, BaseProjectOperator<?> projectOperator, int numSortedExpressions) {
-    super(indexSegment, queryContext, expressions, projectOperator, numSortedExpressions);
+    this(indexSegment, queryContext, expressions, projectOperator, numSortedExpressions, false);
+  }
+
+  public SelectionPartiallyOrderedByLinearOperator(IndexSegment indexSegment, QueryContext queryContext,
+      List<ExpressionContext> expressions, BaseProjectOperator<?> projectOperator, int numSortedExpressions,
+      boolean lateMaterialize) {
+    super(indexSegment, queryContext, expressions, projectOperator, numSortedExpressions, lateMaterialize);
     boolean firstColIsAsc = queryContext.getOrderByExpressions().stream()
         .filter(expr -> expr.getExpression().getType() == ExpressionContext.Type.IDENTIFIER)
         .findFirst()
@@ -61,8 +67,7 @@ public class SelectionPartiallyOrderedByLinearOperator extends LinearSelectionOr
 
   @Override
   protected List<Object[]> fetch(Supplier<ListBuilder> listBuilderSupplier) {
-    int numExpressions = _expressions.size();
-    BlockValSet[] blockValSets = new BlockValSet[numExpressions];
+    BlockValSet[] blockValSets = new BlockValSet[getNumProjectedExpressions()];
     ListBuilder listBuilder = listBuilderSupplier.get();
     ValueBlock valueBlock;
     while ((valueBlock = _projectOperator.nextBlock()) != null) {
