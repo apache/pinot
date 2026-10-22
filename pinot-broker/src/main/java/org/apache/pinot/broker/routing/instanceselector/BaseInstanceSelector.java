@@ -414,6 +414,7 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
         new HashMap<>(HashUtil.getHashMapCapacity(_oldSegmentCandidatesMap.size() + _newSegmentStateMap.size()));
     Set<String> servingInstances = new HashSet<>();
     Set<String> unavailableSegments = new HashSet<>();
+    Set<String> segmentsWithoutCandidates = new HashSet<>();
     int minPercentOfReplicas = TableReplicaHealth.FULLY_REPLICATED_PERCENT;
     // Segments seen at exactly minPercentOfReplicas so far. Reset whenever a lower percentage displaces the
     // minimum, so that the pair published below always describes the same population.
@@ -438,13 +439,19 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
       if (!enabledCandidates.isEmpty()) {
         instanceCandidatesMap.put(segment, enabledCandidates);
       } else {
-        List<String> candidateInstances = new ArrayList<>(candidates.size());
-        for (SegmentInstanceCandidate candidate : candidates) {
-          candidateInstances.add(candidate.getInstance());
+        if (candidates.isEmpty()) {
+          LOGGER.warn("Failed to find servers hosting old segment: {} for table: {} "
+              + "(no candidate instances, counting segment as unavailable)", segment, _tableNameWithType);
+          segmentsWithoutCandidates.add(segment);
+        } else {
+          List<String> candidateInstances = new ArrayList<>(candidates.size());
+          for (SegmentInstanceCandidate candidate : candidates) {
+            candidateInstances.add(candidate.getInstance());
+          }
+          LOGGER.warn("Failed to find servers hosting old segment: {} for table: {} "
+                  + "(all candidate instances: {} are disabled, counting segment as unavailable)", segment,
+              _tableNameWithType, candidateInstances);
         }
-        LOGGER.warn("Failed to find servers hosting old segment: {} for table: {} "
-                + "(all candidate instances: {} are disabled, counting segment as unavailable)", segment,
-            _tableNameWithType, candidateInstances);
         unavailableSegments.add(segment);
         _brokerMetrics.addMeteredTableValue(_tableNameWithType, BrokerMeter.NO_SERVING_HOST_FOR_SEGMENT, 1);
       }
@@ -470,7 +477,21 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
       }
     }
 
-    _segmentStates = new SegmentStates(instanceCandidatesMap, servingInstances, unavailableSegments);
+    SegmentStates previousSegmentStates = _segmentStates;
+    Set<String> previousUnavailableSegments =
+        previousSegmentStates != null ? previousSegmentStates.getUnavailableSegments() : Set.of();
+    Set<String> previousSegmentsWithoutCandidates =
+        previousSegmentStates != null ? previousSegmentStates.getSegmentsWithoutCandidates() : Set.of();
+    for (String segment : unavailableSegments) {
+      boolean wasAlreadyUnavailableWithCandidates =
+          previousUnavailableSegments.contains(segment) && !previousSegmentsWithoutCandidates.contains(segment);
+      if (!segmentsWithoutCandidates.contains(segment) && !wasAlreadyUnavailableWithCandidates) {
+        _brokerMetrics.addMeteredTableValue(_tableNameWithType, BrokerMeter.FAIL_OPEN_ELIGIBLE_SEGMENTS, 1);
+      }
+    }
+
+    _segmentStates =
+        new SegmentStates(instanceCandidatesMap, servingInstances, unavailableSegments, segmentsWithoutCandidates);
     _replicaHealth = new TableReplicaHealth(minPercentOfReplicas, numSegmentsAtMinPercentOfReplicas,
         unavailableSegments.size());
   }
@@ -577,15 +598,21 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
     SegmentStates segmentStates = _segmentStates;
     InstanceMapping mapping = select(segments, requestIdInt, segmentStates, queryOptions);
     Set<String> unavailableSegments = segmentStates.getUnavailableSegments();
+    Set<String> segmentsWithoutCandidates = segmentStates.getSegmentsWithoutCandidates();
 
     if (unavailableSegments.isEmpty()) {
       return new SelectionResult(mapping, List.of(), 0);
     } else {
       List<String> unavailableSegmentsForRequest = new ArrayList<>();
+      boolean failOpenEligible = false;
       for (String segment : segments) {
         if (unavailableSegments.contains(segment)) {
           unavailableSegmentsForRequest.add(segment);
+          failOpenEligible |= !segmentsWithoutCandidates.contains(segment);
         }
+      }
+      if (failOpenEligible) {
+        _brokerMetrics.addMeteredGlobalValue(BrokerMeter.FAIL_OPEN_ELIGIBLE_REQUESTS, 1);
       }
       return new SelectionResult(mapping, unavailableSegmentsForRequest, 0);
     }

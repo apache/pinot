@@ -786,6 +786,10 @@ public class CommonConstants {
         "pinot.broker.enable.single.pool.segments.metric";
     public static final boolean DEFAULT_ENABLE_SINGLE_POOL_SEGMENTS_METRIC = false;
 
+    // Config for whether the broker may route to an unhealthy server when no healthy replica is available for a segment
+    public static final String CONFIG_OF_ENABLE_FAIL_OPEN = "pinot.broker.enable.fail.open";
+    public static final boolean DEFAULT_ENABLE_FAIL_OPEN = false;
+
     // When the server instance's pool field is null or the pool contains multi distinguished group value, the broker
     // would set the pool to -1 in the routing table for that server.
     public static final int FALLBACK_POOL_ID = -1;
