@@ -1389,6 +1389,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
         // Remove backup directory to mark the completion of segment reloading.
         removeBackup(indexDir);
+        // Count successful CRC-driven replacements only (exclude same-CRC force downloads and failed reloads).
+        if (shouldDownload && !crcMatch) {
+          _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_REPLACED_DUE_TO_CRC_MISMATCH, 1);
+        }
       } catch (Exception reloadFailureException) {
         try {
           LoaderUtils.reloadFailureRecovery(indexDir);

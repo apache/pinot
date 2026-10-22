@@ -297,6 +297,8 @@ public class BaseTableDataManagerTest {
     SegmentMetadata localMetadata = mock(SegmentMetadata.class);
     when(localMetadata.getCrc()).thenReturn(0L);
 
+    ServerMetrics serverMetrics = ServerMetrics.get();
+    clearInvocations(serverMetrics);
     BaseTableDataManager tableDataManager = spy(createTableManager());
     tableDataManager.registerSegment(SEGMENT_NAME, createImmutableSegmentDataManager(SEGMENT_NAME, localMetadata));
     seedZKMetadata(tableDataManager, SEGMENT_NAME, zkMetadata);
@@ -305,8 +307,30 @@ public class BaseTableDataManagerTest {
     File dataDir = tableDataManager.getSegmentDataDir(SEGMENT_NAME);
     assertFalse(dataDir.exists());
     tableDataManager.reloadSegment(SEGMENT_NAME, false, null);
+    verify(serverMetrics)
+        .addMeteredTableValue(OFFLINE_TABLE_NAME, ServerMeter.SEGMENT_REPLACED_DUE_TO_CRC_MISMATCH, 1);
     assertTrue(dataDir.exists());
     assertEquals(new SegmentMetadataImpl(dataDir).getTotalDocs(), 5);
+  }
+
+  @Test
+  public void testCrcReplacementMetricNotEmittedWhenReloadDownloadFails()
+      throws Exception {
+    SegmentZKMetadata zkMetadata = createRawSegment(SegmentVersion.v3, 5);
+    SegmentMetadata localMetadata = mock(SegmentMetadata.class);
+    when(localMetadata.getCrc()).thenReturn(0L);
+
+    ServerMetrics serverMetrics = ServerMetrics.get();
+    clearInvocations(serverMetrics);
+    BaseTableDataManager tableDataManager = spy(createTableManager());
+    tableDataManager.registerSegment(SEGMENT_NAME, createImmutableSegmentDataManager(SEGMENT_NAME, localMetadata));
+    seedZKMetadata(tableDataManager, SEGMENT_NAME, zkMetadata);
+    doAnswer(invocation -> new IndexLoadingConfig()).when(tableDataManager).fetchIndexLoadingConfig();
+    doThrow(new IOException("download failed")).when(tableDataManager).downloadSegment(zkMetadata);
+
+    assertThrows(IOException.class, () -> tableDataManager.reloadSegment(SEGMENT_NAME, false, null));
+    verify(serverMetrics, never())
+        .addMeteredTableValue(OFFLINE_TABLE_NAME, ServerMeter.SEGMENT_REPLACED_DUE_TO_CRC_MISMATCH, 1);
   }
 
   @Test
@@ -504,6 +528,8 @@ public class BaseTableDataManagerTest {
     assertEquals(segmentMetadata.getCrc(), zkMetadata.getCrc());
 
     // Same CRC but force to download.
+    ServerMetrics serverMetrics = ServerMetrics.get();
+    clearInvocations(serverMetrics);
     BaseTableDataManager tableDataManager = spy(createTableManager());
     tableDataManager.registerSegment(SEGMENT_NAME, createImmutableSegmentDataManager(SEGMENT_NAME, segmentMetadata));
     seedZKMetadata(tableDataManager, SEGMENT_NAME, zkMetadata);
@@ -519,6 +545,9 @@ public class BaseTableDataManagerTest {
     }
 
     tableDataManager.reloadSegment(SEGMENT_NAME, true, null);
+    // Same-CRC force download should not count as a CRC-driven replacement.
+    verify(serverMetrics, never())
+        .addMeteredTableValue(OFFLINE_TABLE_NAME, ServerMeter.SEGMENT_REPLACED_DUE_TO_CRC_MISMATCH, 1);
     assertTrue(indexDir.exists());
     segmentMetadata = new SegmentMetadataImpl(indexDir);
     assertEquals(segmentMetadata.getCrc(), zkMetadata.getCrc());
