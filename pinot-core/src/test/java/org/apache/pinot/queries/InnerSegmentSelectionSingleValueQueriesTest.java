@@ -290,7 +290,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
   public void testSelectionOrderBySingleSortedColumnDescDidOrder() {
     String orderBy = " ORDER BY column5 DESC";
     BaseOperator<SelectionResultsBlock> selectionOrderByOperator = getOperator(
-        "SET allowReverseOrder = false; SET lateMaterializeSortedOrderBy = true; " + SELECTION_QUERY + orderBy);
+        "SET allowReverseOrder = false; " + SELECTION_QUERY + orderBy);
     assertTrue(selectionOrderByOperator instanceof SelectionPartiallyOrderedByDescOperation, "Expected: "
         + SelectionPartiallyOrderedByLinearOperator.class + ", found: " + selectionOrderByOperator.getClass());
     SelectionResultsBlock resultsBlock = selectionOrderByOperator.nextBlock();
@@ -310,17 +310,6 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     Object[] lastRow = selectionResult.get(9);
     assertEquals(lastRow.length, 3);
     assertEquals(lastRow[0], "gFuH");
-  }
-
-  /// The optimization is opt-in, so the same query without the option must still read every selected column
-  /// for the whole match set. Pins the default; delete or invert this when the default flips.
-  @Test
-  public void testSelectionOrderBySingleSortedColumnDescIsEagerByDefault() {
-    BaseOperator<SelectionResultsBlock> operator =
-        getOperator("SET allowReverseOrder = false; " + SELECTION_QUERY + " ORDER BY column5 DESC");
-    operator.nextBlock();
-    // 30000 docs * 3 selected columns, as before late materialisation existed.
-    assertEquals(operator.getExecutionStatistics().getNumEntriesScannedPostFilter(), 90000L);
   }
 
   @Test
@@ -738,79 +727,45 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     assertEquals(brokerResponse.getRealtimeThreadMemAllocatedBytes(), 0);
   }
 
-  /// Runs `query` with late materialisation on and off and asserts the answers are identical. column5 is the sorted
-  /// column in this fixture.
-  ///
-  /// @param expectFewerEntries whether late materialisation should read fewer entries post-filter. It should not when
-  ///                           the scan already stops at the limit, which is the case for the linear operator with a
-  ///                           fully sorted order-by prefix.
-  private void assertSameAnswerWithAndWithoutLateMaterialization(String query, boolean expectFewerEntries) {
-    BaseOperator<SelectionResultsBlock> lateOperator = getOperator("SET lateMaterializeSortedOrderBy = true; " + query);
-    SelectionResultsBlock lateBlock = lateOperator.nextBlock();
-    ExecutionStatistics lateStats = lateOperator.getExecutionStatistics();
-
-    BaseOperator<SelectionResultsBlock> eagerOperator =
-        getOperator("SET lateMaterializeSortedOrderBy = false; " + query);
-    SelectionResultsBlock eagerBlock = eagerOperator.nextBlock();
-    ExecutionStatistics eagerStats = eagerOperator.getExecutionStatistics();
-
-    DataSchema lateSchema = lateBlock.getDataSchema();
-    DataSchema eagerSchema = eagerBlock.getDataSchema();
-    assertEquals(lateSchema.getColumnNames(), eagerSchema.getColumnNames());
-    assertEquals(lateSchema.getColumnDataTypes(), eagerSchema.getColumnDataTypes());
-
-    List<Object[]> lateRows = lateBlock.getRows();
-    List<Object[]> eagerRows = eagerBlock.getRows();
-    assertEquals(lateRows.size(), eagerRows.size());
-    for (int i = 0; i < lateRows.size(); i++) {
-      assertEquals(lateRows.get(i), eagerRows.get(i), "row " + i + " differs for query: " + query);
-    }
-    assertEquals(lateStats.getNumDocsScanned(), eagerStats.getNumDocsScanned());
-
-    long late = lateStats.getNumEntriesScannedPostFilter();
-    long eager = eagerStats.getNumEntriesScannedPostFilter();
-    if (expectFewerEntries) {
-      assertTrue(late < eager, "expected fewer entries post-filter, but read " + late + " vs " + eager
-          + " for query: " + query);
-    } else {
-      assertEquals(late, eager, "expected the same entries post-filter for query: " + query);
-    }
-  }
-
-  /// The linear operator stops at the limit, so there is nothing to defer and the plan keeps projecting everything.
-  @Test
-  public void testLateMaterializationSkippedWhenScanStopsAtLimit() {
-    assertSameAnswerWithAndWithoutLateMaterialization(SELECTION_QUERY + " ORDER BY column5", false);
-    assertSameAnswerWithAndWithoutLateMaterialization(
-        "SET allowReverseOrder = true; " + SELECTION_QUERY + " ORDER BY column5 DESC", false);
-  }
-
-  /// Descending without a reverse cursor reads the whole match set, so deferring the other columns is a real saving.
-  @Test
-  public void testLateMaterializationSortedColumnDesc() {
-    assertSameAnswerWithAndWithoutLateMaterialization(
-        "SET allowReverseOrder = false; " + SELECTION_QUERY + " ORDER BY column5 DESC", true);
-  }
-
-  @Test
-  public void testLateMaterializationWithOffsetAndLimit() {
-    assertSameAnswerWithAndWithoutLateMaterialization(
-        "SET allowReverseOrder = false; " + SELECTION_QUERY + " ORDER BY column5 DESC LIMIT 5 OFFSET 3", true);
-  }
-
-  /// An unsorted tail in the order-by removes the limit bound on the scan, so the linear operator benefits too. The
-  /// unsorted order-by column is still projected during the scan; only the remaining output columns are deferred.
   @Test
   public void testLateMaterializationWithUnsortedOrderBySuffix() {
-    assertSameAnswerWithAndWithoutLateMaterialization(SELECTION_QUERY + " ORDER BY column5, column6", true);
+    BaseOperator<SelectionResultsBlock> operator = getOperator(
+        "SELECT column5, column1, ADD(column1, 1) FROM testTable ORDER BY column5, column6, column1");
+    assertTrue(operator instanceof SelectionPartiallyOrderedByLinearOperator);
+    SelectionResultsBlock block = operator.nextBlock();
+    assertEquals(block.getDataSchema().getColumnNames(),
+        new String[]{"column5", "column6", "column1", "add(column1,'1')"});
+    assertEquals(block.getDataSchema().getColumnDataTypes(),
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.INT, ColumnDataType.DOUBLE});
+    List<Object[]> rows = block.getRows();
+    assertEquals(rows.size(), 10);
+    for (Object[] row : rows) {
+      assertEquals(row[3], ((Integer) row[2]).doubleValue() + 1);
+    }
+    assertEquals(rows.get(9), new Object[]{"gFuH", 6043515, 10542595, 10542596.0});
+    assertEquals(operator.getExecutionStatistics().getNumDocsScanned(), 30000L);
+    // The transform rereads column1 for the selected rows after scanning the three order-by columns.
+    assertEquals(operator.getExecutionStatistics().getNumEntriesScannedPostFilter(), 90010L);
   }
 
-  /// The late fetch builds its own TransformOperator, so a non-order-by expression that is a function must resolve,
-  /// both for its values and for its data type in the schema.
   @Test
   public void testLateMaterializationWithTransformProjection() {
-    assertSameAnswerWithAndWithoutLateMaterialization(
+    BaseOperator<SelectionResultsBlock> operator = getOperator(
         "SET allowReverseOrder = false; SELECT column5, ADD(column1, 1), column11 FROM testTable "
-            + "ORDER BY column5 DESC", true);
+            + "ORDER BY column5 DESC, column1, column11 LIMIT 5 OFFSET 3");
+    assertTrue(operator instanceof SelectionPartiallyOrderedByDescOperation);
+    SelectionResultsBlock block = operator.nextBlock();
+    assertEquals(block.getDataSchema().getColumnNames(),
+        new String[]{"column5", "column1", "column11", "add(column1,'1')"});
+    assertEquals(block.getDataSchema().getColumnDataTypes(),
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.DOUBLE});
+    List<Object[]> rows = block.getRows();
+    // Segment operators retain limit + offset rows; the broker applies the offset.
+    assertEquals(rows.size(), 8);
+    for (Object[] row : rows) {
+      assertEquals(row[3], ((Integer) row[1]).doubleValue() + 1);
+    }
+    assertEquals(operator.getExecutionStatistics().getNumDocsScanned(), 30000L);
+    assertEquals(operator.getExecutionStatistics().getNumEntriesScannedPostFilter(), 90008L);
   }
 }

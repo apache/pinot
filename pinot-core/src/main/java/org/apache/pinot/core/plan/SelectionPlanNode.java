@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.plan;
 
-import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
@@ -74,8 +73,8 @@ public class SelectionPlanNode implements PlanNode {
       return new SelectionOnlyOperator(_indexSegment, _queryContext, expressions, projectOperator);
     }
     int numOrderByExpressions = orderByExpressions.size();
-    // Although it is a break of abstraction, some code, specially merging, assumes that if there is an order by
-    // expression the operator will return a block whose selection result is a priority queue.
+    // Order-by expressions come first; any remaining output expressions are fetched after selection.
+    List<ExpressionContext> expressionsToProject = expressions.subList(0, numOrderByExpressions);
     int sortedColumnsPrefixSize = getSortedColumnsPrefix(orderByExpressions, _queryContext.isNullHandlingEnabled());
     if (sortedColumnsPrefixSize > 0) {
       int maxDocsPerCall = DocIdSetPlanNode.MAX_DOC_PER_CALL;
@@ -84,59 +83,24 @@ public class SelectionPlanNode implements PlanNode {
       // or: SELECT ... FROM Table WHERE predicates ORDER BY sorted_column, not_sorted LIMIT 10 OFFSET 5
       // but not SELECT ... FROM Table WHERE predicates ORDER BY not_sorted, sorted_column LIMIT 10 OFFSET 5
 
-      if (sortedColumnsPrefixSize == orderByExpressions.size()) {
+      if (sortedColumnsPrefixSize == numOrderByExpressions) {
         maxDocsPerCall = Math.min(limit + _queryContext.getOffset(), DocIdSetPlanNode.MAX_DOC_PER_CALL);
       }
 
-      // Whether the scan can iterate in query order, and so stop once the list builder is full. Ascending always
-      // can; descending only when reverse iteration is permitted, because DocIdSetPlanNode only produces an
-      // ascending DocIdSetOperator. getSortedByProject below performs the actual switch and decides for real; this
-      // is a conservative prediction, and being wrong only costs the optimization, never correctness.
-      boolean asc = orderByExpressions.get(0).isAsc();
-      boolean canIterateInQueryOrder =
-          asc || QueryOptionsUtils.isReverseOrderAllowed(_queryContext.getQueryOptions());
-
-      // Projecting only the order-by expressions and fetching the rest for the rows that survive the limit pays off
-      // only when the scan cannot stop at the limit. The linear operator stops as soon as the list builder is full,
-      // which with a fully sorted order-by prefix is after limit+offset documents, so there is nothing to save
-      // there. The descending operator has to read the whole match set because there is no descending cursor.
-      boolean scanBoundedByLimit = canIterateInQueryOrder && sortedColumnsPrefixSize == orderByExpressions.size();
-      boolean lateMaterialize = expressions.size() > numOrderByExpressions && !scanBoundedByLimit
-          && QueryOptionsUtils.isLateMaterializeSortedOrderByEnabled(_queryContext.getQueryOptions());
-
-      // Build the project operator once. Constructing one is not free -- it resolves a DataSource and a
-      // ColumnContext per selected column, and some implementations start prefetching those columns -- so a
-      // build-and-discard probe would read exactly the columns this is trying to avoid reading.
-      List<ExpressionContext> expressionsToProject =
-          lateMaterialize ? expressions.subList(0, numOrderByExpressions) : expressions;
       BaseProjectOperator<?> projectOperator =
           getSortedByProject(expressionsToProject, maxDocsPerCall, orderByExpressions);
-      // Remember that we cannot use asc == projectOperator.isAscending() because empty operators are considered
-      // both ascending and descending
-      DocIdOrderedOperator.DocIdOrder queryOrder = DocIdOrderedOperator.DocIdOrder.fromAsc(asc);
+      // Empty operators support both directions, so check compatibility with the query order.
+      DocIdOrderedOperator.DocIdOrder queryOrder =
+          DocIdOrderedOperator.DocIdOrder.fromAsc(orderByExpressions.get(0).isAsc());
       if (projectOperator.isCompatibleWith(queryOrder)) {
         return new SelectionPartiallyOrderedByLinearOperator(_indexSegment, _queryContext, expressions, projectOperator,
-            sortedColumnsPrefixSize, lateMaterialize);
+            sortedColumnsPrefixSize);
       } else {
         return new SelectionPartiallyOrderedByDescOperation(_indexSegment, _queryContext, expressions, projectOperator,
-            sortedColumnsPrefixSize, lateMaterialize);
+            sortedColumnsPrefixSize);
       }
     }
-    if (numOrderByExpressions == expressions.size()) {
-      // All output expressions are ordered
-      // ie: SELECT not_sorted1, not_sorted2 FROM Table WHERE ... ORDER BY not_sorted1, not_sorted2 LIMIT 10 OFFSET 5
-      BaseProjectOperator<?> projectOperator =
-          new ProjectPlanNode(_segmentContext, _queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
-      return new SelectionOrderByOperator(_indexSegment, _queryContext, expressions, projectOperator);
-    }
-    // Not all output expressions are ordered, only fetch the order-by expressions and docId to avoid the
-    // unnecessary data fetch
-    // ie: SELECT ... FROM Table WHERE ... ORDER BY not_sorted1, not_sorted2 LIMIT 10
-    List<ExpressionContext> expressionsToTransform = new ArrayList<>(numOrderByExpressions);
-    for (OrderByExpressionContext orderByExpression : orderByExpressions) {
-      expressionsToTransform.add(orderByExpression.getExpression());
-    }
-    BaseProjectOperator<?> projectOperator = new ProjectPlanNode(_segmentContext, _queryContext, expressionsToTransform,
+    BaseProjectOperator<?> projectOperator = new ProjectPlanNode(_segmentContext, _queryContext, expressionsToProject,
         DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
     return new SelectionOrderByOperator(_indexSegment, _queryContext, expressions, projectOperator);
   }
@@ -153,8 +117,7 @@ public class SelectionPlanNode implements PlanNode {
       try {
         return projectOperator.withOrder(DocIdOrderedOperator.DocIdOrder.DESC);
       } catch (IllegalArgumentException | UnsupportedOperationException e) {
-        // This happens when the operator cannot provide the required order between blocks
-        // Fallback to SelectionOrderByOperator
+        // Keep the ascending project operator for SelectionPartiallyOrderedByDescOperation.
         return projectOperator;
       }
     }

@@ -44,13 +44,7 @@ public class SelectionPartiallyOrderedByDescOperation extends LinearSelectionOrd
 
   public SelectionPartiallyOrderedByDescOperation(IndexSegment indexSegment, QueryContext queryContext,
       List<ExpressionContext> expressions, BaseProjectOperator<?> projectOperator, int numSortedExpressions) {
-    this(indexSegment, queryContext, expressions, projectOperator, numSortedExpressions, false);
-  }
-
-  public SelectionPartiallyOrderedByDescOperation(IndexSegment indexSegment, QueryContext queryContext,
-      List<ExpressionContext> expressions, BaseProjectOperator<?> projectOperator, int numSortedExpressions,
-      boolean lateMaterialize) {
-    super(indexSegment, queryContext, expressions, projectOperator, numSortedExpressions, lateMaterialize);
+    super(indexSegment, queryContext, expressions, projectOperator, numSortedExpressions);
     assert queryContext.getOrderByExpressions() != null;
     Preconditions.checkArgument(!queryContext.getOrderByExpressions().stream()
             .filter(expr -> expr.getExpression().getType() == ExpressionContext.Type.IDENTIFIER)
@@ -63,12 +57,10 @@ public class SelectionPartiallyOrderedByDescOperation extends LinearSelectionOrd
   @Override
   protected List<Object[]> fetch(Supplier<ListBuilder> listBuilderSupplier) {
 
-    // Ideally we would use a descending cursor, but we don't actually have them
-    // Alternatively, we could store all blocks in a list and iterate them in reverse order, but ProjectionBlocks share
-    // the same DataBlockCache, so they may be ephemeral and being overridden by the next block.
-    // The only alternative we have right now is to retrieve the last LIMIT elements from each block
+    // This path handles projections that cannot iterate in descending order. Keep the best rows from each block
+    // because the blocks share a mutable DataBlockCache and cannot be buffered for reverse iteration.
 
-    BlockValSet[] blockValSets = new BlockValSet[getNumProjectedExpressions()];
+    BlockValSet[] blockValSets = new BlockValSet[_numOrderByExpressions];
     List<Object[]> localBestRows = new ArrayList<>();
     ValueBlock valueBlock;
     while ((valueBlock = _projectOperator.nextBlock()) != null) {
