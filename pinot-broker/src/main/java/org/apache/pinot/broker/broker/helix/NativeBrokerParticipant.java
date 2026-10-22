@@ -33,6 +33,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.annotation.Nullable;
+import org.apache.pinot.broker.routing.NativeBrokerQueryAdmission;
 import org.apache.pinot.broker.routing.NativeBrokerRoutingImage;
 import org.apache.pinot.common.coordination.MetadataRpcConnection;
 import org.apache.pinot.common.coordination.NativeMetadataConfig;
@@ -63,7 +64,8 @@ import static java.util.Objects.requireNonNull;
 /// qualified serving settings enable local admission and committed readiness, never a network query resource.
 /// The applied revision covers only the committed own-participant/control projection, never table or routing state.
 /// Lifecycle operations and the single bounded heartbeat lane are serialized; status reads never perform RPCs.
-final class NativeBrokerParticipant implements AutoCloseable, ServiceStatus.ServiceStatusCallback {
+final class NativeBrokerParticipant implements AutoCloseable, ServiceStatus.ServiceStatusCallback,
+    NativeBrokerQueryAdmission {
   private static final Logger LOGGER = LoggerFactory.getLogger(NativeBrokerParticipant.class);
   private static final int MAX_ROUTING_TABLES = 128;
   private static final int MAX_ROUTING_BYTES = 8 * 1024 * 1024;
@@ -127,7 +129,7 @@ final class NativeBrokerParticipant implements AutoCloseable, ServiceStatus.Serv
   }
 
   /// A request-owned immutable plan and fanout, bound to its original finite serving and selected-server leases.
-  static final class QueryAdmission {
+  private static final class QueryAdmission implements NativeBrokerQueryAdmission.Admission {
     private final NativeBrokerRoutingImage _image;
     private final List<NativeBrokerRoutingImage.ServerRequest> _requests;
     private final List<PeerLeaseBound> _serverLeases;
@@ -143,15 +145,18 @@ final class NativeBrokerParticipant implements AutoCloseable, ServiceStatus.Serv
       _generation = generation;
     }
 
-    NativeBrokerRoutingImage image() {
+    @Override
+    public NativeBrokerRoutingImage image() {
       return _image;
     }
 
-    List<NativeBrokerRoutingImage.ServerRequest> requests() {
+    @Override
+    public List<NativeBrokerRoutingImage.ServerRequest> requests() {
       return _requests;
     }
 
-    NativeBrokerRoutingImage.PlanningMetadata planningMetadata(boolean ignoreCase) {
+    @Override
+    public NativeBrokerRoutingImage.PlanningMetadata planningMetadata(boolean ignoreCase) {
       return _image.planningMetadata(ignoreCase);
     }
   }
@@ -493,7 +498,8 @@ final class NativeBrokerParticipant implements AutoCloseable, ServiceStatus.Serv
   }
 
   /// Originate once at authenticated request entry, before planning. Retries retain the returned deadline.
-  NativeQueryDeadline originateDeadline(long requestedMillis) {
+  @Override
+  public NativeQueryDeadline originateDeadline(long requestedMillis) {
     _admission.readLock().lock();
     try {
       serving();
@@ -503,7 +509,8 @@ final class NativeBrokerParticipant implements AutoCloseable, ServiceStatus.Serv
     }
   }
 
-  QueryAdmission admitQuery(String table, UUID queryId, UUID attemptId, NativeQueryDeadline deadline) {
+  @Override
+  public Admission admitQuery(String table, UUID queryId, UUID attemptId, NativeQueryDeadline deadline) {
     _admission.readLock().lock();
     try {
       ServingPermitGuard guard = serving();
@@ -527,10 +534,11 @@ final class NativeBrokerParticipant implements AutoCloseable, ServiceStatus.Serv
     }
   }
 
-  void checkQueryDelivery(QueryAdmission admission) {
+  @Override
+  public void checkQueryDelivery(Admission admission) {
     _admission.readLock().lock();
     try {
-      validateDelivery(admission);
+      validateDelivery(ownedAdmission(admission));
     } finally {
       _admission.readLock().unlock();
     }
@@ -538,15 +546,36 @@ final class NativeBrokerParticipant implements AutoCloseable, ServiceStatus.Serv
 
   /// The callback must be bounded and must not call lifecycle methods or acquire membership/routing monitors.
   /// It executes under the admission read lock so a committed local revocation cannot race check-then-delivery.
-  void deliverQuery(QueryAdmission admission, Runnable callback) {
+  @Override
+  public void deliverQuery(Admission admission, Runnable callback) {
     requireNonNull(callback);
     _admission.readLock().lock();
     try {
-      validateDelivery(admission);
+      validateDelivery(ownedAdmission(admission));
       callback.run();
     } finally {
       _admission.readLock().unlock();
     }
+  }
+
+  @Override
+  public long remainingMillis(Admission admission) {
+    _admission.readLock().lock();
+    try {
+      QueryAdmission owned = ownedAdmission(admission);
+      validateDelivery(owned);
+      long remaining = requireNonNull(_servingSettings).queryDeadlines()
+          .remainingMillis(owned._requests.getFirst().context().deadline());
+      validateDelivery(owned);
+      return remaining;
+    } finally {
+      _admission.readLock().unlock();
+    }
+  }
+
+  private static QueryAdmission ownedAdmission(Admission admission) {
+    checkArgument(admission instanceof QueryAdmission, "Admission was not issued by a native broker participant");
+    return (QueryAdmission) admission;
   }
 
   private void validateDelivery(QueryAdmission admission) {

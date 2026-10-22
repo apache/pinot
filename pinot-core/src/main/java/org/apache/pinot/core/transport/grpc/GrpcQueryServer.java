@@ -359,6 +359,10 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
       ServerResponse serverResponse;
       try {
         DataTable dataTable = instanceResponse.toDataTable();
+        if (_nativeQueryGate != null) {
+          dataTable.getMetadata().put(DataTable.MetadataKey.REQUEST_ID.getName(),
+              Long.toString(queryRequest.getRequestId()));
+        }
         serverResponse = queryRequest.isEnableStreaming() ? StreamingResponseUtils.getMetadataResponse(dataTable)
             : StreamingResponseUtils.getNonStreamingResponse(dataTable);
       } catch (Exception e) {

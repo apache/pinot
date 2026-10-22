@@ -38,6 +38,7 @@ import java.security.MessageDigest;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateExpiredException;
 import java.security.cert.X509Certificate;
+import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.Iterator;
 import java.util.List;
@@ -57,6 +58,7 @@ import org.apache.pinot.common.config.provider.NativeOfflineSegmentAction.Object
 import org.apache.pinot.common.config.provider.NativeOfflineSegmentAction.Participant;
 import org.apache.pinot.common.config.provider.NativeOfflineSegmentAction.Role;
 import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.proto.PinotQueryServerGrpc;
 import org.apache.pinot.common.proto.Server.ServerRequest;
@@ -64,6 +66,10 @@ import org.apache.pinot.common.proto.Server.ServerResponse;
 import org.apache.pinot.common.request.context.NativeQueryContext;
 import org.apache.pinot.common.request.context.NativeQueryDeadline;
 import org.apache.pinot.common.request.context.NativeQueryGate;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.core.common.datatable.DataTableBuilder;
+import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.query.executor.QueryExecutor;
@@ -156,7 +162,9 @@ public class NativeGrpcQueryGuardTest {
         assertTrue(responses.hasNext());
         responses.next();
         assertTrue(responses.hasNext());
-        responses.next();
+        DataTable terminal = DataTableFactory.getDataTable(responses.next().getPayload().asReadOnlyByteBuffer());
+        assertEquals(terminal.getMetadata().get(DataTable.MetadataKey.REQUEST_ID.getName()), "42",
+            "Native responses must carry the exact admitted request ID");
         assertFalse(responses.hasNext());
         assertEquals(peer.get(), tls._fingerprint, "Request metadata must not supply the authenticated identity");
         assertEquals(callbacks.get(), 3, "Streaming data, final metadata and completion must all be guarded");
@@ -218,7 +226,11 @@ public class NativeGrpcQueryGuardTest {
         Iterator<ServerResponse> responses = legacy.submit(request().toBuilder().clearNativeQueryContext().build());
         int count = 0;
         while (responses.hasNext()) {
-          assertNotNull(responses.next());
+          ServerResponse response = responses.next();
+          assertNotNull(response);
+          assertFalse(DataTableFactory.getDataTable(response.getPayload().asReadOnlyByteBuffer())
+              .getMetadata().containsKey(DataTable.MetadataKey.REQUEST_ID.getName()),
+              "Native response stamping must not change the legacy gRPC path");
           count++;
         }
         assertEquals(count, 2);
@@ -242,6 +254,7 @@ public class NativeGrpcQueryGuardTest {
         List.of(new NativeQueryContext.Segment("segment", object(), "a".repeat(64), object(), UUID.randomUUID())),
         List.of()).withDeadline(new NativeQueryDeadline("test-clock", 10, 100));
     return ServerRequest.newBuilder().setSql("SELECT count(*) FROM tbl_OFFLINE").addSegments("segment")
+        .putMetadata(Request.MetadataKeys.REQUEST_ID, "42")
         .putMetadata(Request.MetadataKeys.BROKER_ID, "broker")
         .putMetadata(Request.MetadataKeys.ENABLE_STREAMING, "true")
         .putMetadata("native-query-peer-certificate", "forged-request-identity")
@@ -259,12 +272,16 @@ public class NativeGrpcQueryGuardTest {
 
     private Fixture(TlsFixture tls, NativeQueryGate gate) throws Exception {
       ServerMetrics.register(mock(ServerMetrics.class));
-      DataTable data = mock(DataTable.class);
-      when(data.toBytes()).thenReturn(new byte[]{1, 2});
+      DataTableBuilder builder = DataTableBuilderFactory.getDataTableBuilder(
+          new DataSchema(new String[]{"count(*)"}, new ColumnDataType[]{ColumnDataType.LONG}));
+      builder.startRow();
+      builder.setColumn(0, 1L);
+      builder.finishRow();
+      DataTable data = builder.build();
       BaseResultsBlock block = mock(BaseResultsBlock.class);
       when(block.getDataTable()).thenReturn(data);
-      InstanceResponseBlock result = mock(InstanceResponseBlock.class);
-      when(result.toDataTable()).thenReturn(data);
+      when(block.getResultsMetadata()).thenReturn(new HashMap<>());
+      InstanceResponseBlock result = new InstanceResponseBlock(block);
       when(_executor.execute(any(), any(), any())).thenAnswer(invocation -> {
         ResultsBlockStreamer streamer = invocation.getArgument(2);
         streamer.send(block);

@@ -459,8 +459,36 @@ Admission and delivery use a separate local lock and perform no metadata RPCs. A
 under that lock, serialized with local invalidation; it must not call lifecycle operations or acquire their locks.
 Shutdown fences locally before waiting for an in-flight membership RPC or unregistering.
 
-These APIs are not yet connected to authenticated query entry, normal network dispatch or final HTTP serialization.
+These APIs are not yet connected to authenticated query entry or final HTTP serialization.
 Synthetic clocks in the focused tests establish lifecycle behavior, not production clock qualification.
+
+## Native broker dispatch infrastructure
+
+`NativeBrokerQueryAdmission` exposes the participant's existing local admission and delivery checks without exposing
+its lifecycle locks. `NativeGrpcQueryDispatcher` binds the normal OFFLINE route to every exact admitted destination
+and identity envelope before sending requests. It rejects dropped or optional segments, sampling and
+`ignoreMissingSegments`. Every server must provide one complete non-streaming DataTable with matching request ID,
+required-segment count and successful RPC completion. Missing, repeated, malformed or failed responses cancel the
+whole attempt. The existing Pinot reducer handles selection, ordering, aggregation and group-by; any partial reducer
+result fails the attempt. Reduction runs synchronously on the dispatching thread, including group-by subtasks, so
+timed-out reducer workers cannot accumulate after query capacity is released. This currently trades parallel reduction
+for explicit attempt ownership. Empty result rows remain valid; empty-table routing remains unsupported.
+
+Native response decoding accepts V4 with bounded section lengths, nested counts, variable data and null bitmaps.
+It supports scalar and array representations but explicitly rejects `OBJECT`, `MAP` and `UNKNOWN` columns; functions
+requiring those intermediate formats remain unsupported. These decoding limits do not establish a total heap bound
+for arbitrary reducers or result formatting.
+
+The transport requires fixed, explicitly scoped mutual-TLS credentials and canonical approved `grpcs` endpoints,
+checks the negotiated certificate chain, hostname and validity, and has no plaintext fallback or retries. It bounds
+request/frame/response bytes, call duration and active channels; a cancelled channel retains capacity until termination.
+Each call currently owns its channel, accepting handshake overhead instead of introducing another shared TLS cache.
+Dispatch bounds concurrent queries, fanout and aggregate bytes; cancelled receivers retain capacity until they exit.
+All fanout requests carry the original deadline, and acceptance checks retain the original finite admission.
+
+This path is not registered with the normal request handler or a native listener. Authenticated request entry, quotas,
+qualified production clocks and final HTTP output fencing still need integration before query serving can be enabled.
+Helix/ZK remains the default, and native query listeners remain disabled.
 
 ## Authenticated native query admission
 

@@ -23,6 +23,7 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.datatable.DataTable;
@@ -63,6 +64,16 @@ public class BrokerReduceService extends BaseReduceService {
   /// [org.apache.pinot.spi.query.QueryThreadContext] must already be set up before calling this method.
   public BrokerResponseNative reduceOnDataTable(BrokerRequest brokerRequest, BrokerRequest serverBrokerRequest,
       Map<ServerRoutingInstance, DataTable> dataTableMap, long reduceTimeOutMs, BrokerMetrics brokerMetrics) {
+    return reduceOnDataTable(brokerRequest, serverBrokerRequest, dataTableMap, reduceTimeOutMs, brokerMetrics,
+        _reduceExecutorService);
+  }
+
+  /// Reduces with a caller-owned executor, which also runs any nested group-by finalization work.
+  /// The caller owns its lifetime; this method does not shut it down. [org.apache.pinot.spi.query.QueryThreadContext]
+  /// must already be set up, and an asynchronous executor must propagate that context.
+  public BrokerResponseNative reduceOnDataTable(BrokerRequest brokerRequest, BrokerRequest serverBrokerRequest,
+      Map<ServerRoutingInstance, DataTable> dataTableMap, long reduceTimeOutMs, BrokerMetrics brokerMetrics,
+      ExecutorService executorService) {
     if (dataTableMap.isEmpty()) {
       // Empty response.
       return BrokerResponseNative.empty();
@@ -113,7 +124,7 @@ public class BrokerReduceService extends BaseReduceService {
 
     QueryContext serverQueryContext = QueryContextConverterUtils.getQueryContext(serverBrokerRequest.getPinotQuery());
     DataTableReducer dataTableReducer = ResultReducerFactory.getResultReducer(serverQueryContext);
-    DataTableReducerContext reducerContext = createReducerContext(queryOptions, reduceTimeOutMs);
+    DataTableReducerContext reducerContext = createReducerContext(queryOptions, reduceTimeOutMs, executorService);
 
     try {
       dataTableReducer.reduceAndSetResults(rawTableName, cachedDataSchema, dataTableMap, brokerResponseNative,
@@ -234,7 +245,8 @@ public class BrokerReduceService extends BaseReduceService {
     QueryContext serverQueryContext = QueryContextConverterUtils.getQueryContext(serverBrokerRequest.getPinotQuery());
     DataTableReducer dataTableReducer = ResultReducerFactory.getResultReducer(serverQueryContext);
     DataTableReducerContext reducerContext =
-        createReducerContext(serverBrokerRequest.getPinotQuery().getQueryOptions(), reduceTimeOutMs);
+        createReducerContext(serverBrokerRequest.getPinotQuery().getQueryOptions(), reduceTimeOutMs,
+            _reduceExecutorService);
     DataTable merged = dataTableReducer.mergeDataTablesOnly(rawTableName, cachedDataSchema, dataTableMap,
         reducerContext, brokerMetrics);
 
@@ -309,7 +321,7 @@ public class BrokerReduceService extends BaseReduceService {
   /// Resolves the group-by trim parameters (query option overrides, else broker defaults) and builds the
   /// [DataTableReducerContext]
   private DataTableReducerContext createReducerContext(@Nullable Map<String, String> queryOptions,
-      long reduceTimeOutMs) {
+      long reduceTimeOutMs, ExecutorService executorService) {
     Integer minGroupTrimSizeQueryOption = null;
     Integer groupTrimThresholdQueryOption = null;
     Integer minInitialIndexedTableCapacityQueryOption = null;
@@ -324,7 +336,7 @@ public class BrokerReduceService extends BaseReduceService {
     int minInitialIndexedTableCapacity =
         minInitialIndexedTableCapacityQueryOption != null ? minInitialIndexedTableCapacityQueryOption
             : _minInitialIndexedTableCapacity;
-    return new DataTableReducerContext(_reduceExecutorService, _maxReduceThreadsPerQuery, reduceTimeOutMs,
+    return new DataTableReducerContext(executorService, _maxReduceThreadsPerQuery, reduceTimeOutMs,
         groupTrimThreshold, minGroupTrimSize, minInitialIndexedTableCapacity);
   }
 
