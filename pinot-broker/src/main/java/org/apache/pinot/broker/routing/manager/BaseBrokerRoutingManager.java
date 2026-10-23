@@ -749,14 +749,16 @@ public abstract class BaseBrokerRoutingManager
     }
   }
 
-  /// Reports the table's replica health gauges from what its own instance selector currently measures.
+  /// Reports the table's replica health gauges, and the fail-open eligible segments meter, from what its own
+  /// instance selector currently measures.
   /// Called after every change that can move those numbers, so the gauges track the routing rather than a
   /// sampling interval.
   ///
   /// Only the routing entry's own selector is asked. The per-sampler selectors see a subset of the table's
   /// segments and share its name, so reporting from them would overwrite the table's real values with
-  /// numbers measured over that subset. They still measure their own subset - the wasted work is a counter
-  /// per sampled segment, cheap enough not to be worth a switch that could be set wrong.
+  /// numbers measured over that subset, and count each fail-open transition again per sampler. They still
+  /// measure their own subset - the wasted work is a counter per sampled segment, cheap enough not to be worth
+  /// a switch that could be set wrong.
   ///
   /// Callers must hold the table's routing build lock: that is what makes the `_disabled` read below see the
   /// value written by the assignment change, and what keeps two changes from interleaving a report with a
@@ -785,6 +787,16 @@ public abstract class BaseBrokerRoutingManager
         replicaHealth.getNumSegmentsAtMinPercentOfReplicas());
     _brokerMetrics.setValueOfTableGauge(tableNameWithType, BrokerGauge.UNAVAILABLE_SEGMENTS,
         replicaHealth.getNumUnavailableSegments());
+    // Unlike the gauges, this is a delta, so it is reported once per snapshot: a call that follows a refresh that
+    // threw before reaching the selector sees the previous snapshot again and must not count it twice
+    if (replicaHealth != routingEntry._lastReportedReplicaHealth) {
+      routingEntry._lastReportedReplicaHealth = replicaHealth;
+      int numNewFailOpenEligibleSegments = replicaHealth.getNumNewFailOpenEligibleSegments();
+      if (numNewFailOpenEligibleSegments > 0) {
+        _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.FAIL_OPEN_ELIGIBLE_SEGMENTS,
+            numNewFailOpenEligibleSegments);
+      }
+    }
   }
 
   /// Reports the number of segments the routing entry tracks. Callers must hold the table's routing build lock.
@@ -1440,6 +1452,9 @@ public abstract class BaseBrokerRoutingManager
     transient TimeBoundaryManager _timeBoundaryManager;
 
     transient boolean _disabled;
+
+    // Replica health snapshot last reported by updateReplicaHealthMetrics, so that its deltas are emitted once
+    transient TableReplicaHealth _lastReportedReplicaHealth;
 
     // Number of pre-selected online segments at the last build or assignment change
     transient int _numPreSelectedOnlineSegments;
