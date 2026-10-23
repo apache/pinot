@@ -95,37 +95,29 @@ public class PinotAggregateTypeArgumentRewriteRule extends RelOptRule {
 
     // Appending keeps the existing field indexes, so the group set and the other calls are unaffected.
     List<AggregateCall> orgAggCalls = aggRel.getAggCallList();
-    int numAggCalls = orgAggCalls.size();
-    int[] literalIndexes = new int[numAggCalls];
+    List<AggregateCall> aggCalls = new ArrayList<>(orgAggCalls.size());
     Map<String, Integer> literalIndexByDataType = new HashMap<>();
-    for (int i = 0; i < numAggCalls; i++) {
-      String dataType = getDataTypeArgument(orgAggCalls.get(i), input);
-      literalIndexes[i] = dataType == null ? -1 : literalIndexByDataType.computeIfAbsent(dataType, type -> {
-        projects.add(rexBuilder.makeLiteral(type));
-        return projects.size() - 1;
-      });
-    }
-    RelNode newInput = LogicalProject.create(projectInput, hints, projects, (List<String>) null, Set.of());
-
-    List<AggregateCall> aggCalls = new ArrayList<>(numAggCalls);
-    for (int i = 0; i < numAggCalls; i++) {
-      AggregateCall aggCall = orgAggCalls.get(i);
-      if (literalIndexes[i] < 0) {
+    for (AggregateCall aggCall : orgAggCalls) {
+      String dataType = getDataTypeArgument(aggCall, input);
+      if (dataType == null) {
         aggCalls.add(aggCall);
         continue;
       }
       List<Integer> argList = new ArrayList<>(aggCall.getArgList());
-      argList.add(literalIndexes[i]);
+      argList.add(literalIndexByDataType.computeIfAbsent(dataType, type -> {
+        projects.add(rexBuilder.makeLiteral(type));
+        return projects.size() - 1;
+      }));
       // Keeps the original result type, so the rewrite does not change the result schema.
       aggCalls.add(aggCall.withArgList(argList));
     }
+    RelNode newInput = LogicalProject.create(projectInput, hints, projects, (List<String>) null, Set.of());
     call.transformTo(
         aggRel.copy(aggRel.getTraitSet(), newInput, aggRel.getGroupSet(), aggRel.getGroupSets(), aggCalls));
   }
 
-  /// Returns the data type argument to append, or `null` when the call already has one or is not such a call. The
-  /// mapped types match `ValueWithTimeOperandTypeChecker` in [AggregationFunctionType], which rejects the others during
-  /// validation.
+  /// Returns the data type argument to append, or `null` when the call already has one or is not such a call. Throws
+  /// for a data argument without an explicit form, such as an array from a multi-value column.
   @Nullable
   private static String getDataTypeArgument(AggregateCall aggCall, RelNode input) {
     if (aggCall.getArgList().size() != 2) {
@@ -165,8 +157,7 @@ public class PinotAggregateTypeArgumentRewriteRule extends RelOptRule {
       case UUID:
         return "UUID";
       default:
-        // Rejected during validation
-        throw new IllegalStateException(
+        throw new IllegalArgumentException(
             String.format("Unsupported data type for %s(dataColumn, timeColumn): %s", name, dataType));
     }
   }

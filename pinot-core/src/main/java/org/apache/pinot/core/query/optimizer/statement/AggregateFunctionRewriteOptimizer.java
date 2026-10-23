@@ -105,8 +105,8 @@ public class AggregateFunctionRewriteOptimizer implements StatementOptimizer {
     }
   }
 
-  /// Appends the data column's logical type. The supported types match `ValueWithTimeOperandTypeChecker` in
-  /// [AggregationFunctionType] and `PinotAggregateTypeArgumentRewriteRule` in the multi-stage engine.
+  /// Appends the data column's logical type. The supported types match `PinotAggregateTypeArgumentRewriteRule` in the
+  /// multi-stage engine.
   private static void addDataTypeArgument(Function function, String functionName, FieldSpec fieldSpec) {
     if (fieldSpec.isSingleValueField()) {
       switch (fieldSpec.getDataType()) {

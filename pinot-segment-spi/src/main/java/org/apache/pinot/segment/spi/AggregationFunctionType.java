@@ -26,10 +26,7 @@ import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
-import org.apache.calcite.sql.SqlCallBinding;
 import org.apache.calcite.sql.SqlKind;
-import org.apache.calcite.sql.SqlOperandCountRange;
-import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.SqlOperatorBinding;
 import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.ReturnTypes;
@@ -68,8 +65,12 @@ public enum AggregationFunctionType {
   AVG("avg", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
   MODE("mode", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
   ANYVALUE("anyValue", ReturnTypes.ARG0, OperandTypes.ANY, SqlTypeName.OTHER),
-  FIRSTWITHTIME("firstWithTime", ReturnTypes.ARG0, new ValueWithTimeOperandTypeChecker(), SqlTypeName.OTHER),
-  LASTWITHTIME("lastWithTime", ReturnTypes.ARG0, new ValueWithTimeOperandTypeChecker(), SqlTypeName.OTHER),
+  FIRSTWITHTIME("firstWithTime", ReturnTypes.ARG0, OperandTypes.or(
+      OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY),
+      OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER)), SqlTypeName.OTHER),
+  LASTWITHTIME("lastWithTime", ReturnTypes.ARG0, OperandTypes.or(
+      OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY),
+      OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER)), SqlTypeName.OTHER),
   MINMAXRANGE("minMaxRange", ReturnTypes.DOUBLE, OperandTypes.ANY, SqlTypeName.OTHER, SqlTypeName.DOUBLE),
 
   /// for all distinct count family functions:
@@ -424,46 +425,6 @@ public enum AggregationFunctionType {
       } catch (IllegalArgumentException e) {
         throw new IllegalArgumentException("Invalid aggregation function name: " + functionName);
       }
-    }
-  }
-
-  /// Accepts `(dataColumn, timeColumn)` and `(dataColumn, timeColumn, 'dataType')`. The two-argument form is limited to
-  /// the types of the explicit form, since its data type argument is inferred from the data argument.
-  ///
-  /// `INFERRED_DATA_TYPES` matches the types that `PinotAggregateTypeArgumentRewriteRule` maps to a data type argument,
-  /// and the single-stage `AggregateFunctionRewriteOptimizer` supports the corresponding schema types.
-  private static class ValueWithTimeOperandTypeChecker implements SqlOperandTypeChecker {
-    private static final SqlOperandTypeChecker DELEGATE = OperandTypes.or(
-        OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY),
-        OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER));
-    private static final Set<SqlTypeName> INFERRED_DATA_TYPES = Set.of(SqlTypeName.TINYINT, SqlTypeName.SMALLINT,
-        SqlTypeName.INTEGER, SqlTypeName.BIGINT, SqlTypeName.REAL, SqlTypeName.FLOAT, SqlTypeName.DOUBLE,
-        SqlTypeName.DECIMAL, SqlTypeName.CHAR, SqlTypeName.VARCHAR, SqlTypeName.BOOLEAN, SqlTypeName.TIMESTAMP,
-        SqlTypeName.BINARY, SqlTypeName.VARBINARY, SqlTypeName.UUID);
-
-    @Override
-    public boolean checkOperandTypes(SqlCallBinding callBinding, boolean throwOnFailure) {
-      if (!DELEGATE.checkOperandTypes(callBinding, throwOnFailure)) {
-        return false;
-      }
-      if (callBinding.getOperandCount() == 2
-          && !INFERRED_DATA_TYPES.contains(callBinding.getOperandType(0).getSqlTypeName())) {
-        if (throwOnFailure) {
-          throw callBinding.newValidationSignatureError();
-        }
-        return false;
-      }
-      return true;
-    }
-
-    @Override
-    public SqlOperandCountRange getOperandCountRange() {
-      return DELEGATE.getOperandCountRange();
-    }
-
-    @Override
-    public String getAllowedSignatures(SqlOperator op, String opName) {
-      return DELEGATE.getAllowedSignatures(op, opName);
     }
   }
 
