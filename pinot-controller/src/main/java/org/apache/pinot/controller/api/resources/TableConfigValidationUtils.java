@@ -20,19 +20,24 @@ package org.apache.pinot.controller.api.resources;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import javax.ws.rs.core.Response;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentUtils;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.util.TaskConfigUtils;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
+import org.apache.pinot.segment.local.utils.TableConfigUtils.ValidationType;
 import org.apache.pinot.spi.config.ConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableConfigValidatorRegistry;
@@ -40,6 +45,8 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /// Utility class that encapsulates table config validation logic.
@@ -52,31 +59,55 @@ public final class TableConfigValidationUtils {
   private TableConfigValidationUtils() {
   }
 
+  private static final Logger LOGGER = LoggerFactory.getLogger(TableConfigValidationUtils.class);
+
+  /// Description of the `validationTypesToSkip` request parameter parsed by [#parseValidationTypesToSkip].
+  public static final String VALIDATION_TYPES_TO_SKIP_DESCRIPTION =
+      "Comma separated list of validation type(s) to skip. Supported types: "
+          + "(ALL|TASK|UPSERT|DEDUP|INSTANCE_ASSIGNMENT|TENANT|MINION_INSTANCES). TENANT and MINION_INSTANCES apply "
+          + "only to validating and tuning table configs, as creating or updating a table always validates them";
+
+  /// Parses the `validationTypesToSkip` request parameter, rejecting an unknown validation type as a bad request.
+  /// Returns `null` when the parameter is not set or blank.
+  @Nullable
+  public static EnumSet<ValidationType> parseValidationTypesToSkip(@Nullable String typesToSkip) {
+    try {
+      return TableConfigUtils.parseTypesToSkipString(typesToSkip);
+    } catch (IllegalArgumentException e) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Invalid validationTypesToSkip: %s, supported types: %s", typesToSkip,
+              Arrays.toString(ValidationType.values())), Response.Status.BAD_REQUEST, e);
+    }
+  }
+
   /// Validates a table config against the given schema and controller configuration.
   ///
   /// @param tableConfig   the table config to validate
   /// @param schema        the schema for the table (must not be null)
-  /// @param typesToSkip   comma-separated list of validation types to skip (ALL|TASK|UPSERT), or null
+  /// @param skipTypes     the validation types to skip, or null to skip none, see [ValidationType]
   /// @param resourceManager the Helix resource manager
   /// @param controllerConf  the controller configuration
   /// @param taskManager     the task manager, or null to skip task validation
-  public static void validateTableConfig(TableConfig tableConfig, Schema schema, @Nullable String typesToSkip,
-      PinotHelixResourceManager resourceManager, ControllerConf controllerConf,
-      @Nullable PinotTaskManager taskManager) {
-    validateTableConfig(tableConfig, schema, typesToSkip, resourceManager, controllerConf, taskManager, null);
+  public static void validateTableConfig(TableConfig tableConfig, Schema schema,
+      @Nullable EnumSet<ValidationType> skipTypes, PinotHelixResourceManager resourceManager,
+      ControllerConf controllerConf, @Nullable PinotTaskManager taskManager) {
+    validateTableConfig(tableConfig, schema, skipTypes, resourceManager, controllerConf, taskManager, null);
   }
 
-  public static void validateTableConfig(TableConfig tableConfig, Schema schema, @Nullable String typesToSkip,
-      PinotHelixResourceManager resourceManager, ControllerConf controllerConf, @Nullable PinotTaskManager taskManager,
+  public static void validateTableConfig(TableConfig tableConfig, Schema schema,
+      @Nullable EnumSet<ValidationType> skipTypes, PinotHelixResourceManager resourceManager,
+      ControllerConf controllerConf, @Nullable PinotTaskManager taskManager,
       @Nullable TableConfig existingTableConfig) {
     validateEnvironmentVariables(tableConfig);
-    TableConfigUtils.validate(tableConfig, schema, typesToSkip, existingTableConfig);
+    TableConfigUtils.validate(tableConfig, schema, skipTypes, existingTableConfig);
     TableConfigUtils.validateTableName(tableConfig);
     TableConfigUtils.ensureMinReplicas(tableConfig, controllerConf.getDefaultTableMinReplicas());
     TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, controllerConf.getDimTableMaxSize());
     checkHybridTableConfig(resourceManager, tableConfig);
-    TaskConfigUtils.validateTaskConfigs(tableConfig, schema, taskManager, typesToSkip);
-    validateInstanceAssignment(resourceManager, tableConfig);
+    TaskConfigUtils.validateTaskConfigs(tableConfig, schema, taskManager, skipTypes);
+    if (!ValidationType.INSTANCE_ASSIGNMENT.isSkipped(skipTypes)) {
+      validateInstanceAssignment(resourceManager, tableConfig);
+    }
     resourceManager.validateTableTenantConfig(tableConfig);
     resourceManager.validateTableTaskMinionInstanceTagConfig(tableConfig);
     TableConfigValidatorRegistry.validate(tableConfig, schema);

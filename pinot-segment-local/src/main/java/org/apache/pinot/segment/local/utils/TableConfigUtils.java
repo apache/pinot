@@ -23,9 +23,9 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -162,7 +162,7 @@ public final class TableConfigUtils {
     _enforcePoolBasedAssignment = enforcePoolBasedAssignment;
   }
 
-  /// @see TableConfigUtils#validate(TableConfig, Schema, String)
+  /// @see TableConfigUtils#validate(TableConfig, Schema, EnumSet)
   public static void validate(TableConfig tableConfig, Schema schema) {
     validate(tableConfig, schema, null);
   }
@@ -175,17 +175,18 @@ public final class TableConfigUtils {
   /// 5. Field Config List
   /// 6. Instance pool and replica group, if enabled
   ///
+  /// The validation types in `skipTypes` are skipped, or none when it is `null`, see [ValidationType].
+  ///
   /// TODO: Add more validations for each section (e.g. validate conditions are met for aggregateMetrics)
-  public static void validate(TableConfig tableConfig, Schema schema, @Nullable String typesToSkip) {
-    validate(tableConfig, schema, typesToSkip, null);
+  public static void validate(TableConfig tableConfig, Schema schema, @Nullable EnumSet<ValidationType> skipTypes) {
+    validate(tableConfig, schema, skipTypes, null);
   }
 
-  public static void validate(TableConfig tableConfig, Schema schema, @Nullable String typesToSkip,
+  public static void validate(TableConfig tableConfig, Schema schema, @Nullable EnumSet<ValidationType> skipTypes,
       @Nullable TableConfig existingTableConfig) {
     Preconditions.checkArgument(schema != null, "Schema should not be null for table: %s", tableConfig.getTableName());
-    Set<ValidationType> skipTypes = parseTypesToSkipString(typesToSkip);
     validateEffectiveTableConfig(tableConfig, schema, skipTypes, existingTableConfig);
-    if (skipTypes.contains(ValidationType.ALL) || !hasConsumingSegmentTierOverwriteForRealtimeTable(tableConfig)) {
+    if (ValidationType.ALL.isSkipped(skipTypes) || !hasConsumingSegmentTierOverwriteForRealtimeTable(tableConfig)) {
       return;
     }
     try {
@@ -198,11 +199,11 @@ public final class TableConfigUtils {
   }
 
   private static void validateEffectiveTableConfig(TableConfig tableConfig, Schema schema,
-      Set<ValidationType> skipTypes, @Nullable TableConfig existingTableConfig) {
+      @Nullable EnumSet<ValidationType> skipTypes, @Nullable TableConfig existingTableConfig) {
     // Sanitize the table config before validation
     sanitize(tableConfig);
 
-    if (skipTypes.contains(ValidationType.ALL)) {
+    if (ValidationType.ALL.isSkipped(skipTypes)) {
       return;
     }
 
@@ -229,8 +230,15 @@ public final class TableConfigUtils {
     validateInstanceAssignmentConfigs(tableConfig);
     validateStrictReplicaGroupRouting(tableConfig);
 
-    if (!skipTypes.contains(ValidationType.UPSERT)) {
-      validateUpsertAndDedupConfig(tableConfig, schema, existingTableConfig);
+    boolean upsertEnabled = tableConfig.isUpsertEnabled();
+    boolean dedupEnabled = tableConfig.isDedupEnabled();
+    Preconditions.checkState(!(upsertEnabled && dedupEnabled),
+        "A table can have either Upsert or Dedup enabled, but not both");
+    if (upsertEnabled && !ValidationType.UPSERT.isSkipped(skipTypes)) {
+      validateUpsertConfig(tableConfig, schema, existingTableConfig);
+    }
+    if (dedupEnabled && !ValidationType.DEDUP.isSkipped(skipTypes)) {
+      validateDedupConfig(tableConfig, schema);
     }
 
     validateTaskConfig(tableConfig);
@@ -278,14 +286,16 @@ public final class TableConfigUtils {
         "Instance pool and replica group configurations must be enabled");
   }
 
-  public static Set<ValidationType> parseTypesToSkipString(@Nullable String typesToSkipStr) {
+  /// Parses the comma separated validation types to skip, ignoring case and surrounding whitespace. Returns `null` when
+  /// there is nothing to skip, that is when the input is `null` or blank.
+  @Nullable
+  public static EnumSet<ValidationType> parseTypesToSkipString(@Nullable String typesToSkipStr) {
     if (StringUtils.isBlank(typesToSkipStr)) {
-      return Set.of();
+      return null;
     }
-    String[] split = StringUtils.split(typesToSkipStr, ',');
-    Set<ValidationType> typesToSkip = Sets.newHashSetWithExpectedSize(split.length);
-    for (String type : split) {
-      typesToSkip.add(ValidationType.valueOf(type.trim().toUpperCase()));
+    EnumSet<ValidationType> typesToSkip = EnumSet.noneOf(ValidationType.class);
+    for (String type : StringUtils.split(typesToSkipStr, ',')) {
+      typesToSkip.add(ValidationType.valueOf(type.trim().toUpperCase(Locale.ROOT)));
     }
     return typesToSkip;
   }
@@ -1058,33 +1068,12 @@ public final class TableConfigUtils {
     }
   }
 
-  /// Validates the upsert- and dedup-related configuration. Returns early when neither is enabled; otherwise checks
-  /// the shared requirements (upsert and dedup are mutually exclusive, primary keys exist and are single-valued,
-  /// strict replica-group routing, no tenant tag override for REALTIME, OFFLINE restrictions) and then, per the enabled
-  /// mode:
-  /// - Upsert: no multi-tier / star-tree, comparison / delete-record / out-of-order columns are valid, deleted-keys
-  ///   compaction consistency, post-partial-upsert transforms, consistency-mode constraints, and delegates to
-  ///   [#validateTTLForUpsertConfig] and [#validatePartialUpsertStrategies]; rejects MD5 when disabled.
-  /// - Dedup: delegates to [#validateTTLForDedupConfig]; rejects MD5 when disabled.
+  /// Validates the requirements shared by upsert and dedup tables: the primary key columns exist in the schema and are
+  /// single-valued, the routing uses strict replica-group, and a REALTIME table has no tenant tag override.
   ///
   /// The segment assignment requirements shared with strict replica-group routing (one instance per partition, no
   /// COMPLETED segment relocation) are validated by [#validateStrictReplicaGroupRouting].
-  @VisibleForTesting
-  static void validateUpsertAndDedupConfig(TableConfig tableConfig, Schema schema) {
-    validateUpsertAndDedupConfig(tableConfig, schema, null);
-  }
-
-  static void validateUpsertAndDedupConfig(TableConfig tableConfig, Schema schema,
-      @Nullable TableConfig existingTableConfig) {
-    boolean upsertEnabled = tableConfig.isUpsertEnabled();
-    boolean dedupEnabled = tableConfig.isDedupEnabled();
-    if (!upsertEnabled && !dedupEnabled) {
-      return;
-    }
-
-    // check both upsert and dedup are not enabled simultaneously
-    Preconditions.checkState(!(upsertEnabled && dedupEnabled),
-        "A table can have either Upsert or Dedup enabled, but not both");
+  private static void validateUpsertAndDedupCommonConfig(TableConfig tableConfig, Schema schema) {
     // primary key exists
     Preconditions.checkState(CollectionUtils.isNotEmpty(schema.getPrimaryKeyColumns()),
         "Upsert/Dedup table must have primary key columns in the schema");
@@ -1100,18 +1089,30 @@ public final class TableConfigUtils {
     Preconditions.checkState(
         tableConfig.getRoutingConfig() != null && isRoutingStrategyAllowedForUpsert(tableConfig.getRoutingConfig()),
         "Upsert/Dedup table must use strict replica-group (i.e. strictReplicaGroup) based routing");
-
-    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
-    DedupConfig dedupConfig = tableConfig.getDedupConfig();
     if (tableConfig.getTableType() == TableType.REALTIME) {
       Preconditions.checkState(tableConfig.getTenantConfig().getTagOverrideConfig() == null || (
               tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeConsuming() == null
                   && tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeCompleted() == null),
           "Invalid tenant tag override used for Upsert/Dedup table");
-    } else {
-      Preconditions.checkState(!dedupEnabled,
-          "Dedup is not supported for OFFLINE table. Only upsert is supported for OFFLINE table");
-      assert upsertConfig != null;
+    }
+  }
+
+  /// Validates the upsert config of a table with upsert enabled: checks the requirements shared with dedup (see
+  /// [#validateUpsertAndDedupCommonConfig]), the OFFLINE restrictions (no partial upsert, segment partition config,
+  /// comparison or time column), no multi-tier / star-tree, comparison / delete-record / out-of-order columns are
+  /// valid, deleted-keys compaction consistency, post-partial-upsert transforms, consistency-mode constraints, and
+  /// delegates to [#validateTTLForUpsertConfig] and [#validatePartialUpsertStrategies]; rejects MD5 when disabled.
+  @VisibleForTesting
+  static void validateUpsertConfig(TableConfig tableConfig, Schema schema) {
+    validateUpsertConfig(tableConfig, schema, null);
+  }
+
+  static void validateUpsertConfig(TableConfig tableConfig, Schema schema, @Nullable TableConfig existingTableConfig) {
+    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+    assert upsertConfig != null;
+    validateUpsertAndDedupCommonConfig(tableConfig, schema);
+
+    if (tableConfig.getTableType() == TableType.OFFLINE) {
       Preconditions.checkState(upsertConfig.getMode() != UpsertConfig.Mode.PARTIAL,
           "Partial upsert is not supported for OFFLINE table");
       // Offline upsert tables require segment partition config so that segments are assigned to servers
@@ -1126,174 +1127,168 @@ public final class TableConfigUtils {
       // A comparison column is required, same as realtime upsert. It resolves to the configured comparison columns, or
       // the table's time column when comparison columns are not set. Unlike realtime, offline tables do not require a
       // time column, so reject the case where neither is configured (no implicit segment creation time fallback).
-      Preconditions.checkState(
-          CollectionUtils.isNotEmpty(upsertConfig.getComparisonColumns())
+      Preconditions.checkState(CollectionUtils.isNotEmpty(upsertConfig.getComparisonColumns())
               || tableConfig.getValidationConfig().getTimeColumnName() != null,
           "Offline upsert table must have a comparison column or a time column configured");
     }
 
-    if (upsertEnabled) {
-      // specifically for upsert
-      assert upsertConfig != null;
+    // Currently, only one tier is allowed for upsert table, as the committed segments can't be moved to other tiers.
+    Preconditions.checkState(tableConfig.getTierConfigsList() == null, "The upsert table cannot have multi-tiers");
+    // no startree index
+    Preconditions.checkState(CollectionUtils.isEmpty(tableConfig.getIndexingConfig().getStarTreeIndexConfigs())
+        && !tableConfig.getIndexingConfig().isEnableDefaultStarTree(), "The upsert table cannot have star-tree index.");
 
-      // Currently, only one tier is allowed for upsert table, as the committed segments can't be moved to other tiers.
-      Preconditions.checkState(tableConfig.getTierConfigsList() == null, "The upsert table cannot have multi-tiers");
-      // no startree index
-      Preconditions.checkState(CollectionUtils.isEmpty(tableConfig.getIndexingConfig().getStarTreeIndexConfigs())
-              && !tableConfig.getIndexingConfig().isEnableDefaultStarTree(),
-          "The upsert table cannot have star-tree index.");
-
-      // comparison column exists
-      List<String> comparisonColumns = upsertConfig.getComparisonColumns();
-      if (comparisonColumns != null) {
-        for (String column : comparisonColumns) {
-          Preconditions.checkState(schema.hasColumn(column), "The comparison column does not exist on schema");
-        }
+    // comparison column exists
+    List<String> comparisonColumns = upsertConfig.getComparisonColumns();
+    if (comparisonColumns != null) {
+      for (String column : comparisonColumns) {
+        Preconditions.checkState(schema.hasColumn(column), "The comparison column does not exist on schema");
       }
-
-      // Delete record column exist and is a BOOLEAN field
-      String deleteRecordColumn = upsertConfig.getDeleteRecordColumn();
-      if (deleteRecordColumn != null) {
-        FieldSpec fieldSpec = schema.getFieldSpecFor(deleteRecordColumn);
-        Preconditions.checkState(fieldSpec != null,
-            String.format("Column %s specified in deleteRecordColumn does not exist", deleteRecordColumn));
-        Preconditions.checkState(fieldSpec.isSingleValueField(),
-            String.format("The deleteRecordColumn - %s must be a single-valued column", deleteRecordColumn));
-        DataType dataType = fieldSpec.getDataType();
-        Preconditions.checkState(dataType == DataType.BOOLEAN || dataType == DataType.STRING || dataType.isNumeric(),
-            String.format("The deleteRecordColumn - %s must be of type: String / Boolean / Numeric",
-                deleteRecordColumn));
-      }
-
-      String outOfOrderRecordColumn = upsertConfig.getOutOfOrderRecordColumn();
-      if (outOfOrderRecordColumn != null) {
-        Preconditions.checkState(!upsertConfig.isDropOutOfOrderRecord(),
-            "outOfOrderRecordColumn and dropOutOfOrderRecord shouldn't exist together for upsert table");
-        FieldSpec fieldSpec = schema.getFieldSpecFor(outOfOrderRecordColumn);
-        Preconditions.checkState(
-            fieldSpec != null && fieldSpec.isSingleValueField() && fieldSpec.getDataType() == DataType.BOOLEAN,
-            "The outOfOrderRecordColumn must be a single-valued BOOLEAN column");
-      }
-
-      if (upsertConfig.isEnableDeletedKeysCompactionConsistency()) {
-        // enableDeletedKeysCompactionConsistency shouldn't exist with metadataTTL
-        Preconditions.checkState(upsertConfig.getMetadataTTL() == 0,
-            "enableDeletedKeysCompactionConsistency and metadataTTL shouldn't exist together for upsert table");
-
-        // enableDeletedKeysCompactionConsistency shouldn't exist with preload enabled
-        Preconditions.checkState(upsertConfig.getPreload() != Enablement.ENABLE,
-            "enableDeletedKeysCompactionConsistency and preload shouldn't exist together for upsert table");
-
-        // enableDeletedKeysCompactionConsistency should exist with deletedKeysTTL
-        Preconditions.checkState(upsertConfig.getDeletedKeysTTL() > 0,
-            "enableDeletedKeysCompactionConsistency should exist with deletedKeysTTL for upsert table");
-
-        // enableDeletedKeysCompactionConsistency should exist with snapshot enabled
-        // NOTE: Allow snapshot to be DEFAULT because it might be enabled at server level.
-        Preconditions.checkState(upsertConfig.getSnapshot() != Enablement.DISABLE,
-            "enableDeletedKeysCompactionConsistency should exist with snapshot for upsert table");
-
-        // enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask / UpsertCompactMergeTask
-        TableTaskConfig taskConfig = tableConfig.getTaskConfig();
-        Preconditions.checkState(
-            taskConfig != null && (taskConfig.getTaskTypeConfigsMap().containsKey(UPSERT_COMPACTION_TASK_TYPE)
-                || taskConfig.getTaskTypeConfigsMap().containsKey(UPSERT_COMPACT_MERGE_TASK_TYPE)),
-            "enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask"
-                + " / UpsertCompactMergeTask for upsert table");
-      }
-
-      // Validate post-partial-upsert transform configs
-      List<TransformConfig> postPartialUpsertTransformConfigs =
-          upsertConfig.getPostPartialUpsertTransformConfigs();
-      if (postPartialUpsertTransformConfigs != null) {
-        List<TransformConfig> existingPostPartialUpsertTransformConfigs =
-            getPostPartialUpsertTransformConfigs(existingTableConfig);
-        Preconditions.checkState(upsertConfig.getMode() == UpsertConfig.Mode.PARTIAL,
-            "postPartialUpsertTransformConfigs can only be configured for PARTIAL upsert tables");
-        Set<String> primaryKeyColumns = new HashSet<>(schema.getPrimaryKeyColumns());
-        Set<String> transformColumns = new HashSet<>();
-        for (TransformConfig transformConfig : postPartialUpsertTransformConfigs) {
-          String columnName = transformConfig.getColumnName();
-          String transformFunction = transformConfig.getTransformFunction();
-          if (columnName == null || transformFunction == null) {
-            throw new IllegalStateException(
-                "columnName/transformFunction cannot be null in postPartialUpsertTransformConfigs "
-                    + transformConfig);
-          }
-          Preconditions.checkState(!primaryKeyColumns.contains(columnName),
-              "Post-partial-upsert transform cannot target primary key column '%s'", columnName);
-          Preconditions.checkState(comparisonColumns == null || !comparisonColumns.contains(columnName),
-              "Post-partial-upsert transform cannot target comparison column '%s'", columnName);
-          Preconditions.checkState(!columnName.equals(deleteRecordColumn),
-              "Post-partial-upsert transform cannot target delete record column '%s'", columnName);
-          Preconditions.checkState(!columnName.equals(outOfOrderRecordColumn),
-              "Post-partial-upsert transform cannot target out-of-order record column '%s'", columnName);
-          if (!transformColumns.add(columnName)) {
-            throw new IllegalStateException(
-                "Duplicate post-partial-upsert transform config found for column '" + columnName + "'");
-          }
-          Preconditions.checkState(schema.hasColumn(columnName),
-              "The destination column '%s' of the post-partial-upsert transform function must be present in the "
-                  + "schema", columnName);
-          if (_disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(transformFunction)) {
-            throw new IllegalStateException(
-                "Groovy transform functions are disabled. Found '" + transformFunction + "' for column '"
-                    + columnName + "' in postPartialUpsertTransformConfigs");
-          }
-          try {
-            validateIngestionTransformFunctionVolatility(transformConfig,
-                existingPostPartialUpsertTransformConfigs);
-            FunctionEvaluator expressionEvaluator =
-                FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction);
-            List<String> arguments = expressionEvaluator.getArguments();
-            if (arguments.contains(columnName)) {
-              throw new IllegalStateException(
-                  "Arguments of a post-partial-upsert transform function '" + arguments
-                      + "' cannot contain the destination column '" + columnName + "'");
-            }
-          } catch (IllegalStateException e) {
-            throw e;
-          } catch (Exception e) {
-            throw new IllegalStateException(
-                "Invalid post-partial-upsert transform function '" + transformFunction + "' for column '"
-                    + columnName + "'", e);
-          }
-        }
-      }
-
-      if (upsertConfig.getConsistencyMode() != UpsertConfig.ConsistencyMode.NONE) {
-        Preconditions.checkState(upsertConfig.getNewSegmentTrackingTimeMs() > 0,
-            "Positive newSegmentTrackingTimeMs is required to enable consistency mode: "
-                + upsertConfig.getConsistencyMode());
-        // dropOutOfOrderRecord and outOfOrderRecordColumn are not supported with SYNC/SNAPSHOT consistency mode
-        // because records must be indexed before metadata is updated. By the time we know if a record is
-        // out-of-order, it's already indexed - As of today, we can't skip indexing or update the
-        // out-of-order column value.
-        Preconditions.checkState(!upsertConfig.isDropOutOfOrderRecord(),
-            "dropOutOfOrderRecord cannot be enabled when consistencyMode is %s. "
-                + "Out-of-order records can only be dropped in NONE consistency mode.",
-            upsertConfig.getConsistencyMode());
-        Preconditions.checkState(upsertConfig.getOutOfOrderRecordColumn() == null,
-            "outOfOrderRecordColumn cannot be configured when consistencyMode is %s. "
-                + "Out-of-order record marking is only supported in NONE consistency mode.",
-            upsertConfig.getConsistencyMode());
-      }
-
-      validateTTLForUpsertConfig(tableConfig, schema);
-      validatePartialUpsertStrategies(tableConfig, schema);
-      validateConsumptionDuringUpsertRevert(tableConfig);
-      Preconditions.checkState(
-          !(PinotMd5Mode.isPinotMd5Disabled() && upsertConfig.getHashFunction() == HashFunction.MD5),
-          "Upsert hash function MD5 is disabled via '%s=true'", CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED);
-    } else {
-      // specifically for dedup
-      assert dedupConfig != null;
-
-      validateTTLForDedupConfig(tableConfig, schema);
-      Preconditions.checkState(
-          !(PinotMd5Mode.isPinotMd5Disabled() && dedupConfig.getHashFunction() == HashFunction.MD5),
-          "Dedup hash function MD5 is disabled via '%s=true'", CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED);
     }
+
+    // Delete record column exist and is a BOOLEAN field
+    String deleteRecordColumn = upsertConfig.getDeleteRecordColumn();
+    if (deleteRecordColumn != null) {
+      FieldSpec fieldSpec = schema.getFieldSpecFor(deleteRecordColumn);
+      Preconditions.checkState(fieldSpec != null,
+          String.format("Column %s specified in deleteRecordColumn does not exist", deleteRecordColumn));
+      Preconditions.checkState(fieldSpec.isSingleValueField(),
+          String.format("The deleteRecordColumn - %s must be a single-valued column", deleteRecordColumn));
+      DataType dataType = fieldSpec.getDataType();
+      Preconditions.checkState(dataType == DataType.BOOLEAN || dataType == DataType.STRING || dataType.isNumeric(),
+          String.format("The deleteRecordColumn - %s must be of type: String / Boolean / Numeric", deleteRecordColumn));
+    }
+
+    String outOfOrderRecordColumn = upsertConfig.getOutOfOrderRecordColumn();
+    if (outOfOrderRecordColumn != null) {
+      Preconditions.checkState(!upsertConfig.isDropOutOfOrderRecord(),
+          "outOfOrderRecordColumn and dropOutOfOrderRecord shouldn't exist together for upsert table");
+      FieldSpec fieldSpec = schema.getFieldSpecFor(outOfOrderRecordColumn);
+      Preconditions.checkState(
+          fieldSpec != null && fieldSpec.isSingleValueField() && fieldSpec.getDataType() == DataType.BOOLEAN,
+          "The outOfOrderRecordColumn must be a single-valued BOOLEAN column");
+    }
+
+    if (upsertConfig.isEnableDeletedKeysCompactionConsistency()) {
+      // enableDeletedKeysCompactionConsistency shouldn't exist with metadataTTL
+      Preconditions.checkState(upsertConfig.getMetadataTTL() == 0,
+          "enableDeletedKeysCompactionConsistency and metadataTTL shouldn't exist together for upsert table");
+
+      // enableDeletedKeysCompactionConsistency shouldn't exist with preload enabled
+      Preconditions.checkState(upsertConfig.getPreload() != Enablement.ENABLE,
+          "enableDeletedKeysCompactionConsistency and preload shouldn't exist together for upsert table");
+
+      // enableDeletedKeysCompactionConsistency should exist with deletedKeysTTL
+      Preconditions.checkState(upsertConfig.getDeletedKeysTTL() > 0,
+          "enableDeletedKeysCompactionConsistency should exist with deletedKeysTTL for upsert table");
+
+      // enableDeletedKeysCompactionConsistency should exist with snapshot enabled
+      // NOTE: Allow snapshot to be DEFAULT because it might be enabled at server level.
+      Preconditions.checkState(upsertConfig.getSnapshot() != Enablement.DISABLE,
+          "enableDeletedKeysCompactionConsistency should exist with snapshot for upsert table");
+
+      // enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask / UpsertCompactMergeTask
+      TableTaskConfig taskConfig = tableConfig.getTaskConfig();
+      Preconditions.checkState(
+          taskConfig != null && (taskConfig.getTaskTypeConfigsMap().containsKey(UPSERT_COMPACTION_TASK_TYPE)
+              || taskConfig.getTaskTypeConfigsMap().containsKey(UPSERT_COMPACT_MERGE_TASK_TYPE)),
+          "enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask"
+              + " / UpsertCompactMergeTask for upsert table");
+    }
+
+    // Validate post-partial-upsert transform configs
+    List<TransformConfig> postPartialUpsertTransformConfigs = upsertConfig.getPostPartialUpsertTransformConfigs();
+    if (postPartialUpsertTransformConfigs != null) {
+      List<TransformConfig> existingPostPartialUpsertTransformConfigs =
+          getPostPartialUpsertTransformConfigs(existingTableConfig);
+      Preconditions.checkState(upsertConfig.getMode() == UpsertConfig.Mode.PARTIAL,
+          "postPartialUpsertTransformConfigs can only be configured for PARTIAL upsert tables");
+      Set<String> primaryKeyColumns = new HashSet<>(schema.getPrimaryKeyColumns());
+      Set<String> transformColumns = new HashSet<>();
+      for (TransformConfig transformConfig : postPartialUpsertTransformConfigs) {
+        String columnName = transformConfig.getColumnName();
+        String transformFunction = transformConfig.getTransformFunction();
+        if (columnName == null || transformFunction == null) {
+          throw new IllegalStateException(
+              "columnName/transformFunction cannot be null in postPartialUpsertTransformConfigs " + transformConfig);
+        }
+        Preconditions.checkState(!primaryKeyColumns.contains(columnName),
+            "Post-partial-upsert transform cannot target primary key column '%s'", columnName);
+        Preconditions.checkState(comparisonColumns == null || !comparisonColumns.contains(columnName),
+            "Post-partial-upsert transform cannot target comparison column '%s'", columnName);
+        Preconditions.checkState(!columnName.equals(deleteRecordColumn),
+            "Post-partial-upsert transform cannot target delete record column '%s'", columnName);
+        Preconditions.checkState(!columnName.equals(outOfOrderRecordColumn),
+            "Post-partial-upsert transform cannot target out-of-order record column '%s'", columnName);
+        if (!transformColumns.add(columnName)) {
+          throw new IllegalStateException(
+              "Duplicate post-partial-upsert transform config found for column '" + columnName + "'");
+        }
+        Preconditions.checkState(schema.hasColumn(columnName),
+            "The destination column '%s' of the post-partial-upsert transform function must be present in the "
+                + "schema", columnName);
+        if (_disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(transformFunction)) {
+          throw new IllegalStateException(
+              "Groovy transform functions are disabled. Found '" + transformFunction + "' for column '" + columnName
+                  + "' in postPartialUpsertTransformConfigs");
+        }
+        try {
+          validateIngestionTransformFunctionVolatility(transformConfig, existingPostPartialUpsertTransformConfigs);
+          FunctionEvaluator expressionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction);
+          List<String> arguments = expressionEvaluator.getArguments();
+          if (arguments.contains(columnName)) {
+            throw new IllegalStateException("Arguments of a post-partial-upsert transform function '" + arguments
+                + "' cannot contain the destination column '" + columnName + "'");
+          }
+        } catch (IllegalStateException e) {
+          throw e;
+        } catch (Exception e) {
+          throw new IllegalStateException(
+              "Invalid post-partial-upsert transform function '" + transformFunction + "' for column '" + columnName
+                  + "'", e);
+        }
+      }
+    }
+
+    if (upsertConfig.getConsistencyMode() != UpsertConfig.ConsistencyMode.NONE) {
+      Preconditions.checkState(upsertConfig.getNewSegmentTrackingTimeMs() > 0,
+          "Positive newSegmentTrackingTimeMs is required to enable consistency mode: "
+              + upsertConfig.getConsistencyMode());
+      // dropOutOfOrderRecord and outOfOrderRecordColumn are not supported with SYNC/SNAPSHOT consistency mode
+      // because records must be indexed before metadata is updated. By the time we know if a record is
+      // out-of-order, it's already indexed - As of today, we can't skip indexing or update the
+      // out-of-order column value.
+      Preconditions.checkState(!upsertConfig.isDropOutOfOrderRecord(),
+          "dropOutOfOrderRecord cannot be enabled when consistencyMode is %s. "
+              + "Out-of-order records can only be dropped in NONE consistency mode.",
+          upsertConfig.getConsistencyMode());
+      Preconditions.checkState(upsertConfig.getOutOfOrderRecordColumn() == null,
+          "outOfOrderRecordColumn cannot be configured when consistencyMode is %s. "
+              + "Out-of-order record marking is only supported in NONE consistency mode.",
+          upsertConfig.getConsistencyMode());
+    }
+
+    validateTTLForUpsertConfig(tableConfig, schema);
+    validatePartialUpsertStrategies(tableConfig, schema);
+    validateConsumptionDuringUpsertRevert(tableConfig);
+    Preconditions.checkState(!(PinotMd5Mode.isPinotMd5Disabled() && upsertConfig.getHashFunction() == HashFunction.MD5),
+        "Upsert hash function MD5 is disabled via '%s=true'", CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED);
+  }
+
+  /// Validates the dedup config of a table with dedup enabled: checks the requirements shared with upsert (see
+  /// [#validateUpsertAndDedupCommonConfig]), rejects OFFLINE tables, delegates to [#validateTTLForDedupConfig], and
+  /// rejects MD5 when disabled.
+  @VisibleForTesting
+  static void validateDedupConfig(TableConfig tableConfig, Schema schema) {
+    DedupConfig dedupConfig = tableConfig.getDedupConfig();
+    assert dedupConfig != null;
+    validateUpsertAndDedupCommonConfig(tableConfig, schema);
+    Preconditions.checkState(tableConfig.getTableType() == TableType.REALTIME,
+        "Dedup is not supported for OFFLINE table. Only upsert is supported for OFFLINE table");
+
+    validateTTLForDedupConfig(tableConfig, schema);
+    Preconditions.checkState(!(PinotMd5Mode.isPinotMd5Disabled() && dedupConfig.getHashFunction() == HashFunction.MD5),
+        "Dedup hash function MD5 is disabled via '%s=true'", CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED);
   }
 
   /// Rejects consuming the next segment during a download on tables that revert upsert metadata in PROTECTED mode,
@@ -2491,13 +2486,32 @@ public final class TableConfigUtils {
         || upsertConfig.getOutOfOrderRecordColumn() != null);
   }
 
-  // enum of all the skip-able validation types.
-  // ACTIVE_TASKS is retained for backward compatibility: it is still accepted as a validationTypesToSkip value so
-  // existing clients do not break, but it is no longer consumed by any production path. Active-task validation runs
-  // only on the create/update path (see PinotTableRestletResource.tableTasksValidation, gated by ignoreActiveTasks),
-  // not on the validate/tune preflight endpoints, so passing ACTIVE_TASKS there is a no-op.
+  /// Validation types that can be skipped through the `validationTypesToSkip` parameter. A type is skipped when the
+  /// types to skip contain it or `ALL`, see [#isSkipped].
   public enum ValidationType {
-    ALL, TASK, UPSERT, TENANT, MINION_INSTANCES, ACTIVE_TASKS
+    /// Every type below, and the whole table config validation in [TableConfigUtils#validate]
+    ALL,
+    /// Validation of the task configs
+    TASK,
+    /// Validation of the upsert config of an upsert table
+    UPSERT,
+    /// Validation of the dedup config of a dedup table
+    DEDUP,
+    /// Validation of the instance assignment on table creation and update: the controller computes the instance
+    /// partitions the table would get from the current instances, and validates them
+    INSTANCE_ASSIGNMENT,
+    /// Validation of the tenants on the validate and tune endpoints; creating or updating a table always validates
+    /// them
+    TENANT,
+    /// Validation of the minion instances for the task configs on the validate and tune endpoints; creating or
+    /// updating a table always validates them
+    MINION_INSTANCES;
+
+    /// Returns whether this validation type is skipped, that is whether the given types to skip contain it or `ALL`.
+    /// `null` skips nothing.
+    public boolean isSkipped(@Nullable EnumSet<ValidationType> skipTypes) {
+      return skipTypes != null && (skipTypes.contains(this) || skipTypes.contains(ALL));
+    }
   }
 
   /// needsEmptySegmentPruner checks if EmptySegmentPruner is needed for a TableConfig.
