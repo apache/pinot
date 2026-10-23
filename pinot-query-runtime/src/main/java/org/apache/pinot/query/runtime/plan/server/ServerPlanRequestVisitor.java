@@ -288,9 +288,10 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
   @Override
   public Void visitSort(SortNode node, ServerPlanRequestContext context) {
     if (visit(node.getInputs().get(0), context)) {
-      if (node.isSingleRunRequired()) {
-        // An unbounded sort must cover the complete MSE input. Sorting each V1 physical request separately can
-        // interleave multiple runs (hybrid and logical tables), violating downstream ordered-input requirements.
+      if (node.isSingleRunRequired()
+          && !(node.getFetch() >= 0 && node.isLeafSelectionSort() && context.isSinglePhysicalTable())) {
+        // A required run may be pushed only into one physical selection request with a finite row budget.
+        // Window and hybrid/logical inputs retain the MSE sort so separate physical requests cannot interleave runs.
         context.setLeafStageBoundaryNode(node.getInputs().get(0));
         return null;
       }

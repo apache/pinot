@@ -254,7 +254,14 @@ public final class PlanNodeToRelConverter {
     @Override
     public Void visitMailboxMergeReceive(MailboxMergeReceiveNode node, Void context) {
       visitChildren(node);
-      _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "MailboxMergeReceive", Map.of(),
+      ExplainAttributeBuilder attributes = new ExplainAttributeBuilder();
+      if (node.getFetch() >= 0) {
+        attributes.putLong("fetch", node.getFetch());
+      }
+      if (node.getOffset() > 0) {
+        attributes.putLong("offset", node.getOffset());
+      }
+      _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "MailboxMergeReceive", attributes.build(),
           node.getDataSchema(), readAlreadyPushedChildren(node)));
       return null;
     }

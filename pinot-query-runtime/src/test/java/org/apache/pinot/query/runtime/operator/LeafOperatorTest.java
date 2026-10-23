@@ -30,10 +30,12 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.Table;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
@@ -50,12 +52,16 @@ import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.plannode.SortNode;
+import org.apache.pinot.query.planner.plannode.TableScanNode;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerOperator;
+import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestContext;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.mockito.Mock;
@@ -112,6 +118,36 @@ public class LeafOperatorTest {
       return metadataBlock;
     });
     return queryExecutor;
+  }
+
+  @Test
+  public void shouldDeclareOrderingOnlyForOnePhysicalOrderedLeafRequest() {
+    OpChainExecutionContext context = OperatorTestUtil.getTracingContext();
+    DataSchema schema = new DataSchema(new String[]{"key"}, new ColumnDataType[]{ColumnDataType.INT});
+    List<RelFieldCollation> collations = List.of(new RelFieldCollation(0));
+    TableScanNode scan = new TableScanNode(0, schema, PlanNode.NodeHint.EMPTY, List.of(), "table", List.of("key"));
+    SortNode sort = new SortNode(0, schema, PlanNode.NodeHint.EMPTY, List.of(scan), collations, 10, -1);
+    ServerPlanRequestContext leafContext = mock(ServerPlanRequestContext.class);
+    when(leafContext.isSinglePhysicalTable()).thenReturn(true);
+    when(leafContext.getLeafStageBoundaryNode()).thenReturn(sort);
+    context.setLeafStageContext(leafContext);
+    try (LeafOperator leaf = new LeafOperator(context, mockQueryRequests(1), schema, null, _executorService)) {
+      assertTrue(leaf.isSortedOn(collations));
+      assertFalse(leaf.isSortedOn(List.of()));
+      assertFalse(leaf.isSortedOn(List.of(new RelFieldCollation(0, RelFieldCollation.Direction.DESCENDING))));
+      when(leafContext.getLeafStageBoundaryNode()).thenReturn(scan);
+      assertFalse(leaf.isSortedOn(collations));
+      when(leafContext.getLeafStageBoundaryNode()).thenReturn(sort);
+      when(leafContext.isSinglePhysicalTable()).thenReturn(false);
+      assertFalse(leaf.isSortedOn(collations));
+      when(leafContext.isSinglePhysicalTable()).thenReturn(true);
+      context.setLeafStageContext(null);
+      assertFalse(leaf.isSortedOn(collations));
+      context.setLeafStageContext(leafContext);
+    }
+    try (LeafOperator hybrid = new LeafOperator(context, mockQueryRequests(2), schema, null, _executorService)) {
+      assertFalse(hybrid.isSortedOn(collations));
+    }
   }
 
   private List<ServerQueryRequest> mockQueryRequests(int numRequests) {
