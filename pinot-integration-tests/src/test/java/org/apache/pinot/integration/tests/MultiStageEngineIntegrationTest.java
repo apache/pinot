@@ -22,6 +22,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.jayway.jsonpath.DocumentContext;
 import com.jayway.jsonpath.JsonPath;
+import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
+import io.grpc.Metadata;
+import io.grpc.StatusRuntimeException;
+import io.grpc.stub.MetadataUtils;
+import io.grpc.stub.StreamObserver;
 import java.io.File;
 import java.io.IOException;
 import java.time.Duration;
@@ -37,6 +43,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -47,9 +54,17 @@ import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.model.HelixConfigScope;
+import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandlerDelegate;
+import org.apache.pinot.common.proto.Mailbox;
+import org.apache.pinot.common.proto.PinotMailboxGrpc;
+import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
+import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.controller.api.resources.PinotQueryResource.MultiStageQueryValidationRequest;
+import org.apache.pinot.query.grpc.ReceiverIdentity;
+import org.apache.pinot.query.mailbox.channel.ChannelUtils;
+import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.RoutingConfig;
@@ -84,6 +99,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestSet {
@@ -293,6 +309,94 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertAllLeafStagesEmptyRows(prefix,
         "SELECT AirlineID, COUNT(*) FROM " + table + " WHERE DaysSinceEpoch < 0 GROUP BY AirlineID",
         List.of(), "LONG", "LONG");
+  }
+
+  /// The mailbox and query servers of a running cluster reject requests that say they are meant for another instance.
+  /// Shows that the instance ids reach the receivers of a real server and broker, and that the check is on by default.
+  /// The other tests of this class show that the requests of real plans, which carry the ids, are accepted.
+  @Test
+  public void testReceiversRejectRequestsForAnotherInstance()
+      throws Exception {
+    String otherInstanceId = "Server_other-host_8098";
+    String serverInstanceId = _serverStarters.get(0).getInstanceId();
+    InstanceConfig serverConfig = _helixAdmin.getInstanceConfig(getHelixClusterName(), serverInstanceId);
+    // Every instance of the test cluster runs on this host
+    String host = "localhost";
+
+    // Stage plan request (the cancel of an unknown query, which is harmless when accepted)
+    int queryServerPort = serverConfig.getRecord()
+        .getIntField(CommonConstants.Helix.Instance.MULTI_STAGE_QUERY_ENGINE_SERVICE_PORT_KEY, -1);
+    ManagedChannel queryServerChannel = ManagedChannelBuilder.forAddress(host, queryServerPort).usePlaintext().build();
+    try {
+      Metadata headers = new Metadata();
+      ReceiverIdentity.addTargetInstanceIdHash(headers, QueryServerInstance.hashInstanceId(otherInstanceId));
+      StatusRuntimeException e = expectThrows(StatusRuntimeException.class, () -> cancel(queryServerChannel, headers));
+      assertMisroutedTo(e, serverInstanceId);
+
+      Metadata ownHeaders = new Metadata();
+      ReceiverIdentity.addTargetInstanceIdHash(ownHeaders, QueryServerInstance.hashInstanceId(serverInstanceId));
+      cancel(queryServerChannel, ownHeaders);
+    } finally {
+      queryServerChannel.shutdownNow();
+    }
+
+    // Mailbox streams, to the server and to the broker
+    int serverMailboxPort = serverConfig.getRecord()
+        .getIntField(CommonConstants.Helix.Instance.MULTI_STAGE_QUERY_ENGINE_MAILBOX_PORT_KEY, -1);
+    assertMailboxStreamRejected(host, serverMailboxPort, otherInstanceId, serverInstanceId);
+    String brokerInstanceId = _brokerStarters.get(0).getInstanceId();
+    InstanceConfig brokerConfig = _helixAdmin.getInstanceConfig(getHelixClusterName(), brokerInstanceId);
+    int brokerMailboxPort = brokerConfig.getRecord()
+        .getIntField(CommonConstants.Helix.Instance.MULTI_STAGE_QUERY_ENGINE_MAILBOX_PORT_KEY, -1);
+    assertMailboxStreamRejected(host, brokerMailboxPort, otherInstanceId, brokerInstanceId);
+  }
+
+  private static void cancel(ManagedChannel channel, Metadata headers) {
+    PinotQueryWorkerGrpc.newBlockingStub(channel).withInterceptors(MetadataUtils.newAttachHeadersInterceptor(headers))
+        .withDeadlineAfter(10, TimeUnit.SECONDS).cancel(Worker.CancelRequest.newBuilder().setRequestId(-1).build());
+  }
+
+  private static void assertMailboxStreamRejected(String host, int port, String targetInstanceId,
+      String receiverInstanceId)
+      throws Exception {
+    ManagedChannel channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext().build();
+    try {
+      Metadata headers = new Metadata();
+      headers.put(ChannelUtils.MAILBOX_ID_METADATA_KEY, "-1|1|0|0|0");
+      ReceiverIdentity.addTargetInstanceIdHash(headers, QueryServerInstance.hashInstanceId(targetInstanceId));
+      CompletableFuture<Throwable> error = new CompletableFuture<>();
+      StreamObserver<Mailbox.MailboxContent> stream = PinotMailboxGrpc.newStub(channel)
+          .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(headers))
+          .withDeadlineAfter(10, TimeUnit.SECONDS)
+          .open(new StreamObserver<>() {
+            @Override
+            public void onNext(Mailbox.MailboxStatus value) {
+            }
+
+            @Override
+            public void onError(Throwable t) {
+              error.complete(t);
+            }
+
+            @Override
+            public void onCompleted() {
+              error.complete(null);
+            }
+          });
+      stream.onNext(Mailbox.MailboxContent.newBuilder().setMailboxId("-1|1|0|0|0").setWaitForMore(true).build());
+      Throwable t = error.get(10, TimeUnit.SECONDS);
+      assertNotNull(t, "The mailbox server at " + host + ":" + port + " accepted a stream for another instance");
+      assertMisroutedTo(t, receiverInstanceId);
+    } finally {
+      channel.shutdownNow();
+    }
+  }
+
+  /// Asserts that `t` is the rejection of a request by the instance with the given id.
+  private static void assertMisroutedTo(Throwable t, String receiverInstanceId) {
+    String misroutedTo = ReceiverIdentity.getMisroutedTo(t);
+    assertNotNull(misroutedTo, "Not a rejection of a request meant for another instance: " + t);
+    assertEquals(misroutedTo.split(" ")[0], receiverInstanceId);
   }
 
   /// The proto segment list encoding ships disabled, so a query uses the legacy JSON encoding until an operator turns

@@ -2910,6 +2910,20 @@ public class CommonConstants {
         "pinot.query.runner.mailbox.server.permit.keep.alive.without.calls";
     public static final boolean DEFAULT_OF_MAILBOX_SERVER_PERMIT_KEEP_ALIVE_WITHOUT_CALLS = false;
 
+    /// Whether the mailbox server and the query server of an instance reject a request addressed to another instance.
+    ///
+    /// Senders identify the instance they mean in the request headers. A request reaches the wrong instance when the
+    /// sender's connection is stale: for example after two server pods restart together and take each other's IP
+    /// addresses, while every server listens on the same port. If the wrong instance accepts the request, the intended
+    /// one waits for data until the query times out, and the wrong one runs the stage plan, or keeps the block in a
+    /// mailbox that nothing reads. When the wrong instance rejects the request, the sender resets the connection and
+    /// the query fails with a clear error, in most cases at once rather than at its deadline.
+    ///
+    /// Requests without the headers, as sent by older versions, are always accepted. The value is read when the
+    /// instance starts, on brokers and servers.
+    public static final String KEY_OF_REJECT_MISROUTED_REQUESTS = "pinot.query.runner.reject.misrouted.requests";
+    public static final boolean DEFAULT_REJECT_MISROUTED_REQUESTS = true;
+
     /// Configuration for server port used to receive query plans.
     public static final String KEY_OF_QUERY_SERVER_PORT = "pinot.query.server.port";
     public static final int DEFAULT_QUERY_SERVER_PORT = 0;
