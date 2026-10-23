@@ -26,6 +26,8 @@ import io.grpc.netty.shaded.io.netty.channel.ChannelOption;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 import io.grpc.stub.StreamObserver;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import javax.annotation.Nullable;
@@ -50,8 +52,13 @@ class DispatchClient {
   /// Using a static allocator allows for better memory pooling across all DispatchClient instances.
   private static final PooledByteBufAllocator BUF_ALLOCATOR = new PooledByteBufAllocator(true);
 
+  /// The channel is refreshed at most once in this interval, see [#refreshChannel].
+  private static final long MIN_REFRESH_INTERVAL_NS = TimeUnit.SECONDS.toNanos(1);
+
   private final ManagedChannel _channel;
   private final PinotQueryWorkerGrpc.PinotQueryWorkerStub _dispatchStub;
+  /// When the channel was last refreshed, from [System#nanoTime()], see [#refreshChannel].
+  private final AtomicLong _lastRefreshTimeNs = new AtomicLong(System.nanoTime() - MIN_REFRESH_INTERVAL_NS);
 
   public DispatchClient(String host, int port, @Nullable TlsConfig tlsConfig) {
     this(host, port, tlsConfig, null, GrpcKeepAliveConfig.DISABLED);
@@ -97,6 +104,20 @@ class DispatchClient {
   public void submit(Worker.QueryRequest request, QueryServerInstance virtualServer, Deadline deadline,
       Consumer<AsyncResponse<Worker.QueryResponse>> callback) {
     _dispatchStub.withDeadline(deadline).submit(request, new LastValueDispatchObserver<>(virtualServer, callback));
+  }
+
+  /// Makes the channel resolve the server's hostname again and open a new connection, without reconnect backoff, for
+  /// the next request. Requests in flight finish on the old connection. Does nothing, and returns false, if the
+  /// channel was refreshed less than a second ago: each refresh drops the connection that the previous one opened.
+  public boolean refreshChannel() {
+    long nowNs = System.nanoTime();
+    long lastRefreshTimeNs = _lastRefreshTimeNs.get();
+    if (nowNs - lastRefreshTimeNs < MIN_REFRESH_INTERVAL_NS
+        || !_lastRefreshTimeNs.compareAndSet(lastRefreshTimeNs, nowNs)) {
+      return false;
+    }
+    _channel.enterIdle();
+    return true;
   }
 
   /// Opens a `SubmitWithStream` bidi RPC for one server, sends the initial `submit`, and registers the
