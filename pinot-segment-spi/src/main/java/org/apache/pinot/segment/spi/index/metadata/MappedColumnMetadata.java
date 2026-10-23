@@ -318,7 +318,8 @@ public final class MappedColumnMetadata implements ColumnMetadata {
 
   @Override
   public long getIndexSizeFor(IndexType type) {
-    for (int i = 0; i < getNumIndexes(); i++) {
+    int count = getNumIndexes();
+    for (int i = 0; i < count; i++) {
       IndexSize entry = indexAt(i);
       if (entry._type.equals(type.getId())) {
         return entry._size;
@@ -331,7 +332,8 @@ public final class MappedColumnMetadata implements ColumnMetadata {
   @SuppressWarnings("unused")
   public Map<IndexType<?, ?, ?>, Long> getIndexSizeMap() {
     Map<IndexType<?, ?, ?>, Long> sizes = new HashMap<>();
-    for (int i = 0; i < getNumIndexes(); i++) {
+    int count = getNumIndexes();
+    for (int i = 0; i < count; i++) {
       IndexSize entry = indexAt(i);
       sizes.put(IndexService.getInstance().get(entry._type), entry._size);
     }
@@ -339,11 +341,11 @@ public final class MappedColumnMetadata implements ColumnMetadata {
   }
 
   private IndexSize indexAt(int position) {
-    int count = getNumIndexes();
+    IndexSize[] indexes = _indexes;
+    int count = indexes != null ? indexes.length : getNumIndexes();
     if (position < 0 || position >= count) {
       throw new IndexOutOfBoundsException(position);
     }
-    IndexSize[] indexes = _indexes;
     if (indexes == null) {
       synchronized (this) {
         indexes = _indexes;
