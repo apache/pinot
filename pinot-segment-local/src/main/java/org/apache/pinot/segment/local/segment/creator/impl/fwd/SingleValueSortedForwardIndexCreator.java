@@ -30,6 +30,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 
 /// Forward index creator for dictionary-encoded sorted single-value column.
 public class SingleValueSortedForwardIndexCreator implements ForwardIndexCreator {
+  private final String _column;
   private final FixedByteSingleValueMultiColWriter _writer;
   private final int[] _minDocIds;
   private final int[] _maxDocIds;
@@ -38,6 +39,7 @@ public class SingleValueSortedForwardIndexCreator implements ForwardIndexCreator
 
   public SingleValueSortedForwardIndexCreator(File outputDir, String column, int cardinality)
       throws Exception {
+    _column = column;
     File indexFile = new File(outputDir, column + V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
     _writer =
         new FixedByteSingleValueMultiColWriter(indexFile, cardinality, 2, new int[]{Integer.BYTES, Integer.BYTES});
@@ -78,6 +80,16 @@ public class SingleValueSortedForwardIndexCreator implements ForwardIndexCreator
       throws IOException {
     int cardinality = _maxDocIds.length;
     try (Closeable closeable = _writer) {
+      // A dictionary id with no row still holds the fill values. Written to disk, (MAX_VALUE, MIN_VALUE) is an
+      // invalid doc id range that breaks every query on that value, so fail the build instead. IOException lets
+      // FileUtils.close() keep closing the other creators.
+      for (int i = 0; i < cardinality; i++) {
+        if (_minDocIds[i] > _maxDocIds[i]) {
+          throw new IOException(
+              "Dictionary id: " + i + " of sorted column: " + _column + " has no rows (cardinality: " + cardinality
+                  + ", rows indexed: " + _nextDocId + ")");
+        }
+      }
       for (int i = 0; i < cardinality; i++) {
         _writer.setInt(i, 0, _minDocIds[i]);
         _writer.setInt(i, 1, _maxDocIds[i]);
