@@ -83,6 +83,7 @@ import org.apache.pinot.query.planner.explain.MultiStageExplainAskingServersUtil
 import org.apache.pinot.query.planner.explain.PhysicalExplainPlanVisitor;
 import org.apache.pinot.query.planner.logical.PinotLogicalQueryPlanner;
 import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
+import org.apache.pinot.query.planner.logical.SpoolMode;
 import org.apache.pinot.query.planner.logical.TransformationTracker;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.planner.physical.PinotDispatchPlanner;
@@ -557,8 +558,9 @@ public class QueryEnvironment {
           _envConfig.getWorkerManager(), requestId, _envConfig.getTableCache());
       return pinotDispatchPlanner.createDispatchableSubPlanV2(plan.getLeft(), plan.getRight());
     }
-    SubPlan plan = PinotLogicalQueryPlanner.makePlan(relRoot, tracker, useSpools(plannerContext.getOptions()),
-        _envConfig.defaultHashFunction(), pruneUnnestColumns(plannerContext.getOptions()));
+    Map<String, String> options = plannerContext.getOptions();
+    SubPlan plan = PinotLogicalQueryPlanner.makePlan(relRoot, tracker, getSpoolMode(options),
+        isSpoolsFeedback(options), _envConfig.defaultHashFunction(), pruneUnnestColumns(options));
     PinotDispatchPlanner pinotDispatchPlanner =
         new PinotDispatchPlanner(plannerContext, _envConfig.getWorkerManager(), _envConfig.getRequestId(),
             _envConfig.getTableCache());
@@ -726,12 +728,26 @@ public class QueryEnvironment {
     return ImmutableQueryEnvironment.Config.builder();
   }
 
-  public boolean useSpools(Map<String, String> options) {
+  /// Returns the spool mode of the query: the [CommonConstants.Broker.Request.QueryOptionKey#USE_SPOOLS] query option
+  /// when it is set, or [Config#defaultSpoolMode()] otherwise.
+  ///
+  /// @throws QueryException with [QueryErrorCode#QUERY_VALIDATION] if the query option is not a valid [SpoolMode].
+  public SpoolMode getSpoolMode(Map<String, String> options) {
     String optionValue = options.get(CommonConstants.Broker.Request.QueryOptionKey.USE_SPOOLS);
     if (optionValue == null) {
-      return _envConfig.defaultUseSpools();
+      return _envConfig.defaultSpoolMode();
     }
-    return Boolean.parseBoolean(optionValue);
+    try {
+      return SpoolMode.fromString(optionValue);
+    } catch (IllegalArgumentException e) {
+      throw QueryErrorCode.QUERY_VALIDATION.asException(e.getMessage(), e);
+    }
+  }
+
+  /// Whether the response must describe the spool decisions of the planner. See
+  /// [CommonConstants.Broker.Request.QueryOptionKey#SPOOLS_FEEDBACK].
+  public static boolean isSpoolsFeedback(Map<String, String> options) {
+    return Boolean.parseBoolean(options.get(CommonConstants.Broker.Request.QueryOptionKey.SPOOLS_FEEDBACK));
   }
 
   /// Whether to prune unused input (passthrough) columns from the UNNEST output. Defaults to the broker config
@@ -791,15 +807,15 @@ public class QueryEnvironment {
       return CommonConstants.Broker.DEFAULT_INFER_PARTITION_HINT;
     }
 
-    /// Whether to use spools or not.
+    /// The spool mode.
     ///
     /// This is treated as the default value for the broker and it is expected to be obtained from a Pinot
     /// configuration.
     /// This default value can be always overridden at query level by the query option
     /// [CommonConstants.Broker.Request.QueryOptionKey#USE_SPOOLS].
     @Value.Default
-    default boolean defaultUseSpools() {
-      return CommonConstants.Broker.DEFAULT_OF_SPOOLS;
+    default SpoolMode defaultSpoolMode() {
+      return SpoolMode.fromString(CommonConstants.Broker.DEFAULT_SPOOLS_MODE);
     }
 
     /// Whether to prune unused input (passthrough) columns from the UNNEST output by default.

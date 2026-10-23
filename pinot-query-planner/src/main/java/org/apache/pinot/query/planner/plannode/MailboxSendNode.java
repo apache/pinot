@@ -130,6 +130,14 @@ public class MailboxSendNode extends BasePlanNode {
     _receiverStages.set(node.getStageId());
   }
 
+  /// Undoes [#addReceiver(MailboxReceiveNode)].
+  public void removeReceiver(MailboxReceiveNode node) {
+    if (!_receiverStages.get(node.getStageId())) {
+      throw new IllegalStateException("Receiver not present: " + node.getStageId());
+    }
+    _receiverStages.clear(node.getStageId());
+  }
+
   public PinotRelExchangeType getExchangeType() {
     return _exchangeType;
   }
