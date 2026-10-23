@@ -51,6 +51,7 @@ import org.apache.calcite.util.DateString;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.QueryFunctionInvoker;
+import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.function.scalar.DateTimeFunctions;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
@@ -177,7 +178,7 @@ public class PinotEvaluateLiteralRule {
     // A SQL NULL JSON input or default becomes either SQL NULL or a type placeholder based on the query's
     // null-handling option. This Calcite rule does not carry that option, so leave those calls for the
     // leaf/intermediate runtime. A NULL path or result type is always NULL and remains safe to fold.
-    if (isJsonExtractScalar(canonicalName)
+    if (TransformFunctionType.isJsonExtractScalar(canonicalName)
         && (RexLiteral.isNullLiteral(operands.get(0))
         || (numArguments == 4 && RexLiteral.isNullLiteral(operands.get(3))))) {
       return rexCall;
@@ -189,7 +190,7 @@ public class PinotEvaluateLiteralRule {
         return rexCall;
       }
       argumentTypes[i] = RelToPlanNodeConverter.convertToColumnDataType(rexNode.getType());
-      if (isJsonExtractScalar(canonicalName) && i == 3) {
+      if (TransformFunctionType.isJsonExtractScalar(canonicalName) && i == 3) {
         argumentTypes[i] = RexExpressionUtils.fromJsonExtractScalarDefaultLiteral((RexLiteral) rexNode).getDataType();
       }
     }
@@ -218,7 +219,7 @@ public class PinotEvaluateLiteralRule {
     Object[] arguments = new Object[argumentTypes.length];
     for (int i = 0; i < numArguments; i++) {
       RexLiteral literal = (RexLiteral) operands.get(i);
-      if (isJsonExtractScalar(canonicalName) && i == 3) {
+      if (TransformFunctionType.isJsonExtractScalar(canonicalName) && i == 3) {
         RexExpression.Literal defaultLiteral = RexExpressionUtils.fromJsonExtractScalarDefaultLiteral(literal);
         arguments[i] = defaultLiteral.getDataType().toExternal(defaultLiteral.getValue());
       } else {
@@ -411,11 +412,6 @@ public class PinotEvaluateLiteralRule {
   private static RelDataType convertDecimalType(RelDataType relDataType, RexBuilder rexBuilder) {
     Preconditions.checkArgument(relDataType.getSqlTypeName() == SqlTypeName.DECIMAL);
     return RelToPlanNodeConverter.convertToColumnDataType(relDataType).toType(rexBuilder.getTypeFactory());
-  }
-
-  private static boolean isJsonExtractScalar(String canonicalName) {
-    return canonicalName.equals("jsonextractscalar") || canonicalName.equals("jsonextractscalarfast")
-        || canonicalName.equals("jsonextractscalarfirstmatch") || canonicalName.equals("jsonextractscalarfory");
   }
 
   private static boolean isUnsignedIntegerType(SqlTypeName sqlTypeName) {

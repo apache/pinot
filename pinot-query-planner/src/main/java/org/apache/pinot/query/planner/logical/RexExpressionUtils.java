@@ -59,6 +59,7 @@ import org.apache.calcite.util.TimestampString;
 import org.apache.pinot.calcite.rex.PinotSealedSearchOperator;
 import org.apache.pinot.calcite.sql.fun.PinotOperatorTable;
 import org.apache.pinot.common.function.FunctionRegistry;
+import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.function.scalar.arithmetic.NegateScalarFunction;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.utils.BooleanUtils;
@@ -334,24 +335,13 @@ public class RexExpressionUtils {
       default:
         String functionName = getFunctionName(rexCall.op);
         List<RexExpression> operands = fromRexNodes(rexCall.operands);
-        if (isJsonExtractScalarTransform(functionName) && rexCall.operands.size() == 4
+        if (TransformFunctionType.isJsonExtractScalar(FunctionRegistry.canonicalize(functionName))
+            && rexCall.operands.size() == 4
             && rexCall.operands.get(3) instanceof RexLiteral) {
           operands.set(3, fromJsonExtractScalarDefaultLiteral((RexLiteral) rexCall.operands.get(3)));
         }
         return new RexExpression.FunctionCall(RelToPlanNodeConverter.convertToColumnDataType(rexCall.type),
             functionName, operands);
-    }
-  }
-
-  private static boolean isJsonExtractScalarTransform(String functionName) {
-    switch (FunctionRegistry.canonicalize(functionName)) {
-      case "jsonextractscalar":
-      case "jsonextractscalarfast":
-      case "jsonextractscalarfirstmatch":
-      case "jsonextractscalarfory":
-        return true;
-      default:
-        return false;
     }
   }
 

@@ -353,6 +353,21 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
   }
 
   @Test
+  public void testJsonExtractScalarPathEvaluationFailure() {
+    for (boolean nullHandlingEnabled : new boolean[]{false, true}) {
+      String options = "SET enableNullHandling=" + nullHandlingEnabled + "; ";
+      assertSingleColumnValue(options
+          + "SELECT jsonExtractScalar('{\"v\":[]}', '$.v.avg()', 'DOUBLE', 7) FROM a", 7D, 15);
+      assertSingleColumnValue(options
+          + "SELECT jsonExtractScalar(REPLACE(col1, col1, '{\"v\":[]}'), '$.v.avg()', 'DOUBLE', 7) FROM a", 7D, 15);
+      // Both join inputs are needed, so this extract executes as a scalar in an intermediate stage.
+      assertSingleColumnValue(options + "SELECT jsonExtractScalar(REPLACE(CONCAT(a.col1, b.col1), "
+          + "CONCAT(a.col1, b.col1), '{\"v\":[]}'), '$.v.avg()', 'DOUBLE', 7) "
+          + "FROM a JOIN b ON a.col1 = b.col1", 7D, 15);
+    }
+  }
+
+  @Test
   public void testJsonExtractScalarLiteralDefaultParity() {
     for (String booleanDefault : new String[]{"true", "false"}) {
       assertSingleColumnValue(

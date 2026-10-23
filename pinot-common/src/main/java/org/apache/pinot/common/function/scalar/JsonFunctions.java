@@ -649,16 +649,17 @@ public class JsonFunctions {
   /// 4-argument form returns `defaultValue` (including SQL `NULL`). SQL `NULL` input propagates independently
   /// of that default. A multi-value path yields an empty array when unresolved or when the resolved value is not a
   /// JSON array, except that an explicit SQL `NULL` default preserves the unresolved result as SQL `NULL`. A `null`
-  /// element inside a resolved array still throws unless a default is supplied. A malformed JSON document is treated
-  /// as unresolved. An illegal JSONPath (for example `$[`) is rejected, matching transform init.
+  /// element inside a resolved array still throws unless a default is supplied. A malformed JSON document or failed
+  /// path evaluation is treated as unresolved. An illegal JSONPath (for example `$[`) is rejected, matching transform
+  /// init.
   @ScalarFunction
   public static Object jsonExtractScalar(Object jsonInput, String jsonPath, String resultsType) {
     return jsonExtractScalarInternal(jsonInput, jsonPath, resultsType, null, false);
   }
 
   /// See [#jsonExtractScalar(Object, String, String)]. `defaultValue` is returned (coerced to `resultsType`)
-  /// when the path resolves to `null` or the document is malformed. An explicit SQL `NULL` default returns
-  /// Java `null` rather than throwing.
+  /// when the path resolves to `null`, the document is malformed, or path evaluation fails. An explicit SQL `NULL`
+  /// default returns Java `null` rather than throwing.
   @ScalarFunction(nullableParameters = true)
   @Nullable
   public static Object jsonExtractScalar(@Nullable Object jsonInput, @Nullable String jsonPath,
@@ -732,27 +733,14 @@ public class JsonFunctions {
     return parseContext.parse(jsonInput);
   }
 
+  /// Treats document parsing and path evaluation failures as unresolved, matching the leaf transform.
+  /// Path compilation and result coercion happen outside this method so their errors still fail the query.
   @Nullable
-  private static Object readJsonPathValue(@Nullable Object jsonInput, JsonPath jsonPath, boolean useBigDecimal) {
-    DocumentContext document = parseJsonDocumentOrNull(jsonInput, useBigDecimal);
-    if (document == null) {
-      return null;
-    }
-    return document.read(jsonPath);
-  }
-
-  /// Parses the document only. A bad document is unresolved (null). Path compile already happened
-  /// in [jsonExtractScalarInternal], so a bad path is not swallowed here.
-  @Nullable
-  private static DocumentContext parseJsonDocumentOrNull(@Nullable Object jsonInput, boolean useBigDecimal) {
-    if (jsonInput == null) {
-      return null;
-    }
+  private static Object readJsonPathValue(Object jsonInput, JsonPath jsonPath, boolean useBigDecimal) {
     try {
-      return parseJsonDocument(jsonInput, useBigDecimal ? PARSE_CONTEXT_WITH_BIG_DECIMAL : PARSE_CONTEXT);
+      return parseJsonDocument(jsonInput, useBigDecimal ? PARSE_CONTEXT_WITH_BIG_DECIMAL : PARSE_CONTEXT)
+          .read(jsonPath);
     } catch (Exception e) {
-      // Malformed JSON (e.g. a plain-text row) is treated as unresolved, mirroring the transform which swallows
-      // per-row parse errors; the caller then applies the default or throws.
       return null;
     }
   }

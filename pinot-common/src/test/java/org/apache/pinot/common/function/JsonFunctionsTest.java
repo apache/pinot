@@ -1110,6 +1110,25 @@ public class JsonFunctionsTest {
   }
 
   @Test
+  public void testJsonExtractScalarPathEvaluationFailure() {
+    String json = "{\"v\":[]}";
+    // The path is valid, but Jayway's avg() throws for an empty array even with SUPPRESS_EXCEPTIONS.
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.v.avg()", "DOUBLE", 7D), 7D);
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.v.avg()", "BIG_DECIMAL", BigDecimal.ONE), BigDecimal.ONE);
+    assertNull(JsonFunctions.jsonExtractScalar(json, "$.v.avg()", "DOUBLE", null));
+    assertEquals((double[]) JsonFunctions.jsonExtractScalar(json, "$.v.avg()", "DOUBLE_ARRAY"), new double[0]);
+    assertNull(JsonFunctions.jsonExtractScalar(json, "$.v.avg()", "DOUBLE_ARRAY", null));
+    IllegalArgumentException exception = expectThrows(IllegalArgumentException.class,
+        () -> JsonFunctions.jsonExtractScalar(json, "$.v.avg()", "DOUBLE"));
+    assertTrue(exception.getMessage().startsWith("Cannot resolve JSON path"));
+
+    assertEquals(JsonFunctions.jsonExtractScalar("{\"v\":[1,3]}", "$.v.avg()", "DOUBLE", 7D), 2D);
+    // A resolved value that cannot be coerced must still fail, even when a default was supplied.
+    expectThrows(NumberFormatException.class,
+        () -> JsonFunctions.jsonExtractScalar("{\"v\":\"bad\"}", "$.v", "DOUBLE", 7D));
+  }
+
+  @Test
   public void testJsonExtractScalarArrayTypeRequiresJsonArray() {
     assertEquals((int[]) JsonFunctions.jsonExtractScalar("{\"v\":42}", "$.v", "INT_ARRAY"), new int[0]);
     assertEquals((int[]) JsonFunctions.jsonExtractScalar("{\"v\":{\"a\":1}}", "$.v", "INT_ARRAY"), new int[0]);

@@ -29,6 +29,7 @@ import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.FunctionUtils;
 import org.apache.pinot.common.function.QueryFunctionInvoker;
+import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
@@ -79,7 +80,7 @@ public class FunctionOperand implements TransformOperand {
     }
     String functionName = functionCall.getFunctionName();
     String canonicalName = FunctionRegistry.canonicalize(functionName);
-    _replaceNullJsonOperands = !nullHandlingEnabled && isJsonExtractScalar(canonicalName);
+    _replaceNullJsonOperands = !nullHandlingEnabled && TransformFunctionType.isJsonExtractScalar(canonicalName);
     FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(canonicalName, argumentTypes);
     if (functionInfo == null) {
       if (FunctionRegistry.contains(canonicalName)) {
@@ -171,11 +172,6 @@ public class FunctionOperand implements TransformOperand {
       _resultCached = true;
     }
     return convertedResult;
-  }
-
-  private static boolean isJsonExtractScalar(String canonicalName) {
-    return canonicalName.equals("jsonextractscalar") || canonicalName.equals("jsonextractscalarfast")
-        || canonicalName.equals("jsonextractscalarfirstmatch") || canonicalName.equals("jsonextractscalarfory");
   }
 
   @Nullable
