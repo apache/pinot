@@ -193,11 +193,16 @@ public class SegmentMetadataImplTest {
   @Test
   public void testServingLoadFallsBackOrMappingIsDisabled()
       throws Exception {
+    InstanceDataManagerConfig instanceConfig = mock(InstanceDataManagerConfig.class);
+    PinotConfiguration config = new PinotConfiguration();
+    when(instanceConfig.getConfig()).thenReturn(config);
+
     File sidecar = new File(_segmentDirectory, "segment_metadata.bin");
     assertTrue(sidecar.mkdir());
     Files.writeString(new File(sidecar, "blocker").toPath(), "keep directory non-empty");
     try {
-      ImmutableSegment segment = ImmutableSegmentLoader.load(_segmentDirectory, ReadMode.mmap);
+      ImmutableSegment segment =
+          ImmutableSegmentLoader.load(_segmentDirectory, new IndexLoadingConfig(instanceConfig, null, null), false);
       try {
         assertFalse(((SegmentMetadataImpl) segment.getSegmentMetadata()).isMapped());
         assertTrue(segment.getColumnNames().contains("daysSinceEpoch"));
@@ -208,10 +213,7 @@ public class SegmentMetadataImplTest {
       FileUtils.deleteQuietly(sidecar);
     }
 
-    InstanceDataManagerConfig instanceConfig = mock(InstanceDataManagerConfig.class);
-    PinotConfiguration config = new PinotConfiguration();
     config.setProperty(IndexLoadingConfig.MAPPED_SEGMENT_METADATA_ENABLED, false);
-    when(instanceConfig.getConfig()).thenReturn(config);
     ImmutableSegment disabled =
         ImmutableSegmentLoader.load(_segmentDirectory, new IndexLoadingConfig(instanceConfig, null, null), false);
     try {
@@ -221,7 +223,17 @@ public class SegmentMetadataImplTest {
       disabled.destroy();
     }
 
-    ImmutableSegment segment = ImmutableSegmentLoader.load(_segmentDirectory, ReadMode.mmap);
+    ImmutableSegment reader = ImmutableSegmentLoader.load(_segmentDirectory, ReadMode.mmap);
+    try {
+      assertFalse(((SegmentMetadataImpl) reader.getSegmentMetadata()).isMapped());
+      assertFalse(sidecar.exists());
+    } finally {
+      reader.destroy();
+    }
+
+    config.setProperty(IndexLoadingConfig.MAPPED_SEGMENT_METADATA_ENABLED, true);
+    ImmutableSegment segment =
+        ImmutableSegmentLoader.load(_segmentDirectory, new IndexLoadingConfig(instanceConfig, null, null), false);
     try {
       assertTrue(((SegmentMetadataImpl) segment.getSegmentMetadata()).isMapped());
     } finally {

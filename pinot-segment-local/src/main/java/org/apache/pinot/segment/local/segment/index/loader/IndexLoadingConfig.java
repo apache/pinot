@@ -113,7 +113,7 @@ public class IndexLoadingConfig {
       PinotConfiguration instanceConfig =
           instanceDataManagerConfig != null ? instanceDataManagerConfig.getConfig() : null;
       _mappedSegmentMetadataEnabled =
-          instanceConfig == null || instanceConfig.getProperty(MAPPED_SEGMENT_METADATA_ENABLED, true);
+          instanceConfig != null && instanceConfig.getProperty(MAPPED_SEGMENT_METADATA_ENABLED, true);
 
       String instanceId = null;
       boolean isRealtimeOffHeapAllocation = false;

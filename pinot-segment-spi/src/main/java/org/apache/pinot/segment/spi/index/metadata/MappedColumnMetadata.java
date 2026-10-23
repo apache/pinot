@@ -186,9 +186,20 @@ public final class MappedColumnMetadata implements ColumnMetadata {
   @Override
   public PartitionFunction getPartitionFunction() {
     PartitionFunction cached = _partitionFunction;
-    if (cached != null) {
-      return cached;
+    if (cached == null) {
+      synchronized (this) {
+        cached = _partitionFunction;
+        if (cached == null) {
+          cached = decodePartitionFunction();
+          _partitionFunction = cached;
+        }
+      }
     }
+    return cached;
+  }
+
+  @Nullable
+  private PartitionFunction decodePartitionFunction() {
     byte[] bytes = _store.blob(_ordinal, MappedSegmentMetadataStore.PARTITION_FUNCTION);
     if (bytes == null) {
       return null;
@@ -201,9 +212,7 @@ public final class MappedColumnMetadata implements ColumnMetadata {
       for (int i = 0; i < configSize; i++) {
         config.put(MappedSegmentMetadataStore.readString(input), MappedSegmentMetadataStore.readString(input));
       }
-      PartitionFunction function = PartitionFunctionFactory.getPartitionFunction(name, numPartitions, config);
-      _partitionFunction = function;
-      return function;
+      return PartitionFunctionFactory.getPartitionFunction(name, numPartitions, config);
     } catch (IOException e) {
       throw new IllegalStateException("Cannot decode partition function for " + getColumnName(), e);
     }
@@ -213,9 +222,20 @@ public final class MappedColumnMetadata implements ColumnMetadata {
   @Override
   public Set<Integer> getPartitions() {
     Set<Integer> cached = _partitions;
-    if (cached != null) {
-      return cached;
+    if (cached == null) {
+      synchronized (this) {
+        cached = _partitions;
+        if (cached == null) {
+          cached = decodePartitions();
+          _partitions = cached;
+        }
+      }
     }
+    return cached;
+  }
+
+  @Nullable
+  private Set<Integer> decodePartitions() {
     byte[] bytes = _store.blob(_ordinal, MappedSegmentMetadataStore.PARTITIONS);
     if (bytes == null) {
       return null;
@@ -226,7 +246,6 @@ public final class MappedColumnMetadata implements ColumnMetadata {
       for (int i = 0; i < count; i++) {
         partitions.add(input.readInt());
       }
-      _partitions = partitions;
       return partitions;
     } catch (IOException e) {
       throw new IllegalStateException("Cannot decode partitions for " + getColumnName(), e);

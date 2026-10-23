@@ -55,6 +55,9 @@ public class IndexLoadingConfigTest {
 
   @Test
   public void testMappedSegmentMetadataInstanceSetting() {
+    assertFalse(new IndexLoadingConfig().isMappedSegmentMetadataEnabled());
+    assertFalse(new IndexLoadingConfig((TableConfig) null, null).isMappedSegmentMetadataEnabled());
+
     InstanceDataManagerConfig instanceConfig = mock(InstanceDataManagerConfig.class);
     PinotConfiguration config = new PinotConfiguration();
     when(instanceConfig.getConfig()).thenReturn(config);
