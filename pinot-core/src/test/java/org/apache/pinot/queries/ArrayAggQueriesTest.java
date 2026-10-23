@@ -20,6 +20,7 @@ package org.apache.pinot.queries;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -29,6 +30,7 @@ import java.util.Set;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationOperator;
@@ -83,6 +85,11 @@ public class ArrayAggQueriesTest extends BaseQueriesTest {
       .addSingleValueDimension(BYTES_COLUMN, DataType.BYTES)
       .addSingleValueDimension(UUID_COLUMN, DataType.UUID)
       .build();
+  // The JSON column aggregates to strings
+  private static final ColumnDataType[] EXPECTED_COLUMN_DATA_TYPES = {
+      ColumnDataType.INT_ARRAY, ColumnDataType.LONG_ARRAY, ColumnDataType.FLOAT_ARRAY, ColumnDataType.DOUBLE_ARRAY,
+      ColumnDataType.STRING_ARRAY, ColumnDataType.STRING_ARRAY, ColumnDataType.BYTES_ARRAY, ColumnDataType.UUID_ARRAY
+  };
 
   private Set<Integer> _values;
   private int[] _expectedCardinalityResults;
@@ -224,6 +231,32 @@ public class ArrayAggQueriesTest extends BaseQueriesTest {
     assertEquals(((String[]) resultTable.getRows().get(0)[5]).length, _expectedCardinalityResults[5]);
     assertEquals(((String[]) resultTable.getRows().get(0)[6]).length, _expectedCardinalityResults[6]);
     assertEquals(((String[]) resultTable.getRows().get(0)[7]).length, _expectedCardinalityResults[7]);
+  }
+
+  /// The data type argument can be omitted for a column; the optimizer supplies it from the schema.
+  @Test
+  public void testArrayAggWithInferredDataType() {
+    String query = "SELECT ArrayAgg(intColumn), ArrayAgg(longColumn), ArrayAgg(floatColumn), ArrayAgg(doubleColumn), "
+        + "ArrayAgg(stringColumn), ArrayAgg(jsonColumn), ArrayAgg(bytesColumn), ArrayAgg(uuidColumn) FROM testTable";
+    ResultTable resultTable = getBrokerResponseForOptimizedQuery(query, SCHEMA).getResultTable();
+    assertEquals(resultTable.getDataSchema().getColumnDataTypes(), EXPECTED_COLUMN_DATA_TYPES);
+    Object[] row = resultTable.getRows().get(0);
+    for (int i = 0; i < 8; i++) {
+      assertEquals(Array.getLength(row[i]), 4 * NUM_RECORDS);
+    }
+  }
+
+  @Test
+  public void testArrayAggDistinctWithInferredDataType() {
+    String query = "SELECT ArrayAgg(intColumn, true), ArrayAgg(longColumn, true), ArrayAgg(floatColumn, true), "
+        + "ArrayAgg(doubleColumn, true), ArrayAgg(stringColumn, true), ArrayAgg(jsonColumn, true), "
+        + "ArrayAgg(bytesColumn, true), ArrayAgg(uuidColumn, true) FROM testTable";
+    ResultTable resultTable = getBrokerResponseForOptimizedQuery(query, SCHEMA).getResultTable();
+    assertEquals(resultTable.getDataSchema().getColumnDataTypes(), EXPECTED_COLUMN_DATA_TYPES);
+    Object[] row = resultTable.getRows().get(0);
+    for (int i = 0; i < 8; i++) {
+      assertEquals(Array.getLength(row[i]), _expectedCardinalityResults[i]);
+    }
   }
 
   @AfterClass

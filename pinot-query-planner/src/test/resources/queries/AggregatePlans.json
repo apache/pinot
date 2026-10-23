@@ -198,6 +198,50 @@
         ]
       },
       {
+        "description": "ARRAY_AGG without a data type infers it from the expression as the second argument",
+        "sql": "EXPLAIN PLAN FOR SELECT ARRAY_AGG(a.col1), ARRAY_AGG(a.col3, true), ARRAY_AGG(a.col4), ARRAY_AGG(a.ts_timestamp, true), ARRAY_AGG(a.col5), ARRAY_AGG(a.col7 + 1) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{}], agg#0=[ARRAYAGG($0, _UTF-8'STRING')], agg#1=[ARRAYAGG($1, _UTF-8'INT', true)], agg#2=[ARRAYAGG($2, _UTF-8'BIG_DECIMAL')], agg#3=[ARRAYAGG($3, _UTF-8'TIMESTAMP', true)], agg#4=[ARRAYAGG($4, _UTF-8'BOOLEAN')], agg#5=[ARRAYAGG($5, _UTF-8'LONG')], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash])",
+          "\n    PinotLogicalAggregate(group=[{}], agg#0=[ARRAYAGG($0, _UTF-8'STRING')], agg#1=[ARRAYAGG($1, _UTF-8'INT', true)], agg#2=[ARRAYAGG($3, _UTF-8'BIG_DECIMAL')], agg#3=[ARRAYAGG($4, _UTF-8'TIMESTAMP', true)], agg#4=[ARRAYAGG($5, _UTF-8'BOOLEAN')], agg#5=[ARRAYAGG($6, _UTF-8'LONG')], aggType=[LEAF])",
+          "\n      LogicalProject($f0=[$0], $f1=[$2], $f2=[true], $f3=[$3], $f4=[$8], $f5=[$4], $f6=[+($6, 1)], $f7=[_UTF-8'STRING'], $f8=[_UTF-8'INT'], $f9=[_UTF-8'BIG_DECIMAL'], $f10=[_UTF-8'TIMESTAMP'], $f11=[_UTF-8'BOOLEAN'], $f12=[_UTF-8'LONG'])",
+          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "ARRAY_AGG without a data type next to the explicit forms in a grouped aggregate",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col2, ARRAY_AGG(a.col3, true), ARRAY_AGG(a.col3, 'LONG', true), ARRAY_AGG(a.col1, 'STRING') FROM a GROUP BY a.col2",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{0}], agg#0=[ARRAYAGG($1, _UTF-8'INT', true)], agg#1=[ARRAYAGG($2, _UTF-8'LONG', true)], agg#2=[ARRAYAGG($3, _UTF-8'STRING')], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash[0]])",
+          "\n    PinotLogicalAggregate(group=[{0}], agg#0=[ARRAYAGG($1, _UTF-8'INT', true)], agg#1=[ARRAYAGG($1, _UTF-8'LONG', true)], agg#2=[ARRAYAGG($4, _UTF-8'STRING')], aggType=[LEAF])",
+          "\n      LogicalProject($f0=[$1], $f1=[$2], $f2=[true], $f3=[_UTF-8'LONG'], $f4=[$0], $f5=[_UTF-8'STRING'], $f6=[_UTF-8'INT'])",
+          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "ARRAY_AGG without a data type uses the element type of a multi-value column",
+        "sql": "EXPLAIN PLAN FOR SELECT ARRAY_AGG(e.mcol1), ARRAY_AGG(e.mcol2, true) FROM e",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{}], agg#0=[ARRAYAGG($0, _UTF-8'STRING')], agg#1=[ARRAYAGG($1, _UTF-8'LONG', true)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash])",
+          "\n    PinotLogicalAggregate(group=[{}], agg#0=[ARRAYAGG($0, _UTF-8'STRING')], agg#1=[ARRAYAGG($1, _UTF-8'LONG', true)], aggType=[LEAF])",
+          "\n      LogicalProject($f0=[$7], $f1=[$8], $f2=[true], $f3=[_UTF-8'STRING'], $f4=[_UTF-8'LONG'])",
+          "\n        PinotLogicalTableScan(table=[[default, e]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "ARRAY_AGG without a data type rejects an unsupported expression type",
+        "sql": "EXPLAIN PLAN FOR SELECT ARRAY_AGG(CAST(a.col1 AS DATE), true) FROM a",
+        "expectedException": ".*Unsupported data type for .*\\(expression\\): DATE.*"
+      },
+      {
         "description": "MIN on STRING column rewritten to MINSTRING",
         "sql": "SET autoRewriteAggregationType=true; EXPLAIN PLAN FOR SELECT MIN(a.col1) FROM a",
         "output": [
