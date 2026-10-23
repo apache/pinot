@@ -19,12 +19,13 @@
 package org.apache.pinot.core.transport;
 
 import com.google.common.annotations.VisibleForTesting;
+import io.netty.channel.Channel;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.lang3.tuple.Pair;
@@ -63,11 +64,11 @@ public class QueryRouter {
 
   private final BrokerMetrics _brokerMetrics = BrokerMetrics.get();
   private final ConcurrentHashMap<Long, AsyncQueryResponse> _asyncQueryResponseMap = new ConcurrentHashMap<>();
-  // Per channel: queries that timed out without the server answering anything since. Reset by any response from
-  // the server, so a slow server that still answers some queries never reaches the threshold; a dead channel does.
-  private final ConcurrentHashMap<ServerRoutingInstance, AtomicInteger> _consecutiveTimeouts =
-      new ConcurrentHashMap<>();
-  private final int _consecutiveTimeoutsThreshold;
+  // Told about a server that stopped answering queries on one of its channels (see ServerChannels). The request
+  // handler points it at the failure detector; until then, or without one, the suspect channel is still replaced by
+  // the next query to it, so recovery does not depend on the failure detector being configured.
+  private volatile Consumer<ServerRoutingInstance> _unansweredServerReporter = serverRoutingInstance -> {
+  };
 
   /// Creates a query router with TLS config.
   ///
@@ -77,21 +78,28 @@ public class QueryRouter {
   public QueryRouter(String brokerId, @Nullable NettyConfig nettyConfig, @Nullable TlsConfig tlsConfig,
       ServerRoutingStatsManager serverRoutingStatsManager, ThreadAccountant threadAccountant) {
     this(brokerId, nettyConfig, tlsConfig, serverRoutingStatsManager, threadAccountant,
-        Broker.FailureDetector.DEFAULT_CONSECUTIVE_TIMEOUTS_THRESHOLD);
+        Broker.FailureDetector.DEFAULT_UNANSWERED_QUERIES_THRESHOLD,
+        Broker.FailureDetector.DEFAULT_UNANSWERED_QUERY_GRACE_MS);
   }
 
-  /// @param consecutiveTimeoutsThreshold see [Broker.FailureDetector#CONFIG_OF_CONSECUTIVE_TIMEOUTS_THRESHOLD];
-  ///                                     non-positive disables timeout based failure reporting
+  /// @param unansweredQueriesThreshold see [Broker.FailureDetector#CONFIG_OF_UNANSWERED_QUERIES_THRESHOLD];
+  ///                                   non-positive disables the check
+  /// @param unansweredQueryGraceMs see [Broker.FailureDetector#CONFIG_OF_UNANSWERED_QUERY_GRACE_MS]
   public QueryRouter(String brokerId, @Nullable NettyConfig nettyConfig, @Nullable TlsConfig tlsConfig,
       ServerRoutingStatsManager serverRoutingStatsManager, ThreadAccountant threadAccountant,
-      int consecutiveTimeoutsThreshold) {
+      int unansweredQueriesThreshold, long unansweredQueryGraceMs) {
     _brokerId = brokerId;
-    _serverChannels = new ServerChannels(this, nettyConfig, null, threadAccountant);
-    _serverChannelsTls = tlsConfig != null ? new ServerChannels(this, nettyConfig, tlsConfig, threadAccountant) : null;
+    _serverChannels = new ServerChannels(this, nettyConfig, null, threadAccountant, unansweredQueriesThreshold,
+        unansweredQueryGraceMs);
+    _serverChannelsTls = tlsConfig != null ? new ServerChannels(this, nettyConfig, tlsConfig, threadAccountant,
+        unansweredQueriesThreshold, unansweredQueryGraceMs) : null;
     _serverRoutingStatsManager = serverRoutingStatsManager;
-    _consecutiveTimeoutsThreshold = consecutiveTimeoutsThreshold;
-    LOGGER.info("Reporting a server unhealthy after {} consecutive unanswered query timeouts ({})",
-        consecutiveTimeoutsThreshold, consecutiveTimeoutsThreshold > 0 ? "enabled" : "disabled");
+  }
+
+  /// Registers the consumer told about a server that stopped answering queries on one of its channels, typically
+  /// the failure detector. Called from the transport's liveness thread, never from an event loop.
+  public void setUnansweredServerReporter(Consumer<ServerRoutingInstance> unansweredServerReporter) {
+    _unansweredServerReporter = unansweredServerReporter;
   }
 
   public AsyncQueryResponse submitQuery(long requestId, String rawTableName,
@@ -184,9 +192,10 @@ public class QueryRouter {
   }
 
   /// The failure detector's retry probe. Re-establishes every channel this broker has queried the server over:
-  /// reconnects the ones that are down and replaces the ones marked suspect by [#recordServerTimeout] with a fresh
-  /// connection, so that a half-open socket that still reports active is never vouched for. Returns `true` if every
-  /// such channel is connected afterwards. Channels that only startup pre-connect opened are left alone, as before.
+  /// reconnects the ones that are down and replaces the ones marked suspect (see
+  /// [ServerChannels#recordUnansweredQuery]) with a fresh connection, so that a half-open socket that still reports
+  /// active is never vouched for. Returns `true` if every such channel is connected afterwards. Channels that only
+  /// startup pre-connect opened are left alone, as before.
   public boolean connect(ServerInstance serverInstance) {
     try {
       for (Pair<ServerChannels, ServerRoutingInstance> channel : getChannels(serverInstance)) {
@@ -216,30 +225,25 @@ public class QueryRouter {
     return channels;
   }
 
-  /// Records that a query timed out without the server answering it. Returns `true` when this is the configured
-  /// number of consecutive unanswered timeouts for the server, in which case its channel is marked suspect so the
-  /// retry probe replaces it, and the caller reports the server to the failure detector. The count is reset by any
-  /// response from the server ([#receiveDataTable]) and once the threshold is reached.
-  boolean recordServerTimeout(ServerRoutingInstance serverRoutingInstance) {
-    if (_consecutiveTimeoutsThreshold <= 0) {
-      return false;
+  /// Records that a query written to the server at `submitTimeMs` timed out unanswered; the transport judges it
+  /// after a grace period (see [ServerChannels#recordUnansweredQuery]).
+  void recordServerTimeout(ServerRoutingInstance serverRoutingInstance, long submitTimeMs) {
+    getServerChannels(serverRoutingInstance).recordUnansweredQuery(serverRoutingInstance, submitTimeMs);
+  }
+
+  /// Called by the transport once a server has left the configured number of consecutive queries unanswered on a
+  /// channel; hands the server to the registered reporter (the failure detector).
+  void reportUnansweredServer(ServerRoutingInstance serverRoutingInstance) {
+    try {
+      _unansweredServerReporter.accept(serverRoutingInstance);
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while reporting unanswered server: {}", serverRoutingInstance, e);
     }
-    AtomicInteger consecutiveTimeouts =
-        _consecutiveTimeouts.computeIfAbsent(serverRoutingInstance, k -> new AtomicInteger());
-    if (consecutiveTimeouts.incrementAndGet() < _consecutiveTimeoutsThreshold) {
-      return false;
-    }
-    consecutiveTimeouts.set(0);
-    LOGGER.warn("Server: {} did not answer {} consecutive queries before they timed out, reporting it unhealthy and "
-        + "marking its channel suspect", serverRoutingInstance, _consecutiveTimeoutsThreshold);
-    getServerChannels(serverRoutingInstance).markSuspect(serverRoutingInstance);
-    return true;
   }
 
   @VisibleForTesting
-  int getConsecutiveTimeouts(ServerRoutingInstance serverRoutingInstance) {
-    AtomicInteger consecutiveTimeouts = _consecutiveTimeouts.get(serverRoutingInstance);
-    return consecutiveTimeouts != null ? consecutiveTimeouts.get() : 0;
+  int getUnansweredQueries(ServerRoutingInstance serverRoutingInstance) {
+    return getServerChannels(serverRoutingInstance).getUnansweredQueries(serverRoutingInstance);
   }
 
   private ServerChannels getServerChannels(ServerRoutingInstance serverRoutingInstance) {
@@ -300,10 +304,7 @@ public class QueryRouter {
   void receiveDataTable(ServerRoutingInstance serverRoutingInstance, DataTable dataTable, int responseSize,
       int deserializationTimeMs) {
     // Any response proves the server and its channel alive, whether or not the query it answers is still waiting
-    AtomicInteger consecutiveTimeouts = _consecutiveTimeouts.get(serverRoutingInstance);
-    if (consecutiveTimeouts != null) {
-      consecutiveTimeouts.set(0);
-    }
+    getServerChannels(serverRoutingInstance).recordResponse(serverRoutingInstance);
     long requestId = Long.parseLong(dataTable.getMetadata().get(MetadataKey.REQUEST_ID.getName()));
     AsyncQueryResponse asyncQueryResponse = _asyncQueryResponseMap.get(requestId);
 
@@ -317,8 +318,16 @@ public class QueryRouter {
   /// ([DataTableHandler]) or a request write to it fails ([ServerChannels]). Queries submitted with
   /// `skipUnavailableServers=true` degrade to partial results for this genuine unavailability; others are failed.
   void markServerUnavailable(ServerRoutingInstance serverRoutingInstance, Exception exception) {
+    markServerUnavailable(serverRoutingInstance, null, exception, true);
+  }
+
+  /// As [#markServerUnavailable(ServerRoutingInstance, Exception)], restricted to the queries written to `channel`
+  /// when one is given, and with `reportServer` false when the broker itself closed the channel (see
+  /// [AsyncQueryResponse#markServerUnavailable(ServerRoutingInstance, Channel, Exception, boolean)]).
+  void markServerUnavailable(ServerRoutingInstance serverRoutingInstance, @Nullable Channel channel,
+      Exception exception, boolean reportServer) {
     for (AsyncQueryResponse asyncQueryResponse : _asyncQueryResponseMap.values()) {
-      if (asyncQueryResponse.markServerUnavailable(serverRoutingInstance, exception)) {
+      if (asyncQueryResponse.markServerUnavailable(serverRoutingInstance, channel, exception, reportServer)) {
         _brokerMetrics.addMeteredGlobalValue(BrokerMeter.SERVER_MARKED_DOWN_SKIPPED, 1);
       }
     }

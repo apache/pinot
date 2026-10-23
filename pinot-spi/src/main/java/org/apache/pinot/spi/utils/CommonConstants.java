@@ -1329,13 +1329,19 @@ public class CommonConstants {
       public static final String CONFIG_OF_MAX_RETRIES = "pinot.broker.failure.detector.max.retries";
       public static final int DEFAULT_MAX_RETRIES = 10;
 
-      // Number of consecutive single-stage queries to a server that time out without the server answering any of
-      // them before the server is reported unhealthy and the retry probe re-establishes its channel. A server that
-      // is merely slow still answers some queries, which resets the count; a half-open channel answers none, and
-      // nothing else notices it while the socket still reports active. Non-positive disables the check.
-      public static final String CONFIG_OF_CONSECUTIVE_TIMEOUTS_THRESHOLD =
-          "pinot.broker.failure.detector.consecutive.timeouts.threshold";
-      public static final int DEFAULT_CONSECUTIVE_TIMEOUTS_THRESHOLD = 5;
+      // Single-stage queries a server leaves unanswered are counted per channel. A query counts once its timeout has
+      // passed and, a further grace period later, the server has still sent nothing on the channel since the query
+      // was written to it. The grace lets the server's own late timeout response through, so a burst of slow queries
+      // or a broker pause does not look like a dead channel; a half-open channel answers nothing, ever. At the
+      // threshold the channel is marked suspect (the next query to it, or the failure detector's retry probe,
+      // replaces it with a fresh connection) and the server is reported to the failure detector. Any response from
+      // the server resets the count. A non-positive threshold disables the check.
+      public static final String CONFIG_OF_UNANSWERED_QUERIES_THRESHOLD =
+          "pinot.broker.failure.detector.unanswered.queries.threshold";
+      public static final int DEFAULT_UNANSWERED_QUERIES_THRESHOLD = 5;
+      public static final String CONFIG_OF_UNANSWERED_QUERY_GRACE_MS =
+          "pinot.broker.failure.detector.unanswered.query.grace.ms";
+      public static final long DEFAULT_UNANSWERED_QUERY_GRACE_MS = 2_000L;
     }
 
     // Configs related to AdaptiveServerSelection.

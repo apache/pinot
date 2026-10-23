@@ -138,10 +138,16 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
         threadAccountant, multiClusterRoutingContext, materializedViewHandler);
     _brokerReduceService = new BrokerReduceService(_config);
     _queryRouter = new QueryRouter(_brokerId, nettyConfig, tlsConfig, serverRoutingStatsManager, threadAccountant,
-        _config.getProperty(CommonConstants.Broker.FailureDetector.CONFIG_OF_CONSECUTIVE_TIMEOUTS_THRESHOLD,
-            CommonConstants.Broker.FailureDetector.DEFAULT_CONSECUTIVE_TIMEOUTS_THRESHOLD));
+        _config.getProperty(CommonConstants.Broker.FailureDetector.CONFIG_OF_UNANSWERED_QUERIES_THRESHOLD,
+            CommonConstants.Broker.FailureDetector.DEFAULT_UNANSWERED_QUERIES_THRESHOLD),
+        _config.getProperty(CommonConstants.Broker.FailureDetector.CONFIG_OF_UNANSWERED_QUERY_GRACE_MS,
+            CommonConstants.Broker.FailureDetector.DEFAULT_UNANSWERED_QUERY_GRACE_MS));
     _failureDetector = failureDetector;
     _failureDetector.registerUnhealthyServerRetrier(this::retryUnhealthyServer);
+    // A server that has gone silent on one of its channels is reported like a server the transport saw go down: it
+    // leaves routing until the retry probe re-establishes the channel
+    _queryRouter.setUnansweredServerReporter(serverRoutingInstance -> _failureDetector.markServerUnhealthy(
+        serverRoutingInstance.getInstanceId(), serverRoutingInstance.getHostname()));
   }
 
   @Override
