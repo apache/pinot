@@ -242,7 +242,10 @@ public class AggregationDataTableReducer implements DataTableReducer {
     int numColumns = columnDataTypes.length;
     for (Object[] rewrittenRow : rows) {
       for (int j = 0; j < numColumns; j++) {
-        rewrittenRow[j] = columnDataTypes[j].format(rewrittenRow[j]);
+        Object value = rewrittenRow[j];
+        if (value != null) {
+          rewrittenRow[j] = columnDataTypes[j].format(value);
+        }
       }
     }
 

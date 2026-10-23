@@ -1216,6 +1216,9 @@ public class CommonConstants {
         // MAX(stringCol) -> MAXSTRING(stringCol)
         // SUM(intCol) -> SUMINT(intCol)
         public static final String AUTO_REWRITE_AGGREGATION_TYPE = "autoRewriteAggregationType";
+        /// Whether ANY_VALUE(expr) is rewritten to ANY_VALUE(expr, 'dataType') to return the type of `expr`. Defaults
+        /// to true; set to false to keep the legacy result type, which is STRING in the single-stage engine.
+        public static final String INFER_ANY_VALUE_TYPE = "inferAnyValueType";
         // When enabled, allows multi cluster/federated queries to be executed.
         public static final String ENABLE_MULTI_CLUSTER_ROUTING = "enableMultiClusterRouting";
 

@@ -19,6 +19,7 @@
 package org.apache.pinot.calcite.rel.rules;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,31 +34,50 @@ import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.rel.logical.LogicalAggregate;
 import org.apache.calcite.rel.logical.LogicalProject;
+import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
-import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.tools.RelBuilderFactory;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
 /// Supplies the explicit data type argument from the type of the data argument:
 /// - FIRST_WITH_TIME(dataColumn, timeColumn) -> FIRST_WITH_TIME(dataColumn, timeColumn, 'dataType')
 /// - LAST_WITH_TIME(dataColumn, timeColumn) -> LAST_WITH_TIME(dataColumn, timeColumn, 'dataType')
+/// - ANY_VALUE(expr) -> ANY_VALUE(expr, 'dataType'), except by [#WITHOUT_ANY_VALUE]
 ///
 /// The result type of the call is unchanged. The literal is projected directly beneath the aggregate, appended to the
 /// existing project when there is one, because [PinotAggregateExchangeNodeInsertRule] and `AggregatePushdownRule`
 /// inline literal arguments only from the immediate project.
 ///
-/// The servers require the data type argument, so the rule is required rather than an optimization: `QueryEnvironment`
-/// always applies it, and `skipPlannerRules` cannot turn it off.
+/// The servers require the data type argument of FIRST_WITH_TIME / LAST_WITH_TIME, so the rule is required rather than
+/// an optimization: `QueryEnvironment` always applies [#INSTANCE], or [#WITHOUT_ANY_VALUE] when the `inferAnyValueType`
+/// query option is false, and `skipPlannerRules` cannot turn it off.
 public class PinotAggregateTypeArgumentRewriteRule extends RelOptRule {
+  // Data types of the explicit forms, by the type the multi-stage engine reads the data argument as
+  private static final Set<ColumnDataType> DATA_TYPES =
+      EnumSet.of(ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.FLOAT, ColumnDataType.DOUBLE,
+          ColumnDataType.BIG_DECIMAL, ColumnDataType.BOOLEAN, ColumnDataType.TIMESTAMP, ColumnDataType.STRING,
+          ColumnDataType.BYTES, ColumnDataType.UUID);
+
   public static final PinotAggregateTypeArgumentRewriteRule INSTANCE =
-      new PinotAggregateTypeArgumentRewriteRule(PinotRuleUtils.PINOT_REL_FACTORY);
+      new PinotAggregateTypeArgumentRewriteRule(true, PinotRuleUtils.PINOT_REL_FACTORY, null);
+  /// Leaves ANY_VALUE without the data type argument.
+  public static final PinotAggregateTypeArgumentRewriteRule WITHOUT_ANY_VALUE =
+      new PinotAggregateTypeArgumentRewriteRule(false, PinotRuleUtils.PINOT_REL_FACTORY,
+          "PinotAggregateTypeArgumentRewriteRuleWithoutAnyValue");
+
+  private final boolean _rewriteAnyValue;
 
   // Matches with RelOptRule operands, like the other aggregate rewrite rules, instead of a RelRule config.
   @SuppressWarnings("deprecation")
-  private PinotAggregateTypeArgumentRewriteRule(RelBuilderFactory factory) {
-    super(operand(LogicalAggregate.class, any()), factory, null);
+  private PinotAggregateTypeArgumentRewriteRule(boolean rewriteAnyValue, RelBuilderFactory factory,
+      @Nullable String description) {
+    super(operand(LogicalAggregate.class, any()), factory, description);
+    _rewriteAnyValue = rewriteAnyValue;
   }
 
   @Override
@@ -119,46 +139,54 @@ public class PinotAggregateTypeArgumentRewriteRule extends RelOptRule {
   /// Returns the data type argument to append, or `null` when the call already has one or is not such a call. Throws
   /// for a data argument without an explicit form, such as an array from a multi-value column.
   @Nullable
-  private static String getDataTypeArgument(AggregateCall aggCall, RelNode input) {
-    if (aggCall.getArgList().size() != 2) {
-      return null;
-    }
+  private String getDataTypeArgument(AggregateCall aggCall, RelNode input) {
     String name = AggregationFunctionType.getNormalizedAggregationFunctionName(aggCall.getAggregation().getName());
-    if (!name.equals(AggregationFunctionType.FIRSTWITHTIME.name())
-        && !name.equals(AggregationFunctionType.LASTWITHTIME.name())) {
+    List<Integer> argList = aggCall.getArgList();
+    String arguments;
+    if (name.equals(AggregationFunctionType.FIRSTWITHTIME.name())
+        || name.equals(AggregationFunctionType.LASTWITHTIME.name())) {
+      if (argList.size() != 2) {
+        return null;
+      }
+      arguments = "dataColumn, timeColumn";
+    } else if (name.equals(AggregationFunctionType.ANYVALUE.name())) {
+      if (argList.size() == 2) {
+        checkAnyValueDataTypeArgument(name, argList, input);
+        return null;
+      }
+      if (!_rewriteAnyValue) {
+        return null;
+      }
+      arguments = "expr";
+    } else {
       return null;
     }
-    SqlTypeName dataType =
-        input.getRowType().getFieldList().get(aggCall.getArgList().get(0)).getType().getSqlTypeName();
-    switch (dataType) {
-      case TINYINT:
-      case SMALLINT:
-      case INTEGER:
-        return "INT";
-      case BIGINT:
-        return "LONG";
-      case REAL:
-      case FLOAT:
-        return "FLOAT";
-      case DOUBLE:
-        return "DOUBLE";
-      case DECIMAL:
-        return "BIG_DECIMAL";
-      case CHAR:
-      case VARCHAR:
-        return "STRING";
-      case BOOLEAN:
-        return "BOOLEAN";
-      case TIMESTAMP:
-        return "TIMESTAMP";
-      case BINARY:
-      case VARBINARY:
-        return "BYTES";
-      case UUID:
-        return "UUID";
-      default:
-        throw new IllegalArgumentException(
-            String.format("Unsupported data type for %s(dataColumn, timeColumn): %s", name, dataType));
+    return inferDataType(name, arguments, input.getRowType().getFieldList().get(argList.get(0)).getType());
+  }
+
+  private static String inferDataType(String name, String arguments, RelDataType relDataType) {
+    ColumnDataType dataType = RelToPlanNodeConverter.convertToColumnDataType(relDataType);
+    if (!DATA_TYPES.contains(dataType)) {
+      throw new IllegalArgumentException(
+          String.format("Unsupported data type for %s(%s): %s", name, arguments, relDataType.getSqlTypeName()));
+    }
+    return dataType.name();
+  }
+
+  /// The result type of ANY_VALUE follows its data argument, so an explicit data type argument must be the one the data
+  /// argument is read as.
+  private static void checkAnyValueDataTypeArgument(String name, List<Integer> argList, RelNode input) {
+    RelDataType relDataType = input.getRowType().getFieldList().get(argList.get(0)).getType();
+    String dataType = inferDataType(name, "expr", relDataType);
+    RelNode unboxedInput = PinotRuleUtils.unboxRel(input);
+    RexNode dataTypeArgument =
+        unboxedInput instanceof Project ? ((Project) unboxedInput).getProjects().get(argList.get(1)) : null;
+    String explicitDataType =
+        dataTypeArgument instanceof RexLiteral ? ((RexLiteral) dataTypeArgument).getValueAs(String.class) : null;
+    if (!dataType.equalsIgnoreCase(explicitDataType)) {
+      throw new IllegalArgumentException(
+          String.format("Unsupported data type for %s(expr, 'dataType') with expr of type %s: %s", name,
+              relDataType.getSqlTypeName(), explicitDataType != null ? explicitDataType : dataTypeArgument));
     }
   }
 }

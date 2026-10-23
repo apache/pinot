@@ -101,6 +101,51 @@ public class AggregateFunctionRewriteOptimizerTest {
             + "ORDER BY LAST_WITH_TIME(timestampCol, timeCol, 'TIMESTAMP')");
   }
 
+  @Test(dataProvider = "dataTypes")
+  public void testAnyValueInfersDataType(String column, String dataType) {
+    for (String function : new String[]{"ANY_VALUE", "anyValue"}) {
+      assertRewrite("SELECT " + function + "(" + column + ") FROM testTable",
+          "SELECT " + function + "(" + column + ", '" + dataType + "') FROM testTable");
+    }
+  }
+
+  @Test
+  public void testAnyValueRejectsMultiValueColumn() {
+    PinotQuery query = CalciteSqlParser.compileToPinotQuery("SELECT ANY_VALUE(mvCol) FROM testTable");
+    BadQueryRequestException exception = expectThrows(BadQueryRequestException.class,
+        () -> new AggregateFunctionRewriteOptimizer().optimize(query, SCHEMA));
+    assertEquals(exception.getMessage(), "Unsupported data type for ANYVALUE(expr): multi-value INT");
+    assertUnchanged("SET inferAnyValueType=false; SELECT ANY_VALUE(mvCol) FROM testTable");
+  }
+
+  @Test
+  public void testAnyValueKeepsArgumentsWithoutSchemaType() {
+    for (String column : new String[]{"missingCol", "trim(stringCol)"}) {
+      assertUnchanged("SELECT ANY_VALUE(" + column + ") FROM testTable");
+    }
+    assertUnchanged("SELECT ANY_VALUE(intCol, 'LONG') FROM testTable");
+  }
+
+  @Test
+  public void testRewritesNestedAnyValueConsistently() {
+    assertRewrite("SELECT intCol, ANY_VALUE(stringCol) AS v1, ANY_VALUE(doubleCol) FILTER (WHERE boolCol) "
+            + "FROM testTable GROUP BY intCol HAVING ANY_VALUE(longCol) > 1 ORDER BY ANY_VALUE(timestampCol)",
+        "SELECT intCol, ANY_VALUE(stringCol, 'STRING') AS v1, ANY_VALUE(doubleCol, 'DOUBLE') FILTER (WHERE boolCol) "
+            + "FROM testTable GROUP BY intCol HAVING ANY_VALUE(longCol, 'LONG') > 1 "
+            + "ORDER BY ANY_VALUE(timestampCol, 'TIMESTAMP')");
+  }
+
+  @Test
+  public void testAnyValueDataTypeCanBeDisabled() {
+    String query = "SELECT ANY_VALUE(intCol), FIRST_WITH_TIME(intCol, timeCol) FROM testTable";
+    String expectedQuery = "SELECT ANY_VALUE(intCol, 'INT'), FIRST_WITH_TIME(intCol, timeCol, 'INT') FROM testTable";
+    assertRewrite("SET inferAnyValueType=true; " + query, "SET inferAnyValueType=true; " + expectedQuery);
+    // The option only applies to ANY_VALUE.
+    assertRewrite("SET inferAnyValueType=false; " + query,
+        "SET inferAnyValueType=false; SELECT ANY_VALUE(intCol), FIRST_WITH_TIME(intCol, timeCol, 'INT') "
+            + "FROM testTable");
+  }
+
   @Test
   public void testTypedVariantsRequireQueryOption() {
     String query = "SELECT MIN(stringCol) AS m, MAX(longCol), SUM(intCol), SUM(longCol), MIN(doubleCol) "

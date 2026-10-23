@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -47,6 +48,9 @@ import org.apache.pinot.spi.utils.ByteArray;
 /// only until it finds the first non-null value in the current batch for each group/key. This makes it O(n) over the
 /// input once per group until the first value is set, with early-exit fast paths when there are no nulls.
 ///
+/// `ANY_VALUE(expr, 'dataType')` fixes the result type at construction and reads every block as that type. Without
+/// the data type argument, the result type is the stored type of the first block, or STRING before any block.
+///
 /// **Example:**
 ///
 /// ```
@@ -58,17 +62,60 @@ import org.apache.pinot.spi.utils.ByteArray;
 /// ```
 public class AnyValueAggregationFunction extends BaseSingleInputAggregationFunction<Object, Comparable<?>> {
   private static final DataType[] DATA_TYPE_VALUES = DataType.values();
-  // Result type is determined at runtime based on input expression type
+  // Data type argument, or null when the result type is determined at runtime from the input blocks
+  @Nullable
+  private final DataType _dataType;
   private ColumnDataType _resultType;
 
   public AnyValueAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
-    super(verifySingleArgument(arguments, "ANY_VALUE"), nullHandlingEnabled);
-    _resultType = null;
+    super(getValueArgument(arguments), nullHandlingEnabled);
+    if (arguments.size() == 2) {
+      ExpressionContext dataTypeArgument = arguments.get(1);
+      Preconditions.checkArgument(dataTypeArgument.getType() == ExpressionContext.Type.LITERAL,
+          "ANY_VALUE expects the 2nd argument to be literal, got: %s", dataTypeArgument.getType());
+      _dataType = DataType.valueOf(dataTypeArgument.getLiteral().getStringValue().toUpperCase());
+      _resultType = getResultType(_dataType);
+    } else {
+      _dataType = null;
+    }
+  }
+
+  private static ExpressionContext getValueArgument(List<ExpressionContext> arguments) {
+    int numArguments = arguments.size();
+    Preconditions.checkArgument(numArguments == 1 || numArguments == 2, "ANY_VALUE expects 1 or 2 arguments, got: %s",
+        numArguments);
+    return arguments.get(0);
+  }
+
+  private static ColumnDataType getResultType(DataType dataType) {
+    switch (dataType) {
+      case INT:
+      case LONG:
+      case FLOAT:
+      case DOUBLE:
+      case BIG_DECIMAL:
+      case BOOLEAN:
+      case TIMESTAMP:
+      case STRING:
+      case BYTES:
+      case UUID:
+        return ColumnDataType.fromDataTypeSV(dataType);
+      default:
+        throw new IllegalArgumentException("Unsupported data type for ANY_VALUE: " + dataType);
+    }
   }
 
   @Override
   public AggregationFunctionType getType() {
     return AggregationFunctionType.ANYVALUE;
+  }
+
+  @Override
+  public String getResultColumnName() {
+    if (_dataType == null) {
+      return super.getResultColumnName();
+    }
+    return getType().getName().toLowerCase() + "(" + _expression + ",'" + _dataType + "')";
   }
 
   @Override
@@ -85,7 +132,7 @@ public class AnyValueAggregationFunction extends BaseSingleInputAggregationFunct
   public ColumnDataType getIntermediateResultColumnType() {
     // Default to STRING if result type is not yet determined
     // TODO: See if UNKNOWN can be used instead
-    return _resultType != null ? _resultType : ColumnDataType.STRING;
+    return _resultType != null ? _resultType.getStoredType() : ColumnDataType.STRING;
   }
 
   @Override
@@ -184,13 +231,15 @@ public class AnyValueAggregationFunction extends BaseSingleInputAggregationFunct
 
   /// Generic helper for processing values with dictionary optimization for all supported data types
   private void aggregateHelper(int length, BlockValSet bvs, ValueProcessor<Object> processor) {
+    // Reading through the bound type keeps values consistent when segments store the column as different types
+    DataType storedType = _dataType != null ? _dataType.getStoredType() : bvs.getValueType().getStoredType();
     // Use dictionary-based access for efficiency when available
     if (bvs.isDictionaryEncoded()) {
       final int[] dictIds = bvs.getDictionaryIdsSV();
       final Dictionary dict = bvs.getDictionary();
       forEachNotNull(length, bvs, (from, to) -> {
         for (int i = from; i < to; i++) {
-          Object value = getDictionaryValue(dict, dictIds[i], bvs.getValueType().getStoredType());
+          Object value = getDictionaryValue(dict, dictIds[i], storedType);
           if (processor.process(i, value)) {
             break;
           }
@@ -200,7 +249,7 @@ public class AnyValueAggregationFunction extends BaseSingleInputAggregationFunct
       // Fall back to direct value access based on type
       forEachNotNull(length, bvs, (from, to) -> {
         for (int i = from; i < to; i++) {
-          Object value = getDirectValue(bvs, i);
+          Object value = getDirectValue(bvs, i, storedType);
           if (value != null && processor.process(i, value)) {
             break;
           }
@@ -232,8 +281,8 @@ public class AnyValueAggregationFunction extends BaseSingleInputAggregationFunct
   }
 
   /// Get value directly from BlockValSet based on data type
-  private Object getDirectValue(BlockValSet bvs, int index) {
-    switch (bvs.getValueType().getStoredType()) {
+  private Object getDirectValue(BlockValSet bvs, int index, DataType storedType) {
+    switch (storedType) {
       case INT:
         return bvs.getIntValuesSV()[index];
       case LONG:
@@ -249,7 +298,7 @@ public class AnyValueAggregationFunction extends BaseSingleInputAggregationFunct
       case BYTES:
         return new ByteArray(bvs.getBytesValuesSV()[index]);
       default:
-        throw new IllegalStateException("Unsupported direct access type: " + bvs.getValueType().getStoredType());
+        throw new IllegalStateException("Unsupported direct access type: " + storedType);
     }
   }
 
@@ -326,33 +375,8 @@ public class AnyValueAggregationFunction extends BaseSingleInputAggregationFunct
   }
 
   private void ensureResultType(BlockValSet bvs) {
-    if (_resultType != null) {
-      return;
-    }
-    switch (bvs.getValueType().getStoredType()) {
-      case INT:
-        _resultType = ColumnDataType.INT;
-        return;
-      case LONG:
-        _resultType = ColumnDataType.LONG;
-        return;
-      case FLOAT:
-        _resultType = ColumnDataType.FLOAT;
-        return;
-      case DOUBLE:
-        _resultType = ColumnDataType.DOUBLE;
-        return;
-      case STRING:
-        _resultType = ColumnDataType.STRING;
-        return;
-      case BIG_DECIMAL:
-        _resultType = ColumnDataType.BIG_DECIMAL;
-        return;
-      case BYTES:
-        _resultType = ColumnDataType.BYTES;
-        return;
-      default:
-        throw new IllegalStateException("ANY_VALUE unsupported type: " + bvs.getValueType());
+    if (_resultType == null) {
+      _resultType = getResultType(bvs.getValueType().getStoredType());
     }
   }
 

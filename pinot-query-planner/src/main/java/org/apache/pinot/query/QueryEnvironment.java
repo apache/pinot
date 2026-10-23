@@ -171,7 +171,7 @@ public class QueryEnvironment {
         rootSchema, List.of(database), _typeFactory, CONNECTION_CONFIG, config.isCaseSensitive());
     _defaultDisabledPlannerRules = _envConfig.defaultDisabledPlannerRules();
     // default optProgram with no skip rule options and no use rule options
-    _optProgram = getOptProgram(_envConfig.getRuleSet(), Set.of(), Set.of(), _defaultDisabledPlannerRules);
+    _optProgram = getOptProgram(_envConfig.getRuleSet(), Set.of(), Set.of(), _defaultDisabledPlannerRules, true);
     _multiClusterRoutingContext = multiClusterRoutingContext;
   }
 
@@ -205,9 +205,11 @@ public class QueryEnvironment {
     }
     if (MapUtils.isNotEmpty(options)) {
       Set<String> skipRuleSet = QueryOptionsUtils.getSkipPlannerRules(options);
-      if (!skipRuleSet.isEmpty() || !useRuleSet.isEmpty()) {
+      boolean inferAnyValueType = QueryOptionsUtils.isInferAnyValueType(options);
+      if (!skipRuleSet.isEmpty() || !useRuleSet.isEmpty() || !inferAnyValueType) {
         // dynamically create optProgram according to rule options
-        optProgram = getOptProgram(_envConfig.getRuleSet(), skipRuleSet, useRuleSet, _defaultDisabledPlannerRules);
+        optProgram = getOptProgram(_envConfig.getRuleSet(), skipRuleSet, useRuleSet, _defaultDisabledPlannerRules,
+            inferAnyValueType);
       }
     }
     int sortExchangeCopyLimit = QueryOptionsUtils.getSortExchangeCopyThreshold(options,
@@ -579,9 +581,10 @@ public class QueryEnvironment {
   /// @param skipRuleSet parsed skipped rule name set from query options
   /// @param useRuleSet parsed use rule set from query options
   /// @param defaultDisabledRuleSet parsed default disabled rule set from broker config
+  /// @param inferAnyValueType whether ANY_VALUE gets the data type argument of its argument's type
   /// @return HepProgram that performs logical transformations
   private static HepProgram getOptProgram(PinotRuleSet ruleSet, Set<String> skipRuleSet, Set<String> useRuleSet,
-      Set<String> defaultDisabledRuleSet) {
+      Set<String> defaultDisabledRuleSet, boolean inferAnyValueType) {
     HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
     // Set the match order as DEPTH_FIRST. The default is arbitrary which works the same as DEPTH_FIRST, but it's
     // best to be explicit.
@@ -606,7 +609,8 @@ public class QueryEnvironment {
       hepProgramBuilder.addRuleInstance(relOptRule);
     }
     // Required to plan FIRST_WITH_TIME / LAST_WITH_TIME without a data type, so the rule options do not filter it.
-    hepProgramBuilder.addRuleInstance(PinotAggregateTypeArgumentRewriteRule.INSTANCE);
+    hepProgramBuilder.addRuleInstance(inferAnyValueType ? PinotAggregateTypeArgumentRewriteRule.INSTANCE
+        : PinotAggregateTypeArgumentRewriteRule.WITHOUT_ANY_VALUE);
 
     // ----
     // Pushdown filters using a single HepInstruction.
