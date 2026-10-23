@@ -629,16 +629,21 @@ public class SegmentPushUtilsTest {
   @Test
   public void testGetSegmentUriToTarPathMapWithoutOutputDirectory() {
     PushJobSpec pushSpec = new PushJobSpec();
-    pushSpec.setSegmentUriPrefix("https://segments.example.com");
     String segmentPath = "/output/segment.tar.gz";
+    String segmentUri = "https://segments.example.com" + segmentPath;
+    assertEquals(SegmentPushUtils.getSegmentUriToTarPathMap(null, pushSpec, new String[]{segmentPath}),
+        Map.of(segmentPath, segmentPath));
+    assertEquals(SegmentPushUtils.getSegmentUriToTarPathMap(null, pushSpec, new String[]{segmentUri}),
+        Map.of(segmentUri, segmentUri));
+    pushSpec.setSegmentUriPrefix("https://segments.example.com");
     assertEquals(SegmentPushUtils.getSegmentUriToTarPathMap(null, pushSpec, new String[]{segmentPath}),
         Map.of("https://segments.example.com/output/segment.tar.gz", segmentPath));
   }
 
-  @Test
-  public void testDuplicateSegmentsRejectedBeforeUpload()
+  @Test(dataProvider = "segmentTarExtensions")
+  public void testDuplicateSegmentsRejectedBeforeUpload(String extension)
       throws Exception {
-    List<String> archives = List.of("file:///output/segment.tar.gz", "file:///output/2022/segment.tar.gz");
+    List<String> archives = List.of("file:///output/segment.tar.gz", "file:///output/2022/segment" + extension);
     Map<String, String> segmentUriToTarPathMap = Map.of(archives.get(0), archives.get(0),
         archives.get(1), archives.get(1));
     PinotFS fileSystem = mock(PinotFS.class);

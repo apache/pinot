@@ -124,6 +124,9 @@ public class SegmentPushUtils implements Serializable {
 
   public static URI generateSegmentTarURI(URI dirURI, URI fileURI, String prefix, String suffix) {
     if (StringUtils.isEmpty(prefix) && StringUtils.isEmpty(suffix)) {
+      if (dirURI == null) {
+        return fileURI;
+      }
       // In case the FS doesn't provide scheme or host, will fill it up from dirURI.
       String scheme = fileURI.getScheme();
       if (StringUtils.isEmpty(fileURI.getScheme())) {
