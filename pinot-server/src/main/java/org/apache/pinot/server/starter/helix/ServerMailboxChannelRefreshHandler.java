@@ -18,10 +18,13 @@
  */
 package org.apache.pinot.server.starter.helix;
 
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.api.listeners.BatchMode;
@@ -36,8 +39,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/// Listens for instance config changes and resets GRPC mailbox channel backoff when a server
-/// completes startup (IS_SHUTDOWN_IN_PROGRESS transitions from true to false).
+/// Listens for instance config changes and refreshes the GRPC mailbox channel to a server when it completes startup
+/// (IS_SHUTDOWN_IN_PROGRESS transitions from true to false).
 ///
 /// When a server restarts (gracefully or after a crash), the startup sequence is:
 ///
@@ -46,13 +49,19 @@ import org.slf4j.LoggerFactory;
 /// 3. Query/gRPC server starts listening
 /// 4. IS_SHUTDOWN_IN_PROGRESS set to false (readiness signal)
 ///
-/// This handler detects the transition in step 4 and resets the GRPC channel backoff for
-/// that specific server, but only if the channel is currently in TRANSIENT_FAILURE state.
-/// Channels in other states (READY, IDLE, CONNECTING) are left untouched.
+/// This handler detects the transition in step 4 and refreshes the channel to that server: the channel resolves the
+/// server's hostname again before the next send, and connects without waiting for its reconnect backoff. Resolving
+/// again matters because the restarted server may have a new IP address. The channel last resolved the hostname when
+/// the old connection was lost, while DNS could still return the old address, and it would reconnect there. When
+/// another server took over that address and listens on the same port, the connection succeeds and the data goes to
+/// the wrong server.
+///
+/// It also shuts down the channel to the old mailbox address of a server that moved to another address (for example a
+/// new port after a restart) or left the cluster, since nothing will use it again.
 @BatchMode(enabled = false)
 @PreFetch(enabled = false)
-public class ServerGrpcChannelBackoffResetHandler implements InstanceConfigChangeListener {
-  private static final Logger LOGGER = LoggerFactory.getLogger(ServerGrpcChannelBackoffResetHandler.class);
+public class ServerMailboxChannelRefreshHandler implements InstanceConfigChangeListener {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ServerMailboxChannelRefreshHandler.class);
 
   private final HelixAdmin _helixAdmin;
   private final String _clusterName;
@@ -60,10 +69,12 @@ public class ServerGrpcChannelBackoffResetHandler implements InstanceConfigChang
   private final MailboxService _mailboxService;
 
   // Tracks servers that have IS_SHUTDOWN_IN_PROGRESS=true. When a server transitions
-  // from being in this set to having IS_SHUTDOWN_IN_PROGRESS=false, we reset its channel backoff.
+  // from being in this set to having IS_SHUTDOWN_IN_PROGRESS=false, we refresh its channel.
   private final Set<String> _shuttingDownServers = new HashSet<>();
+  // Last known mailbox address of each server, to retire the channel of an address a server has left
+  private final Map<String, Pair<String, Integer>> _mailboxAddresses = new HashMap<>();
 
-  public ServerGrpcChannelBackoffResetHandler(HelixAdmin helixAdmin, String clusterName, String selfInstanceId,
+  public ServerMailboxChannelRefreshHandler(HelixAdmin helixAdmin, String clusterName, String selfInstanceId,
       MailboxService mailboxService) {
     _helixAdmin = helixAdmin;
     _clusterName = clusterName;
@@ -95,18 +106,28 @@ public class ServerGrpcChannelBackoffResetHandler implements InstanceConfigChang
   /// Full cluster scan: used on INIT (first callback) and when instances are added/removed.
   private void handleFullScan() {
     Set<String> currentShuttingDown = new HashSet<>();
+    Set<String> currentServers = new HashSet<>();
     for (String instance : _helixAdmin.getInstancesInCluster(_clusterName)) {
       if (!InstanceTypeUtils.isServer(instance) || instance.equals(_selfInstanceId)) {
         continue;
       }
+      // Before reading the config: a server whose config cannot be read now has not left the cluster
+      currentServers.add(instance);
       InstanceConfig config = getInstanceConfig(instance);
       if (config == null) {
         continue;
       }
+      updateMailboxAddress(instance, config);
       if (isShutdownInProgress(config)) {
         currentShuttingDown.add(instance);
       } else if (_shuttingDownServers.contains(instance)) {
-        resetBackoffForServer(instance, config);
+        refreshChannelToServer(instance, config);
+      }
+    }
+    // Servers that left the cluster
+    for (String instance : new HashSet<>(_mailboxAddresses.keySet())) {
+      if (!currentServers.contains(instance)) {
+        retireChannel(instance, _mailboxAddresses.remove(instance));
       }
     }
     _shuttingDownServers.clear();
@@ -123,10 +144,11 @@ public class ServerGrpcChannelBackoffResetHandler implements InstanceConfigChang
     if (config == null) {
       return;
     }
+    updateMailboxAddress(instance, config);
     if (isShutdownInProgress(config)) {
       _shuttingDownServers.add(instance);
     } else if (_shuttingDownServers.remove(instance)) {
-      resetBackoffForServer(instance, config);
+      refreshChannelToServer(instance, config);
     }
   }
 
@@ -145,24 +167,51 @@ public class ServerGrpcChannelBackoffResetHandler implements InstanceConfigChang
         config.getRecord().getStringField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, "false"));
   }
 
+  /// Records the server's current mailbox address, and retires the channel to its previous one if it moved.
+  private void updateMailboxAddress(String instanceId, InstanceConfig config) {
+    Pair<String, Integer> address = getMailboxAddress(instanceId, config);
+    Pair<String, Integer> previousAddress =
+        address != null ? _mailboxAddresses.put(instanceId, address) : _mailboxAddresses.remove(instanceId);
+    if (previousAddress != null && !previousAddress.equals(address)) {
+      retireChannel(instanceId, previousAddress);
+    }
+  }
 
-  private void resetBackoffForServer(String instanceId, InstanceConfig config) {
+  private void retireChannel(String instanceId, Pair<String, Integer> address) {
+    // Another server may have taken over the address
+    if (_mailboxAddresses.containsValue(address)) {
+      return;
+    }
+    if (_mailboxService.retireChannel(address.getLeft(), address.getRight())) {
+      LOGGER.info("Server {} left mailbox address {}:{}, shut down the channel to it", instanceId, address.getLeft(),
+          address.getRight());
+    }
+  }
+
+  @Nullable
+  private static Pair<String, Integer> getMailboxAddress(String instanceId, InstanceConfig config) {
     int mailboxPort = config.getRecord().getIntField(
         CommonConstants.Helix.Instance.MULTI_STAGE_QUERY_ENGINE_MAILBOX_PORT_KEY, -1);
     if (mailboxPort <= 0) {
-      LOGGER.debug("Server {} has no mailbox port configured, skipping backoff reset", instanceId);
-      return;
+      return null;
     }
-    String hostname;
     try {
-      hostname = ServerInstance.extractHostnameFromConfig(config);
+      return Pair.of(ServerInstance.extractHostnameFromConfig(config), mailboxPort);
     } catch (Exception e) {
-      LOGGER.warn("Could not extract hostname for server: {}, skipping backoff reset", instanceId, e);
+      LOGGER.warn("Could not extract hostname for server: {}", instanceId, e);
+      return null;
+    }
+  }
+
+  private void refreshChannelToServer(String instanceId, InstanceConfig config) {
+    Pair<String, Integer> address = getMailboxAddress(instanceId, config);
+    if (address == null) {
+      LOGGER.debug("Server {} has no mailbox address, skipping channel refresh", instanceId);
       return;
     }
-    if (_mailboxService.resetConnectBackoff(hostname, mailboxPort)) {
-      LOGGER.info("Server {} completed startup, reset mailbox channel backoff to {}:{}", instanceId, hostname,
-          mailboxPort);
+    if (_mailboxService.refreshChannel(address.getLeft(), address.getRight())) {
+      LOGGER.info("Server {} completed startup, refreshed mailbox channel to {}:{}", instanceId, address.getLeft(),
+          address.getRight());
     }
   }
 }
