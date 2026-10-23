@@ -642,6 +642,11 @@ public class SegmentPushUtilsTest {
         new File(_tempDir, "testSegment.tar.bz2").toURI().toString()};
     assertEquals(SegmentPushUtils.getSegmentUriToTarPathMap(_tempDir.toURI(), new PushJobSpec(), files),
         Map.of(archiveUri, archiveUri));
+
+    PushJobSpec pushSpec = new PushJobSpec();
+    pushSpec.setSegmentUriPrefix("s3://segments-bucket");
+    assertEquals(SegmentPushUtils.getSegmentUriToTarPathMap(null, pushSpec, files),
+        Map.of("s3://segments-bucket" + URI.create(archiveUri).getRawPath(), archiveUri));
   }
 
   @Test

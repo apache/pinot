@@ -693,7 +693,7 @@ public class SegmentPushUtils implements Serializable {
         }
       }
 
-      URI uri = "file".equals(outputDirURI.getScheme()) && new File(file).isAbsolute()
+      URI uri = outputDirURI != null && "file".equals(outputDirURI.getScheme()) && new File(file).isAbsolute()
           ? new File(file).toURI() : URI.create(file);
       if (uri.getPath().endsWith(Constants.METADATA_TAR_GZ_FILE_EXT)) {
         // Skip segment metadata tar gz files
