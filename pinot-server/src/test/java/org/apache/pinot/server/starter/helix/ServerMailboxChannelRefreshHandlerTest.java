@@ -278,6 +278,30 @@ public class ServerMailboxChannelRefreshHandlerTest {
     verify(_mailboxService, never()).retireChannel(OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT);
   }
 
+  /// A full scan applies every server's new address before it retires any, so it keeps the channel to an address that
+  /// one server left and another one took over in the same scan, whichever of the two it reads first.
+  @Test
+  public void testFullScanKeepsChannelToAddressTakenOverInTheSameScan() {
+    String thirdServerId = "Server_thirdhost_8000";
+    when(_helixAdmin.getInstancesInCluster(CLUSTER_NAME))
+        .thenReturn(Arrays.asList(SELF_INSTANCE_ID, OTHER_SERVER_ID, thirdServerId));
+    when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
+        .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, false));
+    when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, thirdServerId))
+        .thenReturn(createServerConfig(thirdServerId, "thirdhost", OTHER_SERVER_MAILBOX_PORT, false));
+    _handler.onInstanceConfigChange(List.of(), createInitContext());
+
+    // One scan reads the other server first: it moved away, and the third server took over its address
+    when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
+        .thenReturn(createServerConfig(OTHER_SERVER_ID, "newhost", OTHER_SERVER_MAILBOX_PORT, false));
+    when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, thirdServerId))
+        .thenReturn(createServerConfig(thirdServerId, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, false));
+    _handler.onInstanceConfigChange(List.of(), createChildChangeContext());
+
+    verify(_mailboxService).retireChannel("thirdhost", OTHER_SERVER_MAILBOX_PORT);
+    verify(_mailboxService, never()).retireChannel(OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT);
+  }
+
   private InstanceConfig createServerConfig(String instanceId, String hostname, int mailboxPort,
       boolean shutdownInProgress) {
     ZNRecord record = new ZNRecord(instanceId);

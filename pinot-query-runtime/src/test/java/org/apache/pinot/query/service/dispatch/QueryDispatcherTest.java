@@ -156,16 +156,41 @@ public class QueryDispatcherTest extends QueryTestSet {
       ManagedChannel channel = client.getChannel();
       // Connecting fails, but takes the channel out of IDLE
       channel.getState(true);
-      dispatcher.onServerEnabled(serverInstance(port));
+      dispatcher.onServerEnabled(serverInstance("Server_localhost_8098", port));
       Assert.assertSame(dispatcher.getOrCreateDispatchClient(server), client);
       TestUtils.waitForCondition(aVoid -> channel.getState(false) == ConnectivityState.IDLE, 10_000L,
           "The channel did not go back to IDLE");
       Assert.assertFalse(channel.isShutdown());
 
       // The server restarted on another port
-      dispatcher.onServerEnabled(serverInstance(port + 1));
+      dispatcher.onServerEnabled(serverInstance("Server_localhost_8098", port + 1));
       Assert.assertTrue(channel.isShutdown());
       Assert.assertNotSame(dispatcher.getOrCreateDispatchClient(server), client);
+    } finally {
+      dispatcher.shutdown();
+    }
+  }
+
+  /// The dispatch channel to an address stays when the server that had the address moves away, if another server has
+  /// taken the address over.
+  @Test
+  public void testServerEnabledKeepsChannelToAddressTakenOver() {
+    QueryDispatcher dispatcher =
+        new QueryDispatcher(Mockito.mock(MailboxService.class), Mockito.mock(FailureDetector.class), null, false,
+            Duration.ofSeconds(1));
+    try {
+      int port = QueryTestUtils.getAvailablePort();
+      dispatcher.onServerEnabled(serverInstance("Server_localhost_8098", port));
+      DispatchClient client = dispatcher.getOrCreateDispatchClient(
+          new QueryServerInstance("Server_localhost_8098", "localhost", port, 8101));
+
+      // Another server takes over the address, then the server that had it comes back on another port
+      dispatcher.onServerEnabled(serverInstance("Server_localhost_8099", port));
+      dispatcher.onServerEnabled(serverInstance("Server_localhost_8098", port + 1));
+
+      Assert.assertFalse(client.getChannel().isShutdown());
+      Assert.assertSame(dispatcher.getOrCreateDispatchClient(
+          new QueryServerInstance("Server_localhost_8099", "localhost", port, 8101)), client);
     } finally {
       dispatcher.shutdown();
     }
@@ -184,10 +209,10 @@ public class QueryDispatcherTest extends QueryTestSet {
     }
   }
 
-  private static ServerInstance serverInstance(int queryServerPort) {
-    InstanceConfig instanceConfig = new InstanceConfig("Server_localhost_8098");
+  private static ServerInstance serverInstance(String instanceId, int queryServerPort) {
+    InstanceConfig instanceConfig = new InstanceConfig(instanceId);
     instanceConfig.setHostName("localhost");
-    instanceConfig.setPort("8098");
+    instanceConfig.setPort(instanceId.substring(instanceId.lastIndexOf('_') + 1));
     instanceConfig.getRecord()
         .setIntField(CommonConstants.Helix.Instance.MULTI_STAGE_QUERY_ENGINE_SERVICE_PORT_KEY, queryServerPort);
     instanceConfig.getRecord()

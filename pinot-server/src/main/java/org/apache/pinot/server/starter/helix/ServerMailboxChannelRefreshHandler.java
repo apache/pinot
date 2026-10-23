@@ -104,9 +104,14 @@ public class ServerMailboxChannelRefreshHandler implements InstanceConfigChangeL
   }
 
   /// Full cluster scan: used on INIT (first callback) and when instances are added/removed.
+  ///
+  /// It records the new address of every server before it retires any old one. Otherwise, when one server left an
+  /// address and a server read later in the scan took it over, the scan would shut down the channel the second server
+  /// uses.
   private void handleFullScan() {
     Set<String> currentShuttingDown = new HashSet<>();
     Set<String> currentServers = new HashSet<>();
+    Map<String, Pair<String, Integer>> previousAddresses = new HashMap<>();
     for (String instance : _helixAdmin.getInstancesInCluster(_clusterName)) {
       if (!InstanceTypeUtils.isServer(instance) || instance.equals(_selfInstanceId)) {
         continue;
@@ -117,7 +122,10 @@ public class ServerMailboxChannelRefreshHandler implements InstanceConfigChangeL
       if (config == null) {
         continue;
       }
-      updateMailboxAddress(instance, config);
+      Pair<String, Integer> previousAddress = recordMailboxAddress(instance, config);
+      if (previousAddress != null) {
+        previousAddresses.put(instance, previousAddress);
+      }
       if (isShutdownInProgress(config)) {
         currentShuttingDown.add(instance);
       } else if (_shuttingDownServers.contains(instance)) {
@@ -127,7 +135,12 @@ public class ServerMailboxChannelRefreshHandler implements InstanceConfigChangeL
     // Servers that left the cluster
     for (String instance : new HashSet<>(_mailboxAddresses.keySet())) {
       if (!currentServers.contains(instance)) {
-        retireChannel(instance, _mailboxAddresses.remove(instance));
+        previousAddresses.put(instance, _mailboxAddresses.remove(instance));
+      }
+    }
+    for (Map.Entry<String, Pair<String, Integer>> entry : previousAddresses.entrySet()) {
+      if (!entry.getValue().equals(_mailboxAddresses.get(entry.getKey()))) {
+        retireChannel(entry.getKey(), entry.getValue());
       }
     }
     _shuttingDownServers.clear();
@@ -169,12 +182,17 @@ public class ServerMailboxChannelRefreshHandler implements InstanceConfigChangeL
 
   /// Records the server's current mailbox address, and retires the channel to its previous one if it moved.
   private void updateMailboxAddress(String instanceId, InstanceConfig config) {
-    Pair<String, Integer> address = getMailboxAddress(instanceId, config);
-    Pair<String, Integer> previousAddress =
-        address != null ? _mailboxAddresses.put(instanceId, address) : _mailboxAddresses.remove(instanceId);
-    if (previousAddress != null && !previousAddress.equals(address)) {
+    Pair<String, Integer> previousAddress = recordMailboxAddress(instanceId, config);
+    if (previousAddress != null && !previousAddress.equals(_mailboxAddresses.get(instanceId))) {
       retireChannel(instanceId, previousAddress);
     }
+  }
+
+  /// Records the server's current mailbox address, and returns its previous one.
+  @Nullable
+  private Pair<String, Integer> recordMailboxAddress(String instanceId, InstanceConfig config) {
+    Pair<String, Integer> address = getMailboxAddress(instanceId, config);
+    return address != null ? _mailboxAddresses.put(instanceId, address) : _mailboxAddresses.remove(instanceId);
   }
 
   private void retireChannel(String instanceId, Pair<String, Integer> address) {
