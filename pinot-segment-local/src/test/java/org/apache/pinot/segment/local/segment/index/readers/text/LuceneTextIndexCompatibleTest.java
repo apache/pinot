@@ -36,13 +36,13 @@ import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.NoMergePolicy;
 import org.apache.lucene.index.Term;
-import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Sort;
 import org.apache.lucene.search.SortField;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
+import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.TextIndexConfig.DocIdTranslatorMode;
@@ -80,16 +80,20 @@ public class LuceneTextIndexCompatibleTest {
     try {
       File indexDir = writeMappedIndex(segmentDir, "all", false, false);
       try (Directory directory = FSDirectory.open(indexDir.toPath());
-          DirectoryReader reader = DirectoryReader.open(directory);
+          DirectoryReader reader = spy(DirectoryReader.open(directory));
           PinotDataBuffer buffer = PinotDataBuffer.allocateDirect(PINOT_IDS.length * Integer.BYTES,
               ByteOrder.LITTLE_ENDIAN, "doc-id mapping test")) {
         assertTrue(reader.leaves().size() > 1);
-        IndexSearcher searcher = spy(new IndexSearcher(reader));
-        assertFalse(LuceneTextIndexReader.fillDocIdMapping(searcher, buffer, PINOT_IDS.length));
+        assertFalse(TextIndexUtils.fillDocIdMapping(reader, buffer, PINOT_IDS.length, null));
         for (int i = 0; i < PINOT_IDS.length; i++) {
           assertEquals(buffer.getInt(i * Integer.BYTES), PINOT_IDS[i]);
         }
-        verify(searcher, never()).storedFields();
+        // Remapping the permuted mutable IDs back to Lucene order creates an identity mapping.
+        assertTrue(TextIndexUtils.fillDocIdMapping(reader, buffer, PINOT_IDS.length, new int[]{1, 3, 0, 2}));
+        for (int i = 0; i < PINOT_IDS.length; i++) {
+          assertEquals(buffer.getInt(i * Integer.BYTES), i);
+        }
+        verify(reader, never()).storedFields();
       }
     } finally {
       FileUtils.deleteDirectory(segmentDir);

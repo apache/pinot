@@ -29,13 +29,8 @@ import java.util.Map;
 import java.util.Properties;
 import javax.annotation.Nullable;
 import org.apache.lucene.analysis.Analyzer;
-import org.apache.lucene.document.DocumentStoredFieldVisitor;
 import org.apache.lucene.index.DirectoryReader;
-import org.apache.lucene.index.FieldInfo;
 import org.apache.lucene.index.IndexReader;
-import org.apache.lucene.index.MultiDocValues;
-import org.apache.lucene.index.NumericDocValues;
-import org.apache.lucene.index.StoredFields;
 import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.queryparser.classic.QueryParserBase;
 import org.apache.lucene.search.Collector;
@@ -43,7 +38,6 @@ import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
-import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.local.utils.LuceneTextIndexUtils;
@@ -479,42 +473,35 @@ public class LuceneTextIndexReader implements TextIndexReader {
             PinotDataBuffer.mapFile(docIdMappingFile, /* readOnly */ true, 0, length, ByteOrder.LITTLE_ENDIAN, desc);
 
         return new DefaultDocIdTranslator(buffer);
-      } else {
-        buffer =
-            PinotDataBuffer.mapFile(docIdMappingFile, /* readOnly */ false, 0, length, ByteOrder.LITTLE_ENDIAN, desc);
-
-        if (config.getDocIdTranslatorMode() == DocIdTranslatorMode.TryOptimize) {
-          LOGGER.debug("Creating lucene to pinot doc id mapping.");
-          boolean allIdsAreEqual = fillDocIdMapping(indexSearcher, buffer, numDocs);
-
-          if (allIdsAreEqual) {
-            LOGGER.debug("Lucene doc ids are equal to Pinot's. Deleting mapping and updating index settings.");
-            // TODO: it'd be better to unmap without flushing the buffer. Only some buffer types support it, though.
-            buffer.close();
-            buffer = null;
-            // get rid of mapping and use lucene ids
-            docIdMappingFile.delete();
-
-            // mapping is unnecessary so store flag in config file to skip checking on next load
-            TextIndexConfig newConfig =
-                new TextIndexConfigBuilder(config).withDocIdTranslatorMode(DocIdTranslatorMode.Skip.name()).build();
-            TextIndexUtils.writeConfigToPropertiesFile(indexDir, newConfig);
-
-            return NoOpDocIdTranslator.INSTANCE;
-          } else {
-            LOGGER.debug("Lucene doc ids are not equal to Pinot's. Keeping the mapping.");
-            // mapping is required so switch to default mode
-            TextIndexConfig newConfig =
-                new TextIndexConfigBuilder(config).withDocIdTranslatorMode(DocIdTranslatorMode.Default.name()).build();
-            TextIndexUtils.writeConfigToPropertiesFile(indexDir, newConfig);
-
-            return new DefaultDocIdTranslator(buffer);
-          }
-        } else {
-          fillDocIdMapping(indexSearcher, buffer, numDocs);
-          return new DefaultDocIdTranslator(buffer);
-        }
       }
+      buffer =
+          PinotDataBuffer.mapFile(docIdMappingFile, /* readOnly */ false, 0, length, ByteOrder.LITTLE_ENDIAN, desc);
+      LOGGER.debug("Creating lucene to pinot doc id mapping.");
+      boolean isIdentityMapping =
+          TextIndexUtils.fillDocIdMapping(indexSearcher.getIndexReader(), buffer, numDocs, null);
+      if (config.getDocIdTranslatorMode() == DocIdTranslatorMode.TryOptimize) {
+        if (isIdentityMapping) {
+          LOGGER.debug("Lucene doc ids are equal to Pinot's. Deleting mapping and updating index settings.");
+          // TODO: it'd be better to unmap without flushing the buffer. Only some buffer types support it, though.
+          buffer.close();
+          buffer = null;
+          // get rid of mapping and use lucene ids
+          docIdMappingFile.delete();
+
+          // mapping is unnecessary so store flag in config file to skip checking on next load
+          TextIndexConfig newConfig =
+              new TextIndexConfigBuilder(config).withDocIdTranslatorMode(DocIdTranslatorMode.Skip.name()).build();
+          TextIndexUtils.writeConfigToPropertiesFile(indexDir, newConfig);
+
+          return NoOpDocIdTranslator.INSTANCE;
+        }
+        LOGGER.debug("Lucene doc ids are not equal to Pinot's. Keeping the mapping.");
+        // mapping is required so switch to default mode
+        TextIndexConfig newConfig =
+            new TextIndexConfigBuilder(config).withDocIdTranslatorMode(DocIdTranslatorMode.Default.name()).build();
+        TextIndexUtils.writeConfigToPropertiesFile(indexDir, newConfig);
+      }
+      return new DefaultDocIdTranslator(buffer);
     } catch (Exception e) {
       if (buffer != null) {
         buffer.close();
@@ -548,75 +535,21 @@ public class LuceneTextIndexReader implements TextIndexReader {
     PinotDataBuffer buffer = PinotDataBuffer.allocateDirect(length, ByteOrder.LITTLE_ENDIAN, desc);
 
     try {
+      LOGGER.debug("Creating lucene to pinot doc id mapping.");
+      boolean isIdentityMapping = TextIndexUtils.fillDocIdMapping(_indexReader, buffer, numDocs, null);
       if (config.getDocIdTranslatorMode() == DocIdTranslatorMode.TryOptimize) {
-        LOGGER.debug("Creating lucene to pinot doc id mapping.");
-        boolean allIdsAreEqual = fillDocIdMapping(_indexSearcher, buffer, numDocs);
-
-        if (allIdsAreEqual) {
+        if (isIdentityMapping) {
           LOGGER.debug("Lucene doc ids are equal to Pinot's. Using no-op translator.");
           buffer.close();
           return NoOpDocIdTranslator.INSTANCE;
-        } else {
-          LOGGER.debug("Lucene doc ids are not equal to Pinot's. Using default translator.");
-          return new DefaultDocIdTranslator(buffer);
         }
-      } else {
-        fillDocIdMapping(_indexSearcher, buffer, numDocs);
-        return new DefaultDocIdTranslator(buffer);
+        LOGGER.debug("Lucene doc ids are not equal to Pinot's. Using default translator.");
       }
+      return new DefaultDocIdTranslator(buffer);
     } catch (Exception e) {
       buffer.close();
       throw new RuntimeException("Caught exception while creating doc id translator for text index column: " + _column,
           e);
     }
-  }
-
-  /// Reads the actual Pinot ids after Lucene merges and sorting. Doc values avoid stored-field decompression;
-  /// indexes created by older writers, including individual older leaves, retain the stored-field fallback.
-  @VisibleForTesting
-  static boolean fillDocIdMapping(IndexSearcher indexSearcher, PinotDataBuffer buffer, int numDocs)
-      throws IOException {
-    NumericDocValues docIds = MultiDocValues.getNumericValues(indexSearcher.getIndexReader(),
-        LuceneTextIndexCreator.PINOT_DOC_ID_DOC_VALUES_FIELD_NAME);
-    class DocIdVisitor extends DocumentStoredFieldVisitor {
-      int _pinotDocId;
-
-      @Override
-      public Status needsField(FieldInfo fieldInfo) {
-        return LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME.equals(fieldInfo.name) ? Status.YES : Status.NO;
-      }
-
-      @Override
-      public void intField(FieldInfo fieldInfo, int value) {
-        _pinotDocId = value;
-      }
-
-      @Override
-      public void stringField(FieldInfo fieldInfo, String value) {
-        _pinotDocId = Integer.parseInt(value);
-      }
-    }
-    DocIdVisitor visitor = new DocIdVisitor();
-    StoredFields storedFields = null;
-    boolean allIdsAreEqual = true;
-    for (int i = 0; i < numDocs; i++) {
-      int pinotDocId;
-      if (docIds != null && docIds.advanceExact(i)) {
-        pinotDocId = Math.toIntExact(docIds.longValue());
-      } else {
-        if (storedFields == null) {
-          storedFields = indexSearcher.storedFields();
-        }
-        visitor._pinotDocId = Integer.MIN_VALUE;
-        storedFields.document(i, visitor);
-        pinotDocId = visitor._pinotDocId;
-        if (pinotDocId == Integer.MIN_VALUE) {
-          throw new IOException("Missing Pinot document id for Lucene document: " + i);
-        }
-      }
-      allIdsAreEqual &= i == pinotDocId;
-      buffer.putInt((long) i * Integer.BYTES, pinotDocId);
-    }
-    return allIdsAreEqual;
   }
 }

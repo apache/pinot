@@ -161,6 +161,23 @@ public class LuceneTextIndexCreatorTest {
   }
 
   @Test
+  public void testDocValuesFieldNameColumnWithEmptyValues()
+      throws IOException {
+    String column = LuceneTextIndexCreator.PINOT_DOC_ID_DOC_VALUES_FIELD_NAME;
+    TextIndexConfig config = new TextIndexConfigBuilder().build();
+    try (LuceneTextIndexCreator creator =
+        new LuceneTextIndexCreator(column, INDEX_DIR, true, false, null, null, config)) {
+      creator.add(new String[0], 0);
+      creator.add(new String[]{"alpha"}, 1);
+      creator.seal();
+    }
+    try (LuceneTextIndexReader reader = new LuceneTextIndexReader(column, INDEX_DIR, 2, config)) {
+      assertEquals(reader.getDocIds("alpha", null).toArray(), new int[]{1});
+      assertEquals(reader.getDocIds("*:* ", null).toArray(), new int[]{0, 1});
+    }
+  }
+
+  @Test
   public void testMutableIndexRetainsStoredFieldFallback()
       throws IOException {
     String column = "mutableValues";
