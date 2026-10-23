@@ -85,6 +85,8 @@ import org.apache.pinot.core.query.aggregation.utils.exprminmax.ExprMinMaxObject
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
 import org.apache.pinot.segment.local.customobject.AvgPair;
+import org.apache.pinot.segment.local.customobject.BigDecimalLongPair;
+import org.apache.pinot.segment.local.customobject.BytesLongPair;
 import org.apache.pinot.segment.local.customobject.CovarianceTuple;
 import org.apache.pinot.segment.local.customobject.CpcSketchAccumulator;
 import org.apache.pinot.segment.local.customobject.DoubleLongPair;
@@ -173,7 +175,9 @@ public class ObjectSerDeUtils {
     FunnelStepEventAccumulator(51),
     BigDecimalArrayList(52),
     BigDecimalSet(53),
-    BytesArrayList(54);
+    BytesArrayList(54),
+    BigDecimalLongPair(55),
+    BytesLongPair(56);
 
     private final int _value;
 
@@ -287,6 +291,10 @@ public class ObjectSerDeUtils {
         return ObjectType.DoubleLongPair;
       } else if (value instanceof StringLongPair) {
         return ObjectType.StringLongPair;
+      } else if (value instanceof BigDecimalLongPair) {
+        return ObjectType.BigDecimalLongPair;
+      } else if (value instanceof BytesLongPair) {
+        return ObjectType.BytesLongPair;
       } else if (value instanceof CovarianceTuple) {
         return ObjectType.CovarianceTuple;
       } else if (value instanceof VarianceTuple) {
@@ -808,6 +816,41 @@ public class ObjectSerDeUtils {
     @Override
     public StringLongPair deserialize(ByteBuffer byteBuffer) {
       return StringLongPair.fromByteBuffer(byteBuffer);
+    }
+  };
+  public static final ObjectSerDe<BigDecimalLongPair> BIG_DECIMAL_LONG_PAIR_SER_DE =
+      new ObjectSerDe<BigDecimalLongPair>() {
+
+        @Override
+        public byte[] serialize(BigDecimalLongPair bigDecimalLongPair) {
+          return bigDecimalLongPair.toBytes();
+        }
+
+        @Override
+        public BigDecimalLongPair deserialize(byte[] bytes) {
+          return BigDecimalLongPair.fromBytes(bytes);
+        }
+
+        @Override
+        public BigDecimalLongPair deserialize(ByteBuffer byteBuffer) {
+          return BigDecimalLongPair.fromByteBuffer(byteBuffer);
+        }
+      };
+  public static final ObjectSerDe<BytesLongPair> BYTES_LONG_PAIR_SER_DE = new ObjectSerDe<BytesLongPair>() {
+
+    @Override
+    public byte[] serialize(BytesLongPair bytesLongPair) {
+      return bytesLongPair.toBytes();
+    }
+
+    @Override
+    public BytesLongPair deserialize(byte[] bytes) {
+      return BytesLongPair.fromBytes(bytes);
+    }
+
+    @Override
+    public BytesLongPair deserialize(ByteBuffer byteBuffer) {
+      return BytesLongPair.fromByteBuffer(byteBuffer);
     }
   };
 
@@ -2089,6 +2132,8 @@ public class ObjectSerDeUtils {
       BIG_DECIMAL_ARRAY_LIST_SER_DE,
       BIG_DECIMAL_SET_SER_DE,
       BYTES_ARRAY_LIST_SER_DE,
+      BIG_DECIMAL_LONG_PAIR_SER_DE,
+      BYTES_LONG_PAIR_SER_DE,
   };
   //@formatter:on
 

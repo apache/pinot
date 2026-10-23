@@ -32,6 +32,7 @@ import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
+import java.math.BigDecimal;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -60,6 +61,8 @@ import org.apache.pinot.core.query.aggregation.function.PercentileEstAggregation
 import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.funnel.FunnelStepEvent;
 import org.apache.pinot.segment.local.customobject.AvgPair;
+import org.apache.pinot.segment.local.customobject.BigDecimalLongPair;
+import org.apache.pinot.segment.local.customobject.BytesLongPair;
 import org.apache.pinot.segment.local.customobject.CpcSketchAccumulator;
 import org.apache.pinot.segment.local.customobject.DoubleLongPair;
 import org.apache.pinot.segment.local.customobject.FloatLongPair;
@@ -76,6 +79,7 @@ import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigest.Centroid;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigestAccumulator;
 import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -401,6 +405,36 @@ public class ObjectSerDeUtilsTest {
 
       byte[] bytes = ObjectSerDeUtils.serialize(expected);
       ValueLongPair<String> actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.StringLongPair);
+
+      assertEquals(actual.getValue(), expected.getValue(), ERROR_MESSAGE);
+      assertEquals(actual.getTime(), expected.getTime(), ERROR_MESSAGE);
+    }
+  }
+
+  @Test
+  public void testBigDecimalValueTimePair() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      ValueLongPair<BigDecimal> expected =
+          new BigDecimalLongPair(BigDecimal.valueOf(RANDOM.nextLong(), RANDOM.nextInt(20)), RANDOM.nextLong());
+
+      byte[] bytes = ObjectSerDeUtils.serialize(expected);
+      ValueLongPair<BigDecimal> actual =
+          ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.BigDecimalLongPair);
+
+      assertEquals(actual.getValue(), expected.getValue(), ERROR_MESSAGE);
+      assertEquals(actual.getTime(), expected.getTime(), ERROR_MESSAGE);
+    }
+  }
+
+  @Test
+  public void testBytesValueTimePair() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      byte[] value = new byte[RANDOM.nextInt(32)];
+      RANDOM.nextBytes(value);
+      ValueLongPair<ByteArray> expected = new BytesLongPair(new ByteArray(value), RANDOM.nextLong());
+
+      byte[] bytes = ObjectSerDeUtils.serialize(expected);
+      ValueLongPair<ByteArray> actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.BytesLongPair);
 
       assertEquals(actual.getValue(), expected.getValue(), ERROR_MESSAGE);
       assertEquals(actual.getTime(), expected.getTime(), ERROR_MESSAGE);

@@ -21,6 +21,8 @@ package org.apache.pinot.queries;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -28,6 +30,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
@@ -55,6 +58,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
@@ -90,6 +94,10 @@ public class FirstWithTimeQueriesTest extends BaseQueriesTest {
   private static final String STRING_COLUMN = "stringColumn";
   private static final String STRING_NO_DICT_COLUMN = "stringNoDictColumn";
   private static final String TIME_COLUMN = "timestampColumn";
+  private static final String TIMESTAMP_VALUE_COLUMN = "timestampValueColumn";
+  private static final String BIG_DECIMAL_COLUMN = "bigDecimalColumn";
+  private static final String BYTES_COLUMN = "bytesColumn";
+  private static final String UUID_COLUMN = "uuidColumn";
   private static final Schema SCHEMA = new Schema.SchemaBuilder()
       .addSingleValueDimension(BOOL_COLUMN, DataType.BOOLEAN)
       .addSingleValueDimension(BOOL_NO_DICT_COLUMN, DataType.BOOLEAN)
@@ -104,6 +112,10 @@ public class FirstWithTimeQueriesTest extends BaseQueriesTest {
       .addSingleValueDimension(DOUBLE_NO_DICT_COLUMN, DataType.DOUBLE)
       .addSingleValueDimension(STRING_COLUMN, DataType.STRING)
       .addSingleValueDimension(STRING_NO_DICT_COLUMN, DataType.STRING)
+      .addSingleValueDimension(TIMESTAMP_VALUE_COLUMN, DataType.TIMESTAMP)
+      .addSingleValueDimension(BYTES_COLUMN, DataType.BYTES)
+      .addSingleValueDimension(UUID_COLUMN, DataType.UUID)
+      .addMetric(BIG_DECIMAL_COLUMN, DataType.BIG_DECIMAL)
       .addSingleValueDimension(TIME_COLUMN, DataType.LONG).build();
   private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
       .setNoDictionaryColumns(
@@ -116,12 +128,20 @@ public class FirstWithTimeQueriesTest extends BaseQueriesTest {
   private Float _expectedResultFirstFloat;
   private Double _expectedResultFirstDouble;
   private String _expectedResultFirstString;
+  private Long _expectedResultFirstTimestamp;
+  private BigDecimal _expectedResultFirstBigDecimal;
+  private byte[] _expectedResultFirstBytes;
+  private String _expectedResultFirstUuid;
   private Map<Integer, Boolean> _boolGroupValues;
   private Map<Integer, Integer> _intGroupValues;
   private Map<Integer, Long> _longGroupValues;
   private Map<Integer, Float> _floatGroupValues;
   private Map<Integer, Double> _doubleGroupValues;
   private Map<Integer, String> _stringGroupValues;
+  private Map<Integer, Long> _timestampGroupValues;
+  private Map<Integer, BigDecimal> _bigDecimalGroupValues;
+  private Map<Integer, byte[]> _bytesGroupValues;
+  private Map<Integer, String> _uuidGroupValues;
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
 
@@ -152,6 +172,10 @@ public class FirstWithTimeQueriesTest extends BaseQueriesTest {
     _floatGroupValues = new HashMap<>();
     _doubleGroupValues = new HashMap<>();
     _stringGroupValues = new HashMap<>();
+    _timestampGroupValues = new HashMap<>();
+    _bigDecimalGroupValues = new HashMap<>();
+    _bytesGroupValues = new HashMap<>();
+    _uuidGroupValues = new HashMap<>();
     for (int i = 0; i < NUM_RECORDS; i++) {
       boolean boolValue = RANDOM.nextBoolean();
       int intValue = RANDOM.nextInt(MAX_VALUE);
@@ -159,6 +183,11 @@ public class FirstWithTimeQueriesTest extends BaseQueriesTest {
       float floatValue = RANDOM.nextFloat();
       double doubleValue = RANDOM.nextDouble();
       String strValue = String.valueOf(RANDOM.nextDouble());
+      long timestampValue = 1_600_000_000_000L + RANDOM.nextInt(1_000_000_000);
+      BigDecimal bigDecimalValue = BigDecimal.valueOf(RANDOM.nextLong(), 3);
+      byte[] bytesValue = new byte[4];
+      RANDOM.nextBytes(bytesValue);
+      String uuidValue = new UUID(RANDOM.nextLong(), RANDOM.nextLong()).toString();
       GenericRow record = new GenericRow();
       record.putValue(BOOL_COLUMN, boolValue);
       record.putValue(BOOL_NO_DICT_COLUMN, boolValue);
@@ -173,6 +202,10 @@ public class FirstWithTimeQueriesTest extends BaseQueriesTest {
       record.putValue(DOUBLE_NO_DICT_COLUMN, doubleValue);
       record.putValue(STRING_COLUMN, strValue);
       record.putValue(STRING_NO_DICT_COLUMN, strValue);
+      record.putValue(TIMESTAMP_VALUE_COLUMN, timestampValue);
+      record.putValue(BIG_DECIMAL_COLUMN, bigDecimalValue);
+      record.putValue(BYTES_COLUMN, bytesValue);
+      record.putValue(UUID_COLUMN, uuidValue);
       record.putValue(TIME_COLUMN, (long) i);
       if (i == 0) {
         _expectedResultFirstBoolean = boolValue;
@@ -181,6 +214,10 @@ public class FirstWithTimeQueriesTest extends BaseQueriesTest {
         _expectedResultFirstFloat = floatValue;
         _expectedResultFirstDouble = doubleValue;
         _expectedResultFirstString = strValue;
+        _expectedResultFirstTimestamp = timestampValue;
+        _expectedResultFirstBigDecimal = bigDecimalValue;
+        _expectedResultFirstBytes = bytesValue;
+        _expectedResultFirstUuid = uuidValue;
       }
       _boolGroupValues.putIfAbsent(intValue, boolValue);
       _intGroupValues.putIfAbsent(intValue, intValue);
@@ -188,6 +225,10 @@ public class FirstWithTimeQueriesTest extends BaseQueriesTest {
       _floatGroupValues.putIfAbsent(intValue, floatValue);
       _doubleGroupValues.putIfAbsent(intValue, doubleValue);
       _stringGroupValues.putIfAbsent(intValue, strValue);
+      _timestampGroupValues.putIfAbsent(intValue, timestampValue);
+      _bigDecimalGroupValues.putIfAbsent(intValue, bigDecimalValue);
+      _bytesGroupValues.putIfAbsent(intValue, bytesValue);
+      _uuidGroupValues.putIfAbsent(intValue, uuidValue);
       records.add(record);
     }
 
@@ -420,6 +461,113 @@ public class FirstWithTimeQueriesTest extends BaseQueriesTest {
       assertEquals(row[4], _floatGroupValues.get(key));
       assertEquals(row[5], _doubleGroupValues.get(key));
       assertEquals(row[6], _stringGroupValues.get(key));
+    }
+  }
+
+  /// The data type argument can be omitted for a column; the optimizer supplies it from the schema.
+  @Test
+  public void testAggregationOnlyWithInferredDataType() {
+    String query = "SELECT "
+        + "FIRSTWITHTIME(boolColumn, timestampColumn), "
+        + "FIRSTWITHTIME(intColumn, timestampColumn), "
+        + "FIRSTWITHTIME(longColumn, timestampColumn), "
+        + "FIRSTWITHTIME(floatColumn, timestampColumn), "
+        + "FIRSTWITHTIME(doubleColumn, timestampColumn), "
+        + "FIRSTWITHTIME(stringColumn, timestampColumn), "
+        + "FIRSTWITHTIME(timestampValueColumn, timestampColumn), "
+        + "FIRSTWITHTIME(timestampValueColumn, timestampColumn, 'TIMESTAMP'), "
+        + "FIRSTWITHTIME(bigDecimalColumn, timestampColumn), "
+        + "FIRSTWITHTIME(bytesColumn, timestampColumn), "
+        + "FIRSTWITHTIME(uuidColumn, timestampColumn) "
+        + "FROM testTable";
+    BrokerResponseNative brokerResponse = getBrokerResponseForOptimizedQuery(query, SCHEMA);
+    // The result columns are named after the explicit form the query is rewritten to.
+    DataSchema expectedDataSchema = new DataSchema(new String[]{
+        "firstwithtime(boolColumn,timestampColumn,'BOOLEAN')",
+        "firstwithtime(intColumn,timestampColumn,'INT')",
+        "firstwithtime(longColumn,timestampColumn,'LONG')",
+        "firstwithtime(floatColumn,timestampColumn,'FLOAT')",
+        "firstwithtime(doubleColumn,timestampColumn,'DOUBLE')",
+        "firstwithtime(stringColumn,timestampColumn,'STRING')",
+        "firstwithtime(timestampValueColumn,timestampColumn,'TIMESTAMP')",
+        "firstwithtime(timestampValueColumn,timestampColumn,'TIMESTAMP')",
+        "firstwithtime(bigDecimalColumn,timestampColumn,'BIG_DECIMAL')",
+        "firstwithtime(bytesColumn,timestampColumn,'BYTES')",
+        "firstwithtime(uuidColumn,timestampColumn,'UUID')"
+    }, new ColumnDataType[]{
+        ColumnDataType.BOOLEAN,
+        ColumnDataType.INT,
+        ColumnDataType.LONG,
+        ColumnDataType.FLOAT,
+        ColumnDataType.DOUBLE,
+        ColumnDataType.STRING,
+        ColumnDataType.TIMESTAMP,
+        ColumnDataType.TIMESTAMP,
+        ColumnDataType.BIG_DECIMAL,
+        ColumnDataType.BYTES,
+        ColumnDataType.UUID
+    });
+    String expectedTimestamp = new Timestamp(_expectedResultFirstTimestamp).toString();
+    Object[] expectedResults = new Object[]{
+        _expectedResultFirstBoolean,
+        _expectedResultFirstInt,
+        _expectedResultFirstLong,
+        _expectedResultFirstFloat,
+        _expectedResultFirstDouble,
+        _expectedResultFirstString,
+        expectedTimestamp,
+        expectedTimestamp,
+        // Ingestion strips trailing zeros from BIG_DECIMAL values.
+        _expectedResultFirstBigDecimal.stripTrailingZeros().toPlainString(),
+        BytesUtils.toHexString(_expectedResultFirstBytes),
+        _expectedResultFirstUuid
+    };
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 4 * NUM_RECORDS, 0L, 4 * 11 * NUM_RECORDS,
+        4 * NUM_RECORDS, new ResultTable(expectedDataSchema, List.<Object[]>of(expectedResults)));
+  }
+
+  @Test
+  public void testAggregationOnlyWithInferredDataTypeAndNoMatchingRows() {
+    // Without matching rows, the results are the default values; for UUID it is the nil UUID.
+    String query = "SELECT FIRSTWITHTIME(bigDecimalColumn, timestampColumn), "
+        + "FIRSTWITHTIME(bytesColumn, timestampColumn), FIRSTWITHTIME(uuidColumn, timestampColumn) "
+        + "FROM testTable WHERE timestampColumn < 0";
+    ResultTable resultTable = getBrokerResponseForOptimizedQuery(query, SCHEMA).getResultTable();
+    assertEquals(resultTable.getRows().get(0), new Object[]{"0", "", "00000000-0000-0000-0000-000000000000"});
+  }
+
+  @Test
+  public void testAggregationGroupByWithInferredDataType() {
+    String query = "SELECT intColumn AS key, "
+        + "FIRSTWITHTIME(boolColumn, timestampColumn) AS v1, "
+        + "FIRSTWITHTIME(longNoDictColumn, timestampColumn) AS v2, "
+        + "FIRSTWITHTIME(stringColumn, timestampColumn) AS v3, "
+        + "FIRSTWITHTIME(timestampValueColumn, timestampColumn) AS v4, "
+        + "FIRSTWITHTIME(bytesColumn, timestampColumn) AS v5, "
+        + "FIRSTWITHTIME(uuidColumn, timestampColumn) AS v6, "
+        + "FIRSTWITHTIME(bigDecimalColumn, timestampColumn) AS v7 "
+        + "FROM testTable GROUP BY key ORDER BY FIRSTWITHTIME(longNoDictColumn, timestampColumn)";
+    ResultTable resultTable = getBrokerResponseForOptimizedQuery(query, SCHEMA).getResultTable();
+    assertEquals(resultTable.getDataSchema(),
+        new DataSchema(new String[]{"key", "v1", "v2", "v3", "v4", "v5", "v6", "v7"}, new ColumnDataType[]{
+            ColumnDataType.INT, ColumnDataType.BOOLEAN, ColumnDataType.LONG, ColumnDataType.STRING,
+            ColumnDataType.TIMESTAMP, ColumnDataType.BYTES, ColumnDataType.UUID, ColumnDataType.BIG_DECIMAL
+        }));
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 10);
+    long previous = Long.MIN_VALUE;
+    for (Object[] row : rows) {
+      int key = (Integer) row[0];
+      assertEquals(row[1], _boolGroupValues.get(key));
+      assertEquals(row[2], _longGroupValues.get(key));
+      assertEquals(row[3], _stringGroupValues.get(key));
+      assertEquals(row[4], new Timestamp(_timestampGroupValues.get(key)).toString());
+      assertEquals(row[5], BytesUtils.toHexString(_bytesGroupValues.get(key)));
+      assertEquals(row[6], _uuidGroupValues.get(key));
+      assertEquals(row[7], _bigDecimalGroupValues.get(key).stripTrailingZeros().toPlainString());
+      // ORDER BY repeats the call, so it must be rewritten the same way as the SELECT list.
+      assertTrue((Long) row[2] >= previous);
+      previous = (Long) row[2];
     }
   }
 

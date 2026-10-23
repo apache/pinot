@@ -65,10 +65,12 @@ public enum AggregationFunctionType {
   AVG("avg", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
   MODE("mode", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
   ANYVALUE("anyValue", ReturnTypes.ARG0, OperandTypes.ANY, SqlTypeName.OTHER),
-  FIRSTWITHTIME("firstWithTime", ReturnTypes.ARG0,
-      OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), SqlTypeName.OTHER),
-  LASTWITHTIME("lastWithTime", ReturnTypes.ARG0,
-      OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), SqlTypeName.OTHER),
+  FIRSTWITHTIME("firstWithTime", ReturnTypes.ARG0, OperandTypes.or(
+      OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY),
+      OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER)), SqlTypeName.OTHER),
+  LASTWITHTIME("lastWithTime", ReturnTypes.ARG0, OperandTypes.or(
+      OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY),
+      OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER)), SqlTypeName.OTHER),
   MINMAXRANGE("minMaxRange", ReturnTypes.DOUBLE, OperandTypes.ANY, SqlTypeName.OTHER, SqlTypeName.DOUBLE),
 
   /// for all distinct count family functions:

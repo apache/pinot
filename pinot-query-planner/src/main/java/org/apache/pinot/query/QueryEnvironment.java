@@ -58,6 +58,7 @@ import org.apache.calcite.tools.RelBuilder;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.calcite.rel.rules.ImmutablePinotSortExchangeCopyRule;
+import org.apache.pinot.calcite.rel.rules.PinotAggregateTypeArgumentRewriteRule;
 import org.apache.pinot.calcite.rel.rules.PinotImplicitTableHintRule;
 import org.apache.pinot.calcite.rel.rules.PinotJoinToDynamicBroadcastRule;
 import org.apache.pinot.calcite.rel.rules.PinotRelDistributionTraitRule;
@@ -604,6 +605,8 @@ public class QueryEnvironment {
     for (RelOptRule relOptRule : basicRules) {
       hepProgramBuilder.addRuleInstance(relOptRule);
     }
+    // Required to plan FIRST_WITH_TIME / LAST_WITH_TIME without a data type, so the rule options do not filter it.
+    hepProgramBuilder.addRuleInstance(PinotAggregateTypeArgumentRewriteRule.INSTANCE);
 
     // ----
     // Pushdown filters using a single HepInstruction.
