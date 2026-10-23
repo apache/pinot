@@ -3012,33 +3012,6 @@ public class TableConfigUtilsTest {
       assertEquals(e.getMessage(), "Invalid tenant tag override used for Upsert/Dedup table");
     }
 
-    // Instance assignment config with just CONSUMING instance partitions configured should be allowed
-    InstanceAssignmentConfig instanceAssignmentConfig = mock(InstanceAssignmentConfig.class);
-    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setTimeColumnName(TIME_COLUMN)
-        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
-        .setStreamConfigs(getStreamConfigs())
-        .setRoutingConfig(STRICT_REPLICA_ROUTING_CONFIG)
-        .setInstanceAssignmentConfigMap(Map.of(InstancePartitionsType.CONSUMING.name(), instanceAssignmentConfig))
-        .build();
-    TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, validSchema);
-
-    // Instance assignment config with CONSUMING and COMPLETED instance partitions configured should not be allowed
-    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setTimeColumnName(TIME_COLUMN)
-        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
-        .setStreamConfigs(getStreamConfigs())
-        .setRoutingConfig(STRICT_REPLICA_ROUTING_CONFIG)
-        .setInstanceAssignmentConfigMap(Map.of(InstancePartitionsType.CONSUMING.name(), instanceAssignmentConfig,
-            InstancePartitionsType.COMPLETED.name(), instanceAssignmentConfig))
-        .build();
-    try {
-      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, validSchema);
-      fail("Instance assignment config with COMPLETED instance partitions must not be allowed with upsert");
-    } catch (IllegalStateException e) {
-      assertEquals(e.getMessage(), "COMPLETED instance partitions can't be configured for upsert / dedup tables");
-    }
-
     // empty tag override with upsert should pass
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
         .setTimeColumnName(TIME_COLUMN)
@@ -3853,6 +3826,271 @@ public class TableConfigUtilsTest {
   }
 
   @SuppressWarnings("removal")
+  private static InstanceAssignmentConfig createReplicaGroupInstanceAssignmentConfig(boolean replicaGroupBased,
+      int numInstancesPerReplicaGroup, int numPartitions, int numInstancesPerPartition) {
+    return new InstanceAssignmentConfig(new InstanceTagPoolConfig("DefaultTenant_OFFLINE", false, 0, null), null,
+        new InstanceReplicaGroupPartitionConfig(replicaGroupBased, 0, 2, numInstancesPerReplicaGroup, numPartitions,
+            numInstancesPerPartition, false, null), null, false);
+  }
+
+  private static TableConfigBuilder strictReplicaGroupTableConfigBuilder(TableType tableType) {
+    return new TableConfigBuilder(tableType).setTableName(TABLE_NAME).setRoutingConfig(STRICT_REPLICA_ROUTING_CONFIG);
+  }
+
+  private static void assertStrictReplicaGroupRoutingFails(TableConfig tableConfig, String expectedMessage) {
+    IllegalStateException e = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validateStrictReplicaGroupRouting(tableConfig));
+    assertEquals(e.getMessage(), expectedMessage);
+  }
+
+  @SuppressWarnings("removal")
+  @Test
+  public void testValidateStrictReplicaGroupRouting() {
+    String offlineKey = InstancePartitionsType.OFFLINE.name();
+    SegmentPartitionConfig segmentPartitionConfig =
+        new SegmentPartitionConfig(Map.of("myCol", new ColumnPartitionConfig("murmur", 4)));
+    Map<String, InstanceAssignmentConfig> offlineInstanceAssignmentConfigMap =
+        Map.of(offlineKey, createReplicaGroupInstanceAssignmentConfig(true, 0, 4, 1));
+    SegmentAssignmentConfig replicaGroupSegmentAssignmentConfig =
+        new SegmentAssignmentConfig(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY, null);
+    SegmentAssignmentConfig balancedSegmentAssignmentConfig =
+        new SegmentAssignmentConfig(AssignmentStrategy.BALANCE_NUM_SEGMENT_ASSIGNMENT_STRATEGY, null);
+
+    // Tables without strict replica-group routing are not validated
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .build();
+    TableConfigUtils.validateStrictReplicaGroupRouting(tableConfig);
+
+    // Dimension tables host every segment on every server
+    tableConfig = strictReplicaGroupTableConfigBuilder(TableType.OFFLINE)
+        .setIsDimTable(true)
+        .build();
+    TableConfigUtils.validateStrictReplicaGroupRouting(tableConfig);
+
+    // OFFLINE table with partitioned replica-group instance assignment and one instance per partition
+    tableConfig = strictReplicaGroupTableConfigBuilder(TableType.OFFLINE)
+        .setSegmentPartitionConfig(segmentPartitionConfig)
+        .setInstanceAssignmentConfigMap(offlineInstanceAssignmentConfigMap)
+        .build();
+    TableConfigUtils.validateStrictReplicaGroupRouting(tableConfig);
+
+    // OFFLINE table with the replica-group segment assignment strategy configured explicitly
+    tableConfig = strictReplicaGroupTableConfigBuilder(TableType.OFFLINE)
+        .setSegmentPartitionConfig(segmentPartitionConfig)
+        .setInstanceAssignmentConfigMap(offlineInstanceAssignmentConfigMap)
+        .setSegmentAssignmentConfigMap(Map.of(offlineKey, replicaGroupSegmentAssignmentConfig))
+        .build();
+    TableConfigUtils.validateStrictReplicaGroupRouting(tableConfig);
+
+    // OFFLINE table with the round-robin replica-group strategy, which is the same as replica-group with one instance
+    // per partition
+    tableConfig = strictReplicaGroupTableConfigBuilder(TableType.OFFLINE)
+        .setSegmentPartitionConfig(segmentPartitionConfig)
+        .setInstanceAssignmentConfigMap(offlineInstanceAssignmentConfigMap)
+        .setSegmentAssignmentConfigMap(Map.of(offlineKey,
+            new SegmentAssignmentConfig(AssignmentStrategy.ROUND_ROBIN_REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY,
+                null)))
+        .build();
+    TableConfigUtils.validateStrictReplicaGroupRouting(tableConfig);
+
+    // Without numInstancesPerPartition, each partition gets numInstancesPerReplicaGroup instances, and the layout is
+    // left to the controller when neither is set
+    tableConfig = strictReplicaGroupTableConfigBuilder(TableType.OFFLINE)
+        .setInstanceAssignmentConfigMap(Map.of(offlineKey, createReplicaGroupInstanceAssignmentConfig(true, 1, 0, 0)))
+        .build();
+    TableConfigUtils.validateStrictReplicaGroupRouting(tableConfig);
+    tableConfig = strictReplicaGroupTableConfigBuilder(TableType.OFFLINE)
+        .setInstanceAssignmentConfigMap(Map.of(offlineKey, createReplicaGroupInstanceAssignmentConfig(true, 0, 0, 0)))
+        .build();
+    TableConfigUtils.validateStrictReplicaGroupRouting(tableConfig);
+    tableConfig = strictReplicaGroupTableConfigBuilder(TableType.OFFLINE)
+        .setInstanceAssignmentConfigMap(Map.of(offlineKey, createReplicaGroupInstanceAssignmentConfig(true, 2, 0, 0)))
+        .build();
+    assertStrictReplicaGroupRoutingFails(tableConfig,
+        "Table using strict replica-group routing must have one instance per partition (numInstancesPerPartition, or "
+            + "numInstancesPerReplicaGroup when it is not set) in OFFLINE instance assignment config to ensure all "
+            + "segments of a partition are assigned to the same server");
+
+    // OFFLINE table with a single partition keeps every segment on one instance per replica-group
+    tableConfig = strictReplicaGroupTableConfigBuilder(TableType.OFFLINE)
+        .setInstanceAssignmentConfigMap(Map.of(offlineKey, createReplicaGroupInstanceAssignmentConfig(true, 0, 0, 1)))
+        .build();
+    TableConfigUtils.validateStrictReplicaGroupRouting(tableConfig);
+
+    // OFFLINE table without OFFLINE instance assignment config
+    tableConfig = strictReplicaGroupTableConfigBuilder(TableType.OFFLINE)
+        .setSegmentPartitionConfig(segmentPartitionConfig)
+        .build();
+    assertStrictReplicaGroupRoutingFails(tableConfig,
+        "Table using strict replica-group routing must have OFFLINE instance assignment config "
+            + "(instanceAssignmentConfigMap) to ensure all segments of a partition are assigned to the same server");
+
+    // OFFLINE table with the deprecated replicaGroupStrategyConfig, which takes effect only together with the
+    // replica-group segment assignment strategy
+    tableConfig = strictReplicaGroupTableConfigBuilder(TableType.OFFLINE)
+        .setSegmentPartitionConfig(segmentPartitionConfig)
+        .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig("myCol", 1))
+        .setSegmentAssignmentConfigMap(Map.of(offlineKey, replicaGroupSegmentAssignmentConfig))
+        .build();
+    TableConfigUtils.validateStrictReplicaGroupRouting(tableConfig);
+    tableConfig = strictReplicaGroupTableConfigBuilder(TableType.OFFLINE)
+        .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(null, 1))
+        .setSegmentAssignmentConfigMap(Map.of(offlineKey, replicaGroupSegmentAssignmentConfig))
+        .build();
+    TableConfigUtils.validateStrictReplicaGroupRouting(tableConfig);
+    tableConfig = strictReplicaGroupTableConfigBuilder(TableType.OFFLINE)
+        .setSegmentPartitionConfig(segmentPartitionConfig)
+        .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig("myCol", 2))
+        .setSegmentAssignmentConfigMap(Map.of(offlineKey, replicaGroupSegmentAssignmentConfig))
+        .build();
+    assertStrictReplicaGroupRoutingFails(tableConfig,
+        "Table using strict replica-group routing must have one instance per partition (numInstancesPerPartition, or "
+            + "numInstancesPerReplicaGroup when it is not set) in OFFLINE instance assignment config to ensure all "
+            + "segments of a partition are assigned to the same server");
+    tableConfig = strictReplicaGroupTableConfigBuilder(TableType.OFFLINE)
+        .setSegmentPartitionConfig(segmentPartitionConfig)
+        .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig("myCol", 1))
+        .build();
+    assertStrictReplicaGroupRoutingFails(tableConfig,
+        "Table using strict replica-group routing must have OFFLINE instance assignment config "
+            + "(instanceAssignmentConfigMap) to ensure all segments of a partition are assigned to the same server");
+
+    // OFFLINE table with pre-configured instance partitions leaves the layout check to the controller, but still
+    // cannot use a segment assignment strategy that ignores the partition
+    tableConfig = strictReplicaGroupTableConfigBuilder(TableType.OFFLINE)
+        .setInstancePartitionsMap(Map.of(InstancePartitionsType.OFFLINE, "test_OFFLINE"))
+        .build();
+    TableConfigUtils.validateStrictReplicaGroupRouting(tableConfig);
+    tableConfig = strictReplicaGroupTableConfigBuilder(TableType.OFFLINE)
+        .setInstancePartitionsMap(Map.of(InstancePartitionsType.OFFLINE, "test_OFFLINE"))
+        .setSegmentAssignmentConfigMap(Map.of(offlineKey, balancedSegmentAssignmentConfig))
+        .build();
+    assertStrictReplicaGroupRoutingFails(tableConfig,
+        "Table using strict replica-group routing can only use 'replicagroup' or 'roundrobinreplicagroup' OFFLINE "
+            + "segment assignment strategy, found: balanced");
+
+    // OFFLINE table with non replica-group based instance assignment
+    tableConfig = strictReplicaGroupTableConfigBuilder(TableType.OFFLINE)
+        .setSegmentPartitionConfig(segmentPartitionConfig)
+        .setInstanceAssignmentConfigMap(Map.of(offlineKey, createReplicaGroupInstanceAssignmentConfig(false, 0, 4, 1)))
+        .build();
+    assertStrictReplicaGroupRoutingFails(tableConfig,
+        "Table using strict replica-group routing must use replica-group based OFFLINE instance assignment to ensure "
+            + "all segments of a partition are assigned to the same server");
+
+    // OFFLINE table with multiple instances per partition
+    tableConfig = strictReplicaGroupTableConfigBuilder(TableType.OFFLINE)
+        .setSegmentPartitionConfig(segmentPartitionConfig)
+        .setInstanceAssignmentConfigMap(Map.of(offlineKey, createReplicaGroupInstanceAssignmentConfig(true, 0, 4, 2)))
+        .build();
+    assertStrictReplicaGroupRoutingFails(tableConfig,
+        "Table using strict replica-group routing must have one instance per partition (numInstancesPerPartition, or "
+            + "numInstancesPerReplicaGroup when it is not set) in OFFLINE instance assignment config to ensure all "
+            + "segments of a partition are assigned to the same server");
+
+    // OFFLINE table with a segment assignment strategy that ignores the partition
+    tableConfig = strictReplicaGroupTableConfigBuilder(TableType.OFFLINE)
+        .setSegmentPartitionConfig(segmentPartitionConfig)
+        .setInstanceAssignmentConfigMap(offlineInstanceAssignmentConfigMap)
+        .setSegmentAssignmentConfigMap(Map.of(offlineKey, balancedSegmentAssignmentConfig))
+        .build();
+    assertStrictReplicaGroupRoutingFails(tableConfig,
+        "Table using strict replica-group routing can only use 'replicagroup' or 'roundrobinreplicagroup' OFFLINE "
+            + "segment assignment strategy, found: balanced");
+
+    // REALTIME table without COMPLETED segment relocation places every partition on one instance per replica-group
+    tableConfig = strictReplicaGroupTableConfigBuilder(TableType.REALTIME)
+        .build();
+    TableConfigUtils.validateStrictReplicaGroupRouting(tableConfig);
+    tableConfig = strictReplicaGroupTableConfigBuilder(TableType.REALTIME)
+        .setInstanceAssignmentConfigMap(Map.of(InstancePartitionsType.CONSUMING.name(),
+            createReplicaGroupInstanceAssignmentConfig(true, 0, 0, 0)))
+        .build();
+    TableConfigUtils.validateStrictReplicaGroupRouting(tableConfig);
+
+    // REALTIME table with partitioned CONSUMING instance assignment needs one instance per partition
+    tableConfig = strictReplicaGroupTableConfigBuilder(TableType.REALTIME)
+        .setInstanceAssignmentConfigMap(Map.of(InstancePartitionsType.CONSUMING.name(),
+            createReplicaGroupInstanceAssignmentConfig(true, 0, 4, 1)))
+        .build();
+    TableConfigUtils.validateStrictReplicaGroupRouting(tableConfig);
+    tableConfig = strictReplicaGroupTableConfigBuilder(TableType.REALTIME)
+        .setInstanceAssignmentConfigMap(Map.of(InstancePartitionsType.CONSUMING.name(),
+            createReplicaGroupInstanceAssignmentConfig(true, 1, 4, 0)))
+        .build();
+    TableConfigUtils.validateStrictReplicaGroupRouting(tableConfig);
+    tableConfig = strictReplicaGroupTableConfigBuilder(TableType.REALTIME)
+        .setInstanceAssignmentConfigMap(Map.of(InstancePartitionsType.CONSUMING.name(),
+            createReplicaGroupInstanceAssignmentConfig(true, 0, 4, 2)))
+        .build();
+    assertStrictReplicaGroupRoutingFails(tableConfig,
+        "Table using strict replica-group routing must have one instance per partition (numInstancesPerPartition, or "
+            + "numInstancesPerReplicaGroup when it is not set) in CONSUMING instance assignment config with multiple "
+            + "partitions to ensure all segments of a partition are assigned to the same server");
+
+    // REALTIME table with tag override that does not relocate COMPLETED segments
+    tableConfig = strictReplicaGroupTableConfigBuilder(TableType.REALTIME)
+        .setTagOverrideConfig(new TagOverrideConfig(null, null))
+        .build();
+    TableConfigUtils.validateStrictReplicaGroupRouting(tableConfig);
+    tableConfig = strictReplicaGroupTableConfigBuilder(TableType.REALTIME)
+        .setTagOverrideConfig(new TagOverrideConfig("T1_REALTIME", "T1_REALTIME"))
+        .build();
+    TableConfigUtils.validateStrictReplicaGroupRouting(tableConfig);
+
+    // REALTIME table relocating COMPLETED segments through tag override, instance assignment config or pre-configured
+    // instance partitions
+    String relocationMessage =
+        "Table using strict replica-group routing must not relocate COMPLETED segments (tagOverrideConfig with a "
+            + "different realtimeCompleted tag, instanceAssignmentConfigMap.COMPLETED or "
+            + "instancePartitionsMap.COMPLETED) to ensure all segments of a partition are assigned to the same server";
+    tableConfig = strictReplicaGroupTableConfigBuilder(TableType.REALTIME)
+        .setTagOverrideConfig(new TagOverrideConfig("T1_REALTIME", "T2_REALTIME"))
+        .build();
+    assertStrictReplicaGroupRoutingFails(tableConfig, relocationMessage);
+    tableConfig = strictReplicaGroupTableConfigBuilder(TableType.REALTIME)
+        .setInstanceAssignmentConfigMap(Map.of(InstancePartitionsType.COMPLETED.name(),
+            createReplicaGroupInstanceAssignmentConfig(true, 0, 4, 1)))
+        .build();
+    assertStrictReplicaGroupRoutingFails(tableConfig, relocationMessage);
+    tableConfig = strictReplicaGroupTableConfigBuilder(TableType.REALTIME)
+        .setInstancePartitionsMap(Map.of(InstancePartitionsType.COMPLETED, "test_COMPLETED"))
+        .build();
+    assertStrictReplicaGroupRoutingFails(tableConfig, relocationMessage);
+
+    // Upsert and dedup tables are validated regardless of the instance selector
+    RoutingConfig multiStageReplicaGroupRoutingConfig =
+        new RoutingConfig(null, null, RoutingConfig.MULTI_STAGE_REPLICA_GROUP_SELECTOR_TYPE, false);
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
+        .setRoutingConfig(multiStageReplicaGroupRoutingConfig)
+        .setTagOverrideConfig(new TagOverrideConfig("T1_REALTIME", "T2_REALTIME"))
+        .build();
+    assertStrictReplicaGroupRoutingFails(tableConfig, relocationMessage);
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setDedupConfig(new DedupConfig())
+        .setRoutingConfig(multiStageReplicaGroupRoutingConfig)
+        .setInstancePartitionsMap(Map.of(InstancePartitionsType.COMPLETED, "test_COMPLETED"))
+        .build();
+    assertStrictReplicaGroupRoutingFails(tableConfig, relocationMessage);
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
+        .setRoutingConfig(multiStageReplicaGroupRoutingConfig)
+        .setSegmentPartitionConfig(segmentPartitionConfig)
+        .build();
+    assertStrictReplicaGroupRoutingFails(tableConfig,
+        "Table using strict replica-group routing must have OFFLINE instance assignment config "
+            + "(instanceAssignmentConfigMap) to ensure all segments of a partition are assigned to the same server");
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
+        .setRoutingConfig(multiStageReplicaGroupRoutingConfig)
+        .setSegmentPartitionConfig(segmentPartitionConfig)
+        .setInstanceAssignmentConfigMap(offlineInstanceAssignmentConfigMap)
+        .build();
+    TableConfigUtils.validateStrictReplicaGroupRouting(tableConfig);
+  }
+
   @Test
   public void testValidatePartitionedReplicaGroupInstance() {
     String partitionColumn = "testPartitionCol";

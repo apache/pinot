@@ -19,7 +19,9 @@
 package org.apache.pinot.controller.api.resources;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
@@ -44,7 +46,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 ///
 /// This lives in `pinot-controller` (not `pinot-segment-local`'s `TableConfigUtils`)
 /// because validation requires controller-level dependencies like [PinotHelixResourceManager],
-/// [ControllerConf], [PinotTaskManager], and [TableRebalancer].
+/// [ControllerConf], [PinotTaskManager], and [InstanceAssignmentUtils].
 public final class TableConfigValidationUtils {
 
   private TableConfigValidationUtils() {
@@ -121,9 +123,10 @@ public final class TableConfigValidationUtils {
   }
 
   /// Computes the instance partitions the table would get on creation, so that an instance assignment that cannot be
-  /// satisfied by the current instances is rejected before the table config is persisted, and validates that the
-  /// OFFLINE segments are placed by partition when the OFFLINE instance partitions have multiple partitions. This
-  /// covers pre-configured instance partitions, whose layout is not visible in the table config.
+  /// satisfied by the current instances is rejected before the table config is persisted, and validates them: the
+  /// OFFLINE segments must be placed by partition when the OFFLINE instance partitions have multiple partitions, and
+  /// the instance partitions must fit strict replica-group routing. This covers pre-configured instance partitions,
+  /// whose layout is not visible in the table config.
   private static void validateInstanceAssignment(PinotHelixResourceManager resourceManager, TableConfig tableConfig) {
     List<InstancePartitionsType> instancePartitionsTypes;
     if (tableConfig.getTableType() == TableType.OFFLINE) {
@@ -135,6 +138,7 @@ public final class TableConfigValidationUtils {
     }
     List<InstanceConfig> instanceConfigs = resourceManager.getAllHelixInstanceConfigs();
     InstancePartitions offlineInstancePartitions = null;
+    InstancePartitions consumingInstancePartitions = null;
     try {
       for (InstancePartitionsType instancePartitionsType : instancePartitionsTypes) {
         InstancePartitions instancePartitions;
@@ -147,6 +151,8 @@ public final class TableConfigValidationUtils {
         }
         if (instancePartitionsType == InstancePartitionsType.OFFLINE) {
           offlineInstancePartitions = instancePartitions;
+        } else if (instancePartitionsType == InstancePartitionsType.CONSUMING) {
+          consumingInstancePartitions = instancePartitions;
         }
       }
     } catch (Exception e) {
@@ -156,6 +162,37 @@ public final class TableConfigValidationUtils {
     }
     if (offlineInstancePartitions != null && offlineInstancePartitions.getNumPartitions() > 1) {
       TableConfigUtils.validatePartitionedSegmentAssignment(tableConfig, InstancePartitionsType.OFFLINE.name());
+    }
+    validateStrictReplicaGroupInstancePartitions(tableConfig, offlineInstancePartitions, consumingInstancePartitions);
+  }
+
+  /// Validates the computed or fetched instance partitions of a table using strict replica-group routing, which is the
+  /// only place where pre-configured instance partitions can be checked; the strict replica-group routing check in
+  /// [TableConfigUtils#validate] covers the instance assignment config. The OFFLINE instance partitions must place each
+  /// partition on exactly one instance per replica-group. CONSUMING segments are placed by their stream partition, so
+  /// the CONSUMING instance partitions need the same layout only when they have multiple partitions. COMPLETED segments
+  /// are never relocated for such tables.
+  @VisibleForTesting
+  static void validateStrictReplicaGroupInstancePartitions(TableConfig tableConfig,
+      @Nullable InstancePartitions offlineInstancePartitions,
+      @Nullable InstancePartitions consumingInstancePartitions) {
+    if (!TableConfigUtils.requiresStrictReplicaGroupAssignment(tableConfig)) {
+      return;
+    }
+    if (offlineInstancePartitions != null) {
+      validateOneInstancePerPartition(tableConfig, offlineInstancePartitions);
+    }
+    if (consumingInstancePartitions != null && consumingInstancePartitions.getNumPartitions() > 1) {
+      validateOneInstancePerPartition(tableConfig, consumingInstancePartitions);
+    }
+  }
+
+  private static void validateOneInstancePerPartition(TableConfig tableConfig, InstancePartitions instancePartitions) {
+    for (Map.Entry<String, List<String>> entry : instancePartitions.getPartitionToInstancesMap().entrySet()) {
+      Preconditions.checkState(entry.getValue().size() == 1,
+          "Table: %s using strict replica-group routing must have exactly one instance per partition in each "
+              + "replica-group, found instances: %s for partition_replicaGroup: %s in instance partitions: %s",
+          tableConfig.getTableName(), entry.getValue(), entry.getKey(), instancePartitions.getInstancePartitionsName());
     }
   }
 }
