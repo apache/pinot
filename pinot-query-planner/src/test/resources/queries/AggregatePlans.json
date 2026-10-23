@@ -198,6 +198,32 @@
         ]
       },
       {
+        "description": "MODE on a STRING argument gets the tie reducer and data type; numeric, BOOLEAN and TIMESTAMP MODE are unchanged",
+        "sql": "EXPLAIN PLAN FOR SELECT MODE(a.col1), MODE(a.col3), MODE(a.col5), MODE(a.ts_timestamp), MODE(UPPER(a.col2)) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{}], agg#0=[MODE($0, _UTF-8'MIN', _UTF-8'STRING')], agg#1=[MODE($1)], agg#2=[MODE($2)], agg#3=[MODE($3)], agg#4=[MODE($4, _UTF-8'MIN', _UTF-8'STRING')], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash])",
+          "\n    PinotLogicalAggregate(group=[{}], agg#0=[MODE($0, _UTF-8'MIN', _UTF-8'STRING')], agg#1=[MODE($1)], agg#2=[MODE($2)], agg#3=[MODE($3)], agg#4=[MODE($4, _UTF-8'MIN', _UTF-8'STRING')], aggType=[LEAF])",
+          "\n      LogicalProject($f0=[$0], $f1=[$2], $f2=[$4], $f3=[$8], $f4=[UPPER($1)], $f5=[_UTF-8'MIN'], $f6=[_UTF-8'STRING'])",
+          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "MODE and FIRST_WITH_TIME share the projected data type literal in a grouped aggregate",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col3, MODE(a.col2), FIRST_WITH_TIME(a.col1, a.ts) FROM a GROUP BY a.col3",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{0}], agg#0=[MODE($1, _UTF-8'MIN', _UTF-8'STRING')], agg#1=[FIRSTWITHTIME($2, $2, _UTF-8'STRING')], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash[0]])",
+          "\n    PinotLogicalAggregate(group=[{0}], agg#0=[MODE($1, _UTF-8'MIN', _UTF-8'STRING')], agg#1=[FIRSTWITHTIME($2, $3, _UTF-8'STRING')], aggType=[LEAF])",
+          "\n      LogicalProject($f0=[$2], $f1=[$1], $f2=[$0], $f3=[$7], $f4=[_UTF-8'MIN'], $f5=[_UTF-8'STRING'])",
+          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
         "description": "MIN on STRING column rewritten to MINSTRING",
         "sql": "SET autoRewriteAggregationType=true; EXPLAIN PLAN FOR SELECT MIN(a.col1) FROM a",
         "output": [

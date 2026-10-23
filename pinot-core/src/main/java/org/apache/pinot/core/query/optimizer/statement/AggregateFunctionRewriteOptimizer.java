@@ -36,6 +36,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 /// Always applied:
 /// - FIRST_WITH_TIME(dataColumn, timeColumn) -> FIRST_WITH_TIME(dataColumn, timeColumn, 'dataType')
 /// - LAST_WITH_TIME(dataColumn, timeColumn) -> LAST_WITH_TIME(dataColumn, timeColumn, 'dataType')
+/// - MODE(nonNumericColumn[, 'MIN'|'MAX']) -> MODE(nonNumericColumn, 'MIN'|'MAX', 'dataType')
 ///
 /// Applied only when enabled through the `autoRewriteAggregationType` query option:
 /// - MIN(stringType) -> MINSTRING
@@ -98,6 +99,10 @@ public class AggregateFunctionRewriteOptimizer implements StatementOptimizer {
       addDataTypeArgument(function, normalizedName, fieldSpec);
       return;
     }
+    if (normalizedName.equals(AggregationFunctionType.MODE.name()) && function.getOperandsSize() <= 2) {
+      addModeDataTypeArgument(function, fieldSpec);
+      return;
+    }
     if (rewriteToTypedVariants) {
       // The typed variants follow the stored type (e.g. TIMESTAMP as LONG), while the data type argument above keeps
       // the logical type.
@@ -132,6 +137,31 @@ public class AggregateFunctionRewriteOptimizer implements StatementOptimizer {
     }
     throw new BadQueryRequestException(String.format("Unsupported data type for %s(dataColumn, timeColumn): %s%s",
         functionName, fieldSpec.isSingleValueField() ? "" : "multi-value ", fieldSpec.getDataType()));
+  }
+
+  /// Appends the default tie reducer when missing, then the data column's logical type when it is non-numeric.
+  private static void addModeDataTypeArgument(Function function, FieldSpec fieldSpec) {
+    if (!fieldSpec.isSingleValueField()) {
+      return;
+    }
+    String dataType;
+    switch (fieldSpec.getDataType()) {
+      case STRING:
+      case BOOLEAN:
+      case TIMESTAMP:
+        dataType = fieldSpec.getDataType().name();
+        break;
+      case JSON:
+        // Same as the multi-stage engine, which types a JSON column as VARCHAR.
+        dataType = FieldSpec.DataType.STRING.name();
+        break;
+      default:
+        return;
+    }
+    if (function.getOperandsSize() == 1) {
+      function.addToOperands(RequestUtils.getLiteralExpression("MIN"));
+    }
+    function.addToOperands(RequestUtils.getLiteralExpression(dataType));
   }
 
   private static void rewriteToTypedVariant(Function function, String functionName, FieldSpec.DataType operandType) {

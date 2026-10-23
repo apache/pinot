@@ -46,6 +46,7 @@ public class AggregateFunctionRewriteOptimizerTest {
       .addSingleValueDimension("bytesCol", DataType.BYTES)
       .addSingleValueDimension("uuidCol", DataType.UUID)
       .addMultiValueDimension("mvCol", DataType.INT)
+      .addMultiValueDimension("mvStringCol", DataType.STRING)
       .addSingleValueDimension("timeCol", DataType.LONG)
       .build();
   private static final String AUTO_REWRITE = "SET autoRewriteAggregationType=true; ";
@@ -99,6 +100,28 @@ public class AggregateFunctionRewriteOptimizerTest {
             + "FIRST_WITH_TIME(doubleCol, timeCol, 'DOUBLE') FILTER (WHERE boolCol) "
             + "FROM testTable GROUP BY intCol HAVING FIRST_WITH_TIME(longCol, timeCol, 'LONG') > 1 "
             + "ORDER BY LAST_WITH_TIME(timestampCol, timeCol, 'TIMESTAMP')");
+  }
+
+  @Test
+  public void testModeInfersNonNumericDataType() {
+    assertRewrite("SELECT MODE(stringCol), MODE(jsonCol), MODE(boolCol, 'MAX'), MODE(timestampCol, 'AVG') "
+            + "FROM testTable",
+        "SELECT MODE(stringCol, 'MIN', 'STRING'), MODE(jsonCol, 'MIN', 'STRING'), MODE(boolCol, 'MAX', 'BOOLEAN'), "
+            + "MODE(timestampCol, 'AVG', 'TIMESTAMP') FROM testTable");
+    assertRewrite("SELECT intCol, MODE(stringCol) FILTER (WHERE boolCol) AS m FROM testTable GROUP BY intCol "
+            + "HAVING MODE(boolCol) = true ORDER BY MODE(timestampCol, 'MAX')",
+        "SELECT intCol, MODE(stringCol, 'MIN', 'STRING') FILTER (WHERE boolCol) AS m FROM testTable GROUP BY intCol "
+            + "HAVING MODE(boolCol, 'MIN', 'BOOLEAN') = true ORDER BY MODE(timestampCol, 'MAX', 'TIMESTAMP')");
+  }
+
+  @Test
+  public void testModeKeepsOtherInputs() {
+    // Numeric MODE keeps its DOUBLE result
+    assertUnchanged("SELECT MODE(intCol), MODE(longCol, 'AVG'), MODE(floatCol, 'MAX'), MODE(doubleCol) FROM testTable");
+    for (String column : new String[]{"bytesCol", "uuidCol", "mvStringCol", "missingCol", "trim(stringCol)"}) {
+      assertUnchanged("SELECT MODE(" + column + ") FROM testTable");
+    }
+    assertUnchanged("SELECT MODE(stringCol, 'MAX', 'STRING') FROM testTable");
   }
 
   @Test
