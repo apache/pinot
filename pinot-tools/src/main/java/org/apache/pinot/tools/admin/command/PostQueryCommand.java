@@ -214,7 +214,7 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
     if (exceptions.size() > 0 || root.path("partialResult").asBoolean(false)) {
       LOGGER.warn("Response has a 'resultTable' but also reports exceptions and/or a partial "
           + "result; CSV output only renders resultTable rows, so this detail is not reflected "
-          + "in the CSV. Use -outputFormat JSON to inspect the full response.");
+          + "in the CSV. Full broker response: {}", rawResponse);
       _lastResponseSafeForOutputFile = false;
     }
     JsonNode columnNames = resultTable.path("dataSchema").path("columnNames");
@@ -268,7 +268,7 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
       if (_outputFormat == OutputFormat.CSV && !_lastResponseSafeForOutputFile) {
         // The response either could not be rendered as CSV or the CSV would omit failure metadata.
         // Refuse the write so a file consumer cannot mistake fallback JSON or incomplete rows for
-        // a successful CSV export. The diagnostic response remains visible in the log above.
+        // a successful CSV export. The failure details remain visible in the logs.
         LOGGER.warn("Not writing '{}': response is not safe for CSV file output. Use "
             + "-outputFormat JSON to inspect the full response.", _outputFile);
         return false;
