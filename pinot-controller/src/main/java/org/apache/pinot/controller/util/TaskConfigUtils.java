@@ -20,10 +20,13 @@ package org.apache.pinot.controller.util;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.util.EnumSet;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorRegistry;
+import org.apache.pinot.segment.local.utils.TableConfigUtils.ValidationType;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -33,22 +36,21 @@ import org.slf4j.LoggerFactory;
 
 
 public class TaskConfigUtils {
-  private static final Logger LOGGER = LoggerFactory.getLogger(TaskConfigUtils.class);
-  private static final String SCHEDULE_KEY = "schedule";
-  private static final String ALL_VALIDATION_TYPE = "ALL";
-  private static final String TASK_VALIDATION_TYPE = "TASK";
-
   private TaskConfigUtils() {
   }
 
-  public static void validateTaskConfigs(TableConfig tableConfig, Schema schema, PinotTaskManager pinotTaskManager,
-      String validationTypesToSkip) {
-    if (tableConfig == null || tableConfig.getTaskConfig() == null) {
+  private static final Logger LOGGER = LoggerFactory.getLogger(TaskConfigUtils.class);
+  private static final String SCHEDULE_KEY = "schedule";
+
+  /// Validates the task configs of the table with the task generators of the task manager. Skips the validation when
+  /// the table has no task config, the task manager is `null`, or the task validation is skipped.
+  public static void validateTaskConfigs(TableConfig tableConfig, Schema schema,
+      @Nullable PinotTaskManager pinotTaskManager, @Nullable EnumSet<ValidationType> skipTypes) {
+    if (tableConfig == null || tableConfig.getTaskConfig() == null || pinotTaskManager == null) {
       return;
     }
-    if (ALL_VALIDATION_TYPE.equalsIgnoreCase(validationTypesToSkip) || TASK_VALIDATION_TYPE.equalsIgnoreCase(
-        validationTypesToSkip)) {
-      LOGGER.info("Skipping task validation as validationTypesToSkip is set to: {}", validationTypesToSkip);
+    if (ValidationType.TASK.isSkipped(skipTypes)) {
+      LOGGER.info("Skipping task validation as validationTypesToSkip is set to: {}", skipTypes);
       return;
     }
     TableTaskConfig taskConfig = tableConfig.getTaskConfig();
