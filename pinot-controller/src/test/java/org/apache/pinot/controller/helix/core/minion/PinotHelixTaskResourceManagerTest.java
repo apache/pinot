@@ -29,6 +29,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.helix.HelixException;
 import org.apache.helix.task.JobConfig;
 import org.apache.helix.task.JobContext;
 import org.apache.helix.task.JobDag;
@@ -1276,6 +1277,50 @@ public class PinotHelixTaskResourceManagerTest {
         spyMgr.getTaskCounts(taskType, null, null);
     assertEquals(allTasks.size(), 1);
     assertTrue(allTasks.containsKey(taskName1));
+  }
+
+  @Test
+  public void testForceDeleteTaskRetriesWhenHelixFailsToRemoveJob() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+
+    // Helix reports a ZooKeeper NotEmpty failure while removing the job context as a cause-less HelixException
+    Mockito.doThrow(new HelixException("Failed to delete job: TaskQueue_TestTask_Task_TestTask_a"))
+        .doNothing()
+        .when(taskDriver).deleteJob("TaskQueue_TestTask", "Task_TestTask_a", true);
+
+    mgr.deleteTask("Task_TestTask_a", true);
+
+    verify(taskDriver, Mockito.times(2)).deleteJob("TaskQueue_TestTask", "Task_TestTask_a", true);
+  }
+
+  @Test
+  public void testForceDeleteTaskThrowsAfterMaxAttempts() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+
+    HelixException failure = new HelixException("Failed to delete job: TaskQueue_TestTask_Task_TestTask_a");
+    Mockito.doThrow(failure).when(taskDriver).deleteJob("TaskQueue_TestTask", "Task_TestTask_a", true);
+
+    HelixException thrown = expectThrows(HelixException.class, () -> mgr.deleteTask("Task_TestTask_a", true));
+    assertSame(thrown, failure);
+    verify(taskDriver, Mockito.times(PinotHelixTaskResourceManager.FORCE_DELETE_JOB_MAX_ATTEMPTS))
+        .deleteJob("TaskQueue_TestTask", "Task_TestTask_a", true);
+  }
+
+  @Test
+  public void testDeleteTaskWithoutForceDoesNotRetry() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+
+    Mockito.doThrow(new HelixException("Workflow TaskQueue_TestTask is not stopped"))
+        .when(taskDriver).deleteJob("TaskQueue_TestTask", "Task_TestTask_a", false);
+
+    expectThrows(HelixException.class, () -> mgr.deleteTask("Task_TestTask_a", false));
+    verify(taskDriver).deleteJob("TaskQueue_TestTask", "Task_TestTask_a", false);
   }
 
   // ==================== Tests for task queue bounding ====================
