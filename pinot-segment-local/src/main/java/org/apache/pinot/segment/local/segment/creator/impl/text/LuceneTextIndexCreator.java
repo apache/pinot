@@ -37,10 +37,6 @@ import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.LogByteSizeMergePolicy;
-import org.apache.lucene.index.MultiDocValues;
-import org.apache.lucene.index.NumericDocValues;
-import org.apache.lucene.index.StoredFields;
-import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.NRTCachingDirectory;
@@ -61,8 +57,9 @@ import org.slf4j.LoggerFactory;
 /// and realtime from [org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndex]
 public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
   private static final Logger LOGGER = LoggerFactory.getLogger(LuceneTextIndexCreator.class);
-  public static final String LUCENE_INDEX_DOC_ID_COLUMN_NAME = "DocID";
+  public static final String PINOT_DOC_ID_STORED_FIELD_NAME = "DocID";
   public static final String PINOT_DOC_ID_DOC_VALUES_FIELD_NAME = "PinotDocID";
+  public static final String LUCENE_INDEX_DOC_ID_COLUMN_NAME = PINOT_DOC_ID_STORED_FIELD_NAME;
 
   private final String _textColumn;
   private final boolean _commitOnClose;
@@ -94,7 +91,7 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
   ///               been added), false if index should not be committed
   /// @param realtimeConversion index creator should create an index using the realtime segment
   /// @param consumerDir consumer dir containing the realtime index, used when realtimeConversion and commit is true
-  /// @param immutableToMutableIdMap immutableToMutableIdMap from segment conversion
+  /// @param mutableToImmutableDocIdMap mutableToImmutableDocIdMap from segment conversion
   /// @param combineAndCleanupFiles true if files should be combined and text index directory should be removed
   /// Note on commit:
   ///               Once [org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator]
@@ -113,7 +110,7 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
   ///               to offline), we close this lucene index writer to release resources but don't commit.
   /// @param config the text index config
   public LuceneTextIndexCreator(String column, File segmentIndexDir, boolean commit, boolean realtimeConversion,
-      @Nullable File consumerDir, boolean mutableSegmentCompacted, @Nullable int[] immutableToMutableIdMap,
+      @Nullable File consumerDir, boolean mutableSegmentCompacted, @Nullable int[] mutableToImmutableDocIdMap,
       boolean combineAndCleanupFiles, TextIndexConfig config) {
     _textColumn = column;
     _commitOnClose = commit;
@@ -154,7 +151,7 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
       if (_reuseMutableIndex) {
         LOGGER.info("Reusing the realtime lucene index for segment {} and column {}", segmentIndexDir, column);
         indexWriterConfig.setOpenMode(IndexWriterConfig.OpenMode.CREATE_OR_APPEND);
-        convertMutableSegment(segmentIndexDir, consumerDir, immutableToMutableIdMap, indexWriterConfig);
+        convertMutableSegment(segmentIndexDir, consumerDir, mutableToImmutableDocIdMap, indexWriterConfig);
         return;
       }
 
@@ -194,11 +191,11 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
   /// @param commit true if the index should be committed
   /// @param realtimeConversion index creator should create an index using the realtime segment
   /// @param consumerDir consumer dir containing the realtime index
-  /// @param immutableToMutableIdMap immutableToMutableIdMap from segment conversion
+  /// @param mutableToImmutableDocIdMap mutableToImmutableDocIdMap from segment conversion
   /// @param config the text index config
   public LuceneTextIndexCreator(String column, File segmentIndexDir, boolean commit, boolean realtimeConversion,
-      @Nullable File consumerDir, @Nullable int[] immutableToMutableIdMap, TextIndexConfig config) {
-    this(column, segmentIndexDir, commit, realtimeConversion, consumerDir, false, immutableToMutableIdMap, false,
+      @Nullable File consumerDir, @Nullable int[] mutableToImmutableDocIdMap, TextIndexConfig config) {
+    this(column, segmentIndexDir, commit, realtimeConversion, consumerDir, false, mutableToImmutableDocIdMap, false,
         config);
   }
 
@@ -258,44 +255,19 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
   private void buildMappingFile(File segmentIndexDir, String column, Directory directory,
       @Nullable int[] mutableToImmutableDocIdMap)
       throws IOException {
-    IndexReader indexReader = DirectoryReader.open(directory);
-    IndexSearcher indexSearcher = new IndexSearcher(indexReader);
-
-    int numDocs = indexSearcher.getIndexReader().numDocs();
-    int length = Integer.BYTES * numDocs;
-    File docIdMappingFile = new File(SegmentDirectoryPaths.findSegmentDirectory(segmentIndexDir),
-        column + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
-    String desc = "Text index docId mapping buffer: " + column;
-    try (PinotDataBuffer buffer = PinotDataBuffer.mapFile(docIdMappingFile, /* readOnly */ false, 0, length,
-        ByteOrder.LITTLE_ENDIAN, desc)) {
-      try {
-        NumericDocValues docIds = MultiDocValues.getNumericValues(indexReader, PINOT_DOC_ID_DOC_VALUES_FIELD_NAME);
-        StoredFields storedFields = null;
-        for (int i = 0; i < numDocs; i++) {
-          int pinotDocId;
-          if (docIds != null && docIds.advanceExact(i)) {
-            pinotDocId = Math.toIntExact(docIds.longValue());
-          } else {
-            // Older mutable indexes contain only the stored field. Mixed-version leaves can also lack doc values.
-            if (storedFields == null) {
-              storedFields = indexSearcher.storedFields();
-            }
-            String storedDocId = storedFields.document(i).get(LUCENE_INDEX_DOC_ID_COLUMN_NAME);
-            if (storedDocId == null) {
-              throw new IOException("Missing Pinot document id for Lucene document: " + i);
-            }
-            pinotDocId = Integer.parseInt(storedDocId);
-          }
-          // Conversion can reorder Pinot rows independently of Lucene's own document order.
-          buffer.putInt(i * Integer.BYTES,
-              mutableToImmutableDocIdMap == null ? pinotDocId : mutableToImmutableDocIdMap[pinotDocId]);
-        }
+    try (IndexReader indexReader = DirectoryReader.open(directory)) {
+      int numDocs = indexReader.numDocs();
+      int length = Integer.BYTES * numDocs;
+      File docIdMappingFile = new File(SegmentDirectoryPaths.findSegmentDirectory(segmentIndexDir),
+          column + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
+      String desc = "Text index docId mapping buffer: " + column;
+      try (PinotDataBuffer buffer = PinotDataBuffer.mapFile(docIdMappingFile, /* readOnly */ false, 0, length,
+          ByteOrder.LITTLE_ENDIAN, desc)) {
+        TextIndexUtils.fillDocIdMapping(indexReader, buffer, numDocs, mutableToImmutableDocIdMap);
       } catch (Exception e) {
         throw new RuntimeException(
             "Caught exception while building mutable to immutable doc id mapping for text index column: " + column, e);
       }
-    } finally {
-      indexReader.close();
     }
   }
 
@@ -345,8 +317,9 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
     int docId = _nextDocId++;
     // Keep the stored field for older readers. Immutable indexes add doc values to avoid decompressing every stored
     // document on segment load and retain the actual Pinot id when Lucene flushes or merges reorder documents.
-    document.add(new StoredField(LUCENE_INDEX_DOC_ID_COLUMN_NAME, docId));
-    if (_commitOnClose) {
+    document.add(new StoredField(PINOT_DOC_ID_STORED_FIELD_NAME, docId));
+    // A TEXT column with this name must keep the stored-field fallback to avoid conflicting Lucene field schemas.
+    if (_commitOnClose && !_textColumn.equals(PINOT_DOC_ID_DOC_VALUES_FIELD_NAME)) {
       document.add(new NumericDocValuesField(PINOT_DOC_ID_DOC_VALUES_FIELD_NAME, docId));
     }
   }
