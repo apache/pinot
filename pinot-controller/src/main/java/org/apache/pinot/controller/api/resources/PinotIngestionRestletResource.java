@@ -44,7 +44,6 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.controller.ControllerConf;
@@ -239,13 +238,15 @@ public class PinotIngestionRestletResource {
     return fileIngestionHelper.buildSegmentAndPush(payload);
   }
 
-  /// A record failure returns its causes, which describe the uploaded data. Other failures don't: they can involve
-  /// files on the controller that the batch config names.
+  /// A record failure returns the causes from its [RecordProcessingException] down, which describe the uploaded data.
+  /// Wrappers above it and other failures don't: they can involve files on the controller that the batch config names.
   @VisibleForTesting
   static ControllerApplicationException newIngestFromFileException(String message, Response.Status status,
       Exception e) {
-    if (ExceptionUtils.indexOfType(e, RecordProcessingException.class) >= 0) {
-      return ControllerApplicationException.withCausesInResponse(LOGGER, message, status, e);
+    RecordProcessingException recordFailure =
+        org.apache.commons.lang3.exception.ExceptionUtils.throwableOfType(e, RecordProcessingException.class);
+    if (recordFailure != null) {
+      return ControllerApplicationException.withCausesInResponse(LOGGER, message, status, recordFailure);
     }
     return new ControllerApplicationException(LOGGER, message, status, e);
   }

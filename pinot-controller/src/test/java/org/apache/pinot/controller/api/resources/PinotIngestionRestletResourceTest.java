@@ -52,12 +52,16 @@ public class PinotIngestionRestletResourceTest {
   }
 
   @Test
-  public void testWrappedRecordFailureIsDescribedByItsCauseChain() {
+  public void testWrappedRecordFailureIsDescribedFromTheRecordFailureDown() {
+    Exception recordFailure = new RecordProcessingException("Error occurred while reading row during indexing",
+        new IllegalArgumentException(ROOT_CAUSE));
     Exception e = new IllegalStateException("Failed to build segment",
-        new RecordProcessingException("Error occurred while reading row during indexing",
-            new IllegalArgumentException(ROOT_CAUSE)));
+        new RuntimeException("Failed in working dir /var/pinot/controller/ingestion/abc", recordFailure));
 
-    assertEquals(WebApplicationExceptionMapper.getErrorMessage(getFailure(e)),
+    ControllerApplicationException failure = getFailure(e);
+
+    assertSame(failure.getCause(), recordFailure);
+    assertEquals(WebApplicationExceptionMapper.getErrorMessage(failure),
         MESSAGE + "Failed to build segment -> Error occurred while reading row during indexing -> " + ROOT_CAUSE);
   }
 
