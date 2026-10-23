@@ -46,6 +46,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationD
 import org.apache.pinot.segment.local.segment.index.converter.SegmentV1V2ToV3FormatConverter;
 import org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
 import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils;
@@ -2288,6 +2289,63 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     }
   }
 
+  /// A column derived at load must see the source's nulls the way ingestion does: a null source value is a null input
+  /// to the function, not the default value stored in its place, so the derived value is null too.
+  @Test(dataProvider = "bothV1AndV3")
+  public void testDerivedColumnFromNullableSourceKeepsNulls(SegmentVersion segmentVersion)
+      throws Exception {
+    Schema schema =
+        new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME).addMetric("source", DataType.DOUBLE).build();
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNullHandlingEnabled(true).build();
+    Double[] sourceValues = {1.5, null, 3.0, null, 5.0};
+    List<GenericRow> rows = new ArrayList<>(sourceValues.length);
+    for (Double value : sourceValues) {
+      GenericRow row = new GenericRow();
+      row.putValue("source", value);
+      rows.add(row);
+    }
+    FileUtils.deleteQuietly(TEMP_DIR);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    config.setInstanceType(InstanceType.SERVER);
+    config.setOutDir(TEMP_DIR.getAbsolutePath());
+    config.setSegmentName(SEGMENT_NAME);
+    config.setSegmentVersion(segmentVersion);
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    driver.init(config, new GenericRowRecordReader(rows));
+    driver.build();
+
+    Schema derivedSchema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
+        .addMetric("source", DataType.DOUBLE)
+        .addMetric("derived", DataType.DOUBLE)
+        .build();
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("derived", "times(source, 2)")));
+    TableConfig derivedTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setNullHandlingEnabled(true)
+        .setIngestionConfig(ingestionConfig)
+        .build();
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(derivedTableConfig, derivedSchema);
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig)) {
+      processor.process(SEGMENT_OPERATIONS_THROTTLER);
+    }
+
+    ImmutableSegment segment = ImmutableSegmentLoader.load(INDEX_DIR, indexLoadingConfig, false);
+    try (PinotSegmentColumnReader reader = new PinotSegmentColumnReader(segment, "derived")) {
+      for (int docId = 0; docId < sourceValues.length; docId++) {
+        if (sourceValues[docId] == null) {
+          assertTrue(reader.isNull(docId), "Derived value must be null where the source is null, doc: " + docId);
+        } else {
+          assertFalse(reader.isNull(docId), "Derived value must not be null, doc: " + docId);
+          assertEquals(reader.getValue(docId), sourceValues[docId] * 2);
+        }
+      }
+    } finally {
+      segment.destroy();
+    }
+  }
+
   private void buildStarTreeTestSegment(TableConfig tableConfig, Schema schema)
       throws Exception {
     FileUtils.deleteQuietly(TEMP_DIR);
@@ -2709,6 +2767,9 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
   @Test(dataProvider = "bothV1AndV3")
   public void testDerivedColumnReadingDefaultColumnAddedInSameReload(SegmentVersion segmentVersion)
       throws Exception {
+    // With null handling on, a default column added in this reload is null on every row, and the derived column reads
+    // that null as ingestion would. Turn it off so the source holds its default value and the ordering is visible.
+    _nullHandlingEnabled = false;
     buildSegment(segmentVersion);
 
     // newIntMetric is NOT derived -- it is a plain new column filled with its default value (0).
@@ -2949,6 +3010,9 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
   @Test(dataProvider = "bothV1AndV3")
   public void testDerivedColumnOrderedAfterUpdatedSource(SegmentVersion segmentVersion)
       throws Exception {
+    // With null handling on, a default column added in this reload is null on every row, and the derived column reads
+    // that null as ingestion would. Turn it off so the source holds its default value and the ordering is visible.
+    _nullHandlingEnabled = false;
     buildSegment(segmentVersion);
 
     // First reload: the source is added, holding the default value its schema declares.
@@ -2984,6 +3048,9 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
   @Test
   public void testDerivedColumnFromForwardIndexDisabledColumnAddedInSameReload()
       throws Exception {
+    // With null handling on, a default column added in this reload is null on every row, and the derived column reads
+    // that null as ingestion would. Turn it off so the source holds its default value and the ordering is visible.
+    _nullHandlingEnabled = false;
     buildSegment(SegmentVersion.v3);
 
     // A default value of its own, so a derived column that fell back to ITS default would be visibly different.

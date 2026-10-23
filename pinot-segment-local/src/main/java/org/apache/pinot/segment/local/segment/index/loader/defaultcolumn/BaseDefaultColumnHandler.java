@@ -62,6 +62,7 @@ import org.apache.pinot.segment.local.segment.index.forward.CompressionStatsMeta
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.InvertedIndexAndDictionaryBasedForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
+import org.apache.pinot.segment.local.segment.index.readers.NullValueVectorReaderImpl;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.utils.ClusterConfigForTable;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -1690,12 +1691,21 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       } else {
         _dictionary = null;
       }
-      _columnReader = new PinotSegmentColumnReader(columnMetadata.getColumnName(), _forwardIndexReader, _dictionary,
-          null, columnMetadata.getMaxNumberOfMultiValues());
+      // A null source value is stored as the column's default value. Read the null vector too, so the function sees
+      // null for those docs, as it does at ingestion, instead of deriving a non-null value from the placeholder.
+      String column = columnMetadata.getColumnName();
+      NullValueVectorReaderImpl nullValueVectorReader = null;
+      if (_segmentWriter.hasIndexFor(column, StandardIndexes.nullValueVector())) {
+        nullValueVectorReader =
+            new NullValueVectorReaderImpl(_segmentWriter.getIndexFor(column, StandardIndexes.nullValueVector()));
+      }
+      _columnReader = new PinotSegmentColumnReader(column, _forwardIndexReader, _dictionary, nullValueVectorReader,
+          columnMetadata.getMaxNumberOfMultiValues());
     }
 
+    @Nullable
     Object getValue(int docId) {
-      return _columnReader.getValue(docId);
+      return _columnReader.isNull(docId) ? null : _columnReader.getValue(docId);
     }
 
     @Override
