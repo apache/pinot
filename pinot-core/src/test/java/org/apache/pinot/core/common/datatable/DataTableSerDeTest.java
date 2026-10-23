@@ -22,8 +22,10 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
@@ -36,6 +38,8 @@ import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
+import org.apache.pinot.segment.spi.memory.PagedPinotOutputStream;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -372,7 +376,24 @@ public class DataTableSerDeTest {
 
     DataTable dataTable = dataTableBuilder.build();
     DataTable newDataTable = DataTableFactory.getDataTable(dataTable.toBytes());
-    for (DataTable table : new DataTable[]{dataTable, dataTable.toDataOnlyDataTable(), newDataTable}) {
+
+    // toDataBuffer() returns the builder's pages without copying them. The first buffer holds the header and the
+    // small sections, and the last one the metadata. Every buffer between them is one page at most.
+    DataBuffer dataBuffer = dataTable.toDataBuffer();
+    List<ByteBuffer> buffers = new ArrayList<>();
+    dataBuffer.appendAsByteBuffers(buffers);
+    assertTrue(buffers.size() > 2, "Expected the sections in pages: " + buffers.size());
+    for (ByteBuffer buffer : buffers.subList(1, buffers.size() - 1)) {
+      assertTrue(buffer.remaining() <= PagedPinotOutputStream.PageAllocator.MIN_RECOMMENDED_PAGE_SIZE,
+          "Buffer of " + buffer.remaining() + " bytes");
+    }
+    byte[] dataBufferBytes = new byte[Math.toIntExact(dataBuffer.size())];
+    dataBuffer.copyTo(0, dataBufferBytes);
+    DataTable dataBufferTable = DataTableFactory.getDataTable(dataBufferBytes);
+
+    for (DataTable table : new DataTable[]{
+        dataTable, dataTable.toDataOnlyDataTable(), newDataTable, dataBufferTable
+    }) {
       assertEquals(table.getNumberOfRows(), numRows, ERROR_MESSAGE);
       RoaringBitmap nullRowIds = table.getNullRowIds(6);
       assertNotNull(nullRowIds, ERROR_MESSAGE);
