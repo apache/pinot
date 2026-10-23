@@ -651,6 +651,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     // Helix resource manager must be started in order to create PinotLLCRealtimeSegmentManager
     LOGGER.info("Starting realtime segment manager");
     _pinotLLCRealtimeSegmentManager = createPinotLLCRealtimeSegmentManager();
+    _pinotLLCRealtimeSegmentManager.setLeadControllerManager(_leadControllerManager);
     // TODO: Need to put this inside HelixResourceManager when HelixControllerLeadershipManager is removed.
     _helixResourceManager.registerPinotLLCRealtimeSegmentManager(_pinotLLCRealtimeSegmentManager);
 

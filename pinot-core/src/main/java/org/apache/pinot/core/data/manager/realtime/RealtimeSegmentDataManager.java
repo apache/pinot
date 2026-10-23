@@ -1640,7 +1640,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   public void goOnlineFromConsuming(SegmentZKMetadata segmentZKMetadata)
       throws InterruptedException {
-    _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING, 0);
+    setNotConsumingUnlessOffloaded();
     try {
       // Remove the segment file before we do anything else.
       removeSegmentFile();
@@ -1759,6 +1759,14 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     } catch (Exception e) {
       Utils.rethrowException(e);
     } finally {
+      setNotConsumingUnlessOffloaded();
+    }
+  }
+
+  /// Sets LLC_PARTITION_CONSUMING to 0, unless the segment was already replaced and offloaded, which removed the gauge.
+  /// Adding it back would leave it at 0 forever when the partition has no next consuming segment on this server.
+  private void setNotConsumingUnlessOffloaded() {
+    if (!isOffloaded()) {
       _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING, 0);
     }
   }

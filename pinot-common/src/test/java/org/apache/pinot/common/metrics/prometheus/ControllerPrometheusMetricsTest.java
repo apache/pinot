@@ -42,7 +42,8 @@ public abstract class ControllerPrometheusMetricsTest extends PinotPrometheusMet
 
   //local gauges that accept partition
   private static final List<ControllerGauge> GAUGES_ACCEPTING_PARTITION =
-      List.of(ControllerGauge.MAX_RECORDS_LAG, ControllerGauge.MAX_RECORD_AVAILABILITY_LAG_MS);
+      List.of(ControllerGauge.MAX_RECORDS_LAG, ControllerGauge.MAX_RECORD_AVAILABILITY_LAG_MS,
+          ControllerGauge.PARTITION_END_OF_LIFE);
 
   //these accept task type (per-table scoped)
   private static final List<ControllerGauge> GAUGES_ACCEPTING_TASKTYPE =
