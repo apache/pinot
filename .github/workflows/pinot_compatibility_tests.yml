@@ -67,7 +67,7 @@ jobs:
         env:
           OLD_COMMIT: ${{ github.event.inputs.oldCommit }}
           NEW_COMMIT: ${{ github.event.inputs.newCommit }}
-          WORKING_DIR: /tmp/compatibility-verifier
+          WORKING_DIR: ${{ runner.temp }}/compatibility-verifier
           TEST_SUITE: ${{ matrix.test_suite }}
           MAVEN_OPTS: >
             -Xmx2G
@@ -87,7 +87,7 @@ jobs:
       - name: Archive artifacts into zip
         if: always()
         run: |
-          zip -1 -r artifacts.zip /tmp/compatibility-verifier/*
+          zip -1 -r artifacts.zip "${{ runner.temp }}/compatibility-verifier/"*
       - uses: actions/upload-artifact@v7.0.1
         name: Store compatibility verifier work directory
         if: always()

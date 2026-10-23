@@ -121,7 +121,7 @@ function waitForBrokerReady() {
   while [ $status -ne 0 ]; do
     sleep 1
     echo "Checking port ${BROKER_QUERY_PORT} for broker ready"
-    curl localhost:${BROKER_QUERY_PORT}/debug/routingTable 1>/dev/null 2>&1
+    curl --fail localhost:${BROKER_QUERY_PORT}/health 1>/dev/null 2>&1
     status=$?
   done
 }
