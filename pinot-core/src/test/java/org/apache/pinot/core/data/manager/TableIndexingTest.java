@@ -272,7 +272,6 @@ public class TableIndexingTest {
           schemaName.startsWith("raw") ? FieldConfig.EncodingType.RAW : FieldConfig.EncodingType.DICTIONARY;
 
       List<FieldConfig.IndexType> indexTypes = new ArrayList<>();
-      Map<String, String> properties = new HashMap<>();
       ObjectNode indexes = new ObjectNode(JsonNodeFactory.instance);
       TimestampConfig tstmpConfig = null;
       FieldConfig config = null; // table will be created from scratch for each run;
@@ -302,7 +301,11 @@ public class TableIndexingTest {
               "fieldConfigList":[
               {
                 "name":"text_col_1",
-                "encodingType":"DICTIONARY",
+                "indexes": {
+                  "forward": {
+                    "encodingType":"DICTIONARY"
+                  }
+                },
                 "indexType":"FST"
                 }
                 ]
@@ -315,8 +318,10 @@ public class TableIndexingTest {
               "fieldConfigList": [
                 {
                   "name": "location_st_point",
-                  "encodingType":"RAW", // this actually disables the dictionary
                   "indexes": {
+                    "forward": {
+                      "encodingType":"RAW"
+                    },
                     "h3": {
                       "resolutions": [13, 5, 6]
                     }
@@ -368,8 +373,12 @@ public class TableIndexingTest {
             "fieldConfigList":[
               {
                  "name":"text_col_1",
-                 "encodingType":"RAW",
-                 "indexTypes":["TEXT"]
+                 "indexTypes":["TEXT"],
+                 "indexes": {
+                   "forward": {
+                     "encodingType":"RAW"
+                   }
+                 }
               }
             ] */
           indexTypes.add(FieldConfig.IndexType.TEXT);
@@ -455,28 +464,37 @@ public class TableIndexingTest {
             /* vector
             "fieldConfigList": [
             {
-              "encodingType": "RAW",
-              "indexType": "VECTOR",
               "name": "embedding",
-              "properties": {
-                "vectorIndexType": "HNSW",
-                "vectorDimension": 1536,
-                "vectorDistanceFunction": "COSINE",
-                "version": 1
+              "indexes": {
+                "vector": {
+                  "vectorIndexType": "HNSW",
+                  "vectorDimension": 1536,
+                  "vectorDistanceFunction": "COSINE",
+                  "version": 1
+                },
+                "forward": {
+                  "encodingType": "RAW"
+                }
               }
             } */
-          indexTypes.add(FieldConfig.IndexType.VECTOR);
-          properties.put("vectorIndexType", "HNSW");
-          properties.put("vectorDimension", "1536");
-          properties.put("vectorDistanceFunction", "COSINE");
-          properties.put("version", "1");
+          ObjectNode vector = indexes.putObject("vector");
+          vector.put("vectorIndexType", "HNSW");
+          vector.put("vectorDimension", 1536);
+          vector.put("vectorDistanceFunction", "COSINE");
+          vector.put("version", 1);
           break;
         default:
           throw new IllegalArgumentException("Unexpected index type " + indexType);
       }
 
-      config =
-          new FieldConfig(field.getName(), encoding, null, indexTypes, null, tstmpConfig, indexes, properties, null);
+      ObjectNode forwardIndex = JsonUtils.newObjectNode();
+      forwardIndex.put("encodingType", encoding.name());
+      indexes.set("forward", forwardIndex);
+      config = new FieldConfig.Builder(field.getName())
+          .withIndexTypes(indexTypes)
+          .withTimestampConfig(tstmpConfig)
+          .withIndexes(indexes)
+          .build();
 
       tableConfig.getFieldConfigList().add(config);
 

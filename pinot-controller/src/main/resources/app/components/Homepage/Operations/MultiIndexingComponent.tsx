@@ -188,7 +188,15 @@ export default function MultiIndexingComponent({
                         outputData.bloomFilterColumns.push(i.columnName);
                     break;
                     case "Text":
-                        fieldConfigList.push({"name":i.columnName, "encodingType":"RAW", "indexType":"TEXT"})
+                        fieldConfigList.push({
+                            "name": i.columnName,
+                            "indexType": "TEXT",
+                            "indexes": {
+                                "forward": {
+                                    "encodingType": "RAW"
+                                }
+                            }
+                        })
                     break;
                 }
             })
