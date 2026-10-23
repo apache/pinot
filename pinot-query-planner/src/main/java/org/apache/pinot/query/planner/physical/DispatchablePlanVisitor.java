@@ -136,7 +136,11 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
   @Override
   public Void visitMailboxMergeReceive(MailboxMergeReceiveNode node, DispatchablePlanContext context) {
     node.getSender().visit(this, context);
-    getOrCreateDispatchablePlanMetadata(node, context);
+    DispatchablePlanMetadata metadata = getOrCreateDispatchablePlanMetadata(node, context);
+    // A bounded merge replaces the final Sort, including its singleton assignment and hotspot rotation.
+    if (node.getFetch() >= 0 || node.getOffset() >= 0) {
+      metadata.setRequireSingleton(true);
+    }
     return null;
   }
 

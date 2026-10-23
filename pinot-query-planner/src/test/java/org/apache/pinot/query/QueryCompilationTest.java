@@ -1246,11 +1246,19 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   public void testPartitionedWindowUnderFinalOrderBy() {
     String query = "SET stageParallelism=2; SELECT col1, ROW_NUMBER() OVER (PARTITION BY col1 ORDER BY col3) AS rn "
         + "FROM a ORDER BY rn";
-    Map<SortNode, DispatchablePlanFragment> sortStages = findSortOverReceiveStages(_queryEnvironment.planQuery(query));
-    assertEquals(sortStages.size(), 2, "Expected the window Sort and the final Sort");
-    for (Map.Entry<SortNode, DispatchablePlanFragment> entry : sortStages.entrySet()) {
-      int expectedNumWorkers = isOverPartitionedReceive(entry.getKey()) ? 4 : 1;
-      assertEquals(entry.getValue().getWorkerMetadataList().size(), expectedNumWorkers);
+    QueryEnvironment environment = getQueryEnvironment(3, 1, 2, TABLE_SCHEMAS, SERVER1_SEGMENTS,
+        SERVER2_SEGMENTS, PARTITIONED_SEGMENTS_MAP, true);
+    for (boolean enabled : List.of(false, true)) {
+      try (CompiledQuery compiled = environment.compile("SET windowKWayMerge=" + enabled
+          + "; SET streamingSortedMailboxReceive=" + enabled + "; " + query)) {
+        Map<SortNode, DispatchablePlanFragment> sortStages =
+            findSortOverReceiveStages(compiled.planQuery(0).getQueryPlan());
+        assertEquals(sortStages.size(), 2, "Expected the window Sort and the final Sort");
+        for (Map.Entry<SortNode, DispatchablePlanFragment> entry : sortStages.entrySet()) {
+          int expectedNumWorkers = isOverPartitionedReceive(entry.getKey()) ? 4 : 1;
+          assertEquals(entry.getValue().getWorkerMetadataList().size(), expectedNumWorkers);
+        }
+      }
     }
   }
 
@@ -1474,7 +1482,8 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     QueryEnvironment environment = getQueryEnvironment(3, 1, 2, TABLE_SCHEMAS, SERVER1_SEGMENTS,
         SERVER2_SEGMENTS, PARTITIONED_SEGMENTS_MAP, capability);
     DispatchableSubPlan plan;
-    try (CompiledQuery compiled = environment.compile("SET streamingSortedMailboxReceive=" + enabled + "; " + query)) {
+    try (CompiledQuery compiled = environment.compile(
+        "SET stageParallelism=2; SET streamingSortedMailboxReceive=" + enabled + "; " + query)) {
       plan = compiled.planQuery(0).getQueryPlan();
     }
     MailboxMergeReceiveNode merge = null;
@@ -1483,6 +1492,8 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
           MailboxMergeReceiveNode.class);
       if (candidate != null) {
         merge = candidate;
+        assertEquals(fragment.getWorkerMetadataList().size(), 1,
+            "The bounded merge replaces the final sort and must keep its singleton worker");
         break;
       }
     }
