@@ -1118,11 +1118,8 @@ public class TablesResource {
       if (!segmentDir.equals(file.getParentFile())) {
         return true;
       }
-      // Keep these names in sync with MappedSegmentMetadataStore.FILE_NAME and writeAtomically()'s temp-file pattern.
-      // Both are local serving artifacts, rebuilt from metadata.properties on the receiving server.
-      String name = file.getName();
-      return !name.equals("segment_metadata.bin")
-          && !(name.startsWith(".segment_metadata.") && name.endsWith(".tmp"));
+      // Local serving artifacts are rebuilt from metadata.properties on the receiving server.
+      return !SegmentMetadataImpl.isMappedMetadataSidecarFileName(file.getName());
     });
   }
 

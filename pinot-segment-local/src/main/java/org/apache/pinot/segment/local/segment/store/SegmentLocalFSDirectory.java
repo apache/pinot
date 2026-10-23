@@ -155,7 +155,7 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
 
   /// Replaces mutable metadata with the mapped representation after preprocessing and before the segment is queryable.
   public void loadMappedMetadata()
-      throws IOException, ConfigurationException {
+      throws IOException {
     if (_segmentMetadata.isMapped()) {
       return;
     }

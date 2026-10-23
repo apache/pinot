@@ -80,6 +80,13 @@ import org.apache.pinot.spi.utils.JsonUtils;
 /// than migrated.
 final class MappedSegmentMetadataStore implements Closeable {
   static final String FILE_NAME = "segment_metadata.bin";
+  private static final String TEMP_FILE_PREFIX = ".segment_metadata.";
+  private static final String TEMP_FILE_SUFFIX = ".tmp";
+
+  static boolean isSidecarFileName(String fileName) {
+    return FILE_NAME.equals(fileName)
+        || (fileName.startsWith(TEMP_FILE_PREFIX) && fileName.endsWith(TEMP_FILE_SUFFIX));
+  }
 
   private static final int MAGIC = 0x504d4431; // PMD1
   private static final int VERSION = 3;
@@ -751,7 +758,7 @@ final class MappedSegmentMetadataStore implements Closeable {
   private static void writeAtomically(File sidecar, byte[] bytes)
       throws IOException {
     Path path = sidecar.toPath();
-    Path temp = Files.createTempFile(path.getParent(), ".segment_metadata.", ".tmp");
+    Path temp = Files.createTempFile(path.getParent(), TEMP_FILE_PREFIX, TEMP_FILE_SUFFIX);
     try {
       Files.write(temp, bytes);
       try {

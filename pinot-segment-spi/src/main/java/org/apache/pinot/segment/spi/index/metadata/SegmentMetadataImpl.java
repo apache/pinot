@@ -163,6 +163,11 @@ public class SegmentMetadataImpl implements SegmentMetadata, Closeable {
     return new SegmentMetadataImpl(indexDir, true);
   }
 
+  /// Identifies the local mapped metadata sidecar and its incomplete temporary files.
+  public static boolean isMappedMetadataSidecarFileName(String fileName) {
+    return MappedSegmentMetadataStore.isSidecarFileName(fileName);
+  }
+
   /// Mapped constructor for segment-directory implementations that subclass [SegmentMetadataImpl].
   protected SegmentMetadataImpl(File indexDir, boolean mapped)
       throws IOException, ConfigurationException {

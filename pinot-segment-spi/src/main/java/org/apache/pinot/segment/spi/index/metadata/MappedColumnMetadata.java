@@ -48,8 +48,10 @@ public final class MappedColumnMetadata implements ColumnMetadata {
   private final int _ordinal;
   @Nullable
   private volatile PartitionFunction _partitionFunction;
+  private volatile boolean _partitionFunctionLoaded;
   @Nullable
   private volatile Set<Integer> _partitions;
+  private volatile boolean _partitionsLoaded;
   @Nullable
   private volatile Bounds _bounds;
   @Nullable
@@ -187,17 +189,15 @@ public final class MappedColumnMetadata implements ColumnMetadata {
   @Nullable
   @Override
   public PartitionFunction getPartitionFunction() {
-    PartitionFunction cached = _partitionFunction;
-    if (cached == null) {
+    if (!_partitionFunctionLoaded) {
       synchronized (this) {
-        cached = _partitionFunction;
-        if (cached == null) {
-          cached = decodePartitionFunction();
-          _partitionFunction = cached;
+        if (!_partitionFunctionLoaded) {
+          _partitionFunction = decodePartitionFunction();
+          _partitionFunctionLoaded = true;
         }
       }
     }
-    return cached;
+    return _partitionFunction;
   }
 
   @Nullable
@@ -223,17 +223,15 @@ public final class MappedColumnMetadata implements ColumnMetadata {
   @Nullable
   @Override
   public Set<Integer> getPartitions() {
-    Set<Integer> cached = _partitions;
-    if (cached == null) {
+    if (!_partitionsLoaded) {
       synchronized (this) {
-        cached = _partitions;
-        if (cached == null) {
-          cached = decodePartitions();
-          _partitions = cached;
+        if (!_partitionsLoaded) {
+          _partitions = decodePartitions();
+          _partitionsLoaded = true;
         }
       }
     }
-    return cached;
+    return _partitions;
   }
 
   @Nullable
