@@ -116,7 +116,7 @@ public class TarCompressionUtilsTest {
 
   @Test(dataProvider = "lz4Implementations")
   public void testLz4ArchiveRoundTrip(String compressorName)
-      throws IOException {
+      throws IOException, CompressorException {
     int contentSize = compressorName.equals(CompressorStreamFactory.LZ4_FRAMED) ? 32 * 1024 : 5 * 1024 * 1024;
     byte[] content = new byte[contentSize];
     new Random(0).nextBytes(content);
@@ -128,7 +128,10 @@ public class TarCompressionUtilsTest {
     if (compressorName.equals(LZ4_FAST)) {
       File defaultArchive = new File(TAR_DIR, "default" + TarCompressionUtils.TAR_LZ4_FILE_EXTENSION);
       TarCompressionUtils.createCompressedTarFile(inputFile, defaultArchive);
-      assertEquals(Files.readAllBytes(defaultArchive.toPath()), Files.readAllBytes(archive.toPath()));
+      // Tar entry headers record the input file's access time, which reading it for the first archive can advance, so
+      // the two archives may differ. Re-encode the default archive's own tar stream to verify its compressor instead.
+      byte[] defaultArchiveBytes = Files.readAllBytes(defaultArchive.toPath());
+      assertEquals(defaultArchiveBytes, compress(LZ4_FAST, decompress(defaultArchiveBytes)));
     }
 
     List<File> extractedFiles = TarCompressionUtils.untar(archive, UNTAR_DIR);
@@ -137,6 +140,23 @@ public class TarCompressionUtilsTest {
     File extractedFile = new File(UNTAR_DIR, "single");
     TarCompressionUtils.untarOneFile(archive, inputFile.getName(), extractedFile);
     assertEquals(Files.readAllBytes(extractedFile.toPath()), content);
+  }
+
+  private static byte[] compress(String compressorName, byte[] content)
+      throws IOException, CompressorException {
+    ByteArrayOutputStream compressed = new ByteArrayOutputStream();
+    try (OutputStream output = COMPRESSOR_STREAM_FACTORY.createCompressorOutputStream(compressorName, compressed)) {
+      output.write(content);
+    }
+    return compressed.toByteArray();
+  }
+
+  private static byte[] decompress(byte[] compressed)
+      throws IOException, CompressorException {
+    try (InputStream input = COMPRESSOR_STREAM_FACTORY.createCompressorInputStream(
+        new ByteArrayInputStream(compressed))) {
+      return IOUtils.toByteArray(input);
+    }
   }
 
   @Test
