@@ -1207,7 +1207,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   @Nullable
   protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit)
       throws SegmentBuildFailureException {
-    if (_parallelSegmentConsumptionPolicy.isAllowedDuringBuild()) {
+    if (shouldReleaseSemaphoreBeforeBuild()) {
       closeStreamConsumerAndReleaseSemaphore();
     }
     // Do not allow building segment when table data manager is already shut down
@@ -1765,24 +1765,49 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   protected void downloadSegmentAndReplace(SegmentZKMetadata segmentZKMetadata)
       throws Exception {
-    boolean allowedDuringDownload = _parallelSegmentConsumptionPolicy.isAllowedDuringDownload();
-    // A local build that failed or mismatched the committed CRC has already released the semaphore when the policy
-    // allows consumption during build, so the next consuming segment can be running during this download as well
-    boolean releasedDuringBuild =
-        _parallelSegmentConsumptionPolicy.isAllowedDuringBuild() && !_consumerSemaphoreAcquired.get();
-    if ((allowedDuringDownload || releasedDuringBuild) && _partitionUpsertMetadataManager != null
-        && _partitionUpsertMetadataManager.shouldRevertMetadataOnInconsistency(_realtimeSegment)) {
-      // Table config validation rejects this in PROTECTED mode. It still happens when the mode is switched after the
-      // table is created, when the server-level default allows partial upsert consumption during commit, or when a
-      // pauseless table falls back to a download after its local build fails.
-      _segmentLogger.error("Next consuming segment can run during download while this replace reverts upsert "
-          + "metadata. Its snapshot can miss the rows the revert restores. Use DISALLOW_ALWAYS");
-      _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.UPSERT_REVERT_WITH_CONSUMPTION_DURING_DOWNLOAD, 1L);
-    }
-    if (allowedDuringDownload) {
+    boolean holdsPermit = holdsConsumerSemaphoreForMetadata();
+    if (_parallelSegmentConsumptionPolicy.isAllowedDuringDownload() && !holdsPermit) {
       closeStreamConsumerAndReleaseSemaphore();
     }
+    // Under a policy that releases somewhere, the permit should still be ours, so a missing one means the next
+    // consuming segment is already running. DISALLOW_ALWAYS never releases, so a missing permit there just means this
+    // segment never consumed.
+    boolean policyReleasesSomewhere = _parallelSegmentConsumptionPolicy.isAllowedDuringBuild()
+        || _parallelSegmentConsumptionPolicy.isAllowedDuringDownload();
+    if (holdsPermit && policyReleasesSomewhere && !_consumerSemaphoreAcquired.get()) {
+      _segmentLogger.error("Next consuming segment is running while this replace rewrites upsert or dedup metadata, "
+          + "so its rows can be dropped against keys this replace removes. Policy: {}. Use DISALLOW_ALWAYS",
+          _parallelSegmentConsumptionPolicy);
+      if (revertsUpsertMetadata()) {
+        _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.UPSERT_REVERT_WITH_CONSUMPTION_DURING_DOWNLOAD, 1L);
+      }
+    }
     _realtimeTableDataManager.downloadAndReplaceConsumingSegment(segmentZKMetadata);
+  }
+
+  /// A build that fails or mismatches the committed CRC falls back to a download, and the permit cannot be taken back
+  /// then, so tables whose replace rewrites the key map keep it. Pauseless dedup is the exception: it is the one case
+  /// where holding costs what pauseless exists to provide, and it skips the CRC check, so only an outright build
+  /// failure leaves it exposed.
+  ///
+  /// Negation of [#holdsConsumerSemaphoreForMetadata()] plus that exception; keep the two in step.
+  @VisibleForTesting
+  boolean shouldReleaseSemaphoreBeforeBuild() {
+    if (!_parallelSegmentConsumptionPolicy.isAllowedDuringBuild()) {
+      return false;
+    }
+    return !revertsUpsertMetadata()
+        && (_partitionDedupMetadataManager == null || PauselessConsumptionUtils.isPauselessEnabled(_tableConfig));
+  }
+
+  /// The replace re-points or reverts every key of the consuming segment, so the next one must not run against it.
+  private boolean holdsConsumerSemaphoreForMetadata() {
+    return revertsUpsertMetadata() || _partitionDedupMetadataManager != null;
+  }
+
+  private boolean revertsUpsertMetadata() {
+    return _partitionUpsertMetadataManager != null
+        && _partitionUpsertMetadataManager.shouldRevertMetadataOnInconsistency(_realtimeSegment);
   }
 
   protected long now() {
