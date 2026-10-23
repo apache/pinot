@@ -29,6 +29,7 @@ import javax.annotation.concurrent.ThreadSafe;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.common.response.BrokerResponse;
+import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.trace.RequestContext;
@@ -82,6 +83,14 @@ public interface BrokerRequestHandler {
   /// number of channels connected before `deadlineMs` (an absolute [System#currentTimeMillis] value).
   default int preConnectServers(long deadlineMs) {
     return 0;
+  }
+
+  /// Called when the routing manager re-enables a server it had seen leave the enabled set, which is how a server
+  /// restart shows up through Helix. A handler that caches connections to the server must assume they point at the
+  /// previous process and drop them, so the next query reconnects instead of writing into a half-open socket. The
+  /// default is a no-op; invoked on the Helix callback thread under the routing manager's lock, so it must be quick
+  /// and must not block.
+  default void onServerReenabled(ServerInstance serverInstance) {
   }
 
   BrokerResponse handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,

@@ -713,6 +713,57 @@ public class QueryRoutingTest {
     }
   }
 
+  /// Readmission of a restarted server: every cached channel to it, one per table type, is closed and forgotten,
+  /// and the next query reconnects instead of writing into the channels of the previous process.
+  @Test
+  public void testEvictChannelsDropsBothTableTypesAndNextQueryReconnects()
+      throws Exception {
+    long requestId = 123;
+    DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
+    dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
+    byte[] responseBytes = dataTable.toBytes();
+    _queryServer = getQueryServer(0, responseBytes);
+    initializeTestFixtures(startAndGetPort(_queryServer));
+    QueryRouter queryRouter = newIsolatedQueryRouter();
+    try {
+      // Nothing cached yet
+      assertEquals(queryRouter.evictChannels(_serverInstance), 0);
+
+      // A hybrid query opens one channel per table type
+      AsyncQueryResponse asyncQueryResponse =
+          queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, _routingTable, BROKER_REQUEST, _routingTable,
+              10_000L);
+      Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
+      assertEquals(response.size(), 2);
+      assertNotNull(response.get(_offlineServerRoutingInstance).getDataTable());
+      assertNotNull(response.get(_realtimeServerRoutingInstance).getDataTable());
+      assertTrue(queryRouter.hasChannel(_serverInstance));
+      TestUtils.waitForCondition(aVoid -> _queryServer.getConnectedChannelCount() == 2, 10L, 5_000L,
+          "Expected one channel per table type on the server");
+
+      assertEquals(queryRouter.evictChannels(_serverInstance), 2);
+      assertEquals(queryRouter.evictChannels(_serverInstance), 0, "Nothing left to evict");
+      assertFalse(queryRouter.hasChannel(_serverInstance), "No channel left for the transport to vouch for");
+      TestUtils.waitForCondition(aVoid -> _queryServer.getConnectedChannelCount() == 0, 10L, 5_000L,
+          "Evicted channels were not closed");
+
+      // The next query reconnects and succeeds
+      asyncQueryResponse =
+          queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, _routingTable, BROKER_REQUEST, _routingTable,
+              10_000L);
+      response = asyncQueryResponse.getFinalResponses();
+      assertEquals(response.size(), 2);
+      assertNotNull(response.get(_offlineServerRoutingInstance).getDataTable());
+      assertNotNull(response.get(_realtimeServerRoutingInstance).getDataTable());
+      assertNull(asyncQueryResponse.getException());
+      assertTrue(queryRouter.hasChannel(_serverInstance));
+      TestUtils.waitForCondition(aVoid -> _queryServer.getConnectedChannelCount() == 2, 10L, 5_000L,
+          "Expected fresh channels on the server");
+    } finally {
+      queryRouter.shutDown();
+    }
+  }
+
   @Test
   public void testChannelActiveInactiveEmitPerServerTaggedMeters() {
     PinotMetricUtils.init(new PinotConfiguration());

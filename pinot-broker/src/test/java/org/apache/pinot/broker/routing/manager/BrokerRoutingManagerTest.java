@@ -284,7 +284,7 @@ public class BrokerRoutingManagerTest {
   @Test
   public void testServerReenableCallbackInvokedWhenExcludedServerReenabled() {
     // Set up callback
-    _routingManager.setServerReenableCallback(_serverReenableCallback);
+    _routingManager.addServerReenableCallback(_serverReenableCallback);
 
     // First, enable the server by processing instance config change
     List<ZNRecord> instanceConfigs = List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID));
@@ -322,7 +322,7 @@ public class BrokerRoutingManagerTest {
   @Test
   public void testServerReenableCallbackNotInvokedForNewServer() {
     // Set up callback
-    _routingManager.setServerReenableCallback(_serverReenableCallback);
+    _routingManager.addServerReenableCallback(_serverReenableCallback);
 
     // Enable a new server (never excluded)
     List<ZNRecord> instanceConfigs = List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID));
@@ -333,6 +333,81 @@ public class BrokerRoutingManagerTest {
 
     // Verify callback was NOT invoked (server was never excluded)
     verify(_serverReenableCallback, never()).accept(any());
+
+    // Nor on a refresh that changes nothing
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    verify(_serverReenableCallback, never()).accept(any());
+  }
+
+  /// A restart that disables and re-enables the instance without the failure detector ever excluding it (the
+  /// common case: timeouts alone never mark a server unhealthy) must still notify, so cached channels to the
+  /// previous process get dropped.
+  @Test
+  public void testServerReenableCallbackInvokedWhenDisabledServerReenabledWithoutExclusion() {
+    _routingManager.addServerReenableCallback(_serverReenableCallback);
+
+    List<ZNRecord> instanceConfigs = List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID));
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(instanceConfigs);
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    assertTrue(_routingManager.getEnabledServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
+    verify(_serverReenableCallback, never()).accept(any());
+
+    // Disable (instance config gone), then re-enable
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(List.of());
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    assertFalse(_routingManager.getEnabledServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
+    verify(_serverReenableCallback, never()).accept(any());
+
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(instanceConfigs);
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+
+    ArgumentCaptor<ServerInstance> captor = ArgumentCaptor.forClass(ServerInstance.class);
+    verify(_serverReenableCallback).accept(captor.capture());
+    assertEquals(captor.getValue().getInstanceId(), SERVER_INSTANCE_ID);
+    assertEquals(captor.getValue().getHostname(), SERVER_HOST);
+    assertEquals(captor.getValue().getPort(), SERVER_PORT);
+
+    // Once per re-enable: a second restart notifies again, a plain refresh does not
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    verify(_serverReenableCallback, times(1)).accept(any());
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(List.of());
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(instanceConfigs);
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    verify(_serverReenableCallback, times(2)).accept(any());
+  }
+
+  /// Several listeners share the signal (the SSE transport drops its channels, MSE resets its gRPC backoff), and one
+  /// failing must not stop the others or the routing update.
+  @Test
+  @SuppressWarnings("unchecked")
+  public void testAllServerReenableCallbacksInvokedEvenIfOneThrows() {
+    Consumer<ServerInstance> failingCallback = mock(Consumer.class);
+    doThrow(new RuntimeException("callback failure")).when(failingCallback).accept(any());
+    _routingManager.addServerReenableCallback(failingCallback);
+    _routingManager.addServerReenableCallback(_serverReenableCallback);
+
+    List<ZNRecord> instanceConfigs = List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID));
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(instanceConfigs);
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    _routingManager.excludeServerFromRouting(SERVER_INSTANCE_ID);
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(List.of());
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(instanceConfigs);
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+
+    verify(failingCallback).accept(any());
+    verify(_serverReenableCallback).accept(any());
+    assertTrue(_routingManager.getEnabledServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
+    assertTrue(_routingManager.getRoutableServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
   }
 
   @Test

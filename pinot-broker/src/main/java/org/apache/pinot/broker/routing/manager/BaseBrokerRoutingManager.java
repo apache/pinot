@@ -137,13 +137,16 @@ public abstract class BaseBrokerRoutingManager
   private final Map<String, ServerInstance> _enabledServerInstanceMap = new ConcurrentHashMap<>();
   // NOTE: _excludedServers doesn't need to be concurrent because it is only accessed within the _globalLock write lock
   private final Set<String> _excludedServers = new HashSet<>();
+  // Servers that were enabled at some point and have since left the enabled set (disabled, shutting down or removed).
+  // Tells a server that comes back, which has most likely been restarted, from one seen for the first time. Only
+  // accessed within the _globalLock write lock.
+  private final Set<String> _previouslyEnabledServers = new HashSet<>();
   private final ServerRoutingStatsManager _serverRoutingStatsManager;
   private final PinotConfiguration _pinotConfig;
   private final boolean _enablePartitionMetadataManager;
   private final long _newSegmentExpirationMs;
   private final ExecutorService _executorService;
-  @Nullable
-  private Consumer<ServerInstance> _serverReenableCallback;
+  private final List<Consumer<ServerInstance>> _serverReenableCallbacks = new CopyOnWriteArrayList<>();
 
   // Providers of extra per-table segment ZK metadata fetch listeners, registered alongside the built-in segment
   // pruners on every table's routing entry. Each provider is invoked once per table (with the table name with type)
@@ -233,10 +236,20 @@ public abstract class BaseBrokerRoutingManager
     return _partitionPruningPreparationThreshold;
   }
 
-  /// Sets a callback to be invoked when a server is re-enabled after being excluded.
-  /// This is useful for resetting gRPC channel state to avoid exponential backoff delays.
+  /// Registers a callback invoked with the [ServerInstance] of a server that re-enters the enabled set after having
+  /// left it: it was enabled before and then disabled, marked as shutting down or removed, or the failure detector
+  /// had excluded it. That transition is how a server restart shows up through Helix, so callers use it to drop
+  /// state tied to the previous process (cached connections, connection backoff). Not invoked for a server seen for
+  /// the first time. Callbacks run on the Helix callback thread while the routing manager holds its write lock, so
+  /// they must be quick and must not block.
+  public void addServerReenableCallback(Consumer<ServerInstance> callback) {
+    _serverReenableCallbacks.add(callback);
+  }
+
+  /// @deprecated Use [#addServerReenableCallback(Consumer)]; several callbacks can be registered.
+  @Deprecated
   public void setServerReenableCallback(Consumer<ServerInstance> callback) {
-    _serverReenableCallback = callback;
+    addServerReenableCallback(callback);
   }
 
   /// Registers a provider of an extra [SegmentZkMetadataFetchListener] that is attached to every table's routing
@@ -451,14 +464,16 @@ public abstract class BaseBrokerRoutingManager
             newEnabledServers.add(instanceId);
 
             // NOTE: Remove new enabled server from excluded servers because the server is likely being restarted
-            if (_excludedServers.remove(instanceId)) {
+            boolean wasExcluded = _excludedServers.remove(instanceId);
+            if (wasExcluded) {
               LOGGER.info("Got excluded server: {} re-enabled, including it into the routing", instanceId);
-              // We clear any GRPC channel reconnection backoff in this callback when a server is re-enabled. Otherwise,
-              // MSE queries to this server may fail fast until the next backoff retry succeeds.
-              if (_serverReenableCallback != null) {
-                LOGGER.info("Calling server re-enable callback for server: {}", instanceId);
-                _serverReenableCallback.accept(serverInstance);
-              }
+            }
+            // A server that comes back after having left the enabled set has most likely been restarted, whether or
+            // not the failure detector had excluded it in between. Let the listeners drop state tied to the previous
+            // process: cached Netty channels that may be half-open, and the gRPC connection backoff that would
+            // otherwise make MSE queries fail fast until the next backoff retry succeeds.
+            if (_previouslyEnabledServers.remove(instanceId) | wasExcluded) {
+              notifyServerReenabled(serverInstance);
             }
           }
         }
@@ -520,6 +535,7 @@ public abstract class BaseBrokerRoutingManager
     // always contains the selected servers
     for (String newDisabledInstance : newDisabledServers) {
       _enabledServerInstanceMap.remove(newDisabledInstance);
+      _previouslyEnabledServers.add(newDisabledInstance);
     }
 
     LOGGER.info("Processed instance config change in {}ms "
@@ -548,6 +564,18 @@ public abstract class BaseBrokerRoutingManager
       return false;
     }
     return true;
+  }
+
+  private void notifyServerReenabled(ServerInstance serverInstance) {
+    for (Consumer<ServerInstance> callback : _serverReenableCallbacks) {
+      try {
+        LOGGER.info("Calling server re-enable callback for server: {}", serverInstance.getInstanceId());
+        callback.accept(serverInstance);
+      } catch (Exception e) {
+        LOGGER.error("Caught exception in server re-enable callback for server: {}, ignoring it",
+            serverInstance.getInstanceId(), e);
+      }
+    }
   }
 
   /// Excludes a server from the routing.

@@ -199,8 +199,32 @@ public class QueryRouter {
     }
   }
 
+  /// Closes and forgets every cached channel to the given server: both table types, over TLS and plaintext. Returns
+  /// the number of channels evicted.
+  ///
+  /// Called through `BrokerRequestHandler#onServerReenabled` when the routing manager re-enables a server it had
+  /// seen leave the enabled set, which is how a restart shows up through Helix. See
+  /// [ServerChannels#evictChannel] for why the cached channel cannot be trusted at that point.
+  public int evictChannels(ServerInstance serverInstance) {
+    int numEvicted = 0;
+    for (TableType tableType : TableType.values()) {
+      if (serverInstance.getPort() > 0 && _serverChannels.evictChannel(
+          serverInstance.toServerRoutingInstance(tableType, ServerInstance.RoutingType.NETTY))) {
+        numEvicted++;
+      }
+      if (_serverChannelsTls != null && serverInstance.getNettyTlsPort() > 0 && _serverChannelsTls.evictChannel(
+          serverInstance.toServerRoutingInstance(tableType, ServerInstance.RoutingType.NETTY_TLS))) {
+        numEvicted++;
+      }
+    }
+    return numEvicted;
+  }
+
   public void shutDown() {
     _serverChannels.shutDown();
+    if (_serverChannelsTls != null) {
+      _serverChannelsTls.shutDown();
+    }
   }
 
   void receiveDataTable(ServerRoutingInstance serverRoutingInstance, DataTable dataTable, int responseSize,
