@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.integration.tests.custom;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
@@ -51,6 +52,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -115,7 +117,30 @@ public abstract class CustomDataQueryClusterIntegrationTest extends BaseClusterI
     setUpTable();
 
     waitForAllDocsLoaded(60_000);
+    waitForNoOptionalSegments(60_000);
     LOGGER.warn("Finished setting up integration test class: {}", getClass().getSimpleName());
+  }
+
+  /// Waits until the broker routes no optional segment for the table.
+  ///
+  /// The broker routes a new segment as optional until it sees the segment ONLINE in the external view. The
+  /// single-stage engine still sends optional segments to the servers, which query them once loaded, so
+  /// [#waitForAllDocsLoaded] can pass before the broker sees the last segment ONLINE. The multi-stage engine skips
+  /// optional segments, so a multi-stage query issued at that point misses them.
+  protected void waitForNoOptionalSegments(long timeoutMs) {
+    String routingTableUrl = getBrokerBaseApiUrl() + "/debug/routingTableWithOptionalSegments/" + getTableName();
+    TestUtils.waitForCondition(() -> {
+      // Routing table per table type: server -> {"segments": [...], "optionalSegments": [...]}
+      for (JsonNode serverToSegments : JsonUtils.stringToJsonNode(sendGetRequest(routingTableUrl))) {
+        for (JsonNode segments : serverToSegments) {
+          if (!segments.get("optionalSegments").isEmpty()) {
+            return false;
+          }
+        }
+      }
+      return true;
+    }, 100L, timeoutMs, "Broker still routes optional segments for table: " + getTableName(),
+        Duration.ofMillis(timeoutMs / 10));
   }
 
   /// Initializes the controller request URL builder for the shared suite.
