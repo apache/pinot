@@ -24,6 +24,7 @@ import java.sql.Timestamp;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionUtils;
@@ -37,12 +38,20 @@ import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 import org.apache.pinot.spi.utils.PinotDataType;
 import org.apache.pinot.spi.utils.UuidUtils;
+import org.roaringbitmap.PeekableIntIterator;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /// Wrapper transform function on the annotated scalar function.
+///
+/// When null handling is enabled and the function accepts `null` arguments (see `ScalarFunction#nullableParameters`),
+/// the function is invoked with `null` for the null rows of the arguments, and the rows where it returns `null` are the
+/// null rows of the result. Otherwise, the function is invoked with the values stored in the null rows (e.g. the
+/// default null value of a column), and a row of the result is null when any argument is null in it.
 public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
   private final String _name;
   private final QueryFunctionInvoker _functionInvoker;
+  private final boolean _nullableParameters;
   private final ColumnDataType _resultType;
   private final TransformResultMetadata _resultMetadata;
 
@@ -50,11 +59,22 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
   private int _numNonLiteralArguments;
   private int[] _nonLiteralIndices;
   private TransformFunction[] _nonLiteralFunctions;
+  private PinotDataType[] _nonLiteralTypes;
   private Object[][] _nonLiteralValues;
+
+  // Whether the function is invoked with null for null argument rows, and decides the null rows of the result
+  private boolean _invokeWithNulls;
+  // When invoking with nulls, the value block evaluated last, whose values are in the result buffer, and the rows of it
+  // where the function returns null. Value blocks are not reused across batches, so these stay valid for the block.
+  @Nullable
+  private ValueBlock _evaluatedValueBlock;
+  @Nullable
+  private RoaringBitmap _resultNullBitmap;
 
   public ScalarTransformFunctionWrapper(FunctionInfo functionInfo) {
     _name = functionInfo.getMethod().getName();
     _functionInvoker = new QueryFunctionInvoker(functionInfo);
+    _nullableParameters = functionInfo.hasNullableParameters();
     Class<?>[] parameterClasses = _functionInvoker.getParameterClasses();
     PinotDataType[] parameterTypes = _functionInvoker.getParameterTypes();
     int numParameters = parameterClasses.length;
@@ -91,6 +111,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     _scalarArguments = new Object[numArguments];
     _nonLiteralIndices = new int[numArguments];
     _nonLiteralFunctions = new TransformFunction[numArguments];
+    _nonLiteralTypes = new PinotDataType[numArguments];
     for (int i = 0; i < numArguments; i++) {
       TransformFunction transformFunction = arguments.get(i);
       if (transformFunction instanceof LiteralTransformFunction) {
@@ -146,10 +167,20 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       } else {
         _nonLiteralIndices[_numNonLiteralArguments] = i;
         _nonLiteralFunctions[_numNonLiteralArguments] = transformFunction;
+        _nonLiteralTypes[_numNonLiteralArguments] = parameterTypes[i] != PinotDataType.OBJECT
+            ? parameterTypes[i]
+            : getObjectArgumentType(transformFunction.getResultMetadata());
         _numNonLiteralArguments++;
       }
     }
     _nonLiteralValues = new Object[_numNonLiteralArguments][];
+  }
+
+  @Override
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap,
+      boolean nullHandlingEnabled) {
+    super.init(arguments, columnContextMap, nullHandlingEnabled);
+    _invokeWithNulls = nullHandlingEnabled && _nullableParameters;
   }
 
   @Override
@@ -162,6 +193,9 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     if (_resultMetadata.getDataType().getStoredType() != DataType.INT) {
       return super.transformToIntValuesSV(valueBlock);
     }
+    if (valueBlock == _evaluatedValueBlock) {
+      return _intValuesSV;
+    }
     int length = valueBlock.getNumDocs();
     initIntValuesSV(length);
     getNonLiteralValues(valueBlock);
@@ -170,7 +204,12 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
       Object value = _functionInvoker.invoke(_scalarArguments);
-      _intValuesSV[i] = value != null ? (int) _resultType.toInternal(value) : NullValuePlaceHolder.INT;
+      if (value != null) {
+        _intValuesSV[i] = (int) _resultType.toInternal(value);
+      } else {
+        _intValuesSV[i] = NullValuePlaceHolder.INT;
+        addNullResult(i);
+      }
     }
     return _intValuesSV;
   }
@@ -180,6 +219,9 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     if (_resultMetadata.getDataType().getStoredType() != DataType.LONG) {
       return super.transformToLongValuesSV(valueBlock);
     }
+    if (valueBlock == _evaluatedValueBlock) {
+      return _longValuesSV;
+    }
     int length = valueBlock.getNumDocs();
     initLongValuesSV(length);
     getNonLiteralValues(valueBlock);
@@ -188,7 +230,12 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
       Object value = _functionInvoker.invoke(_scalarArguments);
-      _longValuesSV[i] = value != null ? (long) _resultType.toInternal(value) : NullValuePlaceHolder.LONG;
+      if (value != null) {
+        _longValuesSV[i] = (long) _resultType.toInternal(value);
+      } else {
+        _longValuesSV[i] = NullValuePlaceHolder.LONG;
+        addNullResult(i);
+      }
     }
     return _longValuesSV;
   }
@@ -198,6 +245,9 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     if (_resultMetadata.getDataType().getStoredType() != DataType.FLOAT) {
       return super.transformToFloatValuesSV(valueBlock);
     }
+    if (valueBlock == _evaluatedValueBlock) {
+      return _floatValuesSV;
+    }
     int length = valueBlock.getNumDocs();
     initFloatValuesSV(length);
     getNonLiteralValues(valueBlock);
@@ -206,8 +256,12 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
       Object value = _functionInvoker.invoke(_scalarArguments);
-      _floatValuesSV[i] =
-          value != null ? (float) _resultType.toInternal(value) : NullValuePlaceHolder.FLOAT;
+      if (value != null) {
+        _floatValuesSV[i] = (float) _resultType.toInternal(value);
+      } else {
+        _floatValuesSV[i] = NullValuePlaceHolder.FLOAT;
+        addNullResult(i);
+      }
     }
     return _floatValuesSV;
   }
@@ -217,6 +271,9 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     if (_resultMetadata.getDataType().getStoredType() != DataType.DOUBLE) {
       return super.transformToDoubleValuesSV(valueBlock);
     }
+    if (valueBlock == _evaluatedValueBlock) {
+      return _doubleValuesSV;
+    }
     int length = valueBlock.getNumDocs();
     initDoubleValuesSV(length);
     getNonLiteralValues(valueBlock);
@@ -225,8 +282,12 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
       Object value = _functionInvoker.invoke(_scalarArguments);
-      _doubleValuesSV[i] =
-          value != null ? (double) _resultType.toInternal(value) : NullValuePlaceHolder.DOUBLE;
+      if (value != null) {
+        _doubleValuesSV[i] = (double) _resultType.toInternal(value);
+      } else {
+        _doubleValuesSV[i] = NullValuePlaceHolder.DOUBLE;
+        addNullResult(i);
+      }
     }
     return _doubleValuesSV;
   }
@@ -236,6 +297,9 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     if (_resultMetadata.getDataType().getStoredType() != DataType.BIG_DECIMAL) {
       return super.transformToBigDecimalValuesSV(valueBlock);
     }
+    if (valueBlock == _evaluatedValueBlock) {
+      return _bigDecimalValuesSV;
+    }
     int length = valueBlock.getNumDocs();
     initBigDecimalValuesSV(length);
     getNonLiteralValues(valueBlock);
@@ -244,8 +308,12 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
       Object value = _functionInvoker.invoke(_scalarArguments);
-      _bigDecimalValuesSV[i] =
-          value != null ? (BigDecimal) _resultType.toInternal(value) : NullValuePlaceHolder.BIG_DECIMAL;
+      if (value != null) {
+        _bigDecimalValuesSV[i] = (BigDecimal) _resultType.toInternal(value);
+      } else {
+        _bigDecimalValuesSV[i] = NullValuePlaceHolder.BIG_DECIMAL;
+        addNullResult(i);
+      }
     }
     return _bigDecimalValuesSV;
   }
@@ -255,6 +323,9 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     if (_resultMetadata.getDataType().getStoredType() != DataType.STRING) {
       return super.transformToStringValuesSV(valueBlock);
     }
+    if (valueBlock == _evaluatedValueBlock) {
+      return _stringValuesSV;
+    }
     int length = valueBlock.getNumDocs();
     initStringValuesSV(length);
     getNonLiteralValues(valueBlock);
@@ -263,8 +334,12 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
       Object value = _functionInvoker.invoke(_scalarArguments);
-      _stringValuesSV[i] =
-          value != null ? (String) _resultType.toInternal(value) : NullValuePlaceHolder.STRING;
+      if (value != null) {
+        _stringValuesSV[i] = (String) _resultType.toInternal(value);
+      } else {
+        _stringValuesSV[i] = NullValuePlaceHolder.STRING;
+        addNullResult(i);
+      }
     }
     return _stringValuesSV;
   }
@@ -274,6 +349,9 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     if (_resultMetadata.getDataType().getStoredType() != DataType.BYTES) {
       return super.transformToBytesValuesSV(valueBlock);
     }
+    if (valueBlock == _evaluatedValueBlock) {
+      return _bytesValuesSV;
+    }
     int length = valueBlock.getNumDocs();
     initBytesValuesSV(length);
     getNonLiteralValues(valueBlock);
@@ -282,9 +360,12 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
       Object value = _functionInvoker.invoke(_scalarArguments);
-      byte[] bytes =
-          value != null ? ((ByteArray) _resultType.toInternal(value)).getBytes() : NullValuePlaceHolder.BYTES;
-      _bytesValuesSV[i] = bytes;
+      if (value != null) {
+        _bytesValuesSV[i] = ((ByteArray) _resultType.toInternal(value)).getBytes();
+      } else {
+        _bytesValuesSV[i] = NullValuePlaceHolder.BYTES;
+        addNullResult(i);
+      }
     }
     return _bytesValuesSV;
   }
@@ -294,6 +375,9 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     if (_resultMetadata.getDataType().getStoredType() != DataType.INT) {
       return super.transformToIntValuesMV(valueBlock);
     }
+    if (valueBlock == _evaluatedValueBlock) {
+      return _intValuesMV;
+    }
     int length = valueBlock.getNumDocs();
     initIntValuesMV(length);
     getNonLiteralValues(valueBlock);
@@ -301,7 +385,13 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
-      _intValuesMV[i] = (int[]) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
+      Object value = _functionInvoker.invoke(_scalarArguments);
+      if (value != null) {
+        _intValuesMV[i] = (int[]) _resultType.toInternal(value);
+      } else {
+        _intValuesMV[i] = NullValuePlaceHolder.INT_ARRAY;
+        addNullResult(i);
+      }
     }
     return _intValuesMV;
   }
@@ -311,6 +401,9 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     if (_resultMetadata.getDataType().getStoredType() != DataType.LONG) {
       return super.transformToLongValuesMV(valueBlock);
     }
+    if (valueBlock == _evaluatedValueBlock) {
+      return _longValuesMV;
+    }
     int length = valueBlock.getNumDocs();
     initLongValuesMV(length);
     getNonLiteralValues(valueBlock);
@@ -318,7 +411,13 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
-      _longValuesMV[i] = (long[]) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
+      Object value = _functionInvoker.invoke(_scalarArguments);
+      if (value != null) {
+        _longValuesMV[i] = (long[]) _resultType.toInternal(value);
+      } else {
+        _longValuesMV[i] = NullValuePlaceHolder.LONG_ARRAY;
+        addNullResult(i);
+      }
     }
     return _longValuesMV;
   }
@@ -328,6 +427,9 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     if (_resultMetadata.getDataType().getStoredType() != DataType.FLOAT) {
       return super.transformToFloatValuesMV(valueBlock);
     }
+    if (valueBlock == _evaluatedValueBlock) {
+      return _floatValuesMV;
+    }
     int length = valueBlock.getNumDocs();
     initFloatValuesMV(length);
     getNonLiteralValues(valueBlock);
@@ -335,7 +437,13 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
-      _floatValuesMV[i] = (float[]) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
+      Object value = _functionInvoker.invoke(_scalarArguments);
+      if (value != null) {
+        _floatValuesMV[i] = (float[]) _resultType.toInternal(value);
+      } else {
+        _floatValuesMV[i] = NullValuePlaceHolder.FLOAT_ARRAY;
+        addNullResult(i);
+      }
     }
     return _floatValuesMV;
   }
@@ -345,6 +453,9 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     if (_resultMetadata.getDataType().getStoredType() != DataType.DOUBLE) {
       return super.transformToDoubleValuesMV(valueBlock);
     }
+    if (valueBlock == _evaluatedValueBlock) {
+      return _doubleValuesMV;
+    }
     int length = valueBlock.getNumDocs();
     initDoubleValuesMV(length);
     getNonLiteralValues(valueBlock);
@@ -352,7 +463,13 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
-      _doubleValuesMV[i] = (double[]) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
+      Object value = _functionInvoker.invoke(_scalarArguments);
+      if (value != null) {
+        _doubleValuesMV[i] = (double[]) _resultType.toInternal(value);
+      } else {
+        _doubleValuesMV[i] = NullValuePlaceHolder.DOUBLE_ARRAY;
+        addNullResult(i);
+      }
     }
     return _doubleValuesMV;
   }
@@ -362,6 +479,9 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     if (_resultMetadata.getDataType().getStoredType() != DataType.STRING) {
       return super.transformToStringValuesMV(valueBlock);
     }
+    if (valueBlock == _evaluatedValueBlock) {
+      return _stringValuesMV;
+    }
     int length = valueBlock.getNumDocs();
     initStringValuesMV(length);
     getNonLiteralValues(valueBlock);
@@ -369,16 +489,134 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
-      _stringValuesMV[i] = (String[]) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
+      Object value = _functionInvoker.invoke(_scalarArguments);
+      if (value != null) {
+        _stringValuesMV[i] = (String[]) _resultType.toInternal(value);
+      } else {
+        _stringValuesMV[i] = NullValuePlaceHolder.STRING_ARRAY;
+        addNullResult(i);
+      }
     }
     return _stringValuesMV;
   }
 
-  /// Helper method to fetch values for the non-literal transform functions based on the parameter types.
+  @Nullable
+  @Override
+  public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
+    if (!_invokeWithNulls) {
+      return super.getNullBitmap(valueBlock);
+    }
+    if (valueBlock != _evaluatedValueBlock) {
+      evaluate(valueBlock);
+    }
+    return _resultNullBitmap;
+  }
+
+  /// Evaluates the function on the given value block with the transform method of the result type, which also records
+  /// the null rows of the result.
+  private void evaluate(ValueBlock valueBlock) {
+    DataType storedType = _resultMetadata.getDataType().getStoredType();
+    if (_resultMetadata.isSingleValue()) {
+      switch (storedType) {
+        case INT:
+          transformToIntValuesSV(valueBlock);
+          break;
+        case LONG:
+          transformToLongValuesSV(valueBlock);
+          break;
+        case FLOAT:
+          transformToFloatValuesSV(valueBlock);
+          break;
+        case DOUBLE:
+          transformToDoubleValuesSV(valueBlock);
+          break;
+        case BIG_DECIMAL:
+          transformToBigDecimalValuesSV(valueBlock);
+          break;
+        case STRING:
+          transformToStringValuesSV(valueBlock);
+          break;
+        case BYTES:
+          transformToBytesValuesSV(valueBlock);
+          break;
+        default:
+          throw new IllegalStateException("Unsupported single-value result type: " + storedType);
+      }
+    } else {
+      switch (storedType) {
+        case INT:
+          transformToIntValuesMV(valueBlock);
+          break;
+        case LONG:
+          transformToLongValuesMV(valueBlock);
+          break;
+        case FLOAT:
+          transformToFloatValuesMV(valueBlock);
+          break;
+        case DOUBLE:
+          transformToDoubleValuesMV(valueBlock);
+          break;
+        case STRING:
+          transformToStringValuesMV(valueBlock);
+          break;
+        default:
+          throw new IllegalStateException("Unsupported multi-value result type: " + storedType);
+      }
+    }
+  }
+
+  private void addNullResult(int row) {
+    if (_invokeWithNulls) {
+      if (_resultNullBitmap == null) {
+        _resultNullBitmap = new RoaringBitmap();
+      }
+      _resultNullBitmap.add(row);
+    }
+  }
+
+  /// Returns the type to read an argument for an `Object` parameter, so that the function gets the external Java value
+  /// of the argument result type, the same as `ColumnDataType.toExternal()` in the multi-stage engine `FunctionOperand`
+  /// for that type. Complex types such as MAP are not supported.
+  private PinotDataType getObjectArgumentType(TransformResultMetadata argumentMetadata) {
+    DataType dataType = argumentMetadata.getDataType();
+    boolean singleValue = argumentMetadata.isSingleValue();
+    switch (dataType) {
+      case INT:
+        return singleValue ? PinotDataType.INT : PinotDataType.PRIMITIVE_INT_ARRAY;
+      case LONG:
+        return singleValue ? PinotDataType.LONG : PinotDataType.PRIMITIVE_LONG_ARRAY;
+      case FLOAT:
+        return singleValue ? PinotDataType.FLOAT : PinotDataType.PRIMITIVE_FLOAT_ARRAY;
+      case DOUBLE:
+        return singleValue ? PinotDataType.DOUBLE : PinotDataType.PRIMITIVE_DOUBLE_ARRAY;
+      case BIG_DECIMAL:
+        return singleValue ? PinotDataType.BIG_DECIMAL : PinotDataType.BIG_DECIMAL_ARRAY;
+      case BOOLEAN:
+        return singleValue ? PinotDataType.BOOLEAN : PinotDataType.PRIMITIVE_BOOLEAN_ARRAY;
+      case TIMESTAMP:
+        return singleValue ? PinotDataType.TIMESTAMP : PinotDataType.TIMESTAMP_ARRAY;
+      case STRING:
+      case JSON:
+        return singleValue ? PinotDataType.STRING : PinotDataType.STRING_ARRAY;
+      case BYTES:
+        return singleValue ? PinotDataType.BYTES : PinotDataType.BYTES_ARRAY;
+      case UUID:
+        return singleValue ? PinotDataType.UUID : PinotDataType.UUID_ARRAY;
+      default:
+        throw new IllegalArgumentException(
+            String.format("Unsupported argument type: %s for Object parameter of method: %s", dataType,
+                _functionInvoker.getMethod()));
+    }
+  }
+
+  /// Helper method to fetch values for the non-literal transform functions based on the parameter types. For an
+  /// `Object` parameter, the values are read based on the argument result type (see [#getObjectArgumentType]).
+  ///
+  /// When invoking with nulls, also replaces the values of the null rows with `null`, and starts recording the null
+  /// rows of the result for the value block.
   private void getNonLiteralValues(ValueBlock valueBlock) {
-    PinotDataType[] parameterTypes = _functionInvoker.getParameterTypes();
     for (int i = 0; i < _numNonLiteralArguments; i++) {
-      PinotDataType parameterType = parameterTypes[_nonLiteralIndices[i]];
+      PinotDataType parameterType = _nonLiteralTypes[i];
       TransformFunction transformFunction = _nonLiteralFunctions[i];
       switch (parameterType) {
         case INT:
@@ -485,9 +723,41 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
         case BYTES_ARRAY:
           _nonLiteralValues[i] = transformFunction.transformToBytesValuesMV(valueBlock);
           break;
+        case UUID_ARRAY: {
+          byte[][][] bytesValuesMV = transformFunction.transformToBytesValuesMV(valueBlock);
+          int numRows = bytesValuesMV.length;
+          UUID[][] uuidValuesMV = new UUID[numRows][];
+          for (int j = 0; j < numRows; j++) {
+            byte[][] bytesValues = bytesValuesMV[j];
+            int numValues = bytesValues.length;
+            UUID[] uuidValues = new UUID[numValues];
+            for (int k = 0; k < numValues; k++) {
+              uuidValues[k] = UuidUtils.toUUID(bytesValues[k]);
+            }
+            uuidValuesMV[j] = uuidValues;
+          }
+          _nonLiteralValues[i] = uuidValuesMV;
+          break;
+        }
         default:
           throw new IllegalStateException("Unsupported parameter type: " + parameterType);
       }
+    }
+    if (_invokeWithNulls) {
+      for (int i = 0; i < _numNonLiteralArguments; i++) {
+        RoaringBitmap nullBitmap = _nonLiteralFunctions[i].getNullBitmap(valueBlock);
+        if (nullBitmap != null && !nullBitmap.isEmpty()) {
+          // The values can be the buffer of the argument, so replace the null rows in a copy
+          Object[] values = _nonLiteralValues[i].clone();
+          PeekableIntIterator iterator = nullBitmap.getIntIterator();
+          while (iterator.hasNext()) {
+            values[iterator.next()] = null;
+          }
+          _nonLiteralValues[i] = values;
+        }
+      }
+      _evaluatedValueBlock = valueBlock;
+      _resultNullBitmap = null;
     }
   }
 }

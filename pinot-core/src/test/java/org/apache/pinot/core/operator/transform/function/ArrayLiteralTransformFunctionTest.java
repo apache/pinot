@@ -80,10 +80,22 @@ public class ArrayLiteralTransformFunctionTest {
     ArrayLiteralTransformFunction booleanArray = new ArrayLiteralTransformFunction(arrayExpressions);
     assertEquals(booleanArray.getResultMetadata().getDataType(), DataType.BOOLEAN);
     assertEquals(booleanArray.getIntArrayLiteral(), new int[]{1, 0});
-    int[][] values = booleanArray.transformToIntValuesMV(_projectionBlock);
-    assertEquals(values.length, NUM_DOCS);
-    for (int[] value : values) {
-      assertEquals(value, new int[]{1, 0});
+    int[][] ints = booleanArray.transformToIntValuesMV(_projectionBlock);
+    long[][] longs = booleanArray.transformToLongValuesMV(_projectionBlock);
+    float[][] floats = booleanArray.transformToFloatValuesMV(_projectionBlock);
+    double[][] doubles = booleanArray.transformToDoubleValuesMV(_projectionBlock);
+    String[][] strings = booleanArray.transformToStringValuesMV(_projectionBlock);
+    assertEquals(ints.length, NUM_DOCS);
+    assertEquals(longs.length, NUM_DOCS);
+    assertEquals(floats.length, NUM_DOCS);
+    assertEquals(doubles.length, NUM_DOCS);
+    assertEquals(strings.length, NUM_DOCS);
+    for (int i = 0; i < NUM_DOCS; i++) {
+      assertEquals(ints[i], new int[]{1, 0});
+      assertEquals(longs[i], new long[]{1, 0});
+      assertEquals(floats[i], new float[]{1, 0});
+      assertEquals(doubles[i], new double[]{1, 0});
+      assertEquals(strings[i], new String[]{"true", "false"});
     }
   }
 

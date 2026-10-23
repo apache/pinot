@@ -52,13 +52,14 @@ public class PinotSortExchangeNodeInsertRule extends RelOptRule {
   @Override
   public void onMatch(RelOptRuleCall call) {
     Sort sort = call.rel(0);
-    // TODO: Assess whether sorting is needed on both sender and receiver side or only receiver side. Potentially add
-    //       SqlHint support to determine this. For now setting sort only on receiver side as sender side sorting is
-    //       not yet implemented.
+    // The Sort is re-parented on top of the exchange below, so a SortOperator always sits above this receive and is
+    // the operator that establishes the global order. Marking the receive as sort-on-receiver would only relocate that
+    // work into SortedMailboxReceiveOperator, which buffers every row from every mailbox because it does not know the
+    // fetch/offset. Leaving it false lets SortOperator pick a bounded implementation when the query has a LIMIT.
     // TODO: Revisit whether we should use hash distribution
     PinotLogicalSortExchange exchange =
         PinotLogicalSortExchange.create(sort.getInput(), RelDistributions.hash(List.of()),
-            sort.getCollation(), false, !sort.getCollation().getKeys().isEmpty());
+            sort.getCollation(), false, false);
     call.transformTo(sort.copy(sort.getTraitSet(), exchange, sort.getCollation()));
   }
 }

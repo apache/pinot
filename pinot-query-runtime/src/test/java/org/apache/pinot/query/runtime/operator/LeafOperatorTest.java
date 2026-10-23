@@ -547,6 +547,71 @@ public class LeafOperatorTest {
   }
 
   @Test
+  public void shouldPropagateRemoteAccessStats() {
+    // Given:
+    DataSchema schema = new DataSchema(new String[]{"intCol"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
+    InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
+    metadataBlock.getResponseMetadata().put(DataTable.MetadataKey.NUM_REMOTE_ACCESSES.getName(), "7");
+    metadataBlock.getResponseMetadata().put(DataTable.MetadataKey.REMOTE_ACCESS_BYTES.getName(), "700");
+    metadataBlock.getResponseMetadata().put(DataTable.MetadataKey.NUM_DIRECT_REMOTE_ACCESSES.getName(), "2");
+    metadataBlock.getResponseMetadata().put(DataTable.MetadataKey.DIRECT_REMOTE_ACCESS_BYTES.getName(), "20");
+    QueryExecutor queryExecutor = mockQueryExecutor(List.of(), metadataBlock);
+    LeafOperator operator =
+        new LeafOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema, queryExecutor,
+            _executorService);
+    _operatorRef.set(operator);
+
+    // When:
+    assertTrue(operator.nextBlock().isEos(), "Expected EOS after reading the metadata block");
+
+    // Then:
+    StatMap<LeafOperator.StatKey> leafStats = operator.copyStatMaps();
+    assertEquals(leafStats.getLong(LeafOperator.StatKey.NUM_REMOTE_ACCESSES), 7L);
+    assertEquals(leafStats.getLong(LeafOperator.StatKey.REMOTE_ACCESS_BYTES), 700L);
+    assertEquals(leafStats.getLong(LeafOperator.StatKey.NUM_DIRECT_REMOTE_ACCESSES), 2L);
+    assertEquals(leafStats.getLong(LeafOperator.StatKey.DIRECT_REMOTE_ACCESS_BYTES), 20L);
+
+    BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
+    MultiStageOperator.Type.LEAF.mergeInto(brokerResponse, leafStats);
+    assertEquals(brokerResponse.getNumRemoteAccesses(), 7L);
+    assertEquals(brokerResponse.getRemoteAccessBytes(), 700L);
+    assertEquals(brokerResponse.getNumDirectRemoteAccesses(), 2L);
+    assertEquals(brokerResponse.getDirectRemoteAccessBytes(), 20L);
+    JsonNode responseJson = JsonUtils.objectToJsonNode(brokerResponse);
+    assertEquals(responseJson.path("numRemoteAccesses").asLong(), 7L);
+    assertEquals(responseJson.path("remoteAccessBytes").asLong(), 700L);
+    assertEquals(responseJson.path("numDirectRemoteAccesses").asLong(), 2L);
+    assertEquals(responseJson.path("directRemoteAccessBytes").asLong(), 20L);
+
+    operator.close();
+  }
+
+  /// A leaf that returns final results reports a function that returned an approximate result.
+  @Test
+  public void shouldPropagateApproximatedResult() {
+    DataSchema schema = new DataSchema(new String[]{"intCol"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
+    InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
+    metadataBlock.getResponseMetadata().put(DataTable.MetadataKey.APPROXIMATED_RESULT.getName(), "true");
+    QueryExecutor queryExecutor = mockQueryExecutor(List.of(), metadataBlock);
+    LeafOperator operator =
+        new LeafOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema, queryExecutor,
+            _executorService);
+    _operatorRef.set(operator);
+
+    assertTrue(operator.nextBlock().isEos(), "Expected EOS after reading the metadata block");
+    StatMap<LeafOperator.StatKey> leafStats = operator.copyStatMaps();
+    assertTrue(leafStats.getBoolean(LeafOperator.StatKey.APPROXIMATED_RESULT));
+
+    BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
+    MultiStageOperator.Type.LEAF.mergeInto(brokerResponse, leafStats);
+    assertTrue(brokerResponse.isApproximatedResult());
+    assertTrue(JsonUtils.objectToJsonNode(brokerResponse).path("approximatedResult").asBoolean());
+    operator.close();
+  }
+
+  @Test
   public void shouldSkipNoneEarlyTerminationReason() {
     assertSkippedEarlyTerminationReason(EarlyTerminationReason.NONE.name());
   }

@@ -202,10 +202,18 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
           new StageMetadata(stageId, workerMetadataList, dispatchableStagePlan.getCustomProperties());
       StagePlan stagePlan = new StagePlan(dispatchableStagePlan.getPlanFragment().getFragmentRoot(), stageMetadata);
       for (WorkerMetadata workerMetadata : workerMetadataList) {
-        submissionStubs.add(serverEnclosure.processQuery(workerMetadata, stagePlan, requestMetadataMap));
+        submissionStubs.add(serverEnclosure.processQuery(workerMetadata, stagePlan, requestMetadataMap,
+            getExecutionContext(serverEnclosure, requestMetadataMap)));
       }
     }
     return submissionStubs;
+  }
+
+  /// Returns the execution context in which the given server runs a stage worker. By default, each worker gets its own
+  /// context, while the query server shares one context between all the stages of a query.
+  protected QueryExecutionContext getExecutionContext(QueryServerEnclosure server,
+      Map<String, String> requestMetadataMap) {
+    return QueryExecutionContext.forMseServerRequest(requestMetadataMap, "serverId");
   }
 
   protected List<Object[]> queryH2(String sql)
@@ -591,6 +599,10 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       public boolean _replicated;
       @JsonProperty("isDimTable")
       public boolean _isDimTable;
+      @JsonProperty("isActualDimTableNeeded")
+      public boolean _isActualDimTableNeeded;
+      @JsonProperty("disablePreload")
+      public boolean _disablePreload; // Help diff between FastLookup and MemOpt DimData table
       @JsonProperty("primaryKeyColumns")
       public List<String> _primaryKeyColumns;
     }

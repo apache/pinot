@@ -126,6 +126,24 @@ public class PinotOperatorTable implements SqlOperatorTable {
           InferTypes.VARCHAR_1024,
           OperandTypes.ANY);
 
+  /// Placeholder for special functions to handle MV.
+  ///
+  /// NOTE: ARRAY_TO_MV is not deterministic.
+  /// We need to explicitly set it as not deterministic in order to do not let Calcite optimize expressions like
+  /// `ARRAY_TO_MV(RandomAirports) = 'MFR' and ARRAY_TO_MV(RandomAirports) = 'GTR'` as `false`.
+  /// If the function were deterministic, its value would never be MFR and GTR at the same time, so Calcite is
+  /// smart enough to know there is no value that satisfies the condition.
+  /// In fact what ARRAY_TO_MV does is just to trick Calcite typesystem, but then what the leaf stage executor
+  /// receives is `RandomAirports = 'MFR' and RandomAirports = 'GTR'`, which in the V1 semantics means:
+  /// true if and only if RandomAirports contains a value equal to 'MFR' and RandomAirports contains a value equal
+  /// to 'GTR'.
+  ///
+  /// [org.apache.pinot.calcite.rel.rules.PinotRuleUtils#isRelocatable] ignores this flag, so ARRAY_TO_MV filters are
+  /// still pushed below joins.
+  public static final PinotSqlFunction ARRAY_TO_MV =
+      new PinotSqlFunction("ARRAY_TO_MV", opBinding -> opBinding.getOperandType(0).getComponentType(),
+          OperandTypes.ARRAY, false);
+
   /// This list includes the supported standard [SqlOperator]s defined in [SqlStdOperatorTable].
   /// NOTE: The operator order follows the same order as defined in [SqlStdOperatorTable] for easier search.
   ///       Some operators are commented out and re-declared in [#STANDARD_OPERATORS_WITH_ALIASES].
@@ -299,19 +317,13 @@ public class PinotOperatorTable implements SqlOperatorTable {
           OperandTypes.family(
               List.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.INTEGER), i -> i == 2)),
 
-      // Placeholder for special functions to handle MV
-      // NOTE:
-      // ARRAY_TO_MV is not deterministic.
-      // We need to explicitly set it as not deterministic in order to do not let Calcite optimize expressions like
-      // `ARRAY_TO_MV(RandomAirports) = 'MFR' and ARRAY_TO_MV(RandomAirports) = 'GTR'` as `false`.
-      // If the function were deterministic, its value would never be MFR and GTR at the same time, so Calcite is
-      // smart enough to know there is no value that satisfies the condition.
-      // In fact what ARRAY_TO_MV does is just to trick Calcite typesystem, but then what the leaf stage executor
-      // receives is `RandomAirports = 'MFR' and RandomAirports = 'GTR'`, which in the V1 semantics means:
-      // true if and only if RandomAirports contains a value equal to 'MFR' and RandomAirports contains a value equal
-      // to 'GTR'
-      new PinotSqlFunction("ARRAY_TO_MV", opBinding -> opBinding.getOperandType(0).getComponentType(),
-          OperandTypes.ARRAY, false),
+      // IN_SUBQUERY(expr, 'subquery') never runs: the broker runs the subquery first and replaces the call with an
+      // IN_ID_SET on the result. It is registered for the paths that only compile queries, such as the controller
+      // routing a query to a broker. Nullable like IN_ID_SET.
+      new PinotSqlFunction("IN_SUBQUERY", ReturnTypes.BOOLEAN_NULLABLE,
+          OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER)),
+
+      ARRAY_TO_MV,
 
       // SqlStdOperatorTable.COALESCE without rewrite
       new SqlFunction("COALESCE", SqlKind.COALESCE,

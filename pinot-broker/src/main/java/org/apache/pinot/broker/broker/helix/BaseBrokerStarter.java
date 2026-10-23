@@ -422,7 +422,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         _brokerConf.getProperty(Broker.CONFIG_OF_METRICS_NAME_PREFIX, Broker.DEFAULT_METRICS_NAME_PREFIX),
         _metricsRegistry,
         _brokerConf.getProperty(Broker.CONFIG_OF_ENABLE_TABLE_LEVEL_METRICS, Broker.DEFAULT_ENABLE_TABLE_LEVEL_METRICS),
-        _brokerConf.getProperty(Broker.CONFIG_OF_ALLOWED_TABLES_FOR_EMITTING_METRICS, List.of()));
+        getAllowedTablesForEmittingMetrics(_brokerConf));
     _brokerMetrics.initializeGlobalMeters();
     _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.VERSION, PinotVersion.VERSION_METRIC_NAME, 1);
     _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.ZK_JUTE_MAX_BUFFER,
@@ -440,6 +440,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _serverRoutingStatsManager = new ServerRoutingStatsManager(_brokerConf, _brokerMetrics);
     _serverRoutingStatsManager.init();
     initRoutingManager();
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(_routingManager);
 
     final PinotConfiguration factoryConf = _brokerConf.subset(Broker.ACCESS_CONTROL_CONFIG_PREFIX);
     // Adding cluster name to the config so that it can be used by the AccessControlFactory
@@ -586,6 +587,9 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       MultiStageBrokerRequestHandler finalHandler = multiStageBrokerRequestHandler;
       _routingManager.setServerReenableCallback(
           serverInstance -> finalHandler.getQueryDispatcher().resetClientConnectionBackoff(serverInstance));
+      // Lets an operator turn the proto segment list encoding on and off through cluster config, without a restart.
+      _clusterConfigChangeHandler.registerClusterConfigChangeListener(
+          multiStageBrokerRequestHandler.getQueryDispatcher());
     }
     TimeSeriesRequestHandler timeSeriesRequestHandler = null;
     if (StringUtils.isNotBlank(_brokerConf.getProperty(PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey()))) {
@@ -664,12 +668,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     }
     _brokerRequestHandler.start();
 
-    String controllerUrl = _brokerConf.getProperty(Broker.CONTROLLER_URL);
-    if (controllerUrl != null) {
-      _sqlQueryExecutor = new SqlQueryExecutor(controllerUrl);
-    } else {
-      _sqlQueryExecutor = new SqlQueryExecutor(_spectatorHelixManager);
-    }
+    _sqlQueryExecutor = createSqlQueryExecutor();
 
     LOGGER.info("Wiring up cluster config change handler with helix");
     _spectatorHelixManager.addClusterfigChangeListener(_clusterConfigChangeHandler);
@@ -752,6 +751,12 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     LOGGER.info("Finish starting Pinot broker");
   }
 
+  /// Returns the tables that emit table-level metrics even when table-level metrics are disabled.
+  @VisibleForTesting
+  static List<String> getAllowedTablesForEmittingMetrics(PinotConfiguration brokerConf) {
+    return brokerConf.getCommaSeparatedList(Broker.CONFIG_OF_ALLOWED_TABLES_FOR_EMITTING_METRICS, List.of());
+  }
+
   protected void initClusterChangeMediator() throws Exception {
     for (ClusterChangeHandler clusterConfigChangeHandler : _clusterConfigChangeHandlers) {
       clusterConfigChangeHandler.init(_spectatorHelixManager);
@@ -806,7 +811,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
 
   protected void initSpectatorHelixManager() throws Exception {
     _spectatorHelixManager =
-      HelixManagerFactory.getZKHelixManager(_clusterName, _instanceId, InstanceType.SPECTATOR, _zkServers);
+        CompactAssignmentZkHelixManager.createSpectatorHelixManager(_brokerConf, _clusterName, _instanceId,
+            _zkServers);
     _spectatorHelixManager.connect();
     _helixAdmin = _spectatorHelixManager.getClusterManagmentTool();
     _propertyStore = _spectatorHelixManager.getHelixPropertyStore();
@@ -1258,11 +1264,23 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     return _threadAccountant;
   }
 
+  /// Creates the executor of the DML statements sent to the broker. Override it to execute the statements that Pinot
+  /// parses but does not execute itself, e.g. `DELETE` (see `SqlQueryExecutor#executeDelete`).
+  ///
+  /// The controller `/sql` endpoint executes these statements in-process with its own executor, created by
+  /// `BaseControllerStarter#createSqlQueryExecutor`: override both for consistent behavior across the broker and
+  /// controller SQL endpoints, e.g. so that a `DELETE` typed into the query console of the controller UI is executed
+  /// like one sent to the broker.
+  protected SqlQueryExecutor createSqlQueryExecutor() {
+    String controllerUrl = _brokerConf.getProperty(Broker.CONTROLLER_URL);
+    return controllerUrl != null ? new SqlQueryExecutor(controllerUrl) : new SqlQueryExecutor(_spectatorHelixManager);
+  }
+
   protected BrokerAdminApiApplication createBrokerAdminApp() {
     BrokerAdminApiApplication brokerAdminApiApplication =
         new BrokerAdminApiApplication(_routingManager, _brokerRequestHandler, _brokerMetrics, _brokerConf,
             _sqlQueryExecutor, _serverRoutingStatsManager, _accessControlFactory, _spectatorHelixManager,
-            _queryQuotaManager, _threadAccountant, _responseStore);
+            _queryQuotaManager, _threadAccountant, _responseStore, _tableCache);
     brokerAdminApiApplication.register(
         new AuditServiceBinder(_clusterConfigChangeHandler, getServiceRole(), _brokerMetrics));
     registerExtraComponents(brokerAdminApiApplication);

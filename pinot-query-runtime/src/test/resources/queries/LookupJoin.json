@@ -73,6 +73,26 @@
           ["gamma", 1]
         ],
         "ignoreLiteMode": true
+      },
+      {
+        "description": "Lookup join over an aggregation - the input of the join is an intermediate stage, so the join stage is assigned after it",
+        "sql": "SELECT /*+ joinOptions(join_strategy='lookup') */ t.dim_key, t.cnt, {dim_tbl}.name FROM (SELECT dim_key, COUNT(*) AS cnt FROM {fact_tbl} GROUP BY dim_key) t JOIN {dim_tbl} ON t.dim_key = {dim_tbl}.id",
+        "outputs": [
+          [1, 2, "alpha"],
+          [2, 1, "beta"],
+          [3, 1, "gamma"]
+        ],
+        "ignoreLiteMode": true
+      },
+      {
+        "description": "Two lookup joins over an aggregation - the upper join takes the workers of the lower one, which is assigned after the aggregation",
+        "sql": "SELECT /*+ joinOptions(join_strategy='lookup') */ t.dim_key, t.cnt, d1.name, d2.name FROM (SELECT dim_key, COUNT(*) AS cnt FROM {fact_tbl} GROUP BY dim_key) t JOIN {dim_tbl} d1 ON t.dim_key = d1.id JOIN {dim_tbl} d2 ON t.dim_key = d2.id",
+        "outputs": [
+          [1, 2, "alpha", "alpha"],
+          [2, 1, "beta", "beta"],
+          [3, 1, "gamma", "gamma"]
+        ],
+        "ignoreLiteMode": true
       }
     ]
   },
@@ -239,6 +259,158 @@
         "sql": "SELECT /*+ joinOptions(join_strategy='lookup') */ {fact_tbl}.amount, {dim_tbl}.rate FROM {fact_tbl} JOIN {dim_tbl} ON {dim_tbl}.currency = {fact_tbl}.currency AND {dim_tbl}.rate_start_date = {fact_tbl}.rate_start_date AND {dim_tbl}.rate = {fact_tbl}.amount",
         "outputs": [],
         "expectedException": ".*join key on column: rate, which is not a primary key column.*",
+        "ignoreLiteMode": true
+      }
+    ]
+  },
+  "lookup_join_bytes_primary_key_mem_opt_dim_table": {
+    "comment": "Regression test for issue 19228. This fixes the case where a dimension table contains bytes type primary key.The equals and hashcode of bytes array is object identity based and so fails on equality check. This fix wraps bytes primary in the internal ByteArray.",
+    "tables": {
+      "fact_tbl": {
+        "schema": [
+          {"name": "bytes_value", "type": "BYTES"},
+          {"name": "int_value", "type": "INT"}
+        ],
+        "inputs": [
+          ["f47ac10b58cc4372a5670e02b2c3d479", 1],
+          ["9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d", 2],
+          ["3c9b7e128a4d4e90b183f6a89c25e21a", 3],
+          ["a1b2c3d4e5f64a7b8c9d0e1f2a3b4c5d", 4]
+        ]
+      },
+      "dim_tbl": {
+        "schema": [
+          {"name": "bytes_value", "type": "BYTES"},
+          {"name": "int_value", "type": "INT"}
+        ],
+        "inputs": [
+          ["f47ac10b58cc4372a5670e02b2c3d479", 1],
+          ["9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d", 2],
+          ["a1b2c3d4e5f64a7b8c9d0e1f2a3b4c5d", 4]
+        ],
+        "replicated": true,
+        "isDimTable": true,
+        "isActualDimTableNeeded": true,
+        "disablePreload": true,
+        "primaryKeyColumns": ["bytes_value"]
+      }
+    }, "queries": [
+      {
+        "description": "Checking with a constant value check",
+        "sql": "SELECT /*+ joinOptions(join_strategy='lookup') */ {dim_tbl}.int_value FROM {fact_tbl} JOIN {dim_tbl} ON {dim_tbl}.bytes_value = 'a1b2c3d4e5f64a7b8c9d0e1f2a3b4c5d' AND {dim_tbl}.bytes_value = {fact_tbl}.bytes_value",
+        "outputs": [
+          [4]
+        ],
+        "ignoreLiteMode": true
+      },
+      {
+        "description": "Checking full table join",
+        "sql": "SELECT /*+ joinOptions(join_strategy='lookup') */ {dim_tbl}.bytes_value,{dim_tbl}.int_value FROM {fact_tbl} JOIN {dim_tbl} ON {dim_tbl}.bytes_value = {fact_tbl}.bytes_value",
+        "outputs": [
+          ["f47ac10b58cc4372a5670e02b2c3d479", 1],
+          ["9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d", 2],
+          ["a1b2c3d4e5f64a7b8c9d0e1f2a3b4c5d", 4]
+        ],
+        "ignoreLiteMode": true
+      },
+      {
+        "description": "Checking with a constant value check",
+        "sql": "SELECT /*+ joinOptions(join_strategy='lookup') */ {dim_tbl}.int_value FROM {fact_tbl} JOIN {dim_tbl} ON {dim_tbl}.bytes_value in ('a1b2c3d4e5f64a7b8c9d0e1f2a3b4c5d','9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d') AND {dim_tbl}.bytes_value = {fact_tbl}.bytes_value",
+        "outputs": [
+          [4], [2]
+        ],
+        "ignoreLiteMode": true
+      },
+      {
+        "description": "Checking left join with comparison operator to test case where predicates can possibly fail on a byte[] expecting a ByteArray",
+        "sql": "SELECT  /*+ joinOptions(join_strategy='lookup') */ {dim_tbl}.int_value FROM {fact_tbl} LEFT JOIN {dim_tbl} ON {dim_tbl}.bytes_value = {fact_tbl}.bytes_value AND {dim_tbl}.bytes_value < 'a1b2c3d4e5f64a7b8c9d0e1f2a3b4c5d'",
+        "outputs": [
+          [null], [2], [null], [null]
+        ],
+        "ignoreLiteMode": true
+      },
+      {
+        "description": "Checking left join with comparison operator to test case where predicates can possibly fail on a byte[] expecting a ByteArray, ensuring the comparison value is considered bytes",
+        "sql": "SELECT  /*+ joinOptions(join_strategy='lookup') */ {dim_tbl}.int_value FROM {fact_tbl} LEFT JOIN {dim_tbl} ON {dim_tbl}.bytes_value = {fact_tbl}.bytes_value AND {dim_tbl}.bytes_value < X'a1b2c3d4e5f64a7b8c9d0e1f2a3b4c5d'",
+        "outputs": [
+          [null], [2], [null], [null]
+        ],
+        "ignoreLiteMode": true
+      }
+    ]
+  },
+  "lookup_join_bytes_primary_key_fast_lookup_dim_table": {
+    "comment": "Regression test for issue 19228. This fixes the case where a dimension table contains bytes type primary key.The equals and hashcode of bytes array is object identity based and so fails on equality check. This fix wraps bytes primary in the internal ByteArray.",
+    "tables": {
+      "fact_tbl": {
+        "schema": [
+          {"name": "bytes_value", "type": "BYTES"},
+          {"name": "int_value", "type": "INT"}
+        ],
+        "inputs": [
+          ["f47ac10b58cc4372a5670e02b2c3d479", 1],
+          ["9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d", 2],
+          ["3c9b7e128a4d4e90b183f6a89c25e21a", 3],
+          ["a1b2c3d4e5f64a7b8c9d0e1f2a3b4c5d", 4]
+        ]
+      },
+      "dim_tbl": {
+        "schema": [
+          {"name": "bytes_value", "type": "BYTES"},
+          {"name": "int_value", "type": "INT"}
+        ],
+        "inputs": [
+          ["f47ac10b58cc4372a5670e02b2c3d479", 1],
+          ["9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d", 2],
+          ["a1b2c3d4e5f64a7b8c9d0e1f2a3b4c5d", 4]
+        ],
+        "replicated": true,
+        "isDimTable": true,
+        "isActualDimTableNeeded": true,
+        "disablePreload": false,
+        "primaryKeyColumns": ["bytes_value"]
+      }
+    }, "queries": [
+      {
+        "description": "Checking with a constant value check",
+        "sql": "SELECT /*+ joinOptions(join_strategy='lookup') */ {dim_tbl}.int_value FROM {fact_tbl} JOIN {dim_tbl} ON {dim_tbl}.bytes_value = 'a1b2c3d4e5f64a7b8c9d0e1f2a3b4c5d' AND {dim_tbl}.bytes_value = {fact_tbl}.bytes_value",
+        "outputs": [
+          [4]
+        ],
+        "ignoreLiteMode": true
+      },
+      {
+        "description": "Checking full table join",
+        "sql": "SELECT /*+ joinOptions(join_strategy='lookup') */ {dim_tbl}.bytes_value,{dim_tbl}.int_value FROM {fact_tbl} JOIN {dim_tbl} ON {dim_tbl}.bytes_value = {fact_tbl}.bytes_value",
+        "outputs": [
+          ["f47ac10b58cc4372a5670e02b2c3d479", 1],
+          ["9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d", 2],
+          ["a1b2c3d4e5f64a7b8c9d0e1f2a3b4c5d", 4]
+        ],
+        "ignoreLiteMode": true
+      },
+      {
+        "description": "Checking with a constant value check",
+        "sql": "SELECT /*+ joinOptions(join_strategy='lookup') */ {dim_tbl}.int_value FROM {fact_tbl} JOIN {dim_tbl} ON {dim_tbl}.bytes_value in ('a1b2c3d4e5f64a7b8c9d0e1f2a3b4c5d','9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d') AND {dim_tbl}.bytes_value = {fact_tbl}.bytes_value",
+        "outputs": [
+          [4], [2]
+        ],
+        "ignoreLiteMode": true
+      },
+      {
+        "description": "Checking left join with comparison operator to test case where predicates can possibly fail on a byte[] expecting a ByteArray",
+        "sql": "SELECT  /*+ joinOptions(join_strategy='lookup') */ {dim_tbl}.int_value FROM {fact_tbl} LEFT JOIN {dim_tbl} ON {dim_tbl}.bytes_value = {fact_tbl}.bytes_value AND {dim_tbl}.bytes_value < 'a1b2c3d4e5f64a7b8c9d0e1f2a3b4c5d'",
+        "outputs": [
+          [null], [2], [null], [null]
+        ],
+        "ignoreLiteMode": true
+      },
+      {
+        "description": "Checking left join with comparison operator to test case where predicates can possibly fail on a byte[] expecting a ByteArray, ensuring the comparison value is considered bytes",
+        "sql": "SELECT  /*+ joinOptions(join_strategy='lookup') */ {dim_tbl}.int_value FROM {fact_tbl} LEFT JOIN {dim_tbl} ON {dim_tbl}.bytes_value = {fact_tbl}.bytes_value AND {dim_tbl}.bytes_value < X'a1b2c3d4e5f64a7b8c9d0e1f2a3b4c5d'",
+        "outputs": [
+          [null], [2], [null], [null]
+        ],
         "ignoreLiteMode": true
       }
     ]

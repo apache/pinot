@@ -187,48 +187,18 @@ public final class JsonNumberUtils {
 
   /// Parses `cs[start, end)` as a whole long (sign allowed). Used for the exponent field.
   private static long parseWholeLong(CharSequence cs, int start, int end) {
-    if (cs == null) {
-      throw new NumberFormatException("Can't parse null string");
+    // Long.parseLong also accepts Unicode digits. Preserve the JSON parser's ASCII-only syntax.
+    int digitStart = start;
+    if (start < end && (cs.charAt(start) == '+' || cs.charAt(start) == '-')) {
+      digitStart++;
     }
-
-    boolean negative = false;
-    int i = start;
-    long limit = -Long.MAX_VALUE;
-
-    if (end <= start) {
-      throw formatException(cs);
-    }
-
-    char firstChar = cs.charAt(start);
-    if (firstChar < '0') { // Possible leading "+" or "-"
-      if (firstChar == '-') {
-        negative = true;
-        limit = Long.MIN_VALUE;
-      } else if (firstChar != '+') {
+    for (int i = digitStart; i < end; i++) {
+      char c = cs.charAt(i);
+      if (c < '0' || c > '9') {
         throw formatException(cs);
       }
-
-      if (end == start + 1) { // Cannot have lone "+" or "-"
-        throw formatException(cs);
-      }
-      i++;
     }
-    long multmin = limit / 10;
-    long result = 0;
-    while (i < end) {
-      char c = cs.charAt(i++);
-      if (c < '0' || c > '9' || result < multmin) {
-        throw formatException(cs);
-      }
-
-      int digit = c - '0';
-      result *= 10;
-      if (result < limit + digit) {
-        throw formatException(cs);
-      }
-      result -= digit;
-    }
-    return negative ? result : -result;
+    return Long.parseLong(cs, start, end, 10);
   }
 
   private static NumberFormatException formatException(CharSequence cs) {

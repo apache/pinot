@@ -61,8 +61,7 @@ public class SelectionPartiallyOrderedByLinearOperator extends LinearSelectionOr
 
   @Override
   protected List<Object[]> fetch(Supplier<ListBuilder> listBuilderSupplier) {
-    int numExpressions = _expressions.size();
-    BlockValSet[] blockValSets = new BlockValSet[numExpressions];
+    BlockValSet[] blockValSets = new BlockValSet[_numOrderByExpressions];
     ListBuilder listBuilder = listBuilderSupplier.get();
     ValueBlock valueBlock;
     while ((valueBlock = _projectOperator.nextBlock()) != null) {

@@ -66,7 +66,9 @@ public interface InstanceDataManager {
   /// Should be called only once. After calling shut down, no other method should be called.
   void shutDown();
 
-  /// Delete a table.
+  /// Deletes a table: records `deletionTimeMs` as the table's newest deletion time, even when this instance never
+  /// created a data manager for it, then shuts down and removes the data manager if one exists. Until that record
+  /// expires, a same-name recreation is accepted only from a table config created after the recorded time.
   void deleteTable(String tableNameWithType, long deletionTimeMs)
       throws Exception;
 
@@ -99,15 +101,38 @@ public interface InstanceDataManager {
   /// Reloads a segment in a table. This method can download a new segment to replace the local one before loading.
   /// Download happens when local segment's CRC mismatches the one of the remote segment; but can also be forced to do
   /// regardless of CRC.
-  void reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload, String reloadJobId)
+  default void reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload, String reloadJobId)
+      throws Exception {
+    reloadSegment(tableNameWithType, segmentName, forceDownload, false, reloadJobId);
+  }
+
+  /// Same as [#reloadSegment(String, String, boolean, String)], but when `onlyIfNeeded` is true (and `forceDownload`
+  /// is false) the segment is skipped if its loaded copy is already up to date. See
+  /// [TableDataManager#reloadSegment(String, boolean, boolean, String)].
+  void reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload, boolean onlyIfNeeded,
+      String reloadJobId)
       throws Exception;
 
   /// Reloads all segments of a table.
-  void reloadAllSegments(String tableNameWithType, boolean forceDownload, String reloadJobId)
+  default void reloadAllSegments(String tableNameWithType, boolean forceDownload, String reloadJobId)
+      throws Exception {
+    reloadAllSegments(tableNameWithType, forceDownload, false, reloadJobId);
+  }
+
+  /// Reloads all segments of a table, skipping up-to-date segments when `onlyIfNeeded` is true.
+  void reloadAllSegments(String tableNameWithType, boolean forceDownload, boolean onlyIfNeeded, String reloadJobId)
       throws Exception;
 
   /// Reload a list of segments in a table.
-  void reloadSegments(String tableNameWithType, List<String> segmentNames, boolean forceDownload, String reloadJobId)
+  default void reloadSegments(String tableNameWithType, List<String> segmentNames, boolean forceDownload,
+      String reloadJobId)
+      throws Exception {
+    reloadSegments(tableNameWithType, segmentNames, forceDownload, false, reloadJobId);
+  }
+
+  /// Reload a list of segments in a table, skipping up-to-date segments when `onlyIfNeeded` is true.
+  void reloadSegments(String tableNameWithType, List<String> segmentNames, boolean forceDownload,
+      boolean onlyIfNeeded, String reloadJobId)
       throws Exception;
 
   /// Returns all tables served by the instance.

@@ -41,6 +41,7 @@ import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
@@ -87,8 +88,7 @@ public class StagesTestBase {
     return (stageId, mySchema, myHints) -> {
       MailboxSendNode mailbox = childBuilder.build(stageId);
       int nextStageId = mailbox.getStageId();
-      return new MailboxReceiveNode(stageId, mySchema, nextStageId, null, null, null, null, false, false,
-          mailbox);
+      return new MailboxReceiveNode(stageId, mySchema, nextStageId, null, null, null, null, false, false, mailbox);
     };
   }
 
@@ -97,14 +97,13 @@ public class StagesTestBase {
   /// The join type will be [JoinRelType#FULL], the join strategy will be [JoinNode.JoinStrategy#HASH] and
   /// there will be no conditions. If custom joins are needed feel free to add more builder methods or create your own
   /// instance of [SimpleChildBuilder].
-  public SimpleChildBuilder<JoinNode> join(
-      SimpleChildBuilder<? extends PlanNode> leftBuilder,
+  public SimpleChildBuilder<JoinNode> join(SimpleChildBuilder<? extends PlanNode> leftBuilder,
       SimpleChildBuilder<? extends PlanNode> rightBuilder) {
     return (stageId, mySchema, myHints) -> {
       PlanNode left = leftBuilder.build(stageId);
       PlanNode right = rightBuilder.build(stageId);
-      return new JoinNode(stageId, mySchema, myHints, List.of(left, right), JoinRelType.FULL,
-          List.of(), List.of(), List.of(), JoinNode.JoinStrategy.HASH);
+      return new JoinNode(stageId, mySchema, myHints, List.of(left, right), JoinRelType.FULL, List.of(), List.of(),
+          List.of(), JoinNode.JoinStrategy.HASH);
     };
   }
 
@@ -114,22 +113,16 @@ public class StagesTestBase {
   ///
   /// Although there are builder methods to create send and receive mailboxes separately, this method is recommended
   /// because it deals with the stageId management and creates tests that are easier to read.
-  public ExchangeBuilder exchange(
-      int nextStageId, SimpleChildBuilder<? extends PlanNode> childBuilder) {
-    return new ExchangeBuilder() {
-      @Override
-      public MailboxReceiveNode build(int stageId, DataSchema dataSchema, PlanNode.NodeHint hints,
-          PinotRelExchangeType exchangeType, RelDistribution.Type distribution, List<Integer> keys,
-          boolean prePartitioned, List<RelFieldCollation> collations, boolean sort, boolean sortedOnSender) {
-        PlanNode input = childBuilder.build(nextStageId);
-        MailboxSendNode mailboxSendNode = new MailboxSendNode(nextStageId, input.getDataSchema(), List.of(input),
-            stageId, exchangeType, distribution, keys, prePartitioned, collations, sort,
-            KeySelector.DEFAULT_HASH_ALGORITHM);
-        MailboxSendNode old = _stageRoots.put(nextStageId, mailboxSendNode);
-        Preconditions.checkState(old == null, "Mailbox already exists for stageId: %s", nextStageId);
-        return new MailboxReceiveNode(stageId, input.getDataSchema(), nextStageId, exchangeType, distribution, keys,
-            collations, sort, sortedOnSender, mailboxSendNode);
-      }
+  public ExchangeBuilder exchange(int nextStageId, SimpleChildBuilder<? extends PlanNode> childBuilder) {
+    return (stageId, _, _, exchangeType, distribution, keys, prePartitioned, collations, sort, sortedOnSender) -> {
+      PlanNode input = childBuilder.build(nextStageId);
+      MailboxSendNode mailboxSendNode =
+          new MailboxSendNode(nextStageId, input.getDataSchema(), List.of(input), stageId, exchangeType, distribution,
+              keys, prePartitioned, collations, sort, KeySelector.DEFAULT_HASH_ALGORITHM);
+      MailboxSendNode old = _stageRoots.put(nextStageId, mailboxSendNode);
+      Preconditions.checkState(old == null, "Mailbox already exists for stageId: %s", nextStageId);
+      return new MailboxReceiveNode(stageId, input.getDataSchema(), nextStageId, exchangeType, distribution, keys,
+          collations, sort, sortedOnSender, mailboxSendNode);
     };
   }
 
@@ -143,10 +136,9 @@ public class StagesTestBase {
     }
 
     default ExchangeBuilder withDistributionType(RelDistribution.Type distribution) {
-      return (stageId, dataSchema, hints, exchangeType, distribution1, keys, prePartitioned, collations, sort,
-          sortedOnSender) ->
-        build(stageId, dataSchema, hints, exchangeType, distribution, keys, prePartitioned, collations, sort,
-            sortedOnSender);
+      return (stageId, dataSchema, hints, exchangeType, _, keys, prePartitioned, collations, sort, sortedOnSender) ->
+          build(stageId, dataSchema, hints, exchangeType, distribution, keys, prePartitioned, collations, sort,
+          sortedOnSender);
     }
   }
 
@@ -157,10 +149,8 @@ public class StagesTestBase {
   }
 
   /// Creates an ASOF join node whose whole comparison lives in the match condition, as ASOF joins require.
-  public SimpleChildBuilder<JoinNode> asofJoin(
-      SimpleChildBuilder<? extends PlanNode> leftBuilder,
-      SimpleChildBuilder<? extends PlanNode> rightBuilder,
-      RexExpression matchCondition) {
+  public SimpleChildBuilder<JoinNode> asofJoin(SimpleChildBuilder<? extends PlanNode> leftBuilder,
+      SimpleChildBuilder<? extends PlanNode> rightBuilder, RexExpression matchCondition) {
     return (stageId, mySchema, myHints) -> {
       PlanNode left = leftBuilder.build(stageId);
       PlanNode right = rightBuilder.build(stageId);
@@ -202,6 +192,26 @@ public class StagesTestBase {
     };
   }
 
+  /// Creates an unnest node over the given child with the given table function context.
+  ///
+  /// The unnested expression is always the first input column. Tests vary the context, because that is what the
+  /// equivalence check compares.
+  public SimpleChildBuilder<UnnestNode> unnest(SimpleChildBuilder<? extends PlanNode> childBuilder,
+      UnnestNode.TableFunctionContext tableFunctionContext) {
+    return (stageId, mySchema, myHints) -> {
+      PlanNode input = childBuilder.build(stageId);
+      DataSchema schema = mySchema != null ? mySchema : input.getDataSchema();
+      return new UnnestNode(stageId, schema, myHints, List.of(input), List.of(new RexExpression.InputRef(0)),
+          tableFunctionContext);
+    };
+  }
+
+  /// Creates a table function context that unnests one column, varying only the passthrough fields.
+  public static UnnestNode.TableFunctionContext passthrough(List<Integer> passthroughInputIndexes,
+      boolean prunedPassthrough) {
+    return new UnnestNode.TableFunctionContext(false, List.of(0), -1, passthroughInputIndexes, prunedPassthrough);
+  }
+
   /// Creates a `LAST_VALUE` window aggregate call over the first input column that respects nulls.
   public static RexExpression.FunctionCall lastValueRespectingNulls() {
     return lastValue(false);
@@ -231,12 +241,13 @@ public class StagesTestBase {
   ///
   /// It is usually recommended to use [#exchange(int, SimpleChildBuilder)] instead of this method, given that
   /// `exchange` creates a pair of send and receive mailboxes and deals with the stageId management.
-  public SimpleChildBuilder<MailboxSendNode> sendMailbox(
-      int newStageId, SimpleChildBuilder<? extends PlanNode> childBuilder) {
-    return (stageId, mySchema, myHints) -> {
+  public SimpleChildBuilder<MailboxSendNode> sendMailbox(int newStageId,
+      SimpleChildBuilder<? extends PlanNode> childBuilder) {
+    return (stageId, mySchema, _) -> {
       PlanNode input = childBuilder.build(stageId);
-      MailboxSendNode mailboxSendNode = new MailboxSendNode(newStageId, mySchema, List.of(input), stageId, null,
-          null, null, false, null, false, KeySelector.DEFAULT_HASH_ALGORITHM);
+      MailboxSendNode mailboxSendNode =
+          new MailboxSendNode(newStageId, mySchema, List.of(input), stageId, null, null, null, false, null, false,
+              KeySelector.DEFAULT_HASH_ALGORITHM);
       MailboxSendNode old = _stageRoots.put(stageId, mailboxSendNode);
       Preconditions.checkState(old == null, "Mailbox already exists for stageId: %s", stageId);
       return mailboxSendNode;
@@ -263,7 +274,7 @@ public class StagesTestBase {
     /// );
     /// ```
     default SimpleChildBuilder<P> withDataSchema(DataSchema dataSchema) {
-      return (stageId, dataSchema1, hints) -> build(stageId, dataSchema, hints);
+      return (stageId, _, hints) -> build(stageId, dataSchema, hints);
     }
 
     /// This can be used to set the hints for the node being built in a fluent way.
@@ -277,10 +288,9 @@ public class StagesTestBase {
     /// );
     /// ```
     default SimpleChildBuilder<P> withHints(String key, Map<String, String> values) {
-      return (stageId, dataSchema, hints1) -> {
-        PlanNode.NodeHint myHints = hints1 == null
-            ? new PlanNode.NodeHint(Map.of(key, values))
-            : hints1.with(key, values);
+      return (stageId, dataSchema, hints) -> {
+        PlanNode.NodeHint myHints =
+            hints == null ? new PlanNode.NodeHint(Map.of(key, values)) : hints.with(key, values);
         return build(stageId, dataSchema, myHints);
       };
     }
@@ -383,7 +393,6 @@ public class StagesTestBase {
       return spoolReceiverBuilder;
     }
 
-
     /// Creates a new receiver builder that can be used to create a new receiver for this spool.
     ///
     /// This method is similar to other builder methods (like [#tableScan(String)] or
@@ -403,8 +412,8 @@ public class StagesTestBase {
 
       PlanNode input = _childBuilder.build(_senderStageId);
       DataSchema mySchema = input.getDataSchema();
-      _sender = new MailboxSendNode(_senderStageId, mySchema, List.of(input), 0, null,
-          null, null, false, null, false, KeySelector.DEFAULT_HASH_ALGORITHM);
+      _sender = new MailboxSendNode(_senderStageId, mySchema, List.of(input), 0, null, null, null, false, null, false,
+          KeySelector.DEFAULT_HASH_ALGORITHM);
     }
 
     /// This is the internal class returned as a result of the [#newReceiver(Function)] method.
@@ -436,8 +445,8 @@ public class StagesTestBase {
           _receiver = receiveBuilder.build(stageId);
           _sender.addReceiver(_receiver);
         }
-        Preconditions.checkState(_receiver.getStageId() == stageId, "Receiver stageId mismatch. "
-                + "Expected %s, received %s", _receiver.getStageId(), stageId);
+        Preconditions.checkState(_receiver.getStageId() == stageId,
+            "Receiver stageId mismatch. " + "Expected %s, received %s", _receiver.getStageId(), stageId);
         assert _receiver != null;
         return _receiver;
       }
@@ -478,11 +487,7 @@ public class StagesTestBase {
       for (int i = 0; i < _indent; i++) {
         _builder.append("  ");
       }
-      _builder.append('[')
-          .append(stageId)
-          .append("]: ")
-          .append(node.explain())
-          .append('\n');
+      _builder.append('[').append(stageId).append("]: ").append(node.explain()).append('\n');
       _indent++;
       return null;
     }

@@ -22,6 +22,7 @@ import com.google.common.base.CaseFormat;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -43,8 +44,10 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByExecutor;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
 import org.apache.pinot.core.util.GroupByUtils;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.query.QueryScanCostContext;
 import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,9 +62,17 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
   private final AggregationFunction[] _aggregationFunctions;
   private final ExpressionContext[] _groupByExpressions;
   private final BaseProjectOperator<?> _projectOperator;
-  private final boolean _useStarTree;
+  /// Non-null when the aggregation reads a star-tree, holding the pairs resolved against the one it was routed to.
+  @Nullable
+  private final AggregationFunctionColumnPair[] _starTreeFunctionColumnPairs;
   private final long _numTotalDocs;
   private final DataSchema _dataSchema;
+  /// For a base-aggregation grouping-set query, the schema of the BASE grouping (union columns + aggregations,
+  /// without the synthetic $groupingId column). The segment emits base groups under this schema; the combine
+  /// phase merges them and derives the individual grouping sets. `null` for non-grouping-set queries and for
+  /// grouping-set queries using the per-row expansion path.
+  @Nullable
+  private final DataSchema _baseDataSchema;
 
   private int _numDocsScanned = 0;
 
@@ -71,7 +82,7 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
     _aggregationFunctions = queryContext.getAggregationFunctions();
     _groupByExpressions = queryContext.getGroupByExpressions().toArray(new ExpressionContext[0]);
     _projectOperator = aggregationInfo.getProjectOperator();
-    _useStarTree = aggregationInfo.isUseStarTree();
+    _starTreeFunctionColumnPairs = aggregationInfo.getStarTreeFunctionColumnPairs();
     _numTotalDocs = numTotalDocs;
 
     // NOTE: The indexedTable expects that the data schema will have group by columns before aggregation columns
@@ -108,6 +119,25 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
     }
 
     _dataSchema = new DataSchema(columnNames, columnDataTypes);
+
+    /// Base schema for base aggregation over grouping sets: the union group-by columns and aggregations without
+    /// the synthetic $groupingId column (dropped at index `numGroupByExpressions`). The segment emits base
+    /// groups under this schema; the combine derives the full grouping-set schema (`_dataSchema`) from them.
+    if (numExtraKeyColumns > 0) {
+      int numBaseColumns = numColumns - numExtraKeyColumns;
+      String[] baseColumnNames = new String[numBaseColumns];
+      DataSchema.ColumnDataType[] baseColumnDataTypes = new DataSchema.ColumnDataType[numBaseColumns];
+      // Union group-by columns [0, numGroupByExpressions).
+      System.arraycopy(columnNames, 0, baseColumnNames, 0, numGroupByExpressions);
+      System.arraycopy(columnDataTypes, 0, baseColumnDataTypes, 0, numGroupByExpressions);
+      // Aggregation columns, skipping the discriminator key column(s) between them.
+      System.arraycopy(columnNames, numKeyColumns, baseColumnNames, numGroupByExpressions, numAggregationFunctions);
+      System.arraycopy(columnDataTypes, numKeyColumns, baseColumnDataTypes, numGroupByExpressions,
+          numAggregationFunctions);
+      _baseDataSchema = new DataSchema(baseColumnNames, baseColumnDataTypes);
+    } else {
+      _baseDataSchema = null;
+    }
   }
 
   @Override
@@ -120,8 +150,9 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
     // Perform aggregation group-by on all the blocks
     GroupByExecutor groupByExecutor;
     // TODO: pass trimGroupSize to executor, who creates the result holder
-    if (_useStarTree) {
-      groupByExecutor = new StarTreeGroupByExecutor(_queryContext, _groupByExpressions, _projectOperator);
+    if (_starTreeFunctionColumnPairs != null) {
+      groupByExecutor = new StarTreeGroupByExecutor(_queryContext, _groupByExpressions, _projectOperator,
+          _starTreeFunctionColumnPairs);
     } else {
       groupByExecutor = new DefaultGroupByExecutor(_queryContext, _groupByExpressions, _projectOperator);
     }
@@ -167,6 +198,18 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
     /// the final ORDER BY + LIMIT across all sets.
     if (_queryContext.isGroupingSets()) {
       /// The $groupingId discriminator is the key column immediately after the union group-by columns.
+      if (groupByExecutor.isGroupingSetsBaseAggregation()) {
+        /// Base aggregation: the executor grouped only the base (union) grouping like a plain GROUP BY. Emit the
+        /// BASE groups under the base schema (no $groupingId); the combine phase merges base groups across
+        /// segments and derives the individual grouping sets once, in parallel. This keeps the segment phase's
+        /// per-row work minimal (one group per row instead of one per grouping set) and moves the fan-out to the
+        /// multi-threaded combine.
+        GroupByResultsBlock baseBlock =
+            new GroupByResultsBlock(_baseDataSchema, groupByExecutor.getResult(), _queryContext);
+        baseBlock.setNumGroupsLimitReached(numGroupsLimitReached);
+        baseBlock.setNumGroupsWarningLimitReached(numGroupsWarningLimitReached);
+        return baseBlock;
+      }
       return GroupByUtils.buildGroupingSetsResultsBlock(_queryContext, _dataSchema,
           groupByExecutor.getGroupKeyGenerator(), groupByExecutor.getGroupByResultHolders(),
           groupByExecutor.getNumGroups(), _groupByExpressions.length, numGroupsLimitReached,
@@ -242,6 +285,13 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
       }
     }
 
+    /// For opted-in grouping-set queries, surface whether the instance planner admitted base aggregation.
+    /// Individual segments can still fall back to per-row expansion; the GROUPING_SETS_BASE_AGGREGATION server
+    /// meter tracks actual use.
+    if (shouldExplainGroupingSetsBaseAggregation()) {
+      stringBuilder.append(", groupingSetsBaseAggregation:").append(_queryContext.isGroupingSetsBaseAggregation());
+    }
+
     return stringBuilder.append(')').toString();
   }
 
@@ -262,5 +312,14 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
         .map(AggregationFunction::toExplainString)
         .collect(Collectors.toList());
     attributeBuilder.putStringList("aggregations", aggregations);
+
+    if (shouldExplainGroupingSetsBaseAggregation()) {
+      attributeBuilder.putBool("groupingSetsBaseAggregation", _queryContext.isGroupingSetsBaseAggregation());
+    }
+  }
+
+  private boolean shouldExplainGroupingSetsBaseAggregation() {
+    return _queryContext.isGroupingSets() && Boolean.parseBoolean(_queryContext.getQueryOptions().get(
+        QueryOptionKey.GROUPING_SETS_BASE_AGGREGATION));
   }
 }

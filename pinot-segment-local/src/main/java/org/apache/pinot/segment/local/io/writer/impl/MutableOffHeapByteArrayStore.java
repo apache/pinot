@@ -112,14 +112,8 @@ public class MutableOffHeapByteArrayStore implements Closeable {
     }
 
     private boolean equalsValueAt(byte[] value, int index) {
-      int startOffset = _pinotDataBuffer.getInt(index * Integer.BYTES);
-      int endOffset;
-      if (index != 0) {
-        endOffset = _pinotDataBuffer.getInt((index - 1) * Integer.BYTES);
-      } else {
-        endOffset = _size;
-      }
-      if ((endOffset - startOffset) != value.length) {
+      int startOffset = getStartOffset(index);
+      if (getEndOffset(index) - startOffset != value.length) {
         return false;
       }
       for (int i = 0, j = startOffset; i < value.length; i++, j++) {
@@ -130,39 +124,60 @@ public class MutableOffHeapByteArrayStore implements Closeable {
       return true;
     }
 
-    private byte[] get(int index) {
-      int startOffset = _pinotDataBuffer.getInt(index * Integer.BYTES);
-      int endOffset;
-      if (index != 0) {
-        endOffset = _pinotDataBuffer.getInt((index - 1) * Integer.BYTES);
-      } else {
-        endOffset = _size;
+    private int compareValueAt(int index, byte[] value) {
+      int startOffset = getStartOffset(index);
+      int length = getEndOffset(index) - startOffset;
+      int commonLength = Math.min(length, value.length);
+      for (int i = 0; i < commonLength; i++) {
+        int result = Byte.compareUnsigned(_pinotDataBuffer.getByte(startOffset + i), value[i]);
+        if (result != 0) {
+          return result;
+        }
       }
-      byte[] value = new byte[endOffset - startOffset];
+      return length - value.length;
+    }
+
+    private static int compareValues(Buffer buffer1, int index1, Buffer buffer2, int index2) {
+      PinotDataBuffer dataBuffer1 = buffer1._pinotDataBuffer;
+      PinotDataBuffer dataBuffer2 = buffer2._pinotDataBuffer;
+      int startOffset1 = buffer1.getStartOffset(index1);
+      int startOffset2 = buffer2.getStartOffset(index2);
+      int length1 = buffer1.getEndOffset(index1) - startOffset1;
+      int length2 = buffer2.getEndOffset(index2) - startOffset2;
+      int commonLength = Math.min(length1, length2);
+      for (int i = 0; i < commonLength; i++) {
+        int result = Byte.compareUnsigned(dataBuffer1.getByte(startOffset1 + i),
+            dataBuffer2.getByte(startOffset2 + i));
+        if (result != 0) {
+          return result;
+        }
+      }
+      return length1 - length2;
+    }
+
+    private byte[] get(int index) {
+      int startOffset = getStartOffset(index);
+      byte[] value = new byte[getEndOffset(index) - startOffset];
       _pinotDataBuffer.copyTo(startOffset, value);
       return value;
     }
 
     private ByteBuffer getByteBuffer(int index) {
-      int startOffset = _pinotDataBuffer.getInt(index * Integer.BYTES);
-      int endOffset;
-      if (index != 0) {
-        endOffset = _pinotDataBuffer.getInt((index - 1) * Integer.BYTES);
-      } else {
-        endOffset = _size;
-      }
-      return _pinotDataBuffer.toDirectByteBuffer(startOffset, endOffset - startOffset);
+      int startOffset = getStartOffset(index);
+      return _pinotDataBuffer.toDirectByteBuffer(startOffset, getEndOffset(index) - startOffset);
     }
 
     private int getValueSize(int index) {
-      int startOffset = _pinotDataBuffer.getInt(index * Integer.BYTES);
-      int endOffset;
-      if (index != 0) {
-        endOffset = _pinotDataBuffer.getInt((index - 1) * Integer.BYTES);
-      } else {
-        endOffset = _size;
-      }
-      return endOffset - startOffset;
+      return getEndOffset(index) - getStartOffset(index);
+    }
+
+    private int getStartOffset(int index) {
+      return _pinotDataBuffer.getInt(index * Integer.BYTES);
+    }
+
+    // The values are stored from the end of the buffer towards the start, so a value ends where the previous one starts
+    private int getEndOffset(int index) {
+      return index != 0 ? _pinotDataBuffer.getInt((index - 1) * Integer.BYTES) : _size;
     }
 
     private int getSize() {
@@ -222,40 +237,20 @@ public class MutableOffHeapByteArrayStore implements Closeable {
 
   // Returns a byte array, given an index
   public byte[] get(int index) {
-    List<Buffer> bufList = _buffers;
-    for (int x = bufList.size() - 1; x >= 0; x--) {
-      Buffer buffer = bufList.get(x);
-      if (index >= buffer.getStartIndex()) {
-        return buffer.get(index - buffer.getStartIndex());
-      }
-    }
-    // Assumed that we will never ask for an index that does not exist.
-    throw new RuntimeException("dictionary ID '" + index + "' too low");
+    Buffer buffer = getBuffer(index);
+    return buffer.get(index - buffer.getStartIndex());
   }
 
   /// Returns a read-only view of the value at the given index without copying it.
   /// The returned buffer must not be used after this store is closed.
   public ByteBuffer getByteBuffer(int index) {
-    List<Buffer> bufList = _buffers;
-    for (int x = bufList.size() - 1; x >= 0; x--) {
-      Buffer buffer = bufList.get(x);
-      if (index >= buffer.getStartIndex()) {
-        return buffer.getByteBuffer(index - buffer.getStartIndex()).asReadOnlyBuffer();
-      }
-    }
-    throw new RuntimeException("dictionary ID '" + index + "' too low");
+    Buffer buffer = getBuffer(index);
+    return buffer.getByteBuffer(index - buffer.getStartIndex()).asReadOnlyBuffer();
   }
 
   public int getValueSize(int index) {
-    List<Buffer> bufList = _buffers;
-    for (int x = bufList.size() - 1; x >= 0; x--) {
-      Buffer buffer = bufList.get(x);
-      if (index >= buffer.getStartIndex()) {
-        return buffer.getValueSize(index - buffer.getStartIndex());
-      }
-    }
-    // Assumed that we will never ask for an index that does not exist.
-    throw new RuntimeException("dictionary ID '" + index + "' too low");
+    Buffer buffer = getBuffer(index);
+    return buffer.getValueSize(index - buffer.getStartIndex());
   }
 
   // Adds a byte array and returns the index. No verification is made as to whether the byte array already exists or not
@@ -281,11 +276,33 @@ public class MutableOffHeapByteArrayStore implements Closeable {
   }
 
   public boolean equalsValueAt(byte[] value, int index) {
+    Buffer buffer = getBuffer(index);
+    return buffer.equalsValueAt(value, index - buffer.getStartIndex());
+  }
+
+  /// Compares the value at the given index with the given value in unsigned lexicographic byte order, and returns a
+  /// negative integer, zero, or a positive integer as the stored value is less than, equal to, or greater than the
+  /// given value.
+  public int compareValueAt(int index, byte[] value) {
+    Buffer buffer = getBuffer(index);
+    return buffer.compareValueAt(index - buffer.getStartIndex(), value);
+  }
+
+  /// Compares the values at the given indexes in unsigned lexicographic byte order, and returns a negative integer,
+  /// zero, or a positive integer as the first value is less than, equal to, or greater than the second one.
+  public int compareValues(int index1, int index2) {
+    Buffer buffer1 = getBuffer(index1);
+    Buffer buffer2 = getBuffer(index2);
+    return Buffer.compareValues(buffer1, index1 - buffer1.getStartIndex(), buffer2, index2 - buffer2.getStartIndex());
+  }
+
+  /// Returns the buffer holding the value at the given index. The index is assumed to exist.
+  private Buffer getBuffer(int index) {
     List<Buffer> bufList = _buffers;
     for (int x = bufList.size() - 1; x >= 0; x--) {
       Buffer buffer = bufList.get(x);
       if (index >= buffer.getStartIndex()) {
-        return buffer.equalsValueAt(value, index - buffer.getStartIndex());
+        return buffer;
       }
     }
     throw new RuntimeException("dictionary ID '" + index + "' too low");

@@ -22,7 +22,9 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.sql.Timestamp;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
@@ -38,6 +40,8 @@ import org.apache.parquet.hadoop.util.HadoopInputFile;
 import org.apache.parquet.io.InputFile;
 import org.apache.parquet.schema.LogicalTypeAnnotation;
 import org.apache.parquet.schema.MessageType;
+import org.apache.parquet.schema.PrimitiveType;
+import org.apache.parquet.schema.Type;
 import org.apache.pinot.spi.utils.TimestampUtils;
 
 
@@ -79,6 +83,36 @@ public class ParquetUtils {
         MessageType parquetSchema = reader.getFileMetaData().getSchema();
         return new AvroSchemaConverter().convert(parquetSchema);
       }
+    }
+  }
+
+  /// Returns `true` if the given field is a primitive `INT32` annotated as an unsigned 32-bit integer
+  /// (`INTEGER(32, false)` / legacy `UINT_32`). Such values can exceed `Integer.MAX_VALUE` and must be widened to
+  /// `Long` via [Integer#toUnsignedLong]; narrower unsigned widths always fit in a signed `int`.
+  public static boolean isUnsignedInt32(Type type) {
+    if (!type.isPrimitive()
+        || type.asPrimitiveType().getPrimitiveTypeName() != PrimitiveType.PrimitiveTypeName.INT32) {
+      return false;
+    }
+    LogicalTypeAnnotation logicalTypeAnnotation = type.getLogicalTypeAnnotation();
+    return logicalTypeAnnotation instanceof LogicalTypeAnnotation.IntLogicalTypeAnnotation
+        && ((LogicalTypeAnnotation.IntLogicalTypeAnnotation) logicalTypeAnnotation).getBitWidth() == 32
+        && !((LogicalTypeAnnotation.IntLogicalTypeAnnotation) logicalTypeAnnotation).isSigned();
+  }
+
+  /// Returns the names of the top-level, non-repeated unsigned 32-bit integer fields in the given Parquet file
+  /// (see [#isUnsignedInt32]).
+  public static Set<String> getUnsignedInt32FieldNames(Path path)
+      throws IOException {
+    InputFile inputFile = HadoopInputFile.fromPath(path, getParquetHadoopConfiguration());
+    try (ParquetFileReader reader = ParquetFileReader.open(inputFile)) {
+      Set<String> fieldNames = new HashSet<>();
+      for (Type field : reader.getFileMetaData().getSchema().getFields()) {
+        if (!field.isRepetition(Type.Repetition.REPEATED) && isUnsignedInt32(field)) {
+          fieldNames.add(field.getName());
+        }
+      }
+      return fieldNames;
     }
   }
 

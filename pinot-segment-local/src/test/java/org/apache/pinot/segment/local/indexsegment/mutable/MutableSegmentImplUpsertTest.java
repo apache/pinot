@@ -54,6 +54,7 @@ public class MutableSegmentImplUpsertTest {
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String TIME_COLUMN = "secondsSinceEpoch";
   private static final String OTHER_COMPARISON_COLUMN = "otherComparisonColumn";
+  private static final String PRIMARY_KEY_COLUMN = "event_id";
 
   private MutableSegmentImpl _mutableSegmentImpl;
   private PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
@@ -126,6 +127,60 @@ public class MutableSegmentImplUpsertTest {
     testUpsertIngestion(createFullUpsertConfig(HashFunction.NONE));
     testUpsertIngestion(createFullUpsertConfig(HashFunction.MD5));
     testUpsertIngestion(createFullUpsertConfig(HashFunction.MURMUR3));
+  }
+
+  /// The upsert metadata manager captures the primary key columns once, when the server starts. A consuming
+  /// segment created later picks up whatever schema is current, which may list a different set. Both must key
+  /// records identically, otherwise the same row hashes under two different keys and neither invalidates the other.
+  @Test
+  public void testPrimaryKeyColumnsTakenFromUpsertContext()
+      throws Exception {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setUpsertConfig(createFullUpsertConfig(HashFunction.MURMUR3))
+        .setNullHandlingEnabled(true)
+        .build();
+    URL schemaResourceUrl = getClass().getClassLoader().getResource(SCHEMA_FILE_PATH);
+    assertNotNull(schemaResourceUrl);
+    // Schema as it was when the metadata manager was created: a single primary key column.
+    Schema managerSchema = Schema.fromFile(new File(schemaResourceUrl.getFile()));
+    // Schema the consuming segment was created with: a second column has since joined the primary key.
+    Schema segmentSchema = Schema.fromFile(new File(schemaResourceUrl.getFile()));
+    segmentSchema.setPrimaryKeyColumns(List.of(PRIMARY_KEY_COLUMN, OTHER_COMPARISON_COLUMN));
+
+    TableUpsertMetadataManager tableUpsertMetadataManager =
+        TableUpsertMetadataManagerFactory.create(new PinotConfiguration(), tableConfig, managerSchema,
+            mock(TableDataManager.class), null);
+    PartitionUpsertMetadataManager partitionUpsertMetadataManager =
+        tableUpsertMetadataManager.getOrCreatePartitionManager(0);
+    MutableSegmentImpl mutableSegment =
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(segmentSchema, true, TIME_COLUMN,
+            partitionUpsertMetadataManager, null);
+    try {
+      // Two records sharing event_id, differing only on the column that the segment schema treats as part of the
+      // key but the metadata manager does not.
+      mutableSegment.index(createRow("aa", 1L, 1567205396L), null);
+      mutableSegment.index(createRow("aa", 2L, 1567205397L), null);
+
+      // Keyed on the manager's columns these are the same record, so the older doc must have been invalidated.
+      ImmutableRoaringBitmap bitmap = mutableSegment.getValidDocIds().getMutableRoaringBitmap();
+      assertEquals(bitmap.getCardinality(), 1);
+      assertFalse(bitmap.contains(0));
+      assertTrue(bitmap.contains(1));
+    } finally {
+      mutableSegment.destroy();
+      partitionUpsertMetadataManager.stop();
+      partitionUpsertMetadataManager.close();
+    }
+  }
+
+  private static GenericRow createRow(String eventId, long otherComparisonValue, long timeValue) {
+    GenericRow row = new GenericRow();
+    row.putValue(PRIMARY_KEY_COLUMN, eventId);
+    row.putValue("description", "d");
+    row.putValue(OTHER_COMPARISON_COLUMN, otherComparisonValue);
+    row.putValue(TIME_COLUMN, timeValue);
+    return row;
   }
 
   @Test

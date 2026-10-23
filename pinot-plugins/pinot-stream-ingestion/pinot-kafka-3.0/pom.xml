@@ -24,7 +24,7 @@
   <parent>
     <artifactId>pinot-stream-ingestion</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.6.0-SNAPSHOT</version>
+    <version>1.7.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>pinot-kafka-3.0</artifactId>
@@ -100,6 +100,7 @@
       <classifier>test</classifier>
       <scope>test</scope>
     </dependency>
+    <!-- Runtime dependency of Kafka's KafkaClusterTestKit, which EmbeddedKafkaCluster starts; not a test framework -->
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter-api</artifactId>

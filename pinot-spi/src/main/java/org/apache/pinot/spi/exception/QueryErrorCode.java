@@ -56,7 +56,7 @@ public enum QueryErrorCode {
   BROKER_REQUEST_SEND(425, "BrokerRequestSend", Response.Status.SERVICE_UNAVAILABLE),
   SERVER_NOT_RESPONDING(427, "ServerNotResponding", Response.Status.SERVICE_UNAVAILABLE),
   TOO_MANY_REQUESTS(429, "TooManyRequests", Response.Status.TOO_MANY_REQUESTS),
-  WORKLOAD_BUDGET_EXCEEDED(429, "WorkloadBudgetExceededError", Response.Status.TOO_MANY_REQUESTS),
+  WORKLOAD_BUDGET_EXCEEDED(430, "WorkloadBudgetExceededError", Response.Status.TOO_MANY_REQUESTS),
   INTERNAL(450, "InternalError", Response.Status.INTERNAL_SERVER_ERROR),
   MERGE_RESPONSE(500, "MergeResponseError", Response.Status.INTERNAL_SERVER_ERROR),
   QUERY_CANCELLATION(503, "QueryCancellationError", Response.Status.SERVICE_UNAVAILABLE),

@@ -22,6 +22,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.expectThrows;
 
 
 /// Mirrors the JSON-long corpus in `NumberUtilsTest` so the shared parser stays aligned with
@@ -109,6 +110,18 @@ public class JsonNumberUtilsTest {
     assertJsonLongError("-9.223372036854775809E18");
     assertJsonLongError("1.0E999999999");
     assertJsonLongError("-1.0E999999999");
+  }
+
+  @Test
+  public void testExponentSyntax() {
+    assertJsonLong("2e+1", 20L);
+    assertJsonLong("2e-0", 2L);
+    for (String input : new String[]{"2e+", "2e-", "2e--1", "2e1.0", "2e\u0661", "2e+\uff11",
+        "2e9223372036854775808", "2e-9223372036854775809"}) {
+      NumberFormatException exception = expectThrows(NumberFormatException.class,
+          () -> JsonNumberUtils.parseJsonLong(input));
+      assertEquals(exception.getMessage(), "Wrong exponent", input);
+    }
   }
 
   private void assertJsonLong(String input, long expected) {

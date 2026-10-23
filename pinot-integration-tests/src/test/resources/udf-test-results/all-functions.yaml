@@ -66,20 +66,40 @@ arrayconcatdouble:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayConcatDouble}"
   transform: null
   udf: "org.apache.pinot.query.runtime.function.ArrayConcatDoubleUdf"
+arrayconcatdoubleignorenulls:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayConcatDoubleIgnoreNulls}"
+  transform: null
+  udf: null
 arrayconcatfloat:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayConcatFloat}"
+  transform: null
+  udf: null
+arrayconcatfloatignorenulls:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayConcatFloatIgnoreNulls}"
   transform: null
   udf: null
 arrayconcatint:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayConcatInt}"
   transform: null
   udf: null
+arrayconcatintignorenulls:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayConcatIntIgnoreNulls}"
+  transform: null
+  udf: null
 arrayconcatlong:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayConcatLong}"
   transform: null
   udf: null
+arrayconcatlongignorenulls:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayConcatLongIgnoreNulls}"
+  transform: null
+  udf: null
 arrayconcatstring:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayConcatString}"
+  transform: null
+  udf: null
+arrayconcatstringignorenulls:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayConcatStringIgnoreNulls}"
   transform: null
   udf: null
 arraycontainsint:
@@ -162,40 +182,80 @@ arraypushbackdouble:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayPushBackDouble}"
   transform: null
   udf: null
+arraypushbackdoubleignorenulls:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayPushBackDoubleIgnoreNulls}"
+  transform: null
+  udf: null
 arraypushbackfloat:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayPushBackFloat}"
+  transform: null
+  udf: null
+arraypushbackfloatignorenulls:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayPushBackFloatIgnoreNulls}"
   transform: null
   udf: null
 arraypushbackint:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayPushBackInt}"
   transform: null
   udf: null
+arraypushbackintignorenulls:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayPushBackIntIgnoreNulls}"
+  transform: null
+  udf: null
 arraypushbacklong:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayPushBackLong}"
+  transform: null
+  udf: null
+arraypushbacklongignorenulls:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayPushBackLongIgnoreNulls}"
   transform: null
   udf: null
 arraypushbackstring:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayPushBackString}"
   transform: null
   udf: null
+arraypushbackstringignorenulls:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayPushBackStringIgnoreNulls}"
+  transform: null
+  udf: null
 arraypushfrontdouble:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayPushFrontDouble}"
+  transform: null
+  udf: null
+arraypushfrontdoubleignorenulls:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayPushFrontDoubleIgnoreNulls}"
   transform: null
   udf: null
 arraypushfrontfloat:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayPushFrontFloat}"
   transform: null
   udf: null
+arraypushfrontfloatignorenulls:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayPushFrontFloatIgnoreNulls}"
+  transform: null
+  udf: null
 arraypushfrontint:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayPushFrontInt}"
+  transform: null
+  udf: null
+arraypushfrontintignorenulls:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayPushFrontIntIgnoreNulls}"
   transform: null
   udf: null
 arraypushfrontlong:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayPushFrontLong}"
   transform: null
   udf: null
+arraypushfrontlongignorenulls:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayPushFrontLongIgnoreNulls}"
+  transform: null
+  udf: null
 arraypushfrontstring:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayPushFrontString}"
+  transform: null
+  udf: null
+arraypushfrontstringignorenulls:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayPushFrontStringIgnoreNulls}"
   transform: null
   udf: null
 arrayremoveint:
@@ -255,8 +315,16 @@ arrayunionint:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayUnionInt}"
   transform: null
   udf: null
+arrayunionintignorenulls:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayUnionIntIgnoreNulls}"
+  transform: null
+  udf: null
 arrayunionstring:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayUnionString}"
+  transform: null
+  udf: null
+arrayunionstringignorenulls:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayUnionStringIgnoreNulls}"
   transform: null
   udf: null
 arrayvalueconstructor:
@@ -774,20 +842,28 @@ gcd:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArithmeticFunctions.gcd}"
   transform: null
   udf: null
+generatearray:
+  scalar: "org.apache.pinot.common.function.scalar.array.GenerateArrayScalarFunction"
+  transform: null
+  udf: null
 generatedoublearray:
-  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.generateDoubleArray}"
+  scalar: "ArgumentCountBasedScalarFunction{[2: org.apache.pinot.common.function.scalar.ArrayFunctions.generateDoubleArray,\
+    \ 3: org.apache.pinot.common.function.scalar.ArrayFunctions.generateDoubleArray]}"
   transform: null
   udf: null
 generatefloatarray:
-  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.generateFloatArray}"
+  scalar: "ArgumentCountBasedScalarFunction{[2: org.apache.pinot.common.function.scalar.ArrayFunctions.generateFloatArray,\
+    \ 3: org.apache.pinot.common.function.scalar.ArrayFunctions.generateFloatArray]}"
   transform: null
   udf: null
 generateintarray:
-  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.generateIntArray}"
+  scalar: "ArgumentCountBasedScalarFunction{[2: org.apache.pinot.common.function.scalar.ArrayFunctions.generateIntArray,\
+    \ 3: org.apache.pinot.common.function.scalar.ArrayFunctions.generateIntArray]}"
   transform: null
   udf: null
 generatelongarray:
-  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.generateLongArray}"
+  scalar: "ArgumentCountBasedScalarFunction{[2: org.apache.pinot.common.function.scalar.ArrayFunctions.generateLongArray,\
+    \ 3: org.apache.pinot.common.function.scalar.ArrayFunctions.generateLongArray]}"
   transform: null
   udf: null
 geotoh3:
@@ -866,7 +942,7 @@ in:
   transform: "org.apache.pinot.core.operator.transform.function.InTransformFunction"
   udf: null
 inidset:
-  scalar: null
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.core.function.scalar.IdSetFunctions.inIdSet}"
   transform: "org.apache.pinot.core.operator.transform.function.InIdSetTransformFunction"
   udf: null
 innerproduct:

@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.io.DataOutput;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -199,6 +201,28 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
   /// [AggregationFunction].
   IntermediateResult merge(IntermediateResult intermediateResult1, IntermediateResult intermediateResult2);
 
+  /// Merges a serialized intermediate result into `intermediateResult`, which may be `null`, and returns the merged
+  /// result. The result may be `intermediateResult` itself, modified in place.
+  ///
+  /// The default deserializes `serialized` and merges it with [#merge]. Override it when the function can read the
+  /// serialized form straight into `intermediateResult`, to skip a full-size copy of the incoming value. This matters
+  /// for large intermediate results, such as the value list of an exact percentile, which are humongous objects for G1.
+  ///
+  /// Call [AggregationFunctionUtils#mergeSerialized] instead of calling this directly: it settles a `null` serialized
+  /// value.
+  @Nullable
+  default IntermediateResult mergeSerializedIntermediateResult(@Nullable IntermediateResult intermediateResult,
+      CustomObject serialized) {
+    IntermediateResult incoming = deserializeIntermediateResult(serialized);
+    if (intermediateResult == null) {
+      return incoming;
+    }
+    if (incoming == null) {
+      return intermediateResult;
+    }
+    return merge(intermediateResult, incoming);
+  }
+
   /// Returns the [ColumnDataType] of the intermediate result.
   ///
   /// This column data type is used for transferring data in data table.
@@ -211,6 +235,12 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
   }
 
   /// Serialized intermediate result. Type can be used to identify the intermediate result type when deserializing it.
+  ///
+  /// Data table and data block builders write the value with [#getSize()] and [#writeTo(DataOutput)], and do not call
+  /// [#getBytes()]. A subclass can therefore write a large intermediate result straight into the destination, without
+  /// building the full byte array first. Such a subclass reads the intermediate result when it is written, so it must
+  /// be written before the intermediate result changes. A caller that keeps the object for later must take a snapshot
+  /// instead: `new SerializedIntermediateResult(serialized.getType(), serialized.getBytes())`.
   class SerializedIntermediateResult {
     private final int _type;
     private final byte[] _bytes;
@@ -220,12 +250,33 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
       _bytes = buffer;
     }
 
+    /// Constructor for subclasses that serialize on demand. They must override [#getBytes()], [#getSize()] and
+    /// [#writeTo(DataOutput)].
+    protected SerializedIntermediateResult(int type) {
+      _type = type;
+      _bytes = null;
+    }
+
     public int getType() {
       return _type;
     }
 
     public byte[] getBytes() {
       return _bytes;
+    }
+
+    /// Returns the number of bytes [#writeTo(DataOutput)] writes, which is the length of [#getBytes()].
+    public int getSize() {
+      if (_bytes == null) {
+        throw new IllegalStateException(getClass().getName() + " serializes on demand and must override getSize()");
+      }
+      return _bytes.length;
+    }
+
+    /// Writes the bytes of [#getBytes()] to `output`.
+    public void writeTo(DataOutput output)
+        throws IOException {
+      output.write(_bytes);
     }
   }
 
@@ -241,6 +292,8 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
   ColumnDataType getFinalResultColumnType();
 
   /// Extracts the final result used in the broker response from the given intermediate result.
+  /// When final results are extracted for group-by sorting, preserve the intermediate information needed for
+  /// subsequent merging and final extraction.
   ///
   /// A `null` intermediate result means nothing was aggregated, and this method decides what that means for this
   /// particular aggregation. It is the only place where that per-function answer is expressed, so it must never
@@ -263,9 +316,31 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
     throw new UnsupportedOperationException("Cannot merge final results for function: " + getType());
   }
 
+  /// Returns whether [#extractFinalResult] has returned an approximate result for a function that can also answer
+  /// exactly. The SMART functions start exact and switch a group to a sketch once it crosses their conversion
+  /// threshold. A merge with a sketch always returns a sketch, so the extraction sees the switch, and records it here.
+  /// Read it after extracting, to report the result as approximate.
+  ///
+  /// A function instance belongs to one query, and so does the flag. Group trimming also extracts final results, so a
+  /// group that is trimmed away can still set it. Functions that are always exact or always approximate keep the
+  /// default.
+  default boolean hasApproximatedResult() {
+    return false;
+  }
+
   /// Returns whether a star-tree index with the specified properties can be used for this aggregation function.
   default boolean canUseStarTree(Map<String, Object> functionParameters) {
     // Implementations can override this method to perform additional checks on the function parameters
+    return true;
+  }
+
+  /// Returns whether intermediate results of DIFFERENT groups may be merged together. Most functions merge
+  /// intermediates commutatively regardless of which group produced them, but some are only mergeable across
+  /// SEGMENTS for the SAME group: e.g. SEGMENTPARTITIONEDDISTINCTCOUNT and partitioned FUNNELCOUNT keep a count
+  /// that is already final within one segment and one group, so merging two groups of the same segment
+  /// double-counts entities present in both. The grouping-sets base-aggregation derive merges base groups into
+  /// coarser grouping sets and must not be used for such functions.
+  default boolean canMergeIntermediatesAcrossGroups() {
     return true;
   }
 

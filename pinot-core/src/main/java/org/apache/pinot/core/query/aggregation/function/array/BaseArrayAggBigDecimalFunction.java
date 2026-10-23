@@ -22,9 +22,13 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectCollection;
 import java.math.BigDecimal;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.core.startree.StarTreePreAggregatedBlockValSet;
+import org.apache.pinot.segment.local.aggregator.ArrayAggDistinctValueAggregator.ElementType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -40,6 +44,22 @@ public abstract class BaseArrayAggBigDecimalFunction<I extends ObjectCollection<
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
+    // Star-tree pre-aggregated column: each single-value BYTES entry is a serialized distinct set; add each of its
+    // elements to the group's accumulator.
+    if (blockValSet instanceof StarTreePreAggregatedBlockValSet) {
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          int groupKey = groupKeyArray[i];
+          Set<BigDecimal> set = ObjectSerDeUtils.BIG_DECIMAL_SET_SER_DE.deserialize(
+              starTreeSetPayload(bytesValues[i], ElementType.BIG_DECIMAL));
+          for (BigDecimal v : set) {
+            setGroupByResult(groupByResultHolder, groupKey, v);
+          }
+        }
+      });
+      return;
+    }
     if (blockValSet.isSingleValue()) {
       BigDecimal[] values = blockValSet.getBigDecimalValuesSV();
       forEachNotNull(length, blockValSet, (from, to) -> {
@@ -65,6 +85,23 @@ public abstract class BaseArrayAggBigDecimalFunction<I extends ObjectCollection<
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
+    // Star-tree pre-aggregated column: each single-value BYTES entry is a serialized distinct set; add each of its
+    // elements to every group the row belongs to.
+    if (blockValSet instanceof StarTreePreAggregatedBlockValSet) {
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          Set<BigDecimal> set = ObjectSerDeUtils.BIG_DECIMAL_SET_SER_DE.deserialize(
+              starTreeSetPayload(bytesValues[i], ElementType.BIG_DECIMAL));
+          for (int groupKey : groupKeysArray[i]) {
+            for (BigDecimal v : set) {
+              setGroupByResult(groupByResultHolder, groupKey, v);
+            }
+          }
+        }
+      });
+      return;
+    }
     if (blockValSet.isSingleValue()) {
       BigDecimal[] values = blockValSet.getBigDecimalValuesSV();
       forEachNotNull(length, blockValSet, (from, to) -> {

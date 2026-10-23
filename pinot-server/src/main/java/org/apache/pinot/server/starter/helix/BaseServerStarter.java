@@ -106,10 +106,12 @@ import org.apache.pinot.segment.local.utils.ClusterConfigForTable;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
+import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.memory.unsafe.MmapMemoryConfig;
 import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.api.AdminApiApplication;
+import org.apache.pinot.server.api.resources.ReingestionConsumptionTimeout;
 import org.apache.pinot.server.conf.ServerConf;
 import org.apache.pinot.server.realtime.ControllerLeaderLocator;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
@@ -185,6 +187,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
   protected volatile boolean _isServerReadyToServeQueries = false;
   protected ScheduledExecutorService _helixMessageCountScheduler;
   protected ServerReloadJobStatusCache _reloadJobStatusCache;
+  protected ReingestionConsumptionTimeout _reingestionConsumptionTimeout;
   // Override this to provide custom thread pool for Helix state transitions. Null means using Helix's default
   @Nullable
   protected StateTransitionThreadPoolManager _transitionThreadPoolManager;
@@ -660,6 +663,10 @@ public abstract class BaseServerStarter implements ServiceStartable {
     LOGGER.info("Server configs: {}", new PinotAppConfigs(getConfig()).toJSONString());
     long startTimeMs = System.currentTimeMillis();
 
+    // Load the index plugins before joining the cluster, so that an invalid plugin set (for example more than
+    // IndexService.MAX_INDEX_TYPES index types) fails server startup instead of every later segment load.
+    LOGGER.info("Loaded {} index types", IndexService.getInstance().getAllIndexes().size());
+
     LOGGER.info("Initializing server metrics");
     ServerConf serverConf = new ServerConf(_serverConf);
     _serverMetrics = ServerMetricsInitUtils.initServerMetrics(serverConf);
@@ -672,6 +679,10 @@ public abstract class BaseServerStarter implements ServiceStartable {
     // Register cache as cluster config listener for dynamic config updates
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(_reloadJobStatusCache);
     LOGGER.info("Registered ServerReloadJobStatusCache as cluster config listener");
+
+    // Register re-ingestion consumption timeout as cluster config listener for dynamic config updates
+    _reingestionConsumptionTimeout = new ReingestionConsumptionTimeout(_serverConf);
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(_reingestionConsumptionTimeout);
 
     // install default SSL context if necessary (even if not force-enabled everywhere)
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(_serverConf, Server.SERVER_TLS_PREFIX);
@@ -1275,7 +1286,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
   }
 
   protected AdminApiApplication createServerAdminApp() {
-    return new AdminApiApplication(_serverInstance, _accessControlFactory, _reloadJobStatusCache, _serverConf);
+    return new AdminApiApplication(_serverInstance, _accessControlFactory, _reloadJobStatusCache,
+        _reingestionConsumptionTimeout, _serverConf);
   }
 
   /// Creates the [SegmentMessageHandlerFactory] used to handle user-defined Helix messages for segments.

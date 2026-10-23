@@ -27,6 +27,8 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.core.startree.StarTreePreAggregatedBlockValSet;
+import org.apache.pinot.segment.local.aggregator.ArrayAggDistinctValueAggregator.ElementType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -37,11 +39,28 @@ public class ArrayAggDistinctIntFunction extends BaseArrayAggIntFunction<IntSet>
   }
 
   @Override
+  public boolean canUseStarTree(Map<String, Object> functionParameters) {
+    return true;
+  }
+
+  @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     IntOpenHashSet valueSet =
         aggregationResultHolder.getResult() != null ? aggregationResultHolder.getResult() : new IntOpenHashSet(length);
+    // Star-tree pre-aggregated column: each single-value BYTES entry is a serialized distinct set to merge in.
+    if (blockValSet instanceof StarTreePreAggregatedBlockValSet) {
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          valueSet.addAll(ObjectSerDeUtils.INT_SET_SER_DE.deserialize(starTreeSetPayload(bytesValues[i],
+              ElementType.INT)));
+        }
+      });
+      aggregationResultHolder.setValue(valueSet);
+      return;
+    }
     if (blockValSet.isSingleValue()) {
       int[] values = blockValSet.getIntValuesSV();
       forEachNotNull(length, blockValSet, (from, to) -> {

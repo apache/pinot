@@ -175,14 +175,15 @@ public class PinotQueryRuleSets {
       PinotAggregateFunctionRewriteRule
           .instanceWithDescription(PlannerRuleNames.AGGREGATE_FUNCTION_REWRITE),
 
-      // Must stay ahead of PinotAggregateExchangeNodeInsertRule (POST_LOGICAL), which fixes the leaf-to-final
-      // intermediate result format from the function name.
-      PinotApproximateAggregateRewriteRule.INSTANCE,
-
       // convert CASE-style filtered aggregates into true filtered aggregates
       // put it after AGGREGATE_REDUCE_FUNCTIONS where SUM is converted to SUM0
+      // put it before APPROXIMATE_AGGREGATE_REWRITE, see PinotApproximateAggregateRewriteRule
       AggregateCaseToFilterRule.Config.DEFAULT
-          .withDescription(PlannerRuleNames.AGGREGATE_CASE_TO_FILTER).toRule()
+          .withDescription(PlannerRuleNames.AGGREGATE_CASE_TO_FILTER).toRule(),
+
+      // Must run after AGGREGATE_CASE_TO_FILTER and before PinotAggregateExchangeNodeInsertRule (POST_LOGICAL). The
+      // rule's class doc says why.
+      PinotApproximateAggregateRewriteRule.INSTANCE
   );
 
   // Filter pushdown rules run using a RuleCollection since we want to push down a filter as much as possible in a

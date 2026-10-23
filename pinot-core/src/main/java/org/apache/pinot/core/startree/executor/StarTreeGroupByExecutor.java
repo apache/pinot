@@ -43,27 +43,21 @@ public class StarTreeGroupByExecutor extends DefaultGroupByExecutor {
   private final AggregationFunctionColumnPair[] _aggregationFunctionColumnPairs;
 
   public StarTreeGroupByExecutor(QueryContext queryContext, ExpressionContext[] groupByExpressions,
-      BaseProjectOperator<?> projectOperator) {
-    this(queryContext, queryContext.getAggregationFunctions(), groupByExpressions, projectOperator, null);
+      BaseProjectOperator<?> projectOperator, AggregationFunctionColumnPair[] aggregationFunctionColumnPairs) {
+    this(queryContext, queryContext.getAggregationFunctions(), groupByExpressions, projectOperator,
+        aggregationFunctionColumnPairs, null);
   }
 
-  public StarTreeGroupByExecutor(QueryContext queryContext, AggregationFunction[] aggregationFunctions,
-      ExpressionContext[] groupByExpressions, BaseProjectOperator<?> projectOperator) {
-    this(queryContext, aggregationFunctions, groupByExpressions, projectOperator, null);
-  }
-
+  /// Creates an executor over the pre-aggregated columns the query was routed to.
+  ///
+  /// `aggregationFunctionColumnPairs` must be the pairs the star-tree project operator was built with, because they
+  /// depend on which star-tree was picked: a null-aware star-tree resolves `COUNT(column)` to `count__column` while a
+  /// regular one resolves it to `count__*`.
   public StarTreeGroupByExecutor(QueryContext queryContext, AggregationFunction[] aggregationFunctions,
       ExpressionContext[] groupByExpressions, BaseProjectOperator<?> projectOperator,
-      @Nullable GroupKeyGenerator groupKeyGenerator) {
+      AggregationFunctionColumnPair[] aggregationFunctionColumnPairs, @Nullable GroupKeyGenerator groupKeyGenerator) {
     super(queryContext, aggregationFunctions, groupByExpressions, projectOperator, groupKeyGenerator);
-
-    assert aggregationFunctions != null;
-    int numAggregationFunctions = aggregationFunctions.length;
-    _aggregationFunctionColumnPairs = new AggregationFunctionColumnPair[numAggregationFunctions];
-    for (int i = 0; i < numAggregationFunctions; i++) {
-      _aggregationFunctionColumnPairs[i] =
-          AggregationFunctionUtils.getStoredFunctionColumnPair(aggregationFunctions[i]);
-    }
+    _aggregationFunctionColumnPairs = aggregationFunctionColumnPairs;
   }
 
   @Override

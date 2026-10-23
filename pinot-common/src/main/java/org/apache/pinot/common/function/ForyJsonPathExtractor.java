@@ -38,7 +38,7 @@ import org.slf4j.LoggerFactory;
 /// Streaming extraction uses one bounded parser pool shared by all worker threads. Initialization or runtime linkage
 /// failures permanently disable the optional path, allowing callers to fall back to Jackson/Jayway. Jackson's
 /// document, token, nesting, field-name, string, and number constraints are enforced while walking the document.
-/// The Fory runtime is an optional dependency; applications must add `org.apache.fory:fory-json:1.6.0` (and its
+/// The Fory runtime is an optional dependency; applications must add `org.apache.fory:fory-json:1.7.5` (and its
 /// transitive `fory-core` dependency) to the application classpath to enable this experimental path.
 public final class ForyJsonPathExtractor {
   private static final Logger LOGGER = LoggerFactory.getLogger(ForyJsonPathExtractor.class);
@@ -107,6 +107,7 @@ public final class ForyJsonPathExtractor {
     context._path = path;
     context._result = null;
     context._tokenCount = 0;
+    context._checkStringLength = json.length() > JACKSON_CONSTRAINTS.getMaxStringLength();
     try {
       parser.fromJson(json, PathResult.class);
       return context._result;
@@ -118,6 +119,7 @@ public final class ForyJsonPathExtractor {
       context._path = null;
       context._result = null;
       context._tokenCount = 0;
+      context._checkStringLength = false;
       context._active = false;
     }
   }
@@ -262,11 +264,11 @@ public final class ForyJsonPathExtractor {
     }
     if (token == '"') {
       countToken(context);
-      // Fory 1.6's skipValue() computes an FNV hash over every character. Its string decoder uses packed scans and
-      // is substantially faster even when the decoded value is discarded. An upstream fast-skip API could remove
-      // this temporary allocation in a future Fory version.
-      String value = reader.readString();
-      if (value.length() > JACKSON_CONSTRAINTS.getMaxStringLength()) {
+      // A decoded string cannot exceed its containing String document. Larger documents need decoded lengths:
+      // raw token lengths overcount escapes. The reader's reusable text view avoids materializing a String.
+      if (!context._checkStringLength) {
+        reader.skipValue();
+      } else if (reader.readQuotedText().length() > JACKSON_CONSTRAINTS.getMaxStringLength()) {
         throw new IllegalArgumentException("JSON string exceeds Jackson's configured limit");
       }
       return;
@@ -330,6 +332,7 @@ public final class ForyJsonPathExtractor {
   private static final class PathContext {
     private final PathResult _marker = new PathResult();
     private boolean _active;
+    private boolean _checkStringLength;
     private long _tokenCount;
     @Nullable
     private SimpleJsonPath _path;

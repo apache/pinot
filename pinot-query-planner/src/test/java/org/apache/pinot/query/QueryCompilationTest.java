@@ -33,6 +33,7 @@ import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.pinot.query.QueryEnvironment.CompiledQuery;
 import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
@@ -45,8 +46,14 @@ import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
+import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Ignore;
 import org.testng.annotations.Test;
@@ -143,6 +150,32 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     }
   }
 
+  @Test
+  public void testPostgreSqlByteaLiteralTypeInference() {
+    RelDataType rowType = _queryEnvironment.compile(
+            "SELECT '\\x0102'::bytea, ARRAY['\\x00'::bytea, CAST('\\x0102' AS BYTEA)] FROM a")
+        .getRelRoot().validatedRowType;
+    assertEquals(rowType.getFieldList().get(0).getType().getSqlTypeName(), SqlTypeName.BINARY);
+    RelDataType arrayType = rowType.getFieldList().get(1).getType();
+    assertEquals(arrayType.getSqlTypeName(), SqlTypeName.ARRAY);
+    assertEquals(arrayType.getComponentType().getSqlTypeName(), SqlTypeName.VARBINARY);
+  }
+
+  /// A bytea constant must not change which plan EXPLAIN returns. Rewriting it used to rebuild the statement node, so
+  /// `EXPLAIN IMPLEMENTATION PLAN` lost its physical-plan marker and silently returned the logical plan instead.
+  @Test
+  public void testPostgreSqlByteaLiteralKeepsPhysicalExplain() {
+    long requestId = RANDOM_REQUEST_ID_GEN.nextLong();
+    String expected =
+        _queryEnvironment.explainQuery("EXPLAIN IMPLEMENTATION PLAN FOR SELECT col1, X'01' FROM a", requestId);
+    assertTrue(expected.contains("MAIL_RECEIVE"), expected);
+    for (String bytea : List.of("'\\x01'::bytea", "CAST('\\x01' AS BYTEA)")) {
+      String explain = _queryEnvironment.explainQuery(
+          "EXPLAIN IMPLEMENTATION PLAN FOR SELECT col1, " + bytea + " FROM a", requestId);
+      assertEquals(explain, expected, bytea);
+    }
+  }
+
   /// `jsonPath` must resolve to a literal, but the operand type checker deliberately does not demand a literal
   /// `SqlNode` in that position: operand checking runs before `PinotEvaluateLiteralRule` folds constant
   /// expressions, so an argument such as `CONCAT('$.', 'foo')` folds to a literal and plans and executes
@@ -179,60 +212,65 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         "SELECT jsonExtractScalar('{\"v\":[1.5,2.5]}', '$.v', 'FLOAT_ARRAY') FROM a",
         "SELECT jsonExtractScalar('{\"v\":[1.5,2.5]}', '$.v', 'DOUBLE_ARRAY') FROM a",
         "SELECT jsonExtractScalar('{\"v\":[true,false]}', '$.v', 'BOOLEAN_ARRAY') FROM a",
+        "SELECT arraySum(jsonExtractScalar('{\"v\":[true,false]}', '$.v', 'BOOLEAN_ARRAY')) FROM a",
         "SELECT jsonExtractScalar('{\"v\":[1514805173000]}', '$.v', 'TIMESTAMP_ARRAY') FROM a",
         "SELECT jsonExtractScalar('{\"v\":null}', '$.v', 'INT', 7) FROM a"
     );
     for (String query : queries) {
-      assertNotNull(_queryEnvironment.planQuery(query), query);
-      String explain = _queryEnvironment.explainQuery("EXPLAIN PLAN FOR " + query, RANDOM_REQUEST_ID_GEN.nextLong());
+      try (CompiledQuery compiledQuery = _queryEnvironment.compile(query)) {
+        assertNotNull(compiledQuery.planQuery(0).getQueryPlan(), query);
+      }
+      String explain = explainCompiledQuery("EXPLAIN PLAN FOR " + query, RANDOM_REQUEST_ID_GEN.nextLong());
       assertFalse(explain.toUpperCase().contains("JSONEXTRACTSCALAR"),
           "all-literal call must fold away the function, but plan still has it: " + explain);
     }
-    String booleanExplain = _queryEnvironment.explainQuery(
+    String booleanExplain = explainCompiledQuery(
         "EXPLAIN PLAN FOR SELECT jsonExtractScalar('{\"v\":true}', '$.v', 'BOOLEAN') FROM a",
         RANDOM_REQUEST_ID_GEN.nextLong());
     assertTrue(booleanExplain.contains("true"), booleanExplain);
-    String arrayExplain = _queryEnvironment.explainQuery(
+    String arrayExplain = explainCompiledQuery(
         "EXPLAIN PLAN FOR SELECT jsonExtractScalar('{\"v\":[1,2]}', '$.v', 'INT_ARRAY') FROM a",
         RANDOM_REQUEST_ID_GEN.nextLong());
     assertTrue(arrayExplain.contains("1") && arrayExplain.contains("2"), arrayExplain);
-    String longArrayExplain = _queryEnvironment.explainQuery(
+    String longArrayExplain = explainCompiledQuery(
         "EXPLAIN PLAN FOR SELECT jsonExtractScalar('{\"v\":[9007199254740993]}', '$.v', 'LONG_ARRAY') FROM a",
         RANDOM_REQUEST_ID_GEN.nextLong());
     assertFalse(longArrayExplain.toUpperCase().contains("JSONEXTRACTSCALAR"), longArrayExplain);
     assertTrue(longArrayExplain.contains("9007199254740993"), longArrayExplain);
-    String floatArrayExplain = _queryEnvironment.explainQuery(
+    String floatArrayExplain = explainCompiledQuery(
         "EXPLAIN PLAN FOR SELECT jsonExtractScalar('{\"v\":[1.5]}', '$.v', 'FLOAT_ARRAY') FROM a",
         RANDOM_REQUEST_ID_GEN.nextLong());
     assertFalse(floatArrayExplain.toUpperCase().contains("JSONEXTRACTSCALAR"), floatArrayExplain);
     assertTrue(floatArrayExplain.contains("1.5"), floatArrayExplain);
-    String booleanArrayExplain = _queryEnvironment.explainQuery(
+    String booleanArrayExplain = explainCompiledQuery(
         "EXPLAIN PLAN FOR SELECT jsonExtractScalar('{\"v\":[true,false]}', '$.v', 'BOOLEAN_ARRAY') FROM a",
         RANDOM_REQUEST_ID_GEN.nextLong());
     assertFalse(booleanArrayExplain.toUpperCase().contains("JSONEXTRACTSCALAR"), booleanArrayExplain);
     assertTrue(booleanArrayExplain.contains("true") && booleanArrayExplain.contains("false"), booleanArrayExplain);
-    String timestampArrayExplain = _queryEnvironment.explainQuery(
+    String timestampArrayExplain = explainCompiledQuery(
         "EXPLAIN PLAN FOR SELECT jsonExtractScalar('{\"v\":[1514805173000]}', '$.v', 'TIMESTAMP_ARRAY') FROM a",
         RANDOM_REQUEST_ID_GEN.nextLong());
     assertFalse(timestampArrayExplain.toUpperCase().contains("JSONEXTRACTSCALAR"), timestampArrayExplain);
     assertTrue(timestampArrayExplain.contains("2018-01-01 11:12:53"), timestampArrayExplain);
-    String defaultExplain = _queryEnvironment.explainQuery(
+    String defaultExplain = explainCompiledQuery(
         "EXPLAIN PLAN FOR SELECT jsonExtractScalar('{\"v\":null}', '$.v', 'INT', 7) FROM a",
         RANDOM_REQUEST_ID_GEN.nextLong());
     assertFalse(defaultExplain.toUpperCase().contains("JSONEXTRACTSCALAR"), defaultExplain);
     assertTrue(defaultExplain.contains("[7]"), defaultExplain);
-    String nullDefaultExplain = _queryEnvironment.explainQuery(
+    String nullDefaultExplain = explainCompiledQuery(
         "EXPLAIN PLAN FOR SELECT jsonExtractScalar('{\"v\":null}', '$.v', 'INT', NULL) FROM a",
         RANDOM_REQUEST_ID_GEN.nextLong());
     assertTrue(nullDefaultExplain.toUpperCase().contains("JSONEXTRACTSCALAR"), nullDefaultExplain);
 
     String emptyArrayQuery = "SELECT jsonExtractScalar('{}', '$.missing', 'INT_ARRAY') FROM a";
-    assertNotNull(_queryEnvironment.planQuery(emptyArrayQuery));
-    String emptyArrayExplain = _queryEnvironment.explainQuery("EXPLAIN PLAN FOR " + emptyArrayQuery,
+    try (CompiledQuery compiledQuery = _queryEnvironment.compile(emptyArrayQuery)) {
+      assertNotNull(compiledQuery.planQuery(0).getQueryPlan());
+    }
+    String emptyArrayExplain = explainCompiledQuery("EXPLAIN PLAN FOR " + emptyArrayQuery,
         RANDOM_REQUEST_ID_GEN.nextLong());
     assertTrue(emptyArrayExplain.toUpperCase().contains("JSONEXTRACTSCALAR"), emptyArrayExplain);
 
-    String timestampDefaultExplain = _queryEnvironment.explainQuery(
+    String timestampDefaultExplain = explainCompiledQuery(
         "EXPLAIN PLAN FOR SELECT jsonExtractScalar('{}', '$.missing', 'STRING', "
             + "TIMESTAMP '2018-01-01 11:12:53') FROM a",
         RANDOM_REQUEST_ID_GEN.nextLong());
@@ -245,21 +283,21 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         {"TIME '11:12:53'", "11:12:53"},
         {"UUID '123e4567-e89b-12d3-a456-426614174000'", "123e4567-e89b-12d3-a456-426614174000"}
     }) {
-      String canonicalDefaultExplain = _queryEnvironment.explainQuery(
+      String canonicalDefaultExplain = explainCompiledQuery(
           "EXPLAIN PLAN FOR SELECT jsonExtractScalar('{}', '$.missing', 'STRING', " + testCase[0] + ") FROM a",
           RANDOM_REQUEST_ID_GEN.nextLong());
       assertFalse(canonicalDefaultExplain.toUpperCase().contains("JSONEXTRACTSCALAR"), canonicalDefaultExplain);
       assertTrue(canonicalDefaultExplain.contains(testCase[1]), canonicalDefaultExplain);
     }
 
-    String decimalDefaultExplain = _queryEnvironment.explainQuery(
+    String decimalDefaultExplain = explainCompiledQuery(
         "EXPLAIN PLAN FOR SELECT jsonExtractScalar('{}', '$.missing', 'LONG', 9007199254740993.0) FROM a",
         RANDOM_REQUEST_ID_GEN.nextLong());
     assertFalse(decimalDefaultExplain.toUpperCase().contains("JSONEXTRACTSCALAR"), decimalDefaultExplain);
     assertTrue(decimalDefaultExplain.contains("9007199254740992"), decimalDefaultExplain);
     assertFalse(decimalDefaultExplain.contains("9007199254740993"), decimalDefaultExplain);
 
-    String decimalArrayDefaultExplain = _queryEnvironment.explainQuery(
+    String decimalArrayDefaultExplain = explainCompiledQuery(
         "EXPLAIN PLAN FOR SELECT jsonExtractScalar('{\"v\":[null]}', '$.v', 'LONG_ARRAY', "
             + "9007199254740993.0) FROM a",
         RANDOM_REQUEST_ID_GEN.nextLong());
@@ -267,10 +305,16 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     assertTrue(decimalArrayDefaultExplain.contains("9007199254740992"), decimalArrayDefaultExplain);
     assertFalse(decimalArrayDefaultExplain.contains("9007199254740993"), decimalArrayDefaultExplain);
 
-    String nullInputExplain = _queryEnvironment.explainQuery(
+    String nullInputExplain = explainCompiledQuery(
         "EXPLAIN PLAN FOR SELECT jsonExtractScalar(CAST(NULL AS VARCHAR), '$.missing', 'INT', 7) FROM a",
         RANDOM_REQUEST_ID_GEN.nextLong());
     assertTrue(nullInputExplain.toUpperCase().contains("JSONEXTRACTSCALAR"), nullInputExplain);
+  }
+
+  private String explainCompiledQuery(String query, long requestId) {
+    try (CompiledQuery compiledQuery = _queryEnvironment.compile(query)) {
+      return compiledQuery.explain(requestId, null).getExplainPlan();
+    }
   }
 
   @Test
@@ -1264,6 +1308,96 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     return null;
   }
 
+  /// A Sort without fetch/offset over a hash-partitioned exchange orders each partition only. It feeds a
+  /// `PARTITION BY ... ORDER BY` window or a `WITHIN GROUP` aggregate, so its stage must keep the partitioned worker
+  /// assignment (one worker per server, times `stageParallelism`) instead of the single worker of a final ORDER BY.
+  @Test(dataProvider = "partitionedSortQueries")
+  public void testSortOverPartitionedExchangeKeepsPartitionedWorkers(String query, int expectedNumWorkers) {
+    Map<SortNode, DispatchablePlanFragment> sortStages = findSortOverReceiveStages(_queryEnvironment.planQuery(query));
+    assertEquals(sortStages.size(), 1, "Expected one Sort over a mailbox receive");
+    Map.Entry<SortNode, DispatchablePlanFragment> entry = sortStages.entrySet().iterator().next();
+    assertTrue(isOverPartitionedReceive(entry.getKey()), "Expected the Sort to read a hash-partitioned exchange");
+    DispatchablePlanFragment sortStage = entry.getValue();
+    assertEquals(sortStage.getServerInstanceToWorkerIdMap().size(), 2, "Sort stage should run on every server");
+    assertEquals(sortStage.getWorkerMetadataList().size(), expectedNumWorkers);
+  }
+
+  @DataProvider(name = "partitionedSortQueries")
+  public Object[][] partitionedSortQueries() {
+    return new Object[][]{
+        {"SELECT col1, ROW_NUMBER() OVER (PARTITION BY col1 ORDER BY col3 DESC) FROM a", 2},
+        {"SELECT col1, SUM(col3) OVER (PARTITION BY col1 ORDER BY col3) FROM a", 2},
+        {"SET stageParallelism=2; SELECT col1, ROW_NUMBER() OVER (PARTITION BY col1 ORDER BY col3 DESC) FROM a", 4},
+        {"SELECT col1, LISTAGG(col2, ',') WITHIN GROUP (ORDER BY col3) FROM a GROUP BY col1", 2},
+        {"SET stageParallelism=2; SELECT col1, LISTAGG(col2, ',') WITHIN GROUP (ORDER BY col3) FROM a GROUP BY col1",
+            4}
+    };
+  }
+
+  /// A Sort that trims (fetch/offset) or reads a keyless exchange establishes a total order, so its stage must run on
+  /// a single worker even when `stageParallelism` asks for more.
+  @Test(dataProvider = "globalSortQueries")
+  public void testSortOverGlobalExchangeUsesSingletonWorker(String query) {
+    Map<SortNode, DispatchablePlanFragment> sortStages = findSortOverReceiveStages(_queryEnvironment.planQuery(query));
+    assertEquals(sortStages.size(), 1, "Expected one Sort over a mailbox receive");
+    Map.Entry<SortNode, DispatchablePlanFragment> entry = sortStages.entrySet().iterator().next();
+    assertFalse(isOverPartitionedReceive(entry.getKey()), "Expected the Sort to read a keyless exchange");
+    assertEquals(entry.getValue().getWorkerMetadataList().size(), 1, "Global sort stage should use a single worker");
+  }
+
+  @DataProvider(name = "globalSortQueries")
+  public Object[][] globalSortQueries() {
+    return new Object[][]{
+        {"SET stageParallelism=2; SELECT * FROM a ORDER BY col1"},
+        {"SET stageParallelism=2; SELECT * FROM a ORDER BY col1 LIMIT 10"},
+        {"SET stageParallelism=2; SELECT col1, ROW_NUMBER() OVER (ORDER BY col3) FROM a"},
+        {"SET stageParallelism=2; SELECT LISTAGG(col2, ',') WITHIN GROUP (ORDER BY col3) FROM a"}
+    };
+  }
+
+  /// A partitioned window under a final ORDER BY: the window's Sort keeps the partitioned workers, and the final Sort
+  /// still runs on a single worker.
+  @Test
+  public void testPartitionedWindowUnderFinalOrderBy() {
+    String query = "SET stageParallelism=2; SELECT col1, ROW_NUMBER() OVER (PARTITION BY col1 ORDER BY col3) AS rn "
+        + "FROM a ORDER BY rn";
+    Map<SortNode, DispatchablePlanFragment> sortStages = findSortOverReceiveStages(_queryEnvironment.planQuery(query));
+    assertEquals(sortStages.size(), 2, "Expected the window Sort and the final Sort");
+    for (Map.Entry<SortNode, DispatchablePlanFragment> entry : sortStages.entrySet()) {
+      int expectedNumWorkers = isOverPartitionedReceive(entry.getKey()) ? 4 : 1;
+      assertEquals(entry.getValue().getWorkerMetadataList().size(), expectedNumWorkers);
+    }
+  }
+
+  /// Maps each Sort that reads straight from a mailbox to the stage that runs it.
+  private static Map<SortNode, DispatchablePlanFragment> findSortOverReceiveStages(
+      DispatchableSubPlan dispatchableSubPlan) {
+    Map<SortNode, DispatchablePlanFragment> sortStages = new HashMap<>();
+    for (DispatchablePlanFragment fragment : dispatchableSubPlan.getQueryStages()) {
+      List<SortNode> sortNodes = new ArrayList<>();
+      collectSortsOverReceive(fragment.getPlanFragment().getFragmentRoot(), sortNodes);
+      for (SortNode sortNode : sortNodes) {
+        sortStages.put(sortNode, fragment);
+      }
+    }
+    return sortStages;
+  }
+
+  private static void collectSortsOverReceive(PlanNode node, List<SortNode> sortNodes) {
+    if (node instanceof SortNode && node.getInputs().get(0) instanceof MailboxReceiveNode) {
+      sortNodes.add((SortNode) node);
+    }
+    for (PlanNode input : node.getInputs()) {
+      collectSortsOverReceive(input, sortNodes);
+    }
+  }
+
+  private static boolean isOverPartitionedReceive(SortNode sortNode) {
+    MailboxReceiveNode receiveNode = (MailboxReceiveNode) sortNode.getInputs().get(0);
+    return receiveNode.getDistributionType() == RelDistribution.Type.HASH_DISTRIBUTED
+        && !receiveNode.getKeys().isEmpty();
+  }
+
   /// Tests that FULL OUTER JOIN with only non-equi conditions uses a singleton worker for the join stage, to ensure
   /// correctness of unmatched row tracking. With multiple workers, the broadcast right table would be on each worker
   /// but each worker only sees a subset of left rows, leading to incorrect unmatched-right-rows output.
@@ -1769,6 +1903,35 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     return false;
   }
 
+  @Test
+  public void testCompilesInSubquery() {
+    // The broker runs the subquery before it compiles the query, but the paths that only compile queries accept
+    // IN_SUBQUERY too. They see the tables outside the subquery only.
+    try (QueryEnvironment.CompiledQuery compiledQuery = _queryEnvironment.compile(
+        "SELECT COUNT(*) FROM a WHERE IN_SUBQUERY(col1, 'SELECT IDSET(col1) FROM b') = 1")) {
+      assertEquals(compiledQuery.getTableNames(), Set.of("a"));
+    }
+    assertTrue(_queryEnvironment.canCompileQuery(
+        "SELECT inSubquery(col3, 'SELECT IDSET(col3) FROM b') FROM a WHERE INSUBQUERY(col2, 'SELECT 1') = 0"));
+  }
+
+  @Test
+  public void testValidate() {
+    _queryEnvironment.validate(CalciteSqlParser.compileToSqlNodeAndOptions("SELECT col1 FROM a WHERE col3 > 1"));
+
+    // A correlated subquery does not validate on its own
+    expectThrows(QueryException.class, () -> _queryEnvironment.validate(
+        CalciteSqlParser.compileToSqlNodeAndOptions("SELECT IDSET(b.col1) FROM b WHERE b.col2 = a.col2")));
+
+    // An invalid option fails before the validation starts, but is reported the same way
+    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions("SELECT col1 FROM a");
+    sqlNodeAndOptions.getOptions().put(QueryOptionKey.INFER_PARTITION_HINT, "foo");
+    QueryException exception =
+        expectThrows(QueryException.class, () -> _queryEnvironment.validate(sqlNodeAndOptions));
+    assertEquals(exception.getErrorCode(), QueryErrorCode.QUERY_VALIDATION);
+    assertTrue(exception.getMessage().contains(QueryOptionKey.INFER_PARTITION_HINT), exception.getMessage());
+  }
+
   @DataProvider(name = "testQueryExceptionDataProvider")
   private Object[][] provideQueriesWithException() {
     return new Object[][]{
@@ -1855,5 +2018,68 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     assertFalse(explain.contains("EnrichedJoin"),
         "usePlannerRules=JoinToEnrichedJoin must be a no-op, got:\n" + explain);
     assertTrue(explain.contains("LogicalJoin"), "expected an ordinary LogicalJoin, got:\n" + explain);
+  }
+
+  /// `generateArray` on literal arguments must not fold into an array literal. The array would be serialized into the
+  /// plan of every worker, while the workers only need the three arguments to generate it themselves.
+  @Test
+  public void testGenerateArrayIsNotFolded() {
+    String explain = _queryEnvironment.explainQuery(
+        "EXPLAIN PLAN FOR SELECT grid.ts FROM UNNEST(generateArray(0, 6, 2)) AS grid(ts)",
+        RANDOM_REQUEST_ID_GEN.nextLong());
+    assertTrue(explain.contains("GENERATEARRAY(0, 6, 2)"), "expected an unfolded generateArray call, got:\n" + explain);
+    assertFalse(explain.contains("ARRAY(0, 2, 4, 6)"), "expected no folded array literal, got:\n" + explain);
+  }
+
+  /// Folding a scalar function returning a primitive array used to fail in
+  /// [org.apache.pinot.calcite.rel.rules.PinotEvaluateLiteralRule], which read the elements by casting to `Object[]`
+  /// -- a cast a `long[]` cannot satisfy.
+  @Test
+  public void testPrimitiveArrayFunctionFoldsIntoAnArrayLiteral() {
+    String explain = _queryEnvironment.explainQuery(
+        "EXPLAIN PLAN FOR SELECT grid.ts FROM UNNEST(generateLongArray(0, 6, 2)) AS grid(ts)",
+        RANDOM_REQUEST_ID_GEN.nextLong());
+    assertTrue(explain.contains("ARRAY(0:BIGINT, 2:BIGINT, 4:BIGINT, 6:BIGINT)"),
+        "expected a folded array literal, got:\n" + explain);
+  }
+
+  /// The element type is the widest of the argument types, so a time grid in epoch millis stays a LONG sequence
+  /// instead of overflowing an INT, and a fractional increment makes the whole sequence DOUBLE.
+  @Test
+  public void testGenerateArrayElementTypeFollowsItsArguments() {
+    assertEquals(generateArrayElementType("0, 6, 2"), SqlTypeName.INTEGER);
+    assertEquals(generateArrayElementType("0, 6"), SqlTypeName.INTEGER);
+    assertEquals(generateArrayElementType("1633078800000, 1633080600000, 1800000"), SqlTypeName.BIGINT);
+    assertEquals(generateArrayElementType("0, 1633080600000, 1800000"), SqlTypeName.BIGINT);
+    assertEquals(generateArrayElementType("CAST(0 AS FLOAT), CAST(1 AS FLOAT), CAST(0.5 AS FLOAT)"),
+        SqlTypeName.REAL);
+    assertEquals(generateArrayElementType("0, 1, 0.5"), SqlTypeName.DOUBLE);
+    // The plan converts these decimals to INT, LONG and DOUBLE, so execution picks those element types.
+    assertEquals(generateArrayElementType("CAST(0 AS DECIMAL(10, 0)), 4"), SqlTypeName.INTEGER);
+    assertEquals(generateArrayElementType("CAST(0 AS DECIMAL(12, 0)), 4"), SqlTypeName.BIGINT);
+    assertEquals(generateArrayElementType("CAST(0 AS DECIMAL(5, 2)), 4"), SqlTypeName.DOUBLE);
+  }
+
+  /// The function returns null when an argument is null. If the inferred type did not allow null, Calcite would drop
+  /// the fallback of a `COALESCE` that follows the call.
+  @Test
+  public void testGenerateArrayTypeAllowsNullWhenAnArgumentDoes() {
+    assertTrue(generateArrayType("CAST(NULL AS INTEGER), 4").isNullable());
+    assertFalse(generateArrayType("0, 4").isNullable());
+    String explain = _queryEnvironment.explainQuery("EXPLAIN PLAN FOR SELECT g.x FROM "
+        + "UNNEST(COALESCE(generateArray(CAST(NULL AS INTEGER), 4), ARRAY[7])) AS g(x)",
+        RANDOM_REQUEST_ID_GEN.nextLong());
+    assertTrue(explain.contains("ARRAY(7)"), "expected the COALESCE fallback, got:\n" + explain);
+  }
+
+  private SqlTypeName generateArrayElementType(String arguments) {
+    String query = "SELECT grid.ts FROM UNNEST(generateArray(" + arguments + ")) AS grid(ts)";
+    return _queryEnvironment.compile(query).getRelRoot().validatedRowType.getFieldList().get(0).getType()
+        .getSqlTypeName();
+  }
+
+  private RelDataType generateArrayType(String arguments) {
+    String query = "SELECT generateArray(" + arguments + ") AS grid FROM a";
+    return _queryEnvironment.compile(query).getRelRoot().validatedRowType.getFieldList().get(0).getType();
   }
 }

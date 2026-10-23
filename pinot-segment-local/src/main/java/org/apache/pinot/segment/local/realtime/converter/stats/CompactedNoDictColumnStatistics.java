@@ -47,7 +47,7 @@ public class CompactedNoDictColumnStatistics extends MutableNoDictColumnStatisti
 
   public CompactedNoDictColumnStatistics(DataSource dataSource, @Nullable int[] sortedDocIds, boolean isSortedColumn,
       RoaringBitmap validDocIds) {
-    super(dataSource, sortedDocIds, isSortedColumn);
+    super(dataSource, sortedDocIds, isSortedColumn, false);
     Preconditions.checkState(!validDocIds.isEmpty(), "Use EmptyColumnStatistics for empty column: %s",
         _fieldSpec.getName());
     _totalDocs = validDocIds.getCardinality();

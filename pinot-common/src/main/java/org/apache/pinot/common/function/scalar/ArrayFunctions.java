@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.function.scalar;
 
+import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
@@ -25,6 +26,7 @@ import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.math.BigDecimal;
 import java.util.Arrays;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
@@ -32,6 +34,11 @@ import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 
 /// Inbuilt array scalar functions. See [ArrayUtils] for details.
 public class ArrayFunctions {
+  /// Maximum number of elements the `generate*Array` functions may produce. Calls on literal arguments are folded
+  /// into the query plan as an array literal, so an unbounded range would exhaust broker memory rather than fail
+  /// cleanly. 100000 covers a minute resolution grid over 69 days, which is well past any practical time grid.
+  private static final int MAX_GENERATED_ARRAY_LENGTH = 100_000;
+
   private ArrayFunctions() {
   }
 
@@ -179,6 +186,28 @@ public class ArrayFunctions {
     return set.toArray(new String[0]);
   }
 
+  /// Same as [#arrayUnionInt], but ignores a `null` array instead of returning `null`. Returns `null` only when both
+  /// arrays are `null`.
+  @Nullable
+  @ScalarFunction(nullableParameters = true)
+  public static int[] arrayUnionIntIgnoreNulls(@Nullable int[] values1, @Nullable int[] values2) {
+    if (values1 == null) {
+      return values2 != null ? arrayDistinctInt(values2) : null;
+    }
+    return values2 != null ? arrayUnionInt(values1, values2) : arrayDistinctInt(values1);
+  }
+
+  /// Same as [#arrayUnionString], but ignores a `null` array instead of returning `null`. Returns `null` only when both
+  /// arrays are `null`.
+  @Nullable
+  @ScalarFunction(nullableParameters = true)
+  public static String[] arrayUnionStringIgnoreNulls(@Nullable String[] values1, @Nullable String[] values2) {
+    if (values1 == null) {
+      return values2 != null ? arrayDistinctString(values2) : null;
+    }
+    return values2 != null ? arrayUnionString(values1, values2) : arrayDistinctString(values1);
+  }
+
   @ScalarFunction
   public static int[] arrayConcatInt(int[] values1, int[] values2) {
     return ArrayUtils.addAll(values1, values2);
@@ -202,6 +231,61 @@ public class ArrayFunctions {
   @ScalarFunction
   public static String[] arrayConcatString(String[] values1, String[] values2) {
     return ArrayUtils.addAll(values1, values2);
+  }
+
+  /// Same as [#arrayConcatInt], but ignores a `null` array instead of returning `null`. Returns `null` only when both
+  /// arrays are `null`.
+  @Nullable
+  @ScalarFunction(nullableParameters = true)
+  public static int[] arrayConcatIntIgnoreNulls(@Nullable int[] values1, @Nullable int[] values2) {
+    if (values1 == null) {
+      return values2;
+    }
+    return values2 != null ? arrayConcatInt(values1, values2) : values1;
+  }
+
+  /// Same as [#arrayConcatLong], but ignores a `null` array instead of returning `null`. Returns `null` only when both
+  /// arrays are `null`.
+  @Nullable
+  @ScalarFunction(nullableParameters = true)
+  public static long[] arrayConcatLongIgnoreNulls(@Nullable long[] values1, @Nullable long[] values2) {
+    if (values1 == null) {
+      return values2;
+    }
+    return values2 != null ? arrayConcatLong(values1, values2) : values1;
+  }
+
+  /// Same as [#arrayConcatFloat], but ignores a `null` array instead of returning `null`. Returns `null` only when both
+  /// arrays are `null`.
+  @Nullable
+  @ScalarFunction(nullableParameters = true)
+  public static float[] arrayConcatFloatIgnoreNulls(@Nullable float[] values1, @Nullable float[] values2) {
+    if (values1 == null) {
+      return values2;
+    }
+    return values2 != null ? arrayConcatFloat(values1, values2) : values1;
+  }
+
+  /// Same as [#arrayConcatDouble], but ignores a `null` array instead of returning `null`. Returns `null` only when
+  /// both arrays are `null`.
+  @Nullable
+  @ScalarFunction(nullableParameters = true)
+  public static double[] arrayConcatDoubleIgnoreNulls(@Nullable double[] values1, @Nullable double[] values2) {
+    if (values1 == null) {
+      return values2;
+    }
+    return values2 != null ? arrayConcatDouble(values1, values2) : values1;
+  }
+
+  /// Same as [#arrayConcatString], but ignores a `null` array instead of returning `null`. Returns `null` only when
+  /// both arrays are `null`.
+  @Nullable
+  @ScalarFunction(nullableParameters = true)
+  public static String[] arrayConcatStringIgnoreNulls(@Nullable String[] values1, @Nullable String[] values2) {
+    if (values1 == null) {
+      return values2;
+    }
+    return values2 != null ? arrayConcatString(values1, values2) : values1;
   }
 
   @ScalarFunction
@@ -229,6 +313,61 @@ public class ArrayFunctions {
     return ArrayUtils.add(values, element);
   }
 
+  /// Same as [#arrayPushBackInt], but ignores a `null` array or element instead of returning `null`. Returns `null`
+  /// only when both are `null`.
+  @Nullable
+  @ScalarFunction(nullableParameters = true)
+  public static int[] arrayPushBackIntIgnoreNulls(@Nullable int[] values, @Nullable Integer element) {
+    if (element == null) {
+      return values;
+    }
+    return values != null ? arrayPushBackInt(values, element) : new int[]{element};
+  }
+
+  /// Same as [#arrayPushBackLong], but ignores a `null` array or element instead of returning `null`. Returns `null`
+  /// only when both are `null`.
+  @Nullable
+  @ScalarFunction(nullableParameters = true)
+  public static long[] arrayPushBackLongIgnoreNulls(@Nullable long[] values, @Nullable Long element) {
+    if (element == null) {
+      return values;
+    }
+    return values != null ? arrayPushBackLong(values, element) : new long[]{element};
+  }
+
+  /// Same as [#arrayPushBackFloat], but ignores a `null` array or element instead of returning `null`. Returns `null`
+  /// only when both are `null`.
+  @Nullable
+  @ScalarFunction(nullableParameters = true)
+  public static float[] arrayPushBackFloatIgnoreNulls(@Nullable float[] values, @Nullable Float element) {
+    if (element == null) {
+      return values;
+    }
+    return values != null ? arrayPushBackFloat(values, element) : new float[]{element};
+  }
+
+  /// Same as [#arrayPushBackDouble], but ignores a `null` array or element instead of returning `null`. Returns `null`
+  /// only when both are `null`.
+  @Nullable
+  @ScalarFunction(nullableParameters = true)
+  public static double[] arrayPushBackDoubleIgnoreNulls(@Nullable double[] values, @Nullable Double element) {
+    if (element == null) {
+      return values;
+    }
+    return values != null ? arrayPushBackDouble(values, element) : new double[]{element};
+  }
+
+  /// Same as [#arrayPushBackString], but ignores a `null` array or element instead of returning `null`. Returns `null`
+  /// only when both are `null`.
+  @Nullable
+  @ScalarFunction(nullableParameters = true)
+  public static String[] arrayPushBackStringIgnoreNulls(@Nullable String[] values, @Nullable String element) {
+    if (element == null) {
+      return values;
+    }
+    return values != null ? arrayPushBackString(values, element) : new String[]{element};
+  }
+
   @ScalarFunction
   public static int[] arrayPushFrontInt(int[] values, int element) {
     return ArrayUtils.insert(0, values, element);
@@ -252,6 +391,61 @@ public class ArrayFunctions {
   @ScalarFunction
   public static String[] arrayPushFrontString(String[] values, String element) {
     return ArrayUtils.insert(0, values, element);
+  }
+
+  /// Same as [#arrayPushFrontInt], but ignores a `null` array or element instead of returning `null`. Returns `null`
+  /// only when both are `null`.
+  @Nullable
+  @ScalarFunction(nullableParameters = true)
+  public static int[] arrayPushFrontIntIgnoreNulls(@Nullable int[] values, @Nullable Integer element) {
+    if (element == null) {
+      return values;
+    }
+    return values != null ? arrayPushFrontInt(values, element) : new int[]{element};
+  }
+
+  /// Same as [#arrayPushFrontLong], but ignores a `null` array or element instead of returning `null`. Returns `null`
+  /// only when both are `null`.
+  @Nullable
+  @ScalarFunction(nullableParameters = true)
+  public static long[] arrayPushFrontLongIgnoreNulls(@Nullable long[] values, @Nullable Long element) {
+    if (element == null) {
+      return values;
+    }
+    return values != null ? arrayPushFrontLong(values, element) : new long[]{element};
+  }
+
+  /// Same as [#arrayPushFrontFloat], but ignores a `null` array or element instead of returning `null`. Returns `null`
+  /// only when both are `null`.
+  @Nullable
+  @ScalarFunction(nullableParameters = true)
+  public static float[] arrayPushFrontFloatIgnoreNulls(@Nullable float[] values, @Nullable Float element) {
+    if (element == null) {
+      return values;
+    }
+    return values != null ? arrayPushFrontFloat(values, element) : new float[]{element};
+  }
+
+  /// Same as [#arrayPushFrontDouble], but ignores a `null` array or element instead of returning `null`. Returns `null`
+  /// only when both are `null`.
+  @Nullable
+  @ScalarFunction(nullableParameters = true)
+  public static double[] arrayPushFrontDoubleIgnoreNulls(@Nullable double[] values, @Nullable Double element) {
+    if (element == null) {
+      return values;
+    }
+    return values != null ? arrayPushFrontDouble(values, element) : new double[]{element};
+  }
+
+  /// Same as [#arrayPushFrontString], but ignores a `null` array or element instead of returning `null`. Returns `null`
+  /// only when both are `null`.
+  @Nullable
+  @ScalarFunction(nullableParameters = true)
+  public static String[] arrayPushFrontStringIgnoreNulls(@Nullable String[] values, @Nullable String element) {
+    if (element == null) {
+      return values;
+    }
+    return values != null ? arrayPushFrontString(values, element) : new String[]{element};
   }
 
   @ScalarFunction
@@ -362,48 +556,130 @@ public class ArrayFunctions {
     return arr;
   }
 
+  /// Generates the sequence `start, start + inc, ...`, stopping at the last value that does not pass `end`. Both
+  /// bounds are inclusive when `end` lands exactly on a step, and `inc` may be negative to count down.
+  ///
+  /// The main use is building a dense time grid to `UNNEST` and left join a sparse time series onto, which is how gap
+  /// filling is expressed in the multi-stage engine:
+  /// ```sql
+  /// SELECT ts FROM UNNEST(generateArray(1633078800000, 1633089600000, 1800000)) AS grid(ts)
+  /// ```
+  /// `generateArray` selects the variant to call from its argument types; see
+  /// [org.apache.pinot.common.function.scalar.array.GenerateArrayScalarFunction].
+  ///
+  /// @throws IllegalArgumentException if `inc` is zero, if its sign does not lead from `start` to `end`, or if the
+  ///         sequence would hold more than [#MAX_GENERATED_ARRAY_LENGTH] elements
+  @ScalarFunction
+  public static long[] generateLongArray(long start, long end, long inc) {
+    long[] arr = new long[generatedArrayLength(start, end, inc)];
+    for (int i = 0; i < arr.length; i++) {
+      arr[i] = start + i * inc;
+    }
+    return arr;
+  }
+
+  /// Same as [#generateLongArray(long, long, long)] with a step of `1`, or `-1` when `end` is below `start`.
+  @ScalarFunction
+  public static long[] generateLongArray(long start, long end) {
+    return generateLongArray(start, end, end < start ? -1 : 1);
+  }
+
   @ScalarFunction
   public static int[] generateIntArray(int start, int end, int inc) {
-    int size = (end - start) / inc + 1;
-    int[] arr = new int[size];
-
-    for (int i = 0, value = start; i < size; i++, value += inc) {
-      arr[i] = value;
+    int[] arr = new int[generatedArrayLength(start, end, inc)];
+    for (int i = 0; i < arr.length; i++) {
+      arr[i] = start + i * inc;
     }
     return arr;
   }
 
   @ScalarFunction
-  public static long[] generateLongArray(long start, long end, long inc) {
-    int size = (int) ((end - start) / inc + 1);
-    long[] arr = new long[size];
-
-    for (int i = 0; i < size; i++, start += inc) {
-      arr[i] = start;
-    }
-    return arr;
+  public static int[] generateIntArray(int start, int end) {
+    return generateIntArray(start, end, end < start ? -1 : 1);
   }
 
   @ScalarFunction
   public static float[] generateFloatArray(float start, float end, float inc) {
-    int size = (int) ((end - start) / inc + 1);
-    float[] arr = new float[size];
-
-    for (int i = 0; i < size; i++, start += inc) {
-      arr[i] = start;
+    float[] arr = new float[generatedArrayLength(start, end, inc)];
+    for (int i = 0; i < arr.length; i++) {
+      arr[i] = start + i * inc;
     }
     return arr;
   }
 
   @ScalarFunction
-  public static double[] generateDoubleArray(double start, double end, double inc) {
-    int size = (int) ((end - start) / inc + 1);
-    double[] arr = new double[size];
+  public static float[] generateFloatArray(float start, float end) {
+    return generateFloatArray(start, end, end < start ? -1 : 1);
+  }
 
-    for (int i = 0; i < size; i++, start += inc) {
-      arr[i] = start;
+  @ScalarFunction
+  public static double[] generateDoubleArray(double start, double end, double inc) {
+    double[] arr = new double[generatedArrayLength(start, end, inc)];
+    for (int i = 0; i < arr.length; i++) {
+      arr[i] = start + i * inc;
     }
     return arr;
+  }
+
+  @ScalarFunction
+  public static double[] generateDoubleArray(double start, double end) {
+    return generateDoubleArray(start, end, end < start ? -1 : 1);
+  }
+
+  /// Length of the integral sequence `start, start + inc, ...` bounded by `end`, inclusive.
+  private static int generatedArrayLength(long start, long end, long inc) {
+    Preconditions.checkArgument(inc != 0, "Increment must not be zero");
+    long span;
+    try {
+      span = Math.subtractExact(end, start);
+    } catch (ArithmeticException e) {
+      // The span does not fit in a long, so the sequence is far past the length limit whatever the increment is.
+      throw new IllegalArgumentException(
+          String.format("Range from %s to %s is too wide to generate an array from", start, end));
+    }
+    checkIncrementLeadsToEnd(Long.signum(span), Long.signum(inc), start, end, inc);
+    return checkGeneratedArrayLength(span / inc);
+  }
+
+  /// Length of the `float` sequence `start, start + inc, ...` bounded by `end`, inclusive. The step count is computed
+  /// in `float` arithmetic, as the single-stage engine always did.
+  private static int generatedArrayLength(float start, float end, float inc) {
+    checkFloatingPointArguments(start, end, inc);
+    // TODO: decimal steps such as 0.1 are not exact in binary, so this can drop the end; see apache/pinot#19814
+    return checkGeneratedArrayLength((long) ((end - start) / inc + 1) - 1);
+  }
+
+  /// Length of the `double` sequence `start, start + inc, ...` bounded by `end`, inclusive.
+  private static int generatedArrayLength(double start, double end, double inc) {
+    checkFloatingPointArguments(start, end, inc);
+    // Adding 1 before truncating matches the length the single-stage engine always computed. It absorbs part of the
+    // rounding error of decimal steps, so 0.1 to 0.3 by 0.1 keeps its end.
+    // TODO: it does not absorb all of it, so 0.1 to 0.7 by 0.1 still drops its end; see apache/pinot#19814
+    // A span too wide for a long saturates the cast at Long.MAX_VALUE, which the length check below rejects.
+    return checkGeneratedArrayLength((long) ((end - start) / inc + 1) - 1);
+  }
+
+  private static void checkFloatingPointArguments(double start, double end, double inc) {
+    // An infinite increment would turn the first element, start + 0 * inc, into NaN.
+    Preconditions.checkArgument(inc != 0 && Double.isFinite(inc), "Increment must be finite and not zero, got: %s",
+        inc);
+    Preconditions.checkArgument(Double.isFinite(start) && Double.isFinite(end),
+        "Range from %s to %s must be finite", start, end);
+    checkIncrementLeadsToEnd((int) Math.signum(end - start), (int) Math.signum(inc), start, end, inc);
+  }
+
+  private static void checkIncrementLeadsToEnd(int spanSignum, int incSignum, Number start, Number end, Number inc) {
+    // A zero span yields the single element sequence [start], so any non-zero increment is fine there.
+    Preconditions.checkArgument(spanSignum == 0 || spanSignum == incSignum,
+        "Increment: %s does not lead from start: %s to end: %s", inc, start, end);
+  }
+
+  /// Checks the length of a sequence taking `steps` increments to reach its end, and returns it. The check is on the
+  /// step count rather than on the length so that a span of `Long.MAX_VALUE` cannot overflow into a small length.
+  private static int checkGeneratedArrayLength(long steps) {
+    Preconditions.checkArgument(steps < MAX_GENERATED_ARRAY_LENGTH,
+        "Generating more than %s elements exceeds the maximum of %s", steps, MAX_GENERATED_ARRAY_LENGTH);
+    return (int) steps + 1;
   }
 
   @ScalarFunction

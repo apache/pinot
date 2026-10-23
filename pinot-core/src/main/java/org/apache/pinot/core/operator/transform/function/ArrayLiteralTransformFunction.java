@@ -363,6 +363,7 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
       long[] longArrayLiteral = _longArrayLiteral;
       if (longArrayLiteral == null) {
         switch (_dataType) {
+          case BOOLEAN:
           case INT:
             longArrayLiteral = new long[_intArrayLiteral.length];
             for (int i = 0; i < _intArrayLiteral.length; i++) {
@@ -406,6 +407,7 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
       float[] floatArrayLiteral = _floatArrayLiteral;
       if (floatArrayLiteral == null) {
         switch (_dataType) {
+          case BOOLEAN:
           case INT:
             floatArrayLiteral = new float[_intArrayLiteral.length];
             for (int i = 0; i < _intArrayLiteral.length; i++) {
@@ -449,6 +451,7 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
       double[] doubleArrayLiteral = _doubleArrayLiteral;
       if (doubleArrayLiteral == null) {
         switch (_dataType) {
+          case BOOLEAN:
           case INT:
             doubleArrayLiteral = new double[_intArrayLiteral.length];
             for (int i = 0; i < _intArrayLiteral.length; i++) {
@@ -497,6 +500,12 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
       String[] stringArrayLiteral = _stringArrayLiteral;
       if (stringArrayLiteral == null) {
         switch (_dataType) {
+          case BOOLEAN:
+            stringArrayLiteral = new String[_intArrayLiteral.length];
+            for (int i = 0; i < _intArrayLiteral.length; i++) {
+              stringArrayLiteral[i] = Boolean.toString(_intArrayLiteral[i] != 0);
+            }
+            break;
           case INT:
             stringArrayLiteral = new String[_intArrayLiteral.length];
             for (int i = 0; i < _intArrayLiteral.length; i++) {

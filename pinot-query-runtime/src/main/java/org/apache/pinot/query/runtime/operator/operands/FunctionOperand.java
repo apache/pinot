@@ -33,12 +33,13 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
+import org.apache.pinot.spi.annotations.FunctionVolatility;
 import org.apache.pinot.spi.utils.PinotDataType;
 
 
-/*
- * FunctionOperands are generated from {@link RexExpression}s.
- */
+/// Evaluates scalar function calls generated from [RexExpression]s. Immutable and stable calls on literal arguments
+/// cache their result on first use, including null. Like [LiteralOperand], cached results are shared and must not be
+/// mutated. Instances are scoped to one query and operator chain and are not thread-safe.
 public class FunctionOperand implements TransformOperand {
   private final ColumnDataType _resultType;
   private final QueryFunctionInvoker _functionInvoker;
@@ -47,6 +48,11 @@ public class FunctionOperand implements TransformOperand {
   private final List<TransformOperand> _operands;
   private final Object[] _reusableOperandHolder;
   private final boolean _replaceNullJsonOperands;
+  @Nullable
+  private final Object _jsonNullDefault;
+  private final boolean _cacheable;
+  private boolean _resultCached;
+  private Object _cachedResult;
 
   public FunctionOperand(RexExpression.FunctionCall functionCall, DataSchema dataSchema) {
     this(functionCall, dataSchema, false);
@@ -114,7 +120,11 @@ public class FunctionOperand implements TransformOperand {
     for (RexExpression operand : operands) {
       _operands.add(TransformOperandFactory.getTransformOperand(operand, dataSchema, nullHandlingEnabled));
     }
+    _jsonNullDefault = _replaceNullJsonOperands && numOperands == 4
+        ? getJsonNullDefault(((RexExpression.Literal) operands.get(2)).getValue()) : null;
     _reusableOperandHolder = new Object[numOperands];
+    _cacheable = functionInfo.getVolatility() != FunctionVolatility.VOLATILE
+        && _operands.stream().allMatch(LiteralOperand.class::isInstance);
   }
 
   @Override
@@ -125,6 +135,9 @@ public class FunctionOperand implements TransformOperand {
   @Nullable
   @Override
   public Object apply(List<Object> row) {
+    if (_resultCached) {
+      return _cachedResult;
+    }
     for (int i = 0; i < _operands.size(); i++) {
       TransformOperand operand = _operands.get(i);
       Object value = operand.apply(row);
@@ -138,9 +151,8 @@ public class FunctionOperand implements TransformOperand {
         // non-BYTES JSON input through transformToStringValuesSV(), whose NULL literal value is the empty string.
         _reusableOperandHolder[0] = nullPlaceholder != null ? inputType.toExternal(nullPlaceholder) : "";
       }
-      if (_reusableOperandHolder.length == 4 && _reusableOperandHolder[3] == null
-          && _reusableOperandHolder[2] != null) {
-        _reusableOperandHolder[3] = getJsonNullDefault(_reusableOperandHolder[2].toString());
+      if (_reusableOperandHolder.length == 4 && _reusableOperandHolder[3] == null) {
+        _reusableOperandHolder[3] = _jsonNullDefault;
       }
     }
     Object result;
@@ -152,8 +164,13 @@ public class FunctionOperand implements TransformOperand {
       }
       result = _functionInvoker.invoke(_reusableOperandHolder);
     }
-    return result != null ? TypeUtils.convert(_functionInvokerResultType.toInternal(result),
+    Object convertedResult = result != null ? TypeUtils.convert(_functionInvokerResultType.toInternal(result),
         _resultType.getStoredType()) : null;
+    if (_cacheable) {
+      _cachedResult = convertedResult;
+      _resultCached = true;
+    }
+    return convertedResult;
   }
 
   private static boolean isJsonExtractScalar(String canonicalName) {
@@ -162,8 +179,11 @@ public class FunctionOperand implements TransformOperand {
   }
 
   @Nullable
-  private static Object getJsonNullDefault(String resultsType) {
-    String baseType = resultsType.toUpperCase(Locale.ROOT);
+  private static Object getJsonNullDefault(@Nullable Object resultsType) {
+    if (resultsType == null) {
+      return null;
+    }
+    String baseType = resultsType.toString().toUpperCase(Locale.ROOT);
     if (baseType.endsWith("_ARRAY")) {
       baseType = baseType.substring(0, baseType.length() - 6);
     }

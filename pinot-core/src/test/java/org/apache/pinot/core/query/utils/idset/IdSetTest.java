@@ -21,6 +21,9 @@ package org.apache.pinot.core.query.utils.idset;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Random;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.annotations.BeforeClass;
@@ -29,6 +32,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class IdSetTest {
@@ -127,6 +131,78 @@ public class IdSetTest {
 
     assertEquals(IdSets.fromBytes(_longBloomFilterIdSet.toBytes()), _longBloomFilterIdSet);
     assertEquals(IdSets.fromBase64String(_longBloomFilterIdSet.toBase64String()), _longBloomFilterIdSet);
+  }
+
+  @Test
+  public void testDeserializeFromReadOnlyAndDirectBuffers()
+      throws IOException {
+    IdSet stringBloomFilterIdSet = IdSets.create(DataType.STRING, 0, NUM_VALUES, IdSets.DEFAULT_FPP);
+    IdSet bytesBloomFilterIdSet = IdSets.create(DataType.BYTES, 0, NUM_VALUES, IdSets.DEFAULT_FPP);
+    for (int intId : _intSet) {
+      String stringId = Integer.toString(intId);
+      stringBloomFilterIdSet.add(stringId);
+      bytesBloomFilterIdSet.add(stringId.getBytes(StandardCharsets.UTF_8));
+    }
+    List<IdSet> idSets =
+        List.of(IdSets.emptyIdSet(), _intIdSet, _longIdSet, _intBloomFilterIdSet, _longBloomFilterIdSet,
+            stringBloomFilterIdSet, bytesBloomFilterIdSet);
+    for (IdSet idSet : idSets) {
+      byte[] bytes = idSet.toBytes();
+      // The multi-stage engine reads intermediate results from read-only buffers, which expose no backing array
+      ByteBuffer directBuffer = ByteBuffer.allocateDirect(bytes.length);
+      directBuffer.put(bytes).flip();
+      // Serialized bytes that start inside a larger array, as a positioned buffer and as a slice
+      byte[] paddedBytes = new byte[bytes.length + 3];
+      System.arraycopy(bytes, 0, paddedBytes, 3, bytes.length);
+      List<ByteBuffer> byteBuffers =
+          List.of(ByteBuffer.wrap(bytes), ByteBuffer.wrap(bytes).asReadOnlyBuffer(), directBuffer,
+              ByteBuffer.wrap(paddedBytes, 3, bytes.length), ByteBuffer.wrap(paddedBytes, 3, bytes.length).slice(),
+              ByteBuffer.wrap(paddedBytes, 3, bytes.length).asReadOnlyBuffer());
+      for (ByteBuffer byteBuffer : byteBuffers) {
+        assertEquals(IdSets.fromByteBuffer(byteBuffer), idSet, idSet.getType() + " from " + byteBuffer);
+      }
+    }
+  }
+
+  @Test
+  public void testValidateValueType()
+      throws IOException {
+    assertValueTypes(IdSets.emptyIdSet(), DataType.INT, DataType.LONG, DataType.FLOAT, DataType.DOUBLE,
+        DataType.STRING, DataType.BYTES);
+    assertValueTypes(_intIdSet, DataType.INT);
+    assertValueTypes(_longIdSet, DataType.LONG);
+    // A Bloom filter funnel serves 2 stored types: FLOAT values hash as int bits, DOUBLE values as long bits
+    assertValueTypes(_intBloomFilterIdSet, DataType.INT, DataType.FLOAT);
+    assertValueTypes(IdSets.create(DataType.FLOAT, 0, NUM_VALUES, IdSets.DEFAULT_FPP), DataType.INT, DataType.FLOAT);
+    assertValueTypes(_longBloomFilterIdSet, DataType.LONG, DataType.DOUBLE);
+    assertValueTypes(IdSets.create(DataType.DOUBLE, 0, NUM_VALUES, IdSets.DEFAULT_FPP), DataType.LONG,
+        DataType.DOUBLE);
+    assertValueTypes(IdSets.create(DataType.STRING, 0, NUM_VALUES, IdSets.DEFAULT_FPP), DataType.STRING);
+    assertValueTypes(IdSets.create(DataType.BYTES, 0, NUM_VALUES, IdSets.DEFAULT_FPP), DataType.BYTES);
+    // The funnel survives serialization
+    assertValueTypes(IdSets.fromBytes(_intBloomFilterIdSet.toBytes()), DataType.INT, DataType.FLOAT);
+    assertValueTypes(IdSets.fromBytes(_longBloomFilterIdSet.toBytes()), DataType.LONG, DataType.DOUBLE);
+
+    IllegalArgumentException exception = expectThrows(IllegalArgumentException.class,
+        () -> IdSets.validateValueType(_intBloomFilterIdSet, DataType.STRING));
+    assertEquals(exception.getMessage(), "Cannot look up STRING values in an IdSet built from INT or FLOAT values");
+    // Even an empty IdSet rejects value types that no IdSet can hold
+    exception = expectThrows(IllegalArgumentException.class,
+        () -> IdSets.validateValueType(IdSets.emptyIdSet(), DataType.BIG_DECIMAL));
+    assertTrue(exception.getMessage().startsWith("Cannot look up BIG_DECIMAL values in an IdSet"),
+        exception.getMessage());
+  }
+
+  private static void assertValueTypes(IdSet idSet, DataType... acceptedTypes) {
+    List<DataType> acceptedTypeList = List.of(acceptedTypes);
+    for (DataType storedType : List.of(DataType.INT, DataType.LONG, DataType.FLOAT, DataType.DOUBLE, DataType.STRING,
+        DataType.BYTES, DataType.BIG_DECIMAL)) {
+      if (acceptedTypeList.contains(storedType)) {
+        IdSets.validateValueType(idSet, storedType);
+      } else {
+        expectThrows(IllegalArgumentException.class, () -> IdSets.validateValueType(idSet, storedType));
+      }
+    }
   }
 
   @Test

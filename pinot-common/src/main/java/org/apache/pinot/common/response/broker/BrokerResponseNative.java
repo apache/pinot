@@ -42,23 +42,21 @@ import org.apache.pinot.spi.utils.JsonUtils;
 /// This class can be used to serialize/deserialize the broker response.
 @JsonPropertyOrder({
     "resultTable", "numRowsResultSet", "partialResult", "exceptions", "numGroupsLimitReached",
-    "numGroupsWarningLimitReached", "maxRowsInDistinctReached",
-    "maxRowsWithoutChangeInDistinctReached",
-    "maxExecutionTimeInDistinctReached", "timeUsedMs",
-    "requestId", "clientRequestId", "brokerId", "numDocsScanned", "totalDocs",
-    "numEntriesScannedInFilter",
-    "numEntriesScannedPostFilter", "numServersQueried", "numServersResponded", "numSegmentsQueried",
-    "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried", "numConsumingSegmentsProcessed",
-    "numConsumingSegmentsMatched", "minConsumingFreshnessTimeMs", "numSegmentsPrunedByBroker",
-    "numSegmentsPrunedByServer", "numSegmentsPrunedInvalid", "numSegmentsPrunedByLimit", "numSegmentsPrunedByValue",
-    "brokerReduceTimeMs", "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs", "offlineSystemActivitiesCpuTimeNs",
+    "numGroupsWarningLimitReached", "maxRowsInDistinctReached", "maxRowsWithoutChangeInDistinctReached",
+    "maxExecutionTimeInDistinctReached", "timeUsedMs", "requestId", "clientRequestId", "brokerId", "numDocsScanned",
+    "totalDocs", "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numServersQueried",
+    "numServersResponded", "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched",
+    "numConsumingSegmentsQueried", "numConsumingSegmentsProcessed", "numConsumingSegmentsMatched",
+    "minConsumingFreshnessTimeMs", "numSegmentsPrunedByBroker", "numSegmentsPrunedByServer",
+    "numSegmentsPrunedInvalid", "numSegmentsPrunedByLimit", "numSegmentsPrunedByValue", "numRemoteAccesses",
+    "remoteAccessBytes", "numDirectRemoteAccesses", "directRemoteAccessBytes", "brokerReduceTimeMs",
+    "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs", "offlineSystemActivitiesCpuTimeNs",
     "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
     "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs", "realtimeTotalCpuTimeNs",
     "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tablesQueried",
     "offlineThreadMemAllocatedBytes", "realtimeThreadMemAllocatedBytes", "offlineResponseSerMemAllocatedBytes",
-    "realtimeResponseSerMemAllocatedBytes", "offlineTotalMemAllocatedBytes", "realtimeTotalMemAllocatedBytes",
-    "pools", "rlsFiltersApplied", "approximateFunctionApplied", "groupsTrimmed", "materializedViewQueried",
-    "serverStats"
+    "realtimeResponseSerMemAllocatedBytes", "offlineTotalMemAllocatedBytes", "realtimeTotalMemAllocatedBytes", "pools",
+    "rlsFiltersApplied", "approximatedResult", "groupsTrimmed", "materializedViewQueried", "serverStats"
 })
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class BrokerResponseNative implements BrokerResponse {
@@ -102,6 +100,10 @@ public class BrokerResponseNative implements BrokerResponse {
   private long _numSegmentsPrunedInvalid = 0L;
   private long _numSegmentsPrunedByLimit = 0L;
   private long _numSegmentsPrunedByValue = 0L;
+  private long _numRemoteAccesses = 0L;
+  private long _remoteAccessBytes = 0L;
+  private long _numDirectRemoteAccesses = 0L;
+  private long _directRemoteAccessBytes = 0L;
   private long _brokerReduceTimeMs = 0L;
   private long _offlineThreadCpuTimeNs = 0L;
   private long _realtimeThreadCpuTimeNs = 0L;
@@ -122,7 +124,7 @@ public class BrokerResponseNative implements BrokerResponse {
 
   private Set<Integer> _pools = Set.of();
   private boolean _rlsFiltersApplied = false;
-  private boolean _approximateFunctionApplied = false;
+  private boolean _approximatedResult = false;
 
   @Nullable
   private String _materializedViewQueried;
@@ -481,6 +483,46 @@ public class BrokerResponseNative implements BrokerResponse {
     _numSegmentsPrunedByValue = numSegmentsPrunedByValue;
   }
 
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+  @Override
+  public long getNumRemoteAccesses() {
+    return _numRemoteAccesses;
+  }
+
+  public void setNumRemoteAccesses(long numRemoteAccesses) {
+    _numRemoteAccesses = numRemoteAccesses;
+  }
+
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+  @Override
+  public long getRemoteAccessBytes() {
+    return _remoteAccessBytes;
+  }
+
+  public void setRemoteAccessBytes(long remoteAccessBytes) {
+    _remoteAccessBytes = remoteAccessBytes;
+  }
+
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+  @Override
+  public long getNumDirectRemoteAccesses() {
+    return _numDirectRemoteAccesses;
+  }
+
+  public void setNumDirectRemoteAccesses(long numDirectRemoteAccesses) {
+    _numDirectRemoteAccesses = numDirectRemoteAccesses;
+  }
+
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+  @Override
+  public long getDirectRemoteAccessBytes() {
+    return _directRemoteAccessBytes;
+  }
+
+  public void setDirectRemoteAccessBytes(long directRemoteAccessBytes) {
+    _directRemoteAccessBytes = directRemoteAccessBytes;
+  }
+
   @Override
   public long getBrokerReduceTimeMs() {
     return _brokerReduceTimeMs;
@@ -639,16 +681,15 @@ public class BrokerResponseNative implements BrokerResponse {
     return _rlsFiltersApplied;
   }
 
-  @JsonProperty("approximateFunctionApplied")
-  @Override
-  public void setApproximateFunctionApplied(boolean approximateFunctionApplied) {
-    _approximateFunctionApplied = approximateFunctionApplied;
+  @JsonProperty("approximatedResult")
+  public void setApproximatedResult(boolean approximatedResult) {
+    _approximatedResult = approximatedResult;
   }
 
-  @JsonProperty("approximateFunctionApplied")
+  @JsonProperty("approximatedResult")
   @Override
-  public boolean isApproximateFunctionApplied() {
-    return _approximateFunctionApplied;
+  public boolean isApproximatedResult() {
+    return _approximatedResult;
   }
 
   @JsonProperty("materializedViewQueried")

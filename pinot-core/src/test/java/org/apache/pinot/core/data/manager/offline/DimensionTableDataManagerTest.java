@@ -40,7 +40,6 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
-import org.apache.pinot.segment.local.segment.index.loader.LoaderTest;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
@@ -77,7 +76,8 @@ import static org.testng.Assert.*;
 
 @SuppressWarnings("unchecked")
 public class DimensionTableDataManagerTest {
-  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), LoaderTest.class.getName());
+  private static final File TEMP_DIR =
+      new File(FileUtils.getTempDirectory(), DimensionTableDataManagerTest.class.getName());
   private static final String RAW_TABLE_NAME = "dimBaseballTeams";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
   private static final String CSV_DATA_PATH = "data/dimBaseballTeams.csv";
@@ -122,7 +122,7 @@ public class DimensionTableDataManagerTest {
     _indexDir = new File(tableDataDir, segmentName);
     SegmentMetadata segmentMetadata = new SegmentMetadataImpl(_indexDir);
     _segmentZKMetadata = new SegmentZKMetadata(segmentName);
-    _segmentZKMetadata.setCrc(Long.parseLong(segmentMetadata.getCrc()));
+    _segmentZKMetadata.setCrc(segmentMetadata.getCrc());
   }
 
   @AfterMethod(alwaysRun = true)

@@ -307,9 +307,11 @@ public class FilterPlanNode implements PlanNode {
                   "Cannot apply TEXT_MATCH on column: %s without text index", column);
 
               if (textIndexReader.isMultiColumn()) {
-                return new TextMatchFilterOperator(column, textIndexReader, (TextMatchPredicate) predicate, numDocs);
+                return new TextMatchFilterOperator(column, textIndexReader, (TextMatchPredicate) predicate, numDocs,
+                    _queryContext);
               } else {
-                return new TextMatchFilterOperator(textIndexReader, (TextMatchPredicate) predicate, numDocs);
+                return new TextMatchFilterOperator(textIndexReader, (TextMatchPredicate) predicate, numDocs,
+                    _queryContext);
               }
             case REGEXP_LIKE:
               // PredicateEvaluatorProvider handles FST/IFST upgrade internally when the dictionary is usable for

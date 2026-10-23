@@ -24,7 +24,7 @@
   <parent>
     <groupId>org.apache.pinot</groupId>
     <artifactId>pinot-connectors</artifactId>
-    <version>1.6.0-SNAPSHOT</version>
+    <version>1.7.0-SNAPSHOT</version>
   </parent>
   <artifactId>pinot-flink-connector</artifactId>
   <name>Pinot Flink Connector</name>
@@ -103,6 +103,7 @@
       <classifier>test</classifier>
       <scope>test</scope>
     </dependency>
+    <!-- Runtime dependency of the embedded Kafka broker (EmbeddedKafkaCluster); not a test framework -->
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter-api</artifactId>

@@ -19,6 +19,8 @@
 package org.apache.pinot.controller.helix.core.realtime;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.BiMap;
+import com.google.common.collect.HashBiMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import java.io.File;
@@ -27,9 +29,11 @@ import java.net.URISyntaxException;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -40,15 +44,19 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import javax.annotation.Nullable;
 import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.AccessOption;
+import org.apache.helix.BaseDataAccessor;
 import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
+import org.apache.helix.PropertyKey;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
@@ -56,9 +64,12 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
+import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerGauge;
+import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.restlet.resources.BatchConfig;
 import org.apache.pinot.common.restlet.resources.PauseStatusDetails;
@@ -66,6 +77,7 @@ import org.apache.pinot.common.restlet.resources.TableLLCSegmentUploadResponse;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.URIUtils;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
@@ -77,12 +89,14 @@ import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
+import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.DisasterRecoveryMode;
 import org.apache.pinot.spi.config.table.PauseState;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
@@ -113,6 +127,7 @@ import org.joda.time.Interval;
 import org.mockito.MockedStatic;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.ControllerConf.ControllerPeriodicTasksConf.ENABLE_TMP_SEGMENT_ASYNC_DELETION;
@@ -143,8 +158,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
   private static final long END_TIME_MS = START_TIME_MS + TimeUnit.HOURS.toMillis(RANDOM.nextInt(24) + 1);
   private static final Interval INTERVAL = new Interval(START_TIME_MS, END_TIME_MS);
   // NOTE: CRC is always non-negative
-  private static final String CRC = Long.toString(RANDOM.nextLong() & 0xFFFFFFFFL);
-  private static final String DATA_CRC = Long.toString(RANDOM.nextLong() & 0xFFFFFFFFL);
+  private static final long CRC = RANDOM.nextLong() & 0xFFFFFFFFL;
+  private static final long DATA_CRC = RANDOM.nextLong() & 0xFFFFFFFFL;
   private static final SegmentVersion SEGMENT_VERSION = RANDOM.nextBoolean() ? SegmentVersion.v1 : SegmentVersion.v3;
 
   @AfterClass
@@ -341,8 +356,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     assertEquals(committedSegmentZKMetadata.getStartOffset(), PARTITION_OFFSET.toString());
     assertEquals(committedSegmentZKMetadata.getEndOffset(), NEXT_OFFSET);
     assertEquals(committedSegmentZKMetadata.getCreationTime(), CURRENT_TIME_MS);
-    assertEquals(committedSegmentZKMetadata.getCrc(), Long.parseLong(CRC));
-    assertEquals(committedSegmentZKMetadata.getDataCrc(), Long.parseLong(DATA_CRC));
+    assertEquals(committedSegmentZKMetadata.getCrc(), CRC);
+    assertEquals(committedSegmentZKMetadata.getDataCrc(), DATA_CRC);
     assertEquals(committedSegmentZKMetadata.getIndexVersion(), SEGMENT_VERSION.name());
     assertEquals(committedSegmentZKMetadata.getTotalDocs(), NUM_DOCS);
     assertEquals(committedSegmentZKMetadata.getSizeInBytes(), SEGMENT_SIZE_IN_BYTES);
@@ -419,7 +434,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     assertEquals(committedSegmentZKMetadata.getStartOffset(), committingSegmentStartOffset);
     assertEquals(committedSegmentZKMetadata.getEndOffset(), committingSegmentEndOffset);
     assertEquals(committedSegmentZKMetadata.getCreationTime(), CURRENT_TIME_MS);
-    assertEquals(committedSegmentZKMetadata.getCrc(), Long.parseLong(CRC));
+    assertEquals(committedSegmentZKMetadata.getCrc(), CRC);
     assertEquals(committedSegmentZKMetadata.getIndexVersion(), SEGMENT_VERSION.name());
     assertEquals(committedSegmentZKMetadata.getTotalDocs(), NUM_DOCS);
     assertEquals(committedSegmentZKMetadata.getSizeInBytes(), SEGMENT_SIZE_IN_BYTES);
@@ -614,7 +629,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
       assertEquals(committedSegmentZKMetadata.getStartOffset(), PARTITION_OFFSET.toString());
       assertEquals(committedSegmentZKMetadata.getEndOffset(), NEXT_OFFSET);
       assertEquals(committedSegmentZKMetadata.getCreationTime(), CURRENT_TIME_MS);
-      assertEquals(committedSegmentZKMetadata.getCrc(), Long.parseLong(CRC));
+      assertEquals(committedSegmentZKMetadata.getCrc(), CRC);
       assertEquals(committedSegmentZKMetadata.getIndexVersion(), SEGMENT_VERSION.name());
       assertEquals(committedSegmentZKMetadata.getTotalDocs(), NUM_DOCS);
       assertEquals(committedSegmentZKMetadata.getSizeInBytes(), SEGMENT_SIZE_IN_BYTES);
@@ -678,7 +693,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
       assertEquals(committedSegmentZKMetadata.getStartOffset(), PARTITION_OFFSET.toString());
       assertEquals(committedSegmentZKMetadata.getEndOffset(), NEXT_OFFSET);
       assertEquals(committedSegmentZKMetadata.getCreationTime(), CURRENT_TIME_MS);
-      assertEquals(committedSegmentZKMetadata.getCrc(), Long.parseLong(CRC));
+      assertEquals(committedSegmentZKMetadata.getCrc(), CRC);
       assertEquals(committedSegmentZKMetadata.getIndexVersion(), SEGMENT_VERSION.name());
       assertEquals(committedSegmentZKMetadata.getTotalDocs(), NUM_DOCS);
       assertEquals(committedSegmentZKMetadata.getSizeInBytes(), SEGMENT_SIZE_IN_BYTES);
@@ -1023,6 +1038,181 @@ public class PinotLLCRealtimeSegmentManagerTest {
         Set.of(SegmentStateModel.CONSUMING));
     assertEquals(consumingSegmentInstanceStateMap.size(), 3);
     assertEquals(consumingSegmentInstanceStateMap.get(offlineInstance), SegmentStateModel.CONSUMING);
+  }
+
+  @Test
+  public void testEnsureAllPartitionsConsumingRetryAddsSegmentsCreatedByEarlierAttempt() {
+    ControllerMetrics controllerMetrics = mock(ControllerMetrics.class);
+    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager(controllerMetrics);
+    setUpNewTable(segmentManager, 2, 5, 4);
+    Map<String, Map<String, String>> instanceStatesMap = segmentManager._idealState.getRecord().getMapFields();
+
+    // Partition 0: step 1 of the segment commit is done, but the segment is still CONSUMING in IdealState
+    String committingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+    SegmentZKMetadata committingSegmentZKMetadata = segmentManager._segmentZKMetadataMap.get(committingSegment);
+    committingSegmentZKMetadata.setStatus(Status.DONE);
+    committingSegmentZKMetadata.setEndOffset(NEXT_OFFSET);
+    segmentManager._segmentsExceedingMaxSegmentCompletionTime.add(committingSegment);
+    // Partition 1: all replicas of the consuming segment are OFFLINE
+    String offlineSegment = new LLCSegmentName(RAW_TABLE_NAME, 1, 0, CURRENT_TIME_MS).getSegmentName();
+    instanceStatesMap.get(offlineSegment).replaceAll((instance, state) -> SegmentStateModel.OFFLINE);
+    // Partition 4: a new partition of the stream
+    segmentManager._numPartitions = 5;
+
+    // The first attempt creates the new segments, but its IdealState write fails
+    Map<String, Boolean> newSegmentsCreated = new HashMap<>();
+    runFailedEnsureAllPartitionsConsumingAttempt(segmentManager, newSegmentsCreated);
+    String newSegment0 = new LLCSegmentName(RAW_TABLE_NAME, 0, 1, CURRENT_TIME_MS).getSegmentName();
+    String newSegment1 = new LLCSegmentName(RAW_TABLE_NAME, 1, 1, CURRENT_TIME_MS).getSegmentName();
+    String newSegment4 = new LLCSegmentName(RAW_TABLE_NAME, 4, 0, CURRENT_TIME_MS).getSegmentName();
+
+    // The retry starts from the unchanged IdealState. It must add the new segments right away instead of waiting for
+    // them to exceed the max segment completion time.
+    segmentManager.ensureAllPartitionsConsuming(segmentManager._tableConfig, segmentManager._streamConfigs,
+        segmentManager._idealState, getStreamMetadataList(segmentManager), null, newSegmentsCreated);
+    assertEquals(segmentManager._segmentZKMetadataMap.keySet().stream()
+            .filter(segment -> Set.of(0, 1, 4).contains(new LLCSegmentName(segment).getPartitionGroupId()))
+            .collect(Collectors.toSet()),
+        Set.of(committingSegment, newSegment0, offlineSegment, newSegment1, newSegment4));
+    assertEquals(new HashSet<>(instanceStatesMap.get(committingSegment).values()), Set.of(SegmentStateModel.ONLINE));
+    assertEquals(new HashSet<>(instanceStatesMap.get(newSegment0).values()), Set.of(SegmentStateModel.CONSUMING));
+    assertEquals(new HashSet<>(instanceStatesMap.get(offlineSegment).values()), Set.of(SegmentStateModel.OFFLINE));
+    assertEquals(new HashSet<>(instanceStatesMap.get(newSegment1).values()), Set.of(SegmentStateModel.CONSUMING));
+    assertEquals(new HashSet<>(instanceStatesMap.get(newSegment4).values()), Set.of(SegmentStateModel.CONSUMING));
+    verify(controllerMetrics, never()).addMeteredTableValue(REALTIME_TABLE_NAME, ControllerMeter.LLC_STREAM_DATA_LOSS,
+        1L);
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  public void testEnsureAllPartitionsConsumingAddsSegmentsCreatedByAttemptWithFailedIdealStateWrite() {
+    PinotHelixResourceManager resourceManager = FakePinotLLCRealtimeSegmentManager.createMockedResourceManager();
+    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager(resourceManager);
+    setUpNewTable(segmentManager, 2, 5, 4);
+    String committingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+    SegmentZKMetadata committingSegmentZKMetadata = segmentManager._segmentZKMetadataMap.get(committingSegment);
+    committingSegmentZKMetadata.setStatus(Status.DONE);
+    committingSegmentZKMetadata.setEndOffset(NEXT_OFFSET);
+    segmentManager._segmentsExceedingMaxSegmentCompletionTime.add(committingSegment);
+
+    // The first IdealState write fails because another controller uploads a segment in the meantime
+    HelixDataAccessor dataAccessor = mock(HelixDataAccessor.class);
+    when(resourceManager.getHelixZkManager().getHelixDataAccessor()).thenReturn(dataAccessor);
+    when(dataAccessor.keyBuilder()).thenReturn(new PropertyKey.Builder(CLUSTER_NAME));
+    when(dataAccessor.getProperty(any(PropertyKey.class))).thenAnswer(
+        invocation -> HelixHelper.cloneIdealState(segmentManager._idealState));
+    BaseDataAccessor<ZNRecord> baseDataAccessor = mock(BaseDataAccessor.class);
+    when(dataAccessor.getBaseDataAccessor()).thenReturn(baseDataAccessor);
+    String uploadedSegment = "uploadedSegment";
+    AtomicInteger numWrites = new AtomicInteger();
+    when(baseDataAccessor.set(anyString(), any(ZNRecord.class), anyInt(), anyInt())).thenAnswer(invocation -> {
+      if (numWrites.getAndIncrement() == 0) {
+        segmentManager._idealState.getRecord().getMapFields()
+            .put(uploadedSegment, Map.of(Helix.PREFIX_OF_SERVER_INSTANCE + 0, SegmentStateModel.ONLINE));
+        return false;
+      }
+      segmentManager._idealState = new IdealState(invocation.<ZNRecord>getArgument(1));
+      return true;
+    });
+
+    // The retry adds the new segment created by the first attempt right away, and keeps the uploaded segment
+    segmentManager.ensureAllPartitionsConsuming(segmentManager._tableConfig, segmentManager._streamConfigs, null);
+    assertEquals(numWrites.get(), 2);
+    String newSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 1, CURRENT_TIME_MS).getSegmentName();
+    assertEquals(segmentManager._segmentZKMetadataMap.keySet().stream()
+        .filter(segment -> new LLCSegmentName(segment).getPartitionGroupId() == 0)
+        .collect(Collectors.toSet()), Set.of(committingSegment, newSegment));
+    Map<String, Map<String, String>> instanceStatesMap = segmentManager._idealState.getRecord().getMapFields();
+    assertEquals(new HashSet<>(instanceStatesMap.get(committingSegment).values()), Set.of(SegmentStateModel.ONLINE));
+    assertEquals(new HashSet<>(instanceStatesMap.get(newSegment).values()), Set.of(SegmentStateModel.CONSUMING));
+    assertTrue(instanceStatesMap.containsKey(uploadedSegment));
+  }
+
+  @DataProvider
+  public Object[][] reverseLLCSegments() {
+    return new Object[][]{{false}, {true}};
+  }
+
+  @Test(dataProvider = "reverseLLCSegments")
+  public void testEnsureAllPartitionsConsumingRetryKeepsSegmentAddedByAnotherController(boolean reverseLLCSegments) {
+    ControllerMetrics controllerMetrics = mock(ControllerMetrics.class);
+    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager(controllerMetrics);
+    setUpNewTable(segmentManager, 2, 5, 4);
+    // Lists the segments in both orders across the test runs, as the segments with the same sequence number below
+    // must be resolved the same way in either order
+    segmentManager._reverseLLCSegments = reverseLLCSegments;
+    Map<String, Map<String, String>> instanceStatesMap = segmentManager._idealState.getRecord().getMapFields();
+    String committingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+    SegmentZKMetadata committingSegmentZKMetadata = segmentManager._segmentZKMetadataMap.get(committingSegment);
+    committingSegmentZKMetadata.setStatus(Status.DONE);
+    committingSegmentZKMetadata.setEndOffset(NEXT_OFFSET);
+    segmentManager._segmentsExceedingMaxSegmentCompletionTime.add(committingSegment);
+
+    // The first attempt creates a new segment, but its IdealState write fails
+    Map<String, Boolean> newSegmentsCreated = new HashMap<>();
+    runFailedEnsureAllPartitionsConsumingAttempt(segmentManager, newSegmentsCreated);
+    String newSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 1, CURRENT_TIME_MS).getSegmentName();
+
+    // Meanwhile, another controller, e.g. the previous lead controller, creates its own new segment with the same
+    // sequence number and adds it to the IdealState first
+    String otherNewSegment =
+        new LLCSegmentName(RAW_TABLE_NAME, 0, 1, CURRENT_TIME_MS - TimeUnit.MINUTES.toMillis(1)).getSegmentName();
+    segmentManager.persistSegmentZKMetadata(REALTIME_TABLE_NAME, new SegmentZKMetadata(
+        new ZNRecord(segmentManager._segmentZKMetadataMap.get(newSegment).toZNRecord(), otherNewSegment)), -1);
+    Map<String, String> otherNewSegmentInstanceStateMap = new TreeMap<>();
+    for (String instance : instanceStatesMap.get(committingSegment).keySet()) {
+      otherNewSegmentInstanceStateMap.put(instance, SegmentStateModel.CONSUMING);
+    }
+    instanceStatesMap.get(committingSegment).replaceAll((instance, state) -> SegmentStateModel.ONLINE);
+    instanceStatesMap.put(otherNewSegment, otherNewSegmentInstanceStateMap);
+
+    // The retry keeps the segment of the other controller instead of adding its own one
+    Map<String, Map<String, String>> expectedInstanceStatesMap = cloneInstanceStatesMap(instanceStatesMap);
+    Set<String> expectedSegments = new HashSet<>(segmentManager._segmentZKMetadataMap.keySet());
+    segmentManager.ensureAllPartitionsConsuming(segmentManager._tableConfig, segmentManager._streamConfigs,
+        segmentManager._idealState, getStreamMetadataList(segmentManager), null, newSegmentsCreated);
+    assertEquals(instanceStatesMap, expectedInstanceStatesMap);
+    assertEquals(segmentManager._segmentZKMetadataMap.keySet(), expectedSegments);
+    verify(controllerMetrics, never()).addMeteredTableValue(REALTIME_TABLE_NAME, ControllerMeter.LLC_STREAM_DATA_LOSS,
+        1L);
+  }
+
+  @Test
+  public void testEnsureAllPartitionsConsumingRetryReportsDataLossWhenReplacedSegmentGoesOffline() {
+    ControllerMetrics controllerMetrics = mock(ControllerMetrics.class);
+    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager(controllerMetrics);
+    setUpNewTable(segmentManager, 2, 5, 4);
+    Map<String, Map<String, String>> instanceStatesMap = segmentManager._idealState.getRecord().getMapFields();
+    String committingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+    SegmentZKMetadata committingSegmentZKMetadata = segmentManager._segmentZKMetadataMap.get(committingSegment);
+    committingSegmentZKMetadata.setStatus(Status.DONE);
+    committingSegmentZKMetadata.setEndOffset(NEXT_OFFSET);
+    segmentManager._segmentsExceedingMaxSegmentCompletionTime.add(committingSegment);
+
+    Map<String, Boolean> newSegmentsCreated = new HashMap<>();
+    runFailedEnsureAllPartitionsConsumingAttempt(segmentManager, newSegmentsCreated);
+
+    // All replicas of the segment being replaced go OFFLINE before the retry
+    instanceStatesMap.get(committingSegment).replaceAll((instance, state) -> SegmentStateModel.OFFLINE);
+    segmentManager.ensureAllPartitionsConsuming(segmentManager._tableConfig, segmentManager._streamConfigs,
+        segmentManager._idealState, getStreamMetadataList(segmentManager), null, newSegmentsCreated);
+    String newSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 1, CURRENT_TIME_MS).getSegmentName();
+    assertEquals(new HashSet<>(instanceStatesMap.get(newSegment).values()), Set.of(SegmentStateModel.CONSUMING));
+    verify(controllerMetrics).addMeteredTableValue(REALTIME_TABLE_NAME, ControllerMeter.LLC_STREAM_DATA_LOSS, 1L);
+  }
+
+  /// Runs ensureAllPartitionsConsuming on a copy of the IdealState, as an attempt whose IdealState write fails.
+  private void runFailedEnsureAllPartitionsConsumingAttempt(FakePinotLLCRealtimeSegmentManager segmentManager,
+      Map<String, Boolean> newSegmentsCreated) {
+    IdealState failedAttemptIdealState = new IdealState(REALTIME_TABLE_NAME);
+    failedAttemptIdealState.getRecord()
+        .setMapFields(cloneInstanceStatesMap(segmentManager._idealState.getRecord().getMapFields()));
+    segmentManager.ensureAllPartitionsConsuming(segmentManager._tableConfig, segmentManager._streamConfigs,
+        failedAttemptIdealState, getStreamMetadataList(segmentManager), null, newSegmentsCreated);
+  }
+
+  private List<StreamMetadata> getStreamMetadataList(FakePinotLLCRealtimeSegmentManager segmentManager) {
+    return segmentManager.getNewStreamMetadataList(segmentManager._streamConfigs, List.of(), mock(IdealState.class));
   }
 
   @Test
@@ -1484,6 +1674,403 @@ public class PinotLLCRealtimeSegmentManagerTest {
     verify(propertyStore).remove(
         ZKMetadataProvider.constructPropertyStorePathForSegment(REALTIME_TABLE_NAME, newConsumingSegment),
         AccessOption.PERSISTENT);
+  }
+
+  /// Sets up a table for pauseless commit start tests: the committing segments list can be created, and removing a
+  /// segment ZK metadata removes it from the fake segment manager.
+  private FakePinotLLCRealtimeSegmentManager setUpTableForCommitStart() {
+    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager();
+    setUpNewTable(segmentManager, 2, 5, 4);
+    ZkHelixPropertyStore<ZNRecord> propertyStore = segmentManager._mockResourceManager.getPropertyStore();
+    when(propertyStore.create(anyString(), any(), eq(AccessOption.PERSISTENT))).thenReturn(true);
+    when(propertyStore.remove(anyString(), eq(AccessOption.PERSISTENT))).thenAnswer(invocation -> {
+      String path = invocation.getArgument(0);
+      String segmentName = path.substring(path.lastIndexOf('/') + 1);
+      segmentManager._segmentZKMetadataMap.remove(segmentName);
+      segmentManager._segmentZKMetadataVersionMap.remove(segmentName);
+      return true;
+    });
+    return segmentManager;
+  }
+
+  /// Simulates another controller completing the commit start of the segment: the new segment is created (with the
+  /// given status), the committing segment becomes ONLINE and the new segment CONSUMING in the IdealState.
+  private static void completeCommitStartElsewhere(FakePinotLLCRealtimeSegmentManager segmentManager,
+      String committingSegment, String newSegment, Status newSegmentStatus) {
+    SegmentZKMetadata newSegmentZKMetadata = new SegmentZKMetadata(newSegment);
+    newSegmentZKMetadata.setStatus(newSegmentStatus);
+    newSegmentZKMetadata.setStartOffset(NEXT_OFFSET);
+    segmentManager.persistSegmentZKMetadata(REALTIME_TABLE_NAME, newSegmentZKMetadata, -1);
+    Map<String, Map<String, String>> instanceStatesMap = segmentManager._idealState.getRecord().getMapFields();
+    instanceStatesMap.put(newSegment, new TreeMap<>(instanceStatesMap.get(committingSegment)));
+    instanceStatesMap.get(committingSegment).replaceAll((instance, state) -> SegmentStateModel.ONLINE);
+  }
+
+  @Test
+  public void testCommitStartResumesAfterIdealStateUpdateFailure() {
+    FakePinotLLCRealtimeSegmentManager segmentManager = setUpTableForCommitStart();
+    String committingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+    String newConsumingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 1, CURRENT_TIME_MS).getSegmentName();
+    CommittingSegmentDescriptor committingSegmentDescriptor = createCommittingSegmentDescriptor(committingSegment);
+
+    segmentManager._numFailedIdealStateUpdates = 1;
+    assertThrows(RuntimeException.class,
+        () -> segmentManager.commitSegmentMetadataToCommitting(REALTIME_TABLE_NAME, committingSegmentDescriptor));
+    // The committing segment stays COMMITTING, and the new segment is kept for the next attempt
+    SegmentZKMetadata committingSegmentZKMetadata = segmentManager._segmentZKMetadataMap.get(committingSegment);
+    assertEquals(committingSegmentZKMetadata.getStatus(), Status.COMMITTING);
+    assertEquals(committingSegmentZKMetadata.getEndOffset(), NEXT_OFFSET);
+    assertEquals(segmentManager._segmentZKMetadataMap.get(newConsumingSegment).getStatus(), Status.IN_PROGRESS);
+    int newSegmentZKMetadataVersion = segmentManager._segmentZKMetadataVersionMap.get(newConsumingSegment);
+    Map<String, Map<String, String>> instanceStatesMap = segmentManager._idealState.getRecord().getMapFields();
+    assertEquals(new HashSet<>(instanceStatesMap.get(committingSegment).values()),
+        Set.of(SegmentStateModel.CONSUMING));
+    assertFalse(instanceStatesMap.containsKey(newConsumingSegment));
+
+    // The retry resumes the commit start with the same new segment, although the current time moved on
+    segmentManager._currentTimeMs += TimeUnit.MINUTES.toMillis(2);
+    segmentManager.commitSegmentMetadataToCommitting(REALTIME_TABLE_NAME, committingSegmentDescriptor);
+    committingSegmentZKMetadata = segmentManager._segmentZKMetadataMap.get(committingSegment);
+    assertEquals(committingSegmentZKMetadata.getStatus(), Status.COMMITTING);
+    assertEquals(committingSegmentZKMetadata.getEndOffset(), NEXT_OFFSET);
+    assertEquals(segmentManager._segmentZKMetadataMap.keySet().stream()
+        .filter(segment -> new LLCSegmentName(segment).getPartitionGroupId() == 0)
+        .collect(Collectors.toSet()), Set.of(committingSegment, newConsumingSegment));
+    assertEquals((int) segmentManager._segmentZKMetadataVersionMap.get(newConsumingSegment),
+        newSegmentZKMetadataVersion);
+    assertEquals(new HashSet<>(instanceStatesMap.get(committingSegment).values()), Set.of(SegmentStateModel.ONLINE));
+    assertEquals(new HashSet<>(instanceStatesMap.get(newConsumingSegment).values()),
+        Set.of(SegmentStateModel.CONSUMING));
+  }
+
+  @Test
+  public void testCommitStartResumeCreatesNewSegmentWithCurrentTimeWhenEarlierAttemptCreatedNone() {
+    FakePinotLLCRealtimeSegmentManager segmentManager = setUpTableForCommitStart();
+    String committingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+    CommittingSegmentDescriptor committingSegmentDescriptor = createCommittingSegmentDescriptor(committingSegment);
+
+    // The first attempt fails after step 1, before creating the new segment
+    segmentManager._beforeNewSegmentZKMetadata = () -> {
+      throw new RuntimeException("Injected failure before creating the new segment");
+    };
+    assertThrows(RuntimeException.class,
+        () -> segmentManager.commitSegmentMetadataToCommitting(REALTIME_TABLE_NAME, committingSegmentDescriptor));
+    segmentManager._beforeNewSegmentZKMetadata = () -> {
+    };
+
+    // The resumed attempt creates the new segment with its own creation time, but fails to update the IdealState
+    segmentManager._currentTimeMs += TimeUnit.MINUTES.toMillis(6);
+    long newSegmentCreationTimeMs = segmentManager._currentTimeMs;
+    String newConsumingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 1, newSegmentCreationTimeMs).getSegmentName();
+    segmentManager._numFailedIdealStateUpdates = 1;
+    assertThrows(RuntimeException.class,
+        () -> segmentManager.commitSegmentMetadataToCommitting(REALTIME_TABLE_NAME, committingSegmentDescriptor));
+    assertEquals(segmentManager._segmentZKMetadataMap.get(newConsumingSegment).getCreationTime(),
+        newSegmentCreationTimeMs);
+
+    // The next resumed attempt finds that new segment
+    segmentManager._currentTimeMs += TimeUnit.MINUTES.toMillis(1);
+    segmentManager.commitSegmentMetadataToCommitting(REALTIME_TABLE_NAME, committingSegmentDescriptor);
+    assertEquals(segmentManager._segmentZKMetadataMap.keySet().stream()
+        .filter(segment -> new LLCSegmentName(segment).getPartitionGroupId() == 0)
+        .collect(Collectors.toSet()), Set.of(committingSegment, newConsumingSegment));
+    assertEquals(new HashSet<>(segmentManager._idealState.getInstanceStateMap(newConsumingSegment).values()),
+        Set.of(SegmentStateModel.CONSUMING));
+  }
+
+  @Test
+  public void testCommitStartResumeFindsNewSegmentAtEdgeOfClockSkewAllowance() {
+    FakePinotLLCRealtimeSegmentManager segmentManager = setUpTableForCommitStart();
+    String committingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+    CommittingSegmentDescriptor committingSegmentDescriptor = createCommittingSegmentDescriptor(committingSegment);
+    long minuteStartMs = CURRENT_TIME_MS / 60_000 * 60_000;
+
+    // Step 1 at second 59 of a minute, then the first attempt fails before creating the new segment
+    segmentManager._currentTimeMs = minuteStartMs + 59_000;
+    segmentManager._beforeNewSegmentZKMetadata = () -> {
+      throw new RuntimeException("Injected failure before creating the new segment");
+    };
+    assertThrows(RuntimeException.class,
+        () -> segmentManager.commitSegmentMetadataToCommitting(REALTIME_TABLE_NAME, committingSegmentDescriptor));
+    segmentManager._beforeNewSegmentZKMetadata = () -> {
+    };
+
+    // Another controller, with a clock less than a minute ahead, created the new segment in the next minute
+    segmentManager._currentTimeMs = minuteStartMs + TimeUnit.MINUTES.toMillis(10) + 1_000;
+    String newConsumingSegment =
+        new LLCSegmentName(RAW_TABLE_NAME, 0, 1, minuteStartMs + TimeUnit.MINUTES.toMillis(11)).getSegmentName();
+    SegmentZKMetadata newSegmentZKMetadata = new SegmentZKMetadata(newConsumingSegment);
+    newSegmentZKMetadata.setStatus(Status.IN_PROGRESS);
+    newSegmentZKMetadata.setStartOffset(NEXT_OFFSET);
+    segmentManager.persistSegmentZKMetadata(REALTIME_TABLE_NAME, newSegmentZKMetadata, -1);
+
+    segmentManager.commitSegmentMetadataToCommitting(REALTIME_TABLE_NAME, committingSegmentDescriptor);
+    assertEquals(segmentManager._segmentZKMetadataMap.keySet().stream()
+        .filter(segment -> new LLCSegmentName(segment).getPartitionGroupId() == 0)
+        .collect(Collectors.toSet()), Set.of(committingSegment, newConsumingSegment));
+    assertEquals(new HashSet<>(segmentManager._idealState.getInstanceStateMap(newConsumingSegment).values()),
+        Set.of(SegmentStateModel.CONSUMING));
+  }
+
+  @Test
+  public void testCommitStartSucceedsWhenFailedIdealStateUpdateWasApplied() {
+    FakePinotLLCRealtimeSegmentManager segmentManager = setUpTableForCommitStart();
+    String committingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+    String newConsumingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 1, CURRENT_TIME_MS).getSegmentName();
+
+    segmentManager._numAppliedButFailedIdealStateUpdates = 1;
+    segmentManager.commitSegmentMetadataToCommitting(REALTIME_TABLE_NAME,
+        createCommittingSegmentDescriptor(committingSegment));
+
+    assertEquals(segmentManager._segmentZKMetadataMap.get(committingSegment).getStatus(), Status.COMMITTING);
+    assertEquals(segmentManager._segmentZKMetadataMap.get(newConsumingSegment).getStatus(), Status.IN_PROGRESS);
+    Map<String, Map<String, String>> instanceStatesMap = segmentManager._idealState.getRecord().getMapFields();
+    assertEquals(new HashSet<>(instanceStatesMap.get(committingSegment).values()), Set.of(SegmentStateModel.ONLINE));
+    assertEquals(new HashSet<>(instanceStatesMap.get(newConsumingSegment).values()),
+        Set.of(SegmentStateModel.CONSUMING));
+    ZkHelixPropertyStore<ZNRecord> propertyStore = segmentManager._mockResourceManager.getPropertyStore();
+    verify(propertyStore, never()).remove(anyString(), eq(AccessOption.PERSISTENT));
+  }
+
+  @Test
+  public void testCommitStartRetryAfterCompletedCommitStartDoesNotOverwriteNewSegment() {
+    FakePinotLLCRealtimeSegmentManager segmentManager = setUpTableForCommitStart();
+    String committingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+    String newConsumingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 1, CURRENT_TIME_MS).getSegmentName();
+    CommittingSegmentDescriptor committingSegmentDescriptor = createCommittingSegmentDescriptor(committingSegment);
+    segmentManager.commitSegmentMetadataToCommitting(REALTIME_TABLE_NAME, committingSegmentDescriptor);
+    int newSegmentZKMetadataVersion = segmentManager._segmentZKMetadataVersionMap.get(newConsumingSegment);
+    Map<String, Map<String, String>> expectedInstanceStatesMap =
+        cloneInstanceStatesMap(segmentManager._idealState.getRecord().getMapFields());
+
+    // E.g. the server retries the commit after the commit end failed. The new segment might be consuming already.
+    segmentManager.commitSegmentMetadataToCommitting(REALTIME_TABLE_NAME, committingSegmentDescriptor);
+    assertEquals((int) segmentManager._segmentZKMetadataVersionMap.get(newConsumingSegment),
+        newSegmentZKMetadataVersion);
+    assertEquals(segmentManager._idealState.getRecord().getMapFields(), expectedInstanceStatesMap);
+  }
+
+  @Test
+  public void testCommitStartDoesNotOverwriteNewSegmentCreatedByConcurrentAttempt() {
+    FakePinotLLCRealtimeSegmentManager segmentManager = setUpTableForCommitStart();
+    String committingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+    String newConsumingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 1, CURRENT_TIME_MS).getSegmentName();
+
+    // After step 1, another controller (e.g. the new lead controller) resumes and completes the commit start, and the
+    // new segment is committed already
+    segmentManager._beforeNewSegmentZKMetadata =
+        () -> completeCommitStartElsewhere(segmentManager, committingSegment, newConsumingSegment, Status.DONE);
+    segmentManager.commitSegmentMetadataToCommitting(REALTIME_TABLE_NAME,
+        createCommittingSegmentDescriptor(committingSegment));
+
+    assertEquals(segmentManager._segmentZKMetadataMap.get(newConsumingSegment).getStatus(), Status.DONE);
+    assertEquals(new HashSet<>(segmentManager._idealState.getInstanceStateMap(committingSegment).values()),
+        Set.of(SegmentStateModel.ONLINE));
+  }
+
+  @Test
+  public void testCommitStartFailureRemovesNewSegmentAfterPartitionRepairedWithAnotherSegment() {
+    FakePinotLLCRealtimeSegmentManager segmentManager = setUpTableForCommitStart();
+    String committingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+    String newConsumingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 1, CURRENT_TIME_MS).getSegmentName();
+    String repairSegment =
+        new LLCSegmentName(RAW_TABLE_NAME, 0, 1, CURRENT_TIME_MS + TimeUnit.MINUTES.toMillis(2)).getSegmentName();
+
+    // Before the IdealState update, RealtimeSegmentValidationManager repairs the partition with another new segment,
+    // so the new segment of this attempt can no longer be added
+    segmentManager._beforeCommitIdealStateUpdate =
+        () -> completeCommitStartElsewhere(segmentManager, committingSegment, repairSegment, Status.IN_PROGRESS);
+    Map<String, Map<String, String>> instanceStatesMap = segmentManager._idealState.getRecord().getMapFields();
+    assertThrows(RuntimeException.class,
+        () -> segmentManager.commitSegmentMetadataToCommitting(REALTIME_TABLE_NAME,
+            createCommittingSegmentDescriptor(committingSegment)));
+    assertFalse(segmentManager._segmentZKMetadataMap.containsKey(newConsumingSegment));
+    assertFalse(instanceStatesMap.containsKey(newConsumingSegment));
+    assertEquals(new HashSet<>(instanceStatesMap.get(repairSegment).values()), Set.of(SegmentStateModel.CONSUMING));
+    assertEquals(segmentManager._segmentZKMetadataMap.get(committingSegment).getStatus(), Status.COMMITTING);
+  }
+
+  @Test
+  public void testValidationAfterCommitStartAndConcurrentRepairCreatedDifferentNewSegments() {
+    FakePinotLLCRealtimeSegmentManager segmentManager = setUpTableForCommitStart();
+    String committingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+    String newConsumingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 1, CURRENT_TIME_MS).getSegmentName();
+    String repairSegment =
+        new LLCSegmentName(RAW_TABLE_NAME, 0, 1, CURRENT_TIME_MS + TimeUnit.MINUTES.toMillis(30)).getSegmentName();
+
+    // The commit start keeps its new segment after its IdealState update fails, then a concurrent repair that did not
+    // see that segment adds another new segment with the same sequence number
+    segmentManager._numFailedIdealStateUpdates = 1;
+    assertThrows(RuntimeException.class,
+        () -> segmentManager.commitSegmentMetadataToCommitting(REALTIME_TABLE_NAME,
+            createCommittingSegmentDescriptor(committingSegment)));
+    assertTrue(segmentManager._segmentZKMetadataMap.containsKey(newConsumingSegment));
+    completeCommitStartElsewhere(segmentManager, committingSegment, repairSegment, Status.IN_PROGRESS);
+    Map<String, Map<String, String>> expectedInstanceStatesMap =
+        cloneInstanceStatesMap(segmentManager._idealState.getRecord().getMapFields());
+
+    // Validation keeps the segment in the IdealState as the latest segment, whichever order the segments are listed in
+    segmentManager._exceededMaxSegmentCompletionTime = true;
+    for (String lastSegment : List.of(newConsumingSegment, repairSegment)) {
+      Map<String, SegmentZKMetadata> segmentZKMetadataMap = new LinkedHashMap<>(segmentManager._segmentZKMetadataMap);
+      segmentZKMetadataMap.put(lastSegment, segmentZKMetadataMap.remove(lastSegment));
+      segmentManager._segmentZKMetadataMap = segmentZKMetadataMap;
+      segmentManager.ensureAllPartitionsConsuming();
+      assertEquals(segmentManager._idealState.getRecord().getMapFields(), expectedInstanceStatesMap);
+    }
+  }
+
+  @Test
+  public void testCommitStartUsesNewSegmentCreatedConcurrentlyByAnotherAttempt() {
+    FakePinotLLCRealtimeSegmentManager segmentManager = setUpTableForCommitStart();
+    segmentManager._useProductionCreateIfAbsent = true;
+    String committingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+    String newConsumingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 1, CURRENT_TIME_MS).getSegmentName();
+    String newConsumingSegmentPath =
+        ZKMetadataProvider.constructPropertyStorePathForSegment(REALTIME_TABLE_NAME, newConsumingSegment);
+    // Another attempt creates the new segment ZK metadata between the existence check and the creation
+    ZkHelixPropertyStore<ZNRecord> propertyStore = segmentManager._mockResourceManager.getPropertyStore();
+    when(propertyStore.create(eq(newConsumingSegmentPath), any(), eq(AccessOption.PERSISTENT))).thenReturn(false);
+    when(propertyStore.exists(newConsumingSegmentPath, AccessOption.PERSISTENT)).thenReturn(true);
+
+    segmentManager.commitSegmentMetadataToCommitting(REALTIME_TABLE_NAME,
+        createCommittingSegmentDescriptor(committingSegment));
+    verify(propertyStore).create(eq(newConsumingSegmentPath), any(), eq(AccessOption.PERSISTENT));
+    verify(propertyStore, never()).set(eq(newConsumingSegmentPath), any(), anyInt(), anyInt());
+    assertFalse(segmentManager._segmentZKMetadataMap.containsKey(newConsumingSegment));
+    assertEquals(new HashSet<>(segmentManager._idealState.getInstanceStateMap(newConsumingSegment).values()),
+        Set.of(SegmentStateModel.CONSUMING));
+  }
+
+  @Test
+  public void testCreateSegmentZKMetadataIfAbsentFailsWhenNotCreated() {
+    FakePinotLLCRealtimeSegmentManager segmentManager = setUpTableForCommitStart();
+    segmentManager._useProductionCreateIfAbsent = true;
+    ZkHelixPropertyStore<ZNRecord> propertyStore = segmentManager._mockResourceManager.getPropertyStore();
+    when(propertyStore.create(anyString(), any(), eq(AccessOption.PERSISTENT))).thenReturn(false);
+    SegmentZKMetadata segmentZKMetadata =
+        new SegmentZKMetadata(new LLCSegmentName(RAW_TABLE_NAME, 0, 1, CURRENT_TIME_MS).getSegmentName());
+    assertThrows(IllegalStateException.class,
+        () -> segmentManager.createSegmentZKMetadataIfAbsent(REALTIME_TABLE_NAME, segmentZKMetadata));
+  }
+
+  @Test
+  public void testCommitStartDoesNotResumeWithDifferentEndOffset() {
+    FakePinotLLCRealtimeSegmentManager segmentManager = setUpTableForCommitStart();
+    String committingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+    segmentManager._numFailedIdealStateUpdates = 1;
+    assertThrows(RuntimeException.class,
+        () -> segmentManager.commitSegmentMetadataToCommitting(REALTIME_TABLE_NAME,
+            createCommittingSegmentDescriptor(committingSegment)));
+
+    String otherOffset = new LongMsgOffset(PARTITION_OFFSET.getOffset() + NUM_DOCS + 1L).toString();
+    IllegalStateException e = expectThrows(IllegalStateException.class,
+        () -> segmentManager.commitSegmentMetadataToCommitting(REALTIME_TABLE_NAME,
+            createCommittingSegmentDescriptor(committingSegment, otherOffset)));
+    assertTrue(e.getMessage().contains("should be IN_PROGRESS, found: COMMITTING"));
+  }
+
+  @Test
+  public void testCommitStartDoesNotResumeAfterMaxSegmentCompletionTime() {
+    FakePinotLLCRealtimeSegmentManager segmentManager = setUpTableForCommitStart();
+    String committingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+    String newConsumingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 1, CURRENT_TIME_MS).getSegmentName();
+    CommittingSegmentDescriptor committingSegmentDescriptor = createCommittingSegmentDescriptor(committingSegment);
+    segmentManager._numFailedIdealStateUpdates = 1;
+    assertThrows(RuntimeException.class,
+        () -> segmentManager.commitSegmentMetadataToCommitting(REALTIME_TABLE_NAME, committingSegmentDescriptor));
+
+    // RealtimeSegmentValidationManager owns the repair once the max segment completion time is exceeded
+    segmentManager._exceededMaxSegmentCompletionTime = true;
+    assertThrows(IllegalStateException.class,
+        () -> segmentManager.commitSegmentMetadataToCommitting(REALTIME_TABLE_NAME, committingSegmentDescriptor));
+    assertFalse(segmentManager._idealState.getRecord().getMapFields().containsKey(newConsumingSegment));
+    assertEquals(segmentManager._segmentZKMetadataMap.get(committingSegment).getStatus(), Status.COMMITTING);
+  }
+
+  /// Runs the production IdealState update with a write that is applied but reported as failed, for both the group
+  /// commit and the single commit.
+  @Test
+  @SuppressWarnings("unchecked")
+  public void testIdealStateUpdateOnSegmentCompletionSkipsAppliedUpdate() {
+    for (boolean groupCommitEnabled : new boolean[]{true, false}) {
+      ControllerConf controllerConf = new ControllerConf();
+      controllerConf.setDataDir(TEMP_DIR.toString());
+      controllerConf.setProperty(ControllerConf.CONTROLLER_SEGMENT_COMPLETION_GROUP_COMMIT_ENABLED,
+          groupCommitEnabled);
+      PinotHelixResourceManager resourceManager = FakePinotLLCRealtimeSegmentManager.createMockedResourceManager();
+      when(resourceManager.getPropertyStore().create(anyString(), any(), eq(AccessOption.PERSISTENT))).thenReturn(
+          true);
+      FakePinotLLCRealtimeSegmentManager segmentManager =
+          new FakePinotLLCRealtimeSegmentManager(resourceManager, controllerConf);
+      setUpNewTable(segmentManager, 2, 5, 4);
+      segmentManager._useProductionIdealStateUpdate = true;
+
+      HelixDataAccessor dataAccessor = mock(HelixDataAccessor.class);
+      when(resourceManager.getHelixZkManager().getHelixDataAccessor()).thenReturn(dataAccessor);
+      when(dataAccessor.keyBuilder()).thenReturn(new PropertyKey.Builder(CLUSTER_NAME));
+      int[] version = {0};
+      when(dataAccessor.getProperty(any(PropertyKey.class))).thenAnswer(invocation -> {
+        IdealState idealState = new IdealState(segmentManager._idealState.getRecord());
+        idealState.getRecord().setVersion(version[0]);
+        return idealState;
+      });
+      BaseDataAccessor<ZNRecord> baseDataAccessor = mock(BaseDataAccessor.class);
+      when(dataAccessor.getBaseDataAccessor()).thenReturn(baseDataAccessor);
+      when(baseDataAccessor.set(anyString(), any(ZNRecord.class), anyInt(), eq(AccessOption.PERSISTENT))).thenAnswer(
+          invocation -> {
+            assertEquals((int) invocation.getArgument(2), version[0]);
+            segmentManager._idealState = new IdealState((ZNRecord) invocation.getArgument(1));
+            version[0]++;
+            // The write is applied, but the response is lost
+            return false;
+          });
+
+      String committingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+      String newConsumingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 1, CURRENT_TIME_MS).getSegmentName();
+      segmentManager.commitSegmentMetadataToCommitting(REALTIME_TABLE_NAME,
+          createCommittingSegmentDescriptor(committingSegment));
+
+      // The retry finds the update applied and does not write again
+      verify(baseDataAccessor, times(1)).set(anyString(), any(ZNRecord.class), anyInt(), eq(AccessOption.PERSISTENT));
+      verify(dataAccessor, times(2)).getProperty(any(PropertyKey.class));
+      Map<String, Map<String, String>> instanceStatesMap = segmentManager._idealState.getRecord().getMapFields();
+      assertEquals(new HashSet<>(instanceStatesMap.get(committingSegment).values()),
+          Set.of(SegmentStateModel.ONLINE));
+      assertEquals(new HashSet<>(instanceStatesMap.get(newConsumingSegment).values()),
+          Set.of(SegmentStateModel.CONSUMING));
+    }
+  }
+
+  @Test
+  public void testIsSegmentCompletionApplied() {
+    String committingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+    String newSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 1, CURRENT_TIME_MS).getSegmentName();
+    IdealState idealState = new IdealState(REALTIME_TABLE_NAME);
+
+    // Committing segment missing
+    assertFalse(PinotLLCRealtimeSegmentManager.isSegmentCompletionApplied(idealState, committingSegment, newSegment));
+
+    // Committing segment still CONSUMING on one replica
+    idealState.setPartitionState(committingSegment, "Server_0", SegmentStateModel.ONLINE);
+    idealState.setPartitionState(committingSegment, "Server_1", SegmentStateModel.CONSUMING);
+    assertFalse(PinotLLCRealtimeSegmentManager.isSegmentCompletionApplied(idealState, committingSegment, newSegment));
+
+    // Committing segment ONLINE, new segment missing
+    idealState.setPartitionState(committingSegment, "Server_1", SegmentStateModel.ONLINE);
+    assertFalse(PinotLLCRealtimeSegmentManager.isSegmentCompletionApplied(idealState, committingSegment, newSegment));
+    assertTrue(PinotLLCRealtimeSegmentManager.isSegmentCompletionApplied(idealState, committingSegment, null));
+
+    // Committing segment ONLINE, new segment present
+    idealState.setPartitionState(newSegment, "Server_0", SegmentStateModel.CONSUMING);
+    assertTrue(PinotLLCRealtimeSegmentManager.isSegmentCompletionApplied(idealState, committingSegment, newSegment));
+
+    // Table paused, so no new segment is expected
+    idealState.getRecord().getMapFields().remove(newSegment);
+    idealState.getRecord().setSimpleField(PinotLLCRealtimeSegmentManager.PAUSE_STATE,
+        new PauseState(true, PauseState.ReasonCode.ADMINISTRATIVE, "pause-for-test", Long.toString(CURRENT_TIME_MS),
+            List.of()).toJsonString());
+    assertTrue(PinotLLCRealtimeSegmentManager.isSegmentCompletionApplied(idealState, committingSegment, newSegment));
   }
 
   /// Test cases for fixing LLC segment by uploading to segment store if missing
@@ -2316,6 +2903,249 @@ public class PinotLLCRealtimeSegmentManagerTest {
   }
 
   @Test
+  public void testRepairSegmentsInErrorStateResetsCommittedSegmentsOnPauselessDedupTable()
+      throws InvalidConfigException {
+    PinotHelixResourceManager mockHelixResourceManager = mock(PinotHelixResourceManager.class);
+    ControllerMetrics mockControllerMetrics = mock(ControllerMetrics.class);
+    FakePinotLLCRealtimeSegmentManager segmentManager =
+        new FakePinotLLCRealtimeSegmentManager(mockHelixResourceManager, mockControllerMetrics);
+    IdealState idealState = new IdealState(REALTIME_TABLE_NAME);
+    ExternalView externalView = new ExternalView(REALTIME_TABLE_NAME);
+    String committingPartialErrorSegment = addSegmentForErrorRepair(mockHelixResourceManager, idealState,
+        externalView, 0, 0, Status.COMMITTING, SegmentStateModel.ONLINE, SegmentStateModel.ERROR);
+    addSegmentForErrorRepair(mockHelixResourceManager, idealState, externalView, 0, 1, Status.COMMITTING,
+        SegmentStateModel.ERROR, SegmentStateModel.ERROR);
+    // The next segment of the partition whose COMMITTING segment stays in ERROR
+    addSegmentForErrorRepair(mockHelixResourceManager, idealState, externalView, 0, 2, Status.IN_PROGRESS,
+        SegmentStateModel.ERROR, SegmentStateModel.ERROR);
+    String donePartialErrorSegment = addSegmentForErrorRepair(mockHelixResourceManager, idealState, externalView, 1,
+        0, Status.DONE, SegmentStateModel.ONLINE, SegmentStateModel.ERROR);
+    String doneAllErrorSegment = addSegmentForErrorRepair(mockHelixResourceManager, idealState, externalView, 1, 1,
+        Status.DONE, SegmentStateModel.ERROR, SegmentStateModel.ERROR);
+    addSegmentForErrorRepair(mockHelixResourceManager, idealState, externalView, 1, 2, Status.IN_PROGRESS,
+        SegmentStateModel.CONSUMING, SegmentStateModel.ERROR);
+    segmentManager._idealState = idealState;
+    when(mockHelixResourceManager.getTableExternalView(REALTIME_TABLE_NAME)).thenReturn(externalView);
+
+    segmentManager.repairSegmentsInErrorState(createPauselessTableConfig(new DedupConfig(), null), false);
+
+    // Only the committed segments are reset: their ERROR replicas reload from a peer or the deep store. Resetting an
+    // IN_PROGRESS segment would re-consume it, and the COMMITTING segment with every replica in ERROR needs
+    // re-ingestion, both of which stay disallowed on a dedup table without the override.
+    verify(mockHelixResourceManager).resetErrorReplicas(REALTIME_TABLE_NAME,
+        Set.of(committingPartialErrorSegment, donePartialErrorSegment, doneAllErrorSegment));
+    verify(mockHelixResourceManager, never()).resetSegment(any(), any(), any());
+    verify(mockHelixResourceManager, never()).getDataInstanceAdminEndpoints(any());
+    // The error count keeps counting segments with every replica in ERROR. The two left unrepaired are unrecoverable;
+    // the IN_PROGRESS segment with a healthy replica is not, since its ERROR replica is reset once it commits.
+    verify(mockControllerMetrics).setOrUpdateTableGauge(REALTIME_TABLE_NAME,
+        ControllerGauge.PAUSELESS_SEGMENTS_IN_ERROR_COUNT, 3L);
+    verify(mockControllerMetrics).setOrUpdateTableGauge(REALTIME_TABLE_NAME,
+        ControllerGauge.PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT, 2L);
+  }
+
+  @Test
+  public void testRepairSegmentsInErrorStateDoesNotReconsumeAfterErrorSegmentOnPauselessPartialUpsertTable()
+      throws InvalidConfigException {
+    PinotHelixResourceManager mockHelixResourceManager = mock(PinotHelixResourceManager.class);
+    ControllerMetrics mockControllerMetrics = mock(ControllerMetrics.class);
+    FakePinotLLCRealtimeSegmentManager segmentManager =
+        new FakePinotLLCRealtimeSegmentManager(mockHelixResourceManager, mockControllerMetrics);
+    IdealState idealState = new IdealState(REALTIME_TABLE_NAME);
+    ExternalView externalView = new ExternalView(REALTIME_TABLE_NAME);
+    // Re-consuming the IN_PROGRESS segment would merge its rows against the previous values held by the COMMITTING
+    // segment before it, which no replica has loaded
+    addSegmentForErrorRepair(mockHelixResourceManager, idealState, externalView, 0, 0, Status.COMMITTING,
+        SegmentStateModel.ERROR, SegmentStateModel.ERROR);
+    addSegmentForErrorRepair(mockHelixResourceManager, idealState, externalView, 0, 1, Status.IN_PROGRESS,
+        SegmentStateModel.ERROR, SegmentStateModel.ERROR);
+    segmentManager._idealState = idealState;
+    when(mockHelixResourceManager.getTableExternalView(REALTIME_TABLE_NAME)).thenReturn(externalView);
+
+    segmentManager.repairSegmentsInErrorState(
+        createPauselessTableConfig(null, new UpsertConfig(UpsertConfig.Mode.PARTIAL)), false);
+
+    verify(mockHelixResourceManager, never()).resetErrorReplicas(any(), any());
+    verify(mockHelixResourceManager, never()).resetSegment(any(), any(), any());
+    verify(mockHelixResourceManager, never()).getDataInstanceAdminEndpoints(any());
+    verify(mockControllerMetrics).setOrUpdateTableGauge(REALTIME_TABLE_NAME,
+        ControllerGauge.PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT, 2L);
+  }
+
+  @Test
+  public void testRepairSegmentsInErrorStateReingestsAndReconsumesOnPauselessDedupTableWithOverride()
+      throws InvalidConfigException {
+    PinotHelixResourceManager mockHelixResourceManager = mock(PinotHelixResourceManager.class);
+    ControllerMetrics mockControllerMetrics = mock(ControllerMetrics.class);
+    FakePinotLLCRealtimeSegmentManager segmentManager =
+        new FakePinotLLCRealtimeSegmentManager(mockHelixResourceManager, mockControllerMetrics);
+    IdealState idealState = new IdealState(REALTIME_TABLE_NAME);
+    ExternalView externalView = new ExternalView(REALTIME_TABLE_NAME);
+    String committingAllErrorSegment = addSegmentForErrorRepair(mockHelixResourceManager, idealState, externalView,
+        0, 0, Status.COMMITTING, SegmentStateModel.ERROR, SegmentStateModel.ERROR);
+    String inProgressAllErrorSegment = addSegmentForErrorRepair(mockHelixResourceManager, idealState, externalView,
+        0, 1, Status.IN_PROGRESS, SegmentStateModel.ERROR, SegmentStateModel.ERROR);
+    segmentManager._idealState = idealState;
+    when(mockHelixResourceManager.getTableExternalView(REALTIME_TABLE_NAME)).thenReturn(externalView);
+    BiMap<String, String> serverEndpoints = HashBiMap.create(
+        Map.of(Helix.PREFIX_OF_SERVER_INSTANCE + 0, "http://server0:8097", Helix.PREFIX_OF_SERVER_INSTANCE + 1,
+            "http://server1:8097"));
+    when(mockHelixResourceManager.getDataInstanceAdminEndpoints(serverEndpoints.keySet())).thenReturn(
+        serverEndpoints);
+
+    segmentManager.repairSegmentsInErrorState(createPauselessTableConfig(new DedupConfig(), null), true);
+
+    // With the override, the COMMITTING segment is re-ingested on one of the servers hosting it, and the IN_PROGRESS
+    // segment is reset so it re-consumes
+    assertEquals(segmentManager._reingestionRequests.keySet(), Set.of(committingAllErrorSegment));
+    assertTrue(serverEndpoints.containsValue(segmentManager._reingestionRequests.get(committingAllErrorSegment)));
+    verify(mockHelixResourceManager).resetErrorReplicas(REALTIME_TABLE_NAME, Set.of(inProgressAllErrorSegment));
+    verify(mockControllerMetrics).setOrUpdateTableGauge(REALTIME_TABLE_NAME,
+        ControllerGauge.PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT, 0L);
+  }
+
+  @Test
+  public void testRepairSegmentsInErrorStateCountsFailedRepairsAsUnrecoverable()
+      throws InvalidConfigException {
+    PinotHelixResourceManager mockHelixResourceManager = mock(PinotHelixResourceManager.class);
+    ControllerMetrics mockControllerMetrics = mock(ControllerMetrics.class);
+    FakePinotLLCRealtimeSegmentManager segmentManager =
+        new FakePinotLLCRealtimeSegmentManager(mockHelixResourceManager, mockControllerMetrics);
+    IdealState idealState = new IdealState(REALTIME_TABLE_NAME);
+    ExternalView externalView = new ExternalView(REALTIME_TABLE_NAME);
+    addSegmentForErrorRepair(mockHelixResourceManager, idealState, externalView, 0, 0, Status.COMMITTING,
+        SegmentStateModel.ERROR, SegmentStateModel.ERROR);
+    String donePartialErrorSegment = addSegmentForErrorRepair(mockHelixResourceManager, idealState, externalView, 1,
+        0, Status.DONE, SegmentStateModel.ONLINE, SegmentStateModel.ERROR);
+    segmentManager._idealState = idealState;
+    when(mockHelixResourceManager.getTableExternalView(REALTIME_TABLE_NAME)).thenReturn(externalView);
+    when(mockHelixResourceManager.getDataInstanceAdminEndpoints(any())).thenReturn(HashBiMap.create(
+        Map.of(Helix.PREFIX_OF_SERVER_INSTANCE + 0, "http://server0:8097", Helix.PREFIX_OF_SERVER_INSTANCE + 1,
+            "http://server1:8097")));
+    segmentManager._failReingestion = true;
+    when(mockHelixResourceManager.resetErrorReplicas(REALTIME_TABLE_NAME, Set.of(donePartialErrorSegment)))
+        .thenReturn(Set.of(donePartialErrorSegment));
+
+    // A failed reset fails the pass, as it did before resets were isolated per segment, after the gauge is set
+    RuntimeException exception = expectThrows(RuntimeException.class,
+        () -> segmentManager.repairSegmentsInErrorState(createPauselessTableConfig(null, null), false));
+    assertTrue(exception.getMessage().contains(donePartialErrorSegment), exception.getMessage());
+    verify(mockControllerMetrics).setOrUpdateTableGauge(REALTIME_TABLE_NAME,
+        ControllerGauge.PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT, 2L);
+  }
+
+  @Test
+  public void testRepairSegmentsInErrorStateCountsCommittingSegmentWithoutServerEndpointAsUnrecoverable()
+      throws InvalidConfigException {
+    PinotHelixResourceManager mockHelixResourceManager = mock(PinotHelixResourceManager.class);
+    ControllerMetrics mockControllerMetrics = mock(ControllerMetrics.class);
+    FakePinotLLCRealtimeSegmentManager segmentManager =
+        new FakePinotLLCRealtimeSegmentManager(mockHelixResourceManager, mockControllerMetrics);
+    IdealState idealState = new IdealState(REALTIME_TABLE_NAME);
+    ExternalView externalView = new ExternalView(REALTIME_TABLE_NAME);
+    addSegmentForErrorRepair(mockHelixResourceManager, idealState, externalView, 0, 0, Status.COMMITTING,
+        SegmentStateModel.ERROR, SegmentStateModel.ERROR);
+    segmentManager._idealState = idealState;
+    when(mockHelixResourceManager.getTableExternalView(REALTIME_TABLE_NAME)).thenReturn(externalView);
+    when(mockHelixResourceManager.getDataInstanceAdminEndpoints(any())).thenReturn(HashBiMap.create());
+
+    segmentManager.repairSegmentsInErrorState(createPauselessTableConfig(null, null), false);
+
+    assertTrue(segmentManager._reingestionRequests.isEmpty());
+    verify(mockControllerMetrics).setOrUpdateTableGauge(REALTIME_TABLE_NAME,
+        ControllerGauge.PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT, 1L);
+  }
+
+  @Test
+  public void testRepairSegmentsInErrorStateCountsSegmentsWithNoOtherSource()
+      throws InvalidConfigException {
+    PinotHelixResourceManager mockHelixResourceManager = mock(PinotHelixResourceManager.class);
+    ControllerMetrics mockControllerMetrics = mock(ControllerMetrics.class);
+    FakePinotLLCRealtimeSegmentManager segmentManager =
+        new FakePinotLLCRealtimeSegmentManager(mockHelixResourceManager, mockControllerMetrics);
+    IdealState idealState = new IdealState(REALTIME_TABLE_NAME);
+    ExternalView externalView = new ExternalView(REALTIME_TABLE_NAME);
+    // The commit has not updated the ideal state yet, so a reset would re-consume these segments. They wait for the
+    // commit, which the second one has no replica left to finish.
+    String committingStillConsumingSegment = addSegmentForErrorRepair(mockHelixResourceManager, idealState,
+        externalView, 0, 0, Status.COMMITTING, SegmentStateModel.CONSUMING, SegmentStateModel.ERROR);
+    String committingStillConsumingWithoutConsumerSegment = addSegmentForErrorRepair(mockHelixResourceManager,
+        idealState, externalView, 0, 1, Status.COMMITTING, SegmentStateModel.OFFLINE, SegmentStateModel.ERROR);
+    for (String segmentName : List.of(committingStillConsumingSegment,
+        committingStillConsumingWithoutConsumerSegment)) {
+      idealState.setPartitionState(segmentName, Helix.PREFIX_OF_SERVER_INSTANCE + 0, SegmentStateModel.CONSUMING);
+      idealState.setPartitionState(segmentName, Helix.PREFIX_OF_SERVER_INSTANCE + 1, SegmentStateModel.CONSUMING);
+    }
+    // Not in the deep store yet: reset, since the ERROR replica may load a local copy or wait for the other replica.
+    // With no ONLINE or CONSUMING replica, only a local copy is left.
+    String committingWithConsumingReplicaSegment = addSegmentForErrorRepair(mockHelixResourceManager, idealState,
+        externalView, 1, 0, Status.COMMITTING, SegmentStateModel.CONSUMING, SegmentStateModel.ERROR);
+    String committingWithOfflineReplicaSegment = addSegmentForErrorRepair(mockHelixResourceManager, idealState,
+        externalView, 2, 0, Status.COMMITTING, SegmentStateModel.OFFLINE, SegmentStateModel.ERROR);
+    // Committed with a peer download URL
+    String peerDownloadOnlineSegment = addSegmentForErrorRepair(mockHelixResourceManager, idealState, externalView, 3,
+        0, Status.DONE, SegmentStateModel.ONLINE, SegmentStateModel.ERROR);
+    String peerDownloadAllErrorSegment = addSegmentForErrorRepair(mockHelixResourceManager, idealState, externalView,
+        3, 1, Status.DONE, SegmentStateModel.ERROR, SegmentStateModel.ERROR);
+    for (String segmentName : List.of(peerDownloadOnlineSegment, peerDownloadAllErrorSegment)) {
+      SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
+      segmentZKMetadata.setStatus(Status.DONE);
+      segmentZKMetadata.setDownloadUrl(METADATA_URI_FOR_PEER_DOWNLOAD);
+      when(mockHelixResourceManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentName)).thenReturn(
+          segmentZKMetadata);
+    }
+    segmentManager._idealState = idealState;
+    when(mockHelixResourceManager.getTableExternalView(REALTIME_TABLE_NAME)).thenReturn(externalView);
+    Set<String> segmentsToReset = Set.of(committingWithConsumingReplicaSegment, committingWithOfflineReplicaSegment,
+        peerDownloadOnlineSegment, peerDownloadAllErrorSegment);
+    // A segment whose reset also fails is counted once
+    when(mockHelixResourceManager.resetErrorReplicas(REALTIME_TABLE_NAME, segmentsToReset)).thenReturn(
+        Set.of(peerDownloadAllErrorSegment));
+
+    expectThrows(RuntimeException.class,
+        () -> segmentManager.repairSegmentsInErrorState(createPauselessTableConfig(null, null), false));
+
+    verify(mockHelixResourceManager).resetErrorReplicas(REALTIME_TABLE_NAME, segmentsToReset);
+    verify(mockControllerMetrics).setOrUpdateTableGauge(REALTIME_TABLE_NAME,
+        ControllerGauge.PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT, 3L);
+  }
+
+  private static TableConfig createPauselessTableConfig(@Nullable DedupConfig dedupConfig,
+      @Nullable UpsertConfig upsertConfig) {
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    StreamIngestionConfig streamIngestionConfig = new StreamIngestionConfig(
+        List.of(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap()));
+    streamIngestionConfig.setPauselessConsumptionEnabled(true);
+    ingestionConfig.setStreamIngestionConfig(streamIngestionConfig);
+    return new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
+        .setNumReplicas(2)
+        .setIngestionConfig(ingestionConfig)
+        .setDedupConfig(dedupConfig)
+        .setUpsertConfig(upsertConfig)
+        .build();
+  }
+
+  /// Adds a segment with one replica per given external view state, hosted on servers 0, 1, ..., and mocks its ZK
+  /// metadata status. Returns the segment name.
+  private static String addSegmentForErrorRepair(PinotHelixResourceManager mockHelixResourceManager,
+      IdealState idealState, ExternalView externalView, int partitionId, int sequenceNumber, Status status,
+      String... replicaStates) {
+    String segmentName = new LLCSegmentName(RAW_TABLE_NAME, partitionId, sequenceNumber, CURRENT_TIME_MS)
+        .getSegmentName();
+    String idealStateState = status == Status.IN_PROGRESS ? SegmentStateModel.CONSUMING : SegmentStateModel.ONLINE;
+    for (int i = 0; i < replicaStates.length; i++) {
+      String server = Helix.PREFIX_OF_SERVER_INSTANCE + i;
+      idealState.setPartitionState(segmentName, server, idealStateState);
+      externalView.setState(segmentName, server, replicaStates[i]);
+    }
+    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
+    segmentZKMetadata.setStatus(status);
+    when(mockHelixResourceManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentName)).thenReturn(
+        segmentZKMetadata);
+    return segmentName;
+  }
+
+  @Test
   public void testOnChangeUpdatesMaxSegmentCompletionTime() {
     FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager();
 
@@ -2436,12 +3266,35 @@ public class PinotLLCRealtimeSegmentManagerTest {
     InstancePartitions _consumingInstancePartitions;
     Map<String, SegmentZKMetadata> _segmentZKMetadataMap = new HashMap<>();
     Map<String, Integer> _segmentZKMetadataVersionMap = new HashMap<>();
+    Map<String, Long> _segmentZKMetadataModifiedTimeMap = new HashMap<>();
+    long _currentTimeMs = CURRENT_TIME_MS;
     IdealState _idealState;
     int _numPartitions;
     List<StreamMetadata> _streamMetadataList = null;
     boolean _exceededMaxSegmentCompletionTime = false;
+    // Segments that exceed the max segment completion time even when _exceededMaxSegmentCompletionTime is false
+    Set<String> _segmentsExceedingMaxSegmentCompletionTime = new HashSet<>();
+    // Whether to list the LLC segments in reverse order
+    boolean _reverseLLCSegments = false;
+    // Number of upcoming IdealState updates on segment completion that fail without being applied
+    int _numFailedIdealStateUpdates = 0;
+    // Number of upcoming IdealState updates on segment completion that are applied but reported as failed
+    int _numAppliedButFailedIdealStateUpdates = 0;
+    // Whether to update the IdealState on segment completion through the production code path
+    boolean _useProductionIdealStateUpdate = false;
+    // Whether to create segment ZK metadata if absent through the production code path
+    boolean _useProductionCreateIfAbsent = false;
+    // Runs before creating the new segment ZK metadata (step 2) of a segment commit
+    Runnable _beforeNewSegmentZKMetadata = () -> {
+    };
+    // Runs before updating the IdealState (step 3) of a segment commit
+    Runnable _beforeCommitIdealStateUpdate = () -> {
+    };
     FileUploadDownloadClient _mockedFileUploadDownloadClient;
     PinotHelixResourceManager _mockResourceManager;
+    // Segment name to the server endpoint re-ingestion was triggered on
+    Map<String, String> _reingestionRequests = new HashMap<>();
+    boolean _failReingestion = false;
 
     FakePinotLLCRealtimeSegmentManager() {
       this(createMockedResourceManager());
@@ -2453,8 +3306,17 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     FakePinotLLCRealtimeSegmentManager(PinotHelixResourceManager pinotHelixResourceManager) {
-      super(pinotHelixResourceManager, CONTROLLER_CONF, mock(ControllerMetrics.class));
+      this(pinotHelixResourceManager, mock(ControllerMetrics.class));
+    }
+
+    FakePinotLLCRealtimeSegmentManager(PinotHelixResourceManager pinotHelixResourceManager,
+        ControllerMetrics controllerMetrics) {
+      super(pinotHelixResourceManager, CONTROLLER_CONF, controllerMetrics);
       _mockResourceManager = pinotHelixResourceManager;
+    }
+
+    FakePinotLLCRealtimeSegmentManager(ControllerMetrics controllerMetrics) {
+      super(createMockedResourceManager(), CONTROLLER_CONF, controllerMetrics);
     }
 
     FakePinotLLCRealtimeSegmentManager(PinotHelixResourceManager pinotHelixResourceManager,
@@ -2547,7 +3409,11 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     @Override
     List<String> getLLCSegments(String realtimeTableName) {
-      return new ArrayList<>(_segmentZKMetadataMap.keySet());
+      List<String> llcSegments = new ArrayList<>(_segmentZKMetadataMap.keySet());
+      if (_reverseLLCSegments) {
+        Collections.reverse(llcSegments);
+      }
+      return llcSegments;
     }
 
     @Override
@@ -2556,6 +3422,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
       Preconditions.checkState(_segmentZKMetadataMap.containsKey(segmentName));
       if (stat != null) {
         stat.setVersion(_segmentZKMetadataVersionMap.get(segmentName));
+        stat.setMtime(_segmentZKMetadataModifiedTimeMap.getOrDefault(segmentName, CURRENT_TIME_MS));
       }
       return new SegmentZKMetadata(new ZNRecord(_segmentZKMetadataMap.get(segmentName).toZNRecord()));
     }
@@ -2569,6 +3436,34 @@ public class PinotLLCRealtimeSegmentManagerTest {
       }
       _segmentZKMetadataMap.put(segmentName, segmentZKMetadata);
       _segmentZKMetadataVersionMap.put(segmentName, version + 1);
+      _segmentZKMetadataModifiedTimeMap.put(segmentName, _currentTimeMs);
+    }
+
+    @Override
+    boolean segmentZKMetadataExists(String realtimeTableName, String segmentName) {
+      return _segmentZKMetadataMap.containsKey(segmentName);
+    }
+
+    @Override
+    boolean createSegmentZKMetadataIfAbsent(String realtimeTableName, SegmentZKMetadata segmentZKMetadata) {
+      if (_useProductionCreateIfAbsent) {
+        return super.createSegmentZKMetadataIfAbsent(realtimeTableName, segmentZKMetadata);
+      }
+      if (_segmentZKMetadataMap.containsKey(segmentZKMetadata.getSegmentName())) {
+        return false;
+      }
+      persistSegmentZKMetadata(realtimeTableName, segmentZKMetadata, -1);
+      return true;
+    }
+
+    @Override
+    protected void preProcessNewSegmentZKMetadata() {
+      _beforeNewSegmentZKMetadata.run();
+    }
+
+    @Override
+    protected void preProcessCommitIdealStateUpdate() {
+      _beforeCommitIdealStateUpdate.run();
     }
 
     @Override
@@ -2585,6 +3480,14 @@ public class PinotLLCRealtimeSegmentManagerTest {
     IdealState updateIdealStateOnSegmentCompletion(String realtimeTableName, String committingSegmentName,
         String newSegmentName, SegmentAssignment segmentAssignment,
         Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap) {
+      if (_useProductionIdealStateUpdate) {
+        return super.updateIdealStateOnSegmentCompletion(realtimeTableName, committingSegmentName, newSegmentName,
+            segmentAssignment, instancePartitionsMap);
+      }
+      if (_numFailedIdealStateUpdates > 0) {
+        _numFailedIdealStateUpdates--;
+        throw new RuntimeException("Injected IdealState update failure");
+      }
       Map<String, String> committingSegmentInstanceStateMap = _idealState.getInstanceStateMap(committingSegmentName);
       Preconditions.checkState(
           committingSegmentInstanceStateMap != null && committingSegmentInstanceStateMap.containsValue(
@@ -2593,6 +3496,10 @@ public class PinotLLCRealtimeSegmentManagerTest {
       updateInstanceStatesForNewConsumingSegment(_idealState.getRecord().getMapFields(), committingSegmentName,
           isTablePaused(_idealState) || isTopicPaused(_idealState, committingSegmentName) ? null : newSegmentName,
           segmentAssignment, instancePartitionsMap);
+      if (_numAppliedButFailedIdealStateUpdates > 0) {
+        _numAppliedButFailedIdealStateUpdates--;
+        throw new RuntimeException("Injected IdealState update failure after applying the update");
+      }
       return _idealState;
     }
 
@@ -2628,12 +3535,21 @@ public class PinotLLCRealtimeSegmentManagerTest {
     @Override
     protected boolean isExceededMaxSegmentCompletionTime(String realtimeTableName, String segmentName,
         long currentTimeMs) {
-      return _exceededMaxSegmentCompletionTime;
+      return _exceededMaxSegmentCompletionTime || _segmentsExceedingMaxSegmentCompletionTime.contains(segmentName);
     }
 
     @Override
     long getCurrentTimeMs() {
-      return CURRENT_TIME_MS;
+      return _currentTimeMs;
+    }
+
+    @Override
+    void triggerReingestion(String serverHostPort, String segmentName)
+        throws IOException {
+      if (_failReingestion) {
+        throw new IOException("Injected re-ingestion failure for segment: " + segmentName);
+      }
+      _reingestionRequests.put(segmentName, serverHostPort);
     }
   }
 

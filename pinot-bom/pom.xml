@@ -24,6 +24,13 @@
     xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
+  <parent>
+    <groupId>org.apache</groupId>
+    <artifactId>apache</artifactId>
+    <version>39</version>
+    <relativePath />
+  </parent>
+
   <groupId>org.apache.pinot</groupId>
   <artifactId>pinot-bom</artifactId>
   <!--
@@ -43,18 +50,27 @@
     the repository root and this module is updated automatically (the versions
     plugin finds it in the reactor by matching this literal version).
 
-    WHY NO <parent>: the root pom imports this BOM via <scope>import</scope>.
+    WHY THE APACHE PARENT: the root pom imports this BOM via <scope>import</scope>.
     Maven 3 rejects a cycle where the BOM also inherits from that same root pom.
-    Omitting <parent> breaks the cycle; Maven resolves this POM independently.
+    The independent Apache parent supplies release deployment and signing configuration.
   -->
-  <version>1.6.0-SNAPSHOT</version>
+  <version>1.7.0-SNAPSHOT</version>
   <name>Pinot BOM</name>
+  <description>Bill of materials for Apache Pinot modules</description>
+  <url>https://pinot.apache.org/</url>
   <packaging>pom</packaging>
+
+  <scm>
+    <connection>scm:git:https://github.com/apache/pinot.git</connection>
+    <developerConnection>scm:git:git@github.com:apache/pinot.git</developerConnection>
+    <url>https://github.com/apache/pinot</url>
+    <tag>HEAD</tag>
+  </scm>
 
   <build>
     <plugins>
       <!--
-        pinot-bom has no <parent>, so Maven cannot inherit the root pom's
+        pinot-bom does not inherit from Pinot's root pom, so Maven cannot inherit its
         pluginManagement entry for com.mycila:license-maven-plugin. Without
         this explicit binding, `mvn license:check` resolves to
         org.codehaus.mojo:license-maven-plugin which has no "check" goal.
@@ -70,7 +86,7 @@
         </configuration>
       </plugin>
       <!--
-        Same reason as the license plugin above: pinot-bom has no <parent>
+        Same reason as the license plugin above: pinot-bom does not inherit from Pinot's root pom
         so the spotless plugin is not in any of Maven's searched plugin groups.
         `mvn spotless:check` would fail with "No plugin found for prefix 'spotless'".
         Skip it; there are no Java source files to format here.
@@ -93,7 +109,7 @@
         </configuration>
       </plugin>
       <!--
-        pinot-bom has no <parent>, so org.jacoco is not in Maven's discoverable
+        pinot-bom does not inherit from Pinot's root pom, so org.jacoco is not in Maven's discoverable
         plugin groups unless explicitly declared here. Without this entry,
         `mvn jacoco:report-aggregate@report -P codecoverage` fails with
         "No plugin found for prefix 'jacoco'". This stub registers the groupId;

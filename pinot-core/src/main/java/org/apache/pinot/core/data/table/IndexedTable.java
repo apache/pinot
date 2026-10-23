@@ -29,6 +29,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -59,6 +60,8 @@ public abstract class IndexedTable extends BaseTable {
   protected Collection<Record> _topRecords;
   private int _numResizes;
   private long _resizeTimeNs;
+  private boolean _markedTrimmed;
+  private boolean _numGroupsLimitReached;
 
   /// Constructor for the IndexedTable.
   ///
@@ -84,10 +87,14 @@ public abstract class IndexedTable extends BaseTable {
 
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
     assert groupByExpressions != null;
-    /// Includes the synthetic $groupingId key column for GROUP BY GROUPING SETS / ROLLUP / CUBE queries, so
-    /// that rows from different grouping sets are keyed (and therefore merged) independently.
-    _numKeyColumns = queryContext.getNumGroupByKeyColumns();
     _aggregationFunctions = queryContext.getAggregationFunctions();
+    /// Derive the key-column count from the schema (total columns minus aggregation columns) rather than the
+    /// query context, so it matches the actual record layout. This normally equals
+    /// `queryContext.getNumGroupByKeyColumns()` -- which includes the synthetic $groupingId column for GROUP BY
+    /// GROUPING SETS / ROLLUP / CUBE so rows from different grouping sets are keyed (and merged) independently --
+    /// but for a base-aggregation grouping-set combine table the records are BASE groups WITHOUT the $groupingId
+    /// column, so the key count is the union-column count. Deriving from the schema keeps both layouts correct.
+    _numKeyColumns = dataSchema.size() - _aggregationFunctions.length;
     _hasOrderBy = queryContext.getOrderByExpressions() != null;
     _tableResizer = _hasOrderBy ? new TableResizer(dataSchema, hasFinalInput, queryContext) : null;
     // NOTE: Trim should be disabled when there is no ORDER BY
@@ -108,14 +115,78 @@ public abstract class IndexedTable extends BaseTable {
     return upsert(new Key(keyValues), record);
   }
 
+  /// Upserts an already-extracted result into a table with exactly one aggregation function.
+  /// The table may retain the key and result; callers must not modify them after this call.
+  /// A null result follows the aggregation function's existing merge semantics.
+  /// Final inputs must be Comparable, as required by the aggregation function's final-result merge.
+  /// Returns true even when new groups are rejected; existing groups can still accept updates.
+  public boolean upsertSingleAggregationResult(Key key, @Nullable Object result) {
+    Preconditions.checkState(_aggregationFunctions.length == 1,
+        "upsertSingleAggregationResult requires exactly one aggregation function");
+    Preconditions.checkArgument(!_hasFinalInput || result == null || result instanceof Comparable,
+        "Final aggregation inputs must be Comparable");
+    if (_hasOrderBy) {
+      return upsert(key, createSingleAggregationRecord(key, result));
+    }
+    upsertWithoutOrderBy(key, null, result);
+    return true;
+  }
+
+  /// Applies the table's unordered admission policy to either an eager record or a single aggregation result.
+  /// A null record selects the single-result input, which may itself be null.
+  protected abstract void upsertWithoutOrderBy(Key key, @Nullable Record record, @Nullable Object result);
+
+  protected Record createSingleAggregationRecord(Key key, @Nullable Object result) {
+    Object[] values = Arrays.copyOf(key.getValues(), _numKeyColumns + 1);
+    values[_numKeyColumns] = result;
+    return new Record(values);
+  }
+
+  private Record updateSingleAggregationRecord(Record record, @Nullable Object result) {
+    Object[] values = record.getValues();
+    values[_numKeyColumns] = mergeValue(0, values[_numKeyColumns], result, _hasFinalInput);
+    return record;
+  }
+
   /// Adds a record with new key or updates a record with existing key.
   protected void addOrUpdateRecord(Key key, Record newRecord) {
-    _lookupMap.compute(key, (k, v) -> v == null ? newRecord : updateRecord(v, newRecord));
+    addOrUpdateRecord(key, newRecord, null);
+  }
+
+  protected void addOrUpdateRecord(Key key, @Nullable Record newRecord, @Nullable Object result) {
+    _lookupMap.compute(key, (k, existing) -> {
+      if (existing == null) {
+        return newRecord != null ? newRecord : createSingleAggregationRecord(k, result);
+      }
+      return newRecord != null ? updateRecord(existing, newRecord) : updateSingleAggregationRecord(existing, result);
+    });
   }
 
   /// Updates a record with existing key. Record with new key will be ignored.
-  protected void updateExistingRecord(Key key, Record newRecord) {
-    _lookupMap.computeIfPresent(key, (k, v) -> updateRecord(v, newRecord));
+  protected void updateExistingRecord(Key key, @Nullable Record newRecord, @Nullable Object result) {
+    // computeIfPresent waits for pending insertions; a containsKey check would discard their updates.
+    _lookupMap.computeIfPresent(key, (k, existing) -> newRecord != null
+        ? updateRecord(existing, newRecord) : updateSingleAggregationRecord(existing, result));
+  }
+
+  /// Same as [#updateExistingRecord], additionally reporting whether a record with the key existed (and was
+  /// therefore merged into).
+  protected boolean updateExistingRecordIfPresent(Key key, Record newRecord) {
+    return updateExistingRecordIfPresent(key, newRecord, null);
+  }
+
+  /// Same as [#updateExistingRecord], additionally reporting whether a record with the key existed (and was
+  /// therefore merged into). A null record selects the single-result input, which may itself be null.
+  protected boolean updateExistingRecordIfPresent(Key key, @Nullable Record newRecord, @Nullable Object result) {
+    return _lookupMap.computeIfPresent(key, (k, existing) -> newRecord != null
+        ? updateRecord(existing, newRecord)
+        : updateSingleAggregationRecord(existing, result)) != null;
+  }
+
+  /// Merges a record only when its key is already present, reporting whether it was retained. Used when a
+  /// grouping-set derived table has reached its group limit and cannot admit a new full-layout group.
+  public boolean upsertExistingIfPresent(Key key, Record newRecord) {
+    return updateExistingRecordIfPresent(key, newRecord);
   }
 
   private Record updateRecord(Record existingRecord, Record newRecord) {
@@ -125,16 +196,23 @@ public abstract class IndexedTable extends BaseTable {
     int index = _numKeyColumns;
     if (!_hasFinalInput) {
       for (int i = 0; i < numAggregations; i++, index++) {
-        existingValues[index] =
-            AggregationFunctionUtils.merge(_aggregationFunctions[i], existingValues[index], newValues[index]);
+        existingValues[index] = mergeValue(i, existingValues[index], newValues[index], false);
       }
     } else {
       for (int i = 0; i < numAggregations; i++, index++) {
-        existingValues[index] = AggregationFunctionUtils.mergeFinalResult(_aggregationFunctions[i],
-            (Comparable) existingValues[index], (Comparable) newValues[index]);
+        existingValues[index] = mergeValue(i, existingValues[index], newValues[index], true);
       }
     }
     return existingRecord;
+  }
+
+  @Nullable
+  private Object mergeValue(int functionIndex, @Nullable Object existing, @Nullable Object input,
+      boolean hasFinalInput) {
+    return hasFinalInput
+        ? AggregationFunctionUtils.mergeFinalResult(_aggregationFunctions[functionIndex], (Comparable) existing,
+            (Comparable) input)
+        : AggregationFunctionUtils.merge(_aggregationFunctions[functionIndex], existing, input);
   }
 
   /// Resizes the lookup map based on the trim size.
@@ -260,6 +338,14 @@ public abstract class IndexedTable extends BaseTable {
     return _topRecords.iterator();
   }
 
+  /// Returns the (key, record) entries accumulated so far, before [#finish]. Used by the grouping-sets base
+  /// aggregation path to read the merged base groups and derive the individual grouping sets from them. The
+  /// returned view is backed by the live map and must be treated as read-only; callers must not mutate it, and
+  /// must not add to the table while iterating it.
+  public Collection<Map.Entry<Key, Record>> getRecordEntries() {
+    return _lookupMap.entrySet();
+  }
+
   public int getNumResizes() {
     return _numResizes;
   }
@@ -268,7 +354,23 @@ public abstract class IndexedTable extends BaseTable {
     // single resize occurs on finish() if there's orderBy
     // all other re-sizes are triggered by trim size and threshold
     int min = _topRecords != null && _hasOrderBy ? 1 : 0;
-    return _numResizes > min;
+    return _markedTrimmed || _numResizes > min;
+  }
+
+  /// Marks this table as holding a trimmed (group-dropping) result even though no resize ran on it, e.g. when
+  /// it was rebuilt from the survivors of an external trim such as the grouping-sets per-set server trim.
+  public void markTrimmed() {
+    _markedTrimmed = true;
+  }
+
+  /// Records that the grouping-set derive or mixed-layout merge dropped a group at the server group limit.
+  public void markNumGroupsLimitReached() {
+    _numGroupsLimitReached = true;
+    markTrimmed();
+  }
+
+  public boolean isNumGroupsLimitReached() {
+    return _numGroupsLimitReached;
   }
 
   public long getResizeTimeMs() {

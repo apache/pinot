@@ -19,11 +19,16 @@
 package org.apache.pinot.segment.local.segment.index;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.StreamReadConstraints;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -32,6 +37,7 @@ import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.realtime.impl.json.MutableJsonIndexImpl;
+import org.apache.pinot.segment.local.recordtransformer.DataTypeTransformer;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.json.OffHeapJsonIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.json.OnHeapJsonIndexCreator;
 import org.apache.pinot.segment.local.segment.index.json.JsonIndexType;
@@ -42,7 +48,13 @@ import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.testng.annotations.AfterMethod;
@@ -94,6 +106,153 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
   public void tearDown()
       throws IOException {
     FileUtils.deleteDirectory(INDEX_DIR);
+  }
+
+  /// The realtime parse-once path must build an identical index: indexing each document via `addParsed(Map, String)`
+  /// (the cache path) must yield the same matching docIds as `add(String)` (the re-parse path) for every filter.
+  @Test
+  public void testMutableJsonIndexParsedMatchesString()
+      throws Exception {
+    String[] docs = {
+        "{\"name\":\"adam\",\"age\":20,\"addresses\":[{\"country\":\"us\"},{\"country\":\"ca\"}]}",
+        "{\"name\":\"bob\",\"age\":30,\"tags\":[\"x\",\"y\"],\"active\":true}",
+        "{\"name\":\"carol\",\"nested\":{\"a\":1,\"b\":\"z\"}}"
+    };
+    JsonIndexConfig config = new JsonIndexConfig();
+    try (MutableJsonIndexImpl fromString = new MutableJsonIndexImpl(config, "table__0__0", "col");
+        MutableJsonIndexImpl fromParsed = new MutableJsonIndexImpl(config, "table__0__0", "col")) {
+      for (String doc : docs) {
+        fromString.add(doc);
+        fromParsed.addParsed(JsonUtils.stringToObject(doc, Map.class), doc);
+      }
+      for (String filter : new String[]{
+          "name='adam'", "name='bob'", "name='carol'", "age='20'", "age='30'", "active='true'", "name='nobody'"}) {
+        assertEquals(fromParsed.getMatchingDocIds(filter), fromString.getMatchingDocIds(filter), "filter: " + filter);
+      }
+    }
+  }
+
+  @Test
+  public void testMutableJsonIndexCachedMapMatchesForwardValue()
+      throws Exception {
+    Map<String, Object> collision = new LinkedHashMap<>();
+    collision.put("a.b", 2);
+    collision.put("a", Map.of("b", 1));
+    List<Map<String, Object>> docs = List.of(Map.of("a", new BigDecimal("2.0")),
+        Map.of("a", new BigDecimal("123456789012345678900")), collision, Map.of("nested", collision));
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("col", DataType.JSON).build();
+    TableConfig withIndex = new TableConfigBuilder(TableType.REALTIME).setTableName("table")
+        .setJsonIndexColumns(List.of("col")).build();
+    TableConfig noIndex = new TableConfigBuilder(TableType.REALTIME).setTableName("table").build();
+    DataTypeTransformer cachedTransformer = new DataTypeTransformer(withIndex, schema);
+    DataTypeTransformer referenceTransformer = new DataTypeTransformer(noIndex, schema);
+    JsonIndexConfig config = new JsonIndexConfig();
+    String[] forwardValues = new String[docs.size()];
+    try (MutableJsonIndexImpl fromParsed = new MutableJsonIndexImpl(config, "table__0__0", "col")) {
+      for (int i = 0; i < docs.size(); i++) {
+        GenericRow reference = new GenericRow();
+        reference.putValue("col", docs.get(i));
+        referenceTransformer.transform(reference);
+        forwardValues[i] = (String) reference.getValue("col");
+        GenericRow cached = new GenericRow();
+        cached.putValue("col", docs.get(i));
+        cachedTransformer.transform(cached);
+        assertEquals(cached.getValue("col"), forwardValues[i]);
+        assertNotNull(cached.getParsedJsonValue("col"));
+        fromParsed.addParsed(cached.getParsedJsonValue("col"), forwardValues[i]);
+      }
+      createIndex(true, config, forwardValues);
+      File indexFile = new File(INDEX_DIR, ON_HEAP_COLUMN_NAME + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
+      try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(indexFile);
+          JsonIndexReader fromString = new ImmutableJsonIndexReader(buffer, docs.size())) {
+        Map<String, int[]> expected = Map.of("a='2.0'", ids(0), "a='2'", empty(),
+            "a='123456789012345678900'", ids(1), "\"a.b\"='2'", ids(2), "\"a.b\"='1'", empty(),
+            "\"nested.a.b\"='2'", ids(3), "\"nested.a.b\"='1'", empty());
+        for (Map.Entry<String, int[]> entry : expected.entrySet()) {
+          assertDocIds(fromString, entry.getKey(), entry.getValue());
+          assertEquals(fromParsed.getMatchingDocIds(entry.getKey()), fromString.getMatchingDocIds(entry.getKey()),
+              "filter: " + entry.getKey());
+        }
+      }
+    }
+  }
+
+  /// A document whose forward value the string path cannot parse (here a name, an integer, or a decimal longer than
+  /// Jackson's limits) must not be indexed from its cached parsed value: with `skipInvalidJson`, the immutable index
+  /// built from the forward value after sealing skips the whole document, so the consuming index must skip it as well.
+  @Test
+  public void testMutableJsonIndexCachedValueRespectsParserConstraints()
+      throws Exception {
+    StreamReadConstraints constraints = StreamReadConstraints.defaults();
+    String longName = "k".repeat(constraints.getMaxNameLength() + 1);
+    String longInteger = "9".repeat(constraints.getMaxNumberLength() + 1);
+    List<Object> docs = List.of(Map.of("ok", "v", longName, "v"), Map.of("ok", "v", "n", new BigInteger(longInteger)),
+        JsonNodeFactory.instance.objectNode().put("ok", "v").put(longName, "v"),
+        Map.of("ok", "v", "d", new BigDecimal("1." + longInteger.substring(1))), Map.of("ok", "v"));
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("col", DataType.JSON).build();
+    TableConfig withIndex = new TableConfigBuilder(TableType.REALTIME).setTableName("table")
+        .setJsonIndexColumns(List.of("col")).build();
+    TableConfig noIndex = new TableConfigBuilder(TableType.REALTIME).setTableName("table").build();
+    DataTypeTransformer cachedTransformer = new DataTypeTransformer(withIndex, schema);
+    DataTypeTransformer referenceTransformer = new DataTypeTransformer(noIndex, schema);
+    JsonIndexConfig config = new JsonIndexConfig();
+    config.setSkipInvalidJson(true);
+    String[] forwardValues = new String[docs.size()];
+    try (MutableJsonIndexImpl consuming = new MutableJsonIndexImpl(config, "table__0__0", "col")) {
+      for (int i = 0; i < docs.size(); i++) {
+        GenericRow reference = new GenericRow();
+        reference.putValue("col", docs.get(i));
+        referenceTransformer.transform(reference);
+        forwardValues[i] = (String) reference.getValue("col");
+        GenericRow cached = new GenericRow();
+        cached.putValue("col", docs.get(i));
+        cachedTransformer.transform(cached);
+        assertEquals(cached.getValue("col"), forwardValues[i]);
+        // Like MutableSegmentImpl, index the cached value along with the forward value.
+        Object parsedValue = cached.getParsedJsonValue("col");
+        assertNotNull(parsedValue, "doc: " + i);
+        consuming.addParsed(parsedValue, forwardValues[i]);
+      }
+      createIndex(true, config, forwardValues);
+      File indexFile = new File(INDEX_DIR, ON_HEAP_COLUMN_NAME + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
+      try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(indexFile);
+          JsonIndexReader sealed = new ImmutableJsonIndexReader(buffer, docs.size())) {
+        assertDocIds(sealed, "ok='v'", ids(4));
+        for (String filter : new String[]{"ok='v'", "n='" + longInteger + "'"}) {
+          assertEquals(consuming.getMatchingDocIds(filter), sealed.getMatchingDocIds(filter), "filter: " + filter);
+        }
+        Map<String, RoaringBitmap> skipped = getMatchingDocsMap(sealed, "$");
+        assertEquals(skipped, Map.of(JsonUtils.SKIPPED_VALUE_REPLACEMENT, RoaringBitmap.bitmapOf(0, 1, 2, 3)));
+        assertEquals(consuming.getMatchingFlattenedDocsMap("$", null), skipped);
+      }
+    }
+  }
+
+  /// The JSON-text fast path: a column fed as JSON text is parsed once into a JsonNode (with BigDecimal, as
+  /// PinotDataType does) and that node is fed to the index via `addParsed`. It must yield the same matching docIds
+  /// as re-parsing the serialized string. The docs include a fractional number to exercise the DecimalNode fallback.
+  @Test
+  public void testMutableJsonIndexParsedNodeMatchesString()
+      throws Exception {
+    String[] docs = {
+        "{\"name\":\"adam\",\"age\":20,\"score\":98.6,\"addresses\":[{\"country\":\"us\"},{\"country\":\"ca\"}]}",
+        "{\"name\":\"bob\",\"age\":30,\"tags\":[\"x\",\"y\"],\"active\":true}",
+        "{\"name\":\"carol\",\"nested\":{\"a\":1,\"b\":\"z\"}}"
+    };
+    JsonIndexConfig config = new JsonIndexConfig();
+    try (MutableJsonIndexImpl fromString = new MutableJsonIndexImpl(config, "table__0__0", "col");
+        MutableJsonIndexImpl fromParsed = new MutableJsonIndexImpl(config, "table__0__0", "col")) {
+      for (String doc : docs) {
+        // The forward index stores the canonical string (node.toString()); the index re-parses it on the string path.
+        String canonical = JsonUtils.stringToJsonNodeWithBigDecimal(doc).toString();
+        fromString.add(canonical);
+        fromParsed.addParsed(JsonUtils.stringToJsonNodeWithBigDecimal(doc), canonical);
+      }
+      for (String filter : new String[]{
+          "name='adam'", "name='bob'", "name='carol'", "age='20'", "score='98.6'", "active='true'", "name='nobody'"}) {
+        assertEquals(fromParsed.getMatchingDocIds(filter), fromString.getMatchingDocIds(filter), "filter: " + filter);
+      }
+    }
   }
 
   @Test

@@ -176,8 +176,14 @@ public enum TransformFunctionType {
   MAP_VALUE("mapValue",
       ReturnTypes.cascade(opBinding -> positionalComponentType(opBinding, 2), SqlTypeTransforms.FORCE_NULLABLE),
       OperandTypes.family(List.of(SqlTypeFamily.ARRAY, SqlTypeFamily.ANY, SqlTypeFamily.ARRAY))),
-  IN_ID_SET("inIdSet", ReturnTypes.BOOLEAN, OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER)),
+  // Nullable: both the transform and the scalar function return NULL for a NULL value, unless the IdSet is empty. The
+  // multi-stage planner also uses this operator for the inIdSet scalar function (see IdSetFunctions).
+  IN_ID_SET("inIdSet", ReturnTypes.BOOLEAN_NULLABLE, OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER)),
+  // Reads another table: a DELETE predicate rejects it, see DeleteStatement#CROSS_TABLE_FUNCTIONS, which lists the
+  // functions by hand and must gain any new function that reads another table
   LOOKUP("lookUp"),
+  // Runs a script: a DELETE predicate rejects it, see DeleteStatement#SCRIPT_FUNCTIONS, which must gain any new
+  // script function
   GROOVY("groovy"),
   SCALAR("scalar"),
 

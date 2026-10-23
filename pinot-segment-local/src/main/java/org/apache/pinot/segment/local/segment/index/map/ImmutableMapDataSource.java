@@ -62,36 +62,19 @@ public class ImmutableMapDataSource extends BaseMapDataSource {
     return null;
   }
 
+  /// Exposes the MAP column's [ColumnMetadata] through the [DataSourceMetadata] view by delegating every accessor
+  /// through a single reference instead of copying the fields (see the equivalent adapter in `ImmutableDataSource`).
+  /// A MAP column is never reported as sorted and does not support the max row length.
   private static class ImmutableMapDataSourceMetadata implements DataSourceMetadata {
-    final FieldSpec _fieldSpec;
-    final int _numDocs;
-    final int _numValues;
-    final int _maxNumValuesPerMVEntry;
-    final int _cardinality;
-    final PartitionFunction _partitionFunction;
-    final Set<Integer> _partitions;
-    final Comparable _minValue;
-    final Comparable _maxValue;
+    final ColumnMetadata _columnMetadata;
 
     ImmutableMapDataSourceMetadata(ColumnMetadata columnMetadata) {
-      _fieldSpec = columnMetadata.getFieldSpec();
-      _numDocs = columnMetadata.getTotalDocs();
-      _numValues = columnMetadata.getTotalNumberOfEntries();
-      if (_fieldSpec.isSingleValueField()) {
-        _maxNumValuesPerMVEntry = -1;
-      } else {
-        _maxNumValuesPerMVEntry = columnMetadata.getMaxNumberOfMultiValues();
-      }
-      _minValue = columnMetadata.getMinValue();
-      _maxValue = columnMetadata.getMaxValue();
-      _partitionFunction = columnMetadata.getPartitionFunction();
-      _partitions = columnMetadata.getPartitions();
-      _cardinality = columnMetadata.getCardinality();
+      _columnMetadata = columnMetadata;
     }
 
     @Override
     public FieldSpec getFieldSpec() {
-      return _fieldSpec;
+      return _columnMetadata.getFieldSpec();
     }
 
     @Override
@@ -101,45 +84,47 @@ public class ImmutableMapDataSource extends BaseMapDataSource {
 
     @Override
     public int getNumDocs() {
-      return _numDocs;
+      return _columnMetadata.getTotalDocs();
     }
 
     @Override
     public int getNumValues() {
-      return _numValues;
+      return _columnMetadata.getTotalNumberOfEntries();
     }
 
     @Override
     public int getMaxNumValuesPerMVEntry() {
-      return _maxNumValuesPerMVEntry;
+      // DataSourceMetadata reports -1 for single-value columns, whereas ColumnMetadata reports 0
+      return _columnMetadata.getFieldSpec().isSingleValueField() ? -1 : _columnMetadata.getMaxNumberOfMultiValues();
     }
 
     @Nullable
     @Override
     public Comparable getMinValue() {
-      return _minValue;
+      return _columnMetadata.getMinValue();
     }
 
+    @Nullable
     @Override
     public Comparable getMaxValue() {
-      return _maxValue;
+      return _columnMetadata.getMaxValue();
     }
 
     @Nullable
     @Override
     public PartitionFunction getPartitionFunction() {
-      return _partitionFunction;
+      return _columnMetadata.getPartitionFunction();
     }
 
     @Nullable
     @Override
     public Set<Integer> getPartitions() {
-      return _partitions;
+      return _columnMetadata.getPartitions();
     }
 
     @Override
     public int getCardinality() {
-      return _cardinality;
+      return _columnMetadata.getCardinality();
     }
 
     @Override

@@ -36,6 +36,7 @@ import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.OpenStructIndexConfig;
@@ -55,6 +56,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 
 
@@ -275,6 +277,290 @@ public class OpenStructConsumingSealedParityTest {
     } finally {
       sealed.destroy();
     }
+  }
+
+  /// A key whose values are lists is a multi-value column on both tiers, and must read back element for element
+  /// either side of the seal boundary. The two build it by different routes -- a mutable MV forward index of
+  /// dictIds during consumption, the standard MV creators at seal -- so a divergence here would make the REALTIME
+  /// and OFFLINE halves of a hybrid table disagree on the same row.
+  @Test
+  public void testConsumingMatchesSealedForMultiValueKey()
+      throws Exception {
+    String mvKey = "tags";
+    ComplexFieldSpec mvSpec = new ComplexFieldSpec(METRICS, FieldSpec.DataType.OPEN_STRUCT, true, Map.of());
+    OpenStructIndexConfig osConfig =
+        new OpenStructIndexConfig(false, null, -1, Set.of(mvKey), 0.5, List.of(), null);
+
+    List<List<Object>> consumingValues;
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex(METRICS, "testTable_REALTIME", mvSpec,
+        osConfig, _mm, NUM_DOCS)) {
+      for (int docId = 0; docId < NUM_DOCS; docId++) {
+        idx.index(docId, mvDoc(docId));
+      }
+      MutableOpenStructDataSource ds = new MutableOpenStructDataSource(mvSpec, idx, NUM_DOCS);
+      DataSource tags = ds.getDataSource(mvKey);
+      assertNotNull(tags, "a multi-value key must be materialized on the consuming side");
+      // The planner reads shape off the metadata, not the forward index, so the two must agree.
+      assertFalse(tags.getDataSourceMetadata().getFieldSpec().isSingleValueField(),
+          "consuming metadata must report the key as multi-value");
+      consumingValues = readAllMultiValues(tags);
+    }
+
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testOpenStructMvParity").addField(mvSpec).build();
+    ObjectNode indexes = JsonUtils.newObjectNode();
+    indexes.set("open_struct", JsonUtils.objectToJsonNode(osConfig));
+    FieldConfig metricsCfg = new FieldConfig.Builder(METRICS).withIndexes(indexes).build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testOpenStructMvParity")
+        .setFieldConfigList(List.of(metricsCfg)).build();
+
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    config.setOutDir(TMP_DIR.getAbsolutePath());
+    config.setSegmentName("testSegmentMvParity");
+
+    List<GenericRow> rows = new ArrayList<>(NUM_DOCS);
+    for (int docId = 0; docId < NUM_DOCS; docId++) {
+      GenericRow row = new GenericRow();
+      row.putValue(METRICS, mvDoc(docId));
+      rows.add(row);
+    }
+
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    driver.init(config, new GenericRowRecordReader(rows));
+    driver.build();
+
+    ImmutableSegment sealed = ImmutableSegmentLoader.load(driver.getOutputDirectory(), ReadMode.mmap);
+    try {
+      OpenStructDataSource sealedMetrics = (OpenStructDataSource) sealed.getDataSource(METRICS);
+      DataSource sealedTags = sealedMetrics.getDataSource(mvKey);
+      assertNotNull(sealedTags, "a multi-value key must be materialized on the sealed side");
+      assertFalse(sealedTags.getDataSourceMetadata().getFieldSpec().isSingleValueField(),
+          "sealed metadata must report the key as multi-value");
+      assertEquals(consumingValues, readAllMultiValues(sealedTags));
+
+      // Pin the values themselves, not just cross-tier equality: a bug shared by both tiers would survive an
+      // equality-only assertion. Docs 0-4 carry two tags, docs 5-9 carry none.
+      for (int docId = 0; docId < 5; docId++) {
+        assertEquals(consumingValues.get(docId), List.of("t" + docId, "shared"), "docId " + docId);
+      }
+      for (int docId = 5; docId < NUM_DOCS; docId++) {
+        assertEquals(consumingValues.get(docId).size(), 1, "an absent doc holds one default element");
+      }
+    } finally {
+      sealed.destroy();
+    }
+  }
+
+  private static Map<String, Object> mvDoc(int docId) {
+    Map<String, Object> document = new HashMap<>();
+    if (docId < 5) {
+      document.put("tags", List.of("t" + docId, "shared"));
+    }
+    document.put("host", "host-" + docId);
+    return document;
+  }
+
+  @SuppressWarnings("unchecked")
+  private static List<List<Object>> readAllMultiValues(DataSource dataSource)
+      throws Exception {
+    ForwardIndexReader<ForwardIndexReaderContext> fwd =
+        (ForwardIndexReader<ForwardIndexReaderContext>) dataSource.getForwardIndex();
+    assertFalse(fwd.isSingleValue(), "expected a multi-value forward index");
+    List<List<Object>> values = new ArrayList<>(NUM_DOCS);
+    int[] buffer = new int[MutableKeyColumn.MAX_NUM_MULTI_VALUES];
+    try (ForwardIndexReaderContext context = fwd.createContext()) {
+      for (int docId = 0; docId < NUM_DOCS; docId++) {
+        int length = fwd.getDictIdMV(docId, buffer, context);
+        List<Object> row = new ArrayList<>(length);
+        for (int i = 0; i < length; i++) {
+          row.add(dataSource.getDictionary().get(buffer[i]));
+        }
+        values.add(row);
+      }
+    }
+    return values;
+  }
+
+  /// A nested value addressed by its path key (`device.os`) must resolve identically either side of
+  /// the seal boundary, and so must the container it was split out of. The two tiers reach the same
+  /// key by different routes -- the consuming tier flattens into its own mutable columns, the sealed
+  /// tier flattens into the splitter's dense/sparse classification -- so a divergence here would make
+  /// the REALTIME and OFFLINE halves of a hybrid table disagree on the same row.
+  @Test
+  public void testConsumingMatchesSealedForNestedPathKey()
+      throws Exception {
+    String pathKey = "device.os";
+    String containerKey = "device";
+    ComplexFieldSpec nestedSpec = new ComplexFieldSpec(METRICS, FieldSpec.DataType.OPEN_STRUCT, true, Map.of());
+    // maxNestedKeyDepth = 2 makes 'device.os' a key; 'device' is pinned dense so both tiers
+    // materialize the container rather than one of them routing it to the sparse blob.
+    OpenStructIndexConfig osConfig = new OpenStructIndexConfig(false, null, -1,
+        Set.of(pathKey, containerKey), 0.5, List.of(), null, null, null, 2);
+
+    List<Object> consumingValues;
+    List<Object> consumingContainers;
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex(METRICS, "testTable_REALTIME", nestedSpec,
+        osConfig, _mm, NUM_DOCS)) {
+      for (int docId = 0; docId < NUM_DOCS; docId++) {
+        idx.index(docId, nestedDoc(docId));
+      }
+      MutableOpenStructDataSource ds = new MutableOpenStructDataSource(nestedSpec, idx, NUM_DOCS);
+      DataSource os = ds.getDataSource(pathKey);
+      assertNotNull(os, "nested leaf must be addressable by its path key on the consuming side");
+      consumingValues = readAllValues(os);
+      DataSource container = ds.getDataSource(containerKey);
+      assertNotNull(container, "container must remain a key of its own");
+      consumingContainers = readAllValues(container);
+    }
+
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testOpenStructNestedParity")
+        .addField(nestedSpec)
+        .build();
+    ObjectNode indexes = JsonUtils.newObjectNode();
+    indexes.set("open_struct", JsonUtils.objectToJsonNode(osConfig));
+    FieldConfig metricsCfg = new FieldConfig.Builder(METRICS).withIndexes(indexes).build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testOpenStructNestedParity")
+        .setFieldConfigList(List.of(metricsCfg)).build();
+
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    config.setOutDir(TMP_DIR.getAbsolutePath());
+    config.setSegmentName("testSegmentNestedParity");
+
+    List<GenericRow> rows = new ArrayList<>(NUM_DOCS);
+    for (int docId = 0; docId < NUM_DOCS; docId++) {
+      GenericRow row = new GenericRow();
+      row.putValue(METRICS, nestedDoc(docId));
+      rows.add(row);
+    }
+
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    driver.init(config, new GenericRowRecordReader(rows));
+    driver.build();
+
+    ImmutableSegment sealed = ImmutableSegmentLoader.load(driver.getOutputDirectory(), ReadMode.mmap);
+    try {
+      OpenStructDataSource sealedMetrics = (OpenStructDataSource) sealed.getDataSource(METRICS);
+      DataSource sealedOs = sealedMetrics.getDataSource(pathKey);
+      assertNotNull(sealedOs, "nested leaf must be addressable by its path key on the sealed side");
+      assertEquals(consumingValues, readAllValues(sealedOs));
+
+      DataSource sealedContainer = sealedMetrics.getDataSource(containerKey);
+      assertNotNull(sealedContainer);
+      assertEquals(consumingContainers, readAllValues(sealedContainer));
+
+      // Pin the values themselves, not just cross-tier equality: a bug shared by both tiers would
+      // survive an equality-only assertion.
+      for (int docId = 0; docId < NUM_DOCS; docId++) {
+        assertEquals(consumingValues.get(docId), docId % 2 == 0 ? "ios" : "android", "docId " + docId);
+      }
+      assertEquals(consumingContainers.get(0), "{\"os\":\"ios\"}");
+    } finally {
+      sealed.destroy();
+    }
+  }
+
+  /// A document can carry a key that flattening would also synthesize: `.` is an ordinary key character, so
+  /// `{"a.b": 100, "a": {"b": 200}}` names `a.b` twice. The document's own key is the value both tiers must
+  /// read, and the second emission must not reach storage at all -- the sealed tier pairs values with a
+  /// presence bitmap positionally, so an extra value for one document shifts every document after it.
+  @Test
+  public void testConsumingMatchesSealedForKeyCollidingWithItsFlattenedPath()
+      throws Exception {
+    String collidingKey = "a.b";
+    ComplexFieldSpec nestedSpec = new ComplexFieldSpec(METRICS, FieldSpec.DataType.OPEN_STRUCT, true, Map.of());
+    OpenStructIndexConfig osConfig = new OpenStructIndexConfig(false, null, -1,
+        Set.of(collidingKey, "a"), 0.5, List.of(), null, null, null, 2);
+
+    List<Object> consumingValues;
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex(METRICS, "testTable_REALTIME", nestedSpec,
+        osConfig, _mm, NUM_DOCS)) {
+      for (int docId = 0; docId < NUM_DOCS; docId++) {
+        idx.index(docId, collidingDoc(docId));
+      }
+      MutableOpenStructDataSource ds = new MutableOpenStructDataSource(nestedSpec, idx, NUM_DOCS);
+      DataSource collided = ds.getDataSource(collidingKey);
+      assertNotNull(collided);
+      consumingValues = readAllDictValues(collided);
+    }
+
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testOpenStructCollisionParity")
+        .addField(nestedSpec)
+        .build();
+    ObjectNode indexes = JsonUtils.newObjectNode();
+    indexes.set("open_struct", JsonUtils.objectToJsonNode(osConfig));
+    FieldConfig metricsCfg = new FieldConfig.Builder(METRICS).withIndexes(indexes).build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testOpenStructCollisionParity")
+        .setFieldConfigList(List.of(metricsCfg)).build();
+
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    config.setOutDir(TMP_DIR.getAbsolutePath());
+    config.setSegmentName("testSegmentCollisionParity");
+
+    List<GenericRow> rows = new ArrayList<>(NUM_DOCS);
+    for (int docId = 0; docId < NUM_DOCS; docId++) {
+      GenericRow row = new GenericRow();
+      row.putValue(METRICS, collidingDoc(docId));
+      rows.add(row);
+    }
+
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    driver.init(config, new GenericRowRecordReader(rows));
+    driver.build();
+
+    ImmutableSegment sealed = ImmutableSegmentLoader.load(driver.getOutputDirectory(), ReadMode.mmap);
+    try {
+      OpenStructDataSource sealedMetrics = (OpenStructDataSource) sealed.getDataSource(METRICS);
+      DataSource sealedCollided = sealedMetrics.getDataSource(collidingKey);
+      assertNotNull(sealedCollided);
+      assertEquals(consumingValues, readAllDictValues(sealedCollided));
+
+      // Every document reads its own literal value: the nested `{"b": 999}` in doc 0 neither replaces the
+      // 100 the document keys directly, nor shifts the documents after it.
+      for (int docId = 0; docId < NUM_DOCS; docId++) {
+        assertEquals(consumingValues.get(docId), 100 * (docId + 1), "docId " + docId);
+      }
+    } finally {
+      sealed.destroy();
+    }
+  }
+
+  /// Like [#readAllValues] but with the reader's own context, which a sealed dictionary-encoded numeric
+  /// forward index requires.
+  private static List<Object> readAllDictValues(DataSource dataSource)
+      throws Exception {
+    ForwardIndexReader<?> fwd = dataSource.getForwardIndex();
+    List<Object> values = new ArrayList<>(NUM_DOCS);
+    try (ForwardIndexReaderContext ctx = fwd.createContext()) {
+      for (int docId = 0; docId < NUM_DOCS; docId++) {
+        values.add(dataSource.getDictionary().get(readDictId(fwd, docId, ctx)));
+      }
+    }
+    return values;
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T extends ForwardIndexReaderContext> int readDictId(ForwardIndexReader<T> fwd, int docId,
+      ForwardIndexReaderContext ctx) {
+    return fwd.getDictId(docId, (T) ctx);
+  }
+
+  /// Every document keys `a.b` directly; doc 0 also nests an object whose flattened path is the same key.
+  private static Map<String, Object> collidingDoc(int docId) {
+    Map<String, Object> document = new HashMap<>();
+    document.put("a.b", 100 * (docId + 1));
+    if (docId == 0) {
+      Map<String, Object> nested = new HashMap<>();
+      nested.put("b", 999);
+      document.put("a", nested);
+    }
+    return document;
+  }
+
+  private static Map<String, Object> nestedDoc(int docId) {
+    Map<String, Object> device = new HashMap<>();
+    device.put("os", docId % 2 == 0 ? "ios" : "android");
+    Map<String, Object> document = new HashMap<>();
+    document.put("device", device);
+    return document;
   }
 
   private static long min(List<Object> values) {

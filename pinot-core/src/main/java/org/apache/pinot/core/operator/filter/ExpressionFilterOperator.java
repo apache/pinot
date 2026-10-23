@@ -95,7 +95,7 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
   /// predicate is UNKNOWN where the expression is null.
   @Override
   protected BlockDocIdSet getNulls() {
-    return isNullCheck() ? EmptyDocIdSet.getInstance() : getExpressionNulls();
+    return isNullCheck() ? EmptyDocIdSet.unscanned() : getExpressionNulls();
   }
 
   @Override

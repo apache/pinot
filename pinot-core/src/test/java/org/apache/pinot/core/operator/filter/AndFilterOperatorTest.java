@@ -250,7 +250,7 @@ public class AndFilterOperatorTest {
             new TestFilterOperator(emptyDocIds, numDocs)
         ), null, numDocs, false);
 
-    assertEquals((andFilterOperator.getTrues()).getOptimizedDocIdSet(), EmptyDocIdSet.getInstance());
+    assertTrue(andFilterOperator.getTrues() instanceof EmptyDocIdSet);
   }
 
   @Test

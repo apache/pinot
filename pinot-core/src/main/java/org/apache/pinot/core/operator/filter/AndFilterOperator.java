@@ -28,7 +28,6 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
 import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
-import org.apache.pinot.core.operator.docidsets.ShortCircuitingDocIdSet;
 import org.apache.pinot.spi.trace.Tracing;
 import org.roaringbitmap.buffer.BufferFastAggregation;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -40,12 +39,19 @@ public class AndFilterOperator extends BaseFilterOperator {
 
   private final List<BaseFilterOperator> _filterOperators;
   private final Map<String, String> _queryOptions;
+  private final boolean _restrictionPushdownEnabled;
 
   public AndFilterOperator(List<BaseFilterOperator> filterOperators, @Nullable Map<String, String> queryOptions,
       int numDocs, boolean nullHandlingEnabled) {
+    this(filterOperators, queryOptions, numDocs, nullHandlingEnabled, false);
+  }
+
+  public AndFilterOperator(List<BaseFilterOperator> filterOperators, @Nullable Map<String, String> queryOptions,
+      int numDocs, boolean nullHandlingEnabled, boolean restrictionPushdownEnabled) {
     super(numDocs, nullHandlingEnabled);
     _filterOperators = filterOperators;
     _queryOptions = queryOptions;
+    _restrictionPushdownEnabled = restrictionPushdownEnabled;
   }
 
   @Override
@@ -55,20 +61,19 @@ public class AndFilterOperator extends BaseFilterOperator {
     long totalEntriesScanned = 0L;
     for (BaseFilterOperator filterOperator : _filterOperators) {
       BlockDocIdSet blockDocIdSet = filterOperator.getTrues();
-      BlockDocIdSet optimizedDocIdSet = blockDocIdSet.getOptimizedDocIdSet();
       totalEntriesScanned += blockDocIdSet.getNumEntriesScannedInFilter();
-      if (optimizedDocIdSet instanceof EmptyDocIdSet) {
-        return new ShortCircuitingDocIdSet(totalEntriesScanned);
+      if (blockDocIdSet instanceof EmptyDocIdSet) {
+        return new EmptyDocIdSet(totalEntriesScanned);
       }
-      if (optimizedDocIdSet instanceof MatchAllDocIdSet) {
+      if (blockDocIdSet instanceof MatchAllDocIdSet) {
         continue;
       }
-      blockDocIdSets.add(optimizedDocIdSet);
+      blockDocIdSets.add(blockDocIdSet);
     }
     if (blockDocIdSets.isEmpty()) {
       return new MatchAllDocIdSet(_numDocs);
     }
-    return new AndDocIdSet(blockDocIdSets, _queryOptions);
+    return new AndDocIdSet(blockDocIdSets, _queryOptions, _restrictionPushdownEnabled);
   }
 
   /// A conjunction is not false where no child is false: the intersection of the children's not-false documents.
@@ -78,7 +83,7 @@ public class AndFilterOperator extends BaseFilterOperator {
     for (BaseFilterOperator filterOperator : _filterOperators) {
       BlockDocIdSet childNotFalses = filterOperator.getNotFalses();
       if (childNotFalses instanceof EmptyDocIdSet) {
-        return EmptyDocIdSet.getInstance();
+        return EmptyDocIdSet.unscanned();
       }
       if (childNotFalses instanceof MatchAllDocIdSet) {
         continue;
@@ -88,12 +93,13 @@ public class AndFilterOperator extends BaseFilterOperator {
     if (notFalses.isEmpty()) {
       return new MatchAllDocIdSet(_numDocs);
     }
-    return notFalses.size() == 1 ? notFalses.get(0) : new AndDocIdSet(notFalses, _queryOptions);
+    return notFalses.size() == 1 ? notFalses.get(0)
+        : new AndDocIdSet(notFalses, _queryOptions, _restrictionPushdownEnabled);
   }
 
   @Override
   protected BlockDocIdSet getNulls() {
-    return mayHaveNulls() ? deriveNulls(_queryOptions) : EmptyDocIdSet.getInstance();
+    return mayHaveNulls() ? deriveNulls(_queryOptions) : EmptyDocIdSet.unscanned();
   }
 
   @Override

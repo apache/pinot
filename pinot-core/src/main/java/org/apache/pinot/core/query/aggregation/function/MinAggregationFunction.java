@@ -37,6 +37,9 @@ import org.apache.pinot.spi.exception.BadQueryRequestException;
 
 public class MinAggregationFunction extends BaseSingleInputAggregationFunction<Double, Double> {
   protected static final double DEFAULT_VALUE = Double.POSITIVE_INFINITY;
+  private static final String NON_NUMERIC_TYPE_MESSAGE_SUFFIX = ". MIN only supports numeric columns; use MINSTRING "
+      + "for string columns, or set the query option 'autoRewriteAggregationType=true' to automatically rewrite "
+      + "MIN to MINSTRING on string columns.";
 
   public MinAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
     this(verifySingleArgument(arguments, "MIN"), nullHandlingEnabled);
@@ -71,12 +74,23 @@ public class MinAggregationFunction extends BaseSingleInputAggregationFunction<D
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-
-    if (blockValSet.isSingleValue()) {
-      aggregateSV(blockValSet, length, aggregationResultHolder);
-    } else {
-      aggregateMV(blockValSet, length, aggregationResultHolder);
+    try {
+      if (blockValSet.isSingleValue()) {
+        aggregateSV(blockValSet, length, aggregationResultHolder);
+      } else {
+        aggregateMV(blockValSet, length, aggregationResultHolder);
+      }
+    } catch (NumberFormatException e) {
+      throw nonNumericValueException(blockValSet, e);
     }
+  }
+
+  /// Wraps a failure to convert a non-numeric (e.g. STRING) value to a `double` into a descriptive
+  /// [BadQueryRequestException]. Numeric strings still convert successfully and are not affected.
+  private static BadQueryRequestException nonNumericValueException(BlockValSet blockValSet, NumberFormatException e) {
+    return new BadQueryRequestException(
+        "Cannot compute min for non-numeric value in column of type: " + blockValSet.getValueType()
+            + NON_NUMERIC_TYPE_MESSAGE_SUFFIX + " Cause: " + e.getMessage(), e);
   }
 
   protected void aggregateSV(BlockValSet blockValSet, int length, AggregationResultHolder aggregationResultHolder) {
@@ -153,7 +167,8 @@ public class MinAggregationFunction extends BaseSingleInputAggregationFunction<D
         break;
       }
       default:
-        throw new BadQueryRequestException("Cannot compute min for non-numeric type: " + blockValSet.getValueType());
+        throw new BadQueryRequestException(
+            "Cannot compute min for non-numeric type: " + blockValSet.getValueType() + NON_NUMERIC_TYPE_MESSAGE_SUFFIX);
     }
   }
 
@@ -191,11 +206,14 @@ public class MinAggregationFunction extends BaseSingleInputAggregationFunction<D
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-
-    if (blockValSet.isSingleValue()) {
-      aggregateSVGroupBySV(blockValSet, length, groupKeyArray, groupByResultHolder);
-    } else {
-      aggregateMVGroupBySV(blockValSet, length, groupKeyArray, groupByResultHolder);
+    try {
+      if (blockValSet.isSingleValue()) {
+        aggregateSVGroupBySV(blockValSet, length, groupKeyArray, groupByResultHolder);
+      } else {
+        aggregateMVGroupBySV(blockValSet, length, groupKeyArray, groupByResultHolder);
+      }
+    } catch (NumberFormatException e) {
+      throw nonNumericValueException(blockValSet, e);
     }
   }
 
@@ -260,11 +278,14 @@ public class MinAggregationFunction extends BaseSingleInputAggregationFunction<D
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-
-    if (blockValSet.isSingleValue()) {
-      aggregateSVGroupByMV(blockValSet, length, groupKeysArray, groupByResultHolder);
-    } else {
-      aggregateMVGroupByMV(blockValSet, length, groupKeysArray, groupByResultHolder);
+    try {
+      if (blockValSet.isSingleValue()) {
+        aggregateSVGroupByMV(blockValSet, length, groupKeysArray, groupByResultHolder);
+      } else {
+        aggregateMVGroupByMV(blockValSet, length, groupKeysArray, groupByResultHolder);
+      }
+    } catch (NumberFormatException e) {
+      throw nonNumericValueException(blockValSet, e);
     }
   }
 

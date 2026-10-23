@@ -345,7 +345,26 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
   }
 
   @Test
+  public void testJsonExtractScalarFoldedBooleanArrayConsumer() {
+    for (boolean nullHandlingEnabled : new boolean[]{false, true}) {
+      assertSingleColumnValue("SET enableNullHandling=" + nullHandlingEnabled
+          + "; SELECT arraySum(jsonExtractScalar('{\"v\":[true,false]}', '$.v', 'BOOLEAN_ARRAY')) FROM a", 1D, 15);
+    }
+  }
+
+  @Test
   public void testJsonExtractScalarLiteralDefaultParity() {
+    for (String booleanDefault : new String[]{"true", "false"}) {
+      assertSingleColumnValue(
+          "SELECT jsonExtractScalar('{}', '$.missing', 'STRING', " + booleanDefault + ") FROM a",
+          booleanDefault, 15);
+      assertSingleColumnValue(
+          "SELECT jsonExtractScalar('{\"v\":[null]}', '$.v', 'STRING_ARRAY', " + booleanDefault + ") FROM a",
+          new String[]{booleanDefault}, 15);
+      assertSingleColumnValue(
+          "SELECT jsonExtractScalar(a.col1, b.col2, 'STRING', " + booleanDefault
+              + ") FROM a JOIN b ON a.col1 = b.col1", booleanDefault, 15);
+    }
     String timestamp = "TIMESTAMP '2018-01-01 11:12:53'";
     assertSingleColumnValue(
         "SELECT jsonExtractScalar('{}', '$.missing', 'STRING', " + timestamp + ") FROM a LIMIT 1",

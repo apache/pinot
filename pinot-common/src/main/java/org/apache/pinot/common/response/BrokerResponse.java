@@ -221,6 +221,22 @@ public interface BrokerResponse {
   /// This value is always lower or equal than [#getNumSegmentsPrunedByServer()]
   long getNumSegmentsPrunedByValue();
 
+  /// Returns the number of remote accesses (local cache misses) made to read segment data from a remote storage tier.
+  ///
+  /// This value is always `0` when the segments are not backed by a remote storage tier.
+  long getNumRemoteAccesses();
+
+  /// Returns the number of bytes read by the remote accesses (see [#getNumRemoteAccesses()]).
+  long getRemoteAccessBytes();
+
+  /// Returns the number of remote accesses (see [#getNumRemoteAccesses()]) made directly, i.e. outside the buffers
+  /// fetched for the query. Each of them is a round trip to the remote storage tier for a single read, so a non-zero
+  /// value points at reads the fetch plan of the query did not cover.
+  long getNumDirectRemoteAccesses();
+
+  /// Returns the number of bytes read by the direct remote accesses (see [#getNumDirectRemoteAccesses()]).
+  long getDirectRemoteAccessBytes();
+
   /// Returns the time used to reduce the server responses into the final response in milliseconds.
   long getBrokerReduceTimeMs();
 
@@ -311,16 +327,13 @@ public interface BrokerResponse {
   /// @return true if RLS filters were applied, false otherwise
   boolean getRLSFiltersApplied();
 
-  /// Set whether the broker rewrote an exact aggregation into its approximate counterpart, for example
-  /// `DISTINCT_COUNT` into `DISTINCT_COUNT_SMART_HLL`. The result is then approximate, not exact.
-  /// The default is a no-op so that implementations which do not track this need no change.
-  /// @param approximateFunctionApplied true if at least one function was rewritten
-  default void setApproximateFunctionApplied(boolean approximateFunctionApplied) {
-  }
-
-  /// Get whether the broker rewrote an exact aggregation into its approximate counterpart.
-  /// @return true if at least one function was rewritten, false otherwise
-  default boolean isApproximateFunctionApplied() {
+  /// Get whether the result is approximated: a function that can return an exact result returned an approximate one.
+  /// For example, a SMART function such as `DISTINCT_COUNT_SMART_HLL` crossed its conversion threshold and switched to
+  /// a sketch, including the SMART functions that the broker rewrites exact `DISTINCT_COUNT` and `PERCENTILE` into.
+  /// Functions that are always approximate, such as `DISTINCT_COUNT_HLL`, do not set it.
+  /// The default returns `false` so that implementations which do not track this need no change.
+  /// @return true if at least one function returned an approximated result, false otherwise
+  default boolean isApproximatedResult() {
     return false;
   }
 

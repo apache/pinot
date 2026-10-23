@@ -43,11 +43,13 @@ import org.apache.pinot.query.routing.SharedMailboxInfos;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.StagePlan;
 import org.apache.pinot.query.routing.WorkerMetadata;
+import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
 import org.apache.pinot.query.runtime.operator.OperatorTestUtil;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.executor.ExecutorServiceUtils;
 import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
@@ -61,6 +63,8 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.INT;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 
@@ -241,6 +245,53 @@ public class PipelineBreakerExecutorTest {
     Assert.assertTrue(errorBlock.isError());
 
     latch.countDown();
+  }
+
+  /// The query is terminated before its pipeline breaker starts. The pipeline breaker does not run, and its result
+  /// carries the termination error instead of looking like it collected no rows.
+  @Test
+  public void shouldReturnTerminationErrorWhenQueryIsTerminatedBeforePBStarts() {
+    MailboxReceiveNode mailboxReceiveNode = getPBReceiveNode(1);
+    StagePlan stagePlan = new StagePlan(mailboxReceiveNode, _stageMetadata);
+    when(_mailboxService.getReceivingMailbox(MAILBOX_ID_1)).thenReturn(_mailbox1);
+
+    QueryExecutionContext executionContext =
+        new QueryExecutionContext(QueryExecutionContext.QueryType.MSE, 0, "0", Accounting.DEFAULT_WORKLOAD_NAME,
+            System.currentTimeMillis(), Long.MAX_VALUE, Long.MAX_VALUE, "brokerId", "serverId", "");
+    executionContext.terminate(QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED, "OOM killed on SERVER");
+    PipelineBreakerResult pipelineBreakerResult;
+    try (QueryThreadContext ignore = QueryThreadContext.open(executionContext,
+        new QueryThreadContext.MseWorkerInfo(1, 2), ThreadAccountantUtils.getNoOpAccountant())) {
+      pipelineBreakerResult = PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService,
+          _workerMetadata, stagePlan, Map.of(), true, true);
+    }
+
+    Assert.assertNotNull(pipelineBreakerResult);
+    ErrorMseBlock errorBlock = pipelineBreakerResult.getErrorBlock();
+    Assert.assertNotNull(errorBlock);
+    Assert.assertEquals(errorBlock.getErrorMessages(),
+        Map.of(QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED, "OOM killed on SERVER"));
+    verify(_mailbox1, never()).poll();
+  }
+
+  /// The scheduler cancels an op chain that fails with an Error too. The pipeline breaker keeps that Error as its
+  /// error instead of looking like it collected no rows.
+  @Test
+  public void shouldReturnErrorBlockWhenPBFailsWithError() {
+    MailboxReceiveNode mailboxReceiveNode = getPBReceiveNode(1);
+    StagePlan stagePlan = new StagePlan(mailboxReceiveNode, _stageMetadata);
+    when(_mailboxService.getReceivingMailbox(MAILBOX_ID_1)).thenReturn(_mailbox1);
+    when(_mailbox1.poll()).thenThrow(new OutOfMemoryError("Java heap space (test)"));
+
+    PipelineBreakerResult pipelineBreakerResult =
+        executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan, Map.of(), 0, Long.MAX_VALUE);
+
+    Assert.assertNotNull(pipelineBreakerResult);
+    ErrorMseBlock errorBlock = pipelineBreakerResult.getErrorBlock();
+    Assert.assertNotNull(errorBlock);
+    String message = errorBlock.getErrorMessages().get(QueryErrorCode.UNKNOWN);
+    Assert.assertNotNull(message, "Unexpected error: " + errorBlock.getErrorMessages());
+    Assert.assertTrue(message.contains("Java heap space (test)"), message);
   }
 
   @Test

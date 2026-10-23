@@ -20,15 +20,23 @@ package org.apache.pinot.core.transport;
 
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListenableFutureTask;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.LongAccumulator;
+import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.datatable.DataTable.MetadataKey;
+import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
@@ -37,10 +45,14 @@ import org.apache.pinot.core.query.scheduler.resources.UnboundedResourceManager;
 import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.query.QueryExecutionContext;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.util.TestUtils;
+import org.apache.thrift.TSerializer;
+import org.apache.thrift.protocol.TCompactProtocol;
 import org.mockito.ArgumentCaptor;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -142,6 +154,40 @@ public class InstanceRequestHandlerTest {
     listenerCaptor.getValue().operationComplete(failedFuture);
 
     verify(ctx).close();
+  }
+
+  @Test
+  public void testRepliesWithErrorWhenQueryCannotBeCompiled()
+      throws Exception {
+    PinotConfiguration config = new PinotConfiguration();
+    QueryScheduler queryScheduler = createQueryScheduler(config, new CountDownLatch(0));
+    InstanceRequestHandler handler =
+        new InstanceRequestHandler("server01", config, queryScheduler, mock(AccessControl.class),
+            ThreadAccountantUtils.getNoOpAccountant());
+
+    // EXPR_MIN cannot be executed without the broker-side ExprMinMaxRewriter, so the server fails to build the
+    // aggregation function while it compiles the request.
+    BrokerRequest brokerRequest = new BrokerRequest();
+    brokerRequest.setPinotQuery(CalciteSqlParser.compileToPinotQuery("SELECT EXPR_MIN(a, b) FROM testTable_OFFLINE"));
+    InstanceRequest instanceRequest = new InstanceRequest(123L, brokerRequest);
+    byte[] requestBytes = new TSerializer(new TCompactProtocol.Factory()).serialize(instanceRequest);
+
+    ChannelHandlerContext ctx = mock(ChannelHandlerContext.class);
+    when(ctx.writeAndFlush(any())).thenReturn(mock(ChannelFuture.class));
+    handler.channelRead0(ctx, Unpooled.wrappedBuffer(requestBytes));
+
+    ArgumentCaptor<ByteBuf> responseCaptor = ArgumentCaptor.forClass(ByteBuf.class);
+    verify(ctx).writeAndFlush(responseCaptor.capture());
+    ByteBuf response = responseCaptor.getValue();
+    byte[] responseBytes = new byte[response.readableBytes()];
+    response.readBytes(responseBytes);
+    DataTable dataTable = DataTableFactory.getDataTable(responseBytes);
+    assertEquals(dataTable.getMetadata().get(MetadataKey.REQUEST_ID.getName()), "123");
+    Map<Integer, String> exceptions = dataTable.getExceptions();
+    assertEquals(exceptions.size(), 1);
+    String message = exceptions.get(QueryErrorCode.QUERY_EXECUTION.getId());
+    // Thrown by AggregationFunctionFactory for an EXPR_MIN that the broker did not rewrite
+    assertTrue(message.contains("Aggregation function: EXPRMIN is only supported in selection without alias"), message);
   }
 
   private QueryScheduler createQueryScheduler(PinotConfiguration config, CountDownLatch queryFinishLatch) {

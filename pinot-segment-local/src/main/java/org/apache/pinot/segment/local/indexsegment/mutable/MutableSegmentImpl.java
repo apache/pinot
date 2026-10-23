@@ -61,6 +61,7 @@ import org.apache.pinot.segment.local.realtime.impl.dictionary.BaseOffHeapMutabl
 import org.apache.pinot.segment.local.realtime.impl.dictionary.SameValueMutableDictionary;
 import org.apache.pinot.segment.local.realtime.impl.forward.SameValueMutableForwardIndex;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.MultiColumnRealtimeLuceneTextIndex;
+import org.apache.pinot.segment.local.realtime.impl.json.MutableJsonIndexImpl;
 import org.apache.pinot.segment.local.realtime.impl.nullvalue.MutableNullValueVector;
 import org.apache.pinot.segment.local.segment.index.datasource.MutableDataSource;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
@@ -176,8 +177,10 @@ public class MutableSegmentImpl implements MutableSegment {
   private final Collection<ComplexFieldSpec> _physicalComplexFieldSpecs;
   private final PartitionDedupMetadataManager _partitionDedupMetadataManager;
   private final String _dedupTimeColumn;
+  private final List<String> _dedupPrimaryKeyColumns;
   private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
   private final boolean _isPartialUpsert;
+  private final List<String> _upsertPrimaryKeyColumns;
   private final List<String> _upsertComparisonColumns;
   private final String _deleteRecordColumn;
   private final boolean _upsertDropOutOfOrderRecord;
@@ -382,7 +385,8 @@ public class MutableSegmentImpl implements MutableSegment {
           // See isNoDictionaryColumn to have more context.
           dictionaryIndexConfig = DictionaryIndexConfig.DEFAULT;
         }
-        dictionary = DictionaryIndexType.createMutableDictionary(context, dictionaryIndexConfig);
+        dictionary = ((DictionaryIndexType) StandardIndexes.dictionary()).createMutableDictionary(context,
+            dictionaryIndexConfig);
       } else {
         dictionary = null;
         if (!fieldSpec.isSingleValueField()) {
@@ -456,6 +460,9 @@ public class MutableSegmentImpl implements MutableSegment {
     _dedupTimeColumn =
         _partitionDedupMetadataManager != null ? _partitionDedupMetadataManager.getContext().getDedupTimeColumn()
             : null;
+    _dedupPrimaryKeyColumns =
+        _partitionDedupMetadataManager != null ? _partitionDedupMetadataManager.getContext().getPrimaryKeyColumns()
+            : null;
 
     _partitionUpsertMetadataManager = config.getPartitionUpsertMetadataManager();
     if (_partitionUpsertMetadataManager != null) {
@@ -463,6 +470,7 @@ public class MutableSegmentImpl implements MutableSegment {
           "Metrics aggregation and upsert cannot be enabled together");
       UpsertContext upsertContext = _partitionUpsertMetadataManager.getContext();
       _isPartialUpsert = upsertContext.getUpsertMode() == UpsertConfig.Mode.PARTIAL;
+      _upsertPrimaryKeyColumns = upsertContext.getPrimaryKeyColumns();
       _upsertComparisonColumns = upsertContext.getComparisonColumns();
       _deleteRecordColumn = upsertContext.getDeleteRecordColumn();
       _upsertDropOutOfOrderRecord = upsertContext.isDropOutOfOrderRecord();
@@ -476,6 +484,7 @@ public class MutableSegmentImpl implements MutableSegment {
       }
     } else {
       _isPartialUpsert = false;
+      _upsertPrimaryKeyColumns = null;
       _upsertComparisonColumns = null;
       _deleteRecordColumn = null;
       _upsertDropOutOfOrderRecord = false;
@@ -777,7 +786,7 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   private DedupRecordInfo getDedupRecordInfo(GenericRow row) {
-    PrimaryKey primaryKey = row.getPrimaryKey(_schema.getPrimaryKeyColumns());
+    PrimaryKey primaryKey = row.getPrimaryKey(_dedupPrimaryKeyColumns);
     // it is okay not having dedup time column if metadata ttl is not enabled
     if (_dedupTimeColumn == null) {
       return new DedupRecordInfo(primaryKey);
@@ -787,7 +796,10 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   private RecordInfo getRecordInfo(GenericRow row, int docId) {
-    PrimaryKey primaryKey = row.getPrimaryKey(_schema.getPrimaryKeyColumns());
+    // Take the key from the metadata manager's context, not this segment's schema: the context is fixed for the
+    // life of the manager, while a new consuming segment picks up the latest schema. Reading the schema here lets
+    // a primary key change desync the two and hash the same row under two different keys.
+    PrimaryKey primaryKey = row.getPrimaryKey(_upsertPrimaryKeyColumns);
     Comparable comparisonValue = getComparisonValue(row);
     boolean deleteRecord = _deleteRecordColumn != null && BooleanUtils.toBoolean(row.getValue(_deleteRecordColumn));
     return new RecordInfo(primaryKey, docId, comparisonValue, deleteRecord);
@@ -952,6 +964,18 @@ public class MutableSegmentImpl implements MutableSegment {
         for (Map.Entry<IndexType, MutableIndex> indexEntry : indexContainer._mutableIndexes.entrySet()) {
           try {
             MutableIndex mutableIndex = indexEntry.getValue();
+            if (mutableIndex instanceof MutableJsonIndexImpl) {
+              // Feed the JSON index the parsed value cached by the DataTypeTransformer (if any), so it flattens the
+              // document directly instead of re-parsing the string this column was serialized into for the forward
+              // index; the index falls back to that string for documents it cannot flatten directly. This is
+              // intentionally scoped to Pinot's built-in JSON index implementation.
+              Object parsedValue = row.getParsedJsonValue(column);
+              if (parsedValue != null && value instanceof String) {
+                ((MutableJsonIndexImpl) mutableIndex).addParsed(parsedValue, (String) value);
+                updateIndexCapacityThresholdBreached(mutableIndex, indexEntry.getKey(), column);
+                continue;
+              }
+            }
             mutableIndex.add(value, dictId, docId);
             updateIndexCapacityThresholdBreached(mutableIndex, indexEntry.getKey(), column);
           } catch (Exception e) {

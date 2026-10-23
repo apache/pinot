@@ -320,8 +320,10 @@ public class TransformFunctionFactory {
               expression.getFunction().getArguments(), ArrayLiteralTransformFunction::new);
         }
 
-        // Check if the function is GenerateArray transform function
-        if (functionName.equalsIgnoreCase(GenerateArrayTransformFunction.FUNCTION_NAME)) {
+        // Check if the function is GenerateArray transform function. It generates the array once, so it takes only
+        // literals. Other arguments go through the scalar function below, which generates an array per row.
+        if (functionName.equalsIgnoreCase(GenerateArrayTransformFunction.FUNCTION_NAME) && function.getArguments()
+            .stream().allMatch(argument -> argument.getType() == ExpressionContext.Type.LITERAL)) {
           return queryContext.getOrComputeSharedValue(GenerateArrayTransformFunction.class,
               expression.getFunction().getArguments(),
               GenerateArrayTransformFunction::new);
@@ -370,7 +372,7 @@ public class TransformFunctionFactory {
         }
 
         try {
-          transformFunction.init(transformFunctionArguments, columnContextMap, queryContext.isNullHandlingEnabled());
+          transformFunction.init(transformFunctionArguments, columnContextMap, queryContext);
         } catch (Exception e) {
           throw new BadQueryRequestException("Caught exception while initializing transform function: "
               + functionName + ": " + e.getMessage(), e);

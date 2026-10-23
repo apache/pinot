@@ -168,4 +168,40 @@ public class GenericRowTest {
     second.putDefaultNullValue("one", null);
     Assert.assertEquals(first, second);
   }
+
+  @Test
+  public void testParsedJsonValueInvalidatedOnValueChange() {
+    // The parse-once cache must not outlive the value it mirrors: overwriting or removing a field drops its cached
+    // parsed JSON node, so a downstream JSON index never flattens content the serialized value no longer holds.
+    GenericRow row = new GenericRow();
+    row.putValue("j", "{\"a\":1}");
+    row.putParsedJsonValue("j", "parsed-node");
+    Assert.assertNotNull(row.getParsedJsonValue("j"));
+
+    // putValue (e.g. a sanitization transformer trimming the JSON string) invalidates the now-stale node.
+    row.putValue("j", "{\"a\":");
+    Assert.assertNull(row.getParsedJsonValue("j"));
+
+    // putValues invalidates the overwritten keys.
+    row.putParsedJsonValue("j", "parsed-node");
+    HashMap<String, Object> values = new HashMap<>();
+    values.put("j", "x");
+    row.putValues(values);
+    Assert.assertNull(row.getParsedJsonValue("j"));
+
+    // putDefaultNullValue invalidates.
+    row.putParsedJsonValue("j", "parsed-node");
+    row.putDefaultNullValue("j", "default");
+    Assert.assertNull(row.getParsedJsonValue("j"));
+
+    // removeValue invalidates.
+    row.putParsedJsonValue("k", "parsed-node");
+    row.removeValue("k");
+    Assert.assertNull(row.getParsedJsonValue("k"));
+
+    // clear() drops everything for row reuse.
+    row.putParsedJsonValue("m", "parsed-node");
+    row.clear();
+    Assert.assertNull(row.getParsedJsonValue("m"));
+  }
 }

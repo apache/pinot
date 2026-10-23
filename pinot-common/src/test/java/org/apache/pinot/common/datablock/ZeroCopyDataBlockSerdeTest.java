@@ -19,9 +19,12 @@
 package org.apache.pinot.common.datablock;
 
 import com.google.common.collect.Lists;
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.testng.annotations.AfterSuite;
@@ -30,6 +33,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.fail;
 
 
@@ -99,5 +103,28 @@ public class ZeroCopyDataBlockSerdeTest {
     assertEquals(deserialized.getNumberOfColumns(), block.getNumberOfColumns(), "Unexpected number of columns");
     assertEquals(deserialized.getExceptions(), block.getExceptions(), "Unexpected exceptions");
     DataBlockEquals.checkSameContent(deserialized, block, "Unexpected data");
+  }
+
+  @Test
+  void testStringDictionary()
+      throws Exception {
+    // Longer, shorter and empty entries share the scratch bytes used while decoding the dictionary.
+    String[] dictionary = {"", "long-" + "x".repeat(4097), "tiny", "東京", "𝄞😀", "", "\u0000tail", "final"};
+    ByteBuffer fixedSizeData = ByteBuffer.allocate(dictionary.length * Integer.BYTES);
+    for (int dictId = dictionary.length - 1; dictId >= 0; dictId--) {
+      fixedSizeData.putInt(dictId);
+    }
+    DataSchema dataSchema = new DataSchema(new String[]{"value"}, new ColumnDataType[]{ColumnDataType.STRING});
+    RowDataBlock block =
+        new RowDataBlock(dictionary.length, dataSchema, dictionary, fixedSizeData.array(), new byte[0]);
+
+    DataBlock deserialized = DataBlockUtils.deserialize(DataBlockUtils.serialize(block));
+    String[] actual = deserialized.getStringDictionary();
+    assertEquals(actual, dictionary);
+    assertSame(actual[0], "");
+    assertSame(actual[5], "");
+    for (int row = 0; row < dictionary.length; row++) {
+      assertEquals(deserialized.getString(row, 0), dictionary[dictionary.length - 1 - row]);
+    }
   }
 }

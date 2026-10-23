@@ -55,6 +55,9 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 /// 3. JSON index (JsonMatchFilterOperator)
 /// 4. Expression scan fallback (ExpressionFilterOperator)
 public class MapFilterOperator extends BaseFilterOperator {
+  /// A key's JSON path, in the form an index's configured paths are written in ("$.user_tier").
+  private static final String JSON_PATH_PREFIX = "$.";
+
   private static final String EXPLAIN_NAME = "FILTER_MAP";
 
   private enum DelegateType {
@@ -161,10 +164,16 @@ public class MapFilterOperator extends BaseFilterOperator {
   private BaseFilterOperator trySparseJsonIndex(OpenStructDataSource osDs, DataSource sparseKeyDs,
       QueryContext queryContext, int numDocs) {
     JsonIndexReader jsonIndex = osDs.getSparseJsonIndex();
-    if (jsonIndex == null) {
+    if (jsonIndex == null || !servesKey(jsonIndex)) {
       return null;
     }
     if (sparseKeyDs.getDataSourceMetadata().getDataType().getStoredType() != FieldSpec.DataType.STRING) {
+      return null;
+    }
+    if (!sparseKeyDs.getDataSourceMetadata().isSingleValue()) {
+      // The blob holds a multi-value key as a JSON array, and the index flattens an array element-wise, while
+      // the predicate here names the key itself -- so the postings answer a different question than the scan
+      // over the key's values does. A multi-value key never takes the fast path.
       return null;
     }
     List<String> values;
@@ -244,11 +253,21 @@ public class MapFilterOperator extends BaseFilterOperator {
         jsonIndex = (JsonIndexReader) dataSource.getIndex(compositeIndex.get());
       }
     }
-    if (jsonIndex == null) {
+    if (jsonIndex == null || !servesKey(jsonIndex)) {
       return null;
     }
     FilterContext filterContext = createFilterContext();
     return new JsonMatchFilterOperator(jsonIndex, filterContext, numDocs);
+  }
+
+  /// Whether this index actually holds postings for the key being filtered on.
+  ///
+  /// An index that indexes every path -- the standard JSON index -- always does. One that indexes a configured
+  /// subset answers an unindexed path with an empty bitmap, which is indistinguishable from "no document matches":
+  /// the query returns zero rows and nothing says why. Asking first turns that into a scan, which is slower and
+  /// right.
+  private boolean servesKey(JsonIndexReader jsonIndex) {
+    return jsonIndex.isPathIndexed(JSON_PATH_PREFIX + _keyName);
   }
 
   private FilterContext createFilterContext() {
@@ -265,9 +284,10 @@ public class MapFilterOperator extends BaseFilterOperator {
   }
 
   /// Forwarded so three-valued logic survives the delegation. `NotFilterOperator.getTrues()` reads
-  /// `getFalses()`, and `And`/`OrFilterOperator.getFalses()` read `getNulls()`; leaving these on the
-  /// base implementation would report an absent key's UNKNOWN docs as FALSE, so
-  /// `NOT (col['key'] = v)` would match every doc missing the key.
+  /// `getFalses()`, and `And`/`OrFilterOperator.getNotFalses()` read their children's `getNotFalses()`;
+  /// leaving these on the base implementation would report an absent key's UNKNOWN docs as FALSE, so
+  /// `NOT (col['key'] = v)` would match every doc missing the key. `getNulls()` is forwarded too, so
+  /// that it stays consistent with the other three.
   @Override
   protected BlockDocIdSet getNulls() {
     return _delegate.getNulls();

@@ -23,6 +23,8 @@ import com.google.protobuf.ByteString;
 import io.grpc.Deadline;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 import java.util.HashMap;
 import java.util.List;
@@ -77,6 +79,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class QueryServerTest extends QueryTestSet {
@@ -146,6 +149,58 @@ public class QueryServerTest extends QueryTestSet {
         QueryTestUtils.getAvailablePort(), mock(QueryRunner.class), null, ThreadAccountantUtils.getNoOpAccountant());
     assertEquals(server.getPermitKeepAliveTimeMs(), 30_000);
     assertTrue(server.isPermitKeepAliveWithoutCalls());
+  }
+
+  @Test
+  public void testMaxInboundMessageSizeDefault() {
+    QueryServer server = new QueryServer(QueryTestUtils.getAvailablePort(), mock(QueryRunner.class));
+    assertEquals(server.getMaxInboundMessageSizeBytes(), 64 * 1024 * 1024);
+  }
+
+  @Test
+  public void testRejectsNonPositiveMaxInboundMessageSize() {
+    for (int maxInboundMessageSizeBytes : new int[]{0, -1}) {
+      PinotConfiguration config = new PinotConfiguration(
+          Map.of(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_SERVER_MAX_INBOUND_MESSAGE_SIZE_BYTES,
+              maxInboundMessageSizeBytes));
+      IllegalArgumentException exception = expectThrows(IllegalArgumentException.class,
+          () -> new QueryServer(config, "serverId", QueryTestUtils.getAvailablePort(), mock(QueryRunner.class), null,
+              ThreadAccountantUtils.getNoOpAccountant()));
+      assertTrue(exception.getMessage()
+          .contains(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_SERVER_MAX_INBOUND_MESSAGE_SIZE_BYTES));
+    }
+  }
+
+  @Test
+  public void testMaxInboundMessageSizeFromConfig()
+      throws Exception {
+    // A request with large literals, e.g. an IdSet, must fit the configured limit
+    Worker.QueryRequest queryRequest;
+    try (QueryEnvironment.CompiledQuery compiledQuery = _queryEnvironment.compile("SELECT * FROM a")) {
+      queryRequest = getQueryRequest(compiledQuery.planQuery(0).getQueryPlan(), 1);
+    }
+    int maxInboundMessageSizeBytes = queryRequest.getSerializedSize() - 1;
+    int port = QueryTestUtils.getAvailablePort();
+    QueryServer server = new QueryServer(new PinotConfiguration(
+        Map.of(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_SERVER_MAX_INBOUND_MESSAGE_SIZE_BYTES,
+            maxInboundMessageSizeBytes)), "serverId", port, mock(QueryRunner.class), null,
+        ThreadAccountantUtils.getNoOpAccountant());
+    assertEquals(server.getMaxInboundMessageSizeBytes(), maxInboundMessageSizeBytes);
+    server.start();
+    ManagedChannel channel = ManagedChannelBuilder.forAddress("localhost", port).usePlaintext().build();
+    try {
+      PinotQueryWorkerGrpc.PinotQueryWorkerBlockingStub stub =
+          PinotQueryWorkerGrpc.newBlockingStub(channel).withDeadline(Deadline.after(10, TimeUnit.SECONDS));
+      StatusRuntimeException exception = expectThrows(StatusRuntimeException.class, () -> stub.submit(queryRequest));
+      assertEquals(exception.getStatus().getCode(), Status.Code.RESOURCE_EXHAUSTED);
+      // A smaller request reaches the server
+      Worker.QueryResponse response =
+          stub.submit(Worker.QueryRequest.newBuilder().setMetadata(queryRequest.getMetadata()).build());
+      assertTrue(response.getMetadataMap().containsKey(CommonConstants.Query.Response.ServerResponseStatus.STATUS_OK));
+    } finally {
+      channel.shutdownNow();
+      server.shutdown();
+    }
   }
 
   @Test
@@ -235,13 +290,26 @@ public class QueryServerTest extends QueryTestSet {
   @Test(dataProvider = "testSql")
   public void testWorkerAcceptsWorkerRequestCorrect(String sql)
       throws Exception {
+    testWorkerAcceptsWorkerRequestCorrect(sql, false);
+  }
+
+  /// Same as [#testWorkerAcceptsWorkerRequestCorrect(String)] with the leaf-stage segment lists shipped as native
+  /// proto fields instead of the legacy JSON custom property.
+  @Test(dataProvider = "testSql")
+  public void testWorkerAcceptsProtoSegmentListRequestCorrect(String sql)
+      throws Exception {
+    testWorkerAcceptsWorkerRequestCorrect(sql, true);
+  }
+
+  private void testWorkerAcceptsWorkerRequestCorrect(String sql, boolean protoSegmentList)
+      throws Exception {
     DispatchableSubPlan queryPlan = _queryEnvironment.planQuery(sql);
     Set<DispatchablePlanFragment> stagePlans = queryPlan.getQueryStagesWithoutRoot();
     // Ignore reduce stage (stage 0)
     for (DispatchablePlanFragment stagePlan : stagePlans) {
       int stageId = stagePlan.getPlanFragment().getFragmentId();
       // only get one worker request out.
-      Worker.QueryRequest queryRequest = getQueryRequest(queryPlan, stageId);
+      Worker.QueryRequest queryRequest = getQueryRequest(queryPlan, stageId, protoSegmentList);
       Map<String, String> requestMetadata = QueryPlanSerDeUtils.fromProtoProperties(queryRequest.getMetadata());
 
       // submit the request for testing.
@@ -321,10 +389,14 @@ public class QueryServerTest extends QueryTestSet {
   }
 
   private Worker.QueryRequest getQueryRequest(DispatchableSubPlan queryPlan, int stageId) {
+    return getQueryRequest(queryPlan, stageId, false);
+  }
+
+  private Worker.QueryRequest getQueryRequest(DispatchableSubPlan queryPlan, int stageId, boolean protoSegmentList) {
     DispatchablePlanFragment stagePlan = queryPlan.getQueryStageMap().get(stageId);
     Plan.PlanNode rootNode = PlanNodeSerializer.process(stagePlan.getPlanFragment().getFragmentRoot());
     List<Worker.WorkerMetadata> workerMetadataList =
-        QueryPlanSerDeUtils.toProtoWorkerMetadataList(stagePlan.getWorkerMetadataList());
+        QueryPlanSerDeUtils.toProtoWorkerMetadataList(stagePlan.getWorkerMetadataList(), protoSegmentList);
     ByteString customProperty = QueryPlanSerDeUtils.toProtoProperties(stagePlan.getCustomProperties());
 
     // this particular test set requires the request to have a single QueryServerInstance to dispatch to

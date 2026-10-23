@@ -1,0 +1,49 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.pinot.segment.local.customobject.tdigest;
+
+import org.apache.pinot.spi.utils.BytesUtils;
+
+import static com.google.common.base.Preconditions.checkArgument;
+
+/// Immutable serialized result and comparison key for a specific percentile value.
+/// Uses Double.compare ordering: NaN quantiles sort last ascending and first descending, ahead of positive infinity.
+public class SerializedTDigest implements Comparable<SerializedTDigest> {
+  private final double _percentile;
+  private final byte[] _serializedBytes;
+  private final double _quantile;
+
+  public SerializedTDigest(TDigest tDigest, double percentile) {
+    _percentile = percentile / 100.0;
+    // Finalize a snapshot: trim survivors continue aggregating, and the key must match the emitted encoding.
+    _serializedBytes = tDigest.serializeSnapshot();
+    _quantile = TDigestCodec.quantile(_serializedBytes, _percentile);
+  }
+
+  @Override
+  public int compareTo(SerializedTDigest other) {
+    checkArgument(other._percentile == _percentile, "Percentile number doesn't match!");
+    return Double.compare(_quantile, other._quantile);
+  }
+
+  @Override
+  public String toString() {
+    return BytesUtils.toHexString(_serializedBytes);
+  }
+}
