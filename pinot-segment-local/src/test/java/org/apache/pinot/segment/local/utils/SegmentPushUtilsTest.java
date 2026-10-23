@@ -635,7 +635,8 @@ public class SegmentPushUtilsTest {
   }
 
   @Test(dataProvider = "segmentTarExtensions")
-  public void testSegmentArchiveScanning(String extension) {
+  public void testSegmentArchiveScanning(String extension)
+      throws IOException {
     String archiveUri = _tempDir.toURI().resolve(TEST_SEGMENT_NAME + extension).toString();
     assertEquals(SegmentPushUtils.getSegmentNameFromTarFile(archiveUri), TEST_SEGMENT_NAME);
     String[] files = {archiveUri, new File(_tempDir, "testSegment.metadata.tar.gz").toURI().toString(),
@@ -647,6 +648,16 @@ public class SegmentPushUtilsTest {
     pushSpec.setSegmentUriPrefix("s3://segments-bucket");
     assertEquals(SegmentPushUtils.getSegmentUriToTarPathMap(null, pushSpec, files),
         Map.of("s3://segments-bucket" + URI.create(archiveUri).getRawPath(), archiveUri));
+
+    File localArchive = new File(_tempDir, "a%3Ab" + extension);
+    assertTrue(localArchive.createNewFile());
+    String localArchivePath = localArchive.getAbsolutePath();
+    String localArchiveUri = _tempDir.toURI().resolve("a%253Ab" + extension).toString();
+    String[] localFiles = {localArchivePath};
+    assertEquals(SegmentPushUtils.getSegmentUriToTarPathMap(_tempDir.toURI(), new PushJobSpec(), localFiles),
+        Map.of(localArchiveUri, localArchivePath));
+    assertEquals(SegmentPushUtils.getSegmentUriToTarPathMap(_tempDir.toURI(), pushSpec, localFiles),
+        Map.of("s3://segments-bucket" + URI.create(localArchiveUri).getRawPath(), localArchivePath));
   }
 
   @Test

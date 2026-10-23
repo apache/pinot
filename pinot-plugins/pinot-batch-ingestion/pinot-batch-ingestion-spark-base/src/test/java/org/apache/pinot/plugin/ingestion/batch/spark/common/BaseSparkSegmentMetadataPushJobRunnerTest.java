@@ -23,7 +23,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.plugin.ingestion.batch.common.BaseSegmentPushJobRunner;
 import org.apache.pinot.spi.ingestion.batch.runner.IngestionJobRunner;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.PushJobSpec;
@@ -32,10 +34,38 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.fail;
 
 
 /// Exercises shared archive selection before dispatching Spark push jobs.
 public class BaseSparkSegmentMetadataPushJobRunnerTest {
+  @Test
+  public void testEmptyStandaloneSelectionSkipsConsistentPush()
+      throws Exception {
+    BaseSegmentPushJobRunner runner = new BaseSegmentPushJobRunner() {
+      @Override
+      public void initFileSys() {
+        _spec = new SegmentGenerationJobSpec();
+        _spec.setPushJobSpec(new PushJobSpec());
+        _spec.getPushJobSpec().setPushFileNamePattern("glob:**/*.tar.zst");
+        _outputDirURI = URI.create("file:/segments/");
+        _files = new String[]{"/segments/segment.tar.gz"};
+        _consistentPushEnabled = true;
+      }
+
+      @Override
+      public List<String> getSegmentsToReplace(Map<String, String> segments) {
+        throw new AssertionError("Empty selection must not start consistent push");
+      }
+
+      @Override
+      public void uploadSegments(Map<String, String> segments) {
+        fail("Empty selection must not upload segments");
+      }
+    };
+    runner.run();
+  }
+
   @Test
   public void testPushPatternSelectsSegmentArchives()
       throws Exception {

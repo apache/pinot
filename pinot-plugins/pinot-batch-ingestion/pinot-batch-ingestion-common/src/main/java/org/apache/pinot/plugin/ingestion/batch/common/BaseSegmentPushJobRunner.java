@@ -125,6 +125,9 @@ public abstract class BaseSegmentPushJobRunner implements IngestionJobRunner {
     try {
       Map<String, String> segmentsUriToTarPathMap =
           SegmentPushUtils.getSegmentUriToTarPathMap(_outputDirURI, _spec.getPushJobSpec(), _files);
+      if (segmentsUriToTarPathMap.isEmpty()) {
+        return;
+      }
       if (_consistentPushEnabled) {
         List<String> segmentsToReplace = getSegmentsToReplace(segmentsUriToTarPathMap);
         uriToLineageEntryIdMap = ConsistentDataPushUtils.preUpload(_spec, segmentsToReplace);

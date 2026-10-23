@@ -705,6 +705,10 @@ public class SegmentPushUtils implements Serializable {
         segmentUriToTarPathMap.put(updatedURI.toString(), file);
       }
     }
+    if (segmentUriToTarPathMap.isEmpty()) {
+      LOGGER.warn("No segment archives selected under outputDirURI: {} with pushFileNamePattern: {}", outputDirURI,
+          pushSpec.getPushFileNamePattern());
+    }
     return segmentUriToTarPathMap;
   }
 
