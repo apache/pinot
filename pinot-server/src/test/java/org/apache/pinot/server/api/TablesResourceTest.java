@@ -536,6 +536,10 @@ public class TablesResourceTest extends BaseResourceTest {
     String segmentPath = "/segments/" + tableNameWithType + "/" + segment.getSegmentName();
 
     File segmentDir = new File(_tableDataManagerMap.get(tableNameWithType).getTableDataDir(), segment.getSegmentName());
+    // The fixture loads without an instance config; create the local serving sidecar to test its tar exclusion.
+    try (SegmentMetadataImpl mappedMetadata = SegmentMetadataImpl.loadMapped(segmentDir)) {
+      assertTrue(mappedMetadata.isMapped());
+    }
     assertTrue(new File(segmentDir, "segment_metadata.bin").isFile());
     File temporarySidecar = new File(segmentDir, ".segment_metadata.test.tmp");
     Files.writeString(temporarySidecar.toPath(), "in progress");
