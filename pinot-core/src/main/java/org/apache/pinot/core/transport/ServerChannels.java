@@ -140,14 +140,16 @@ public class ServerChannels {
     _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_CHUNK_SIZE, metric::chunkSize);
   }
 
-  public void sendRequest(String rawTableName, AsyncQueryResponse asyncQueryResponse,
+  /// Sends the request to the server, connecting first if there is no open connection, and returns the connection the
+  /// request was written to.
+  public Channel sendRequest(String rawTableName, AsyncQueryResponse asyncQueryResponse,
       ServerRoutingInstance serverRoutingInstance, InstanceRequest instanceRequest, long timeoutMs)
       throws Exception {
     byte[] requestBytes = THREAD_LOCAL_T_SERIALIZER.get().serialize(instanceRequest);
     ServerChannel serverChannel = _serverToChannelMap.computeIfAbsent(serverRoutingInstance, ServerChannel::new);
     // This server is now query-carrying, whoever opened the channel. See [#hasChannel].
     serverChannel._openedByQuery = true;
-    serverChannel.sendRequest(rawTableName, asyncQueryResponse, serverRoutingInstance, requestBytes, timeoutMs);
+    return serverChannel.sendRequest(rawTableName, asyncQueryResponse, serverRoutingInstance, requestBytes, timeoutMs);
   }
 
   /// Whether this broker has sent, or tried to send, a single-stage query to the given server.
@@ -168,19 +170,6 @@ public class ServerChannels {
   public void connect(ServerRoutingInstance serverRoutingInstance)
       throws InterruptedException, TimeoutException {
     _serverToChannelMap.computeIfAbsent(serverRoutingInstance, ServerChannel::new).connect();
-  }
-
-  /// Closes the channel to the server, if one is open, so that the next request to it connects afresh.
-  ///
-  /// The broker uses this after a server fails to answer a ping. The channel may be half-open -- nothing closes it
-  /// when the peer's node disappears without sending a FIN or an RST -- and requests written into it are never read.
-  /// Closing it also ends whatever is still in flight to that server right away (see [DataTableHandler]), rather than
-  /// leaving those queries to wait out their own timeouts against a server that is not going to answer.
-  void closeChannel(ServerRoutingInstance serverRoutingInstance) {
-    ServerChannel serverChannel = _serverToChannelMap.get(serverRoutingInstance);
-    if (serverChannel != null) {
-      serverChannel.closeChannel();
-    }
   }
 
   /// Opens a channel ahead of query traffic, awaiting the TLS handshake so that neither the connect nor
@@ -209,7 +198,7 @@ public class ServerChannels {
     final Bootstrap _bootstrap;
     // lock to protect channel as requests must be written into channel sequentially
     final ReentrantLock _channelLock = new ReentrantLock();
-    volatile Channel _channel;
+    Channel _channel;
     // Set once a query has been sent, or attempted, through this channel; startup pre-connect leaves it
     // false. Read by hasChannel(), which the failure detector uses to decide whether the single-stage
     // transport has any opinion on this server's health. Volatile: written on a query thread, read on the
@@ -263,13 +252,15 @@ public class ServerChannels {
       }
     }
 
-    void sendRequest(String rawTableName, AsyncQueryResponse asyncQueryResponse,
+    Channel sendRequest(String rawTableName, AsyncQueryResponse asyncQueryResponse,
         ServerRoutingInstance serverRoutingInstance, byte[] requestBytes, long timeoutMs)
         throws InterruptedException, TimeoutException {
       if (_channelLock.tryLock(timeoutMs, TimeUnit.MILLISECONDS)) {
         try {
           connectWithoutLocking(timeoutMs);
+          Channel channel = _channel;
           sendRequestWithoutLocking(rawTableName, asyncQueryResponse, serverRoutingInstance, requestBytes);
+          return channel;
         } finally {
           _channelLock.unlock();
         }
@@ -377,7 +368,9 @@ public class ServerChannels {
     void sendRequestWithoutLocking(String rawTableName, AsyncQueryResponse asyncQueryResponse,
         ServerRoutingInstance serverRoutingInstance, byte[] requestBytes) {
       long startTimeMs = System.currentTimeMillis();
-      _channel.writeAndFlush(Unpooled.wrappedBuffer(requestBytes)).addListener(f -> {
+      // The listener runs later, by when a reconnect may have replaced _channel: on failure it closes this connection.
+      Channel channel = _channel;
+      channel.writeAndFlush(Unpooled.wrappedBuffer(requestBytes)).addListener(f -> {
         if (f.isSuccess()) {
           int requestSentLatencyMs = (int) (System.currentTimeMillis() - startTimeMs);
           _brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.NETTY_CONNECTION_SEND_REQUEST_LATENCY,
@@ -390,7 +383,7 @@ public class ServerChannels {
               new RuntimeException("Failed to send request to server: " + serverRoutingInstance, f.cause()))) {
             _brokerMetrics.addMeteredGlobalValue(BrokerMeter.SERVER_MARKED_DOWN_SKIPPED, 1);
           }
-          _channel.close();
+          channel.close();
         }
       });
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.NETTY_CONNECTION_REQUESTS_SENT, 1);

@@ -181,6 +181,10 @@ public class ServerChannelsTest {
     // Simulate write failure
     when(mockFuture.isSuccess()).thenReturn(false);
     when(mockFuture.cause()).thenReturn(new OutOfMemoryError("Direct buffer memory"));
+    // By the time the listener runs, a reconnect may have replaced the channel. Only the connection written to is
+    // closed.
+    Channel replacementChannel = mock(Channel.class);
+    serverChannel.setChannel(replacementChannel);
 
     try {
       listenerCaptor.getValue().operationComplete(mockFuture);
@@ -189,6 +193,7 @@ public class ServerChannelsTest {
     }
 
     verify(mockChannel).close();
+    verify(replacementChannel, never()).close();
 
     verify(asyncQueryResponse).markServerUnavailable(any(ServerRoutingInstance.class), any(Exception.class));
     verify(asyncQueryResponse, never()).markRequestSent(any(ServerRoutingInstance.class), any(Integer.class));

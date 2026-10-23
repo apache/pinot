@@ -19,10 +19,11 @@
 package org.apache.pinot.core.transport;
 
 import com.google.common.annotations.VisibleForTesting;
+import io.netty.channel.Channel;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
@@ -205,42 +206,48 @@ public class QueryRouter {
   /// channel itself is half-open, left over from a server that went away. Either way queries sent over it would time
   /// out, which is why every channel has to answer, not just one.
   ///
-  /// Each channel that stays silent is closed so the next attempt over it connects afresh -- see
-  /// [ServerChannels#closeChannel]. Pings record no routing stats, so they never skew adaptive server selection.
+  /// Each channel gets a ping and a response of its own. With a shared one, a channel that fails at once would end the
+  /// wait for all of them, and a channel still due to answer would look silent.
+  ///
+  /// The connection a ping went out on is closed when that ping stays silent, so the next attempt connects afresh. It
+  /// is the one closed, rather than whichever connection the channel holds by then: a query may have reconnected in
+  /// the meantime, and its new connection has nothing to do with the silent one. Closing also ends whatever was still
+  /// in flight on the silent connection right away (see [DataTableHandler]), rather than leaving those queries to wait
+  /// out their own timeouts. Pings record no routing stats, so they never skew adaptive server selection.
   public boolean ping(ServerInstance serverInstance, long timeoutMs) {
+    List<Long> requestIds = new ArrayList<>(2);
     try {
       List<ServerRoutingInstance> routingInstances = channelRoutingInstances(serverInstance);
       if (routingInstances.isEmpty()) {
         return false;
       }
-      long requestId = _pingRequestIdGenerator.decrementAndGet();
-      InstanceRequest pingRequest = newPingRequest(requestId, _brokerId);
-      // Like a hybrid query, the pings share one request id and one response, which waits for every channel.
-      AsyncQueryResponse pingResponse =
-          new AsyncQueryResponse(this, requestId, new HashSet<>(routingInstances), System.currentTimeMillis(),
-              timeoutMs, _noOpRoutingStatsManager, false);
-      _asyncQueryResponseMap.put(requestId, pingResponse);
       ServerChannels serverChannels = channels();
-      List<ServerRoutingInstance> pingedRoutingInstances = new ArrayList<>(routingInstances.size());
+      List<SentPing> sentPings = new ArrayList<>(routingInstances.size());
+      boolean answered = true;
       for (ServerRoutingInstance routingInstance : routingInstances) {
-        pingedRoutingInstances.add(routingInstance);
+        long requestId = _pingRequestIdGenerator.decrementAndGet();
+        // The timeout starts at this ping's own send, so a slow send over one channel cannot cut short the wait for
+        // the next.
+        AsyncQueryResponse pingResponse =
+            new AsyncQueryResponse(this, requestId, Set.of(routingInstance), System.currentTimeMillis(), timeoutMs,
+                _noOpRoutingStatsManager, false);
+        requestIds.add(requestId);
+        _asyncQueryResponseMap.put(requestId, pingResponse);
         try {
-          serverChannels.sendRequest(PING_TABLE_NAME, pingResponse, routingInstance, pingRequest, timeoutMs);
+          Channel channel = serverChannels.sendRequest(PING_TABLE_NAME, pingResponse, routingInstance,
+              newPingRequest(requestId, _brokerId), timeoutMs);
+          sentPings.add(new SentPing(pingResponse, channel));
         } catch (Exception e) {
-          // Fails the whole ping; do not spend another connect timeout on the remaining channels.
-          pingResponse.markQueryFailed(routingInstance, e);
+          // No connection carried this ping, so there is none to close. Do not spend another connect timeout on the
+          // remaining channels: the ping has failed already, and the channels not reached stay as they are.
+          answered = false;
           break;
         }
       }
-      // Removes the ping from _asyncQueryResponseMap on every outcome.
-      // A channel the ping never reached, because an earlier send failed, stays open. That failed send already makes
-      // the ping unanswered.
-      Map<ServerRoutingInstance, ServerResponse> responses = pingResponse.getFinalResponses();
-      boolean answered = true;
-      for (ServerRoutingInstance routingInstance : pingedRoutingInstances) {
-        if (responses.get(routingInstance).getDataTable() == null) {
+      for (SentPing sentPing : sentPings) {
+        if (sentPing.response().getFinalResponses().values().iterator().next().getDataTable() == null) {
           answered = false;
-          serverChannels.closeChannel(routingInstance);
+          sentPing.channel().close();
         }
       }
       return answered;
@@ -251,7 +258,16 @@ public class QueryRouter {
       // toServerRoutingInstance() rejects a server that has not advertised the port, which happens mid-rollout.
       LOGGER.debug("Failed to ping server: {}", serverInstance, e);
       return false;
+    } finally {
+      // getFinalResponses() deregisters each response it waits for; this covers the ones it never got to.
+      for (long requestId : requestIds) {
+        markQueryDone(requestId);
+      }
     }
+  }
+
+  /// A ping that went out, and the connection it went out on.
+  private record SentPing(AsyncQueryResponse response, Channel channel) {
   }
 
   @VisibleForTesting
