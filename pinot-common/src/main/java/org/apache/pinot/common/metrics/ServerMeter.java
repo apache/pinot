@@ -193,6 +193,9 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   /// The number of bytes that have been sent to the next stage in serialized format.
   /// This is the sum of all bytes sent by all workers in the stage.
   MULTI_STAGE_RAW_BYTES("bytes", true),
+  /// Number of receiving mailboxes this server dropped because no operator ever read them, for example because the
+  /// blocks were meant for another server, or arrived after the query had ended.
+  MULTI_STAGE_ORPHANED_RECEIVING_MAILBOXES("mailboxes", true),
   /// Number of times the max number of rows in window has been reached. It is increased at most one by one each time
   /// per stage. That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 1.
   /// But if a single query has 2 different window operators and each one reaches the limit, this will be increased by

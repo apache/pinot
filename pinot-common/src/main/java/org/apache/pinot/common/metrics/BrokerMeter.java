@@ -260,6 +260,11 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   public static final BrokerMeter MSE_OPCHAINS_STARTED = create("MSE_OPCHAINS_STARTED", "opchains", true);
   public static final BrokerMeter MSE_OPCHAINS_COMPLETED = create("MSE_OPCHAINS_COMPLETED", "opchains", true);
 
+  /// Number of receiving mailboxes this broker dropped because no operator ever read them, for example because the
+  /// blocks were meant for another instance, or arrived after the query had ended.
+  public static final BrokerMeter MULTI_STAGE_ORPHANED_RECEIVING_MAILBOXES =
+      create("MULTI_STAGE_ORPHANED_RECEIVING_MAILBOXES", "mailboxes", true);
+
   /// Number of MSE queries that used the `SubmitWithStream` bidi-RPC stats path (stream mode).
   public static final BrokerMeter MSE_STREAM_STATS_QUERIES = create("MSE_STREAM_STATS_QUERIES", "queries", true);
 
