@@ -24,6 +24,7 @@ import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.buffer.PooledByteBufAllocatorMetric;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
@@ -139,14 +140,16 @@ public class ServerChannels {
     _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_CHUNK_SIZE, metric::chunkSize);
   }
 
-  public void sendRequest(String rawTableName, AsyncQueryResponse asyncQueryResponse,
+  /// Sends the request to the server, connecting first if there is no open connection, and returns the connection the
+  /// request was written to.
+  public Channel sendRequest(String rawTableName, AsyncQueryResponse asyncQueryResponse,
       ServerRoutingInstance serverRoutingInstance, InstanceRequest instanceRequest, long timeoutMs)
       throws Exception {
     byte[] requestBytes = THREAD_LOCAL_T_SERIALIZER.get().serialize(instanceRequest);
     ServerChannel serverChannel = _serverToChannelMap.computeIfAbsent(serverRoutingInstance, ServerChannel::new);
     // This server is now query-carrying, whoever opened the channel. See [#hasChannel].
     serverChannel._openedByQuery = true;
-    serverChannel.sendRequest(rawTableName, asyncQueryResponse, serverRoutingInstance, requestBytes, timeoutMs);
+    return serverChannel.sendRequest(rawTableName, asyncQueryResponse, serverRoutingInstance, requestBytes, timeoutMs);
   }
 
   /// Whether this broker has sent, or tried to send, a single-stage query to the given server.
@@ -249,13 +252,15 @@ public class ServerChannels {
       }
     }
 
-    void sendRequest(String rawTableName, AsyncQueryResponse asyncQueryResponse,
+    Channel sendRequest(String rawTableName, AsyncQueryResponse asyncQueryResponse,
         ServerRoutingInstance serverRoutingInstance, byte[] requestBytes, long timeoutMs)
         throws InterruptedException, TimeoutException {
       if (_channelLock.tryLock(timeoutMs, TimeUnit.MILLISECONDS)) {
         try {
-          connectWithoutLocking();
+          connectWithoutLocking(timeoutMs);
+          Channel channel = _channel;
           sendRequestWithoutLocking(rawTableName, asyncQueryResponse, serverRoutingInstance, requestBytes);
+          return channel;
         } finally {
           _channelLock.unlock();
         }
@@ -264,20 +269,29 @@ public class ServerChannels {
       }
     }
 
-    /// Lazy query path: opens the TCP connection only. Any TLS handshake is left to proceed
-    /// asynchronously so the channel lock is released as soon as the socket is up, keeping the first
-    /// query's critical section short. Startup pre-connect uses [#preConnectWithoutLocking(long)]
-    /// instead, which additionally pays the handshake.
-    void connectWithoutLocking()
-        throws InterruptedException {
+    /// Lazy query path: opens the TCP connection only, waiting at most `timeoutMs`. Any TLS handshake is left to
+    /// proceed asynchronously so the channel lock is released as soon as the socket is up, keeping the first query's
+    /// critical section short. Startup pre-connect uses [#preConnectWithoutLocking(long)] instead, which additionally
+    /// pays the handshake.
+    ///
+    /// Without the bound, a connect to a host that silently drops packets -- the very host the failure detector pings
+    /// -- blocks for Netty's 30 s default, however long the caller can actually wait.
+    void connectWithoutLocking(long timeoutMs)
+        throws InterruptedException, TimeoutException {
       if (_channel == null || !_channel.isActive()) {
         long startTime = System.currentTimeMillis();
-        _channel = _bootstrap.connect().sync().channel();
+        ChannelFuture connectFuture = _bootstrap.connect();
+        if (!connectFuture.await(timeoutMs, TimeUnit.MILLISECONDS)) {
+          connectFuture.channel().close();
+          throw new TimeoutException("Timed out connecting to server: " + _serverRoutingInstance);
+        }
+        // Completed by now: returns the channel, or rethrows the connect failure as sync() always did.
+        _channel = connectFuture.sync().channel();
         recordConnectTime(System.currentTimeMillis() - startTime);
       }
     }
 
-    /// Like [#connectWithoutLocking()] but additionally waits out the TLS handshake, and bounds both
+    /// Like [#connectWithoutLocking(long)] but additionally waits out the TLS handshake, and bounds both
     /// waits by `timeoutMs`.
     ///
     /// Used only by startup pre-connect ([#preConnect(long)]), never by the lazy query path or by the
@@ -354,7 +368,9 @@ public class ServerChannels {
     void sendRequestWithoutLocking(String rawTableName, AsyncQueryResponse asyncQueryResponse,
         ServerRoutingInstance serverRoutingInstance, byte[] requestBytes) {
       long startTimeMs = System.currentTimeMillis();
-      _channel.writeAndFlush(Unpooled.wrappedBuffer(requestBytes)).addListener(f -> {
+      // The listener runs later, by when a reconnect may have replaced _channel: on failure it closes this connection.
+      Channel channel = _channel;
+      channel.writeAndFlush(Unpooled.wrappedBuffer(requestBytes)).addListener(f -> {
         if (f.isSuccess()) {
           int requestSentLatencyMs = (int) (System.currentTimeMillis() - startTimeMs);
           _brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.NETTY_CONNECTION_SEND_REQUEST_LATENCY,
@@ -367,7 +383,7 @@ public class ServerChannels {
               new RuntimeException("Failed to send request to server: " + serverRoutingInstance, f.cause()))) {
             _brokerMetrics.addMeteredGlobalValue(BrokerMeter.SERVER_MARKED_DOWN_SKIPPED, 1);
           }
-          _channel.close();
+          channel.close();
         }
       });
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.NETTY_CONNECTION_REQUESTS_SENT, 1);
@@ -383,7 +399,8 @@ public class ServerChannels {
         throws InterruptedException, TimeoutException {
       if (_channelLock.tryLock(TRY_CONNECT_CHANNEL_LOCK_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
         try {
-          connectWithoutLocking();
+          // The connect gets as long as the lock wait.
+          connectWithoutLocking(TRY_CONNECT_CHANNEL_LOCK_TIMEOUT_MS);
         } finally {
           _channelLock.unlock();
         }
