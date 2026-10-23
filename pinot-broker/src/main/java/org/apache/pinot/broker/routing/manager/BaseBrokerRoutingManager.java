@@ -147,6 +147,9 @@ public abstract class BaseBrokerRoutingManager
   private final long _newSegmentExpirationMs;
   private final ExecutorService _executorService;
   private final List<Consumer<ServerInstance>> _serverReenableCallbacks = new CopyOnWriteArrayList<>();
+  // The callback installed through the deprecated setter, so that setting it again replaces it rather than piling up
+  @Nullable
+  private Consumer<ServerInstance> _legacyServerReenableCallback;
 
   // Providers of extra per-table segment ZK metadata fetch listeners, registered alongside the built-in segment
   // pruners on every table's routing entry. Each provider is invoked once per table (with the table name with type)
@@ -246,10 +249,18 @@ public abstract class BaseBrokerRoutingManager
     _serverReenableCallbacks.add(callback);
   }
 
+  /// Sets the callback of callers that predate [#addServerReenableCallback(Consumer)]. Keeps its replace semantics:
+  /// setting it again replaces the previously set callback, and only that one, so callbacks registered through
+  /// `addServerReenableCallback` (the single-stage channel eviction) are never dropped by a legacy caller.
+  ///
   /// @deprecated Use [#addServerReenableCallback(Consumer)]; several callbacks can be registered.
   @Deprecated
-  public void setServerReenableCallback(Consumer<ServerInstance> callback) {
-    addServerReenableCallback(callback);
+  public synchronized void setServerReenableCallback(Consumer<ServerInstance> callback) {
+    if (_legacyServerReenableCallback != null) {
+      _serverReenableCallbacks.remove(_legacyServerReenableCallback);
+    }
+    _legacyServerReenableCallback = callback;
+    _serverReenableCallbacks.add(callback);
   }
 
   /// Registers a provider of an extra [SegmentZkMetadataFetchListener] that is attached to every table's routing

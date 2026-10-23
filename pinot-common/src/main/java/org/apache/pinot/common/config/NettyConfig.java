@@ -87,10 +87,15 @@ public class NettyConfig {
         pinotConfig.getProperty(key(namespace, WRITE_TIMEOUT_MS), defaultConfig.getWriteTimeoutMs()));
     nettyConfig.setTcpUserTimeoutMs(
         pinotConfig.getProperty(key(namespace, TCP_USER_TIMEOUT_MS), defaultConfig.getTcpUserTimeoutMs()));
-    int highWaterMark = pinotConfig.getProperty(key(namespace, WRITE_BUFFER_HIGH_WATER_MARK_BYTES),
-        defaultConfig.getWriteBufferHighWaterMarkBytes());
-    int lowWaterMark = pinotConfig.getProperty(key(namespace, WRITE_BUFFER_LOW_WATER_MARK_BYTES),
-        defaultConfig.getWriteBufferLowWaterMarkBytes());
+    String highWaterMarkKey = key(namespace, WRITE_BUFFER_HIGH_WATER_MARK_BYTES);
+    int highWaterMark = pinotConfig.getProperty(highWaterMarkKey, defaultConfig.getWriteBufferHighWaterMarkBytes());
+    // An operator who only lowers the high watermark should not have to know about the low one: when the high
+    // watermark is overridden, the default low watermark is pulled down to half of it if it would sit above that
+    int defaultLowWaterMark = defaultConfig.getWriteBufferLowWaterMarkBytes();
+    if (pinotConfig.containsKey(highWaterMarkKey)) {
+      defaultLowWaterMark = Math.min(defaultLowWaterMark, highWaterMark / 2);
+    }
+    int lowWaterMark = pinotConfig.getProperty(key(namespace, WRITE_BUFFER_LOW_WATER_MARK_BYTES), defaultLowWaterMark);
     nettyConfig.setWriteBufferWaterMarks(lowWaterMark, highWaterMark);
 
     return nettyConfig;

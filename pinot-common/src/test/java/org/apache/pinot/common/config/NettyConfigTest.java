@@ -133,4 +133,25 @@ public class NettyConfigTest {
     assertThrows(IllegalArgumentException.class,
         () -> NettyConfig.extractNettyConfig(new PinotConfiguration(properties), Broker.BROKER_NETTY_PREFIX));
   }
+
+  /// Lowering only the high watermark must not fail startup because the default low watermark sits above it.
+  @Test
+  public void testLoweredHighWaterMarkPullsTheDefaultLowWaterMarkDown() {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put("pinot.broker.netty.write.buffer.high.water.mark.bytes", 1024 * 1024);
+    NettyConfig config =
+        NettyConfig.extractNettyConfig(new PinotConfiguration(properties), Broker.BROKER_NETTY_PREFIX);
+    assertEquals(config.getWriteBufferHighWaterMarkBytes(), 1024 * 1024);
+    assertEquals(config.getWriteBufferLowWaterMarkBytes(), 512 * 1024);
+
+    // A high watermark above the default leaves the default low watermark alone
+    properties.put("pinot.broker.netty.write.buffer.high.water.mark.bytes", 64 * 1024 * 1024);
+    config = NettyConfig.extractNettyConfig(new PinotConfiguration(properties), Broker.BROKER_NETTY_PREFIX);
+    assertEquals(config.getWriteBufferLowWaterMarkBytes(), NettyConfig.DEFAULT_WRITE_BUFFER_LOW_WATER_MARK_BYTES);
+
+    // An explicit low watermark is always honoured
+    properties.put("pinot.broker.netty.write.buffer.low.water.mark.bytes", 1024);
+    config = NettyConfig.extractNettyConfig(new PinotConfiguration(properties), Broker.BROKER_NETTY_PREFIX);
+    assertEquals(config.getWriteBufferLowWaterMarkBytes(), 1024);
+  }
 }

@@ -410,7 +410,8 @@ public class ServerChannelsTest {
           10_000L);
       Channel channel = serverChannel._channel;
       assertNotNull(channel.pipeline().get(RequestWriteTimeoutHandler.class));
-      assertTrue(channel.isActive(), "The stalled socket looks healthy until the write times out");
+      // Not asserting isActive() here: on a slow host the timeout can fire before this line runs. The elapsed-time
+      // check below is what proves the handler, not the kernel, closed the socket.
 
       TestUtils.waitForCondition(aVoid -> !channel.isActive(), 10L, 10_000L,
           "The write timeout did not close the stalled channel");

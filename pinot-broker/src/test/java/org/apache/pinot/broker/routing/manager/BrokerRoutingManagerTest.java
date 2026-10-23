@@ -382,6 +382,33 @@ public class BrokerRoutingManagerTest {
     verify(_serverReenableCallback, times(2)).accept(any());
   }
 
+  /// The deprecated setter still replaces what it set before, and only that, so a legacy caller cannot drop the
+  /// callbacks registered through the new method.
+  @Test
+  @SuppressWarnings({"unchecked", "deprecation"})
+  public void testLegacySetServerReenableCallbackReplacesOnlyItsOwnCallback() {
+    Consumer<ServerInstance> legacyCallback1 = mock(Consumer.class);
+    Consumer<ServerInstance> legacyCallback2 = mock(Consumer.class);
+    _routingManager.addServerReenableCallback(_serverReenableCallback);
+    _routingManager.setServerReenableCallback(legacyCallback1);
+    _routingManager.setServerReenableCallback(legacyCallback2);
+
+    List<ZNRecord> instanceConfigs = List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID));
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(instanceConfigs);
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(List.of());
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(instanceConfigs);
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+
+    verify(_serverReenableCallback).accept(any());
+    verify(legacyCallback1, never()).accept(any());
+    verify(legacyCallback2).accept(any());
+  }
+
   /// Several listeners share the signal (the SSE transport drops its channels, MSE resets its gRPC backoff), and one
   /// failing must not stop the others or the routing update.
   @Test
