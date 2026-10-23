@@ -88,6 +88,30 @@ public class SegmentPartitionUtilsTest {
     }
   }
 
+  /// A partition function the broker cannot build (unknown name, e.g. written by a newer version or a plugin missing
+  /// from the broker classpath) marks only that segment's partition info invalid instead of throwing, so one segment
+  /// cannot fail routing for the whole table.
+  @Test
+  public void testUnbuildablePartitionFunctionIsInvalid() {
+    ZNRecord unknown = znRecord("segment0", "NoSuchPartitionFunction", 8, Set.of(3), null);
+    assertSame(SegmentPartitionUtils.extractPartitionInfo(TABLE_NAME, PARTITION_COLUMN, "segment0", unknown),
+        SegmentPartitionUtils.INVALID_PARTITION_INFO);
+    Set<String> partitionColumns = Set.of(PARTITION_COLUMN, OTHER_PARTITION_COLUMN);
+    assertSame(SegmentPartitionUtils.extractPartitionInfoMap(TABLE_NAME, partitionColumns, "segment0", unknown),
+        SegmentPartitionUtils.INVALID_COLUMN_PARTITION_INFO_MAP);
+
+    // With multiple partition columns, only the column whose function cannot be built is dropped
+    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata("segment1");
+    segmentZKMetadata.setPartitionMetadata(new SegmentPartitionMetadata(
+        Map.of(PARTITION_COLUMN, new ColumnPartitionMetadata("Murmur", 8, Set.of(3), null),
+            OTHER_PARTITION_COLUMN, new ColumnPartitionMetadata("NoSuchPartitionFunction", 8, Set.of(3), null))));
+    Map<String, SegmentPartitionInfo> infoMap = SegmentPartitionUtils.extractPartitionInfoMap(TABLE_NAME,
+        partitionColumns, "segment1", segmentZKMetadata.toZNRecord());
+    assertNotNull(infoMap);
+    assertEquals(infoMap.keySet(), Set.of(PARTITION_COLUMN));
+    assertEquals(infoMap.get(PARTITION_COLUMN).getPartitionFunction().getName(), "Murmur");
+  }
+
   private static SegmentPartitionInfo extract(String segment, String functionName, int numPartitions,
       Set<Integer> partitions, Map<String, String> functionConfig) {
     SegmentPartitionInfo info = SegmentPartitionUtils.extractPartitionInfo(TABLE_NAME, PARTITION_COLUMN, segment,

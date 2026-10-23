@@ -100,8 +100,27 @@ public class SegmentPartitionUtils {
       return INVALID_PARTITION_INFO;
     }
 
-    return new SegmentPartitionInfo(partitionColumn, getPartitionFunction(columnPartitionMetadata),
-        getPartitions(columnPartitionMetadata));
+    PartitionFunction partitionFunction =
+        getPartitionFunction(tableNameWithType, partitionColumn, segment, columnPartitionMetadata);
+    if (partitionFunction == null) {
+      return INVALID_PARTITION_INFO;
+    }
+    return new SegmentPartitionInfo(partitionColumn, partitionFunction, getPartitions(columnPartitionMetadata));
+  }
+
+  /// Returns the shared partition function for the given metadata, or `null` when it cannot be built (e.g. an unknown
+  /// function name written by a newer version, or a function whose plugin is missing on this broker). The segment is
+  /// then treated as having no valid partition info, so it is never pruned, instead of failing routing for the table.
+  @Nullable
+  private static PartitionFunction getPartitionFunction(String tableNameWithType, String partitionColumn,
+      String segment, ColumnPartitionMetadata columnPartitionMetadata) {
+    try {
+      return getPartitionFunction(columnPartitionMetadata);
+    } catch (Exception e) {
+      LOGGER.warn("Caught exception while creating partition function: {} for column: {}, segment: {}, table: {}",
+          columnPartitionMetadata.getFunctionName(), partitionColumn, segment, tableNameWithType, e);
+      return null;
+    }
   }
 
   /// Returns a partition function for the given metadata, shared with the other segments with equal metadata.
@@ -175,8 +194,13 @@ public class SegmentPartitionUtils {
             segment, tableNameWithType);
         continue;
       }
-      SegmentPartitionInfo segmentPartitionInfo = new SegmentPartitionInfo(partitionColumn,
-          getPartitionFunction(columnPartitionMetadata), getPartitions(columnPartitionMetadata));
+      PartitionFunction partitionFunction =
+          getPartitionFunction(tableNameWithType, partitionColumn, segment, columnPartitionMetadata);
+      if (partitionFunction == null) {
+        continue;
+      }
+      SegmentPartitionInfo segmentPartitionInfo =
+          new SegmentPartitionInfo(partitionColumn, partitionFunction, getPartitions(columnPartitionMetadata));
       columnSegmentPartitionInfoMap.put(partitionColumn, segmentPartitionInfo);
     }
     if (columnSegmentPartitionInfoMap.size() == 1) {

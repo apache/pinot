@@ -674,9 +674,16 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
 
     // Step-2: Create new segment metadata if needed
     long startTimeNs2 = System.nanoTime();
+    // Other attempts of the same commit start might have created the new segment already, even several ones when
+    // attempts on 2 controllers overlap. Find them before deciding whether the partition still needs a new segment, so
+    // that the unused ones can be removed.
+    List<String> newSegmentsOfEarlierAttempts =
+        resumed ? findNewSegmentsOfEarlierAttempts(realtimeTableName, new LLCSegmentName(committingSegmentName))
+            : List.of();
     String newConsumingSegmentName =
         createNewSegmentMetadata(tableConfig, committingSegmentDescriptor, committingSegmentZKMetadata,
-            instancePartitions, toCommitting, resumed);
+            instancePartitions, toCommitting,
+            newSegmentsOfEarlierAttempts.isEmpty() ? null : newSegmentsOfEarlierAttempts.get(0));
 
     preProcessCommitIdealStateUpdate();
 
@@ -708,17 +715,20 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     }
 
     Map<String, Map<String, String>> instanceStatesMapAfterStep3 = idealState.getRecord().getMapFields();
-    boolean newConsumingSegmentInIdealState = false;
+    boolean newConsumingSegmentInIdealState =
+        newConsumingSegmentName != null && instanceStatesMapAfterStep3.containsKey(newConsumingSegmentName);
+    // The committing segment is ONLINE now, so no attempt of the commit can add a new segment that is not in the
+    // IdealState anymore. Remove their ZK metadata so that RealtimeSegmentValidationManager does not add them either.
+    Set<String> unusedNewSegments = new HashSet<>(newSegmentsOfEarlierAttempts);
     if (newConsumingSegmentName != null) {
-      newConsumingSegmentInIdealState = instanceStatesMapAfterStep3.containsKey(newConsumingSegmentName);
-      if (!newConsumingSegmentInIdealState) {
-        LOGGER.info(
-            "Cleaning up segment ZK metadata for new consuming segment {} of table {} because it was not added to "
-                + "IdealState. This can happen when table/topic consumption is paused.",
-            newConsumingSegmentName, realtimeTableName);
-        removeSegmentZKMetadataBestEffort(realtimeTableName, newConsumingSegmentName);
-        newConsumingSegmentName = null;
-      }
+      unusedNewSegments.add(newConsumingSegmentName);
+    }
+    unusedNewSegments.removeIf(instanceStatesMapAfterStep3::containsKey);
+    if (!unusedNewSegments.isEmpty()) {
+      removeUnusedNewSegmentsZKMetadata(realtimeTableName, unusedNewSegments);
+    }
+    if (!newConsumingSegmentInIdealState) {
+      newConsumingSegmentName = null;
     }
 
     long endTimeNs = System.nanoTime();
@@ -849,7 +859,7 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     return true;
   }
 
-  /// Returns the new segment created by an earlier attempt of a resumed commit start, or `null` if there is none.
+  /// Returns the new segments created by earlier attempts of a resumed commit start, oldest first.
   ///
   /// The new segment is named after its creation time with minute granularity, and is created between step 1 of the
   /// first attempt (the modification time of the committing segment ZK metadata) and now, which is bounded by the max
@@ -857,29 +867,34 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
   /// clock differences between controllers and ZK. This relies on nothing rewriting the committing segment ZK metadata
   /// while it stays COMMITTING, as a later modification time would skip the minutes in which the new segment was
   /// created.
-  @Nullable
-  private String findNewSegmentOfEarlierAttempt(String realtimeTableName, LLCSegmentName committingLLCSegment) {
+  private List<String> findNewSegmentsOfEarlierAttempts(String realtimeTableName,
+      LLCSegmentName committingLLCSegment) {
     Stat stat = new Stat();
     getSegmentZKMetadata(realtimeTableName, committingLLCSegment.getSegmentName(), stat);
     long oneMinuteMs = TimeUnit.MINUTES.toMillis(1);
     long startTimeMs = Math.floorDiv(stat.getMtime(), oneMinuteMs) * oneMinuteMs - oneMinuteMs;
     long endTimeMs = Math.floorDiv(getCurrentTimeMs(), oneMinuteMs) * oneMinuteMs + oneMinuteMs;
+    List<String> newSegments = new ArrayList<>();
     for (long timeMs = startTimeMs; timeMs <= endTimeMs; timeMs += oneMinuteMs) {
       String segmentName = new LLCSegmentName(committingLLCSegment.getTableName(),
           committingLLCSegment.getPartitionGroupId(), committingLLCSegment.getSequenceNumber() + 1,
           timeMs).getSegmentName();
       if (segmentZKMetadataExists(realtimeTableName, segmentName)) {
-        return segmentName;
+        newSegments.add(segmentName);
       }
     }
-    return null;
+    return newSegments;
   }
 
   // Step 2: Create new segment metadata
+
+  /// Returns the new consuming segment of the partition of the committing segment, or `null` if the partition is no
+  /// longer in the stream, or the table/topic is paused. Uses `newSegmentOfEarlierAttempt` if not `null`, and creates
+  /// the new segment ZK metadata otherwise.
   @Nullable
   private String createNewSegmentMetadata(TableConfig tableConfig,
       CommittingSegmentDescriptor committingSegmentDescriptor, SegmentZKMetadata committingSegmentZKMetadata,
-      InstancePartitions instancePartitions, boolean createIfAbsent, boolean resumed) {
+      InstancePartitions instancePartitions, boolean createIfAbsent, @Nullable String newSegmentOfEarlierAttempt) {
     String committingSegmentName = committingSegmentDescriptor.getSegmentName();
 
     String realtimeTableName = tableConfig.getTableName();
@@ -905,14 +920,10 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
             + "paused.", committingSegmentName);
         return null;
       }
-      // Another attempt of the same commit start might have created the new segment already, and the segment might be
-      // consuming or even committed, so never overwrite its ZK metadata
-      if (resumed) {
-        String existingNewSegmentName = findNewSegmentOfEarlierAttempt(realtimeTableName, committingLLCSegment);
-        if (existingNewSegmentName != null) {
-          LOGGER.info("Using existing segment metadata for new segment: {}", existingNewSegmentName);
-          return existingNewSegmentName;
-        }
+      // The new segment of an earlier attempt might be consuming or even committed, so never overwrite its ZK metadata
+      if (newSegmentOfEarlierAttempt != null) {
+        LOGGER.info("Using existing segment metadata for new segment: {}", newSegmentOfEarlierAttempt);
+        return newSegmentOfEarlierAttempt;
       }
       String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
       long newSegmentCreationTimeMs = getCurrentTimeMs();
@@ -942,6 +953,27 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
               + "found in upstream metadata.", committingSegmentName, committingSegmentPartitionGroupId);
     }
     return newConsumingSegmentName;
+  }
+
+  /// Removes the ZK metadata of new segments that are not added to the IdealState, e.g. when table/topic consumption is
+  /// paused, or the partition is no longer in the stream. The removal is fenced against concurrent IdealState updates
+  /// that add one of them, e.g. by RealtimeSegmentValidationManager (see
+  /// PinotHelixResourceManager#removeInProgressSegmentsZKMetadataNotInIdealState).
+  @VisibleForTesting
+  void removeUnusedNewSegmentsZKMetadata(String realtimeTableName, Set<String> segmentNames) {
+    LOGGER.info("Cleaning up segment ZK metadata for new segments: {} of table: {} which are not in the IdealState",
+        segmentNames, realtimeTableName);
+    try {
+      Set<String> removedSegments =
+          _helixResourceManager.removeInProgressSegmentsZKMetadataNotInIdealState(realtimeTableName, segmentNames);
+      if (removedSegments.size() < segmentNames.size()) {
+        LOGGER.info("Removed segment ZK metadata for segments: {} of table: {}, the others were added to the "
+            + "IdealState or removed concurrently", removedSegments, realtimeTableName);
+      }
+    } catch (Exception e) {
+      LOGGER.warn("Caught exception while removing segment ZK metadata for segments: {} of table: {}", segmentNames,
+          realtimeTableName, e);
+    }
   }
 
   private void removeSegmentZKMetadataBestEffort(String realtimeTableName, String segmentName) {

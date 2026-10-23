@@ -59,7 +59,7 @@ public class ParquetAvroRecordReader implements RecordReader {
       extractorConfig.setExtractRawTimeValues(
           ((ParquetRecordReaderConfig) recordReaderConfig).isExtractRawTimeValues());
     }
-    _recordExtractor = new ParquetAvroRecordExtractor();
+    _recordExtractor = new ParquetAvroRecordExtractor(ParquetUtils.getUnsignedInt32FieldNames(_dataFilePath));
     _recordExtractor.init(fieldsToRead, extractorConfig);
     _nextRecord = _parquetReader.read();
   }

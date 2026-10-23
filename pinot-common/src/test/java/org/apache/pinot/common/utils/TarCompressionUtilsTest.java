@@ -126,10 +126,13 @@ public class TarCompressionUtilsTest {
     File archive = new File(TAR_DIR, "data" + TarCompressionUtils.TAR_LZ4_FILE_EXTENSION);
     TarCompressionUtils.createCompressedTarFile(inputFile, archive, compressorName);
     if (compressorName.equals(LZ4_FAST)) {
+      assertEquals(TarCompressionUtils.COMPRESSOR_NAME_BY_FILE_EXTENSIONS.get(
+          TarCompressionUtils.TAR_LZ4_FILE_EXTENSION), LZ4_FAST);
       File defaultArchive = new File(TAR_DIR, "default" + TarCompressionUtils.TAR_LZ4_FILE_EXTENSION);
       TarCompressionUtils.createCompressedTarFile(inputFile, defaultArchive);
-      // Tar entry headers record the input file's access time, which reading it for the first archive can advance, so
-      // the two archives may differ. Re-encode the default archive's own tar stream to verify its compressor instead.
+      assertEquals(Files.readAllBytes(TarCompressionUtils.untar(defaultArchive, UNTAR_DIR).get(0).toPath()), content);
+      // Reading the input can advance the access time recorded in its tar header, so verify the compressor by
+      // re-encoding the default archive's own tar stream instead of comparing it with the explicit archive.
       byte[] defaultArchiveBytes = Files.readAllBytes(defaultArchive.toPath());
       assertEquals(defaultArchiveBytes, compress(LZ4_FAST, decompress(defaultArchiveBytes)));
     }
