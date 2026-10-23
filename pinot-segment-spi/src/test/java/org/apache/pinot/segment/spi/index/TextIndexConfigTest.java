@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.spi.index;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import java.util.List;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
 import org.testng.collections.Lists;
@@ -89,6 +90,32 @@ public class TextIndexConfigTest {
     assertNull(config.getStopWordsExclude(), "Unexpected stopWordsExclude");
     assertTrue(config.isLuceneUseCompoundFile(), "Unexpected luceneUseCompoundFile");
     assertEquals(config.getLuceneMaxBufferSizeMB(), 500, "Unexpected luceneMaxBufferSize");
+  }
+
+  @Test
+  public void withBuildOnDictionary()
+      throws JsonProcessingException {
+    // Defaults to false when absent.
+    assertFalse(JsonUtils.stringToObject("{}", TextIndexConfig.class).isBuildOnDictionary(),
+        "buildOnDictionary should default to false");
+
+    // Parses from JSON and survives a full serialize/deserialize round-trip (mirrors how the segment persists it).
+    TextIndexConfig config = JsonUtils.stringToObject("{\"buildOnDictionary\": true}", TextIndexConfig.class);
+    assertTrue(config.isBuildOnDictionary(), "Unexpected buildOnDictionary");
+    TextIndexConfig roundTripped =
+        JsonUtils.stringToObject(JsonUtils.objectToString(config), TextIndexConfig.class);
+    assertTrue(roundTripped.isBuildOnDictionary(), "buildOnDictionary not preserved across round-trip");
+
+    // buildOnDictionary participates in equals/hashCode.
+    TextIndexConfig off = JsonUtils.stringToObject("{\"buildOnDictionary\": false}", TextIndexConfig.class);
+    assertNotEquals(config, off, "Configs differing only by buildOnDictionary must not be equal");
+    assertEquals(config, JsonUtils.stringToObject("{\"buildOnDictionary\": true}", TextIndexConfig.class));
+
+    // The pre-buildOnDictionary constructor (retained for binary compatibility) defaults the flag to false.
+    TextIndexConfig legacy = new TextIndexConfig(false, null, false, false, List.of(),
+        List.of(), true, 500, null, null, null, null, false, false, 0, false, null, false,
+        false);
+    assertFalse(legacy.isBuildOnDictionary(), "Legacy constructor should default buildOnDictionary to false");
   }
 
   @Test
