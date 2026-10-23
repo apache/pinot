@@ -306,6 +306,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       }
       // The stats pass sized the dictionaries and wrote total docs into the metadata. If the index pass read a
       // different number of rows, some dictionary ids own no document and the indexes disagree with the metadata.
+      // Only this row-based path re-reads the record reader. buildByColumn() and buildColumnar() index from the
+      // source columns instead, and the sorted forward index close() check still covers them.
       if (numDocsIndexed != _totalDocs) {
         throw new IllegalStateException(
             "Segment: " + _config.getSegmentName() + " of table: " + _config.getTableName() + " indexed "
