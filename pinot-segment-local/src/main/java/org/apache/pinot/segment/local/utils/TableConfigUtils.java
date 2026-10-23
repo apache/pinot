@@ -39,6 +39,8 @@ import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
+import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionRegistry;
@@ -225,6 +227,7 @@ public final class TableConfigUtils {
     validateInstancePartitionsTypeMapConfig(tableConfig);
     validatePartitionedReplicaGroupInstance(tableConfig);
     validateInstanceAssignmentConfigs(tableConfig);
+    validateStrictReplicaGroupRouting(tableConfig);
 
     if (!skipTypes.contains(ValidationType.UPSERT)) {
       validateUpsertAndDedupConfig(tableConfig, schema, existingTableConfig);
@@ -1057,12 +1060,15 @@ public final class TableConfigUtils {
 
   /// Validates the upsert- and dedup-related configuration. Returns early when neither is enabled; otherwise checks
   /// the shared requirements (upsert and dedup are mutually exclusive, primary keys exist and are single-valued,
-  /// strict replica-group routing, no COMPLETED instance partitions, valid tenant tag override for REALTIME, OFFLINE
-  /// restrictions) and then, per the enabled mode:
+  /// strict replica-group routing, no tenant tag override for REALTIME, OFFLINE restrictions) and then, per the enabled
+  /// mode:
   /// - Upsert: no multi-tier / star-tree, comparison / delete-record / out-of-order columns are valid, deleted-keys
   ///   compaction consistency, post-partial-upsert transforms, consistency-mode constraints, and delegates to
   ///   [#validateTTLForUpsertConfig] and [#validatePartialUpsertStrategies]; rejects MD5 when disabled.
   /// - Dedup: delegates to [#validateTTLForDedupConfig]; rejects MD5 when disabled.
+  ///
+  /// The segment assignment requirements shared with strict replica-group routing (one instance per partition, no
+  /// COMPLETED segment relocation) are validated by [#validateStrictReplicaGroupRouting].
   @VisibleForTesting
   static void validateUpsertAndDedupConfig(TableConfig tableConfig, Schema schema) {
     validateUpsertAndDedupConfig(tableConfig, schema, null);
@@ -1102,10 +1108,6 @@ public final class TableConfigUtils {
               tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeConsuming() == null
                   && tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeCompleted() == null),
           "Invalid tenant tag override used for Upsert/Dedup table");
-      Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = tableConfig.getInstanceAssignmentConfigMap();
-      Preconditions.checkState(instanceAssignmentConfigMap == null || !instanceAssignmentConfigMap.containsKey(
-              InstancePartitionsType.COMPLETED.name()),
-          "COMPLETED instance partitions can't be configured for upsert / dedup tables");
     } else {
       Preconditions.checkState(!dedupEnabled,
           "Dedup is not supported for OFFLINE table. Only upsert is supported for OFFLINE table");
@@ -1567,6 +1569,116 @@ public final class TableConfigUtils {
     Preconditions.checkState(getColumnPartitionMap(tableConfig).containsKey(partitionColumn),
         "Partition column: %s configured for segment assignment is not found in segment partition config",
         partitionColumn);
+  }
+
+  /// Validates that a table using strict replica-group routing has a segment assignment that places all segments of
+  /// a partition on exactly one instance per replica-group. Strict replica-group routing routes all segments with the
+  /// same instances in the ideal state to the same instance, which only provides partition level consistency when the
+  /// segment assignment keeps each partition on one instance per replica-group. Upsert and dedup tables rely on the
+  /// same property and are validated regardless of the configured instance selector.
+  ///
+  /// - OFFLINE: the OFFLINE instance assignment must be replica-group based with one instance per partition, and the
+  ///   OFFLINE segment assignment strategy, if configured, must be partition based (`replicagroup` or
+  ///   `roundrobinreplicagroup`), since the other strategies ignore the partition. The partition column of a
+  ///   partitioned instance assignment is validated by [#validatePartitionedSegmentAssignment]. The instance
+  ///   assignment can also come from the deprecated `replicaGroupStrategyConfig`, which takes effect only together with
+  ///   the `replicagroup` strategy.
+  /// - REALTIME: CONSUMING segments are placed by their stream partition, which keeps each partition on one instance
+  ///   per replica-group when the CONSUMING instance partitions have a single partition or one instance per
+  ///   partition. COMPLETED segments must not be relocated, which would split each partition between its CONSUMING
+  ///   and COMPLETED instances.
+  ///
+  /// The layout of pre-configured instance partitions lives in ZK and is not visible here, so the controller validates
+  /// it on the fetched instance partitions instead. Dimension tables are exempt because every server hosts every
+  /// segment.
+  @VisibleForTesting
+  static void validateStrictReplicaGroupRouting(TableConfig tableConfig) {
+    if (!requiresStrictReplicaGroupAssignment(tableConfig)) {
+      return;
+    }
+    if (tableConfig.getTableType() == TableType.OFFLINE) {
+      validateStrictReplicaGroupOfflineInstanceAssignment(tableConfig);
+    } else {
+      validateStrictReplicaGroupRealtimeInstanceAssignment(tableConfig);
+    }
+  }
+
+  /// Returns `true` if the segment assignment of the table must place all segments of a partition on exactly one
+  /// instance per replica-group: the table uses strict replica-group routing, or is an upsert/dedup table, whose
+  /// allowed instance selectors all rely on this property. Dimension tables are excluded because every server hosts
+  /// every segment.
+  public static boolean requiresStrictReplicaGroupAssignment(TableConfig tableConfig) {
+    if (tableConfig.isDimTable()) {
+      return false;
+    }
+    if (tableConfig.isUpsertEnabled() || tableConfig.isDedupEnabled()) {
+      return true;
+    }
+    RoutingConfig routingConfig = tableConfig.getRoutingConfig();
+    String instanceSelectorType = routingConfig != null ? routingConfig.getInstanceSelectorType() : null;
+    return RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE.equalsIgnoreCase(instanceSelectorType);
+  }
+
+  /// Validates the OFFLINE instance assignment config for strict replica-group routing.
+  private static void validateStrictReplicaGroupOfflineInstanceAssignment(TableConfig tableConfig) {
+    SegmentAssignmentConfig segmentAssignmentConfig =
+        MapUtils.emptyIfNull(tableConfig.getSegmentAssignmentConfigMap()).get(InstancePartitionsType.OFFLINE.name());
+    String assignmentStrategy =
+        segmentAssignmentConfig != null ? segmentAssignmentConfig.getAssignmentStrategy() : null;
+    Preconditions.checkState(assignmentStrategy == null
+            || AssignmentStrategy.PARTITION_BASED_STRATEGIES.contains(assignmentStrategy.toLowerCase(Locale.ROOT)),
+        "Table using strict replica-group routing can only use '%s' or '%s' OFFLINE segment assignment strategy, "
+            + "found: %s", AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY,
+        AssignmentStrategy.ROUND_ROBIN_REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY, assignmentStrategy);
+    if (InstancePartitionsUtils.hasPreConfiguredInstancePartitions(tableConfig, InstancePartitionsType.OFFLINE)) {
+      return;
+    }
+    // The instance assignment config comes from instanceAssignmentConfigMap, or from the deprecated
+    // replicaGroupStrategyConfig when the replica-group segment assignment strategy is configured
+    Preconditions.checkState(
+        InstanceAssignmentConfigUtils.allowInstanceAssignment(tableConfig, InstancePartitionsType.OFFLINE),
+        "Table using strict replica-group routing must have OFFLINE instance assignment config "
+            + "(instanceAssignmentConfigMap) to ensure all segments of a partition are assigned to the same server");
+    InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig =
+        InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(tableConfig, InstancePartitionsType.OFFLINE)
+            .getReplicaGroupPartitionConfig();
+    Preconditions.checkState(replicaGroupPartitionConfig.isReplicaGroupBased(),
+        "Table using strict replica-group routing must use replica-group based OFFLINE instance assignment to ensure "
+            + "all segments of a partition are assigned to the same server");
+    Preconditions.checkState(getNumInstancesPerPartition(replicaGroupPartitionConfig) <= 1,
+        "Table using strict replica-group routing must have one instance per partition (numInstancesPerPartition, or "
+            + "numInstancesPerReplicaGroup when it is not set) in OFFLINE instance assignment config to ensure all "
+            + "segments of a partition are assigned to the same server");
+  }
+
+  /// Validates the REALTIME instance assignment config for strict replica-group routing.
+  private static void validateStrictReplicaGroupRealtimeInstanceAssignment(TableConfig tableConfig) {
+    Preconditions.checkState(!InstanceAssignmentConfigUtils.shouldRelocateCompletedSegments(tableConfig),
+        "Table using strict replica-group routing must not relocate COMPLETED segments (tagOverrideConfig with a "
+            + "different realtimeCompleted tag, instanceAssignmentConfigMap.COMPLETED or "
+            + "instancePartitionsMap.COMPLETED) to ensure all segments of a partition are assigned to the same server");
+    InstanceAssignmentConfig consumingInstanceAssignmentConfig =
+        MapUtils.emptyIfNull(tableConfig.getInstanceAssignmentConfigMap()).get(InstancePartitionsType.CONSUMING.name());
+    if (consumingInstanceAssignmentConfig != null) {
+      InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig =
+          consumingInstanceAssignmentConfig.getReplicaGroupPartitionConfig();
+      Preconditions.checkState(!replicaGroupPartitionConfig.isReplicaGroupBased()
+              || replicaGroupPartitionConfig.getNumPartitions() <= 1
+              || getNumInstancesPerPartition(replicaGroupPartitionConfig) <= 1,
+          "Table using strict replica-group routing must have one instance per partition (numInstancesPerPartition, or "
+              + "numInstancesPerReplicaGroup when it is not set) in CONSUMING instance assignment config with multiple "
+              + "partitions to ensure all segments of a partition are assigned to the same server");
+    }
+  }
+
+  /// Returns the number of instances per partition the instance assignment config resolves to: the configured
+  /// `numInstancesPerPartition`, or `numInstancesPerReplicaGroup` when it is not set, since each partition then gets
+  /// every instance of its replica-group. Returns 0 when neither is set, in which case the count depends on the
+  /// instances in the pool and is validated on the computed instance partitions by the controller.
+  private static int getNumInstancesPerPartition(InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig) {
+    int numInstancesPerPartition = replicaGroupPartitionConfig.getNumInstancesPerPartition();
+    return numInstancesPerPartition > 0 ? numInstancesPerPartition
+        : replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup();
   }
 
   /// Validates the partial upsert-related configurations:
