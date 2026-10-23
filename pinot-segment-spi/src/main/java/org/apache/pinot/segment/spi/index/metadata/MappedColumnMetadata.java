@@ -40,7 +40,8 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 /// A small view of one fixed record in [MappedSegmentMetadataStore]. No per-column values are copied into this view.
-/// The segment owns the mapping; callers must not use the view after the segment directory is closed.
+/// Data-source metadata delegates to this live view. Neither can outlive the owning segment: reference-counted
+/// teardown must wait for query readers before closing the mapping.
 public final class MappedColumnMetadata implements ColumnMetadata {
   private final MappedSegmentMetadataStore _store;
   private final int _ordinal;
