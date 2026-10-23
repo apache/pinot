@@ -17,11 +17,13 @@
  * under the License.
  */
 package org.apache.pinot.controller.api.resources;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import com.google.common.io.ByteStreams;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
@@ -32,6 +34,8 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -49,7 +53,9 @@ import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.Encoded;
 import javax.ws.rs.GET;
+import javax.ws.rs.HeaderParam;
 import javax.ws.rs.POST;
+import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
@@ -65,11 +71,13 @@ import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.helix.zookeeper.zkclient.exception.ZkMarshallingError;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.PauselessConsumptionUtils;
@@ -116,6 +124,8 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 ///   - "/segments/{tableNameWithType}/{segmentName}/reset": reset a segment
 ///   - "/segments/{tableNameWithType}/reset": reset all segments
 ///   - "/segments/{tableName}/delete": delete the segments in the payload
+/// - PUT requests:
+///   - "/segments/{tableNameWithType}/{segmentName}/metadata": update the custom map in segment ZK metadata
 /// - DELETE requests:
 ///   - "/segments/{tableName}/{segmentName}": delete a segment
 ///   - "/segments/{tableName}: delete all segments
@@ -145,6 +155,9 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 @Path("/")
 public class PinotSegmentRestletResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotSegmentRestletResource.class);
+  // Bound memory used to read untrusted JSON independently of the resulting ZNRecord size. This endpoint accepts
+  // small custom-map control messages, not segment data; the limit is part of its API contract.
+  private static final int MAX_CUSTOM_MAP_MODIFIER_SIZE_BYTES = 64 * 1024;
 
   @Inject
   ControllerConf _controllerConf;
@@ -315,6 +328,122 @@ public class PinotSegmentRestletResource {
       throw new ControllerApplicationException(LOGGER,
           "Failed to find segment: " + segmentName + " in table: " + tableName, Status.NOT_FOUND);
     }
+  }
+
+  @PUT
+  @Path("segments/{tableNameWithType}/{segmentName}/metadata")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableNameWithType", action = Actions.Table.UPLOAD_SEGMENT)
+  @Authenticate(AccessType.UPDATE)
+  @Consumes(MediaType.APPLICATION_JSON)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Update the custom map in the ZK metadata for a segment",
+      notes = "Updates only the segment ZK metadata custom map without uploading or refreshing the segment. "
+          + "The modifier JSON request body is limited to 64 KiB.")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 400, message = "Invalid table name, CRC, or custom map modifier"),
+      @ApiResponse(code = 404, message = "Table or segment not found"),
+      @ApiResponse(code = 409, message = "Segment metadata changed concurrently"),
+      @ApiResponse(code = 412, message = "Segment CRC does not match"),
+      @ApiResponse(code = 413, message = "Modifier exceeds 64 KiB or resulting ZK metadata exceeds the Helix "
+          + "serializer write limit")
+  })
+  public SuccessResponse updateSegmentZKMetadataCustomMap(
+      @ApiParam(value = "Table name with type", required = true, example = "myTable_OFFLINE")
+      @PathParam("tableNameWithType") String tableNameWithType,
+      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
+      @ApiParam(value = "Expected segment CRC", required = true) @HeaderParam(HttpHeaders.IF_MATCH)
+      String expectedCrcString,
+      @ApiParam(value = "Custom map modifier", required = true) InputStream customMapModifierInputStream,
+      @Context HttpHeaders headers) {
+    tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
+    segmentName = decodePathSegment(segmentName);
+    // The metadata path is built from these names in ZKMetadataProvider. A slash can address a different znode;
+    // an empty segment name cannot name a znode. Other legal segment-name characters are left unchanged.
+    if (tableNameWithType.contains("/") || segmentName.isEmpty() || segmentName.contains("/")) {
+      throw new ControllerApplicationException(LOGGER, "Invalid table or segment path", Status.BAD_REQUEST);
+    }
+    if (TableNameBuilder.getTableTypeFromTableName(tableNameWithType) == null) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Table type not provided with table name: %s", tableNameWithType), Status.BAD_REQUEST);
+    }
+    String customMapModifierJson = readCustomMapModifier(customMapModifierInputStream);
+
+    long expectedCrc;
+    try {
+      expectedCrc = Long.parseLong(expectedCrcString);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, "Missing or invalid If-Match segment CRC", Status.BAD_REQUEST,
+          e);
+    }
+
+    SegmentZKMetadataCustomMapModifier customMapModifier;
+    try {
+      customMapModifier = new SegmentZKMetadataCustomMapModifier(customMapModifierJson);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, "Invalid segment ZK metadata custom map modifier",
+          Status.BAD_REQUEST, e);
+    }
+
+    ZNRecord segmentMetadataRecord =
+        _pinotHelixResourceManager.getSegmentMetadataZnRecord(tableNameWithType, segmentName);
+    if (segmentMetadataRecord == null) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Failed to find segment: %s in table: %s", segmentName, tableNameWithType), Status.NOT_FOUND);
+    }
+    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentMetadataRecord);
+    if (segmentZKMetadata.getSegmentUploadStartTime() > 0) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Segment upload is in progress for segment: %s in table: %s", segmentName,
+              tableNameWithType), Status.CONFLICT);
+    }
+    if (segmentZKMetadata.getCrc() != expectedCrc) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Segment CRC does not match for segment: %s in table: %s", segmentName, tableNameWithType),
+          Status.PRECONDITION_FAILED);
+    }
+    segmentZKMetadata.setCustomMap(customMapModifier.modifyMap(segmentZKMetadata.getCustomMap()));
+    boolean updated;
+    try {
+      // Let the normal Helix write serialize and enforce its compression-aware record size limit once.
+      updated = _pinotHelixResourceManager.updateZkMetadataWithoutDataChange(tableNameWithType, segmentZKMetadata,
+          segmentMetadataRecord.getVersion());
+    } catch (ZkMarshallingError e) {
+      throw new ControllerApplicationException(LOGGER, "Resulting segment ZK metadata is too large",
+          Status.REQUEST_ENTITY_TOO_LARGE, e);
+    }
+    if (!updated) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Segment metadata changed concurrently for segment: %s in table: %s", segmentName,
+              tableNameWithType), Status.CONFLICT);
+    }
+    return new SuccessResponse(
+        String.format("Successfully updated ZK metadata for segment: %s in table: %s", segmentName,
+            tableNameWithType));
+  }
+
+  private static String readCustomMapModifier(@Nullable InputStream inputStream) {
+    if (inputStream == null) {
+      throw new ControllerApplicationException(LOGGER, "Missing segment ZK metadata custom map modifier",
+          Status.BAD_REQUEST);
+    }
+    try {
+      byte[] bytes = ByteStreams.toByteArray(ByteStreams.limit(inputStream, MAX_CUSTOM_MAP_MODIFIER_SIZE_BYTES + 1L));
+      if (bytes.length > MAX_CUSTOM_MAP_MODIFIER_SIZE_BYTES) {
+        throw new ControllerApplicationException(LOGGER, "Segment ZK metadata custom map modifier is too large",
+            Status.REQUEST_ENTITY_TOO_LARGE);
+      }
+      return new String(bytes, StandardCharsets.UTF_8);
+    } catch (IOException e) {
+      throw new ControllerApplicationException(LOGGER, "Failed to read segment ZK metadata custom map modifier",
+          Status.BAD_REQUEST, e);
+    }
+  }
+
+  private static String decodePathSegment(String pathSegment) {
+    // URIUtils uses form decoding, where '+' represents a space. Here the value is a path component, so a literal
+    // plus must survive whether supplied raw or as %2B by the client; percent escapes still decode once.
+    return URIUtils.decode(pathSegment.replace("+", "%2B"));
   }
 
   private JsonNode getExtraMetaData(String tableName, String segmentName, List<String> columns) {
