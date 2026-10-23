@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -122,7 +123,8 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
 
     for (Map.Entry<String, ColumnIndexContainer> entry : columnIndexContainerMap.entrySet()) {
       String colName = entry.getKey();
-      ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(colName);
+      ColumnMetadata columnMetadata = Objects.requireNonNull(segmentMetadata.getColumnMetadataFor(colName),
+          "Missing metadata for column: " + colName);
 
       if (columnMetadata.isMaterializedChild()) {
         String parent = columnMetadata.getParentColumn();

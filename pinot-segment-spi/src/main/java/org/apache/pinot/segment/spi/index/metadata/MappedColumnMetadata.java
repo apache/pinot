@@ -40,8 +40,9 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 /// A small view of one fixed record in [MappedSegmentMetadataStore]. No per-column values are copied into this view.
-/// Data-source metadata delegates to this live view. Neither can outlive the owning segment: reference-counted
-/// teardown must wait for query readers before closing the mapping.
+/// Data-source metadata delegates to this live view. Serving callers must hold the owning segment's acquired
+/// reference for the full read; the segment manager's reference count delays destruction and unmapping until readers
+/// release it. Standalone callers must keep the owning mapped metadata open. Reads after close are unsafe.
 public final class MappedColumnMetadata implements ColumnMetadata {
   private final MappedSegmentMetadataStore _store;
   private final int _ordinal;
@@ -350,6 +351,9 @@ public final class MappedColumnMetadata implements ColumnMetadata {
         indexes = _indexes;
         if (indexes == null) {
           byte[] bytes = _store.blob(_ordinal, MappedSegmentMetadataStore.INDEXES);
+          if (bytes == null) {
+            throw new IllegalStateException("Missing index sizes for " + getColumnName());
+          }
           indexes = new IndexSize[count];
           try (DataInputStream input = new DataInputStream(new ByteArrayInputStream(bytes))) {
             for (int i = 0; i < count; i++) {
