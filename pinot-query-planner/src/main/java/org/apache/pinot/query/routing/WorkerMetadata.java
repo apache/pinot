@@ -54,6 +54,7 @@ public class WorkerMetadata {
   /// broker/server versions keep working; never present in [#getCustomProperties()] of a decoded instance.
   public static final String TABLE_SEGMENTS_MAP_KEY = "tableSegmentsMap";
   public static final String LOGICAL_TABLE_SEGMENTS_MAP_KEY = "logicalTableSegmentsMap";
+  public static final String OPTIONAL_SEGMENTS_MAP_KEY = "optionalSegmentsMap";
 
   private static final TypeReference<Map<String, List<String>>> SEGMENTS_MAP_TYPE = new TypeReference<>() {
   };
@@ -65,12 +66,17 @@ public class WorkerMetadata {
   private volatile Map<String, List<String>> _tableSegmentsMap;
   @Nullable
   private volatile Map<String, List<String>> _logicalTableSegmentsMap;
+  @Nullable
+  private volatile Map<String, List<String>> _optionalSegmentsMap;
   /// The legacy JSON encoding of [#_tableSegmentsMap] as received from the broker, parsed on first access.
   @Nullable
   private String _tableSegmentsMapJson;
   /// The legacy JSON encoding of [#_logicalTableSegmentsMap] as received from the broker, parsed on first access.
   @Nullable
   private String _logicalTableSegmentsMapJson;
+  /// The legacy JSON encoding of [#_optionalSegmentsMap] as received from the broker, parsed on first access.
+  @Nullable
+  private String _optionalSegmentsMapJson;
 
   public WorkerMetadata(int workerId, Map<Integer, MailboxInfos> mailboxInfosMap) {
     this(workerId, mailboxInfosMap, new HashMap<>());
@@ -139,6 +145,31 @@ public class WorkerMetadata {
   /// [#getLogicalTableSegmentsMap] on first access.
   void setLogicalTableSegmentsMapJson(String logicalTableSegmentsMapJson) {
     _logicalTableSegmentsMapJson = logicalTableSegmentsMapJson;
+  }
+
+  /// Optional segments to scan if the server has them, keyed like the worker's segment map (table type, or physical
+  /// table name for a logical table), or `null` when the worker has none. These are the new segments the broker routes
+  /// as optional because it has not seen them ONLINE yet; unlike the segments of the segment map, a missing one is not
+  /// reported as an error.
+  @Nullable
+  public Map<String, List<String>> getOptionalSegmentsMap() {
+    Map<String, List<String>> optionalSegmentsMap = _optionalSegmentsMap;
+    if (optionalSegmentsMap == null && _optionalSegmentsMapJson != null) {
+      optionalSegmentsMap = decodeSegmentsMapJson(_optionalSegmentsMapJson);
+      _optionalSegmentsMap = optionalSegmentsMap;
+    }
+    return optionalSegmentsMap;
+  }
+
+  /// Stores `optionalSegmentsMap` by reference, with the same no-mutation contract as [#setTableSegmentsMap].
+  public void setOptionalSegmentsMap(Map<String, List<String>> optionalSegmentsMap) {
+    _optionalSegmentsMap = optionalSegmentsMap;
+  }
+
+  /// Stores the legacy JSON encoding of the optional segments map, to be parsed by [#getOptionalSegmentsMap] on first
+  /// access.
+  void setOptionalSegmentsMapJson(String optionalSegmentsMapJson) {
+    _optionalSegmentsMapJson = optionalSegmentsMapJson;
   }
 
   /// A leaf-stage worker carries a (possibly empty) segment map, parsed or not; an intermediate-stage worker carries

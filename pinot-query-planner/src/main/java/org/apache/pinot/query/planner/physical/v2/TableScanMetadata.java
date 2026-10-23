@@ -60,6 +60,10 @@ public class TableScanMetadata {
   /// ```
   @Nullable
   private final Map<Integer, Map<String, List<String>>> _workerIdToLogicalTableSegmentsMap;
+  /// Stores workerId to the optional segments of the worker, keyed like the segment map in use (table type, or
+  /// physical table name for logical tables). Only workers with optional segments have an entry; `null` when none has.
+  @Nullable
+  private final Map<Integer, Map<String, List<String>>> _workerIdToOptionalSegmentsMap;
   private final Map<String, String> _tableOptions;
   private final Map<String, Set<String>> _unavailableSegmentsMap;
   @Nullable
@@ -69,11 +73,13 @@ public class TableScanMetadata {
 
   /// Constructor for physical table scan metadata.
   public TableScanMetadata(Set<String> scannedTables, Map<Integer, Map<String, List<String>>> workedIdToSegmentsMap,
+      @Nullable Map<Integer, Map<String, List<String>>> workerIdToOptionalSegmentsMap,
       Map<String, String> tableOptions, Map<String, Set<String>> unavailableSegmentsMap,
       @Nullable TimeBoundaryInfo timeBoundaryInfo) {
     _scannedTables = scannedTables;
     _workedIdToSegmentsMap = workedIdToSegmentsMap;
     _workerIdToLogicalTableSegmentsMap = null;
+    _workerIdToOptionalSegmentsMap = workerIdToOptionalSegmentsMap;
     _tableOptions = tableOptions;
     _unavailableSegmentsMap = unavailableSegmentsMap;
     _timeBoundaryInfo = timeBoundaryInfo;
@@ -83,9 +89,11 @@ public class TableScanMetadata {
   /// Constructor for logical table scan metadata.
   public TableScanMetadata(Set<String> scannedTables,
       Map<Integer, Map<String, List<String>>> workerIdToLogicalTableSegmentsMap,
+      @Nullable Map<Integer, Map<String, List<String>>> workerIdToOptionalSegmentsMap,
       Map<String, String> tableOptions, Map<String, Set<String>> unavailableSegmentsMap,
       @Nullable TimeBoundaryInfo timeBoundaryInfo, boolean isLogicalTable) {
     _scannedTables = scannedTables;
+    _workerIdToOptionalSegmentsMap = workerIdToOptionalSegmentsMap;
     if (isLogicalTable) {
       _workedIdToSegmentsMap = null;
       _workerIdToLogicalTableSegmentsMap = workerIdToLogicalTableSegmentsMap;
@@ -111,6 +119,11 @@ public class TableScanMetadata {
   @Nullable
   public Map<Integer, Map<String, List<String>>> getWorkerIdToLogicalTableSegmentsMap() {
     return _workerIdToLogicalTableSegmentsMap;
+  }
+
+  @Nullable
+  public Map<Integer, Map<String, List<String>>> getWorkerIdToOptionalSegmentsMap() {
+    return _workerIdToOptionalSegmentsMap;
   }
 
   public Map<String, String> getTableOptions() {

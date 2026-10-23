@@ -53,6 +53,7 @@ public class MockRoutingManagerFactory {
   private final Set<String> _hybridTables;
   private final Map<String, ServerInstance> _serverInstances;
   private final Map<String, Map<String, List<ServerInstance>>> _tableSegmentServersMap;
+  private final Map<String, Map<String, ServerInstance>> _tableOptionalSegmentServerMap;
   private final Set<String> _disabledTables;
 
   public MockRoutingManagerFactory(int... ports) {
@@ -61,6 +62,7 @@ public class MockRoutingManagerFactory {
     _hybridTables = new HashSet<>();
     _serverInstances = new HashMap<>();
     _tableSegmentServersMap = new HashMap<>();
+    _tableOptionalSegmentServerMap = new HashMap<>();
     _disabledTables = new HashSet<>();
     for (int port : ports) {
       _serverInstances.put(toHostname(port), getServerInstance(HOST_NAME, port, port, port, port));
@@ -89,6 +91,13 @@ public class MockRoutingManagerFactory {
     _tableSegmentServersMap.computeIfAbsent(tableNameWithType, k -> new HashMap<>())
         .computeIfAbsent(segmentName, k -> new ArrayList<>())
         .add(serverInstance);
+  }
+
+  /// Registers a segment routed to the given server as optional, like a new segment the broker has not seen ONLINE yet.
+  /// As in `BaseBrokerRoutingManager`, it is only routed when the server also gets a non-optional segment of the table.
+  public void registerOptionalSegment(int insertToServerPort, String tableNameWithType, String segmentName) {
+    _tableOptionalSegmentServerMap.computeIfAbsent(tableNameWithType, k -> new HashMap<>())
+        .put(segmentName, _serverInstances.get(toHostname(insertToServerPort)));
   }
 
   /// Registers a routing entry for a table that has no routable segments (e.g. an empty table, or one whose segments
@@ -123,9 +132,16 @@ public class MockRoutingManagerFactory {
           server = servers.get(serverId % numServers);
           serverId++;
         }
-        segmentsToQueryMap.computeIfAbsent(server, k -> new SegmentsToQuery(new ArrayList<>(), null))
+        segmentsToQueryMap.computeIfAbsent(server, k -> new SegmentsToQuery(new ArrayList<>(), new ArrayList<>()))
             .getSegments()
             .add(segment);
+      }
+      for (Map.Entry<String, ServerInstance> optionalSegmentServerEntry
+          : _tableOptionalSegmentServerMap.getOrDefault(tableNameWithType, Map.of()).entrySet()) {
+        SegmentsToQuery segmentsToQuery = segmentsToQueryMap.get(optionalSegmentServerEntry.getValue());
+        if (segmentsToQuery != null) {
+          segmentsToQuery.getOptionalSegments().add(optionalSegmentServerEntry.getKey());
+        }
       }
       routingTableMap.put(tableNameWithType, new RoutingTable(segmentsToQueryMap, List.of(), 0));
       tableSegmentsMap.put(tableNameWithType, new ArrayList<>(segmentServersMap.keySet()));

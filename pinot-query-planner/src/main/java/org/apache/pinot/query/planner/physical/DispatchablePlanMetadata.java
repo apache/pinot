@@ -84,6 +84,9 @@ public class DispatchablePlanMetadata implements Serializable {
 
   /// Map from workerId -> {physicalTableName -> segments} is required for logical tables.
   private Map<Integer, Map<String, List<String>>> _workerIdToTableSegmentsMap;
+  /// Map from workerId -> {tableType or physicalTableName -> optional segments}, keyed like the segment map of the
+  /// stage; only workers with optional segments have an entry.
+  private Map<Integer, Map<String, List<String>>> _workerIdToOptionalSegmentsMap;
   private LogicalTableRouteInfo _logicalTableRouteInfo;
 
   public List<String> getScannedTables() {
@@ -247,5 +250,17 @@ public class DispatchablePlanMetadata implements Serializable {
   public void setWorkerIdToTableSegmentsMap(
       Map<Integer, Map<String, List<String>>> workerIdToTableSegmentsMap) {
     _workerIdToTableSegmentsMap = workerIdToTableSegmentsMap;
+  }
+
+  /// Returns the optional segments of each leaf-stage worker (see `WorkerMetadata#getOptionalSegmentsMap()`), or `null`
+  /// when no worker has any.
+  @Nullable
+  public Map<Integer, Map<String, List<String>>> getWorkerIdToOptionalSegmentsMap() {
+    return _workerIdToOptionalSegmentsMap;
+  }
+
+  public void setWorkerIdToOptionalSegmentsMap(
+      @Nullable Map<Integer, Map<String, List<String>>> workerIdToOptionalSegmentsMap) {
+    _workerIdToOptionalSegmentsMap = workerIdToOptionalSegmentsMap;
   }
 }

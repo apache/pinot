@@ -44,6 +44,8 @@ public class QueryPlanSerDeUtilsTest {
       Map.of("OFFLINE", List.of("seg_0", "seg_1"), "REALTIME", List.of("seg__0__0__20240101T0000Z"));
   private static final Map<String, List<String>> LOGICAL_TABLE_SEGMENTS_MAP =
       Map.of("t1_OFFLINE", List.of("t1_seg_0"), "t2_REALTIME", List.of("t2_seg_0", "t2_seg_1"));
+  private static final Map<String, List<String>> OPTIONAL_SEGMENTS_MAP =
+      Map.of("REALTIME", List.of("seg__0__1__20240101T0100Z"));
 
   @DataProvider
   public static Object[][] encodings() {
@@ -60,12 +62,15 @@ public class QueryPlanSerDeUtilsTest {
     assertFalse(proto.hasLogicalTableSegmentsMap());
     assertEquals(proto.getCustomPropertyMap().containsKey(WorkerMetadata.TABLE_SEGMENTS_MAP_KEY), !protoSegmentList);
     assertFalse(proto.getCustomPropertyMap().containsKey(WorkerMetadata.LOGICAL_TABLE_SEGMENTS_MAP_KEY));
+    assertFalse(proto.hasOptionalSegmentsMap());
+    assertFalse(proto.getCustomPropertyMap().containsKey(WorkerMetadata.OPTIONAL_SEGMENTS_MAP_KEY));
     assertEquals(proto.getCustomPropertyMap().get("foo"), "bar");
 
     WorkerMetadata decoded = QueryPlanSerDeUtils.fromProtoWorkerMetadata(proto);
     assertEquals(decoded.getWorkerId(), 3);
     assertEquals(decoded.getTableSegmentsMap(), TABLE_SEGMENTS_MAP);
     assertNull(decoded.getLogicalTableSegmentsMap());
+    assertNull(decoded.getOptionalSegmentsMap());
     assertTrue(decoded.isLeafStageWorker());
     // The JSON is never surfaced as a custom property of the decoded metadata, whichever encoding was used.
     assertEquals(decoded.getCustomProperties(), CUSTOM_PROPERTIES);
@@ -90,6 +95,37 @@ public class QueryPlanSerDeUtilsTest {
     assertNull(decoded.getTableSegmentsMap());
     assertEquals(decoded.getLogicalTableSegmentsMap(), LOGICAL_TABLE_SEGMENTS_MAP);
     assertTrue(decoded.isLeafStageWorker());
+    assertEquals(decoded.getCustomProperties(), CUSTOM_PROPERTIES);
+  }
+
+  @Test(dataProvider = "encodings")
+  public void testOptionalSegmentsRoundTrip(boolean protoSegmentList)
+      throws Exception {
+    WorkerMetadata workerMetadata = leafWorker(TABLE_SEGMENTS_MAP, null);
+    workerMetadata.setOptionalSegmentsMap(OPTIONAL_SEGMENTS_MAP);
+
+    Worker.WorkerMetadata proto = toProto(workerMetadata, protoSegmentList);
+    assertEquals(proto.hasOptionalSegmentsMap(), protoSegmentList);
+    assertEquals(proto.getCustomPropertyMap().containsKey(WorkerMetadata.OPTIONAL_SEGMENTS_MAP_KEY),
+        !protoSegmentList);
+
+    WorkerMetadata decoded = QueryPlanSerDeUtils.fromProtoWorkerMetadata(proto);
+    assertEquals(decoded.getTableSegmentsMap(), TABLE_SEGMENTS_MAP);
+    assertEquals(decoded.getOptionalSegmentsMap(), OPTIONAL_SEGMENTS_MAP);
+    assertEquals(decoded.getCustomProperties(), CUSTOM_PROPERTIES);
+  }
+
+  /// Optional segments of a logical table are keyed by physical table name, like its segment map.
+  @Test(dataProvider = "encodings")
+  public void testLogicalTableOptionalSegmentsRoundTrip(boolean protoSegmentList)
+      throws Exception {
+    Map<String, List<String>> optionalSegmentsMap = Map.of("t2_REALTIME", List.of("t2_seg_2"));
+    WorkerMetadata workerMetadata = leafWorker(null, LOGICAL_TABLE_SEGMENTS_MAP);
+    workerMetadata.setOptionalSegmentsMap(optionalSegmentsMap);
+
+    WorkerMetadata decoded = QueryPlanSerDeUtils.fromProtoWorkerMetadata(toProto(workerMetadata, protoSegmentList));
+    assertEquals(decoded.getLogicalTableSegmentsMap(), LOGICAL_TABLE_SEGMENTS_MAP);
+    assertEquals(decoded.getOptionalSegmentsMap(), optionalSegmentsMap);
     assertEquals(decoded.getCustomProperties(), CUSTOM_PROPERTIES);
   }
 

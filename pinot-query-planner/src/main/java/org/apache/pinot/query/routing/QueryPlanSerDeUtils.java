@@ -86,10 +86,12 @@ public class QueryPlanSerDeUtils {
     Map<String, String> customProperties = protoWorkerMetadata.getCustomPropertyMap();
     String tableSegmentsJson = customProperties.get(WorkerMetadata.TABLE_SEGMENTS_MAP_KEY);
     String logicalTableSegmentsJson = customProperties.get(WorkerMetadata.LOGICAL_TABLE_SEGMENTS_MAP_KEY);
-    if (tableSegmentsJson != null || logicalTableSegmentsJson != null) {
+    String optionalSegmentsJson = customProperties.get(WorkerMetadata.OPTIONAL_SEGMENTS_MAP_KEY);
+    if (tableSegmentsJson != null || logicalTableSegmentsJson != null || optionalSegmentsJson != null) {
       Map<String, String> strippedProperties = new HashMap<>(customProperties);
       strippedProperties.remove(WorkerMetadata.TABLE_SEGMENTS_MAP_KEY);
       strippedProperties.remove(WorkerMetadata.LOGICAL_TABLE_SEGMENTS_MAP_KEY);
+      strippedProperties.remove(WorkerMetadata.OPTIONAL_SEGMENTS_MAP_KEY);
       customProperties = Collections.unmodifiableMap(strippedProperties);
     }
     WorkerMetadata workerMetadata =
@@ -104,6 +106,11 @@ public class QueryPlanSerDeUtils {
           fromProtoSegmentsMap(protoWorkerMetadata.getLogicalTableSegmentsMap()));
     } else if (logicalTableSegmentsJson != null) {
       workerMetadata.setLogicalTableSegmentsMapJson(logicalTableSegmentsJson);
+    }
+    if (protoWorkerMetadata.hasOptionalSegmentsMap()) {
+      workerMetadata.setOptionalSegmentsMap(fromProtoSegmentsMap(protoWorkerMetadata.getOptionalSegmentsMap()));
+    } else if (optionalSegmentsJson != null) {
+      workerMetadata.setOptionalSegmentsMapJson(optionalSegmentsJson);
     }
     return workerMetadata;
   }
@@ -168,6 +175,16 @@ public class QueryPlanSerDeUtils {
       } else {
         builder.putCustomProperty(WorkerMetadata.LOGICAL_TABLE_SEGMENTS_MAP_KEY,
             encodeSegmentsMapJson(logicalTableSegmentsMap));
+      }
+    }
+    // A server that predates optional segments ignores them under either encoding (an unknown proto field, or an
+    // unknown custom property), and so keeps skipping them as before.
+    Map<String, List<String>> optionalSegmentsMap = workerMetadata.getOptionalSegmentsMap();
+    if (optionalSegmentsMap != null) {
+      if (protoSegmentList) {
+        builder.setOptionalSegmentsMap(toProtoSegmentsMap(optionalSegmentsMap));
+      } else {
+        builder.putCustomProperty(WorkerMetadata.OPTIONAL_SEGMENTS_MAP_KEY, encodeSegmentsMapJson(optionalSegmentsMap));
       }
     }
     return builder.build();
