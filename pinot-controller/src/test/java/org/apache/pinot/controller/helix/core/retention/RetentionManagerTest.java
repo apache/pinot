@@ -20,6 +20,7 @@ package org.apache.pinot.controller.helix.core.retention;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
@@ -65,6 +66,7 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.filesystem.FileMetadata;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -82,6 +84,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
@@ -1857,5 +1860,78 @@ public class RetentionManagerTest {
         new LineageEntry(List.of(source), List.of(destination), state, timestamp));
     when(resourceManager.getPropertyStore().get(anyString(), any(Stat.class), eq(AccessOption.PERSISTENT)))
         .thenReturn(lineage.toZNRecord());
+  }
+
+  /// Per-table work added by a subclass must not add ZK or deep-store reads. The subclass reads through the run
+  /// context before the built-in steps run, and the whole call sees one ZK metadata read and one listing.
+  @Test
+  public void testRunContextSharesReadsWithSubclassPerTableWork() {
+    final long oldTimeMs = 1343001600000L;
+    SegmentZKMetadata oldSegment = mockSegmentZKMetadata(oldTimeMs, oldTimeMs, TimeUnit.MILLISECONDS);
+    List<SegmentZKMetadata> segmentsZKMetadata = List.of(oldSegment);
+    // Tracked old file (deleted through its ZK metadata), untracked old file (deleted by the sweep), untracked recent
+    // file (kept).
+    createFileWithContent(new File(_tableDir, oldSegment.getSegmentName()), "tracked");
+    File untrackedOld = new File(_tableDir, "untrackedOld");
+    createFileWithContent(untrackedOld, "untracked old");
+    setFileModificationTime(untrackedOld, oldTimeMs);
+    createFileWithContent(new File(_tableDir, "untrackedRecent"), "untracked recent");
+    List<String> expectedDeletes = List.of(oldSegment.getSegmentName(), "untrackedOld");
+
+    TableConfig tableConfig = createOfflineTableConfig();
+    LeadControllerManager leadControllerManager = mock(LeadControllerManager.class);
+    when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
+    PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+    setupPinotHelixResourceManager(tableConfig, expectedDeletes, pinotHelixResourceManager, leadControllerManager);
+    when(pinotHelixResourceManager.getTableConfig(OFFLINE_TABLE_NAME)).thenReturn(tableConfig);
+    when(pinotHelixResourceManager.getSegmentsZKMetadata(OFFLINE_TABLE_NAME)).thenReturn(segmentsZKMetadata);
+    when(pinotHelixResourceManager.getDataDir()).thenReturn(_tempDir.toString());
+    // Lets the lineage cleanup step run (no lineage znode) instead of failing on a null lock.
+    when(pinotHelixResourceManager.getLineageUpdaterLock(OFFLINE_TABLE_NAME)).thenReturn(new Object());
+
+    ControllerConf conf = new ControllerConf();
+    conf.setRetentionControllerFrequencyInSeconds(0);
+    conf.setDeletedSegmentsRetentionInDays(0);
+    conf.setUntrackedSegmentDeletionEnabled(true);
+    ControllerMetrics controllerMetrics = new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+    BrokerServiceHelper brokerServiceHelper =
+        new BrokerServiceHelper(mock(PinotHelixResourceManager.class), conf, null, null);
+
+    AtomicInteger listings = new AtomicInteger();
+    AtomicInteger subclassCalls = new AtomicInteger();
+    RetentionManager retentionManager =
+        new RetentionManager(pinotHelixResourceManager, leadControllerManager, conf, controllerMetrics,
+            brokerServiceHelper) {
+          @Override
+          protected void processTable(TableConfig config, TableRunContext context) {
+            subclassCalls.incrementAndGet();
+            assertEquals(context.getTableNameWithType(), OFFLINE_TABLE_NAME);
+            assertEquals(context.getRawTableName(), TEST_TABLE_NAME);
+            assertEquals(context.getSegmentsZKMetadata(), segmentsZKMetadata);
+            List<FileMetadata> files;
+            try {
+              files = context.getDeepStoreFiles();
+            } catch (IOException e) {
+              throw new RuntimeException(e);
+            }
+            assertNotNull(files);
+            assertEquals(files.size(), 3);
+            super.processTable(config, context);
+          }
+
+          @Override
+          protected List<FileMetadata> listDeepStoreTableDir(URI tableDataUri)
+              throws IOException {
+            listings.incrementAndGet();
+            return super.listDeepStoreTableDir(tableDataUri);
+          }
+        };
+    retentionManager.start();
+    retentionManager.run();
+
+    assertEquals(subclassCalls.get(), 1);
+    assertEquals(listings.get(), 1);
+    verify(pinotHelixResourceManager, times(1)).getSegmentsZKMetadata(OFFLINE_TABLE_NAME);
+    verify(pinotHelixResourceManager, times(1)).deleteSegments(eq(OFFLINE_TABLE_NAME), anyList());
   }
 }
