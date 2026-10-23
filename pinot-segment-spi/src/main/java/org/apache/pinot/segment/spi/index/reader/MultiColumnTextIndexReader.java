@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.spi.index.reader;
 
+import it.unimi.dsi.fastutil.ints.Int2FloatMap;
 import javax.annotation.Nullable;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -58,6 +59,24 @@ public interface MultiColumnTextIndexReader extends TextIndexReader {
   @Override
   default int getNumMatchingDocs(String searchQuery, @Nullable String optionsString) {
     throw new UnsupportedOperationException("Multi-column text index requires column name to count!");
+  }
+
+  /// Column-aware counterpart of [TextIndexReader#getDocScores]: returns the relevance score of every document
+  /// of `column` matching the query, keyed by Pinot doc id.
+  ///
+  /// @param column The column to query
+  /// @param searchQuery The search query string
+  /// @param optionsString Options string in format "key1=value1,key2=value2", can be null
+  /// @return map from Pinot doc id to score, containing only matching documents
+  default Int2FloatMap getDocScores(String column, String searchQuery, @Nullable String optionsString) {
+    throw new UnsupportedOperationException(
+        "Relevance scoring is not supported by text index reader: " + getClass().getSimpleName());
+  }
+
+  /// A multi-column index cannot score without a column, matching [#getDocIds(String)].
+  @Override
+  default Int2FloatMap getDocScores(String searchQuery, @Nullable String optionsString) {
+    throw new UnsupportedOperationException("Multi-column text index requires column name to score!");
   }
 
   default boolean isMultiColumn() {

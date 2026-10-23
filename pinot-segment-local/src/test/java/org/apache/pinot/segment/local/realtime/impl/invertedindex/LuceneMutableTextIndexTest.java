@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.segment.local.realtime.impl.invertedindex;
 
+import it.unimi.dsi.fastutil.ints.Int2FloatMap;
 import java.io.File;
 import java.io.IOException;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -280,6 +282,36 @@ public class LuceneMutableTextIndexTest {
     if (_realtimeLuceneTextIndex != null) {
       _realtimeLuceneTextIndex.close();
       _realtimeLuceneTextIndex = null;
+    }
+  }
+
+  @Test
+  public void testGetDocScores()
+      throws IOException {
+    TextIndexConfig config = new TextIndexConfigBuilder().withUseANDForMultiTermQueries(false).build();
+    RealtimeLuceneTextIndex index = new RealtimeLuceneTextIndex(TEXT_COLUMN_NAME, INDEX_DIR,
+        "table__0__" + SEGMENT_NAME_SUFFIX_COUNTER.getAndIncrement() + "__20240601T1818Z", config);
+    try {
+      index.add("usb charger");
+      index.add("usb charger braided cable wall adapter travel kit pouch");
+      index.add("usb usb usb hub");
+      index.add("usb power bank hub");
+      index.add("hdmi monitor cable");
+      index.getSearcherManager().maybeRefreshBlocking();
+
+      Int2FloatMap scores = index.getDocScores("usb", null);
+      assertEquals(scores.keySet(), Set.of(0, 1, 2, 3));
+      for (float score : scores.values()) {
+        assertTrue(score > 0);
+      }
+      // Same length, more occurrences
+      assertTrue(scores.get(2) > scores.get(3));
+      // Same occurrences, shorter document
+      assertTrue(scores.get(0) > scores.get(1));
+      // Non-matching documents are absent and read as 0
+      assertEquals(scores.get(4), 0f);
+    } finally {
+      index.close();
     }
   }
 

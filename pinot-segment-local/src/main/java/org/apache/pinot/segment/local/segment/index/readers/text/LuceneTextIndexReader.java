@@ -19,6 +19,8 @@
 package org.apache.pinot.segment.local.segment.index.readers.text;
 
 import com.google.common.annotations.VisibleForTesting;
+import it.unimi.dsi.fastutil.ints.Int2FloatMap;
+import it.unimi.dsi.fastutil.ints.Int2FloatOpenHashMap;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
@@ -258,6 +260,22 @@ public class LuceneTextIndexReader implements TextIndexReader {
     if (maxDoc > _numDocs) {
       throw new IllegalStateException(
           "Lucene text index contains " + maxDoc + " documents, exceeding segment document count: " + _numDocs);
+    }
+  }
+
+  @Override
+  public Int2FloatMap getDocScores(String searchQuery, @Nullable String optionsString) {
+    Int2FloatOpenHashMap scores = new Int2FloatOpenHashMap();
+    try {
+      validateDocCount();
+      _indexSearcher.search(buildQuery(searchQuery, optionsString, null),
+          new LuceneDocScoreCollector(scores, _docIdTranslator::getPinotDocId));
+      return scores;
+    } catch (QueryException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new RuntimeException(
+          "Caught exception while scoring the text index for column:" + _column + " search query:" + searchQuery, e);
     }
   }
 
