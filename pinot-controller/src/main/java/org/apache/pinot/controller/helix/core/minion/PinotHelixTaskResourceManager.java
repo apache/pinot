@@ -328,7 +328,7 @@ public class PinotHelixTaskResourceManager {
   /// @param forceDelete as said in helix comment, if set true, all job's related zk nodes will
   ///                    be clean up from zookeeper even if its workflow information can not be found.
   ///                    A forced delete that fails is retried a few times with a short backoff.
-  public synchronized void deleteTask(String taskName, boolean forceDelete) {
+  public void deleteTask(String taskName, boolean forceDelete) {
     String taskType = getTaskType(taskName);
     String helixJobQueueName = getHelixJobQueueName(taskType);
     if (forceDelete) {
@@ -336,7 +336,9 @@ public class PinotHelixTaskResourceManager {
       forceDeleteJob(helixJobQueueName, taskName);
     } else {
       LOGGER.info("Deleting task: {} from queue: {} of task type: {}", taskName, helixJobQueueName, taskType);
-      _taskDriver.deleteJob(helixJobQueueName, taskName, false);
+      synchronized (this) {
+        _taskDriver.deleteJob(helixJobQueueName, taskName, false);
+      }
     }
   }
 
@@ -345,11 +347,14 @@ public class PinotHelixTaskResourceManager {
   /// The Helix task pipeline can still be writing the job context right after the queue is stopped or the task is
   /// scheduled. Removing the context ZNode then fails with ZooKeeper `NotEmpty`, which Helix reports as a
   /// [HelixException] without the cause. Each step of a forced delete skips ZNodes that are already gone, so a retry
-  /// resumes where the failed attempt stopped. The caller holds this manager's lock, so the backoff stays short.
+  /// resumes where the failed attempt stopped. Each attempt holds this manager's lock, but the backoff between attempts
+  /// does not, so other callers are not blocked while it waits.
   private void forceDeleteJob(String helixJobQueueName, String taskName) {
     for (int attempt = 1; ; attempt++) {
       try {
-        _taskDriver.deleteJob(helixJobQueueName, taskName, true);
+        synchronized (this) {
+          _taskDriver.deleteJob(helixJobQueueName, taskName, true);
+        }
         return;
       } catch (HelixException e) {
         if (attempt >= FORCE_DELETE_JOB_MAX_ATTEMPTS) {
