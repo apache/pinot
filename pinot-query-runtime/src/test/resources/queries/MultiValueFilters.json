@@ -1,0 +1,370 @@
+{
+  "mv_filter": {
+    "comment": "Comparisons of a multi-value column to a value. As in the single-stage engine, = and IN match a row if any value matches, <> and NOT IN if no value matches. They are only supported in filters pushed down to the leaf stage.",
+    "tables": {
+      "orders": {
+        "schema": [
+          {
+            "name": "order_id",
+            "type": "STRING"
+          },
+          {
+            "name": "customer_id",
+            "type": "STRING"
+          },
+          {
+            "name": "tags",
+            "type": "STRING",
+            "isSingleValue": false
+          },
+          {
+            "name": "codes",
+            "type": "INT",
+            "isSingleValue": false
+          }
+        ],
+        "inputs": [
+          [
+            "o1",
+            "c1",
+            [
+              "urgent",
+              "vip"
+            ],
+            [
+              1,
+              2
+            ]
+          ],
+          [
+            "o2",
+            "c1",
+            [
+              "urgent"
+            ],
+            [
+              2
+            ]
+          ],
+          [
+            "o3",
+            "c2",
+            [
+              "urgent"
+            ],
+            [
+              3
+            ]
+          ],
+          [
+            "o4",
+            "c2",
+            [
+              "vip"
+            ],
+            [
+              4,
+              5
+            ]
+          ],
+          [
+            "o5",
+            "c3",
+            [
+              "normal"
+            ],
+            [
+              5
+            ]
+          ]
+        ]
+      },
+      "customers": {
+        "schema": [
+          {
+            "name": "customer_id",
+            "type": "STRING"
+          },
+          {
+            "name": "name",
+            "type": "STRING"
+          }
+        ],
+        "inputs": [
+          [
+            "c1",
+            "Alice"
+          ],
+          [
+            "c2",
+            "Bob"
+          ],
+          [
+            "c3",
+            "Charlie"
+          ]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "Equality on a STRING MV column",
+        "sql": "SELECT order_id FROM {orders} WHERE tags = 'urgent' ORDER BY order_id",
+        "outputs": [
+          [
+            "o1"
+          ],
+          [
+            "o2"
+          ],
+          [
+            "o3"
+          ]
+        ]
+      },
+      {
+        "description": "Equality with the value on the left side",
+        "sql": "SELECT order_id FROM {orders} WHERE 'vip' = tags ORDER BY order_id",
+        "outputs": [
+          [
+            "o1"
+          ],
+          [
+            "o4"
+          ]
+        ]
+      },
+      {
+        "description": "IN on a STRING MV column",
+        "sql": "SELECT order_id FROM {orders} WHERE tags IN ('vip', 'normal') ORDER BY order_id",
+        "outputs": [
+          [
+            "o1"
+          ],
+          [
+            "o4"
+          ],
+          [
+            "o5"
+          ]
+        ]
+      },
+      {
+        "description": "IN with a large value list on a STRING MV column",
+        "sql": "SELECT order_id FROM {orders} WHERE tags IN ('v0', 'v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'v7', 'v8', 'v9', 'v10', 'v11', 'v12', 'v13', 'v14', 'v15', 'v16', 'v17', 'v18', 'v19', 'v20', 'v21', 'v22', 'v23', 'v24', 'normal') ORDER BY order_id",
+        "outputs": [
+          [
+            "o5"
+          ]
+        ]
+      },
+      {
+        "description": "Two equalities on the same MV column are not folded to false",
+        "sql": "SELECT order_id FROM {orders} WHERE tags = 'urgent' AND tags = 'vip' ORDER BY order_id",
+        "outputs": [
+          [
+            "o1"
+          ]
+        ]
+      },
+      {
+        "description": "Equality and IN on an INT MV column",
+        "sql": "SELECT order_id FROM {orders} WHERE codes = 5 OR codes IN (1, 3) ORDER BY order_id",
+        "outputs": [
+          [
+            "o1"
+          ],
+          [
+            "o3"
+          ],
+          [
+            "o4"
+          ],
+          [
+            "o5"
+          ]
+        ]
+      },
+      {
+        "description": "MV equality pushed below a join",
+        "sql": "SELECT o.order_id, c.name FROM {orders} o JOIN {customers} c ON o.customer_id = c.customer_id WHERE o.tags = 'urgent' ORDER BY o.order_id",
+        "outputs": [
+          [
+            "o1",
+            "Alice"
+          ],
+          [
+            "o2",
+            "Alice"
+          ],
+          [
+            "o3",
+            "Bob"
+          ]
+        ]
+      },
+      {
+        "description": "MV IN pushed below a join with an aggregate above it",
+        "sql": "SELECT c.name, COUNT(*) FROM {orders} o JOIN {customers} c ON o.customer_id = c.customer_id WHERE o.tags IN ('vip', 'normal') GROUP BY c.name ORDER BY c.name",
+        "outputs": [
+          [
+            "Alice",
+            1
+          ],
+          [
+            "Bob",
+            1
+          ],
+          [
+            "Charlie",
+            1
+          ]
+        ]
+      },
+      {
+        "description": "Not-equals on an MV column matches rows with no equal value",
+        "sql": "SELECT order_id FROM {orders} WHERE tags <> 'urgent' ORDER BY order_id",
+        "outputs": [
+          [
+            "o4"
+          ],
+          [
+            "o5"
+          ]
+        ]
+      },
+      {
+        "description": "NOT of an MV equality is the complement",
+        "sql": "SELECT order_id FROM {orders} WHERE NOT (tags = 'urgent') ORDER BY order_id",
+        "outputs": [
+          [
+            "o4"
+          ],
+          [
+            "o5"
+          ]
+        ]
+      },
+      {
+        "description": "NOT IN on an MV column matches rows with no value in the list",
+        "sql": "SELECT order_id FROM {orders} WHERE tags NOT IN ('urgent', 'normal') ORDER BY order_id",
+        "outputs": [
+          [
+            "o4"
+          ]
+        ]
+      },
+      {
+        "description": "NOT of an equality on an INT MV column",
+        "sql": "SELECT order_id FROM {orders} WHERE NOT (codes = 5) ORDER BY order_id",
+        "outputs": [
+          [
+            "o1"
+          ],
+          [
+            "o2"
+          ],
+          [
+            "o3"
+          ]
+        ]
+      },
+      {
+        "description": "String value compared to an INT MV column",
+        "sql": "SELECT order_id FROM {orders} WHERE codes = '5' ORDER BY order_id",
+        "outputs": [
+          [
+            "o4"
+          ],
+          [
+            "o5"
+          ]
+        ]
+      },
+      {
+        "description": "MV equality in a LEFT JOIN condition is pushed to the leaf stage",
+        "sql": "SELECT c.name, o.order_id FROM {customers} c LEFT JOIN {orders} o ON c.customer_id = o.customer_id AND o.tags = 'vip' ORDER BY c.name",
+        "outputs": [
+          [
+            "Alice",
+            "o1"
+          ],
+          [
+            "Bob",
+            "o4"
+          ],
+          [
+            "Charlie",
+            null
+          ]
+        ]
+      },
+      {
+        "description": "MV equality in an aggregate FILTER clause",
+        "sql": "SELECT COUNT(*) FILTER (WHERE tags = 'urgent') FROM {orders}",
+        "outputs": [
+          [
+            3
+          ]
+        ]
+      },
+      {
+        "description": "Range comparison on an MV column is not supported",
+        "sql": "SELECT order_id FROM {orders} WHERE NOT (codes > 4)",
+        "expectedException": ".*Cannot apply '>' to arguments of type '<INTEGER ARRAY> > <INTEGER>'.*",
+        "outputs": []
+      },
+      {
+        "description": "Range comparison on a STRING MV column is not supported",
+        "sql": "SELECT order_id FROM {orders} WHERE tags > 'u'",
+        "expectedException": ".*Cannot apply '>' to arguments of type '<VARCHAR ARRAY> > <CHAR\\(1\\)>'.*",
+        "outputs": []
+      },
+      {
+        "description": "Value that needs a cast of the MV column is not supported",
+        "sql": "SELECT order_id FROM {orders} WHERE tags = 5",
+        "expectedException": ".*Cannot apply '=' to arguments of type '<VARCHAR ARRAY> = <INTEGER>'.*",
+        "outputs": []
+      },
+      {
+        "description": "NULL in an IN list on an MV column is rejected",
+        "sql": "SELECT order_id FROM {orders} WHERE tags IN ('vip', NULL)",
+        "expectedException": ".*NULL is not supported in an IN list compared to multi-value column.*",
+        "outputs": []
+      },
+      {
+        "description": "MV filter that cannot be pushed to the leaf stage",
+        "sql": "SELECT order_id FROM (SELECT order_id, tags FROM {orders} ORDER BY order_id LIMIT 10) t WHERE t.tags = 'urgent'",
+        "expectedException": ".*Comparing a multi-value column to a value.*FILTER Intermediate Stage.*arrayContainsString.*",
+        "outputs": []
+      },
+      {
+        "description": "MV filter in a disjunction across both sides of a join",
+        "sql": "SELECT o.order_id FROM {orders} o JOIN {customers} c ON o.customer_id = c.customer_id WHERE o.tags IN ('vip', 'normal') OR c.name = 'Alice'",
+        "expectedException": ".*Comparing a multi-value column to a value.*arrayContainsString.*",
+        "outputs": []
+      },
+      {
+        "description": "MV comparison in a projection",
+        "sql": "SELECT order_id, CASE WHEN tags = 'urgent' THEN 1 ELSE 0 END FROM {orders}",
+        "expectedException": ".*Comparing a multi-value column to a value.*PROJECT Leaf Stage.*arrayContainsString.*",
+        "outputs": []
+      },
+      {
+        "description": "arrayContainsString works where an MV comparison is not supported",
+        "sql": "SELECT order_id FROM (SELECT order_id, tags FROM {orders} ORDER BY order_id LIMIT 10) t WHERE arrayContainsString(t.tags, 'urgent') ORDER BY order_id",
+        "outputs": [
+          [
+            "o1"
+          ],
+          [
+            "o2"
+          ],
+          [
+            "o3"
+          ]
+        ]
+      }
+    ]
+  }
+}

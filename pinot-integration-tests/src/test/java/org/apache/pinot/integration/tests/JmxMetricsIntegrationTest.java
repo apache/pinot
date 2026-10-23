@@ -117,8 +117,8 @@ public class JmxMetricsIntegrationTest extends BaseClusterIntegrationTestSet {
 
     // Run some queries that are known to not work as is with the multi-stage query engine
 
-    // MV column requires ARRAY_TO_MV wrapper to be used in filter predicates
-    response = postQuery("SELECT COUNT(*) FROM mytable WHERE DivAirports = 'JFK'");
+    // A range predicate on an MV column requires an explicit ARRAY_TO_MV wrapper
+    response = postQuery("SELECT COUNT(*) FROM mytable WHERE DivAirports > 'JFK'");
     assertFalse(response.get("resultTable").get("rows").isEmpty());
 
     // Repeated columns in an ORDER BY query

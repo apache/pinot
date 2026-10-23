@@ -19,6 +19,8 @@
 package org.apache.pinot.query.planner.validation;
 
 import java.util.List;
+import java.util.Set;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
@@ -46,11 +48,13 @@ import org.apache.pinot.spi.exception.QueryException;
 public class ArrayToMvValidationVisitor implements PlanNodeVisitor<Void, Boolean> {
   public static final ArrayToMvValidationVisitor INSTANCE = new ArrayToMvValidationVisitor();
 
+  private static final Set<String> COMPARISON_FUNCTIONS =
+      Set.of(SqlKind.EQUALS.name(), SqlKind.NOT_EQUALS.name(), SqlKind.IN.name(), SqlKind.NOT_IN.name());
+
   @Override
   public Void visitFilter(FilterNode node, Boolean isIntermediateStage) {
     if (isIntermediateStage && containsArrayToMv(node.getCondition())) {
-      throw new QueryException(QueryErrorCode.QUERY_PLANNING,
-          "Function 'ArrayToMv' is not supported in FILTER Intermediate Stage");
+      throw arrayToMvNotSupported("FILTER Intermediate Stage", List.of(node.getCondition()), "");
     }
     node.getInputs().forEach(e -> e.visit(this, isIntermediateStage));
     return null;
@@ -59,8 +63,7 @@ public class ArrayToMvValidationVisitor implements PlanNodeVisitor<Void, Boolean
   @Override
   public Void visitJoin(JoinNode node, Boolean isIntermediateStage) {
     if (containsArrayToMv(node.getNonEquiConditions())) {
-      throw new QueryException(QueryErrorCode.QUERY_PLANNING,
-          "Function 'ArrayToMv' is not supported in JOIN Intermediate Stage");
+      throw arrayToMvNotSupported("JOIN Intermediate Stage", node.getNonEquiConditions(), "");
     }
     node.getInputs().forEach(e -> e.visit(this, isIntermediateStage));
     return null;
@@ -113,9 +116,8 @@ public class ArrayToMvValidationVisitor implements PlanNodeVisitor<Void, Boolean
   public Void visitProject(ProjectNode node, Boolean isIntermediateStage) {
     // V1 project node contains arrayToMv function is not supported as it will be transferred using toString.
     if (containsArrayToMv(node.getProjects())) {
-      throw new QueryException(QueryErrorCode.QUERY_PLANNING,
-          "Function 'ArrayToMv' is not supported in PROJECT " + (isIntermediateStage ? "Intermediate Stage"
-              : "Leaf Stage") + ". To get one row for each value of a multi-value column, use "
+      throw arrayToMvNotSupported("PROJECT " + (isIntermediateStage ? "Intermediate Stage" : "Leaf Stage"),
+          node.getProjects(), ". To get one row for each value of a multi-value column, use "
               + "'CROSS JOIN UNNEST(mvCol) AS t(val)' instead");
     }
     node.getInputs().forEach(e -> e.visit(this, isIntermediateStage));
@@ -170,6 +172,42 @@ public class ArrayToMvValidationVisitor implements PlanNodeVisitor<Void, Boolean
   public Void visitUnnest(UnnestNode node, Boolean isIntermediateStage) {
     node.getInputs().forEach(e -> e.visit(this, isIntermediateStage));
     return null;
+  }
+
+  /// Comparing a multi-value column to a value (e.g. `mvCol = 'a'`) is planned as a comparison on `ARRAY_TO_MV`. As
+  /// the query does not contain `ARRAY_TO_MV` in this case, the error explains the comparison instead.
+  private QueryException arrayToMvNotSupported(String location, List<? extends RexExpression> expressions,
+      String hint) {
+    if (containsMultiValueComparison(expressions)) {
+      return new QueryException(QueryErrorCode.QUERY_PLANNING,
+          "Comparing a multi-value column to a value (e.g. mvCol = 'a' or mvCol IN ('a', 'b')) is not supported in "
+              + location + ". It is only supported in a WHERE clause filter that can be pushed down to the table "
+              + "scan. Elsewhere, use an arrayContains function instead, e.g. arrayContainsString(mvCol, 'a')");
+    }
+    return new QueryException(QueryErrorCode.QUERY_PLANNING,
+        "Function 'ArrayToMv' is not supported in " + location + hint);
+  }
+
+  private boolean containsMultiValueComparison(List<? extends RexExpression> expressions) {
+    for (RexExpression expression : expressions) {
+      if (expression instanceof RexExpression.FunctionCall) {
+        RexExpression.FunctionCall functionCall = (RexExpression.FunctionCall) expression;
+        List<RexExpression> operands = functionCall.getFunctionOperands();
+        if ((COMPARISON_FUNCTIONS.contains(functionCall.getFunctionName()) && operands.stream()
+            .anyMatch(ArrayToMvValidationVisitor::isArrayToMv)) || containsMultiValueComparison(operands)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  private static boolean isArrayToMv(RexExpression expression) {
+    if (!(expression instanceof RexExpression.FunctionCall)) {
+      return false;
+    }
+    String functionName = ((RexExpression.FunctionCall) expression).getFunctionName();
+    return functionName.equalsIgnoreCase("ARRAY_TO_MV") || functionName.equalsIgnoreCase("ARRAYTOMV");
   }
 
   private boolean containsArrayToMv(RexExpression expression) {

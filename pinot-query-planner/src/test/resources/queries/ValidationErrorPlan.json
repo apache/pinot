@@ -22,6 +22,11 @@
         "expectedException": ".*'ArrayToMv' is not supported in PROJECT.*CROSS JOIN UNNEST.*"
       },
       {
+        "description": "Comparing an MV column to a value in a PROJECT error suggests arrayContains",
+        "sql": "EXPLAIN PLAN FOR SELECT CASE WHEN mcol1 = 'a' THEN 1 ELSE 0 END FROM e",
+        "expectedException": ".*Comparing a multi-value column to a value.*PROJECT Leaf Stage.*arrayContainsString.*"
+      },
+      {
         "description": "Select * with negative limit -1",
         "sql": "EXPLAIN PLAN FOR SELECT * FROM d LIMIT -1",
         "expectedException": "Encountered.*LIMIT.*"
