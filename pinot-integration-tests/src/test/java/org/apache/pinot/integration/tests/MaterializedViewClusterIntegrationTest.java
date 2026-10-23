@@ -22,7 +22,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -31,6 +33,7 @@ import org.apache.helix.store.HelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.core.function.scalar.SketchFunctions;
 import org.apache.pinot.materializedview.metadata.MaterializedViewDefinitionMetadata;
 import org.apache.pinot.materializedview.metadata.MaterializedViewDefinitionMetadata.MaterializedViewSplitSpec;
 import org.apache.pinot.materializedview.metadata.MaterializedViewDefinitionMetadataUtils;
@@ -118,6 +121,13 @@ public class MaterializedViewClusterIntegrationTest extends BaseClusterIntegrati
   private static final String MATERIALIZED_VIEW_COST_TABLE_OFFLINE = MATERIALIZED_VIEW_COST_TABLE_NAME + "_OFFLINE";
   private static final String MATERIALIZED_VIEW_SCALAR_TABLE_OFFLINE =
       MATERIALIZED_VIEW_SCALAR_TABLE_NAME + "_OFFLINE";
+  private static final String MATERIALIZED_VIEW_SKETCH_TABLE_NAME = "materializedViewSketchTable";
+  private static final String MATERIALIZED_VIEW_SKETCH_TABLE_OFFLINE =
+      MATERIALIZED_VIEW_SKETCH_TABLE_NAME + "_OFFLINE";
+  private static final String TUPLE_SOURCE_TABLE_NAME = "materializedViewTupleSource";
+  private static final String MATERIALIZED_VIEW_TUPLE_TABLE_NAME = "materializedViewTupleTable";
+  private static final String MATERIALIZED_VIEW_TUPLE_TABLE_OFFLINE =
+      MATERIALIZED_VIEW_TUPLE_TABLE_NAME + "_OFFLINE";
 
   private static final String TIME_COLUMN = "DaysSinceEpoch";
 
@@ -219,6 +229,8 @@ public class MaterializedViewClusterIntegrationTest extends BaseClusterIntegrati
     setupScanMv();
     setupCostCompetitorMv();
     setupScalarGroupingMv();
+    setupSketchMv();
+    setupTupleSketchMv();
 
     /// Wait for the broker's MaterializedViewMetadataCache to register every newly-published MV
     /// by polling a sentinel query that should be served by the full-rewrite MV.  Polling on a
@@ -230,6 +242,11 @@ public class MaterializedViewClusterIntegrationTest extends BaseClusterIntegrati
     waitForMaterializedViewRegistered(MATERIALIZED_VIEW_SCALAR_TABLE_OFFLINE,
         "SELECT UPPER(UniqueCarrier), SUM(ArrDelayMinutes) FROM " + SOURCE_TABLE_NAME
             + " GROUP BY UPPER(UniqueCarrier)");
+    waitForMaterializedViewRegistered(MATERIALIZED_VIEW_SKETCH_TABLE_OFFLINE,
+        "SELECT Carrier, DISTINCTCOUNTCPCSKETCH(Origin) FROM " + SOURCE_TABLE_NAME + " GROUP BY Carrier");
+    waitForMaterializedViewRegistered(MATERIALIZED_VIEW_TUPLE_TABLE_OFFLINE,
+        "SELECT tupleGroup, DISTINCTCOUNTTUPLESKETCH(tupleSketch) FROM " + TUPLE_SOURCE_TABLE_NAME
+            + " GROUP BY tupleGroup");
   }
 
   /// Polls a query that is known to be rewritable to the given MV until the broker's metadata
@@ -261,6 +278,8 @@ public class MaterializedViewClusterIntegrationTest extends BaseClusterIntegrati
     cleanupMaterializedViewMetadata(MATERIALIZED_VIEW_SCAN_TABLE_OFFLINE);
     cleanupMaterializedViewMetadata(MATERIALIZED_VIEW_COST_TABLE_OFFLINE);
     cleanupMaterializedViewMetadata(MATERIALIZED_VIEW_SCALAR_TABLE_OFFLINE);
+    cleanupMaterializedViewMetadata(MATERIALIZED_VIEW_SKETCH_TABLE_OFFLINE);
+    cleanupMaterializedViewMetadata(MATERIALIZED_VIEW_TUPLE_TABLE_OFFLINE);
 
     /// Drop MV tables before the base table so the controller's referential-integrity check
     /// (introduced in pinot-controller to prevent orphaned MVs) does not block the base drop.
@@ -270,6 +289,9 @@ public class MaterializedViewClusterIntegrationTest extends BaseClusterIntegrati
     dropOfflineTable(MATERIALIZED_VIEW_SCAN_TABLE_NAME);
     dropOfflineTable(MATERIALIZED_VIEW_COST_TABLE_NAME);
     dropOfflineTable(MATERIALIZED_VIEW_SCALAR_TABLE_NAME);
+    dropOfflineTable(MATERIALIZED_VIEW_SKETCH_TABLE_NAME);
+    dropOfflineTable(MATERIALIZED_VIEW_TUPLE_TABLE_NAME);
+    dropOfflineTable(TUPLE_SOURCE_TABLE_NAME);
     dropOfflineTable(SOURCE_TABLE_NAME);
 
     stopServer();
@@ -927,6 +949,110 @@ public class MaterializedViewClusterIntegrationTest extends BaseClusterIntegrati
   }
 
   /// -----------------------------------------------------------------------
+  ///  Sketch re-aggregation: CPC, theta, integer-sum tuple
+  /// -----------------------------------------------------------------------
+
+  /// The MV stores a raw CPC sketch of Origin per Carrier (populated from the source's own raw
+  /// aggregation, so the bytes are identical). Verifies both the cardinality result rule and the
+  /// raw-self rule are rewritten to the MV and return the same values as the base table.
+  @Test
+  public void testCpcSketchRewrite()
+      throws Exception {
+    assertMaterializedViewMatchesBaseline(
+        "SELECT Carrier, DISTINCTCOUNTCPCSKETCH(Origin) FROM " + SOURCE_TABLE_NAME + " GROUP BY Carrier",
+        MATERIALIZED_VIEW_SKETCH_TABLE_OFFLINE);
+    assertRawSketchMatchesBaseline(
+        "SELECT Carrier, DISTINCTCOUNTRAWCPCSKETCH(Origin) FROM " + SOURCE_TABLE_NAME + " GROUP BY Carrier",
+        "SELECT Carrier, GETCPCSKETCHESTIMATE(DISTINCTCOUNTRAWCPCSKETCH(Origin)) FROM " + SOURCE_TABLE_NAME
+            + " GROUP BY Carrier", MATERIALIZED_VIEW_SKETCH_TABLE_OFFLINE);
+  }
+
+  @Test
+  public void testThetaSketchRewrite()
+      throws Exception {
+    assertMaterializedViewMatchesBaseline(
+        "SELECT Carrier, DISTINCTCOUNTTHETASKETCH(Origin) FROM " + SOURCE_TABLE_NAME + " GROUP BY Carrier",
+        MATERIALIZED_VIEW_SKETCH_TABLE_OFFLINE);
+    assertRawSketchMatchesBaseline(
+        "SELECT Carrier, DISTINCTCOUNTRAWTHETASKETCH(Origin) FROM " + SOURCE_TABLE_NAME + " GROUP BY Carrier",
+        "SELECT Carrier, GETTHETASKETCHESTIMATE(DISTINCTCOUNTRAWTHETASKETCH(Origin)) FROM " + SOURCE_TABLE_NAME
+            + " GROUP BY Carrier", MATERIALIZED_VIEW_SKETCH_TABLE_OFFLINE);
+  }
+
+  /// One stored raw integer-sum tuple sketch per group serves cardinality, sum, average and the raw
+  /// result, since they share an accumulator and differ only in how the final value is extracted.
+  @Test
+  public void testTupleSketchRewrite()
+      throws Exception {
+    assertMaterializedViewMatchesBaseline(
+        "SELECT tupleGroup, DISTINCTCOUNTTUPLESKETCH(tupleSketch) FROM " + TUPLE_SOURCE_TABLE_NAME
+            + " GROUP BY tupleGroup", MATERIALIZED_VIEW_TUPLE_TABLE_OFFLINE);
+    assertMaterializedViewMatchesBaseline(
+        "SELECT tupleGroup, SUMVALUESINTEGERSUMTUPLESKETCH(tupleSketch) FROM " + TUPLE_SOURCE_TABLE_NAME
+            + " GROUP BY tupleGroup", MATERIALIZED_VIEW_TUPLE_TABLE_OFFLINE);
+    assertMaterializedViewMatchesBaseline(
+        "SELECT tupleGroup, AVGVALUEINTEGERSUMTUPLESKETCH(tupleSketch) FROM " + TUPLE_SOURCE_TABLE_NAME
+            + " GROUP BY tupleGroup", MATERIALIZED_VIEW_TUPLE_TABLE_OFFLINE);
+    assertRawSketchMatchesBaseline(
+        "SELECT tupleGroup, DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH(tupleSketch) FROM " + TUPLE_SOURCE_TABLE_NAME
+            + " GROUP BY tupleGroup",
+        "SELECT tupleGroup, GETINTTUPLESKETCHESTIMATE(DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH(tupleSketch)) FROM "
+            + TUPLE_SOURCE_TABLE_NAME + " GROUP BY tupleGroup", MATERIALIZED_VIEW_TUPLE_TABLE_OFFLINE);
+  }
+
+  /// Runs a query with MV rewrite enabled (broker default) and again with it disabled, asserting the
+  /// enabled run is served by the expected MV, the disabled run hits no MV, and the per-group
+  /// results are identical (compared unordered, since neither query imposes an ordering).
+  private void assertMaterializedViewMatchesBaseline(String query, String expectedMaterializedViewOfflineTable)
+      throws Exception {
+    JsonNode withRewrite = postQuery(query);
+    assertNoExceptions(withRewrite);
+    assertEquals(getMaterializedViewQueried(withRewrite), expectedMaterializedViewOfflineTable,
+        "Expected MV " + expectedMaterializedViewOfflineTable + " to be selected. Response: " + withRewrite);
+
+    JsonNode baseline = postQuery("SET enableMaterializedViewRewrite=false;\n" + query);
+    assertNoExceptions(baseline);
+    assertNull(getMaterializedViewQueried(baseline), "Baseline query must not hit any MV");
+
+    Map<String, JsonNode> rewriteValues = valuesByGroup(withRewrite);
+    Map<String, JsonNode> baselineValues = valuesByGroup(baseline);
+    assertFalse(rewriteValues.isEmpty(), "Rewrite result should have rows");
+    assertEquals(rewriteValues, baselineValues, "MV rewrite result must equal the base-table baseline");
+  }
+
+  /// Maps the first result column (the group key) to the second (the aggregation value), so two
+  /// result sets can be compared without depending on row order.
+  private static Map<String, JsonNode> valuesByGroup(JsonNode response) {
+    Map<String, JsonNode> valuesByGroup = new HashMap<>();
+    for (JsonNode row : response.get("resultTable").get("rows")) {
+      valuesByGroup.put(row.get(0).asText(), row.get(1));
+    }
+    return valuesByGroup;
+  }
+
+  /// Covers the raw-sketch shape (user wants the merged sketch itself). The bare raw query asserts
+  /// the raw-self rule selects the MV; the estimate query wraps the same aggregation in the family's
+  /// estimate scalar and checks the value equals the base-table baseline. Estimates are used rather
+  /// than the raw bytes because merging one stored sketch re-serializes to different (content-equal)
+  /// bytes than the base table's direct sketch.
+  private void assertRawSketchMatchesBaseline(String rawQuery, String estimateQuery,
+      String expectedMaterializedViewOfflineTable)
+      throws Exception {
+    JsonNode rawResponse = postQuery(rawQuery);
+    assertNoExceptions(rawResponse);
+    assertEquals(getMaterializedViewQueried(rawResponse), expectedMaterializedViewOfflineTable,
+        "Expected MV " + expectedMaterializedViewOfflineTable + " to be selected. Response: " + rawResponse);
+    assertFalse(valuesByGroup(rawResponse).isEmpty(), "Raw sketch result should have rows");
+
+    JsonNode withRewrite = postQuery(estimateQuery);
+    assertNoExceptions(withRewrite);
+    JsonNode baseline = postQuery("SET enableMaterializedViewRewrite=false;\n" + estimateQuery);
+    assertNoExceptions(baseline);
+    assertEquals(valuesByGroup(withRewrite), valuesByGroup(baseline),
+        "Raw sketch estimate must match the base-table baseline");
+  }
+
+  /// -----------------------------------------------------------------------
   ///  MV table setup
   /// -----------------------------------------------------------------------
 
@@ -1269,6 +1395,165 @@ public class MaterializedViewClusterIntegrationTest extends BaseClusterIntegrati
   /// -----------------------------------------------------------------------
   ///  Segment building helpers
   /// -----------------------------------------------------------------------
+
+  /// Sketch MV: full coverage, groups by Carrier, stores a raw CPC and a raw theta sketch of Origin.
+  /// The stored bytes are produced by the source table's own raw-sketch aggregation, so a rewrite
+  /// that re-aggregates them returns exactly the base-table result.
+  private void setupSketchMv()
+      throws Exception {
+    Schema materializedViewSchema = new Schema.SchemaBuilder()
+        .setSchemaName(MATERIALIZED_VIEW_SKETCH_TABLE_NAME)
+        .addSingleValueDimension("Carrier", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("raw_cpc_origin", FieldSpec.DataType.BYTES)
+        .addSingleValueDimension("raw_theta_origin", FieldSpec.DataType.BYTES)
+        .build();
+    addSchema(materializedViewSchema);
+
+    TableConfig materializedViewTableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(MATERIALIZED_VIEW_SKETCH_TABLE_NAME)
+        .setNumReplicas(1)
+        .build();
+    addTableConfig(materializedViewTableConfig);
+
+    Map<String, String> aliasToRawAggregation = new LinkedHashMap<>();
+    aliasToRawAggregation.put("raw_cpc_origin", "DISTINCTCOUNTRAWCPCSKETCH(Origin)");
+    aliasToRawAggregation.put("raw_theta_origin", "DISTINCTCOUNTRAWTHETASKETCH(Origin)");
+    Map<String, Map<String, byte[]>> sketchesByCarrier =
+        rawSketchesByGroup(SOURCE_TABLE_NAME, "Carrier", aliasToRawAggregation);
+
+    List<GenericRow> rows = new ArrayList<>();
+    for (Map.Entry<String, Map<String, byte[]>> entry : sketchesByCarrier.entrySet()) {
+      GenericRow row = new GenericRow();
+      row.putValue("Carrier", entry.getKey());
+      row.putValue("raw_cpc_origin", entry.getValue().get("raw_cpc_origin"));
+      row.putValue("raw_theta_origin", entry.getValue().get("raw_theta_origin"));
+      rows.add(row);
+    }
+    buildAndUploadSegment(materializedViewTableConfig, materializedViewSchema, rows,
+        MATERIALIZED_VIEW_SKETCH_TABLE_NAME, "materializedViewSketchSeg");
+
+    waitForAnyDocLoaded(MATERIALIZED_VIEW_SKETCH_TABLE_NAME, 60_000L);
+
+    String definedSql = "SELECT Carrier, "
+        + "DISTINCTCOUNTRAWCPCSKETCH(Origin) AS raw_cpc_origin, "
+        + "DISTINCTCOUNTRAWTHETASKETCH(Origin) AS raw_theta_origin "
+        + "FROM " + SOURCE_TABLE_NAME + " GROUP BY Carrier";
+    MaterializedViewDefinitionMetadata definition = new MaterializedViewDefinitionMetadata(
+        MATERIALIZED_VIEW_SKETCH_TABLE_OFFLINE,
+        List.of(SOURCE_TABLE_NAME),
+        definedSql,
+        Map.of(),
+        null);
+    MaterializedViewDefinitionMetadataUtils.persist(_propertyStore, definition, -1);
+
+    MaterializedViewRuntimeMetadata runtime = new MaterializedViewRuntimeMetadata(
+        MATERIALIZED_VIEW_SKETCH_TABLE_OFFLINE, DATA_MAX_TIME_MS, new HashMap<>());
+    MaterializedViewRuntimeMetadataUtils.persist(_propertyStore, runtime, -1);
+  }
+
+  /// Tuple MV: the integer-sum tuple sketch aggregates a BYTES column of pre-serialized sketches, so
+  /// this first builds a dedicated source table of synthetic per-key sketches, then an MV storing
+  /// the merged raw tuple sketch per group.
+  private void setupTupleSketchMv()
+      throws Exception {
+    Schema sourceSchema = new Schema.SchemaBuilder()
+        .setSchemaName(TUPLE_SOURCE_TABLE_NAME)
+        .addSingleValueDimension("tupleGroup", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("tupleSketch", FieldSpec.DataType.BYTES)
+        .build();
+    addSchema(sourceSchema);
+
+    TableConfig sourceTableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(TUPLE_SOURCE_TABLE_NAME)
+        .setNumReplicas(1)
+        .build();
+    addTableConfig(sourceTableConfig);
+
+    String[] groups = {"g0", "g1", "g2"};
+    List<GenericRow> sourceRows = new ArrayList<>();
+    for (int g = 0; g < groups.length; g++) {
+      for (int key = 0; key < 50; key++) {
+        GenericRow row = new GenericRow();
+        row.putValue("tupleGroup", groups[g]);
+        row.putValue("tupleSketch", SketchFunctions.toIntegerSumTupleSketch("key_" + g + "_" + key, key + 1));
+        sourceRows.add(row);
+      }
+    }
+    buildAndUploadSegment(sourceTableConfig, sourceSchema, sourceRows,
+        TUPLE_SOURCE_TABLE_NAME, "materializedViewTupleSourceSeg");
+    waitForAnyDocLoaded(TUPLE_SOURCE_TABLE_NAME, 60_000L);
+
+    Schema materializedViewSchema = new Schema.SchemaBuilder()
+        .setSchemaName(MATERIALIZED_VIEW_TUPLE_TABLE_NAME)
+        .addSingleValueDimension("tupleGroup", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("raw_tuple", FieldSpec.DataType.BYTES)
+        .build();
+    addSchema(materializedViewSchema);
+
+    TableConfig materializedViewTableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(MATERIALIZED_VIEW_TUPLE_TABLE_NAME)
+        .setNumReplicas(1)
+        .build();
+    addTableConfig(materializedViewTableConfig);
+
+    Map<String, String> aliasToRawAggregation = new LinkedHashMap<>();
+    aliasToRawAggregation.put("raw_tuple", "DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH(tupleSketch)");
+    Map<String, Map<String, byte[]>> sketchesByGroup =
+        rawSketchesByGroup(TUPLE_SOURCE_TABLE_NAME, "tupleGroup", aliasToRawAggregation);
+
+    List<GenericRow> rows = new ArrayList<>();
+    for (Map.Entry<String, Map<String, byte[]>> entry : sketchesByGroup.entrySet()) {
+      GenericRow row = new GenericRow();
+      row.putValue("tupleGroup", entry.getKey());
+      row.putValue("raw_tuple", entry.getValue().get("raw_tuple"));
+      rows.add(row);
+    }
+    buildAndUploadSegment(materializedViewTableConfig, materializedViewSchema, rows,
+        MATERIALIZED_VIEW_TUPLE_TABLE_NAME, "materializedViewTupleSeg");
+    waitForAnyDocLoaded(MATERIALIZED_VIEW_TUPLE_TABLE_NAME, 60_000L);
+
+    String definedSql = "SELECT tupleGroup, "
+        + "DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH(tupleSketch) AS raw_tuple "
+        + "FROM " + TUPLE_SOURCE_TABLE_NAME + " GROUP BY tupleGroup";
+    MaterializedViewDefinitionMetadata definition = new MaterializedViewDefinitionMetadata(
+        MATERIALIZED_VIEW_TUPLE_TABLE_OFFLINE,
+        List.of(TUPLE_SOURCE_TABLE_NAME),
+        definedSql,
+        Map.of(),
+        null);
+    MaterializedViewDefinitionMetadataUtils.persist(_propertyStore, definition, -1);
+
+    MaterializedViewRuntimeMetadata runtime = new MaterializedViewRuntimeMetadata(
+        MATERIALIZED_VIEW_TUPLE_TABLE_OFFLINE, DATA_MAX_TIME_MS, new HashMap<>());
+    MaterializedViewRuntimeMetadataUtils.persist(_propertyStore, runtime, -1);
+  }
+
+  /// Runs the source table's raw-sketch aggregation (rewrite disabled) and returns, per group value,
+  /// the decoded sketch bytes for each aliased raw aggregation.
+  private Map<String, Map<String, byte[]>> rawSketchesByGroup(String sourceTable, String groupColumn,
+      Map<String, String> aliasToRawAggregation)
+      throws Exception {
+    StringBuilder query = new StringBuilder("SET enableMaterializedViewRewrite=false;\nSELECT ").append(groupColumn);
+    for (Map.Entry<String, String> entry : aliasToRawAggregation.entrySet()) {
+      query.append(", ").append(entry.getValue()).append(" AS ").append(entry.getKey());
+    }
+    query.append(" FROM ").append(sourceTable).append(" GROUP BY ").append(groupColumn);
+
+    JsonNode response = postQuery(query.toString());
+    assertNoExceptions(response);
+    JsonNode rows = response.get("resultTable").get("rows");
+
+    Map<String, Map<String, byte[]>> result = new LinkedHashMap<>();
+    for (JsonNode row : rows) {
+      Map<String, byte[]> perAlias = new LinkedHashMap<>();
+      int columnIndex = 1;
+      for (String alias : aliasToRawAggregation.keySet()) {
+        perAlias.put(alias, Base64.getDecoder().decode(row.get(columnIndex++).asText()));
+      }
+      result.put(row.get(0).asText(), perAlias);
+    }
+    return result;
+  }
 
   private void buildAndUploadSegment(TableConfig tableConfig, Schema schema,
       List<GenericRow> rows, String tableName, String segmentName)
