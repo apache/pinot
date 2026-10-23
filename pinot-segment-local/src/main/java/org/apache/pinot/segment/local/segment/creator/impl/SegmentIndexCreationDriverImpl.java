@@ -273,6 +273,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       _recordReader.rewind();
       LOGGER.info("Start building IndexCreator!");
       GenericRow reuse = new GenericRow();
+      int numDocsIndexed = 0;
       while (_recordReader.hasNext()) {
         long recordReadStopTimeNs;
         reuse.clear();
@@ -296,14 +297,25 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
         for (GenericRow row : result.getTransformedRows()) {
           _indexCreator.indexRow(row);
+          numDocsIndexed++;
         }
         _totalIndexTimeNs += System.nanoTime() - recordReadStopTimeNs;
         _incompleteRowsFound += result.getIncompleteRowCount();
         _skippedRowsFound += result.getSkippedRowCount();
         _sanitizedRowsFound += result.getSanitizedRowCount();
       }
+      // The stats pass sized the dictionaries and wrote total docs into the metadata. If the index pass read a
+      // different number of rows, some dictionary ids own no document and the indexes disagree with the metadata.
+      // Only this row-based path re-reads the record reader. buildByColumn() and buildColumnar() index from the
+      // source columns instead, and the sorted forward index close() check still covers them.
+      if (numDocsIndexed != _totalDocs) {
+        throw new IllegalStateException(
+            "Segment: " + _config.getSegmentName() + " of table: " + _config.getTableName() + " indexed "
+                + numDocsIndexed + " rows but the stats pass counted " + _totalDocs
+                + " rows. The record reader returned different rows on the two passes.");
+      }
     } catch (Exception e) {
-      _indexCreator.close();
+      closeIndexCreatorOnFailure(e);
       throw e;
     } finally {
       _recordReader.close();
@@ -381,7 +393,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
         _indexCreator.indexColumn(col, sortedDocIds, indexSegment, validDocIds);
       }
     } catch (Exception e) {
-      _indexCreator.close();
+      closeIndexCreatorOnFailure(e);
       throw e;
     } finally {
       // The record reader is created by the `init` method and needs to be closed and
@@ -394,6 +406,15 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     LOGGER.info("Finished records indexing by column in IndexCreator!");
 
     handlePostCreation();
+  }
+
+  /// Closes the index creator after a failed build, keeping the build failure as the thrown exception.
+  private void closeIndexCreatorOnFailure(Exception buildFailure) {
+    try {
+      _indexCreator.close();
+    } catch (Exception closeException) {
+      buildFailure.addSuppressed(closeException);
+    }
   }
 
   private void handlePostCreation()

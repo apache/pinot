@@ -148,6 +148,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
         int numValues = sortedInts.length;
         Preconditions.checkState(numValues > 0);
         _intValueToIndexMap = new Int2IntOpenHashMap(numValues);
+        _intValueToIndexMap.defaultReturnValue(-1);
 
         // Backward-compatible: index file is always big-endian
         try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapFile(_dictionaryFile, false, 0,
@@ -167,6 +168,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
         numValues = sortedLongs.length;
         Preconditions.checkState(numValues > 0);
         _longValueToIndexMap = new Long2IntOpenHashMap(numValues);
+        _longValueToIndexMap.defaultReturnValue(-1);
 
         // Backward-compatible: index file is always big-endian
         try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapFile(_dictionaryFile, false, 0,
@@ -186,6 +188,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
         numValues = sortedFloats.length;
         Preconditions.checkState(numValues > 0);
         _floatValueToIndexMap = new Float2IntOpenHashMap(numValues);
+        _floatValueToIndexMap.defaultReturnValue(-1);
 
         // Backward-compatible: index file is always big-endian
         try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapFile(_dictionaryFile, false, 0,
@@ -205,6 +208,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
         numValues = sortedDoubles.length;
         Preconditions.checkState(numValues > 0);
         _doubleValueToIndexMap = new Double2IntOpenHashMap(numValues);
+        _doubleValueToIndexMap.defaultReturnValue(-1);
 
         // Backward-compatible: index file is always big-endian
         try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapFile(_dictionaryFile, false, 0,
@@ -224,6 +228,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
         numValues = sortedBigDecimals.length;
         Preconditions.checkState(numValues > 0);
         _objectValueToIndexMap = new Object2IntOpenHashMap<>(numValues);
+        _objectValueToIndexMap.defaultReturnValue(-1);
         initializeSerializedLengthCache(numValues);
 
         // Get the maximum length of all entries
@@ -247,6 +252,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
         numValues = sortedStrings.length;
         Preconditions.checkState(numValues > 0);
         _objectValueToIndexMap = new Object2IntOpenHashMap<>(numValues);
+        _objectValueToIndexMap.defaultReturnValue(-1);
         initializeSerializedLengthCache(numValues);
 
         // Get the maximum length of all entries
@@ -270,6 +276,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
         numValues = sortedBytes.length;
         Preconditions.checkState(numValues > 0);
         _objectValueToIndexMap = new Object2IntOpenHashMap<>(numValues);
+        _objectValueToIndexMap.defaultReturnValue(-1);
         initializeSerializedLengthCache(numValues);
 
         // Get the maximum length of all entries
@@ -353,13 +360,13 @@ public class SegmentDictionaryCreator implements IndexCreator {
   public int indexOfSV(Object value) {
     switch (_storedType) {
       case INT:
-        return _intValueToIndexMap.get((int) value);
+        return checkedDictId((int) value);
       case LONG:
-        return _longValueToIndexMap.get((long) value);
+        return checkedDictId((long) value);
       case FLOAT:
-        return _floatValueToIndexMap.get((float) value);
+        return checkedDictId((float) value);
       case DOUBLE:
-        return _doubleValueToIndexMap.get((double) value);
+        return checkedDictId((double) value);
       case BIG_DECIMAL:
       case STRING:
         return indexOfVariableLengthValue(value);
@@ -372,22 +379,22 @@ public class SegmentDictionaryCreator implements IndexCreator {
 
   /// Get dictionary index for a primitive int value without boxing.
   public int indexOfSV(int value) {
-    return _intValueToIndexMap.get(value);
+    return checkedDictId(value);
   }
 
   /// Get dictionary index for a primitive long value without boxing.
   public int indexOfSV(long value) {
-    return _longValueToIndexMap.get(value);
+    return checkedDictId(value);
   }
 
   /// Get dictionary index for a primitive float value without boxing.
   public int indexOfSV(float value) {
-    return _floatValueToIndexMap.get(value);
+    return checkedDictId(value);
   }
 
   /// Get dictionary index for a primitive double value without boxing.
   public int indexOfSV(double value) {
-    return _doubleValueToIndexMap.get(value);
+    return checkedDictId(value);
   }
 
   /// Get dictionary index for a String value.
@@ -403,7 +410,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
   public int[] indexOfMV(int[] values) {
     int[] indexes = new int[values.length];
     for (int i = 0; i < values.length; i++) {
-      indexes[i] = _intValueToIndexMap.get(values[i]);
+      indexes[i] = checkedDictId(values[i]);
     }
     return indexes;
   }
@@ -411,7 +418,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
   public int[] indexOfMV(long[] values) {
     int[] indexes = new int[values.length];
     for (int i = 0; i < values.length; i++) {
-      indexes[i] = _longValueToIndexMap.get(values[i]);
+      indexes[i] = checkedDictId(values[i]);
     }
     return indexes;
   }
@@ -419,7 +426,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
   public int[] indexOfMV(float[] values) {
     int[] indexes = new int[values.length];
     for (int i = 0; i < values.length; i++) {
-      indexes[i] = _floatValueToIndexMap.get(values[i]);
+      indexes[i] = checkedDictId(values[i]);
     }
     return indexes;
   }
@@ -427,7 +434,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
   public int[] indexOfMV(double[] values) {
     int[] indexes = new int[values.length];
     for (int i = 0; i < values.length; i++) {
-      indexes[i] = _doubleValueToIndexMap.get(values[i]);
+      indexes[i] = checkedDictId(values[i]);
     }
     return indexes;
   }
@@ -436,12 +443,12 @@ public class SegmentDictionaryCreator implements IndexCreator {
     int[] indexes = new int[values.length];
     if (!_trackUncompressedValueBytes) {
       for (int i = 0; i < values.length; i++) {
-        indexes[i] = _objectValueToIndexMap.getInt(values[i]);
+        indexes[i] = checkedDictId(values[i]);
       }
       return indexes;
     }
     for (int i = 0; i < values.length; i++) {
-      indexes[i] = trackUncompressedValueSize(values[i], _objectValueToIndexMap.getInt(values[i]));
+      indexes[i] = trackUncompressedValueSize(values[i], checkedDictId(values[i]));
     }
     return indexes;
   }
@@ -450,12 +457,12 @@ public class SegmentDictionaryCreator implements IndexCreator {
     int[] indexes = new int[values.length];
     if (!_trackUncompressedValueBytes) {
       for (int i = 0; i < values.length; i++) {
-        indexes[i] = _objectValueToIndexMap.getInt(values[i]);
+        indexes[i] = checkedDictId(values[i]);
       }
       return indexes;
     }
     for (int i = 0; i < values.length; i++) {
-      indexes[i] = trackUncompressedValueSize(values[i], _objectValueToIndexMap.getInt(values[i]));
+      indexes[i] = trackUncompressedValueSize(values[i], checkedDictId(values[i]));
     }
     return indexes;
   }
@@ -464,19 +471,19 @@ public class SegmentDictionaryCreator implements IndexCreator {
     int[] indexes = new int[values.length];
     if (!_trackUncompressedValueBytes) {
       for (int i = 0; i < values.length; i++) {
-        indexes[i] = _objectValueToIndexMap.getInt(new ByteArray(values[i]));
+        indexes[i] = checkedDictId(new ByteArray(values[i]));
       }
       return indexes;
     }
     for (int i = 0; i < values.length; i++) {
       ByteArray value = new ByteArray(values[i]);
-      indexes[i] = trackUncompressedValueSize(value, _objectValueToIndexMap.getInt(value));
+      indexes[i] = trackUncompressedValueSize(value, checkedDictId(value));
     }
     return indexes;
   }
 
   private int indexOfVariableLengthValue(Object value) {
-    int dictId = _objectValueToIndexMap.getInt(value);
+    int dictId = checkedDictId(value);
     return _trackUncompressedValueBytes ? trackUncompressedValueSize(value, dictId) : dictId;
   }
 
@@ -520,56 +527,56 @@ public class SegmentDictionaryCreator implements IndexCreator {
     switch (_storedType) {
       case INT:
         for (int i = 0; i < multiValues.length; i++) {
-          indexes[i] = _intValueToIndexMap.get((int) multiValues[i]);
+          indexes[i] = checkedDictId((int) multiValues[i]);
         }
         break;
       case LONG:
         for (int i = 0; i < multiValues.length; i++) {
-          indexes[i] = _longValueToIndexMap.get((long) multiValues[i]);
+          indexes[i] = checkedDictId((long) multiValues[i]);
         }
         break;
       case FLOAT:
         for (int i = 0; i < multiValues.length; i++) {
-          indexes[i] = _floatValueToIndexMap.get((float) multiValues[i]);
+          indexes[i] = checkedDictId((float) multiValues[i]);
         }
         break;
       case DOUBLE:
         for (int i = 0; i < multiValues.length; i++) {
-          indexes[i] = _doubleValueToIndexMap.get((double) multiValues[i]);
+          indexes[i] = checkedDictId((double) multiValues[i]);
         }
         break;
       case BIG_DECIMAL:
         if (!_trackUncompressedValueBytes) {
           for (int i = 0; i < multiValues.length; i++) {
-            indexes[i] = _objectValueToIndexMap.getInt(multiValues[i]);
+            indexes[i] = checkedDictId(multiValues[i]);
           }
           break;
         }
         for (int i = 0; i < multiValues.length; i++) {
-          indexes[i] = trackUncompressedValueSize(multiValues[i], _objectValueToIndexMap.getInt(multiValues[i]));
+          indexes[i] = trackUncompressedValueSize(multiValues[i], checkedDictId(multiValues[i]));
         }
         break;
       case STRING:
         if (!_trackUncompressedValueBytes) {
           for (int i = 0; i < multiValues.length; i++) {
-            indexes[i] = _objectValueToIndexMap.getInt(multiValues[i]);
+            indexes[i] = checkedDictId(multiValues[i]);
           }
           break;
         }
         for (int i = 0; i < multiValues.length; i++) {
-          indexes[i] = trackUncompressedValueSize(multiValues[i], _objectValueToIndexMap.getInt(multiValues[i]));
+          indexes[i] = trackUncompressedValueSize(multiValues[i], checkedDictId(multiValues[i]));
         }
         break;
       case BYTES:
         if (!_trackUncompressedValueBytes) {
           for (int i = 0; i < multiValues.length; i++) {
-            indexes[i] = _objectValueToIndexMap.getInt(new ByteArray((byte[]) multiValues[i]));
+            indexes[i] = checkedDictId(new ByteArray((byte[]) multiValues[i]));
           }
           break;
         }
         for (int i = 0; i < multiValues.length; i++) {
           ByteArray bytes = new ByteArray((byte[]) multiValues[i]);
-          indexes[i] = trackUncompressedValueSize(bytes, _objectValueToIndexMap.getInt(bytes));
+          indexes[i] = trackUncompressedValueSize(bytes, checkedDictId(bytes));
         }
         break;
       default:
@@ -596,5 +603,51 @@ public class SegmentDictionaryCreator implements IndexCreator {
   @Override
   public void close() {
     postIndexingCleanup();
+  }
+
+  private int checkedDictId(int value) {
+    int dictId = _intValueToIndexMap.get(value);
+    if (dictId < 0) {
+      throw valueNotInDictionary(value);
+    }
+    return dictId;
+  }
+
+  private int checkedDictId(long value) {
+    int dictId = _longValueToIndexMap.get(value);
+    if (dictId < 0) {
+      throw valueNotInDictionary(value);
+    }
+    return dictId;
+  }
+
+  private int checkedDictId(float value) {
+    int dictId = _floatValueToIndexMap.get(value);
+    if (dictId < 0) {
+      throw valueNotInDictionary(value);
+    }
+    return dictId;
+  }
+
+  private int checkedDictId(double value) {
+    int dictId = _doubleValueToIndexMap.get(value);
+    if (dictId < 0) {
+      throw valueNotInDictionary(value);
+    }
+    return dictId;
+  }
+
+  private int checkedDictId(Object value) {
+    int dictId = _objectValueToIndexMap.getInt(value);
+    if (dictId < 0) {
+      throw valueNotInDictionary(value);
+    }
+    return dictId;
+  }
+
+  /// A miss means the index pass saw a value the stats pass did not. Mapping it to id 0 would corrupt the index.
+  private IllegalStateException valueNotInDictionary(Object value) {
+    return new IllegalStateException(
+        "Value: " + value + " is not in the dictionary for column: " + _columnName + " (" + _storedType + ")");
   }
 }
