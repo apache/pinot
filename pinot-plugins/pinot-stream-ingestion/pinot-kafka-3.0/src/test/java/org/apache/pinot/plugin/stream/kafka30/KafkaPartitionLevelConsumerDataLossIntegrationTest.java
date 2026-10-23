@@ -34,6 +34,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
@@ -50,6 +51,8 @@ import static org.testng.Assert.assertTrue;
 ///    left by commit control records while the data is still retained.
 /// 2. Delete offsets (advance the log start via [EmbeddedKafkaCluster#deleteRecordsBeforeOffset])
 ///    and confirm data loss IS reported.
+/// 3. Replay the production pattern: a caught-up consumer on a low-traffic transactional topic with one
+///    record per transaction, which sees every new record one offset past where it was parked.
 ///
 /// Speed/stability: setup uses only synchronous broker calls (createTopics().all().get(),
 /// commitTransaction()/flush(), deleteRecords().all().get()), so there are no fixed sleeps. Reads
@@ -77,6 +80,10 @@ public class KafkaPartitionLevelConsumerDataLossIntegrationTest {
   private static final int TRUNCATED_TOPIC_RECORDS = 30;
   private static final long TRUNCATE_BEFORE_OFFSET = 20;
 
+  // Low-traffic transactional topic: one record per transaction, so every record is followed by its commit marker
+  // and a caught-up consumer is always parked at a marker offset. Produced during the test, not in setUp.
+  private static final String LOW_TRAFFIC_TXN_TOPIC = "txn-low-traffic";
+
   private EmbeddedKafkaCluster _kafkaCluster;
   private String _kafkaBrokerAddress;
 
@@ -93,6 +100,7 @@ public class KafkaPartitionLevelConsumerDataLossIntegrationTest {
     // createTopic uses AdminClient.createTopics().all().get() -> synchronous, no sleep needed.
     _kafkaCluster.createTopic(TXN_TOPIC, 1);
     _kafkaCluster.createTopic(TRUNCATED_TOPIC, 1);
+    _kafkaCluster.createTopic(LOW_TRAFFIC_TXN_TOPIC, 1);
 
     // commitTransaction()/flush() are synchronous -> records are durable on return, no sleep needed.
     produceTransactional(TXN_TOPIC, 2, RECORDS_PER_TXN);
@@ -107,6 +115,7 @@ public class KafkaPartitionLevelConsumerDataLossIntegrationTest {
     try {
       _kafkaCluster.deleteTopic(TXN_TOPIC);
       _kafkaCluster.deleteTopic(TRUNCATED_TOPIC);
+      _kafkaCluster.deleteTopic(LOW_TRAFFIC_TXN_TOPIC);
     } finally {
       _kafkaCluster.stop();
     }
@@ -174,6 +183,50 @@ public class KafkaPartitionLevelConsumerDataLossIntegrationTest {
     }
   }
 
+  /// Scenario 4, the production pattern behind this check: a caught-up consumer on a low-traffic transactional
+  /// topic where every transaction carries a single record. Each record is followed by its commit marker, which
+  /// the Kafka client skips without delivering anything, so after record N the consumer is parked at the marker
+  /// offset N + 1 and the next record lands at N + 2. RealtimeSegmentDataManager keeps requesting N + 1 (no
+  /// record was ever delivered there), so every new transaction shows up as a one-offset gap, e.g. 196 -> 197.
+  /// That gap must not be reported as data loss, transaction after transaction.
+  @Test
+  public void testCaughtUpConsumerOnLowTrafficTransactionalTopicIsNotDataLoss()
+      throws Exception {
+    StreamConfig streamConfig = streamConfig(LOW_TRAFFIC_TXN_TOPIC, null, null);
+    try (KafkaProducer<String, String> producer = createTransactionalProducer();
+        KafkaPartitionLevelConsumer consumer =
+            new KafkaPartitionLevelConsumer("txn-low-traffic-client", streamConfig, 0)) {
+      // Transaction 1: record at offset 0, commit marker at offset 1
+      commitSingleRecordTransaction(producer, LOW_TRAFFIC_TXN_TOPIC, "txn-1");
+      KafkaMessageBatch batch = fetchUntilRecords(consumer, 0);
+      assertEquals(batch.getMessageCount(), 1);
+      assertEquals(firstOffset(batch), 0);
+      assertFalse(batch.hasDataLoss());
+
+      // Caught up: the caller asks for offset 1, the marker. The client skips it and returns nothing, and the
+      // empty batch reports the consumer's real position (2) as the start of the next batch.
+      KafkaMessageBatch emptyBatch = fetchUntilNextBatchOffset(consumer, 1, 2);
+      assertFalse(emptyBatch.hasDataLoss());
+
+      // Transaction 2: record at offset 2, marker at 3. The caller still asks for offset 1, as
+      // RealtimeSegmentDataManager would since no record has been delivered since.
+      commitSingleRecordTransaction(producer, LOW_TRAFFIC_TXN_TOPIC, "txn-2");
+      batch = fetchUntilRecords(consumer, 1);
+      assertEquals(batch.getMessageCount(), 1);
+      assertEquals(firstOffset(batch), 2, "The first record is one past the requested offset (the commit marker)");
+      assertFalse(batch.hasDataLoss(),
+          "A one-offset gap over a commit marker on a caught-up consumer must not be reported as data loss");
+
+      // Transaction 3 repeats the pattern from the new position: the caller asks for 3 (the marker) and gets the
+      // record at 4, with the marker skipped either in this poll or in an earlier empty one.
+      commitSingleRecordTransaction(producer, LOW_TRAFFIC_TXN_TOPIC, "txn-3");
+      batch = fetchUntilRecords(consumer, 3);
+      assertEquals(batch.getMessageCount(), 1);
+      assertEquals(firstOffset(batch), 4);
+      assertFalse(batch.hasDataLoss());
+    }
+  }
+
   /// Polls repeatedly at the same startOffset until a non-empty batch is returned (or the wait
   /// budget elapses). Repeating the same startOffset hits the consumer's "no re-seek" path, so this
   /// does not disturb offset positioning; it only tolerates an empty first poll while data is
@@ -187,8 +240,29 @@ public class KafkaPartitionLevelConsumerDataLossIntegrationTest {
     return batch;
   }
 
+  /// Polls repeatedly at the same startOffset until the (empty) batch reports `expectedNextBatchOffset` as the
+  /// start of the next batch, i.e. until the consumer has observed and skipped the control record(s) at/after
+  /// startOffset, or the wait budget elapses. Fails if a record shows up instead.
+  private KafkaMessageBatch fetchUntilNextBatchOffset(KafkaPartitionLevelConsumer consumer, long startOffset,
+      long expectedNextBatchOffset) {
+    long deadlineMs = System.currentTimeMillis() + FETCH_MAX_WAIT_MS;
+    KafkaMessageBatch batch = consumer.fetchMessages(new LongMsgOffset(startOffset), FETCH_TIMEOUT_MS);
+    while (batch.getMessageCount() == 0 && nextBatchOffset(batch) < expectedNextBatchOffset
+        && System.currentTimeMillis() < deadlineMs) {
+      batch = consumer.fetchMessages(new LongMsgOffset(startOffset), FETCH_TIMEOUT_MS);
+    }
+    assertEquals(batch.getMessageCount(), 0, "Expected no record at/after offset " + startOffset + " yet");
+    assertEquals(nextBatchOffset(batch), expectedNextBatchOffset,
+        "Expected the empty batch to report the consumer position past the skipped control record");
+    return batch;
+  }
+
   private static long firstOffset(KafkaMessageBatch batch) {
     return Long.parseLong(batch.getFirstMessageOffset().toString());
+  }
+
+  private static long nextBatchOffset(KafkaMessageBatch batch) {
+    return Long.parseLong(batch.getOffsetOfNextBatch().toString());
   }
 
   private StreamConfig streamConfig(String topic, String isolationLevel, String autoOffsetReset) {
@@ -208,11 +282,8 @@ public class KafkaPartitionLevelConsumerDataLossIntegrationTest {
   }
 
   private void produceTransactional(String topic, int numTransactions, int recordsPerTransaction) {
-    Properties props = producerProps();
-    props.put(ProducerConfig.TRANSACTIONAL_ID_CONFIG, "test-transaction-" + UUID.randomUUID());
     int seq = 0;
-    try (KafkaProducer<String, String> producer = new KafkaProducer<>(props)) {
-      producer.initTransactions();
+    try (KafkaProducer<String, String> producer = createTransactionalProducer()) {
       for (int t = 0; t < numTransactions; t++) {
         producer.beginTransaction();
         for (int i = 0; i < recordsPerTransaction; i++) {
@@ -221,6 +292,23 @@ public class KafkaPartitionLevelConsumerDataLossIntegrationTest {
         producer.commitTransaction();
       }
     }
+  }
+
+  /// Commits one transaction holding a single record, i.e. one record followed by one commit marker in the log.
+  private static void commitSingleRecordTransaction(KafkaProducer<String, String> producer, String topic,
+      String value) {
+    producer.beginTransaction();
+    producer.send(new ProducerRecord<>(topic, 0, null, value));
+    producer.commitTransaction();
+  }
+
+  /// Creates a producer with a unique transactional id and initializes it, so callers can begin transactions.
+  private KafkaProducer<String, String> createTransactionalProducer() {
+    Properties props = producerProps();
+    props.put(ProducerConfig.TRANSACTIONAL_ID_CONFIG, "test-transaction-" + UUID.randomUUID());
+    KafkaProducer<String, String> producer = new KafkaProducer<>(props);
+    producer.initTransactions();
+    return producer;
   }
 
   private void producePlain(String topic, int count) {
