@@ -50,6 +50,8 @@ public class AsyncQueryResponse implements QueryResponse {
   // A server can be reported down more than once for the same query
   private final Set<ServerRoutingInstance> _countedDownServers = ConcurrentHashMap.newKeySet();
 
+  // The server to report to the failure detector, if any: one the transport saw go down, or one that has not
+  // answered the configured number of consecutive queries (see QueryRouter#recordServerTimeout)
   private volatile ServerRoutingInstance _failedServer;
   private volatile Exception _exception;
 
@@ -94,7 +96,9 @@ public class AsyncQueryResponse implements QueryResponse {
       throws InterruptedException {
     try {
       boolean finish = _countDownLatch.await(_maxEndTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
-      _status.compareAndSet(Status.IN_PROGRESS, finish ? Status.COMPLETED : Status.TIMED_OUT);
+      if (_status.compareAndSet(Status.IN_PROGRESS, finish ? Status.COMPLETED : Status.TIMED_OUT) && !finish) {
+        recordTimedOutServers();
+      }
       return _responseMap;
     } finally {
       // Update ServerRoutingStats for query completion. This is done here to ensure that the stats are updated for
@@ -113,6 +117,21 @@ public class AsyncQueryResponse implements QueryResponse {
       }
 
       _queryRouter.markQueryDone(_requestId);
+    }
+  }
+
+  /// On a timeout, counts every server the request reached but that never answered towards that server's
+  /// consecutive unanswered timeouts, and records the first server that crosses the threshold as the failed server
+  /// so the request handler reports it to the failure detector. A timeout alone used to leave `_failedServer` null,
+  /// so a server whose channel was dead but still active-looking was never reported, however many queries it ate.
+  private void recordTimedOutServers() {
+    for (Map.Entry<ServerRoutingInstance, ServerResponse> entry : _responseMap.entrySet()) {
+      ServerResponse response = entry.getValue();
+      // Only servers the request was actually submitted to can be blamed for not answering it
+      if (response.getDataTable() == null && response.getSubmitDelayMs() >= 0 && _queryRouter.recordServerTimeout(
+          entry.getKey()) && _failedServer == null) {
+        _failedServer = entry.getKey();
+      }
     }
   }
 

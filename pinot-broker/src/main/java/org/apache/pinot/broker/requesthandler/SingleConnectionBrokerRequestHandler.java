@@ -137,7 +137,9 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
     super(config, brokerId, requestIdGenerator, routingManager, accessControlFactory, queryQuotaManager, tableCache,
         threadAccountant, multiClusterRoutingContext, materializedViewHandler);
     _brokerReduceService = new BrokerReduceService(_config);
-    _queryRouter = new QueryRouter(_brokerId, nettyConfig, tlsConfig, serverRoutingStatsManager, threadAccountant);
+    _queryRouter = new QueryRouter(_brokerId, nettyConfig, tlsConfig, serverRoutingStatsManager, threadAccountant,
+        _config.getProperty(CommonConstants.Broker.FailureDetector.CONFIG_OF_CONSECUTIVE_TIMEOUTS_THRESHOLD,
+            CommonConstants.Broker.FailureDetector.DEFAULT_CONSECUTIVE_TIMEOUTS_THRESHOLD));
     _failureDetector = failureDetector;
     _failureDetector.registerUnhealthyServerRetrier(this::retryUnhealthyServer);
   }
@@ -1026,7 +1028,8 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
     }
   }
 
-  /// Check if a server that was previously detected as unhealthy is now healthy.
+  /// Check if a server that was previously detected as unhealthy is now healthy: re-establishes every channel this
+  /// broker has queried the server over (see [QueryRouter#connect]), replacing the ones that stopped answering.
   public FailureDetector.ServerState retryUnhealthyServer(String instanceId) {
     LOGGER.info("Retrying unhealthy server: {}", instanceId);
     ServerInstance serverInstance = _routingManager.getEnabledServerInstanceMap().get(instanceId);
@@ -1036,13 +1039,14 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
       return FailureDetector.ServerState.UNHEALTHY;
     }
 
-    // Could occur if the cluster is only serving multi-stage queries
+    // No single-stage query has been sent to this server over any channel: nothing for this transport to vouch for.
+    // Happens on a cluster that only serves multi-stage queries, or after the server's channels were evicted.
     if (!_queryRouter.hasChannel(serverInstance)) {
       return FailureDetector.ServerState.UNKNOWN;
     }
 
     if (_queryRouter.connect(serverInstance)) {
-      LOGGER.info("Successfully connect to server: {}, marking it healthy", instanceId);
+      LOGGER.info("Re-established the channel(s) to server: {}, marking it healthy", instanceId);
       return FailureDetector.ServerState.HEALTHY;
     } else {
       LOGGER.warn("Still cannot connect to server: {}, retry later", instanceId);

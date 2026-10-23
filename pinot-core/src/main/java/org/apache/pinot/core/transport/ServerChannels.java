@@ -239,6 +239,29 @@ public class ServerChannels {
     _serverToChannelMap.computeIfAbsent(serverRoutingInstance, ServerChannel::new).connect();
   }
 
+  /// Marks the cached channel to the given routing instance suspect: the server stopped answering queries on it
+  /// while the socket still looked active. The next [#probe] replaces it instead of trusting `isActive()`.
+  public void markSuspect(ServerRoutingInstance serverRoutingInstance) {
+    ServerChannel serverChannel = _serverToChannelMap.get(serverRoutingInstance);
+    if (serverChannel != null) {
+      serverChannel._suspect = true;
+    }
+  }
+
+  /// The failure detector's retry probe for one channel. Does nothing and returns `false` when this broker has not
+  /// queried the server over this channel (see [#hasChannel]); otherwise reconnects the channel if it is down,
+  /// replaces it with a fresh connection if it was marked suspect, and returns `true`, throwing if the connection
+  /// cannot be established.
+  public boolean probe(ServerRoutingInstance serverRoutingInstance)
+      throws InterruptedException, TimeoutException {
+    ServerChannel serverChannel = _serverToChannelMap.get(serverRoutingInstance);
+    if (serverChannel == null || !serverChannel._openedByQuery) {
+      return false;
+    }
+    serverChannel.probe();
+    return true;
+  }
+
   /// Opens a channel ahead of query traffic, awaiting the TLS handshake so that neither the connect nor
   /// the handshake lands on the first query's critical path. Both waits are bounded by `timeoutMs`.
   ///
@@ -276,6 +299,9 @@ public class ServerChannels {
     // sender that fetched the entry before the eviction neither writes into the evicted channel nor reconnects an
     // entry nobody can reach any more; it retries on a fresh entry instead.
     volatile boolean _evicted;
+    // Set when the server stopped answering queries on this channel while the socket still looked active (see
+    // QueryRouter#recordServerTimeout). Cleared by probe(), which then replaces the channel rather than trusting it.
+    volatile boolean _suspect;
 
     ServerChannel(ServerRoutingInstance serverRoutingInstance) {
       _serverRoutingInstance = serverRoutingInstance;
@@ -509,6 +535,36 @@ public class ServerChannels {
       if (_channelLock.tryLock(TRY_CONNECT_CHANNEL_LOCK_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
         try {
           checkNotEvicted();
+          connectWithoutLocking();
+          checkNotEvicted();
+        } finally {
+          _channelLock.unlock();
+        }
+      } else {
+        throw new TimeoutException(CHANNEL_LOCK_TIMEOUT_MSG);
+      }
+    }
+
+    /// The failure detector's retry probe. Reconnects when the channel is down, as [#connect()] does, and replaces
+    /// the channel with a fresh connection when it is suspect: a half-open socket reports `isActive()` until the
+    /// kernel gives up on it, so a probe that only looked at that flag would vouch for a dead channel and put the
+    /// server straight back into routing on it, which is how a readmitted server kept losing queries. Closing the
+    /// suspect channel fails whatever is still in flight on it; the server has been out of routing since it was
+    /// reported, so that is little, and none of it was being answered.
+    void probe()
+        throws InterruptedException, TimeoutException {
+      if (_channelLock.tryLock(TRY_CONNECT_CHANNEL_LOCK_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+        try {
+          checkNotEvicted();
+          if (_suspect) {
+            _suspect = false;
+            Channel suspectChannel = _channel;
+            _channel = null;
+            if (suspectChannel != null) {
+              LOGGER.info("Replacing suspect channel to server: {} with a fresh connection", _serverRoutingInstance);
+              suspectChannel.close();
+            }
+          }
           connectWithoutLocking();
           checkNotEvicted();
         } finally {

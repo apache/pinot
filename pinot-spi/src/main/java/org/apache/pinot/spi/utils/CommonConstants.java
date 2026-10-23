@@ -1328,6 +1328,14 @@ public class CommonConstants {
       public static final double DEFAULT_RETRY_DELAY_FACTOR = 2.0;
       public static final String CONFIG_OF_MAX_RETRIES = "pinot.broker.failure.detector.max.retries";
       public static final int DEFAULT_MAX_RETRIES = 10;
+
+      // Number of consecutive single-stage queries to a server that time out without the server answering any of
+      // them before the server is reported unhealthy and the retry probe re-establishes its channel. A server that
+      // is merely slow still answers some queries, which resets the count; a half-open channel answers none, and
+      // nothing else notices it while the socket still reports active. Non-positive disables the check.
+      public static final String CONFIG_OF_CONSECUTIVE_TIMEOUTS_THRESHOLD =
+          "pinot.broker.failure.detector.consecutive.timeouts.threshold";
+      public static final int DEFAULT_CONSECUTIVE_TIMEOUTS_THRESHOLD = 5;
     }
 
     // Configs related to AdaptiveServerSelection.

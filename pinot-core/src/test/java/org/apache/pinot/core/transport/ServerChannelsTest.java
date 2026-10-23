@@ -646,6 +646,57 @@ public class ServerChannelsTest {
     }
   }
 
+  /// The failure detector's probe must not vouch for a channel the server stopped answering on just because the
+  /// socket still reports active: a suspect channel is replaced, a healthy one kept, a closed one reconnected, and
+  /// an unreachable server fails the probe.
+  @Test
+  public void testProbeReplacesSuspectChannelAndKeepsHealthyOne()
+      throws Exception {
+    ServerChannels serverChannels =
+        new ServerChannels(mock(QueryRouter.class), null, null, ThreadAccountantUtils.getNoOpAccountant());
+    StalledServer server = new StalledServer();
+    try {
+      ServerRoutingInstance instance = new ServerRoutingInstance("localhost", server.getPort(), TableType.REALTIME);
+      // Nothing to vouch for before a query was sent, even once pre-connect opened a channel
+      assertFalse(serverChannels.probe(instance));
+      serverChannels.preConnect(instance, 5_000L);
+      assertFalse(serverChannels.probe(instance), "Pre-connected only: not query-carrying");
+
+      serverChannels.sendRequest("testTable", mock(AsyncQueryResponse.class), instance, smallInstanceRequest(),
+          10_000L);
+      ServerChannels.ServerChannel entry = serverChannels.getOrCreateServerChannel(instance);
+      Channel healthyChannel = entry._channel;
+      assertTrue(serverChannels.probe(instance));
+      assertSame(entry._channel, healthyChannel, "A healthy channel is kept");
+      assertTrue(healthyChannel.isActive());
+
+      serverChannels.markSuspect(instance);
+      assertTrue(serverChannels.probe(instance));
+      Channel freshChannel = entry._channel;
+      assertNotSame(freshChannel, healthyChannel, "A suspect channel is replaced");
+      assertTrue(freshChannel.isActive());
+      TestUtils.waitForCondition(aVoid -> !healthyChannel.isActive(), 10L, 5_000L, "Suspect channel was not closed");
+      // No longer suspect: the replacement is kept by the next probe
+      assertTrue(serverChannels.probe(instance));
+      assertSame(entry._channel, freshChannel);
+
+      // A closed channel is reconnected, as the probe always did
+      freshChannel.close().sync();
+      assertTrue(serverChannels.probe(instance));
+      assertNotSame(entry._channel, freshChannel);
+      assertTrue(entry._channel.isActive());
+
+      // An unreachable server fails the probe and leaves no channel behind
+      serverChannels.markSuspect(instance);
+      server.close();
+      assertThrows(Exception.class, () -> serverChannels.probe(instance));
+      assertNull(entry._channel);
+    } finally {
+      server.close();
+      serverChannels.shutDown();
+    }
+  }
+
   private static long meterCount(BrokerMeter meter) {
     return BrokerMetrics.get().getMeteredValue(meter).count();
   }
