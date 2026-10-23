@@ -123,7 +123,9 @@ public class PinotAggregateTypeArgumentRewriteRule extends RelOptRule {
         aggRel.copy(aggRel.getTraitSet(), newInput, aggRel.getGroupSet(), aggRel.getGroupSets(), aggCalls));
   }
 
-  /// Returns the data type argument to append, or `null` when the call already has one or is not such a call.
+  /// Returns the data type argument to append, or `null` when the call already has one or is not such a call. The
+  /// mapped types match `ValueWithTimeOperandTypeChecker` in [AggregationFunctionType], which rejects the others during
+  /// validation.
   @Nullable
   private static String getDataTypeArgument(AggregateCall aggCall, RelNode input) {
     if (aggCall.getArgList().size() != 2) {

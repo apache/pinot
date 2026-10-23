@@ -11,16 +11,17 @@
           {"name": "bool_col", "type": "BOOLEAN"},
           {"name": "decimal_col", "type": "BIG_DECIMAL"},
           {"name": "timestamp_col", "type": "TIMESTAMP"},
-          {"name": "bytes_col", "type": "BYTES"}
+          {"name": "bytes_col", "type": "BYTES"},
+          {"name": "uuid_col", "type": "UUID"}
         ],
         "inputs": [
-          [2, 2, 300, 300, "a", true, "1E-307", "2020-01-01 03:10:12", "DEADBEEF"],
-          [2, 2, 400, 400, "a", true, "1E+307", "2020-01-01 03:39:12", "FDEADBEE"],
-          [3, 3, 100, 100, "b", false, "1E-308", "2020-01-01 08:32:12", "EFDEADBE"],
-          [100, 100, 1, 1, "b", false, "1E+308", "2020-02-06 03:32:12", "BEEFDEAD"],
-          [101, 101, 1.01, 1.01, "c", false, "1E-317", "2020-05-01 03:32:12", "ADBEEFDE"],
-          [150, 150, 1.5, 1.5, "c", false, "1E+317", "2020-02-03 03:32:12", "DEADBE01"],
-          [175, 175, 1.75, 1.75, "c", true, "1E+328", "2020-01-02 03:32:12", "DEADBE02"]
+          [2, 2, 300, 300, "a", true, "1E-307", "2020-01-01 03:10:12", "DEADBEEF", "00000000-0000-0000-0000-000000000001"],
+          [2, 2, 400, 400, "a", true, "1E+307", "2020-01-01 03:39:12", "FDEADBEE", "00000000-0000-0000-0000-000000000002"],
+          [3, 3, 100, 100, "b", false, "1E-308", "2020-01-01 08:32:12", "EFDEADBE", "00000000-0000-0000-0000-000000000003"],
+          [100, 100, 1, 1, "b", false, "1E+308", "2020-02-06 03:32:12", "BEEFDEAD", "00000000-0000-0000-0000-000000000004"],
+          [101, 101, 1.01, 1.01, "c", false, "1E-317", "2020-05-01 03:32:12", "ADBEEFDE", "00000000-0000-0000-0000-000000000005"],
+          [150, 150, 1.5, 1.5, "c", false, "1E+317", "2020-02-03 03:32:12", "DEADBE01", "00000000-0000-0000-0000-000000000006"],
+          [175, 175, 1.75, 1.75, "c", true, "1E+328", "2020-01-02 03:32:12", "DEADBE02", "00000000-0000-0000-0000-000000000007"]
         ]
       }
     },
@@ -77,6 +78,14 @@
       {
         "sql": "SELECT FIRST_WITH_TIME(timestamp_col, timestamp_col), LAST_WITH_TIME(timestamp_col, timestamp_col), FIRST_WITH_TIME(timestamp_col, timestamp_col, 'TIMESTAMP') FROM {tbl}",
         "outputs": [["2020-01-01 03:10:12.0", "2020-05-01 03:32:12.0", "2020-01-01 03:10:12.0"]]
+      },
+      {
+        "sql": "SELECT FIRST_WITH_TIME(uuid_col, timestamp_col), LAST_WITH_TIME(uuid_col, timestamp_col) FROM {tbl}",
+        "outputs": [["00000000-0000-0000-0000-000000000001", "00000000-0000-0000-0000-000000000005"]]
+      },
+      {
+        "sql": "SELECT string_col, FIRST_WITH_TIME(uuid_col, timestamp_col), LAST_WITH_TIME(uuid_col, timestamp_col) FROM {tbl} GROUP BY string_col",
+        "outputs": [["a", "00000000-0000-0000-0000-000000000001", "00000000-0000-0000-0000-000000000002"], ["b", "00000000-0000-0000-0000-000000000003", "00000000-0000-0000-0000-000000000004"], ["c", "00000000-0000-0000-0000-000000000007", "00000000-0000-0000-0000-000000000005"]]
       },
       {
         "comment": "SMALLINT and TINYINT data arguments infer 'INT'",

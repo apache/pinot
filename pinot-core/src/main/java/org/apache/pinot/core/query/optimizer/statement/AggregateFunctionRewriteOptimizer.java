@@ -99,11 +99,14 @@ public class AggregateFunctionRewriteOptimizer implements StatementOptimizer {
       return;
     }
     if (rewriteToTypedVariants) {
+      // The typed variants follow the stored type (e.g. TIMESTAMP as LONG), while the data type argument above keeps
+      // the logical type.
       rewriteToTypedVariant(function, functionName, fieldSpec.getDataType().getStoredType());
     }
   }
 
-  /// Appends the data column's logical type.
+  /// Appends the data column's logical type. The supported types match `ValueWithTimeOperandTypeChecker` in
+  /// [AggregationFunctionType] and `PinotAggregateTypeArgumentRewriteRule` in the multi-stage engine.
   private static void addDataTypeArgument(Function function, String functionName, FieldSpec fieldSpec) {
     if (fieldSpec.isSingleValueField()) {
       switch (fieldSpec.getDataType()) {

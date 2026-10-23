@@ -429,6 +429,9 @@ public enum AggregationFunctionType {
 
   /// Accepts `(dataColumn, timeColumn)` and `(dataColumn, timeColumn, 'dataType')`. The two-argument form is limited to
   /// the types of the explicit form, since its data type argument is inferred from the data argument.
+  ///
+  /// `INFERRED_DATA_TYPES` matches the types that `PinotAggregateTypeArgumentRewriteRule` maps to a data type argument,
+  /// and the single-stage `AggregateFunctionRewriteOptimizer` supports the corresponding schema types.
   private static class ValueWithTimeOperandTypeChecker implements SqlOperandTypeChecker {
     private static final SqlOperandTypeChecker DELEGATE = OperandTypes.or(
         OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY),
