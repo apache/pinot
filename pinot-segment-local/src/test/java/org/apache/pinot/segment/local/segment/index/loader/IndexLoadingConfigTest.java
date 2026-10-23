@@ -62,8 +62,12 @@ public class IndexLoadingConfigTest {
     PinotConfiguration config = new PinotConfiguration();
     when(instanceConfig.getConfig()).thenReturn(config);
 
+    IndexLoadingConfig defaultConfig = new IndexLoadingConfig(instanceConfig, null, null);
+    assertFalse(defaultConfig.isMappedSegmentMetadataEnabled());
+    config.setProperty(IndexLoadingConfig.MAPPED_SEGMENT_METADATA_ENABLED, true);
     IndexLoadingConfig enabled = new IndexLoadingConfig(instanceConfig, null, null);
     assertTrue(enabled.isMappedSegmentMetadataEnabled());
+    assertTrue(enabled.withSegmentTier("coldTier").isMappedSegmentMetadataEnabled());
     config.setProperty(IndexLoadingConfig.MAPPED_SEGMENT_METADATA_ENABLED, false);
     IndexLoadingConfig disabled = new IndexLoadingConfig(instanceConfig, null, null);
     assertFalse(disabled.isMappedSegmentMetadataEnabled());

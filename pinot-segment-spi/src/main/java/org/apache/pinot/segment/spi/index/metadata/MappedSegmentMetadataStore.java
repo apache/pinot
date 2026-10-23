@@ -51,6 +51,7 @@ import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -76,8 +77,8 @@ import org.apache.pinot.spi.utils.JsonUtils;
 /// mapping. The column layout retains names and reusable [FieldSpec] references on heap.
 ///
 /// A stale or corrupt sidecar is rebuilt from the canonical source and replaced locally, using atomic rename where
-/// supported. Change `VERSION` whenever the header, record, or blob encoding changes; old versions are rebuilt rather
-/// than migrated.
+/// supported. Change `VERSION` whenever the encoding or the values derived from canonical metadata change; old
+/// versions are rebuilt rather than migrated.
 final class MappedSegmentMetadataStore implements Closeable {
   static final String FILE_NAME = "segment_metadata.bin";
   private static final String TEMP_FILE_PREFIX = ".segment_metadata.";
@@ -89,7 +90,7 @@ final class MappedSegmentMetadataStore implements Closeable {
   }
 
   private static final int MAGIC = 0x504d4431; // PMD1
-  private static final int VERSION = 3;
+  private static final int VERSION = 4;
   private static final int HEADER_SIZE = 64;
   private static final int RECORD_SIZE = 180;
 
@@ -164,6 +165,7 @@ final class MappedSegmentMetadataStore implements Closeable {
       throw new IOException("Missing metadata.properties in " + indexDir);
     }
     File sidecar = new File(indexDir, FILE_NAME);
+    boolean rebuilt = false;
     for (int attempt = 0; attempt < 3; attempt++) {
       Fingerprint propertiesFingerprint = Fingerprint.of(source);
       Fingerprint indexMapFingerprint = Fingerprint.of(findIndexMap(indexDir));
@@ -171,6 +173,7 @@ final class MappedSegmentMetadataStore implements Closeable {
       byte[] bytes = readValid(sidecar, propertiesFingerprint, indexMapFingerprint);
       if (bytes == null) {
         writeAtomically(sidecar, build(indexDir, propertiesFingerprint, indexMapFingerprint));
+        rebuilt = true;
         bytes = readValid(sidecar, propertiesFingerprint, indexMapFingerprint);
         if (bytes == null) {
           continue;
@@ -206,6 +209,13 @@ final class MappedSegmentMetadataStore implements Closeable {
         keepBuffer = true;
         return store;
       } catch (IOException | RuntimeException e) {
+        if (!rebuilt) {
+          // A checksum-valid older sidecar can still contain FieldSpec JSON this reader cannot parse. Rebuild it
+          // once from canonical metadata instead of falling back to eager on every load.
+          writeAtomically(sidecar, build(indexDir, propertiesFingerprint, indexMapFingerprint));
+          rebuilt = true;
+          continue;
+        }
         throw new IOException("Invalid field specs in mapped segment metadata: " + sidecar, e);
       } finally {
         if (!keepBuffer) {
@@ -350,7 +360,8 @@ final class MappedSegmentMetadataStore implements Closeable {
     BlobWriter blobs = new BlobWriter(blobBase);
     BlobRef segmentConfig = blobs.add(encodeSegmentConfiguration(config));
     // EmptyColumnMetadata does not load index sizes even if a stale index_map is still present.
-    Map<String, List<IndexSize>> indexSizes = source.getTotalDocs() > 0 ? readIndexSizes(indexDir) : Map.of();
+    Map<String, List<IndexSize>> indexSizes = source.getTotalDocs() > 0
+        && source.getVersion() == SegmentVersion.v3 ? readIndexSizes(indexDir) : Map.of();
     byte[] records = new byte[columns.size() * RECORD_SIZE];
     ByteBuffer recordBuffer = ByteBuffer.wrap(records).order(ByteOrder.BIG_ENDIAN);
     for (int ordinal = 0; ordinal < columns.size(); ordinal++) {
@@ -424,7 +435,7 @@ final class MappedSegmentMetadataStore implements Closeable {
     header.putInt(60, blobBase);
     System.arraycopy(records, 0, bytes, HEADER_SIZE, records.length);
     System.arraycopy(blobBytes, 0, bytes, blobBase, blobBytes.length);
-    header.putInt(40, crc(bytes, HEADER_SIZE, bytes.length - HEADER_SIZE));
+    header.putInt(40, sidecarCrc(bytes));
     return bytes;
   }
 
@@ -520,9 +531,7 @@ final class MappedSegmentMetadataStore implements Closeable {
     if (indexMap == null) {
       return Map.of();
     }
-    // The local v3 index map is read by SegmentMetadataImpl and retains zero-sized indexes. The root-level map is
-    // staged by tiered storage, whose existing reporting path omits zero-sized placeholders.
-    boolean stagedIndexMap = indexMap.getParentFile().equals(indexDir);
+    // Match SegmentMetadataImpl: index sizes come only from the local v3 index_map.
     PropertiesConfiguration config = CommonsConfigurationUtils.fromFile(indexMap);
     Map<String, List<IndexSize>> result = new HashMap<>();
     for (String key : CommonsConfigurationUtils.getKeys(config)) {
@@ -530,7 +539,7 @@ final class MappedSegmentMetadataStore implements Closeable {
         String[] parsed = ColumnIndexUtils.parseIndexMapKeys(key, indexDir.getPath());
         if (ColumnIndexUtils.MAP_KEY_NAME_SIZE.equals(parsed[2])) {
           long size = config.getLong(key);
-          if (size < 0 || size > (1L << 48) - 1 || (stagedIndexMap && size == 0)) {
+          if (size < 0 || size > (1L << 48) - 1) {
             continue;
           }
           IndexType<?, ?, ?> type = IndexService.getInstance().get(parsed[1]);
@@ -547,11 +556,7 @@ final class MappedSegmentMetadataStore implements Closeable {
   @Nullable
   private static File findIndexMap(File indexDir) {
     File v3 = new File(new File(indexDir, "v3"), V1Constants.INDEX_MAP_FILE_NAME);
-    if (v3.isFile()) {
-      return v3;
-    }
-    File root = new File(indexDir, V1Constants.INDEX_MAP_FILE_NAME);
-    return root.isFile() ? root : null;
+    return v3.isFile() ? v3 : null;
   }
 
   private static void writeValue(ByteBuffer target, int tagOffset, int rawOffset, int blobOffset,
@@ -613,7 +618,7 @@ final class MappedSegmentMetadataStore implements Closeable {
     if (buffer.getInt(0) != MAGIC || buffer.getInt(4) != VERSION || buffer.getLong(8) != bytes.length
         || buffer.getLong(16) != properties._length || buffer.getInt(24) != properties._crc
         || buffer.getLong(28) != indexMap._length || buffer.getInt(36) != indexMap._crc
-        || buffer.getInt(40) != crc(bytes, HEADER_SIZE, bytes.length - HEADER_SIZE)) {
+        || buffer.getInt(40) != sidecarCrc(bytes)) {
       throw new IllegalArgumentException("Invalid metadata header");
     }
     int count = buffer.getInt(52);
@@ -752,6 +757,16 @@ final class MappedSegmentMetadataStore implements Closeable {
   private static int crc(byte[] bytes, int offset, int length) {
     CRC32C crc = new CRC32C();
     crc.update(bytes, offset, length);
+    return (int) crc.getValue();
+  }
+
+  private static int sidecarCrc(byte[] bytes) {
+    CRC32C crc = new CRC32C();
+    crc.update(bytes, 0, 40);
+    for (int i = 0; i < Integer.BYTES; i++) {
+      crc.update(0);
+    }
+    crc.update(bytes, 44, bytes.length - 44);
     return (int) crc.getValue();
   }
 

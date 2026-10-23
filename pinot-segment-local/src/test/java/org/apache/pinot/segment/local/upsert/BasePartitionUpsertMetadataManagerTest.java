@@ -43,6 +43,7 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImp
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager.SnapshotPass;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
@@ -62,7 +63,10 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
@@ -102,6 +106,40 @@ public class BasePartitionUpsertMetadataManagerTest {
       assertFalse(upsertMetadataManager.isPreloading());
       upsertMetadataManager.stop();
     }
+  }
+
+  @Test
+  public void testWatermarkSkipsDestroyedSegment() {
+    UpsertContext context = mock(UpsertContext.class);
+    when(context.isSnapshotEnabled()).thenReturn(true);
+    when(context.getMetadataTTL()).thenReturn(100.0);
+    when(context.getComparisonColumns()).thenReturn(List.of("eventTime"));
+    when(context.getTableIndexDir()).thenReturn(TEMP_DIR);
+    DummyPartitionUpsertMetadataManager manager =
+        new DummyPartitionUpsertMetadataManager("myTable_REALTIME", 0, context);
+    manager.updateLargestSeenComparisonValue(1_000.0);
+
+    ImmutableSegmentImpl destroyed = mock(ImmutableSegmentImpl.class);
+    when(destroyed.tryAcquireReadLock()).thenReturn(false);
+    manager.trackSegment(destroyed);
+    manager.markSegmentAsUpdated(destroyed);
+
+    assertEquals(manager.getWatermarkToPersist(), 1_000.0);
+    verify(destroyed).tryAcquireReadLock();
+    verify(destroyed, never()).getSegmentMetadata();
+
+    ImmutableSegmentImpl live = mock(ImmutableSegmentImpl.class);
+    SegmentMetadataImpl metadata = mock(SegmentMetadataImpl.class);
+    ColumnMetadata columnMetadata = mock(ColumnMetadata.class);
+    when(live.tryAcquireReadLock()).thenReturn(true);
+    when(live.getSegmentMetadata()).thenReturn(metadata);
+    when(metadata.getColumnMetadataFor("eventTime")).thenReturn(columnMetadata);
+    doReturn(50).when(columnMetadata).getMaxValue();
+    manager.trackSegment(live);
+    manager.markSegmentAsUpdated(live);
+
+    assertEquals(manager.getWatermarkToPersist(), 150.0);
+    verify(live).releaseReadLock();
   }
 
   @Test
@@ -1204,6 +1242,20 @@ public class BasePartitionUpsertMetadataManagerTest {
     upsertMetadataManager.addRecord(mock(MutableSegmentImpl.class), mock(RecordInfo.class));
     upsertMetadataManager.takeSnapshot();
     assertFalse(upsertMetadataManager.getLastSnapshotPass().consistent());
+  }
+
+  @Test
+  public void testSnapshotPassSkipsDestroyedSegment() {
+    DummyPartitionUpsertMetadataManager manager =
+        new DummyPartitionUpsertMetadataManager("myTable", 0, createSnapshotPassContext());
+    ImmutableSegmentImpl destroyed = mock(ImmutableSegmentImpl.class);
+    when(destroyed.tryAcquireReadLock()).thenReturn(false);
+    manager.trackSegment(destroyed);
+
+    manager.takeSnapshot();
+
+    assertFalse(manager.getLastSnapshotPass().consistent());
+    verify(destroyed, never()).getSegmentMetadata();
   }
 
   private static UpsertContext createSnapshotPassContext() {

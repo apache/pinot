@@ -1001,9 +1001,21 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     TreeMap<String, Long> segmentVersions = new TreeMap<>();
     for (IndexSegment segment : _trackedSegments) {
       if (segment instanceof ImmutableSegmentImpl) {
-        SegmentMetadata segmentMetadata = segment.getSegmentMetadata();
-        long dataCrc = segmentMetadata.getDataCrc();
-        segmentVersions.put(segment.getSegmentName(), dataCrc >= 0 ? dataCrc : segmentMetadata.getCrc());
+        if (!tryAcquireSegmentReadLock(segment)) {
+          consistent = false;
+          continue;
+        }
+        try {
+          if (!_trackedSegments.contains(segment)) {
+            consistent = false;
+            continue;
+          }
+          SegmentMetadata segmentMetadata = segment.getSegmentMetadata();
+          long dataCrc = segmentMetadata.getDataCrc();
+          segmentVersions.put(segment.getSegmentName(), dataCrc >= 0 ? dataCrc : segmentMetadata.getCrc());
+        } finally {
+          releaseSegmentReadLock(segment);
+        }
       } else {
         // The pass runs before the new consuming segment takes its first record, so a tracked mutable segment is an
         // earlier one still waiting to be sealed. Its rows may not match the committed copy yet.
@@ -1198,23 +1210,33 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   /// the persisted watermark to keep such segments within TTL, and get them added with the regular flow after restart.
   /// The watermark in memory is not changed, and primary keys are still expired against it, so a segment that keeps
   /// missing its snapshot doesn't keep the expired primary keys in memory.
-  private double getWatermarkToPersist() {
+  @VisibleForTesting
+  double getWatermarkToPersist() {
     double watermark = _largestSeenComparisonValue.get();
     if (_metadataTTL <= 0) {
       return watermark;
     }
     double cappedWatermark = watermark;
-    // Unlike taking the snapshots above, reading the max comparison value doesn't need the segmentLock or the check
-    // against _trackedSegments: it comes from the segment metadata, which can still be read after the segment is
-    // destroyed, and a segment removed in the meantime can only cap the watermark lower than needed.
+    // A mapped segment's metadata is closed on destroy. Hold the segment read lock while reading its maximum, and
+    // ignore stale entries that were removed from tracking after the snapshot pass.
     for (ImmutableSegmentImpl segment : _updatedSegmentsSinceLastSnapshot) {
-      double maxComparisonValue = getMaxComparisonValue(segment);
-      double maxWatermark = maxComparisonValue + _metadataTTL;
-      // Make sure the segment is not out of TTL as checked by isOutOfMetadataTTL(), regardless of rounding
-      while (maxComparisonValue < maxWatermark - _metadataTTL) {
-        maxWatermark = Math.nextDown(maxWatermark);
+      if (!tryAcquireSegmentReadLock(segment)) {
+        continue;
       }
-      cappedWatermark = Math.min(cappedWatermark, maxWatermark);
+      try {
+        if (!_trackedSegments.contains(segment)) {
+          continue;
+        }
+        double maxComparisonValue = getMaxComparisonValue(segment);
+        double maxWatermark = maxComparisonValue + _metadataTTL;
+        // Make sure the segment is not out of TTL as checked by isOutOfMetadataTTL(), regardless of rounding
+        while (maxComparisonValue < maxWatermark - _metadataTTL) {
+          maxWatermark = Math.nextDown(maxWatermark);
+        }
+        cappedWatermark = Math.min(cappedWatermark, maxWatermark);
+      } finally {
+        releaseSegmentReadLock(segment);
+      }
     }
     if (cappedWatermark < watermark) {
       _logger.warn("Capped TTL watermark to persist from: {} to: {} because some segments missed taking snapshot",

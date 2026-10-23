@@ -30,6 +30,7 @@ import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
@@ -52,7 +53,7 @@ import static org.testng.Assert.assertTrue;
 public class ImmutableSegmentImplTest {
 
   @Test
-  public void testColumnNamesIncludeOpenStructParentInsteadOfMaterializedChild() {
+  public void testColumnNamesKeepSchemaNamesForOpenStruct() {
     SegmentMetadataImpl metadata = mock(SegmentMetadataImpl.class);
     ColumnMetadata child = mock(ColumnMetadata.class);
     when(child.isMaterializedChild()).thenReturn(true);
@@ -60,11 +61,12 @@ public class ImmutableSegmentImplTest {
     when(metadata.getColumnMetadataFor("event$key")).thenReturn(child);
     Schema schema = new Schema();
     schema.addField(new ComplexFieldSpec("event", DataType.OPEN_STRUCT, true, Map.of()));
+    schema.addField(new DimensionFieldSpec("event$key", DataType.INT, true));
     when(metadata.getSchema()).thenReturn(schema);
 
     ImmutableSegmentImpl segment = new ImmutableSegmentImpl(mock(SegmentDirectory.class), metadata,
         Map.of("event$key", mock(ColumnIndexContainer.class)), null);
-    assertEquals(segment.getColumnNames(), Set.of("event"));
+    assertEquals(segment.getColumnNames(), Set.of("event", "event$key"));
   }
 
   /// The hook must reach the directory at most once per segment instance: the same segment can be registered more than

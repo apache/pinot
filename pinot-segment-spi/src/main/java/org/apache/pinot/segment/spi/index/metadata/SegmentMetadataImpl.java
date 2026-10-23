@@ -611,7 +611,8 @@ public class SegmentMetadataImpl implements SegmentMetadata, Closeable {
   @Override
   public ColumnMetadata getColumnMetadataFor(String column) {
     if (_mappedStore == null) {
-      return _columnMetadataMap != null ? _columnMetadataMap.get(column) : null;
+      TreeMap<String, ColumnMetadata> columnMetadataMap = getColumnMetadataMap();
+      return columnMetadataMap != null ? columnMetadataMap.get(column) : null;
     }
     ColumnMetadata virtual = _virtualColumnMetadata.get(column);
     if (virtual != null) {

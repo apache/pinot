@@ -29,12 +29,14 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.zip.CRC32C;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
@@ -196,6 +198,7 @@ public class SegmentMetadataImplTest {
     InstanceDataManagerConfig instanceConfig = mock(InstanceDataManagerConfig.class);
     PinotConfiguration config = new PinotConfiguration();
     when(instanceConfig.getConfig()).thenReturn(config);
+    config.setProperty(IndexLoadingConfig.MAPPED_SEGMENT_METADATA_ENABLED, true);
 
     File sidecar = new File(_segmentDirectory, "segment_metadata.bin");
     assertTrue(sidecar.mkdir());
@@ -277,6 +280,9 @@ public class SegmentMetadataImplTest {
     }
     assertEquals(PinotDataBuffer.getMmapBufferCount(), mappings);
 
+    byte[] sidecarBytes = Files.readAllBytes(sidecar.toPath());
+    assertEquals(ByteBuffer.wrap(sidecarBytes).order(ByteOrder.BIG_ENDIAN).getInt(40), sidecarCrc(sidecarBytes));
+
     // An invalid sidecar is regenerated from canonical metadata.properties.
     Files.write(sidecar.toPath(), new byte[]{1, 2, 3});
     try (SegmentMetadataImpl mapped = SegmentMetadataImpl.loadMapped(_segmentDirectory)) {
@@ -288,7 +294,7 @@ public class SegmentMetadataImplTest {
     try (SegmentMetadataImpl mapped = SegmentMetadataImpl.loadMapped(_segmentDirectory)) {
       assertEquals(mapped.getCustomMap().get("mappedRefresh"), "yes");
     }
-    // A zero-sized local v3 index is still present; the same root-level tiered-storage placeholder is omitted.
+    // A zero-sized local v3 index is still present; a root-only map does not supply eager or mapped index sizes.
     File indexMap = new File(new File(_segmentDirectory, "v3"), V1Constants.INDEX_MAP_FILE_NAME);
     PropertiesConfiguration indexConfig = CommonsConfigurationUtils.fromFile(indexMap);
     String sizeKey = CommonsConfigurationUtils.getKeys(indexConfig).stream()
@@ -307,8 +313,12 @@ public class SegmentMetadataImplTest {
       FileUtils.copyFile(properties, new File(staging, properties.getName()));
       File creationMeta = SegmentDirectoryPaths.findCreationMetaFile(_segmentDirectory);
       FileUtils.copyFile(creationMeta, new File(staging, creationMeta.getName()));
-      FileUtils.copyFile(indexMap, new File(staging, V1Constants.INDEX_MAP_FILE_NAME));
+      indexConfig.setProperty(sizeKey, 123);
+      CommonsConfigurationUtils.saveToFile(indexConfig, new File(staging, V1Constants.INDEX_MAP_FILE_NAME));
+      SegmentMetadataImpl stagedEager = new SegmentMetadataImpl(staging);
       try (SegmentMetadataImpl mapped = SegmentMetadataImpl.loadMapped(staging)) {
+        assertEquals(stagedEager.getColumnMetadataFor(parsedKey[0]).getIndexSizeFor(
+            IndexService.getInstance().get(parsedKey[1])), ColumnMetadata.UNAVAILABLE);
         assertEquals(mapped.getColumnMetadataFor(parsedKey[0]).getIndexSizeFor(
             IndexService.getInstance().get(parsedKey[1])),
             ColumnMetadata.UNAVAILABLE);
@@ -317,6 +327,28 @@ public class SegmentMetadataImplTest {
       FileUtils.deleteQuietly(staging);
     }
     assertEquals(PinotDataBuffer.getMmapBufferCount(), mappings);
+  }
+
+  @Test
+  public void testMappedMetadataRebuildsChecksumValidInvalidFieldSpec()
+      throws Exception {
+    new SegmentV1V2ToV3FormatConverter().convert(_segmentDirectory);
+    File sidecar = new File(_segmentDirectory, "segment_metadata.bin");
+    try (SegmentMetadataImpl ignored = SegmentMetadataImpl.loadMapped(_segmentDirectory)) {
+      assertTrue(ignored.isMapped());
+    }
+    byte[] bytes = Files.readAllBytes(sidecar.toPath());
+    ByteBuffer header = ByteBuffer.wrap(bytes).order(ByteOrder.BIG_ENDIAN);
+    int fieldSpecOffset = header.getInt(header.getInt(56) + 8);
+    assertEquals(bytes[fieldSpecOffset], (byte) '{');
+    bytes[fieldSpecOffset] = '!';
+    header.putInt(40, sidecarCrc(bytes));
+    Files.write(sidecar.toPath(), bytes);
+
+    try (SegmentMetadataImpl mapped = SegmentMetadataImpl.loadMapped(_segmentDirectory)) {
+      assertTrue(mapped.isMapped());
+    }
+    assertEquals(Files.readAllBytes(sidecar.toPath())[fieldSpecOffset], (byte) '{');
   }
 
   @Test
@@ -350,17 +382,29 @@ public class SegmentMetadataImplTest {
           assertEquals(mapped.getSchema(), eager.getSchema());
         }
       }
-      // A checksum-valid v2 header must still trigger a rebuild from canonical metadata.
-      byte[] version2 = Files.readAllBytes(sidecar.toPath());
-      ByteBuffer.wrap(version2).order(ByteOrder.BIG_ENDIAN).putInt(4, 2);
-      Files.write(sidecar.toPath(), version2);
+      // A v3 sidecar with its original payload-only checksum must rebuild under the v4 format.
+      byte[] version3 = Files.readAllBytes(sidecar.toPath());
+      ByteBuffer version3Header = ByteBuffer.wrap(version3).order(ByteOrder.BIG_ENDIAN);
+      version3Header.putInt(4, 3);
+      CRC32C payloadCrc = new CRC32C();
+      payloadCrc.update(version3, 64, version3.length - 64);
+      version3Header.putInt(40, (int) payloadCrc.getValue());
+      Files.write(sidecar.toPath(), version3);
       try (SegmentMetadataImpl mapped = SegmentMetadataImpl.loadMapped(segmentDir)) {
         assertEquals(mapped.getSchema(), eager.getSchema());
       }
-      assertEquals(ByteBuffer.wrap(Files.readAllBytes(sidecar.toPath())).order(ByteOrder.BIG_ENDIAN).getInt(4), 3);
+      assertEquals(ByteBuffer.wrap(Files.readAllBytes(sidecar.toPath())).order(ByteOrder.BIG_ENDIAN).getInt(4), 4);
     } finally {
       FileUtils.deleteQuietly(segmentDir);
     }
+  }
+
+  private static int sidecarCrc(byte[] bytes) {
+    byte[] withZeroedSlot = Arrays.copyOf(bytes, bytes.length);
+    ByteBuffer.wrap(withZeroedSlot).order(ByteOrder.BIG_ENDIAN).putInt(40, 0);
+    CRC32C crc = new CRC32C();
+    crc.update(withZeroedSlot, 0, withZeroedSlot.length);
+    return (int) crc.getValue();
   }
 
   /// A server holds one column-metadata graph per loaded segment, so the per-column strings and default null values

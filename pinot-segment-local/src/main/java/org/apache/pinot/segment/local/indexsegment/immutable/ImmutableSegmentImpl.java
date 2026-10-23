@@ -333,7 +333,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
 
   @Override
   public Set<String> getColumnNames() {
-    return _dataSources.keySet();
+    return _segmentMetadata.getSchema().getColumnNames();
   }
 
   @Override
