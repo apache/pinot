@@ -39,12 +39,14 @@ import org.testng.annotations.Test;
 import static org.apache.kafka.clients.consumer.ConsumerRecord.NULL_CHECKSUM;
 import static org.apache.kafka.common.record.LegacyRecord.NO_TIMESTAMP;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 
 
 /// Regression tests for [KafkaPartitionLevelConsumer] seek decisions.
@@ -85,6 +87,31 @@ public class KafkaPartitionLevelConsumerSeekTest {
     assertEquals(emptyBatch.getOffsetOfNextBatch().toString(), "100");
     assertEquals(nextBatch.getFirstMessageOffset().toString(), "100");
     verify(mockConsumer, times(1)).seek(TOPIC_PARTITION, 0L);
+  }
+
+  /// Under read_uncommitted an empty poll can still move the consumer past a transaction control record. The empty
+  /// batch must report that position as the start of the next batch, and the repeated startOffset must not undo
+  /// the progress with a re-seek.
+  @Test
+  public void testRepeatedStartOffsetAfterReadUncommittedEmptyFetchDoesNotSeekAgain() {
+    Consumer<Bytes, Bytes> mockConsumer = mock(Consumer.class);
+    ConsumerRecords<Bytes, Bytes> emptyRecords =
+        new ConsumerRecords<>(Map.of(TOPIC_PARTITION, List.<ConsumerRecord<Bytes, Bytes>>of()));
+    // The client skipped the commit marker at offset 1 without returning anything, so its position is now 2
+    when(mockConsumer.poll(any(Duration.class))).thenReturn(emptyRecords, records(record(2L)));
+    when(mockConsumer.position(eq(TOPIC_PARTITION), any(Duration.class))).thenReturn(2L);
+    when(mockConsumer.beginningOffsets(anyCollection(), any(Duration.class)))
+        .thenReturn(Map.of(TOPIC_PARTITION, 0L));
+
+    KafkaPartitionLevelConsumer consumer = createConsumerWithMock(getStreamConfig(null), mockConsumer);
+    KafkaMessageBatch emptyBatch = consumer.fetchMessages(new LongMsgOffset(1L), 10000);
+    KafkaMessageBatch nextBatch = consumer.fetchMessages(new LongMsgOffset(1L), 10000);
+
+    assertEquals(emptyBatch.getMessageCount(), 0);
+    assertEquals(emptyBatch.getOffsetOfNextBatch().toString(), "2");
+    assertEquals(nextBatch.getFirstMessageOffset().toString(), "2");
+    assertFalse(nextBatch.hasDataLoss());
+    verify(mockConsumer, times(1)).seek(TOPIC_PARTITION, 1L);
   }
 
   private static KafkaPartitionLevelConsumer createConsumerWithMock(StreamConfig streamConfig,
