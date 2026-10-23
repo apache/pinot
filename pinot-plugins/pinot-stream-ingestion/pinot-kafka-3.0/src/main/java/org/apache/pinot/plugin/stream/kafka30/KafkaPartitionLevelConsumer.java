@@ -22,6 +22,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.common.header.Header;
@@ -46,13 +47,17 @@ import org.slf4j.LoggerFactory;
 public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHandler
     implements PartitionGroupConsumer {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaPartitionLevelConsumer.class);
+  // Minimum interval between WARN lines for a failed log-start-offset lookup. The lookup runs on every poll
+  // whose first record is past the requested offset (every transaction on a low-traffic transactional topic),
+  // so an unhealthy broker would otherwise emit one WARN per poll.
+  private static final long LOG_START_OFFSET_LOOKUP_FAILURE_LOG_INTERVAL_MS = TimeUnit.MINUTES.toMillis(1);
 
   // Offset the consumer is positioned to read NEXT. -1 means the consumer has not been
   // positioned for any caller-requested startOffset yet (we have not issued a seek).
-  // After a successful fetch, this is lastRecord.offset + 1. After an empty fetch under
-  // read_committed (where the batch may have been filtered as aborted), this is the
+  // After a successful fetch, this is lastRecord.offset + 1. After an empty fetch, this is the
   // consumer's actual KafkaConsumer.position(), which may have advanced past the caller's
-  // startOffset even though zero records were returned.
+  // startOffset even though zero records were returned (skipped transaction control records,
+  // or aborted records under read_committed).
   private long _nextReadOffset = -1;
   // The caller's startOffset on the previous fetchMessages() call. Used to distinguish
   // "caller is passing the same startOffset back because RealtimeSegmentDataManager's
@@ -73,6 +78,9 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
   // construction (the value is final per consumer) and reused on every fetch instead of
   // re-resolving the StreamConfig each time.
   private final boolean _isReadCommitted = isReadCommitted(_config);
+  // Rate limiting for the WARN in getLogStartOffset(). Only touched from fetchMessages(), which is synchronized.
+  private long _lastLogStartOffsetLookupFailureLogMs = 0;
+  private int _suppressedLogStartOffsetLookupFailures = 0;
 
   public KafkaPartitionLevelConsumer(String clientId, StreamConfig streamConfig, int partition) {
     super(clientId, streamConfig, partition);
@@ -139,18 +147,15 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
         }
         lastMessageMetadata = messageMetadata;
       }
-    } else if (_isReadCommitted) {
-      // No records returned. With read_committed isolation, the underlying KafkaConsumer's
-      // internal position may still have advanced past offsets filtered out as aborted
-      // transactional records, so snap _nextReadOffset to the consumer's actual position.
-      // RealtimeSegmentDataManager doesn't advance _currentOffset on empty batches and will
-      // call us again with the same startOffset; without this update the seek-check would
-      // re-seek to startOffset and undo the consumer's progress through the aborted region.
-      //
-      // For read_uncommitted (the default), empty polls can never advance the internal
-      // position past records that didn't exist, so we skip the position() call in the
-      // hot path. The call is bounded by the same timeout as poll() so a sick broker
-      // can't stall this loop unbounded.
+    } else {
+      // No records returned, but the underlying KafkaConsumer may still have moved past offsets it will never
+      // deliver: transaction control records (commit/abort markers) under either isolation level, and records of
+      // aborted transactions under read_committed. Snap _nextReadOffset to the consumer's actual position so the
+      // returned batch reports where consumption really resumes. RealtimeSegmentDataManager doesn't advance its
+      // offset on an empty batch and calls us again with the same startOffset; the no-re-seek rule above keeps
+      // the consumer's progress in that case. position() is answered from the client's local state once a
+      // position is known, and is bounded by the same timeout as poll() otherwise, so a sick broker can't stall
+      // this loop.
       long currentPosition;
       try {
         currentPosition = _consumer.position(_topicPartition, Duration.ofMillis(timeoutMs));
@@ -165,13 +170,17 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
       }
     }
     long offsetOfNextBatch = _nextReadOffset;
-    // A gap between the requested startOffset and the first returned offset does NOT by itself
-    // imply data loss. Transactional producers write commit/abort control records that occupy
-    // offsets but are never delivered to the consumer (even under read_uncommitted), so a
-    // contiguous stream of user records legitimately has offset gaps. Real data loss only
-    // happens when the requested startOffset is below the log's start offset, i.e. the broker
-    // has already deleted (via retention or truncation) records at or after startOffset. For
-    // read_committed we never flag loss because aborted-record gaps are always expected.
+    // A gap between the requested startOffset and the first returned offset does NOT by itself imply data loss.
+    // Transactional producers write commit/abort control records that occupy offsets but are never delivered to
+    // the consumer (under either isolation level), so a contiguous stream of user records legitimately has offset
+    // gaps. On a low-traffic transactional topic every transaction produces one: after record N the caller is
+    // parked at the marker offset N + 1 and the next record lands at N + 2. The Kafka client gives no way to tell
+    // a skipped control record from an out-of-range reset (both just move the position), so the only reliable
+    // signal is the broker's log start offset: real data loss means records at/after startOffset were deleted
+    // (retention or truncation), i.e. the log start offset is now above startOffset. That lookup is one round
+    // trip per gap, never on the contiguous hot path. For read_committed we never flag loss because aborted-record
+    // gaps are always expected, and the caller's startOffset can lag far behind the consumer's position through
+    // an aborted region.
     boolean hasDataLoss = false;
     if (!_isReadCommitted && firstOffset > startOffset) {
       hasDataLoss = getLogStartOffset(timeoutMs) > startOffset;
@@ -188,10 +197,28 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
       return _consumer.beginningOffsets(List.of(_topicPartition), Duration.ofMillis(timeoutMs))
           .getOrDefault(_topicPartition, Long.MIN_VALUE);
     } catch (Exception e) {
-      LOGGER.warn("Failed to read log start offset for {}; treating the offset gap as no data loss "
-          + "(this can mask genuine data loss if it persists)", _topicPartition, e);
+      logLogStartOffsetLookupFailure(e);
       return Long.MIN_VALUE;
     }
+  }
+
+  /// Logs a failed log-start-offset lookup at WARN at most once per
+  /// [#LOG_START_OFFSET_LOOKUP_FAILURE_LOG_INTERVAL_MS], reporting how many failures were suppressed since the
+  /// previous line. Suppressed failures are still logged at DEBUG.
+  private void logLogStartOffsetLookupFailure(Exception e) {
+    long nowMs = System.currentTimeMillis();
+    if (nowMs - _lastLogStartOffsetLookupFailureLogMs < LOG_START_OFFSET_LOOKUP_FAILURE_LOG_INTERVAL_MS) {
+      _suppressedLogStartOffsetLookupFailures++;
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("Failed to read log start offset for {} (WARN suppressed)", _topicPartition, e);
+      }
+      return;
+    }
+    LOGGER.warn("Failed to read log start offset for {} ({} similar failures suppressed since the last report); "
+        + "treating the offset gap as no data loss (this can mask genuine data loss if it persists)",
+        _topicPartition, _suppressedLogStartOffsetLookupFailures, e);
+    _lastLogStartOffsetLookupFailureLogMs = nowMs;
+    _suppressedLogStartOffsetLookupFailures = 0;
   }
 
   private static boolean isReadCommitted(KafkaPartitionLevelStreamConfig config) {

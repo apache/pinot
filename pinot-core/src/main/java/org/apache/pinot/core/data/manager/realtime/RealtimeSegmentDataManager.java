@@ -238,6 +238,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private static final int MSG_COUNT_THRESHOLD_FOR_LOG = 100000;
   private static final int BUILD_TIME_LEASE_SECONDS = 30;
   private static final int MAX_CONSECUTIVE_ERROR_COUNT = 5;
+  // Minimum interval between the data-loss ERROR log line and segment error entry for a segment. The
+  // STREAM_DATA_LOSS gauge is still set for every batch that reports loss; only the diagnostics are throttled.
+  private static final long DATA_LOSS_REPORT_INTERVAL_MS = TimeUnit.MINUTES.toMillis(1);
   // 8 min max timeout for the retry policy
   private static final RetryPolicy CONSUMER_RECREATE_RETRY_POLICY =
       RetryPolicies.exponentialBackoffRetryPolicy(10, 1000L, 2.0f);
@@ -335,6 +338,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private long _consumeStartTime = -1;
   private long _lastLogTime = 0;
   private int _lastConsumedCount = 0;
+  // Rate limiting for reportDataLoss(). Only touched from the consumer thread.
+  private long _lastDataLossReportTimeMs = -1;
+  private int _dataLossBatchesSinceLastReport = 0;
   private SegmentCompletionProtocol.ReasonCode _stopReasonCode = null;
   private final Semaphore _segBuildSemaphore;
   private final boolean _isOffHeap;
@@ -1164,16 +1170,31 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   /// Checks and reports if the consumer is going through data loss.
   ///
+  /// The [ServerGauge#STREAM_DATA_LOSS] gauge is set for every batch that reports loss. The ERROR log line and the
+  /// segment error entry are emitted at most once per [#DATA_LOSS_REPORT_INTERVAL_MS] per segment, carrying the
+  /// number of affected batches since the previous report, so a stream that keeps reporting loss on every poll
+  /// does not flood the log or churn the segment error cache.
+  ///
   /// @param messageBatch Message batch to validate
-  private void reportDataLoss(MessageBatch messageBatch) {
-    if (messageBatch.hasDataLoss()) {
-      _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.STREAM_DATA_LOSS, 1L);
-      String message = "Message loss detected in stream partition: " + _partitionGroupId + " for table: "
-          + _tableNameWithType + " startOffset: " + _currentOffset + " batchFirstOffset: "
-          + messageBatch.getFirstMessageOffset();
-      _segmentLogger.error(message);
-      _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), message, null));
+  @VisibleForTesting
+  void reportDataLoss(MessageBatch messageBatch) {
+    if (!messageBatch.hasDataLoss()) {
+      return;
     }
+    _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.STREAM_DATA_LOSS, 1L);
+    _dataLossBatchesSinceLastReport++;
+    long now = now();
+    if (_lastDataLossReportTimeMs >= 0 && now - _lastDataLossReportTimeMs < DATA_LOSS_REPORT_INTERVAL_MS) {
+      return;
+    }
+    String message = "Message loss detected in stream partition: " + _partitionGroupId + " for table: "
+        + _tableNameWithType + " startOffset: " + _currentOffset + " batchFirstOffset: "
+        + messageBatch.getFirstMessageOffset() + " (batches with loss since last report: "
+        + _dataLossBatchesSinceLastReport + ")";
+    _segmentLogger.error(message);
+    _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now, message, null));
+    _lastDataLossReportTimeMs = now;
+    _dataLossBatchesSinceLastReport = 0;
   }
 
   public StreamPartitionMsgOffset getCurrentOffset() {
