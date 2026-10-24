@@ -42,6 +42,8 @@ import org.testng.annotations.Test;
 import static org.apache.kafka.common.record.RecordBatch.NO_TIMESTAMP;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -136,6 +138,168 @@ public class KafkaPartitionLevelConsumerDataLossCheckTest {
     // A repeated failure within the WARN interval is throttled in the log but evaluated the same way
     batch = consumer.fetchMessages(new LongMsgOffset(100L), TIMEOUT_MS);
     assertFalse(batch.hasDataLoss());
+    verify(mockConsumer, times(2)).beginningOffsets(anyCollection(), any(Duration.class));
+  }
+
+  /// The client moved past a control record while delivering records (the fetch response ended with the commit
+  /// marker of the delivered record): the next, empty poll finds the client already there and must not pay a broker
+  /// round trip for it, and the data poll after that starts exactly at the new position, so no gap is seen either.
+  @Test
+  public void testPositionMoveInsideRecordPollNeedsNoLookup() {
+    Consumer<Bytes, Bytes> mockConsumer = mock(Consumer.class);
+    when(mockConsumer.poll(any(Duration.class))).thenReturn(records(record(2L)), records(), records(record(4L)));
+    // After delivering record 2 the client skipped the commit marker at 3 in the same fetch response
+    when(mockConsumer.position(eq(TOPIC_PARTITION), any(Duration.class))).thenReturn(4L);
+
+    KafkaPartitionLevelConsumer consumer = createConsumerWithMock(getStreamConfig(null), mockConsumer);
+    KafkaMessageBatch dataBatch = consumer.fetchMessages(new LongMsgOffset(2L), TIMEOUT_MS);
+    assertEquals(dataBatch.getMessageCount(), 1);
+    assertEquals(dataBatch.getOffsetOfNextBatch().toString(), "3", "the caller continues after the delivered record");
+    assertFalse(dataBatch.hasDataLoss());
+
+    KafkaMessageBatch emptyBatch = consumer.fetchMessages(new LongMsgOffset(3L), TIMEOUT_MS);
+    assertEquals(emptyBatch.getMessageCount(), 0);
+    assertEquals(emptyBatch.getOffsetOfNextBatch().toString(), "4", "the empty batch reports the client position");
+    assertFalse(emptyBatch.hasDataLoss());
+
+    KafkaMessageBatch nextDataBatch = consumer.fetchMessages(new LongMsgOffset(4L), TIMEOUT_MS);
+    assertEquals(nextDataBatch.getFirstMessageOffset().toString(), "4");
+    assertFalse(nextDataBatch.hasDataLoss());
+    verify(mockConsumer, never()).beginningOffsets(anyCollection(), any(Duration.class));
+    verify(mockConsumer, times(1)).seek(any(TopicPartition.class), anyLong());
+  }
+
+  /// The client moved during an empty poll (the commit marker landed in a later fetch than its record). That move
+  /// cannot be told apart from an out-of-range reset without the broker, so it is validated against the log start
+  /// offset exactly once; it is not loss while the log still starts at or below the position the poll started from.
+  /// The following data poll starts at the new position and needs no lookup of its own.
+  @Test
+  public void testPositionMoveDuringEmptyPollIsValidatedOnce() {
+    Consumer<Bytes, Bytes> mockConsumer = mock(Consumer.class);
+    when(mockConsumer.poll(any(Duration.class))).thenReturn(records(record(2L)), records(), records(record(4L)));
+    // Position after each poll: 3 after record 2, 4 once the marker at 3 is skipped, 5 after record 4
+    when(mockConsumer.position(eq(TOPIC_PARTITION), any(Duration.class))).thenReturn(3L, 4L, 5L);
+    when(mockConsumer.beginningOffsets(anyCollection(), any(Duration.class)))
+        .thenReturn(Map.of(TOPIC_PARTITION, 0L));
+
+    KafkaPartitionLevelConsumer consumer = createConsumerWithMock(getStreamConfig(null), mockConsumer);
+    KafkaMessageBatch dataBatch = consumer.fetchMessages(new LongMsgOffset(2L), TIMEOUT_MS);
+    assertEquals(dataBatch.getOffsetOfNextBatch().toString(), "3");
+    assertFalse(dataBatch.hasDataLoss());
+    verify(mockConsumer, never()).beginningOffsets(anyCollection(), any(Duration.class));
+
+    KafkaMessageBatch emptyBatch = consumer.fetchMessages(new LongMsgOffset(3L), TIMEOUT_MS);
+    assertEquals(emptyBatch.getMessageCount(), 0);
+    assertEquals(emptyBatch.getOffsetOfNextBatch().toString(), "4");
+    assertFalse(emptyBatch.hasDataLoss());
+    verify(mockConsumer, times(1)).beginningOffsets(anyCollection(), any(Duration.class));
+
+    KafkaMessageBatch nextDataBatch = consumer.fetchMessages(new LongMsgOffset(4L), TIMEOUT_MS);
+    assertEquals(nextDataBatch.getFirstMessageOffset().toString(), "4");
+    assertFalse(nextDataBatch.hasDataLoss());
+    verify(mockConsumer, times(1)).beginningOffsets(anyCollection(), any(Duration.class));
+  }
+
+  /// A move during an empty poll that was an auto.offset.reset: everything from the position the poll started from
+  /// up to the reset target is gone for this consumer, and the log now starts above that position. The loss must be
+  /// reported on the empty batch, because the caller adopts the reported position and the next data poll then
+  /// starts exactly where it was requested, with no gap left to notice.
+  @Test
+  public void testResetDuringEmptyPollIsDataLoss() {
+    Consumer<Bytes, Bytes> mockConsumer = mock(Consumer.class);
+    when(mockConsumer.poll(any(Duration.class))).thenReturn(records(), records(record(150L)));
+    when(mockConsumer.position(eq(TOPIC_PARTITION), any(Duration.class))).thenReturn(150L);
+    when(mockConsumer.beginningOffsets(anyCollection(), any(Duration.class)))
+        .thenReturn(Map.of(TOPIC_PARTITION, 150L));
+
+    KafkaPartitionLevelConsumer consumer = createConsumerWithMock(getStreamConfig(null), mockConsumer);
+    KafkaMessageBatch emptyBatch = consumer.fetchMessages(new LongMsgOffset(100L), TIMEOUT_MS);
+    assertEquals(emptyBatch.getMessageCount(), 0);
+    assertEquals(emptyBatch.getOffsetOfNextBatch().toString(), "150");
+    assertTrue(emptyBatch.hasDataLoss());
+
+    // Reported once: the data poll from the adopted position sees no gap
+    KafkaMessageBatch dataBatch = consumer.fetchMessages(new LongMsgOffset(150L), TIMEOUT_MS);
+    assertEquals(dataBatch.getFirstMessageOffset().toString(), "150");
+    assertFalse(dataBatch.hasDataLoss());
+    verify(mockConsumer, times(1)).beginningOffsets(anyCollection(), any(Duration.class));
+  }
+
+  @Test
+  public void testEmptyPollWithoutPositionMoveNeedsNoLookup() {
+    Consumer<Bytes, Bytes> mockConsumer = mock(Consumer.class);
+    when(mockConsumer.poll(any(Duration.class))).thenReturn(records());
+    when(mockConsumer.position(eq(TOPIC_PARTITION), any(Duration.class))).thenReturn(5L);
+
+    KafkaMessageBatch batch = createConsumerWithMock(getStreamConfig(null), mockConsumer)
+        .fetchMessages(new LongMsgOffset(5L), TIMEOUT_MS);
+
+    assertEquals(batch.getMessageCount(), 0);
+    assertEquals(batch.getOffsetOfNextBatch().toString(), "5");
+    assertFalse(batch.hasDataLoss());
+    verify(mockConsumer, never()).beginningOffsets(anyCollection(), any(Duration.class));
+  }
+
+  @Test
+  public void testPositionMoveDuringEmptyPollUnderReadCommittedIsNotDataLossWithoutLookup() {
+    Consumer<Bytes, Bytes> mockConsumer = mock(Consumer.class);
+    when(mockConsumer.poll(any(Duration.class))).thenReturn(records());
+    when(mockConsumer.position(eq(TOPIC_PARTITION), any(Duration.class))).thenReturn(150L);
+
+    KafkaMessageBatch batch = createConsumerWithMock(
+        getStreamConfig(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_ISOLATION_LEVEL_READ_COMMITTED),
+        mockConsumer).fetchMessages(new LongMsgOffset(100L), TIMEOUT_MS);
+
+    assertEquals(batch.getMessageCount(), 0);
+    assertEquals(batch.getOffsetOfNextBatch().toString(), "150");
+    assertFalse(batch.hasDataLoss());
+    verify(mockConsumer, never()).beginningOffsets(anyCollection(), any(Duration.class));
+  }
+
+  /// The gap in front of a record that the client skipped while delivering the previous records (the commit marker
+  /// arrived in the same fetch as the record before it) is not re-checked when the next data poll starts at the
+  /// caller's offset inside that gap. Before, the gap was compared with the caller's offset, and a log start offset
+  /// that had meanwhile moved onto the marker produced a false loss report.
+  @Test
+  public void testGapSkippedInsideEarlierRecordPollNeedsNoLookupOnNextRecordPoll() {
+    Consumer<Bytes, Bytes> mockConsumer = mock(Consumer.class);
+    when(mockConsumer.poll(any(Duration.class))).thenReturn(records(record(2L)), records(record(4L)));
+    // After delivering record 2 the client skipped the commit marker at 3 in the same fetch response
+    when(mockConsumer.position(eq(TOPIC_PARTITION), any(Duration.class))).thenReturn(4L, 5L);
+    // Retention has since moved the log start onto the marker
+    when(mockConsumer.beginningOffsets(anyCollection(), any(Duration.class)))
+        .thenReturn(Map.of(TOPIC_PARTITION, 4L));
+
+    KafkaPartitionLevelConsumer consumer = createConsumerWithMock(getStreamConfig(null), mockConsumer);
+    KafkaMessageBatch dataBatch = consumer.fetchMessages(new LongMsgOffset(2L), TIMEOUT_MS);
+    assertEquals(dataBatch.getOffsetOfNextBatch().toString(), "3");
+
+    KafkaMessageBatch nextDataBatch = consumer.fetchMessages(new LongMsgOffset(3L), TIMEOUT_MS);
+    assertEquals(nextDataBatch.getFirstMessageOffset().toString(), "4");
+    assertFalse(nextDataBatch.hasDataLoss(), "The marker at 3 was skipped while record 2 was delivered: not a loss");
+    verify(mockConsumer, never()).beginningOffsets(anyCollection(), any(Duration.class));
+  }
+
+  /// When the log start offset cannot be read for a move during an empty poll, the move stays unaccounted for and is
+  /// validated again on the next poll, so a broker hiccup cannot hide a reset for good. Here the retry on the
+  /// following data poll finds the log start above the position the empty poll started from and reports the loss.
+  @Test
+  public void testFailedValidationOfEmptyPollMoveIsRetriedOnNextRecordPoll() {
+    Consumer<Bytes, Bytes> mockConsumer = mock(Consumer.class);
+    when(mockConsumer.poll(any(Duration.class))).thenReturn(records(), records(record(150L)));
+    when(mockConsumer.position(eq(TOPIC_PARTITION), any(Duration.class))).thenReturn(150L, 151L);
+    when(mockConsumer.beginningOffsets(anyCollection(), any(Duration.class)))
+        .thenThrow(new TimeoutException("broker unavailable"))
+        .thenReturn(Map.of(TOPIC_PARTITION, 150L));
+
+    KafkaPartitionLevelConsumer consumer = createConsumerWithMock(getStreamConfig(null), mockConsumer);
+    KafkaMessageBatch emptyBatch = consumer.fetchMessages(new LongMsgOffset(100L), TIMEOUT_MS);
+    assertEquals(emptyBatch.getOffsetOfNextBatch().toString(), "150", "The position is still reported");
+    assertFalse(emptyBatch.hasDataLoss(), "A failed lookup does not manufacture a loss report");
+
+    KafkaMessageBatch dataBatch = consumer.fetchMessages(new LongMsgOffset(150L), TIMEOUT_MS);
+    assertEquals(dataBatch.getFirstMessageOffset().toString(), "150");
+    assertTrue(dataBatch.hasDataLoss(), "The move from 100 to 150 is validated again and turns out to be a reset");
     verify(mockConsumer, times(2)).beginningOffsets(anyCollection(), any(Duration.class));
   }
 
