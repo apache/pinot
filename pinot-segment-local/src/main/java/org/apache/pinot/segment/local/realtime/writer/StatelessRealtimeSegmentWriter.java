@@ -79,6 +79,10 @@ import org.slf4j.LoggerFactory;
 
 /// Segment writer to ingest streaming data from a start offset to an end offset.
 ///
+/// An advancing empty batch cannot prove coverage of the replay range, even when it reports no data loss. Such an
+/// attempt fails immediately, including read_committed control-only tails; external retry or existing recovery may
+/// be required. This check does not certify historical completeness across delivered or filtered record gaps.
+///
 /// TODO:
 ///   1. Clean up this class and only keep the necessary parts.
 ///   2. Use a different segment impl for better performance because it doesn't need to serve queries.
@@ -298,7 +302,12 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
             }
           }
 
-          _currentOffset = messageBatch.getOffsetOfNextBatch();
+          StreamPartitionMsgOffset nextBatchOffset = messageBatch.getOffsetOfNextBatch();
+          if (messageBatch.getUnfilteredMessageCount() == 0 && nextBatchOffset.compareTo(_currentOffset) > 0) {
+            throw new IllegalStateException("Cannot verify empty stream offset advance from " + _currentOffset + " to "
+                + nextBatchOffset + " while replaying to " + _endOffset);
+          }
+          _currentOffset = nextBatchOffset;
         }
         _isSuccess = true;
       } catch (Exception e) {
