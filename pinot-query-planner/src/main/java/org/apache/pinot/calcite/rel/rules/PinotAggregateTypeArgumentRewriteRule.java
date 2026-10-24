@@ -52,8 +52,8 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 /// inline literal arguments only from the immediate project.
 ///
 /// The servers require the data type argument of FIRST_WITH_TIME / LAST_WITH_TIME, so the rule is required rather than
-/// an optimization: `QueryEnvironment` always applies [#INSTANCE], or [#WITHOUT_ANY_VALUE] when the `inferAnyValueType`
-/// query option is false, and `skipPlannerRules` cannot turn it off.
+/// an optimization: `QueryEnvironment` always applies [#WITHOUT_ANY_VALUE], or [#INSTANCE] when the `inferAnyValueType`
+/// query option is true, and `skipPlannerRules` cannot turn it off.
 public class PinotAggregateTypeArgumentRewriteRule extends RelOptRule {
   public static final PinotAggregateTypeArgumentRewriteRule INSTANCE =
       new PinotAggregateTypeArgumentRewriteRule(true, PinotRuleUtils.PINOT_REL_FACTORY, null);

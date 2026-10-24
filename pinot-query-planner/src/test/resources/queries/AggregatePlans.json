@@ -199,7 +199,7 @@
       },
       {
         "description": "ANY_VALUE without a data type infers it from its argument",
-        "sql": "EXPLAIN PLAN FOR SELECT ANY_VALUE(a.col1), ANY_VALUE(a.col3), ANY_VALUE(a.col4), ANY_VALUE(a.col5), ANY_VALUE(a.col7), ANY_VALUE(a.ts_timestamp) FROM a",
+        "sql": "SET inferAnyValueType=true; EXPLAIN PLAN FOR SELECT ANY_VALUE(a.col1), ANY_VALUE(a.col3), ANY_VALUE(a.col4), ANY_VALUE(a.col5), ANY_VALUE(a.col7), ANY_VALUE(a.ts_timestamp) FROM a",
         "output": [
           "Execution Plan",
           "\nPinotLogicalAggregate(group=[{}], agg#0=[ANYVALUE($0, _UTF-8'STRING')], agg#1=[ANYVALUE($1, _UTF-8'INT')], agg#2=[ANYVALUE($2, _UTF-8'BIG_DECIMAL')], agg#3=[ANYVALUE($3, _UTF-8'BOOLEAN')], agg#4=[ANYVALUE($4, _UTF-8'LONG')], agg#5=[ANYVALUE($5, _UTF-8'TIMESTAMP')], aggType=[FINAL])",
@@ -212,7 +212,7 @@
       },
       {
         "description": "Inferred ANY_VALUE data type for a transform and a filtered aggregate in a grouped aggregate",
-        "sql": "EXPLAIN PLAN FOR SELECT a.col2, ANY_VALUE(a.col3 + 1), ANY_VALUE(a.col5) FILTER (WHERE a.col3 > 0), ANY_VALUE(a.col1, 'STRING') FROM a GROUP BY a.col2",
+        "sql": "SET inferAnyValueType=true; EXPLAIN PLAN FOR SELECT a.col2, ANY_VALUE(a.col3 + 1), ANY_VALUE(a.col5) FILTER (WHERE a.col3 > 0), ANY_VALUE(a.col1, 'STRING') FROM a GROUP BY a.col2",
         "output": [
           "Execution Plan",
           "\nPinotLogicalAggregate(group=[{0}], agg#0=[ANYVALUE($1, _UTF-8'INT')], agg#1=[ANYVALUE($2, _UTF-8'BOOLEAN')], agg#2=[ANYVALUE($3, _UTF-8'STRING')], aggType=[FINAL])",
@@ -225,7 +225,7 @@
       },
       {
         "description": "ANY_VALUE over a DECIMAL expression infers BIG_DECIMAL",
-        "sql": "EXPLAIN PLAN FOR SELECT ANY_VALUE(a.col3 * 1.5), ANY_VALUE(CAST(a.col3 AS DECIMAL(10, 0))) FROM a",
+        "sql": "SET inferAnyValueType=true; EXPLAIN PLAN FOR SELECT ANY_VALUE(a.col3 * 1.5), ANY_VALUE(CAST(a.col3 AS DECIMAL(10, 0))) FROM a",
         "output": [
           "Execution Plan",
           "\nPinotLogicalAggregate(group=[{}], agg#0=[ANYVALUE($0, _UTF-8'BIG_DECIMAL')], agg#1=[ANYVALUE($1, _UTF-8'BIG_DECIMAL')], aggType=[FINAL])",
@@ -238,7 +238,7 @@
       },
       {
         "description": "ANY_VALUE without a data type rejects a multi-value argument",
-        "sql": "EXPLAIN PLAN FOR SELECT ANY_VALUE(e.mcol1) FROM e",
+        "sql": "SET inferAnyValueType=true; EXPLAIN PLAN FOR SELECT ANY_VALUE(e.mcol1) FROM e",
         "expectedException": ".*Unsupported data type for ANYVALUE\\(expr\\): ARRAY.*"
       },
       {
@@ -247,8 +247,8 @@
         "expectedException": ".*Unsupported data type for ANYVALUE\\(expr, 'dataType'\\) with expr of type INTEGER: STRING.*"
       },
       {
-        "description": "ANY_VALUE rejects a data type that does not match its argument when inferAnyValueType is false",
-        "sql": "SET inferAnyValueType=false; EXPLAIN PLAN FOR SELECT ANY_VALUE(a.col5, 'INT') FROM a",
+        "description": "ANY_VALUE rejects a data type that does not match its argument when inferAnyValueType is true",
+        "sql": "SET inferAnyValueType=true; EXPLAIN PLAN FOR SELECT ANY_VALUE(a.col5, 'INT') FROM a",
         "expectedException": ".*Unsupported data type for ANYVALUE\\(expr, 'dataType'\\) with expr of type BOOLEAN: INT.*"
       },
       {
@@ -257,8 +257,8 @@
         "expectedException": ".*Unsupported data type for ANYVALUE\\(expr, 'dataType'\\) with expr of type INTEGER: \\$.*"
       },
       {
-        "description": "ANY_VALUE keeps the form without a data type when inferAnyValueType is false",
-        "sql": "SET inferAnyValueType=false; EXPLAIN PLAN FOR SELECT ANY_VALUE(a.col5), FIRST_WITH_TIME(a.col5, a.ts) FROM a",
+        "description": "ANY_VALUE keeps the form without a data type by default",
+        "sql": "EXPLAIN PLAN FOR SELECT ANY_VALUE(a.col5), FIRST_WITH_TIME(a.col5, a.ts) FROM a",
         "output": [
           "Execution Plan",
           "\nPinotLogicalAggregate(group=[{}], agg#0=[ANYVALUE($0)], agg#1=[FIRSTWITHTIME($1, $1, _UTF-8'BOOLEAN')], aggType=[FINAL])",

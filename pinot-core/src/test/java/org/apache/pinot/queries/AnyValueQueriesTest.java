@@ -49,8 +49,9 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/// Queries test for ANY_VALUE, whose data type argument the optimizer supplies from the schema. All the rows with the
-/// same key hold the same values, so that any value is the expected one.
+/// Queries test for ANY_VALUE, whose data type argument the optimizer supplies from the schema when the
+/// `inferAnyValueType` query option is set. All the rows with the same key hold the same values, so that any value is
+/// the expected one.
 public class AnyValueQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "AnyValueQueriesTest");
   private static final String RAW_TABLE_NAME = "testTable";
@@ -73,6 +74,7 @@ public class AnyValueQueriesTest extends BaseQueriesTest {
       .build();
   private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
       .setNoDictionaryColumns(List.of("longCol", "doubleCol", "bytesCol")).build();
+  private static final String INFER_ANY_VALUE_TYPE = "SET inferAnyValueType=true; ";
   private static final String ALL_COLUMNS = "ANY_VALUE(intCol), ANY_VALUE(longCol), ANY_VALUE(floatCol), "
       + "ANY_VALUE(doubleCol), ANY_VALUE(bigDecimalCol), ANY_VALUE(boolCol), ANY_VALUE(timestampCol), "
       + "ANY_VALUE(stringCol), ANY_VALUE(jsonCol), ANY_VALUE(bytesCol), ANY_VALUE(uuidCol)";
@@ -134,8 +136,8 @@ public class AnyValueQueriesTest extends BaseQueriesTest {
 
   @Test
   public void testAggregationOnly() {
-    BrokerResponseNative brokerResponse =
-        getBrokerResponseForOptimizedQuery("SELECT " + ALL_COLUMNS + " FROM testTable WHERE keyCol = 0", SCHEMA);
+    BrokerResponseNative brokerResponse = getBrokerResponseForOptimizedQuery(
+        INFER_ANY_VALUE_TYPE + "SELECT " + ALL_COLUMNS + " FROM testTable WHERE keyCol = 0", SCHEMA);
     DataSchema expectedDataSchema = new DataSchema(new String[]{
         "anyvalue(intCol,'INT')", "anyvalue(longCol,'LONG')", "anyvalue(floatCol,'FLOAT')",
         "anyvalue(doubleCol,'DOUBLE')", "anyvalue(bigDecimalCol,'BIG_DECIMAL')", "anyvalue(boolCol,'BOOLEAN')",
@@ -157,7 +159,8 @@ public class AnyValueQueriesTest extends BaseQueriesTest {
   @Test
   public void testGroupBy() {
     ResultTable resultTable = getBrokerResponseForOptimizedQuery(
-        "SELECT keyCol, ANY_VALUE(intCol) AS v1, ANY_VALUE(boolCol) AS v2, ANY_VALUE(timestampCol) AS v3, "
+        INFER_ANY_VALUE_TYPE + "SELECT keyCol, ANY_VALUE(intCol) AS v1, ANY_VALUE(boolCol) AS v2, "
+            + "ANY_VALUE(timestampCol) AS v3, "
             + "ANY_VALUE(uuidCol) AS v4 FROM testTable GROUP BY keyCol ORDER BY ANY_VALUE(longCol) DESC",
         SCHEMA).getResultTable();
     assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"keyCol", "v1", "v2", "v3", "v4"},
@@ -177,9 +180,8 @@ public class AnyValueQueriesTest extends BaseQueriesTest {
 
   @Test
   public void testEmptyInput() {
-    ResultTable resultTable =
-        getBrokerResponseForOptimizedQuery("SELECT " + ALL_COLUMNS + " FROM testTable WHERE keyCol < 0", SCHEMA)
-            .getResultTable();
+    ResultTable resultTable = getBrokerResponseForOptimizedQuery(
+        INFER_ANY_VALUE_TYPE + "SELECT " + ALL_COLUMNS + " FROM testTable WHERE keyCol < 0", SCHEMA).getResultTable();
     assertEquals(resultTable.getDataSchema().getColumnDataTypes(), new ColumnDataType[]{
         ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.FLOAT, ColumnDataType.DOUBLE,
         ColumnDataType.BIG_DECIMAL, ColumnDataType.BOOLEAN, ColumnDataType.TIMESTAMP, ColumnDataType.STRING,
@@ -189,7 +191,8 @@ public class AnyValueQueriesTest extends BaseQueriesTest {
     assertEquals(resultTable.getRows().get(0), new Object[11]);
 
     resultTable = getBrokerResponseForOptimizedQuery(
-        "SELECT keyCol, ANY_VALUE(boolCol), ANY_VALUE(timestampCol) FROM testTable WHERE keyCol < 0 GROUP BY keyCol",
+        INFER_ANY_VALUE_TYPE + "SELECT keyCol, ANY_VALUE(boolCol), ANY_VALUE(timestampCol) FROM testTable "
+            + "WHERE keyCol < 0 GROUP BY keyCol",
         SCHEMA).getResultTable();
     assertEquals(resultTable.getDataSchema().getColumnDataTypes(),
         new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.BOOLEAN, ColumnDataType.TIMESTAMP});
@@ -209,7 +212,7 @@ public class AnyValueQueriesTest extends BaseQueriesTest {
   @Test
   public void testWithoutInferredDataType() {
     ResultTable resultTable = getBrokerResponseForOptimizedQuery(
-        "SET inferAnyValueType=false; SELECT ANY_VALUE(intCol), ANY_VALUE(boolCol), ANY_VALUE(timestampCol) "
+        "SELECT ANY_VALUE(intCol), ANY_VALUE(boolCol), ANY_VALUE(timestampCol) "
             + "FROM testTable WHERE keyCol = 0", SCHEMA).getResultTable();
     assertEquals(resultTable.getDataSchema(),
         new DataSchema(new String[]{"anyvalue(intCol)", "anyvalue(boolCol)", "anyvalue(timestampCol)"},

@@ -106,6 +106,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   /// Resolves the approximate-function rewrite defaults, live from the Helix cluster config. Registered as a
   /// listener by the broker starter through [#getApproximateFunctionOverrideProvider()].
   protected final ApproximateFunctionOverrideProvider _approximateFunctionOverrideProvider;
+  /// Resolves the default of the `inferAnyValueType` query option, live from the Helix cluster config. Registered as a
+  /// listener by the broker starter through [#getInferAnyValueTypeProvider()].
+  protected final InferAnyValueTypeProvider _inferAnyValueTypeProvider;
 
   public BaseBrokerRequestHandler(PinotConfiguration config, String brokerId,
       BrokerRequestIdGenerator requestIdGenerator, RoutingManager routingManager,
@@ -121,6 +124,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _threadAccountant = threadAccountant;
     _multiClusterRoutingContext = multiClusterRoutingContext;
     _approximateFunctionOverrideProvider = new ApproximateFunctionOverrideProvider(config);
+    _inferAnyValueTypeProvider = new InferAnyValueTypeProvider(config);
     _brokerMetrics = BrokerMetrics.get();
     _brokerQueryEventListener = BrokerQueryEventListenerFactory.getBrokerQueryEventListener();
     _trackedHeaders = BrokerQueryEventListenerFactory.getTrackedHeaders();
@@ -147,6 +151,12 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   /// with the cluster config change handler so that the defaults reload without a restart.
   public ApproximateFunctionOverrideProvider getApproximateFunctionOverrideProvider() {
     return _approximateFunctionOverrideProvider;
+  }
+
+  /// Returns the provider that resolves the default of the `inferAnyValueType` query option. The broker starter
+  /// registers it with the cluster config change handler so that the default reloads without a restart.
+  public InferAnyValueTypeProvider getInferAnyValueTypeProvider() {
+    return _inferAnyValueTypeProvider;
   }
 
   @Override
@@ -214,6 +224,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (_enableAutoRewriteAggregationType != null) {
       sqlNodeAndOptions.getOptions()
           .putIfAbsent(QueryOptionKey.AUTO_REWRITE_AGGREGATION_TYPE, _enableAutoRewriteAggregationType);
+    }
+
+    if (_inferAnyValueTypeProvider.isEnabled()) {
+      sqlNodeAndOptions.getOptions().putIfAbsent(QueryOptionKey.INFER_ANY_VALUE_TYPE, "true");
     }
 
     if (_regexDictSizeThreshold != null) {

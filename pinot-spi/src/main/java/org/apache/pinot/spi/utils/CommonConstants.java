@@ -797,6 +797,10 @@ public class CommonConstants {
 
     public static final String CONFIG_OF_BROKER_QUERY_ENABLE_AUTO_REWRITE_AGGREGATION_TYPE =
         "pinot.broker.query.enable.auto.rewrite.aggregation.type";
+    /// Default of the [Request.QueryOptionKey#INFER_ANY_VALUE_TYPE] query option, read from the broker conf and, live,
+    /// from the cluster config.
+    public static final String CONFIG_OF_BROKER_QUERY_INFER_ANY_VALUE_TYPE = "pinot.broker.query.infer.any.value.type";
+    public static final boolean DEFAULT_BROKER_QUERY_INFER_ANY_VALUE_TYPE = false;
 
     /// Config for sort exchange copy threshold in multi-stage engine.
     ///
@@ -1216,8 +1220,9 @@ public class CommonConstants {
         // MAX(stringCol) -> MAXSTRING(stringCol)
         // SUM(intCol) -> SUMINT(intCol)
         public static final String AUTO_REWRITE_AGGREGATION_TYPE = "autoRewriteAggregationType";
-        /// Whether ANY_VALUE(expr) is rewritten to ANY_VALUE(expr, 'dataType') to return the type of `expr`. Defaults
-        /// to true; set to false to keep the legacy result type, which is STRING in the single-stage engine.
+        /// Whether ANY_VALUE(expr) is rewritten to ANY_VALUE(expr, 'dataType') to return the type of `expr`, instead of
+        /// the legacy result type, which is STRING in the single-stage engine. Defaults to
+        /// [Broker#CONFIG_OF_BROKER_QUERY_INFER_ANY_VALUE_TYPE].
         public static final String INFER_ANY_VALUE_TYPE = "inferAnyValueType";
         // When enabled, allows multi cluster/federated queries to be executed.
         public static final String ENABLE_MULTI_CLUSTER_ROUTING = "enableMultiClusterRouting";

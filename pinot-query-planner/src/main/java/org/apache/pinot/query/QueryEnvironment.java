@@ -147,6 +147,8 @@ public class QueryEnvironment {
   private final FrameworkConfig _config;
   private final CalciteCatalogReader _catalogReader;
   private final HepProgram _optProgram;
+  // Same as _optProgram, but rewrites ANY_VALUE(expr) to ANY_VALUE(expr, 'dataType') as well
+  private final HepProgram _inferAnyValueTypeOptProgram;
   private final Config _envConfig;
   private final PinotCatalog _catalog;
   private final Set<String> _defaultDisabledPlannerRules;
@@ -171,7 +173,9 @@ public class QueryEnvironment {
         rootSchema, List.of(database), _typeFactory, CONNECTION_CONFIG, config.isCaseSensitive());
     _defaultDisabledPlannerRules = _envConfig.defaultDisabledPlannerRules();
     // default optProgram with no skip rule options and no use rule options
-    _optProgram = getOptProgram(_envConfig.getRuleSet(), Set.of(), Set.of(), _defaultDisabledPlannerRules, true);
+    _optProgram = getOptProgram(_envConfig.getRuleSet(), Set.of(), Set.of(), _defaultDisabledPlannerRules, false);
+    _inferAnyValueTypeOptProgram =
+        getOptProgram(_envConfig.getRuleSet(), Set.of(), Set.of(), _defaultDisabledPlannerRules, true);
     _multiClusterRoutingContext = multiClusterRoutingContext;
   }
 
@@ -198,15 +202,15 @@ public class QueryEnvironment {
       _catalog.configureVirtualColumnExclusion(true);
     }
 
-    HepProgram optProgram = _optProgram;
+    boolean inferAnyValueType = QueryOptionsUtils.isInferAnyValueType(options);
+    HepProgram optProgram = inferAnyValueType ? _inferAnyValueTypeOptProgram : _optProgram;
     Set<String> useRuleSet = new HashSet<>(QueryOptionsUtils.getUsePlannerRules(options));
     if (Boolean.parseBoolean(options.get(QueryOptionKey.AUTO_REWRITE_AGGREGATION_TYPE))) {
       useRuleSet.add(CommonConstants.Broker.PlannerRuleNames.AGGREGATE_FUNCTION_REWRITE);
     }
     if (MapUtils.isNotEmpty(options)) {
       Set<String> skipRuleSet = QueryOptionsUtils.getSkipPlannerRules(options);
-      boolean inferAnyValueType = QueryOptionsUtils.isInferAnyValueType(options);
-      if (!skipRuleSet.isEmpty() || !useRuleSet.isEmpty() || !inferAnyValueType) {
+      if (!skipRuleSet.isEmpty() || !useRuleSet.isEmpty()) {
         // dynamically create optProgram according to rule options
         optProgram = getOptProgram(_envConfig.getRuleSet(), skipRuleSet, useRuleSet, _defaultDisabledPlannerRules,
             inferAnyValueType);

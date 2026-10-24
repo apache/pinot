@@ -38,7 +38,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 /// - FIRST_WITH_TIME(dataColumn, timeColumn) -> FIRST_WITH_TIME(dataColumn, timeColumn, 'dataType')
 /// - LAST_WITH_TIME(dataColumn, timeColumn) -> LAST_WITH_TIME(dataColumn, timeColumn, 'dataType')
 ///
-/// Applied unless disabled through the `inferAnyValueType` query option:
+/// Applied only when enabled through the `inferAnyValueType` query option:
 /// - ANY_VALUE(column) -> ANY_VALUE(column, 'dataType')
 ///
 /// Applied only when enabled through the `autoRewriteAggregationType` query option:

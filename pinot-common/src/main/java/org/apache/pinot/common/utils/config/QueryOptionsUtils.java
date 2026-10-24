@@ -394,13 +394,9 @@ public class QueryOptionsUtils {
     return value == null || Boolean.parseBoolean(value);
   }
 
-  /// Returns whether ANY_VALUE(expr) is rewritten to take the data type of `expr`. Defaults to `true`.
+  /// Returns whether ANY_VALUE(expr) is rewritten to take the data type of `expr`. Defaults to `false`.
   public static boolean isInferAnyValueType(@Nullable Map<String, String> queryOptions) {
-    if (queryOptions == null) {
-      return true;
-    }
-    String value = queryOptions.get(QueryOptionKey.INFER_ANY_VALUE_TYPE);
-    return value == null || Boolean.parseBoolean(value);
+    return queryOptions != null && Boolean.parseBoolean(queryOptions.get(QueryOptionKey.INFER_ANY_VALUE_TYPE));
   }
 
   public static boolean isSkipUpsertView(Map<String, String> queryOptions) {
