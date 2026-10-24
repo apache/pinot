@@ -41,7 +41,16 @@ import org.apache.pinot.common.config.provider.NativeOfflineSegmentAction.Reques
 import org.apache.pinot.common.config.provider.NativeOfflineSegmentAction.Result;
 import org.apache.pinot.common.config.provider.RecoverableClusterConfigCache;
 import org.apache.pinot.common.coordination.NativeOfflineSegmentWorker;
+import org.apache.pinot.common.coordination.QueryDeadlineGuard;
+import org.apache.pinot.common.coordination.ServingPermitGuard;
+import org.apache.pinot.common.coordination.ServingPermitGuard.MembershipView;
+import org.apache.pinot.common.coordination.ServingPermitGuard.MonotonicClock;
+import org.apache.pinot.common.coordination.ServingPermitGuard.QualifiedLifetimePolicy;
+import org.apache.pinot.common.coordination.ServingPermitGuard.QueryTicket;
+import org.apache.pinot.common.coordination.ServingPermitGuard.ReadOnlyCapability;
+import org.apache.pinot.common.coordination.ServingPermitGuard.ServingDeniedException;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.request.context.NativeQueryContext;
 import org.apache.pinot.coordination.ratis.rpc.MetadataRpc;
 import org.apache.pinot.coordination.ratis.rpc.MetadataRpc.ResultStatus;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
@@ -56,8 +65,9 @@ import static java.util.Objects.requireNonNull;
 
 
 /// Owns a native SERVER registration, independent heartbeat lane, scoped metadata image and bounded installation
-/// workers. Durable operation discovery makes lost local wake-ups harmless. This runtime deliberately grants no
-/// query readiness: the normal query paths still require serving-permit and per-content admission integration.
+/// workers. Durable operation discovery makes lost local wake-ups harmless. Explicit clock qualification enables
+/// local serving-permit and absolute-deadline checks, but does not start query listeners: transport authentication,
+/// broker deadline propagation and delivery integration remain separate activation requirements.
 public final class NativeServerParticipant implements AutoCloseable {
   private static final Logger LOGGER = LoggerFactory.getLogger(NativeServerParticipant.class);
 
@@ -92,9 +102,39 @@ public final class NativeServerParticipant implements AutoCloseable {
     }
   }
 
+  /// Explicit deployment-qualified serving inputs. There are no clock or lifetime defaults. Supplying these inputs
+  /// opts into SERVER_QUERY grants; it does not qualify the platform or enable any network query resource.
+  public record ServingSettings(MonotonicClock clock, QualifiedLifetimePolicy lifetimePolicy,
+                                QueryDeadlineGuard queryDeadlines) {
+    public ServingSettings {
+      requireNonNull(clock, "clock");
+      requireNonNull(lifetimePolicy, "lifetimePolicy");
+      requireNonNull(queryDeadlines, "queryDeadlines");
+    }
+  }
+
+  /// One local query admission, bound to its immutable attempt identity and original finite serving ticket.
+  /// Callers must still authenticate the broker and pin exact segment handles. The original end-to-end deadline
+  /// is retained by the ticket and cannot be extended by a renewed serving permit.
+  public static final class QueryAdmission {
+    private final NativeQueryContext _context;
+    private final QueryTicket _ticket;
+
+    private QueryAdmission(NativeQueryContext context, QueryTicket ticket) {
+      _context = context;
+      _ticket = ticket;
+    }
+
+    public NativeQueryContext context() {
+      return _context;
+    }
+  }
+
   private final Settings _settings;
   private final Rpc _membership;
   private final Rpc _work;
+  @Nullable
+  private final ServingSettings _servingSettings;
   private final UUID _incarnation = UUID.randomUUID();
   private final NativeInstanceDataManager _manager = new NativeInstanceDataManager();
   private final RecoverableClusterConfigCache _clusterConfig = new RecoverableClusterConfigCache();
@@ -115,19 +155,28 @@ public final class NativeServerParticipant implements AutoCloseable {
   @Nullable
   private volatile InstallationOutbox _outbox;
   @Nullable
+  private volatile ServingPermitGuard _serving;
+  @Nullable
   private volatile String _failure;
   private volatile boolean _hydrated;
   private volatile boolean _membershipHealthy;
   private volatile boolean _fenced;
+  private volatile long _minimumServingRevision;
   private boolean _started;
   private long _nextRenewal = 1;
   @Nullable
   private MetadataRpc.MembershipCommandRequest _pendingRenewal;
 
   public NativeServerParticipant(Settings settings, Rpc membership, Rpc work) {
+    this(settings, membership, work, null);
+  }
+
+  public NativeServerParticipant(Settings settings, Rpc membership, Rpc work,
+      @Nullable ServingSettings servingSettings) {
     _settings = requireNonNull(settings, "settings");
     _membership = requireNonNull(membership, "membership");
     _work = requireNonNull(work, "work");
+    _servingSettings = servingSettings;
     checkArgument(membership != work, "Membership must have independent channel admission");
     _actions = new ThreadPoolExecutor(settings.actionThreads(), settings.actionThreads(), 0, TimeUnit.MILLISECONDS,
         new ArrayBlockingQueue<>(settings.queuedActions()), runnable -> new Thread(runnable, "native-server-action"));
@@ -143,7 +192,11 @@ public final class NativeServerParticipant implements AutoCloseable {
       _manager.initWithMetadata(instanceConfig, table -> metadata().provider(table), metrics, throttlers, jobs);
       require(_settings.participantId().equals(_manager.getInstanceId()), "Configured instance ID differs");
       register();
-      _metadata = new NativeServerMetadata(participant(), _clusterConfig);
+      _metadata = new NativeServerMetadata(participant(), _clusterConfig, allowedCapabilities());
+      if (_servingSettings != null) {
+        _serving = new ServingPermitGuard(participant(), allowedCapabilities(), _servingSettings.clock(),
+            _servingSettings.lifetimePolicy(), this::servingView);
+      }
       hydrate();
       MetadataRpc.MembershipCommandRequest ready = command().setReady(MetadataRpc.ParticipantReadiness.newBuilder()
           .setSession(session()).setAppliedRevision(metadata().revision()).setReady(true)).build();
@@ -152,6 +205,8 @@ public final class NativeServerParticipant implements AutoCloseable {
       require(response.getStatus() == ResultStatus.OK && response.hasParticipant()
           && response.getParticipant().getParticipant().equals(participant()) && response.getParticipant().getReady(),
           "Native readiness was not committed: " + response.getStatus());
+      // Publish readiness only from a coherent committed image, never by patching the bootstrap projection.
+      hydrate();
       _manager.start();
       InstallationOutbox outbox = _manager.openInstallationOutbox(participant(), _work, _settings.rpcTimeoutMillis());
       _outbox = outbox;
@@ -196,8 +251,10 @@ public final class NativeServerParticipant implements AutoCloseable {
         "Registration response does not match this process");
     // Remember confirmed authority before later startup checks so cleanup can retire this exact registration.
     _participant = token;
-    require(registered.getParticipant().getCapabilitiesCount() == 0,
-        "Native installation runtime must not be granted query-serving capabilities");
+    require(registered.getParticipant().getCapabilitiesCount() <= allowedCapabilities().size()
+        && registered.getParticipant().getCapabilitiesList().stream()
+        .allMatch(capability -> capability == MetadataRpc.ServingCapability.SERVER_QUERY
+            && _servingSettings != null), "Native runtime received unconfigured query-serving capabilities");
   }
 
   private void hydrate() throws Exception {
@@ -247,9 +304,23 @@ public final class NativeServerParticipant implements AutoCloseable {
         _pendingRenewal = command().setRenew(MetadataRpc.ParticipantRenewal.newBuilder().setSession(session())
             .setSequence(_nextRenewal).setAppliedRevision(metadata().revision())).build();
       }
+      if (_serving != null) {
+        // Retransmissions retain this logical sequence's first-send time, including after an unknown outcome.
+        _serving.firstSend(_nextRenewal);
+      }
       MetadataRpc.MembershipResponse response = _membership.membershipExecute(_pendingRenewal,
           _settings.rpcTimeoutMillis());
       validateMembership(response);
+      if (_serving != null) {
+        // Even a replayed old grant can carry newer control/policy state in its response. A known no-grant outcome
+        // may reflect drain or readiness changes. Require a coherent image through all newly observed information.
+        _admission.writeLock().lock();
+        try {
+          _minimumServingRevision = Math.max(_minimumServingRevision, response.getRevision().getIndex());
+        } finally {
+          _admission.writeLock().unlock();
+        }
+      }
       if (response.getStatus() == ResultStatus.FENCED || response.getStatus() == ResultStatus.HISTORY_MISMATCH) {
         fence("Native registration expired or history changed");
         return;
@@ -258,22 +329,39 @@ public final class NativeServerParticipant implements AutoCloseable {
         membership(false);
         return;
       }
-      require(response.getStatus() == ResultStatus.OK && response.getRenewalsCount() == 1,
-          "Renewal response is incomplete: " + response.getStatus());
+      if (response.getStatus() != ResultStatus.OK || response.getRenewalsCount() != 1) {
+        fence("Native renewal was rejected or incomplete: " + response.getStatus());
+        return;
+      }
       MetadataRpc.RenewalResult result = response.getRenewals(0);
-      require(result.getParticipant().equals(participant()) && result.getSequence() == _nextRenewal,
-          "Renewal response identity differs");
+      if (!result.getParticipant().equals(participant()) || result.getSequence() != _nextRenewal) {
+        fence("Native renewal response identity differs");
+        return;
+      }
       if (result.getStatus() == ResultStatus.FENCED || result.getStatus() == ResultStatus.HISTORY_MISMATCH) {
         fence("Native registration expired or was replaced");
         return;
       }
-      require(result.getStatus() == ResultStatus.OK || result.getStatus() == ResultStatus.NOT_READY,
-          "Unexpected durable renewal outcome: " + result.getStatus());
-      require(_nextRenewal < Long.MAX_VALUE, "Renewal sequence exhausted");
+      if (result.getStatus() != ResultStatus.OK && result.getStatus() != ResultStatus.NOT_READY
+          || result.getStatus() != ResultStatus.OK && result.hasPermit()) {
+        // A definite semantic rejection (including conflict after ACL narrowing) cannot become a grant on retry.
+        fence("Native renewal has an unusable durable outcome: " + result.getStatus());
+        return;
+      }
+      if (_serving != null && result.hasPermit()) {
+        _serving.accept(result.getPermit());
+      }
+      if (_nextRenewal == Long.MAX_VALUE) {
+        fence("Native renewal sequence exhausted");
+        return;
+      }
       _nextRenewal++;
       _pendingRenewal = null;
       membership(result.getStatus() == ResultStatus.OK);
-      // Serving permits are deliberately unused while query/content admission is not integrated.
+    } catch (ServingDeniedException e) {
+      // A lost clock qualification or invalid grant must not strand the renewal sequence in a retry loop or revive
+      // old tickets. This registration is terminal; a new process registration must re-establish qualification.
+      fence("Native serving authority failed: " + e.getMessage());
     } catch (Exception e) {
       membership(false);
       failed("membership renewal", e);
@@ -381,7 +469,63 @@ public final class NativeServerParticipant implements AutoCloseable {
   }
 
   public boolean isReadyForInstallations() {
-    return !_closed.get() && !_fenced && _hydrated && _membershipHealthy && _worker != null;
+    if (_closed.get() || _fenced || !_hydrated || !_membershipHealthy || _worker == null) {
+      return false;
+    }
+    try {
+      MembershipView view = metadata().membershipView();
+      return view.live() && view.ready() && !view.draining();
+    } catch (IllegalStateException e) {
+      return false;
+    }
+  }
+
+  /// Local admission only. The metadata predicate checks the current desired content; physical acquisition must
+  /// independently pin and compare installed identities before execution. No metadata RPC is performed here.
+  public QueryAdmission admitQuery(NativeQueryContext context) {
+    requireNonNull(context, "context");
+    checkState(context.version() == NativeQueryContext.DEADLINE_VERSION && context.deadline() != null,
+        "Native query admission requires an immutable end-to-end deadline");
+    _admission.readLock().lock();
+    try {
+      ServingPermitGuard guard = serving();
+      QueryTicket ticket = guard.admit(ReadOnlyCapability.SERVER_QUERY, context.deadline(),
+          requireNonNull(_servingSettings).queryDeadlines());
+      checkState(metadata().isCurrentQuery(context), "Native query identity differs from current metadata");
+      guard.checkDelivery(ticket);
+      return new QueryAdmission(context, ticket);
+    } finally {
+      _admission.readLock().unlock();
+    }
+  }
+
+  /// Check after resume and immediately before each result delivery. A held reader may finish after desired
+  /// content changes, but its original ticket, membership, capability and control fences still apply.
+  public void checkQueryDelivery(QueryAdmission admission) {
+    requireNonNull(admission, "admission");
+    _admission.readLock().lock();
+    try {
+      serving().checkDelivery(admission._ticket);
+    } finally {
+      _admission.readLock().unlock();
+    }
+  }
+
+  private ServingPermitGuard serving() {
+    checkState(_serving != null, "Native query serving requires explicit qualified clock inputs");
+    return _serving;
+  }
+
+  private MembershipView servingView() {
+    checkState(!_closed.get() && !_fenced && _hydrated, "Native serving metadata is unavailable");
+    MembershipView view = metadata().membershipView();
+    checkState(view.revision().getIndex() >= _minimumServingRevision,
+        "Native serving metadata has not applied the latest renewal outcome");
+    return view;
+  }
+
+  private Set<ReadOnlyCapability> allowedCapabilities() {
+    return _servingSettings == null ? Set.of() : Set.of(ReadOnlyCapability.SERVER_QUERY);
   }
 
   public NativeInstanceDataManager dataManager() {
@@ -417,6 +561,9 @@ public final class NativeServerParticipant implements AutoCloseable {
 
   private void validateMembership(MetadataRpc.MembershipResponse response) throws IOException {
     NativeOfflineSegmentWorker.validateMessage(response);
+    if (_participant != null && response.getStatus() == ResultStatus.HISTORY_MISMATCH) {
+      fence("Native registration history changed");
+    }
     require(response.hasRevision() && response.getRevision().getHistoryId().equals(_settings.historyId().toString())
         && response.getRevision().getIndex() >= 0, "Membership response history differs");
   }
@@ -438,7 +585,12 @@ public final class NativeServerParticipant implements AutoCloseable {
     } finally {
       _admission.writeLock().unlock();
     }
-    metadata().invalidate();
+    if (_serving != null) {
+      _serving.invalidate();
+    }
+    if (_metadata != null) {
+      _metadata.invalidate();
+    }
   }
 
   private void failed(String operation, Exception e) {
@@ -467,6 +619,9 @@ public final class NativeServerParticipant implements AutoCloseable {
       _membershipHealthy = false;
     } finally {
       _admission.writeLock().unlock();
+    }
+    if (_serving != null) {
+      _serving.invalidate();
     }
     _heartbeats.shutdownNow();
     _snapshots.shutdownNow();
