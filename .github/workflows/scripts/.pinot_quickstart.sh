@@ -319,6 +319,41 @@ if [ "${PASS}" -eq 0 ]; then
   exit 1
 fi
 
+# Test the packaged Parquet VARIANT quickstart entrypoint
+bin/quick-start-variant-batch.sh &
+PID=$!
+
+PASS=0
+
+# Wait at most 5 minutes for the sample segment and a nested VARIANT value to be queryable
+for i in $(seq 1 150)
+do
+  QUERY_RES=$(curl -sS -X POST --header 'Accept: application/json' \
+    -d "{\"sql\":\"SET enableNullHandling=true; SELECT COUNT(*) FROM variantEvents\",\"trace\":false}" \
+    http://localhost:8000/query/sql)
+  if [ $? -eq 0 ]; then
+    COUNT_STAR_RES=$(echo "${QUERY_RES}" | jq '.resultTable.rows[0][0]')
+    VARIANT_QUERY_RES=$(curl -sS -X POST --header 'Accept: application/json' \
+      -d "{\"sql\":\"SET enableNullHandling=true; SELECT variant_get(payload, '$.user.id', 'STRING') FROM variantEvents WHERE eventId = 'evt-001'\",\"trace\":false}" \
+      http://localhost:8000/query/sql)
+    if [ $? -eq 0 ]; then
+      USER_ID_RES=$(echo "${VARIANT_QUERY_RES}" | jq -r '.resultTable.rows[0][0] // empty')
+      if [[ "${COUNT_STAR_RES}" =~ ^[0-9]+$ ]] && [ "${COUNT_STAR_RES}" -eq 5 ] \
+          && [ "${USER_ID_RES}" = "u-1" ]; then
+        PASS=1
+        break
+      fi
+    fi
+  fi
+  sleep 2
+done
+
+cleanup "${PID}"
+if [ "${PASS}" -eq 0 ]; then
+  echo 'Parquet VARIANT quickstart failed: Cannot query the five sample rows and nested user ID.'
+  exit 1
+fi
+
 # Test quick-start-streaming
 bin/quick-start-streaming.sh &
 PID=$!
