@@ -79,9 +79,14 @@ import org.slf4j.LoggerFactory;
 
 /// Segment writer to ingest streaming data from a start offset to an end offset.
 ///
-/// An advancing empty batch cannot prove coverage of the replay range, even when it reports no data loss. Such an
-/// attempt fails immediately, including read_committed control-only tails; external retry or existing recovery may
-/// be required. This check does not certify historical completeness across delivered or filtered record gaps.
+/// Like `RealtimeSegmentDataManager`, the writer never moves its offset on a batch without unfiltered messages: it
+/// polls again from the same offset and lets the consumer keep its own progress. A Kafka consumer, for one, moves past
+/// transaction control records without returning anything, so such a batch can report a next offset ahead of the
+/// requested one, either because only commit/abort markers were skipped (routine on a transactional topic) or because
+/// the client reset after an out-of-range fetch. The gap from the retained offset to the first record of the next
+/// non-empty batch is validated by the consumer's data-loss check, so a batch reporting data loss fails the replay
+/// before anything from it is indexed. A range whose tail holds no records completes once a batch delivers a record
+/// at or after the end offset; the caller's consumption timeout bounds a stream that delivers nothing.
 ///
 /// TODO:
 ///   1. Clean up this class and only keep the necessary parts.
@@ -276,6 +281,12 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
 
           // Fetch messages
           MessageBatch messageBatch = _consumer.fetchMessages(_currentOffset, _fetchTimeoutMs);
+          Preconditions.checkState(!messageBatch.hasDataLoss(), "Stream data loss at offset %s while replaying to %s",
+              _currentOffset, _endOffset);
+          if (messageBatch.getUnfilteredMessageCount() == 0) {
+            // Keep the offset and poll again (see the class Javadoc): the next non-empty batch is validated against it.
+            continue;
+          }
 
           int messageCount = messageBatch.getMessageCount();
 
@@ -302,12 +313,7 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
             }
           }
 
-          StreamPartitionMsgOffset nextBatchOffset = messageBatch.getOffsetOfNextBatch();
-          if (messageBatch.getUnfilteredMessageCount() == 0 && nextBatchOffset.compareTo(_currentOffset) > 0) {
-            throw new IllegalStateException("Cannot verify empty stream offset advance from " + _currentOffset + " to "
-                + nextBatchOffset + " while replaying to " + _endOffset);
-          }
-          _currentOffset = nextBatchOffset;
+          _currentOffset = messageBatch.getOffsetOfNextBatch();
         }
         _isSuccess = true;
       } catch (Exception e) {

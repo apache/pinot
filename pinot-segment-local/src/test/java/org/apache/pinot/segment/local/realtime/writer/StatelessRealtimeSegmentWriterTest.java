@@ -115,59 +115,99 @@ public class StatelessRealtimeSegmentWriterTest {
     ServerMetrics.register(mock(ServerMetrics.class));
   }
 
+  /// A batch without unfiltered messages never moves the writer's offset, whatever next offset it reports: a Kafka
+  /// consumer reports its position past skipped transaction markers, which is routine on a transactional topic and
+  /// may land below, at or past the end offset. The writer polls again from the same offset and relies on the loss
+  /// check of the next non-empty batch, so every such replay completes with exactly the records below the end.
   @DataProvider
-  public Object[][] emptyAdvances() {
-    return new Object[][]{{110, false}, {120, false}, {150, false}, {110, true}, {120, true}, {150, true}};
+  public Object[][] validReplays() {
+    return new Object[][]{
+        {"records", List.of(records(0, 120)), 120, List.of(0L)},
+        {"nonmoving", List.of(records(0, 100), empty(100, 0, false), records(100, 120)), 120, List.of(0L, 100L, 100L)},
+        // Commit marker at 100: the empty poll moves the consumer to 101, the next one delivers 101..119
+        {"marker", List.of(records(0, 100), empty(101, 0, false), records(101, 120)), 119, List.of(0L, 100L, 100L)},
+        {"markerThenFiltered", List.of(records(0, 100), empty(101, 0, false), empty(106, 5, false), records(106, 120)),
+            114, List.of(0L, 100L, 100L, 106L)},
+        // Five fetched tombstones/filtered records legitimately advance the position without decoded rows
+        {"filtered", List.of(records(0, 100), empty(105, 5, false), records(105, 120)), 115, List.of(0L, 100L, 105L)},
+        // Markers fill the tail of the range: the empty advance stays below, reaches or crosses the end, and the next
+        // record lands at or after the end
+        {"markerTailBelowEnd", List.of(records(0, 100), empty(110, 0, false), records(120, 121)), 100,
+            List.of(0L, 100L, 100L)},
+        {"markerTailAtEnd", List.of(records(0, 100), empty(120, 0, false), records(120, 121)), 100,
+            List.of(0L, 100L, 100L)},
+        {"markerTailPastEnd", List.of(records(0, 100), empty(150, 0, false), records(150, 151)), 100,
+            List.of(0L, 100L, 100L)},
+        {"alreadyAtEnd", List.of(), 0, List.of()}
+    };
   }
 
-  @Test(dataProvider = "emptyAdvances")
-  public void testOpaqueEmptyAdvanceFailsReplay(int nextOffset, boolean hasDataLoss)
+  @Test(dataProvider = "validReplays")
+  public void testValidReplayCompletes(String kind, List<MessageBatch<byte[]>> batches, int expectedRows,
+      List<Long> expectedRequestedOffsets)
       throws Exception {
-    try (Replay replay = replay(120, List.of(records(0, 100), empty(nextOffset, 0, hasDataLoss), records(110, 120)))) {
+    try (Replay replay = replay("alreadyAtEnd".equals(kind) ? 0 : 120, batches)) {
       replay.writer().startConsumption();
       awaitDone(replay.writer());
-      assertTrue(indexedRows(replay.writer()) >= 100, "the failure must follow real nonempty row ingestion");
-      if (replay.writer().isSuccess()) {
-        // Prove the old incomplete rowset really builds, unlike the unrelated empty-segment builder failure.
+      assertNull(replay.writer().getConsumptionException(), kind);
+      assertTrue(replay.writer().isSuccess(), kind);
+      assertEquals(indexedRows(replay.writer()), expectedRows, kind);
+      assertEquals(replay.requestedOffsets(), expectedRequestedOffsets, kind);
+      verify(replay.consumer(), times(1)).close();
+      if (expectedRows > 0) {
         assertTrue(replay.writer().buildSegment().isFile());
       }
-      assertFalse(replay.writer().isSuccess(), "an opaque empty jump cannot complete bounded replay");
+    }
+  }
+
+  /// An empty batch that reports data loss (the consumer saw its position jump past deleted records) fails the replay
+  /// at once, wherever the reported next offset is, and the writer's offset stays where the loss was detected.
+  @DataProvider
+  public Object[][] emptyBatchesWithLoss() {
+    return new Object[][]{{100}, {110}, {120}, {150}};
+  }
+
+  @Test(dataProvider = "emptyBatchesWithLoss")
+  public void testEmptyBatchReportingLossFailsReplay(int nextOffset)
+      throws Exception {
+    try (Replay replay = replay(120, List.of(records(0, 100), empty(nextOffset, 0, true), records(110, 120)))) {
+      replay.writer().startConsumption();
+      awaitDone(replay.writer());
+      assertFalse(replay.writer().isSuccess());
       assertTrue(replay.writer().getConsumptionException() instanceof IllegalStateException);
-      assertTrue(replay.writer().getConsumptionException().getMessage().contains("empty stream"));
+      assertTrue(replay.writer().getConsumptionException().getMessage().contains("data loss"));
+      assertEquals(indexedRows(replay.writer()), 100);
       assertEquals(((LongMsgOffset) field(replay.writer(), "_currentOffset")).getOffset(), 100L);
       assertEquals(replay.requestedOffsets(), List.of(0L, 100L));
       verify(replay.consumer(), times(1)).close();
     }
   }
 
+  /// A non-empty batch that reports data loss is not indexed, including the case where an empty poll moved the
+  /// consumer first (the loss check of the data poll covers the gap from the retained offset).
   @DataProvider
-  public Object[][] validReplays() {
-    return new Object[][]{{"records", 120}, {"nonmoving", 120}, {"filtered", 115}, {"alreadyAtEnd", 0}};
+  public Object[][] lossAfterMarker() {
+    return new Object[][]{{false}, {true}};
   }
 
-  @Test(dataProvider = "validReplays")
-  public void testValidReplayStillCompletes(String kind, int expectedRows)
+  @Test(dataProvider = "lossAfterMarker")
+  public void testDataLossFailsBeforeIndexing(boolean afterMarker)
       throws Exception {
-    List<MessageBatch<byte[]>> batches = switch (kind) {
-      case "records" -> List.of(records(0, 120));
-      case "nonmoving" -> List.of(records(0, 100), empty(100, 0, false), records(100, 120));
-      // Five fetched tombstones/filtered records legitimately advance the position without decoded rows.
-      case "filtered" -> List.of(records(0, 100), empty(105, 5, false), records(105, 120));
-      case "alreadyAtEnd" -> List.of();
-      default -> throw new IllegalArgumentException(kind);
-    };
-    try (Replay replay = replay("alreadyAtEnd".equals(kind) ? 0 : 120, batches)) {
+    List<MessageBatch<byte[]>> batches = new ArrayList<>();
+    batches.add(records(0, 100));
+    if (afterMarker) {
+      batches.add(empty(101, 0, false));
+    }
+    batches.add(records(afterMarker ? 101 : 100, 120, true));
+    try (Replay replay = replay(120, batches)) {
       replay.writer().startConsumption();
       awaitDone(replay.writer());
-      assertTrue(replay.writer().isSuccess());
-      assertNull(replay.writer().getConsumptionException());
-      assertEquals(indexedRows(replay.writer()), expectedRows);
+      assertFalse(replay.writer().isSuccess());
+      assertEquals(indexedRows(replay.writer()), 100, "The loss batch must not be indexed");
+      assertTrue(replay.writer().getConsumptionException().getMessage().contains("data loss"));
+      assertEquals(((LongMsgOffset) field(replay.writer(), "_currentOffset")).getOffset(), 100L);
+      assertEquals(replay.requestedOffsets(), afterMarker ? List.of(0L, 100L, 100L) : List.of(0L, 100L));
       verify(replay.consumer(), times(1)).close();
-      if (expectedRows > 0) {
-        assertTrue(replay.writer().buildSegment().isFile());
-      } else {
-        assertTrue(replay.requestedOffsets().isEmpty());
-      }
     }
   }
 
@@ -226,6 +266,10 @@ public class StatelessRealtimeSegmentWriterTest {
   }
 
   private static MessageBatch<byte[]> records(int start, int end) {
+    return records(start, end, false);
+  }
+
+  private static MessageBatch<byte[]> records(int start, int end, boolean hasDataLoss) {
     List<StreamMessage<byte[]>> messages = new ArrayList<>();
     for (int offset = start; offset < end; offset++) {
       messages.add(new BytesStreamMessage(Integer.toString(offset).getBytes(StandardCharsets.UTF_8),
@@ -252,6 +296,11 @@ public class StatelessRealtimeSegmentWriterTest {
       public long getSizeInBytes() {
         return 0;
       }
+
+      @Override
+      public boolean hasDataLoss() {
+        return hasDataLoss;
+      }
     };
   }
 
@@ -265,6 +314,11 @@ public class StatelessRealtimeSegmentWriterTest {
       @Override
       public boolean hasDataLoss() {
         return hasDataLoss;
+      }
+
+      @Override
+      public StreamPartitionMsgOffset getFirstMessageOffset() {
+        return unfiltered > 0 ? new LongMsgOffset(nextOffset - unfiltered) : null;
       }
     };
   }
