@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -37,9 +38,12 @@ import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshManager;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexSearcherPool;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.upsert.ConcurrentMapPartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
+import org.apache.pinot.segment.local.upsert.RecordInfo;
 import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManagerFactory;
+import org.apache.pinot.segment.local.upsert.UpsertContext;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -751,6 +755,67 @@ public class IndexingFailureTest implements PinotBuffersAfterMethodCheckRule {
       upsertMetadataManager.stop();
       upsertMetadataManager.close();
       ServerMetrics.deregister();
+    }
+  }
+
+  /// The drop decision comes from an unlocked peek. If the key's segment goes away before the drop is recorded, the
+  /// dropped row must not claim the doc id it never wrote; the next row lands in that doc.
+  @Test
+  public void testDroppedOooUpsertDoesNotClaimUnwrittenDocWhenKeyIsRemoved()
+      throws Exception {
+    Schema schema = upsertSchema();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COL)
+        .build();
+    UpsertContext upsertContext = new UpsertContext.Builder().setTableConfig(tableConfig)
+        .setSchema(schema)
+        .setTableDataManager(mock(TableDataManager.class))
+        .setPrimaryKeyColumns(List.of(PK_COL))
+        .setComparisonColumns(List.of(TIME_COL))
+        .setDropOutOfOrderRecord(true)
+        .build();
+    AtomicReference<MutableSegmentImpl> removeOnNextPeek = new AtomicReference<>();
+    ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
+        new ConcurrentMapPartitionUpsertMetadataManager(TABLE_NAME + "_REALTIME", 0, upsertContext) {
+          @Override
+          public boolean isOutOfOrderRecord(RecordInfo recordInfo) {
+            boolean outOfOrder = super.isOutOfOrderRecord(recordInfo);
+            // Stands in for the Helix thread taking the key's segment offline right after the peek.
+            MutableSegmentImpl segmentToRemove = removeOnNextPeek.getAndSet(null);
+            if (segmentToRemove != null) {
+              removeSegment(segmentToRemove);
+            }
+            return outOfOrder;
+          }
+        };
+    MutableSegmentImpl oldSegment =
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, true, TIME_COL, upsertMetadataManager, null);
+    MutableSegmentImpl segment =
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, true, TIME_COL, upsertMetadataManager, null);
+    try {
+      oldSegment.index(upsertRow("A", "a5", 5L), METADATA);
+      assertTrue(oldSegment.getValidDocIds().getMutableRoaringBitmap().contains(0));
+
+      removeOnNextPeek.set(oldSegment);
+      segment.index(upsertRow("A", "a3", 3L), METADATA);
+      assertEquals(segment.getNumDocsIndexed(), 0);
+      assertTrue(segment.getValidDocIds().getMutableRoaringBitmap().isEmpty());
+
+      segment.index(upsertRow("B", "b7", 7L), METADATA);
+      segment.index(upsertRow("A", "a6", 6L), METADATA);
+      assertEquals(segment.getNumDocsIndexed(), 2);
+      assertEquals(segment.getValidDocIds().getMutableRoaringBitmap().toArray(), new int[]{0, 1});
+      GenericRow reuse = new GenericRow();
+      assertEquals(segment.getRecord(0, reuse).getValue(PK_COL), "B");
+      assertEquals(reuse.getValue(STRING_COL), "b7");
+      reuse.clear();
+      assertEquals(segment.getRecord(1, reuse).getValue(PK_COL), "A");
+      assertEquals(reuse.getValue(STRING_COL), "a6");
+    } finally {
+      segment.destroy();
+      oldSegment.destroy();
+      upsertMetadataManager.stop();
+      upsertMetadataManager.close();
     }
   }
 

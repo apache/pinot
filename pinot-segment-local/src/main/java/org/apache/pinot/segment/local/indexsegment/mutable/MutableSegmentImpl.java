@@ -709,8 +709,9 @@ public class MutableSegmentImpl implements MutableSegment {
           updatedRow.putValue(_upsertOutOfOrderRecordColumn, BooleanUtils.toInt(isOutOfOrderRecord));
         }
         if (isOutOfOrderRecord && _upsertDropOutOfOrderRecord) {
-          // addRecord on an OOO key only meters UPSERT_OUT_OF_ORDER; it does not move validDocIds.
-          _partitionUpsertMetadataManager.addRecord(this, recordInfo);
+          // Not addRecord(): the check above ran without the key's lock, and if the key's segment was removed since
+          // then, addRecord() would treat it as new and mark the unwritten doc `numDocsIndexed` valid.
+          _partitionUpsertMetadataManager.dropOutOfOrderRecord(this, recordInfo);
           updateIndexedAndIngestionTime(metadata);
           return canAddMore();
         }

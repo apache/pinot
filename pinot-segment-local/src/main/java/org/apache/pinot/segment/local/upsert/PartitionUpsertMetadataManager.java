@@ -81,6 +81,12 @@ public interface PartitionUpsertMetadataManager extends Closeable {
     return true;
   }
 
+  /// Called instead of [#addRecord] for a record the consuming segment drops, without writing it, because
+  /// [#isOutOfOrderRecord] returned true. Does the out-of-order bookkeeping only and never changes the key's location:
+  /// the key may have been removed since that check, and the record has no doc to point at.
+  default void dropOutOfOrderRecord(MutableSegment segment, RecordInfo recordInfo) {
+  }
+
   /// Updates the upsert metadata for a new consumed record in the given consuming segment.
   boolean addRecord(MutableSegment segment, RecordInfo recordInfo);
 
