@@ -160,8 +160,8 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
               if (!InetAddresses.isInetAddress(hostName)) {
                 httpHeaders.add(new BasicHeader(HttpHeaders.HOST, hostName + ":" + port));
               }
-              ret.set(_httpClient.downloadUntarFileStreamed(uri, dest, _authProvider, httpHeaders, maxStreamRateInByte,
-                  _connectionRequestTimeoutMs, _socketTimeoutMs));
+              ret.set(_httpClient.downloadUntarSegmentStreamed(uri, dest, _authProvider, httpHeaders,
+                  maxStreamRateInByte, _connectionRequestTimeoutMs, _socketTimeoutMs));
 
               return true;
             } catch (HttpErrorStatusException e) {
@@ -212,7 +212,7 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
     if (!InetAddresses.isInetAddress(hostName)) {
       httpHeaders.add(new BasicHeader(HttpHeaders.HOST, hostName + ":" + port));
     }
-    return _httpClient.downloadUntarFileStreamed(uri, dest, _authProvider, httpHeaders, maxStreamRateInByte,
+    return _httpClient.downloadUntarSegmentStreamed(uri, dest, _authProvider, httpHeaders, maxStreamRateInByte,
         _connectionRequestTimeoutMs, _socketTimeoutMs);
   }
 

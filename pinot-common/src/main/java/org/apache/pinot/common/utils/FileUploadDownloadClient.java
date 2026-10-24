@@ -1075,6 +1075,14 @@ public class FileUploadDownloadClient implements AutoCloseable {
         httpHeaders, maxStreamRateInByte);
   }
 
+  /// Downloads and un-tars a segment stream, synchronizing each extracted segment file before returning.
+  public File downloadUntarSegmentStreamed(URI uri, File dest, AuthProvider authProvider, List<Header> httpHeaders,
+      long maxStreamRateInByte, int connectionRequestTimeoutMs, int socketTimeoutMs)
+      throws IOException, HttpErrorStatusException {
+    return _httpClient.downloadUntarSegmentStreamed(uri, connectionRequestTimeoutMs, socketTimeoutMs, dest,
+        authProvider, httpHeaders, maxStreamRateInByte);
+  }
+
   /// Generate a param list with a table name attribute.
   ///
   /// @param tableName table name
