@@ -19,58 +19,52 @@
 package org.apache.pinot.coordination.ratis.transport;
 
 import com.google.protobuf.Message;
-import io.grpc.ManagedChannel;
-import io.grpc.Status;
-import io.grpc.netty.shaded.io.grpc.netty.GrpcSslContexts;
-import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import org.apache.pinot.common.coordination.MetadataRpcClient;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.CatalogRecord;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.ObjectVersion;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Result;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Revision;
+import org.apache.pinot.coordination.ratis.metadata.OfflineInstallationProtocol;
 import org.apache.pinot.coordination.ratis.rpc.MetadataRpc;
-import org.apache.pinot.coordination.ratis.rpc.MetadataServiceGrpc;
-import org.apache.pinot.coordination.ratis.rpc.ParticipantMembershipServiceGrpc;
 
 
-/// Bounded mutually authenticated metadata client. It never invents a new transaction identity or retries an unknown
-/// write outcome; callers resolve/retry the same client epoch, stream and sequence. Server hostname verification stays
-/// enabled and there is no authority override or trust-all path.
-public final class MetadataGrpcClient implements AutoCloseable {
-  private final ManagedChannel _channel;
-  private final MetadataServiceGrpc.MetadataServiceBlockingStub _stub;
-  private final ParticipantMembershipServiceGrpc.ParticipantMembershipServiceBlockingStub _membership;
-  private final long _timeoutMillis;
-
+/// Controller-side typed model adapters over the backend-independent [MetadataRpcClient]. Wire transport and channel
+/// ownership are shared with normal workers; strict domain decoding stays inside the Ratis metadata module.
+public final class MetadataGrpcClient extends MetadataRpcClient {
   public MetadataGrpcClient(String host, int port, Path certificateChain, Path privateKey, Path trustCertificates,
       long timeoutMillis)
       throws IOException {
-    if (timeoutMillis < 1 || timeoutMillis > 30_000) {
-      throw new IllegalArgumentException("Metadata RPC timeout must be between 1 and 30000 milliseconds");
+    super(host, port, certificateChain, privateKey, trustCertificates, timeoutMillis);
+  }
+
+  public static MetadataRpc.InstallationReport encodeInstallationReport(
+      OfflineInstallationProtocol.ReportInstallation report) {
+    return InstallationRpcCodec.report(report);
+  }
+
+  public static OfflineInstallationProtocol.WorkResult decodeInstallationWork(
+      MetadataRpc.InstallationWorkResult response)
+      throws IOException {
+    validateSize(response);
+    try {
+      return InstallationRpcCodec.work(response);
+    } catch (IllegalArgumentException e) {
+      throw new IOException("Invalid installation work response", e);
     }
-    _timeoutMillis = timeoutMillis;
-    _channel = NettyChannelBuilder.forAddress(host, port)
-        .sslContext(GrpcSslContexts.forClient().keyManager(certificateChain.toFile(), privateKey.toFile())
-            .trustManager(trustCertificates.toFile()).build()).maxInboundMessageSize(MetadataProtocol.MAX_CHANGE_BYTES)
-        .disableRetry().build();
-    _stub = MetadataServiceGrpc.newBlockingStub(_channel);
-    _membership = ParticipantMembershipServiceGrpc.newBlockingStub(_channel);
-  }
-
-  public MetadataRpc.MembershipResponse membershipExecute(MetadataRpc.MembershipCommandRequest request) {
-    checkMembershipRequest(request);
-    return _membership.withDeadlineAfter(_timeoutMillis, TimeUnit.MILLISECONDS).execute(request);
-  }
-
-  public MetadataRpc.MembershipResponse membershipRead(MetadataRpc.MembershipReadRequest request) {
-    checkMembershipRequest(request);
-    return _membership.withDeadlineAfter(_timeoutMillis, TimeUnit.MILLISECONDS).read(request);
   }
 
   public static MembershipProtocol.Response decodeMembershipResponse(MetadataRpc.MembershipResponse response)
       throws IOException {
-    if (response == null || response.getSerializedSize() > MembershipGrpcService.MAX_MESSAGE_BYTES) {
+    if (response == null || response.getSerializedSize() > MAX_MEMBERSHIP_BYTES) {
       throw new IOException("Membership response exceeds the transport byte limit");
     }
     try {
@@ -80,69 +74,38 @@ public final class MetadataGrpcClient implements AutoCloseable {
     }
   }
 
-  private static void checkMembershipRequest(Message request) {
-    if (request == null || request.getSerializedSize() > MembershipGrpcService.MAX_MESSAGE_BYTES) {
-      throw Status.RESOURCE_EXHAUSTED.withDescription("Membership request exceeds the transport byte limit")
-          .asRuntimeException();
+  /// Decodes a bounded typed result without changing its original committed revision or durable request outcome.
+  public static Result decodeResult(MetadataRpc.CommandResult response)
+      throws IOException {
+    validateSize(response);
+    try {
+      MetadataRpcCodec.rejectUnknown(response);
+      if (!response.hasRevision() || response.getRevision().getIndex() < 0
+          || response.getVersionsCount() > MetadataProtocol.MAX_MUTATIONS
+          || response.hasClientEpoch() && response.getClientEpoch() <= 0) {
+        throw new IllegalArgumentException("Invalid metadata result envelope");
+      }
+      MetadataProtocol.Status status = MetadataProtocol.Status.valueOf(response.getStatus().name());
+      UUID history = UUID.fromString(response.getRevision().getHistoryId());
+      List<ObjectVersion> versions = new ArrayList<>(response.getVersionsCount());
+      Set<UUID> objects = new HashSet<>();
+      for (MetadataRpc.ObjectVersion encoded : response.getVersionsList()) {
+        ObjectVersion version = OfflineSegmentRpcCodec.version(encoded);
+        if (!history.equals(version.historyId()) || !objects.add(version.objectId())) {
+          throw new IllegalArgumentException("Result version history or object identity differs");
+        }
+        versions.add(version);
+      }
+      CatalogRecord record = response.hasRecord() ? MetadataRpcCodec.record(response.getRecord()) : null;
+      if (status != MetadataProtocol.Status.OK && (response.hasClientEpoch() || !versions.isEmpty() || record != null)
+          || record != null && record.lastModifiedIndex() > response.getRevision().getIndex()) {
+        throw new IllegalArgumentException("Result payload differs from status or committed revision");
+      }
+      return new Result(status, new Revision(history, response.getRevision().getIndex()), response.getDetail(),
+          response.hasClientEpoch() ? response.getClientEpoch() : null, versions, record);
+    } catch (IllegalArgumentException e) {
+      throw new IOException("Invalid metadata result response", e);
     }
-  }
-
-  public MetadataRpc.CommandResult execute(MetadataRpc.CommandRequest request) {
-    return call(request, stub -> stub.execute(request));
-  }
-
-  public MetadataRpc.CommandResult read(MetadataRpc.ReadRequest request) {
-    return call(request, stub -> stub.read(request));
-  }
-
-  public MetadataRpc.OpenSnapshotResult openSnapshot(MetadataRpc.OpenSnapshotRequest request) {
-    return openSnapshot(request, _timeoutMillis);
-  }
-
-  public MetadataRpc.OpenSnapshotResult openSnapshot(MetadataRpc.OpenSnapshotRequest request, long timeoutMillis) {
-    return call(request, timeoutMillis, stub -> stub.openSnapshot(request));
-  }
-
-  public MetadataRpc.SnapshotPage page(MetadataRpc.SnapshotPageRequest request) {
-    return page(request, _timeoutMillis);
-  }
-
-  public MetadataRpc.SnapshotPage page(MetadataRpc.SnapshotPageRequest request, long timeoutMillis) {
-    return call(request, timeoutMillis, stub -> stub.getSnapshotPage(request));
-  }
-
-  public MetadataRpc.ChangePage changes(MetadataRpc.ChangesRequest request) {
-    return changes(request, _timeoutMillis);
-  }
-
-  public MetadataRpc.ChangePage changes(MetadataRpc.ChangesRequest request, long timeoutMillis) {
-    return call(request, timeoutMillis, stub -> stub.getChanges(request));
-  }
-
-  public void closeSnapshot(String handle) {
-    closeSnapshot(handle, _timeoutMillis);
-  }
-
-  public void closeSnapshot(String handle, long timeoutMillis) {
-    MetadataRpc.CloseSnapshotRequest request = MetadataRpc.CloseSnapshotRequest.newBuilder().setSnapshotHandle(handle)
-        .build();
-    call(request, timeoutMillis, stub -> stub.closeSnapshot(request));
-  }
-
-  private <T> T call(Message request, Function<MetadataServiceGrpc.MetadataServiceBlockingStub, T> operation) {
-    return call(request, _timeoutMillis, operation);
-  }
-
-  private <T> T call(Message request, long timeoutMillis,
-      Function<MetadataServiceGrpc.MetadataServiceBlockingStub, T> operation) {
-    if (request == null || request.getSerializedSize() > MetadataProtocol.MAX_COMMAND_BYTES) {
-      throw Status.RESOURCE_EXHAUSTED.withDescription("Metadata request exceeds transport byte limit")
-          .asRuntimeException();
-    }
-    if (timeoutMillis <= 0) {
-      throw Status.DEADLINE_EXCEEDED.withDescription("Metadata request deadline expired").asRuntimeException();
-    }
-    return operation.apply(_stub.withDeadlineAfter(Math.min(_timeoutMillis, timeoutMillis), TimeUnit.MILLISECONDS));
   }
 
   public static MetadataProtocol.CatalogRecord decodeRecord(MetadataRpc.CatalogRecord record)
@@ -177,18 +140,8 @@ public final class MetadataGrpcClient implements AutoCloseable {
 
   private static void validateSize(Message response)
       throws IOException {
-    if (response == null || response.getSerializedSize() > MetadataProtocol.MAX_CHANGE_BYTES) {
+    if (response == null || response.getSerializedSize() > MAX_RESPONSE_BYTES) {
       throw new IOException("Metadata response exceeds the transport byte limit");
-    }
-  }
-
-  @Override
-  public void close() {
-    _channel.shutdownNow();
-    try {
-      _channel.awaitTermination(5, TimeUnit.SECONDS);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
     }
   }
 }

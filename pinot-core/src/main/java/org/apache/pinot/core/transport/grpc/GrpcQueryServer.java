@@ -63,6 +63,8 @@ import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.server.access.GrpcRequesterIdentity;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
@@ -251,7 +253,9 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
     } catch (Exception e) {
       LOGGER.error("Caught exception while deserializing the request: {}", request, e);
       _serverMetrics.addMeteredGlobalValue(ServerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS, 1);
-      responseObserver.onError(Status.INVALID_ARGUMENT.withDescription("Bad request").withCause(e).asException());
+      String description = request.hasNativeQueryContext() && e instanceof QueryException
+          && ((QueryException) e).getErrorCode() == QueryErrorCode.QUERY_VALIDATION ? e.getMessage() : "Bad request";
+      responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(description).withCause(e).asException());
       return;
     }
 

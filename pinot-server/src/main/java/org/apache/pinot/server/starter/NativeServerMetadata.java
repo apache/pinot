@@ -1,0 +1,341 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.pinot.server.starter;
+
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import javax.annotation.Nullable;
+import org.apache.pinot.common.config.provider.NativeOfflineSegmentAction.Identity;
+import org.apache.pinot.common.config.provider.NativeOfflineSegmentAction.ObjectVersion;
+import org.apache.pinot.common.config.provider.NativeOfflineSegmentAction.Role;
+import org.apache.pinot.common.config.provider.RecoverableClusterConfigCache;
+import org.apache.pinot.common.config.provider.TableDataManagerMetadata;
+import org.apache.pinot.common.coordination.NativeOfflineSegmentWorker;
+import org.apache.pinot.common.metadata.segment.SegmentLoadMetadata;
+import org.apache.pinot.coordination.ratis.rpc.MetadataRpc;
+import org.apache.pinot.coordination.ratis.rpc.MetadataRpc.CatalogRecord;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+
+import static com.google.common.base.Preconditions.checkState;
+
+
+/// Complete own-session metadata images for an installation-only server. A provider remains bound to its table
+/// incarnation; loading inputs are detached from the image and do not grant publication or query-serving authority.
+public final class NativeServerMetadata {
+  private final MetadataRpc.ParticipantToken _server;
+  private final RecoverableClusterConfigCache _clusterConfig;
+  @Nullable
+  private MetadataRpc.InstallationSnapshot _lastSnapshot;
+  @Nullable
+  private volatile Image _image;
+
+  private record Image(MetadataRpc.Revision revision, Map<String, CatalogRecord> tables,
+                       Map<String, CatalogRecord> schemas, Map<String, CatalogRecord> contents,
+                       Map<String, CatalogRecord> assignments, List<UUID> operations) {
+  }
+
+  public NativeServerMetadata(MetadataRpc.ParticipantToken server, RecoverableClusterConfigCache clusterConfig)
+      throws IOException {
+    InstallationOutbox.validateServer(server);
+    _server = server;
+    _clusterConfig = clusterConfig;
+  }
+
+  /// Validates the whole image before publishing. Listener failure invalidates the usable image; callers must fence
+  /// readiness and retry hydration rather than advertise this revision or fall back to older metadata.
+  public synchronized void apply(MetadataRpc.InstallationSnapshot snapshot) throws IOException {
+    NativeOfflineSegmentWorker.validateMessage(snapshot);
+    require(snapshot.getStatus() == MetadataRpc.ResultStatus.OK && snapshot.hasRevision()
+        && snapshot.hasParticipant() && snapshot.hasControl(), "Incomplete server metadata snapshot");
+    MetadataRpc.Revision revision = snapshot.getRevision();
+    require(revision.getHistoryId().equals(_server.getHistoryId()) && revision.getIndex() > 0,
+        "Server metadata history or revision differs");
+    MetadataRpc.ParticipantState participant = snapshot.getParticipant();
+    require(participant.getParticipant().equals(_server) && !participant.getRetired() && !participant.getDraining()
+        && participant.getExpiryRound() > snapshot.getControl().getRound()
+        && participant.getLastModifiedIndex() > 0 && participant.getLastModifiedIndex() <= revision.getIndex()
+        && participant.getLastRenewalSequence() >= 0 && participant.hasAppliedRevision()
+        && participant.getAppliedRevision().getHistoryId().equals(_server.getHistoryId())
+        && participant.getAppliedRevision().getIndex() >= 0
+        && participant.getAppliedRevision().getIndex() <= revision.getIndex(), "Server registration is not current");
+    require(participant.getCapabilitiesCount() == 0,
+        "Installation-only metadata cannot enable query-serving capabilities");
+    require(snapshot.getControl().hasControlEpoch() && snapshot.getControl().hasPolicy()
+        && snapshot.getControl().getControlEpoch().getHistoryId().equals(_server.getHistoryId()),
+        "Server metadata lacks a current membership control epoch");
+    MetadataRpc.MembershipControl control = snapshot.getControl();
+    MetadataRpc.ControlToken epoch = control.getControlEpoch();
+    require(epoch.getRaftTerm() > 0 && epoch.getBarrierIndex() > 0 && epoch.getBarrierIndex() <= revision.getIndex()
+        && !epoch.getLeaderId().isBlank() && control.getRound() >= 0
+        && control.getClockBarrierIndex() >= epoch.getBarrierIndex()
+        && control.getClockBarrierIndex() <= revision.getIndex(), "Invalid membership control barriers");
+    uuid(epoch.getActivationId());
+    MetadataRpc.MembershipPolicy policy = control.getPolicy();
+    require(policy.getVersion() > 0 && policy.getMinTickIntervalMillis() > 0 && policy.getLeaseRounds() > 0
+        && policy.getPermitLifetimeMillis() > 0 && policy.getMaxQueryLifetimeMillis() > 0
+        && policy.getMaxRevisionLag() >= 0, "Invalid membership policy");
+    require(_lastSnapshot == null || revision.getIndex() > _lastSnapshot.getRevision().getIndex()
+        || snapshot.equals(_lastSnapshot), "Server metadata revision regressed or changed at the same index");
+    require(snapshot.getRecordsCount() + snapshot.getOperationIdsCount() <= 4096,
+        "Server metadata snapshot exceeds record bound");
+    Map<String, CatalogRecord> tables = new HashMap<>();
+    Map<String, CatalogRecord> schemas = new HashMap<>();
+    Map<String, CatalogRecord> configsById = new HashMap<>();
+    Map<String, CatalogRecord> contents = new HashMap<>();
+    Map<String, CatalogRecord> assignments = new HashMap<>();
+    Map<String, String> cluster = Map.of();
+    Set<String> identities = new HashSet<>();
+    boolean hasCluster = false;
+    for (CatalogRecord record : snapshot.getRecordsList()) {
+      require(record.getSchemaVersion() == 1 && record.getVersion() > 0 && !record.getName().isBlank()
+          && record.getLastModifiedIndex() > 0 && record.getLastModifiedIndex() <= revision.getIndex()
+          && identities.add(uuid(record.getObjectId()).toString()), "Invalid or repeated metadata record");
+      switch (record.getKind()) {
+        case CLUSTER_CONFIG -> {
+          require(!hasCluster && record.getName().equals("cluster"), "Invalid cluster configuration record");
+          hasCluster = true;
+          require(record.getDeleted() ? !record.hasValue() : record.getValue().hasClusterConfig(),
+              "Missing or inconsistent cluster configuration");
+          cluster = record.getDeleted() ? Map.of() : record.getValue().getClusterConfig().getPropertiesMap();
+        }
+        case TABLE_CONFIG -> {
+          if (!record.getDeleted()) {
+            NativeOfflineSegmentWorker.decodeTable(record);
+            require(tables.put(record.getName(), record) == null, "Repeated live table configuration");
+          } else {
+            require(!record.hasValue(), "Deleted table retains a value");
+          }
+          configsById.put(record.getObjectId(), record);
+        }
+        case SCHEMA -> {
+          if (!record.getDeleted()) {
+            NativeOfflineSegmentWorker.decodeSchema(record);
+            require(schemas.put(record.getName(), record) == null, "Repeated live schema");
+          } else {
+            require(!record.hasValue(), "Deleted schema retains a value");
+          }
+          configsById.put(record.getObjectId(), record);
+        }
+        case OFFLINE_SEGMENT_CONTENT -> {
+          require(!record.getDeleted() && record.getValue().hasOfflineSegmentContent(), "Missing immutable content");
+          MetadataRpc.OfflineSegmentContent content = record.getValue().getOfflineSegmentContent();
+          NativeOfflineSegmentWorker.validateContent(content);
+          require(record.getVersion() == 1 && content.getSegmentObjectId().equals(record.getObjectId()),
+              "Immutable content identity or version differs");
+          require(contents.put(content.getSegmentObjectId(), record) == null, "Repeated content");
+        }
+        case OFFLINE_REPLICA_ASSIGNMENT -> {
+          require(!record.getDeleted() && record.getValue().hasOfflineReplicaAssignment(), "Missing assignment");
+          MetadataRpc.OfflineReplicaAssignment assignment = record.getValue().getOfflineReplicaAssignment();
+          require(assignment.getServer().equals(_server), "Another server's assignment was exposed");
+          require(assignment.getAssignmentEpoch() > 0 && assignment.getAssignmentEpoch() == record.getVersion()
+              && assignment.hasCompatibility() && assignment.getCompatibility().hasTable()
+              && assignment.getCompatibility().hasSchema(), "Incomplete assignment");
+          uuid(assignment.getMaterializationId());
+          require(assignments.put(assignment.getSegmentObjectId(), record) == null, "Repeated assignment");
+        }
+        default -> throw new IOException("Unexpected record in server metadata projection: " + record.getKind());
+      }
+    }
+    for (CatalogRecord record : assignments.values()) {
+      MetadataRpc.OfflineReplicaAssignment assignment = record.getValue().getOfflineReplicaAssignment();
+      CatalogRecord contentRecord = contents.get(assignment.getSegmentObjectId());
+      require(contentRecord != null, "Assignment content is missing from snapshot");
+      MetadataRpc.OfflineSegmentContent content = contentRecord.getValue().getOfflineSegmentContent();
+      require(content.getTableName().equals(assignment.getTableName())
+          && content.getTableObjectId().equals(assignment.getTableObjectId())
+          && content.getSegmentName().equals(assignment.getSegmentName())
+          && content.getContentSha256().equals(assignment.getContentSha256()), "Assignment content differs");
+      MetadataRpc.MaterializationCompatibility compatibility = assignment.getCompatibility();
+      require(compatibility.getTable().getObjectId().equals(assignment.getTableObjectId()),
+          "Assignment table compatibility differs");
+      validateReference(configsById, compatibility.getTable(), MetadataRpc.RecordKind.TABLE_CONFIG,
+          assignment.getTableName());
+      validateReference(configsById, compatibility.getSchema(), MetadataRpc.RecordKind.SCHEMA,
+          TableNameBuilder.extractRawTableName(assignment.getTableName()));
+    }
+    Set<UUID> operations = new HashSet<>();
+    for (String operation : snapshot.getOperationIdsList()) {
+      require(operations.add(uuid(operation)), "Repeated operation discovery hint");
+    }
+    Image next = new Image(revision, Map.copyOf(tables), Map.copyOf(schemas), Map.copyOf(contents),
+        Map.copyOf(assignments), operations.stream().sorted().toList());
+    // Retain the validated high watermark even if a callback partially applies the update and then fails.
+    _lastSnapshot = snapshot;
+    _image = null;
+    _clusterConfig.updateClusterConfigs(cluster);
+    _image = next;
+  }
+
+  public List<UUID> operations() {
+    return image().operations();
+  }
+
+  public MetadataRpc.Revision revision() {
+    return image().revision();
+  }
+
+  public synchronized void invalidate() {
+    _image = null;
+  }
+
+  /// Intersects a captured work identity with this complete local image, without decoding values or doing I/O.
+  /// The participant must hold its admission read guard through publication to serialize invalidation with this check.
+  /// Operation hints establish continued discovery, while the separate fresh-work guard checks attempt and owner.
+  boolean isCurrent(Identity identity) {
+    Image current = _image;
+    if (current == null || !_server.getHistoryId().equals(identity.historyId().toString())
+        || identity.server().role() != Role.SERVER
+        || !_server.getParticipantId().equals(identity.server().participantId())
+        || !_server.getIncarnation().equals(identity.server().incarnation().toString())
+        || _server.getRegistrationEpoch() != identity.server().registrationEpoch()
+        || !current.operations().contains(identity.operation().operationId())
+        || !matches(current.tables().get(identity.tableName()), identity.table())
+        || !matches(current.schemas().get(identity.schemaName()), identity.schema())) {
+      return false;
+    }
+    String contentId = identity.content().objectId().toString();
+    CatalogRecord contentRecord = current.contents().get(contentId);
+    CatalogRecord assignmentRecord = current.assignments().get(contentId);
+    if (!matches(contentRecord, identity.content()) || !matches(assignmentRecord, identity.assignment())) {
+      return false;
+    }
+    MetadataRpc.OfflineSegmentContent content = contentRecord.getValue().getOfflineSegmentContent();
+    MetadataRpc.OfflineReplicaAssignment assignment = assignmentRecord.getValue().getOfflineReplicaAssignment();
+    MetadataRpc.MaterializationCompatibility compatibility = assignment.getCompatibility();
+    return content.getTableName().equals(identity.tableName())
+        && content.getTableObjectId().equals(identity.table().objectId().toString())
+        && content.getSegmentName().equals(identity.segmentName()) && content.getSegmentObjectId().equals(contentId)
+        && content.getContentSha256().equals(identity.contentSha256())
+        && assignment.getDesiredOnline() && assignment.getServer().equals(_server)
+        && assignment.getTableName().equals(identity.tableName())
+        && assignment.getTableObjectId().equals(identity.table().objectId().toString())
+        && assignment.getSegmentName().equals(identity.segmentName())
+        && assignment.getSegmentObjectId().equals(contentId)
+        && assignment.getContentSha256().equals(identity.contentSha256())
+        && assignment.getAssignmentEpoch() == identity.assignment().version()
+        && assignment.getMaterializationId().equals(identity.materializationId().toString())
+        && matches(compatibility.getTable(), identity.table(), identity.historyId())
+        && matches(compatibility.getSchema(), identity.schema(), identity.historyId());
+  }
+
+  private static boolean matches(@Nullable CatalogRecord record, ObjectVersion expected) {
+    return record != null && !record.getDeleted() && record.getObjectId().equals(expected.objectId().toString())
+        && record.getVersion() == expected.version();
+  }
+
+  private static boolean matches(MetadataRpc.ObjectVersion actual, ObjectVersion expected, UUID history) {
+    return actual.getHistoryId().equals(history.toString())
+        && actual.getObjectId().equals(expected.objectId().toString()) && actual.getVersion() == expected.version();
+  }
+
+  public TableDataManagerMetadata provider(String tableName) {
+    CatalogRecord captured = image().tables().get(tableName);
+    checkState(captured != null && !captured.getDeleted(), "Assigned table metadata is absent: %s", tableName);
+    String objectId = captured.getObjectId();
+    return new TableDataManagerMetadata() {
+      @Override
+      public TableSnapshot fetchTable(String requested) {
+        checkState(tableName.equals(requested), "Table provider identity differs");
+        return table(image(), tableName, objectId);
+      }
+
+      @Nullable
+      @Override
+      public SegmentSnapshot fetchSegment(String requested, String segmentName) {
+        checkState(tableName.equals(requested), "Table provider identity differs");
+        Image current = image();
+        TableSnapshot table = table(current, tableName, objectId);
+        for (CatalogRecord record : current.assignments().values()) {
+          MetadataRpc.OfflineReplicaAssignment assignment = record.getValue().getOfflineReplicaAssignment();
+          if (!assignment.getTableName().equals(tableName) || !assignment.getSegmentName().equals(segmentName)
+              || !assignment.getTableObjectId().equals(objectId) || !assignment.getDesiredOnline()) {
+            continue;
+          }
+          checkVersion(current.tables().get(tableName), assignment.getCompatibility().getTable());
+          checkVersion(current.schemas().get(table.schema().getSchemaName()),
+              assignment.getCompatibility().getSchema());
+          MetadataRpc.OfflineSegmentContent content = current.contents().get(assignment.getSegmentObjectId())
+              .getValue().getOfflineSegmentContent();
+          MetadataRpc.SegmentLoaderDescriptor loader = content.getLoader();
+          SegmentLoadMetadata segment = new SegmentLoadMetadata(segmentName, loader.getCrc(), loader.getDataCrc(),
+              loader.getUseDataCrc(), content.getDownloadUri(), loader.hasTier() ? loader.getTier() : null,
+              loader.hasCrypterName() ? loader.getCrypterName() : null, loader.getCreationTimeMs(),
+              loader.getPushTimeMs(), loader.getCustomConfigsMap(), true);
+          return new SegmentSnapshot(table.tableConfig(), table.schema(), segment);
+        }
+        return null;
+      }
+    };
+  }
+
+  private TableDataManagerMetadata.TableSnapshot table(Image image, String tableName, String objectId) {
+    CatalogRecord table = image.tables().get(tableName);
+    CatalogRecord schema = image.schemas().get(TableNameBuilder.extractRawTableName(tableName));
+    checkState(table != null && !table.getDeleted() && table.getObjectId().equals(objectId)
+        && schema != null && !schema.getDeleted(), "Table or schema was deleted or replaced");
+    try {
+      return new TableDataManagerMetadata.TableSnapshot(NativeOfflineSegmentWorker.decodeTable(table),
+          NativeOfflineSegmentWorker.decodeSchema(schema));
+    } catch (IOException e) {
+      throw new IllegalStateException("Invalid server metadata", e);
+    }
+  }
+
+  private void validateReference(Map<String, CatalogRecord> configs, MetadataRpc.ObjectVersion reference,
+      MetadataRpc.RecordKind kind, String name) throws IOException {
+    CatalogRecord record = configs.get(reference.getObjectId());
+    require(reference.getHistoryId().equals(_server.getHistoryId()) && reference.getVersion() > 0
+        && record != null && record.getKind() == kind && record.getName().equals(name)
+        && reference.getVersion() <= record.getVersion(), "Assignment configuration reference is absent or invalid");
+  }
+
+  private void checkVersion(CatalogRecord record, MetadataRpc.ObjectVersion expected) {
+    checkState(record != null && !record.getDeleted() && expected.getHistoryId().equals(_server.getHistoryId())
+        && expected.getObjectId().equals(record.getObjectId()) && expected.getVersion() == record.getVersion(),
+        "Assignment compatibility changed; controller reconciliation is required");
+  }
+
+  private Image image() {
+    Image image = _image;
+    checkState(image != null, "Server metadata is not hydrated");
+    return image;
+  }
+
+  private static UUID uuid(String value) throws IOException {
+    try {
+      UUID parsed = UUID.fromString(value);
+      require(parsed.toString().equals(value), "Noncanonical metadata UUID");
+      return parsed;
+    } catch (IllegalArgumentException e) {
+      throw new IOException("Invalid metadata UUID", e);
+    }
+  }
+
+  private static void require(boolean condition, String message) throws IOException {
+    if (!condition) {
+      throw new IOException(message);
+    }
+  }
+}

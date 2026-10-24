@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.request;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -29,6 +30,7 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.TableSegmentsInfo;
+import org.apache.pinot.common.request.context.NativeQueryContext;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.TableSegmentsContext;
@@ -36,6 +38,8 @@ import org.apache.pinot.core.query.request.context.TimerContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.query.utils.QueryIdUtils;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Query.Request;
@@ -64,6 +68,8 @@ public class ServerQueryRequest {
   private final List<TableSegmentsContext> _tableSegmentsContexts;
   private final QueryContext _queryContext;
   private final TableType _tableType;
+  @Nullable
+  private final NativeQueryContext _nativeQueryContext;
 
   // Request id might not be unique across brokers or for request hitting a hybrid table. To solve that we may construct
   // a unique query id from broker id, request id and table type.
@@ -88,13 +94,18 @@ public class ServerQueryRequest {
     _brokerId = instanceRequest.getBrokerId() != null ? instanceRequest.getBrokerId() : "unknown";
     _enableTrace = instanceRequest.isEnableTrace();
     _enableStreaming = enableStreaming;
-    _segmentsToQuery = instanceRequest.getSearchSegments();
-    _optionalSegments = instanceRequest.getOptionalSegments();
+    _nativeQueryContext = instanceRequest.isSetNativeQueryContext()
+        ? normalizeNativeContext(() -> NativeQueryContext.fromThrift(instanceRequest.getNativeQueryContext())) : null;
+    _segmentsToQuery = _nativeQueryContext != null
+        ? copyNativeSegments(instanceRequest.getSearchSegments()) : instanceRequest.getSearchSegments();
+    _optionalSegments = _nativeQueryContext != null && instanceRequest.getOptionalSegments() != null
+        ? copyNativeSegments(instanceRequest.getOptionalSegments()) : instanceRequest.getOptionalSegments();
     _queryContext = getQueryContext(instanceRequest.getQuery().getPinotQuery());
     _tableType = TableNameBuilder.getTableTypeFromTableName(_queryContext.getTableName());
     _queryId = QueryIdUtils.getQueryId(_brokerId, _requestId, _tableType);
     _queryHash = QueryOptionsUtils.getQueryHash(_queryContext.getQueryOptions());
     _timerContext = new TimerContext(_queryContext.getTableName(), serverMetrics, queryArrivalTimeMs);
+    validateNativeContext(instanceRequest.isSetTableSegmentsInfoList());
     if (instanceRequest.getTableSegmentsInfoListSize() > 0) {
       _tableSegmentsContexts = new ArrayList<>(instanceRequest.getTableSegmentsInfoListSize());
       for (TableSegmentsInfo tableSegmentsInfo : instanceRequest.getTableSegmentsInfoList()) {
@@ -123,8 +134,10 @@ public class ServerQueryRequest {
     _enableStreaming = Boolean.parseBoolean(metadata.get(Request.MetadataKeys.ENABLE_STREAMING));
 
     _segmentsToQuery = serverRequest.getSegmentsList();
-    // TODO: support optional segments for GrpcQueryServer
-    _optionalSegments = null;
+    _nativeQueryContext = serverRequest.hasNativeQueryContext()
+        ? normalizeNativeContext(() -> NativeQueryContext.fromProto(serverRequest.getNativeQueryContext())) : null;
+    // Preserve legacy gRPC behavior; the identity contract explicitly carries optional segments.
+    _optionalSegments = _nativeQueryContext != null ? serverRequest.getOptionalSegmentsList() : null;
 
     BrokerRequest brokerRequest;
     String payloadType = metadata.getOrDefault(Request.MetadataKeys.PAYLOAD_TYPE, Request.PayloadType.SQL);
@@ -142,6 +155,7 @@ public class ServerQueryRequest {
     _queryId = QueryIdUtils.getQueryId(_brokerId, _requestId, _tableType);
     _queryHash = QueryOptionsUtils.getQueryHash(_queryContext.getQueryOptions());
     _timerContext = new TimerContext(_queryContext.getTableName(), serverMetrics, queryArrivalTimeMs);
+    validateNativeContext(serverRequest.getTableSegmentsInfoCount() > 0);
     if (serverRequest.getTableSegmentsInfoCount() > 0) {
       _tableSegmentsContexts = new ArrayList<>(serverRequest.getTableSegmentsInfoCount());
       for (org.apache.pinot.common.proto.Server.TableSegmentsInfo tableSegmentsInfo
@@ -176,10 +190,39 @@ public class ServerQueryRequest {
 
     _timerContext = new TimerContext(_queryContext.getTableName(), serverMetrics, queryArrivalTimeMs);
     _tableSegmentsContexts = null;
+    _nativeQueryContext = null;
   }
 
   private static QueryContext getQueryContext(PinotQuery pinotQuery) {
     return QueryContextConverterUtils.getQueryContext(pinotQuery);
+  }
+
+  private static NativeQueryContext normalizeNativeContext(Supplier<NativeQueryContext> decoder) {
+    try {
+      return decoder.get();
+    } catch (RuntimeException e) {
+      throw new QueryException(QueryErrorCode.QUERY_VALIDATION, "Invalid native query identity: " + e.getMessage(), e);
+    }
+  }
+
+  private static List<String> copyNativeSegments(@Nullable List<String> names) {
+    try {
+      return names == null ? List.of() : List.copyOf(names);
+    } catch (RuntimeException e) {
+      throw new QueryException(QueryErrorCode.QUERY_VALIDATION, "Invalid native query segment names", e);
+    }
+  }
+
+  private void validateNativeContext(boolean logicalForm) {
+    if (_nativeQueryContext != null) {
+      try {
+        _nativeQueryContext.validateRequest(_queryContext.getTableName(), _brokerId, _segmentsToQuery,
+            _optionalSegments, logicalForm);
+      } catch (RuntimeException e) {
+        throw new QueryException(QueryErrorCode.QUERY_VALIDATION,
+            "Invalid native query identity: " + e.getMessage(), e);
+      }
+    }
   }
 
   public long getRequestId() {
@@ -192,6 +235,12 @@ public class ServerQueryRequest {
 
   public String getBrokerId() {
     return _brokerId;
+  }
+
+  /// Identity only; presence does not authorize native execution or response delivery.
+  @Nullable
+  public NativeQueryContext getNativeQueryContext() {
+    return _nativeQueryContext;
   }
 
   public boolean isEnableTrace() {

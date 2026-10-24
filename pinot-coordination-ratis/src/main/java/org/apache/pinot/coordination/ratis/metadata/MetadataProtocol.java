@@ -82,7 +82,7 @@ public final class MetadataProtocol {
 
   public enum RecordKind {
     CLUSTER_CONFIG, SCHEMA, TABLE_CONFIG, MEMBERSHIP_CONTROL, PARTICIPANT, OWNER_LAYOUT, OWNER_ASSIGNMENT,
-    CONTROLLER_OPERATION
+    CONTROLLER_OPERATION, OFFLINE_SEGMENT_CONTENT, OFFLINE_REPLICA_ASSIGNMENT, OFFLINE_INSTALLATION
   }
 
   public enum Action {
@@ -107,7 +107,9 @@ public final class MetadataProtocol {
   public record CatalogRecord(RecordKind kind, String name, UUID objectId, long version, int schemaVersion,
                               long lastModifiedIndex, boolean deleted, JsonNode value) {
     public CatalogRecord {
-      value = value == null ? null : value.deepCopy();
+      // Jackson restores an explicit JSON null as NullNode. Keep the same absent-value representation as live
+      // tombstones, including equality and transport encoding; a non-null tombstone payload still fails validation.
+      value = value == null || value.isNull() ? null : value.deepCopy();
     }
 
     @Override
@@ -234,16 +236,21 @@ public final class MetadataProtocol {
       @JsonSubTypes.Type(value = MembershipCommand.class, name = "MEMBERSHIP"),
       @JsonSubTypes.Type(value = OwnershipCommand.class, name = "OWNERSHIP"),
       @JsonSubTypes.Type(value = OperationCommand.class, name = "CONTROLLER_OPERATION"),
+      @JsonSubTypes.Type(value = NativeOperationCommand.class, name = "NATIVE_CONTROLLER_OPERATION"),
+      @JsonSubTypes.Type(value = OfflineSegmentCommand.class, name = "OFFLINE_SEGMENT"),
+      @JsonSubTypes.Type(value = NativeInstallationCommand.class, name = "NATIVE_INSTALLATION"),
+      @JsonSubTypes.Type(value = InstallationSessionCommand.class, name = "INSTALLATION_SESSION"),
       @JsonSubTypes.Type(value = ReadBarrier.class, name = "READ_BARRIER")})
   public sealed interface Command permits RegisterClient, RetireClient, SequencedCommand, Acknowledge,
-      MembershipCommand, ReadBarrier {
+      MembershipCommand, ReadBarrier, InstallationSessionCommand {
     UUID historyId();
 
     String clientId();
   }
 
   /// All effect-producing controller commands share the same durable request stream and retained outcome contract.
-  public sealed interface SequencedCommand extends Command permits Transaction, OwnershipCommand, OperationCommand {
+  public sealed interface SequencedCommand extends Command permits Transaction, OwnershipCommand, OperationCommand,
+      OfflineSegmentCommand, NativeOperationCommand, NativeInstallationCommand {
     long clientEpoch();
 
     String streamId();
@@ -257,6 +264,36 @@ public final class MetadataProtocol {
 
   public record OperationCommand(UUID historyId, String clientId, long clientEpoch, String streamId, long sequence,
                                  OperationProtocol.Operation request) implements SequencedCommand {
+  }
+
+  /// Native operation requests resolve authoritative content and assignment identities. The distinct command tag
+  /// preserves replay of earlier ledger-only requests without granting those requests participant execution rights.
+  public record NativeOperationCommand(UUID historyId, String clientId, long clientEpoch, String streamId,
+                                       long sequence, OperationProtocol.Operation request) implements SequencedCommand {
+  }
+
+  public record OfflineSegmentCommand(UUID historyId, String clientId, long clientEpoch, String streamId, long sequence,
+                                      OfflineSegmentProtocol.Operation request) implements SequencedCommand {
+  }
+
+  public record NativeInstallationCommand(UUID historyId, String clientId, long clientEpoch, String streamId,
+                                          long sequence, OfflineInstallationProtocol.ReportInstallation request)
+      implements SequencedCommand {
+  }
+
+  /// The catalog validates the participant session atomically with registration, acknowledgement or reporting.
+  /// Only these three inner commands are permitted; this envelope never grants generic controller access.
+  public record InstallationSessionCommand(MembershipProtocol.ParticipantToken server, Command request)
+      implements Command {
+    @Override
+    public UUID historyId() {
+      return request == null ? null : request.historyId();
+    }
+
+    @Override
+    public String clientId() {
+      return request == null ? null : request.clientId();
+    }
   }
 
   /// Internal committed control-plane read. It carries no mutation or durable client request identity; each new
@@ -304,8 +341,11 @@ public final class MetadataProtocol {
   @JsonSubTypes({@JsonSubTypes.Type(value = GetRecord.class, name = "GET_RECORD"),
       @JsonSubTypes.Type(value = GetOutcome.class, name = "GET_OUTCOME"),
       @JsonSubTypes.Type(value = GetRevision.class, name = "GET_REVISION"),
+      @JsonSubTypes.Type(value = InstallationSessionQuery.class, name = "INSTALLATION_SESSION"),
+      @JsonSubTypes.Type(value = GetInstallationWork.class, name = "GET_INSTALLATION_WORK"),
       @JsonSubTypes.Type(value = MembershipQuery.class, name = "MEMBERSHIP")})
-  public sealed interface Query permits GetRecord, GetOutcome, GetRevision, MembershipQuery {
+  public sealed interface Query permits GetRecord, GetOutcome, GetRevision, MembershipQuery, InstallationSessionQuery,
+      GetInstallationWork {
     UUID historyId();
   }
 
@@ -321,6 +361,19 @@ public final class MetadataProtocol {
 
   /// Lookup authority must be checked by the transport; possession of the identity is not an authorization grant.
   public record GetOutcome(UUID historyId, String clientId, long clientEpoch, String streamId, long sequence)
+      implements Query {
+  }
+
+  public record InstallationSessionQuery(MembershipProtocol.ParticipantToken server, GetOutcome request)
+      implements Query {
+    @Override
+    public UUID historyId() {
+      return request == null ? null : request.historyId();
+    }
+  }
+
+  /// One coherent, authorized target capture. It neither lists other work nor exposes another server's target.
+  public record GetInstallationWork(UUID historyId, MembershipProtocol.ParticipantToken server, UUID operationId)
       implements Query {
   }
 

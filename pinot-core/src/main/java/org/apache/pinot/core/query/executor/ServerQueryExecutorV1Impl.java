@@ -261,7 +261,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       } else {
         executionInfo =
             SingleTableExecutionInfo.create(_instanceDataManager, tableNameWithType, queryRequest.getSegmentsToQuery(),
-                queryRequest.getOptionalSegments(), queryContext);
+                queryRequest.getOptionalSegments(), queryContext, queryRequest.getNativeQueryContext());
       }
     } catch (TableNotFoundException exception) {
       String errorMessage =
@@ -269,6 +269,11 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       InstanceResponseBlock instanceResponse = new InstanceResponseBlock();
       instanceResponse.addException(QueryErrorCode.SERVER_TABLE_MISSING, errorMessage);
       LOGGER.error("{} while processing requestId: {}", errorMessage, requestId);
+      return instanceResponse;
+    } catch (QueryException exception) {
+      InstanceResponseBlock instanceResponse = new InstanceResponseBlock();
+      instanceResponse.addException(exception.getErrorCode(), exception.getMessage());
+      LOGGER.info("Rejected content acquisition for requestId: {}, {}", requestId, exception.getMessage());
       return instanceResponse;
     }
 

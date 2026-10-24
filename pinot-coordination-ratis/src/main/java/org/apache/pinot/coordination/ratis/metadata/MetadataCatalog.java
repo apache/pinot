@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.ParticipantToken;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Acknowledge;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Action;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.CatalogImage;
@@ -42,13 +43,19 @@ import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.ChangeTrans
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Command;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.FeedCursor;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.FeedScope;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.GetInstallationWork;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.GetOutcome;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.GetRecord;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.GetRevision;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.InstallationSessionCommand;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.InstallationSessionQuery;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.MembershipCommand;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.MembershipQuery;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Mutation;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.NativeInstallationCommand;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.NativeOperationCommand;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.ObjectVersion;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.OfflineSegmentCommand;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.OperationCommand;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.OwnershipCommand;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Query;
@@ -62,6 +69,12 @@ import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Revision;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.SequencedCommand;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Status;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Transaction;
+import org.apache.pinot.coordination.ratis.metadata.OfflineInstallationProtocol.InstallationSnapshot;
+import org.apache.pinot.coordination.ratis.metadata.OfflineInstallationProtocol.WorkResult;
+import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.Assignment;
+import org.apache.pinot.coordination.ratis.metadata.OperationProtocol.AssignedOfflineSegmentReload;
+import org.apache.pinot.coordination.ratis.metadata.OperationProtocol.OperationState;
+import org.apache.pinot.coordination.ratis.metadata.OperationProtocol.State;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
@@ -72,7 +85,8 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 /// Deterministic, synchronized metadata state owned by a single Ratis state machine. Catalog records and retry
 /// outcomes commit together. Only affected records are staged; readers and snapshot capture share the same lock.
 /// A query is coherent but becomes linearizable only when the caller supplies the required consensus read barrier.
-/// Authentication, domain ownership and complete table lifecycle operations are not implemented by this internal layer.
+/// Transports authenticate callers; owner-dependent commands validate committed authority here. Full table lifecycle
+/// and participant execution remain separate integrations.
 /// Tombstones and client epoch fences are intentionally retained without unsafe GC.
 public final class MetadataCatalog {
   private static final int MAX_IDENTIFIER_LENGTH = 1024;
@@ -134,6 +148,9 @@ public final class MetadataCatalog {
       result = switch (command) {
         case RegisterClient registration -> register(registration, committedIndex);
         case RetireClient retirement -> retire(retirement, committedIndex);
+        case InstallationSessionCommand session -> executeInstallationSession(session, actualRaftTerm, committedIndex);
+        case NativeInstallationCommand ignored -> throw new Rejection(Status.INVALID_REQUEST,
+            "Installation reports require an authenticated session envelope");
         case SequencedCommand sequenced -> transact(sequenced, actualRaftTerm, committedIndex);
         case Acknowledge acknowledgement -> acknowledge(acknowledgement, committedIndex);
         case MembershipCommand ignored -> throw new IllegalStateException("Membership dispatch failed");
@@ -141,6 +158,8 @@ public final class MetadataCatalog {
       };
     } catch (Rejection e) {
       result = result(e._status, e.getMessage(), committedIndex);
+    } catch (CoordinationRejection e) {
+      result = result(e.status(), e.getMessage(), committedIndex);
     }
     List<CatalogRecord> changes = List.of();
     if (result.status() == Status.OK && result.revision().index() == committedIndex && !result.versions().isEmpty()) {
@@ -149,6 +168,25 @@ public final class MetadataCatalog {
     appendJournal(new ChangeTransaction(_lastAppliedIndex, committedIndex, changes));
     _lastAppliedIndex = committedIndex;
     return encode(result);
+  }
+
+  private Result executeInstallationSession(InstallationSessionCommand session, long term, long index)
+      throws IOException {
+    OfflineInstallationCatalog.validateSession(session.server(), coordinationView());
+    require(session.request() != null
+        && OfflineInstallationProtocol.clientId(session.server()).equals(session.request().clientId()),
+        Status.FENCED, "Installation request belongs to another participant session");
+    return switch (session.request()) {
+      case RegisterClient registration -> register(registration, index);
+      case Acknowledge acknowledgement -> acknowledge(acknowledgement, index);
+      case NativeInstallationCommand installation -> {
+        require(installation.request() != null && installation.request().installed() != null
+            && session.server().equals(installation.request().installed().server()), Status.FENCED,
+            "Installation report belongs to another participant session");
+        yield transact(installation, term, index);
+      }
+      default -> throw new Rejection(Status.INVALID_REQUEST, "Unsupported participant installation command");
+    };
   }
 
   /// Returns one record or a retained outcome. General listing and subscription are deliberately a separate,
@@ -178,24 +216,166 @@ public final class MetadataCatalog {
         return encodeMembership(_membership.error(Status.RESPONSE_TOO_LARGE, e.getMessage(), readIndex));
       }
     }
+    if (query instanceof GetInstallationWork work) {
+      return installationWork(work, readIndex);
+    }
     try {
       require(_historyId.equals(query.historyId()), Status.HISTORY_MISMATCH, "Metadata history differs");
       return encode(switch (query) {
         case GetRecord read -> readRecord(read, readIndex);
         case GetOutcome lookup -> readOutcome(lookup);
         case GetRevision ignored -> result(Status.OK, "", readIndex);
+        case InstallationSessionQuery session -> {
+          OfflineInstallationCatalog.validateSession(session.server(), coordinationView());
+          require(session.request() != null
+              && OfflineInstallationProtocol.clientId(session.server()).equals(session.request().clientId()),
+              Status.FENCED, "Installation outcome belongs to another participant session");
+          yield readOutcome(session.request());
+        }
+        case GetInstallationWork ignored -> throw new IllegalStateException("Installation work dispatch failed");
         case MembershipQuery ignored -> throw new IllegalStateException("Membership dispatch failed");
       });
     } catch (Rejection e) {
       return encode(result(e._status, e.getMessage(), readIndex));
+    } catch (CoordinationRejection e) {
+      return encode(result(e.status(), e.getMessage(), readIndex));
     } catch (ResponseTooLargeException e) {
       return encode(result(Status.RESPONSE_TOO_LARGE, e.getMessage(), readIndex));
     }
   }
 
+  private byte[] installationWork(GetInstallationWork query, long index)
+      throws IOException {
+    WorkResult result;
+    try {
+      require(_historyId.equals(query.historyId()), Status.HISTORY_MISMATCH, "Metadata history differs");
+      result = new WorkResult(Status.OK, revision(index), "",
+          OfflineInstallationCatalog.work(query.operationId(), query.server(), coordinationView()));
+    } catch (Rejection e) {
+      result = new WorkResult(e._status, revision(index), e.getMessage(), null);
+    } catch (CoordinationRejection e) {
+      result = new WorkResult(e.status(), revision(index), e.getMessage(), null);
+    }
+    byte[] encoded = MetadataProtocol.encodeValue(result);
+    return encoded.length <= MAX_RESULT_BYTES
+        ? encoded
+        : MetadataProtocol.encodeValue(new WorkResult(Status.RESPONSE_TOO_LARGE, revision(index),
+            "Installation work exceeds the supported size", null));
+  }
+
   /// Returns immutable committed control state for the local leader clock. This is not a linearizable remote read.
   public synchronized MembershipProtocol.ControlState membershipControl() {
     return _membership.control();
+  }
+
+  /// Captures one complete own-session projection after the caller's consensus read barrier. Readiness is not
+  /// required for bootstrap. The revision describes this whole projection, not arbitrary operation lookup progress.
+  /// Fixed bounds deliberately reject a large image; pagination must not be simulated by dropping records here.
+  public synchronized InstallationSnapshot installationSnapshot(ParticipantToken server, int maxRecords, int maxBytes)
+      throws IOException {
+    try {
+      require(maxRecords > 0 && maxRecords <= OfflineInstallationProtocol.MAX_SNAPSHOT_RECORDS
+          && maxBytes >= OfflineInstallationProtocol.MIN_SNAPSHOT_BYTES
+          && maxBytes <= OfflineInstallationProtocol.MAX_SNAPSHOT_BYTES, Status.INVALID_REQUEST,
+          "Invalid installation snapshot bounds");
+      OperationCatalog.View view = coordinationView();
+      OfflineInstallationCatalog.validateProjectionSession(server, view);
+      InstallationSnapshot header = new InstallationSnapshot(Status.OK, revision(_lastAppliedIndex), "",
+          view.participant(server.participantId()), List.of(), List.of(), view.control());
+      InstallationProjection projection = new InstallationProjection(header, maxRecords, maxBytes);
+      for (UUID objectId : _names.values()) {
+        CatalogRecord record = _records.get(objectId);
+        if (record.kind() == RecordKind.CLUSTER_CONFIG) {
+          projection.add(record);
+        } else if (record.kind() == RecordKind.OFFLINE_REPLICA_ASSIGNMENT) {
+          Assignment assignment = OfflineSegmentProtocol.decodeAssignment(record.value());
+          if (assignment.server().equals(server)) {
+            projection.add(record);
+            projection.addReferenced(assignment.segmentObjectId(), RecordKind.OFFLINE_SEGMENT_CONTENT);
+            projection.addReferenced(assignment.compatibility().table().objectId(), RecordKind.TABLE_CONFIG);
+            projection.addReferenced(assignment.compatibility().schema().objectId(), RecordKind.SCHEMA);
+          }
+        } else if (record.kind() == RecordKind.CONTROLLER_OPERATION) {
+          OperationState operation = OperationProtocol.decodeOperation(record.value());
+          if ((operation.status() == State.ACCEPTED || operation.status() == State.RUNNING)
+              && operation.input() instanceof AssignedOfflineSegmentReload assigned
+              && assigned.reload().targets().stream().anyMatch(target -> target.server().equals(server))) {
+            projection.addOperation(operation.operationId());
+          }
+        }
+      }
+      return projection.result();
+    } catch (Rejection e) {
+      return installationSnapshotError(e._status, e.getMessage());
+    } catch (CoordinationRejection e) {
+      return installationSnapshotError(e.status(), e.getMessage());
+    }
+  }
+
+  private InstallationSnapshot installationSnapshotError(Status status, String detail) {
+    return new InstallationSnapshot(status, revision(_lastAppliedIndex), detail, null, List.of(), List.of(), null);
+  }
+
+  /// Uses maintained canonical record sizes; capturing an image never serializes large configuration values under
+  /// the apply lock. The transport checks its own encoding against the same budget before emitting any response.
+  private final class InstallationProjection {
+    private final InstallationSnapshot _header;
+    private final int _maxRecords;
+    private final int _maxBytes;
+    private final Map<UUID, CatalogRecord> _selected = new HashMap<>();
+    private final List<UUID> _operations = new ArrayList<>();
+    private long _bytes;
+
+    private InstallationProjection(InstallationSnapshot header, int maxRecords, int maxBytes)
+        throws IOException {
+      _header = header;
+      _maxRecords = maxRecords;
+      _maxBytes = maxBytes;
+      _bytes = MetadataProtocol.encodeValue(header).length;
+      checkBounds();
+    }
+
+    private void add(CatalogRecord record) {
+      if (_selected.containsKey(record.objectId())) {
+        return;
+      }
+      _bytes += _recordBytes.get(record.objectId()) + (_selected.isEmpty() ? 0 : 1);
+      require(_selected.size() + _operations.size() < _maxRecords, Status.RESPONSE_TOO_LARGE,
+          "Installation snapshot exceeds its record bound");
+      checkBounds();
+      _selected.put(record.objectId(), record);
+    }
+
+    private void addReferenced(UUID objectId, RecordKind kind) {
+      CatalogRecord record = _records.get(objectId);
+      require(record != null && record.kind() == kind
+          && (!record.deleted() || kind == RecordKind.TABLE_CONFIG || kind == RecordKind.SCHEMA), Status.NOT_READY,
+          "Installation assignment references unavailable current metadata");
+      // Retained assignments may outlive their table/schema. Deliver the exact tombstone so consumers can fence
+      // that target without losing unrelated metadata or borrowing a recreated name's new object incarnation.
+      add(record);
+    }
+
+    private void addOperation(UUID operationId) {
+      _bytes += 38 + (_operations.isEmpty() ? 0 : 1);
+      require(_selected.size() + _operations.size() < _maxRecords, Status.RESPONSE_TOO_LARGE,
+          "Installation snapshot exceeds its record bound");
+      checkBounds();
+      _operations.add(operationId);
+    }
+
+    private void checkBounds() {
+      require(_bytes <= _maxBytes, Status.RESPONSE_TOO_LARGE, "Installation snapshot exceeds its byte bound");
+    }
+
+    private InstallationSnapshot result() {
+      List<CatalogRecord> records = new ArrayList<>(_selected.values());
+      records.sort(Comparator.comparing(CatalogRecord::kind).thenComparing(CatalogRecord::name)
+          .thenComparing(CatalogRecord::objectId));
+      _operations.sort(Comparator.naturalOrder());
+      return new InstallationSnapshot(Status.OK, _header.revision(), "", _header.participant(), records, _operations,
+          _header.control());
+    }
   }
 
   private OperationCatalog.View coordinationView() {
@@ -522,8 +702,9 @@ public final class MetadataCatalog {
       Map<UUID, Integer> recordBytes = new HashMap<>();
       Map<RecordKey, UUID> names = new HashMap<>();
       for (CatalogRecord record : restored.records()) {
-        require(detached.path("formatVersion").asInt() >= minimumSnapshotFormat(record),
-            Status.INVALID_REQUEST, "Legacy snapshot contains records from a newer protocol format");
+        require(record != null && record.kind() != null
+            && detached.path("formatVersion").asInt() >= minimumSnapshotFormat(record),
+            Status.INVALID_REQUEST, "Snapshot contains a record family newer than its format");
         validateRecord(record, restored.lastAppliedIndex());
         require(records.putIfAbsent(record.objectId(), record) == null, Status.INVALID_REQUEST,
             "Duplicate object ID in snapshot");
@@ -588,6 +769,11 @@ public final class MetadataCatalog {
       OwnershipCatalog.validateReferences(record, view);
     } else if (record.kind() == RecordKind.CONTROLLER_OPERATION) {
       OperationCatalog.validateReferences(record, view);
+    } else if (record.kind() == RecordKind.OFFLINE_INSTALLATION) {
+      OfflineInstallationCatalog.validateReferences(record, view);
+    } else if (record.kind() == RecordKind.OFFLINE_SEGMENT_CONTENT
+        || record.kind() == RecordKind.OFFLINE_REPLICA_ASSIGNMENT) {
+      OfflineSegmentCatalog.validateReferences(record, view);
     }
   }
 
@@ -683,6 +869,12 @@ public final class MetadataCatalog {
             OwnershipCatalog.stage(ownership.request(), coordinationView(), actualTerm, index));
         case OperationCommand operation -> staged.addAll(
             OperationCatalog.stage(operation.request(), coordinationView(), index));
+        case NativeOperationCommand operation -> staged.addAll(
+            OperationCatalog.stageNative(operation.request(), coordinationView(), index));
+        case OfflineSegmentCommand segment -> staged.addAll(
+            OfflineSegmentCatalog.stage(segment.request(), coordinationView(), index));
+        case NativeInstallationCommand installation -> staged.addAll(
+            OfflineInstallationCatalog.stage(installation.request(), coordinationView(), index));
       }
       require(staged.size() <= MetadataProtocol.MAX_MUTATIONS, Status.LIMIT_EXCEEDED,
           "Controller transaction exceeds the supported record count");
@@ -869,6 +1061,14 @@ public final class MetadataCatalog {
       OperationCatalog.validateRecord(record, _historyId, snapshotIndex);
       return;
     }
+    if (record.kind() == RecordKind.OFFLINE_INSTALLATION) {
+      OfflineInstallationCatalog.validateRecord(record, _historyId, snapshotIndex);
+      return;
+    }
+    if (record.kind() == RecordKind.OFFLINE_SEGMENT_CONTENT || record.kind() == RecordKind.OFFLINE_REPLICA_ASSIGNMENT) {
+      OfflineSegmentCatalog.validateRecord(record, _historyId, snapshotIndex);
+      return;
+    }
     if (record.kind() == RecordKind.MEMBERSHIP_CONTROL || record.kind() == RecordKind.PARTICIPANT) {
       require(!record.deleted(), Status.INVALID_REQUEST, "Membership identity records cannot be tombstones");
       require(record.value() != null && record.value().isObject(), Status.INVALID_REQUEST,
@@ -889,7 +1089,23 @@ public final class MetadataCatalog {
     return switch (record.kind()) {
       case CLUSTER_CONFIG, SCHEMA, TABLE_CONFIG -> 1;
       case MEMBERSHIP_CONTROL, PARTICIPANT -> 8;
-      case OWNER_LAYOUT, OWNER_ASSIGNMENT, CONTROLLER_OPERATION -> 4;
+      case OWNER_LAYOUT, OWNER_ASSIGNMENT -> 4;
+      case CONTROLLER_OPERATION -> {
+        JsonNode value = record.value();
+        if (value != null && (value.at("/input/reconcile").asBoolean()
+            || value.at("/input/reload/reconcile").asBoolean()
+            || value.at("/input/submittedAtMs").asLong() != 0
+            || value.at("/input/reload/submittedAtMs").asLong() != 0)) {
+          yield 7;
+        }
+        if (value != null && (value.hasNonNull("completionProof") || value.at("/input/initialLoad").asBoolean()
+            || value.at("/input/reload/initialLoad").asBoolean())) {
+          yield 6;
+        }
+        yield value != null && "ASSIGNED_OFFLINE_SEGMENT_RELOAD".equals(value.at("/input/specType").asText()) ? 5 : 4;
+      }
+      case OFFLINE_SEGMENT_CONTENT, OFFLINE_REPLICA_ASSIGNMENT -> 5;
+      case OFFLINE_INSTALLATION -> 6;
     };
   }
 

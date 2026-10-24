@@ -36,6 +36,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import javax.annotation.Nullable;
+import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.Role;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.CatalogImage;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.ChangePage;
@@ -43,9 +45,11 @@ import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.ChangeTrans
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.FeedCursor;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.FeedScope;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.RecordKind;
+import org.apache.pinot.coordination.ratis.metadata.OfflineInstallationProtocol;
 import org.apache.pinot.coordination.ratis.rpc.MetadataRpc;
 import org.apache.pinot.coordination.ratis.rpc.MetadataServiceGrpc;
 import org.apache.pinot.coordination.ratis.transport.ControllerAccessPolicy.ControllerIdentity;
+import org.apache.pinot.coordination.ratis.transport.ParticipantAccessPolicy.ParticipantIdentity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,6 +60,8 @@ public final class MetadataGrpcService extends MetadataServiceGrpc.MetadataServi
   private static final Logger LOGGER = LoggerFactory.getLogger(MetadataGrpcService.class);
   private final MetadataAccess _access;
   private final ControllerAccessPolicy _policy;
+  @Nullable
+  private final ParticipantAccessPolicy _participantPolicy;
   private final MetadataAudit _audit;
   private final Limits _limits;
   private final Semaphore _calls;
@@ -90,8 +96,14 @@ public final class MetadataGrpcService extends MetadataServiceGrpc.MetadataServi
   }
 
   MetadataGrpcService(MetadataAccess access, ControllerAccessPolicy policy, MetadataAudit audit, Limits limits) {
+    this(access, policy, null, audit, limits);
+  }
+
+  MetadataGrpcService(MetadataAccess access, ControllerAccessPolicy policy,
+      @Nullable ParticipantAccessPolicy participantPolicy, MetadataAudit audit, Limits limits) {
     _access = Objects.requireNonNull(access);
     _policy = Objects.requireNonNull(policy);
+    _participantPolicy = participantPolicy;
     _audit = Objects.requireNonNull(audit);
     _limits = Objects.requireNonNull(limits);
     _calls = new Semaphore(limits.maxConcurrentCalls());
@@ -102,12 +114,19 @@ public final class MetadataGrpcService extends MetadataServiceGrpc.MetadataServi
   public void execute(MetadataRpc.CommandRequest request, StreamObserver<MetadataRpc.CommandResult> observer) {
     respond("Execute", request, observer, identity -> {
       MetadataProtocol.Command command;
+      ParticipantIdentity participant = request.hasControllerOperation() ? authorizeParticipant() : null;
       try {
-        command = MetadataRpcCodec.command(request, identity.clientId());
+        command = participant == null ? MetadataRpcCodec.command(request, identity.clientId())
+            : ControllerRpcCodec.command(request, identity.clientId(), participant);
       } catch (IOException e) {
         throw Status.INVALID_ARGUMENT.withDescription("Invalid typed metadata value").asRuntimeException();
       }
-      return MetadataRpcCodec.result(_access.execute(command, remainingMillis()));
+      MetadataRpc.CommandResult result = MetadataRpcCodec.result(_access.execute(command, remainingMillis()));
+      if (participant != null && !participant.equals(authorizeParticipant())) {
+        throw Status.PERMISSION_DENIED.withDescription("Controller participant authorization changed during request")
+            .asRuntimeException();
+      }
+      return result;
     });
   }
 
@@ -371,7 +390,7 @@ public final class MetadataGrpcService extends MetadataServiceGrpc.MetadataServi
   private ControllerIdentity authorize() {
     String fingerprint = MetadataGrpcServer.PEER_FINGERPRINT.get();
     ControllerIdentity identity = fingerprint == null ? null : _policy.authorize(fingerprint);
-    if (identity == null) {
+    if (identity == null || identity.clientId().startsWith(OfflineInstallationProtocol.CLIENT_PREFIX)) {
       throw Status.PERMISSION_DENIED.withDescription("Controller metadata access is not authorized")
           .asRuntimeException();
     }
@@ -383,6 +402,17 @@ public final class MetadataGrpcService extends MetadataServiceGrpc.MetadataServi
       throw Status.PERMISSION_DENIED.withDescription("Metadata authorization changed during request")
           .asRuntimeException();
     }
+  }
+
+  private ParticipantIdentity authorizeParticipant() {
+    String fingerprint = MetadataGrpcServer.PEER_FINGERPRINT.get();
+    ParticipantIdentity identity = fingerprint == null || _participantPolicy == null ? null
+        : _participantPolicy.authorize(fingerprint);
+    if (identity == null || identity.role() != Role.CONTROLLER) {
+      throw Status.PERMISSION_DENIED.withDescription("Controller operation participant access is not authorized")
+          .asRuntimeException();
+    }
+    return identity;
   }
 
   private <T extends Message> void respond(String operation, Message request, StreamObserver<T> observer,

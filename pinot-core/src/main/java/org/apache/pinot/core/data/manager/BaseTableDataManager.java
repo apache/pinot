@@ -25,6 +25,7 @@ import com.google.common.cache.CacheBuilder;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -41,6 +42,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Phaser;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
@@ -55,7 +57,11 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.auth.AuthProviderUtils;
-import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.config.provider.NativeOfflineSegmentAction;
+import org.apache.pinot.common.config.provider.TableDataManagerMetadata;
+import org.apache.pinot.common.config.provider.TableDataManagerMetadata.SegmentSnapshot;
+import org.apache.pinot.common.config.provider.TableDataManagerMetadata.TableSnapshot;
+import org.apache.pinot.common.metadata.segment.SegmentLoadMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
@@ -69,8 +75,8 @@ import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
+import org.apache.pinot.core.data.manager.offline.NativeImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
-import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.StaleSegment;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
@@ -118,11 +124,13 @@ import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.ConsumingSegmentConsistencyModeListener;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -147,6 +155,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected String _instanceId;
   protected HelixManager _helixManager;
   protected ZkHelixPropertyStore<ZNRecord> _propertyStore;
+  @Nullable
+  private TableDataManagerMetadata _nativeMetadata;
+  @Nullable
+  private NativeOfflineSegmentActionExecutor _nativeActionExecutor;
   protected SegmentLocks _segmentLocks;
   protected String _tableNameWithType;
   protected String _tableDataDir;
@@ -197,13 +209,41 @@ public abstract class BaseTableDataManager implements TableDataManager {
       @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
       @Nullable SegmentOperationsThrottlerSet segmentOperationsThrottlerSet, boolean enableAsyncSegmentRefresh,
       ServerReloadJobStatusCache reloadJobStatusCache) {
+    _helixManager = helixManager;
+    _propertyStore = helixManager.getHelixPropertyStore();
+    initCommon(instanceDataManagerConfig, segmentLocks, tableConfig, schema, segmentReloadSemaphore,
+        segmentReloadRefreshExecutor, segmentPreloadExecutor, errorCache, segmentOperationsThrottlerSet,
+        enableAsyncSegmentRefresh, reloadJobStatusCache);
+  }
+
+  /// Initializes the supported native offline path without constructing or passing a Helix manager/store.
+  protected final void initWithMetadataInternal(InstanceDataManagerConfig instanceDataManagerConfig,
+      TableDataManagerMetadata metadata, SegmentLocks segmentLocks, TableSnapshot snapshot,
+      SegmentReloadSemaphore segmentReloadSemaphore, ExecutorService segmentReloadRefreshExecutor,
+      @Nullable ExecutorService segmentPreloadExecutor,
+      @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
+      @Nullable SegmentOperationsThrottlerSet segmentOperationsThrottlerSet, boolean enableAsyncSegmentRefresh,
+      ServerReloadJobStatusCache reloadJobStatusCache) {
+    validateNativeTable(instanceDataManagerConfig, snapshot.tableConfig());
+    _nativeMetadata = requireNonNull(metadata, "metadata");
+    Schema schema = snapshot.schema();
+    initCommon(instanceDataManagerConfig, segmentLocks, copyNativeTableConfig(snapshot.tableConfig()),
+        Schema.cloneSchemaWithName(schema, schema.getSchemaName()), segmentReloadSemaphore,
+        segmentReloadRefreshExecutor, segmentPreloadExecutor, errorCache, segmentOperationsThrottlerSet,
+        enableAsyncSegmentRefresh, reloadJobStatusCache);
+  }
+
+  private void initCommon(InstanceDataManagerConfig instanceDataManagerConfig, SegmentLocks segmentLocks,
+      TableConfig tableConfig, Schema schema, SegmentReloadSemaphore segmentReloadSemaphore,
+      ExecutorService segmentReloadRefreshExecutor, @Nullable ExecutorService segmentPreloadExecutor,
+      @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
+      @Nullable SegmentOperationsThrottlerSet segmentOperationsThrottlerSet, boolean enableAsyncSegmentRefresh,
+      ServerReloadJobStatusCache reloadJobStatusCache) {
     LOGGER.info("Initializing table data manager for table: {}", tableConfig.getTableName());
 
     _instanceDataManagerConfig = instanceDataManagerConfig;
     _reloadJobStatusCache = requireNonNull(reloadJobStatusCache, "reloadJobStatusCache cannot be null");
     _instanceId = instanceDataManagerConfig.getInstanceId();
-    _helixManager = helixManager;
-    _propertyStore = helixManager.getHelixPropertyStore();
     _segmentLocks = segmentLocks;
     _segmentReloadSemaphore = segmentReloadSemaphore;
     _segmentReloadRefreshExecutor = segmentReloadRefreshExecutor;
@@ -240,7 +280,11 @@ public abstract class BaseTableDataManager implements TableDataManager {
         .maximumSize(instanceDataManagerConfig.getDeletedSegmentsCacheSize())
         .expireAfterWrite(instanceDataManagerConfig.getDeletedSegmentsCacheTtlMinutes(), TimeUnit.MINUTES)
         .build();
-    updateCachedTableConfigAndSchema(tableConfig, schema);
+    if (_nativeMetadata == null) {
+      updateCachedTableConfigAndSchema(tableConfig, schema);
+    } else {
+      cacheTableConfigAndSchema(tableConfig, schema);
+    }
 
     _peerDownloadScheme = tableConfig.getValidationConfig().getPeerSegmentDownloadScheme();
     if (_peerDownloadScheme == null) {
@@ -381,6 +425,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   /// @param immutableSegment Immutable segment to add
   @Override
   public void addSegment(ImmutableSegment immutableSegment, @Nullable SegmentZKMetadata zkMetadata) {
+    requireLegacyMutation();
     boolean admitted;
     synchronized (_segmentDataManagerMap) {
       admitted = !_shutDown;
@@ -404,26 +449,42 @@ public abstract class BaseTableDataManager implements TableDataManager {
   /// Adds an admitted immutable segment, including its metadata and replacement cleanup. Shutdown waits for this
   /// operation to finish before stopping partition managers and draining registered segments.
   protected void doAddSegment(ImmutableSegment immutableSegment, @Nullable SegmentZKMetadata zkMetadata) {
+    addImmutableSegment(new ImmutableSegmentDataManager(immutableSegment), null);
+  }
+
+  private void addImmutableSegment(ImmutableSegmentDataManager newSegmentManager,
+      @Nullable AtomicBoolean ownershipTransferred) {
+    ImmutableSegment immutableSegment = newSegmentManager.getSegment();
     String segmentName = immutableSegment.getSegmentName();
     _logger.info("Adding immutable segment: {}", segmentName);
     _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.DOCUMENT_COUNT,
         immutableSegment.getSegmentMetadata().getTotalDocs());
     _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.SEGMENT_COUNT, 1L);
 
-    ImmutableSegmentDataManager newSegmentManager = new ImmutableSegmentDataManager(immutableSegment);
-    SegmentDataManager oldSegmentManager = registerSegment(segmentName, newSegmentManager);
+    SegmentDataManager oldSegmentManager = ownershipTransferred == null
+        ? registerSegment(segmentName, newSegmentManager)
+        : registerSegmentWithOwnership(segmentName, newSegmentManager, ownershipTransferred);
     if (oldSegmentManager == null) {
       _logger.info("Added new immutable segment: {}", segmentName);
     } else {
       _logger.info("Replaced immutable segment: {}", segmentName);
-      oldSegmentManager.offload();
-      releaseSegment(oldSegmentManager);
+      if (ownershipTransferred == null) {
+        oldSegmentManager.offload();
+        releaseSegment(oldSegmentManager);
+      } else {
+        try {
+          oldSegmentManager.offload();
+        } finally {
+          releaseSegment(oldSegmentManager);
+        }
+      }
     }
   }
 
   @Override
   public void addOnlineSegment(String segmentName)
       throws Exception {
+    requireLegacyMutation();
     Preconditions.checkState(!_shutDown,
         "Table data manager is already shut down, cannot add ONLINE segment: %s to table: %s", segmentName,
         _tableNameWithType);
@@ -446,13 +507,18 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   @Nullable
   public SegmentZKMetadata fetchZKMetadataNullable(String segmentName) {
-    return ZKMetadataProvider.getSegmentZKMetadata(_propertyStore, _tableNameWithType, segmentName);
+    if (_nativeMetadata != null) {
+      SegmentSnapshot snapshot = fetchNativeSegmentNullable(segmentName);
+      return snapshot != null ? legacyLoadingValue(snapshot.segment()) : null;
+    }
+    return HelixTableDataManagerMetadata.fetchSegment(_propertyStore, _tableNameWithType, segmentName);
   }
 
   @Override
   public SegmentZKMetadata fetchZKMetadata(String segmentName) {
-    SegmentZKMetadata zkMetadata =
-        ZKMetadataProvider.getSegmentZKMetadata(_propertyStore, _tableNameWithType, segmentName);
+    SegmentZKMetadata zkMetadata = _nativeMetadata != null
+        ? legacyLoadingValue(fetchNativeSegment(segmentName).segment())
+        : HelixTableDataManagerMetadata.fetchSegment(_propertyStore, _tableNameWithType, segmentName);
     Preconditions.checkState(zkMetadata != null, "Failed to find ZK metadata for segment: %s of table: %s", segmentName,
         _tableNameWithType);
     return zkMetadata;
@@ -460,14 +526,130 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   @Override
   public IndexLoadingConfig fetchIndexLoadingConfig() {
-    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, _tableNameWithType);
-    Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", _tableNameWithType);
-    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
-    Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _tableNameWithType);
+    TableSnapshot snapshot = _nativeMetadata != null ? _nativeMetadata.fetchTable(_tableNameWithType)
+        : HelixTableDataManagerMetadata.fetchTable(_propertyStore, _tableNameWithType);
+    TableConfig tableConfig = snapshot.tableConfig();
+    Schema schema = snapshot.schema();
+    if (_nativeMetadata != null) {
+      validateNativeSnapshot(tableConfig);
+      tableConfig = copyNativeTableConfig(tableConfig);
+      schema = Schema.cloneSchemaWithName(schema, schema.getSchemaName());
+    }
+    return indexLoadingConfig(tableConfig, schema);
+  }
+
+  private IndexLoadingConfig indexLoadingConfig(TableConfig tableConfig, Schema schema) {
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig, schema);
     indexLoadingConfig.setTableDataDir(_tableDataDir);
-    updateCachedTableConfigAndSchema(tableConfig, schema);
+    if (_nativeMetadata == null) {
+      updateCachedTableConfigAndSchema(tableConfig, schema);
+    } else {
+      cacheTableConfigAndSchema(tableConfig, schema);
+    }
     return indexLoadingConfig;
+  }
+
+  private void requireLegacyMutation() {
+    Preconditions.checkState(_nativeMetadata == null,
+        "Native table mutations require a fenced operation through nativeExecutor");
+  }
+
+  @Override
+  public boolean requiresQueryIdentity() {
+    return _nativeMetadata != null;
+  }
+
+  /// Returns the explicit native physical-action API; existing Helix transitions never use it.
+  protected final synchronized NativeOfflineSegmentAction.Executor nativeActionExecutor() {
+    Preconditions.checkState(_nativeMetadata != null, "Native metadata initialization is required");
+    if (_nativeActionExecutor == null) {
+      _nativeActionExecutor = new NativeOfflineSegmentActionExecutor(this);
+    }
+    return _nativeActionExecutor;
+  }
+
+  // Admission covers durable selection and registration together. Shutdown closes admission and then waits for
+  // this phaser before draining segments, just as it does for the existing immutable-segment add path.
+  final boolean publishNativeSegment(NativeImmutableSegmentDataManager segment, NativeOfflineSegmentManifest manifest,
+      Path activeManifest, AtomicBoolean ownershipTransferred) throws Exception {
+    synchronized (_segmentDataManagerMap) {
+      if (_shutDown) {
+        return false;
+      }
+      _immutableSegmentAdds.register();
+    }
+    try {
+      manifest.write(activeManifest);
+      // Captured per-segment config/schema belongs to this loaded segment. It must never overwrite the independently
+      // refreshed table cache, whose metadata may already be newer when this physical action completes.
+      addImmutableSegment(segment, ownershipTransferred);
+      return true;
+    } finally {
+      _immutableSegmentAdds.arriveAndDeregister();
+    }
+  }
+
+  // Timestamp normalization modifies table index/transform settings as well as the schema. Neither may mutate
+  // provider-owned snapshots. Preserve the existing Helix path's normalization and object identity behavior.
+  static TableConfig copyNativeTableConfig(TableConfig tableConfig) {
+    try {
+      return JsonUtils.jsonNodeToObject(tableConfig.toJsonNode(), TableConfig.class);
+    } catch (IOException e) {
+      throw new IllegalStateException("Failed to copy native table config: " + tableConfig.getTableName(), e);
+    }
+  }
+
+  private SegmentSnapshot fetchNativeSegment(String segmentName) {
+    SegmentSnapshot snapshot = fetchNativeSegmentNullable(segmentName);
+    Preconditions.checkState(snapshot != null, "Failed to find native metadata for segment: %s of table: %s",
+        segmentName, _tableNameWithType);
+    return snapshot;
+  }
+
+  @Nullable
+  private SegmentSnapshot fetchNativeSegmentNullable(String segmentName) {
+    SegmentSnapshot snapshot = requireNonNull(_nativeMetadata).fetchSegment(_tableNameWithType, segmentName);
+    if (snapshot != null) {
+      validateNativeSnapshot(snapshot.tableConfig());
+      SegmentLoadMetadata segment = snapshot.segment();
+      Preconditions.checkState(segmentName.equals(segment.segmentName()), "Native segment identity differs: %s",
+          segmentName);
+      Preconditions.checkState(segment.published() && segment.crc() >= 0
+          && (!segment.useDataCrc() || segment.dataCrc() >= 0), "Native segment is not published: %s", segmentName);
+      Preconditions.checkState(!CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD.equals(segment.downloadUri()),
+          "Native peer segment download is not supported");
+    }
+    return snapshot;
+  }
+
+  private void validateNativeSnapshot(TableConfig tableConfig) {
+    Preconditions.checkState(_tableNameWithType.equals(tableConfig.getTableName()), "Native table identity differs");
+    validateNativeTable(_instanceDataManagerConfig, tableConfig);
+  }
+
+  static void validateNativeTable(InstanceDataManagerConfig instanceConfig, TableConfig tableConfig) {
+    Preconditions.checkArgument(tableConfig.getTableType() == TableType.OFFLINE && !tableConfig.isUpsertEnabled()
+        && !tableConfig.isDimTable(), "Native metadata supports ordinary OFFLINE tables without upsert only");
+    Preconditions.checkArgument(tableConfig.getValidationConfig().getPeerSegmentDownloadScheme() == null
+        && instanceConfig.getSegmentPeerDownloadScheme() == null, "Native peer segment download is not supported");
+  }
+
+  /// Compatibility with the existing immutable-segment loader signatures only. This leaf value performs no ZK
+  /// access and never becomes a provider, manager or property store. Helix metadata does not pass through it.
+  static SegmentZKMetadata legacyLoadingValue(SegmentLoadMetadata descriptor) {
+    SegmentZKMetadata value = new SegmentZKMetadata(descriptor.segmentName());
+    value.setCrc(descriptor.crc());
+    value.setDataCrc(descriptor.dataCrc());
+    value.setUseDataCrc(descriptor.useDataCrc());
+    value.setDownloadUrl(descriptor.downloadUri());
+    value.setTier(descriptor.tier());
+    value.setCrypterName(descriptor.crypterName());
+    value.setCreationTime(descriptor.creationTimeMs());
+    value.setPushTime(descriptor.pushTimeMs());
+    value.setCustomMap(new HashMap<>(descriptor.customConfigs()));
+    value.setStatus(descriptor.published() ? CommonConstants.Segment.Realtime.Status.DONE
+        : CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
+    return value;
   }
 
   /// Returns the shared processed config for ordinary loads. Segment-specific settings are applied with the
@@ -492,6 +674,11 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   @Override
   public void updateCachedTableConfigAndSchema(TableConfig tableConfig, Schema schema) {
+    requireLegacyMutation();
+    cacheTableConfigAndSchema(tableConfig, schema);
+  }
+
+  private void cacheTableConfigAndSchema(TableConfig tableConfig, Schema schema) {
     // Normalize before publishing so segment loads never add timestamp fields to a shared schema.
     if (schema != null) {
       TimestampIndexUtils.applyTimestampIndex(tableConfig, schema);
@@ -501,7 +688,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   @Override
   public void onTableConfigOrSchemaRefresh() {
-    // A genuine config/schema change: refresh the cached table config and schema from ZK. The returned index loading
+    // A genuine config/schema change: refresh the cached table config and schema. The returned index loading
     // config is not needed here; the side effect of updating the cache is the contract of this callback.
     fetchIndexLoadingConfig();
   }
@@ -509,6 +696,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Override
   public void addNewOnlineSegment(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
+    requireLegacyMutation();
     _logger.info("Adding new ONLINE segment: {}", zkMetadata.getSegmentName());
     if (!tryLoadExistingSegment(zkMetadata, indexLoadingConfig)) {
       downloadAndLoadSegment(zkMetadata, indexLoadingConfig);
@@ -542,6 +730,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Override
   public void downloadAndLoadSegment(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
+    requireLegacyMutation();
     String segmentName = zkMetadata.getSegmentName();
     _logger.info("Downloading and loading segment: {}", segmentName);
     File indexDir = downloadSegment(zkMetadata);
@@ -555,6 +744,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Override
   public void replaceSegment(String segmentName)
       throws Exception {
+    requireLegacyMutation();
     if (_enableAsyncSegmentRefresh) {
       enqueueSegmentToReplace(segmentName);
     } else {
@@ -618,6 +808,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   @Override
   public void offloadSegment(String segmentName) {
+    requireLegacyMutation();
     // NOTE: Do not throw exception when data manager has been shut down. This is regular flow when a table is deleted.
     if (_shutDown) {
       _logger.info("Table data manager is already shut down, skipping offloading segment: {}", segmentName);
@@ -639,6 +830,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   @Override
   public void offloadSegmentUnsafe(String segmentName) {
+    requireLegacyMutation();
     if (_shutDown) {
       _logger.info("Table data manager is already shut down, skipping offloading segment: {} unsafe", segmentName);
       return;
@@ -667,6 +859,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Override
   public void deleteSegment(String segmentName)
       throws Exception {
+    requireLegacyMutation();
     _logger.info("Deleting segment: {}", segmentName);
     Lock segmentLock = getSegmentLock(segmentName);
     segmentLock.lock();
@@ -715,6 +908,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Override
   public void reloadSegment(String segmentName, boolean forceDownload, boolean onlyIfNeeded, String reloadJobId)
       throws Exception {
+    requireLegacyMutation();
     Preconditions.checkState(!_shutDown,
         "Table data manager is already shut down, cannot reload segment: %s in table: %s", segmentName,
         _tableNameWithType);
@@ -739,6 +933,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Override
   public void reloadAllSegments(boolean forceDownload, boolean onlyIfNeeded, String reloadJobId)
       throws Exception {
+    requireLegacyMutation();
     Preconditions.checkState(!_shutDown,
         "Table data manager is already shut down, cannot reload all segments in table: %s", _tableNameWithType);
     _logger.info("Reloading all segments with forceDownload: {}, onlyIfNeeded: {}", forceDownload, onlyIfNeeded);
@@ -759,6 +954,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   public void reloadSegments(List<String> segmentNames, boolean forceDownload, boolean onlyIfNeeded,
       String reloadJobId)
       throws Exception {
+    requireLegacyMutation();
     Preconditions.checkState(!_shutDown,
         "Table data manager is already shut down, cannot reload segments: %s in table: %s", segmentNames,
         _tableNameWithType);
@@ -884,6 +1080,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   @Override
   public HelixManager getHelixManager() {
+    Preconditions.checkState(_nativeMetadata == null, "Native table metadata does not provide a Helix manager");
     return _helixManager;
   }
 
@@ -893,6 +1090,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   public ZkHelixPropertyStore<ZNRecord> getPropertyStore() {
+    Preconditions.checkState(_nativeMetadata == null, "Native table metadata does not provide a Helix property store");
     return _propertyStore;
   }
 
@@ -929,6 +1127,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   @Override
   public void setDeleted(boolean deleted) {
+    requireLegacyMutation();
     _isDeleted = deleted;
   }
 
@@ -1009,7 +1208,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _logger.info("Adding immutable segment: {} with upsert enabled", segmentName);
     Integer partitionId;
     if (zkMetadata == null && TableNameBuilder.isOfflineTableResource(_tableNameWithType)) {
-      zkMetadata = ZKMetadataProvider.getSegmentZKMetadata(_helixManager.getHelixPropertyStore(), _tableNameWithType,
+      zkMetadata = HelixTableDataManagerMetadata.fetchSegment(_helixManager.getHelixPropertyStore(), _tableNameWithType,
           segmentName);
     }
     setZkOperationTimeIfAvailable(immutableSegment, zkMetadata);
@@ -1277,6 +1476,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   public void reloadSegment(String segmentName, IndexLoadingConfig indexLoadingConfig, SegmentZKMetadata zkMetadata,
       SegmentMetadata localMetadata, boolean forceDownload)
       throws Exception {
+    requireLegacyMutation();
     String segmentTier = getSegmentCurrentTier(segmentName);
     indexLoadingConfig = indexLoadingConfig.copyWithSegmentTier(segmentTier);
     indexLoadingConfig.setTableDataDir(_tableDataDir);
@@ -1427,9 +1627,21 @@ public abstract class BaseTableDataManager implements TableDataManager {
   /// existing segment with the same name.
   @Nullable
   public SegmentDataManager registerSegment(String segmentName, SegmentDataManager segmentDataManager) {
+    requireLegacyMutation();
+    return registerSegmentWithOwnership(segmentName, segmentDataManager, null);
+  }
+
+  @Nullable
+  private SegmentDataManager registerSegmentWithOwnership(String segmentName, SegmentDataManager segmentDataManager,
+      @Nullable AtomicBoolean ownershipTransferred) {
     SegmentDataManager oldSegmentDataManager;
     synchronized (_segmentDataManagerMap) {
       oldSegmentDataManager = _segmentDataManagerMap.put(segmentName, segmentDataManager);
+      if (ownershipTransferred != null) {
+        // From this exact point, only SegmentDataManager reference-count release may destroy the segment, even if
+        // post-registration work throws and another thread removes it from the visible map before caller cleanup.
+        ownershipTransferred.set(true);
+      }
     }
     _recentlyDeletedSegments.invalidate(segmentName);
     // Fire the post-registration lifecycle hook now that the segment is swapped into the serving set
@@ -1473,6 +1685,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   /// identify this scenario.
   @Nullable
   public SegmentDataManager unregisterSegment(String segmentName) {
+    requireLegacyMutation();
     _recentlyDeletedSegments.put(segmentName, segmentName);
     synchronized (_segmentDataManagerMap) {
       return _segmentDataManagerMap.remove(segmentName);
@@ -1484,6 +1697,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   /// encrypted, and this method takes care of decompressing and decrypting the segment.
   public File downloadSegment(SegmentZKMetadata zkMetadata)
       throws Exception {
+    requireLegacyMutation();
     String segmentName = zkMetadata.getSegmentName();
     String downloadUrl = zkMetadata.getDownloadUrl();
     Preconditions.checkState(downloadUrl != null,
@@ -1587,6 +1801,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   protected File downloadSegmentFromPeers(SegmentZKMetadata zkMetadata)
       throws Exception {
+    Preconditions.checkState(_nativeMetadata == null, "Native peer segment download is not supported");
     String segmentName = zkMetadata.getSegmentName();
     Preconditions.checkState(_peerDownloadScheme != null, "Peer download is not enabled for table: %s",
         _tableNameWithType);
@@ -1608,7 +1823,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     try {
       SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(segmentName, _peerDownloadScheme, () -> {
         List<URI> peerServerURIs =
-            PeerServerSegmentFinder.getPeerServerURIs(_helixManager, _tableNameWithType, segmentName,
+            HelixTableDataManagerMetadata.peerUris(_helixManager, _tableNameWithType, segmentName,
                 _peerDownloadScheme);
         Collections.shuffle(peerServerURIs);
         return peerServerURIs;
@@ -1719,6 +1934,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   /// The original index directory is restored lazily, as depending on the conditions,
   /// it may be restored from the backup directory or segment downloaded from deep store.
   public void createBackup(File indexDir) {
+    requireLegacyMutation();
     if (!indexDir.exists()) {
       return;
     }
@@ -1735,6 +1951,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   /// already succeeded, so that we can safely delete the segment temporary directory.
   public void removeBackup(File indexDir)
       throws IOException {
+    requireLegacyMutation();
     File parentDir = indexDir.getParentFile();
     File segmentBackupDir = new File(parentDir, indexDir.getName() + CommonConstants.Segment.SEGMENT_BACKUP_DIR_SUFFIX);
     if (!segmentBackupDir.exists()) {
@@ -1750,6 +1967,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   @Override
   public boolean tryLoadExistingSegment(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig) {
+    requireLegacyMutation();
     ImmutableSegment segment = tryLoadExistingSegmentWithoutRegistering(zkMetadata, indexLoadingConfig);
     if (segment == null) {
       return false;
@@ -1764,6 +1982,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Nullable
   public ImmutableSegment tryLoadExistingSegmentWithoutRegistering(SegmentZKMetadata zkMetadata,
       IndexLoadingConfig indexLoadingConfig) {
+    requireLegacyMutation();
     String segmentName = zkMetadata.getSegmentName();
     Preconditions.checkState(!_shutDown,
         "Table data manager is already shut down, cannot load existing segment: %s of table: %s", segmentName,
