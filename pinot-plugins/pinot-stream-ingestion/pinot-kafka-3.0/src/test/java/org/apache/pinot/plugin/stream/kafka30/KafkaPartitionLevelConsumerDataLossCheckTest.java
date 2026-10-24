@@ -42,6 +42,7 @@ import org.testng.annotations.Test;
 import static org.apache.kafka.common.record.RecordBatch.NO_TIMESTAMP;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -137,6 +138,67 @@ public class KafkaPartitionLevelConsumerDataLossCheckTest {
     batch = consumer.fetchMessages(new LongMsgOffset(100L), TIMEOUT_MS);
     assertFalse(batch.hasDataLoss());
     verify(mockConsumer, times(2)).beginningOffsets(anyCollection(), any(Duration.class));
+  }
+
+  /// An out-of-range reset can surface on an empty poll: the client jumps to the new log start without returning a
+  /// record, so that batch cannot be told from one that only skipped transaction markers and reports no loss. No
+  /// caller adopts an empty batch's offset (`RealtimeSegmentDataManager` and the re-ingestion writer both poll again
+  /// from the same offset), so the loss is reported by the next poll that returns records: its first offset is past
+  /// the requested one and the log now starts above it.
+  @Test
+  public void testResetSeenOnEmptyPollIsReportedOnNextDataPoll()
+      throws Exception {
+    Consumer<Bytes, Bytes> mockConsumer = mock(Consumer.class);
+    when(mockConsumer.poll(any(Duration.class))).thenReturn(records(), records(record(150L)));
+    when(mockConsumer.position(eq(TOPIC_PARTITION), any(Duration.class))).thenReturn(150L);
+    when(mockConsumer.beginningOffsets(anyCollection(), any(Duration.class)))
+        .thenReturn(Map.of(TOPIC_PARTITION, 150L));
+
+    try (KafkaPartitionLevelConsumer consumer = createConsumerWithMock(getStreamConfig(null), mockConsumer)) {
+      KafkaMessageBatch emptyBatch = consumer.fetchMessages(new LongMsgOffset(100L), TIMEOUT_MS);
+      assertEquals(emptyBatch.getMessageCount(), 0);
+      assertEquals(emptyBatch.getOffsetOfNextBatch().toString(), "150");
+      assertFalse(emptyBatch.hasDataLoss());
+
+      KafkaMessageBatch batch = consumer.fetchMessages(new LongMsgOffset(100L), TIMEOUT_MS);
+      assertEquals(batch.getFirstMessageOffset().toString(), "150");
+      assertTrue(batch.hasDataLoss(), "Records 100..149 were deleted before they were consumed");
+    }
+    verify(mockConsumer, times(1)).seek(TOPIC_PARTITION, 100L);
+  }
+
+  /// Failed lookups suppressed by the WARN rate limit are reported once lookups succeed again, and once more when the
+  /// consumer closes, so a failure storm that ends for good still reports its tail.
+  @Test
+  public void testSuppressedLookupFailuresAreReportedOnRecoveryAndClose()
+      throws Exception {
+    Consumer<Bytes, Bytes> mockConsumer = mock(Consumer.class);
+    when(mockConsumer.poll(any(Duration.class))).thenReturn(records(record(150L)));
+    TimeoutException failure = new TimeoutException("broker unavailable");
+    when(mockConsumer.beginningOffsets(anyCollection(), any(Duration.class)))
+        .thenThrow(failure, failure, failure)
+        .thenReturn(Map.of(TOPIC_PARTITION, 40L))
+        .thenThrow(failure, failure);
+
+    KafkaPartitionLevelConsumer consumer = createConsumerWithMock(getStreamConfig(null), mockConsumer);
+    // The first failure is logged at WARN, the next two are suppressed within the interval
+    for (int i = 0; i < 3; i++) {
+      assertFalse(consumer.fetchMessages(new LongMsgOffset(100L), TIMEOUT_MS).hasDataLoss());
+    }
+    assertEquals(consumer.getSuppressedLogStartOffsetLookupFailures(), 2);
+
+    // A successful lookup reports the suppressed failures
+    assertFalse(consumer.fetchMessages(new LongMsgOffset(100L), TIMEOUT_MS).hasDataLoss());
+    assertEquals(consumer.getSuppressedLogStartOffsetLookupFailures(), 0);
+
+    // New failures within the interval are suppressed again, and closing the consumer reports them
+    for (int i = 0; i < 2; i++) {
+      assertFalse(consumer.fetchMessages(new LongMsgOffset(100L), TIMEOUT_MS).hasDataLoss());
+    }
+    assertEquals(consumer.getSuppressedLogStartOffsetLookupFailures(), 2);
+    consumer.close();
+    assertEquals(consumer.getSuppressedLogStartOffsetLookupFailures(), 0);
+    verify(mockConsumer, times(1)).close();
   }
 
   private static KafkaPartitionLevelConsumer createConsumerWithMock(StreamConfig streamConfig,

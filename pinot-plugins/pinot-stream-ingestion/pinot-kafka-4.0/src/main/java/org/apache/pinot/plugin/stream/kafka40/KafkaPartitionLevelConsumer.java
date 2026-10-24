@@ -18,11 +18,14 @@
  */
 package org.apache.pinot.plugin.stream.kafka40;
 
+import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.common.header.Header;
@@ -78,9 +81,10 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
   // construction (the value is final per consumer) and reused on every fetch instead of
   // re-resolving the StreamConfig each time.
   private final boolean _isReadCommitted = isReadCommitted(_config);
-  // Rate limiting for the WARN in getLogStartOffset(). Only touched from fetchMessages(), which is synchronized.
+  // Rate limiting for the WARN in getLogStartOffset(). The timestamp is only touched from fetchMessages(), which is
+  // synchronized; the count is also drained by close(), which may run on another thread.
   private long _lastLogStartOffsetLookupFailureLogMs = 0;
-  private int _suppressedLogStartOffsetLookupFailures = 0;
+  private final AtomicInteger _suppressedLogStartOffsetLookupFailures = new AtomicInteger();
 
   public KafkaPartitionLevelConsumer(String clientId, StreamConfig streamConfig, int partition) {
     super(clientId, streamConfig, partition);
@@ -193,22 +197,27 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
   /// timeout as [#poll]. Returns [Long#MIN_VALUE] when it cannot be determined so the caller
   /// treats an offset gap as expected (no data loss) rather than raising a false positive.
   private long getLogStartOffset(int timeoutMs) {
+    long logStartOffset;
     try {
-      return _consumer.beginningOffsets(List.of(_topicPartition), Duration.ofMillis(timeoutMs))
+      logStartOffset = _consumer.beginningOffsets(List.of(_topicPartition), Duration.ofMillis(timeoutMs))
           .getOrDefault(_topicPartition, Long.MIN_VALUE);
     } catch (Exception e) {
       logLogStartOffsetLookupFailure(e);
       return Long.MIN_VALUE;
     }
+    reportSuppressedLogStartOffsetLookupFailures("the lookup succeeded again");
+    return logStartOffset;
   }
 
   /// Logs a failed log-start-offset lookup at WARN at most once per
   /// [#LOG_START_OFFSET_LOOKUP_FAILURE_LOG_INTERVAL_MS], reporting how many failures were suppressed since the
-  /// previous line. Suppressed failures are still logged at DEBUG.
+  /// previous line. Suppressed failures are still logged at DEBUG, and their count is also reported when lookups
+  /// succeed again or the consumer is closed (see [#reportSuppressedLogStartOffsetLookupFailures]), so the tail of a
+  /// failure storm is not lost when no further failure comes to trigger the next WARN.
   private void logLogStartOffsetLookupFailure(Exception e) {
     long nowMs = System.currentTimeMillis();
     if (nowMs - _lastLogStartOffsetLookupFailureLogMs < LOG_START_OFFSET_LOOKUP_FAILURE_LOG_INTERVAL_MS) {
-      _suppressedLogStartOffsetLookupFailures++;
+      _suppressedLogStartOffsetLookupFailures.incrementAndGet();
       if (LOGGER.isDebugEnabled()) {
         LOGGER.debug("Failed to read log start offset for {} (WARN suppressed)", _topicPartition, e);
       }
@@ -216,9 +225,29 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
     }
     LOGGER.warn("Failed to read log start offset for {} ({} similar failures suppressed since the last report); "
         + "treating the offset gap as no data loss (this can mask genuine data loss if it persists)",
-        _topicPartition, _suppressedLogStartOffsetLookupFailures, e);
+        _topicPartition, _suppressedLogStartOffsetLookupFailures.getAndSet(0), e);
     _lastLogStartOffsetLookupFailureLogMs = nowMs;
-    _suppressedLogStartOffsetLookupFailures = 0;
+  }
+
+  /// Reports, at WARN, the failed log-start-offset lookups suppressed since the last WARN, if any.
+  private void reportSuppressedLogStartOffsetLookupFailures(String reason) {
+    int suppressed = _suppressedLogStartOffsetLookupFailures.getAndSet(0);
+    if (suppressed > 0) {
+      LOGGER.warn("{} more failed log start offset lookups for {} were suppressed since the last report; {}",
+          suppressed, _topicPartition, reason);
+    }
+  }
+
+  @VisibleForTesting
+  int getSuppressedLogStartOffsetLookupFailures() {
+    return _suppressedLogStartOffsetLookupFailures.get();
+  }
+
+  @Override
+  public void close()
+      throws IOException {
+    reportSuppressedLogStartOffsetLookupFailures("the consumer is closing");
+    super.close();
   }
 
   private static boolean isReadCommitted(KafkaPartitionLevelStreamConfig config) {
