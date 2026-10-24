@@ -21,8 +21,10 @@ package org.apache.pinot.queries;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -31,6 +33,9 @@ import java.util.Random;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
@@ -49,6 +54,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
@@ -57,8 +63,10 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 /// Queries test for MODE queries.
@@ -80,23 +88,44 @@ public class ModeQueriesTest extends BaseQueriesTest {
   private static final String LONG_NO_DICT_COLUMN = "longNoDictColumn";
   private static final String FLOAT_NO_DICT_COLUMN = "floatNoDictColumn";
   private static final String DOUBLE_NO_DICT_COLUMN = "doubleNoDictColumn";
+  private static final String STRING_COLUMN = "stringColumn";
+  private static final String STRING_NO_DICT_COLUMN = "stringNoDictColumn";
+  private static final String JSON_COLUMN = "jsonColumn";
+  private static final String BOOLEAN_COLUMN = "booleanColumn";
+  private static final String BOOLEAN_NO_DICT_COLUMN = "booleanNoDictColumn";
+  private static final String TIMESTAMP_COLUMN = "timestampColumn";
+  private static final String TIMESTAMP_NO_DICT_COLUMN = "timestampNoDictColumn";
   private static final Schema SCHEMA = new Schema.SchemaBuilder().addSingleValueDimension(INT_COLUMN, DataType.INT)
       .addMultiValueDimension(INT_MV_COLUMN, DataType.INT).addSingleValueDimension(INT_NO_DICT_COLUMN, DataType.INT)
       .addSingleValueDimension(LONG_COLUMN, DataType.LONG).addSingleValueDimension(LONG_NO_DICT_COLUMN, DataType.LONG)
       .addSingleValueDimension(FLOAT_COLUMN, DataType.FLOAT)
       .addSingleValueDimension(FLOAT_NO_DICT_COLUMN, DataType.FLOAT)
       .addSingleValueDimension(DOUBLE_COLUMN, DataType.DOUBLE)
-      .addSingleValueDimension(DOUBLE_NO_DICT_COLUMN, DataType.DOUBLE).build();
+      .addSingleValueDimension(DOUBLE_NO_DICT_COLUMN, DataType.DOUBLE)
+      .addSingleValueDimension(STRING_COLUMN, DataType.STRING)
+      .addSingleValueDimension(STRING_NO_DICT_COLUMN, DataType.STRING)
+      .addSingleValueDimension(JSON_COLUMN, DataType.JSON)
+      .addSingleValueDimension(BOOLEAN_COLUMN, DataType.BOOLEAN)
+      .addSingleValueDimension(BOOLEAN_NO_DICT_COLUMN, DataType.BOOLEAN)
+      .addSingleValueDimension(TIMESTAMP_COLUMN, DataType.TIMESTAMP)
+      .addSingleValueDimension(TIMESTAMP_NO_DICT_COLUMN, DataType.TIMESTAMP).build();
   private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
       .setNoDictionaryColumns(
-          Lists.newArrayList(INT_NO_DICT_COLUMN, LONG_NO_DICT_COLUMN, FLOAT_NO_DICT_COLUMN, DOUBLE_NO_DICT_COLUMN))
+          Lists.newArrayList(INT_NO_DICT_COLUMN, LONG_NO_DICT_COLUMN, FLOAT_NO_DICT_COLUMN, DOUBLE_NO_DICT_COLUMN,
+              STRING_NO_DICT_COLUMN, BOOLEAN_NO_DICT_COLUMN, TIMESTAMP_NO_DICT_COLUMN))
       .build();
   private static final double DELTA = 0.00001;
+  private static final long TIMESTAMP_BASE = 1_600_000_000_000L;
 
   private HashMap<Integer, Long> _values;
   private Double _expectedResultMin;
   private Double _expectedResultMax;
   private Double _expectedResultAvg;
+  private String _expectedStringMin;
+  private String _expectedStringMax;
+  private boolean _expectedBoolean;
+  private String _expectedTimestampMin;
+  private String _expectedTimestampMax;
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
 
@@ -136,6 +165,13 @@ public class ModeQueriesTest extends BaseQueriesTest {
       record.putValue(FLOAT_NO_DICT_COLUMN, (float) value);
       record.putValue(DOUBLE_COLUMN, (double) value);
       record.putValue(DOUBLE_NO_DICT_COLUMN, (double) value);
+      record.putValue(STRING_COLUMN, String.valueOf(value));
+      record.putValue(STRING_NO_DICT_COLUMN, String.valueOf(value));
+      record.putValue(JSON_COLUMN, String.valueOf(value));
+      record.putValue(BOOLEAN_COLUMN, value % 3 == 0);
+      record.putValue(BOOLEAN_NO_DICT_COLUMN, value % 3 == 0);
+      record.putValue(TIMESTAMP_COLUMN, TIMESTAMP_BASE + value);
+      record.putValue(TIMESTAMP_NO_DICT_COLUMN, TIMESTAMP_BASE + value);
       records.add(record);
     }
     long maxOccurrences = _values.values().stream().max(Long::compareTo).get();
@@ -144,6 +180,15 @@ public class ModeQueriesTest extends BaseQueriesTest {
     _expectedResultMin = Arrays.stream(modes).min().getAsDouble();
     _expectedResultMax = Arrays.stream(modes).max().getAsDouble();
     _expectedResultAvg = Arrays.stream(modes).average().getAsDouble();
+    // Ties between string modes are broken in string order, e.g. "10" < "9"
+    List<String> stringModes = Arrays.stream(modes).mapToObj(mode -> String.valueOf((int) mode)).toList();
+    _expectedStringMin = stringModes.stream().min(Comparator.naturalOrder()).get();
+    _expectedStringMax = stringModes.stream().max(Comparator.naturalOrder()).get();
+    long numTrueValues = _values.entrySet().stream().filter(e -> e.getKey() % 3 == 0).mapToLong(Map.Entry::getValue)
+        .sum();
+    _expectedBoolean = 2 * numTrueValues > NUM_RECORDS;
+    _expectedTimestampMin = new Timestamp(TIMESTAMP_BASE + _expectedResultMin.longValue()).toString();
+    _expectedTimestampMax = new Timestamp(TIMESTAMP_BASE + _expectedResultMax.longValue()).toString();
 
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
     segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
@@ -369,6 +414,118 @@ public class ModeQueriesTest extends BaseQueriesTest {
             + "MODE(doubleColumn, 'AVG') FROM testTable GROUP BY intMVColumn"
     });
     return entries.toArray(new Object[0][]);
+  }
+
+  @Test(dataProvider = "testNonNumericAggregationOnlyDataProvider")
+  public void testNonNumericAggregationOnly(String query, Object[] expectedRow) {
+    // The optimizer supplies the data type, so the result keeps the column's type
+    ResultTable resultTable = getBrokerResponseForOptimizedQuery(query, SCHEMA).getResultTable();
+    assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{
+        "mode(stringColumn)", "mode(stringNoDictColumn)", "mode(booleanColumn)", "mode(booleanNoDictColumn)",
+        "mode(timestampColumn)", "mode(timestampNoDictColumn)", "mode(jsonColumn)"
+    }, new ColumnDataType[]{
+        ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.BOOLEAN, ColumnDataType.BOOLEAN,
+        ColumnDataType.TIMESTAMP, ColumnDataType.TIMESTAMP, ColumnDataType.STRING
+    }));
+    assertEquals(resultTable.getRows().size(), 1);
+    assertEquals(resultTable.getRows().get(0), expectedRow);
+  }
+
+  @DataProvider
+  public Object[][] testNonNumericAggregationOnlyDataProvider() {
+    Object[] expectedMinRow = new Object[]{
+        _expectedStringMin, _expectedStringMin, _expectedBoolean, _expectedBoolean, _expectedTimestampMin,
+        _expectedTimestampMin, _expectedStringMin
+    };
+    Object[] expectedMaxRow = new Object[]{
+        _expectedStringMax, _expectedStringMax, _expectedBoolean, _expectedBoolean, _expectedTimestampMax,
+        _expectedTimestampMax, _expectedStringMax
+    };
+    return new Object[][]{
+        {
+            "SELECT MODE(stringColumn), MODE(stringNoDictColumn), MODE(booleanColumn), MODE(booleanNoDictColumn), "
+                + "MODE(timestampColumn), MODE(timestampNoDictColumn), MODE(jsonColumn) FROM testTable", expectedMinRow
+        }, {
+            "SELECT MODE(stringColumn, 'MIN'), MODE(stringNoDictColumn, 'MIN'), MODE(booleanColumn, 'MIN'), "
+                + "MODE(booleanNoDictColumn, 'MIN'), MODE(timestampColumn, 'MIN'), MODE(timestampNoDictColumn, 'MIN'), "
+                + "MODE(jsonColumn, 'MIN') FROM testTable", expectedMinRow
+        }, {
+            "SELECT MODE(stringColumn, 'MAX'), MODE(stringNoDictColumn, 'MAX'), MODE(booleanColumn, 'MAX'), "
+                + "MODE(booleanNoDictColumn, 'MAX'), MODE(timestampColumn, 'MAX'), MODE(timestampNoDictColumn, 'MAX'), "
+                + "MODE(jsonColumn, 'MAX') FROM testTable", expectedMaxRow
+        }
+    };
+  }
+
+  @Test(dataProvider = "testNonNumericAggregationGroupByDataProvider")
+  public void testNonNumericAggregationGroupBy(String query) {
+    ResultTable resultTable = getBrokerResponseForOptimizedQuery(query, SCHEMA).getResultTable();
+    assertEquals(resultTable.getDataSchema().getColumnDataTypes(), new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.BOOLEAN,
+        ColumnDataType.BOOLEAN, ColumnDataType.TIMESTAMP, ColumnDataType.TIMESTAMP
+    });
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), _values.size());
+    String previous = "";
+    for (Object[] row : rows) {
+      // Each group has a single value per column
+      int key = (Integer) row[0];
+      String timestamp = new Timestamp(TIMESTAMP_BASE + key).toString();
+      assertEquals(row, new Object[]{
+          key, String.valueOf(key), String.valueOf(key), key % 3 == 0, key % 3 == 0, timestamp, timestamp
+      });
+      // ORDER BY repeats the call, so it must be rewritten the same way as the SELECT list
+      assertTrue(((String) row[1]).compareTo(previous) > 0);
+      previous = (String) row[1];
+    }
+  }
+
+  @DataProvider
+  public Object[][] testNonNumericAggregationGroupByDataProvider() {
+    return new Object[][]{
+        {
+            "SELECT intColumn, MODE(stringColumn), MODE(stringNoDictColumn), MODE(booleanColumn), "
+                + "MODE(booleanNoDictColumn, 'MAX'), MODE(timestampColumn), MODE(timestampNoDictColumn, 'MAX') "
+                + "FROM testTable GROUP BY intColumn ORDER BY MODE(stringColumn) LIMIT 1000"
+        }, {
+            "SELECT intMVColumn, MODE(stringColumn), MODE(stringNoDictColumn), MODE(booleanColumn), "
+                + "MODE(booleanNoDictColumn, 'MAX'), MODE(timestampColumn), MODE(timestampNoDictColumn, 'MAX') "
+                + "FROM testTable GROUP BY intMVColumn ORDER BY MODE(stringNoDictColumn) LIMIT 1000"
+        }
+    };
+  }
+
+  @Test
+  public void testNonNumericEmptyInput() {
+    String query = "SELECT MODE(stringColumn), MODE(stringNoDictColumn), MODE(booleanColumn), "
+        + "MODE(timestampNoDictColumn) FROM testTable WHERE intColumn < 0";
+    List<Object[]> rows = getBrokerResponseForOptimizedQuery(query, SCHEMA).getResultTable().getRows();
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0), new Object[]{null, null, null, null});
+  }
+
+  @Test
+  public void testNonNumericRejectsAvg() {
+    for (String column : new String[]{STRING_COLUMN, BOOLEAN_COLUMN, TIMESTAMP_COLUMN}) {
+      String query = "SELECT MODE(" + column + ", 'AVG') FROM testTable";
+      BadQueryRequestException exception =
+          expectThrows(BadQueryRequestException.class, () -> getBrokerResponseForOptimizedQuery(query, SCHEMA));
+      assertTrue(exception.getMessage().contains("Unsupported MODE reducer for"), exception.getMessage());
+    }
+  }
+
+  @Test
+  public void testNonNumericRejectsMismatchedDataType() {
+    for (String query : new String[]{
+        "SELECT MODE(intColumn, 'MIN', 'STRING') FROM testTable",
+        "SELECT MODE(longNoDictColumn, 'MIN', 'BOOLEAN') FROM testTable",
+        "SELECT MODE(stringNoDictColumn, 'MIN', 'TIMESTAMP') FROM testTable"
+    }) {
+      BrokerResponseNative brokerResponse = getBrokerResponse(query);
+      assertFalse(brokerResponse.getExceptions().isEmpty(), query);
+      String message = brokerResponse.getExceptions().get(0).getMessage();
+      assertTrue(message.contains("Illegal data type for MODE aggregation function"), message);
+    }
   }
 
   @AfterClass
