@@ -1217,16 +1217,16 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       return watermark;
     }
     double cappedWatermark = watermark;
-    // A mapped segment's metadata is closed on destroy. Hold the segment read lock while reading its maximum, and
-    // ignore stale entries that were removed from tracking after the snapshot pass.
+    // A mapped segment's metadata is closed on destroy. Hold the segment read lock while reading its maximum. An
+    // updated segment observed while being untracked can later return with a stale snapshot, so it still caps the
+    // watermark.
     for (ImmutableSegmentImpl segment : _updatedSegmentsSinceLastSnapshot) {
       if (!tryAcquireSegmentReadLock(segment)) {
-        continue;
+        // Its maximum is no longer readable. Force the normal reload path rather than trusting a stale snapshot.
+        cappedWatermark = TTL_WATERMARK_NOT_SET;
+        break;
       }
       try {
-        if (!_trackedSegments.contains(segment)) {
-          continue;
-        }
         double maxComparisonValue = getMaxComparisonValue(segment);
         double maxWatermark = maxComparisonValue + _metadataTTL;
         // Make sure the segment is not out of TTL as checked by isOutOfMetadataTTL(), regardless of rounding

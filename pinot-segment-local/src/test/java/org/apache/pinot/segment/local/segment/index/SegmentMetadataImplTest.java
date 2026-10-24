@@ -263,6 +263,7 @@ public class SegmentMetadataImplTest {
       assertEquals(mapped.getTimeColumn(), eager.getTimeColumn());
       assertEquals(mapped.getCustomMap(), eager.getCustomMap());
       assertEquals(mapped.getPhysicalColumnNames(), eager.getSchema().getPhysicalColumnNames());
+      assertEquals(mapped.getAllColumns(), mapped.getSchema().getColumnNames());
       assertEquals(mapped.toJson(null), eager.toJson(null));
       for (String column : mapped.getPhysicalColumnNames()) {
         ColumnMetadata expected = eager.getColumnMetadataFor(column);

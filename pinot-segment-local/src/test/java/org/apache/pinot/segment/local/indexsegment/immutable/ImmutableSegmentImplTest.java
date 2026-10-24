@@ -63,6 +63,7 @@ public class ImmutableSegmentImplTest {
     schema.addField(new ComplexFieldSpec("event", DataType.OPEN_STRUCT, true, Map.of()));
     schema.addField(new DimensionFieldSpec("event$key", DataType.INT, true));
     when(metadata.getSchema()).thenReturn(schema);
+    when(metadata.getAllColumns()).thenReturn(schema.getColumnNames());
 
     ImmutableSegmentImpl segment = new ImmutableSegmentImpl(mock(SegmentDirectory.class), metadata,
         Map.of("event$key", mock(ColumnIndexContainer.class)), null);

@@ -38,10 +38,12 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableSet;
 import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 import javax.annotation.Nullable;
@@ -600,6 +602,16 @@ public class SegmentMetadataImpl implements SegmentMetadata, Closeable {
   /// Returns the physical column names without materializing a metadata map or Schema on mapped segments.
   public Set<String> getPhysicalColumnNames() {
     return _mappedStore != null ? _physicalColumnNames : _schema.getPhysicalColumnNames();
+  }
+
+  @Override
+  public NavigableSet<String> getAllColumns() {
+    if (_mappedStore == null) {
+      return getSchema().getColumnNames();
+    }
+    NavigableSet<String> columns = new TreeSet<>(getPhysicalColumnNames());
+    columns.addAll(_virtualColumnMetadata.keySet());
+    return columns;
   }
 
   /// Indicates whether the immutable segment is reading its metadata from the binary mapping.

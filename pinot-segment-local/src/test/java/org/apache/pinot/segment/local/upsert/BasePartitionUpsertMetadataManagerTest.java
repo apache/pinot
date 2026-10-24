@@ -109,7 +109,7 @@ public class BasePartitionUpsertMetadataManagerTest {
   }
 
   @Test
-  public void testWatermarkSkipsDestroyedSegment() {
+  public void testWatermarkConservativelyCapsDestroyedSegment() {
     UpsertContext context = mock(UpsertContext.class);
     when(context.isSnapshotEnabled()).thenReturn(true);
     when(context.getMetadataTTL()).thenReturn(100.0);
@@ -124,9 +124,10 @@ public class BasePartitionUpsertMetadataManagerTest {
     manager.trackSegment(destroyed);
     manager.markSegmentAsUpdated(destroyed);
 
-    assertEquals(manager.getWatermarkToPersist(), 1_000.0);
+    assertEquals(manager.getWatermarkToPersist(), BasePartitionUpsertMetadataManager.TTL_WATERMARK_NOT_SET);
     verify(destroyed).tryAcquireReadLock();
     verify(destroyed, never()).getSegmentMetadata();
+    manager.untrackSegment(destroyed);
 
     ImmutableSegmentImpl live = mock(ImmutableSegmentImpl.class);
     SegmentMetadataImpl metadata = mock(SegmentMetadataImpl.class);
