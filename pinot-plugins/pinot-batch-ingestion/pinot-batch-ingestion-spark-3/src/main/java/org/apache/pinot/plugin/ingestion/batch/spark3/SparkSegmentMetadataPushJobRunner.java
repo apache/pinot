@@ -103,9 +103,6 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
 
     // Collect files to process
     List<String> segmentsToPush = getSegmentsToPush(outputDirFS, outputDirURI);
-    if (segmentsToPush.isEmpty()) {
-      return;
-    }
 
     // Ensure tableConfigURI is set if missing
     setupTableConfigURI();
@@ -114,6 +111,9 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
     TableConfig tableConfig =
         SegmentGenerationUtils.getTableConfig(_spec.getTableSpec().getTableConfigURI(), _spec.getAuthToken());
     boolean consistentPushEnabled = ConsistentDataPushUtils.consistentDataPushEnabled(tableConfig);
+    if (segmentsToPush.isEmpty() && !consistentPushEnabled) {
+      return;
+    }
 
     // Determine push parallelism
     int pushParallelism = _spec.getPushJobSpec().getPushParallelism();
@@ -136,6 +136,11 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
             segmentsToPush.toArray(new String[0]));
     Map<URI, String> uriToLineageEntryIdMap =
         ConsistentDataPushUtils.preUpload(_spec, getSegmentsToReplace(segmentsToPushUriToTarPathMap));
+    if (segmentsToPush.isEmpty()) {
+      // An empty REFRESH snapshot still replaces the existing segments.
+      executePostUpload(uriToLineageEntryIdMap);
+      return;
+    }
 
     if (pushParallelism == 1) {
       // Single push
@@ -306,6 +311,7 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
   ///                                tarPaths (values), or both may be used depending on upload mode.
   public List<String> getSegmentsToReplace(Map<String, String> segmentsUriToTarPathMap) {
     Collection<String> tarFilePaths = segmentsUriToTarPathMap.values();
+    SegmentPushUtils.validateUniqueSegmentNames(tarFilePaths);
     List<String> segmentNames = new ArrayList<>(tarFilePaths.size());
     for (String tarFilePath : tarFilePaths) {
       segmentNames.add(SegmentPushUtils.getSegmentNameFromTarFile(tarFilePath));

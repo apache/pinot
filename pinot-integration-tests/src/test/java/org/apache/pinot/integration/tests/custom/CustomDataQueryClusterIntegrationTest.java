@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.integration.tests.custom;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
@@ -53,6 +54,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -160,6 +162,17 @@ public abstract class CustomDataQueryClusterIntegrationTest extends BaseClusterI
         ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFile, tableConfig, schema, segmentIndex++, _segmentDir,
             _tarDir);
         uploadSegments(getTableName(), _tarDir);
+      }
+      if (!avroFiles.isEmpty()) {
+        String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
+        // MSE skips optional segments even when SSE can already query them.
+        TestUtils.waitForCondition(() -> {
+          int numRoutableSegments = 0;
+          for (JsonNode segments : getDebugInfo("debug/routingTable/" + offlineTableName).path(offlineTableName)) {
+            numRoutableSegments += segments.size();
+          }
+          return numRoutableSegments == avroFiles.size();
+        }, 100L, 60_000L, "Broker did not route all offline segments for " + offlineTableName, Duration.ofSeconds(5));
       }
     }
   }

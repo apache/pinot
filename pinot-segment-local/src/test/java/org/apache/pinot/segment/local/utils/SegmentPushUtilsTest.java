@@ -85,6 +85,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -609,24 +610,52 @@ public class SegmentPushUtilsTest {
     };
 
     PushJobSpec pushSpec = new PushJobSpec();
-    Map<String, String> result = SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, pushSpec, segmentFiles);
-    assertEquals(result.size(), 4);
-    for (String segmentFile : segmentFiles) {
-      assertTrue(result.containsKey(segmentFile));
-      assertEquals(result.get(segmentFile), segmentFile);
-    }
+    IllegalArgumentException failure = expectThrows(IllegalArgumentException.class,
+        () -> SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, pushSpec, segmentFiles));
+    assertTrue(failure.getMessage().contains(segmentFiles[0]));
+    assertTrue(failure.getMessage().contains(segmentFiles[2]));
 
     pushSpec.setPushFileNamePattern("glob:**/2022/*.tar.gz");
-    result = SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, pushSpec, segmentFiles);
+    Map<String, String> result = SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, pushSpec, segmentFiles);
     assertEquals(result.size(), 2);
     assertEquals(result.get(segmentFiles[2]), segmentFiles[2]);
     assertEquals(result.get(segmentFiles[3]), segmentFiles[3]);
 
     pushSpec.setPushFileNamePattern("glob:**/stats_*.tar.gz");
-    result = SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, pushSpec, segmentFiles);
-    assertEquals(result.size(), 2);
-    assertEquals(result.get(segmentFiles[1]), segmentFiles[1]);
-    assertEquals(result.get(segmentFiles[3]), segmentFiles[3]);
+    assertThrows(IllegalArgumentException.class,
+        () -> SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, pushSpec, segmentFiles));
+  }
+
+  @Test
+  public void testGetSegmentUriToTarPathMapWithoutOutputDirectory() {
+    PushJobSpec pushSpec = new PushJobSpec();
+    String segmentPath = "/output/segment.tar.gz";
+    String segmentUri = "https://segments.example.com" + segmentPath;
+    assertEquals(SegmentPushUtils.getSegmentUriToTarPathMap(null, pushSpec, new String[]{segmentPath}),
+        Map.of(segmentPath, segmentPath));
+    assertEquals(SegmentPushUtils.getSegmentUriToTarPathMap(null, pushSpec, new String[]{segmentUri}),
+        Map.of(segmentUri, segmentUri));
+    pushSpec.setSegmentUriPrefix("https://segments.example.com");
+    assertEquals(SegmentPushUtils.getSegmentUriToTarPathMap(null, pushSpec, new String[]{segmentPath}),
+        Map.of("https://segments.example.com/output/segment.tar.gz", segmentPath));
+  }
+
+  @Test(dataProvider = "segmentTarExtensions")
+  public void testDuplicateSegmentsRejectedBeforeUpload(String extension)
+      throws Exception {
+    List<String> archives = List.of("file:///output/segment.tar.gz", "file:///output/2022/segment" + extension);
+    Map<String, String> segmentUriToTarPathMap = Map.of(archives.get(0), archives.get(0),
+        archives.get(1), archives.get(1));
+    PinotFS fileSystem = mock(PinotFS.class);
+    SegmentGenerationJobSpec spec = createSegmentGenerationJobSpec(URI.create("https://localhost:1"), null);
+    assertThrows(IllegalArgumentException.class, () -> SegmentPushUtils.pushSegments(spec, fileSystem, archives));
+    assertThrows(IllegalArgumentException.class, () -> {
+      SegmentPushUtils.sendSegmentUriAndMetadata(spec, fileSystem, segmentUriToTarPathMap, List.of(), List.of());
+    });
+    assertThrows(IllegalArgumentException.class, () -> {
+      SegmentPushUtils.sendSegmentsUriAndMetadata(spec, fileSystem, segmentUriToTarPathMap, List.of(), List.of());
+    });
+    verifyNoInteractions(fileSystem);
   }
 
   @DataProvider(name = "segmentTarExtensions")
