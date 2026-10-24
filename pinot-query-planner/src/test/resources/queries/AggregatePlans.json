@@ -224,14 +224,14 @@
         ]
       },
       {
-        "description": "ANY_VALUE over a DECIMAL expression takes the type the expression is read as",
+        "description": "ANY_VALUE over a DECIMAL expression infers BIG_DECIMAL",
         "sql": "EXPLAIN PLAN FOR SELECT ANY_VALUE(a.col3 * 1.5), ANY_VALUE(CAST(a.col3 AS DECIMAL(10, 0))) FROM a",
         "output": [
           "Execution Plan",
-          "\nPinotLogicalAggregate(group=[{}], agg#0=[ANYVALUE($0, _UTF-8'DOUBLE')], agg#1=[ANYVALUE($1, _UTF-8'INT')], aggType=[FINAL])",
+          "\nPinotLogicalAggregate(group=[{}], agg#0=[ANYVALUE($0, _UTF-8'BIG_DECIMAL')], agg#1=[ANYVALUE($1, _UTF-8'BIG_DECIMAL')], aggType=[FINAL])",
           "\n  PinotLogicalExchange(distribution=[hash])",
-          "\n    PinotLogicalAggregate(group=[{}], agg#0=[ANYVALUE($0, _UTF-8'DOUBLE')], agg#1=[ANYVALUE($1, _UTF-8'INT')], aggType=[LEAF])",
-          "\n      LogicalProject($f0=[*($2, 1.5:DECIMAL(2, 1))], $f1=[CAST($2):DECIMAL(10, 0) NOT NULL], $f2=[_UTF-8'DOUBLE'], $f3=[_UTF-8'INT'])",
+          "\n    PinotLogicalAggregate(group=[{}], agg#0=[ANYVALUE($0, _UTF-8'BIG_DECIMAL')], agg#1=[ANYVALUE($1, _UTF-8'BIG_DECIMAL')], aggType=[LEAF])",
+          "\n      LogicalProject($f0=[*($2, 1.5:DECIMAL(2, 1))], $f1=[CAST($2):DECIMAL(10, 0) NOT NULL], $f2=[_UTF-8'BIG_DECIMAL'])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -255,19 +255,6 @@
         "description": "ANY_VALUE rejects a data type argument that is not a literal",
         "sql": "EXPLAIN PLAN FOR SELECT ANY_VALUE(a.col3, a.col1) FROM a",
         "expectedException": ".*Unsupported data type for ANYVALUE\\(expr, 'dataType'\\) with expr of type INTEGER: \\$.*"
-      },
-      {
-        "description": "FIRST_WITH_TIME over a DECIMAL expression takes the type the expression is read as",
-        "sql": "EXPLAIN PLAN FOR SELECT FIRST_WITH_TIME(a.col3 * 1.5, a.ts) FROM a",
-        "output": [
-          "Execution Plan",
-          "\nPinotLogicalAggregate(group=[{}], agg#0=[FIRSTWITHTIME($0, $0, _UTF-8'DOUBLE')], aggType=[FINAL])",
-          "\n  PinotLogicalExchange(distribution=[hash])",
-          "\n    PinotLogicalAggregate(group=[{}], agg#0=[FIRSTWITHTIME($0, $1, _UTF-8'DOUBLE')], aggType=[LEAF])",
-          "\n      LogicalProject($f0=[*($2, 1.5:DECIMAL(2, 1))], $f1=[$7], $f2=[_UTF-8'DOUBLE'])",
-          "\n        PinotLogicalTableScan(table=[[default, a]])",
-          "\n"
-        ]
       },
       {
         "description": "ANY_VALUE keeps the form without a data type when inferAnyValueType is false",

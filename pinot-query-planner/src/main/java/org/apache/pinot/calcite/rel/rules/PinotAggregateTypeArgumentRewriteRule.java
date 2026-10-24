@@ -19,7 +19,6 @@
 package org.apache.pinot.calcite.rel.rules;
 
 import java.util.ArrayList;
-import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,9 +37,8 @@ import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.tools.RelBuilderFactory;
-import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
@@ -57,12 +55,6 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 /// an optimization: `QueryEnvironment` always applies [#INSTANCE], or [#WITHOUT_ANY_VALUE] when the `inferAnyValueType`
 /// query option is false, and `skipPlannerRules` cannot turn it off.
 public class PinotAggregateTypeArgumentRewriteRule extends RelOptRule {
-  // Data types of the explicit forms, by the type the multi-stage engine reads the data argument as
-  private static final Set<ColumnDataType> DATA_TYPES =
-      EnumSet.of(ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.FLOAT, ColumnDataType.DOUBLE,
-          ColumnDataType.BIG_DECIMAL, ColumnDataType.BOOLEAN, ColumnDataType.TIMESTAMP, ColumnDataType.STRING,
-          ColumnDataType.BYTES, ColumnDataType.UUID);
-
   public static final PinotAggregateTypeArgumentRewriteRule INSTANCE =
       new PinotAggregateTypeArgumentRewriteRule(true, PinotRuleUtils.PINOT_REL_FACTORY, null);
   /// Leaves ANY_VALUE without the data type argument.
@@ -165,16 +157,41 @@ public class PinotAggregateTypeArgumentRewriteRule extends RelOptRule {
   }
 
   private static String inferDataType(String name, String arguments, RelDataType relDataType) {
-    ColumnDataType dataType = RelToPlanNodeConverter.convertToColumnDataType(relDataType);
-    if (!DATA_TYPES.contains(dataType)) {
-      throw new IllegalArgumentException(
-          String.format("Unsupported data type for %s(%s): %s", name, arguments, relDataType.getSqlTypeName()));
+    SqlTypeName dataType = relDataType.getSqlTypeName();
+    switch (dataType) {
+      case TINYINT:
+      case SMALLINT:
+      case INTEGER:
+        return "INT";
+      case BIGINT:
+        return "LONG";
+      case REAL:
+      case FLOAT:
+        return "FLOAT";
+      case DOUBLE:
+        return "DOUBLE";
+      case DECIMAL:
+        return "BIG_DECIMAL";
+      case CHAR:
+      case VARCHAR:
+        return "STRING";
+      case BOOLEAN:
+        return "BOOLEAN";
+      case TIMESTAMP:
+        return "TIMESTAMP";
+      case BINARY:
+      case VARBINARY:
+        return "BYTES";
+      case UUID:
+        return "UUID";
+      default:
+        throw new IllegalArgumentException(
+            String.format("Unsupported data type for %s(%s): %s", name, arguments, dataType));
     }
-    return dataType.name();
   }
 
-  /// The result type of ANY_VALUE follows its data argument, so an explicit data type argument must be the one the data
-  /// argument is read as.
+  /// The result type of ANY_VALUE follows its data argument, so an explicit data type argument must be the one this
+  /// rule supplies for it.
   private static void checkAnyValueDataTypeArgument(String name, List<Integer> argList, RelNode input) {
     RelDataType relDataType = input.getRowType().getFieldList().get(argList.get(0)).getType();
     String dataType = inferDataType(name, "expr", relDataType);
