@@ -81,11 +81,17 @@
       <artifactId>testcontainers</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- The shared Kafka classification fixtures include an MSK IAM credential failure, which carries AWS SDK
+         exceptions -->
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>sdk-core</artifactId>
+      <scope>test</scope>
+    </dependency>
     <!-- kafka-clients 4.x needs jose4j to build an OAUTHBEARER client; it does not declare it -->
     <dependency>
       <groupId>org.bitbucket.b_c</groupId>
       <artifactId>jose4j</artifactId>
-      <version>0.9.6</version>
       <scope>test</scope>
     </dependency>
   </dependencies>

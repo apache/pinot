@@ -45,6 +45,9 @@ public final class IngestionSourceErrorEvidence extends RuntimeException {
   public static final String LOCAL_PRECHECK = "local_precheck";
   /// The code for Pinot's own setup failing before any request reached the source, e.g. a trust store it can't load.
   public static final String LOCAL_SETUP = "local_setup";
+  /// The code a Kafka client records when it synthesizes "topic does not exist" from a metadata answer that lacks the
+  /// topic: Kafka's own `UNKNOWN_TOPIC_OR_PARTITION` error, which the synthesized exception doesn't carry.
+  public static final String UNKNOWN_TOPIC_OR_PARTITION = "UNKNOWN_TOPIC_OR_PARTITION";
 
   // Throwables built with suppression disabled can't carry evidence; their evidence lives here, keyed by identity.
   private static final ConcurrentMap<Throwable, IngestionSourceErrorEvidence> UNSUPPRESSIBLE =
@@ -68,13 +71,17 @@ public final class IngestionSourceErrorEvidence extends RuntimeException {
 
   /// Attaches a copy of `evidence` to `failure` and returns `failure`. A failure that already carries evidence keeps
   /// it: the innermost client is the closest to the source.
+  ///
+  /// Attach only to an exception created for this failure, such as the plugin's own wrapper. Some clients throw
+  /// shared instances (Kafka's `Errors.X.exception()`), and evidence attached to one would apply to every later
+  /// failure that reuses it.
   public static <T extends Throwable> T attach(T failure, IngestionSourceErrorEvidence evidence) {
     if (of(failure) != null) {
       return failure;
     }
     IngestionSourceErrorEvidence copy = evidence.copy();
     failure.addSuppressed(copy);
-    if (!carries(failure, copy)) {
+    if (of(failure) == null) {
       UNSUPPRESSIBLE.put(failure, copy);
     }
     return failure;
@@ -91,13 +98,10 @@ public final class IngestionSourceErrorEvidence extends RuntimeException {
     return UNSUPPRESSIBLE.get(failure);
   }
 
-  private static boolean carries(Throwable failure, IngestionSourceErrorEvidence evidence) {
-    for (Throwable suppressed : failure.getSuppressed()) {
-      if (suppressed == evidence) {
-        return true;
-      }
-    }
-    return false;
+  /// The evidence of a failure that couldn't carry it as a suppressed exception, or null.
+  @Nullable
+  static IngestionSourceErrorEvidence ofUnsuppressible(Throwable failure) {
+    return UNSUPPRESSIBLE.get(failure);
   }
 
   /// The service the client was talking to when it isn't the source itself, e.g.
@@ -130,10 +134,6 @@ public final class IngestionSourceErrorEvidence extends RuntimeException {
     return this;
   }
 
-  public boolean hasEvidence() {
-    return _status != 0 || _code != null;
-  }
-
   @Nullable
   public IngestionSourceCredentialMode getCredentialMode() {
     return _credentialMode;
@@ -154,7 +154,8 @@ public final class IngestionSourceErrorEvidence extends RuntimeException {
     return this;
   }
 
-  /// The endpoint as the client resolved it, reduced to scheme, host and port, or null.
+  /// The endpoint as the client resolved it, reduced to scheme, host and port, or null. The built-in rules don't read
+  /// it; registered rules and log lines can.
   @Nullable
   public String getResource() {
     return _resource;
@@ -167,7 +168,9 @@ public final class IngestionSourceErrorEvidence extends RuntimeException {
     return this;
   }
 
-  /// Whether the client talks to a source the table configured, rather than one Pinot itself was configured with.
+  /// Whether the client talks to a source the table configured, rather than one Pinot itself was configured with
+  /// (a batch reader can fall back to Pinot's deep store). Stream clients always talk to the table's source. The
+  /// built-in rules don't read it; registered rules can.
   public boolean isCustomerConfigured() {
     return _customerConfigured;
   }
@@ -178,7 +181,7 @@ public final class IngestionSourceErrorEvidence extends RuntimeException {
   }
 
   /// A copy to attach to one failure: a stack trace prints a throwable it meets twice as a circular reference.
-  public IngestionSourceErrorEvidence copy() {
+  private IngestionSourceErrorEvidence copy() {
     IngestionSourceErrorEvidence copy = new IngestionSourceErrorEvidence().setTarget(_target)
         .setEvidence(_status, _code).setCredentialMode(_credentialMode).setRoleArnConfigured(_roleArnConfigured)
         .setCustomerConfigured(_customerConfigured);

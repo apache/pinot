@@ -20,38 +20,42 @@ package org.apache.pinot.plugin.stream.kafka;
 
 import com.sun.net.httpserver.HttpServer;
 import java.net.InetSocketAddress;
+import java.net.ServerSocket;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
 import java.security.cert.CertificateException;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 import javax.net.ssl.SSLHandshakeException;
 import javax.security.auth.login.LoginException;
 import javax.security.sasl.SaslException;
-import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.OffsetOutOfRangeException;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.config.ConfigException;
+import org.apache.kafka.common.errors.IllegalSaslStateException;
 import org.apache.kafka.common.errors.InvalidConfigurationException;
 import org.apache.kafka.common.errors.SaslAuthenticationException;
 import org.apache.kafka.common.errors.SslAuthenticationException;
 import org.apache.kafka.common.errors.TimeoutException;
 import org.apache.kafka.common.errors.TopicAuthorizationException;
+import org.apache.kafka.common.errors.UnsupportedSaslMechanismException;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceCredentialMode;
-import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorCategory;
-import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorClassification;
-import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorClassifier;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorEvidence;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorSubReason;
 import org.testng.annotations.Test;
+import software.amazon.awssdk.core.exception.SdkClientException;
 
+import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorAssertions.assertAuth;
+import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorAssertions.assertNotClassified;
+import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorAssertions.assertSourceRead;
+import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorVerdict.TARGET_BROKER;
+import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorVerdict.TARGET_IDP;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
@@ -59,41 +63,19 @@ import static org.testng.Assert.fail;
 
 /// Pins the classifier's Kafka broker rules against the kafka-clients version on the test classpath: 3.x here, and
 /// 4.x through the subclass in pinot-kafka-4.0, where the authentication classes moved under
-/// `InvalidConfigurationException`. Where it is cheap, a fixture is produced by the real client.
+/// `InvalidConfigurationException` and the OAuth login reports failures differently. Where it is cheap, a fixture is
+/// produced by the real client.
 public class KafkaSourceErrorClassificationTest {
-  private static final String BROKER = "broker";
-  private static final String IDP = "idp";
-
-  private static void assertAuth(Throwable failure, IngestionSourceErrorSubReason subReason, String target) {
-    IngestionSourceErrorClassification classification = classify(failure);
-    assertEquals(classification.getCategory(), IngestionSourceErrorCategory.AUTH, describe(failure));
-    assertEquals(classification.getSubReason(), subReason, describe(failure));
-    assertEquals(classification.getTarget(), target, describe(failure));
-  }
-
-  private static void assertSourceRead(Throwable failure, String target) {
-    IngestionSourceErrorClassification classification = classify(failure);
-    assertEquals(classification.getCategory(), IngestionSourceErrorCategory.SOURCE_READ, describe(failure));
-    assertEquals(classification.getTarget(), target, describe(failure));
-  }
-
-  private static void assertNotClassified(Throwable failure) {
-    Optional<IngestionSourceErrorClassification> classification = IngestionSourceErrorClassifier.classify(failure);
-    assertTrue(classification.isEmpty(), classification + " for " + describe(failure));
-  }
-
-  private static IngestionSourceErrorClassification classify(Throwable failure) {
-    return IngestionSourceErrorClassifier.classify(failure)
-        .orElseThrow(() -> new AssertionError("Not classified: " + describe(failure)));
-  }
-
-  private static String describe(Throwable failure) {
-    return ExceptionUtils.getStackTrace(failure);
-  }
 
   /// The consume loop sees the broker's exception raw, under Pinot's own wrappers.
   private static Throwable underPinot(Throwable failure) {
     return new RuntimeException("Pinot wrapper", failure);
+  }
+
+  private static <T extends Throwable> T withCredentials(T failure, IngestionSourceCredentialMode mode,
+      boolean roleArnConfigured) {
+    return IngestionSourceErrorEvidence.attach(failure,
+        new IngestionSourceErrorEvidence().setCredentialMode(mode).setRoleArnConfigured(roleArnConfigured));
   }
 
   @Test
@@ -101,38 +83,56 @@ public class KafkaSourceErrorClassificationTest {
     // A broker rejection carries no cause.
     assertAuth(underPinot(new SaslAuthenticationException(
             "Authentication failed during authentication due to invalid credentials with SASL mechanism PLAIN")),
-        IngestionSourceErrorSubReason.AUTHENTICATION, BROKER);
+        IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_BROKER);
+    assertAuth(new UnsupportedSaslMechanismException("Client SASL mechanism 'PLAIN' not enabled in the server"),
+        IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_BROKER);
+    assertAuth(new IllegalSaslStateException("Unexpected handshake request"),
+        IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_BROKER);
   }
 
   @Test
   public void cloudIdentityDenialIsUnspecified() {
-    // MSK IAM reports a policy denial as a SASL authentication failure; the plugin records it signs with a cloud
-    // identity, so the class can't say which.
-    Throwable failure = IngestionSourceErrorEvidence.attach(new SaslAuthenticationException("[uuid]: Access denied"),
-        new IngestionSourceErrorEvidence().setCredentialMode(IngestionSourceCredentialMode.AMBIENT)
-            .setRoleArnConfigured(true));
-    assertAuth(underPinot(failure), IngestionSourceErrorSubReason.UNSPECIFIED, BROKER);
+    // MSK IAM reports a policy denial as a SASL authentication failure, whether it signs with the process's identity
+    // or an assumed role: the class can't say which.
+    Throwable ambient = withCredentials(new SaslAuthenticationException("[uuid]: Access denied"),
+        IngestionSourceCredentialMode.AMBIENT, false);
+    assertAuth(underPinot(ambient), IngestionSourceErrorSubReason.UNSPECIFIED, TARGET_BROKER);
+    Throwable assumedRole = withCredentials(new SaslAuthenticationException("[uuid]: Access denied"),
+        IngestionSourceCredentialMode.STATIC, true);
+    assertAuth(underPinot(assumedRole), IngestionSourceErrorSubReason.UNSPECIFIED, TARGET_BROKER);
+    // A table credential on SCRAM is a plain rejected identity.
+    Throwable scram = withCredentials(new SaslAuthenticationException("Authentication failed during authentication "
+        + "due to invalid credentials with SASL mechanism SCRAM-SHA-512"), IngestionSourceCredentialMode.STATIC, false);
+    assertAuth(underPinot(scram), IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_BROKER);
   }
 
   @Test
   public void clientSideSaslFailureIsNotTheBrokers() {
-    // Our credential chain or Kerberos setup failed while building the SASL token: the broker judged nothing.
-    Throwable ours = new SaslAuthenticationException(
+    // The MSK IAM login module failing to load the process's credentials, as kafka-clients and aws-msk-iam-auth
+    // build it.
+    Throwable credentialsGone = new SaslAuthenticationException(
         "An error: (java.security.PrivilegedActionException: javax.security.sasl.SaslException: Failed to find AWS "
-            + "IAM Credentials) occurred when evaluating SASL token received from the Kafka Broker.",
-        new SaslException("Failed to find AWS IAM Credentials", new IllegalStateException("no credentials")));
-    assertNotClassified(underPinot(ours));
+            + "IAM Credentials [Caused by software.amazon.awssdk.core.exception.SdkClientException: Unable to load "
+            + "credentials from any of the providers in the chain]) occurred when evaluating SASL token received from "
+            + "the Kafka Broker.",
+        new SaslException("Failed to find AWS IAM Credentials", SdkClientException.create(
+            "Unable to load credentials from any of the providers in the chain AwsCredentialsProviderChain")));
+    assertNotClassified(underPinot(credentialsGone));
+    // Any client-side failure building the SASL token: the broker judged nothing.
+    Throwable kerberosClient = new SaslAuthenticationException("An error occurred when evaluating SASL token",
+        new SaslException("GSS initiate failed", new IllegalStateException("no valid credentials")));
+    assertNotClassified(underPinot(kerberosClient));
   }
 
   @Test
   public void connectionThrottleIsSourceRead() {
-    assertSourceRead(new SaslAuthenticationException("[uuid]: Too many connects"), BROKER);
+    assertSourceRead(new SaslAuthenticationException("[uuid]: Too many connects"), TARGET_BROKER);
   }
 
   @Test
   public void topicAclDenied() {
     assertAuth(underPinot(new TopicAuthorizationException(Set.of("events"))),
-        IngestionSourceErrorSubReason.AUTHORIZATION, BROKER);
+        IngestionSourceErrorSubReason.AUTHORIZATION, TARGET_BROKER);
   }
 
   @Test
@@ -140,31 +140,27 @@ public class KafkaSourceErrorClassificationTest {
     Throwable weRejectedTheBroker = new SslAuthenticationException("SSL handshake failed",
         new SSLHandshakeException("PKIX path building failed",
             new CertificateException("unable to find valid certification path to requested target")));
-    assertSourceRead(underPinot(weRejectedTheBroker), BROKER);
+    assertSourceRead(underPinot(weRejectedTheBroker), TARGET_BROKER);
 
     Throwable brokerRejectedUs = new SslAuthenticationException("SSL handshake failed",
         new SSLHandshakeException("Received fatal alert: bad_certificate"));
-    assertAuth(underPinot(brokerRejectedUs), IngestionSourceErrorSubReason.AUTHENTICATION, BROKER);
-
-    Throwable expiredClientCertificate = new SslAuthenticationException("SSL handshake failed",
-        new SSLHandshakeException("Received fatal alert: certificate_expired"));
-    assertAuth(expiredClientCertificate, IngestionSourceErrorSubReason.AUTHENTICATION, BROKER);
+    assertAuth(underPinot(brokerRejectedUs), IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_BROKER);
 
     Throwable otherHandshakeFailure = new SslAuthenticationException("SSL handshake failed",
         new SSLHandshakeException("Received fatal alert: handshake_failure"));
-    assertSourceRead(otherHandshakeFailure, BROKER);
+    assertSourceRead(otherHandshakeFailure, TARGET_BROKER);
   }
 
   @Test
   public void brokerNeverAnswered() {
-    assertSourceRead(underPinot(new TimeoutException("Timeout expired while fetching topic metadata")), BROKER);
+    assertSourceRead(underPinot(new TimeoutException("Timeout expired while fetching topic metadata")), TARGET_BROKER);
   }
 
   @Test
   public void unresolvableBootstrapFromTheRealClient() {
     Properties props = consumerProperties();
     props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "no-such-broker.invalid:9092");
-    assertSourceRead(underPinot(constructConsumer(props)), BROKER);
+    assertSourceRead(underPinot(constructConsumer(props)), TARGET_BROKER);
   }
 
   @Test
@@ -173,31 +169,62 @@ public class KafkaSourceErrorClassificationTest {
         new ConfigException("Invalid value FOO for configuration security.protocol")));
     // In 4.x the authentication classes extend this one: it must never decide on its own.
     assertNotClassified(new InvalidConfigurationException("Invalid configuration"));
+    // A keystore we can't read, from the real client.
+    Properties props = consumerProperties();
+    props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
+    props.put("security.protocol", "SSL");
+    props.put("ssl.keystore.location", "/nonexistent/keystore.jks");
+    props.put("ssl.keystore.password", "fixture-only");
+    assertNotClassified(underPinot(constructConsumer(props)));
   }
 
   @Test
   public void expiredOffsetWithoutResetPolicyIsSourceRead() {
     assertSourceRead(underPinot(new OffsetOutOfRangeException("Fetch position out of range",
-        Map.of(new TopicPartition("events", 0), 42L))), BROKER);
+        Map.of(new TopicPartition("events", 0), 42L))), TARGET_BROKER);
   }
 
   @Test
   public void oauthTokenEndpointRefusesTheClientInTheRealClient()
       throws Exception {
-    assertAuth(underPinot(constructOAuthConsumer(401, "{\"error\":\"invalid_client\"}")),
-        IngestionSourceErrorSubReason.AUTHENTICATION, IDP);
-    assertAuth(underPinot(constructOAuthConsumer(403, "{}")), IngestionSourceErrorSubReason.AUTHORIZATION, IDP);
-    // A malformed token request is ours.
+    assertEquals(assertAuth(underPinot(constructOAuthConsumer(401, "{\"error\":\"invalid_client\"}")),
+        IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_IDP).getCode(), "invalid_client");
+    // RFC 6749 refusals arrive as 400.
+    assertEquals(assertAuth(underPinot(constructOAuthConsumer(400, "{\"error\":\"invalid_grant\"}")),
+        IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_IDP).getCode(), "invalid_grant");
+    assertEquals(assertAuth(underPinot(constructOAuthConsumer(400, "{\"error\":\"unauthorized_client\"}")),
+        IngestionSourceErrorSubReason.AUTHORIZATION, TARGET_IDP).getCode(), "unauthorized_client");
+    assertEquals(assertAuth(underPinot(constructOAuthConsumer(403, "{}")), IngestionSourceErrorSubReason.AUTHORIZATION,
+        TARGET_IDP).getCode(), "403");
+    // A malformed token request is ours, whatever the status.
     assertNotClassified(underPinot(constructOAuthConsumer(400, "{\"error\":\"invalid_request\"}")));
+    assertNotClassified(underPinot(constructOAuthConsumer(401, "{\"error\":\"invalid_request\"}")));
+  }
+
+  @Test
+  public void oauthTokenEndpointThatFailedIsSourceReadInTheRealClient()
+      throws Exception {
+    assertSourceRead(underPinot(constructOAuthConsumer(503, "unavailable")), TARGET_IDP);
+    int closedPort;
+    try (ServerSocket socket = new ServerSocket(0)) {
+      closedPort = socket.getLocalPort();
+    }
+    assertSourceRead(underPinot(constructOAuthConsumer("http://localhost:" + closedPort + "/token")), TARGET_IDP);
   }
 
   @Test
   public void kerberosLogin() {
     Throwable rejected = new KafkaException("Failed to construct kafka consumer",
         new KafkaException(new LoginException("Pre-authentication information was invalid (24)")));
-    assertAuth(rejected, IngestionSourceErrorSubReason.AUTHENTICATION, IDP);
-    assertSourceRead(new LoginException("Cannot contact any KDC for realm 'EXAMPLE.COM'"), IDP);
+    assertAuth(rejected, IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_IDP);
+    assertAuth(new LoginException("Client not found in Kerberos database (6)"),
+        IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_IDP);
+    assertSourceRead(new LoginException("Cannot contact any KDC for realm 'EXAMPLE.COM'"), TARGET_IDP);
+    assertSourceRead(new LoginException("Receive timed out"), TARGET_IDP);
+    // Our clock, keytab or krb5 setup.
     assertNotClassified(new LoginException("Unable to obtain password from user"));
+    assertNotClassified(new LoginException("Clock skew too great (37)"));
+    assertNotClassified(new LoginException("Cannot locate default realm"));
   }
 
   @Test
@@ -209,7 +236,7 @@ public class KafkaSourceErrorClassificationTest {
       Class<?> isolatedClass = isolated.loadClass(TopicAuthorizationException.class.getName());
       assertTrue(isolatedClass != TopicAuthorizationException.class);
       Throwable denied = (Throwable) isolatedClass.getConstructor(String.class).newInstance("denied");
-      assertAuth(underPinot(denied), IngestionSourceErrorSubReason.AUTHORIZATION, BROKER);
+      assertAuth(underPinot(denied), IngestionSourceErrorSubReason.AUTHORIZATION, TARGET_BROKER);
     }
   }
 
@@ -241,7 +268,14 @@ public class KafkaSourceErrorClassificationTest {
       exchange.close();
     });
     server.start();
-    String tokenUrl = "http://localhost:" + server.getAddress().getPort() + "/token";
+    try {
+      return constructOAuthConsumer("http://localhost:" + server.getAddress().getPort() + "/token");
+    } finally {
+      server.stop(0);
+    }
+  }
+
+  private static Throwable constructOAuthConsumer(String tokenUrl) {
     String allowedUrls = System.getProperty("org.apache.kafka.sasl.oauthbearer.allowed.urls");
     System.setProperty("org.apache.kafka.sasl.oauthbearer.allowed.urls", tokenUrl);
     try {
@@ -263,7 +297,6 @@ public class KafkaSourceErrorClassificationTest {
       } else {
         System.clearProperty("org.apache.kafka.sasl.oauthbearer.allowed.urls");
       }
-      server.stop(0);
     }
   }
 }

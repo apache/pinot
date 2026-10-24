@@ -43,4 +43,13 @@
     <module>pinot-pulsar</module>
   </modules>
 
+  <dependencies>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-spi</artifactId>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
 </project>
