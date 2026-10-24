@@ -26,8 +26,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import org.apache.pinot.common.config.provider.TableDataManagerMetadata.SegmentSnapshot;
+import org.apache.pinot.coordination.ratis.client.MetadataImage;
+import org.apache.pinot.coordination.ratis.client.RatisOfflineTableMetadata;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.ActivateControlEpoch;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.BeginDrain;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.Capability;
@@ -50,7 +54,9 @@ import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.GetOutcome;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.GetRecord;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.MembershipCommand;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Mutation;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.NativeOperationCommand;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.ObjectVersion;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.OfflineSegmentCommand;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.OperationCommand;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.OwnershipCommand;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.RecordKind;
@@ -59,6 +65,12 @@ import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Result;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Revision;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Status;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Transaction;
+import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.AssignReplica;
+import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.Compatibility;
+import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.Content;
+import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.LoaderDescriptor;
+import org.apache.pinot.coordination.ratis.metadata.OfflineSegmentProtocol.PublishContent;
+import org.apache.pinot.coordination.ratis.metadata.OperationProtocol.AssignedOfflineSegmentReload;
 import org.apache.pinot.coordination.ratis.metadata.OperationProtocol.Cancel;
 import org.apache.pinot.coordination.ratis.metadata.OperationProtocol.Checkpoint;
 import org.apache.pinot.coordination.ratis.metadata.OperationProtocol.Claim;
@@ -84,6 +96,7 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
@@ -93,6 +106,7 @@ import static org.testng.Assert.assertTrue;
 /// segment reload completion. Publication, retry outcomes and snapshots share the catalog's transaction boundary.
 public class ControllerCoordinationTest {
   private static final String TABLE = "analytics.orders_OFFLINE";
+  private static final String SCHEMA = "analytics.orders";
   private static final FeedScope ALL = new FeedScope(Set.of(RecordKind.values()), "controller-test");
   private static final Layout LAYOUT = new Layout(1, 24, HashVersion.MURMUR2_UTF8_MASK_POSITIVE_V1);
 
@@ -221,7 +235,7 @@ public class ControllerCoordinationTest {
     assertEquals(fixture.operation(new Submit(id, fixture.input())).status(), Status.OK);
     assertEquals(fixture.claim(id, first).status(), Status.OK);
     long attempt = fixture.operationState(id).attempt();
-    CatalogRecord schema = fixture.record(RecordKind.SCHEMA, "orders");
+    CatalogRecord schema = fixture.record(RecordKind.SCHEMA, SCHEMA);
     assertEquals(fixture.transaction(Mutation.updateSchema(fixture.version(schema), fixture.schema())).status(),
         Status.OK);
     assertEquals(fixture.operation(new Checkpoint(id, fixture.operationVersion(id), first, attempt,
@@ -249,6 +263,140 @@ public class ControllerCoordinationTest {
   }
 
   @Test
+  public void testImmutableOfflineContentAndAssignmentFences()
+      throws Exception {
+    Fixture fixture = new Fixture();
+    OwnerToken owner = fixture.assign(fixture._first, 0);
+    Content content = fixture.content();
+    ObjectVersion table = fixture.version(fixture.record(RecordKind.TABLE_CONFIG, TABLE));
+    assertEquals(fixture.segment(new PublishContent(owner, table, content)).status(), Status.OK);
+    assertEquals(fixture.segment(new PublishContent(owner, table, content)).status(), Status.CONFLICT);
+    Compatibility initial = fixture.compatibility();
+    assertEquals(fixture.segment(new AssignReplica(owner, content.segmentObjectId(), 0, fixture._server, initial, true))
+        .status(), Status.OK);
+    OfflineSegmentProtocol.Assignment first = fixture.replica(content);
+    assertEquals(first.assignmentEpoch(), 1L);
+    assertTrue(first.desiredOnline());
+    assertEquals(first.materializationId(), OfflineSegmentProtocol.materializationId(fixture._history,
+        OfflineSegmentProtocol.assignmentObjectId(fixture._history, content.segmentObjectId(),
+            fixture._server.participantId()), 1));
+    AtomicReference<MetadataImage> image = new AtomicReference<>(MetadataImage.fromSnapshot(ALL,
+        fixture._catalog.captureImage(ALL)));
+    RatisOfflineTableMetadata metadata = new RatisOfflineTableMetadata(image::get, fixture._server, fixture._tableId);
+    SegmentSnapshot loading = metadata.fetchSegment(TABLE, content.segmentName());
+    assertEquals(loading.segment().downloadUri(), content.downloadUri());
+    assertEquals(loading.segment().crc(), content.loader().crc());
+    assertEquals(loading.tableConfig().getValidationConfig().getReplication(), "1");
+    assertEquals(loading.schema().getSchemaName(), SCHEMA);
+
+    assertEquals(fixture.transaction(Mutation.updateTableConfig(table, fixture.table(2))).status(), Status.OK);
+    image.set(MetadataImage.fromSnapshot(ALL, fixture._catalog.captureImage(ALL)));
+    assertThrows(IllegalStateException.class, () -> metadata.fetchSegment(TABLE, content.segmentName()));
+    assertEquals(fixture.segment(new AssignReplica(owner, content.segmentObjectId(), 1, fixture._server, initial, true))
+        .status(), Status.CONFLICT);
+    Compatibility current = fixture.compatibility();
+    assertEquals(fixture.segment(new AssignReplica(owner, content.segmentObjectId(), 1, fixture._server, current, true))
+        .status(), Status.OK);
+    OfflineSegmentProtocol.Assignment next = fixture.replica(content);
+    assertEquals(next.assignmentEpoch(), 2L);
+    assertNotEquals(next.materializationId(), first.materializationId());
+    image.set(MetadataImage.fromSnapshot(ALL, fixture._catalog.captureImage(ALL)));
+    assertEquals(metadata.fetchSegment(TABLE, content.segmentName()).tableConfig().getValidationConfig()
+        .getReplication(), "2");
+    // Mutating a caller's decoded configuration cannot change the published metadata image.
+    loading.tableConfig().getValidationConfig().setReplication("99");
+    assertEquals(metadata.fetchTable(TABLE).tableConfig().getValidationConfig().getReplication(), "2");
+    assertEquals(fixture.segment(new AssignReplica(owner, content.segmentObjectId(), 1, fixture._server, current, true))
+        .status(), Status.CONFLICT);
+
+    assertEquals(fixture.member(new BeginDrain(fixture._server)).status(), Status.OK);
+    image.set(MetadataImage.fromSnapshot(ALL, fixture._catalog.captureImage(ALL)));
+    assertThrows(IllegalStateException.class, () -> metadata.fetchSegment(TABLE, content.segmentName()));
+    assertEquals(fixture.segment(new AssignReplica(owner, content.segmentObjectId(), 2, fixture._server, current, true))
+        .status(), Status.FENCED);
+    assertEquals(fixture.transaction(Mutation.delete(RecordKind.TABLE_CONFIG, TABLE, current.table())).status(),
+        Status.OK);
+    assertEquals(fixture.transaction(Mutation.createTableConfig(fixture._history, UUID.randomUUID(), fixture.table(1)))
+        .status(), Status.OK);
+    OwnerToken successor = fixture.assign(fixture._second, 1);
+    assertEquals(fixture.segment(new AssignReplica(owner, content.segmentObjectId(), 2, fixture._server, current,
+        false)).status(), Status.FENCED);
+    assertEquals(fixture.segment(new AssignReplica(successor, content.segmentObjectId(), 2, fixture._server, current,
+        false)).status(), Status.OK);
+    assertFalse(fixture.replica(content).desiredOnline());
+    assertEquals(fixture.replica(content).assignmentEpoch(), 3L);
+    MetadataCatalog recovered = new MetadataCatalog(fixture._cluster, fixture._history);
+    recovered.restoreSnapshot(fixture._catalog.captureSnapshot());
+    assertEquals(recovered.captureSnapshot(), fixture._catalog.captureSnapshot());
+  }
+
+  @Test
+  public void testNativeReloadRequiresAuthoritativeAssignment()
+      throws Exception {
+    Fixture fixture = new Fixture();
+    OwnerToken owner = fixture.assign(fixture._first, 0);
+    assertEquals(fixture.nativeOperation(new Submit(UUID.randomUUID(), fixture.input())).status(), Status.NOT_FOUND);
+    Content content = fixture.content();
+    assertEquals(fixture.segment(new PublishContent(owner, fixture.compatibility().table(), content)).status(),
+        Status.OK);
+    assertEquals(fixture.segment(new AssignReplica(owner, content.segmentObjectId(), 0, fixture._server,
+        fixture.compatibility(), true)).status(), Status.OK);
+    OfflineSegmentProtocol.Assignment replica = fixture.replica(content);
+    UUID id = UUID.randomUUID();
+    OfflineSegmentReload input = new OfflineSegmentReload(TABLE, fixture._tableId, content.segmentName(),
+        content.segmentObjectId(), content.contentSha256(), List.of(new TargetMaterialization(fixture._server,
+        replica.assignmentEpoch(), replica.materializationId())), true);
+    assertEquals(fixture.nativeOperation(new Submit(id, input)).status(), Status.OK);
+    AssignedOfflineSegmentReload assigned = (AssignedOfflineSegmentReload) fixture.operationState(id).input();
+    assertEquals(assigned.dependencies().size(), 4);
+    assertEquals(fixture.nativeOperation(new Claim(id, 1, owner, assigned.dependencies())).status(), Status.OK);
+    // A controller's counters cannot certify physical installation without committed target observations.
+    assertEquals(fixture.nativeOperation(new Complete(id, 2, owner, 1, State.SUCCEEDED,
+        new Progress(1, 0, "unverified"), List.of())).status(), Status.INVALID_REQUEST);
+    assertEquals(fixture.operationState(id).status(), State.RUNNING);
+    assertEquals(fixture.segment(new AssignReplica(owner, content.segmentObjectId(), 1, fixture._server,
+        fixture.compatibility(), true)).status(), Status.OK);
+    assertEquals(fixture.nativeOperation(new Checkpoint(id, 2, owner, 1, new Progress(0, 0, "stale assignment")))
+        .status(), Status.FENCED);
+    assertEquals(fixture.nativeOperation(new Cancel(id, 2, owner, "replan current assignment")).status(), Status.OK);
+
+    UUID legacyId = UUID.randomUUID();
+    assertEquals(fixture.operation(new Submit(legacyId, fixture.input())).status(), Status.OK);
+    assertEquals(fixture.nativeOperation(new Claim(legacyId, 1, owner,
+        List.of(fixture.compatibility().table()))).status(), Status.INVALID_REQUEST);
+    MetadataCatalog restored = new MetadataCatalog(fixture._cluster, fixture._history);
+    restored.restoreSnapshot(fixture._catalog.captureSnapshot());
+    assertEquals(restored.captureSnapshot(), fixture._catalog.captureSnapshot());
+  }
+
+  @Test
+  public void testOfflineSnapshotReferencesAndLegacyMembershipRejection()
+      throws Exception {
+    Fixture fixture = new Fixture();
+    OwnerToken owner = fixture.assign(fixture._first, 0);
+    ObjectNode legacy = fixture._catalog.captureSnapshot().deepCopy();
+    legacy.put("formatVersion", 4);
+    MetadataCatalog recovered = new MetadataCatalog(fixture._cluster, fixture._history);
+    assertThrows(IOException.class, () -> recovered.restoreSnapshot(legacy));
+    Content content = fixture.content();
+    assertEquals(fixture.segment(new PublishContent(owner, fixture.compatibility().table(), content)).status(),
+        Status.OK);
+    assertEquals(fixture.segment(new AssignReplica(owner, content.segmentObjectId(), 0, fixture._server,
+        fixture.compatibility(), true)).status(), Status.OK);
+    JsonNode valid = fixture._catalog.captureSnapshot();
+    recovered.restoreSnapshot(valid);
+    ObjectNode corrupt = valid.deepCopy();
+    rewriteRecord(corrupt, RecordKind.OFFLINE_REPLICA_ASSIGNMENT,
+        value -> ((ObjectNode) value.at("/compatibility/schema")).put("version", 999));
+    assertThrows(IOException.class, () -> recovered.restoreSnapshot(corrupt));
+    assertEquals(recovered.captureSnapshot(), valid);
+    ObjectNode oldFormat = valid.deepCopy();
+    oldFormat.put("formatVersion", 4);
+    assertThrows(IOException.class, () -> recovered.restoreSnapshot(oldFormat));
+    assertEquals(recovered.captureSnapshot(), valid);
+  }
+
+  @Test
   public void testDurableOutcomeAndSnapshotReferenceValidation()
       throws Exception {
     Fixture fixture = new Fixture();
@@ -256,6 +404,16 @@ public class ControllerCoordinationTest {
     UUID id = UUID.randomUUID();
     OperationCommand submit = fixture.command(new Submit(id, fixture.input()));
     byte[] request = MetadataProtocol.encode(submit);
+    assertFalse(new String(request, StandardCharsets.UTF_8).contains("forceDownload"),
+        "Default false must preserve the original serialized intent and durable request digest");
+    assertEquals(MetadataProtocol.encode(MetadataProtocol.decodeCommand(request)), request);
+    OfflineSegmentReload input = fixture.input();
+    OfflineSegmentReload forced = new OfflineSegmentReload(input.tableName(), input.tableObjectId(),
+        input.segmentName(), input.segmentObjectId(), input.contentSha256(), input.targets(), true);
+    assertEquals(MetadataProtocol.fromTree(MetadataProtocol.toTree(forced), OfflineSegmentReload.class), forced);
+    ObjectNode malformed = MetadataProtocol.toTree(forced).deepCopy();
+    malformed.remove("segmentName");
+    assertThrows(IOException.class, () -> MetadataProtocol.fromTree(malformed, OfflineSegmentReload.class));
     byte[] original = fixture._catalog.execute(request, fixture._term, ++fixture._index);
     assertEquals(MetadataProtocol.decodeResult(original).status(), Status.OK);
     JsonNode snapshot = fixture._catalog.captureSnapshot();
@@ -315,8 +473,6 @@ public class ControllerCoordinationTest {
     Fixture legacy = new Fixture(false);
     ObjectNode legacyMembership = legacy._catalog.captureSnapshot().deepCopy();
     legacyMembership.put("formatVersion", 3);
-    ((ObjectNode) legacyMembership.at("/membership/control")).remove(
-        List.of("minimumTickDelayMillis", "maxConfiguredPermitLifetimeMillis"));
     MetadataCatalog migrated = new MetadataCatalog(legacy._cluster, legacy._history);
     assertThrows(IOException.class, () -> migrated.restoreSnapshot(legacyMembership));
   }
@@ -391,6 +547,33 @@ public class ControllerCoordinationTest {
       return apply(command(request));
     }
 
+    private Result segment(OfflineSegmentProtocol.Operation request)
+        throws IOException {
+      return apply(new OfflineSegmentCommand(_history, "controller", 1, "coordination", nextSequence(), request));
+    }
+
+    private Result nativeOperation(OperationProtocol.Operation request)
+        throws IOException {
+      return apply(new NativeOperationCommand(_history, "controller", 1, "coordination", nextSequence(), request));
+    }
+
+    private Content content() {
+      return new Content(TABLE, _tableId, "segment-0", UUID.randomUUID(), "b".repeat(64),
+          "file:///immutable/segment-0.tar.gz", new LoaderDescriptor(123, -1, false, null, null, 0, 0, Map.of()));
+    }
+
+    private Compatibility compatibility()
+        throws IOException {
+      return new Compatibility(version(record(RecordKind.TABLE_CONFIG, TABLE)),
+          version(record(RecordKind.SCHEMA, SCHEMA)));
+    }
+
+    private OfflineSegmentProtocol.Assignment replica(Content content)
+        throws IOException {
+      return OfflineSegmentProtocol.decodeAssignment(record(RecordKind.OFFLINE_REPLICA_ASSIGNMENT,
+          OfflineSegmentProtocol.assignmentName(content.segmentObjectId(), _server.participantId())).value());
+    }
+
     private OperationCommand command(OperationProtocol.Operation request)
         throws IOException {
       return new OperationCommand(_history, "controller", 1, "coordination", nextSequence(), request);
@@ -429,7 +612,7 @@ public class ControllerCoordinationTest {
     private Result claim(UUID id, OwnerToken owner)
         throws IOException {
       return operation(new Claim(id, operationVersion(id), owner,
-          List.of(version(record(RecordKind.TABLE_CONFIG, TABLE)), version(record(RecordKind.SCHEMA, "orders")))));
+          List.of(version(record(RecordKind.TABLE_CONFIG, TABLE)), version(record(RecordKind.SCHEMA, SCHEMA)))));
     }
 
     private CatalogRecord record(RecordKind kind, String name)
@@ -475,7 +658,7 @@ public class ControllerCoordinationTest {
     }
 
     private Schema schema() {
-      return new Schema.SchemaBuilder().setSchemaName("orders").addSingleValueDimension("id", DataType.INT).build();
+      return new Schema.SchemaBuilder().setSchemaName(SCHEMA).addSingleValueDimension("id", DataType.INT).build();
     }
 
     private TableShard scope() {

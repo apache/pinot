@@ -39,6 +39,7 @@ import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,17 +50,30 @@ public class LogicalTableExecutionInfo implements TableExecutionInfo {
   public static LogicalTableExecutionInfo create(InstanceDataManager instanceDataManager,
       ServerQueryRequest queryRequest, QueryContext queryContext)
       throws TableNotFoundException {
+    if (queryRequest.getNativeQueryContext() != null) {
+      throw QueryErrorCode.QUERY_VALIDATION.asException("Native logical-table query identities are not supported yet");
+    }
     List<TableSegmentsContext> tableSegmentsContexts = queryRequest.getTableSegmentsContexts();
     List<SingleTableExecutionInfo> tableExecutionInfos =
         new ArrayList<>(Objects.requireNonNull(tableSegmentsContexts).size());
-    for (TableSegmentsContext tableSegmentsContext : tableSegmentsContexts) {
-      SingleTableExecutionInfo singleTableExecutionInfo =
-          SingleTableExecutionInfo.create(instanceDataManager, tableSegmentsContext.getTableName(),
-              tableSegmentsContext.getSegments(), tableSegmentsContext.getOptionalSegments(), queryContext);
-      tableExecutionInfos.add(singleTableExecutionInfo);
+    boolean accepted = false;
+    try {
+      for (TableSegmentsContext tableSegmentsContext : tableSegmentsContexts) {
+        SingleTableExecutionInfo singleTableExecutionInfo =
+            SingleTableExecutionInfo.create(instanceDataManager, tableSegmentsContext.getTableName(),
+                tableSegmentsContext.getSegments(), tableSegmentsContext.getOptionalSegments(), queryContext);
+        tableExecutionInfos.add(singleTableExecutionInfo);
+      }
+      LogicalTableExecutionInfo result = new LogicalTableExecutionInfo(tableExecutionInfos);
+      accepted = true;
+      return result;
+    } finally {
+      if (!accepted) {
+        for (SingleTableExecutionInfo info : tableExecutionInfos) {
+          info.releaseSegmentDataManagers();
+        }
+      }
     }
-
-    return new LogicalTableExecutionInfo(tableExecutionInfos);
   }
 
   private final List<SingleTableExecutionInfo> _tableExecutionInfos;

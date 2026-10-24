@@ -28,6 +28,8 @@ import javax.annotation.Nullable;
 
 /// Current controller-only authorization policy. Returning null denies access. Implementations must be thread-safe,
 /// non-blocking and consult current policy on every call; workers and public users have no access to this full image.
+/// Operation mutations additionally require the same certificate's current CONTROLLER binding from
+/// [ParticipantAccessPolicy]. Metadata client IDs and participant IDs need not have the same spelling.
 @FunctionalInterface
 public interface ControllerAccessPolicy {
   @Nullable

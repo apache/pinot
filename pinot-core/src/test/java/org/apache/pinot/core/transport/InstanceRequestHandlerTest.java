@@ -27,8 +27,10 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.LongAccumulator;
 import org.apache.pinot.common.datatable.DataTable;
@@ -37,6 +39,9 @@ import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
+import org.apache.pinot.common.request.NativeQueryIdentity;
+import org.apache.pinot.common.request.NativeQueryObject;
+import org.apache.pinot.common.request.NativeQueryProcess;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
@@ -60,6 +65,7 @@ import org.testng.annotations.Test;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -188,6 +194,49 @@ public class InstanceRequestHandlerTest {
     String message = exceptions.get(QueryErrorCode.QUERY_EXECUTION.getId());
     // Thrown by AggregationFunctionFactory for an EXPR_MIN that the broker did not rewrite
     assertTrue(message.contains("Aggregation function: EXPRMIN is only supported in selection without alias"), message);
+  }
+
+  @Test
+  public void testRepliesWithValidationErrorForMalformedNativeContext()
+      throws Exception {
+    QueryScheduler queryScheduler = mock(QueryScheduler.class);
+    InstanceRequestHandler handler =
+        new InstanceRequestHandler("server01", new PinotConfiguration(), queryScheduler, mock(AccessControl.class),
+            ThreadAccountantUtils.getNoOpAccountant());
+    String id = UUID.randomUUID().toString();
+    NativeQueryIdentity identity =
+        new NativeQueryIdentity(1, "invalid-history", new NativeQueryProcess("broker", id, 1),
+            new NativeQueryProcess("server", id, 1), id, id, "testTable_OFFLINE", new NativeQueryObject(id, 1),
+            "testTable",
+            new NativeQueryObject(id, 1), List.of(), List.of());
+    BrokerRequest brokerRequest = new BrokerRequest();
+    brokerRequest.setPinotQuery(CalciteSqlParser.compileToPinotQuery("SELECT COUNT(*) FROM testTable_OFFLINE"));
+    InstanceRequest instanceRequest = new InstanceRequest(124L, brokerRequest);
+    instanceRequest.setNativeQueryContext(identity);
+    byte[] requestBytes = new TSerializer(new TCompactProtocol.Factory()).serialize(instanceRequest);
+    ChannelHandlerContext ctx = mock(ChannelHandlerContext.class);
+    when(ctx.writeAndFlush(any())).thenReturn(mock(ChannelFuture.class));
+    ByteBuf input = Unpooled.wrappedBuffer(requestBytes);
+    try {
+      handler.channelRead0(ctx, input);
+    } finally {
+      input.release();
+    }
+    ArgumentCaptor<ByteBuf> responseCaptor = ArgumentCaptor.forClass(ByteBuf.class);
+    verify(ctx).writeAndFlush(responseCaptor.capture());
+    ByteBuf response = responseCaptor.getValue();
+    try {
+      byte[] responseBytes = new byte[response.readableBytes()];
+      response.readBytes(responseBytes);
+      DataTable dataTable = DataTableFactory.getDataTable(responseBytes);
+      assertEquals(dataTable.getMetadata().get(MetadataKey.REQUEST_ID.getName()), "124");
+      assertEquals(dataTable.getExceptions().size(), 1);
+      assertTrue(dataTable.getExceptions().containsKey(QueryErrorCode.QUERY_VALIDATION.getId()),
+          dataTable.getExceptions().toString());
+      verifyNoInteractions(queryScheduler);
+    } finally {
+      response.release();
+    }
   }
 
   private QueryScheduler createQueryScheduler(PinotConfiguration config, CountDownLatch queryFinishLatch) {

@@ -223,6 +223,12 @@ public interface TableDataManager {
   /// @return List of segment data managers
   List<SegmentDataManager> acquireAllSegments();
 
+  /// Whether query execution must validate an explicit content identity against every acquired segment handle.
+  /// This does not grant query-serving authority; callers must also enforce their serving permit and deadline.
+  default boolean requiresQueryIdentity() {
+    return false;
+  }
+
   /// Acquires the segments with the given segment names.
   ///
   /// It is the caller's responsibility to return the segments by calling [#releaseSegment(SegmentDataManager)].

@@ -38,6 +38,42 @@ message ServerRequest {
   bytes payload = 4;
   repeated string optionalSegments = 5;
   repeated TableSegmentsInfo tableSegmentsInfo = 6;
+  NativeQueryIdentity nativeQueryContext = 7;
+}
+
+// Version 1 identifies immutable offline query inputs. It does not grant serving authority.
+message NativeQueryProcess {
+  string participantId = 1;
+  string incarnation = 2;
+  int64 registrationEpoch = 3;
+}
+
+message NativeQueryObject {
+  string objectId = 1;
+  int64 version = 2;
+}
+
+message NativeQuerySegment {
+  string name = 1;
+  NativeQueryObject content = 2;
+  string contentSha256 = 3;
+  NativeQueryObject assignment = 4;
+  string materializationId = 5;
+}
+
+message NativeQueryIdentity {
+  int32 version = 1;
+  string historyId = 2;
+  NativeQueryProcess broker = 3;
+  NativeQueryProcess server = 4;
+  string queryId = 5;
+  string attemptId = 6;
+  string tableName = 7;
+  NativeQueryObject table = 8;
+  string schemaName = 9;
+  NativeQueryObject schema = 10;
+  repeated NativeQuerySegment requiredSegments = 11;
+  repeated NativeQuerySegment optionalSegments = 12;
 }
 
 message ServerResponse {

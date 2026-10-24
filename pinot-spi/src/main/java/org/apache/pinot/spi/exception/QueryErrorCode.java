@@ -45,6 +45,8 @@ public enum QueryErrorCode {
   SERVER_OUT_OF_CAPACITY(211, "ServerOutOfCapacity", Response.Status.SERVICE_UNAVAILABLE),
   SERVER_TABLE_MISSING(230, "ServerTableMissing", Response.Status.NOT_FOUND),
   SERVER_SEGMENT_MISSING(235, "ServerSegmentMissing", Response.Status.NOT_FOUND),
+  /// The pinned segment belongs to a different history, process, table, schema, content or assignment.
+  SERVER_QUERY_IDENTITY_MISMATCH(236, "ServerQueryIdentityMismatch", Response.Status.CONFLICT),
   QUERY_SCHEDULING_TIMEOUT(240, "QuerySchedulingTimeoutError", Response.Status.REQUEST_TIMEOUT),
   SERVER_RESOURCE_LIMIT_EXCEEDED(245, "ServerResourceLimitExceededError", Response.Status.SERVICE_UNAVAILABLE),
   QUERY_SCAN_LIMIT_EXCEEDED(246, "QueryScanLimitExceededError", Response.Status.BAD_REQUEST),
@@ -79,6 +81,7 @@ public enum QueryErrorCode {
       EXECUTION_TIMEOUT,
       BROKER_TIMEOUT,
       SERVER_SEGMENT_MISSING,
+      SERVER_QUERY_IDENTITY_MISMATCH,
       BROKER_SEGMENT_UNAVAILABLE,
       SERVER_NOT_RESPONDING,
       BROKER_REQUEST_SEND,

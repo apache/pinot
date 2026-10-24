@@ -60,4 +60,40 @@ struct InstanceRequest {
   6: optional list<string> optionalSegments;
   7: optional string cid;
   8: optional list<TableSegmentsInfo> tableSegmentsInfoList;
+  9: optional NativeQueryIdentity nativeQueryContext;
+}
+
+// Version 1 identifies immutable offline query inputs. It does not grant serving authority.
+struct NativeQueryProcess {
+  1: required string participantId;
+  2: required string incarnation;
+  3: required i64 registrationEpoch;
+}
+
+struct NativeQueryObject {
+  1: required string objectId;
+  2: required i64 version;
+}
+
+struct NativeQuerySegment {
+  1: required string name;
+  2: required NativeQueryObject content;
+  3: required string contentSha256;
+  4: required NativeQueryObject assignment;
+  5: required string materializationId;
+}
+
+struct NativeQueryIdentity {
+  1: required i32 version;
+  2: required string historyId;
+  3: required NativeQueryProcess broker;
+  4: required NativeQueryProcess server;
+  5: required string queryId;
+  6: required string attemptId;
+  7: required string tableName;
+  8: required NativeQueryObject table;
+  9: required string schemaName;
+ 10: required NativeQueryObject schema;
+ 11: required list<NativeQuerySegment> requiredSegments;
+ 12: required list<NativeQuerySegment> optionalSegments;
 }

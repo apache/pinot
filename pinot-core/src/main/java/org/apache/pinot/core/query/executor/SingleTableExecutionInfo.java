@@ -29,7 +29,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.exception.TableNotFoundException;
+import org.apache.pinot.common.request.context.NativeQueryContext;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.core.data.manager.offline.NativeImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.core.query.pruner.SegmentPrunerService;
 import org.apache.pinot.core.query.pruner.SegmentPrunerStatistics;
@@ -44,7 +46,9 @@ import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.data.BuiltInVirtualColumnDefinitions;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,13 +63,32 @@ public class SingleTableExecutionInfo implements TableExecutionInfo {
   private final List<String> _segmentsToQuery;
   private final List<String> _optionalSegments;
   private final List<String> _notAcquiredSegments;
+  @Nullable
+  private final Schema _querySchema;
 
   public static SingleTableExecutionInfo create(InstanceDataManager instanceDataManager, String tableNameWithType,
       List<String> segmentsToQuery, List<String> optionalSegments, QueryContext queryContext)
       throws TableNotFoundException {
+    return create(instanceDataManager, tableNameWithType, segmentsToQuery, optionalSegments, queryContext, null);
+  }
+
+  /// Pins native content before validating its identity. Installation changes after acquisition cannot change the
+  /// pinned handle or schema. Serving-permit and deadline checks remain the responsibility of query admission.
+  public static SingleTableExecutionInfo create(InstanceDataManager instanceDataManager, String tableNameWithType,
+      List<String> segmentsToQuery, List<String> optionalSegments, QueryContext queryContext,
+      @Nullable NativeQueryContext nativeQueryContext) throws TableNotFoundException {
     TableDataManager tableDataManager = instanceDataManager.getTableDataManager(tableNameWithType);
     if (tableDataManager == null) {
       throw new TableNotFoundException(tableNameWithType);
+    }
+    if (tableDataManager.requiresQueryIdentity()) {
+      if (nativeQueryContext == null) {
+        throw QueryErrorCode.QUERY_VALIDATION.asException("Native queries require explicit content identities");
+      }
+      return createNative(tableDataManager, tableNameWithType, segmentsToQuery, optionalSegments, nativeQueryContext);
+    }
+    if (nativeQueryContext != null) {
+      throw QueryErrorCode.QUERY_VALIDATION.asException("Table does not support native query identities");
     }
 
     List<String> notAcquiredSegments = new ArrayList<>();
@@ -115,7 +138,56 @@ public class SingleTableExecutionInfo implements TableExecutionInfo {
     }
 
     return new SingleTableExecutionInfo(tableDataManager, segmentDataManagers, indexSegments, providedSegmentContexts,
-        segmentsToQuery, optionalSegments, notAcquiredSegments);
+        segmentsToQuery, optionalSegments, notAcquiredSegments, null);
+  }
+
+  private static SingleTableExecutionInfo createNative(TableDataManager tableDataManager, String tableName,
+      List<String> requiredSegments, @Nullable List<String> optionalSegments, NativeQueryContext context) {
+    try {
+      context.validateSegments(tableName, requiredSegments, optionalSegments);
+    } catch (IllegalArgumentException exception) {
+      throw QueryErrorCode.QUERY_VALIDATION.asException("Segment names differ from content identities", exception);
+    }
+    if (tableDataManager.isUpsertEnabled() || tableDataManager instanceof RealtimeTableDataManager) {
+      throw QueryErrorCode.QUERY_VALIDATION.asException("Native realtime query identities are not supported yet");
+    }
+    List<String> missingSegments = new ArrayList<>();
+    List<SegmentDataManager> managers =
+        tableDataManager.acquireSegments(requiredSegments, optionalSegments, missingSegments);
+    boolean accepted = false;
+    try {
+      Set<String> acquiredNames = new HashSet<>();
+      for (SegmentDataManager manager : managers) {
+        NativeQueryContext.Segment expected = context.segment(manager.getSegmentName());
+        if (!(manager instanceof NativeImmutableSegmentDataManager) || expected == null
+            || !acquiredNames.add(manager.getSegmentName())
+            || !context.matchesInstallation(expected,
+                ((NativeImmutableSegmentDataManager) manager).getInstallationIdentity())) {
+          throw QueryErrorCode.SERVER_QUERY_IDENTITY_MISMATCH.asException(
+              "Pinned content identity differs for segment: " + manager.getSegmentName());
+        }
+      }
+      if (!acquiredNames.containsAll(requiredSegments)) {
+        throw QueryErrorCode.SERVER_SEGMENT_MISSING.asException("Required native content is not installed");
+      }
+      if (managers.isEmpty()) {
+        // A schema-only native request needs an authoritative catalog snapshot. An independently refreshed cache
+        // cannot establish the requested table/schema incarnation, even when the scan would return zero rows.
+        throw QueryErrorCode.SERVER_SEGMENT_MISSING.asException("No requested native content is installed");
+      }
+      Schema schema = ((NativeImmutableSegmentDataManager) managers.get(0)).getQuerySchema();
+      BuiltInVirtualColumnDefinitions.addToSchema(schema);
+      SingleTableExecutionInfo result = new SingleTableExecutionInfo(tableDataManager, managers,
+          collectIndexSegments(managers), null, requiredSegments, optionalSegments, missingSegments, schema);
+      accepted = true;
+      return result;
+    } finally {
+      if (!accepted) {
+        for (SegmentDataManager manager : managers) {
+          tableDataManager.releaseSegment(manager);
+        }
+      }
+    }
   }
 
   // A SegmentDataManager may expose more than one IndexSegment (e.g. DuoSegmentDataManager during a commit window,
@@ -134,7 +206,8 @@ public class SingleTableExecutionInfo implements TableExecutionInfo {
 
   private SingleTableExecutionInfo(TableDataManager tableDataManager, List<SegmentDataManager> segmentDataManagers,
       List<IndexSegment> indexSegments, Map<IndexSegment, SegmentContext> providedSegmentContexts,
-      List<String> segmentsToQuery, List<String> optionalSegments, List<String> notAcquiredSegments) {
+      List<String> segmentsToQuery, List<String> optionalSegments, List<String> notAcquiredSegments,
+      @Nullable Schema querySchema) {
     _tableDataManager = tableDataManager;
     _segmentDataManagers = segmentDataManagers;
     _indexSegments = indexSegments;
@@ -142,6 +215,7 @@ public class SingleTableExecutionInfo implements TableExecutionInfo {
     _segmentsToQuery = segmentsToQuery;
     _optionalSegments = optionalSegments;
     _notAcquiredSegments = notAcquiredSegments;
+    _querySchema = querySchema;
   }
 
   public TableDataManager getTableDataManager() {
@@ -150,7 +224,7 @@ public class SingleTableExecutionInfo implements TableExecutionInfo {
 
   @Override
   public Schema getSchema() {
-    return _tableDataManager.getCachedTableConfigAndSchema().getRight();
+    return _querySchema != null ? _querySchema : _tableDataManager.getCachedTableConfigAndSchema().getRight();
   }
 
   @Override

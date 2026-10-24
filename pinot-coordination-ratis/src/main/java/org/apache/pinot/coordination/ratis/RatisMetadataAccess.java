@@ -22,18 +22,23 @@ import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol;
+import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.ParticipantToken;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.CatalogImage;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.ChangePage;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Command;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.FeedCursor;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.FeedScope;
+import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.GetInstallationWork;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.GetRevision;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.MembershipCommand;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.MembershipQuery;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Query;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Result;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.Status;
+import org.apache.pinot.coordination.ratis.metadata.OfflineInstallationProtocol;
+import org.apache.pinot.coordination.ratis.metadata.OfflineInstallationProtocol.InstallationSnapshot;
+import org.apache.pinot.coordination.ratis.transport.InstallationAccess;
 import org.apache.pinot.coordination.ratis.transport.MembershipAccess;
 import org.apache.pinot.coordination.ratis.transport.MetadataAccess;
 
@@ -41,7 +46,7 @@ import org.apache.pinot.coordination.ratis.transport.MetadataAccess;
 /// Controller-side metadata access for an authenticated service. Reads establish a consensus barrier before a local
 /// coherent capture; no full catalog image crosses the Raft client transport. The enclosing service authorizes actors.
 /// This class is thread-safe and owns its clients, but does not own the voter.
-public final class RatisMetadataAccess implements MetadataAccess, MembershipAccess, AutoCloseable {
+public final class RatisMetadataAccess implements MetadataAccess, MembershipAccess, InstallationAccess, AutoCloseable {
   private final MetadataStateMachine _stateMachine;
   private final RatisMetadataStore.Client _client;
   private final RatisMetadataStore.Client _membershipClient;
@@ -69,8 +74,8 @@ public final class RatisMetadataAccess implements MetadataAccess, MembershipAcce
   @Override
   public Result query(Query query, long timeoutMillis)
       throws IOException {
-    if (query instanceof MembershipQuery) {
-      throw new IOException("Membership queries require the typed membership access method");
+    if (query instanceof MembershipQuery || query instanceof GetInstallationWork) {
+      throw new IOException("Membership and installation work queries require their typed access method");
     }
     return MetadataProtocol.decodeResult(_client.query(MetadataProtocol.encode(query), timeoutMillis));
   }
@@ -80,6 +85,13 @@ public final class RatisMetadataAccess implements MetadataAccess, MembershipAcce
       throws IOException {
     return MembershipProtocol.decodeResponse(
         _membershipClient.execute(MetadataProtocol.encode(command), timeoutMillis));
+  }
+
+  @Override
+  public OfflineInstallationProtocol.WorkResult query(GetInstallationWork query, long timeoutMillis)
+      throws IOException {
+    return OfflineInstallationProtocol.decodeWorkResult(
+        _client.query(MetadataProtocol.encode(query), timeoutMillis));
   }
 
   @Override
@@ -94,6 +106,15 @@ public final class RatisMetadataAccess implements MetadataAccess, MembershipAcce
     long deadline = deadline(timeoutMillis);
     long index = readBarrier(deadline);
     return _stateMachine.captureImage(scope, maxRecords, maxBytes, index, deadline);
+  }
+
+  @Override
+  public InstallationSnapshot installationSnapshot(ParticipantToken server, int maxRecords, int maxBytes,
+      long timeoutMillis)
+      throws IOException {
+    long deadline = deadline(timeoutMillis);
+    long index = readBarrier(deadline);
+    return _stateMachine.installationSnapshot(server, maxRecords, maxBytes, index, deadline);
   }
 
   @Override

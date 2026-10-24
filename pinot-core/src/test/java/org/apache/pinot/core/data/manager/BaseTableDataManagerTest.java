@@ -23,6 +23,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -40,22 +42,50 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
+import org.apache.pinot.common.config.provider.NativeOfflineSegmentAction;
+import org.apache.pinot.common.config.provider.NativeOfflineSegmentAction.Identity;
+import org.apache.pinot.common.config.provider.NativeOfflineSegmentAction.Installation;
+import org.apache.pinot.common.config.provider.NativeOfflineSegmentAction.Mode;
+import org.apache.pinot.common.config.provider.NativeOfflineSegmentAction.ObjectVersion;
+import org.apache.pinot.common.config.provider.NativeOfflineSegmentAction.Operation;
+import org.apache.pinot.common.config.provider.NativeOfflineSegmentAction.Owner;
+import org.apache.pinot.common.config.provider.NativeOfflineSegmentAction.Participant;
+import org.apache.pinot.common.config.provider.NativeOfflineSegmentAction.Request;
+import org.apache.pinot.common.config.provider.NativeOfflineSegmentAction.Result;
+import org.apache.pinot.common.config.provider.NativeOfflineSegmentAction.Role;
+import org.apache.pinot.common.config.provider.NativeOfflineSegmentAction.Status;
+import org.apache.pinot.common.config.provider.TableDataManagerMetadata;
+import org.apache.pinot.common.config.provider.TableDataManagerMetadata.SegmentSnapshot;
+import org.apache.pinot.common.config.provider.TableDataManagerMetadata.TableSnapshot;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.segment.SegmentLoadMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.request.InstanceRequest;
+import org.apache.pinot.common.request.context.NativeQueryContext;
+import org.apache.pinot.common.request.context.NativeQueryContext.ProcessIdentity;
+import org.apache.pinot.common.request.context.NativeQueryContext.Segment;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.fetcher.BaseSegmentFetcher;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.FakePropertyStore;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
+import org.apache.pinot.core.data.manager.offline.NativeImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.offline.OfflineTableDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
+import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
+import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
+import org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl;
+import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.EmptyIndexSegment;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -72,6 +102,7 @@ import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
@@ -81,16 +112,20 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.TimestampConfig;
 import org.apache.pinot.spi.config.table.TimestampIndexGranularity;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.crypt.PinotCrypter;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
+import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
 import org.testng.annotations.AfterClass;
@@ -1038,6 +1073,511 @@ public class BaseTableDataManagerTest {
 
     // As CRC is same, the index dir is left as is, so not get created by the test.
     assertFalse(tableDataManager.getSegmentDataDir(segmentName).exists());
+  }
+
+  @Test
+  public void testNativeConditionalLoadReloadAndHeldReader() throws Exception {
+    try (NativeActionFixture fixture = new NativeActionFixture()) {
+      Request load = fixture.request(Mode.LOAD, DEFAULT_TABLE_CONFIG, 1, null, fixture._digest);
+      TableConfig refreshedTable = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+          .setInvertedIndexColumns(List.of(LONG_COLUMN)).build();
+      Schema refreshedSchema = Schema.cloneSchemaWithName(SCHEMA, RAW_TABLE_NAME);
+      refreshedSchema.addField(new DimensionFieldSpec("futureColumn", DataType.STRING, true));
+      fixture._onRefresh = () -> {
+        when(fixture._metadata.fetchTable(OFFLINE_TABLE_NAME))
+            .thenReturn(new TableSnapshot(refreshedTable, refreshedSchema));
+        fixture._manager.onTableConfigOrSchemaRefresh();
+      };
+      Result first = fixture.execute(load);
+      assertEquals(first.status(), Status.INSTALLED);
+      fixture.assertCount(first.installation().identity());
+      // A newer table-level refresh can finish while older physical work is prepared in another segment lane.
+      TableConfig cachedTable = fixture._manager.getCachedTableConfigAndSchema().getLeft();
+      Schema cachedSchema = fixture._manager.getCachedTableConfigAndSchema().getRight();
+      assertEquals(cachedTable.toJsonString(), refreshedTable.toJsonString());
+      assertEquals(cachedSchema, refreshedSchema);
+      fixture._onRefresh = () -> { };
+      SegmentDataManager old = fixture._manager.acquireSegment(SEGMENT_NAME);
+      assertNotNull(old);
+      assertTrue(fixture._manager.requiresQueryIdentity());
+      assertTrue(old instanceof NativeImmutableSegmentDataManager);
+      NativeImmutableSegmentDataManager oldNative = (NativeImmutableSegmentDataManager) old;
+      assertEquals(oldNative.getInstallationIdentity(), load.identity());
+      assertEquals(old.getReferenceCount(), 2);
+      assertEquals(oldNative.getQuerySchema(), SCHEMA);
+      assertFalse(oldNative.getQuerySchema().hasColumn("futureColumn"));
+      Schema readerSchema = oldNative.getQuerySchema();
+      readerSchema.setSchemaName("readerLocalName");
+      readerSchema.getFieldSpecFor(STRING_COLUMN).setDefaultNullValue("readerLocalDefault");
+      assertEquals(oldNative.getQuerySchema(), SCHEMA);
+      File original = old.getSegment().getSegmentMetadata().getIndexDir();
+      try {
+        TableConfig indexed = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+            .setInvertedIndexColumns(List.of(STRING_COLUMN)).build();
+        Request reload = fixture.request(Mode.RELOAD, indexed, 2, first.installation().installationId(),
+            fixture._digest);
+        Result second = fixture.execute(reload);
+        assertEquals(second.status(), Status.INSTALLED);
+        fixture.assertCount(second.installation().identity());
+        assertSame(fixture._manager.getCachedTableConfigAndSchema().getLeft(), cachedTable);
+        assertSame(fixture._manager.getCachedTableConfigAndSchema().getRight(), cachedSchema);
+        assertNotEquals(second.installation().installationId(), first.installation().installationId());
+        SegmentDataManager current = fixture._manager.acquireSegment(SEGMENT_NAME);
+        assertNotNull(current);
+        try {
+          assertTrue(current instanceof NativeImmutableSegmentDataManager);
+          NativeImmutableSegmentDataManager currentNative = (NativeImmutableSegmentDataManager) current;
+          assertEquals(currentNative.getInstallationIdentity(), reload.identity());
+          assertEquals(currentNative.getQuerySchema(), SCHEMA);
+          assertEquals(oldNative.getInstallationIdentity(), load.identity());
+          assertEquals(old.getReferenceCount(), 1);
+          assertEquals(current.getReferenceCount(), 2);
+          File replacement = current.getSegment().getSegmentMetadata().getIndexDir();
+          assertNotEquals(replacement, original);
+          assertTrue(hasInvertedIndex(replacement, STRING_COLUMN));
+          assertFalse(hasInvertedIndex(original, STRING_COLUMN));
+          assertEquals(old.getSegment().getDataSource(STRING_COLUMN).getDictionary().getStringValue(0), "A");
+          assertEquals(current.getSegment().getSegmentMetadata().getTotalDocs(), 5);
+        } finally {
+          fixture._manager.releaseSegment(current);
+        }
+        fixture.restart();
+        assertFalse(fixture._manager.hasSegment(SEGMENT_NAME));
+        Files.delete(fixture._archive.toPath());
+        Result replay = fixture.execute(reload);
+        assertEquals(replay.status(), Status.INSTALLED);
+        assertEquals(replay.installation().installationId(), second.installation().installationId());
+        assertEquals(replay.installation().manifestSha256(), second.installation().manifestSha256());
+        assertTrue(fixture._manager.hasSegment(SEGMENT_NAME));
+        SegmentDataManager restored = fixture._manager.acquireSegment(SEGMENT_NAME);
+        assertNotNull(restored);
+        try {
+          assertTrue(restored instanceof NativeImmutableSegmentDataManager);
+          assertEquals(((NativeImmutableSegmentDataManager) restored).getInstallationIdentity(), reload.identity());
+          assertEquals(((NativeImmutableSegmentDataManager) restored).getQuerySchema(), SCHEMA);
+          assertEquals(oldNative.getInstallationIdentity(), load.identity());
+          assertEquals(old.getReferenceCount(), 1);
+        } finally {
+          fixture._manager.releaseSegment(restored);
+        }
+      } finally {
+        fixture._manager.releaseSegment(old);
+      }
+      assertEquals(old.getReferenceCount(), 0);
+    }
+  }
+
+  @Test
+  public void testNativeRegistrationFailureKeepsConcurrentReaderAlive() throws Exception {
+    try (NativeActionFixture fixture = new NativeActionFixture()) {
+      Request load = fixture.request(Mode.LOAD, DEFAULT_TABLE_CONFIG, 1, null, fixture._digest);
+      Result first = fixture.execute(load);
+      SegmentDataManager original = fixture._manager._segmentDataManagerMap.get(SEGMENT_NAME);
+      SegmentDataManager old = spy(original);
+      assertTrue(fixture._manager._segmentDataManagerMap.replace(SEGMENT_NAME, original, old));
+      CountDownLatch registered = new CountDownLatch(1);
+      CountDownLatch removed = new CountDownLatch(1);
+      doAnswer(invocation -> {
+        registered.countDown();
+        assertTrue(removed.await(10, TimeUnit.SECONDS));
+        throw new IllegalStateException("Post-registration offload failure");
+      }).when(old).doOffload();
+      Request reload = fixture.request(Mode.RELOAD, DEFAULT_TABLE_CONFIG, 1,
+          first.installation().installationId(), fixture._digest);
+      Future<Result> publication = fixture._executor.submit(() -> fixture.execute(reload));
+      SegmentDataManager held = null;
+      ImmutableSegmentImpl segment = null;
+      try {
+        assertTrue(registered.await(10, TimeUnit.SECONDS));
+        held = fixture._manager.acquireSegment(SEGMENT_NAME);
+        assertNotNull(held);
+        segment = (ImmutableSegmentImpl) held.getSegment();
+        SegmentDataManager unregistered;
+        synchronized (fixture._manager._segmentDataManagerMap) {
+          unregistered = fixture._manager._segmentDataManagerMap.remove(SEGMENT_NAME);
+        }
+        assertSame(unregistered, held);
+        fixture._manager.releaseSegment(unregistered);
+        removed.countDown();
+        ExecutionException failure = expectThrows(ExecutionException.class,
+            () -> publication.get(10, TimeUnit.SECONDS));
+        assertTrue(failure.getCause() instanceof IllegalStateException);
+        // The map no longer contains this segment, but the query still owns its resources after publication failed.
+        assertTrue(segment.tryAcquireReadLock(), "A query-retained segment must not be destroyed by action cleanup");
+        try {
+          assertEquals(segment.getDataSource(STRING_COLUMN).getDictionary().getStringValue(0), "A");
+        } finally {
+          segment.releaseReadLock();
+        }
+      } finally {
+        removed.countDown();
+        if (held != null) {
+          fixture._manager.releaseSegment(held);
+        }
+      }
+      boolean stillAlive = segment.tryAcquireReadLock();
+      if (stillAlive) {
+        segment.releaseReadLock();
+      }
+      assertFalse(stillAlive, "Normal reference-count cleanup destroys the last released segment");
+    }
+  }
+
+  @Test
+  public void testNativeActionFencesChangedAuthorityPointerAndMissingReload() throws Exception {
+    try (NativeActionFixture fixture = new NativeActionFixture()) {
+      Request absent = fixture.request(Mode.RELOAD, DEFAULT_TABLE_CONFIG, 1, null, fixture._digest);
+      assertEquals(fixture.execute(absent).status(), Status.ABSENT);
+      Request load = fixture.request(Mode.LOAD, DEFAULT_TABLE_CONFIG, 1, null, fixture._digest);
+      fixture._onRefresh = () -> fixture.authorize(absent);
+      assertEquals(fixture.execute(load).status(), Status.FENCED);
+      assertNull(fixture._manager.nativeExecutor().installed(SEGMENT_NAME));
+      assertFalse(fixture._manager.hasSegment(SEGMENT_NAME));
+      fixture._onRefresh = () -> { };
+      Request wrongDigest = fixture.request(Mode.LOAD, DEFAULT_TABLE_CONFIG, 1, null, "0".repeat(64));
+      expectThrows(IOException.class, () -> fixture.execute(wrongDigest));
+      assertNull(fixture._manager.nativeExecutor().installed(SEGMENT_NAME));
+      Result installed = fixture.execute(load);
+      Request stalePointer = fixture.request(Mode.RELOAD, DEFAULT_TABLE_CONFIG, 1, UUID.randomUUID(), fixture._digest);
+      assertEquals(fixture.execute(stalePointer).status(), Status.FENCED);
+      assertEquals(fixture._manager.nativeExecutor().installed(SEGMENT_NAME).installationId(),
+          installed.installation().installationId());
+      // Metadata snapshots alone never authorize mutations through the legacy public entry points.
+      OfflineTableDataManager manager = fixture._manager;
+      expectThrows(IllegalStateException.class, () -> manager.addOnlineSegment(SEGMENT_NAME));
+      expectThrows(IllegalStateException.class, () -> manager.addSegment(null, null));
+      expectThrows(IllegalStateException.class, () -> manager.addNewOnlineSegment(null, null));
+      expectThrows(IllegalStateException.class, () -> manager.downloadAndLoadSegment(null, null));
+      expectThrows(IllegalStateException.class, () -> manager.tryLoadExistingSegment(null, null));
+      expectThrows(IllegalStateException.class, () -> manager.tryLoadExistingSegmentWithoutRegistering(null, null));
+      expectThrows(IllegalStateException.class, () -> manager.reloadSegment(SEGMENT_NAME, false, null));
+      expectThrows(IllegalStateException.class, () -> manager.reloadSegment(SEGMENT_NAME, null, null, null, false));
+      expectThrows(IllegalStateException.class, () -> manager.reloadSegments(List.of(SEGMENT_NAME), false, null));
+      expectThrows(IllegalStateException.class, () -> manager.reloadAllSegments(false, null));
+      expectThrows(IllegalStateException.class, () -> manager.replaceSegment(SEGMENT_NAME));
+      expectThrows(IllegalStateException.class, () -> manager.offloadSegment(SEGMENT_NAME));
+      expectThrows(IllegalStateException.class, () -> manager.offloadSegmentUnsafe(SEGMENT_NAME));
+      expectThrows(IllegalStateException.class, () -> manager.deleteSegment(SEGMENT_NAME));
+      expectThrows(IllegalStateException.class, () -> manager.registerSegment(SEGMENT_NAME, null));
+      expectThrows(IllegalStateException.class, () -> manager.unregisterSegment(SEGMENT_NAME));
+      expectThrows(IllegalStateException.class, () -> manager.downloadSegment(null));
+      expectThrows(IllegalStateException.class, () -> manager.createBackup(null));
+      expectThrows(IllegalStateException.class, () -> manager.removeBackup(null));
+      expectThrows(IllegalStateException.class, () -> manager.setDeleted(true));
+      expectThrows(IllegalStateException.class, () -> manager.updateCachedTableConfigAndSchema(null, null));
+      assertTrue(manager.hasSegment(SEGMENT_NAME));
+      assertEquals(manager.nativeExecutor().installed(SEGMENT_NAME).installationId(),
+          installed.installation().installationId());
+    }
+  }
+
+  @Test
+  public void testNativeReconcileNewSessionWithExistingAndAbsentDisk() throws Exception {
+    try (NativeActionFixture fixture = new NativeActionFixture()) {
+      Request absent = fixture.request(Mode.RECONCILE, DEFAULT_TABLE_CONFIG, 1, 1, null, fixture._digest, false);
+      Result first = fixture.execute(absent);
+      assertEquals(first.status(), Status.INSTALLED);
+      SegmentDataManager held = fixture._manager.acquireSegment(SEGMENT_NAME);
+      assertNotNull(held);
+      assertTrue(held instanceof NativeImmutableSegmentDataManager);
+      NativeImmutableSegmentDataManager oldNative = (NativeImmutableSegmentDataManager) held;
+      assertEquals(oldNative.getInstallationIdentity(), absent.identity());
+      File original = held.getSegment().getSegmentMetadata().getIndexDir();
+      try {
+        fixture.restart();
+        fixture._server = new Participant("server", Role.SERVER, UUID.randomUUID(), 2);
+        Files.delete(fixture._archive.toPath());
+        Request reconcile = fixture.request(Mode.RECONCILE, DEFAULT_TABLE_CONFIG, 1, 2,
+            first.installation().installationId(), fixture._digest, false);
+        Request stalePointer = fixture.request(Mode.RECONCILE, DEFAULT_TABLE_CONFIG, 1, 2,
+            UUID.randomUUID(), fixture._digest, false);
+        assertEquals(fixture.execute(stalePointer).status(), Status.FENCED);
+        assertFalse(fixture._manager.hasSegment(SEGMENT_NAME));
+        Result recovered = fixture.execute(reconcile);
+        assertEquals(recovered.status(), Status.INSTALLED);
+        assertNotEquals(recovered.installation().installationId(), first.installation().installationId());
+        assertNotEquals(recovered.installation().manifestSha256(), first.installation().manifestSha256());
+        assertEquals(recovered.installation().identity().server(), fixture._server);
+        SegmentDataManager current = fixture._manager.acquireSegment(SEGMENT_NAME);
+        assertNotNull(current);
+        try {
+          assertTrue(current instanceof NativeImmutableSegmentDataManager);
+          NativeImmutableSegmentDataManager currentNative = (NativeImmutableSegmentDataManager) current;
+          assertEquals(currentNative.getInstallationIdentity(), reconcile.identity());
+          assertNotEquals(currentNative.getInstallationIdentity().server(),
+              oldNative.getInstallationIdentity().server());
+          assertNotEquals(currentNative.getInstallationIdentity().materializationId(),
+              oldNative.getInstallationIdentity().materializationId());
+          assertNotEquals(current.getSegment().getSegmentMetadata().getIndexDir(), original);
+          assertEquals(oldNative.getInstallationIdentity(), absent.identity());
+          assertEquals(held.getReferenceCount(), 1);
+        } finally {
+          fixture._manager.releaseSegment(current);
+        }
+        assertEquals(held.getSegment().getDataSource(STRING_COLUMN).getDictionary().getStringValue(0), "A");
+        fixture.restart();
+        Result replay = fixture.execute(reconcile);
+        assertEquals(replay.installation().installationId(), recovered.installation().installationId());
+        assertEquals(replay.installation().manifestSha256(), recovered.installation().manifestSha256());
+        Request staleSession = new Request(Mode.RECONCILE, absent.identity(), absent.snapshot(), false,
+            recovered.installation().installationId());
+        assertEquals(fixture.execute(staleSession).status(), Status.FENCED);
+        Request forced = fixture.request(Mode.RECONCILE, DEFAULT_TABLE_CONFIG, 1, 2,
+            recovered.installation().installationId(), fixture._digest, true);
+        expectThrows(Exception.class, () -> fixture.execute(forced));
+        assertEquals(fixture._manager.nativeExecutor().installed(SEGMENT_NAME).installationId(),
+            recovered.installation().installationId());
+      } finally {
+        fixture._manager.releaseSegment(held);
+      }
+      assertEquals(held.getReferenceCount(), 0);
+    }
+  }
+
+  @Test
+  // Injects failure at the existing registration metrics call, whose compatibility API remains deprecated.
+  @SuppressWarnings("deprecation")
+  public void testNativeManifestRecoversInterruptedRegistrationAndRejectsCorruption() throws Exception {
+    try (NativeActionFixture fixture = new NativeActionFixture()) {
+      Request load = fixture.request(Mode.LOAD, DEFAULT_TABLE_CONFIG, 1, null, fixture._digest);
+      AtomicBoolean failRegistration = new AtomicBoolean(true);
+      doAnswer(invocation -> {
+        if (failRegistration.getAndSet(false)) {
+          throw new IllegalStateException("Interrupted after durable selection, before registration");
+        }
+        return null;
+      }).when(ServerMetrics.get()).addValueToTableGauge(OFFLINE_TABLE_NAME, ServerGauge.DOCUMENT_COUNT, 5L);
+      expectThrows(IllegalStateException.class, () -> fixture.execute(load));
+      Installation selected = fixture._manager.nativeExecutor().installed(SEGMENT_NAME);
+      assertNotNull(selected);
+      assertFalse(fixture._manager.hasSegment(SEGMENT_NAME));
+      fixture.restart();
+      Files.delete(fixture._archive.toPath());
+      Result restored = fixture.execute(load);
+      assertEquals(restored.status(), Status.INSTALLED);
+      assertEquals(restored.installation().installationId(), selected.installationId());
+      assertEquals(restored.installation().manifestSha256(), selected.manifestSha256());
+      fixture.restart();
+      Path manifest;
+      try (Stream<Path> paths = Files.list(new File(TABLE_DATA_DIR, ".native/active").toPath())) {
+        manifest = paths.findFirst().orElseThrow();
+      }
+      byte[] valid = Files.readAllBytes(manifest);
+      Files.writeString(manifest, "{}");
+      expectThrows(IOException.class, () -> fixture.execute(load));
+      assertFalse(fixture._manager.hasSegment(SEGMENT_NAME));
+      Files.write(manifest, valid);
+      Path installation = new File(TABLE_DATA_DIR, ".native/materializations").toPath()
+          .resolve(load.identity().historyId().toString()).resolve(load.identity().table().objectId().toString())
+          .resolve(load.identity().content().objectId().toString()).resolve(selected.installationId().toString())
+          .resolve("segment");
+      Path extra = installation.resolve("unmanifested.index");
+      Files.writeString(extra, "unmanifested index bytes");
+      expectThrows(IOException.class, () -> fixture.execute(load));
+      assertFalse(fixture._manager.hasSegment(SEGMENT_NAME));
+      Files.delete(extra);
+      Files.createSymbolicLink(extra, Path.of("v3"));
+      expectThrows(IOException.class, () -> fixture.execute(load));
+      assertFalse(fixture._manager.hasSegment(SEGMENT_NAME));
+      Files.delete(extra);
+      File creationMetadata = SegmentDirectoryPaths.findCreationMetaFile(installation.toFile());
+      assertNotNull(creationMetadata);
+      Files.write(creationMetadata.toPath(), new byte[] {0});
+      expectThrows(IOException.class, () -> fixture.execute(load));
+      assertFalse(fixture._manager.hasSegment(SEGMENT_NAME));
+    }
+  }
+
+  /// Uses actual segment bytes and the public native API. Local authority and component configuration are fixtures.
+  private static final class NativeActionFixture implements AutoCloseable {
+    private final UUID _history = UUID.randomUUID();
+    private final UUID _tableId = UUID.randomUUID();
+    private final UUID _schemaId = UUID.randomUUID();
+    private final UUID _contentId = UUID.randomUUID();
+    private final UUID _assignmentId = UUID.randomUUID();
+    private Participant _server = new Participant("server", Role.SERVER, UUID.randomUUID(), 1);
+    private final Owner _owner = new Owner(1, 0, 1,
+        new Participant("controller", Role.CONTROLLER, UUID.randomUUID(), 1));
+    private final File _archive;
+    private final SegmentLoadMetadata _descriptor;
+    private final String _digest;
+    private final ExecutorService _executor = Executors.newSingleThreadExecutor();
+    private final ReentrantReadWriteLock _authorityLock = new ReentrantReadWriteLock();
+    private Identity _authorized;
+    private Runnable _onRefresh = () -> { };
+    private OfflineTableDataManager _manager;
+    private TableDataManagerMetadata _metadata;
+
+    private NativeActionFixture() throws Exception {
+      File segment = createSegment(SegmentVersion.v3, 5);
+      long crc = getCRC(segment);
+      _archive = new File(TEMP_DIR, "native-content.tar.gz");
+      TarCompressionUtils.createCompressedTarFile(segment, _archive);
+      _digest = NativeOfflineSegmentManifest.digest(_archive.toPath());
+      FileUtils.deleteDirectory(segment);
+      _descriptor = new SegmentLoadMetadata(SEGMENT_NAME, crc, 0, false, _archive.toURI().toString(), null, null,
+          1, 2, Map.of(), true);
+      restart();
+    }
+
+    private void restart() {
+      if (_manager != null) {
+        _manager.shutDown();
+      }
+      _manager = new OfflineTableDataManager();
+      _metadata = mock(TableDataManagerMetadata.class);
+      when(_metadata.fetchTable(OFFLINE_TABLE_NAME)).thenReturn(new TableSnapshot(DEFAULT_TABLE_CONFIG, SCHEMA));
+      InstanceDataManagerConfig config = createDefaultInstanceDataManagerConfig();
+      when(config.getSegmentDirectoryLoader()).thenReturn(
+          SegmentDirectoryLoaderRegistry.DEFAULT_SEGMENT_DIRECTORY_LOADER_NAME);
+      _manager.initWithMetadata(config, _metadata, new SegmentLocks(), OFFLINE_TABLE_NAME,
+          new SegmentReloadSemaphore(1), _executor, null, null, SEGMENT_OPERATIONS_THROTTLER, false,
+          mock(ServerReloadJobStatusCache.class));
+      _manager.start();
+    }
+
+    private Request request(Mode mode, TableConfig table, long version, UUID expected, String digest) {
+      return request(mode, table, version, version, expected, digest, true);
+    }
+
+    private Request request(Mode mode, TableConfig table, long version, long assignmentEpoch, UUID expected,
+        String digest, boolean forceDownload) {
+      Identity identity = new Identity(_history, OFFLINE_TABLE_NAME, new ObjectVersion(_tableId, version),
+          RAW_TABLE_NAME, new ObjectVersion(_schemaId, 1), SEGMENT_NAME, new ObjectVersion(_contentId, 1), digest,
+          _server, new ObjectVersion(_assignmentId, assignmentEpoch), UUID.randomUUID(),
+          new Operation(UUID.randomUUID(), 1, _owner));
+      return new Request(mode, identity, new SegmentSnapshot(table, SCHEMA, _descriptor), forceDownload, expected);
+    }
+
+    private void authorize(Request request) {
+      _authorityLock.writeLock().lock();
+      try {
+        _authorized = request.identity();
+      } finally {
+        _authorityLock.writeLock().unlock();
+      }
+    }
+
+    private Result execute(Request request) throws Exception {
+      authorize(request);
+      return _manager.nativeExecutor().execute(request, new NativeOfflineSegmentAction.Authority() {
+        @Override
+        public void refresh() {
+          _onRefresh.run();
+        }
+
+        @Override
+        public NativeOfflineSegmentAction.ReadGuard acquire(Identity expected) {
+          _authorityLock.readLock().lock();
+          return new NativeOfflineSegmentAction.ReadGuard() {
+            @Override
+            public boolean isCurrent() {
+              return expected.equals(_authorized);
+            }
+
+            @Override
+            public void close() {
+              _authorityLock.readLock().unlock();
+            }
+          };
+        }
+      });
+    }
+
+    /// Executes through the normal query planner over installed native bytes, without opening a query listener.
+    private void assertCount(Identity identity) throws Exception {
+      NativeQueryContext context = new NativeQueryContext(NativeQueryContext.VERSION, identity.historyId(),
+          new ProcessIdentity("broker", UUID.randomUUID(), 1), identity.server(), UUID.randomUUID(), UUID.randomUUID(),
+          identity.tableName(), identity.table(), identity.schemaName(), identity.schema(),
+          List.of(new Segment(identity.segmentName(), identity.content(), identity.contentSha256(),
+              identity.assignment(), identity.materializationId())), List.of());
+      InstanceDataManager instance = mock(InstanceDataManager.class);
+      when(instance.getTableDataManager(OFFLINE_TABLE_NAME)).thenReturn(_manager);
+      ServerQueryExecutorV1Impl executor = new ServerQueryExecutorV1Impl();
+      executor.init(new PinotConfiguration(), instance, ServerMetrics.get());
+      InstanceRequest request = new InstanceRequest(1,
+          CalciteSqlCompiler.compileToBrokerRequest("SELECT COUNT(*) FROM " + OFFLINE_TABLE_NAME));
+      request.setBrokerId(context.broker().participantId());
+      request.setSearchSegments(context.requiredNames());
+      request.setNativeQueryContext(context.toThrift());
+      try (QueryThreadContext ignored = QueryThreadContext.openForSseTest()) {
+        ServerQueryRequest query = new ServerQueryRequest(request, ServerMetrics.get(), System.currentTimeMillis());
+        InstanceResponseBlock response =
+            executor.execute(query, QueryThreadContext.contextAwareExecutorService(_executor));
+        assertTrue(response.getExceptions().isEmpty(), response.getExceptions().toString());
+        assertTrue(response.getResultsBlock() instanceof AggregationResultsBlock);
+        assertEquals(((AggregationResultsBlock) response.getResultsBlock()).getResults().get(0), 5L);
+      } finally {
+        executor.shutDown();
+      }
+    }
+
+    @Override
+    public void close() {
+      _manager.shutDown();
+      _executor.shutdownNow();
+    }
+  }
+
+  @Test
+  public void testNativeInitializationPreservesProviderConfiguration() throws Exception {
+    TableConfig table = createTimestampTable(TimestampIndexGranularity.DAY);
+    Schema schema = createSchemaReuseSchema();
+    String originalTableJson = table.toJsonString();
+    TableDataManagerMetadata metadata = mock(TableDataManagerMetadata.class);
+    when(metadata.fetchTable(OFFLINE_TABLE_NAME)).thenReturn(new TableSnapshot(table, schema));
+    OfflineTableDataManager manager = new OfflineTableDataManager();
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    manager.initWithMetadata(createDefaultInstanceDataManagerConfig(), metadata, new SegmentLocks(), OFFLINE_TABLE_NAME,
+        new SegmentReloadSemaphore(1), executor, null, null, SEGMENT_OPERATIONS_THROTTLER, false,
+        mock(ServerReloadJobStatusCache.class));
+    try {
+      manager.start();
+      assertTrue(manager.getCachedTableConfigAndSchema().getRight().hasColumn("$ts$DAY"));
+      assertFalse(schema.hasColumn("$ts$DAY"));
+      assertEquals(table.toJsonString(), originalTableJson);
+      expectThrows(IllegalStateException.class, manager::getHelixManager);
+      expectThrows(IllegalStateException.class, manager::getPropertyStore);
+    } finally {
+      manager.shutDown();
+      executor.shutdownNow();
+    }
+  }
+
+  @Test
+  public void testNativeUnsupportedConfigurationRejectedBeforeFilesystemChanges() {
+    TableConfig upsert = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL)).build();
+    TableConfig dimension = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setIsDimTable(true).build();
+    TableConfig realtime = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).build();
+    TableConfig peer = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    peer.getValidationConfig().setPeerSegmentDownloadScheme("http");
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      for (TableConfig table : List.of(upsert, dimension, realtime, peer)) {
+        assertNativeInitializationRejected(new OfflineTableDataManager(), createDefaultInstanceDataManagerConfig(),
+            table, executor);
+      }
+      InstanceDataManagerConfig peerInstance = createDefaultInstanceDataManagerConfig();
+      when(peerInstance.getSegmentPeerDownloadScheme()).thenReturn("http");
+      assertNativeInitializationRejected(new OfflineTableDataManager(), peerInstance, DEFAULT_TABLE_CONFIG, executor);
+      assertNativeInitializationRejected(new OfflineTableDataManager() { }, createDefaultInstanceDataManagerConfig(),
+          DEFAULT_TABLE_CONFIG, executor);
+      assertFalse(TABLE_DATA_DIR.exists());
+      assertFalse(new File(TEMP_DIR, realtime.getTableName()).exists());
+    } finally {
+      executor.shutdownNow();
+    }
+  }
+
+  private static void assertNativeInitializationRejected(OfflineTableDataManager manager,
+      InstanceDataManagerConfig instanceConfig, TableConfig table, ExecutorService executor) {
+    TableDataManagerMetadata metadata = mock(TableDataManagerMetadata.class);
+    when(metadata.fetchTable(table.getTableName())).thenReturn(new TableSnapshot(table, SCHEMA));
+    expectThrows(IllegalArgumentException.class, () -> manager.initWithMetadata(instanceConfig, metadata,
+        new SegmentLocks(), table.getTableName(), new SegmentReloadSemaphore(1), executor, null, null,
+        SEGMENT_OPERATIONS_THROTTLER, false, mock(ServerReloadJobStatusCache.class)));
   }
 
   @Test

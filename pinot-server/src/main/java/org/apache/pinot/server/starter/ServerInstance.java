@@ -68,12 +68,15 @@ import static java.util.Objects.requireNonNull;
 public class ServerInstance {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerInstance.class);
 
+  @Nullable
   private final HelixManager _helixManager;
   private final ThreadAccountant _threadAccountant;
   private final InstanceDataManager _instanceDataManager;
   private final ServerReloadJobStatusCache _reloadJobStatusCache;
+  @Nullable
   private final QueryExecutor _queryExecutor;
   private final LongAccumulator _latestQueryTime;
+  @Nullable
   private final QueryScheduler _queryScheduler;
   private final QueryServer _nettyQueryServer;
   private final QueryServer _nettyTlsQueryServer;
@@ -81,7 +84,9 @@ public class ServerInstance {
   private final WorkerQueryServer _workerQueryServer;
   private final ChannelHandler _instanceRequestHandler;
   private final ServerMetrics _serverMetrics = ServerMetrics.get();
+  @Nullable
   private final PageCacheWarmupServerQueryExecutor _pageCacheWarmupServerQueryExecutor;
+  private final boolean _requiresNativeServingFences;
 
   private boolean _dataManagerStarted = false;
   private boolean _queryServerStarted = false;
@@ -92,8 +97,35 @@ public class ServerInstance {
       KeepPipelineBreakerStatsPredicate keepPipelineBreakerStatsPredicate,
       ServerReloadJobStatusCache reloadJobStatusCache)
       throws Exception {
+    this(serverConf, instanceId, helixManager, null, accessControlFactory, null,
+        segmentOperationsThrottlerSet, threadAccountant, sendStatsPredicate, keepPipelineBreakerStatsPredicate,
+        reloadJobStatusCache);
+  }
+
+  /// Uses an initialized coordination-native data manager and access control without constructing a Helix backend.
+  /// Query startup remains disabled until native permit and per-content admission fences are integrated.
+  public ServerInstance(ServerConf serverConf, String instanceId, InstanceDataManager initializedDataManager,
+      AccessControl accessControl, @Nullable SegmentOperationsThrottlerSet segmentOperationsThrottlerSet,
+      ThreadAccountant threadAccountant, SendStatsPredicate sendStatsPredicate,
+      KeepPipelineBreakerStatsPredicate keepPipelineBreakerStatsPredicate,
+      ServerReloadJobStatusCache reloadJobStatusCache)
+      throws Exception {
+    this(serverConf, instanceId, null, requireNonNull(initializedDataManager, "initializedDataManager"), null,
+        requireNonNull(accessControl, "accessControl"), segmentOperationsThrottlerSet, threadAccountant,
+        sendStatsPredicate, keepPipelineBreakerStatsPredicate, reloadJobStatusCache);
+  }
+
+  private ServerInstance(ServerConf serverConf, String instanceId, @Nullable HelixManager helixManager,
+      @Nullable InstanceDataManager initializedDataManager, @Nullable AccessControlFactory accessControlFactory,
+      @Nullable AccessControl initializedAccessControl,
+      @Nullable SegmentOperationsThrottlerSet segmentOperationsThrottlerSet,
+      ThreadAccountant threadAccountant, SendStatsPredicate sendStatsPredicate,
+      KeepPipelineBreakerStatsPredicate keepPipelineBreakerStatsPredicate,
+      ServerReloadJobStatusCache reloadJobStatusCache)
+      throws Exception {
     LOGGER.info("Initializing server instance: {}", instanceId);
     _helixManager = helixManager;
+    _requiresNativeServingFences = initializedDataManager != null;
     _threadAccountant = threadAccountant;
     _reloadJobStatusCache = requireNonNull(reloadJobStatusCache, "reloadJobStatusCache cannot be null");
 
@@ -102,11 +134,32 @@ public class ServerInstance {
       segmentOperationsThrottlerSet.initializeMetrics();
     }
 
-    String instanceDataManagerClassName = serverConf.getInstanceDataManagerClassName();
-    LOGGER.info("Initializing instance data manager of class: {}", instanceDataManagerClassName);
-    _instanceDataManager = PluginManager.get().createInstance(instanceDataManagerClassName);
-    _instanceDataManager.init(serverConf.getInstanceDataManagerConfig(), helixManager, _serverMetrics,
-        segmentOperationsThrottlerSet, _reloadJobStatusCache);
+    if (initializedDataManager == null) {
+      String instanceDataManagerClassName = serverConf.getInstanceDataManagerClassName();
+      LOGGER.info("Initializing instance data manager of class: {}", instanceDataManagerClassName);
+      _instanceDataManager = PluginManager.get().createInstance(instanceDataManagerClassName);
+      _instanceDataManager.init(serverConf.getInstanceDataManagerConfig(), helixManager, _serverMetrics,
+          segmentOperationsThrottlerSet, _reloadJobStatusCache);
+    } else {
+      Preconditions.checkArgument(instanceId.equals(initializedDataManager.getInstanceId()),
+          "Initialized data manager belongs to another instance");
+      _instanceDataManager = initializedDataManager;
+    }
+
+    if (_requiresNativeServingFences) {
+      // Installation-only lifecycle must not allocate query listeners, event-loop groups or scheduler resources
+      // that cannot be started or safely stopped before native serving admission is implemented.
+      _queryExecutor = null;
+      _latestQueryTime = new LongAccumulator(Long::max, 0);
+      _queryScheduler = null;
+      _nettyQueryServer = null;
+      _nettyTlsQueryServer = null;
+      _grpcQueryServer = null;
+      _workerQueryServer = null;
+      _instanceRequestHandler = null;
+      _pageCacheWarmupServerQueryExecutor = null;
+      return;
+    }
 
     // Initialize ServerQueryLogger, FunctionRegistry and PartitionFunctionFactory before starting the query executor
     ServerQueryLogger.init(serverConf.getQueryLogMaxRate(), serverConf.getQueryLogDroppedReportMaxRate(),
@@ -129,9 +182,15 @@ public class ServerInstance {
         TlsUtils.extractTlsConfig(serverConf.getPinotConfig(), CommonConstants.Server.SERVER_TLS_PREFIX);
     NettyConfig nettyConfig =
         NettyConfig.extractNettyConfig(serverConf.getPinotConfig(), CommonConstants.Server.SERVER_NETTY_PREFIX);
-    accessControlFactory.init(
-        serverConf.getPinotConfig().subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_ACCESS_CONTROL), helixManager);
-    AccessControl accessControl = accessControlFactory.create();
+    AccessControl accessControl;
+    if (initializedAccessControl == null) {
+      requireNonNull(accessControlFactory, "accessControlFactory").init(
+          serverConf.getPinotConfig().subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_ACCESS_CONTROL), helixManager);
+      accessControl = accessControlFactory.create();
+    } else {
+      accessControl = initializedAccessControl;
+    }
+    String instanceName = helixManager == null ? instanceId : helixManager.getInstanceName();
 
     if (serverConf.isMultiStageServerEnabled()) {
       LOGGER.info("Initializing Multi-stage query engine");
@@ -147,7 +206,7 @@ public class ServerInstance {
       int nettyPort = serverConf.getNettyPort();
       LOGGER.info("Initializing Netty query server on port: {}", nettyPort);
       instanceRequestHandler =
-          ChannelHandlerFactory.getInstanceRequestHandler(helixManager.getInstanceName(), serverConf.getPinotConfig(),
+          ChannelHandlerFactory.getInstanceRequestHandler(instanceName, serverConf.getPinotConfig(),
               _queryScheduler, new AllowAllAccessFactory().create(), threadAccountant);
       _nettyQueryServer = new QueryServer(nettyPort, nettyConfig, instanceRequestHandler);
     } else {
@@ -157,7 +216,7 @@ public class ServerInstance {
       int nettySecPort = serverConf.getNettyTlsPort();
       LOGGER.info("Initializing TLS-secured Netty query server on port: {}", nettySecPort);
       instanceRequestHandler =
-          ChannelHandlerFactory.getInstanceRequestHandler(helixManager.getInstanceName(), serverConf.getPinotConfig(),
+          ChannelHandlerFactory.getInstanceRequestHandler(instanceName, serverConf.getPinotConfig(),
               _queryScheduler, accessControl, threadAccountant);
       _nettyTlsQueryServer = new QueryServer(nettySecPort, nettyConfig, tlsConfig, instanceRequestHandler);
     } else {
@@ -166,7 +225,6 @@ public class ServerInstance {
     if (serverConf.isEnableGrpcServer()) {
       int grpcPort = serverConf.getGrpcPort();
       LOGGER.info("Initializing gRPC query server on port: {}", grpcPort);
-      String instanceName = _helixManager.getInstanceName();
       TlsConfig actualTslConfig = serverConf.isGrpcTlsServerEnabled()
           ? TlsUtils.extractTlsConfig(serverConf.getPinotConfig(), CommonConstants.Server.SERVER_GRPCTLS_PREFIX)
           : null;
@@ -189,8 +247,9 @@ public class ServerInstance {
       }
     }
     TransformFunctionFactory.init(transformFunctionClasses);
-    _pageCacheWarmupServerQueryExecutor = new PageCacheWarmupServerQueryExecutor(_instanceDataManager, _queryScheduler,
-        serverConf.getPinotConfig(), _helixManager);
+    _pageCacheWarmupServerQueryExecutor = helixManager == null ? null
+        : new PageCacheWarmupServerQueryExecutor(_instanceDataManager, _queryScheduler,
+            serverConf.getPinotConfig(), helixManager);
 
     LOGGER.info("Finish initializing server instance");
   }
@@ -210,6 +269,8 @@ public class ServerInstance {
   }
 
   public synchronized void startQueryServer() {
+    Preconditions.checkState(!_requiresNativeServingFences,
+        "Native query startup requires permit and per-content admission fences");
     if (_queryServerStarted) {
       LOGGER.warn("Query server is already running, skipping the start");
       return;
@@ -244,6 +305,11 @@ public class ServerInstance {
 
   public synchronized void shutDown() {
     if (!_dataManagerStarted) {
+      if (_requiresNativeServingFences) {
+        // Injection transfers an already initialized manager, including its exclusive filesystem ownership.
+        // Close it even when startup was never requested or failed before the started flag could be set.
+        _instanceDataManager.shutDown();
+      }
       LOGGER.warn("Server instance is not running, skipping the shut down");
       return;
     }
@@ -306,6 +372,7 @@ public class ServerInstance {
   }
 
   public HelixManager getHelixManager() {
+    Preconditions.checkState(_helixManager != null, "Native server has no Helix manager");
     return _helixManager;
   }
 
@@ -314,10 +381,13 @@ public class ServerInstance {
   }
 
   public QueryScheduler getQueryScheduler() {
+    Preconditions.checkState(_queryScheduler != null, "Native query scheduler requires serving admission fences");
     return _queryScheduler;
   }
 
   public PageCacheWarmupServerQueryExecutor getPageCacheWarmupServerQueryExecutor() {
+    Preconditions.checkState(_pageCacheWarmupServerQueryExecutor != null,
+        "Native page-cache warmup requires serving admission fences");
     return _pageCacheWarmupServerQueryExecutor;
   }
 

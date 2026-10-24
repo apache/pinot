@@ -25,6 +25,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.ControlState;
+import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.ParticipantToken;
 import org.apache.pinot.coordination.ratis.metadata.MetadataCatalog;
 import org.apache.pinot.coordination.ratis.metadata.MetadataCatalog.SnapshotData;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol;
@@ -32,6 +33,7 @@ import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.CatalogImag
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.ChangePage;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.FeedCursor;
 import org.apache.pinot.coordination.ratis.metadata.MetadataProtocol.FeedScope;
+import org.apache.pinot.coordination.ratis.metadata.OfflineInstallationProtocol.InstallationSnapshot;
 import org.apache.ratis.proto.RaftProtos.LogEntryProto;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientRequest;
@@ -163,6 +165,13 @@ final class MetadataStateMachine extends BaseStateMachine {
       throws IOException {
     awaitApplied(minimumIndex, deadlineNanos);
     return _catalog.captureImage(scope, maxRecords, maxBytes);
+  }
+
+  synchronized InstallationSnapshot installationSnapshot(ParticipantToken server, int maxRecords, int maxBytes,
+      long minimumIndex, long deadlineNanos)
+      throws IOException {
+    awaitApplied(minimumIndex, deadlineNanos);
+    return _catalog.installationSnapshot(server, maxRecords, maxBytes);
   }
 
   synchronized ChangePage changes(FeedScope scope, FeedCursor cursor, int maxTransactions, int maxRecords,
