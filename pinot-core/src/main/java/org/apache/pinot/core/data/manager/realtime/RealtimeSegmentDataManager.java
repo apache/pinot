@@ -273,6 +273,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private ServerIngestionOomProtectionManager _serverIngestionOomProtectionManager;
   private final MutableSegmentImpl _realtimeSegment;
   private volatile StreamPartitionMsgOffset _currentOffset; // Next offset to be consumed
+  // Segment-level provenance: published before an offset advanced without consuming rows, and never cleared by
+  // another poll or consumer recreation. A non-committer can only reuse this rowset with committed CRC proof.
+  private volatile boolean _hasUnverifiedOffsetAdvance;
   private volatile State _state;
   private volatile int _numRowsConsumed = 0;
   private volatile int _numRowsIndexed = 0; // Can be different from _numRowsConsumed when metrics update is enabled.
@@ -583,8 +586,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         _currentOffset = nextOffset;
         lastUpdatedOffset = _streamPartitionMsgOffsetFactory.create(nextOffset);
       } else if (adoptNextBatchOffsetOfEmptyBatch(messageBatch)) {
-        // The stream delivered nothing but moved past offsets it will never deliver, so the partition did produce
-        // something. Count it as stream activity for the idle timer (it is not a consumed row: ingestion delay and
+        // The stream delivered nothing but reported a new position. Count it as stream activity for the idle timer
+        // without treating it as proof that no rows were skipped (it is not a consumed row: ingestion delay and
         // freshness are left to processStreamEvents, which already treats an empty batch as caught up).
         _idleTimer.markEventConsumed();
         updateHighestStreamOffsetConsumedGauge();
@@ -626,65 +629,54 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
-  /// Advances `_currentOffset` to [MessageBatch#getOffsetOfNextBatch] of a batch that delivered no messages, when
-  /// that offset is ahead of `_currentOffset`.
+  /// Adopts an empty batch's advanced consumer position for INITIAL consumption or ONLINE catch-up.
+  /// Transaction markers and aborted records can move a stream's position without delivering rows, so adoption
+  /// keeps position and lag current. But a position, including a batch with `hasDataLoss() == false`, does not prove
+  /// the skipped interval contained no rows: validation may be unavailable, or the topic may have been compacted.
+  /// Remember that uncertainty for local-reuse CRC validation even when the new position is below the final offset.
   ///
-  /// A stream can move its position past offsets it will never deliver, e.g. Kafka transaction control records
-  /// (commit/abort markers) under either isolation level, or records of aborted transactions under read_committed.
-  /// Without this, a caught-up consumer on a transactional topic stays parked at the marker offset: the lag metric
-  /// reads one while idle, the committed end offset points at an offset nobody can consume, and every new
-  /// transaction looks like an offset gap to the consumer. Every plugin returns the requested start offset for an
-  /// empty batch when the stream did not move (Kafka, Kinesis, Pulsar and the test fake), so the `> 0` guard makes
-  /// this a no-op for them; a plugin only reports a larger offset once it has itself skipped the offsets in between,
-  /// so adopting it never skips undelivered records.
-  ///
-  /// While catching up to a final offset the adopted offset is capped at `_finalOffset`: the committer may have
-  /// stopped at an offset inside such a skipped region, and the offset after that region must not be mistaken for
-  /// consumption past the committed end (endCriteriaReached treats that as an error). Not when the batch reports
-  /// data loss: the skipped offsets then held rows this replica never saw, and settling on the final offset would
-  /// keep a replica that silently misses them. The uncapped offset lets the overshoot surface and the committed
-  /// segment be downloaded instead.
+  /// Protocol CATCHING_UP can subsequently become the committer, so it must not synthesize progress from an empty
+  /// batch. ONLINE catch-up can cap the position at the committed final offset, because any local reuse is guarded
+  /// by the committed CRC. A reported loss is not capped; ordinary overshoot recovery still applies.
   ///
   /// @return `true` if `_currentOffset` was advanced
   private boolean adoptNextBatchOffsetOfEmptyBatch(MessageBatch messageBatch) {
+    if (_state == State.CATCHING_UP) {
+      return false;
+    }
     StreamPartitionMsgOffset nextBatchOffset = messageBatch.getOffsetOfNextBatch();
     if (nextBatchOffset == null || nextBatchOffset.compareTo(_currentOffset) <= 0) {
       return false;
     }
-    if (isCatchingUpToFinalOffset() && !messageBatch.hasDataLoss() && nextBatchOffset.compareTo(_finalOffset) > 0) {
+    if (_state == State.CONSUMING_TO_ONLINE && _finalOffset != null && !messageBatch.hasDataLoss()
+        && nextBatchOffset.compareTo(_finalOffset) > 0) {
       nextBatchOffset = _finalOffset;
     }
     if (_segmentLogger.isDebugEnabled()) {
       _segmentLogger.debug("Empty batch moved the stream position. Advancing from {} to {}", _currentOffset,
           nextBatchOffset);
     }
+    _hasUnverifiedOffsetAdvance = true;
     _currentOffset = nextBatchOffset;
     return true;
   }
 
-  /// While catching up, stops in front of a message whose next offset lies past `_finalOffset` and settles on
-  /// `_finalOffset`. The committer may have stopped at an offset the stream skipped (a Kafka commit marker, once the
-  /// committer adopted the position past it), which no message's next offset produces: without this the replica
-  /// would index the message, overshoot, and endCriteriaReached() would treat that as an error. Every offset between
-  /// `_currentOffset` and `_finalOffset` was skipped by the stream, so the replica then holds the same rows as the
-  /// committer; the message belongs to the next segment. Not applied when the batch reports data loss (the skipped
-  /// offsets held rows this replica never saw; indexing on lets the overshoot surface and the segment be downloaded),
-  /// nor once `_currentOffset` is already at or past `_finalOffset`.
+  /// ONLINE catch-up can stop before a message ending past the committed final offset. This only establishes
+  /// offset equality, not row equality, so record the unverified advance before publishing the final offset.
+  /// Protocol CATCHING_UP must retain ordinary record advancement and overshoot handling instead of manufacturing
+  /// a target match that could make this replica the committer. Reported loss also retains overshoot recovery.
   ///
   /// @return `true` if consumption must stop before the message
   private boolean reachedFinalOffsetBeforeMessage(MessageBatch messageBatch, StreamPartitionMsgOffset nextOffset) {
-    if (!isCatchingUpToFinalOffset() || messageBatch.hasDataLoss() || _currentOffset.compareTo(_finalOffset) >= 0
-        || nextOffset.compareTo(_finalOffset) <= 0) {
+    if (_state != State.CONSUMING_TO_ONLINE || _finalOffset == null || messageBatch.hasDataLoss()
+        || _currentOffset.compareTo(_finalOffset) >= 0 || nextOffset.compareTo(_finalOffset) <= 0) {
       return false;
     }
     _segmentLogger.info("Next message ends at {}, past the final offset {}. Settling on the final offset from {}",
         nextOffset, _finalOffset, _currentOffset);
+    _hasUnverifiedOffsetAdvance = true;
     _currentOffset = _finalOffset;
     return true;
-  }
-
-  private boolean isCatchingUpToFinalOffset() {
-    return _finalOffset != null && (_state == State.CATCHING_UP || _state == State.CONSUMING_TO_ONLINE);
   }
 
   /// @param messageBatch batch of messages to process
@@ -1532,12 +1524,21 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   /// ordering); swapping in a divergent copy corrupts upsert metadata and leaves replicas inconsistent otherwise. So
   /// when `committedSegmentZKMetadata` carries a CRC, a mismatch discards the local build (returns `false`) and the
   /// caller downloads the committed segment. Skipped for pauseless tables and segments whose CRC is not yet set (the
-  /// COMMITTING window), so we never download a not-yet-uploaded segment (see PR #17885).
+  /// COMMITTING window), so we never download a not-yet-uploaded segment (see PR #17885). After an unverified offset
+  /// advance, those exceptions cannot establish row equality: local reuse requires an enabled, matching committed
+  /// CRC check. Otherwise the caller must use the existing download/recovery path.
   ///
-  /// @param committedSegmentZKMetadata committed ZK metadata carrying the CRC, or `null` to skip the check
+  /// @param committedSegmentZKMetadata committed ZK metadata carrying the CRC, or `null` for legacy unflagged reuse
   /// @return `true` if built and replaced locally; `false` if the build failed or was rejected on a CRC mismatch
   protected boolean buildSegmentAndReplace(@Nullable SegmentZKMetadata committedSegmentZKMetadata)
       throws Exception {
+    boolean crcCheckEnabled = committedSegmentZKMetadata != null && committedSegmentZKMetadata.getCrc() >= 0
+        && !PauselessConsumptionUtils.isPauselessEnabled(_tableConfig);
+    if (_hasUnverifiedOffsetAdvance && !crcCheckEnabled) {
+      _segmentLogger.warn("Segment {} advanced across unverified stream offsets without usable committed CRC proof. "
+          + "Skipping local build to replace", _segmentNameStr);
+      return false;
+    }
     SegmentBuildDescriptor descriptor;
     try {
       descriptor = buildSegmentInternal(false);
@@ -1547,8 +1548,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     if (descriptor == null) {
       return false;
     }
-    boolean crcCheckEnabled = committedSegmentZKMetadata != null && committedSegmentZKMetadata.getCrc() >= 0
-        && !PauselessConsumptionUtils.isPauselessEnabled(_tableConfig);
     if (crcCheckEnabled && !isLocalSegmentCrcMatchingZk(committedSegmentZKMetadata)) {
       _segmentLogger.warn("Locally-built segment: {} CRC does not match committed CRC: {} in zk. "
           + "Skipping local build to replace", _segmentNameStr, committedSegmentZKMetadata.getCrc());
