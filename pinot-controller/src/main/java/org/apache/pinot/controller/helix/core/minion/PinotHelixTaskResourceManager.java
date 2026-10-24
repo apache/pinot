@@ -93,8 +93,8 @@ public class PinotHelixTaskResourceManager {
       EnumSet.of(TaskState.COMPLETED, TaskState.FAILED, TaskState.TIMED_OUT, TaskState.ABORTED);
 
   @VisibleForTesting
-  static final int FORCE_DELETE_JOB_MAX_ATTEMPTS = 3;
-  private static final long FORCE_DELETE_JOB_BACKOFF_MS = 100L;
+  static final int DELETE_JOB_MAX_ATTEMPTS = 3;
+  private static final long DELETE_JOB_BACKOFF_MS = 100L;
 
   private final TaskDriver _taskDriver;
   private final PinotHelixResourceManager _helixResourceManager;
@@ -324,44 +324,35 @@ public class PinotHelixTaskResourceManager {
   /// Delete a single task from the task queue. The task queue should be
   /// stopped before deleting the task, otherwise it fails with exception.
   ///
+  /// A delete that fails with [HelixException] is retried a few times with a short backoff. The Helix task pipeline
+  /// can still be writing the job context right after the queue is stopped or the task is scheduled. Removing the
+  /// context ZNode then fails with ZooKeeper `NotEmpty`, which Helix reports as a [HelixException] without the cause.
+  /// Each step of a delete skips ZNodes that are already gone, so a retry resumes where the failed attempt stopped.
+  /// Each attempt holds this manager's lock, but the backoff between attempts does not.
+  ///
   /// @param taskName the task to delete from the queue.
   /// @param forceDelete as said in helix comment, if set true, all job's related zk nodes will
   ///                    be clean up from zookeeper even if its workflow information can not be found.
-  ///                    A forced delete that fails is retried a few times with a short backoff.
   public void deleteTask(String taskName, boolean forceDelete) {
     String taskType = getTaskType(taskName);
     String helixJobQueueName = getHelixJobQueueName(taskType);
     if (forceDelete) {
       LOGGER.warn("Force deleting task: {} from queue: {} of task type: {}", taskName, helixJobQueueName, taskType);
-      forceDeleteJob(helixJobQueueName, taskName);
     } else {
       LOGGER.info("Deleting task: {} from queue: {} of task type: {}", taskName, helixJobQueueName, taskType);
-      synchronized (this) {
-        _taskDriver.deleteJob(helixJobQueueName, taskName, false);
-      }
     }
-  }
-
-  /// Force deletes a job, retrying when Helix fails to remove its ZNodes.
-  ///
-  /// The Helix task pipeline can still be writing the job context right after the queue is stopped or the task is
-  /// scheduled. Removing the context ZNode then fails with ZooKeeper `NotEmpty`, which Helix reports as a
-  /// [HelixException] without the cause. Each step of a forced delete skips ZNodes that are already gone, so a retry
-  /// resumes where the failed attempt stopped. Each attempt holds this manager's lock, but the backoff between attempts
-  /// does not, so other callers are not blocked while it waits.
-  private void forceDeleteJob(String helixJobQueueName, String taskName) {
     for (int attempt = 1; ; attempt++) {
       try {
         synchronized (this) {
-          _taskDriver.deleteJob(helixJobQueueName, taskName, true);
+          _taskDriver.deleteJob(helixJobQueueName, taskName, forceDelete);
         }
         return;
       } catch (HelixException e) {
-        if (attempt >= FORCE_DELETE_JOB_MAX_ATTEMPTS) {
+        if (attempt >= DELETE_JOB_MAX_ATTEMPTS) {
           throw e;
         }
-        long backoffMs = FORCE_DELETE_JOB_BACKOFF_MS * attempt;
-        LOGGER.warn("Attempt {} to force delete task: {} from queue: {} failed, retrying in {}ms", attempt, taskName,
+        long backoffMs = DELETE_JOB_BACKOFF_MS * attempt;
+        LOGGER.warn("Attempt {} to delete task: {} from queue: {} failed, retrying in {}ms", attempt, taskName,
             helixJobQueueName, backoffMs, e);
         try {
           Thread.sleep(backoffMs);
