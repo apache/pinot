@@ -1042,6 +1042,29 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
     }
   }
 
+  /// Drops the cached Netty channels to a server the routing manager just enabled. Channels opened to a process that
+  /// ran before a restart are half-open if it went away without closing them, and would swallow every query routed to
+  /// the readmitted server until the kernel gives up on them minutes later. A server seen for the first time has no
+  /// cached channel, so this is a no-op for it.
+  @Override
+  public void onServerEnabled(ServerInstance serverInstance) {
+    int numEvicted = _queryRouter.evictChannels(serverInstance);
+    if (numEvicted > 0) {
+      LOGGER.info("Evicted {} cached channel(s) to enabled server: {}, the next query reconnects", numEvicted,
+          serverInstance.getInstanceId());
+    }
+  }
+
+  /// Drops the cached Netty channels to a server removed from the cluster: nothing routes to it any more, and if it
+  /// is ever added back under the same id it is a new process.
+  @Override
+  public void onServerRemoved(ServerInstance serverInstance) {
+    int numEvicted = _queryRouter.evictChannels(serverInstance);
+    if (numEvicted > 0) {
+      LOGGER.info("Evicted {} cached channel(s) to removed server: {}", numEvicted, serverInstance.getInstanceId());
+    }
+  }
+
   /// Check if a server that was previously detected as unhealthy is now healthy: by pinging it when pings are enabled,
   /// otherwise by connecting to it.
   public FailureDetector.ServerState retryUnhealthyServer(String instanceId) {

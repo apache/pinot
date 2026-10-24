@@ -29,6 +29,7 @@ import javax.annotation.concurrent.ThreadSafe;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.common.response.BrokerResponse;
+import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.trace.RequestContext;
@@ -82,6 +83,20 @@ public interface BrokerRequestHandler {
   /// number of channels connected before `deadlineMs` (an absolute [System#currentTimeMillis] value).
   default int preConnectServers(long deadlineMs) {
     return 0;
+  }
+
+  /// Called when the routing manager enables a server: when it first appears, and when it is enabled again after it
+  /// was disabled (as while it restarts) or excluded. A handler that caches connections to the server must assume they
+  /// point at a previous process and drop them, so the next query reconnects instead of writing into a half-open
+  /// socket. The default is a no-op; invoked on the Helix callback thread under the routing manager's lock, so it must
+  /// be quick and must not block.
+  default void onServerEnabled(ServerInstance serverInstance) {
+  }
+
+  /// Called when the routing manager sees a server removed from the cluster altogether (its instance config is
+  /// gone). A handler that caches connections to the server drops them: nothing will be routed to it any more, and
+  /// a server later added back under the same id is a new process. Same contract as [#onServerEnabled].
+  default void onServerRemoved(ServerInstance serverInstance) {
   }
 
   BrokerResponse handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
