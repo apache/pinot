@@ -160,6 +160,10 @@ public class RequestWriteTimeoutHandler extends ChannelDuplexHandler {
         scheduleTimeout(ctx, _timeoutNanos);
       }
       _progressivePromise.addListener(this);
+      // The caller's promise may already be complete, in which case this listener runs right here, on the event loop
+      // write() runs on; otherwise it runs on whichever thread later completes or cancels that promise. Either way it
+      // only cancels _progressivePromise, which is thread-safe, and that promise belongs to this channel's event loop,
+      // so its listener (operationComplete), the one that touches this handler's state, always runs on the loop.
       _promise.addListener(future -> {
         if (future.isCancelled()) {
           // If already flushed, cancellation can fail: keep monitoring those bytes until their actual completion.
