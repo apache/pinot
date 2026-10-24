@@ -123,7 +123,7 @@ public class SerializedIntermediateResultMergeTest {
 
   private static MultistageGroupByExecutor newGroupByExecutor() {
     return new MultistageGroupByExecutor(new int[]{0}, newFunctions(), new int[]{-1, -1}, -1, AggType.FINAL, false,
-        GROUP_BY_RESULT_SCHEMA, Map.of(), null);
+        INPUT_SCHEMA, GROUP_BY_RESULT_SCHEMA, Map.of(), null);
   }
 
   private static MultistageAggregationExecutor newAggregationExecutor() {
