@@ -247,7 +247,8 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
 
   /// Logs at most one line per [#EXPIRED_REQUEST_LOG_INTERVAL_MS] of wall-clock time, carrying the number of expired
   /// requests since the previous line and the details of the latest one. The handler is shared by every channel,
-  /// hence the atomics.
+  /// hence the atomics. The count is approximate: an increment that races the winning CAS lands in this line or the
+  /// next, never nowhere; the meter is exact.
   private void logExpiredRequest(ServerQueryRequest queryRequest, long queryArrivalTimeMs, long requestDeadlineMs,
       long lateByMs) {
     _expiredRequestsSinceLastLog.incrementAndGet();
@@ -258,8 +259,8 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
       return;
     }
     long count = _expiredRequestsSinceLastLog.getAndSet(0);
-    LOGGER.warn("Not executing {} request(s) that arrived after the broker deadline since the previous report, "
-            + "latest: request: {} (query: {}) on table: {} arrived at {}, {}ms after its deadline {}", count,
+    LOGGER.warn("Not executing about {} request(s) that arrived after the broker deadline since the previous "
+            + "report, latest: request: {} (query: {}) on table: {} arrived at {}, {}ms after its deadline {}", count,
         queryRequest.getRequestId(), queryRequest.getQueryId(), queryRequest.getTableNameWithType(),
         queryArrivalTimeMs, lateByMs, requestDeadlineMs);
   }
