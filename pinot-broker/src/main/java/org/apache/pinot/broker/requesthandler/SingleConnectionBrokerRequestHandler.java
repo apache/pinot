@@ -137,9 +137,17 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
     super(config, brokerId, requestIdGenerator, routingManager, accessControlFactory, queryQuotaManager, tableCache,
         threadAccountant, multiClusterRoutingContext, materializedViewHandler);
     _brokerReduceService = new BrokerReduceService(_config);
-    _queryRouter = new QueryRouter(_brokerId, nettyConfig, tlsConfig, serverRoutingStatsManager, threadAccountant);
+    _queryRouter = new QueryRouter(_brokerId, nettyConfig, tlsConfig, serverRoutingStatsManager, threadAccountant,
+        _config.getProperty(CommonConstants.Broker.FailureDetector.CONFIG_OF_UNANSWERED_QUERIES_THRESHOLD,
+            CommonConstants.Broker.FailureDetector.DEFAULT_UNANSWERED_QUERIES_THRESHOLD),
+        _config.getProperty(CommonConstants.Broker.FailureDetector.CONFIG_OF_UNANSWERED_QUERY_GRACE_MS,
+            CommonConstants.Broker.FailureDetector.DEFAULT_UNANSWERED_QUERY_GRACE_MS));
     _failureDetector = failureDetector;
     _failureDetector.registerUnhealthyServerRetrier(this::retryUnhealthyServer);
+    // A server that has gone silent on one of its channels is reported like a server the transport saw go down: it
+    // leaves routing until the retry probe re-establishes the channel
+    _queryRouter.setUnansweredServerReporter(serverRoutingInstance -> _failureDetector.markServerUnhealthy(
+        serverRoutingInstance.getInstanceId(), serverRoutingInstance.getHostname()));
   }
 
   @Override
@@ -1004,7 +1012,30 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
     }
   }
 
-  /// Check if a server that was previously detected as unhealthy is now healthy.
+  /// Drops the cached Netty channels to a server the routing manager just re-enabled. The channels were opened to
+  /// the process that ran before the restart; if it went away without closing them they are half-open and would
+  /// swallow every query routed to the readmitted server until the kernel gives up on them minutes later.
+  @Override
+  public void onServerReenabled(ServerInstance serverInstance) {
+    int numEvicted = _queryRouter.evictChannels(serverInstance);
+    if (numEvicted > 0) {
+      LOGGER.info("Evicted {} cached channel(s) to re-enabled server: {}, the next query reconnects", numEvicted,
+          serverInstance.getInstanceId());
+    }
+  }
+
+  /// Drops the cached Netty channels to a server removed from the cluster: nothing routes to it any more, and if it
+  /// is ever added back under the same id it is a new process.
+  @Override
+  public void onServerRemoved(ServerInstance serverInstance) {
+    int numEvicted = _queryRouter.evictChannels(serverInstance);
+    if (numEvicted > 0) {
+      LOGGER.info("Evicted {} cached channel(s) to removed server: {}", numEvicted, serverInstance.getInstanceId());
+    }
+  }
+
+  /// Check if a server that was previously detected as unhealthy is now healthy: re-establishes every channel this
+  /// broker has queried the server over (see [QueryRouter#connect]), replacing the ones that stopped answering.
   public FailureDetector.ServerState retryUnhealthyServer(String instanceId) {
     LOGGER.info("Retrying unhealthy server: {}", instanceId);
     ServerInstance serverInstance = _routingManager.getEnabledServerInstanceMap().get(instanceId);
@@ -1014,13 +1045,14 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
       return FailureDetector.ServerState.UNHEALTHY;
     }
 
-    // Could occur if the cluster is only serving multi-stage queries
+    // No single-stage query has been sent to this server over any channel: nothing for this transport to vouch for.
+    // Happens on a cluster that only serves multi-stage queries, or after the server's channels were evicted.
     if (!_queryRouter.hasChannel(serverInstance)) {
       return FailureDetector.ServerState.UNKNOWN;
     }
 
     if (_queryRouter.connect(serverInstance)) {
-      LOGGER.info("Successfully connect to server: {}, marking it healthy", instanceId);
+      LOGGER.info("Re-established the channel(s) to server: {}, marking it healthy", instanceId);
       return FailureDetector.ServerState.HEALTHY;
     } else {
       LOGGER.warn("Still cannot connect to server: {}, retry later", instanceId);

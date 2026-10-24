@@ -109,14 +109,27 @@ public abstract class BaseExponentialBackoffRetryFailureDetector implements Fail
           }
           LOGGER.info("Retry unhealthy server: {}", instanceId);
           boolean recovered = true;
+          boolean vouched = false;
           for (Function<String, ServerState> unhealthyServerRetrier : _unhealthyServerRetriers) {
             ServerState serverState = unhealthyServerRetrier.apply(instanceId);
             if (serverState == ServerState.UNHEALTHY) {
               recovered = false;
               break;
             }
+            if (serverState == ServerState.HEALTHY) {
+              vouched = true;
+            }
           }
           if (recovered) {
+            if (!vouched) {
+              // Every retrier answered UNKNOWN: no transport holds a connection to this server any more (its channels
+              // were evicted, or were never opened), so there is nothing left to verify. Treating it as recovered is
+              // deliberate: keeping it unhealthy would leave it out of routing for the rest of the backoff schedule,
+              // and because markServerUnhealthy is idempotent a later failure could not flag it again. The next
+              // query opens a fresh connection and reports afresh if the server is still down.
+              LOGGER.info("No retrier can vouch for server: {} (no transport holds a connection to it), treating it "
+                  + "as recovered", instanceId);
+            }
             markServerHealthy(instanceId, retryInfo._hostName);
           } else {
             // Update the retry info and add it back to the delay queue

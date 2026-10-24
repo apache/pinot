@@ -560,6 +560,10 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
               _serverRoutingStatsManager, _failureDetector, _threadAccountant, multiClusterRoutingContext,
               materializedViewHandler);
     }
+    // A re-enabled server has most likely been restarted: let the handler drop the connections it cached to the
+    // previous process, so the next query reconnects instead of writing into a half-open socket.
+    _routingManager.addServerReenableCallback(singleStageBrokerRequestHandler::onServerReenabled);
+    _routingManager.addServerRemovedCallback(singleStageBrokerRequestHandler::onServerRemoved);
 
     MultiStageBrokerRequestHandler multiStageBrokerRequestHandler = null;
     if (_brokerConf.getProperty(Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED, Helix.DEFAULT_MULTI_STAGE_ENGINE_ENABLED)) {
@@ -585,7 +589,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
               _threadAccountant, multiClusterRoutingContext, workerManager, multiClusterWorkerManager,
               _serverRoutingStatsManager);
       MultiStageBrokerRequestHandler finalHandler = multiStageBrokerRequestHandler;
-      _routingManager.setServerReenableCallback(
+      _routingManager.addServerReenableCallback(
           serverInstance -> finalHandler.getQueryDispatcher().resetClientConnectionBackoff(serverInstance));
       // Lets an operator turn the proto segment list encoding on and off through cluster config, without a restart.
       _clusterConfigChangeHandler.registerClusterConfigChangeListener(
