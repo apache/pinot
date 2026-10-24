@@ -18,11 +18,14 @@
  */
 package org.apache.pinot.core.data.manager.realtime;
 
+import java.util.UUID;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertTrue;
+
 
 public class SegmentCompletionUtilsTest {
 
@@ -35,13 +38,21 @@ public class SegmentCompletionUtilsTest {
   @Test
   public void testGenerateSegmentLocation() {
     String segmentName = "segment";
-    String segmentNamePrefix = SegmentCompletionUtils.getTmpSegmentNamePrefix(segmentName);
-    assertTrue(SegmentCompletionUtils.generateTmpSegmentFileName(segmentName).startsWith(segmentNamePrefix));
+    String first = SegmentCompletionUtils.generateTmpSegmentFileName(segmentName);
+    String second = SegmentCompletionUtils.generateTmpSegmentFileName(segmentName);
+    assertTrue(first.startsWith(segmentName + ".tmp."));
+    assertNotEquals(first, second);
+    UUID.fromString(first.substring((segmentName + ".tmp.").length()));
+    assertTrue(SegmentCompletionUtils.isTmpFile(first));
   }
 
   @Test
   public void testIsTmpFile() {
     assertTrue(SegmentCompletionUtils.isTmpFile("hdfs://foo.tmp.550e8400-e29b-41d4-a716-446655440000"));
+    assertTrue(SegmentCompletionUtils.isTmpFile("hdfs://batch.tmp." + UUID.randomUUID()));
+    assertFalse(SegmentCompletionUtils.isTmpFile("hdfs://batch.tmp.20260918"));
+    assertFalse(SegmentCompletionUtils.isTmpFile("hdfs://foo.tmp.not/a-uuid"));
+    assertFalse(SegmentCompletionUtils.isTmpFile("hdfs://foo.tmp.not\\a-uuid"));
     assertFalse(SegmentCompletionUtils.isTmpFile("hdfs://foo.tmp."));
     assertFalse(SegmentCompletionUtils.isTmpFile(".tmp.550e8400-e29b-41d4-a716-446655440000"));
     assertFalse(SegmentCompletionUtils.isTmpFile("hdfs://foo.tmp.55"));
