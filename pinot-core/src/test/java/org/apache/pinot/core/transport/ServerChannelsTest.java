@@ -741,6 +741,35 @@ public class ServerChannelsTest {
     }
   }
 
+  /// Under a dead server at high QPS the judgments queued per channel are capped; the ones that do queue are enough
+  /// to cross the threshold, so the outcome is the same with a bounded queue.
+  @Test
+  public void testPendingJudgmentsPerChannelAreCapped()
+      throws Exception {
+    QueryRouter queryRouter = mock(QueryRouter.class);
+    int threshold = 3;
+    ServerChannels serverChannels =
+        new ServerChannels(queryRouter, null, null, ThreadAccountantUtils.getNoOpAccountant(), threshold, 300L);
+    try (StalledServer server = new StalledServer()) {
+      ServerRoutingInstance instance = new ServerRoutingInstance("localhost", server.getPort(), TableType.REALTIME);
+      serverChannels.sendRequest("testTable", mock(AsyncQueryResponse.class), instance, smallInstanceRequest(),
+          10_000L);
+      Thread.sleep(5L);
+      long submitTimeMs = System.currentTimeMillis();
+      for (int i = 0; i < 1_000; i++) {
+        serverChannels.recordUnansweredQuery(instance, submitTimeMs);
+      }
+      int numPendingJudgments = serverChannels.getNumPendingJudgments(instance);
+      assertTrue(numPendingJudgments >= threshold && numPendingJudgments <= 16,
+          "Expected between the threshold and the cap of pending judgments, got " + numPendingJudgments);
+      verify(queryRouter, timeout(5_000L)).reportUnansweredServer(instance);
+      TestUtils.waitForCondition(aVoid -> serverChannels.getNumPendingJudgments(instance) == 0, 10L, 5_000L,
+          "Pending judgments were not drained");
+    } finally {
+      serverChannels.shutDown();
+    }
+  }
+
   /// With the check disabled nothing is scheduled or counted.
   @Test
   public void testUnansweredQueryCheckDisabled()

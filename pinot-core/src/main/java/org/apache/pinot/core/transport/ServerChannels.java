@@ -114,6 +114,10 @@ public class ServerChannels {
   private final WriteBufferWaterMark _writeBufferWaterMark;
   private final int _unansweredQueriesThreshold;
   private final long _unansweredQueryGraceMs;
+  // Bound on the judgments queued per channel at a time. Under a dead server at high QPS every timed-out query would
+  // otherwise queue a task for the whole grace period; the first few judgments already cross the threshold, so the
+  // rest add nothing but queue depth. Any value at or above the threshold keeps the behaviour.
+  private final int _maxPendingJudgmentsPerChannel;
   // Judges unanswered queries once their grace period is over, and reports the server from there; null when the
   // check is disabled. Its own thread, because reporting ends in a routing update that must not run on an event loop.
   @Nullable
@@ -178,6 +182,7 @@ public class ServerChannels {
         nettyConfig.getWriteBufferHighWaterMarkBytes());
     _unansweredQueriesThreshold = unansweredQueriesThreshold;
     _unansweredQueryGraceMs = Math.max(0L, unansweredQueryGraceMs);
+    _maxPendingJudgmentsPerChannel = Math.max(16, 2 * unansweredQueriesThreshold);
     _livenessExecutor = unansweredQueriesThreshold > 0 ? Executors.newSingleThreadScheduledExecutor(
         new ThreadFactoryBuilder().setNameFormat("server-channel-liveness-%d").setDaemon(true).build()) : null;
     LOGGER.info("Server channel liveness settings: write timeout: {}ms, TCP user timeout: {}ms ({}), write buffer "
@@ -319,23 +324,37 @@ public class ServerChannels {
     if (serverChannel == null) {
       return;
     }
+    if (serverChannel._numPendingJudgments.incrementAndGet() > _maxPendingJudgmentsPerChannel) {
+      // Enough judgments queued to cross the threshold already; this query adds nothing
+      serverChannel._numPendingJudgments.decrementAndGet();
+      return;
+    }
     try {
       _livenessExecutor.schedule(() -> {
         try {
           serverChannel.judgeUnansweredQuery(submitTimeMs);
         } catch (Exception e) {
           LOGGER.error("Caught exception while judging an unanswered query to server: {}", serverRoutingInstance, e);
+        } finally {
+          serverChannel._numPendingJudgments.decrementAndGet();
         }
       }, _unansweredQueryGraceMs, TimeUnit.MILLISECONDS);
     } catch (RejectedExecutionException e) {
       // Shutting down: nothing left to judge
+      serverChannel._numPendingJudgments.decrementAndGet();
     }
   }
 
   @VisibleForTesting
   int getUnansweredQueries(ServerRoutingInstance serverRoutingInstance) {
     ServerChannel serverChannel = _serverToChannelMap.get(serverRoutingInstance);
-    return serverChannel != null ? serverChannel._unansweredQueries.get() : 0;
+    return serverChannel != null ? serverChannel.getUnansweredQueries() : 0;
+  }
+
+  @VisibleForTesting
+  int getNumPendingJudgments(ServerRoutingInstance serverRoutingInstance) {
+    ServerChannel serverChannel = _serverToChannelMap.get(serverRoutingInstance);
+    return serverChannel != null ? serverChannel._numPendingJudgments.get() : 0;
   }
 
   /// Opens a channel ahead of query traffic, awaiting the TLS handshake so that neither the connect nor
@@ -381,10 +400,16 @@ public class ServerChannels {
     // Set when the server stopped answering queries on this channel while the socket still looked active (see
     // judgeUnansweredQuery). connectWithoutLocking() then replaces the channel rather than trusting it.
     volatile boolean _suspect;
-    // When the server last sent anything on this channel (the connect time for a fresh channel), and how many
-    // consecutive queries it has left unanswered since. See judgeUnansweredQuery.
-    volatile long _lastResponseTimeMs;
-    final AtomicInteger _unansweredQueries = new AtomicInteger();
+    // Liveness bookkeeping, guarded by _livenessLock: when the server last sent anything on this channel (the
+    // connect time for a fresh channel) and how many consecutive queries it has left unanswered since. The lock is
+    // taken briefly on the event loop (per response), on the query thread (when a fresh channel is connected) and on
+    // the liveness thread (judgment), so that a response landing while a judgment runs is never lost: it is either
+    // seen by the judgment or zeroes the count after it. See judgeUnansweredQuery.
+    private final Object _livenessLock = new Object();
+    private long _lastResponseTimeMs;
+    private int _unansweredQueries;
+    // Judgments queued for this channel, bounded by ServerChannels#_maxPendingJudgmentsPerChannel
+    final AtomicInteger _numPendingJudgments = new AtomicInteger();
 
     ServerChannel(ServerRoutingInstance serverRoutingInstance) {
       _serverRoutingInstance = serverRoutingInstance;
@@ -452,26 +477,47 @@ public class ServerChannels {
     }
 
     void recordResponse() {
-      _lastResponseTimeMs = System.currentTimeMillis();
-      _unansweredQueries.set(0);
+      synchronized (_livenessLock) {
+        _lastResponseTimeMs = System.currentTimeMillis();
+        _unansweredQueries = 0;
+      }
+    }
+
+    int getUnansweredQueries() {
+      synchronized (_livenessLock) {
+        return _unansweredQueries;
+      }
+    }
+
+    /// A fresh channel starts with a clean record: counted as answered from its connect time, so queries written to
+    /// the channel it replaced do not count against it.
+    private void resetLiveness() {
+      synchronized (_livenessLock) {
+        _lastResponseTimeMs = System.currentTimeMillis();
+        _unansweredQueries = 0;
+      }
     }
 
     /// Runs on the liveness thread a grace period after a query written at `submitTimeMs` timed out. See
     /// [ServerChannels#recordUnansweredQuery].
     void judgeUnansweredQuery(long submitTimeMs) {
-      // Answered something since the query was written (a fresh channel counts as answered from its connect time, so
-      // queries written to the channel it replaced do not count against it), or no longer in use. Strictly after:
-      // the connect and the first write can share a millisecond, while a real answer never shares one with its
-      // request.
-      if (_evicted || _lastResponseTimeMs > submitTimeMs) {
-        return;
+      int unansweredQueries;
+      synchronized (_livenessLock) {
+        // Nothing to add once the channel is already suspect (it is reported once per episode, until replaced) or
+        // no longer in use, or if the server answered something since the query was written (see resetLiveness for
+        // a fresh channel). Strictly after: the connect and the first write can share a millisecond, while a real
+        // answer never shares one with its request. Checked and acted on under the lock, so a response that lands
+        // meanwhile either makes this judgment bail or zeroes the count right after it.
+        if (_evicted || _suspect || _lastResponseTimeMs > submitTimeMs) {
+          return;
+        }
+        unansweredQueries = ++_unansweredQueries;
+        if (unansweredQueries < _unansweredQueriesThreshold) {
+          return;
+        }
+        _unansweredQueries = 0;
+        _suspect = true;
       }
-      int unansweredQueries = _unansweredQueries.incrementAndGet();
-      if (unansweredQueries < _unansweredQueriesThreshold) {
-        return;
-      }
-      _unansweredQueries.set(0);
-      _suspect = true;
       LOGGER.warn("Server: {} has left {} consecutive queries unanswered on its channel, each judged {}ms past its "
           + "timeout; marking the channel suspect and reporting the server", _serverRoutingInstance,
           unansweredQueries, _unansweredQueryGraceMs);
@@ -550,8 +596,7 @@ public class ServerChannels {
       _suspect = false;
       long startTime = System.currentTimeMillis();
       _channel = _bootstrap.connect().sync().channel();
-      _unansweredQueries.set(0);
-      _lastResponseTimeMs = System.currentTimeMillis();
+      resetLiveness();
       recordConnectTime(System.currentTimeMillis() - startTime);
     }
 
@@ -592,7 +637,7 @@ public class ServerChannels {
         throw t;
       }
       _channel = channel;
-      _lastResponseTimeMs = System.currentTimeMillis();
+      resetLiveness();
       recordConnectTime(System.currentTimeMillis() - startTime);
     }
 
