@@ -330,8 +330,32 @@ public class QueryRouter {
     }
   }
 
+  /// Closes and forgets every cached channel to the given server: both table types, over TLS and plaintext. Returns
+  /// the number of channels evicted.
+  ///
+  /// Called through `BrokerRequestHandler#onServerEnabled` when the routing manager enables a server, which is how a
+  /// restart shows up through Helix, and through `BrokerRequestHandler#onServerRemoved` when a server leaves the
+  /// cluster. See [ServerChannels#evictChannel] for why the cached channel cannot be trusted at that point.
+  public int evictChannels(ServerInstance serverInstance) {
+    int numEvicted = 0;
+    for (TableType tableType : TableType.values()) {
+      if (serverInstance.getPort() > 0 && _serverChannels.evictChannel(
+          serverInstance.toServerRoutingInstance(tableType, ServerInstance.RoutingType.NETTY))) {
+        numEvicted++;
+      }
+      if (_serverChannelsTls != null && serverInstance.getNettyTlsPort() > 0 && _serverChannelsTls.evictChannel(
+          serverInstance.toServerRoutingInstance(tableType, ServerInstance.RoutingType.NETTY_TLS))) {
+        numEvicted++;
+      }
+    }
+    return numEvicted;
+  }
+
   public void shutDown() {
     _serverChannels.shutDown();
+    if (_serverChannelsTls != null) {
+      _serverChannelsTls.shutDown();
+    }
   }
 
   void receiveDataTable(ServerRoutingInstance serverRoutingInstance, DataTable dataTable, int responseSize,
@@ -349,8 +373,14 @@ public class QueryRouter {
   /// ([DataTableHandler]) or a request write to it fails ([ServerChannels]). Queries submitted with
   /// `skipUnavailableServers=true` degrade to partial results for this genuine unavailability; others are failed.
   void markServerUnavailable(ServerRoutingInstance serverRoutingInstance, Exception exception) {
-    for (AsyncQueryResponse asyncQueryResponse : _asyncQueryResponseMap.values()) {
-      if (asyncQueryResponse.markServerUnavailable(serverRoutingInstance, exception)) {
+    markServerUnavailable(serverRoutingInstance, null, exception, true);
+  }
+
+  /// Restricts a down event to the request channel; a broker eviction is not evidence against the server.
+  void markServerUnavailable(ServerRoutingInstance serverRoutingInstance, @Nullable Channel channel,
+      Exception exception, boolean reportServer) {
+    for (AsyncQueryResponse response : _asyncQueryResponseMap.values()) {
+      if (response.markServerUnavailable(serverRoutingInstance, channel, exception, reportServer)) {
         _brokerMetrics.addMeteredGlobalValue(BrokerMeter.SERVER_MARKED_DOWN_SKIPPED, 1);
       }
     }
