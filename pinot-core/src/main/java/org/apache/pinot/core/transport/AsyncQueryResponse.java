@@ -43,6 +43,7 @@ public class AsyncQueryResponse implements QueryResponse {
   private final AtomicInteger _numServersResponded = new AtomicInteger();
   private final ConcurrentHashMap<ServerRoutingInstance, ServerResponse> _responseMap;
   private final CountDownLatch _countDownLatch;
+  private final long _startTimeMs;
   private final long _maxEndTimeMs;
   private final long _timeoutMs;
   private final ServerRoutingStatsManager _serverRoutingStatsManager;
@@ -72,6 +73,7 @@ public class AsyncQueryResponse implements QueryResponse {
     }
     _countDownLatch = new CountDownLatch(numServersQueried);
     _timeoutMs = timeoutMs;
+    _startTimeMs = startTimeMs;
     _maxEndTimeMs = startTimeMs + timeoutMs;
   }
 
@@ -95,7 +97,9 @@ public class AsyncQueryResponse implements QueryResponse {
       throws InterruptedException {
     try {
       boolean finish = _countDownLatch.await(_maxEndTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
-      _status.compareAndSet(Status.IN_PROGRESS, finish ? Status.COMPLETED : Status.TIMED_OUT);
+      if (_status.compareAndSet(Status.IN_PROGRESS, finish ? Status.COMPLETED : Status.TIMED_OUT) && !finish) {
+        recordUnansweredServers();
+      }
       return _responseMap;
     } finally {
       // Update ServerRoutingStats for query completion. This is done here to ensure that the stats are updated for
@@ -114,6 +118,20 @@ public class AsyncQueryResponse implements QueryResponse {
       }
 
       _queryRouter.markQueryDone(_requestId);
+    }
+  }
+
+  /// On a timeout, hands every server the request reached but that never answered to the transport, with the time
+  /// and the channel the request was written to; the transport judges after a grace period whether the server has gone
+  /// silent on that channel (see [ServerChannels#recordUnansweredQuery]).
+  private void recordUnansweredServers() {
+    for (Map.Entry<ServerRoutingInstance, ServerResponse> entry : _responseMap.entrySet()) {
+      ServerResponse response = entry.getValue();
+      int submitDelayMs = response.getSubmitDelayMs();
+      // Only servers the request was actually submitted to can be blamed for not answering it
+      if (response.getDataTable() == null && submitDelayMs >= 0) {
+        _queryRouter.recordServerTimeout(entry.getKey(), _startTimeMs + submitDelayMs, response.getChannel());
+      }
     }
   }
 

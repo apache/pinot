@@ -453,6 +453,25 @@ public class ConnectionFailureDetectorTest {
     }
   }
 
+  /// When no retrier can vouch for or against a server (every transport answers UNKNOWN, e.g. because the server's
+  /// channels were evicted), the server is let go rather than kept unhealthy for the whole backoff schedule, so
+  /// that a later failure can flag it again. Pins the semantics the retriers rely on.
+  @Test
+  public void testAllRetriersUnknownIsTreatedAsRecovered() {
+    _failureDetector.registerUnhealthyServerRetrier(instanceId -> FailureDetector.ServerState.UNKNOWN);
+    _failureDetector.registerUnhealthyServerRetrier(instanceId -> FailureDetector.ServerState.UNKNOWN);
+
+    _failureDetector.markServerUnhealthy(INSTANCE_ID, HOST_NAME);
+    verify(Set.of(INSTANCE_ID), 1, 0);
+
+    TestUtils.waitForCondition(aVoid -> _failureDetector.getUnhealthyServers().isEmpty()
+        && _healthyServerNotifier._notifyHealthyServerCalled == 1, 5_000L, "Server was not let go on all-UNKNOWN");
+
+    // ... and can be flagged again
+    _failureDetector.markServerUnhealthy(INSTANCE_ID, HOST_NAME);
+    verify(Set.of(INSTANCE_ID), 2, 1);
+  }
+
   private void verify(Set<String> expectedUnhealthyServers, int expectedNotifyUnhealthyServerCalled,
       int expectedNotifyHealthyServerCalled) {
     assertEquals(_failureDetector.getUnhealthyServers(), expectedUnhealthyServers);
