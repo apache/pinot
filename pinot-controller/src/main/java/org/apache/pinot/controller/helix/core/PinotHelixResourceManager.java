@@ -96,6 +96,7 @@ import org.apache.helix.zookeeper.zkclient.exception.ZkNoNodeException;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
+import org.apache.pinot.common.assignment.PartitionAssignmentUtils;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.config.provider.ZkTableCache;
@@ -1525,6 +1526,10 @@ public class PinotHelixResourceManager {
             return false;
           }
         }
+      }
+      // The instances of the partition assignment are in use although they might host no segment
+      if (CollectionUtils.containsAny(taggedInstances, PartitionAssignmentUtils.getAllInstances(tableIdealState))) {
+        return false;
       }
     }
     return true;
@@ -3038,8 +3043,7 @@ public class PinotHelixResourceManager {
         instancePartitionsMap = fetchOrComputeInstancePartitions(tableNameWithType, tableConfig);
       }
 
-      SegmentAssignment segmentAssignment =
-          SegmentAssignmentFactory.getSegmentAssignment(_helixZkManager, tableConfig, _controllerMetrics);
+      SegmentAssignment segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(_helixZkManager, tableConfig);
       HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, idealState -> {
         assert idealState != null;
         Map<String, Map<String, String>> currentAssignment = idealState.getRecord().getMapFields();
@@ -3048,7 +3052,7 @@ public class PinotHelixResourceManager {
               tableNameWithType);
         } else {
           List<String> assignedInstances =
-              segmentAssignment.assignSegment(segmentName, currentAssignment, instancePartitionsMap);
+              segmentAssignment.assignSegment(segmentName, idealState, instancePartitionsMap);
           LOGGER.info("Assigning segment: {} to instances: {} for table: {}", segmentName, assignedInstances,
               tableNameWithType);
           currentAssignment.put(segmentName,
@@ -3108,8 +3112,7 @@ public class PinotHelixResourceManager {
         tierToInstancePartitionsMap = null;
       }
 
-      SegmentAssignment segmentAssignment =
-          SegmentAssignmentFactory.getSegmentAssignment(_helixZkManager, tableConfig, _controllerMetrics);
+      SegmentAssignment segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(_helixZkManager, tableConfig);
       long segmentAssignmentStartMs = System.currentTimeMillis();
       HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, idealState -> {
         assert idealState != null;
@@ -3128,7 +3131,7 @@ public class PinotHelixResourceManager {
               instancePartitionsMap = tierToInstancePartitionsMap.get(segmentZKMetadata.getTier());
             }
             List<String> assignedInstances =
-                segmentAssignment.assignSegment(segmentName, currentAssignment, instancePartitionsMap);
+                segmentAssignment.assignSegment(segmentName, idealState, instancePartitionsMap);
             LOGGER.info("Assigning segment: {} to instances: {} for table: {}", segmentName, assignedInstances,
                 tableNameWithType);
             currentAssignment.put(segmentName,
@@ -4250,15 +4253,24 @@ public class PinotHelixResourceManager {
     if (!InstanceTypeUtils.isMinion(instanceName)) {
       getAllResources().forEach(resource -> {
         IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, resource);
-        for (String partition : idealState.getPartitionSet()) {
-          if (idealState.getInstanceSet(partition).contains(instanceName)) {
-            response.putIssue(OperationValidationResponse.ErrorCode.CONTAINS_RESOURCE, instanceName, resource);
-            break;
-          }
+        if (isInstanceInIdealState(idealState, instanceName)) {
+          response.putIssue(OperationValidationResponse.ErrorCode.CONTAINS_RESOURCE, instanceName, resource);
         }
       });
     }
     return response.setSafe(response.getIssues().isEmpty());
+  }
+
+  /// Returns whether the given instance is in the given IdealState: it is assigned a partition (a segment of a table),
+  /// or it is in the partition assignment of a table (see [PartitionAssignmentUtils]), whose new segments are assigned
+  /// to the instances of their partition.
+  private static boolean isInstanceInIdealState(IdealState idealState, String instanceName) {
+    for (String partition : idealState.getPartitionSet()) {
+      if (idealState.getInstanceSet(partition).contains(instanceName)) {
+        return true;
+      }
+    }
+    return PartitionAssignmentUtils.getAllInstances(idealState).contains(instanceName);
   }
 
   /// Restores previous tags for a drained minion instance if applicable.
