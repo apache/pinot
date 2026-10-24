@@ -1264,6 +1264,7 @@ public abstract class AbstractBaseResultSet implements ResultSet {
     switch (dataType) {
       case STRING:
       case JSON:
+      case VARIANT:
         return getString(columnIndex);
       case INT:
         return getInt(columnIndex);
