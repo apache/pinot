@@ -42,7 +42,6 @@ import org.apache.pinot.segment.local.utils.IngestionUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.segment.spi.creator.SegmentCreationDataSource;
-import org.apache.pinot.segment.spi.creator.SegmentCreator;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.creator.SegmentPreIndexStatsContainer;
@@ -82,7 +81,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   private SegmentPreIndexStatsContainer _segmentStats;
   // NOTE: Use TreeMap so that the columns are ordered alphabetically
   private TreeMap<String, ColumnStatistics> _columnStatisticsMap;
-  private SegmentCreator _indexCreator;
+  private BaseSegmentCreator _indexCreator;
   private SegmentCreationDataSource _dataSource;
   private IngestionSchemaValidator _ingestionSchemaValidator;
   private int _totalDocs = 0;
@@ -324,6 +323,9 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
     LOGGER.info("Finished records indexing in IndexCreator!");
 
+    _indexCreator.setTransformProvenanceColumns(
+        _transformPipeline.getColumnsWithOnlyTransformedValues(),
+        _transformPipeline.getColumnsWithDependencyClosedTransformValues());
     handlePostCreation();
   }
 

@@ -20,7 +20,9 @@ package org.apache.pinot.segment.spi.index.metadata;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -57,6 +59,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotEquals;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNotSame;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertSame;
@@ -723,6 +726,58 @@ public class ColumnMetadataImplTest {
       config.setProperty(Column.getKeyFor("col", Column.DATETIME_GRANULARITY), new String(DATETIME_GRANULARITY));
     }
     return config;
+  }
+
+  @Test
+  public void transformFunctionRoundtrip() {
+    String transformFunction = "Groovy({x + ',' + y}, x, y)";
+    ColumnMetadataImpl metadata = ColumnMetadataImpl.builder()
+        .setFieldSpec(new DimensionFieldSpec("col", DataType.STRING, true))
+        .setTransformFunction(transformFunction)
+        .setTransformFunctionProvenanceVersion(1)
+        .build();
+
+    assertEquals(metadata.getTransformFunction(), transformFunction);
+    assertEquals(metadata.getTransformFunctionProvenanceVersion(), 1);
+  }
+
+  @Test
+  public void transformFunctionReadFromBase64PropertiesConfig() {
+    String transformFunction = "Groovy({x + '😀' + '${value}, \\' + y}, x, y)";
+    PropertiesConfiguration config = baseConfig("col");
+    config.setProperty(Column.getKeyFor("col", Column.TRANSFORM_FUNCTION_BASE64),
+        Base64.getEncoder().encodeToString(transformFunction.getBytes(StandardCharsets.UTF_8)));
+    config.setProperty(Column.getKeyFor("col", Column.TRANSFORM_FUNCTION_PROVENANCE_VERSION), 1);
+
+    ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(config, 1, "col");
+
+    assertEquals(metadata.getTransformFunction(), transformFunction);
+    assertEquals(metadata.getTransformFunctionProvenanceVersion(), 1);
+  }
+
+  @Test
+  public void rawTransformFunctionFallbackSupportsIntermediateArtifacts() {
+    String transformFunction = "Groovy({x + ',' + y}, x, y)";
+    String escapedTransformFunction =
+        CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(transformFunction);
+    assertNotNull(escapedTransformFunction);
+    PropertiesConfiguration config = baseConfig("col");
+    config.setProperty(Column.getKeyFor("col", Column.TRANSFORM_FUNCTION), escapedTransformFunction);
+
+    ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(config, 1, "col");
+
+    assertEquals(metadata.getTransformFunction(), transformFunction);
+    assertEquals(metadata.getTransformFunctionProvenanceVersion(), ColumnMetadata.UNAVAILABLE);
+  }
+
+  @Test
+  public void missingTransformFunctionIsBackwardCompatible() {
+    PropertiesConfiguration config = baseConfig("col");
+
+    ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(config, 1, "col");
+
+    assertNull(metadata.getTransformFunction());
+    assertEquals(metadata.getTransformFunctionProvenanceVersion(), ColumnMetadata.UNAVAILABLE);
   }
 
   private static PropertiesConfiguration baseConfig(String column) {

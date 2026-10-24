@@ -51,6 +51,7 @@ import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextMetadata;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -168,6 +169,8 @@ public class SegmentPreProcessor implements AutoCloseable {
       DefaultColumnHandler defaultColumnHandler =
           DefaultColumnHandlerFactory.getDefaultColumnHandler(indexDir, segmentMetadata, _indexLoadingConfig,
               segmentWriter, _segmentDirectory);
+      invalidateIndexesOverChangingColumns(indexDir, segmentMetadata,
+          defaultColumnHandler.getColumnsWithPendingTransformValueChanges());
       defaultColumnHandler.updateDefaultColumns();
       _segmentDirectory.reloadMetadata();
 
@@ -237,6 +240,28 @@ public class SegmentPreProcessor implements AutoCloseable {
         //_segmentDirectory.reloadMetadata();
         segmentWriter.save();
       }
+    }
+  }
+
+  /// A column whose transform function changed is rewritten in place by the default column handler. Before that, drop
+  /// the star-trees and mark the multi-column text index for rebuild, both on disk, so that a crash between the
+  /// rewrite and the rebuild cannot leave either index over the old values: the missing star-trees and the unfinished
+  /// text index are rebuilt by the steps that follow, or by the next load.
+  private void invalidateIndexesOverChangingColumns(File indexDir, SegmentMetadataImpl segmentMetadata,
+      Set<String> changingColumns)
+      throws Exception {
+    if (changingColumns.isEmpty()) {
+      return;
+    }
+    if (StarTreeBuilderUtils.usesAnyColumn(segmentMetadata.getStarTreeV2MetadataList(), changingColumns)) {
+      LOGGER.info("Removing star-trees from segment: {} before regenerating columns: {}", segmentMetadata.getName(),
+          changingColumns);
+      StarTreeBuilderUtils.removeStarTrees(indexDir);
+    }
+    MultiColumnTextMetadata textIndexMetadata = segmentMetadata.getMultiColumnTextMetadata();
+    if (textIndexMetadata != null && textIndexMetadata.getColumns().stream().anyMatch(changingColumns::contains)) {
+      new MultiColumnTextIndexHandler(_segmentDirectory, _indexLoadingConfig,
+          _indexLoadingConfig.getMultiColTextIndexConfig()).markForRebuild();
     }
   }
 
