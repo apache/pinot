@@ -413,6 +413,24 @@ public class AnyValueAggregationFunctionTest extends AbstractAggregationFunction
   }
 
   @Test
+  void testRejectsRawVariantWithInferredOrExplicitType() {
+    BlockValSet valueSet = mock(BlockValSet.class);
+    when(valueSet.getValueType()).thenReturn(DataType.VARIANT);
+    when(valueSet.getBytesValuesSV()).thenReturn(new byte[][]{new byte[]{1}});
+    Map<ExpressionContext, BlockValSet> values = Map.of(EXPRESSION, valueSet);
+    // An explicit BYTES result type must not bypass the logical input type check.
+    for (AnyValueAggregationFunction function : List.of(
+        new AnyValueAggregationFunction(List.of(EXPRESSION), true), createFunction("BYTES"))) {
+      assertThrows(IllegalArgumentException.class,
+          () -> function.aggregate(1, function.createAggregationResultHolder(), values));
+      assertThrows(IllegalArgumentException.class,
+          () -> function.aggregateGroupBySV(1, new int[]{0}, function.createGroupByResultHolder(1, 1), values));
+      assertThrows(IllegalArgumentException.class,
+          () -> function.aggregateGroupByMV(1, new int[][]{{0}}, function.createGroupByResultHolder(1, 1), values));
+    }
+  }
+
+  @Test
   void testDataTypeArgumentRejectsInvalidArguments() {
     assertThrows(IllegalArgumentException.class, () -> createFunction("JSON"));
     assertThrows(BadQueryRequestException.class, () -> createFunction("NOT_A_TYPE"));
