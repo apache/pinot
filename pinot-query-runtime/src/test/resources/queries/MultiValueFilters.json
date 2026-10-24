@@ -76,6 +76,12 @@
             [
               5
             ]
+          ],
+          [
+            "o6",
+            "c3",
+            [],
+            []
           ]
         ]
       },
@@ -324,6 +330,11 @@
         "description": "Value that needs a cast of the MV column is not supported",
         "sql": "SELECT order_id FROM {orders} WHERE tags = 5",
         "expectedException": ".*Cannot apply '=' to arguments of type '<VARCHAR ARRAY> = <INTEGER>'.*",
+        "outputs": []
+      },
+      {
+        "description": "Equality to NULL on an MV column is accepted and matches no row, unlike NULL in an IN list",
+        "sql": "SELECT order_id FROM {orders} WHERE tags = NULL",
         "outputs": []
       },
       {

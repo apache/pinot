@@ -182,7 +182,8 @@ public class ArrayToMvValidationVisitor implements PlanNodeVisitor<Void, Boolean
       return new QueryException(QueryErrorCode.QUERY_PLANNING,
           "Comparing a multi-value column to a value (e.g. mvCol = 'a' or mvCol IN ('a', 'b')) is not supported in "
               + location + ". It is only supported in a WHERE clause filter that can be pushed down to the table "
-              + "scan. Elsewhere, use an arrayContains function instead, e.g. arrayContainsString(mvCol, 'a')");
+              + "scan. Elsewhere, use the arrayContains function for the column type instead, e.g. "
+              + "arrayContainsString(mvCol, 'a') or arrayContainsInt(mvCol, 1)");
     }
     return new QueryException(QueryErrorCode.QUERY_PLANNING,
         "Function 'ArrayToMv' is not supported in " + location + hint);

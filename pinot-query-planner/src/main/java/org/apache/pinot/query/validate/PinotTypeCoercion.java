@@ -101,6 +101,8 @@ public class PinotTypeCoercion extends TypeCoercionImpl {
         if (isMultiValueColumn(binding, mvIndex)) {
           // Range comparisons are not wrapped: Calcite rewrites NOT(mv > x) to mv <= x, which is not the complement
           // under the "any value matches" semantics. Not coercing makes validation fail, as for other array types.
+          // Unlike a NULL in an IN list (rejected in isScalarValueListRejectingNull), mvCol = NULL is accepted: it is
+          // pushed down as col = NULL, which matches no row, the same as on a single-value column.
           return (kind == SqlKind.EQUALS || kind == SqlKind.NOT_EQUALS)
               && coerceMultiValueComparison(binding, mvIndex, () -> binaryComparisonCoercion(binding));
         }
