@@ -115,29 +115,29 @@ public class StatelessRealtimeSegmentWriterTest {
     ServerMetrics.register(mock(ServerMetrics.class));
   }
 
-  /// A batch without unfiltered messages never moves the writer's offset, whatever next offset it reports: a Kafka
-  /// consumer reports its position past skipped transaction markers, which is routine on a transactional topic and
-  /// may land below, at or past the end offset. The writer polls again from the same offset and relies on the loss
-  /// check of the next non-empty batch, so every such replay completes with exactly the records below the end.
+  /// A batch without unfiltered messages that reports a next offset ahead of the writer's moves the writer there: a
+  /// Kafka consumer reports its position past skipped transaction markers (after validating the move), which is
+  /// routine on a transactional topic and may land below, at or past the end offset. A batch that reports the
+  /// requested offset leaves it alone. Every such replay completes with exactly the records below the end, and one
+  /// whose tail holds only markers completes as soon as the reported position reaches the end, without waiting for a
+  /// record at or after it (the scripted streams below end there).
   @DataProvider
   public Object[][] validReplays() {
     return new Object[][]{
         {"records", List.of(records(0, 120)), 120, List.of(0L)},
         {"nonmoving", List.of(records(0, 100), empty(100, 0, false), records(100, 120)), 120, List.of(0L, 100L, 100L)},
         // Commit marker at 100: the empty poll moves the consumer to 101, the next one delivers 101..119
-        {"marker", List.of(records(0, 100), empty(101, 0, false), records(101, 120)), 119, List.of(0L, 100L, 100L)},
+        {"marker", List.of(records(0, 100), empty(101, 0, false), records(101, 120)), 119, List.of(0L, 100L, 101L)},
         {"markerThenFiltered", List.of(records(0, 100), empty(101, 0, false), empty(106, 5, false), records(106, 120)),
-            114, List.of(0L, 100L, 100L, 106L)},
+            114, List.of(0L, 100L, 101L, 106L)},
         // Five fetched tombstones/filtered records legitimately advance the position without decoded rows
         {"filtered", List.of(records(0, 100), empty(105, 5, false), records(105, 120)), 115, List.of(0L, 100L, 105L)},
-        // Markers fill the tail of the range: the empty advance stays below, reaches or crosses the end, and the next
-        // record lands at or after the end
+        // Markers fill the tail of the range: the empty advance stays below the end (the next record lands at the
+        // end), or reaches or crosses the end, which completes the replay with no further record
         {"markerTailBelowEnd", List.of(records(0, 100), empty(110, 0, false), records(120, 121)), 100,
-            List.of(0L, 100L, 100L)},
-        {"markerTailAtEnd", List.of(records(0, 100), empty(120, 0, false), records(120, 121)), 100,
-            List.of(0L, 100L, 100L)},
-        {"markerTailPastEnd", List.of(records(0, 100), empty(150, 0, false), records(150, 151)), 100,
-            List.of(0L, 100L, 100L)},
+            List.of(0L, 100L, 110L)},
+        {"markerTailAtEnd", List.of(records(0, 100), empty(120, 0, false)), 100, List.of(0L, 100L)},
+        {"markerTailPastEnd", List.of(records(0, 100), empty(150, 0, false)), 100, List.of(0L, 100L)},
         {"alreadyAtEnd", List.of(), 0, List.of()}
     };
   }
@@ -184,7 +184,7 @@ public class StatelessRealtimeSegmentWriterTest {
   }
 
   /// A non-empty batch that reports data loss is not indexed, including the case where an empty poll moved the
-  /// consumer first (the loss check of the data poll covers the gap from the retained offset).
+  /// consumer and the writer first (the loss check of the data poll covers the gap from the adopted offset).
   @DataProvider
   public Object[][] lossAfterMarker() {
     return new Object[][]{{false}, {true}};
@@ -205,8 +205,8 @@ public class StatelessRealtimeSegmentWriterTest {
       assertFalse(replay.writer().isSuccess());
       assertEquals(indexedRows(replay.writer()), 100, "The loss batch must not be indexed");
       assertTrue(replay.writer().getConsumptionException().getMessage().contains("data loss"));
-      assertEquals(((LongMsgOffset) field(replay.writer(), "_currentOffset")).getOffset(), 100L);
-      assertEquals(replay.requestedOffsets(), afterMarker ? List.of(0L, 100L, 100L) : List.of(0L, 100L));
+      assertEquals(((LongMsgOffset) field(replay.writer(), "_currentOffset")).getOffset(), afterMarker ? 101L : 100L);
+      assertEquals(replay.requestedOffsets(), afterMarker ? List.of(0L, 100L, 101L) : List.of(0L, 100L));
       verify(replay.consumer(), times(1)).close();
     }
   }

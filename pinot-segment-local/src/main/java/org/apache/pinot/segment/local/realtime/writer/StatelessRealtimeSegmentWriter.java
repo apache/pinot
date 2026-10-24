@@ -79,14 +79,16 @@ import org.slf4j.LoggerFactory;
 
 /// Segment writer to ingest streaming data from a start offset to an end offset.
 ///
-/// Like `RealtimeSegmentDataManager`, the writer never moves its offset on a batch without unfiltered messages: it
-/// polls again from the same offset and lets the consumer keep its own progress. A Kafka consumer, for one, moves past
-/// transaction control records without returning anything, so such a batch can report a next offset ahead of the
-/// requested one, either because only commit/abort markers were skipped (routine on a transactional topic) or because
-/// the client reset after an out-of-range fetch. The gap from the retained offset to the first record of the next
-/// non-empty batch is validated by the consumer's data-loss check, so a batch reporting data loss fails the replay
-/// before anything from it is indexed. A range whose tail holds no records completes once a batch delivers a record
-/// at or after the end offset; the caller's consumption timeout bounds a stream that delivers nothing.
+/// Like `RealtimeSegmentDataManager`, the writer adopts the next offset of a batch without unfiltered messages when
+/// it is ahead of its own. A Kafka consumer, for one, moves past transaction control records without returning
+/// anything, so such a batch can report a next offset ahead of the requested one, either because only commit/abort
+/// markers were skipped (routine on a transactional topic) or because the client reset after an out-of-range fetch.
+/// The consumer validates such a move before reporting it and flags a reset as data loss, on the empty batch itself
+/// or on the next batch that returns records, and the writer fails the replay on any batch reporting data loss
+/// before anything from it is indexed. Adopting the move matters for ranges whose tail holds no records: a segment
+/// committed on an idle transactional partition ends one past the last commit marker, an offset no record's next
+/// offset produces, so a writer that waited for a record at or after the end offset would run into the caller's
+/// consumption timeout on an idle stream.
 ///
 /// TODO:
 ///   1. Clean up this class and only keep the necessary parts.
@@ -284,7 +286,11 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
           Preconditions.checkState(!messageBatch.hasDataLoss(), "Stream data loss at offset %s while replaying to %s",
               _currentOffset, _endOffset);
           if (messageBatch.getUnfilteredMessageCount() == 0) {
-            // Keep the offset and poll again (see the class Javadoc): the next non-empty batch is validated against it.
+            // Adopt a position the stream moved to without delivering anything (see the class Javadoc), else poll again
+            StreamPartitionMsgOffset nextBatchOffset = messageBatch.getOffsetOfNextBatch();
+            if (nextBatchOffset != null && nextBatchOffset.compareTo(_currentOffset) > 0) {
+              _currentOffset = nextBatchOffset;
+            }
             continue;
           }
 

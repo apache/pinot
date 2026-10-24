@@ -280,11 +280,12 @@ public class KafkaPartitionLevelConsumerDataLossCheckTest {
     verify(mockConsumer, never()).beginningOffsets(anyCollection(), any(Duration.class));
   }
 
-  /// When the log start offset cannot be read for a move during an empty poll, the move stays unaccounted for and is
-  /// validated again on the next poll, so a broker hiccup cannot hide a reset for good. Here the retry on the
-  /// following data poll finds the log start above the position the empty poll started from and reports the loss.
+  /// When the log start offset cannot be read for a move during an empty poll, the move stays unaccounted for: the
+  /// empty batch reports the last validated position, so no caller can adopt the move, and the next poll validates
+  /// it again. A broker hiccup therefore cannot hide a reset for good. Here the retry on the following data poll finds
+  /// the log start above the position the empty poll started from and reports the loss.
   @Test
-  public void testFailedValidationOfEmptyPollMoveIsRetriedOnNextRecordPoll() {
+  public void testFailedValidationOfEmptyPollMoveIsNotReportedAndRetriedOnNextRecordPoll() {
     Consumer<Bytes, Bytes> mockConsumer = mock(Consumer.class);
     when(mockConsumer.poll(any(Duration.class))).thenReturn(records(), records(record(150L)));
     when(mockConsumer.position(eq(TOPIC_PARTITION), any(Duration.class))).thenReturn(150L, 151L);
@@ -294,12 +295,36 @@ public class KafkaPartitionLevelConsumerDataLossCheckTest {
 
     KafkaPartitionLevelConsumer consumer = createConsumerWithMock(getStreamConfig(null), mockConsumer);
     KafkaMessageBatch emptyBatch = consumer.fetchMessages(new LongMsgOffset(100L), TIMEOUT_MS);
-    assertEquals(emptyBatch.getOffsetOfNextBatch().toString(), "150", "The position is still reported");
+    assertEquals(emptyBatch.getOffsetOfNextBatch().toString(), "100", "An unvalidated move is not reported");
     assertFalse(emptyBatch.hasDataLoss(), "A failed lookup does not manufacture a loss report");
 
-    KafkaMessageBatch dataBatch = consumer.fetchMessages(new LongMsgOffset(150L), TIMEOUT_MS);
+    // The caller asks for the reported offset again; the consumer keeps its position instead of seeking back
+    KafkaMessageBatch dataBatch = consumer.fetchMessages(new LongMsgOffset(100L), TIMEOUT_MS);
     assertEquals(dataBatch.getFirstMessageOffset().toString(), "150");
     assertTrue(dataBatch.hasDataLoss(), "The move from 100 to 150 is validated again and turns out to be a reset");
+    verify(mockConsumer, times(2)).beginningOffsets(anyCollection(), any(Duration.class));
+    verify(mockConsumer, times(1)).seek(any(TopicPartition.class), anyLong());
+  }
+
+  /// The same unvalidated move, retried on an empty poll: once a lookup succeeds and finds no loss, the move is
+  /// reported and can be adopted.
+  @Test
+  public void testFailedValidationOfEmptyPollMoveIsReportedOnceValidated() {
+    Consumer<Bytes, Bytes> mockConsumer = mock(Consumer.class);
+    when(mockConsumer.poll(any(Duration.class))).thenReturn(records(), records());
+    when(mockConsumer.position(eq(TOPIC_PARTITION), any(Duration.class))).thenReturn(2L);
+    when(mockConsumer.beginningOffsets(anyCollection(), any(Duration.class)))
+        .thenThrow(new TimeoutException("broker unavailable"))
+        .thenReturn(Map.of(TOPIC_PARTITION, 0L));
+
+    KafkaPartitionLevelConsumer consumer = createConsumerWithMock(getStreamConfig(null), mockConsumer);
+    KafkaMessageBatch emptyBatch = consumer.fetchMessages(new LongMsgOffset(1L), TIMEOUT_MS);
+    assertEquals(emptyBatch.getOffsetOfNextBatch().toString(), "1");
+    assertFalse(emptyBatch.hasDataLoss());
+
+    emptyBatch = consumer.fetchMessages(new LongMsgOffset(1L), TIMEOUT_MS);
+    assertEquals(emptyBatch.getOffsetOfNextBatch().toString(), "2", "The commit marker at 1 is skipped once validated");
+    assertFalse(emptyBatch.hasDataLoss());
     verify(mockConsumer, times(2)).beginningOffsets(anyCollection(), any(Duration.class));
   }
 
