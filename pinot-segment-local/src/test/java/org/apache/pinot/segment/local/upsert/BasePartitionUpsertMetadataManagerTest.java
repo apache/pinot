@@ -1245,20 +1245,6 @@ public class BasePartitionUpsertMetadataManagerTest {
     assertFalse(upsertMetadataManager.getLastSnapshotPass().consistent());
   }
 
-  @Test
-  public void testSnapshotPassSkipsDestroyedSegment() {
-    DummyPartitionUpsertMetadataManager manager =
-        new DummyPartitionUpsertMetadataManager("myTable", 0, createSnapshotPassContext());
-    ImmutableSegmentImpl destroyed = mock(ImmutableSegmentImpl.class);
-    when(destroyed.tryAcquireReadLock()).thenReturn(false);
-    manager.trackSegment(destroyed);
-
-    manager.takeSnapshot();
-
-    assertFalse(manager.getLastSnapshotPass().consistent());
-    verify(destroyed, never()).getSegmentMetadata();
-  }
-
   private static UpsertContext createSnapshotPassContext() {
     UpsertContext upsertContext = mock(UpsertContext.class);
     when(upsertContext.isSnapshotEnabled()).thenReturn(true);

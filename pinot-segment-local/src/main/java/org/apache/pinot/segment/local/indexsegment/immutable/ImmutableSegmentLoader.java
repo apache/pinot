@@ -129,7 +129,7 @@ public class ImmutableSegmentLoader {
     if (segmentMetadata.getTotalDocs() == 0) {
       if (indexLoadingConfig.isMappedSegmentMetadataEnabled()) {
         try {
-          return new EmptyIndexSegment(SegmentMetadataImpl.loadMapped(indexDir));
+          return new EmptyIndexSegment(SegmentMetadataImpl.loadMapped(indexDir, indexLoadingConfig.getReadMode()));
         } catch (IOException | ConfigurationException e) {
           LOGGER.warn("Failed to load mapped metadata for empty segment: {}. Using eager metadata.", indexDir, e);
         }

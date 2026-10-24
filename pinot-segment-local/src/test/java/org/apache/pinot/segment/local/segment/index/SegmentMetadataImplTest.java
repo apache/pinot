@@ -31,6 +31,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -52,7 +53,9 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.IndexPlugin;
 import org.apache.pinot.segment.spi.index.IndexService;
+import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
 import org.apache.pinot.segment.spi.index.metadata.MappedColumnMetadata;
@@ -242,6 +245,17 @@ public class SegmentMetadataImplTest {
     } finally {
       segment.destroy();
     }
+
+    IndexLoadingConfig heapConfig = new IndexLoadingConfig(instanceConfig, null, null);
+    heapConfig.setReadMode(ReadMode.heap);
+    long mappings = PinotDataBuffer.getMmapBufferCount();
+    ImmutableSegment heap = ImmutableSegmentLoader.load(_segmentDirectory, heapConfig, false);
+    try {
+      assertTrue(((SegmentMetadataImpl) heap.getSegmentMetadata()).isMapped());
+      assertEquals(PinotDataBuffer.getMmapBufferCount(), mappings);
+    } finally {
+      heap.destroy();
+    }
   }
 
   @Test
@@ -280,6 +294,13 @@ public class SegmentMetadataImplTest {
       }
     }
     assertEquals(PinotDataBuffer.getMmapBufferCount(), mappings);
+    long directBuffers = PinotDataBuffer.getDirectBufferCount();
+    try (SegmentMetadataImpl heap = SegmentMetadataImpl.loadMapped(_segmentDirectory, ReadMode.heap)) {
+      assertEquals(heap.toJson(null), eager.toJson(null));
+      assertEquals(PinotDataBuffer.getMmapBufferCount(), mappings);
+      assertEquals(PinotDataBuffer.getDirectBufferCount(), directBuffers + 1);
+    }
+    assertEquals(PinotDataBuffer.getDirectBufferCount(), directBuffers);
 
     byte[] sidecarBytes = Files.readAllBytes(sidecar.toPath());
     assertEquals(ByteBuffer.wrap(sidecarBytes).order(ByteOrder.BIG_ENDIAN).getInt(40), sidecarCrc(sidecarBytes));
@@ -307,6 +328,27 @@ public class SegmentMetadataImplTest {
     try (SegmentMetadataImpl mapped = SegmentMetadataImpl.loadMapped(_segmentDirectory)) {
       ColumnMetadata zeroSizedColumn = mapped.getColumnMetadataFor(parsedKey[0]);
       assertEquals(zeroSizedColumn.getIndexSizeFor(IndexService.getInstance().get(parsedKey[1])), 0L);
+    }
+    IndexService originalIndexService = IndexService.getInstance();
+    Set<IndexPlugin<?>> plugins = new HashSet<>();
+    for (IndexType<?, ?, ?> type : originalIndexService.getAllIndexes()) {
+      if (!type.getId().equals(parsedKey[1])) {
+        IndexPlugin<IndexType<?, ?, ?>> plugin = () -> type;
+        plugins.add(plugin);
+      }
+    }
+    try {
+      IndexService.setInstance(new IndexService(plugins));
+      try (SegmentMetadataImpl mapped = SegmentMetadataImpl.loadMapped(_segmentDirectory)) {
+        assertEquals(mapped.getColumnMetadataFor(parsedKey[0]).getIndexSizeFor(
+            originalIndexService.get(parsedKey[1])), ColumnMetadata.UNAVAILABLE);
+      }
+    } finally {
+      IndexService.setInstance(originalIndexService);
+    }
+    try (SegmentMetadataImpl mapped = SegmentMetadataImpl.loadMapped(_segmentDirectory)) {
+      assertEquals(mapped.getColumnMetadataFor(parsedKey[0]).getIndexSizeFor(
+          originalIndexService.get(parsedKey[1])), 0L);
     }
     File staging = new File(INDEX_DIR, "mapped-staging");
     try {
@@ -383,18 +425,50 @@ public class SegmentMetadataImplTest {
           assertEquals(mapped.getSchema(), eager.getSchema());
         }
       }
-      // A v3 sidecar with its original payload-only checksum must rebuild under the v4 format.
-      byte[] version3 = Files.readAllBytes(sidecar.toPath());
-      ByteBuffer version3Header = ByteBuffer.wrap(version3).order(ByteOrder.BIG_ENDIAN);
-      version3Header.putInt(4, 3);
-      CRC32C payloadCrc = new CRC32C();
-      payloadCrc.update(version3, 64, version3.length - 64);
-      version3Header.putInt(40, (int) payloadCrc.getValue());
-      Files.write(sidecar.toPath(), version3);
+      // A v4 sidecar must rebuild with the current FieldSpec JSON encoding and index registry fingerprint.
+      byte[] version4 = Files.readAllBytes(sidecar.toPath());
+      ByteBuffer version4Header = ByteBuffer.wrap(version4).order(ByteOrder.BIG_ENDIAN);
+      version4Header.putInt(4, 4);
+      version4Header.putInt(40, sidecarCrc(version4));
+      Files.write(sidecar.toPath(), version4);
       try (SegmentMetadataImpl mapped = SegmentMetadataImpl.loadMapped(segmentDir)) {
         assertEquals(mapped.getSchema(), eager.getSchema());
       }
-      assertEquals(ByteBuffer.wrap(Files.readAllBytes(sidecar.toPath())).order(ByteOrder.BIG_ENDIAN).getInt(4), 4);
+      assertEquals(ByteBuffer.wrap(Files.readAllBytes(sidecar.toPath())).order(ByteOrder.BIG_ENDIAN).getInt(4), 5);
+    } finally {
+      FileUtils.deleteQuietly(segmentDir);
+    }
+  }
+
+  @Test
+  public void testMappedDecimalDefaultNullValuesPreservePrecision()
+      throws Exception {
+    File segmentDir = Files.createTempDirectory("mapped-decimal-defaults").toFile();
+    try {
+      Files.writeString(new File(segmentDir, "metadata.properties").toPath(),
+          "segment.name = decimalDefaults\n"
+              + "segment.table.name = testTable\n"
+              + "segment.total.docs = 0\n"
+              + "segment.version = v1\n"
+              + "segment.dimension.column.names = scaled, precise\n"
+              + "column.scaled.columnType = DIMENSION\n"
+              + "column.scaled.dataType = BIG_DECIMAL\n"
+              + "column.scaled.defaultNullValue = 1.10\n"
+              + "column.precise.columnType = DIMENSION\n"
+              + "column.precise.dataType = BIG_DECIMAL\n"
+              + "column.precise.defaultNullValue = 12345678901234567890.123456789\n");
+      SegmentMetadataImpl eager = new SegmentMetadataImpl(segmentDir);
+      try (SegmentMetadataImpl mapped = SegmentMetadataImpl.loadMapped(segmentDir)) {
+        for (String column : List.of("scaled", "precise")) {
+          FieldSpec expected = eager.getColumnMetadataFor(column).getFieldSpec();
+          FieldSpec actual = mapped.getColumnMetadataFor(column).getFieldSpec();
+          assertEquals(actual, expected);
+          assertEquals(actual.getDefaultNullValueString(), expected.getDefaultNullValueString());
+        }
+        assertEquals(mapped.getColumnMetadataFor("scaled").getFieldSpec().getDefaultNullValueString(), "1.10");
+        assertEquals(mapped.getColumnMetadataFor("precise").getFieldSpec().getDefaultNullValueString(),
+            "12345678901234567890.123456789");
+      }
     } finally {
       FileUtils.deleteQuietly(segmentDir);
     }

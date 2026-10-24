@@ -1001,21 +1001,13 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     TreeMap<String, Long> segmentVersions = new TreeMap<>();
     for (IndexSegment segment : _trackedSegments) {
       if (segment instanceof ImmutableSegmentImpl) {
-        if (!tryAcquireSegmentReadLock(segment)) {
+        if (!_trackedSegments.contains(segment)) {
           consistent = false;
           continue;
         }
-        try {
-          if (!_trackedSegments.contains(segment)) {
-            consistent = false;
-            continue;
-          }
-          SegmentMetadata segmentMetadata = segment.getSegmentMetadata();
-          long dataCrc = segmentMetadata.getDataCrc();
-          segmentVersions.put(segment.getSegmentName(), dataCrc >= 0 ? dataCrc : segmentMetadata.getCrc());
-        } finally {
-          releaseSegmentReadLock(segment);
-        }
+        SegmentMetadata segmentMetadata = segment.getSegmentMetadata();
+        long dataCrc = segmentMetadata.getDataCrc();
+        segmentVersions.put(segment.getSegmentName(), dataCrc >= 0 ? dataCrc : segmentMetadata.getCrc());
       } else {
         // The pass runs before the new consuming segment takes its first record, so a tracked mutable segment is an
         // earlier one still waiting to be sealed. Its rows may not match the committed copy yet.

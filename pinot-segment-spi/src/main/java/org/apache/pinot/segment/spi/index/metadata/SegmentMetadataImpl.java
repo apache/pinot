@@ -68,6 +68,7 @@ import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.utils.ColumnNameInterner;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.joda.time.DateTimeZone;
@@ -162,7 +163,13 @@ public class SegmentMetadataImpl implements SegmentMetadata, Closeable {
   /// open; subsequent opens read the binary file and do not build retained per-column metadata objects.
   public static SegmentMetadataImpl loadMapped(File indexDir)
       throws IOException, ConfigurationException {
-    return new SegmentMetadataImpl(indexDir, true);
+    return loadMapped(indexDir, ReadMode.mmap);
+  }
+
+  /// Uses a direct buffer for `heap` mode and a file mapping for `mmap` mode.
+  public static SegmentMetadataImpl loadMapped(File indexDir, ReadMode readMode)
+      throws IOException, ConfigurationException {
+    return new SegmentMetadataImpl(indexDir, true, readMode);
   }
 
   /// Identifies the local mapped metadata sidecar and its incomplete temporary files.
@@ -173,13 +180,18 @@ public class SegmentMetadataImpl implements SegmentMetadata, Closeable {
   /// Mapped constructor for segment-directory implementations that subclass [SegmentMetadataImpl].
   protected SegmentMetadataImpl(File indexDir, boolean mapped)
       throws IOException, ConfigurationException {
+    this(indexDir, mapped, ReadMode.mmap);
+  }
+
+  protected SegmentMetadataImpl(File indexDir, boolean mapped, ReadMode readMode)
+      throws IOException, ConfigurationException {
     if (!mapped) {
       throw new IllegalArgumentException("Use the regular File constructor for mutable metadata");
     }
     _indexDir = indexDir;
     _columnMetadataMap = null;
     _schema = null;
-    MappedSegmentMetadataStore store = MappedSegmentMetadataStore.open(indexDir);
+    MappedSegmentMetadataStore store = MappedSegmentMetadataStore.open(indexDir, readMode);
     try {
       PropertiesConfiguration segmentConfig = store.segmentConfiguration();
       initSegmentFields(segmentConfig);

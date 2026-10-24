@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.spi.index.metadata;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.Interner;
 import com.google.common.collect.Interners;
@@ -66,15 +67,17 @@ import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.ColumnNameInterner;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.ReadMode;
 
 /// Versioned, file-backed metadata for a sealed segment. The source `metadata.properties` remains the canonical
 /// representation for old readers and preprocessing.
 ///
 /// The big-endian file starts with a 64-byte header containing the magic, format version, total length, source
-/// `metadata.properties` and `index_map` length/CRC fingerprints, payload CRC, segment-property blob reference,
+/// `metadata.properties` and `index_map` length/CRC fingerprints, registered index IDs, payload CRC,
+/// segment-property blob reference,
 /// column count, and record-table bounds. Sorted columns occupy fixed 180-byte records, followed by variable blobs;
 /// each blob reference is an absolute 32-bit offset and length. Numeric column statistics are read directly from the
-/// mapping. The column layout retains names and reusable [FieldSpec] references on heap.
+/// backing buffer. The column layout retains names and reusable [FieldSpec] references on heap.
 ///
 /// A stale or corrupt sidecar is rebuilt from the canonical source and replaced locally, using atomic rename where
 /// supported. Change `VERSION` whenever the encoding or the values derived from canonical metadata change; old
@@ -90,7 +93,7 @@ final class MappedSegmentMetadataStore implements Closeable {
   }
 
   private static final int MAGIC = 0x504d4431; // PMD1
-  private static final int VERSION = 4;
+  private static final int VERSION = 5;
   private static final int HEADER_SIZE = 64;
   private static final int RECORD_SIZE = 180;
 
@@ -158,7 +161,7 @@ final class MappedSegmentMetadataStore implements Closeable {
     _segmentConfigLength = segmentConfigLength;
   }
 
-  static MappedSegmentMetadataStore open(File indexDir)
+  static MappedSegmentMetadataStore open(File indexDir, ReadMode readMode)
       throws IOException, ConfigurationException {
     File source = SegmentDirectoryPaths.findMetadataFile(indexDir);
     if (source == null) {
@@ -167,27 +170,29 @@ final class MappedSegmentMetadataStore implements Closeable {
     File sidecar = new File(indexDir, FILE_NAME);
     boolean rebuilt = false;
     for (int attempt = 0; attempt < 3; attempt++) {
+      IndexService indexService = IndexService.getInstance();
       Fingerprint propertiesFingerprint = Fingerprint.of(source);
-      Fingerprint indexMapFingerprint = Fingerprint.of(findIndexMap(indexDir));
-      // The validated heap copy is transient; the store retains only the mapping and shared column layout.
+      Fingerprint indexMapFingerprint = indexMapFingerprint(indexDir, indexService);
+      // The validated heap copy is transient; the store retains only the buffer and shared column layout.
       byte[] bytes = readValid(sidecar, propertiesFingerprint, indexMapFingerprint);
       if (bytes == null) {
-        writeAtomically(sidecar, build(indexDir, propertiesFingerprint, indexMapFingerprint));
+        writeAtomically(sidecar, build(indexDir, propertiesFingerprint, indexMapFingerprint, indexService));
         rebuilt = true;
         bytes = readValid(sidecar, propertiesFingerprint, indexMapFingerprint);
         if (bytes == null) {
           continue;
         }
       }
-      PinotDataBuffer buffer = PinotDataBuffer.mapFile(sidecar, true, 0, bytes.length, ByteOrder.BIG_ENDIAN,
-          "segment metadata");
+      PinotDataBuffer buffer = readMode == ReadMode.heap
+          ? PinotDataBuffer.loadFile(sidecar, 0, bytes.length, ByteOrder.BIG_ENDIAN, "segment metadata")
+          : PinotDataBuffer.mapFile(sidecar, true, 0, bytes.length, ByteOrder.BIG_ENDIAN, "segment metadata");
       boolean keepBuffer = false;
       try {
-        // Another loader may atomically replace the sidecar between validation and mapFile(). Check the exact mapped
-        // bytes and the canonical inputs before publishing a view over this mapping. The header alone cannot prove
-        // that the mapped payload is the same bytes we validated.
-        if (!matchesMapped(buffer, bytes) || !propertiesFingerprint.sameAs(Fingerprint.of(source))
-            || !indexMapFingerprint.sameAs(Fingerprint.of(findIndexMap(indexDir)))) {
+        // Another loader may atomically replace the sidecar between validation and opening it. Check the exact
+        // buffer bytes and canonical inputs before publishing a view. The header alone cannot prove the bytes match.
+        if (!matchesBuffer(buffer, bytes) || !propertiesFingerprint.sameAs(Fingerprint.of(source))
+            || indexService != IndexService.getInstance()
+            || !indexMapFingerprint.sameAs(indexMapFingerprint(indexDir, indexService))) {
           continue;
         }
         ByteBuffer header = ByteBuffer.wrap(bytes).order(ByteOrder.BIG_ENDIAN);
@@ -212,7 +217,7 @@ final class MappedSegmentMetadataStore implements Closeable {
         if (!rebuilt) {
           // A checksum-valid older sidecar can still contain FieldSpec JSON this reader cannot parse. Rebuild it
           // once from canonical metadata instead of falling back to eager on every load.
-          writeAtomically(sidecar, build(indexDir, propertiesFingerprint, indexMapFingerprint));
+          writeAtomically(sidecar, build(indexDir, propertiesFingerprint, indexMapFingerprint, indexService));
           rebuilt = true;
           continue;
         }
@@ -223,10 +228,10 @@ final class MappedSegmentMetadataStore implements Closeable {
         }
       }
     }
-    throw new IOException("Metadata changed while mapping segment: " + indexDir);
+    throw new IOException("Metadata changed while opening segment: " + indexDir);
   }
 
-  private static boolean matchesMapped(PinotDataBuffer buffer, byte[] bytes) {
+  private static boolean matchesBuffer(PinotDataBuffer buffer, byte[] bytes) {
     if (buffer.size() != bytes.length) {
       return false;
     }
@@ -347,7 +352,8 @@ final class MappedSegmentMetadataStore implements Closeable {
     _buffer.close();
   }
 
-  private static byte[] build(File indexDir, Fingerprint propertiesFingerprint, Fingerprint indexMapFingerprint)
+  private static byte[] build(File indexDir, Fingerprint propertiesFingerprint, Fingerprint indexMapFingerprint,
+      IndexService indexService)
       throws IOException, ConfigurationException {
     SegmentMetadataImpl source = new SegmentMetadataImpl(indexDir);
     PropertiesConfiguration config = SegmentMetadataUtils.getPropertiesConfiguration(indexDir);
@@ -361,7 +367,7 @@ final class MappedSegmentMetadataStore implements Closeable {
     BlobRef segmentConfig = blobs.add(encodeSegmentConfiguration(config));
     // EmptyColumnMetadata does not load index sizes even if a stale index_map is still present.
     Map<String, List<IndexSize>> indexSizes = source.getTotalDocs() > 0
-        && source.getVersion() == SegmentVersion.v3 ? readIndexSizes(indexDir) : Map.of();
+        && source.getVersion() == SegmentVersion.v3 ? readIndexSizes(indexDir, indexService) : Map.of();
     byte[] records = new byte[columns.size() * RECORD_SIZE];
     ByteBuffer recordBuffer = ByteBuffer.wrap(records).order(ByteOrder.BIG_ENDIAN);
     for (int ordinal = 0; ordinal < columns.size(); ordinal++) {
@@ -441,6 +447,10 @@ final class MappedSegmentMetadataStore implements Closeable {
 
   private static ObjectNode fieldSpecJson(FieldSpec fieldSpec) {
     ObjectNode json = fieldSpec.toJsonObject();
+    JsonNode defaultNullValue = json.get("defaultNullValue");
+    if (defaultNullValue != null && defaultNullValue.isNumber()) {
+      json.put("defaultNullValue", fieldSpec.getDefaultNullValueString());
+    }
     // TimeFieldSpec omits the discriminator, including when nested in a ComplexFieldSpec.
     json.put("fieldType", fieldSpec.getFieldType().toString());
     if (fieldSpec instanceof ComplexFieldSpec) {
@@ -525,7 +535,7 @@ final class MappedSegmentMetadataStore implements Closeable {
     return bytes.toByteArray();
   }
 
-  private static Map<String, List<IndexSize>> readIndexSizes(File indexDir)
+  private static Map<String, List<IndexSize>> readIndexSizes(File indexDir, IndexService indexService)
       throws ConfigurationException {
     File indexMap = findIndexMap(indexDir);
     if (indexMap == null) {
@@ -542,7 +552,7 @@ final class MappedSegmentMetadataStore implements Closeable {
           if (size < 0 || size > (1L << 48) - 1) {
             continue;
           }
-          IndexType<?, ?, ?> type = IndexService.getInstance().get(parsed[1]);
+          IndexType<?, ?, ?> type = indexService.get(parsed[1]);
           result.computeIfAbsent(parsed[0], ignored -> new ArrayList<>())
               .add(new IndexSize(type.getId(), size));
         }
@@ -557,6 +567,21 @@ final class MappedSegmentMetadataStore implements Closeable {
   private static File findIndexMap(File indexDir) {
     File v3 = new File(new File(indexDir, "v3"), V1Constants.INDEX_MAP_FILE_NAME);
     return v3.isFile() ? v3 : null;
+  }
+
+  private static Fingerprint indexMapFingerprint(File indexDir, IndexService indexService)
+      throws IOException {
+    Fingerprint file = Fingerprint.of(findIndexMap(indexDir));
+    // A newly registered index can turn a previously unknown index_map entry into an available size.
+    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+    try (DataOutputStream output = new DataOutputStream(bytes)) {
+      output.writeInt(file._crc);
+      for (IndexType<?, ?, ?> type : indexService.getAllIndexes()) {
+        writeString(output, type.getId());
+      }
+    }
+    byte[] encoded = bytes.toByteArray();
+    return new Fingerprint(file._length, crc(encoded, 0, encoded.length));
   }
 
   private static void writeValue(ByteBuffer target, int tagOffset, int rawOffset, int blobOffset,
