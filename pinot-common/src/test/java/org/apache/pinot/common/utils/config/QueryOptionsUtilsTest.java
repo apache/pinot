@@ -445,4 +445,16 @@ public class QueryOptionsUtilsTest {
         () -> QueryOptionsUtils.getSealedInListThreshold(queryOptions, 20));
     assertTrue(e.getMessage().contains(SEALED_IN_LIST_THRESHOLD), e.getMessage());
   }
+
+  @Test
+  public void testGetRequestDeadlineMs() {
+    assertNull(QueryOptionsUtils.getRequestDeadlineMs(Map.of()));
+    // Non-positive means "no deadline", the same as an old broker that sends none
+    assertNull(QueryOptionsUtils.getRequestDeadlineMs(Map.of(REQUEST_DEADLINE_MS, "0")));
+    assertNull(QueryOptionsUtils.getRequestDeadlineMs(Map.of(REQUEST_DEADLINE_MS, "-1")));
+    assertEquals(QueryOptionsUtils.getRequestDeadlineMs(Map.of(REQUEST_DEADLINE_MS, "1761200000000")),
+        Long.valueOf(1761200000000L));
+    expectThrows(IllegalArgumentException.class,
+        () -> QueryOptionsUtils.getRequestDeadlineMs(Map.of(REQUEST_DEADLINE_MS, "soon")));
+  }
 }
