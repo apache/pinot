@@ -166,6 +166,7 @@ public class PlanFragmentAndMailboxAssignment {
       // For physical tables, use workerIdToSegmentsMap (tableType -> segments)
       fragmentMetadata.setWorkerIdToSegmentsMap(tableScanMetadata.getWorkedIdToSegmentsMap());
     }
+    fragmentMetadata.setWorkerIdToOptionalSegmentsMap(tableScanMetadata.getWorkerIdToOptionalSegmentsMap());
 
     NodeHint nodeHint = NodeHint.fromRelHints(tableScan.getHints());
     fragmentMetadata.setTableOptions(nodeHint.getHintOptions().get(PinotHintOptions.TABLE_HINT_OPTIONS));

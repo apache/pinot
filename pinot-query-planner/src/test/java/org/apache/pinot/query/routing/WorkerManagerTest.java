@@ -33,6 +33,8 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.core.routing.ImplicitHybridTableRouteInfo;
+import org.apache.pinot.core.routing.LogicalTableRouteInfo;
 import org.apache.pinot.core.routing.MockRoutingManagerFactory;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
@@ -44,6 +46,7 @@ import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.planner.physical.DispatchablePlanContext;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
+import org.apache.pinot.query.planner.physical.DispatchablePlanMetadata;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -55,6 +58,7 @@ import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.anyString;
@@ -532,6 +536,78 @@ public class WorkerManagerTest {
     when(tableCache.getTableConfig("testTable_OFFLINE")).thenReturn(mock(TableConfig.class));
     WorkerManager workerManager = new WorkerManager("Broker_localhost", "localhost", 3, routingManager);
     return new QueryEnvironment(CommonConstants.DEFAULT_DATABASE, tableCache, workerManager);
+  }
+
+  /// The broker routes a new segment it has not seen ONLINE yet as optional. A leaf worker must carry the optional
+  /// segments of its server apart from its segments (so that the server queries them if it has them, and skips them
+  /// rather than failing otherwise), on both planners.
+  @Test(dataProvider = "physicalOptimizer")
+  public void testLeafWorkersCarryOptionalSegments(boolean usePhysicalOptimizer) {
+    ServerInstance server1 = getServerInstance("localhost", 1);
+    ServerInstance server2 = getServerInstance("localhost", 2);
+    Map<String, ServerInstance> serverInstanceMap =
+        Map.of(server1.getInstanceId(), server1, server2.getInstanceId(), server2);
+    RoutingTable routingTable = new RoutingTable(
+        Map.of(server1, new SegmentsToQuery(List.of("segment1"), List.of("newSegment1")),
+            server2, new SegmentsToQuery(List.of("segment2"), List.of())), List.of(), 0);
+    CapturingRoutingManager routingManager =
+        new CapturingRoutingManager(serverInstanceMap, Map.of("testTable_OFFLINE", routingTable));
+    QueryEnvironment queryEnvironment = newQueryEnvironment(getSchemaBuilder("testTable").build(), routingManager);
+
+    String query = "SET usePhysicalOptimizer=" + usePhysicalOptimizer + "; SELECT col1 FROM testTable";
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(query)) {
+      DispatchableSubPlan dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
+      DispatchablePlanFragment leafFragment = dispatchableSubPlan.getQueryStagesWithoutRoot().stream()
+          .filter(fragment -> fragment.getTableName() != null).findFirst().orElseThrow();
+      Map<String, WorkerMetadata> workerByServer = new HashMap<>();
+      for (Map.Entry<QueryServerInstance, List<Integer>> entry
+          : leafFragment.getServerInstanceToWorkerIdMap().entrySet()) {
+        assertEquals(entry.getValue().size(), 1);
+        workerByServer.put(entry.getKey().getInstanceId(),
+            leafFragment.getWorkerMetadataList().get(entry.getValue().get(0)));
+      }
+      assertEquals(workerByServer.size(), 2);
+      WorkerMetadata worker1 = workerByServer.get(server1.getInstanceId());
+      assertEquals(worker1.getTableSegmentsMap(), Map.of("OFFLINE", List.of("segment1")));
+      assertEquals(worker1.getOptionalSegmentsMap(), Map.of("OFFLINE", List.of("newSegment1")));
+      WorkerMetadata worker2 = workerByServer.get(server2.getInstanceId());
+      assertEquals(worker2.getTableSegmentsMap(), Map.of("OFFLINE", List.of("segment2")));
+      assertNull(worker2.getOptionalSegmentsMap());
+    }
+  }
+
+  @DataProvider
+  public static Object[][] physicalOptimizer() {
+    return new Object[][]{{false}, {true}};
+  }
+
+  /// Optional segments of a logical table are carried per worker keyed by physical table name, like its segments.
+  @Test
+  public void testLogicalTableLeafWorkersCarryOptionalSegments() {
+    ServerInstance server1 = getServerInstance("localhost", 1);
+    ServerInstance server2 = getServerInstance("localhost", 2);
+    ImplicitHybridTableRouteInfo offlineTableRoute = mock(ImplicitHybridTableRouteInfo.class);
+    when(offlineTableRoute.getOfflineTableName()).thenReturn("t1_OFFLINE");
+    when(offlineTableRoute.getOfflineRoutingTable()).thenReturn(
+        Map.of(server1, new SegmentsToQuery(List.of("t1_seg1"), List.of()),
+            server2, new SegmentsToQuery(List.of("t1_seg2"), List.of())));
+    ImplicitHybridTableRouteInfo realtimeTableRoute = mock(ImplicitHybridTableRouteInfo.class);
+    when(realtimeTableRoute.getRealtimeTableName()).thenReturn("t2_REALTIME");
+    when(realtimeTableRoute.getRealtimeRoutingTable()).thenReturn(
+        Map.of(server1, new SegmentsToQuery(List.of("t2_seg1"), List.of("t2_newSeg1"))));
+    LogicalTableRouteInfo logicalTableRouteInfo = mock(LogicalTableRouteInfo.class);
+    when(logicalTableRouteInfo.getOfflineTables()).thenReturn(List.of(offlineTableRoute));
+    when(logicalTableRouteInfo.getRealtimeTables()).thenReturn(List.of(realtimeTableRoute));
+
+    DispatchablePlanMetadata metadata = new DispatchablePlanMetadata();
+    WorkerManager.assignTableSegmentsToWorkers(logicalTableRouteInfo, metadata);
+
+    // Workers are assigned in instance id order.
+    assertEquals(metadata.getWorkerIdToServerInstanceMap().get(0).getInstanceId(), server1.getInstanceId());
+    assertEquals(metadata.getWorkerIdToTableSegmentsMap().get(0),
+        Map.of("t1_OFFLINE", List.of("t1_seg1"), "t2_REALTIME", List.of("t2_seg1")));
+    assertEquals(metadata.getWorkerIdToOptionalSegmentsMap(),
+        Map.of(0, Map.of("t2_REALTIME", List.of("t2_newSeg1"))));
   }
 
   @Test

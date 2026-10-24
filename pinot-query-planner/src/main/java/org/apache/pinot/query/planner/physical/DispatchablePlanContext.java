@@ -187,6 +187,8 @@ public class DispatchablePlanContext {
           dispatchablePlanMetadata.getWorkerIdToSegmentsMap();
       Map<Integer, Map<String, List<String>>> workerIdToTableNameSegmentsMap =
           dispatchablePlanMetadata.getWorkerIdToTableSegmentsMap();
+      Map<Integer, Map<String, List<String>>> workerIdToOptionalSegmentsMap =
+          dispatchablePlanMetadata.getWorkerIdToOptionalSegmentsMap();
       Map<Integer, Map<Integer, MailboxInfos>> workerIdToMailboxesMap =
           dispatchablePlanMetadata.getWorkerIdToMailboxesMap();
       Preconditions.checkArgument(workerIdToSegmentsMap == null || workerIdToTableNameSegmentsMap == null,
@@ -213,6 +215,12 @@ public class DispatchablePlanContext {
           Preconditions.checkNotNull(tableNameSegmentsMap, "Missing logical table segments map for worker id: %s",
               workerId);
           workerMetadata.setLogicalTableSegmentsMap(tableNameSegmentsMap);
+        }
+        if (workerIdToOptionalSegmentsMap != null) {
+          Map<String, List<String>> optionalSegmentsMap = workerIdToOptionalSegmentsMap.get(workerId);
+          if (optionalSegmentsMap != null) {
+            workerMetadata.setOptionalSegmentsMap(optionalSegmentsMap);
+          }
         }
         workerMetadataArray[workerId] = workerMetadata;
       }

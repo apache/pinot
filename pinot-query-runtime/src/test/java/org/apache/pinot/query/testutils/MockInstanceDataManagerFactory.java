@@ -47,9 +47,9 @@ import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyMap;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -158,10 +158,21 @@ public class MockInstanceDataManagerFactory {
 
     Map<String, SegmentDataManager> segmentDataManagerMap =
         segmentList.stream().collect(Collectors.toMap(IndexSegment::getSegmentName, ImmutableSegmentDataManager::new));
-    // TODO: support optional segments for multi-stage engine, but for now, it's always null.
-    when(tableDataManager.acquireSegments(anyList(), eq(null), anyList())).thenAnswer(invocation -> {
+    // As in BaseTableDataManager, an optional segment the server does not have is skipped.
+    when(tableDataManager.acquireSegments(anyList(), any(), anyList())).thenAnswer(invocation -> {
       List<String> segments = invocation.getArgument(0);
-      return segments.stream().map(segmentDataManagerMap::get).collect(Collectors.toList());
+      List<String> optionalSegments = invocation.getArgument(1);
+      List<SegmentDataManager> segmentDataManagers =
+          segments.stream().map(segmentDataManagerMap::get).collect(Collectors.toCollection(ArrayList::new));
+      if (optionalSegments != null) {
+        for (String optionalSegment : optionalSegments) {
+          SegmentDataManager segmentDataManager = segmentDataManagerMap.get(optionalSegment);
+          if (segmentDataManager != null) {
+            segmentDataManagers.add(segmentDataManager);
+          }
+        }
+      }
+      return segmentDataManagers;
     });
     when(tableDataManager.getSegmentContexts(anyList(), anyMap())).thenAnswer(invocation -> {
       List<IndexSegment> segments = invocation.getArgument(0);

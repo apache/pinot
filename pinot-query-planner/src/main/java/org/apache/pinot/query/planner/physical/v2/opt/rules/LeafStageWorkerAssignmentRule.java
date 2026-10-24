@@ -172,19 +172,25 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
       String tableType = routingEntry.getKey();
       RoutingTable routingTable = routingEntry.getValue();
       Map<String, List<String>> currentSegmentsMap = new HashMap<>();
+      Map<String, List<String>> currentOptionalSegmentsMap = new HashMap<>();
       Map<ServerInstance, SegmentsToQuery> tmp = routingTable.getServerInstanceToSegmentsMap();
       for (Map.Entry<ServerInstance, SegmentsToQuery> serverEntry : tmp.entrySet()) {
-        // TODO: Optional segments are not supported yet by the MSE.
         String instanceId = serverEntry.getKey().getInstanceId();
         Preconditions.checkState(currentSegmentsMap.put(instanceId, serverEntry.getValue().getSegments()) == null,
             "Entry for server %s and table type: %s already exist!", serverEntry.getKey(), tableType);
+        List<String> optionalSegments = serverEntry.getValue().getOptionalSegments();
+        if (CollectionUtils.isNotEmpty(optionalSegments)) {
+          currentOptionalSegmentsMap.put(instanceId, optionalSegments);
+        }
         _physicalPlannerContext.getInstanceIdToQueryServerInstance().computeIfAbsent(instanceId,
             (ignore) -> new QueryServerInstance(serverEntry.getKey()));
       }
       if (tableType.equalsIgnoreCase(TableType.OFFLINE.name())) {
         instanceIdToSegments._offlineTableSegmentsMap = currentSegmentsMap;
+        instanceIdToSegments._offlineTableOptionalSegmentsMap = currentOptionalSegmentsMap;
       } else {
         instanceIdToSegments._realtimeTableSegmentsMap = currentSegmentsMap;
+        instanceIdToSegments._realtimeTableOptionalSegmentsMap = currentOptionalSegmentsMap;
       }
       if (!routingTable.getUnavailableSegments().isEmpty()) {
         // Set unavailable segments in context, keyed by PRelNode ID.
@@ -202,7 +208,7 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
     TableScanWorkerAssignmentResult workerAssignmentResult = assignTableScan(tableName, fieldNames,
         instanceIdToSegments, tablePartitionInfoMap, inferInvalidPartitionSegment, inferRealtimeSegmentPartition);
     TableScanMetadata metadata = new TableScanMetadata(Set.of(tableName), workerAssignmentResult._workerIdToSegmentsMap,
-        tableOptions, segmentUnavailableMap, timeBoundaryInfo);
+        workerAssignmentResult._workerIdToOptionalSegmentsMap, tableOptions, segmentUnavailableMap, timeBoundaryInfo);
     return tableScan.with(workerAssignmentResult._pinotDataDistribution, metadata);
   }
 
@@ -240,6 +246,8 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
               tpi.getSegmentsWithInvalidPartition().size());
         }
         if (assignmentResult != null) {
+          // A partitioned assignment carries no optional segments: the server picked for a new segment need not be
+          // the one its partition is assigned to, so they are skipped as before.
           return assignmentResult;
         }
       }
@@ -258,6 +266,7 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
     }
     // For each server, assign one worker each.
     Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap = new HashMap<>();
+    Map<Integer, Map<String, List<String>>> workerIdToOptionalSegmentsMap = new HashMap<>();
     List<String> workers = new ArrayList<>();
     for (Map.Entry<String, Map<String, List<String>>> entry : instanceIdToTableTypeToSegmentsMap.entrySet()) {
       String instanceId = entry.getKey();
@@ -265,6 +274,12 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
         String tableType = tableTypeAndSegments.getKey();
         List<String> segments = tableTypeAndSegments.getValue();
         workerIdToSegmentsMap.computeIfAbsent(workers.size(), (x) -> new HashMap<>()).put(tableType, segments);
+        List<String> optionalSegments =
+            instanceIdToSegments.getOptionalSegments(TableType.valueOf(tableType), instanceId);
+        if (CollectionUtils.isNotEmpty(optionalSegments)) {
+          workerIdToOptionalSegmentsMap.computeIfAbsent(workers.size(), (x) -> new HashMap<>())
+              .put(tableType, optionalSegments);
+        }
       }
       workers.add(String.format("%s@%s", workers.size(), instanceId));
     }
@@ -272,7 +287,8 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
         : RelDistribution.Type.RANDOM_DISTRIBUTED;
     PinotDataDistribution pinotDataDistribution = new PinotDataDistribution(distType, workers, workers.hashCode(),
         null, null);
-    return new TableScanWorkerAssignmentResult(pinotDataDistribution, workerIdToSegmentsMap);
+    return new TableScanWorkerAssignmentResult(pinotDataDistribution, workerIdToSegmentsMap,
+        workerIdToOptionalSegmentsMap.isEmpty() ? null : workerIdToOptionalSegmentsMap);
   }
 
   /// Tries to assign workers for the table-scan node to generate a partitioned data distribution. If this is not
@@ -626,13 +642,15 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
       String logicalTableName, LogicalTableRouteInfo logicalTableRouteInfo, Map<String, String> tableOptions) {
     // Collect server to segments mapping across all physical tables
     Map<ServerInstance, Map<String, List<String>>> serverInstanceToLogicalSegmentsMap = new HashMap<>();
+    Map<ServerInstance, Map<String, List<String>>> serverInstanceToLogicalOptionalSegmentsMap = new HashMap<>();
 
     // Process offline tables
     if (logicalTableRouteInfo.getOfflineTables() != null) {
       for (TableRouteInfo physicalTableRoute : logicalTableRouteInfo.getOfflineTables()) {
         if (physicalTableRoute.getOfflineRoutingTable() != null) {
           transferToServerInstanceLogicalSegmentsMap(physicalTableRoute.getOfflineTableName(),
-              physicalTableRoute.getOfflineRoutingTable(), serverInstanceToLogicalSegmentsMap);
+              physicalTableRoute.getOfflineRoutingTable(), serverInstanceToLogicalSegmentsMap,
+              serverInstanceToLogicalOptionalSegmentsMap);
         }
       }
     }
@@ -642,7 +660,8 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
       for (TableRouteInfo physicalTableRoute : logicalTableRouteInfo.getRealtimeTables()) {
         if (physicalTableRoute.getRealtimeRoutingTable() != null) {
           transferToServerInstanceLogicalSegmentsMap(physicalTableRoute.getRealtimeTableName(),
-              physicalTableRoute.getRealtimeRoutingTable(), serverInstanceToLogicalSegmentsMap);
+              physicalTableRoute.getRealtimeRoutingTable(), serverInstanceToLogicalSegmentsMap,
+              serverInstanceToLogicalOptionalSegmentsMap);
         }
       }
     }
@@ -655,6 +674,7 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
     // Assign 1 worker per server
     int numWorkers = sortedServerInstanceToSegmentsMap.size();
     Map<Integer, Map<String, List<String>>> workerIdToLogicalTableSegmentsMap = new HashMap<>();
+    Map<Integer, Map<String, List<String>>> workerIdToOptionalSegmentsMap = new HashMap<>();
     List<String> workers = new ArrayList<>();
     List<ServerInstance> serverInstances = new ArrayList<>();
 
@@ -664,6 +684,11 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
       Map<String, List<String>> physicalTableSegments = entry.getValue();
 
       workerIdToLogicalTableSegmentsMap.put(workerId, physicalTableSegments);
+      Map<String, List<String>> physicalTableOptionalSegments =
+          serverInstanceToLogicalOptionalSegmentsMap.get(serverInstance);
+      if (physicalTableOptionalSegments != null) {
+        workerIdToOptionalSegmentsMap.put(workerId, physicalTableOptionalSegments);
+      }
       workers.add(String.format("%s@%s", workerId, serverInstance.getInstanceId()));
       serverInstances.add(serverInstance);
     }
@@ -689,6 +714,7 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
     TableScanMetadata metadata = new TableScanMetadata(
         Set.of(logicalTableName),
         workerIdToLogicalTableSegmentsMap,
+        workerIdToOptionalSegmentsMap.isEmpty() ? null : workerIdToOptionalSegmentsMap,
         tableOptions,
         unavailableSegmentsMap,
         timeBoundaryInfo,
@@ -698,28 +724,46 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
     return new LogicalTableScanWorkerAssignmentResult(pinotDataDistribution, metadata, serverInstances);
   }
 
-  /// Helper method to transfer routing table entries to the server instance logical segments map.
+  /// Helper method to transfer routing table entries to the server instance logical segments map, and the optional
+  /// segments, if any, to the server instance logical optional segments map.
   @VisibleForTesting
   static void transferToServerInstanceLogicalSegmentsMap(String physicalTableName,
       Map<ServerInstance, SegmentsToQuery> routingTable,
-      Map<ServerInstance, Map<String, List<String>>> serverInstanceToLogicalSegmentsMap) {
+      Map<ServerInstance, Map<String, List<String>>> serverInstanceToLogicalSegmentsMap,
+      Map<ServerInstance, Map<String, List<String>>> serverInstanceToLogicalOptionalSegmentsMap) {
     for (Map.Entry<ServerInstance, SegmentsToQuery> entry : routingTable.entrySet()) {
       ServerInstance serverInstance = entry.getKey();
       List<String> segments = entry.getValue().getSegments();
       serverInstanceToLogicalSegmentsMap
           .computeIfAbsent(serverInstance, k -> new HashMap<>())
           .put(physicalTableName, segments);
+      List<String> optionalSegments = entry.getValue().getOptionalSegments();
+      if (CollectionUtils.isNotEmpty(optionalSegments)) {
+        serverInstanceToLogicalOptionalSegmentsMap
+            .computeIfAbsent(serverInstance, k -> new HashMap<>())
+            .put(physicalTableName, optionalSegments);
+      }
     }
   }
 
   static class TableScanWorkerAssignmentResult {
     final PinotDataDistribution _pinotDataDistribution;
     final Map<Integer, Map<String, List<String>>> _workerIdToSegmentsMap;
+    /// Optional segments per worker, keyed by table type, or `null` when no worker has any.
+    @Nullable
+    final Map<Integer, Map<String, List<String>>> _workerIdToOptionalSegmentsMap;
 
     TableScanWorkerAssignmentResult(PinotDataDistribution pinotDataDistribution,
         Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap) {
+      this(pinotDataDistribution, workerIdToSegmentsMap, null);
+    }
+
+    TableScanWorkerAssignmentResult(PinotDataDistribution pinotDataDistribution,
+        Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap,
+        @Nullable Map<Integer, Map<String, List<String>>> workerIdToOptionalSegmentsMap) {
       _pinotDataDistribution = pinotDataDistribution;
       _workerIdToSegmentsMap = workerIdToSegmentsMap;
+      _workerIdToOptionalSegmentsMap = workerIdToOptionalSegmentsMap;
     }
   }
 
@@ -743,10 +787,22 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
     Map<String, List<String>> _offlineTableSegmentsMap;
     @Nullable
     Map<String, List<String>> _realtimeTableSegmentsMap;
+    /// Optional segments by instance id, holding only the instances that have any.
+    @Nullable
+    Map<String, List<String>> _offlineTableOptionalSegmentsMap;
+    @Nullable
+    Map<String, List<String>> _realtimeTableOptionalSegmentsMap;
 
     @Nullable
     Map<String, List<String>> getSegmentsMap(TableType tableType) {
       return tableType == TableType.OFFLINE ? _offlineTableSegmentsMap : _realtimeTableSegmentsMap;
+    }
+
+    @Nullable
+    List<String> getOptionalSegments(TableType tableType, String instanceId) {
+      Map<String, List<String>> optionalSegmentsMap =
+          tableType == TableType.OFFLINE ? _offlineTableOptionalSegmentsMap : _realtimeTableOptionalSegmentsMap;
+      return optionalSegmentsMap != null ? optionalSegmentsMap.get(instanceId) : null;
     }
 
     Set<String> getActiveTableTypes() {

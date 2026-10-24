@@ -692,11 +692,36 @@ public class LeafStageWorkerAssignmentRuleTest {
 
     Map<ServerInstance, Map<String, List<String>>> result = new HashMap<>();
     LeafStageWorkerAssignmentRule.transferToServerInstanceLogicalSegmentsMap(
-        "orders_OFFLINE", routingTable, result);
+        "orders_OFFLINE", routingTable, result, new HashMap<>());
 
     assertEquals(result.size(), 2);
     assertEquals(result.get(server1).get("orders_OFFLINE"), List.of("seg1", "seg2"));
     assertEquals(result.get(server2).get("orders_OFFLINE"), List.of("seg3"));
+  }
+
+  /// Optional segments of a logical table are carried per worker keyed by physical table name, like its segments.
+  @Test
+  public void testBuildLogicalTableWorkerAssignmentCarriesOptionalSegments() {
+    ServerInstance server1 = mock(ServerInstance.class);
+    doReturn("server-1").when(server1).getInstanceId();
+    ServerInstance server2 = mock(ServerInstance.class);
+    doReturn("server-2").when(server2).getInstanceId();
+
+    TableRouteInfo offlineTableRoute = mock(TableRouteInfo.class);
+    doReturn("orders_OFFLINE").when(offlineTableRoute).getOfflineTableName();
+    doReturn(Map.of(server1, new SegmentsToQuery(List.of("orders_seg1"), List.of()),
+        server2, new SegmentsToQuery(List.of("orders_seg2"), List.of("orders_newSeg")))).when(offlineTableRoute)
+        .getOfflineRoutingTable();
+    LogicalTableRouteInfo logicalTableRouteInfo = mock(LogicalTableRouteInfo.class);
+    doReturn(List.of(offlineTableRoute)).when(logicalTableRouteInfo).getOfflineTables();
+
+    TableScanMetadata metadata = LeafStageWorkerAssignmentRule.buildLogicalTableWorkerAssignment(
+        "myLogicalTable", logicalTableRouteInfo, Map.of())._tableScanMetadata;
+
+    assertEquals(metadata.getWorkerIdToLogicalTableSegmentsMap().get(1),
+        Map.of("orders_OFFLINE", List.of("orders_seg2")));
+    assertEquals(metadata.getWorkerIdToOptionalSegmentsMap(),
+        Map.of(1, Map.of("orders_OFFLINE", List.of("orders_newSeg"))));
   }
 
   @Test
@@ -711,14 +736,16 @@ public class LeafStageWorkerAssignmentRuleTest {
     SegmentsToQuery seg1 = mock(SegmentsToQuery.class);
     doReturn(List.of("offline_seg1")).when(seg1).getSegments();
     routing1.put(server1, seg1);
-    LeafStageWorkerAssignmentRule.transferToServerInstanceLogicalSegmentsMap("table_OFFLINE", routing1, result);
+    LeafStageWorkerAssignmentRule.transferToServerInstanceLogicalSegmentsMap("table_OFFLINE", routing1, result,
+        new HashMap<>());
 
     // Add second table
     Map<ServerInstance, SegmentsToQuery> routing2 = new HashMap<>();
     SegmentsToQuery seg2 = mock(SegmentsToQuery.class);
     doReturn(List.of("realtime_seg1")).when(seg2).getSegments();
     routing2.put(server1, seg2);
-    LeafStageWorkerAssignmentRule.transferToServerInstanceLogicalSegmentsMap("table_REALTIME", routing2, result);
+    LeafStageWorkerAssignmentRule.transferToServerInstanceLogicalSegmentsMap("table_REALTIME", routing2, result,
+        new HashMap<>());
 
     // Verify single server has both tables
     assertEquals(result.size(), 1);

@@ -101,6 +101,10 @@ message WorkerMetadata {
   SegmentsMap tableSegmentsMap = 4;
   // Leaf-stage segments of a logical table, keyed by physical table name (with type suffix). Same encoding rules.
   SegmentsMap logicalTableSegmentsMap = 5;
+  // Leaf-stage optional segments (new segments the broker has not yet seen ONLINE), keyed like the segment map above;
+  // a server queries them if it has them and skips them otherwise. Absent when the worker has none. Same encoding
+  // rules, with "optionalSegmentsMap" as the custom property.
+  SegmentsMap optionalSegmentsMap = 6;
 }
 
 // Segment names to scan per table type or physical table name, see WorkerMetadata.
