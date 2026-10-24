@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.integration.tests.custom;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
@@ -51,6 +52,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -116,6 +118,32 @@ public abstract class CustomDataQueryClusterIntegrationTest extends BaseClusterI
 
     waitForAllDocsLoaded(60_000);
     LOGGER.warn("Finished setting up integration test class: {}", getClass().getSimpleName());
+  }
+
+  /// Also waits until the broker routes every segment of the table as a regular segment. Right after a segment comes
+  /// online, the broker can still route it as an optional new segment, which the single-stage document count includes
+  /// but the multi-stage engine skips.
+  @Override
+  protected void waitForAllDocsLoaded(String tableName, long timeoutMs) {
+    super.waitForAllDocsLoaded(tableName, timeoutMs);
+    TestUtils.waitForCondition(() -> !hasOptionalSegments(tableName), 100L, timeoutMs,
+        "Failed to route all segments of table: " + tableName + " as regular segments",
+        Duration.ofMillis(timeoutMs / 10));
+  }
+
+  private boolean hasOptionalSegments(String tableName)
+      throws Exception {
+    JsonNode routingTables = JsonUtils.stringToJsonNode(
+        sendGetRequest(getBrokerBaseApiUrl() + "/debug/routingTableWithOptionalSegments/" + tableName));
+    for (JsonNode serverToSegments : routingTables) {
+      for (JsonNode segmentsToQuery : serverToSegments) {
+        JsonNode optionalSegments = segmentsToQuery.get("optionalSegments");
+        if (optionalSegments != null && !optionalSegments.isEmpty()) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   /// Initializes the controller request URL builder for the shared suite.
