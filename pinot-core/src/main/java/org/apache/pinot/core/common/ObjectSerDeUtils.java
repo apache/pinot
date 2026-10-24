@@ -1416,7 +1416,14 @@ public class ObjectSerDeUtils {
 
     @Override
     public byte[] serialize(RoaringBitmap bitmap) {
-      return ObjectSerDe.super.serialize(bitmap);
+      int size = bitmap.serializedSizeInBytes();
+      Preconditions.checkArgument(size >= 0, "Serialized bitmap exceeds the maximum buffer size");
+      byte[] bytes = new byte[size];
+      ByteBuffer destination = ByteBuffer.wrap(bytes);
+      serialize(bitmap, destination);
+      Preconditions.checkState(destination.position() == size && destination.limit() == size,
+          "Serialized bitmap size does not match expected payload size");
+      return bytes;
     }
 
     @Override
