@@ -180,8 +180,8 @@ jobs:
       - name: Compare API
         run: |
           for mod in pinot-spi pinot-segment-spi; do
-            OLD=$(ls master-head/$mod/target/$mod-*.jar | grep -v '\-tests.jar' | head -1)
-            NEW=$(ls $mod/target/$mod-*.jar | grep -v '\-tests.jar' | head -1)
+            OLD=$(find "master-head/$mod/target" -maxdepth 1 -name "$mod-*.jar" ! -name '*-tests.jar' -print -quit)
+            NEW=$(find "$mod/target" -maxdepth 1 -name "$mod-*.jar" ! -name '*-tests.jar' -print -quit)
 
             java -jar japicmp.jar \
               --old "$OLD" \
@@ -198,9 +198,8 @@ jobs:
       fail-fast: false
       matrix:
         test_suite: [ "compatibility-verifier/sample-test-suite" ]
-        old_commit: [
-          "release-1.5.0", "master"
-        ]
+        # Lucene 10 requires the index recovery support merged into master in #19900.
+        old_commit: [ "master" ]
     name: Pinot Compatibility Regression Testing against ${{ matrix.old_commit }} on ${{ matrix.test_suite }}
     steps:
       - uses: actions/checkout@v7.0.1
@@ -257,9 +256,8 @@ jobs:
       fail-fast: false
       matrix:
         test_suite: [ "compatibility-verifier/multi-stage-query-engine-test-suite" ]
-        old_commit: [
-          "release-1.5.0", "master"
-        ]
+        # Lucene 10 requires the index recovery support merged into master in #19900.
+        old_commit: [ "master" ]
     name: Pinot Multi-Stage Query Engine Compatibility Regression Testing against ${{ matrix.old_commit }} on ${{ matrix.test_suite }}
     steps:
       - uses: actions/checkout@v7.0.1
