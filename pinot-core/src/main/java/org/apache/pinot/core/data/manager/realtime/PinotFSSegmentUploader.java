@@ -20,8 +20,7 @@ package org.apache.pinot.core.data.manager.realtime;
 
 import java.io.File;
 import java.net.URI;
-import java.util.concurrent.Callable;
-import java.util.concurrent.CountDownLatch;
+import java.net.URISyntaxException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -47,9 +46,6 @@ import org.slf4j.LoggerFactory;
 public class PinotFSSegmentUploader implements SegmentUploader {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotFSSegmentUploader.class);
   public static final int DEFAULT_SEGMENT_UPLOAD_TIMEOUT_MILLIS = 10 * 1000;
-
-  /// Latches and callbacks used by tests to force the timeout and interrupt races. Production leaves this null.
-  static volatile TestHooks _testHooks;
 
   private final String _segmentStoreUriStr;
   private final ExecutorService _executorService = Executors.newCachedThreadPool();
@@ -84,10 +80,18 @@ public class PinotFSSegmentUploader implements SegmentUploader {
       return null;
     }
     final String rawTableName = TableNameBuilder.extractRawTableName(segmentName.getTableName());
+    final URI destUri;
+    try {
+      destUri = new URI(StringUtil.join(File.separator, _segmentStoreUriStr, segmentName.getTableName(),
+          SegmentCompletionUtils.generateTmpSegmentFileName(segmentName.getSegmentName())));
+    } catch (URISyntaxException e) {
+      LOGGER.warn("Failed copy segment tar file {} to segment store {}", segmentFile.getName(), _segmentStoreUriStr,
+          e);
+      _serverMetrics.addMeteredTableValue(rawTableName, ServerMeter.SEGMENT_UPLOAD_FAILURE, 1);
+      return null;
+    }
     AtomicReference<AttemptState> state = new AtomicReference<>(AttemptState.IN_FLIGHT);
-    AtomicReference<URI> destUriRef = new AtomicReference<>();
-    Callable<URI> uploadTask = () -> copySegment(segmentFile, segmentName, rawTableName, state, destUriRef);
-    Future<URI> future = _executorService.submit(uploadTask);
+    Future<URI> future = _executorService.submit(() -> copySegment(segmentFile, destUri, rawTableName, state));
     try {
       URI segmentLocation = future.get(timeoutInMillis, TimeUnit.MILLISECONDS);
       if (segmentLocation != null) {
@@ -99,18 +103,16 @@ public class PinotFSSegmentUploader implements SegmentUploader {
       LOGGER.info("Interrupted while waiting for segment upload of {} to {}.", segmentName, _segmentStoreUriStr);
       // future.get already cleared the interrupt flag. Leave it clear until a published object is deleted.
       // S3 and HDFS abort a delete when the calling thread is interrupted, and the worker will not delete a URI
-      // this thread already published. Restore the flag after that delete.
-      if (!state.compareAndSet(AttemptState.IN_FLIGHT, AttemptState.ABANDONED)
-          && state.get() == AttemptState.PUBLISHED) {
-        deleteBestEffort(destUriRef.get());
+      // it already published. Restore the flag after that delete.
+      if (abandonUnlessPublished(state)) {
+        deleteBestEffort(destUri);
       }
       Thread.currentThread().interrupt();
     } catch (TimeoutException e) {
-      URI publishedUri = resolveTimedOutAttempt(state, destUriRef);
-      if (publishedUri != null) {
-        LOGGER.info("Successfully upload segment {} to {}.", segmentName, publishedUri);
+      if (abandonUnlessPublished(state)) {
+        LOGGER.info("Successfully upload segment {} to {}.", segmentName, destUri);
         _serverMetrics.addMeteredTableValue(rawTableName, ServerMeter.SEGMENT_UPLOAD_SUCCESS, 1);
-        return publishedUri;
+        return destUri;
       }
       _serverMetrics.addMeteredTableValue(rawTableName, ServerMeter.SEGMENT_UPLOAD_TIMEOUT, 1);
       LOGGER.warn("Timed out waiting to upload segment: {} for table: {}", segmentName.getSegmentName(), rawTableName);
@@ -122,46 +124,17 @@ public class PinotFSSegmentUploader implements SegmentUploader {
     return null;
   }
 
-  /// Caller side of a timed-out `future.get`. Returns the published URI when the copy won the race with the deadline.
-  /// The URI is read after that CAS loses. The worker stores it before its own publish CAS, so a timeout that fired
-  /// while the ref was still empty still observes the URI when the worker has published. Do not pass a URI captured
-  /// before the CAS.
-  /// The caller must not delete. A returned URI is handed to the controller. An abandoned attempt is deleted by the
-  /// worker after the copy finishes, including a late success. An early delete can race a copy that recreates the
-  /// object. Does not cancel the future. An interrupt mid-upload can leave multipart parts this code cannot abort.
-  static URI resolveTimedOutAttempt(AtomicReference<AttemptState> state, AtomicReference<URI> destUriRef) {
-    TestHooks hooks = _testHooks;
-    if (hooks != null && hooks._beforeTimeoutCas != null) {
-      hooks._beforeTimeoutCas.run();
-    }
-    if (state.compareAndSet(AttemptState.IN_FLIGHT, AttemptState.ABANDONED)) {
-      return null;
-    }
-    if (hooks != null && hooks._afterTimeoutCasLost != null) {
-      hooks._afterTimeoutCasLost.run();
-    }
-    if (state.get() == AttemptState.PUBLISHED) {
-      return destUriRef.get();
-    }
-    return null;
+  /// Settles a wait that ended without the worker's result (timeout or interrupt) against the worker's publish.
+  /// Returns true when the worker already published, so the object belongs to the caller. Otherwise the attempt is
+  /// abandoned (or had already failed) and the worker deletes whatever its copy leaves behind, including a late
+  /// success. The caller must not delete in that case: an early delete can race a copy that recreates the object.
+  /// Does not cancel the future. An interrupt mid-upload can leave multipart parts this code cannot abort.
+  static boolean abandonUnlessPublished(AtomicReference<AttemptState> state) {
+    return !state.compareAndSet(AttemptState.IN_FLIGHT, AttemptState.ABANDONED)
+        && state.get() == AttemptState.PUBLISHED;
   }
 
-  private URI copySegment(File segmentFile, LLCSegmentName segmentName, String rawTableName,
-      AtomicReference<AttemptState> state, AtomicReference<URI> destUriRef) {
-    URI destUri;
-    try {
-      destUri = new URI(StringUtil.join(File.separator, _segmentStoreUriStr, segmentName.getTableName(),
-          SegmentCompletionUtils.generateTmpSegmentFileName(segmentName.getSegmentName())));
-    } catch (Exception e) {
-      state.compareAndSet(AttemptState.IN_FLIGHT, AttemptState.FAILED);
-      LOGGER.warn("Failed copy segment tar file {} to segment store {}", segmentFile.getName(), _segmentStoreUriStr,
-          e);
-      return null;
-    }
-    // Minted inside the task. future.get throws the URI away on timeout, so the caller cannot rebuild it.
-    // The store happens before the publish CAS. A timeout that loses that CAS must read the ref afterwards.
-    awaitBeforeDestUriStoreForTest();
-    destUriRef.set(destUri);
+  private URI copySegment(File segmentFile, URI destUri, String rawTableName, AtomicReference<AttemptState> state) {
     long startTime = System.currentTimeMillis();
     try {
       PinotFS pinotFS = openSegmentStore(segmentFile, destUri, state);
@@ -179,7 +152,6 @@ public class PinotFSSegmentUploader implements SegmentUploader {
         return null;
       }
       if (state.compareAndSet(AttemptState.IN_FLIGHT, AttemptState.PUBLISHED)) {
-        pauseAfterPublishForTest();
         return destUri;
       }
       // The caller already abandoned this attempt and will not return the URI.
@@ -203,55 +175,7 @@ public class PinotFSSegmentUploader implements SegmentUploader {
     }
   }
 
-  /// Blocks before `destUriRef` is stored so a test can time out while the ref is still empty.
-  private static void awaitBeforeDestUriStoreForTest() {
-    TestHooks hooks = _testHooks;
-    if (hooks == null) {
-      return;
-    }
-    CountDownLatch entered = hooks._enteredBeforeDestUriStore;
-    if (entered != null) {
-      entered.countDown();
-    }
-    CountDownLatch release = hooks._releaseBeforeDestUriStore;
-    if (release != null) {
-      try {
-        release.await();
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-      }
-    }
-  }
-
-  /// Pauses after the publish CAS and before the worker returns, so a test can interrupt the caller while the future
-  /// is still pending and the state is already `PUBLISHED`.
-  private static void pauseAfterPublishForTest() {
-    TestHooks hooks = _testHooks;
-    if (hooks == null) {
-      return;
-    }
-    CountDownLatch entered = hooks._enteredAfterPublish;
-    if (entered != null) {
-      entered.countDown();
-    }
-    CountDownLatch pause = hooks._pauseAfterPublish;
-    if (pause != null) {
-      try {
-        pause.await();
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-      }
-    }
-    CountDownLatch resumed = hooks._resumedAfterPublish;
-    if (resumed != null) {
-      resumed.countDown();
-    }
-  }
-
   private void deleteBestEffort(URI destUri) {
-    if (destUri == null) {
-      return;
-    }
     try {
       PinotFS pinotFS = PinotFSFactory.create(new URI(_segmentStoreUriStr).getScheme());
       deleteBestEffort(pinotFS, destUri);
@@ -267,24 +191,5 @@ public class PinotFSSegmentUploader implements SegmentUploader {
     } catch (Exception e) {
       LOGGER.warn("Failed to delete temporary segment file: {}", destUri, e);
     }
-  }
-
-  /// Test-only gates for the timeout and interrupt races. Production leaves [PinotFSSegmentUploader#_testHooks] null,
-  /// and every latch here stays null unless a test sets it.
-  static final class TestHooks {
-    /// Runs at the start of [PinotFSSegmentUploader#resolveTimedOutAttempt], before the abandon CAS.
-    Runnable _beforeTimeoutCas;
-    /// Runs after the abandon CAS loses and before the published URI is read.
-    Runnable _afterTimeoutCasLost;
-    /// Counted down when the worker is about to store the destination URI.
-    CountDownLatch _enteredBeforeDestUriStore;
-    /// The worker waits on this before storing the destination URI.
-    CountDownLatch _releaseBeforeDestUriStore;
-    /// Counted down after the publish CAS, before the worker returns the URI.
-    CountDownLatch _enteredAfterPublish;
-    /// The worker waits on this after the publish CAS.
-    CountDownLatch _pauseAfterPublish;
-    /// Counted down once the worker leaves the post-publish pause.
-    CountDownLatch _resumedAfterPublish;
   }
 }

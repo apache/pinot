@@ -26,7 +26,6 @@ import com.google.common.base.Suppliers;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -2686,31 +2685,21 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
       throws IOException {
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");
 
+    // NOTE: Do not delete the file if it is used as download URL. This could happen when user uses temporary file to
+    // backfill segment.
+    Set<String> downloadUrls = Sets.newHashSetWithExpectedSize(segmentsZKMetadata.size());
+    for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
+      if (segmentZKMetadata.getStatus() == Status.DONE) {
+        downloadUrls.add(segmentZKMetadata.getDownloadUrl());
+      }
+    }
+
     String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
     URI tableDirURI = URIUtils.getUri(_controllerConf.getDataDir(), rawTableName);
     PinotFS pinotFS = PinotFSFactory.create(tableDirURI.getScheme());
-    List<String> tmpPaths = new ArrayList<>();
-    for (String filePath : pinotFS.listFiles(tableDirURI, false)) {
-      if (SegmentCompletionUtils.isTmpFile(filePath)) {
-        tmpPaths.add(filePath);
-      }
-    }
-    if (tmpPaths.isEmpty()) {
-      return 0;
-    }
-
-    // A completed segment can legally be named like a temp upload. A file-scheme data dir stores an HTTP download
-    // URL, so the permanent path has to be kept as well as that URL. IN_PROGRESS and COMMITTING are not permanent
-    // files. Offline metadata is loaded only for names whose permanent path is one of the listed temp files.
-    // getTableConfig on the helix resource manager returns null when the offline table is missing.
-    // PinotLLCRealtimeSegmentManager.getTableConfig throws in that case, so this method does not call it.
-    Set<String> protectedPaths = new HashSet<>();
-    collectCompletedSegmentPaths(rawTableName, segmentsZKMetadata, protectedPaths);
-    protectCompletedOfflineSegments(rawTableName, tmpPaths, protectedPaths);
-
     int numDeletedTmpSegments = 0;
-    for (String filePath : tmpPaths) {
-      if (isTmpAndCanDelete(filePath, protectedPaths, pinotFS)) {
+    for (String filePath : pinotFS.listFiles(tableDirURI, false)) {
+      if (isTmpAndCanDelete(filePath, downloadUrls, pinotFS)) {
         URI uri = URIUtils.getUri(filePath);
         String canonicalPath = uri.toString();
         LOGGER.info("Deleting temporary segment file: {}", canonicalPath);
@@ -2729,95 +2718,16 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     return numDeletedTmpSegments;
   }
 
-  /// Loads offline metadata for names whose permanent path or file name is a listed temp file.
-  /// `file:/` and `file:///` do not share one string, so a completed segment also protects the listed URI of a file
-  /// with its name. Download URLs from that metadata are protected too.
-  private void protectCompletedOfflineSegments(String rawTableName, List<String> tmpPaths,
-      Set<String> protectedPaths) {
-    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
-    if (_helixResourceManager.getTableConfig(offlineTableName) == null) {
-      return;
-    }
-    List<String> segmentNames = _helixResourceManager.getSegmentsFromPropertyStore(offlineTableName);
-    if (segmentNames == null || segmentNames.isEmpty()) {
-      return;
-    }
-    Set<String> listedTmpPaths = new HashSet<>();
-    // listFiles paths and createSegmentPath can differ by file:/ versus file:///. Match the file name too.
-    Map<String, String> fileNameToListedUri = new HashMap<>();
-    for (String tmpPath : tmpPaths) {
-      String canonical = URIUtils.getUri(tmpPath).toString();
-      listedTmpPaths.add(canonical);
-      String fileName = new File(tmpPath).getName();
-      fileNameToListedUri.put(fileName, canonical);
-      try {
-        fileNameToListedUri.put(URIUtils.decode(fileName), canonical);
-      } catch (IllegalArgumentException e) {
-        // The raw file name is already recorded.
-      }
-    }
-    List<String> namesToLoad = new ArrayList<>();
-    for (String segmentName : segmentNames) {
-      if (StringUtils.isEmpty(segmentName)) {
-        continue;
-      }
-      String permanentPath = createSegmentPath(rawTableName, segmentName).toString();
-      if (listedTmpPaths.contains(permanentPath) || fileNameToListedUri.containsKey(segmentName)) {
-        namesToLoad.add(segmentName);
-      }
-    }
-    if (namesToLoad.isEmpty()) {
-      return;
-    }
-    List<SegmentZKMetadata> offlineMetadata =
-        _helixResourceManager.getSegmentsZKMetadata(offlineTableName, namesToLoad, null);
-    collectCompletedSegmentPaths(rawTableName, offlineMetadata, protectedPaths);
-    if (offlineMetadata == null) {
-      return;
-    }
-    for (SegmentZKMetadata segmentZKMetadata : offlineMetadata) {
-      if (segmentZKMetadata == null || segmentZKMetadata.getStatus() == null
-          || !segmentZKMetadata.getStatus().isCompleted()) {
-        continue;
-      }
-      String listedUri = fileNameToListedUri.get(segmentZKMetadata.getSegmentName());
-      if (listedUri != null) {
-        protectedPaths.add(listedUri);
-      }
-    }
-  }
-
-  private void collectCompletedSegmentPaths(String rawTableName, List<SegmentZKMetadata> segmentsZKMetadata,
-      Set<String> protectedPaths) {
-    if (segmentsZKMetadata == null) {
-      return;
-    }
-    for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
-      if (segmentZKMetadata == null || segmentZKMetadata.getStatus() == null
-          || !segmentZKMetadata.getStatus().isCompleted()) {
-        continue;
-      }
-      String downloadUrl = segmentZKMetadata.getDownloadUrl();
-      if (downloadUrl != null) {
-        protectedPaths.add(downloadUrl);
-      }
-      String segmentName = segmentZKMetadata.getSegmentName();
-      if (StringUtils.isNotEmpty(segmentName)) {
-        protectedPaths.add(createSegmentPath(rawTableName, segmentName).toString());
-      }
-    }
-  }
-
-  private boolean isTmpAndCanDelete(String filePath, Set<String> protectedPaths, PinotFS pinotFS) {
+  private boolean isTmpAndCanDelete(String filePath, Set<String> downloadUrls, PinotFS pinotFS) {
     if (!SegmentCompletionUtils.isTmpFile(filePath)) {
       return false;
     }
-    // Prepend scheme. Compare the same URI string createSegmentPath and stored download URLs use.
+    // Prepend scheme
     URI uri = URIUtils.getUri(filePath);
     String canonicalPath = uri.toString();
-    // Do not delete a file that is a completed segment's permanent path or download URL. A user can backfill a
-    // segment with a temporary-looking name.
-    if (protectedPaths.contains(canonicalPath)) {
+    // NOTE: Do not delete the file if it is used as download URL. This could happen when user uses temporary file to
+    // backfill segment.
+    if (downloadUrls.contains(canonicalPath)) {
       return false;
     }
     long lastModified;
