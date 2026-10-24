@@ -230,10 +230,14 @@ public class TableConfigRedactionUtilsTest {
     first.put("streamType", "kafka");
     first.put("stream.kafka.topic.name", "first-topic");
     first.put("stream.kafka.consumer.prop.password", "first-password");
+    first.put("stream.kafka.broker.list", "first.example.test:9092");
+    first.put(JAAS_KEY, "example.LoginModule required username=\"first-user\" password=\"first-jaas-password\";");
     Map<String, String> second = new LinkedHashMap<>();
     second.put("streamType", "kafka");
     second.put("stream.kafka.topic.name", "second-topic");
     second.put("stream.kafka.consumer.prop.password", "second-password");
+    second.put("stream.kafka.broker.list", "second.example.test:9092");
+    second.put(JAAS_KEY, "example.LoginModule required username=\"second-user\" password=\"second-jaas-password\";");
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setStreamIngestionConfig(new StreamIngestionConfig(List.of(first, second)));
     TableConfig stored = new TableConfigBuilder(TableType.REALTIME)
@@ -250,6 +254,7 @@ public class TableConfigRedactionUtilsTest {
 
     List<Map<String, String>> restoredStreams = restored.getIngestionConfig().getStreamIngestionConfig()
         .getStreamConfigMaps();
+    assertEquals(restoredStreams, List.of(second, first));
     assertEquals(restoredStreams.get(0).get("stream.kafka.topic.name"), "second-topic");
     assertEquals(restoredStreams.get(0).get("stream.kafka.consumer.prop.password"), "second-password");
     assertEquals(restoredStreams.get(1).get("stream.kafka.topic.name"), "first-topic");
@@ -725,6 +730,41 @@ public class TableConfigRedactionUtilsTest {
     TableConfig restored = TableConfigRedactionUtils.restoreRedactedValues(changedCallback, stored);
     assertEquals(restored.getCustomConfig().getCustomConfigs().get("callbackUrl"), "https://new.example/callback");
     assertEquals(restored.getCustomConfig().getCustomConfigs().get("provider.password"), "provider-secret");
+  }
+
+  @Test
+  public void testRestoreRejectsKafkaDestinationReassociation() {
+    for (String destinationKey : List.of("stream.kafka.broker.list", "bootstrap.servers")) {
+      Map<String, String> stream = new LinkedHashMap<>();
+      stream.put("streamType", "kafka");
+      stream.put("stream.kafka.topic.name", "trusted-topic");
+      stream.put(destinationKey, "trusted.example.test:9092");
+      stream.put(JAAS_KEY, "org.apache.kafka.common.security.plain.PlainLoginModule required "
+          + "username=\"test-user\" password=\"stored-secret\";");
+      for (boolean legacy : List.of(true, false)) {
+        TableConfigBuilder builder = new TableConfigBuilder(TableType.REALTIME)
+            .setTableName("kafkaDestination_REALTIME");
+        if (legacy) {
+          builder.setStreamConfigs(stream);
+        } else {
+          IngestionConfig ingestionConfig = new IngestionConfig();
+          ingestionConfig.setStreamIngestionConfig(new StreamIngestionConfig(List.of(stream)));
+          builder.setIngestionConfig(ingestionConfig);
+        }
+        TableConfig stored = builder.build();
+        TableConfig submitted = TableConfigRedactionUtils.redact(stored);
+        assertEquals(TableConfigRedactionUtils.restoreRedactedValues(submitted, stored).toJsonNode(),
+            stored.toJsonNode());
+
+        Map<String, String> submittedStream = legacy
+            ? submitted.getIndexingConfig().getStreamConfigs()
+            : submitted.getIngestionConfig().getStreamIngestionConfig().getStreamConfigMaps().get(0);
+        submittedStream.put(destinationKey, "other.example.test:9092");
+
+        assertThrows(destinationKey, IllegalArgumentException.class,
+            () -> TableConfigRedactionUtils.restoreRedactedValues(submitted, stored));
+      }
+    }
   }
 
   @Test

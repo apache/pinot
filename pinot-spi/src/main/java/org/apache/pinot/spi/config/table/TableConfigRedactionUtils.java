@@ -578,11 +578,7 @@ public final class TableConfigRedactionUtils {
       }
       return;
     }
-    if (node.isArray()) {
-      for (int i = 0; i < node.size(); i++) {
-        collectObjectSecurityIdentity(node.get(i), path + "[" + i + "]", fieldName, parentSensitive, identity);
-      }
-    }
+    // Array elements are matched and validated independently by restoreArray.
   }
 
   private static boolean isObjectOwnerIdentityField(@Nullable String fieldName) {
@@ -592,6 +588,7 @@ public final class TableConfigRedactionUtils {
     String normalized = normalizeKey(fieldName);
     return normalized.equals("user") || normalized.equals("username") || normalized.equals("principal")
         || normalized.equals("accountname")
+        || normalized.endsWith("brokerlist") || normalized.endsWith("bootstrapservers")
         || isExecutableClassSelectorKey(normalized)
         || normalized.endsWith("clientemail");
   }
