@@ -114,13 +114,6 @@ public class RecordTransformerUtils {
     return getTransformers(tableConfig, schema, false, false, false, false);
   }
 
-  /// Returns the default transformer chain while preserving replayed values for the given transform output columns,
-  /// including values marked null.
-  public static List<RecordTransformer> getDefaultTransformers(TableConfig tableConfig, Schema schema,
-      Set<String> columnsToPreserve) {
-    return getDefaultTransformers(tableConfig, schema, columnsToPreserve, Set.of());
-  }
-
   /// Returns the default replay transformer chain and identifies preserved outputs whose dependency provenance is
   /// trusted under the active transform graph.
   public static List<RecordTransformer> getDefaultTransformers(TableConfig tableConfig, Schema schema,

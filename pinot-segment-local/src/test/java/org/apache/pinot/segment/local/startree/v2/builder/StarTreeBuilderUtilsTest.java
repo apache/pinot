@@ -259,7 +259,7 @@ public class StarTreeBuilderUtilsTest {
     aggregationSpecs.put(new AggregationFunctionColumnPair(AggregationFunctionType.SUM, "derived"),
         AggregationSpec.DEFAULT);
     aggregationSpecs.put(AggregationFunctionColumnPair.COUNT_STAR, AggregationSpec.DEFAULT);
-    StarTreeV2Metadata.writeMetadata(metadataProperties, 1, List.of("dim"), aggregationSpecs, 100, Set.of());
+    StarTreeV2Metadata.writeMetadata(metadataProperties, 1, List.of("dim"), aggregationSpecs, 100, Set.of(), false);
     StarTreeV2Metadata metadata = new StarTreeV2Metadata(metadataProperties);
     List<StarTreeV2Metadata> metadataList = List.of(metadata);
 

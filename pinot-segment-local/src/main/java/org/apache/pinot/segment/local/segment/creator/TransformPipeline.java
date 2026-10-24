@@ -77,21 +77,6 @@ public class TransformPipeline {
     this(tableConfig.getTableName(), RecordTransformerUtils.getDefaultTransformers(tableConfig, schema));
   }
 
-  /// Creates a pipeline for replaying stored rows while preserving authoritative values for selected transform output
-  /// columns. Presence in the decoded row, including a null marker, suppresses expression re-evaluation.
-  public TransformPipeline(TableConfig tableConfig, Schema schema, Set<String> columnsToPreserve) {
-    this(tableConfig, schema, columnsToPreserve, Set.of());
-  }
-
-  /// Creates a replay pipeline that can extend dependency provenance through unchanged, fingerprinted transform
-  /// outputs. Trusted outputs must also be present in `columnsToPreserve`.
-  public TransformPipeline(TableConfig tableConfig, Schema schema, Set<String> columnsToPreserve,
-      Set<String> trustedTransformOutputs) {
-    this(tableConfig.getTableName(),
-        RecordTransformerUtils.getDefaultTransformers(tableConfig, schema, columnsToPreserve,
-            trustedTransformOutputs));
-  }
-
   public static TransformPipeline getPassThroughPipeline(String tableNameWithType) {
     return new TransformPipeline(tableNameWithType, List.of());
   }

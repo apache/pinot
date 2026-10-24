@@ -904,8 +904,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       }
 
       if (createDictionary) {
-        createDerivedColumnForwardIndexWithDictionary(column, transformFunction, fieldSpec, outputValues, statsCollector,
-            useVarLengthDictionary);
+        createDerivedColumnForwardIndexWithDictionary(column, transformFunction, fieldSpec, outputValues,
+            statsCollector, useVarLengthDictionary);
       } else {
         createDerivedColumnForwardIndexWithoutDictionary(column, transformFunction, fieldSpec, outputValues,
             statsCollector);

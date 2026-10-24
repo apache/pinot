@@ -152,25 +152,36 @@ public class DerivedColumnStarTreeReloadTest {
     }
   }
 
+  /// A failure between the column rewrite and the star-tree rebuild, like a crash there, must not leave a tree over the
+  /// old values: the tree is deleted before the rewrite, so the next load builds it from the new ones.
   @Test
-  public void testFailedTransformUpdateKeepsExistingStarTree()
+  public void testStarTreeRebuiltAfterFailureFollowingColumnRewrite()
       throws Exception {
-    File indexDir = buildBaseSegment("failedValueUpdate");
+    File indexDir = buildBaseSegment("failureAfterRewrite");
     Schema schema = schemaWithDerived();
     preprocess(indexDir, tableConfig(ORIGINAL_TRANSFORM, true), schema);
-    long sumBeforeReload = readStarTreeGrandTotal(indexDir);
-    byte[] starTreeBefore = FileUtils.readFileToByteArray(findStarTreeIndex(indexDir));
+    assertEquals(readStarTreeGrandTotal(indexDir), 63L);
 
-    // reverse(dim) produces strings that cannot be stored in the INT derived column. The default failure policy keeps
-    // the old column, so its still-valid star-tree must be kept too.
-    preprocess(indexDir, tableConfig("reverse(dim)", true), schema);
+    // A second star-tree over a column the segment does not have fails the star-tree build, which runs after the
+    // column rewrite. The preprocessor logs and skips a failed star-tree build instead of failing the load, so
+    // process() completes with the column rewritten and no tree over the old values.
+    TableConfig failingConfig = tableConfig(UPDATED_TRANSFORM, true);
+    List<StarTreeIndexConfig> starTreeConfigs =
+        new ArrayList<>(failingConfig.getIndexingConfig().getStarTreeIndexConfigs());
+    starTreeConfigs.add(new StarTreeIndexConfig(List.of("missingColumn"), null, List.of("COUNT__*"), null, 1000));
+    failingConfig.getIndexingConfig().setStarTreeIndexConfigs(starTreeConfigs);
+    preprocess(indexDir, failingConfig, schema);
+    assertEquals(new SegmentMetadataImpl(indexDir).getColumnMetadataFor(DERIVED).getTransformFunction(),
+        UPDATED_TRANSFORM);
+    ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);
+    try {
+      assertTrue(segment.getStarTrees() == null || segment.getStarTrees().isEmpty());
+    } finally {
+      segment.destroy();
+    }
 
-    ColumnMetadata derived = new SegmentMetadataImpl(indexDir).getColumnMetadataFor(DERIVED);
-    assertEquals(derived.getTransformFunction(), ORIGINAL_TRANSFORM);
-    assertEquals(derived.getMinValue(), 11);
-    assertEquals(derived.getMaxValue(), 31);
-    assertEquals(readStarTreeGrandTotal(indexDir), sumBeforeReload);
-    assertEquals(FileUtils.readFileToByteArray(findStarTreeIndex(indexDir)), starTreeBefore);
+    preprocess(indexDir, tableConfig(UPDATED_TRANSFORM, true), schema);
+    assertEquals(readStarTreeGrandTotal(indexDir), 66L);
   }
 
   private static File buildBaseSegment(String dirName)

@@ -316,7 +316,7 @@ public class ColumnMetadataTest {
 
     PropertiesConfiguration config = new PropertiesConfiguration();
     BaseSegmentCreator.addColumnMetadataInfo(config, "mvString", stats, 10, fieldSpec, false, -1,
-        FieldConfig.EncodingType.RAW, false, null);
+        FieldConfig.EncodingType.RAW, false);
     ColumnMetadataImpl meta = ColumnMetadataImpl.fromPropertiesConfiguration(config, 10, "mvString");
     assertEquals(meta.getMaxRowLengthInBytes(), 42);
   }
@@ -334,7 +334,7 @@ public class ColumnMetadataTest {
 
     PropertiesConfiguration config = new PropertiesConfiguration();
     BaseSegmentCreator.addColumnMetadataInfo(config, "mvString", stats, 10, fieldSpec, false, -1,
-        FieldConfig.EncodingType.RAW, false, null);
+        FieldConfig.EncodingType.RAW, false);
     config.clearProperty("column.mvString.maxRowLengthInBytes");
     ColumnMetadataImpl meta = ColumnMetadataImpl.fromPropertiesConfiguration(config, 10, "mvString");
     assertEquals(meta.getMaxRowLengthInBytes(), ColumnMetadata.UNAVAILABLE);
@@ -369,7 +369,7 @@ public class ColumnMetadataTest {
             new DimensionFieldSpec("value", DataType.INT, true)));
     PropertiesConfiguration config = new PropertiesConfiguration();
     BaseSegmentCreator.addColumnMetadataInfo(config, "intMap", mock(ColumnStatistics.class), 1, intMapFieldSpec, false,
-        -1, FieldConfig.EncodingType.RAW, false, null);
+        -1, FieldConfig.EncodingType.RAW, false);
     ColumnMetadataImpl intMapColumnMetadata = ColumnMetadataImpl.fromPropertiesConfiguration(config, 1, "intMap");
     assertEquals(intMapColumnMetadata.getFieldSpec(), intMapFieldSpec);
   }
