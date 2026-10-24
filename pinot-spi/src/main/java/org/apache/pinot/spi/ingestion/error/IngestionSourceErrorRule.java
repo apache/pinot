@@ -46,17 +46,7 @@ public interface IngestionSourceErrorRule {
 
   /// Whether `clazz`, a superclass or an implemented interface is named `className`.
   static boolean hasClass(Class<?> clazz, String className) {
-    for (Class<?> current = clazz; current != null; current = current.getSuperclass()) {
-      if (current.getName().equals(className)) {
-        return true;
-      }
-      for (Class<?> iface : current.getInterfaces()) {
-        if (hasClass(iface, className)) {
-          return true;
-        }
-      }
-    }
-    return false;
+    return IngestionSourceErrorRules.classNames(clazz).contains(className);
   }
 
   /// The message of `throwable`, or "" when it has none or reading it fails: third-party `getMessage()`
@@ -65,7 +55,7 @@ public interface IngestionSourceErrorRule {
     try {
       String message = throwable.getMessage();
       return message != null ? message : "";
-    } catch (RuntimeException | LinkageError | AssertionError e) {
+    } catch (Exception | LinkageError | AssertionError | StackOverflowError e) {
       return "";
     }
   }
@@ -77,7 +67,7 @@ public interface IngestionSourceErrorRule {
       Method method = target.getClass().getMethod(methodName);
       method.trySetAccessible();
       return method.invoke(target);
-    } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+    } catch (Exception | LinkageError | AssertionError | StackOverflowError e) {
       return null;
     }
   }

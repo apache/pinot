@@ -19,11 +19,15 @@
 package org.apache.pinot.spi.ingestion.error;
 
 import java.io.IOException;
+import java.net.BindException;
 import java.net.ConnectException;
+import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
+import javax.security.auth.login.LoginException;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
@@ -85,6 +89,12 @@ public class IngestionSourceErrorClassifierTest {
     _registered.clear();
   }
 
+  @SuppressWarnings("unchecked")
+  private static <E extends Throwable> E sneaky(Throwable t)
+      throws E {
+    throw (E) t;
+  }
+
   private static Optional<IngestionSourceErrorCategory> categoryOf(Throwable failure) {
     return IngestionSourceErrorClassifier.classify(failure).map(IngestionSourceErrorClassification::getCategory);
   }
@@ -99,7 +109,19 @@ public class IngestionSourceErrorClassifierTest {
 
   @Test
   public void ourMetadataEndpointIsNotTheSource() {
-    assertEquals(categoryOf(new RuntimeException(new UnknownHostException("169.254.169.254"))), Optional.empty());
+    // The HTTP client's connect failure names the endpoint; the JDK's own doesn't.
+    assertEquals(categoryOf(new RuntimeException(
+        new ConnectException("Connect to 169.254.169.254:80 [/169.254.169.254] failed: Connection refused"))),
+        Optional.empty());
+  }
+
+  @Test
+  public void ourOwnSocketExhaustionIsNotTheSource() {
+    assertEquals(categoryOf(new RuntimeException(new BindException("Cannot assign requested address"))),
+        Optional.empty());
+    assertEquals(categoryOf(new RuntimeException(new SocketException("Too many open files"))), Optional.empty());
+    assertEquals(categoryOf(new RuntimeException(new SocketException("Connection reset"))),
+        Optional.of(IngestionSourceErrorCategory.SOURCE_READ));
   }
 
   @Test
@@ -155,11 +177,27 @@ public class IngestionSourceErrorClassifierTest {
   }
 
   @Test
+  public void registrationOrderNeverChangesTheDetailEither() {
+    IngestionSourceErrorRule authenticationRule = (node, below, evidence) -> node instanceof MissingException
+        ? IngestionSourceErrorVerdict.auth(IngestionSourceErrorSubReason.AUTHENTICATION, "b", null) : null;
+    IngestionSourceErrorRule authorizationRule = (node, below, evidence) -> node instanceof MissingException
+        ? IngestionSourceErrorVerdict.auth(IngestionSourceErrorSubReason.AUTHORIZATION, "a", null) : null;
+    register(authenticationRule);
+    register(authorizationRule);
+    String first = IngestionSourceErrorClassifier.classify(new MissingException()).get().toString();
+    unregister();
+    register(authorizationRule);
+    register(authenticationRule);
+    assertEquals(IngestionSourceErrorClassifier.classify(new MissingException()).get().toString(), first);
+  }
+
+  @Test
   public void registeredRuleNeverOverridesABuiltInDecision() {
     register((node, below, evidence) -> IngestionSourceErrorVerdict.auth(IngestionSourceErrorSubReason.UNSPECIFIED,
         "any", null));
-    // A built-in rule decides the interrupt; the registered rule is consulted only for the wrapper above it.
-    assertEquals(categoryOf(new InterruptedException()), Optional.empty());
+    // A built-in rule decides the interrupt at the root, so the registered rule's verdict on the wrapper above it is
+    // never reached.
+    assertEquals(categoryOf(new RuntimeException("wrapper", new InterruptedException())), Optional.empty());
   }
 
   @Test
@@ -176,14 +214,39 @@ public class IngestionSourceErrorClassifierTest {
 
   @Test
   public void classifyNeverThrows() {
-    Throwable hostile = new RuntimeException() {
+    // Rules read these classes' messages; a getMessage() that throws reads as no message.
+    Throwable hostileNetwork = new UnknownHostException() {
       @Override
       public String getMessage() {
         throw new IllegalStateException("getMessage fails");
       }
     };
-    assertEquals(categoryOf(new ConnectException().initCause(hostile)), Optional.of(
+    assertEquals(categoryOf(new RuntimeException("wrapper", hostileNetwork)), Optional.of(
         IngestionSourceErrorCategory.SOURCE_READ));
+    Throwable hostileLogin = new LoginException() {
+      @Override
+      public String getMessage() {
+        throw new IllegalStateException("getMessage fails");
+      }
+    };
+    assertEquals(categoryOf(new RuntimeException("wrapper", hostileLogin)), Optional.empty());
+
+    // A rule that smuggles out a checked exception or overflows counts as no decision.
+    register((node, below, evidence) -> {
+      throw IngestionSourceErrorClassifierTest.<RuntimeException>sneaky(new IOException("checked"));
+    });
+    register((node, below, evidence) -> {
+      throw new StackOverflowError();
+    });
+    assertEquals(categoryOf(new ConnectException("refused")), Optional.of(IngestionSourceErrorCategory.SOURCE_READ));
+    // A getCause() that throws ends classification, never the caller.
+    Throwable hostileCause = new RuntimeException("wrapper") {
+      @Override
+      public synchronized Throwable getCause() {
+        throw new IllegalStateException("getCause fails");
+      }
+    };
+    assertEquals(categoryOf(hostileCause), Optional.empty());
 
     // A cause cycle and a tree that suppresses itself terminate.
     RuntimeException a = new RuntimeException("a");
@@ -194,6 +257,31 @@ public class IngestionSourceErrorClassifierTest {
   }
 
   @Test
+  public void deeplyNestedSuppressedFailuresNeverOverflowTheStack()
+      throws Exception {
+    Throwable root = new RuntimeException("outermost");
+    Throwable current = root;
+    for (int i = 0; i < 5_000; i++) {
+      Throwable nested = new RuntimeException("level " + i);
+      current.addSuppressed(nested);
+      current = nested;
+    }
+    current.addSuppressed(new ConnectException("deepest"));
+    AtomicReference<Object> result = new AtomicReference<>();
+    // A small stack, as on a busy consumer thread.
+    Thread thread = new Thread(null, () -> {
+      try {
+        result.set(categoryOf(root));
+      } catch (Throwable t) {
+        result.set(t);
+      }
+    }, "classify", 256 * 1024);
+    thread.start();
+    thread.join();
+    assertTrue(result.get() instanceof Optional, String.valueOf(result.get()));
+  }
+
+  @Test
   public void recordedEvidenceDecidesAndIsNeverAFailureOfItsOwn() {
     Throwable unreachable = IngestionSourceErrorEvidence.attach(new RuntimeException("connect failed"),
         new IngestionSourceErrorEvidence().setEvidence(0, IngestionSourceErrorEvidence.UNREACHABLE));
@@ -201,7 +289,7 @@ public class IngestionSourceErrorClassifierTest {
         Optional.of(IngestionSourceErrorCategory.SOURCE_READ));
 
     Throwable missingTopic = IngestionSourceErrorEvidence.attach(new RuntimeException("Topic does not exist"),
-        new IngestionSourceErrorEvidence().setEvidence(0, IngestionSourceErrorRules.KAFKA_UNKNOWN_TOPIC_OR_PARTITION));
+        new IngestionSourceErrorEvidence().setEvidence(0, IngestionSourceErrorEvidence.UNKNOWN_TOPIC_OR_PARTITION));
     IngestionSourceErrorClassification classification = IngestionSourceErrorClassifier.classify(missingTopic).get();
     assertEquals(classification.getCategory(), IngestionSourceErrorCategory.SOURCE_READ);
     assertEquals(classification.getTarget(), IngestionSourceErrorVerdict.TARGET_BROKER);
@@ -257,10 +345,10 @@ public class IngestionSourceErrorClassifierTest {
   }
 
   @Test
-  public void evidenceHoldsNoSecrets() {
+  public void evidenceDropsUserInfoAndQueryAndBoundsItsTokens() {
     IngestionSourceErrorEvidence evidence = new IngestionSourceErrorEvidence()
-        .setResource("https://key:s3cr3t@registry.example.com:8081/subjects?token=t0k3n")
-        .setEvidence(403, "denied\nforged log line password=s3cr3t" + "x".repeat(200))
+        .setResource("https://fixture-user:fixture-secret@registry.example.com:8081/subjects?token=fixture-token")
+        .setEvidence(403, "denied\nforged log line" + "x".repeat(200))
         .setTarget("schema registry");
     assertEquals(evidence.getResource(), "https://registry.example.com:8081");
     assertEquals(evidence.getTarget(), "schema_registry");
@@ -271,8 +359,9 @@ public class IngestionSourceErrorClassifierTest {
 
     Throwable failure = IngestionSourceErrorEvidence.attach(new RuntimeException(), evidence);
     String printed = IngestionSourceErrorEvidence.of(failure).getMessage();
-    assertFalse(printed.contains("t0k3n"), printed);
-    assertFalse(printed.contains("key:"), printed);
+    assertFalse(printed.contains("fixture-secret"), printed);
+    assertFalse(printed.contains("fixture-token"), printed);
+    assertFalse(printed.contains("fixture-user"), printed);
     assertNull(IngestionSourceErrorEvidence.of(new RuntimeException()));
   }
 }

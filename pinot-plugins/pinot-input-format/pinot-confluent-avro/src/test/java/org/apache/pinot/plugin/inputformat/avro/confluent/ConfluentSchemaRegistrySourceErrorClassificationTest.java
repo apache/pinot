@@ -23,20 +23,21 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
-import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorCategory;
-import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorClassification;
-import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorClassifier;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorSubReason;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorAssertions.assertAuth;
+import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorAssertions.assertNotClassified;
+import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorAssertions.assertSourceRead;
+import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorAssertions.classify;
+import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorVerdict.TARGET_SCHEMA_REGISTRY;
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
@@ -45,7 +46,6 @@ import static org.testng.Assert.fail;
 /// name the registry, not the broker.
 public class ConfluentSchemaRegistrySourceErrorClassificationTest {
   private static final String TOPIC = "events";
-  private static final String SCHEMA_REGISTRY = "schema_registry";
   private static final String VALID_SCHEMA_RESPONSE =
       "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"Event\\\",\\\"fields\\\":"
           + "[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}";
@@ -64,7 +64,7 @@ public class ConfluentSchemaRegistrySourceErrorClassificationTest {
   public void registryRejectsTheCredential()
       throws Exception {
     assertAuth(decodeFailure(registryAnswering(401, "{\"error_code\":401,\"message\":\"Unauthorized\"}"),
-        payload(1, new byte[]{2})), IngestionSourceErrorSubReason.AUTHENTICATION);
+        payload(1, new byte[]{2})), IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_SCHEMA_REGISTRY);
   }
 
   @Test
@@ -72,7 +72,7 @@ public class ConfluentSchemaRegistrySourceErrorClassificationTest {
       throws Exception {
     String denied = "{\"error_code\":40301,\"message\":\"User is denied operation on this server.\"}";
     assertAuth(decodeFailure(registryAnswering(403, denied), payload(1, new byte[]{2})),
-        IngestionSourceErrorSubReason.AUTHORIZATION);
+        IngestionSourceErrorSubReason.AUTHORIZATION, TARGET_SCHEMA_REGISTRY);
   }
 
   @Test
@@ -80,21 +80,49 @@ public class ConfluentSchemaRegistrySourceErrorClassificationTest {
       throws Exception {
     // A proxy or firewall answering 403 with an HTML body: the client's error code is 50005, its status stays 403.
     assertAuth(decodeFailure(registryAnswering(403, "<html><body>Forbidden</body></html>"), payload(1, new byte[]{2})),
-        IngestionSourceErrorSubReason.AUTHORIZATION);
+        IngestionSourceErrorSubReason.AUTHORIZATION, TARGET_SCHEMA_REGISTRY);
   }
 
   @Test
   public void registryCannotServeTheSchema()
       throws Exception {
     assertSourceRead(decodeFailure(registryAnswering(404, "{\"error_code\":40403,\"message\":\"Schema 1 not found\"}"),
-        payload(1, new byte[]{2})), SCHEMA_REGISTRY);
+        payload(1, new byte[]{2})), TARGET_SCHEMA_REGISTRY);
     stopRegistry();
     // A throttled registry: the serde maps 429 to a Kafka class and drops the cause.
-    assertSourceRead(decodeFailure(registryAnswering(429,
-        "{\"error_code\":42901,\"message\":\"Rate limit exceeded\"}"), payload(1, new byte[]{2})), SCHEMA_REGISTRY);
+    String throttled = "{\"error_code\":42901,\"message\":\"Rate limit exceeded\"}";
+    assertSourceRead(decodeFailure(registryAnswering(429, throttled), payload(1, new byte[]{2})),
+        TARGET_SCHEMA_REGISTRY);
     stopRegistry();
     assertSourceRead(decodeFailure(registryAnswering(503, "{\"error_code\":50301,\"message\":\"Unavailable\"}"),
-        payload(1, new byte[]{2})), SCHEMA_REGISTRY);
+        payload(1, new byte[]{2})), TARGET_SCHEMA_REGISTRY);
+    stopRegistry();
+    // A Protobuf reference that was never registered.
+    String subjectNotFound = "{\"error_code\":40401,\"message\":\"Subject not found\"}";
+    assertSourceRead(decodeFailure(registryAnswering(404, subjectNotFound), payload(1, new byte[]{2})),
+        TARGET_SCHEMA_REGISTRY);
+    stopRegistry();
+    // A URL that isn't a registry at all.
+    assertSourceRead(decodeFailure(registryAnswering(404, "<html><body>Not Found</body></html>"),
+        payload(1, new byte[]{2})), TARGET_SCHEMA_REGISTRY);
+  }
+
+  @Test
+  public void registryThatNeverAnswersIsSourceRead()
+      throws Exception {
+    _registry = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+    _registry.createContext("/", exchange -> {
+      try {
+        Thread.sleep(2_000);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+      exchange.close();
+    });
+    _registry.start();
+    Throwable failure = decodeFailure("http://localhost:" + _registry.getAddress().getPort(),
+        payload(1, new byte[]{2}), Map.of("http.read.timeout.ms", "200"));
+    assertEquals(classify(failure).getCategory(), IngestionSourceErrorCategory.SOURCE_READ);
   }
 
   @Test
@@ -105,7 +133,7 @@ public class ConfluentSchemaRegistrySourceErrorClassificationTest {
       closedPort = socket.getLocalPort();
     }
     Throwable failure = decodeFailure("http://localhost:" + closedPort, payload(1, new byte[]{2}));
-    assertEquals(classify(failure).getCategory(), IngestionSourceErrorCategory.SOURCE_READ, describe(failure));
+    assertEquals(classify(failure).getCategory(), IngestionSourceErrorCategory.SOURCE_READ);
   }
 
   @Test
@@ -141,8 +169,16 @@ public class ConfluentSchemaRegistrySourceErrorClassificationTest {
 
   private static Throwable decodeFailure(String registryUrl, byte[] payload)
       throws Exception {
+    return decodeFailure(registryUrl, payload, Map.of());
+  }
+
+  private static Throwable decodeFailure(String registryUrl, byte[] payload, Map<String, String> clientConfig)
+      throws Exception {
+    Map<String, String> props = new HashMap<>(clientConfig);
+    props.put("schema.registry.rest.url", registryUrl);
+    props.put("max.retries", "0");
     KafkaConfluentSchemaRegistryAvroMessageDecoder decoder = new KafkaConfluentSchemaRegistryAvroMessageDecoder();
-    decoder.init(Map.of("schema.registry.rest.url", registryUrl, "max.retries", "0"), Set.of("id"), TOPIC);
+    decoder.init(props, Set.of("id"), TOPIC);
     try {
       decoder.decode(payload, new GenericRow());
       fail("Expected the decode to fail");
@@ -150,32 +186,5 @@ public class ConfluentSchemaRegistrySourceErrorClassificationTest {
     } catch (RuntimeException e) {
       return e;
     }
-  }
-
-  private static void assertAuth(Throwable failure, IngestionSourceErrorSubReason subReason) {
-    IngestionSourceErrorClassification classification = classify(failure);
-    assertEquals(classification.getCategory(), IngestionSourceErrorCategory.AUTH, describe(failure));
-    assertEquals(classification.getSubReason(), subReason, describe(failure));
-    assertEquals(classification.getTarget(), SCHEMA_REGISTRY, describe(failure));
-  }
-
-  private static void assertSourceRead(Throwable failure, String target) {
-    IngestionSourceErrorClassification classification = classify(failure);
-    assertEquals(classification.getCategory(), IngestionSourceErrorCategory.SOURCE_READ, describe(failure));
-    assertEquals(classification.getTarget(), target, describe(failure));
-  }
-
-  private static void assertNotClassified(Throwable failure) {
-    Optional<IngestionSourceErrorClassification> classification = IngestionSourceErrorClassifier.classify(failure);
-    assertTrue(classification.isEmpty(), classification + " for " + describe(failure));
-  }
-
-  private static IngestionSourceErrorClassification classify(Throwable failure) {
-    return IngestionSourceErrorClassifier.classify(failure)
-        .orElseThrow(() -> new AssertionError("Not classified: " + describe(failure)));
-  }
-
-  private static String describe(Throwable failure) {
-    return ExceptionUtils.getStackTrace(failure);
   }
 }

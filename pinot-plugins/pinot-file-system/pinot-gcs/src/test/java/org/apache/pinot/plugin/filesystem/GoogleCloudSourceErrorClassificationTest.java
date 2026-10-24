@@ -18,27 +18,28 @@
  */
 package org.apache.pinot.plugin.filesystem;
 
+import com.google.api.client.http.HttpTransport;
+import com.google.api.client.http.LowLevelHttpRequest;
+import com.google.api.client.http.LowLevelHttpResponse;
 import com.google.api.client.testing.http.MockHttpTransport;
+import com.google.api.client.testing.http.MockLowLevelHttpRequest;
 import com.google.api.client.testing.http.MockLowLevelHttpResponse;
 import com.google.api.gax.grpc.GrpcStatusCode;
 import com.google.api.gax.rpc.ApiExceptionFactory;
 import com.google.auth.oauth2.ServiceAccountCredentials;
 import io.grpc.Status;
 import java.io.IOException;
+import java.net.ConnectException;
 import java.security.KeyPairGenerator;
 import java.util.List;
-import java.util.Optional;
-import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceCredentialMode;
-import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorCategory;
-import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorClassification;
-import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorClassifier;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorEvidence;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorSubReason;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertTrue;
+import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorAssertions.assertAuth;
+import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorAssertions.assertNotClassified;
+import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorAssertions.assertSourceRead;
 import static org.testng.Assert.fail;
 
 
@@ -60,24 +61,29 @@ public class GoogleCloudSourceErrorClassificationTest {
     return ApiExceptionFactory.createException(message, null, GrpcStatusCode.of(code), false);
   }
 
-  /// What grpc-auth reports when the token refresh behind a call fails: UNAUTHENTICATED over the refresh's error.
+  /// What grpc-auth reports when the token refresh behind a call fails: UNAUTHENTICATED over a refused token, and
+  /// UNAVAILABLE over a token endpoint that never answered.
   private static Throwable tokenRefreshFailure(String tokenEndpointBody)
+      throws Exception {
+    return tokenRefreshFailure(new MockHttpTransport.Builder().setLowLevelHttpResponse(
+        new MockLowLevelHttpResponse().setStatusCode(400).setContentType("application/json")
+            .setContent(tokenEndpointBody)).build(), Status.UNAUTHENTICATED);
+  }
+
+  private static Throwable tokenRefreshFailure(HttpTransport transport, Status status)
       throws Exception {
     ServiceAccountCredentials credentials = ServiceAccountCredentials.newBuilder()
         .setClientEmail("fixture@fixture-project.iam.gserviceaccount.com").setPrivateKeyId("fixture")
         .setPrivateKey(KeyPairGenerator.getInstance("RSA").generateKeyPair().getPrivate())
         .setScopes(List.of("https://www.googleapis.com/auth/pubsub"))
-        .setHttpTransportFactory(() -> new MockHttpTransport.Builder().setLowLevelHttpResponse(
-            new MockLowLevelHttpResponse().setStatusCode(400).setContentType("application/json")
-                .setContent(tokenEndpointBody)).build())
+        .setHttpTransportFactory(() -> transport)
         .build();
     try {
       credentials.refresh();
       fail("Expected the token refresh to fail");
       return null;
     } catch (IOException e) {
-      return Status.UNAUTHENTICATED.withDescription("Failed computing credential metadata").withCause(e)
-          .asRuntimeException();
+      return status.withDescription("Failed computing credential metadata").withCause(e).asRuntimeException();
     }
   }
 
@@ -85,7 +91,26 @@ public class GoogleCloudSourceErrorClassificationTest {
   public void tableKeyRejected()
       throws Exception {
     assertAuth(withCredentials(tokenRefreshFailure(KEY_REVOKED), IngestionSourceCredentialMode.STATIC),
-        IngestionSourceErrorSubReason.AUTHENTICATION);
+        IngestionSourceErrorSubReason.AUTHENTICATION, null);
+  }
+
+  @Test
+  public void tokenEndpointThatNeverAnsweredIsSourceRead()
+      throws Exception {
+    HttpTransport unreachable = new MockHttpTransport() {
+      @Override
+      public LowLevelHttpRequest buildRequest(String method, String url) {
+        return new MockLowLevelHttpRequest(url) {
+          @Override
+          public LowLevelHttpResponse execute()
+              throws IOException {
+            throw new ConnectException("Connection refused");
+          }
+        };
+      }
+    };
+    assertSourceRead(withCredentials(tokenRefreshFailure(unreachable, Status.UNAVAILABLE),
+        IngestionSourceCredentialMode.STATIC), null);
   }
 
   @Test
@@ -102,53 +127,30 @@ public class GoogleCloudSourceErrorClassificationTest {
   @Test
   public void permissionDenied() {
     assertAuth(new RuntimeException("Failed to create a subscription", gax(Status.Code.PERMISSION_DENIED,
-        "User not authorized to perform this action.")), IngestionSourceErrorSubReason.AUTHORIZATION);
+        "User not authorized to perform this action.")), IngestionSourceErrorSubReason.AUTHORIZATION, null);
     assertAuth(Status.PERMISSION_DENIED.withDescription("Request is prohibited by organization's policy")
-        .asRuntimeException(), IngestionSourceErrorSubReason.AUTHORIZATION);
+        .asRuntimeException(), IngestionSourceErrorSubReason.AUTHORIZATION, null);
   }
 
   @Test
   public void missingOrDeniedProject() {
     assertAuth(gax(Status.Code.NOT_FOUND, "Requested project not found or user does not have access to it."),
-        IngestionSourceErrorSubReason.MISSING_OR_DENIED);
+        IngestionSourceErrorSubReason.MISSING_OR_DENIED, null);
   }
 
   @Test
   public void sourceCannotServeUs() {
-    assertSourceRead(gax(Status.Code.NOT_FOUND, "Resource not found (resource=events)."));
-    assertSourceRead(gax(Status.Code.FAILED_PRECONDITION, "The resulting snapshot would expire in less than 1 hour"));
-    assertSourceRead(gax(Status.Code.RESOURCE_EXHAUSTED, "Quota exceeded"));
-    assertSourceRead(Status.UNAVAILABLE.withDescription("io exception").asRuntimeException());
-    assertSourceRead(gax(Status.Code.DEADLINE_EXCEEDED, "Deadline exceeded"));
+    assertSourceRead(gax(Status.Code.NOT_FOUND, "Resource not found (resource=events)."), null);
+    assertSourceRead(gax(Status.Code.FAILED_PRECONDITION, "The resulting snapshot would expire in less than 1 hour"),
+        null);
+    assertSourceRead(gax(Status.Code.RESOURCE_EXHAUSTED, "Quota exceeded"), null);
+    assertSourceRead(Status.UNAVAILABLE.withDescription("io exception").asRuntimeException(), null);
+    assertSourceRead(gax(Status.Code.DEADLINE_EXCEEDED, "Deadline exceeded"), null);
   }
 
   @Test
   public void ourCancellationOrRequestIsNotTheSource() {
     assertNotClassified(gax(Status.Code.CANCELLED, "Call cancelled"));
     assertNotClassified(gax(Status.Code.INVALID_ARGUMENT, "Invalid resource name"));
-  }
-
-  private static void assertAuth(Throwable failure, IngestionSourceErrorSubReason subReason) {
-    IngestionSourceErrorClassification classification = classify(failure);
-    assertEquals(classification.getCategory(), IngestionSourceErrorCategory.AUTH, describe(failure));
-    assertEquals(classification.getSubReason(), subReason, describe(failure));
-  }
-
-  private static void assertSourceRead(Throwable failure) {
-    assertEquals(classify(failure).getCategory(), IngestionSourceErrorCategory.SOURCE_READ, describe(failure));
-  }
-
-  private static void assertNotClassified(Throwable failure) {
-    Optional<IngestionSourceErrorClassification> classification = IngestionSourceErrorClassifier.classify(failure);
-    assertTrue(classification.isEmpty(), classification + " for " + describe(failure));
-  }
-
-  private static IngestionSourceErrorClassification classify(Throwable failure) {
-    return IngestionSourceErrorClassifier.classify(failure)
-        .orElseThrow(() -> new AssertionError("Not classified: " + describe(failure)));
-  }
-
-  private static String describe(Throwable failure) {
-    return ExceptionUtils.getStackTrace(failure);
   }
 }

@@ -18,8 +18,11 @@
  */
 package org.apache.pinot.spi.ingestion.error;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.Deque;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Optional;
@@ -61,7 +64,7 @@ public final class IngestionSourceErrorClassifier {
   public static Optional<IngestionSourceErrorClassification> classify(Throwable failure) {
     try {
       Walk walk = new Walk();
-      walk.visitChain(failure);
+      walk.visit(failure);
       Decision decided = null;
       for (Decision decision : walk._decisions) {
         if (decision._verdict.getCategory() == IngestionSourceErrorCategory.AUTH) {
@@ -77,8 +80,12 @@ public final class IngestionSourceErrorClassifier {
       }
       return Optional.of(new IngestionSourceErrorClassification(decided._verdict, decided._node.getClass().getName(),
           decided._evidence));
-    } catch (RuntimeException | LinkageError | AssertionError e) {
-      // Observation only: a classification bug must never change how the failure itself is handled.
+    } catch (Throwable t) {
+      // Observation only: a classification bug, or a hostile exception, must never change how the failure itself is
+      // handled. Running out of memory is not ours to swallow.
+      if (t instanceof VirtualMachineError && !(t instanceof StackOverflowError)) {
+        throw (VirtualMachineError) t;
+      }
       return Optional.empty();
     }
   }
@@ -94,8 +101,8 @@ public final class IngestionSourceErrorClassifier {
   }
 
   /// The decision of the registered rules on `node`. When they disagree, "not the source's verdict" beats
-  /// [IngestionSourceErrorCategory#AUTH], which beats [IngestionSourceErrorCategory#SOURCE_READ], so registration
-  /// order never matters.
+  /// [IngestionSourceErrorCategory#AUTH], which beats [IngestionSourceErrorCategory#SOURCE_READ], and remaining ties
+  /// break on sub-reason, code and target, so registration order never matters.
   @Nullable
   private static IngestionSourceErrorVerdict decideRegistered(Throwable node, List<Throwable> below,
       @Nullable IngestionSourceErrorEvidence evidence) {
@@ -104,15 +111,22 @@ public final class IngestionSourceErrorClassifier {
       IngestionSourceErrorVerdict verdict;
       try {
         verdict = rule.decide(node, below, evidence);
-      } catch (RuntimeException | LinkageError | AssertionError e) {
+      } catch (Exception | LinkageError | AssertionError | StackOverflowError e) {
+        // A rule that throws, even a checked exception it smuggles out, counts as no decision.
         continue;
       }
-      if (verdict != null && (decided == null || rank(verdict) < rank(decided))) {
+      if (verdict != null && (decided == null || PRECEDENCE.compare(verdict, decided) < 0)) {
         decided = verdict;
       }
     }
     return decided;
   }
+
+  private static final Comparator<IngestionSourceErrorVerdict> PRECEDENCE =
+      Comparator.comparingInt(IngestionSourceErrorClassifier::rank)
+          .thenComparing(IngestionSourceErrorVerdict::getSubReason, Comparator.nullsLast(Comparator.naturalOrder()))
+          .thenComparing(IngestionSourceErrorVerdict::getCode, Comparator.nullsLast(Comparator.naturalOrder()))
+          .thenComparing(IngestionSourceErrorVerdict::getTarget, Comparator.nullsLast(Comparator.naturalOrder()));
 
   private static int rank(IngestionSourceErrorVerdict verdict) {
     return verdict.isNone() ? 0 : verdict.getCategory() == IngestionSourceErrorCategory.AUTH ? 1 : 2;
@@ -135,57 +149,75 @@ public final class IngestionSourceErrorClassifier {
     final Set<Throwable> _seen = Collections.newSetFromMap(new IdentityHashMap<>());
     final List<Decision> _decisions = new ArrayList<>();
 
-    /// Decides the chain starting at `head`, then every chain hanging off it as a suppressed exception.
-    void visitChain(Throwable head) {
-      List<Throwable> chain = new ArrayList<>();
-      List<IngestionSourceErrorEvidence> evidence = new ArrayList<>();
-      List<Throwable> suppressedHeads = new ArrayList<>();
-      IngestionSourceErrorEvidence nearest = null;
-      for (Throwable node = head; node != null && _seen.size() < MAX_NODES && _seen.add(node);
-          node = node.getCause()) {
-        IngestionSourceErrorEvidence direct = IngestionSourceErrorEvidence.of(node);
-        if (direct != null) {
-          nearest = direct;
+    /// Decides the chain starting at `failure`, then every chain hanging off it as a suppressed exception, depth
+    /// first. A work stack rather than recursion: suppressed exceptions can nest arbitrarily deep.
+    void visit(Throwable failure) {
+      Deque<Throwable> pending = new ArrayDeque<>();
+      pending.push(failure);
+      while (!pending.isEmpty()) {
+        List<Throwable> suppressedHeads = visitChain(pending.pop());
+        for (int i = suppressedHeads.size() - 1; i >= 0; i--) {
+          pending.push(suppressedHeads.get(i));
         }
-        chain.add(node);
-        evidence.add(nearest);
-        for (Throwable suppressed : node.getSuppressed()) {
-          if (!(suppressed instanceof IngestionSourceErrorEvidence)) {
-            suppressedHeads.add(suppressed);
-          }
-        }
-      }
-      Decision decision = decide(chain, evidence);
-      if (decision != null) {
-        _decisions.add(decision);
-      }
-      for (Throwable suppressed : suppressedHeads) {
-        visitChain(suppressed);
       }
     }
 
+    /// Decides the chain starting at `head` and returns the heads of the chains suppressed along it.
+    private List<Throwable> visitChain(Throwable head) {
+      List<Throwable> chain = new ArrayList<>();
+      List<IngestionSourceErrorEvidence> direct = new ArrayList<>();
+      List<IngestionSourceErrorEvidence> nearest = new ArrayList<>();
+      List<Throwable> suppressedHeads = new ArrayList<>();
+      IngestionSourceErrorEvidence current = null;
+      for (Throwable node = head; node != null && _seen.size() < MAX_NODES && _seen.add(node);
+          node = node.getCause()) {
+        IngestionSourceErrorEvidence own = null;
+        for (Throwable suppressed : node.getSuppressed()) {
+          if (suppressed instanceof IngestionSourceErrorEvidence) {
+            own = own != null ? own : (IngestionSourceErrorEvidence) suppressed;
+          } else {
+            suppressedHeads.add(suppressed);
+          }
+        }
+        if (own == null) {
+          own = IngestionSourceErrorEvidence.ofUnsuppressible(node);
+        }
+        if (own != null) {
+          current = own;
+        }
+        chain.add(node);
+        direct.add(own);
+        nearest.add(current);
+      }
+      Decision decision = decide(chain, direct, nearest);
+      if (decision != null) {
+        _decisions.add(decision);
+      }
+      return suppressedHeads;
+    }
+
     @Nullable
-    private static Decision decide(List<Throwable> chain, List<IngestionSourceErrorEvidence> evidence) {
+    private static Decision decide(List<Throwable> chain, List<IngestionSourceErrorEvidence> direct,
+        List<IngestionSourceErrorEvidence> nearest) {
       for (int i = chain.size() - 1; i >= 0; i--) {
         Throwable node = chain.get(i);
         List<Throwable> below = chain.subList(i + 1, chain.size());
-        IngestionSourceErrorEvidence direct = IngestionSourceErrorEvidence.of(node);
         IngestionSourceErrorVerdict verdict =
-            direct != null && direct.hasEvidence() ? IngestionSourceErrorRules.matchEvidence(direct) : null;
+            direct.get(i) != null ? IngestionSourceErrorRules.matchEvidence(direct.get(i)) : null;
         if (verdict == null) {
-          verdict = IngestionSourceErrorRules.matchSource(node, below, evidence.get(i));
+          verdict = IngestionSourceErrorRules.matchSource(node, below, nearest.get(i));
         }
         if (verdict == null) {
-          verdict = decideRegistered(node, below, evidence.get(i));
+          verdict = decideRegistered(node, below, nearest.get(i));
         }
         if (verdict != null) {
-          return new Decision(verdict, node, evidence.get(i));
+          return new Decision(verdict, node, nearest.get(i));
         }
       }
       for (int i = chain.size() - 1; i >= 0; i--) {
         IngestionSourceErrorVerdict verdict = IngestionSourceErrorRules.matchGeneric(chain.get(i));
         if (verdict != null) {
-          return new Decision(verdict, chain.get(i), evidence.get(i));
+          return new Decision(verdict, chain.get(i), nearest.get(i));
         }
       }
       return null;
