@@ -128,13 +128,13 @@ public class BaseSingleSegmentConversionExecutorTest {
         (java.util.concurrent.atomic.AtomicReference<MinionMetrics>) field.get(null);
     MinionMetrics previous = ref.getAndSet(metrics);
     try {
-      TestSingleSegmentConversionExecutor executor = new TestSingleSegmentConversionExecutor() {
+      TestSingleSegmentConversionExecutor executor = new TestSingleSegmentConversionExecutor(_segmentCrc) {
         @Override
         protected long getSegmentCrc(String tableNameWithType, String segmentName) {
-          return SEGMENT_CRC + 1;
+          return _segmentCrc + 1;
         }
       };
-      SegmentConversionResult result = executor.executeTask(createTaskConfig());
+      SegmentConversionResult result = executor.executeTask(createTaskConfig(_segmentCrc));
       Assert.assertNull(result.getFile());
       Assert.assertEquals(result.getSegmentName(), SEGMENT_NAME);
       Mockito.verify(metrics).addMeteredTableValue(TABLE_NAME_WITH_TYPE, MinionMeter.CRC_SKIP_ZK_CHANGED, 1L);
