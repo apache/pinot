@@ -23,27 +23,47 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.zip.CRC32C;
+import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.converter.SegmentV1V2ToV3FormatConverter;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.IndexPlugin;
+import org.apache.pinot.segment.spi.index.IndexService;
+import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
+import org.apache.pinot.segment.spi.index.metadata.MappedColumnMetadata;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.store.ColumnIndexUtils;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
+import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.OpenStructIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -54,7 +74,10 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.OpenStructNaming;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.env.CommonsConfigurationUtils;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
@@ -62,7 +85,10 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNotSame;
 import static org.testng.Assert.assertNull;
@@ -167,6 +193,293 @@ public class SegmentMetadataImplTest {
           entry.getKey());
       assertTrue(((ColumnMetadataImpl) streamColumn).getIndexSizeMap().isEmpty(), entry.getKey());
     }
+  }
+
+  @Test
+  public void testServingLoadFallsBackOrMappingIsDisabled()
+      throws Exception {
+    InstanceDataManagerConfig instanceConfig = mock(InstanceDataManagerConfig.class);
+    PinotConfiguration config = new PinotConfiguration();
+    when(instanceConfig.getConfig()).thenReturn(config);
+    config.setProperty(IndexLoadingConfig.MAPPED_SEGMENT_METADATA_ENABLED, true);
+
+    File sidecar = new File(_segmentDirectory, "segment_metadata.bin");
+    assertTrue(sidecar.mkdir());
+    Files.writeString(new File(sidecar, "blocker").toPath(), "keep directory non-empty");
+    try {
+      ImmutableSegment segment =
+          ImmutableSegmentLoader.load(_segmentDirectory, new IndexLoadingConfig(instanceConfig, null, null), false);
+      try {
+        assertFalse(((SegmentMetadataImpl) segment.getSegmentMetadata()).isMapped());
+        assertTrue(segment.getColumnNames().contains("daysSinceEpoch"));
+      } finally {
+        segment.destroy();
+      }
+    } finally {
+      FileUtils.deleteQuietly(sidecar);
+    }
+
+    config.setProperty(IndexLoadingConfig.MAPPED_SEGMENT_METADATA_ENABLED, false);
+    ImmutableSegment disabled =
+        ImmutableSegmentLoader.load(_segmentDirectory, new IndexLoadingConfig(instanceConfig, null, null), false);
+    try {
+      assertFalse(((SegmentMetadataImpl) disabled.getSegmentMetadata()).isMapped());
+      assertFalse(sidecar.exists());
+    } finally {
+      disabled.destroy();
+    }
+
+    ImmutableSegment reader = ImmutableSegmentLoader.load(_segmentDirectory, ReadMode.mmap);
+    try {
+      assertFalse(((SegmentMetadataImpl) reader.getSegmentMetadata()).isMapped());
+      assertFalse(sidecar.exists());
+    } finally {
+      reader.destroy();
+    }
+
+    config.setProperty(IndexLoadingConfig.MAPPED_SEGMENT_METADATA_ENABLED, true);
+    ImmutableSegment segment =
+        ImmutableSegmentLoader.load(_segmentDirectory, new IndexLoadingConfig(instanceConfig, null, null), false);
+    try {
+      assertTrue(((SegmentMetadataImpl) segment.getSegmentMetadata()).isMapped());
+    } finally {
+      segment.destroy();
+    }
+
+    IndexLoadingConfig heapConfig = new IndexLoadingConfig(instanceConfig, null, null);
+    heapConfig.setReadMode(ReadMode.heap);
+    long mappings = PinotDataBuffer.getMmapBufferCount();
+    ImmutableSegment heap = ImmutableSegmentLoader.load(_segmentDirectory, heapConfig, false);
+    try {
+      assertTrue(((SegmentMetadataImpl) heap.getSegmentMetadata()).isMapped());
+      assertEquals(PinotDataBuffer.getMmapBufferCount(), mappings);
+    } finally {
+      heap.destroy();
+    }
+  }
+
+  @Test
+  public void testMappedMetadataRoundTripAndRebuild()
+      throws Exception {
+    new SegmentV1V2ToV3FormatConverter().convert(_segmentDirectory);
+    File properties = SegmentDirectoryPaths.findMetadataFile(_segmentDirectory);
+    Files.writeString(properties.toPath(), "\ncustom.escaped = alpha\\,beta\n", StandardCharsets.UTF_8,
+        StandardOpenOption.APPEND);
+    SegmentMetadataImpl eager = new SegmentMetadataImpl(_segmentDirectory);
+    long mappings = PinotDataBuffer.getMmapBufferCount();
+    File sidecar = new File(_segmentDirectory, "segment_metadata.bin");
+    try (SegmentMetadataImpl mapped = SegmentMetadataImpl.loadMapped(_segmentDirectory)) {
+      assertTrue(mapped.isMapped());
+      assertTrue(sidecar.isFile());
+      assertEquals(mapped.getName(), eager.getName());
+      assertEquals(mapped.getTotalDocs(), eager.getTotalDocs());
+      assertEquals(mapped.getVersion(), eager.getVersion());
+      assertEquals(mapped.getTimeColumn(), eager.getTimeColumn());
+      assertEquals(mapped.getCustomMap(), eager.getCustomMap());
+      assertEquals(mapped.getPhysicalColumnNames(), eager.getSchema().getPhysicalColumnNames());
+      assertEquals(mapped.getAllColumns(), mapped.getSchema().getColumnNames());
+      assertEquals(mapped.toJson(null), eager.toJson(null));
+      for (String column : mapped.getPhysicalColumnNames()) {
+        ColumnMetadata expected = eager.getColumnMetadataFor(column);
+        ColumnMetadata actual = mapped.getColumnMetadataFor(column);
+        assertTrue(actual instanceof MappedColumnMetadata);
+        assertSame(mapped.getColumnMetadataFor(column), actual);
+        assertEquals(actual.getFieldSpec(), expected.getFieldSpec(), column);
+        assertEquals(actual.getCardinality(), expected.getCardinality(), column);
+        assertEquals(actual.getMinValue(), expected.getMinValue(), column);
+        assertEquals(actual.getMaxValue(), expected.getMaxValue(), column);
+        assertEquals(actual.getNumIndexes(), expected.getNumIndexes(), column);
+        assertEquals(((MappedColumnMetadata) actual).getIndexSizeMap(),
+            ((ColumnMetadataImpl) expected).getIndexSizeMap(), column);
+      }
+    }
+    assertEquals(PinotDataBuffer.getMmapBufferCount(), mappings);
+    long directBuffers = PinotDataBuffer.getDirectBufferCount();
+    try (SegmentMetadataImpl heap = SegmentMetadataImpl.loadMapped(_segmentDirectory, ReadMode.heap)) {
+      assertEquals(heap.toJson(null), eager.toJson(null));
+      assertEquals(PinotDataBuffer.getMmapBufferCount(), mappings);
+      assertEquals(PinotDataBuffer.getDirectBufferCount(), directBuffers + 1);
+    }
+    assertEquals(PinotDataBuffer.getDirectBufferCount(), directBuffers);
+
+    byte[] sidecarBytes = Files.readAllBytes(sidecar.toPath());
+    assertEquals(ByteBuffer.wrap(sidecarBytes).order(ByteOrder.BIG_ENDIAN).getInt(40), sidecarCrc(sidecarBytes));
+
+    // An invalid sidecar is regenerated from canonical metadata.properties.
+    Files.write(sidecar.toPath(), new byte[]{1, 2, 3});
+    try (SegmentMetadataImpl mapped = SegmentMetadataImpl.loadMapped(_segmentDirectory)) {
+      assertEquals(mapped.getTotalDocs(), eager.getTotalDocs());
+    }
+    // A source-only update invalidates a valid sidecar as well.
+    Files.writeString(properties.toPath(), "\ncustom.mappedRefresh = yes\n", StandardCharsets.UTF_8,
+        StandardOpenOption.APPEND);
+    try (SegmentMetadataImpl mapped = SegmentMetadataImpl.loadMapped(_segmentDirectory)) {
+      assertEquals(mapped.getCustomMap().get("mappedRefresh"), "yes");
+    }
+    // A zero-sized local v3 index is still present; a root-only map does not supply eager or mapped index sizes.
+    File indexMap = new File(new File(_segmentDirectory, "v3"), V1Constants.INDEX_MAP_FILE_NAME);
+    PropertiesConfiguration indexConfig = CommonsConfigurationUtils.fromFile(indexMap);
+    String sizeKey = CommonsConfigurationUtils.getKeys(indexConfig).stream()
+        .filter(key -> ColumnIndexUtils.MAP_KEY_NAME_SIZE.equals(
+            ColumnIndexUtils.parseIndexMapKeys(key, _segmentDirectory.getPath())[2])).findFirst().orElseThrow();
+    String[] parsedKey = ColumnIndexUtils.parseIndexMapKeys(sizeKey, _segmentDirectory.getPath());
+    indexConfig.setProperty(sizeKey, 0);
+    CommonsConfigurationUtils.saveToFile(indexConfig, indexMap);
+    try (SegmentMetadataImpl mapped = SegmentMetadataImpl.loadMapped(_segmentDirectory)) {
+      ColumnMetadata zeroSizedColumn = mapped.getColumnMetadataFor(parsedKey[0]);
+      assertEquals(zeroSizedColumn.getIndexSizeFor(IndexService.getInstance().get(parsedKey[1])), 0L);
+    }
+    IndexService originalIndexService = IndexService.getInstance();
+    Set<IndexPlugin<?>> plugins = new HashSet<>();
+    for (IndexType<?, ?, ?> type : originalIndexService.getAllIndexes()) {
+      if (!type.getId().equals(parsedKey[1])) {
+        IndexPlugin<IndexType<?, ?, ?>> plugin = () -> type;
+        plugins.add(plugin);
+      }
+    }
+    try {
+      IndexService.setInstance(new IndexService(plugins));
+      try (SegmentMetadataImpl mapped = SegmentMetadataImpl.loadMapped(_segmentDirectory)) {
+        assertEquals(mapped.getColumnMetadataFor(parsedKey[0]).getIndexSizeFor(
+            originalIndexService.get(parsedKey[1])), ColumnMetadata.UNAVAILABLE);
+      }
+    } finally {
+      IndexService.setInstance(originalIndexService);
+    }
+    try (SegmentMetadataImpl mapped = SegmentMetadataImpl.loadMapped(_segmentDirectory)) {
+      assertEquals(mapped.getColumnMetadataFor(parsedKey[0]).getIndexSizeFor(
+          originalIndexService.get(parsedKey[1])), 0L);
+    }
+    File staging = new File(INDEX_DIR, "mapped-staging");
+    try {
+      FileUtils.forceMkdir(staging);
+      FileUtils.copyFile(properties, new File(staging, properties.getName()));
+      File creationMeta = SegmentDirectoryPaths.findCreationMetaFile(_segmentDirectory);
+      FileUtils.copyFile(creationMeta, new File(staging, creationMeta.getName()));
+      indexConfig.setProperty(sizeKey, 123);
+      CommonsConfigurationUtils.saveToFile(indexConfig, new File(staging, V1Constants.INDEX_MAP_FILE_NAME));
+      SegmentMetadataImpl stagedEager = new SegmentMetadataImpl(staging);
+      try (SegmentMetadataImpl mapped = SegmentMetadataImpl.loadMapped(staging)) {
+        assertEquals(stagedEager.getColumnMetadataFor(parsedKey[0]).getIndexSizeFor(
+            IndexService.getInstance().get(parsedKey[1])), ColumnMetadata.UNAVAILABLE);
+        assertEquals(mapped.getColumnMetadataFor(parsedKey[0]).getIndexSizeFor(
+            IndexService.getInstance().get(parsedKey[1])),
+            ColumnMetadata.UNAVAILABLE);
+      }
+    } finally {
+      FileUtils.deleteQuietly(staging);
+    }
+    assertEquals(PinotDataBuffer.getMmapBufferCount(), mappings);
+  }
+
+  @Test
+  public void testMappedMetadataRebuildsChecksumValidInvalidFieldSpec()
+      throws Exception {
+    new SegmentV1V2ToV3FormatConverter().convert(_segmentDirectory);
+    File sidecar = new File(_segmentDirectory, "segment_metadata.bin");
+    try (SegmentMetadataImpl ignored = SegmentMetadataImpl.loadMapped(_segmentDirectory)) {
+      assertTrue(ignored.isMapped());
+    }
+    byte[] bytes = Files.readAllBytes(sidecar.toPath());
+    ByteBuffer header = ByteBuffer.wrap(bytes).order(ByteOrder.BIG_ENDIAN);
+    int fieldSpecOffset = header.getInt(header.getInt(56) + 8);
+    assertEquals(bytes[fieldSpecOffset], (byte) '{');
+    bytes[fieldSpecOffset] = '!';
+    header.putInt(40, sidecarCrc(bytes));
+    Files.write(sidecar.toPath(), bytes);
+
+    try (SegmentMetadataImpl mapped = SegmentMetadataImpl.loadMapped(_segmentDirectory)) {
+      assertTrue(mapped.isMapped());
+    }
+    assertEquals(Files.readAllBytes(sidecar.toPath())[fieldSpecOffset], (byte) '{');
+  }
+
+  @Test
+  public void testMappedLegacyTimeFieldSpecAndVersionRebuild()
+      throws Exception {
+    File segmentDir = Files.createTempDirectory("mapped-legacy-time").toFile();
+    try {
+      Files.writeString(new File(segmentDir, "metadata.properties").toPath(),
+          "segment.name = legacyTime\n"
+              + "segment.table.name = testTable\n"
+              + "segment.total.docs = 0\n"
+              + "segment.version = v1\n"
+              + "segment.time.column.name = timestamp\n"
+              + "segment.time.unit = MILLISECONDS\n"
+              + "segment.complex.column.names = parent\n"
+              + "column.timestamp.columnType = TIME\n"
+              + "column.timestamp.dataType = LONG\n"
+              + "column.parent.columnType = COMPLEX\n"
+              + "column.parent.dataType = OPEN_STRUCT\n"
+              + "column.parent.complexChildFieldNames = ts\n"
+              + "column.parent$$ts.columnType = TIME\n"
+              + "column.parent$$ts.dataType = LONG\n");
+      SegmentMetadataImpl eager = new SegmentMetadataImpl(segmentDir);
+      ComplexFieldSpec parent = (ComplexFieldSpec) eager.getColumnMetadataFor("parent").getFieldSpec();
+      assertEquals(parent.getChildFieldSpec("ts").getFieldType(), FieldSpec.FieldType.TIME);
+      File sidecar = new File(segmentDir, "segment_metadata.bin");
+      for (int i = 0; i < 2; i++) {
+        try (SegmentMetadataImpl mapped = SegmentMetadataImpl.loadMapped(segmentDir)) {
+          assertEquals(mapped.getColumnMetadataFor("timestamp").getFieldSpec().getFieldType(),
+              FieldSpec.FieldType.TIME);
+          assertEquals(mapped.getSchema(), eager.getSchema());
+        }
+      }
+      // A v4 sidecar must rebuild with the current FieldSpec JSON encoding and index registry fingerprint.
+      byte[] version4 = Files.readAllBytes(sidecar.toPath());
+      ByteBuffer version4Header = ByteBuffer.wrap(version4).order(ByteOrder.BIG_ENDIAN);
+      version4Header.putInt(4, 4);
+      version4Header.putInt(40, sidecarCrc(version4));
+      Files.write(sidecar.toPath(), version4);
+      try (SegmentMetadataImpl mapped = SegmentMetadataImpl.loadMapped(segmentDir)) {
+        assertEquals(mapped.getSchema(), eager.getSchema());
+      }
+      assertEquals(ByteBuffer.wrap(Files.readAllBytes(sidecar.toPath())).order(ByteOrder.BIG_ENDIAN).getInt(4), 5);
+    } finally {
+      FileUtils.deleteQuietly(segmentDir);
+    }
+  }
+
+  @Test
+  public void testMappedDecimalDefaultNullValuesPreservePrecision()
+      throws Exception {
+    File segmentDir = Files.createTempDirectory("mapped-decimal-defaults").toFile();
+    try {
+      Files.writeString(new File(segmentDir, "metadata.properties").toPath(),
+          "segment.name = decimalDefaults\n"
+              + "segment.table.name = testTable\n"
+              + "segment.total.docs = 0\n"
+              + "segment.version = v1\n"
+              + "segment.dimension.column.names = scaled, precise\n"
+              + "column.scaled.columnType = DIMENSION\n"
+              + "column.scaled.dataType = BIG_DECIMAL\n"
+              + "column.scaled.defaultNullValue = 1.10\n"
+              + "column.precise.columnType = DIMENSION\n"
+              + "column.precise.dataType = BIG_DECIMAL\n"
+              + "column.precise.defaultNullValue = 12345678901234567890.123456789\n");
+      SegmentMetadataImpl eager = new SegmentMetadataImpl(segmentDir);
+      try (SegmentMetadataImpl mapped = SegmentMetadataImpl.loadMapped(segmentDir)) {
+        for (String column : List.of("scaled", "precise")) {
+          FieldSpec expected = eager.getColumnMetadataFor(column).getFieldSpec();
+          FieldSpec actual = mapped.getColumnMetadataFor(column).getFieldSpec();
+          assertEquals(actual, expected);
+          assertEquals(actual.getDefaultNullValueString(), expected.getDefaultNullValueString());
+        }
+        assertEquals(mapped.getColumnMetadataFor("scaled").getFieldSpec().getDefaultNullValueString(), "1.10");
+        assertEquals(mapped.getColumnMetadataFor("precise").getFieldSpec().getDefaultNullValueString(),
+            "12345678901234567890.123456789");
+      }
+    } finally {
+      FileUtils.deleteQuietly(segmentDir);
+    }
+  }
+
+  private static int sidecarCrc(byte[] bytes) {
+    byte[] withZeroedSlot = Arrays.copyOf(bytes, bytes.length);
+    ByteBuffer.wrap(withZeroedSlot).order(ByteOrder.BIG_ENDIAN).putInt(40, 0);
+    CRC32C crc = new CRC32C();
+    crc.update(withZeroedSlot, 0, withZeroedSlot.length);
+    return (int) crc.getValue();
   }
 
   /// A server holds one column-metadata graph per loaded segment, so the per-column strings and default null values
@@ -291,6 +604,19 @@ public class SegmentMetadataImplTest {
       String child = OpenStructNaming.materializedColumnName(parent, "cpu");
       assertSame(second.getColumnMetadataFor(child).getFieldSpec(), first.getColumnMetadataFor(child).getFieldSpec());
       assertSame(second.getColumnMetadataFor("dim").getFieldSpec(), first.getColumnMetadataFor("dim").getFieldSpec());
+      try (SegmentMetadataImpl mapped = SegmentMetadataImpl.loadMapped(segmentDir)) {
+        assertEquals(mapped.toJson(null), first.toJson(null));
+        ColumnMetadata eagerParent = first.getColumnMetadataFor(parent);
+        ColumnMetadata mappedParent = mapped.getColumnMetadataFor(parent);
+        assertEquals(mappedParent.getFieldSpec(), eagerParent.getFieldSpec());
+        assertEquals(mappedParent.getSparseKeys(), eagerParent.getSparseKeys());
+        assertEquals(mappedParent.getSparseMultiValueKeys(), eagerParent.getSparseMultiValueKeys());
+        assertEquals(mappedParent.getSparseKeyTypes(), eagerParent.getSparseKeyTypes());
+        ColumnMetadata mappedChild = mapped.getColumnMetadataFor(child);
+        assertEquals(mappedChild.getFieldSpec(), first.getColumnMetadataFor(child).getFieldSpec());
+        assertEquals(mappedChild.isMaterializedChild(), first.getColumnMetadataFor(child).isMaterializedChild());
+        assertEquals(mappedChild.getParentColumn(), first.getColumnMetadataFor(child).getParentColumn());
+      }
     } finally {
       FileUtils.deleteQuietly(segmentDir);
     }

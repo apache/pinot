@@ -999,8 +999,9 @@ public class LoaderTest {
   private void verifyIndexDirIsV3(File indexDir) {
     File[] files = indexDir.listFiles();
     assertNotNull(files);
-    assertEquals(files.length, 1);
-    assertEquals(files[0].getName(), SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
+    assertTrue(new File(indexDir, SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME).isDirectory());
+    // Serving a sealed segment also writes a versioned metadata sidecar beside the v3 index directory.
+    assertEquals(files.length, new File(indexDir, "segment_metadata.bin").isFile() ? 2 : 1);
   }
 
   @AfterClass

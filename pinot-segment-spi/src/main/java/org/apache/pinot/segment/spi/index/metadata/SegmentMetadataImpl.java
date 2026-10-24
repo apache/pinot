@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
+import java.io.Closeable;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -29,6 +30,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
+import java.util.AbstractSet;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -36,10 +38,14 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableSet;
+import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReferenceArray;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.configuration2.PropertiesConfiguration;
@@ -62,6 +68,7 @@ import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.utils.ColumnNameInterner;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.joda.time.DateTimeZone;
@@ -71,12 +78,22 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class SegmentMetadataImpl implements SegmentMetadata {
+public class SegmentMetadataImpl implements SegmentMetadata, Closeable {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentMetadataImpl.class);
 
   private final File _indexDir;
   private final TreeMap<String, ColumnMetadata> _columnMetadataMap;
   private final Schema _schema;
+  @Nullable
+  private MappedSegmentMetadataStore _mappedStore;
+  @Nullable
+  private AtomicReferenceArray<MappedColumnMetadata> _mappedColumnMetadata;
+  private boolean _mappedStoreClosed;
+  // These overlays are mutated only during segment load, before metadata is published to query threads.
+  private final Map<String, ColumnMetadata> _virtualColumnMetadata = new HashMap<>();
+  private final Set<String> _removedColumns = new HashSet<>();
+  @Nullable
+  private Set<String> _physicalColumnNames;
   private String _segmentName;
   private int _totalDocs;
   private SegmentVersion _segmentVersion;
@@ -139,6 +156,89 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     File creationMetaFile = SegmentDirectoryPaths.findCreationMetaFile(indexDir);
     if (creationMetaFile != null) {
       loadCreationMeta(creationMetaFile);
+    }
+  }
+
+  /// Opens the versioned, file-backed metadata for a sealed segment. A legacy segment is converted locally on first
+  /// open; subsequent opens read the binary file and do not build retained per-column metadata objects.
+  public static SegmentMetadataImpl loadMapped(File indexDir)
+      throws IOException, ConfigurationException {
+    return loadMapped(indexDir, ReadMode.mmap);
+  }
+
+  /// Uses a direct buffer for `heap` mode and a file mapping for `mmap` mode.
+  public static SegmentMetadataImpl loadMapped(File indexDir, ReadMode readMode)
+      throws IOException, ConfigurationException {
+    return new SegmentMetadataImpl(indexDir, true, readMode);
+  }
+
+  /// Identifies the local mapped metadata sidecar and its incomplete temporary files.
+  public static boolean isMappedMetadataSidecarFileName(String fileName) {
+    return MappedSegmentMetadataStore.isSidecarFileName(fileName);
+  }
+
+  /// Mapped constructor for segment-directory implementations that subclass [SegmentMetadataImpl].
+  protected SegmentMetadataImpl(File indexDir, boolean mapped)
+      throws IOException, ConfigurationException {
+    this(indexDir, mapped, ReadMode.mmap);
+  }
+
+  protected SegmentMetadataImpl(File indexDir, boolean mapped, ReadMode readMode)
+      throws IOException, ConfigurationException {
+    if (!mapped) {
+      throw new IllegalArgumentException("Use the regular File constructor for mutable metadata");
+    }
+    _indexDir = indexDir;
+    _columnMetadataMap = null;
+    _schema = null;
+    MappedSegmentMetadataStore store = MappedSegmentMetadataStore.open(indexDir, readMode);
+    try {
+      PropertiesConfiguration segmentConfig = store.segmentConfiguration();
+      initSegmentFields(segmentConfig);
+      setTimeInfo(segmentConfig);
+      File creationMetaFile = SegmentDirectoryPaths.findCreationMetaFile(indexDir);
+      if (creationMetaFile != null) {
+        loadCreationMeta(creationMetaFile);
+      }
+      _mappedStore = store;
+      _mappedColumnMetadata = new AtomicReferenceArray<>(store.size());
+      _physicalColumnNames = new AbstractSet<>() {
+        @Override
+        public int size() {
+          return store.size() - _removedColumns.size();
+        }
+
+        @Override
+        public boolean contains(Object o) {
+          return o instanceof String && store.ordinal((String) o) >= 0 && !_removedColumns.contains(o);
+        }
+
+        @Override
+        public Iterator<String> iterator() {
+          return new Iterator<>() {
+            private int _index;
+
+            @Override
+            public boolean hasNext() {
+              while (_index < store.size() && _removedColumns.contains(store.name(_index))) {
+                _index++;
+              }
+              return _index < store.size();
+            }
+
+            @Override
+            public String next() {
+              if (!hasNext()) {
+                throw new NoSuchElementException();
+              }
+              return store.name(_index++);
+            }
+          };
+        }
+      };
+    } catch (IOException | ConfigurationException | RuntimeException e) {
+      store.close();
+      throw e;
     }
   }
 
@@ -211,16 +311,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   private void init(PropertiesConfiguration segmentMetadata)
       throws ConfigurationException {
-    _segmentName = segmentMetadata.getString(Segment.SEGMENT_NAME);
-    _totalDocs = segmentMetadata.getInt(Segment.SEGMENT_TOTAL_DOCS);
-    _segmentVersion = segmentMetadata.getEnum(Segment.SEGMENT_VERSION, SegmentVersion.class, SegmentVersion.v1);
-    _creatorName = segmentMetadata.getString(Segment.SEGMENT_CREATOR_VERSION, null);
-
-    // Set the table name (for backward compatibility)
-    String tableName = segmentMetadata.getString(Segment.TABLE_NAME);
-    if (tableName != null) {
-      _rawTableName = TableNameBuilder.extractRawTableName(tableName);
-    }
+    initSegmentFields(segmentMetadata);
 
     // NOTE: here we only add physical columns as virtual columns should not be loaded from metadata file
     // NOTE: getList() will always return an non-null List with trimmed strings:
@@ -270,6 +361,19 @@ public class SegmentMetadataImpl implements SegmentMetadata {
         _columnMetadataMap.put(column, columnMetadata);
         _schema.addField(columnMetadata.getFieldSpec());
       }
+    }
+  }
+
+  private void initSegmentFields(PropertiesConfiguration segmentMetadata) {
+    _segmentName = segmentMetadata.getString(Segment.SEGMENT_NAME);
+    _totalDocs = segmentMetadata.getInt(Segment.SEGMENT_TOTAL_DOCS);
+    _segmentVersion = segmentMetadata.getEnum(Segment.SEGMENT_VERSION, SegmentVersion.class, SegmentVersion.v1);
+    _creatorName = segmentMetadata.getString(Segment.SEGMENT_CREATOR_VERSION, null);
+
+    // Set the table name (for backward compatibility)
+    String tableName = segmentMetadata.getString(Segment.TABLE_NAME);
+    if (tableName != null) {
+      _rawTableName = TableNameBuilder.extractRawTableName(tableName);
     }
 
     // Build star-tree v2 metadata
@@ -386,7 +490,19 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   @Override
   public Schema getSchema() {
-    return _schema;
+    if (_mappedStore == null) {
+      return _schema;
+    }
+    // A Schema has several maps and lists per segment. Construct it only for callers that need it, without retaining
+    // another copy of the column directory for the lifetime of a wide segment.
+    Schema schema = new Schema();
+    for (String column : getPhysicalColumnNames()) {
+      schema.addField(_mappedStore.fieldSpec(_mappedStore.ordinal(column)));
+    }
+    for (ColumnMetadata metadata : _virtualColumnMetadata.values()) {
+      schema.addField(metadata.getFieldSpec());
+    }
+    return schema;
   }
 
   @Override
@@ -483,21 +599,106 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   @Override
   public TreeMap<String, ColumnMetadata> getColumnMetadataMap() {
-    return _columnMetadataMap;
+    if (_mappedStore == null) {
+      return _columnMetadataMap;
+    }
+    // Compatibility API for metadata/admin callers. The serving path uses column names and direct lookup instead.
+    TreeMap<String, ColumnMetadata> result = new TreeMap<>();
+    for (String column : getPhysicalColumnNames()) {
+      result.put(column, getColumnMetadataFor(column));
+    }
+    result.putAll(_virtualColumnMetadata);
+    return result;
+  }
+
+  /// Returns the physical column names without materializing a metadata map or Schema on mapped segments.
+  public Set<String> getPhysicalColumnNames() {
+    return _mappedStore != null ? _physicalColumnNames : _schema.getPhysicalColumnNames();
+  }
+
+  @Override
+  public NavigableSet<String> getAllColumns() {
+    if (_mappedStore == null) {
+      return getSchema().getColumnNames();
+    }
+    NavigableSet<String> columns = new TreeSet<>(getPhysicalColumnNames());
+    columns.addAll(_virtualColumnMetadata.keySet());
+    return columns;
+  }
+
+  /// Indicates whether the immutable segment is reading its metadata from the binary mapping.
+  public boolean isMapped() {
+    return _mappedStore != null;
+  }
+
+  @Nullable
+  @Override
+  public ColumnMetadata getColumnMetadataFor(String column) {
+    if (_mappedStore == null) {
+      TreeMap<String, ColumnMetadata> columnMetadataMap = getColumnMetadataMap();
+      return columnMetadataMap != null ? columnMetadataMap.get(column) : null;
+    }
+    ColumnMetadata virtual = _virtualColumnMetadata.get(column);
+    if (virtual != null) {
+      return virtual;
+    }
+    if (_removedColumns.contains(column)) {
+      return null;
+    }
+    int ordinal = _mappedStore.ordinal(column);
+    if (ordinal < 0) {
+      return null;
+    }
+    MappedColumnMetadata metadata = _mappedColumnMetadata.get(ordinal);
+    if (metadata == null) {
+      metadata = new MappedColumnMetadata(_mappedStore, ordinal);
+      if (!_mappedColumnMetadata.compareAndSet(ordinal, null, metadata)) {
+        metadata = _mappedColumnMetadata.get(ordinal);
+      }
+    }
+    return metadata;
+  }
+
+  /// Adds a virtual column generated during serving load without changing the on-disk physical-column directory.
+  public void addVirtualColumnMetadata(String column, ColumnMetadata metadata) {
+    if (_mappedStore == null) {
+      _columnMetadataMap.put(column, metadata);
+    } else {
+      _virtualColumnMetadata.put(column, metadata);
+    }
+  }
+
+  /// Releases the metadata mapping. Managed serving directories close after readers retire; other callers must
+  /// keep the mapping open while it is in use. Synchronization prevents duplicate closes, not concurrent reads.
+  public synchronized void close()
+      throws IOException {
+    if (_mappedStore != null && !_mappedStoreClosed) {
+      _mappedStore.close();
+      _mappedStoreClosed = true;
+    }
   }
 
   @Override
   public void removeColumn(String column) {
     Preconditions.checkState(!column.equals(_timeColumn), "Cannot remove time column: %s", _timeColumn);
-    _columnMetadataMap.remove(column);
-    _schema.removeField(column);
+    if (_mappedStore == null) {
+      _columnMetadataMap.remove(column);
+      _schema.removeField(column);
+    } else {
+      if (_mappedStore.ordinal(column) >= 0) {
+        _removedColumns.add(column);
+      } else {
+        _virtualColumnMetadata.remove(column);
+      }
+    }
   }
 
   @Override
   public JsonNode toJson(@Nullable Set<String> columnFilter) {
     ObjectNode segmentMetadata = JsonUtils.newObjectNode();
     segmentMetadata.put("segmentName", _segmentName);
-    segmentMetadata.put("schemaName", _schema != null ? _schema.getSchemaName() : null);
+    Schema schema = getSchema();
+    segmentMetadata.put("schemaName", schema != null ? schema.getSchemaName() : null);
     segmentMetadata.put("crc", _crc);
     if (_dataCrc != Long.MIN_VALUE) {
       segmentMetadata.put("dataCrc", _dataCrc);
@@ -536,9 +737,10 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     segmentMetadata.put("startOffset", _startOffset);
     segmentMetadata.put("endOffset", _endOffset);
 
-    if (_columnMetadataMap != null) {
+    TreeMap<String, ColumnMetadata> columns = getColumnMetadataMap();
+    if (columns != null) {
       ArrayNode columnsMetadata = JsonUtils.newArrayNode();
-      for (Map.Entry<String, ColumnMetadata> entry : _columnMetadataMap.entrySet()) {
+      for (Map.Entry<String, ColumnMetadata> entry : columns.entrySet()) {
         if (columnFilter == null || columnFilter.contains(entry.getKey())) {
           columnsMetadata.add(JsonUtils.objectToJsonNode(entry.getValue()));
         }
