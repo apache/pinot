@@ -25,6 +25,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -73,11 +74,15 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
+import org.apache.pinot.spi.stream.BytesStreamMessage;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.LongMsgOffsetFactory;
 import org.apache.pinot.spi.stream.MessageBatch;
+import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PermanentConsumerException;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
+import org.apache.pinot.spi.stream.StreamMessage;
+import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -338,6 +343,221 @@ public class RealtimeSegmentDataManagerTest {
       timeSupplier.add(TimeUnit.MINUTES.toMillis(5));
       segmentDataManager.reportDataLoss(healthyBatch);
       verify(tableDataManager, times(3)).addSegmentError(eq(SEGMENT_NAME_STR), any(SegmentErrorInfo.class));
+    }
+  }
+
+  /// An empty batch whose next-batch offset is ahead of the current offset means the stream moved past offsets it
+  /// will never deliver (a Kafka consumer skipping a transaction commit marker, for example). The current offset
+  /// must follow, so an idle consumer parks past the marker instead of on it, and the next fetch asks for the new
+  /// offset. An empty batch that reports the requested offset, no offset, or an offset behind leaves it alone.
+  @Test
+  public void testEmptyBatchAheadOfCurrentOffsetAdvancesCurrentOffset()
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segmentDataManager =
+        createFakeSegmentManager(true, new TimeSupplier(), null, null, null)) {
+      segmentDataManager._stubConsumeLoop = false;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.INITIAL_CONSUMING);
+      // consumeLoop() is called directly, so set the time limit run() would have set
+      segmentDataManager.setConsumeEndTime(System.currentTimeMillis() + TimeUnit.HOURS.toMillis(1));
+      ScriptedPartitionGroupConsumer consumer = new ScriptedPartitionGroupConsumer(segmentDataManager,
+          // The stream skipped START_OFFSET_VALUE and START_OFFSET_VALUE + 1 without delivering anything
+          emptyBatch(START_OFFSET_VALUE + 2),
+          // Nothing moved
+          emptyBatch(START_OFFSET_VALUE + 2),
+          // A stream that does not report where the next batch starts
+          emptyBatch(null),
+          // Behind the current offset: never move backwards
+          emptyBatch(START_OFFSET_VALUE + 1));
+      segmentDataManager.setPartitionGroupConsumer(consumer);
+
+      segmentDataManager.consumeLoop();
+
+      Assert.assertEquals(consumer._requestedOffsets, List.of(START_OFFSET_VALUE, START_OFFSET_VALUE + 2,
+          START_OFFSET_VALUE + 2, START_OFFSET_VALUE + 2));
+      Assert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(),
+          START_OFFSET_VALUE + 2);
+      Assert.assertEquals(segmentDataManager.getSegment().getNumDocsIndexed(), 0);
+    }
+  }
+
+  /// While catching up to a committed end offset, the adopted offset is capped at that end offset: the committer may
+  /// have stopped inside the skipped region, and moving past the end offset would be treated as an error. Being at
+  /// the end offset is the end criteria, so the second scripted batch must never be fetched.
+  @Test
+  public void testEmptyBatchAheadOfFinalOffsetIsCappedWhileCatchingUp()
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segmentDataManager =
+        createFakeSegmentManager(true, new TimeSupplier(), null, null, null)) {
+      segmentDataManager._stubConsumeLoop = false;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.CATCHING_UP);
+      segmentDataManager.setFinalOffset(START_OFFSET_VALUE + 1);
+      ScriptedPartitionGroupConsumer consumer = new ScriptedPartitionGroupConsumer(segmentDataManager,
+          emptyBatch(START_OFFSET_VALUE + 3), emptyBatch(START_OFFSET_VALUE + 3));
+      segmentDataManager.setPartitionGroupConsumer(consumer);
+
+      segmentDataManager.consumeLoop();
+
+      Assert.assertEquals(consumer._requestedOffsets, List.of(START_OFFSET_VALUE),
+          "Caught up to the final offset after the first batch, so no second fetch was issued");
+      Assert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(),
+          START_OFFSET_VALUE + 1);
+    }
+  }
+
+  /// An empty batch that reports data loss moved past rows this replica never saw, so it is not capped at the end
+  /// offset: the overshoot must surface as the usual error (which ends in the committed segment being downloaded)
+  /// rather than settle on the end offset and keep a replica that silently misses those rows.
+  @Test
+  public void testEmptyBatchWithDataLossIsNotCappedWhileCatchingUp()
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segmentDataManager =
+        createFakeSegmentManager(true, new TimeSupplier(), null, null, null)) {
+      segmentDataManager._stubConsumeLoop = false;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.CATCHING_UP);
+      segmentDataManager.setFinalOffset(START_OFFSET_VALUE + 1);
+      ScriptedPartitionGroupConsumer consumer = new ScriptedPartitionGroupConsumer(segmentDataManager,
+          new ScriptedMessageBatch(START_OFFSET_VALUE + 3, true), emptyBatch(START_OFFSET_VALUE + 3));
+      segmentDataManager.setPartitionGroupConsumer(consumer);
+
+      try {
+        segmentDataManager.consumeLoop();
+        Assert.fail("Expected the overshoot past the final offset to be reported");
+      } catch (RuntimeException e) {
+        Assert.assertEquals(e.getMessage(), "Past max offset");
+      }
+      Assert.assertEquals(consumer._requestedOffsets, List.of(START_OFFSET_VALUE));
+      Assert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(),
+          START_OFFSET_VALUE + 3);
+    }
+  }
+
+  /// The committer stopped at an offset the stream skipped (a commit marker it moved past), so no message ends there:
+  /// a replica catching up must stop in front of the message that ends past the end offset and settle on the end
+  /// offset, instead of indexing it and overshooting. The message belongs to the next segment.
+  @Test
+  public void testMessagePastFinalOffsetIsNotIndexedWhileCatchingUp()
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segmentDataManager =
+        createFakeSegmentManager(true, new TimeSupplier(), null, null, null)) {
+      segmentDataManager._stubConsumeLoop = false;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.CATCHING_UP);
+      segmentDataManager.setFinalOffset(START_OFFSET_VALUE + 1);
+      // The marker at START_OFFSET_VALUE was skipped; the message at START_OFFSET_VALUE + 1 ends at + 2, past the end
+      ScriptedPartitionGroupConsumer consumer = new ScriptedPartitionGroupConsumer(segmentDataManager,
+          new ScriptedMessageBatch(START_OFFSET_VALUE + 2, false, START_OFFSET_VALUE + 1),
+          emptyBatch(START_OFFSET_VALUE + 2));
+      segmentDataManager.setPartitionGroupConsumer(consumer);
+
+      segmentDataManager.consumeLoop();
+
+      Assert.assertEquals(consumer._requestedOffsets, List.of(START_OFFSET_VALUE));
+      Assert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(),
+          START_OFFSET_VALUE + 1);
+      Assert.assertEquals(segmentDataManager.getSegment().getNumDocsIndexed(), 0);
+    }
+  }
+
+  /// When the batch reports data loss, the message that ends past the end offset is indexed as before, so the
+  /// overshoot surfaces as the usual error instead of settling on an end offset this replica cannot vouch for.
+  @Test
+  public void testMessagePastFinalOffsetWithDataLossOvershootsWhileCatchingUp()
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segmentDataManager =
+        createFakeSegmentManager(true, new TimeSupplier(), null, null, null)) {
+      segmentDataManager._stubConsumeLoop = false;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.CATCHING_UP);
+      segmentDataManager.setFinalOffset(START_OFFSET_VALUE + 1);
+      ScriptedPartitionGroupConsumer consumer = new ScriptedPartitionGroupConsumer(segmentDataManager,
+          new ScriptedMessageBatch(START_OFFSET_VALUE + 3, true, START_OFFSET_VALUE + 2),
+          emptyBatch(START_OFFSET_VALUE + 3));
+      segmentDataManager.setPartitionGroupConsumer(consumer);
+
+      try {
+        segmentDataManager.consumeLoop();
+        Assert.fail("Expected the overshoot past the final offset to be reported");
+      } catch (RuntimeException e) {
+        Assert.assertEquals(e.getMessage(), "Past max offset");
+      }
+      Assert.assertEquals(consumer._requestedOffsets, List.of(START_OFFSET_VALUE));
+      Assert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(),
+          START_OFFSET_VALUE + 3);
+    }
+  }
+
+  /// An empty batch; `nextBatchOffset` is what [MessageBatch#getOffsetOfNextBatch] reports, `null` for a stream that
+  /// does not report one.
+  private static MessageBatch<byte[]> emptyBatch(@Nullable Long nextBatchOffset) {
+    return new ScriptedMessageBatch(nextBatchOffset, false);
+  }
+
+  /// A batch of empty messages at the given offsets (each ending at the following offset), reporting the given
+  /// next-batch offset (`null` for a stream that does not report one) and data-loss flag. The messages are never
+  /// decoded by the tests using this batch, which stop in front of them.
+  private static class ScriptedMessageBatch implements MessageBatch<byte[]> {
+    private final Long _nextBatchOffset;
+    private final boolean _hasDataLoss;
+    private final long[] _messageOffsets;
+
+    ScriptedMessageBatch(@Nullable Long nextBatchOffset, boolean hasDataLoss, long... messageOffsets) {
+      _nextBatchOffset = nextBatchOffset;
+      _hasDataLoss = hasDataLoss;
+      _messageOffsets = messageOffsets;
+    }
+
+    @Override
+    public int getMessageCount() {
+      return _messageOffsets.length;
+    }
+
+    @Override
+    public StreamMessage<byte[]> getStreamMessage(int index) {
+      long offset = _messageOffsets[index];
+      return new BytesStreamMessage(new byte[0], new StreamMessageMetadata.Builder()
+          .setOffset(new LongMsgOffset(offset), new LongMsgOffset(offset + 1)).build());
+    }
+
+    @Override
+    public StreamPartitionMsgOffset getOffsetOfNextBatch() {
+      return _nextBatchOffset != null ? new LongMsgOffset(_nextBatchOffset) : null;
+    }
+
+    @Override
+    public boolean hasDataLoss() {
+      return _hasDataLoss;
+    }
+
+    @Override
+    public long getSizeInBytes() {
+      return 0;
+    }
+  }
+
+  /// Hands out the given batches in order, recording the offset requested for each, and stops the data manager once
+  /// the last one has been handed out so consumeLoop() returns.
+  private static class ScriptedPartitionGroupConsumer implements PartitionGroupConsumer {
+    final List<Long> _requestedOffsets = new ArrayList<>();
+    private final FakeRealtimeSegmentDataManager _segmentDataManager;
+    private final LinkedList<MessageBatch<byte[]>> _batches;
+
+    @SafeVarargs
+    ScriptedPartitionGroupConsumer(FakeRealtimeSegmentDataManager segmentDataManager,
+        MessageBatch<byte[]>... batches) {
+      _segmentDataManager = segmentDataManager;
+      _batches = new LinkedList<>(List.of(batches));
+    }
+
+    @Override
+    public MessageBatch<byte[]> fetchMessages(StreamPartitionMsgOffset startOffset, int timeoutMs) {
+      _requestedOffsets.add(((LongMsgOffset) startOffset).getOffset());
+      MessageBatch<byte[]> batch = _batches.remove();
+      if (_batches.isEmpty()) {
+        _segmentDataManager.stop();
+      }
+      return batch;
+    }
+
+    @Override
+    public void close() {
     }
   }
 
@@ -1851,6 +2071,14 @@ public class RealtimeSegmentDataManagerTest {
       Field realtimeSegmentField = RealtimeSegmentDataManager.class.getDeclaredField("_realtimeSegment");
       realtimeSegmentField.setAccessible(true);
       realtimeSegmentField.set(this, realtimeSegment);
+    }
+
+    /// Replaces the stream consumer so tests can script the batches consumeLoop() sees.
+    public void setPartitionGroupConsumer(PartitionGroupConsumer partitionGroupConsumer)
+        throws Exception {
+      Field partitionGroupConsumerField = RealtimeSegmentDataManager.class.getDeclaredField("_partitionGroupConsumer");
+      partitionGroupConsumerField.setAccessible(true);
+      partitionGroupConsumerField.set(this, partitionGroupConsumer);
     }
 
     /// Replaces the upsert metadata manager, which the constructor always leaves null.
