@@ -489,6 +489,8 @@ public class ServerChannelsTest {
       verify(mockChannel, never()).close();
       verify(asyncQueryResponse, never()).markRequestSent(any(), anyInt());
       verify(asyncQueryResponse, never()).markServerUnavailable(any(), any(), any(Exception.class), anyBoolean());
+      // The channel is now suspect: the next query replaces it rather than trusting a socket that stopped draining
+      assertTrue(serverChannel._suspect);
     } finally {
       serverChannels.shutDown();
     }
@@ -852,9 +854,20 @@ public class ServerChannelsTest {
       assertTrue(e.getMessage().contains("not writable"), e.getMessage());
       assertEquals(meterCount(BrokerMeter.NETTY_CONNECTION_UNWRITABLE_REJECTIONS), rejectionsBefore + 1);
       verify(rejectedResponse, never()).markRequestSent(any(), anyInt());
-      // Rejecting does not close the channel; the write timeout handler owns that decision
+      // Rejecting does not close the channel on the spot, but marks it suspect ...
       assertTrue(channel.isActive());
       assertSame(serverChannel._channel, channel);
+      assertTrue(serverChannel._suspect);
+
+      // ... so the next request goes out on a fresh connection, and the stalled one is closed along with the request
+      // buffers queued in it
+      AsyncQueryResponse nextResponse = mock(AsyncQueryResponse.class);
+      serverChannels.sendRequest("testTable", nextResponse, instance, smallInstanceRequest(), 10_000L);
+      assertNotSame(serverChannel._channel, channel);
+      assertTrue(serverChannel._channel.isActive());
+      assertFalse(serverChannel._suspect);
+      TestUtils.waitForCondition(aVoid -> !channel.isActive(), 10L, 5_000L, "Stalled channel was not closed");
+      verify(nextResponse, timeout(5_000L)).markRequestSent(eq(instance), anyInt());
     } finally {
       serverChannels.shutDown();
     }
@@ -981,6 +994,223 @@ public class ServerChannelsTest {
       assertFalse(serverChannels.isTcpUserTimeoutApplied());
       assertFalse(serverChannels.getOrCreateServerChannel(new ServerRoutingInstance("localhost", 12345,
           TableType.OFFLINE))._bootstrap.config().options().containsKey(EpollChannelOption.TCP_USER_TIMEOUT));
+    } finally {
+      serverChannels.shutDown();
+    }
+  }
+
+  /// A channel the server stopped answering on is replaced by the next query to it, so recovery does not wait for
+  /// a failure detector, and the queries still in flight on it fail without blaming the server.
+  @Test
+  public void testNextRequestReplacesSuspectChannel()
+      throws Exception {
+    ServerChannels serverChannels =
+        new ServerChannels(mock(QueryRouter.class), null, null, ThreadAccountantUtils.getNoOpAccountant());
+    try (StalledServer server = new StalledServer()) {
+      ServerRoutingInstance instance = new ServerRoutingInstance("localhost", server.getPort(), TableType.OFFLINE);
+      AsyncQueryResponse firstResponse = mock(AsyncQueryResponse.class);
+      Channel suspectChannel =
+          serverChannels.sendRequest("testTable", firstResponse, instance, smallInstanceRequest(), 10_000L);
+      assertNotNull(suspectChannel);
+      ServerChannels.ServerChannel entry = serverChannels.getOrCreateServerChannel(instance);
+      assertSame(entry._channel, suspectChannel);
+
+      serverChannels.markSuspect(instance);
+      AsyncQueryResponse nextResponse = mock(AsyncQueryResponse.class);
+      Channel freshChannel =
+          serverChannels.sendRequest("testTable", nextResponse, instance, smallInstanceRequest(), 10_000L);
+      assertNotSame(freshChannel, suspectChannel);
+      assertSame(entry._channel, freshChannel);
+      assertTrue(freshChannel.isActive());
+      TestUtils.waitForCondition(aVoid -> !suspectChannel.isActive(), 10L, 5_000L, "Suspect channel was not closed");
+      verify(nextResponse, timeout(5_000L)).markRequestSent(eq(instance), anyInt());
+    } finally {
+      serverChannels.shutDown();
+    }
+  }
+
+  /// Unanswered queries are judged a grace period after their timeout: a response in between clears them, a server
+  /// that stays silent for the threshold gets the channel marked suspect and is reported through the router.
+  @Test
+  public void testUnansweredQueriesAreJudgedAfterTheGracePeriod()
+      throws Exception {
+    QueryRouter queryRouter = mock(QueryRouter.class);
+    long graceMs = 200L;
+    ServerChannels serverChannels =
+        new ServerChannels(queryRouter, null, null, ThreadAccountantUtils.getNoOpAccountant(), 2, graceMs);
+    try (StalledServer server = new StalledServer()) {
+      ServerRoutingInstance instance = new ServerRoutingInstance("localhost", server.getPort(), TableType.REALTIME);
+      // Unknown channel: nothing to judge
+      serverChannels.recordUnansweredQuery(instance, System.currentTimeMillis(), null);
+      serverChannels.sendRequest("testTable", mock(AsyncQueryResponse.class), instance, smallInstanceRequest(),
+          10_000L);
+      ServerChannels.ServerChannel entry = serverChannels.getOrCreateServerChannel(instance);
+      Thread.sleep(5L);
+
+      // A query written after the last response, still unanswered a grace period after its timeout: counts
+      serverChannels.recordUnansweredQuery(instance, System.currentTimeMillis(), null);
+      assertEquals(serverChannels.getUnansweredQueries(instance), 0, "Not judged before the grace period");
+      TestUtils.waitForCondition(aVoid -> serverChannels.getUnansweredQueries(instance) == 1, 10L, 5_000L,
+          "The unanswered query was not counted after the grace period");
+      assertFalse(entry._suspect);
+      verify(queryRouter, never()).reportUnansweredServer(any());
+
+      // A response from the server, even to some other query, clears the count ...
+      serverChannels.recordResponse(instance);
+      assertEquals(serverChannels.getUnansweredQueries(instance), 0);
+      // ... and a query the server answered within the grace period does not count
+      long submitTimeMs = System.currentTimeMillis();
+      Thread.sleep(5L);
+      serverChannels.recordResponse(instance);
+      serverChannels.recordUnansweredQuery(instance, submitTimeMs, null);
+      Thread.sleep(graceMs + 200L);
+      assertEquals(serverChannels.getUnansweredQueries(instance), 0);
+
+      // Silence for the threshold marks the channel suspect and reports the server
+      Thread.sleep(5L);
+      serverChannels.recordUnansweredQuery(instance, System.currentTimeMillis(), null);
+      serverChannels.recordUnansweredQuery(instance, System.currentTimeMillis(), null);
+      verify(queryRouter, timeout(5_000L)).reportUnansweredServer(instance);
+      assertTrue(entry._suspect);
+      assertEquals(serverChannels.getUnansweredQueries(instance), 0, "Reset once reported");
+    } finally {
+      serverChannels.shutDown();
+    }
+  }
+
+  /// Under a dead server at high QPS the judgments queued per channel are capped; the ones that do queue are enough
+  /// to cross the threshold, so the outcome is the same with a bounded queue.
+  @Test
+  public void testPendingJudgmentsPerChannelAreCapped()
+      throws Exception {
+    QueryRouter queryRouter = mock(QueryRouter.class);
+    int threshold = 3;
+    ServerChannels serverChannels =
+        new ServerChannels(queryRouter, null, null, ThreadAccountantUtils.getNoOpAccountant(), threshold, 300L);
+    try (StalledServer server = new StalledServer()) {
+      ServerRoutingInstance instance = new ServerRoutingInstance("localhost", server.getPort(), TableType.REALTIME);
+      serverChannels.sendRequest("testTable", mock(AsyncQueryResponse.class), instance, smallInstanceRequest(),
+          10_000L);
+      Thread.sleep(5L);
+      long submitTimeMs = System.currentTimeMillis();
+      for (int i = 0; i < 1_000; i++) {
+        serverChannels.recordUnansweredQuery(instance, submitTimeMs, null);
+      }
+      int numPendingJudgments = serverChannels.getNumPendingJudgments(instance);
+      assertTrue(numPendingJudgments >= threshold && numPendingJudgments <= 16,
+          "Expected between the threshold and the cap of pending judgments, got " + numPendingJudgments);
+      verify(queryRouter, timeout(5_000L)).reportUnansweredServer(instance);
+      TestUtils.waitForCondition(aVoid -> serverChannels.getNumPendingJudgments(instance) == 0, 10L, 5_000L,
+          "Pending judgments were not drained");
+    } finally {
+      serverChannels.shutDown();
+    }
+  }
+
+  /// With the check disabled nothing is scheduled or counted.
+  @Test
+  public void testUnansweredQueryCheckDisabled()
+      throws Exception {
+    QueryRouter queryRouter = mock(QueryRouter.class);
+    ServerChannels serverChannels =
+        new ServerChannels(queryRouter, null, null, ThreadAccountantUtils.getNoOpAccountant(), 0, 10L);
+    try (StalledServer server = new StalledServer()) {
+      ServerRoutingInstance instance = new ServerRoutingInstance("localhost", server.getPort(), TableType.REALTIME);
+      serverChannels.sendRequest("testTable", mock(AsyncQueryResponse.class), instance, smallInstanceRequest(),
+          10_000L);
+      Thread.sleep(5L);
+      serverChannels.recordUnansweredQuery(instance, System.currentTimeMillis(), null);
+      Thread.sleep(200L);
+      assertEquals(serverChannels.getUnansweredQueries(instance), 0);
+      assertFalse(serverChannels.getOrCreateServerChannel(instance)._suspect);
+      verify(queryRouter, never()).reportUnansweredServer(any());
+    } finally {
+      serverChannels.shutDown();
+    }
+  }
+
+  /// The failure detector's probe must not vouch for a channel the server stopped answering on just because the
+  /// socket still reports active: a suspect channel is replaced, a healthy one kept, a closed one reconnected, and
+  /// an unreachable server fails the probe.
+  @Test
+  public void testProbeReplacesSuspectChannelAndKeepsHealthyOne()
+      throws Exception {
+    ServerChannels serverChannels =
+        new ServerChannels(mock(QueryRouter.class), null, null, ThreadAccountantUtils.getNoOpAccountant());
+    StalledServer server = new StalledServer();
+    try {
+      ServerRoutingInstance instance = new ServerRoutingInstance("localhost", server.getPort(), TableType.REALTIME);
+      // Nothing to vouch for before a query was sent, even once pre-connect opened a channel
+      assertFalse(serverChannels.probe(instance));
+      serverChannels.preConnect(instance, 5_000L);
+      assertFalse(serverChannels.probe(instance), "Pre-connected only: not query-carrying");
+
+      serverChannels.sendRequest("testTable", mock(AsyncQueryResponse.class), instance, smallInstanceRequest(),
+          10_000L);
+      ServerChannels.ServerChannel entry = serverChannels.getOrCreateServerChannel(instance);
+      Channel healthyChannel = entry._channel;
+      assertTrue(serverChannels.probe(instance));
+      assertSame(entry._channel, healthyChannel, "A healthy channel is kept");
+      assertTrue(healthyChannel.isActive());
+
+      serverChannels.markSuspect(instance);
+      assertTrue(serverChannels.probe(instance));
+      Channel freshChannel = entry._channel;
+      assertNotSame(freshChannel, healthyChannel, "A suspect channel is replaced");
+      assertTrue(freshChannel.isActive());
+      TestUtils.waitForCondition(aVoid -> !healthyChannel.isActive(), 10L, 5_000L, "Suspect channel was not closed");
+      // No longer suspect: the replacement is kept by the next probe
+      assertTrue(serverChannels.probe(instance));
+      assertSame(entry._channel, freshChannel);
+
+      // A closed channel is reconnected, as the probe always did
+      freshChannel.close().sync();
+      assertTrue(serverChannels.probe(instance));
+      assertNotSame(entry._channel, freshChannel);
+      assertTrue(entry._channel.isActive());
+
+      // An unreachable server fails the probe and leaves no channel behind
+      serverChannels.markSuspect(instance);
+      server.close();
+      assertThrows(Exception.class, () -> serverChannels.probe(instance));
+      assertNull(entry._channel);
+    } finally {
+      server.close();
+      serverChannels.shutDown();
+    }
+  }
+
+  /// A query written to a channel the entry has since replaced says nothing about the new channel: its judgment does
+  /// not count, even when it runs after the replacement, and so cannot mark the fresh channel suspect.
+  @Test
+  public void testJudgmentOfAQueryOnAReplacedChannelDoesNotCount()
+      throws Exception {
+    QueryRouter queryRouter = mock(QueryRouter.class);
+    ServerChannels serverChannels =
+        new ServerChannels(queryRouter, null, null, ThreadAccountantUtils.getNoOpAccountant(), 1, 100L);
+    try (StalledServer server = new StalledServer()) {
+      ServerRoutingInstance instance = new ServerRoutingInstance("localhost", server.getPort(), TableType.REALTIME);
+      Channel oldChannel = serverChannels.sendRequest("testTable", mock(AsyncQueryResponse.class), instance,
+          smallInstanceRequest(), 10_000L);
+      long oldSubmitTimeMs = System.currentTimeMillis();
+      serverChannels.markSuspect(instance);
+      Channel freshChannel = serverChannels.sendRequest("testTable", mock(AsyncQueryResponse.class), instance,
+          smallInstanceRequest(), 10_000L);
+      assertNotSame(freshChannel, oldChannel);
+
+      // With a threshold of 1 a counted judgment would mark the fresh channel suspect at once
+      serverChannels.recordUnansweredQuery(instance, oldSubmitTimeMs, oldChannel);
+      TestUtils.waitForCondition(aVoid -> serverChannels.getNumPendingJudgments(instance) == 0, 10L, 5_000L,
+          "The judgment did not run");
+      assertEquals(serverChannels.getUnansweredQueries(instance), 0);
+      assertFalse(serverChannels.getOrCreateServerChannel(instance)._suspect);
+      verify(queryRouter, never()).reportUnansweredServer(any());
+
+      // A query on the current channel does count
+      Thread.sleep(5L);
+      serverChannels.recordUnansweredQuery(instance, System.currentTimeMillis(), freshChannel);
+      verify(queryRouter, timeout(5_000L)).reportUnansweredServer(instance);
+      assertTrue(serverChannels.getOrCreateServerChannel(instance)._suspect);
     } finally {
       serverChannels.shutDown();
     }

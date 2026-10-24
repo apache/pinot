@@ -19,6 +19,7 @@
 package org.apache.pinot.core.transport;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.buffer.PooledByteBufAllocatorMetric;
@@ -42,8 +43,12 @@ import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.util.concurrent.Future;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -56,6 +61,7 @@ import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.core.util.OsCheck;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
+import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TCompactProtocol;
 import org.apache.thrift.transport.TTransportException;
@@ -76,7 +82,10 @@ import org.slf4j.LoggerFactory;
 ///   - a channel whose outbound queue is above [NettyConfig#WRITE_BUFFER_HIGH_WATER_MARK_BYTES] rejects requests
 ///     instead of queueing them in direct memory ([#sendRequest]);
 ///   - the routing manager evicts the cached channels of a server when it enables it, as after a restart, or sees it
-///     removed from the cluster ([#evictChannel]).
+///     removed from the cluster ([#evictChannel]);
+///   - a channel on which the server left [Broker.FailureDetector#CONFIG_OF_UNANSWERED_QUERIES_THRESHOLD] consecutive
+///     queries unanswered, each judged a grace period after its timeout, is marked suspect: the next query to it, or
+///     the failure detector's retry probe, replaces it with a fresh connection ([#recordUnansweredQuery]).
 @ThreadSafe
 public class ServerChannels {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerChannels.class);
@@ -104,6 +113,16 @@ public class ServerChannels {
   private final long _writeTimeoutMs;
   private final int _tcpUserTimeoutMs;
   private final WriteBufferWaterMark _writeBufferWaterMark;
+  private final int _unansweredQueriesThreshold;
+  private final long _unansweredQueryGraceMs;
+  // Bound on the judgments queued per channel at a time. Under a dead server at high QPS every timed-out query would
+  // otherwise queue a task for the whole grace period; the first few judgments already cross the threshold, so the
+  // rest add nothing but queue depth.
+  private final int _maxPendingJudgmentsPerChannel;
+  // Judges unanswered queries once their grace period is over, and reports the server from there; null when the
+  // check is disabled. Its own thread, because reporting ends in a routing update that must not run on an event loop.
+  @Nullable
+  private final ScheduledExecutorService _livenessExecutor;
 
   private final BrokerMetrics _brokerMetrics = BrokerMetrics.get();
   private final ConcurrentHashMap<ServerRoutingInstance, ServerChannel> _serverToChannelMap = new ConcurrentHashMap<>();
@@ -114,6 +133,16 @@ public class ServerChannels {
   /// @param tlsConfig TLS/SSL config
   public ServerChannels(QueryRouter queryRouter, @Nullable NettyConfig nettyConfig, @Nullable TlsConfig tlsConfig,
       ThreadAccountant threadAccountant) {
+    this(queryRouter, nettyConfig, tlsConfig, threadAccountant,
+        Broker.FailureDetector.DEFAULT_UNANSWERED_QUERIES_THRESHOLD,
+        Broker.FailureDetector.DEFAULT_UNANSWERED_QUERY_GRACE_MS);
+  }
+
+  /// @param unansweredQueriesThreshold see [Broker.FailureDetector#CONFIG_OF_UNANSWERED_QUERIES_THRESHOLD];
+  ///                                   non-positive disables the check
+  /// @param unansweredQueryGraceMs see [Broker.FailureDetector#CONFIG_OF_UNANSWERED_QUERY_GRACE_MS]
+  public ServerChannels(QueryRouter queryRouter, @Nullable NettyConfig nettyConfig, @Nullable TlsConfig tlsConfig,
+      ThreadAccountant threadAccountant, int unansweredQueriesThreshold, long unansweredQueryGraceMs) {
     if (nettyConfig == null) {
       nettyConfig = new NettyConfig();
     }
@@ -152,9 +181,16 @@ public class ServerChannels {
     _tcpUserTimeoutMs = nettyConfig.getTcpUserTimeoutMs();
     _writeBufferWaterMark = new WriteBufferWaterMark(nettyConfig.getWriteBufferLowWaterMarkBytes(),
         nettyConfig.getWriteBufferHighWaterMarkBytes());
+    _unansweredQueriesThreshold = unansweredQueriesThreshold;
+    _unansweredQueryGraceMs = Math.max(0L, unansweredQueryGraceMs);
+    _maxPendingJudgmentsPerChannel = Math.max(16, 2 * unansweredQueriesThreshold);
+    _livenessExecutor = unansweredQueriesThreshold > 0 ? Executors.newSingleThreadScheduledExecutor(
+        new ThreadFactoryBuilder().setNameFormat("server-channel-liveness-%d").setDaemon(true).build()) : null;
     LOGGER.info("Server channel liveness settings: write timeout: {}ms, TCP user timeout: {}ms ({}), write buffer "
-            + "water mark: {}", _writeTimeoutMs, _tcpUserTimeoutMs,
-        isTcpUserTimeoutApplied() ? "applied" : "not applied, requires the Epoll transport", _writeBufferWaterMark);
+            + "water mark: {}, unanswered queries threshold: {} ({}), unanswered query grace: {}ms", _writeTimeoutMs,
+        _tcpUserTimeoutMs, isTcpUserTimeoutApplied() ? "applied" : "not applied, requires the Epoll transport",
+        _writeBufferWaterMark, unansweredQueriesThreshold, _livenessExecutor != null ? "enabled" : "disabled",
+        _unansweredQueryGraceMs);
 
     _bufAllocatorWithLimits = PooledByteBufAllocatorWithLimits.getSharedBufferAllocatorWithLimits();
     PooledByteBufAllocatorMetric metric = _bufAllocatorWithLimits.metric();
@@ -257,7 +293,90 @@ public class ServerChannels {
     _serverToChannelMap.computeIfAbsent(serverRoutingInstance, ServerChannel::new).preConnect(timeoutMs);
   }
 
+  /// Marks the cached channel to the given routing instance suspect: the server stopped answering queries on it
+  /// while the socket still looked active. The next query to it, or the next [#probe], replaces it with a fresh
+  /// connection instead of trusting `isActive()`.
+  public void markSuspect(ServerRoutingInstance serverRoutingInstance) {
+    ServerChannel serverChannel = _serverToChannelMap.get(serverRoutingInstance);
+    if (serverChannel != null) {
+      serverChannel._suspect = true;
+    }
+  }
+
+  /// The failure detector's retry probe for one channel, when pings are off. Does nothing and returns `false` when
+  /// this broker has not queried the server over this channel (see [#hasChannel]); otherwise reconnects the channel if
+  /// it is down, replaces it with a fresh connection if it was marked suspect, and returns `true`, throwing if the
+  /// connection cannot be established.
+  public boolean probe(ServerRoutingInstance serverRoutingInstance)
+      throws InterruptedException, TimeoutException {
+    ServerChannel serverChannel = _serverToChannelMap.get(serverRoutingInstance);
+    if (serverChannel == null || !serverChannel._openedByQuery) {
+      return false;
+    }
+    serverChannel.connect();
+    return true;
+  }
+
+  /// Records a response from the server on the given channel: it is alive, whatever it answered.
+  public void recordResponse(ServerRoutingInstance serverRoutingInstance) {
+    ServerChannel serverChannel = _serverToChannelMap.get(serverRoutingInstance);
+    if (serverChannel != null) {
+      serverChannel.recordResponse();
+    }
+  }
+
+  /// Records that a query written at `submitTimeMs` to `channel` (when known) timed out unanswered. The verdict waits
+  /// out the grace period: the query only counts if the entry still holds that channel and the server has still sent
+  /// nothing on it since the query was written. That lets the server's own late timeout response through, so a burst
+  /// of slow queries, or a broker pause that delays reading the responses, does not look like a dead channel: only a
+  /// channel the server has gone silent on does. At the threshold the channel is marked suspect and the server is
+  /// reported through [QueryRouter#reportUnansweredServer]. No-op when the check is disabled.
+  public void recordUnansweredQuery(ServerRoutingInstance serverRoutingInstance, long submitTimeMs,
+      @Nullable Channel channel) {
+    if (_livenessExecutor == null) {
+      return;
+    }
+    ServerChannel serverChannel = _serverToChannelMap.get(serverRoutingInstance);
+    if (serverChannel == null) {
+      return;
+    }
+    if (serverChannel._numPendingJudgments.incrementAndGet() > _maxPendingJudgmentsPerChannel) {
+      // Enough judgments queued to cross the threshold already; this query adds nothing
+      serverChannel._numPendingJudgments.decrementAndGet();
+      return;
+    }
+    try {
+      _livenessExecutor.schedule(() -> {
+        try {
+          serverChannel.judgeUnansweredQuery(submitTimeMs, channel);
+        } catch (Exception e) {
+          LOGGER.error("Caught exception while judging an unanswered query to server: {}", serverRoutingInstance, e);
+        } finally {
+          serverChannel._numPendingJudgments.decrementAndGet();
+        }
+      }, _unansweredQueryGraceMs, TimeUnit.MILLISECONDS);
+    } catch (RejectedExecutionException e) {
+      // Shutting down: nothing left to judge
+      serverChannel._numPendingJudgments.decrementAndGet();
+    }
+  }
+
+  @VisibleForTesting
+  int getUnansweredQueries(ServerRoutingInstance serverRoutingInstance) {
+    ServerChannel serverChannel = _serverToChannelMap.get(serverRoutingInstance);
+    return serverChannel != null ? serverChannel.getUnansweredQueries() : 0;
+  }
+
+  @VisibleForTesting
+  int getNumPendingJudgments(ServerRoutingInstance serverRoutingInstance) {
+    ServerChannel serverChannel = _serverToChannelMap.get(serverRoutingInstance);
+    return serverChannel != null ? serverChannel._numPendingJudgments.get() : 0;
+  }
+
   public void shutDown() {
+    if (_livenessExecutor != null) {
+      _livenessExecutor.shutdownNow();
+    }
     // Shut down immediately
     _eventLoopGroup.shutdownGracefully(0, 0, TimeUnit.SECONDS);
   }
@@ -284,6 +403,19 @@ public class ServerChannels {
     // sender that fetched the entry before the eviction neither writes into the evicted channel nor reconnects an
     // entry nobody can reach any more; it retries on a fresh entry instead.
     volatile boolean _evicted;
+    // Set when the server stopped answering queries on this channel while the socket still looked active (see
+    // judgeUnansweredQuery), or when the channel stopped draining (see sendRequestWithoutLocking).
+    // connectWithoutLocking() then replaces the channel rather than trusting it.
+    volatile boolean _suspect;
+    // Liveness bookkeeping, guarded by _livenessLock: when the server last sent anything on this channel (the start of
+    // the current connection for a fresh one) and how many consecutive queries it has left unanswered since. The lock
+    // is taken briefly on the event loop (per response), on the query thread (when a connection is replaced) and on the
+    // liveness thread (judgment), so that a response or a replacement landing while a judgment runs is never lost.
+    private final Object _livenessLock = new Object();
+    private long _lastResponseTimeMs;
+    private int _unansweredQueries;
+    // Judgments queued for this channel, bounded by ServerChannels#_maxPendingJudgmentsPerChannel
+    final AtomicInteger _numPendingJudgments = new AtomicInteger();
 
     ServerChannel(ServerRoutingInstance serverRoutingInstance) {
       _serverRoutingInstance = serverRoutingInstance;
@@ -324,12 +456,18 @@ public class ServerChannels {
     void closeChannel() {
       Channel channel = _channel;
       if (channel != null) {
-        DataTableHandler handler = channel.pipeline().get(DataTableHandler.class);
-        if (handler != null) {
-          handler.markClosedByBroker();
-        }
-        channel.close();
+        closeByBroker(channel);
       }
+    }
+
+    /// Closes a channel the broker decided to drop (eviction, replacement of a suspect channel): the queries still in
+    /// flight on it fail through `channelInactive` as on any closed channel, but the server is not reported for it.
+    private void closeByBroker(Channel channel) {
+      DataTableHandler handler = channel.pipeline().get(DataTableHandler.class);
+      if (handler != null) {
+        handler.markClosedByBroker();
+      }
+      channel.close();
     }
 
     /// See [ServerChannels#evictChannel]. Flags the entry first, then closes whatever channel it holds; no lock is
@@ -337,6 +475,56 @@ public class ServerChannels {
     void evict() {
       _evicted = true;
       closeChannel();
+    }
+
+    void recordResponse() {
+      synchronized (_livenessLock) {
+        _lastResponseTimeMs = System.currentTimeMillis();
+        _unansweredQueries = 0;
+      }
+    }
+
+    int getUnansweredQueries() {
+      synchronized (_livenessLock) {
+        return _unansweredQueries;
+      }
+    }
+
+    /// Starts a clean record for a new connection: not suspect, nothing unanswered, counted as answered from now. Done
+    /// before a replacement connects as well as after, so that a judgment of a query written to the dropped channel
+    /// that runs while the connect is in progress finds nothing to count.
+    private void resetLiveness() {
+      synchronized (_livenessLock) {
+        _suspect = false;
+        _lastResponseTimeMs = System.currentTimeMillis();
+        _unansweredQueries = 0;
+      }
+    }
+
+    /// Runs on the liveness thread a grace period after a query written at `submitTimeMs` to `channel` timed out. See
+    /// [ServerChannels#recordUnansweredQuery].
+    void judgeUnansweredQuery(long submitTimeMs, @Nullable Channel channel) {
+      int unansweredQueries;
+      synchronized (_livenessLock) {
+        // Nothing to add once the channel is already suspect (it is reported once, until replaced) or no longer in use,
+        // for a query written to a channel since replaced or closed (it says nothing about the current one), or if the
+        // server answered something since the query was written. Strictly after: a connect and the first write can
+        // share a millisecond, while a real answer never shares one with its request. Checked and acted on under the
+        // lock, so a response or a replacement that lands meanwhile either makes this judgment bail or resets the
+        // count right after it.
+        if (_evicted || _suspect || (channel != null && channel != _channel) || _lastResponseTimeMs > submitTimeMs) {
+          return;
+        }
+        unansweredQueries = ++_unansweredQueries;
+        if (unansweredQueries < _unansweredQueriesThreshold) {
+          return;
+        }
+        _unansweredQueries = 0;
+        _suspect = true;
+      }
+      LOGGER.warn("Server: {} has left {} consecutive queries unanswered on its channel, each judged {}ms past its "
+          + "timeout; marking the channel suspect", _serverRoutingInstance, unansweredQueries, _unansweredQueryGraceMs);
+      _queryRouter.reportUnansweredServer(_serverRoutingInstance);
     }
 
     @VisibleForTesting
@@ -397,19 +585,33 @@ public class ServerChannels {
     ///
     /// Without the bound, a connect to a host that silently drops packets -- the very host the failure detector pings
     /// -- blocks for Netty's 30 s default, however long the caller can actually wait.
+    ///
+    /// Also replaces a channel marked suspect: the server stopped answering on it while the socket still looked
+    /// active, which is what a half-open socket looks like until the kernel gives up on it, so `isActive()` is not
+    /// trusted. The suspect channel is dropped before the connect, so a failed connect does not leave it in place, and
+    /// whatever is still in flight on it fails without the server being reported (nothing on it was being answered).
     void connectWithoutLocking(long timeoutMs)
         throws InterruptedException, TimeoutException {
-      if (_channel == null || !_channel.isActive()) {
-        long startTime = System.currentTimeMillis();
-        ChannelFuture connectFuture = _bootstrap.connect();
-        if (!connectFuture.await(timeoutMs, TimeUnit.MILLISECONDS)) {
-          connectFuture.channel().close();
-          throw new TimeoutException("Timed out connecting to server: " + _serverRoutingInstance);
-        }
-        // Completed by now: returns the channel, or rethrows the connect failure as sync() always did.
-        _channel = connectFuture.sync().channel();
-        recordConnectTime(System.currentTimeMillis() - startTime);
+      Channel channel = _channel;
+      if (channel != null && channel.isActive() && !_suspect) {
+        return;
       }
+      if (channel != null && _suspect) {
+        LOGGER.info("Replacing suspect channel to server: {} with a fresh connection", _serverRoutingInstance);
+        _channel = null;
+        closeByBroker(channel);
+      }
+      resetLiveness();
+      long startTime = System.currentTimeMillis();
+      ChannelFuture connectFuture = _bootstrap.connect();
+      if (!connectFuture.await(timeoutMs, TimeUnit.MILLISECONDS)) {
+        connectFuture.channel().close();
+        throw new TimeoutException("Timed out connecting to server: " + _serverRoutingInstance);
+      }
+      // Completed by now: returns the channel, or rethrows the connect failure as sync() always did.
+      _channel = connectFuture.sync().channel();
+      resetLiveness();
+      recordConnectTime(System.currentTimeMillis() - startTime);
     }
 
     /// Like [#connectWithoutLocking(long)] but additionally waits out the TLS handshake, and bounds both
@@ -449,6 +651,7 @@ public class ServerChannels {
         throw t;
       }
       _channel = channel;
+      resetLiveness();
       recordConnectTime(System.currentTimeMillis() - startTime);
     }
 
@@ -495,8 +698,9 @@ public class ServerChannels {
       if (!channel.isWritable()) {
         // The outbound queue is above the high watermark, which only happens when the server stopped draining its
         // socket or the path stopped forwarding. Fail the query now rather than queueing yet another request buffer
-        // in direct memory behind a closed send window; the write timeout handler closes the channel if the stall
-        // lasts, and the failure detector takes the server out of routing.
+        // in direct memory behind a closed send window, and mark the channel suspect so that the next query, or the
+        // failure detector's probe, replaces it instead of vouching for a socket that still looks active.
+        _suspect = true;
         _brokerMetrics.addMeteredGlobalValue(BrokerMeter.NETTY_CONNECTION_UNWRITABLE_REJECTIONS, 1);
         throw new IllegalStateException(String.format(
             "Channel to server: %s is not writable (%d more bytes must drain before it is), rejecting the request "
@@ -527,10 +731,12 @@ public class ServerChannels {
     }
 
     /// Opens the TCP connection, as the failure detector's reconnect probe
-    /// (`SingleConnectionBrokerRequestHandler#retryUnhealthyServer`) has always done. Deliberately does
-    /// **not** await the TLS handshake: this runs at steady state under live traffic, and holding
-    /// `_channelLock` across a handshake would make concurrent queries to a recovering server queue
-    /// behind it -- the very serialization startup pre-connect exists to remove.
+    /// (`SingleConnectionBrokerRequestHandler#retryUnhealthyServer`) has always done, replacing the channel when it is
+    /// suspect (see [#connectWithoutLocking(long)]): a probe that only looked at `isActive()` would vouch for a
+    /// half-open channel and put the server straight back into routing on it. Deliberately does **not** await the TLS
+    /// handshake: this runs at steady state under live traffic, and holding `_channelLock` across a handshake would
+    /// make concurrent queries to a recovering server queue behind it -- the very serialization startup pre-connect
+    /// exists to remove.
     void connect()
         throws InterruptedException, TimeoutException {
       if (_channelLock.tryLock(TRY_CONNECT_CHANNEL_LOCK_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {

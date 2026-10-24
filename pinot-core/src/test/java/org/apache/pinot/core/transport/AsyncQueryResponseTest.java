@@ -21,12 +21,18 @@ package org.apache.pinot.core.transport;
 import io.netty.channel.Channel;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
@@ -175,5 +181,44 @@ public class AsyncQueryResponseTest {
     response.markServerUnavailable(SERVER_1, closedChannel, new RuntimeException("inactive"), true);
     assertEquals(response.getStatus(), QueryResponse.Status.FAILED);
     assertEquals(response.getFailedServer(), SERVER_1);
+  }
+
+  /// A timeout hands every server the request reached but that never answered to the transport, with the time the
+  /// request was written, and blames nobody on the spot. Servers the request never reached are not handed over.
+  @Test
+  public void testTimeoutRecordsUnansweredServers()
+      throws Exception {
+    QueryRouter queryRouter = mock(QueryRouter.class);
+    long startTimeMs = System.currentTimeMillis();
+    AsyncQueryResponse response =
+        new AsyncQueryResponse(queryRouter, 1L, Set.of(SERVER_1, SERVER_2), startTimeMs, 50L,
+            mock(ServerRoutingStatsManager.class), false);
+    // SERVER_2 is never marked submitted: its send failed before anything was written
+    response.markRequestSubmitted(SERVER_1);
+
+    response.getFinalResponses();
+
+    assertEquals(response.getStatus(), QueryResponse.Status.TIMED_OUT);
+    assertNull(response.getFailedServer());
+    assertNull(response.getException());
+    verify(queryRouter).recordServerTimeout(eq(SERVER_1), anyLong(), any());
+    verify(queryRouter, never()).recordServerTimeout(eq(SERVER_2), anyLong(), any());
+  }
+
+  @Test
+  public void testAnsweredQueryRecordsNoTimeout()
+      throws Exception {
+    QueryRouter queryRouter = mock(QueryRouter.class);
+    AsyncQueryResponse response =
+        new AsyncQueryResponse(queryRouter, 1L, Set.of(SERVER_1), System.currentTimeMillis(), 10_000L,
+            mock(ServerRoutingStatsManager.class), false);
+    response.markRequestSubmitted(SERVER_1);
+    response.receiveDataTable(SERVER_1, mock(DataTable.class), 10, 1);
+
+    response.getFinalResponses();
+
+    assertEquals(response.getStatus(), QueryResponse.Status.COMPLETED);
+    verify(queryRouter, never()).recordServerTimeout(eq(SERVER_1), anyLong(), any());
+    assertNull(response.getFailedServer());
   }
 }
