@@ -248,8 +248,8 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
     }
   }
 
-  /// Generate the mapping file from mutable Pinot docId (stored within the Lucene index) to immutable Pinot docId using
-  /// the mutableToImmutableDocIdMap from segment conversion
+  /// Build a mapping from final Lucene ids to Pinot ids, applying mutable-to-immutable remapping during conversion.
+  /// New immutable indexes persist either the mapping or a verified Skip setting for older readers.
   /// @param segmentIndexDir segment index directory
   /// @param column column name
   /// @param directory directory of the index
@@ -274,7 +274,7 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
         throw new RuntimeException(
             "Caught exception while building mutable to immutable doc id mapping for text index column: " + column, e);
       }
-      if (_config.getDocIdTranslatorMode() == DocIdTranslatorMode.TryOptimize) {
+      if (!_reuseMutableIndex || _config.getDocIdTranslatorMode() == DocIdTranslatorMode.TryOptimize) {
         if (isIdentityMapping) {
           FileUtils.delete(docIdMappingFile);
         }
@@ -329,15 +329,15 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
 
   private void addDocIdFields(Document document) {
     int docId = _nextDocId++;
-    // Keep the stored field for older readers. Immutable indexes add doc values to avoid decompressing every stored
-    // document on segment load and retain the actual Pinot id when Lucene flushes or merges reorder documents.
-    document.add(new StoredField(PINOT_DOC_ID_STORED_FIELD_NAME, docId));
-    // Combined indexes persist the mapping at build time; Skip mode does not need a mapping.
-    // A TEXT column with this name must keep the stored-field fallback to avoid conflicting Lucene field schemas.
-    if (_commitOnClose && !_config.isStoreInSegmentFile()
-        && _config.getDocIdTranslatorMode() != DocIdTranslatorMode.Skip
-        && !_textColumn.equals(PINOT_DOC_ID_DOC_VALUES_FIELD_NAME)) {
-      document.add(new NumericDocValuesField(PINOT_DOC_ID_DOC_VALUES_FIELD_NAME, docId));
+    if (!_commitOnClose) {
+      // Mutable indexes retain the stored field for existing readers and segment conversion.
+      document.add(new StoredField(PINOT_DOC_ID_STORED_FIELD_NAME, docId));
+    } else if (_config.getDocIdTranslatorMode() != DocIdTranslatorMode.Skip) {
+      // Avoid sharing the numeric field with the TEXT column, including empty multi-value documents.
+      String fieldName = _textColumn.equals(PINOT_DOC_ID_DOC_VALUES_FIELD_NAME)
+          ? PINOT_DOC_ID_STORED_FIELD_NAME
+          : PINOT_DOC_ID_DOC_VALUES_FIELD_NAME;
+      document.add(new NumericDocValuesField(fieldName, docId));
     }
   }
 
@@ -418,17 +418,9 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
     try {
       // based on the commit flag set in IndexWriterConfig, this will decide to commit or not
       _indexWriter.close();
-      // Build docIdMapping file if storeInSegmentFile is true
-      // This allows the mapping file to be available during read without building it on-the-fly
-      if (_config.isStoreInSegmentFile()) {
-        //Check if mapping file already exists
-        File mappingFile = new File(SegmentDirectoryPaths.findSegmentDirectory(_segmentDirectory),
-            _textColumn + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
-        if (!mappingFile.exists()) {
-          LOGGER.info("lucene doc IdMapping file doesn't exists for column: {},  building mapping file", _textColumn);
-          // Build the docId mapping file so it's available during segment load
-          buildMappingFile(_segmentDirectory, _textColumn, _indexDirectory, null);
-        }
+      if (_commitOnClose) {
+        // Older readers require the final mapping or verified Skip setting when the stored DocID is absent.
+        buildMappingFile(_segmentDirectory, _textColumn, _indexDirectory, null);
       }
       _indexDirectory.close();
     } catch (Exception e) {

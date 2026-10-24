@@ -34,6 +34,7 @@ import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.MultiDocValues;
 import org.apache.lucene.index.NumericDocValues;
+import org.apache.lucene.index.Term;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
@@ -53,6 +54,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
@@ -132,7 +134,7 @@ public class LuceneTextIndexCreatorTest {
   }
 
   @Test
-  public void testDocValuesRetainStoredIdsForSingleAndMultiValueDocuments()
+  public void testDocValuesReplaceStoredIdsForSingleAndMultiValueDocuments()
       throws IOException {
     String column = "values";
     TextIndexConfig config = new TextIndexConfigBuilder().build();
@@ -154,10 +156,8 @@ public class LuceneTextIndexCreatorTest {
       assertEquals(reader.maxDoc(), 4);
       for (int i = 0; i < reader.maxDoc(); i++) {
         assertTrue(ids.advanceExact(i));
-        // The retained stored field is precisely what an older Pinot reader consults.
-        assertEquals(ids.longValue(),
-            Long.parseLong(reader.storedFields().document(i)
-                .get(LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME)));
+        assertEquals(ids.longValue(), i);
+        assertNull(reader.storedFields().document(i).get(LuceneTextIndexCreator.PINOT_DOC_ID_STORED_FIELD_NAME));
       }
     }
     try (LuceneTextIndexReader reader = new LuceneTextIndexReader(column, INDEX_DIR, 4, config)) {
@@ -168,42 +168,76 @@ public class LuceneTextIndexCreatorTest {
   }
 
   @DataProvider
-  public Object[][] combinedMappingModes() {
-    return new Object[][]{{null}, {DocIdTranslatorMode.Default}, {DocIdTranslatorMode.TryOptimize},
-        {DocIdTranslatorMode.Skip}};
+  public Object[][] persistedMappingModes() {
+    return new Object[][]{
+        {false, true, null}, {true, true, DocIdTranslatorMode.Default},
+        {false, false, DocIdTranslatorMode.Default}, {true, false, DocIdTranslatorMode.TryOptimize},
+        {false, true, DocIdTranslatorMode.Skip}, {true, true, DocIdTranslatorMode.Skip}
+    };
   }
 
-  @Test(dataProvider = "combinedMappingModes")
-  public void testCombinedIndexMapping(DocIdTranslatorMode translatorMode)
-      throws IOException {
-    String column = "combined";
-    TextIndexConfig config = new TextIndexConfigBuilder().setStoreInSegmentFile(true)
+  @Test(dataProvider = "persistedMappingModes")
+  public void testPersistedIndexMapping(boolean combined, boolean identity, DocIdTranslatorMode translatorMode)
+      throws Exception {
+    String column = "mapping";
+    TextIndexConfig config = new TextIndexConfigBuilder().setStoreInSegmentFile(combined)
         .withDocIdTranslatorMode(translatorMode == null ? null : translatorMode.name()).build();
+    int[] pinotDocIds = identity ? new int[]{0, 1, 2} : new int[]{2, 0, 1};
     try (LuceneTextIndexCreator creator =
-        new LuceneTextIndexCreator(column, INDEX_DIR, true, false, null, false, null, true, config)) {
+        new LuceneTextIndexCreator(column, INDEX_DIR, true, false, null, false, null, combined, config)) {
       creator.add("alpha");
       creator.add("beta");
       creator.add("gamma");
+      if (!identity) {
+        String[] terms = {"alpha", "beta", "gamma"};
+        for (int i = 0; i < terms.length; i++) {
+          creator.getIndexWriter().updateNumericDocValue(new Term(column, terms[i]),
+              LuceneTextIndexCreator.PINOT_DOC_ID_DOC_VALUES_FIELD_NAME, pinotDocIds[i]);
+        }
+      }
       creator.seal();
       try (DirectoryReader reader = DirectoryReader.open(creator.getIndexWriter())) {
-        assertNull(MultiDocValues.getNumericValues(reader, LuceneTextIndexCreator.PINOT_DOC_ID_DOC_VALUES_FIELD_NAME));
+        NumericDocValues ids =
+            MultiDocValues.getNumericValues(reader, LuceneTextIndexCreator.PINOT_DOC_ID_DOC_VALUES_FIELD_NAME);
+        if (translatorMode == DocIdTranslatorMode.Skip) {
+          assertNull(ids);
+        } else {
+          assertNotNull(ids);
+        }
+        for (int i = 0; i < pinotDocIds.length; i++) {
+          assertNull(reader.storedFields().document(i).get(LuceneTextIndexCreator.PINOT_DOC_ID_STORED_FIELD_NAME));
+          if (ids != null) {
+            assertTrue(ids.advanceExact(i));
+            assertEquals(ids.longValue(), pinotDocIds[i]);
+          }
+        }
       }
     }
 
+    File indexDir = new File(INDEX_DIR, column + V1Constants.Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION);
     File combinedFile = new File(INDEX_DIR, column + V1Constants.Indexes.LUCENE_COMBINE_TEXT_INDEX_FILE_EXTENSION);
-    try (PinotDataBuffer buffer = PinotDataBuffer.mapFile(combinedFile, true, 0, combinedFile.length(),
-        ByteOrder.LITTLE_ENDIAN, "combined text index test")) {
-      boolean mappingExpected = translatorMode == null || translatorMode == DocIdTranslatorMode.Default;
-      assertEquals(LuceneTextIndexBufferReader.hasFile(buffer,
-          column + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION), mappingExpected);
-      DocIdTranslatorMode persistedMode =
-          translatorMode == DocIdTranslatorMode.TryOptimize ? DocIdTranslatorMode.Skip : translatorMode;
-      assertEquals(LuceneTextIndexBufferReader.extractProperties(buffer, column)
-              .getProperty(FieldConfig.TEXT_INDEX_LUCENE_DOC_ID_TRANSLATOR_MODE),
-          persistedMode == null ? null : persistedMode.name());
-      try (LuceneTextIndexReader reader = new LuceneTextIndexReader(column, buffer, 3, config)) {
-        assertEquals(reader.getDocIds("alpha", null).toArray(), new int[]{0});
-        assertEquals(reader.getDocIds("gamma", null).toArray(), new int[]{2});
+    String mappingFileName = column + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION;
+    try (PinotDataBuffer buffer = combined
+        ? PinotDataBuffer.mapFile(combinedFile, true, 0, combinedFile.length(), ByteOrder.LITTLE_ENDIAN,
+            "combined text index test")
+        : null) {
+      assertEquals(combined
+          ? LuceneTextIndexBufferReader.hasFile(buffer, mappingFileName)
+          : new File(INDEX_DIR, mappingFileName).exists(), !identity);
+      DocIdTranslatorMode persistedMode = identity ? DocIdTranslatorMode.Skip : DocIdTranslatorMode.Default;
+      if (combined) {
+        assertEquals(LuceneTextIndexBufferReader.extractProperties(buffer, column)
+            .getProperty(FieldConfig.TEXT_INDEX_LUCENE_DOC_ID_TRANSLATOR_MODE), persistedMode.name());
+      } else {
+        assertEquals(TextIndexUtils.getUpdatedConfigFromPropertiesFile(
+            new File(indexDir, V1Constants.Indexes.LUCENE_TEXT_INDEX_PROPERTIES_FILE), config).getDocIdTranslatorMode(),
+            persistedMode);
+      }
+      try (LuceneTextIndexReader reader = combined
+          ? new LuceneTextIndexReader(column, buffer, 3, config)
+          : new LuceneTextIndexReader(column, INDEX_DIR, 3, config)) {
+        assertEquals(reader.getDocIds("alpha", null).toArray(), new int[]{pinotDocIds[0]});
+        assertEquals(reader.getDocIds("gamma", null).toArray(), new int[]{pinotDocIds[2]});
         assertEquals(reader.getDocIds("*:*", null).toArray(), new int[]{0, 1, 2});
       }
     }
@@ -219,6 +253,15 @@ public class LuceneTextIndexCreatorTest {
       creator.add(new String[0], 0);
       creator.add(new String[]{"alpha"}, 1);
       creator.seal();
+      try (DirectoryReader reader = DirectoryReader.open(creator.getIndexWriter())) {
+        NumericDocValues ids =
+            MultiDocValues.getNumericValues(reader, LuceneTextIndexCreator.PINOT_DOC_ID_STORED_FIELD_NAME);
+        for (int i = 0; i < 2; i++) {
+          assertTrue(ids.advanceExact(i));
+          assertEquals(ids.longValue(), i);
+          assertNull(reader.storedFields().document(i).get(LuceneTextIndexCreator.PINOT_DOC_ID_STORED_FIELD_NAME));
+        }
+      }
     }
     try (LuceneTextIndexReader reader = new LuceneTextIndexReader(column, INDEX_DIR, 2, config)) {
       assertEquals(reader.getDocIds("alpha", null).toArray(), new int[]{1});

@@ -104,6 +104,11 @@ public class TextIndexUtils {
       throws IOException {
     NumericDocValues pinotDocIdValues =
         MultiDocValues.getNumericValues(indexReader, LuceneTextIndexCreator.PINOT_DOC_ID_DOC_VALUES_FIELD_NAME);
+    if (pinotDocIdValues == null) {
+      // A TEXT column named PinotDocID uses the alternate numeric field to avoid a field-schema collision.
+      pinotDocIdValues =
+          MultiDocValues.getNumericValues(indexReader, LuceneTextIndexCreator.PINOT_DOC_ID_STORED_FIELD_NAME);
+    }
     PinotDocIdVisitor visitor = new PinotDocIdVisitor();
     StoredFields storedFields = null;
     boolean isIdentityMapping = true;
