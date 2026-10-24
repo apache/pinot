@@ -307,6 +307,16 @@ public class QueryOptionsUtils {
     return checkedParseLongPositive(QueryOptionKey.TIMEOUT_MS, timeoutMsString);
   }
 
+  /// The broker's deadline for the request ([QueryOptionKey#REQUEST_DEADLINE_MS]) in epoch milliseconds, or `null`
+  /// when the option is absent or non-positive, in which case the request is not checked against it.
+  @Nullable
+  public static Long getRequestDeadlineMs(Map<String, String> queryOptions) {
+    String requestDeadlineMsString = queryOptions.get(QueryOptionKey.REQUEST_DEADLINE_MS);
+    Long requestDeadlineMs =
+        checkedParseLong(QueryOptionKey.REQUEST_DEADLINE_MS, requestDeadlineMsString, Long.MIN_VALUE);
+    return requestDeadlineMs != null && requestDeadlineMs > 0 ? requestDeadlineMs : null;
+  }
+
   @Nullable
   public static String getTableSampler(@Nullable Map<String, String> queryOptions) {
     if (queryOptions == null || queryOptions.isEmpty()) {
