@@ -28,11 +28,18 @@ import org.apache.pinot.common.config.provider.NativeOfflineSegmentAction.Owner;
 import org.apache.pinot.common.config.provider.NativeOfflineSegmentAction.Participant;
 import org.apache.pinot.common.config.provider.NativeOfflineSegmentAction.Role;
 import org.apache.pinot.common.proto.Server;
+import org.apache.pinot.common.request.NativeQueryIdentity;
 import org.apache.pinot.common.request.context.NativeQueryContext.ProcessIdentity;
 import org.apache.pinot.common.request.context.NativeQueryContext.Segment;
+import org.apache.thrift.TDeserializer;
+import org.apache.thrift.TSerializer;
+import org.apache.thrift.protocol.TCompactProtocol;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
@@ -90,6 +97,46 @@ public class NativeQueryContextTest {
     assertThrows(IllegalArgumentException.class, () -> context.validateSegments("tbl_OFFLINE",
         List.of("segment", "segment"), null));
     context.validateSegments("tbl_OFFLINE", List.of("segment"), List.of());
+  }
+
+  @Test
+  public void testDeadlineWireRoundTripAndVersionCompatibility()
+      throws Exception {
+    NativeQueryContext legacy = context();
+    NativeQueryDeadline deadline = new NativeQueryDeadline("test-utc", 1000, 1100);
+    NativeQueryContext bounded = legacy.withDeadline(deadline);
+    assertEquals(legacy.version(), NativeQueryContext.VERSION);
+    assertNull(legacy.deadline());
+    assertFalse(legacy.toThrift().isSetDeadline());
+    assertFalse(legacy.toProto().hasDeadline());
+    assertEquals(bounded.version(), NativeQueryContext.DEADLINE_VERSION);
+    assertSame(bounded.withDeadline(new NativeQueryDeadline("test-utc", 1000, 1100)), bounded);
+    assertThrows(IllegalArgumentException.class,
+        () -> bounded.withDeadline(new NativeQueryDeadline("test-utc", 1000, 1101)));
+    for (NativeQueryContext original : List.of(legacy, bounded)) {
+      NativeQueryIdentity thrift = new NativeQueryIdentity();
+      byte[] encoded = new TSerializer(new TCompactProtocol.Factory()).serialize(original.toThrift());
+      new TDeserializer(new TCompactProtocol.Factory()).deserialize(thrift, encoded);
+      NativeQueryContext decoded = NativeQueryContext.fromThrift(thrift);
+      assertEquals(decoded.toProto(), original.toProto());
+      assertEquals(decoded.deadline(), original.deadline());
+      assertEquals(NativeQueryContext.fromProto(Server.NativeQueryIdentity.parseFrom(original.toProto().toByteArray()))
+          .toThrift(), original.toThrift());
+    }
+    assertThrows(IllegalArgumentException.class,
+        () -> NativeQueryContext.fromProto(bounded.toProto().toBuilder().setVersion(1).build()));
+    assertThrows(IllegalArgumentException.class,
+        () -> NativeQueryContext.fromProto(bounded.toProto().toBuilder().clearDeadline().build()));
+    NativeQueryIdentity wrongVersion = bounded.toThrift();
+    wrongVersion.setVersion(1);
+    assertThrows(IllegalArgumentException.class, () -> NativeQueryContext.fromThrift(wrongVersion));
+    NativeQueryIdentity missingDeadline = bounded.toThrift();
+    missingDeadline.unsetDeadline();
+    assertThrows(IllegalArgumentException.class, () -> NativeQueryContext.fromThrift(missingDeadline));
+    UnknownFieldSet unknown = UnknownFieldSet.newBuilder()
+        .addField(99, UnknownFieldSet.Field.newBuilder().addVarint(1).build()).build();
+    assertThrows(IllegalArgumentException.class, () -> NativeQueryContext.fromProto(bounded.toProto().toBuilder()
+        .setDeadline(bounded.toProto().getDeadline().toBuilder().setUnknownFields(unknown)).build()));
   }
 
   private static NativeQueryContext context() {

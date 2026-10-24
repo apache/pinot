@@ -54,12 +54,16 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.config.provider.NativeOfflineSegmentAction;
+import org.apache.pinot.common.coordination.QueryDeadlineGuard;
+import org.apache.pinot.common.coordination.QueryDeadlineGuard.TimeInterval;
+import org.apache.pinot.common.coordination.ServingPermitGuard.ClockReading;
+import org.apache.pinot.common.coordination.ServingPermitGuard.QualifiedLifetimePolicy;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.request.context.NativeQueryContext;
 import org.apache.pinot.coordination.ratis.RatisMetadataAccess;
 import org.apache.pinot.coordination.ratis.RatisMetadataStore;
 import org.apache.pinot.coordination.ratis.RatisMetadataStore.MembershipClockSettings;
 import org.apache.pinot.coordination.ratis.client.RatisOfflineSegmentExecutor;
-import org.apache.pinot.coordination.ratis.client.ServingPermitGuard.ClockReading;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.Capability;
 import org.apache.pinot.coordination.ratis.metadata.MembershipProtocol.Role;
@@ -85,9 +89,13 @@ import org.apache.pinot.coordination.ratis.rpc.MetadataRpc;
 import org.apache.pinot.coordination.ratis.rpc.MetadataServiceGrpc;
 import org.apache.pinot.coordination.ratis.transport.ControllerAccessPolicy.ControllerIdentity;
 import org.apache.pinot.coordination.ratis.transport.ParticipantAccessPolicy.ParticipantIdentity;
+import org.apache.pinot.core.query.executor.SingleTableExecutionInfo;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.server.starter.NativeMetadataConnection;
 import org.apache.pinot.server.starter.NativeServerParticipant;
+import org.apache.pinot.server.starter.NativeServerParticipant.QueryAdmission;
+import org.apache.pinot.server.starter.NativeServerParticipant.ServingSettings;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -1106,12 +1114,13 @@ public class MetadataGrpcTransportTest {
         return new ParticipantIdentity("Controller_runtime", Role.CONTROLLER, Set.of());
       }
       return fingerprint.equals(_certificates.get("worker").fingerprint())
-          ? new ParticipantIdentity(participantId, Role.SERVER, Set.of()) : null;
+          ? new ParticipantIdentity(participantId, Role.SERVER, Set.of(Capability.SERVER_QUERY)) : null;
     };
     try (Quorum quorum = new Quorum()) {
       quorum.startMembership();
       try (Fixture fixture = new Fixture(MetadataGrpcService.Limits.defaults(), quorum._history, quorum._access,
-          quorum._access, participants); MetadataGrpcClient controller = fixture.client("controller-a")) {
+          quorum._access, participants); MetadataGrpcClient controller = fixture.client("controller-a");
+          MetadataGrpcClient observer = fixture.client("worker")) {
         UUID history = quorum._history;
         MetadataRpc.ParticipantToken controllerSession = registerReady(controller, history);
         assertEquals(quorum._access.execute(new MetadataProtocol.RegisterClient(history, "native-test",
@@ -1137,13 +1146,21 @@ public class MetadataGrpcTransportTest {
         commitNativeTest(quorum, new MetadataProtocol.Transaction(history, "native-test", 1, "config", 1,
             List.of(MetadataProtocol.Mutation.createTableConfig(history, tableId, table),
                 MetadataProtocol.Mutation.createSchema(history, schemaId, schema))));
+        // Only this test supplies a synthetic qualified clock. No network query listener is started.
+        AtomicLong clockNanos = new AtomicLong();
+        ServingSettings serving = new ServingSettings(() -> new ClockReading(clockNanos.get(), 0, true),
+            new QualifiedLifetimePolicy(1000, 1000, 1_000_000, 0, 0),
+            new QueryDeadlineGuard(() -> {
+              long now = TimeUnit.NANOSECONDS.toMillis(clockNanos.get());
+              return new TimeInterval(now, now, true);
+            }, "test-clock", 1000, 0, 1_000_000));
         Path directory = Files.createTempDirectory(_directory, "native-runtime-");
         PinotConfiguration config = new PinotConfiguration(Map.of("id", participantId,
             "dataDir", directory.resolve("server").toString(), "segmentTarDir", directory.resolve("tar").toString(),
             "max.parallel.refresh.threads", 1));
         try (NativeInstallationScenario bytes = new NativeInstallationScenario(directory, tableId, segmentId,
             table, schema); NativeMetadataConnection work = spy(nativeConnection(fixture));
-            NativeServerParticipant first = nativeParticipant(fixture, participantId, work)) {
+            NativeServerParticipant first = nativeParticipant(fixture, participantId, work, serving)) {
           AtomicBoolean loseReport = new AtomicBoolean(true);
           AtomicInteger recoveredOutcomes = new AtomicInteger();
           CountDownLatch reportCommitted = new CountDownLatch(1);
@@ -1176,7 +1193,7 @@ public class MetadataGrpcTransportTest {
           MembershipProtocol.ParticipantState before = quorum._access.query(new MetadataProtocol.MembershipQuery(
               history, new MembershipProtocol.GetParticipant(participantId)), 5000).participant();
           assertTrue(before.ready());
-          assertTrue(before.capabilities().isEmpty(), "Installation readiness cannot grant query capability");
+          assertEquals(before.capabilities(), Set.of(Capability.SERVER_QUERY));
           assertTrue(first.dataManager().getAllTables().isEmpty(), "No assignment exists at bootstrap");
           OfflineSegmentProtocol.Content content = bytes.content();
           OfflineSegmentProtocol.Compatibility compatibility = new OfflineSegmentProtocol.Compatibility(
@@ -1199,15 +1216,39 @@ public class MetadataGrpcTransportTest {
           assertTrue(recoveredAck.await(10, TimeUnit.SECONDS), first.failure());
           assertTrue(recoveredOutcomes.get() > 0, "A completed operation's unknown receipt still needs recovery");
           awaitNativeHeartbeat(quorum, first, before);
+          NativeQueryContext firstContext = installedQuery(first, tableName, content.segmentName(),
+              serving.queryDeadlines());
+          QueryAdmission firstAdmission = awaitNativeAdmission(first, firstContext);
+          assertEquals(firstAdmission.context(), firstContext);
+          SingleTableExecutionInfo pinned = SingleTableExecutionInfo.create(first.dataManager(), tableName,
+              firstContext.requiredNames(), firstContext.optionalNames(), mock(QueryContext.class),
+              firstAdmission.context());
+          try {
+            assertEquals(pinned.getNumSegmentsAcquired(), 1);
+            assertEquals(pinned.getIndexSegments().get(0).getSegmentMetadata().getTotalDocs(), 5);
+            awaitNativeDelivery(first, firstAdmission, false);
+          } finally {
+            pinned.releaseSegmentDataManagers();
+          }
+          assertEquals(observer.membershipExecute(MetadataRpc.MembershipCommandRequest.newBuilder()
+              .setHistoryId(history.toString()).setDrain(session(firstToken)).build()).getStatus(),
+              MetadataRpc.ResultStatus.OK);
+          awaitNativeDelivery(first, firstAdmission, true);
+          expectThrows(IllegalStateException.class, () -> first.admitQuery(firstContext));
+          assertFalse(first.wake(load), "Draining rejects new installation work");
+          clockNanos.set(TimeUnit.MILLISECONDS.toNanos(1001));
+          expectThrows(IllegalStateException.class, () -> first.checkQueryDelivery(firstAdmission));
           UUID originalInstallation = loaded.installation().installationId();
           first.close();
+          expectThrows(IllegalStateException.class, () -> first.checkQueryDelivery(firstAdmission));
           assertFalse(first.isReadyForInstallations());
           assertTrue(quorum._access.query(new MetadataProtocol.MembershipQuery(history,
               new MembershipProtocol.GetParticipant(participantId)), 5000).participant().retired());
           // A real process lifecycle owns the same directory again, registers a new token and discovers fresh
           // RECONCILE intent. The old selected bytes remain usable even after the source archive disappears.
           Files.delete(Path.of(URI.create(content.downloadUri())));
-          try (NativeServerParticipant restarted = nativeParticipant(fixture, participantId)) {
+          try (NativeServerParticipant restarted =
+              nativeParticipant(fixture, participantId, nativeConnection(fixture), serving)) {
             restarted.start(config, ServerMetrics.get(), null, mock(ServerReloadJobStatusCache.class));
             MetadataRpc.ParticipantToken replacement = restarted.participant();
             assertNotEquals(replacement.getIncarnation(), firstToken.getIncarnation());
@@ -1231,22 +1272,67 @@ public class MetadataGrpcTransportTest {
                     reconcile.toString()), 5000).record().value());
             assertEquals(completed.status(), OperationProtocol.State.SUCCEEDED);
             assertEquals(completed.completionProof().installations().size(), 1);
+            NativeQueryContext replacementContext = installedQuery(restarted, tableName, content.segmentName(),
+                serving.queryDeadlines());
+            QueryAdmission replacementAdmission = awaitNativeAdmission(restarted, replacementContext);
+            expectThrows(IllegalStateException.class, () -> restarted.admitQuery(firstContext));
+            expectThrows(IllegalStateException.class, () -> restarted.checkQueryDelivery(firstAdmission));
+            awaitNativeDelivery(restarted, replacementAdmission, false);
           }
         }
       }
     }
   }
 
-  private NativeServerParticipant nativeParticipant(Fixture fixture, String participantId)
-      throws IOException {
-    return nativeParticipant(fixture, participantId, nativeConnection(fixture));
+  private NativeServerParticipant nativeParticipant(Fixture fixture, String participantId,
+      NativeMetadataConnection work, ServingSettings serving) throws IOException {
+    return new NativeServerParticipant(new NativeServerParticipant.Settings(fixture._history, participantId, Map.of(),
+        5000, 100, 100, 1, 16), nativeConnection(fixture), work, serving);
   }
 
-  private NativeServerParticipant nativeParticipant(Fixture fixture, String participantId,
-      NativeMetadataConnection work)
-      throws IOException {
-    return new NativeServerParticipant(new NativeServerParticipant.Settings(fixture._history, participantId, Map.of(),
-        5000, 100, 100, 1, 16), nativeConnection(fixture), work);
+  private static NativeQueryContext installedQuery(NativeServerParticipant server, String tableName,
+      String segmentName, QueryDeadlineGuard queryDeadlines) throws IOException {
+    NativeOfflineSegmentAction.Identity installed = server.dataManager().executor(tableName).installed(segmentName)
+        .identity();
+    // The normal broker's authentication/routing is outside this local admission test and remains gated.
+    return new NativeQueryContext(NativeQueryContext.VERSION, installed.historyId(),
+        new NativeQueryContext.ProcessIdentity("Broker_test", UUID.randomUUID(), 1), installed.server(),
+        UUID.randomUUID(), UUID.randomUUID(), installed.tableName(), installed.table(), installed.schemaName(),
+        installed.schema(),
+        List.of(new NativeQueryContext.Segment(segmentName, installed.content(), installed.contentSha256(),
+            installed.assignment(), installed.materializationId())), List.of())
+        .withDeadline(queryDeadlines.originate(1000));
+  }
+
+  private static QueryAdmission awaitNativeAdmission(NativeServerParticipant server, NativeQueryContext context)
+      throws InterruptedException {
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+    while (System.nanoTime() < deadline) {
+      try {
+        return server.admitQuery(context);
+      } catch (IllegalStateException e) {
+        // A real committed heartbeat grant still needs a coherent own-server image at its minimum revision.
+        Thread.sleep(20);
+      }
+    }
+    throw new AssertionError("Native runtime did not admit current content: " + server.failure());
+  }
+
+  private static void awaitNativeDelivery(NativeServerParticipant server, QueryAdmission admitted, boolean draining)
+      throws InterruptedException {
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+    while (System.nanoTime() < deadline) {
+      if (!draining || !server.isReadyForInstallations()) {
+        try {
+          server.checkQueryDelivery(admitted);
+          return;
+        } catch (IllegalStateException e) {
+          // An in-progress hydration is unavailable; wait for the complete committed image.
+        }
+      }
+      Thread.sleep(20);
+    }
+    throw new AssertionError("Native runtime did not permit delivery, draining=" + draining + ": " + server.failure());
   }
 
   private NativeMetadataConnection nativeConnection(Fixture fixture)
@@ -1288,7 +1374,7 @@ public class MetadataGrpcTransportTest {
           .participant();
       if (current.lastRenewalSequence() > previous.lastRenewalSequence()
           && current.appliedRevision().index() > previous.appliedRevision().index()) {
-        assertTrue(current.capabilities().isEmpty());
+        assertEquals(current.capabilities(), previous.capabilities());
         return;
       }
       Thread.sleep(20);

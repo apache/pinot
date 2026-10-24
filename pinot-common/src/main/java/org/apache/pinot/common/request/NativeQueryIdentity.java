@@ -41,6 +41,7 @@ public class NativeQueryIdentity implements org.apache.thrift.TBase<NativeQueryI
   private static final org.apache.thrift.protocol.TField SCHEMA_FIELD_DESC = new org.apache.thrift.protocol.TField("schema", org.apache.thrift.protocol.TType.STRUCT, (short)10);
   private static final org.apache.thrift.protocol.TField REQUIRED_SEGMENTS_FIELD_DESC = new org.apache.thrift.protocol.TField("requiredSegments", org.apache.thrift.protocol.TType.LIST, (short)11);
   private static final org.apache.thrift.protocol.TField OPTIONAL_SEGMENTS_FIELD_DESC = new org.apache.thrift.protocol.TField("optionalSegments", org.apache.thrift.protocol.TType.LIST, (short)12);
+  private static final org.apache.thrift.protocol.TField DEADLINE_FIELD_DESC = new org.apache.thrift.protocol.TField("deadline", org.apache.thrift.protocol.TType.STRUCT, (short)13);
 
   private static final org.apache.thrift.scheme.SchemeFactory STANDARD_SCHEME_FACTORY = new NativeQueryIdentityStandardSchemeFactory();
   private static final org.apache.thrift.scheme.SchemeFactory TUPLE_SCHEME_FACTORY = new NativeQueryIdentityTupleSchemeFactory();
@@ -57,6 +58,7 @@ public class NativeQueryIdentity implements org.apache.thrift.TBase<NativeQueryI
   private @org.apache.thrift.annotation.Nullable NativeQueryObject schema; // required
   private @org.apache.thrift.annotation.Nullable java.util.List<NativeQuerySegment> requiredSegments; // required
   private @org.apache.thrift.annotation.Nullable java.util.List<NativeQuerySegment> optionalSegments; // required
+  private @org.apache.thrift.annotation.Nullable NativeQueryTimeBound deadline; // optional
 
   /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
   public enum _Fields implements org.apache.thrift.TFieldIdEnum {
@@ -71,7 +73,8 @@ public class NativeQueryIdentity implements org.apache.thrift.TBase<NativeQueryI
     SCHEMA_NAME((short)9, "schemaName"),
     SCHEMA((short)10, "schema"),
     REQUIRED_SEGMENTS((short)11, "requiredSegments"),
-    OPTIONAL_SEGMENTS((short)12, "optionalSegments");
+    OPTIONAL_SEGMENTS((short)12, "optionalSegments"),
+    DEADLINE((short)13, "deadline");
 
     private static final java.util.Map<java.lang.String, _Fields> byName = new java.util.HashMap<java.lang.String, _Fields>();
 
@@ -111,6 +114,8 @@ public class NativeQueryIdentity implements org.apache.thrift.TBase<NativeQueryI
           return REQUIRED_SEGMENTS;
         case 12: // OPTIONAL_SEGMENTS
           return OPTIONAL_SEGMENTS;
+        case 13: // DEADLINE
+          return DEADLINE;
         default:
           return null;
       }
@@ -156,6 +161,7 @@ public class NativeQueryIdentity implements org.apache.thrift.TBase<NativeQueryI
   // isset id assignments
   private static final int __VERSION_ISSET_ID = 0;
   private byte __isset_bitfield = 0;
+  private static final _Fields optionals[] = {_Fields.DEADLINE};
   public static final java.util.Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
     java.util.Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new java.util.EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
@@ -185,6 +191,8 @@ public class NativeQueryIdentity implements org.apache.thrift.TBase<NativeQueryI
     tmpMap.put(_Fields.OPTIONAL_SEGMENTS, new org.apache.thrift.meta_data.FieldMetaData("optionalSegments", org.apache.thrift.TFieldRequirementType.REQUIRED,
         new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST,
             new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, NativeQuerySegment.class))));
+    tmpMap.put(_Fields.DEADLINE, new org.apache.thrift.meta_data.FieldMetaData("deadline", org.apache.thrift.TFieldRequirementType.OPTIONAL,
+        new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, NativeQueryTimeBound.class)));
     metaDataMap = java.util.Collections.unmodifiableMap(tmpMap);
     org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(NativeQueryIdentity.class, metaDataMap);
   }
@@ -269,6 +277,9 @@ public class NativeQueryIdentity implements org.apache.thrift.TBase<NativeQueryI
       }
       this.optionalSegments = __this__optionalSegments;
     }
+    if (other.isSetDeadline()) {
+      this.deadline = new NativeQueryTimeBound(other.deadline);
+    }
   }
 
   @Override
@@ -291,6 +302,7 @@ public class NativeQueryIdentity implements org.apache.thrift.TBase<NativeQueryI
     this.schema = null;
     this.requiredSegments = null;
     this.optionalSegments = null;
+    this.deadline = null;
   }
 
   public int getVersion() {
@@ -611,6 +623,30 @@ public class NativeQueryIdentity implements org.apache.thrift.TBase<NativeQueryI
     }
   }
 
+  @org.apache.thrift.annotation.Nullable
+  public NativeQueryTimeBound getDeadline() {
+    return this.deadline;
+  }
+
+  public void setDeadline(@org.apache.thrift.annotation.Nullable NativeQueryTimeBound deadline) {
+    this.deadline = deadline;
+  }
+
+  public void unsetDeadline() {
+    this.deadline = null;
+  }
+
+  /** Returns true if field deadline is set (has been assigned a value) and false otherwise */
+  public boolean isSetDeadline() {
+    return this.deadline != null;
+  }
+
+  public void setDeadlineIsSet(boolean value) {
+    if (!value) {
+      this.deadline = null;
+    }
+  }
+
   @Override
   public void setFieldValue(_Fields field, @org.apache.thrift.annotation.Nullable java.lang.Object value) {
     switch (field) {
@@ -710,6 +746,14 @@ public class NativeQueryIdentity implements org.apache.thrift.TBase<NativeQueryI
       }
       break;
 
+    case DEADLINE:
+      if (value == null) {
+        unsetDeadline();
+      } else {
+        setDeadline((NativeQueryTimeBound)value);
+      }
+      break;
+
     }
   }
 
@@ -753,6 +797,9 @@ public class NativeQueryIdentity implements org.apache.thrift.TBase<NativeQueryI
     case OPTIONAL_SEGMENTS:
       return getOptionalSegments();
 
+    case DEADLINE:
+      return getDeadline();
+
     }
     throw new java.lang.IllegalStateException();
   }
@@ -789,6 +836,8 @@ public class NativeQueryIdentity implements org.apache.thrift.TBase<NativeQueryI
       return isSetRequiredSegments();
     case OPTIONAL_SEGMENTS:
       return isSetOptionalSegments();
+    case DEADLINE:
+      return isSetDeadline();
     }
     throw new java.lang.IllegalStateException();
   }
@@ -914,6 +963,15 @@ public class NativeQueryIdentity implements org.apache.thrift.TBase<NativeQueryI
         return false;
     }
 
+    boolean this_present_deadline = true && this.isSetDeadline();
+    boolean that_present_deadline = true && that.isSetDeadline();
+    if (this_present_deadline || that_present_deadline) {
+      if (!(this_present_deadline && that_present_deadline))
+        return false;
+      if (!this.deadline.equals(that.deadline))
+        return false;
+    }
+
     return true;
   }
 
@@ -966,6 +1024,10 @@ public class NativeQueryIdentity implements org.apache.thrift.TBase<NativeQueryI
     hashCode = hashCode * 8191 + ((isSetOptionalSegments()) ? 131071 : 524287);
     if (isSetOptionalSegments())
       hashCode = hashCode * 8191 + optionalSegments.hashCode();
+
+    hashCode = hashCode * 8191 + ((isSetDeadline()) ? 131071 : 524287);
+    if (isSetDeadline())
+      hashCode = hashCode * 8191 + deadline.hashCode();
 
     return hashCode;
   }
@@ -1098,6 +1160,16 @@ public class NativeQueryIdentity implements org.apache.thrift.TBase<NativeQueryI
         return lastComparison;
       }
     }
+    lastComparison = java.lang.Boolean.compare(isSetDeadline(), other.isSetDeadline());
+    if (lastComparison != 0) {
+      return lastComparison;
+    }
+    if (isSetDeadline()) {
+      lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.deadline, other.deadline);
+      if (lastComparison != 0) {
+        return lastComparison;
+      }
+    }
     return 0;
   }
 
@@ -1213,6 +1285,16 @@ public class NativeQueryIdentity implements org.apache.thrift.TBase<NativeQueryI
       sb.append(this.optionalSegments);
     }
     first = false;
+    if (isSetDeadline()) {
+      if (!first) sb.append(", ");
+      sb.append("deadline:");
+      if (this.deadline == null) {
+        sb.append("null");
+      } else {
+        sb.append(this.deadline);
+      }
+      first = false;
+    }
     sb.append(")");
     return sb.toString();
   }
@@ -1279,6 +1361,9 @@ public class NativeQueryIdentity implements org.apache.thrift.TBase<NativeQueryI
     }
     if (schema != null) {
       schema.validate();
+    }
+    if (deadline != null) {
+      deadline.validate();
     }
   }
 
@@ -1442,6 +1527,15 @@ public class NativeQueryIdentity implements org.apache.thrift.TBase<NativeQueryI
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
+          case 13: // DEADLINE
+            if (schemeField.type == org.apache.thrift.protocol.TType.STRUCT) {
+              struct.deadline = new NativeQueryTimeBound();
+              struct.deadline.read(iprot);
+              struct.setDeadlineIsSet(true);
+            } else {
+              org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+            }
+            break;
           default:
             org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
         }
@@ -1528,6 +1622,13 @@ public class NativeQueryIdentity implements org.apache.thrift.TBase<NativeQueryI
         }
         oprot.writeFieldEnd();
       }
+      if (struct.deadline != null) {
+        if (struct.isSetDeadline()) {
+          oprot.writeFieldBegin(DEADLINE_FIELD_DESC);
+          struct.deadline.write(oprot);
+          oprot.writeFieldEnd();
+        }
+      }
       oprot.writeFieldStop();
       oprot.writeStructEnd();
     }
@@ -1569,6 +1670,14 @@ public class NativeQueryIdentity implements org.apache.thrift.TBase<NativeQueryI
         {
           _iter49.write(oprot);
         }
+      }
+      java.util.BitSet optionals = new java.util.BitSet();
+      if (struct.isSetDeadline()) {
+        optionals.set(0);
+      }
+      oprot.writeBitSet(optionals, 1);
+      if (struct.isSetDeadline()) {
+        struct.deadline.write(oprot);
       }
     }
 
@@ -1623,6 +1732,12 @@ public class NativeQueryIdentity implements org.apache.thrift.TBase<NativeQueryI
         }
       }
       struct.setOptionalSegmentsIsSet(true);
+      java.util.BitSet incoming = iprot.readBitSet(1);
+      if (incoming.get(0)) {
+        struct.deadline = new NativeQueryTimeBound();
+        struct.deadline.read(iprot);
+        struct.setDeadlineIsSet(true);
+      }
     }
   }
 
