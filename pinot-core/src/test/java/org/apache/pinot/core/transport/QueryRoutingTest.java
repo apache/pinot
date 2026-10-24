@@ -24,6 +24,7 @@ import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
@@ -53,6 +54,8 @@ import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
@@ -122,9 +125,12 @@ public class QueryRoutingTest {
   }
 
   private QueryServer getQueryServer(int responseDelayMs, byte[] responseBytes, int port) {
-    InstanceRequestHandler handler = new InstanceRequestHandler("server01", new PinotConfiguration(),
-        mockQueryScheduler(responseDelayMs, responseBytes), mock(AccessControl.class),
-        ThreadAccountantUtils.getNoOpAccountant());
+    return getQueryServer(mockQueryScheduler(responseDelayMs, responseBytes), port);
+  }
+
+  private QueryServer getQueryServer(QueryScheduler queryScheduler, int port) {
+    InstanceRequestHandler handler = new InstanceRequestHandler("server01", new PinotConfiguration(), queryScheduler,
+        mock(AccessControl.class), ThreadAccountantUtils.getNoOpAccountant());
     return new QueryServer(port, null, handler);
   }
 
@@ -421,6 +427,61 @@ public class QueryRoutingTest {
     _requestCount += 2;
     waitForStatsUpdate(_requestCount);
     assertEquals(_serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverId).intValue(), 0);
+  }
+
+  /// End to end over Netty: a request that reaches the server after the broker's deadline for it (the
+  /// `requestDeadlineMs` option) is answered with a scheduling-timeout error right away and never handed to the
+  /// scheduler, while a request whose deadline is still ahead is executed as usual. This is what keeps the backlog
+  /// of a stalled connection from being executed once the connection recovers.
+  @Test
+  public void testRequestPastDeadlineIsAnsweredWithoutExecution()
+      throws Exception {
+    long requestId = 123;
+    DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
+    dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
+    QueryScheduler queryScheduler = mockQueryScheduler(0, dataTable.toBytes());
+    _queryServer = getQueryServer(queryScheduler, 0);
+    initializeTestFixtures(startAndGetPort(_queryServer));
+    String serverId = _serverInstance.getInstanceId();
+
+    // The deadline is already 5 seconds in the past when the request is written: the server must not execute it.
+    AsyncQueryResponse asyncQueryResponse = _queryRouter.submitQuery(requestId, "testTable",
+        brokerRequestWithDeadline(System.currentTimeMillis() - 5_000L), _routingTable, null, null, 10_000L);
+    Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
+    assertEquals(asyncQueryResponse.getStatus(), QueryResponse.Status.COMPLETED);
+    ServerResponse serverResponse = response.get(_offlineServerRoutingInstance);
+    assertNotNull(serverResponse.getDataTable());
+    Map<Integer, String> exceptions = serverResponse.getDataTable().getExceptions();
+    assertEquals(exceptions.keySet(), Set.of(QueryErrorCode.QUERY_SCHEDULING_TIMEOUT.getId()));
+    assertTrue(exceptions.get(QueryErrorCode.QUERY_SCHEDULING_TIMEOUT.getId()).contains("after the broker deadline"),
+        String.valueOf(exceptions));
+    verify(queryScheduler, never()).submit(any());
+    _requestCount += 2;
+    waitForStatsUpdate(_requestCount);
+
+    // The deadline is still a minute ahead: executed as usual.
+    asyncQueryResponse = _queryRouter.submitQuery(requestId, "testTable",
+        brokerRequestWithDeadline(System.currentTimeMillis() + 60_000L), _routingTable, null, null, 10_000L);
+    response = asyncQueryResponse.getFinalResponses();
+    serverResponse = response.get(_offlineServerRoutingInstance);
+    assertNotNull(serverResponse.getDataTable());
+    assertTrue(serverResponse.getDataTable().getExceptions().isEmpty());
+    verify(queryScheduler).submit(any());
+    _requestCount += 2;
+    waitForStatsUpdate(_requestCount);
+    assertEquals(_serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverId).intValue(), 0);
+  }
+
+  /// The request the broker builds: the remaining timeout next to the absolute deadline, as
+  /// `BaseSingleStageBrokerRequestHandler#setQueryTimeout` sets them.
+  private static BrokerRequest brokerRequestWithDeadline(long requestDeadlineMs) {
+    BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM testTable");
+    Map<String, String> queryOptions = new HashMap<>();
+    queryOptions.put(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS, "10000");
+    queryOptions.put(CommonConstants.Broker.Request.QueryOptionKey.REQUEST_DEADLINE_MS,
+        Long.toString(requestDeadlineMs));
+    brokerRequest.getPinotQuery().setQueryOptions(queryOptions);
+    return brokerRequest;
   }
 
   @Test

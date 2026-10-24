@@ -69,6 +69,7 @@ import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.auth.TableRowColAccessResult;
 import org.apache.pinot.spi.auth.TableRowColAccessResultImpl;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
+import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -83,6 +84,7 @@ import org.apache.pinot.spi.trace.RequestScope;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.Query.Range;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -93,6 +95,7 @@ import org.mockito.Mockito;
 import org.slf4j.MDC;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -101,6 +104,11 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 
 public class BaseSingleStageBrokerRequestHandlerTest {
@@ -457,6 +465,13 @@ public class BaseSingleStageBrokerRequestHandlerTest {
 
   private BaseSingleStageBrokerRequestHandler createHybridHandlerWithTimeBoundary(
       AtomicReference<TableRouteInfo> capturedRouteInfo) {
+    return createHybridHandlerWithTimeBoundary(capturedRouteInfo, null, null);
+  }
+
+  /// `offlineQueryTimeoutMs` / `realtimeQueryTimeoutMs` go into the table configs' query config when not null.
+  private BaseSingleStageBrokerRequestHandler createHybridHandlerWithTimeBoundary(
+      AtomicReference<TableRouteInfo> capturedRouteInfo, @Nullable Long offlineQueryTimeoutMs,
+      @Nullable Long realtimeQueryTimeoutMs) {
     String offlineTableName = "myTable_OFFLINE";
     String realtimeTableName = "myTable_REALTIME";
 
@@ -475,6 +490,14 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     TenantConfig tenant = new TenantConfig("tier_BROKER", "tier_SERVER", null);
     when(offlineTableCfg.getTenantConfig()).thenReturn(tenant);
     when(realtimeTableCfg.getTenantConfig()).thenReturn(tenant);
+    if (offlineQueryTimeoutMs != null) {
+      when(offlineTableCfg.getQueryConfig()).thenReturn(
+          new QueryConfig(offlineQueryTimeoutMs, null, null, null, null, null));
+    }
+    if (realtimeQueryTimeoutMs != null) {
+      when(realtimeTableCfg.getQueryConfig()).thenReturn(
+          new QueryConfig(realtimeQueryTimeoutMs, null, null, null, null, null));
+    }
     when(tableCache.getTableConfig(offlineTableName)).thenReturn(offlineTableCfg);
     when(tableCache.getTableConfig(realtimeTableName)).thenReturn(realtimeTableCfg);
 
@@ -1195,6 +1218,134 @@ public class BaseSingleStageBrokerRequestHandlerTest {
             + serverOptions);
   }
 
+  /// The broker stamps every server request with its own deadline (`requestDeadlineMs`, epoch millis) next to the
+  /// remaining timeout, overwriting a user-supplied value: the server uses it to tell a request that sat in a
+  /// stalled connection from a live one instead of granting it a fresh timeout budget from its arrival.
+  @Test
+  public void testRequestDeadlineSetOnServerQueryOptions()
+      throws Exception {
+    String offlineTable = "myTable_OFFLINE";
+    String rawTable = "myTable";
+    String userSql = "SET requestDeadlineMs = 1; SELECT ts, SUM(revenue) FROM myTable GROUP BY ts LIMIT 100";
+
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName(rawTable)
+        .addSingleValueDimension("ts", DataType.STRING)
+        .addMetric("revenue", DataType.DOUBLE)
+        .build();
+
+    TableCache tableCache = mock(TableCache.class);
+    when(tableCache.getActualTableName(rawTable)).thenReturn(rawTable);
+    when(tableCache.getSchema(rawTable)).thenReturn(schema);
+    when(tableCache.getColumnNameMap(anyString())).thenReturn(Map.of("ts", "ts", "revenue", "revenue"));
+    TableConfig tableConfig = mock(TableConfig.class);
+    when(tableConfig.getTenantConfig()).thenReturn(new TenantConfig("t_BROKER", "t_SERVER", null));
+    when(tableCache.getTableConfig(offlineTable)).thenReturn(tableConfig);
+
+    BrokerRoutingManager routingManager = mock(BrokerRoutingManager.class);
+    when(routingManager.routingExists(offlineTable)).thenReturn(true);
+    when(routingManager.getQueryTimeoutMs(anyString())).thenReturn(10000L);
+    RoutingTable routingTable = mock(RoutingTable.class);
+    when(routingTable.getServerInstanceToSegmentsMap()).thenReturn(
+        Map.of(new ServerInstance(new InstanceConfig("server01_9000")),
+            new SegmentsToQuery(List.of("seg01"), List.of())));
+    when(routingManager.getRoutingTable(any(), Mockito.anyLong())).thenReturn(routingTable);
+
+    QueryQuotaManager quotaManager = mock(QueryQuotaManager.class);
+    when(quotaManager.acquireDatabase(anyString())).thenReturn(true);
+    when(quotaManager.acquireApplication(anyString())).thenReturn(true);
+    when(quotaManager.acquire(anyString())).thenReturn(true);
+
+    BrokerMetrics.register(mock(BrokerMetrics.class));
+    PinotConfiguration config = new PinotConfiguration();
+    BrokerQueryEventListenerFactory.init(config);
+
+    // What goes on the wire is the route's per-type request, see QueryRouter#submitQuery
+    AtomicReference<Map<String, String>> capturedServerOptions = new AtomicReference<>();
+    BaseSingleStageBrokerRequestHandler handler =
+        new BaseSingleStageBrokerRequestHandler(config, "broker1", new BrokerRequestIdGenerator(),
+            routingManager, new AllowAllAccessControlFactory(), quotaManager, tableCache,
+            ThreadAccountantUtils.getNoOpAccountant(), null, /*materializedViewHandler*/ null) {
+          @Override
+          public void start() {
+          }
+
+          @Override
+          public void shutDown() {
+          }
+
+          @Override
+          protected BrokerResponseNative processBrokerRequest(long requestId,
+              BrokerRequest originalBrokerRequest, BrokerRequest serverBrokerRequest,
+              TableRouteInfo route, long timeoutMs, ServerStats serverStats,
+              RequestContext requestContext) {
+            capturedServerOptions.set(Map.copyOf(route.getOfflineBrokerRequest().getPinotQuery().getQueryOptions()));
+            return BrokerResponseNative.empty();
+          }
+
+          @Override
+          protected BrokerResponseNative processMaterializedViewSplitBrokerRequest(long requestId,
+              long materializedViewRequestId, BrokerRequest originalBrokerRequest, TableRouteInfo baseRoute,
+              TableRouteInfo materializedViewRoute, long timeoutMs, ServerStats serverStats,
+              RequestContext requestContext) {
+            return BrokerResponseNative.empty();
+          }
+        };
+
+    long beforeMs = System.currentTimeMillis();
+    handler.handleRequest(userSql);
+    long afterMs = System.currentTimeMillis();
+
+    Map<String, String> serverOptions = capturedServerOptions.get();
+    Assert.assertNotNull(serverOptions, "processBrokerRequest should have been reached and captured server options");
+    String timeoutMsString = serverOptions.get(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS);
+    Assert.assertNotNull(timeoutMsString, "remaining timeout must be set, options were: " + serverOptions);
+    long timeoutMs = Long.parseLong(timeoutMsString);
+    Assert.assertTrue(timeoutMs > 0 && timeoutMs <= Broker.DEFAULT_BROKER_TIMEOUT_MS,
+        "remaining timeout: " + timeoutMs);
+    String deadlineMsString = serverOptions.get(CommonConstants.Broker.Request.QueryOptionKey.REQUEST_DEADLINE_MS);
+    Assert.assertNotNull(deadlineMsString, "request deadline must be set, options were: " + serverOptions);
+    long deadlineMs = Long.parseLong(deadlineMsString);
+    // Set as now + remaining timeout while the request was handled, so the user's value of 1 is gone
+    Assert.assertTrue(deadlineMs >= beforeMs + timeoutMs && deadlineMs <= afterMs + timeoutMs,
+        String.format("deadline %d not within [%d, %d]", deadlineMs, beforeMs + timeoutMs, afterMs + timeoutMs));
+  }
+
+  /// A hybrid table whose two sides have different timeouts: each side's request gets its own remaining `timeoutMs`,
+  /// but the broker waits for the longer of the two, so the deadline stamped on both sides is the same and follows
+  /// the longer one. Otherwise the side with the shorter timeout would be dropped by the server while the broker was
+  /// still waiting for it.
+  @Test
+  public void testRequestDeadlineOnHybridTableFollowsTheLongerTimeout()
+      throws Exception {
+    AtomicReference<TableRouteInfo> capturedRouteInfo = new AtomicReference<>();
+    BaseSingleStageBrokerRequestHandler handler =
+        createHybridHandlerWithTimeBoundary(capturedRouteInfo, 5_000L, 60_000L);
+
+    long beforeMs = System.currentTimeMillis();
+    handler.handleRequest("SELECT * FROM myTable WHERE created_15min > 1772106300000 LIMIT 10");
+    long afterMs = System.currentTimeMillis();
+
+    TableRouteInfo routeInfo = capturedRouteInfo.get();
+    Assert.assertNotNull(routeInfo, "processBrokerRequest should have been called");
+    Map<String, String> offlineOptions = routeInfo.getOfflineBrokerRequest().getPinotQuery().getQueryOptions();
+    Map<String, String> realtimeOptions = routeInfo.getRealtimeBrokerRequest().getPinotQuery().getQueryOptions();
+    long offlineTimeoutMs =
+        Long.parseLong(offlineOptions.get(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS));
+    long realtimeTimeoutMs =
+        Long.parseLong(realtimeOptions.get(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS));
+    Assert.assertTrue(offlineTimeoutMs <= 5_000L && realtimeTimeoutMs > 5_000L && realtimeTimeoutMs <= 60_000L,
+        "offline: " + offlineTimeoutMs + ", realtime: " + realtimeTimeoutMs);
+    String deadline = offlineOptions.get(CommonConstants.Broker.Request.QueryOptionKey.REQUEST_DEADLINE_MS);
+    Assert.assertNotNull(deadline, "offline options: " + offlineOptions);
+    Assert.assertEquals(realtimeOptions.get(CommonConstants.Broker.Request.QueryOptionKey.REQUEST_DEADLINE_MS),
+        deadline, "both sides must carry the same deadline");
+    long deadlineMs = Long.parseLong(deadline);
+    Assert.assertTrue(deadlineMs >= beforeMs + realtimeTimeoutMs && deadlineMs <= afterMs + realtimeTimeoutMs,
+        String.format("deadline %d not within [%d, %d]", deadlineMs, beforeMs + realtimeTimeoutMs,
+            afterMs + realtimeTimeoutMs));
+  }
+
   /// Pins the C1 fix: FULL_REWRITE is skipped at the broker layer when the base table has a
   /// REALTIME sibling, because a batch MV cannot cover newly-streamed rows. Without this guard
   /// the MV swap would silently drop all rows ingested via the realtime stream since the MV last
@@ -1665,20 +1816,29 @@ public class BaseSingleStageBrokerRequestHandlerTest {
   }
 
   /// Pins the fix for the reviewer-flagged regression: `EXPLAIN PLAN FOR <query>` against a
-  /// SPLIT-eligible MV must NOT enter `tryExecuteMaterializedViewSplit` (which would dispatch
-  /// dual scatter-gather to base+MV and merge live `DataTable`s).  The broker must fall
-  /// through to the standard explain handling instead.
-  @Test
-  public void testMaterializedViewSplitSkippedForExplainQuery()
+  @DataProvider
+  public Object[][] materializedViewSplitQueries() {
+    return new Object[][]{{true, null}, {false, null}, {false, "1"}};
+  }
+
+  /// EXPLAIN skips split execution; a real hybrid split stamps the final base + MV requests.
+  @Test(dataProvider = "materializedViewSplitQueries")
+  public void testMaterializedViewSplitDispatchesFreshDeadlineAndSkipsExplain(boolean explain,
+      @Nullable String suppliedDeadline)
       throws Exception {
     String baseOfflineTable = "baseTable_OFFLINE";
+    String baseRealtimeTable = "baseTable_REALTIME";
     String materializedViewOfflineTable = "mv_baseTable_OFFLINE";
     String baseRawTable = "baseTable";
     String materializedViewRawTable = "mv_baseTable";
 
-    String userSql = "EXPLAIN PLAN FOR SELECT ts, SUM(revenue) FROM baseTable GROUP BY ts";
+    String userSql = "SET timeoutMs=30000; "
+        + (suppliedDeadline != null ? "SET requestDeadlineMs=" + suppliedDeadline + "; " : "")
+        + (explain ? "EXPLAIN PLAN FOR " : "")
+        + "SELECT ts, SUM(revenue) FROM baseTable GROUP BY ts";
     PinotQuery materializedViewServerQuery = CalciteSqlParser.compileToPinotQuery(
         "SELECT ts, SUM(revenue) FROM mv_baseTable_OFFLINE GROUP BY ts");
+    materializedViewServerQuery.putToQueryOptions(QueryOptionKey.TIMEOUT_MS, "15000");
 
     MaterializedViewRewritePlan plan = new MaterializedViewRewritePlan(
         materializedViewOfflineTable, MatchType.EXACT, ExecutionMode.SPLIT_REWRITE,
@@ -1695,16 +1855,20 @@ public class BaseSingleStageBrokerRequestHandlerTest {
         .addMetric("revenue", DataType.DOUBLE)
         .build();
 
-    /// Mock the handler directly so we can return a SPLIT context from `compile()` and assert
-    /// `executeSplit()` is NEVER called.  Using the concrete `DefaultMaterializedViewHandler`
-    /// would force us to thread a full split plan + dispatcher through the engine mock; the
-    /// direct handler mock is the minimal scaffolding needed to pin the explain-skip behavior.
+    // Bridge the MV callback to the real broker dispatcher so it rebuilds all final route requests.
     MaterializedViewHandler materializedViewHandler = mock(MaterializedViewHandler.class);
     when(materializedViewHandler.compile(any(MaterializedViewCompileContext.class)))
         .thenReturn(MaterializedViewContext.forSplitRewrite(
             plan, materializedViewServerQuery, materializedViewOfflineTable, materializedViewSchema));
     when(materializedViewHandler.executeSplit(any(MaterializedViewSplitExecutionContext.class)))
-        .thenThrow(new AssertionError("executeSplit must not run for EXPLAIN queries"));
+        .thenAnswer(invocation -> {
+          assertTrue(!explain, "executeSplit must not run for EXPLAIN queries");
+          MaterializedViewSplitExecutionContext context = invocation.getArgument(0);
+          return context.getDispatcher().dispatch(context.getOriginalBrokerRequest(),
+              context.getBaseServerPinotQuery().deepCopy(), context.getBaseRouteInfo(), context.getBaseSchema(),
+              materializedViewServerQuery.deepCopy(), materializedViewOfflineTable, materializedViewSchema,
+              context.getRemainingTimeMs());
+        });
 
     TableCache tableCache = mock(TableCache.class);
     when(tableCache.getActualTableName(baseRawTable)).thenReturn(baseRawTable);
@@ -1715,9 +1879,17 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     TenantConfig tenant = new TenantConfig("t_BROKER", "t_SERVER", null);
     when(tableCfg.getTenantConfig()).thenReturn(tenant);
     when(tableCache.getTableConfig(baseOfflineTable)).thenReturn(tableCfg);
+    if (!explain) {
+      when(tableCache.getTableConfig(baseRealtimeTable)).thenReturn(tableCfg);
+    }
+    when(tableCache.getTableConfig(materializedViewOfflineTable)).thenReturn(tableCfg);
 
     BrokerRoutingManager routingManager = mock(BrokerRoutingManager.class);
     when(routingManager.routingExists(baseOfflineTable)).thenReturn(true);
+    when(routingManager.routingExists(baseRealtimeTable)).thenReturn(!explain);
+    when(routingManager.routingExists(materializedViewOfflineTable)).thenReturn(true);
+    when(routingManager.getTimeBoundaryInfo(baseOfflineTable))
+        .thenReturn(new TimeBoundaryInfo("ts", "1772109900000"));
     when(routingManager.getQueryTimeoutMs(anyString())).thenReturn(10000L);
     RoutingTable rt = mock(RoutingTable.class);
     when(rt.getServerInstanceToSegmentsMap()).thenReturn(
@@ -1735,6 +1907,9 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     BrokerQueryEventListenerFactory.init(config);
 
     AtomicReference<BrokerRequest> capturedServerBrokerRequest = new AtomicReference<>();
+    AtomicReference<TableRouteInfo> capturedBaseRoute = new AtomicReference<>();
+    AtomicReference<TableRouteInfo> capturedViewRoute = new AtomicReference<>();
+    AtomicReference<Long> capturedTimeoutMs = new AtomicReference<>();
     BaseSingleStageBrokerRequestHandler handler =
         new BaseSingleStageBrokerRequestHandler(config, "broker1", new BrokerRequestIdGenerator(),
             routingManager, new AllowAllAccessControlFactory(), quotaManager, tableCache,
@@ -1761,19 +1936,50 @@ public class BaseSingleStageBrokerRequestHandlerTest {
               long materializedViewRequestId, BrokerRequest originalBrokerRequest, TableRouteInfo baseRoute,
               TableRouteInfo materializedViewRoute, long timeoutMs, ServerStats serverStats,
               RequestContext requestContext) {
-            Assert.fail("processMaterializedViewSplitBrokerRequest must not run for EXPLAIN queries");
-            return null;
+            if (explain) {
+              fail("processMaterializedViewSplitBrokerRequest must not run for EXPLAIN queries");
+            }
+            capturedBaseRoute.set(baseRoute);
+            capturedViewRoute.set(materializedViewRoute);
+            capturedTimeoutMs.set(timeoutMs);
+            return BrokerResponseNative.empty();
           }
         };
 
+    long beforeMs = System.currentTimeMillis();
     handler.handleRequest(userSql);
-    BrokerRequest serverBrokerRequest = capturedServerBrokerRequest.get();
-    Assert.assertNotNull(serverBrokerRequest,
-        "EXPLAIN must fall through to the standard explain handling — processBrokerRequest captures the request");
-    /// The standard explain path uses the BASE table, not the MV.  The split branch was skipped.
-    String serverTableName = serverBrokerRequest.getPinotQuery().getDataSource().getTableName();
-    Assert.assertEquals(serverTableName, baseOfflineTable,
-        "EXPLAIN must route to the base table, not the MV; SPLIT must not have swapped routing");
+    long afterMs = System.currentTimeMillis();
+    if (explain) {
+      BrokerRequest serverBrokerRequest = capturedServerBrokerRequest.get();
+      assertNotNull(serverBrokerRequest, "EXPLAIN must fall through to standard explain handling");
+      assertEquals(serverBrokerRequest.getPinotQuery().getDataSource().getTableName(), baseOfflineTable);
+      assertNull(capturedBaseRoute.get(), "EXPLAIN must not dispatch a split request");
+      return;
+    }
+
+    assertNull(capturedServerBrokerRequest.get(), "the split must not fall back to standard dispatch");
+    TableRouteInfo baseRoute = capturedBaseRoute.get();
+    TableRouteInfo viewRoute = capturedViewRoute.get();
+    assertNotNull(baseRoute, "the real dispatcher must reach the split dispatch boundary");
+    assertNotNull(viewRoute);
+    assertNotNull(baseRoute.getOfflineBrokerRequest());
+    assertNotNull(baseRoute.getRealtimeBrokerRequest());
+    assertNotNull(viewRoute.getOfflineBrokerRequest());
+    assertNull(viewRoute.getRealtimeBrokerRequest());
+    Map<String, String> offlineOptions = baseRoute.getOfflineBrokerRequest().getPinotQuery().getQueryOptions();
+    Map<String, String> realtimeOptions = baseRoute.getRealtimeBrokerRequest().getPinotQuery().getQueryOptions();
+    Map<String, String> viewOptions = viewRoute.getOfflineBrokerRequest().getPinotQuery().getQueryOptions();
+    assertEquals(offlineOptions.get(QueryOptionKey.TIMEOUT_MS), "30000");
+    assertEquals(realtimeOptions.get(QueryOptionKey.TIMEOUT_MS), "30000");
+    assertEquals(viewOptions.get(QueryOptionKey.TIMEOUT_MS), "15000");
+    String deadline = offlineOptions.get(QueryOptionKey.REQUEST_DEADLINE_MS);
+    assertNotNull(deadline, "the final hybrid base request needs a broker deadline");
+    assertEquals(realtimeOptions.get(QueryOptionKey.REQUEST_DEADLINE_MS), deadline);
+    assertEquals(viewOptions.get(QueryOptionKey.REQUEST_DEADLINE_MS), deadline);
+    long deadlineMs = Long.parseLong(deadline);
+    long timeoutMs = capturedTimeoutMs.get();
+    assertTrue(deadlineMs >= beforeMs + timeoutMs && deadlineMs <= afterMs + timeoutMs,
+        "the shared deadline must be refreshed from the split dispatch budget");
   }
 
   @Test
