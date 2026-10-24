@@ -188,6 +188,25 @@ public class ConcurrentMapPartitionDedupMetadataManagerWithoutTTLTest {
     metadataManager.close();
   }
 
+  @Test
+  public void testIsRecordPresentDoesNotInsert()
+      throws IOException {
+    ConcurrentMapPartitionDedupMetadataManager metadataManager =
+        new ConcurrentMapPartitionDedupMetadataManager(DedupTestUtils.REALTIME_TABLE_NAME, 0,
+            _dedupContextBuilder.build());
+    ImmutableSegmentImpl segment = DedupTestUtils.mockSegment(1, 1);
+    DedupRecordInfo recordInfo = new DedupRecordInfo(DedupTestUtils.getPrimaryKey(3), 3000);
+    Assert.assertFalse(metadataManager.isRecordPresent(recordInfo));
+    Assert.assertEquals(metadataManager.getNumPrimaryKeys(), 0);
+    Assert.assertFalse(metadataManager.checkRecordPresentOrUpdate(recordInfo, segment));
+    Assert.assertTrue(metadataManager.isRecordPresent(recordInfo));
+    Assert.assertEquals(metadataManager.getNumPrimaryKeys(), 1);
+    metadataManager.stop();
+    Assert.assertTrue(metadataManager.isRecordPresent(new DedupRecordInfo(DedupTestUtils.getPrimaryKey(4), 4000)),
+        "a stopped manager must not accept a write it can never claim");
+    metadataManager.close();
+  }
+
   private static DedupUtils.DedupRecordInfoReader generateDedupRecordInfoReader() {
     PrimaryKeyReader primaryKeyReader = Mockito.mock(PrimaryKeyReader.class);
     PinotSegmentColumnReader dedupTimeColumnReader = Mockito.mock(PinotSegmentColumnReader.class);
