@@ -59,7 +59,8 @@ import org.apache.pinot.spi.utils.TimestampIndexUtils;
 
 /// Index loading config with shared table-level state and segment-local mutable overrides.
 public class IndexLoadingConfig {
-  /// Instance config key, relative to `pinot.server.instance`, for reverting to eager serving metadata.
+  /// Instance config key, relative to `pinot.server.instance`, that enables mapped (file-backed)
+  /// serving metadata. Disabled by default.
   public static final String MAPPED_SEGMENT_METADATA_ENABLED = "segment.metadata.mmap.enabled";
   private static final int DEFAULT_REALTIME_AVG_MULTI_VALUE_COUNT = 2;
   public static final String READ_MODE_KEY = "readMode";
