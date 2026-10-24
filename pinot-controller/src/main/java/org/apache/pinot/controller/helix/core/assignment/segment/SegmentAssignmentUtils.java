@@ -39,6 +39,8 @@ import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.tier.Tier;
+import org.apache.pinot.spi.config.table.RoutingConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.Pairs;
@@ -47,6 +49,15 @@ import org.apache.pinot.spi.utils.Pairs;
 /// Utility class for segment assignment.
 public class SegmentAssignmentUtils {
   private SegmentAssignmentUtils() {
+  }
+
+  /// Returns whether the table uses strict replica-group routing, which requires all segments of a partition to be
+  /// hosted by the same instances (most upsert and dedup tables use it). The segment assignment pins the segments of
+  /// such a table to their partition, see [org.apache.pinot.common.assignment.PartitionAssignmentUtils].
+  public static boolean isStrictReplicaGroupRouting(TableConfig tableConfig) {
+    RoutingConfig routingConfig = tableConfig.getRoutingConfig();
+    return routingConfig != null && RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE.equalsIgnoreCase(
+        routingConfig.getInstanceSelectorType());
   }
 
   /// Returns the number of segments assigned to each instance.

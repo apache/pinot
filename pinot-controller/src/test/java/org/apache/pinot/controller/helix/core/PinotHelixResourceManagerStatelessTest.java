@@ -44,6 +44,7 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.MasterSlaveSMD;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.zkclient.exception.ZkBadVersionException;
+import org.apache.pinot.common.assignment.PartitionAssignmentUtils;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.lineage.LineageEntryState;
@@ -263,6 +264,22 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     _helixResourceManager.addInstance(instance, false);
     allInstances = _helixResourceManager.getAllInstances();
     assertTrue(allInstances.contains(instanceName));
+
+    // An instance in the partition assignment of a table cannot be dropped, although it hosts no segment
+    String tableNameWithType = "partitionPinnedTable_OFFLINE";
+    IdealState idealState = new IdealState(tableNameWithType);
+    idealState.setStateModelDefRef("OnlineOffline");
+    idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
+    idealState.setReplicas("1");
+    idealState.setNumPartitions(0);
+    PartitionAssignmentUtils.setInstances(idealState, 0, List.of(instanceName));
+    _helixAdmin.addResource(getHelixClusterName(), tableNameWithType, idealState);
+    try {
+      assertFalse(_helixResourceManager.instanceDropSafetyCheck(instanceName).isSafe());
+      assertFalse(_helixResourceManager.dropInstance(instanceName).isSuccessful());
+    } finally {
+      _helixAdmin.dropResource(getHelixClusterName(), tableNameWithType);
+    }
 
     // Remove the added instance
     assertTrue(_helixResourceManager.dropInstance(instanceName).isSuccessful());
