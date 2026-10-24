@@ -47,6 +47,7 @@ import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock.EarlyTerminationReason;
 import org.apache.pinot.core.operator.blocks.results.ExplainV2ResultBlock;
+import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.MetadataResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.plan.ExplainInfo;
@@ -727,11 +728,17 @@ public class LeafOperator extends MultiStageOperator implements ExplainableOpera
   }
 
   private RowHeapDataBlock composeDirectMseBlock(BaseResultsBlock block) {
-    List<Object[]> resultRows = block.getRows();
     DataSchema inputDataSchema = block.getDataSchema();
-    assert resultRows != null && inputDataSchema != null;
+    assert inputDataSchema != null;
     ColumnDataType[] inputStoredTypes = inputDataSchema.getStoredColumnDataTypes();
     ColumnDataType[] outputStoredTypes = _dataSchema.getStoredColumnDataTypes();
+    if (block instanceof GroupByResultsBlock groupByBlock && groupByBlock.getTable() != null
+        && Arrays.equals(inputStoredTypes, outputStoredTypes)) {
+      return new RowHeapDataBlock(groupByBlock.getTable(), _dataSchema,
+          _requests.get(0).getQueryContext().getAggregationFunctions());
+    }
+    List<Object[]> resultRows = block.getRows();
+    assert resultRows != null;
     if (!Arrays.equals(inputStoredTypes, outputStoredTypes)) {
       for (Object[] row : resultRows) {
         convertRow(row, inputStoredTypes, outputStoredTypes);
