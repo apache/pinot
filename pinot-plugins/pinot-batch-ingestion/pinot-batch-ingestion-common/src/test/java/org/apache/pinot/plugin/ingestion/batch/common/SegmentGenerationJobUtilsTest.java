@@ -19,6 +19,7 @@
 
 package org.apache.pinot.plugin.ingestion.batch.common;
 
+import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -33,15 +34,23 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.filesystem.FileMetadata;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentNameGeneratorSpec;
-import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
+import static org.testng.Assert.fail;
 
 
 public class SegmentGenerationJobUtilsTest {
@@ -62,43 +71,43 @@ public class SegmentGenerationJobUtilsTest {
 
   @Test
   public void testUseGlobalDirectorySequenceId() {
-    Assert.assertFalse(SegmentGenerationJobUtils.useGlobalDirectorySequenceId(null));
+    assertFalse(SegmentGenerationJobUtils.useGlobalDirectorySequenceId(null));
     SegmentNameGeneratorSpec spec = new SegmentNameGeneratorSpec();
-    Assert.assertFalse(SegmentGenerationJobUtils.useGlobalDirectorySequenceId(spec));
+    assertFalse(SegmentGenerationJobUtils.useGlobalDirectorySequenceId(spec));
     spec.setConfigs(new HashMap<>());
-    Assert.assertFalse(SegmentGenerationJobUtils.useGlobalDirectorySequenceId(spec));
+    assertFalse(SegmentGenerationJobUtils.useGlobalDirectorySequenceId(spec));
     spec.setConfigs(Map.of("use.global.directory.sequence.id", "false"));
-    Assert.assertFalse(SegmentGenerationJobUtils.useGlobalDirectorySequenceId(spec));
+    assertFalse(SegmentGenerationJobUtils.useGlobalDirectorySequenceId(spec));
     spec.setConfigs(Map.of("use.global.directory.sequence.id", "FALSE"));
-    Assert.assertFalse(SegmentGenerationJobUtils.useGlobalDirectorySequenceId(spec));
+    assertFalse(SegmentGenerationJobUtils.useGlobalDirectorySequenceId(spec));
     spec.setConfigs(Map.of("use.global.directory.sequence.id", "True"));
-    Assert.assertTrue(SegmentGenerationJobUtils.useGlobalDirectorySequenceId(spec));
+    assertTrue(SegmentGenerationJobUtils.useGlobalDirectorySequenceId(spec));
     spec.setConfigs(Map.of("local.directory.sequence.id", "true"));
-    Assert.assertFalse(SegmentGenerationJobUtils.useGlobalDirectorySequenceId(spec));
+    assertFalse(SegmentGenerationJobUtils.useGlobalDirectorySequenceId(spec));
     spec.setConfigs(Map.of("local.directory.sequence.id", "TRUE"));
-    Assert.assertFalse(SegmentGenerationJobUtils.useGlobalDirectorySequenceId(spec));
+    assertFalse(SegmentGenerationJobUtils.useGlobalDirectorySequenceId(spec));
     spec.setConfigs(Map.of("local.directory.sequence.id", "False"));
-    Assert.assertTrue(SegmentGenerationJobUtils.useGlobalDirectorySequenceId(spec));
+    assertTrue(SegmentGenerationJobUtils.useGlobalDirectorySequenceId(spec));
   }
 
   @Test
   public void testGetStagingCopyParallelism() {
-    Assert.assertEquals(SegmentGenerationJobUtils.getStagingCopyParallelism(null),
+    assertEquals(SegmentGenerationJobUtils.getStagingCopyParallelism(null),
         SegmentGenerationJobUtils.DEFAULT_STAGING_COPY_PARALLELISM);
-    Assert.assertEquals(SegmentGenerationJobUtils.getStagingCopyParallelism(Map.of()),
+    assertEquals(SegmentGenerationJobUtils.getStagingCopyParallelism(Map.of()),
         SegmentGenerationJobUtils.DEFAULT_STAGING_COPY_PARALLELISM);
-    Assert.assertEquals(SegmentGenerationJobUtils.getStagingCopyParallelism(
+    assertEquals(SegmentGenerationJobUtils.getStagingCopyParallelism(
             Map.of(SegmentGenerationJobUtils.STAGING_COPY_PARALLELISM, "4")), 4);
-    Assert.assertEquals(SegmentGenerationJobUtils.getStagingCopyParallelism(
+    assertEquals(SegmentGenerationJobUtils.getStagingCopyParallelism(
             Map.of(SegmentGenerationJobUtils.STAGING_COPY_PARALLELISM, "0")),
         SegmentGenerationJobUtils.DEFAULT_STAGING_COPY_PARALLELISM);
-    Assert.assertEquals(SegmentGenerationJobUtils.getStagingCopyParallelism(
+    assertEquals(SegmentGenerationJobUtils.getStagingCopyParallelism(
             Map.of(SegmentGenerationJobUtils.STAGING_COPY_PARALLELISM, "-1")),
         SegmentGenerationJobUtils.DEFAULT_STAGING_COPY_PARALLELISM);
-    Assert.assertEquals(SegmentGenerationJobUtils.getStagingCopyParallelism(
+    assertEquals(SegmentGenerationJobUtils.getStagingCopyParallelism(
             Map.of(SegmentGenerationJobUtils.STAGING_COPY_PARALLELISM, "not-a-number")),
         SegmentGenerationJobUtils.DEFAULT_STAGING_COPY_PARALLELISM);
-    Assert.assertEquals(SegmentGenerationJobUtils.getStagingCopyParallelism(
+    assertEquals(SegmentGenerationJobUtils.getStagingCopyParallelism(
             Map.of(SegmentGenerationJobUtils.STAGING_COPY_PARALLELISM, "999")),
         SegmentGenerationJobUtils.MAX_STAGING_COPY_PARALLELISM);
   }
@@ -128,9 +137,9 @@ public class SegmentGenerationJobUtilsTest {
     LocalPinotFS fs = new LocalPinotFS();
     SegmentGenerationJobUtils.moveFiles(fs, sourceDir.toURI(), destDir.toURI(), false, 2);
 
-    Assert.assertEquals(FileUtils.readFileToString(new File(destDir, "seg.tar.gz"), StandardCharsets.UTF_8), "old");
+    assertEquals(FileUtils.readFileToString(new File(destDir, "seg.tar.gz"), StandardCharsets.UTF_8), "old");
     // Source left in place when destination was not overwritten
-    Assert.assertTrue(new File(sourceDir, "seg.tar.gz").exists());
+    assertTrue(new File(sourceDir, "seg.tar.gz").exists());
   }
 
   @Test
@@ -146,8 +155,8 @@ public class SegmentGenerationJobUtilsTest {
     LocalPinotFS fs = new LocalPinotFS();
     SegmentGenerationJobUtils.moveFiles(fs, sourceDir.toURI(), destDir.toURI(), true, 2);
 
-    Assert.assertEquals(FileUtils.readFileToString(new File(destDir, "seg.tar.gz"), StandardCharsets.UTF_8), "new");
-    Assert.assertFalse(new File(sourceDir, "seg.tar.gz").exists());
+    assertEquals(FileUtils.readFileToString(new File(destDir, "seg.tar.gz"), StandardCharsets.UTF_8), "new");
+    assertFalse(new File(sourceDir, "seg.tar.gz").exists());
   }
 
   @Test
@@ -173,9 +182,9 @@ public class SegmentGenerationJobUtilsTest {
 
     try {
       SegmentGenerationJobUtils.moveFiles(fs, sourceDir.toURI(), destDir.toURI(), true, 4);
-      Assert.fail("Expected IOException when one move fails");
+      fail("Expected IOException when one move fails");
     } catch (IOException e) {
-      Assert.assertTrue(e.getMessage().contains("bad.tar.gz") || (e.getCause() != null && e.getCause().getMessage()
+      assertTrue(e.getMessage().contains("bad.tar.gz") || (e.getCause() != null && e.getCause().getMessage()
           .contains("bad.tar.gz")) || e.getMessage().contains("simulated move failure"), e.getMessage());
     }
   }
@@ -212,8 +221,8 @@ public class SegmentGenerationJobUtilsTest {
     // A direct caller of the overload must not be able to bypass the MAX_STAGING_COPY_PARALLELISM cap.
     SegmentGenerationJobUtils.moveFiles(fs, sourceDir.toURI(), destDir.toURI(), true, Integer.MAX_VALUE);
 
-    Assert.assertEquals(destDir.list().length, fileCount);
-    Assert.assertTrue(workerThreads.size() <= SegmentGenerationJobUtils.MAX_STAGING_COPY_PARALLELISM,
+    assertEquals(destDir.list().length, fileCount);
+    assertTrue(workerThreads.size() <= SegmentGenerationJobUtils.MAX_STAGING_COPY_PARALLELISM,
         "Used " + workerThreads.size() + " threads for " + fileCount + " files");
   }
 
@@ -237,31 +246,31 @@ public class SegmentGenerationJobUtilsTest {
     SegmentGenerationJobUtils.moveFiles(fs, sourceDir.toURI(), destDir.toURI(), false, 2);
 
     // The caller's flag has to reach PinotFS.move, which re-checks the destination itself.
-    Assert.assertEquals(observedOverwriteFlags.size(), 1);
-    Assert.assertFalse(observedOverwriteFlags.get(0));
-    Assert.assertEquals(FileUtils.readFileToString(new File(destDir, "seg.tar.gz"), StandardCharsets.UTF_8), "new");
+    assertEquals(observedOverwriteFlags.size(), 1);
+    assertFalse(observedOverwriteFlags.get(0));
+    assertEquals(FileUtils.readFileToString(new File(destDir, "seg.tar.gz"), StandardCharsets.UTF_8), "new");
   }
 
   @Test
-  public void testMoveFilesTreatsFalseMoveResultAsSkip()
+  public void testMoveFilesFalseMoveResultSkipsOnlyWhenDestinationExistsAndNoOverwrite()
       throws Exception {
-    File sourceDir = new File(_tempDir, "src");
-    File destDir = new File(_tempDir, "dest");
-    FileUtils.forceMkdir(sourceDir);
-    FileUtils.forceMkdir(destDir);
-    FileUtils.writeStringToFile(new File(sourceDir, "seg.tar.gz"), "new", StandardCharsets.UTF_8);
-    PinotFS fs = new LocalPinotFS() {
-      @Override
-      public boolean move(URI srcUri, URI dstUri, boolean overwrite) {
-        // What PinotFS.move does when the destination appeared after the exists() pre-check.
-        return false;
-      }
-    };
+    // A concurrent writer created the destination between the exists() pre-check and move().
+    moveWithFalseResult(false, true);
 
-    SegmentGenerationJobUtils.moveFiles(fs, sourceDir.toURI(), destDir.toURI(), false, 2);
+    assertEquals(FileUtils.readFileToString(new File(_tempDir, "dest/seg.tar.gz"), StandardCharsets.UTF_8), "other");
+    assertTrue(new File(_tempDir, "src/seg.tar.gz").exists());
+  }
 
-    Assert.assertEquals(destDir.list().length, 0);
-    Assert.assertTrue(new File(sourceDir, "seg.tar.gz").exists());
+  @Test
+  public void testMoveFilesFalseMoveResultFailsWithoutDestination()
+      throws Exception {
+    expectThrows(IOException.class, () -> moveWithFalseResult(false, false));
+  }
+
+  @Test
+  public void testMoveFilesFalseMoveResultFailsWhenOverwriting()
+      throws Exception {
+    expectThrows(IOException.class, () -> moveWithFalseResult(true, true));
   }
 
   @Test
@@ -280,7 +289,7 @@ public class SegmentGenerationJobUtilsTest {
 
     SegmentGenerationJobUtils.moveFiles(fs, sourceDir.toURI(), destDir.toURI(), true, 2);
 
-    Assert.assertEquals(FileUtils.readFileToString(new File(destDir, "part-a/seg.tar.gz"), StandardCharsets.UTF_8),
+    assertEquals(FileUtils.readFileToString(new File(destDir, "part-a/seg.tar.gz"), StandardCharsets.UTF_8),
         "content");
   }
 
@@ -312,14 +321,93 @@ public class SegmentGenerationJobUtilsTest {
     Thread.currentThread().interrupt();
     try {
       SegmentGenerationJobUtils.moveFiles(fs, sourceDir.toURI(), destDir.toURI(), true, 4);
-      Assert.fail("Expected IOException when the caller is interrupted");
+      fail("Expected IOException when the caller is interrupted");
     } catch (IOException e) {
       // Thread.interrupted() also clears the flag so it cannot leak into the next test.
-      Assert.assertTrue(Thread.interrupted(), "Interrupt status must be restored");
-      Assert.assertTrue(e.getMessage().contains("Interrupted"), e.getMessage());
+      assertTrue(Thread.interrupted(), "Interrupt status must be restored");
+      assertTrue(e.getMessage().contains("Interrupted"), e.getMessage());
     }
-    // Outstanding moves are cancelled rather than awaited, so nothing reaches the destination.
-    Assert.assertEquals(destDir.list().length, 0);
+    // Outstanding moves are cancelled, so nothing reaches the destination.
+    assertEquals(destDir.list().length, 0);
+  }
+
+  @Test
+  public void testMoveFilesInterruptedWaitsForInFlightMoves()
+      throws Exception {
+    File sourceDir = new File(_tempDir, "src");
+    File destDir = new File(_tempDir, "dest");
+    FileUtils.forceMkdir(sourceDir);
+    FileUtils.forceMkdir(destDir);
+    int fileCount = 2;
+    for (int i = 0; i < fileCount; i++) {
+      FileUtils.writeStringToFile(new File(sourceDir, "seg-" + i + ".tar.gz"), "c" + i, StandardCharsets.UTF_8);
+    }
+    CountDownLatch movesStarted = new CountDownLatch(fileCount);
+    CountDownLatch workersInterrupted = new CountDownLatch(fileCount);
+    CountDownLatch release = new CountDownLatch(1);
+    AtomicInteger movesFinished = new AtomicInteger();
+    PinotFS fs = new LocalPinotFS() {
+      @Override
+      public boolean move(URI srcUri, URI dstUri, boolean overwrite)
+          throws IOException {
+        movesStarted.countDown();
+        try {
+          release.await();
+        } catch (InterruptedException e) {
+          // A move that ignores the interrupt, like a remote copy that is already under way.
+          workersInterrupted.countDown();
+          Uninterruptibles.awaitUninterruptibly(release);
+        }
+        boolean moved = super.move(srcUri, dstUri, overwrite);
+        movesFinished.incrementAndGet();
+        return moved;
+      }
+    };
+    AtomicInteger movesFinishedAtReturn = new AtomicInteger(-1);
+    AtomicReference<Throwable> failure = new AtomicReference<>();
+    AtomicBoolean interruptRestored = new AtomicBoolean();
+    Thread driver = new Thread(() -> {
+      try {
+        SegmentGenerationJobUtils.moveFiles(fs, sourceDir.toURI(), destDir.toURI(), true, fileCount);
+      } catch (Throwable t) {
+        failure.set(t);
+      }
+      movesFinishedAtReturn.set(movesFinished.get());
+      interruptRestored.set(Thread.interrupted());
+    });
+    driver.start();
+
+    movesStarted.await();
+    driver.interrupt();
+    workersInterrupted.await();
+    release.countDown();
+    driver.join();
+
+    // The runners delete the staging dir as soon as moveFiles returns, so no move may still be running then.
+    assertEquals(movesFinishedAtReturn.get(), fileCount);
+    assertTrue(failure.get() instanceof IOException, String.valueOf(failure.get()));
+    assertTrue(interruptRestored.get(), "Interrupt status must be restored");
+  }
+
+  private void moveWithFalseResult(boolean overwrite, boolean destinationAppears)
+      throws Exception {
+    File sourceDir = new File(_tempDir, "src");
+    File destDir = new File(_tempDir, "dest");
+    FileUtils.forceMkdir(sourceDir);
+    FileUtils.forceMkdir(destDir);
+    FileUtils.writeStringToFile(new File(sourceDir, "seg.tar.gz"), "new", StandardCharsets.UTF_8);
+    PinotFS fs = new LocalPinotFS() {
+      @Override
+      public boolean move(URI srcUri, URI dstUri, boolean overwrite)
+          throws IOException {
+        if (destinationAppears) {
+          FileUtils.writeStringToFile(new File(dstUri), "other", StandardCharsets.UTF_8);
+        }
+        return false;
+      }
+    };
+
+    SegmentGenerationJobUtils.moveFiles(fs, sourceDir.toURI(), destDir.toURI(), overwrite, 1);
   }
 
   private void runMoveAndAssertLayout(int parallelism)
@@ -345,12 +433,12 @@ public class SegmentGenerationJobUtilsTest {
 
     for (String relative : expectedRelativePaths) {
       File destFile = new File(destDir, relative);
-      Assert.assertTrue(destFile.exists(), "Missing dest file: " + relative);
+      assertTrue(destFile.exists(), "Missing dest file: " + relative);
       int start = relative.lastIndexOf("seg-") + 4;
       int end = relative.indexOf('.', start);
       String expectedContent = "content-" + relative.substring(start, end);
-      Assert.assertEquals(FileUtils.readFileToString(destFile, StandardCharsets.UTF_8), expectedContent);
-      Assert.assertFalse(new File(sourceDir, relative).exists(), "Source should be moved: " + relative);
+      assertEquals(FileUtils.readFileToString(destFile, StandardCharsets.UTF_8), expectedContent);
+      assertFalse(new File(sourceDir, relative).exists(), "Source should be moved: " + relative);
     }
   }
 }

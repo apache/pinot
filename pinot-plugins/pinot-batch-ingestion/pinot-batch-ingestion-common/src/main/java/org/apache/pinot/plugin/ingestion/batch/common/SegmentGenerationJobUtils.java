@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.ingestion.batch.common;
 
+import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
@@ -140,7 +141,8 @@ public class SegmentGenerationJobUtils implements Serializable {
   ///
   /// On partial failure, remaining in-flight moves are allowed to finish, then an [IOException] is thrown
   /// with any additional failures attached as suppressed exceptions. On interruption, all outstanding
-  /// moves are cancelled, the interrupt status is restored, and an [IOException] is thrown.
+  /// moves are cancelled, moves already in progress are awaited, the interrupt status is restored, and an
+  /// [IOException] is thrown. This method never returns while a worker is still inside [PinotFS#move].
   ///
   /// @param fs filesystem used for both source and destination (must be safe for concurrent move of
   ///     distinct paths)
@@ -211,6 +213,9 @@ public class SegmentGenerationJobUtils implements Serializable {
       }
     } finally {
       executor.shutdownNow();
+      // Callers delete the staging dir once this returns, so an interrupted move must not still be running.
+      // ponytail: unbounded wait; a hung move hangs the job rather than racing the runners' staging cleanup
+      Uninterruptibles.awaitTerminationUninterruptibly(executor);
     }
   }
 
@@ -279,8 +284,11 @@ public class SegmentGenerationJobUtils implements Serializable {
     // The exists() check above is only a cheap short-circuit; passing the flag down lets PinotFS.move reject a
     // destination that showed up in between, which parallel moves make more likely.
     if (!fs.move(sourceFileUri, destFileUri, overwrite)) {
-      LOGGER.warn("Skipped moving {} to {}, move returned false (destination may already exist)", sourceFileUri,
-          destFileUri);
+      if (!overwrite && fs.exists(destFileUri)) {
+        LOGGER.warn("Can't overwrite existing output segment tar file: {}", destFileUri);
+        return;
+      }
+      throw new IOException("Failed to move " + sourceFileUri + " to " + destFileUri);
     }
   }
 }
