@@ -40,6 +40,7 @@ import org.apache.lucene.search.Sort;
 import org.apache.lucene.search.SortField;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
+import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCombined;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
@@ -56,6 +57,7 @@ import static org.mockito.Mockito.verify;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -134,6 +136,31 @@ public class LuceneTextIndexCompatibleTest {
       try (LuceneTextIndexReader reader = new LuceneTextIndexReader(COLUMN, segmentDir, PINOT_IDS.length, config)) {
         assertEquals(reader.getDocIds("matchall", null).toArray(),
             deleteDocument ? new int[]{1, 2, 3} : new int[]{0, 1, 2, 3});
+      }
+    } finally {
+      FileUtils.deleteDirectory(segmentDir);
+    }
+  }
+
+  @Test
+  public void testLegacyCombinedIndexWithoutMappingBuffer()
+      throws IOException {
+    File segmentDir = Files.createTempDirectory("lucene-legacy-combined").toFile();
+    try {
+      File indexDir = writeMappedIndex(segmentDir, "none", false, false);
+      File combinedFile = new File(segmentDir, COLUMN + V1Constants.Indexes.LUCENE_COMBINE_TEXT_INDEX_FILE_EXTENSION);
+      LuceneTextIndexCombined.combineLuceneIndexFiles(indexDir, combinedFile.toString());
+      FileUtils.deleteDirectory(indexDir);
+      TextIndexConfig config = new TextIndexConfigBuilder().setStoreInSegmentFile(true)
+          .withDocIdTranslatorMode(DocIdTranslatorMode.Default.name()).build();
+      try (PinotDataBuffer buffer = PinotDataBuffer.mapFile(combinedFile, true, 0, combinedFile.length(),
+          ByteOrder.LITTLE_ENDIAN, "legacy combined text index test")) {
+        assertNull(LuceneTextIndexBufferReader.extractDocIdMappingBuffer(buffer, COLUMN));
+        try (LuceneTextIndexReader reader = new LuceneTextIndexReader(COLUMN, buffer, PINOT_IDS.length, config)) {
+          assertEquals(reader.getDocIds("tokenzero", null).toArray(), new int[]{2});
+          assertEquals(reader.getDocIds("tokentwo", null).toArray(), new int[]{3});
+          assertEquals(reader.getDocIds("matchall", null).toArray(), new int[]{0, 1, 2, 3});
+        }
       }
     } finally {
       FileUtils.deleteDirectory(segmentDir);

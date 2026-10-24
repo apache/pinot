@@ -42,10 +42,12 @@ import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.NRTCachingDirectory;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.LuceneNRTCachingMergePolicy;
 import org.apache.pinot.segment.local.segment.index.text.AbstractTextIndexCreator;
+import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
+import org.apache.pinot.segment.spi.index.TextIndexConfig.DocIdTranslatorMode;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.slf4j.Logger;
@@ -255,18 +257,30 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
   private void buildMappingFile(File segmentIndexDir, String column, Directory directory,
       @Nullable int[] mutableToImmutableDocIdMap)
       throws IOException {
+    if (_config.getDocIdTranslatorMode() == DocIdTranslatorMode.Skip) {
+      return;
+    }
     try (IndexReader indexReader = DirectoryReader.open(directory)) {
       int numDocs = indexReader.numDocs();
       int length = Integer.BYTES * numDocs;
       File docIdMappingFile = new File(SegmentDirectoryPaths.findSegmentDirectory(segmentIndexDir),
           column + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
       String desc = "Text index docId mapping buffer: " + column;
+      boolean isIdentityMapping;
       try (PinotDataBuffer buffer = PinotDataBuffer.mapFile(docIdMappingFile, /* readOnly */ false, 0, length,
           ByteOrder.LITTLE_ENDIAN, desc)) {
-        TextIndexUtils.fillDocIdMapping(indexReader, buffer, numDocs, mutableToImmutableDocIdMap);
+        isIdentityMapping = TextIndexUtils.fillDocIdMapping(indexReader, buffer, numDocs, mutableToImmutableDocIdMap);
       } catch (Exception e) {
         throw new RuntimeException(
             "Caught exception while building mutable to immutable doc id mapping for text index column: " + column, e);
+      }
+      if (_config.getDocIdTranslatorMode() == DocIdTranslatorMode.TryOptimize) {
+        if (isIdentityMapping) {
+          FileUtils.delete(docIdMappingFile);
+        }
+        DocIdTranslatorMode mode = isIdentityMapping ? DocIdTranslatorMode.Skip : DocIdTranslatorMode.Default;
+        TextIndexConfig newConfig = new TextIndexConfigBuilder(_config).withDocIdTranslatorMode(mode.name()).build();
+        TextIndexUtils.writeConfigToPropertiesFile(_indexFile, newConfig);
       }
     }
   }
@@ -318,8 +332,11 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
     // Keep the stored field for older readers. Immutable indexes add doc values to avoid decompressing every stored
     // document on segment load and retain the actual Pinot id when Lucene flushes or merges reorder documents.
     document.add(new StoredField(PINOT_DOC_ID_STORED_FIELD_NAME, docId));
+    // Combined indexes persist the mapping at build time; Skip mode does not need a mapping.
     // A TEXT column with this name must keep the stored-field fallback to avoid conflicting Lucene field schemas.
-    if (_commitOnClose && !_textColumn.equals(PINOT_DOC_ID_DOC_VALUES_FIELD_NAME)) {
+    if (_commitOnClose && !_config.isStoreInSegmentFile()
+        && _config.getDocIdTranslatorMode() != DocIdTranslatorMode.Skip
+        && !_textColumn.equals(PINOT_DOC_ID_DOC_VALUES_FIELD_NAME)) {
       document.add(new NumericDocValuesField(PINOT_DOC_ID_DOC_VALUES_FIELD_NAME, docId));
     }
   }
