@@ -126,7 +126,8 @@ public class PinotAggregateTypeArgumentRewriteRule extends RelOptRule {
 
   /// Returns the data type argument to add, or `null` when the call already has one or is not such a call. Throws for
   /// a data argument without an explicit form, such as an array from a multi-value column in FIRST_WITH_TIME. The
-  /// mapped types match the single-stage `AggregateFunctionRewriteOptimizer`.
+  /// mapped types match the single-stage `AggregateFunctionRewriteOptimizer`, except for an ARRAY_AGG of a DECIMAL with
+  /// scale 0, which only an expression can produce.
   @Nullable
   private static String getDataTypeArgument(AggregateCall aggCall, RelNode input) {
     List<Integer> argList = aggCall.getArgList();

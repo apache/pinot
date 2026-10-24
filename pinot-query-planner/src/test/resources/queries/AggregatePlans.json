@@ -237,6 +237,19 @@
         ]
       },
       {
+        "description": "ARRAY_AGG without a data type follows the planner's array type for a DECIMAL with scale 0",
+        "sql": "EXPLAIN PLAN FOR SELECT ARRAY_AGG(CAST(a.col3 AS DECIMAL(5, 0))), ARRAY_AGG(CAST(a.col7 AS DECIMAL(20, 0)), true), ARRAY_AGG(CAST(a.col7 AS DECIMAL(39, 0))) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{}], agg#0=[ARRAYAGG($0, _UTF-8'INT')], agg#1=[ARRAYAGG($1, _UTF-8'LONG', true)], agg#2=[ARRAYAGG($2, _UTF-8'BIG_DECIMAL')], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash])",
+          "\n    PinotLogicalAggregate(group=[{}], agg#0=[ARRAYAGG($0, _UTF-8'INT')], agg#1=[ARRAYAGG($1, _UTF-8'LONG', true)], agg#2=[ARRAYAGG($3, _UTF-8'BIG_DECIMAL')], aggType=[LEAF])",
+          "\n      LogicalProject($f0=[CAST($2):DECIMAL(5, 0) NOT NULL], $f1=[CAST($6):DECIMAL(20, 0) NOT NULL], $f2=[true], $f3=[CAST($6):DECIMAL(39, 0) NOT NULL], $f4=[_UTF-8'INT'], $f5=[_UTF-8'LONG'], $f6=[_UTF-8'BIG_DECIMAL'])",
+          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
         "description": "ARRAY_AGG without a data type rejects an unsupported expression type",
         "sql": "EXPLAIN PLAN FOR SELECT ARRAY_AGG(CAST(a.col1 AS DATE), true) FROM a",
         "expectedException": ".*Unsupported data type for .*\\(expression\\): DATE.*"
