@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 
 
@@ -3132,13 +3133,21 @@ public class CommonConstants {
     public static final int DEFAULT_INGESTION_EXCEPTION_LOG_RATE_LIMIT_PER_MIN = 5;
   }
 
-  /// Configuration for setting up groovy static analyzer.
+  /// Configuration for ingestion Groovy and the Groovy static analyzer.
   /// User can config different configuration for query and ingestion (table creation and update) static analyzer.
   /// The all configuration is the default configuration for both query and ingestion static analyzer.
   public static class Groovy {
+    /// Cluster-only switch for ingestion Groovy. Query Groovy remains independently controlled.
+    public static final String DISABLE_INGESTION_GROOVY = "controller.disable.ingestion.groovy";
+    public static final boolean DEFAULT_DISABLE_INGESTION_GROOVY = true;
     public static final String GROOVY_ALL_STATIC_ANALYZER_CONFIG = "pinot.groovy.all.static.analyzer";
     public static final String GROOVY_QUERY_STATIC_ANALYZER_CONFIG = "pinot.groovy.query.static.analyzer";
     public static final String GROOVY_INGESTION_STATIC_ANALYZER_CONFIG = "pinot.groovy.ingestion.static.analyzer";
+
+    /// Only an explicit false enables ingestion Groovy; absent or malformed values fail closed.
+    public static boolean isIngestionGroovyDisabled(@Nullable String value) {
+      return value == null || !value.trim().equalsIgnoreCase("false");
+    }
   }
 
   /// ZK paths used by Pinot.
