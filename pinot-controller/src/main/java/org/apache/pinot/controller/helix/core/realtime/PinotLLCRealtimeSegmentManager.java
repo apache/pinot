@@ -3151,7 +3151,8 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
   /// Segments counted as unrecoverable are those this pass cannot repair or cannot issue a repair for: skipped by the
   /// policy above, with no replica left consuming, with nothing but a possible local copy to load from, with no server
   /// to re-ingest on, or whose re-ingestion trigger or reset fails. A failed reset fails the call once every segment
-  /// is processed.
+  /// is processed. Each reset that could not be sent and each failed re-ingestion trigger is also counted, once per
+  /// segment per pass and for every table, in [ControllerMeter#LLC_ERROR_SEGMENT_REPAIR_FAILURES].
   ///
   /// @param tableConfig The table config
   public void repairSegmentsInErrorState(TableConfig tableConfig,
@@ -3282,6 +3283,8 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
         } catch (Exception e) {
           unrecoverableSegments.add(segmentName);
           LOGGER.error("Failed to trigger re-ingestion for segment: {} on server: {}", segmentName, aliveServer, e);
+          _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_ERROR_SEGMENT_REPAIR_FAILURES,
+              1L);
         }
         continue;
       }
@@ -3337,6 +3340,10 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
         segmentsToReset.isEmpty() ? Set.of() : _helixResourceManager.resetErrorReplicas(realtimeTableName,
             segmentsToReset);
     unrecoverableSegments.addAll(segmentsFailedToReset);
+    if (!segmentsFailedToReset.isEmpty()) {
+      _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_ERROR_SEGMENT_REPAIR_FAILURES,
+          segmentsFailedToReset.size());
+    }
     if (isPauselessTable) {
       _controllerMetrics.setOrUpdateTableGauge(realtimeTableName,
           ControllerGauge.PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT, unrecoverableSegments.size());

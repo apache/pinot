@@ -59,6 +59,11 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   LLC_SEGMENTS_DEEP_STORE_UPLOAD_RETRY_SUCCESS("LLCSegmentDeepStoreUploadRetrySuccess", false),
   LLC_SEGMENTS_DEEP_STORE_UPLOAD_RETRY_ERROR("LLCSegmentDeepStoreUploadRetryError", false),
   SEGMENT_MISSING_DEEP_STORE_LINK("RealtimeSegmentMissingDeepStoreLink", false),
+  // Number of ERROR-segment repairs the periodic repair pass failed to initiate: a reset that could not be sent, or a
+  // re-ingestion trigger that failed. Counted once per affected segment per pass, so a segment that fails again on a
+  // later pass is counted again. Repairs skipped by policy, and repairs that fail asynchronously after they were sent,
+  // are not counted.
+  LLC_ERROR_SEGMENT_REPAIR_FAILURES("failures", false),
   DELETED_TMP_SEGMENT_COUNT("DeletedTmpSegmentCount", false),
   TABLE_REBALANCE_FAILURE_DETECTED("TableRebalanceFailureDetected", false),
   TABLE_REBALANCE_RETRY("TableRebalanceRetry", false),
