@@ -21,6 +21,7 @@ package org.apache.pinot.client.grpc;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.pinot.client.AbstractResultSet;
 import org.apache.pinot.client.TextTable;
 import org.apache.pinot.common.proto.Broker;
@@ -68,9 +69,16 @@ public class GrpcResultSet extends AbstractResultSet {
     return _columnDataTypesArray.get(columnIndex);
   }
 
+  @Nullable
   @Override
   public String getString(int rowIndex, int columnIndex) {
-    return _currentBatchRows.getRows().get(rowIndex)[columnIndex].toString();
+    Object value = _currentBatchRows.getRows().get(rowIndex)[columnIndex];
+    if (value != null) {
+      return value.toString();
+    }
+    // Keep the established getString() contract for existing types. VARIANT alone needs Java null so callers can
+    // distinguish SQL null from the encoded Variant null, whose canonical JSON representation is the string "null".
+    return "VARIANT".equals(getColumnDataType(columnIndex)) ? null : "null";
   }
 
   public List<String> getAllColumns() {
@@ -114,7 +122,8 @@ public class GrpcResultSet extends AbstractResultSet {
       String[] columnValues = new String[numColumns];
       for (int c = 0; c < numColumns; c++) {
         try {
-          columnValues[c] = getString(r, c);
+          String value = getString(r, c);
+          columnValues[c] = value != null ? value : "null";
         } catch (Exception e) {
           columnNames[c] = "ERROR";
         }
