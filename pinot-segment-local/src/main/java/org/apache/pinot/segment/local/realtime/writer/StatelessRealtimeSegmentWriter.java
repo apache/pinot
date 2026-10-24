@@ -79,9 +79,16 @@ import org.slf4j.LoggerFactory;
 
 /// Segment writer to ingest streaming data from a start offset to an end offset.
 ///
-/// A batch that reports data loss (records between the requested offset and the batch were deleted from the stream
-/// before they could be replayed) fails the replay before anything from it is indexed: the replayed segment would
-/// otherwise silently miss part of its offset range.
+/// Like `RealtimeSegmentDataManager`, the writer adopts the next offset of a batch without unfiltered messages when
+/// it is ahead of its own. A Kafka consumer, for one, moves past transaction control records without returning
+/// anything, so such a batch can report a next offset ahead of the requested one, either because only commit/abort
+/// markers were skipped (routine on a transactional topic) or because the client reset after an out-of-range fetch.
+/// The consumer validates such a move before reporting it and flags a reset as data loss, on the empty batch itself
+/// or on the next batch that returns records, and the writer fails the replay on any batch reporting data loss
+/// before anything from it is indexed. Adopting the move matters for ranges whose tail holds no records: a segment
+/// committed on an idle transactional partition ends one past the last commit marker, an offset no record's next
+/// offset produces, so a writer that waited for a record at or after the end offset would run into the caller's
+/// consumption timeout on an idle stream.
 ///
 /// TODO:
 ///   1. Clean up this class and only keep the necessary parts.
@@ -278,6 +285,14 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
           MessageBatch messageBatch = _consumer.fetchMessages(_currentOffset, _fetchTimeoutMs);
           Preconditions.checkState(!messageBatch.hasDataLoss(), "Stream data loss at offset %s while replaying to %s",
               _currentOffset, _endOffset);
+          if (messageBatch.getUnfilteredMessageCount() == 0) {
+            // Adopt a position the stream moved to without delivering anything (see the class Javadoc), else poll again
+            StreamPartitionMsgOffset nextBatchOffset = messageBatch.getOffsetOfNextBatch();
+            if (nextBatchOffset != null && nextBatchOffset.compareTo(_currentOffset) > 0) {
+              _currentOffset = nextBatchOffset;
+            }
+            continue;
+          }
 
           int messageCount = messageBatch.getMessageCount();
 

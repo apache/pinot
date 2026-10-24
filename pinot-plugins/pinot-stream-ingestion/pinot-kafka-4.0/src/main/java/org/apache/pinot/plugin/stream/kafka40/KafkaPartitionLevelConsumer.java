@@ -59,9 +59,9 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
   // Offset the caller should ask for NEXT, reported as the batch's offsetOfNextBatch. -1 means the consumer has not
   // been positioned for any caller-requested startOffset yet (we have not issued a seek). After a fetch that
   // returned records, this is lastRecord.offset + 1 (the caller may stop processing mid-batch and ask for an offset
-  // inside the batch again). After an empty fetch, this is the consumer's actual KafkaConsumer.position(), which may
-  // have advanced past the caller's startOffset even though zero records were returned (skipped transaction control
-  // records, or aborted records under read_committed).
+  // inside the batch again). After an empty fetch, this is the consumer's actual KafkaConsumer.position() as far as
+  // its move has been validated (see _validatedPosition), which may have advanced past the caller's startOffset even
+  // though zero records were returned (skipped transaction control records, or aborted records under read_committed).
   private long _nextReadOffset = -1;
   // The caller's startOffset on the previous fetchMessages() call. Used to distinguish
   // "caller is passing the same startOffset back because RealtimeSegmentDataManager's
@@ -185,23 +185,16 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
       }
     } else {
       // No records returned, but the client may still have moved past offsets it will never deliver (see
-      // _validatedPosition). Snap _nextReadOffset to its actual position so the returned batch reports where
-      // consumption really resumes; RealtimeSegmentDataManager adopts that offset for an empty batch, and a caller
-      // that keeps passing the same startOffset instead is covered by the no-re-seek rule above. position() is
-      // answered from the client's local state once a position is known, and is bounded by the same timeout as
-      // poll() otherwise, so a sick broker can't stall this loop.
+      // _validatedPosition). position() is answered from the client's local state once a position is known, and is
+      // bounded by the same timeout as poll() otherwise, so a sick broker can't stall this loop.
       long currentPosition = readPosition(timeoutMs, positionBeforePoll);
-      if (currentPosition > _nextReadOffset) {
-        _nextReadOffset = currentPosition;
-      }
       if (currentPosition > positionBeforePoll) {
         // The client moved during a poll that delivered nothing: it skipped control/aborted records at its position
         // (a caught-up consumer sees exactly this when a transaction's commit marker lands in a later fetch than its
         // records), or it auto-reset after an out-of-range fetch, in which case everything from positionBeforePoll
-        // to the reset target is gone for this consumer. The same log-start-offset check as above tells them apart;
-        // without it the adopted position would hide the reset from the next data poll, whose records then start
-        // exactly where they were requested. A failed lookup leaves the move unaccounted for, so the next poll
-        // validates it again rather than letting a broker hiccup hide a reset for good.
+        // to the reset target is gone for this consumer. The same log-start-offset check as above tells them apart.
+        // A failed lookup leaves the move unaccounted for, so the next poll validates it again rather than letting a
+        // broker hiccup hide a reset for good.
         if (_isReadCommitted) {
           _validatedPosition = currentPosition;
         } else {
@@ -211,6 +204,14 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
             _validatedPosition = currentPosition;
           }
         }
+      }
+      // Report where consumption resumes, but no further than the validated position. Callers adopt an empty batch's
+      // next offset (RealtimeSegmentDataManager, the re-ingestion writer), and the next data poll then starts exactly
+      // where it was requested, so a move adopted before it was validated would hide a reset for good. A caller that
+      // keeps passing the same startOffset instead is covered by the no-re-seek rule above.
+      long reportablePosition = Math.min(currentPosition, _validatedPosition);
+      if (reportablePosition > _nextReadOffset) {
+        _nextReadOffset = reportablePosition;
       }
     }
     long offsetOfNextBatch = _nextReadOffset;

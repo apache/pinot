@@ -115,11 +115,12 @@ public class StatelessRealtimeSegmentWriterTest {
     ServerMetrics.register(mock(ServerMetrics.class));
   }
 
-  /// A batch without unfiltered messages moves the writer to the next offset it reports: a consumer can move past
-  /// offsets it never delivers (Kafka transaction markers, aborted records under read_committed), which may land
-  /// below, at or past the end offset. A batch that reports the requested offset leaves it alone. Every such replay
-  /// completes with exactly the records below the end, and one whose tail holds only skipped offsets completes as soon
-  /// as the reported position reaches the end (the scripted streams below end there).
+  /// A batch without unfiltered messages that reports a next offset ahead of the writer's moves the writer there: a
+  /// Kafka consumer reports its position past skipped transaction markers (after validating the move), which is
+  /// routine on a transactional topic and may land below, at or past the end offset. A batch that reports the
+  /// requested offset leaves it alone. Every such replay completes with exactly the records below the end, and one
+  /// whose tail holds only markers completes as soon as the reported position reaches the end, without waiting for a
+  /// record at or after it (the scripted streams below end there).
   @DataProvider
   public Object[][] validReplays() {
     return new Object[][]{
