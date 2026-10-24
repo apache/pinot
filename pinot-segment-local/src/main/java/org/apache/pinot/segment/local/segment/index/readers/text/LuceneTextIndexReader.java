@@ -236,6 +236,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
     MutableRoaringBitmap docIds = new MutableRoaringBitmap();
     Collector docIDCollector = new LuceneDocIdCollector(docIds, _docIdTranslator);
     try {
+      validateDocCount();
       _indexSearcher.search(buildQuery(searchQuery, optionsString, queryScopedCache), docIDCollector);
       return docIds;
     } catch (QueryException e) {
@@ -248,6 +249,15 @@ public class LuceneTextIndexReader implements TextIndexReader {
           ? "Failed while searching the text index for column " + _column + " with search query: " + searchQuery
           : "Caught exception while searching the text index for column:" + _column + " search query:" + searchQuery,
           e);
+    }
+  }
+
+  private void validateDocCount() {
+    int maxDoc = _indexReader.maxDoc();
+    // Collectors address maxDoc() space, including deleted documents. Skip mode has no mapping-buffer bounds check.
+    if (maxDoc > _numDocs) {
+      throw new IllegalStateException(
+          "Lucene text index contains " + maxDoc + " documents, exceeding segment document count: " + _numDocs);
     }
   }
 
@@ -322,15 +332,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
   public int getNumMatchingDocs(String searchQuery, @Nullable String optionsString,
       @Nullable QueryScopedCache queryScopedCache) {
     try {
-      // A Lucene index larger than the segment means the doc-id mapping is broken -- a state getDocIds
-      // surfaces as an IndexOutOfBoundsException from the translator. Counting does not consult the
-      // translator, so without this guard the corruption would become a silently inflated count instead.
-      // Compared against maxDoc(), not numDocs(): LuceneDocIdCollector indexes the translator by
-      // `context.docBase + doc`, which is maxDoc() space, and with deletions numDocs() < maxDoc() would let a
-      // broken index slip through. Fall back so that it keeps failing loudly.
-      if (_indexReader.maxDoc() > _numDocs) {
-        return getDocIds(searchQuery, optionsString, queryScopedCache).getCardinality();
-      }
+      validateDocCount();
       return LuceneTextIndexUtils.countWithoutMaterializing(_indexSearcher,
           buildQuery(searchQuery, optionsString, queryScopedCache));
     } catch (QueryException e) {

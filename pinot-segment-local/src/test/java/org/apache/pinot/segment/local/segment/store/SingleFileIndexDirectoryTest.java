@@ -34,6 +34,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
+import org.apache.lucene.index.Term;
 import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.text.LuceneTextIndexReader;
@@ -252,24 +253,36 @@ public class SingleFileIndexDirectoryTest implements PinotBuffersAfterMethodChec
       buf.putChar(111, 'h');
 
       fooCreator.add("{\"clean\":\"this\"}");
+      fooCreator.add("{\"other\":\"that\"}");
+      // Keep valid nonidentity mappings so removal covers both the index and its required sidecar.
+      fooCreator.getIndexWriter().updateNumericDocValue(new Term("foo", "clean"),
+          LuceneTextIndexCreator.PINOT_DOC_ID_DOC_VALUES_FIELD_NAME, 1);
+      fooCreator.getIndexWriter().updateNumericDocValue(new Term("foo", "other"),
+          LuceneTextIndexCreator.PINOT_DOC_ID_DOC_VALUES_FIELD_NAME, 0);
       fooCreator.seal();
       barCreator.add("{\"retain\":\"this\"}");
       barCreator.add("{\"keep\":\"this\"}");
       barCreator.add("{\"hold\":\"this\"}");
+      barCreator.getIndexWriter().updateNumericDocValue(new Term("bar", "retain"),
+          LuceneTextIndexCreator.PINOT_DOC_ID_DOC_VALUES_FIELD_NAME, 2);
+      barCreator.getIndexWriter().updateNumericDocValue(new Term("bar", "hold"),
+          LuceneTextIndexCreator.PINOT_DOC_ID_DOC_VALUES_FIELD_NAME, 0);
       barCreator.seal();
     }
 
     // Remove the Text index to trigger cleanup.
     try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
       assertTrue(sfd.hasIndexFor("foo", StandardIndexes.text()));
-      // Use TextIndex once to trigger the creation of mapping files.
-      try (LuceneTextIndexReader fooReader = new LuceneTextIndexReader("foo", TEMP_DIR, 1, new HashMap<>())) {
-        fooReader.getDocIds("clean");
+      // Verify that the persisted mappings translate the permuted IDs before cleanup.
+      try (LuceneTextIndexReader fooReader = new LuceneTextIndexReader("foo", TEMP_DIR, 2, new HashMap<>())) {
+        assertEquals(fooReader.getDocIds("clean", null).toArray(), new int[]{1});
       }
       try (LuceneTextIndexReader barReader = new LuceneTextIndexReader("bar", TEMP_DIR, 3, new HashMap<>())) {
-        barReader.getDocIds("retain hold");
+        assertEquals(barReader.getDocIds("retain", null).toArray(), new int[]{2});
       }
 
+      assertTrue(
+          new File(TEMP_DIR, "foo" + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION).exists());
       // Both files for TextIndex should be removed.
       sfd.removeIndex("foo", StandardIndexes.text());
       assertFalse(new File(TEMP_DIR, "foo" + V1Constants.Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION).exists());
@@ -296,6 +309,7 @@ public class SingleFileIndexDirectoryTest implements PinotBuffersAfterMethodChec
 
       // Check if the text index still work.
       try (LuceneTextIndexReader barReader = new LuceneTextIndexReader("bar", TEMP_DIR, 3, new HashMap<>())) {
+        assertEquals(barReader.getDocIds("retain", null).toArray(), new int[]{2});
         MutableRoaringBitmap ids = barReader.getDocIds("retain hold");
         assertTrue(ids.contains(0));
         assertTrue(ids.contains(2));
