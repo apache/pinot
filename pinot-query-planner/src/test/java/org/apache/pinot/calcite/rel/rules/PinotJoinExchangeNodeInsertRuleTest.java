@@ -49,6 +49,7 @@ public class PinotJoinExchangeNodeInsertRuleTest {
         {JoinRelType.ANTI, EQUI, RANDOM, BROADCAST, false, false},
         {JoinRelType.ASOF, EQUI, HASH, BROADCAST, false, false},
         {JoinRelType.LEFT_ASOF, EQUI, LOCAL, BROADCAST, false, false},
+        {JoinRelType.LEFT_MARK, EQUI, LOCAL, BROADCAST, false, false},
         {JoinRelType.RIGHT, EQUI, BROADCAST, LOCAL, false, false},
         // A SEMI join emits a left row only on the worker its key hashes to, which holds every right row with that key.
         {JoinRelType.SEMI, EQUI, BROADCAST, HASH, false, false},
@@ -87,6 +88,7 @@ public class PinotJoinExchangeNodeInsertRuleTest {
         {JoinRelType.LEFT, EQUI, BROADCAST, HASH, false, false},
         {JoinRelType.ASOF, EQUI, BROADCAST, HASH, false, false},
         {JoinRelType.LEFT_ASOF, EQUI, BROADCAST, HASH, false, false},
+        {JoinRelType.LEFT_MARK, EQUI, BROADCAST, HASH, false, false},
         {JoinRelType.LEFT, EQUI, LOCAL, LOCAL, true, false},
         {JoinRelType.RIGHT, EQUI, LOCAL, BROADCAST, false, false},
         {JoinRelType.FULL, EQUI, LOCAL, BROADCAST, false, false},
@@ -104,6 +106,31 @@ public class PinotJoinExchangeNodeInsertRuleTest {
         {JoinRelType.FULL, NON_EQUI, LOCAL, LOCAL, false, false},
         {JoinRelType.FULL, NON_EQUI, RANDOM, LOCAL, false, false},
     };
+  }
+
+  /// {join type, join info}
+  @DataProvider
+  public static Object[][] joinTypes() {
+    JoinRelType[] joinTypes = {
+        JoinRelType.INNER, JoinRelType.LEFT, JoinRelType.RIGHT, JoinRelType.FULL, JoinRelType.SEMI, JoinRelType.ANTI,
+        JoinRelType.ASOF, JoinRelType.LEFT_ASOF, JoinRelType.LEFT_MARK
+    };
+    Object[][] cases = new Object[joinTypes.length * 2][];
+    for (int i = 0; i < joinTypes.length; i++) {
+      cases[2 * i] = new Object[]{joinTypes[i], EQUI};
+      cases[2 * i + 1] = new Object[]{joinTypes[i], NON_EQUI};
+    }
+    return cases;
+  }
+
+  /// The distribution types picked when the query has no hint must always pass validation, so a change to the
+  /// inferred defaults cannot start rejecting ordinary queries.
+  @Test(dataProvider = "joinTypes")
+  public void testInferredDefaultsAccepted(JoinRelType joinType, JoinInfo joinInfo) {
+    PinotJoinExchangeNodeInsertRule.validateDistributionTypes(
+        PinotJoinExchangeNodeInsertRule.inferLeftDistributionType(joinInfo, joinType),
+        PinotJoinExchangeNodeInsertRule.inferRightDistributionType(joinInfo, joinType), false, false, joinInfo,
+        joinType);
   }
 
   @Test(dataProvider = "rejected")

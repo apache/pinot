@@ -27,6 +27,7 @@ import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.core.Calc;
 import org.apache.calcite.rel.core.Filter;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinInfo;
@@ -188,6 +189,7 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
         case ANTI:
         case ASOF:
         case LEFT_ASOF:
+        case LEFT_MARK:
           Preconditions.checkArgument(rightWhole,
               "%s join requires every right row on each worker (broadcast the right side, or read a replicated right "
                   + "table locally): a worker decides each left row from the right rows it holds, got left: %s, "
@@ -203,8 +205,11 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
           throw new IllegalArgumentException(
               "FULL join cannot broadcast a side: both sides emit the rows that matched nothing, so neither side can "
                   + "be the partitioned one. Distribute both sides by hash on the join keys.");
-        default:
+        case INNER:
           break;
+        default:
+          // A join type not listed above may be asymmetric, so reject it rather than accept a whole side unchecked
+          throw new IllegalArgumentException("Unsupported join type for a broadcast or replicated side: " + joinType);
       }
       return;
     }
@@ -232,11 +237,13 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
         || distributionType == PinotHintOptions.DistributionType.BROADCAST;
   }
 
-  /// Whether `input` is a scan of a table hinted `is_replicated='true'`, reached only through projects and filters.
+  /// Whether `input` is a scan of a table hinted `is_replicated='true'`, reached only through projects, filters and
+  /// calcs.
   /// Anything else in between (an exchange, an aggregate, another join) is not assumed to keep the whole table.
   private static boolean isReplicatedTableScan(RelNode input) {
     RelNode node = PinotRuleUtils.unboxRel(input);
-    while (node instanceof Project || node instanceof Filter) {
+    // A Sort is not unwrapped: with a LIMIT or OFFSET it no longer keeps the whole table
+    while (node instanceof Project || node instanceof Filter || node instanceof Calc) {
       node = PinotRuleUtils.unboxRel(node.getInput(0));
     }
     return node instanceof TableScan && Boolean.parseBoolean(
@@ -248,7 +255,8 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
   /// worker independently tracks matched right rows via a local BitSet. Workers that receive only a subset of left rows
   /// will incorrectly emit right rows as unmatched. Invert to BROADCAST(left)+RANDOM(right) so each worker has the
   /// full left table and can correctly determine which of its local right rows are unmatched.
-  private static PinotHintOptions.DistributionType inferLeftDistributionType(JoinInfo joinInfo,
+  @VisibleForTesting
+  static PinotHintOptions.DistributionType inferLeftDistributionType(JoinInfo joinInfo,
       JoinRelType joinType) {
     if (!joinInfo.leftKeys.isEmpty()) {
       return PinotHintOptions.DistributionType.HASH;
@@ -259,7 +267,8 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
     return PinotHintOptions.DistributionType.RANDOM;
   }
 
-  private static PinotHintOptions.DistributionType inferRightDistributionType(JoinInfo joinInfo,
+  @VisibleForTesting
+  static PinotHintOptions.DistributionType inferRightDistributionType(JoinInfo joinInfo,
       JoinRelType joinType) {
     if (!joinInfo.rightKeys.isEmpty()) {
       return PinotHintOptions.DistributionType.HASH;
