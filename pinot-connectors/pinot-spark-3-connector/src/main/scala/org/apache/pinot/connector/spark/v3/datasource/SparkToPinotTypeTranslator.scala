@@ -69,7 +69,7 @@ object SparkToPinotTypeTranslator {
     // (see TimestampUtils#toMillisSinceEpoch). Mapping straight to LONG / INT would silently
     // produce values that look 1000× too large (timestamps) or look like a small integer for
     // a date column. The safe path is to require the user to convert upstream — e.g.
-    // `df.withColumn("ts", (col("ts").cast("long") / 1000))` for millis-since-epoch — and
+    // `df.withColumn("ts", unix_millis(col("ts")))` for millis-since-epoch — and
     // declare the column as LongType / StringType in the Spark schema. Until a faithful
     // round-trip is defined (and registered as a DATE_TIME field), reject.
     case _: TimestampType =>
@@ -77,7 +77,7 @@ object SparkToPinotTypeTranslator {
         "TimestampType is not directly supported by the Pinot writer because the unit (Spark " +
           "uses microseconds-since-epoch) does not match Pinot's millis-since-epoch convention. " +
           "Cast to LongType (millis) before writing, e.g. `df.withColumn(\"ts\", " +
-          "(col(\"ts\").cast(\"long\") / 1000))`.")
+          "unix_millis(col(\"ts\")))`.")
     case _: DateType =>
       throw new UnsupportedOperationException(
         "DateType is not directly supported by the Pinot writer because Pinot has no native " +

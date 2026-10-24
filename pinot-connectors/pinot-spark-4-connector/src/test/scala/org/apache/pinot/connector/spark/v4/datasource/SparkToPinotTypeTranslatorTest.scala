@@ -106,7 +106,7 @@ class SparkToPinotTypeTranslatorTest extends AnyFunSuite {
       SparkToPinotTypeTranslator.translate(timestampSchema, "table", null, null, null)
     }
     assert(tsEx.getMessage.contains("TimestampType"))
-    assert(tsEx.getMessage.contains("Cast to LongType"))
+    assert(tsEx.getMessage.contains("unix_millis"))
 
     val dateSchema = StructType(Array(StructField("d", DateType)))
     val dEx = intercept[UnsupportedOperationException] {

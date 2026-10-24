@@ -66,7 +66,7 @@ The Spark 4 module requires Spark 4.1.x and JDK 25+.
 > values 1000× too large. The translator now throws `UnsupportedOperationException` with a
 > hint to cast upstream:
 > ```scala
-> df.withColumn("ts", (col("ts").cast("long") / 1000))   // micros → millis, before write
+> df.withColumn("ts", unix_millis(col("ts")))             // timestamp → millis, before write
 > df.withColumn("d",  date_format(col("d"), "yyyy-MM-dd")) // DateType → STRING
 > ```
 > The translator also rejects `ArrayType(BinaryType)` and `ArrayType(DecimalType)` (Pinot's

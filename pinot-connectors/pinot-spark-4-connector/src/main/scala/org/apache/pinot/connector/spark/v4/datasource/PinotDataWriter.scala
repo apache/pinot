@@ -298,11 +298,8 @@ class PinotDataWriter[InternalRow](
         case dt: org.apache.spark.sql.types.DecimalType =>
           gr.putValue(field.name, record.getDecimal(idx, dt.precision, dt.scale).toJavaBigDecimal)
         case org.apache.spark.sql.types.ArrayType(elementType, _) =>
-          // Use ArrayData's type-specific accessors instead of `.array`, which only works on
-          // GenericArrayData (test scaffolding) and throws on the UnsafeArrayData that Spark
-          // uses in real workloads. The previous `.array.map(_.asInstanceOf[T])` would
-          // ClassCastException on real workloads, with a particularly bad failure for
-          // StringType (UTF8String → String cast).
+          // UnsafeArrayData keeps null bits separate from primitive value slots. Preserve null members in boxed
+          // arrays so Pinot's existing standardizer can omit them and treat an all-null array as a null column.
           val arrayData = record.getArray(idx)
           elementType match {
             case org.apache.spark.sql.types.StringType =>
@@ -316,20 +313,11 @@ class PinotDataWriter[InternalRow](
                 i += 1
               }
               gr.putValue(field.name, out)
-            case org.apache.spark.sql.types.IntegerType =>
-              gr.putValue(field.name, arrayData.toIntArray())
-            case org.apache.spark.sql.types.LongType =>
-              gr.putValue(field.name, arrayData.toLongArray())
-            case org.apache.spark.sql.types.FloatType =>
-              gr.putValue(field.name, arrayData.toFloatArray())
-            case org.apache.spark.sql.types.DoubleType =>
-              gr.putValue(field.name, arrayData.toDoubleArray())
-            case org.apache.spark.sql.types.BooleanType =>
-              gr.putValue(field.name, arrayData.toBooleanArray())
-            case org.apache.spark.sql.types.ByteType =>
-              gr.putValue(field.name, arrayData.toByteArray())
-            case org.apache.spark.sql.types.ShortType =>
-              gr.putValue(field.name, arrayData.toShortArray())
+            case org.apache.spark.sql.types.IntegerType | org.apache.spark.sql.types.LongType |
+                 org.apache.spark.sql.types.FloatType | org.apache.spark.sql.types.DoubleType |
+                 org.apache.spark.sql.types.BooleanType | org.apache.spark.sql.types.ByteType |
+                 org.apache.spark.sql.types.ShortType =>
+              gr.putValue(field.name, arrayData.toObjectArray(elementType))
             case _ =>
               throw new UnsupportedOperationException(s"Unsupported array element type: $elementType")
           }

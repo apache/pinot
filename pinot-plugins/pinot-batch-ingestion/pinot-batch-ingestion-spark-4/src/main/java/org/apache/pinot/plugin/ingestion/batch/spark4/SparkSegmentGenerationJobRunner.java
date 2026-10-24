@@ -20,16 +20,30 @@ package org.apache.pinot.plugin.ingestion.batch.spark4;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.Serializable;
 import java.net.URI;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import java.util.zip.ZipException;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.segment.generation.SegmentGenerationUtils;
 import org.apache.pinot.common.utils.TarCompressionUtils;
@@ -38,6 +52,8 @@ import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationJobUtils;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationTaskRunner;
 import org.apache.pinot.segment.local.utils.ConsistentDataPushUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
@@ -51,14 +67,14 @@ import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationTaskSpec;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.spark.SparkContext;
+import org.apache.spark.SparkFiles;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.api.java.function.VoidFunction;
+import org.codehaus.plexus.classworlds.realm.NoSuchRealmException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.common.segment.generation.SegmentGenerationUtils.PINOT_PLUGINS_DIR;
-import static org.apache.pinot.common.segment.generation.SegmentGenerationUtils.PINOT_PLUGINS_TAR_GZ;
 import static org.apache.pinot.common.segment.generation.SegmentGenerationUtils.getFileName;
 import static org.apache.pinot.spi.plugin.PluginManager.PLUGINS_DIR_PROPERTY_NAME;
 import static org.apache.pinot.spi.plugin.PluginManager.PLUGINS_INCLUDE_PROPERTY_NAME;
@@ -71,6 +87,9 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
   private static final String STAGING_DIR = "stagingDir";
 
   private SegmentGenerationJobSpec _spec;
+  private String _pluginsArchiveName;
+  private String _pluginsArchiveDigest;
+  private String _pluginsInclude;
 
   public SparkSegmentGenerationJobRunner() {
   }
@@ -212,9 +231,7 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
       }
       JavaRDD<String> pathRDD = sparkContext.parallelize(pathAndIdxList, jobParallelism);
 
-      final String pluginsInclude =
-          (sparkContext.getConf().contains(PLUGINS_INCLUDE_PROPERTY_NAME)) ? sparkContext.getConf()
-              .get(PLUGINS_INCLUDE_PROPERTY_NAME) : null;
+      final String pluginsInclude = _pluginsInclude;
       final URI finalInputDirURI = inputDirURI;
       final URI finalOutputDirURI = (stagingDirURI == null) ? outputDirURI : stagingDirURI;
       // Prevent using lambda expression in Spark to avoid potential serialization exceptions, use inner function
@@ -223,37 +240,13 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
         @Override
         public void call(String pathAndIdx)
             throws Exception {
-          PluginManager.get().init();
-          for (PinotFSSpec pinotFSSpec : _spec.getPinotFSSpecs()) {
-            PinotFSFactory.register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(),
-                new PinotConfiguration(pinotFSSpec));
-          }
-          PinotFS finalOutputDirFS = PinotFSFactory.create(finalOutputDirURI.getScheme());
           String[] splits = pathAndIdx.split(" ");
           String path = splits[0];
           int idx = Integer.valueOf(splits[1]);
-          // Load Pinot Plugins copied from Distributed cache.
-          File localPluginsTarFile = new File(PINOT_PLUGINS_TAR_GZ);
-          if (localPluginsTarFile.exists()) {
-            File pluginsDirFile = new File(PINOT_PLUGINS_DIR + "-" + idx);
-            try {
-              TarCompressionUtils.untar(localPluginsTarFile, pluginsDirFile);
-            } catch (Exception e) {
-              LOGGER.error("Failed to untar local Pinot plugins tarball file [{}]", localPluginsTarFile, e);
-              throw new RuntimeException(e);
-            }
-            LOGGER.info("Trying to set System Property: [{}={}]", PLUGINS_DIR_PROPERTY_NAME,
-                pluginsDirFile.getAbsolutePath());
-            System.setProperty(PLUGINS_DIR_PROPERTY_NAME, pluginsDirFile.getAbsolutePath());
-            if (pluginsInclude != null) {
-              LOGGER.info("Trying to set System Property: [{}={}]", PLUGINS_INCLUDE_PROPERTY_NAME, pluginsInclude);
-              System.setProperty(PLUGINS_INCLUDE_PROPERTY_NAME, pluginsInclude);
-            }
-            LOGGER.info("Pinot plugins System Properties are set at [{}], plugins includes [{}]",
-                System.getProperty(PLUGINS_DIR_PROPERTY_NAME), System.getProperty(PLUGINS_INCLUDE_PROPERTY_NAME));
-          } else {
-            LOGGER.warn("Cannot find local Pinot plugins tar file at [{}]", localPluginsTarFile.getAbsolutePath());
-          }
+          File archive = _pluginsArchiveName == null ? null : new File(SparkFiles.get(_pluginsArchiveName));
+          bootstrapPlugins(archive, _pluginsArchiveDigest, pluginsInclude, _spec,
+              new File(FileUtils.getTempDirectory(), "pinot-spark-plugins-" + _pluginsArchiveDigest));
+          PinotFS finalOutputDirFS = PinotFSFactory.create(finalOutputDirURI.getScheme());
           URI inputFileURI = URI.create(path);
           if (inputFileURI.getScheme() == null) {
             inputFileURI =
@@ -359,7 +352,267 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
     }
   }
 
+  // Plugin topology is established before generation. Cooperative bootstraps share the SPI lock even when
+  // Spark loads this runner twice. Immutable installed jars are retained for the lifetime of their loaders.
+  private static String _lastPluginPayload;
+  private static Map<String, Class<?>> _lastPluginClasses = Map.of();
+
+  static void bootstrapPlugins(File archive, String expectedDigest, String include, SegmentGenerationJobSpec spec,
+      File installDir)
+      throws Exception {
+    synchronized (PluginManager.class) {
+      if (archive == null) {
+        PluginManager.get().init();
+      } else {
+        List<String> requirements = new ArrayList<>();
+        requirements.add(spec.getRecordReaderSpec().getClassName());
+        requirements.add(spec.getRecordReaderSpec().getConfigClassName());
+        spec.getPinotFSSpecs().forEach(fs -> requirements.add(fs.getClassName()));
+        String key = archive.getCanonicalPath() + ":" + expectedDigest + ":" + include + ":" + requirements
+            + ":" + archive.length() + ":" + archive.lastModified();
+        // This is only a fast path for our immutable installation. Recheck actual registry identities, not a
+        // runner-local success flag. A different runner classloader independently verifies source provenance.
+        if (!key.equals(_lastPluginPayload) || !samePluginClasses(_lastPluginClasses)) {
+          if (!expectedDigest.equals(fileDigest(archive))) {
+            throw new IOException("Distributed Pinot plugin archive digest does not match " + archive);
+          }
+          installPluginArchive(archive, installDir);
+          String previousDir = System.getProperty(PLUGINS_DIR_PROPERTY_NAME);
+          String previousInclude = System.getProperty(PLUGINS_INCLUDE_PROPERTY_NAME);
+          PluginManager manager;
+          try {
+            System.setProperty(PLUGINS_DIR_PROPERTY_NAME, installDir.getAbsolutePath());
+            restoreProperty(PLUGINS_INCLUDE_PROPERTY_NAME, include);
+            manager = PluginManager.get();
+          } finally {
+            restoreProperty(PLUGINS_DIR_PROPERTY_NAME, previousDir);
+            restoreProperty(PLUGINS_INCLUDE_PROPERTY_NAME, previousInclude);
+          }
+          Map<String, File> selected = manager.getPluginsToLoad(installDir.getAbsolutePath(), include);
+          if (selected.isEmpty()) {
+            throw new IOException("Distributed Pinot plugin archive contains no selected plugins");
+          }
+          Map<String, Class<?>> verified = new HashMap<>();
+          Map<String, Set<Path>> sources = new HashMap<>();
+          List<String> absent = new ArrayList<>();
+          // Check every existing name before changing the registry. Never overwrite a legacy loader or
+          // duplicate a new-style realm. An opaque/partially published name requires a fresh executor.
+          for (Map.Entry<String, File> plugin : selected.entrySet()) {
+            if (pluginPresent(manager, plugin.getKey())) {
+              verifyPluginSource(manager, plugin.getKey(), plugin.getValue(), verified, sources);
+            } else {
+              absent.add(plugin.getKey());
+            }
+          }
+          try {
+            for (String name : absent) {
+              manager.load(name, selected.get(name));
+              verifyPluginSource(manager, name, selected.get(name), verified, sources);
+            }
+            verifyCapability(manager, spec.getRecordReaderSpec().getClassName(), RecordReader.class, verified, sources);
+            verifyCapability(manager, spec.getRecordReaderSpec().getConfigClassName(), RecordReaderConfig.class,
+                verified, sources);
+            for (PinotFSSpec fs : spec.getPinotFSSpecs()) {
+              verifyCapability(manager, fs.getClassName(), PinotFS.class, verified, sources);
+            }
+          } catch (Exception | LinkageError e) {
+            throw new IllegalStateException("Distributed Pinot plugin capability failed; use a fresh executor "
+                + "for failed or partially loaded plugins", e);
+          }
+          _lastPluginClasses = Map.copyOf(verified);
+          _lastPluginPayload = key;
+        }
+      }
+      for (PinotFSSpec fs : spec.getPinotFSSpecs()) {
+        PinotFSFactory.registerIfNeeded(fs.getScheme(), fs.getClassName(), new PinotConfiguration(fs));
+      }
+    }
+  }
+
+  private static boolean samePluginClasses(Map<String, Class<?>> classes)
+      throws ClassNotFoundException {
+    for (Map.Entry<String, Class<?>> entry : classes.entrySet()) {
+      if (PluginManager.get().loadClass(entry.getKey()) != entry.getValue()) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private static void verifyCapability(PluginManager manager, String name, Class<?> contract,
+      Map<String, Class<?>> verified, Map<String, Set<Path>> sources)
+      throws Exception {
+    if (name != null) {
+      Class<?> implementation = manager.loadClass(name);
+      if (!contract.isAssignableFrom(implementation)) {
+        throw new IllegalStateException("Pinot plugin does not implement shared " + contract.getName() + ": " + name);
+      }
+      int separator = name.indexOf(':');
+      if (separator > 0) {
+        String prefix = name.substring(0, separator + 1);
+        Set<Path> allowed = sources.get(name.substring(0, separator));
+        if (allowed != null && (implementation.getProtectionDomain().getCodeSource() == null
+            || !allowed.contains(Paths.get(implementation.getProtectionDomain().getCodeSource().getLocation().toURI())
+                .toRealPath()))) {
+          throw new IllegalStateException("Pinot plugin class source is outside its verified payload: " + name);
+        }
+        for (Map.Entry<String, Class<?>> probe : verified.entrySet()) {
+          if (probe.getKey().startsWith(prefix)
+              && probe.getValue().getClassLoader() != implementation.getClassLoader()) {
+            throw new IllegalStateException("Pinot plugin class resolves outside its payload: " + name);
+          }
+        }
+      }
+      verified.put(name, implementation);
+    }
+  }
+
+  private static boolean pluginPresent(PluginManager manager, String name)
+      throws ClassNotFoundException {
+    try {
+      manager.loadClass(name, "java.lang.Object");
+      return true;
+    } catch (RuntimeException e) {
+      if (e.getCause() instanceof NoSuchRealmException) {
+        return false;
+      }
+      throw e;
+    }
+  }
+
+  private static void verifyPluginSource(PluginManager manager, String name, File expected,
+      Map<String, Class<?>> verified, Map<String, Set<Path>> sources)
+      throws Exception {
+    Path expectedRoot = expected.getCanonicalFile().toPath();
+    String fingerprint = pluginFingerprint(expectedRoot.toFile());
+    // New-style realms put every immediate entry on the classpath, including directories and non-JAR archives.
+    // Legacy loaders use recursive JARs only. Compare the complete loader URLs and all backing content.
+    List<File> entries = new ArrayList<>();
+    if (Files.isRegularFile(expectedRoot.resolve("pinot-plugin.properties"))) {
+      try (Stream<Path> paths = Files.list(expectedRoot)) {
+        paths.sorted().forEach(path -> entries.add(path.toFile()));
+      }
+    } else {
+      entries.addAll(FileUtils.listFiles(expectedRoot.toFile(), new String[]{"jar"}, true));
+    }
+    Set<Path> expectedEntries = entries.stream().map(f -> expectedRoot.relativize(f.toPath()))
+        .collect(Collectors.toSet());
+    for (File entry : entries) {
+      Path relativeSource = expectedRoot.relativize(entry.toPath());
+      List<String> classes = pluginClassNames(entry);
+      for (String className : classes) {
+        Class<?> loaded;
+        try {
+          loaded = manager.loadClass(name, className);
+        } catch (ClassNotFoundException | LinkageError e) {
+          continue;
+        }
+        if (!(loaded.getClassLoader() instanceof URLClassLoader)
+            || loaded.getProtectionDomain().getCodeSource() == null) {
+          continue;
+        }
+        Path source = Paths.get(loaded.getProtectionDomain().getCodeSource().getLocation().toURI()).toRealPath();
+        Path actualRoot = source;
+        for (int i = 0; i < relativeSource.getNameCount() && actualRoot != null; i++) {
+          actualRoot = actualRoot.getParent();
+        }
+        if (actualRoot == null || !actualRoot.resolve(relativeSource).equals(source)) {
+          continue;
+        }
+        Set<Path> actualEntries = new HashSet<>();
+        Set<Path> actualSources = new HashSet<>();
+        for (URL url : ((URLClassLoader) loaded.getClassLoader()).getURLs()) {
+          Path path = Paths.get(url.toURI()).toRealPath();
+          actualEntries.add(actualRoot.relativize(path));
+          actualSources.add(path);
+        }
+        if (actualEntries.equals(expectedEntries) && fingerprint.equals(pluginFingerprint(actualRoot.toFile()))) {
+          verified.put(name + ":" + className, loaded);
+          sources.put(name, Set.copyOf(actualSources));
+          return;
+        }
+      }
+    }
+    throw new IllegalStateException("Cannot verify immutable Pinot plugin '" + name
+        + "' against the distributed payload; use a fresh executor for changed or partially loaded plugins");
+  }
+
+  private static List<String> pluginClassNames(File entry)
+      throws IOException {
+    List<String> names = new ArrayList<>();
+    if (entry.isDirectory()) {
+      try (Stream<Path> files = Files.walk(entry.toPath())) {
+        files.filter(Files::isRegularFile).forEach(file -> names.add(entry.toPath().relativize(file).toString()
+            .replace(File.separatorChar, '/')));
+      }
+    } else {
+      try (JarFile archive = new JarFile(entry)) {
+        for (JarEntry file : Collections.list(archive.entries())) {
+          names.add(file.getName());
+        }
+      } catch (ZipException e) {
+        // A realm also lists non-archive resources such as its descriptor. Their bytes remain in the fingerprint.
+        return List.of();
+      }
+    }
+    return names.stream().map(n -> n.replaceFirst("^META-INF/versions/[0-9]+/", ""))
+        .filter(n -> n.endsWith(".class") && !n.startsWith("META-INF/") && !n.equals("module-info.class"))
+        .map(n -> n.substring(0, n.length() - ".class".length()).replace('/', '.')).distinct().sorted()
+        .collect(Collectors.toList());
+  }
+
+  private static String pluginFingerprint(File directory)
+      throws IOException {
+    Path root = directory.toPath();
+    List<Path> files;
+    try (Stream<Path> paths = Files.walk(root)) {
+      files = paths.filter(Files::isRegularFile).sorted(Comparator.comparing(root::relativize))
+          .collect(Collectors.toList());
+    }
+    StringBuilder identity = new StringBuilder();
+    for (Path file : files) {
+      identity.append(root.relativize(file)).append('\0').append(fileDigest(file.toFile())).append('\0');
+    }
+    return DigestUtils.sha256Hex(identity.toString());
+  }
+
+  private static String fileDigest(File file)
+      throws IOException {
+    try (InputStream input = Files.newInputStream(file.toPath())) {
+      return DigestUtils.sha256Hex(input);
+    }
+  }
+
+  private static void installPluginArchive(File archive, File installDir)
+      throws IOException {
+    if (installDir.isDirectory()) {
+      return;
+    }
+    FileUtils.forceMkdir(installDir.getParentFile());
+    Path staged = Files.createTempDirectory(installDir.getParentFile().toPath(), "pinot-plugin-install-");
+    try {
+      TarCompressionUtils.untar(archive, staged.toFile());
+      Files.move(staged, installDir.toPath(), StandardCopyOption.ATOMIC_MOVE);
+    } finally {
+      FileUtils.deleteDirectory(staged.toFile());
+    }
+  }
+
+  private static void restoreProperty(String name, String value) {
+    if (value == null) {
+      System.clearProperty(name);
+    } else {
+      System.setProperty(name, value);
+    }
+  }
+
   protected void packPluginsToDistributedCache(JavaSparkContext sparkContext) {
+    _pluginsArchiveName = null;
+    _pluginsArchiveDigest = null;
+    _pluginsInclude = System.getProperty(PLUGINS_INCLUDE_PROPERTY_NAME);
+    if (_pluginsInclude == null && sparkContext.getConf().contains(PLUGINS_INCLUDE_PROPERTY_NAME)) {
+      _pluginsInclude = sparkContext.getConf().get(PLUGINS_INCLUDE_PROPERTY_NAME);
+    }
     String[] pluginDirectories = PluginManager.get().getPluginsDirectories();
     if (pluginDirectories == null) {
       LOGGER.warn("Plugin directories is null, skipping packaging...");
@@ -378,17 +631,19 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
       }
     }
 
-    File pluginsTarGzFile = new File(PINOT_PLUGINS_TAR_GZ);
     try {
-      File[] files = validPluginDirectories.toArray(new File[0]);
-      TarCompressionUtils.createCompressedTarFile(files, pluginsTarGzFile);
+      File distribution = Files.createTempDirectory("pinot-spark-plugin-distribution-").toFile();
+      distribution.deleteOnExit();
+      File archive = new File(distribution, "plugins.tar.gz");
+      TarCompressionUtils.createCompressedTarFile(validPluginDirectories.toArray(new File[0]), archive);
+      _pluginsArchiveDigest = fileDigest(archive);
+      _pluginsArchiveName = "pinot-plugins-" + _pluginsArchiveDigest + ".tar.gz";
+      File namedArchive = new File(distribution, _pluginsArchiveName);
+      Files.move(archive.toPath(), namedArchive.toPath());
+      namedArchive.deleteOnExit();
+      sparkContext.addFile(namedArchive.getAbsolutePath());
     } catch (IOException e) {
-      LOGGER.error("Failed to tar plugins directories", e);
-    }
-    sparkContext.addFile(pluginsTarGzFile.getAbsolutePath());
-    String pluginsIncludes = System.getProperty(PLUGINS_INCLUDE_PROPERTY_NAME);
-    if (pluginsIncludes != null) {
-      sparkContext.getConf().set(PLUGINS_INCLUDE_PROPERTY_NAME, pluginsIncludes);
+      throw new IllegalStateException("Failed to distribute Pinot plugin payload", e);
     }
   }
 }

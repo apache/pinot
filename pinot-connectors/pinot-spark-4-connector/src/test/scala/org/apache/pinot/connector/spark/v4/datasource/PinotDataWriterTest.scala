@@ -20,12 +20,16 @@ package org.apache.pinot.connector.spark.v4.datasource
 
 import org.apache.pinot.connector.spark.common.PinotDataSourceWriteOptions
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.UnsafeProjection
-import org.apache.spark.sql.types.{IntegerType, LongType, StringType, StructField, StructType, BinaryType}
+import org.apache.spark.sql.catalyst.expressions.{UnsafeArrayData, UnsafeProjection}
+import org.apache.spark.sql.types.{ArrayType, BinaryType, BooleanType, DataType, DoubleType, FloatType, IntegerType, LongType, StringType, StructField, StructType}
 import org.apache.spark.sql.connector.write.WriterCommitMessage
 import org.scalatest.matchers.should.Matchers
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.pinot.common.utils.TarCompressionUtils
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader
+import org.apache.pinot.segment.local.utils.DataTypeTransformerUtils
+import org.apache.spark.sql.catalyst.util.GenericArrayData
+import org.apache.spark.unsafe.types.UTF8String
 import org.apache.pinot.spi.data.readers.GenericRow
 import org.apache.spark.sql.catalyst.expressions.GenericInternalRow
 import org.scalatest.BeforeAndAfter
@@ -182,6 +186,88 @@ class PinotDataWriterTest extends AnyFunSuite with Matchers with BeforeAndAfter 
     writer.getSegmentName shouldBe "intTimeTable_1234567890_1234567890_0"
 
     writer.close()
+  }
+
+  test("Unsafe MV arrays preserve element nulls through Pinot standardization and segment creation") {
+    val cases: Seq[(String, DataType, AnyRef, AnyRef)] = Seq(
+      ("ints", IntegerType, Int.box(7), Int.box(0)),
+      ("longs", LongType, Long.box(7L), Long.box(0L)),
+      ("floats", FloatType, Float.box(7.0f), Float.box(0.0f)),
+      ("doubles", DoubleType, Double.box(7.0), Double.box(0.0)),
+      ("booleans", BooleanType, Boolean.box(true), Boolean.box(false)),
+      ("strings", StringType, "seven", "aaa"))
+    val writeOptions = PinotDataSourceWriteOptions(
+      tableName = "nullableMv", savePath = tmpDir.getAbsolutePath, timeColumnName = "ts",
+      timeFormat = "EPOCH|SECONDS", timeGranularity = "1:SECONDS", segmentNameFormat = "{table}_{partitionId}",
+      invertedIndexColumns = Array(), noDictionaryColumns = Array(), bloomFilterColumns = Array(),
+      rangeIndexColumns = Array())
+    val writeSchema = StructType(cases.map { case (name, dataType, _, _) =>
+      StructField(name, ArrayType(dataType, containsNull = true), nullable = true)
+    } :+ StructField("ts", LongType, nullable = false))
+    val pinotSchema = SparkToPinotTypeTranslator.translate(writeSchema, writeOptions.tableName,
+      writeOptions.timeColumnName, writeOptions.timeFormat, writeOptions.timeGranularity)
+    val writer = new PinotDataWriter[InternalRow](0, 0, writeOptions, writeSchema, pinotSchema)
+    try {
+      val projection = UnsafeProjection.create(writeSchema)
+      for (variant <- 0 until 3) {
+        val arrays = cases.map { case (_, dataType, positive, zero) =>
+          val values: Array[Any] = variant match {
+            case 0 => Array(null, positive)
+            case 1 => Array(null, null)
+            case 2 => Array(zero, positive)
+          }
+          if (dataType == StringType) {
+            values.indices.foreach(i => if (values(i) != null) {
+              values(i) = UTF8String.fromString(values(i).toString)
+            })
+          }
+          new GenericArrayData(values)
+        }
+        val row = projection(new GenericInternalRow((arrays.map(x => x: Any) :+ 1234567890L).toArray))
+        row.getArray(0) shouldBe a[UnsafeArrayData]
+        writer.write(row)
+      }
+      for (variant <- 0 until 3) {
+        val row = writer.bufferedRecordReader.next()
+        cases.foreach { case (name, _, positive, zero) =>
+          val expected: Array[AnyRef] = variant match {
+            case 0 => Array(null, positive)
+            case 1 => Array(null, null)
+            case 2 => Array(zero, positive)
+          }
+          row.getValue(name) shouldBe expected
+          val standardized = DataTypeTransformerUtils.standardize(name, row.getValue(name), false)
+          variant match {
+            case 0 => standardized shouldBe positive
+            case 1 => standardized shouldBe null
+            case 2 => standardized shouldBe expected
+          }
+        }
+      }
+      writer.bufferedRecordReader.rewind()
+      val segmentName = "nullable_arrays"
+      val segmentDir = writer.generateSegment(segmentName)
+      val reader = new PinotSegmentRecordReader()
+      try {
+        reader.init(new File(segmentDir, segmentName), null, null, false)
+        val rows = (0 until 3).map { _ =>
+          reader.hasNext shouldBe true
+          reader.next(new GenericRow())
+        }
+        reader.hasNext shouldBe false
+        cases.foreach { case (name, dataType, positive, zero) =>
+          val storedPositive = if (dataType == BooleanType) Int.box(1) else positive
+          val storedZero = if (dataType == BooleanType) Int.box(0) else zero
+          rows(0).getValue(name) shouldBe Array[AnyRef](storedPositive)
+          rows(1).getValue(name) shouldBe Array[AnyRef](pinotSchema.getFieldSpecFor(name).getDefaultNullValue)
+          rows(2).getValue(name) shouldBe Array[AnyRef](storedZero, storedPositive)
+        }
+      } finally {
+        reader.close()
+      }
+    } finally {
+      writer.close()
+    }
   }
 
   test("Should create segment file on commit") {

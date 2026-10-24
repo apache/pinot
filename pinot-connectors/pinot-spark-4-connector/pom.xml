@@ -41,6 +41,54 @@
     <spark3.version>${spark4.version}</spark3.version>
   </properties>
 
+  <dependencies>
+    <!-- spark-* versions are inherited from the root pom's <dependencyManagement> via the
+         local spark3.version → spark4.version override above; do not declare <version>
+         inline here (PinotCustomDependencyVersionRule rejects that). -->
+    <dependency>
+      <groupId>org.apache.spark</groupId>
+      <artifactId>spark-core_${scala.compat.version}</artifactId>
+      <scope>provided</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>org.lz4</groupId>
+          <artifactId>lz4-java</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.spark</groupId>
+      <artifactId>spark-launcher_${scala.compat.version}</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.spark</groupId>
+      <artifactId>spark-sql_${scala.compat.version}</artifactId>
+      <scope>provided</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>org.lz4</groupId>
+          <artifactId>lz4-java</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.scala-lang</groupId>
+      <artifactId>scala-library</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <!-- tests -->
+    <dependency>
+      <groupId>org.scalatest</groupId>
+      <artifactId>scalatest_${scala.compat.version}</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-spark-common</artifactId>
+    </dependency>
+  </dependencies>
+
   <profiles>
     <profile>
       <id>build-shaded-jar</id>
@@ -87,64 +135,6 @@
       </properties>
     </profile>
     <profile>
-      <id>scala-build</id>
-      <activation>
-        <activeByDefault>true</activeByDefault>
-      </activation>
-      <dependencies>
-        <!-- spark-* versions are inherited from the root pom's <dependencyManagement> via the
-             local spark3.version → spark4.version override above; do not declare <version>
-             inline here (PinotCustomDependencyVersionRule rejects that). -->
-        <dependency>
-          <groupId>org.apache.spark</groupId>
-          <artifactId>spark-core_${scala.compat.version}</artifactId>
-          <scope>provided</scope>
-          <exclusions>
-            <exclusion>
-              <groupId>org.lz4</groupId>
-              <artifactId>lz4-java</artifactId>
-            </exclusion>
-          </exclusions>
-        </dependency>
-        <dependency>
-          <groupId>org.apache.spark</groupId>
-          <artifactId>spark-launcher_${scala.compat.version}</artifactId>
-          <scope>provided</scope>
-        </dependency>
-        <dependency>
-          <groupId>org.apache.spark</groupId>
-          <artifactId>spark-sql_${scala.compat.version}</artifactId>
-          <scope>provided</scope>
-          <exclusions>
-            <exclusion>
-              <groupId>org.lz4</groupId>
-              <artifactId>lz4-java</artifactId>
-            </exclusion>
-          </exclusions>
-        </dependency>
-        <dependency>
-          <groupId>org.scala-lang</groupId>
-          <artifactId>scala-library</artifactId>
-          <scope>provided</scope>
-        </dependency>
-        <!-- tests -->
-        <dependency>
-          <groupId>org.scalatest</groupId>
-          <artifactId>scalatest_${scala.compat.version}</artifactId>
-          <scope>test</scope>
-        </dependency>
-      </dependencies>
-      <build>
-        <plugins>
-          <!-- scala build -->
-          <plugin>
-            <groupId>net.alchim31.maven</groupId>
-            <artifactId>scala-maven-plugin</artifactId>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-    <profile>
       <id>release-sign-artifacts</id>
       <build>
         <plugins>
@@ -174,6 +164,11 @@
       </testResource>
     </testResources>
     <plugins>
+      <!-- Scala sources must compile under explicit packaging profiles too. -->
+      <plugin>
+        <groupId>net.alchim31.maven</groupId>
+        <artifactId>scala-maven-plugin</artifactId>
+      </plugin>
       <!-- Hard-fail early with a clear message under -Pscala-2.12 instead of letting an
            obscure Maven resolution error leak through. JDK 25+ is already enforced by the
            root pom's requireJavaVersion rule, so we only need the Scala compat check here. -->
@@ -238,10 +233,5 @@
     </plugins>
   </build>
 
-  <dependencies>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-spark-common</artifactId>
-    </dependency>
-  </dependencies>
+
 </project>

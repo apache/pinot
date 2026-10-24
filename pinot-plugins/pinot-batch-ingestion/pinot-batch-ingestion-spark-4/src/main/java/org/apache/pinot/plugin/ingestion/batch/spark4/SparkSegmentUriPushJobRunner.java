@@ -59,7 +59,8 @@ public class SparkSegmentUriPushJobRunner extends BaseSparkSegmentUriPushJobRunn
           PluginManager.get().init();
           for (PinotFSSpec pinotFSSpec : pinotFSSpecs) {
             PinotFSFactory
-                .register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(), new PinotConfiguration(pinotFSSpec));
+                .registerIfNeeded(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(),
+                    new PinotConfiguration(pinotFSSpec));
           }
           SegmentPushUtils.sendSegmentUris(_spec, Arrays.asList(segmentUri));
         } catch (RetriableOperationException | AttemptsExceededException e) {
