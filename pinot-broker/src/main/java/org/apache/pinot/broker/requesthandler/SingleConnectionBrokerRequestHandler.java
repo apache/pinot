@@ -1016,6 +1016,16 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
     }
   }
 
+  /// Drops the cached Netty channels to a server removed from the cluster: nothing routes to it any more, and if it
+  /// is ever added back under the same id it is a new process.
+  @Override
+  public void onServerRemoved(ServerInstance serverInstance) {
+    int numEvicted = _queryRouter.evictChannels(serverInstance);
+    if (numEvicted > 0) {
+      LOGGER.info("Evicted {} cached channel(s) to removed server: {}", numEvicted, serverInstance.getInstanceId());
+    }
+  }
+
   /// Check if a server that was previously detected as unhealthy is now healthy.
   public FailureDetector.ServerState retryUnhealthyServer(String instanceId) {
     LOGGER.info("Retrying unhealthy server: {}", instanceId);

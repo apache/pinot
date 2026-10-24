@@ -93,6 +93,12 @@ public interface BrokerRequestHandler {
   default void onServerReenabled(ServerInstance serverInstance) {
   }
 
+  /// Called when the routing manager sees a server removed from the cluster altogether (its instance config is
+  /// gone). A handler that caches connections to the server drops them: nothing will be routed to it any more, and
+  /// a server later added back under the same id is a new process. Same contract as [#onServerReenabled].
+  default void onServerRemoved(ServerInstance serverInstance) {
+  }
+
   BrokerResponse handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
       @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, @Nullable HttpHeaders httpHeaders)
       throws Exception;

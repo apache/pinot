@@ -434,6 +434,47 @@ public class ServerChannelsTest {
     }
   }
 
+  /// The timeout is on progress, not on completion: a large request to a peer that drains slowly but steadily keeps
+  /// making progress and must not be timed out however long it takes in all, since a false close costs every query in
+  /// flight on the channel.
+  ///
+  /// The peer drains fast relative to the timeout but slow relative to the request: a receiver that reads slowly
+  /// makes the kernel batch its window updates (silly window avoidance), so progress arrives in bursts spaced by
+  /// about half a receive buffer worth of drain time, which must stay well inside the timeout for the test to
+  /// measure the handler rather than the kernel. A slow network path has no such batching: acknowledgements free
+  /// the send buffer continuously.
+  @Test
+  public void testSlowButProgressingWriteIsNotTimedOut()
+      throws Exception {
+    long writeTimeoutMs = 1_000L;
+    NettyConfig nettyConfig = new NettyConfig();
+    nettyConfig.setWriteTimeoutMs(writeTimeoutMs);
+    ServerChannels serverChannels =
+        new ServerChannels(mock(QueryRouter.class), nettyConfig, null, ThreadAccountantUtils.getNoOpAccountant());
+    // About 3MB/s: the 8MB request takes well over the timeout in all, with progress every few tens of milliseconds
+    try (StalledServer server = new StalledServer(32 * 1024, 10L)) {
+      ServerRoutingInstance instance = new ServerRoutingInstance("localhost", server.getPort(), TableType.OFFLINE);
+      ServerChannels.ServerChannel serverChannel = serverChannels.getOrCreateServerChannel(instance);
+      server.shrinkSendBuffer(serverChannel);
+      long writeTimeoutsBefore = meterCount(BrokerMeter.NETTY_CONNECTION_WRITE_TIMEOUTS);
+      AsyncQueryResponse asyncQueryResponse = mock(AsyncQueryResponse.class);
+
+      long startTimeMs = System.currentTimeMillis();
+      serverChannels.sendRequest("testTable", asyncQueryResponse, instance, largeInstanceRequest(8 * 1024 * 1024),
+          10_000L);
+      Channel channel = serverChannel._channel;
+      verify(asyncQueryResponse, timeout(60_000L)).markRequestSent(eq(instance), anyInt());
+      long elapsedMs = System.currentTimeMillis() - startTimeMs;
+      assertTrue(elapsedMs > writeTimeoutMs, "The write must have outlived the timeout to prove the point: "
+          + elapsedMs + "ms");
+      assertTrue(channel.isActive(), "A progressing write must not get the channel closed");
+      assertEquals(meterCount(BrokerMeter.NETTY_CONNECTION_WRITE_TIMEOUTS), writeTimeoutsBefore);
+      verify(asyncQueryResponse, never()).markServerUnavailable(any(), any());
+    } finally {
+      serverChannels.shutDown();
+    }
+  }
+
   /// The memory bound: once the outbound queue of a stalled channel passes the high watermark, requests to that
   /// server fail fast instead of each adding a request buffer to direct memory.
   @Test
@@ -630,9 +671,10 @@ public class ServerChannelsTest {
     return instanceRequest;
   }
 
-  /// A server that accepts connections and never reads from them, with the smallest socket buffers the OS allows.
-  /// Once those buffers are full the client's writes stop completing while its socket still reports active: the
-  /// closest a loopback test gets to a peer that went away without a FIN, or a path that black-holes packets.
+  /// A server that accepts connections and, by default, never reads from them, with the smallest socket buffers the
+  /// OS allows. Once those buffers are full the client's writes stop completing while its socket still reports
+  /// active: the closest a loopback test gets to a peer that went away without a FIN, or a path that black-holes
+  /// packets. Given a drain size and interval, it instead reads that much every interval: a slow but live peer.
   private static class StalledServer implements AutoCloseable {
     private static final int SOCKET_BUFFER_BYTES = 4096;
 
@@ -642,6 +684,11 @@ public class ServerChannelsTest {
 
     StalledServer()
         throws IOException {
+      this(0, 0L);
+    }
+
+    StalledServer(int drainBytes, long drainIntervalMs)
+        throws IOException {
       _serverSocket = new ServerSocket();
       // Must be set before bind so that the accepted sockets inherit it
       _serverSocket.setReceiveBufferSize(SOCKET_BUFFER_BYTES);
@@ -649,7 +696,14 @@ public class ServerChannelsTest {
       _acceptor = new Thread(() -> {
         while (!_serverSocket.isClosed()) {
           try {
-            _accepted.add(_serverSocket.accept());
+            Socket socket = _serverSocket.accept();
+            _accepted.add(socket);
+            if (drainBytes > 0) {
+              Thread drainer = new Thread(() -> drainSlowly(socket, drainBytes, drainIntervalMs),
+                  "stalled-server-drainer");
+              drainer.setDaemon(true);
+              drainer.start();
+            }
           } catch (IOException e) {
             return;
           }
@@ -657,6 +711,25 @@ public class ServerChannelsTest {
       }, "stalled-server-acceptor");
       _acceptor.setDaemon(true);
       _acceptor.start();
+    }
+
+    private static void drainSlowly(Socket socket, int drainBytes, long drainIntervalMs) {
+      byte[] buffer = new byte[drainBytes];
+      try {
+        while (!socket.isClosed()) {
+          int remaining = drainBytes;
+          while (remaining > 0) {
+            int read = socket.getInputStream().read(buffer, 0, remaining);
+            if (read < 0) {
+              return;
+            }
+            remaining -= read;
+          }
+          Thread.sleep(drainIntervalMs);
+        }
+      } catch (IOException | InterruptedException e) {
+        // Closed, or the test is over
+      }
     }
 
     int getPort() {

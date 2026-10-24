@@ -25,6 +25,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -137,16 +138,19 @@ public abstract class BaseBrokerRoutingManager
   private final Map<String, ServerInstance> _enabledServerInstanceMap = new ConcurrentHashMap<>();
   // NOTE: _excludedServers doesn't need to be concurrent because it is only accessed within the _globalLock write lock
   private final Set<String> _excludedServers = new HashSet<>();
-  // Servers that were enabled at some point and have since left the enabled set (disabled, shutting down or removed).
-  // Tells a server that comes back, which has most likely been restarted, from one seen for the first time. Only
+  // Servers that were enabled at some point and are now disabled or shutting down but still part of the cluster, with
+  // the instance each was last seen as. Tells a server that comes back, which has most likely been restarted, from one
+  // seen for the first time. An entry leaves when its server is re-enabled, or when the server is removed from the
+  // cluster altogether (its instance config is gone), so the map is bounded by the servers currently disabled. Only
   // accessed within the _globalLock write lock.
-  private final Set<String> _previouslyEnabledServers = new HashSet<>();
+  private final Map<String, ServerInstance> _previouslyEnabledServers = new HashMap<>();
   private final ServerRoutingStatsManager _serverRoutingStatsManager;
   private final PinotConfiguration _pinotConfig;
   private final boolean _enablePartitionMetadataManager;
   private final long _newSegmentExpirationMs;
   private final ExecutorService _executorService;
   private final List<Consumer<ServerInstance>> _serverReenableCallbacks = new CopyOnWriteArrayList<>();
+  private final List<Consumer<ServerInstance>> _serverRemovedCallbacks = new CopyOnWriteArrayList<>();
   // The callback installed through the deprecated setter, so that setting it again replaces it rather than piling up
   @Nullable
   private Consumer<ServerInstance> _legacyServerReenableCallback;
@@ -247,6 +251,14 @@ public abstract class BaseBrokerRoutingManager
   /// they must be quick and must not block.
   public void addServerReenableCallback(Consumer<ServerInstance> callback) {
     _serverReenableCallbacks.add(callback);
+  }
+
+  /// Registers a callback invoked with the last known [ServerInstance] of a server that has been removed from the
+  /// cluster altogether (its instance config is gone) after having been enabled at some point. Callers drop whatever
+  /// they still hold for it, such as cached connections: a server later added back under the same id is a new
+  /// process. Same threading rules as [#addServerReenableCallback(Consumer)].
+  public void addServerRemovedCallback(Consumer<ServerInstance> callback) {
+    _serverRemovedCallbacks.add(callback);
   }
 
   /// Sets the callback of callers that predate [#addServerReenableCallback(Consumer)]. Keeps its replace semantics:
@@ -457,11 +469,16 @@ public abstract class BaseBrokerRoutingManager
 
     // Calculate new enabled and disabled servers
     Set<String> enabledServers = new HashSet<>();
+    // Every server that still has an instance config, enabled or not
+    Set<String> presentServers = new HashSet<>();
     List<String> newEnabledServers = new ArrayList<>();
     for (ZNRecord instanceConfigZNRecord : instanceConfigZNRecords) {
       // Put instance initialization logics into try-catch block to prevent bad server configs affecting the entire
       // cluster
       String instanceId = instanceConfigZNRecord.getId();
+      if (InstanceTypeUtils.isServer(instanceId)) {
+        presentServers.add(instanceId);
+      }
       try {
         if (isEnabledServer(instanceConfigZNRecord)) {
           // Always refresh the server instance with the latest instance config in case it changes
@@ -483,7 +500,8 @@ public abstract class BaseBrokerRoutingManager
             // not the failure detector had excluded it in between. Let the listeners drop state tied to the previous
             // process: cached Netty channels that may be half-open, and the gRPC connection backoff that would
             // otherwise make MSE queries fail fast until the next backoff retry succeeds.
-            if (_previouslyEnabledServers.remove(instanceId) | wasExcluded) {
+            boolean wasDisabled = _previouslyEnabledServers.remove(instanceId) != null;
+            if (wasDisabled || wasExcluded) {
               notifyServerReenabled(serverInstance);
             }
           }
@@ -496,6 +514,17 @@ public abstract class BaseBrokerRoutingManager
     for (String instance : _enabledServerInstanceMap.keySet()) {
       if (!enabledServers.contains(instance)) {
         newDisabledServers.add(instance);
+      }
+    }
+    // Disabled servers since removed from the cluster altogether are forgotten, and the listeners drop whatever they
+    // still hold for them. Done before the early return below: a removal changes no routing, so nothing else notices.
+    Iterator<Map.Entry<String, ServerInstance>> previouslyEnabledServerIterator =
+        _previouslyEnabledServers.entrySet().iterator();
+    while (previouslyEnabledServerIterator.hasNext()) {
+      Map.Entry<String, ServerInstance> entry = previouslyEnabledServerIterator.next();
+      if (!presentServers.contains(entry.getKey())) {
+        previouslyEnabledServerIterator.remove();
+        notifyServerRemoved(entry.getValue());
       }
     }
 
@@ -545,8 +574,17 @@ public abstract class BaseBrokerRoutingManager
     // Remove new disabled servers from _enabledServerInstanceMap after updating all routing entries to ensure it
     // always contains the selected servers
     for (String newDisabledInstance : newDisabledServers) {
-      _enabledServerInstanceMap.remove(newDisabledInstance);
-      _previouslyEnabledServers.add(newDisabledInstance);
+      ServerInstance serverInstance = _enabledServerInstanceMap.remove(newDisabledInstance);
+      if (serverInstance == null) {
+        continue;
+      }
+      if (presentServers.contains(newDisabledInstance)) {
+        // Still in the cluster, just disabled or shutting down: remember it so that its return counts as a restart
+        _previouslyEnabledServers.put(newDisabledInstance, serverInstance);
+      } else {
+        // Went from enabled to removed in one step
+        notifyServerRemoved(serverInstance);
+      }
     }
 
     LOGGER.info("Processed instance config change in {}ms "
@@ -584,6 +622,18 @@ public abstract class BaseBrokerRoutingManager
         callback.accept(serverInstance);
       } catch (Exception e) {
         LOGGER.error("Caught exception in server re-enable callback for server: {}, ignoring it",
+            serverInstance.getInstanceId(), e);
+      }
+    }
+  }
+
+  private void notifyServerRemoved(ServerInstance serverInstance) {
+    LOGGER.info("Server: {} has been removed from the cluster", serverInstance.getInstanceId());
+    for (Consumer<ServerInstance> callback : _serverRemovedCallbacks) {
+      try {
+        callback.accept(serverInstance);
+      } catch (Exception e) {
+        LOGGER.error("Caught exception in server removed callback for server: {}, ignoring it",
             serverInstance.getInstanceId(), e);
       }
     }
