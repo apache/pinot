@@ -170,6 +170,8 @@ public class RexExpressionToProtoExpression {
         return Expressions.ColumnDataType.BYTES;
       case UUID:
         return Expressions.ColumnDataType.UUID;
+      case VARIANT:
+        return Expressions.ColumnDataType.VARIANT;
       case MAP:
         return Expressions.ColumnDataType.MAP;
       case INT_ARRAY:

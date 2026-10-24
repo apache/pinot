@@ -27,10 +27,9 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.TimestampUtils;
 
 
-/// The type matrix is inherited from [AvroRecordExtractor], with two overrides:
-/// - INT96 timestamp (which parquet-avro surfaces as `fixed(12)` with `doc = "INT96 represented as byte[12]"`) →
-///   `Timestamp` (or `Long` epoch nanos when `extractRawTimeValues` is `true`) via
-///   [ParquetUtils#convertInt96ToEpochNanos].
+/// Extends [AvroRecordExtractor] with Parquet-specific conversions:
+/// - INT96 (surfaced by parquet-avro as `fixed(12)` with `doc = "INT96 represented as byte[12]"`) becomes `Timestamp`,
+///   or `Long` epoch nanos when `extractRawTimeValues` is `true`.
 /// - Top-level unsigned 32-bit integer fields (`INTEGER(32, false)` / legacy `UINT_32`), which parquet-avro surfaces
 ///   as a signed Avro `int` → `Long` via [Integer#toUnsignedLong]. The field names come from the Parquet file schema
 ///   (see [ParquetUtils#getUnsignedInt32FieldNames]) since the Avro schema carries no signedness. Unsigned values

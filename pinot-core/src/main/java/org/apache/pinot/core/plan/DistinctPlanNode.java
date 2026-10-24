@@ -37,6 +37,7 @@ import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.index.reader.SortedIndexReader;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /// Execution plan for distinct queries on a single segment.
@@ -54,6 +55,22 @@ public class DistinctPlanNode implements PlanNode {
   @Override
   public Operator<DistinctResultsBlock> run() {
     List<ExpressionContext> expressions = _queryContext.getSelectExpressions();
+    // QueryContext is shared by every segment. Tables without VARIANT columns take this constant-time branch instead
+    // of repeating one data-source lookup per DISTINCT expression per segment.
+    if (_queryContext.getSchema() == null || _queryContext.hasVariantColumns()) {
+      for (ExpressionContext expression : expressions) {
+        String column = expression.getIdentifier();
+        if (column != null) {
+          DataType dataType = _indexSegment.getDataSource(column, _queryContext.getSchema())
+              .getDataSourceMetadata().getDataType();
+          if (dataType != DataType.VARIANT) {
+            continue;
+          }
+          throw new IllegalArgumentException(
+              "Raw VARIANT values do not support DISTINCT; extract a typed path with variantGet first");
+        }
+      }
+    }
 
     // Use dictionary to solve the query if possible
     if (_queryContext.getFilter() == null && expressions.size() == 1) {

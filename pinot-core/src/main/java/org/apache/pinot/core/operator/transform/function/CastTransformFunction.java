@@ -56,6 +56,11 @@ public class CastTransformFunction extends BaseTransformFunction {
     _transformFunction = arguments.get(0);
     TransformResultMetadata sourceMetadata = _transformFunction.getResultMetadata();
     _sourceDataType = sourceMetadata.getDataType();
+    if (_sourceDataType == DataType.VARIANT) {
+      // Casting the raw envelope would leak encoding bytes as STRING/JSON/BYTES and bypass the opacity contract.
+      throw new IllegalArgumentException(
+          "Raw VARIANT values do not support CAST; extract a typed path with variantGet first");
+    }
     boolean sourceSV = sourceMetadata.isSingleValue();
     TransformFunction castFormatTransformFunction = arguments.get(1);
     if (castFormatTransformFunction instanceof LiteralTransformFunction) {

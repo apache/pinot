@@ -1,0 +1,26 @@
+{
+  "schemaName": "variantEvents",
+  "enableColumnBasedNullHandling": true,
+  "dimensionFieldSpecs": [
+    {
+      "name": "eventId",
+      "dataType": "STRING"
+    },
+    {
+      "name": "eventType",
+      "dataType": "STRING"
+    },
+    {
+      "name": "payload",
+      "dataType": "VARIANT"
+    }
+  ],
+  "dateTimeFieldSpecs": [
+    {
+      "name": "eventTime",
+      "dataType": "LONG",
+      "format": "1:MILLISECONDS:EPOCH",
+      "granularity": "1:MILLISECONDS"
+    }
+  ]
+}
