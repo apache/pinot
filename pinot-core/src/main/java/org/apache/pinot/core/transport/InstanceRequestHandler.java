@@ -245,14 +245,16 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     return true;
   }
 
-  /// Logs at most one line per [#EXPIRED_REQUEST_LOG_INTERVAL_MS], carrying the number of expired requests since
-  /// the previous line and the details of the latest one. The handler is shared by every channel, hence the atomics.
+  /// Logs at most one line per [#EXPIRED_REQUEST_LOG_INTERVAL_MS] of wall-clock time, carrying the number of expired
+  /// requests since the previous line and the details of the latest one. The handler is shared by every channel,
+  /// hence the atomics.
   private void logExpiredRequest(ServerQueryRequest queryRequest, long queryArrivalTimeMs, long requestDeadlineMs,
       long lateByMs) {
     _expiredRequestsSinceLastLog.incrementAndGet();
+    long nowMs = System.currentTimeMillis();
     long nextLogTimeMs = _nextExpiredRequestLogTimeMs.get();
-    if (queryArrivalTimeMs < nextLogTimeMs || !_nextExpiredRequestLogTimeMs.compareAndSet(nextLogTimeMs,
-        queryArrivalTimeMs + EXPIRED_REQUEST_LOG_INTERVAL_MS)) {
+    if (nowMs < nextLogTimeMs
+        || !_nextExpiredRequestLogTimeMs.compareAndSet(nextLogTimeMs, nowMs + EXPIRED_REQUEST_LOG_INTERVAL_MS)) {
       return;
     }
     long count = _expiredRequestsSinceLastLog.getAndSet(0);
