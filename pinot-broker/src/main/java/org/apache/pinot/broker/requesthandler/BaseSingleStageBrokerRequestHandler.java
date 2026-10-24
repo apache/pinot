@@ -1664,6 +1664,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
             .putIfAbsent(QueryOptionKey.AUTO_REWRITE_AGGREGATION_TYPE, _enableAutoRewriteAggregationType);
       }
 
+      if (_inferAnyValueTypeProvider.isEnabled()) {
+        sqlNodeAndOptions.getOptions().putIfAbsent(QueryOptionKey.INFER_ANY_VALUE_TYPE, "true");
+      }
+
       if (_regexDictSizeThreshold != null) {
         sqlNodeAndOptions.getOptions().putIfAbsent(QueryOptionKey.REGEX_DICT_SIZE_THRESHOLD, _regexDictSizeThreshold);
       }

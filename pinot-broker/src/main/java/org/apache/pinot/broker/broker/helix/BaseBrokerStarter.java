@@ -656,15 +656,20 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _brokerRequestHandler =
         new BrokerRequestHandlerDelegate(singleStageBrokerRequestHandler, multiStageBrokerRequestHandler,
             timeSeriesRequestHandler, _responseStore);
-    // Lets the approximate-function rewrite defaults be changed from the cluster config without a broker restart.
+    // Lets the approximate-function rewrite and inferAnyValueType defaults be changed from the cluster config without a
+    // broker restart.
     // Registering here is a no-op in itself, because the cluster config handler is not wired to Helix yet, so the
     // snapshot it hands the listener is empty. The real values arrive from that handler's first Helix callback,
     // which is set up below and still runs before the broker starts serving traffic.
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(
         singleStageBrokerRequestHandler.getApproximateFunctionOverrideProvider());
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(
+        singleStageBrokerRequestHandler.getInferAnyValueTypeProvider());
     if (multiStageBrokerRequestHandler != null) {
       _clusterConfigChangeHandler.registerClusterConfigChangeListener(
           multiStageBrokerRequestHandler.getApproximateFunctionOverrideProvider());
+      _clusterConfigChangeHandler.registerClusterConfigChangeListener(
+          multiStageBrokerRequestHandler.getInferAnyValueTypeProvider());
     }
     _brokerRequestHandler.start();
 
