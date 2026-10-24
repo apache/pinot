@@ -96,9 +96,10 @@ public enum TransformFunctionType {
   TEXT_MATCH("textMatch", ReturnTypes.BOOLEAN, OperandTypes.family(
       List.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER),
       i -> i >= 2)),
-  // Relevance score (BM25 by default) of each document for a text search query; 0 for non-matching documents
+  // Relevance score (BM25 by default) of each document for a text search query; 0 for non-matching documents.
+  // Optional 4th argument: global statistics from TEXT_SCORE_STATS, to score with corpus-wide IDF / average length
   TEXT_SCORE("textScore", ReturnTypes.DOUBLE, OperandTypes.family(
-      List.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER),
+      List.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER),
       i -> i >= 2)),
 
   // date type conversion functions

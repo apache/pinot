@@ -29,6 +29,7 @@ import org.apache.avro.Schema.Field;
 import org.apache.avro.Schema.Type;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
+import org.apache.pinot.segment.spi.index.reader.TextScoreStats;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -115,21 +116,14 @@ public class HybridSearchTest extends CustomDataQueryClusterIntegrationTest {
     try (AvroFilesAndWriters avroFilesAndWriters = createAvroFilesAndWriters(avroSchema)) {
       List<DataFileWriter<GenericData.Record>> writers = avroFilesAndWriters.getWriters();
       for (int i = 0; i < NUM_RECORDS; i++) {
-        int numWords = 2 + random.nextInt(7);
-        StringBuilder title = new StringBuilder();
-        for (int w = 0; w < numWords; w++) {
-          if (w > 0) {
-            title.append(' ');
-          }
-          title.append(VOCABULARY[random.nextInt(VOCABULARY.length)]);
-        }
+        String title = nextTitle(random);
         List<Float> embedding = new ArrayList<>(DIM);
         for (int d = 0; d < DIM; d++) {
           embedding.add(random.nextFloat());
         }
         GenericData.Record record = new GenericData.Record(avroSchema);
         record.put(ID_COL, i);
-        record.put(TITLE_COL, title.toString());
+        record.put(TITLE_COL, title);
         record.put(EMBEDDING_COL, embedding);
         writers.get(i % getNumAvroFiles()).append(record);
       }
@@ -165,6 +159,111 @@ public class HybridSearchTest extends CustomDataQueryClusterIntegrationTest {
     assertTrue(matching > 0 && matching < NUM_RECORDS);
     assertEquals(positive, matching);
     assertEquals(zero, NUM_RECORDS - matching);
+  }
+
+  /// Two-step global BM25: step 1 collects corpus statistics with `TEXT_SCORE_STATS` (summed over both servers'
+  /// segments), step 2 passes them to `TEXT_SCORE`. Scores must equal BM25 computed over the whole corpus, which the
+  /// per-segment default does not.
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testGlobalStatsTwoStep(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    JsonNode statsResponse =
+        postQuery("SELECT TEXT_SCORE_STATS(title, '" + TEXT_QUERY + "') FROM " + TABLE_NAME);
+    assertTrue(statsResponse.get("exceptions").isEmpty(), statsResponse.toString());
+    String stats = rows(statsResponse).get(0).get(0).asText();
+    TextScoreStats.FieldStats fieldStats = TextScoreStats.fromJson(stats).getField(TITLE_COL);
+    assertEquals(fieldStats.getDocCount(), NUM_RECORDS);
+
+    List<String> titles = generateTitles();
+    Map<Integer, Double> expected = corpusBm25(titles, TEXT_QUERY.split(" "));
+    assertEquals(fieldStats.getTermStats("usb")[0], countDocsContaining(titles, "usb"));
+
+    Map<Integer, Double> global = scoresById(
+        "SELECT id, TEXT_SCORE(title, '" + TEXT_QUERY + "', '', '" + stats + "') FROM " + TABLE_NAME
+            + " WHERE TEXT_MATCH(title, '" + TEXT_QUERY + "') LIMIT 1000");
+    Map<Integer, Double> local = scoresById(
+        "SELECT id, TEXT_SCORE(title, '" + TEXT_QUERY + "') FROM " + TABLE_NAME
+            + " WHERE TEXT_MATCH(title, '" + TEXT_QUERY + "') LIMIT 1000");
+    assertEquals(global.keySet(), expected.keySet());
+    double maxLocalError = 0;
+    for (Map.Entry<Integer, Double> entry : expected.entrySet()) {
+      assertEquals(global.get(entry.getKey()), entry.getValue(), 1e-4, "id " + entry.getKey());
+      maxLocalError = Math.max(maxLocalError, Math.abs(local.get(entry.getKey()) - entry.getValue()));
+    }
+    // Per-segment statistics (2 segments of 200 random titles) do not reproduce corpus-wide BM25
+    assertTrue(maxLocalError > 1e-3, "per-segment max error " + maxLocalError);
+  }
+
+  private Map<Integer, Double> scoresById(String query)
+      throws Exception {
+    JsonNode response = postQuery(query);
+    assertTrue(response.get("exceptions").isEmpty(), response.toString());
+    Map<Integer, Double> scores = new HashMap<>();
+    for (JsonNode row : rows(response)) {
+      scores.put(row.get(0).asInt(), row.get(1).asDouble());
+    }
+    return scores;
+  }
+
+  /// Regenerates the titles in id order, consuming the random stream exactly like [#createAvroFiles].
+  private static List<String> generateTitles() {
+    Random random = new Random(42);
+    List<String> titles = new ArrayList<>(NUM_RECORDS);
+    for (int i = 0; i < NUM_RECORDS; i++) {
+      titles.add(nextTitle(random));
+      for (int d = 0; d < DIM; d++) {
+        random.nextFloat();
+      }
+    }
+    return titles;
+  }
+
+  private static String nextTitle(Random random) {
+    int numWords = 2 + random.nextInt(7);
+    StringBuilder title = new StringBuilder();
+    for (int w = 0; w < numWords; w++) {
+      if (w > 0) {
+        title.append(' ');
+      }
+      title.append(VOCABULARY[random.nextInt(VOCABULARY.length)]);
+    }
+    return title.toString();
+  }
+
+  private static long countDocsContaining(List<String> titles, String term) {
+    return titles.stream().filter(t -> List.of(t.split(" ")).contains(term)).count();
+  }
+
+  /// Lucene BM25 (k1 = 1.2, b = 0.75) of an OR query over the whole corpus, for matching ids. Titles have at most 8
+  /// tokens, which Lucene's norm encoding stores exactly.
+  private static Map<Integer, Double> corpusBm25(List<String> titles, String[] terms) {
+    double k1 = 1.2;
+    double b = 0.75;
+    long sumLength = 0;
+    for (String title : titles) {
+      sumLength += title.split(" ").length;
+    }
+    double avgdl = (float) ((double) sumLength / titles.size());
+    Map<Integer, Double> scores = new HashMap<>();
+    for (String term : terms) {
+      long docFreq = countDocsContaining(titles, term);
+      double idf = Math.log(1 + (titles.size() - docFreq + 0.5) / (docFreq + 0.5));
+      for (int id = 0; id < titles.size(); id++) {
+        String[] tokens = titles.get(id).split(" ");
+        int tf = 0;
+        for (String token : tokens) {
+          if (token.equals(term)) {
+            tf++;
+          }
+        }
+        if (tf > 0) {
+          double score = idf * tf / (tf + k1 * (1 - b + b * tokens.length / avgdl));
+          scores.merge(id, score, Double::sum);
+        }
+      }
+    }
+    return scores;
   }
 
   /// RRF with `UNION ALL` + `GROUP BY`: `rrf(d) = sum over lists of 1 / (k + rank(d))`.

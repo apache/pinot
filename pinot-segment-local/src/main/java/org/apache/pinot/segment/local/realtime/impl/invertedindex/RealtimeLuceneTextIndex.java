@@ -24,6 +24,7 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.util.Map;
+import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import java.util.function.IntUnaryOperator;
 import javax.annotation.Nullable;
@@ -37,10 +38,12 @@ import org.apache.lucene.search.SearcherManager;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.text.LuceneDocScoreCollector;
+import org.apache.pinot.segment.local.segment.index.readers.text.LuceneTextScoreStatsUtils;
 import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.local.utils.LuceneTextIndexUtils;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.mutable.MutableTextIndex;
+import org.apache.pinot.segment.spi.index.reader.TextScoreStats;
 import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -260,9 +263,32 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
 
   @Override
   public Int2FloatMap getDocScores(String searchQuery, @Nullable String optionsString) {
-    // Same executor as getDocIds: avoids interrupting a Lucene search on the query thread (see getDocIdsWithOptions)
-    Future<Int2FloatMap> searchFuture =
-        SEARCHER_POOL.getExecutorService().submit(() -> executeScoring(searchQuery, optionsString));
+    return getDocScores(searchQuery, optionsString, null);
+  }
+
+  @Override
+  public Int2FloatMap getDocScores(String searchQuery, @Nullable String optionsString,
+      @Nullable TextScoreStats globalStats) {
+    return runOnSearcherPool(() -> executeScoring(searchQuery, optionsString, globalStats), "scoring", searchQuery);
+  }
+
+  @Override
+  public TextScoreStats getTextScoreStats(String searchQuery, @Nullable String optionsString) {
+    return runOnSearcherPool(() -> {
+      Query query = parseQuery(searchQuery, optionsString);
+      IndexSearcher indexSearcher = _searcherManager.acquire();
+      try {
+        return LuceneTextScoreStatsUtils.collect(indexSearcher, query);
+      } finally {
+        releaseSearcher(indexSearcher);
+      }
+    }, "collecting text score statistics on", searchQuery);
+  }
+
+  /// Runs a Lucene task on the searcher pool, like getDocIds: avoids interrupting a Lucene search on the query thread
+  /// (see getDocIdsWithOptions).
+  private <T> T runOnSearcherPool(Callable<T> task, String action, String searchQuery) {
+    Future<T> searchFuture = SEARCHER_POOL.getExecutorService().submit(task);
     try {
       return searchFuture.get();
     } catch (InterruptedException e) {
@@ -270,25 +296,39 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
       throw new RuntimeException("TEXT_SCORE interrupted while querying the consuming segment " + _segmentName
           + " for column " + _column + " with search query: " + searchQuery, e);
     } catch (Exception e) {
-      throw new RuntimeException("Failed while scoring the realtime text index for segment " + _segmentName
+      throw new RuntimeException("Failed while " + action + " the realtime text index for segment " + _segmentName
           + " for column " + _column + " with search query: " + searchQuery, e);
     }
   }
 
-  private Int2FloatMap executeScoring(String searchQuery, @Nullable String optionsString)
+  private Query parseQuery(String searchQuery, @Nullable String optionsString)
       throws Exception {
-    Query query = null;
     if (optionsString != null && !optionsString.trim().isEmpty()) {
       LuceneTextIndexUtils.LuceneTextIndexOptions options = LuceneTextIndexUtils.createOptions(optionsString);
       if (!options.getOptions().isEmpty()) {
-        query = LuceneTextIndexUtils.createQueryParserWithOptions(searchQuery, options, _column, _analyzer);
+        return LuceneTextIndexUtils.createQueryParserWithOptions(searchQuery, options, _column, _analyzer);
       }
     }
-    if (query == null) {
-      query = parseQueryWithoutOptions(searchQuery);
-    }
-    IndexSearcher indexSearcher = _searcherManager.acquire();
+    return parseQueryWithoutOptions(searchQuery);
+  }
+
+  private void releaseSearcher(IndexSearcher indexSearcher) {
     try {
+      _searcherManager.release(indexSearcher);
+    } catch (Exception e) {
+      LOGGER.error("Failed while releasing the searcher manager for realtime text index for column {}", _column, e);
+    }
+  }
+
+  private Int2FloatMap executeScoring(String searchQuery, @Nullable String optionsString,
+      @Nullable TextScoreStats globalStats)
+      throws Exception {
+    Query query = parseQuery(searchQuery, optionsString);
+    IndexSearcher acquiredSearcher = _searcherManager.acquire();
+    try {
+      IndexSearcher indexSearcher = globalStats != null
+          ? LuceneTextScoreStatsUtils.newGlobalStatsSearcher(acquiredSearcher.getIndexReader(), globalStats)
+          : acquiredSearcher;
       Int2FloatOpenHashMap luceneScores = new Int2FloatOpenHashMap();
       indexSearcher.search(query, new LuceneDocScoreCollector(luceneScores, IntUnaryOperator.identity()));
       // Consuming segments have no pre-built doc id mapping; translate through the stored Pinot doc id field
@@ -300,11 +340,7 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
       }
       return pinotScores;
     } finally {
-      try {
-        _searcherManager.release(indexSearcher);
-      } catch (Exception e) {
-        LOGGER.error("Failed while releasing the searcher manager for realtime text index for column {}", _column, e);
-      }
+      releaseSearcher(acquiredSearcher);
     }
   }
 

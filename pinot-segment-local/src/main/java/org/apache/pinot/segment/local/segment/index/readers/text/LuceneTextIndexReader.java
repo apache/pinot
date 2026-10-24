@@ -48,6 +48,7 @@ import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.TextIndexConfig.DocIdTranslatorMode;
 import org.apache.pinot.segment.spi.index.reader.QueryScopedCache;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
+import org.apache.pinot.segment.spi.index.reader.TextScoreStats;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -265,10 +266,18 @@ public class LuceneTextIndexReader implements TextIndexReader {
 
   @Override
   public Int2FloatMap getDocScores(String searchQuery, @Nullable String optionsString) {
+    return getDocScores(searchQuery, optionsString, null);
+  }
+
+  @Override
+  public Int2FloatMap getDocScores(String searchQuery, @Nullable String optionsString,
+      @Nullable TextScoreStats globalStats) {
     Int2FloatOpenHashMap scores = new Int2FloatOpenHashMap();
     try {
       validateDocCount();
-      _indexSearcher.search(buildQuery(searchQuery, optionsString, null),
+      IndexSearcher searcher = globalStats != null
+          ? LuceneTextScoreStatsUtils.newGlobalStatsSearcher(_indexReader, globalStats) : _indexSearcher;
+      searcher.search(buildQuery(searchQuery, optionsString, null),
           new LuceneDocScoreCollector(scores, _docIdTranslator::getPinotDocId));
       return scores;
     } catch (QueryException e) {
@@ -276,6 +285,19 @@ public class LuceneTextIndexReader implements TextIndexReader {
     } catch (Exception e) {
       throw new RuntimeException(
           "Caught exception while scoring the text index for column:" + _column + " search query:" + searchQuery, e);
+    }
+  }
+
+  @Override
+  public TextScoreStats getTextScoreStats(String searchQuery, @Nullable String optionsString) {
+    try {
+      return LuceneTextScoreStatsUtils.collect(_indexSearcher, buildQuery(searchQuery, optionsString, null));
+    } catch (QueryException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new RuntimeException(
+          "Caught exception while collecting text score statistics for column:" + _column + " search query:"
+              + searchQuery, e);
     }
   }
 

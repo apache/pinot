@@ -636,6 +636,9 @@ public class AggregationFunctionUtils {
 
     Object result;
     switch (functionType) {
+      case TEXTSCORESTATS:
+        result = ((TextScoreStatsAggregationFunction) aggregationFunction).getSegmentStats(dataSource);
+        break;
       case MIN:
       case MINMV:
         result = getMinValueNumeric(dataSource);

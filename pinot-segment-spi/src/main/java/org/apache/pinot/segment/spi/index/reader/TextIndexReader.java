@@ -99,6 +99,37 @@ public interface TextIndexReader extends IndexReader {
         "Relevance scoring is not supported by text index reader: " + getClass().getSimpleName());
   }
 
+  /// Like [#getDocScores(String, String)], but when `globalStats` is given the similarity uses those corpus
+  /// statistics (document count, average field length, per-term document frequency) instead of this index's own,
+  /// so that scores are comparable across segments. Terms or fields the statistics do not cover fall back to this
+  /// index's statistics. `globalStats` normally comes from merging [#getTextScoreStats] over every segment.
+  ///
+  /// @param searchQuery The search query string
+  /// @param optionsString Options string in format "key1=value1,key2=value2", can be null
+  /// @param globalStats corpus statistics to score with, or `null` to use this index's statistics
+  /// @return map from Pinot doc id to score, containing only matching documents
+  default Int2FloatMap getDocScores(String searchQuery, @Nullable String optionsString,
+      @Nullable TextScoreStats globalStats) {
+    if (globalStats == null) {
+      return getDocScores(searchQuery, optionsString);
+    }
+    throw new UnsupportedOperationException(
+        "Relevance scoring with global statistics is not supported by text index reader: "
+            + getClass().getSimpleName());
+  }
+
+  /// Returns this index's statistics for the terms of `searchQuery`, parsed and analyzed exactly as
+  /// [#getDocScores(String, String)] parses it: per queried field the collection statistics, and per query term its
+  /// document frequency and total term frequency. Merging the result of every segment gives the statistics of
+  /// the whole corpus, to pass to [#getDocScores(String, String, TextScoreStats)].
+  ///
+  /// @param searchQuery The search query string
+  /// @param optionsString Options string in format "key1=value1,key2=value2", can be null
+  default TextScoreStats getTextScoreStats(String searchQuery, @Nullable String optionsString) {
+    throw new UnsupportedOperationException(
+        "Text score statistics are not supported by text index reader: " + getClass().getSimpleName());
+  }
+
   /// Marker method that allows to differentiate between single-column and multi-column text index reader .
   default boolean isMultiColumn() {
     return false;

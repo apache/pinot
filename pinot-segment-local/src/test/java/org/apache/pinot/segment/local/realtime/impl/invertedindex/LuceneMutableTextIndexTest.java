@@ -39,6 +39,7 @@ import org.apache.lucene.search.ReferenceManager.RefreshListener;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
+import org.apache.pinot.segment.spi.index.reader.TextScoreStats;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.util.TestUtils;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -51,6 +52,7 @@ import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
@@ -313,6 +315,57 @@ public class LuceneMutableTextIndexTest {
     } finally {
       index.close();
     }
+  }
+
+  @Test
+  public void testGlobalStatsScoring()
+      throws IOException {
+    // Same first document in both consuming segments; `usb` is common in A and rare in B
+    String[] docsA = {"usb charger", "usb hub", "usb cable"};
+    String[] docsB = {"usb charger", "hdmi monitor cable", "wireless mouse pad"};
+    RealtimeLuceneTextIndex indexA = newScoringIndex(docsA);
+    RealtimeLuceneTextIndex indexB = newScoringIndex(docsB);
+    String[] unionDocs = {docsA[0], docsA[1], docsA[2], docsB[0], docsB[1], docsB[2]};
+    RealtimeLuceneTextIndex unionIndex = newScoringIndex(unionDocs);
+    try {
+      String query = "usb charger";
+      assertNotEquals(indexA.getDocScores(query, null).get(0), indexB.getDocScores(query, null).get(0));
+
+      TextScoreStats stats = indexA.getTextScoreStats(query, null).merge(indexB.getTextScoreStats(query, null));
+      assertEquals(stats, unionIndex.getTextScoreStats(query, null));
+      assertEquals(stats.getField(TEXT_COLUMN_NAME).getDocCount(), 6);
+      assertEquals(stats.getField(TEXT_COLUMN_NAME).getTermStats("usb"), new long[]{4, 4});
+
+      Int2FloatMap globalA = indexA.getDocScores(query, null, stats);
+      Int2FloatMap globalB = indexB.getDocScores(query, null, stats);
+      Int2FloatMap union = unionIndex.getDocScores(query, null);
+      assertEquals(globalA.get(0), globalB.get(0));
+      for (int docId = 0; docId < docsA.length; docId++) {
+        assertEquals(globalA.get(docId), union.get(docId), 1e-6f);
+        assertEquals(globalB.get(docId), union.get(docsA.length + docId), 1e-6f);
+      }
+      // No global statistics: identical to the plain call
+      assertEquals(indexA.getDocScores(query, null, null), indexA.getDocScores(query, null));
+    } finally {
+      indexA.close();
+      indexB.close();
+      unionIndex.close();
+    }
+  }
+
+  private static RealtimeLuceneTextIndex newScoringIndex(String[] docs) {
+    TextIndexConfig config = new TextIndexConfigBuilder().withUseANDForMultiTermQueries(false).build();
+    RealtimeLuceneTextIndex index = new RealtimeLuceneTextIndex(TEXT_COLUMN_NAME, INDEX_DIR,
+        "table__0__" + SEGMENT_NAME_SUFFIX_COUNTER.getAndIncrement() + "__20240601T1818Z", config);
+    for (String doc : docs) {
+      index.add(doc);
+    }
+    try {
+      index.getSearcherManager().maybeRefreshBlocking();
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+    return index;
   }
 
   @Test

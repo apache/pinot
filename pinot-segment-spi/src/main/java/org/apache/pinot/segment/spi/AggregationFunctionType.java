@@ -152,6 +152,12 @@ public enum AggregationFunctionType {
   IDSET("idSet", ReturnTypes.VARCHAR,
       OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), i -> i == 1), SqlTypeName.OTHER),
 
+  // Corpus statistics (doc count, average field length, per-term document frequency) of a text search query, merged
+  // across segments, for TEXT_SCORE(column, query, options, stats) to score with global BM25 statistics
+  TEXTSCORESTATS("textScoreStats", ReturnTypes.VARCHAR,
+      OperandTypes.family(List.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER),
+          i -> i == 2), SqlTypeName.VARCHAR),
+
   HISTOGRAM("histogram", new ArrayReturnTypeInference(SqlTypeName.DOUBLE), OperandTypes.VARIADIC, SqlTypeName.OTHER),
 
   COVARPOP("covarPop", SqlTypeName.OTHER, SqlTypeName.DOUBLE),

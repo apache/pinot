@@ -73,10 +73,38 @@ public interface MultiColumnTextIndexReader extends TextIndexReader {
         "Relevance scoring is not supported by text index reader: " + getClass().getSimpleName());
   }
 
+  /// Column-aware counterpart of [TextIndexReader#getDocScores(String, String, TextScoreStats)].
+  default Int2FloatMap getDocScores(String column, String searchQuery, @Nullable String optionsString,
+      @Nullable TextScoreStats globalStats) {
+    if (globalStats == null) {
+      return getDocScores(column, searchQuery, optionsString);
+    }
+    throw new UnsupportedOperationException(
+        "Relevance scoring with global statistics is not supported by text index reader: "
+            + getClass().getSimpleName());
+  }
+
+  /// Column-aware counterpart of [TextIndexReader#getTextScoreStats].
+  default TextScoreStats getTextScoreStats(String column, String searchQuery, @Nullable String optionsString) {
+    throw new UnsupportedOperationException(
+        "Text score statistics are not supported by text index reader: " + getClass().getSimpleName());
+  }
+
   /// A multi-column index cannot score without a column, matching [#getDocIds(String)].
   @Override
   default Int2FloatMap getDocScores(String searchQuery, @Nullable String optionsString) {
     throw new UnsupportedOperationException("Multi-column text index requires column name to score!");
+  }
+
+  @Override
+  default Int2FloatMap getDocScores(String searchQuery, @Nullable String optionsString,
+      @Nullable TextScoreStats globalStats) {
+    throw new UnsupportedOperationException("Multi-column text index requires column name to score!");
+  }
+
+  @Override
+  default TextScoreStats getTextScoreStats(String searchQuery, @Nullable String optionsString) {
+    throw new UnsupportedOperationException("Multi-column text index requires column name to collect statistics!");
   }
 
   default boolean isMultiColumn() {

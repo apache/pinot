@@ -28,20 +28,27 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.MultiColumnTextIndexReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
+import org.apache.pinot.segment.spi.index.reader.TextScoreStats;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/// Implements `TEXT_SCORE(column, 'search query'[, 'options'])`: the relevance score of each document for a text
-/// search query, read from the column's text index (Lucene BM25 by default). Documents that do not match the query
-/// score `0`.
+/// Implements `TEXT_SCORE(column, 'search query'[, 'options'[, 'globalStats']])`: the relevance score of each
+/// document for a text search query, read from the column's text index (Lucene BM25 by default). Documents that do
+/// not match the query score `0`.
 ///
 /// The query is parsed exactly like `TEXT_MATCH` with the same arguments, so
 /// `TEXT_SCORE(col, q) > 0` holds exactly for the documents `TEXT_MATCH(col, q)` accepts (BM25 scores of matching
 /// documents are strictly positive; constant-score queries such as wildcards score `1`).
 ///
 /// The index is searched once per segment, on the first block, and the doc id to score map is reused for the
-/// remaining blocks of that segment. Scores use per-segment term statistics (IDF, average field length), so they
-/// rank documents correctly within a segment but are only approximately comparable across segments.
+/// remaining blocks of that segment. By default scores use per-segment term statistics (IDF, average field length),
+/// so they rank documents correctly within a segment but are only approximately comparable across segments.
+///
+/// With the optional 4th argument, the serialized [TextScoreStats] returned by
+/// `TEXT_SCORE_STATS(column, 'search query'[, 'options'])` for the same query, every segment scores with those
+/// corpus-wide statistics instead, so equal documents get equal scores in every segment (two-step search, like
+/// Elasticsearch's `dfs_query_then_fetch`). An empty string means no global statistics. Pass `''` as options to use
+/// the default parser with global statistics.
 ///
 /// Not thread-safe: like other transform functions, an instance serves one segment on one thread.
 public class TextScoreTransformFunction extends BaseTransformFunction {
@@ -55,6 +62,8 @@ public class TextScoreTransformFunction extends BaseTransformFunction {
   @Nullable
   private String _options;
   @Nullable
+  private TextScoreStats _globalStats;
+  @Nullable
   private Int2FloatMap _scores;
 
   @Override
@@ -66,9 +75,9 @@ public class TextScoreTransformFunction extends BaseTransformFunction {
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
     super.init(arguments, columnContextMap);
     int numArguments = arguments.size();
-    if (numArguments < 2 || numArguments > 3) {
-      throw new IllegalArgumentException(
-          "Expected 2 or 3 arguments for TEXT_SCORE: TEXT_SCORE(column, 'searchQuery'[, 'options'])");
+    if (numArguments < 2 || numArguments > 4) {
+      throw new IllegalArgumentException("Expected 2 to 4 arguments for TEXT_SCORE: "
+          + "TEXT_SCORE(column, 'searchQuery'[, 'options'[, 'globalStats']])");
     }
 
     TransformFunction columnArg = arguments.get(0);
@@ -88,7 +97,13 @@ public class TextScoreTransformFunction extends BaseTransformFunction {
     _textIndexReader = textIndexReader;
 
     _searchQuery = getStringLiteral(arguments.get(1), "second");
-    _options = numArguments == 3 ? getStringLiteral(arguments.get(2), "third") : null;
+    _options = numArguments >= 3 ? getStringLiteral(arguments.get(2), "third") : null;
+    if (numArguments == 4) {
+      String globalStats = getStringLiteral(arguments.get(3), "fourth");
+      if (!globalStats.isBlank()) {
+        _globalStats = TextScoreStats.fromJson(globalStats);
+      }
+    }
   }
 
   private static String getStringLiteral(TransformFunction argument, String position) {
@@ -121,8 +136,9 @@ public class TextScoreTransformFunction extends BaseTransformFunction {
   private Int2FloatMap getScores() {
     if (_scores == null) {
       _scores = _multiColumnName != null
-          ? ((MultiColumnTextIndexReader) _textIndexReader).getDocScores(_multiColumnName, _searchQuery, _options)
-          : _textIndexReader.getDocScores(_searchQuery, _options);
+          ? ((MultiColumnTextIndexReader) _textIndexReader).getDocScores(_multiColumnName, _searchQuery, _options,
+          _globalStats)
+          : _textIndexReader.getDocScores(_searchQuery, _options, _globalStats);
     }
     return _scores;
   }

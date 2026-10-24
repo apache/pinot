@@ -54,6 +54,7 @@ import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.TextIndexConfig.DocIdTranslatorMode;
 import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextIndexConstants;
 import org.apache.pinot.segment.spi.index.reader.MultiColumnTextIndexReader;
+import org.apache.pinot.segment.spi.index.reader.TextScoreStats;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.segment.spi.utils.CsvParser;
@@ -386,24 +387,46 @@ public class MultiColumnLuceneTextIndexReader implements MultiColumnTextIndexRea
 
   @Override
   public Int2FloatMap getDocScores(String column, String searchQuery, @Nullable String optionsString) {
+    return getDocScores(column, searchQuery, optionsString, null);
+  }
+
+  @Override
+  public Int2FloatMap getDocScores(String column, String searchQuery, @Nullable String optionsString,
+      @Nullable TextScoreStats globalStats) {
     Int2FloatOpenHashMap scores = new Int2FloatOpenHashMap();
     try {
-      Query query = null;
-      if (optionsString != null && !optionsString.trim().isEmpty()) {
-        LuceneTextIndexUtils.LuceneTextIndexOptions options = LuceneTextIndexUtils.createOptions(optionsString);
-        if (!options.getOptions().isEmpty()) {
-          query = LuceneTextIndexUtils.createQueryParserWithOptions(searchQuery, options, column, _analyzer);
-        }
-      }
-      if (query == null) {
-        query = parseQueryWithoutOptions(column, searchQuery);
-      }
-      _indexSearcher.search(query, new LuceneDocScoreCollector(scores, _docIdTranslator::getPinotDocId));
+      IndexSearcher searcher = globalStats != null
+          ? LuceneTextScoreStatsUtils.newGlobalStatsSearcher(_indexReader, globalStats) : _indexSearcher;
+      searcher.search(parseQuery(column, searchQuery, optionsString),
+          new LuceneDocScoreCollector(scores, _docIdTranslator::getPinotDocId));
       return scores;
     } catch (Exception e) {
       throw new RuntimeException(
           "Caught exception while scoring the text index for column: " + column + " search query:" + searchQuery, e);
     }
+  }
+
+  @Override
+  public TextScoreStats getTextScoreStats(String column, String searchQuery, @Nullable String optionsString) {
+    try {
+      return LuceneTextScoreStatsUtils.collect(_indexSearcher, parseQuery(column, searchQuery, optionsString));
+    } catch (Exception e) {
+      throw new RuntimeException(
+          "Caught exception while collecting text score statistics for column: " + column + " search query:"
+              + searchQuery, e);
+    }
+  }
+
+  /// Parses a search string for `column`, honouring the options string when it carries options.
+  private Query parseQuery(String column, String searchQuery, @Nullable String optionsString)
+      throws Exception {
+    if (optionsString != null && !optionsString.trim().isEmpty()) {
+      LuceneTextIndexUtils.LuceneTextIndexOptions options = LuceneTextIndexUtils.createOptions(optionsString);
+      if (!options.getOptions().isEmpty()) {
+        return LuceneTextIndexUtils.createQueryParserWithOptions(searchQuery, options, column, _analyzer);
+      }
+    }
+    return parseQueryWithoutOptions(column, searchQuery);
   }
 
   /// Parses a search string for `column` with the column's (or the index-wide) parser configuration.
