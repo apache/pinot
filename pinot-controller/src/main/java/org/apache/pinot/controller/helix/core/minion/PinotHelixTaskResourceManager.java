@@ -94,7 +94,7 @@ public class PinotHelixTaskResourceManager {
 
   @VisibleForTesting
   static final int DELETE_JOB_MAX_ATTEMPTS = 3;
-  private static final long DELETE_JOB_BACKOFF_MS = 100L;
+  private static final long DELETE_JOB_BACKOFF_MS = 1000L;
 
   private final TaskDriver _taskDriver;
   private final PinotHelixResourceManager _helixResourceManager;
@@ -324,7 +324,7 @@ public class PinotHelixTaskResourceManager {
   /// Delete a single task from the task queue. The task queue should be
   /// stopped before deleting the task, otherwise it fails with exception.
   ///
-  /// A delete that fails with [HelixException] is retried a few times with a short backoff. The Helix task pipeline
+  /// A delete that fails with [HelixException] is retried a few times with a growing backoff. The Helix task pipeline
   /// can still be writing the job context right after the queue is stopped or the task is scheduled. Removing the
   /// context ZNode then fails with ZooKeeper `NotEmpty`, which Helix reports as a [HelixException] without the cause.
   /// Each step of a delete skips ZNodes that are already gone, so a retry resumes where the failed attempt stopped.
