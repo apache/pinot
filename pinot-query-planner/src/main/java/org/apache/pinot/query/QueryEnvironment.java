@@ -605,7 +605,8 @@ public class QueryEnvironment {
     for (RelOptRule relOptRule : basicRules) {
       hepProgramBuilder.addRuleInstance(relOptRule);
     }
-    // Required to plan FIRST_WITH_TIME / LAST_WITH_TIME without a data type, so the rule options do not filter it.
+    // Required to plan FIRST_WITH_TIME, LAST_WITH_TIME and ARRAY_AGG without a data type, so the rule options do not
+    // filter it.
     hepProgramBuilder.addRuleInstance(PinotAggregateTypeArgumentRewriteRule.INSTANCE);
 
     // ----
