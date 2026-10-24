@@ -51,11 +51,13 @@ import org.apache.calcite.util.DateString;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.QueryFunctionInvoker;
+import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.function.scalar.DateTimeFunctions;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.logical.RexExpressionUtils;
+import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.TimestampUtils;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
 
@@ -98,13 +100,19 @@ public class PinotEvaluateLiteralRule {
     List<RexNode> castedNewProjects = new ArrayList<>(numProjects);
     boolean needCast = false;
     for (int i = 0; i < numProjects; i++) {
-      RexNode oldNode = oldProjects.get(i);
       RexNode newNode = newProjects.get(i);
+      RelDataType expectedType = oldProject.getRowType().getFieldList().get(i).getType();
       // Need to cast the result to the original type if the literal type is changed, e.g. VARCHAR literal is typed as
-      // CHAR(STRING_LENGTH) in Calcite, but we need to cast it back to VARCHAR.
-      if (!oldNode.getType().equals(newNode.getType())) {
+      // CHAR(STRING_LENGTH) in Calcite, but we need to cast it back to VARCHAR. Use the project's declared row type
+      // instead of the original expression type because a nullable user-defined function can retain a non-null operand
+      // type while the validated projection is nullable.
+      if (!expectedType.equals(newNode.getType())) {
         needCast = true;
-        newNode = rexBuilder.makeCast(oldNode.getType(), newNode, true);
+        newNode = rexBuilder.makeCast(expectedType, newNode, true, false);
+        if (!expectedType.equals(newNode.getType())) {
+          // A non-null literal cannot carry a nullable type; retain a cast only when normalization did not restore it.
+          newNode = rexBuilder.makeAbstractCast(expectedType, newNode, false);
+        }
       }
       castedNewProjects.add(newNode);
     }
@@ -166,6 +174,15 @@ public class PinotEvaluateLiteralRule {
 
     int numArguments = operands.size();
     ColumnDataType[] argumentTypes = new ColumnDataType[numArguments];
+    String canonicalName = FunctionRegistry.canonicalize(PinotRuleUtils.extractFunctionName(rexCall));
+    // A SQL NULL JSON input or default becomes either SQL NULL or a type placeholder based on the query's
+    // null-handling option. This Calcite rule does not carry that option, so leave those calls for the
+    // leaf/intermediate runtime. A NULL path or result type is always NULL and remains safe to fold.
+    if (TransformFunctionType.isJsonExtractScalar(canonicalName)
+        && (RexLiteral.isNullLiteral(operands.get(0))
+        || (numArguments == 4 && RexLiteral.isNullLiteral(operands.get(3))))) {
+      return rexCall;
+    }
     for (int i = 0; i < numArguments; i++) {
       RexNode rexNode = operands.get(i);
       if (!(rexNode instanceof RexLiteral)) {
@@ -173,6 +190,9 @@ public class PinotEvaluateLiteralRule {
         return rexCall;
       }
       argumentTypes[i] = RelToPlanNodeConverter.convertToColumnDataType(rexNode.getType());
+      if (TransformFunctionType.isJsonExtractScalar(canonicalName) && i == 3) {
+        argumentTypes[i] = RexExpressionUtils.fromJsonExtractScalarDefaultLiteral((RexLiteral) rexNode).getDataType();
+      }
     }
 
     if (isDatetimeIntervalArithmetic(rexCall)) {
@@ -189,7 +209,6 @@ public class PinotEvaluateLiteralRule {
       argumentTypes = new ColumnDataType[]{argumentTypes[0], ColumnDataType.STRING};
       castTargetType = RelToPlanNodeConverter.convertToColumnDataType(rexCall.getType()).name();
     }
-    String canonicalName = FunctionRegistry.canonicalize(PinotRuleUtils.extractFunctionName(rexCall));
     FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(canonicalName, argumentTypes);
     if (functionInfo == null || !functionInfo.isDeterministic()) {
       // Function cannot be evaluated
@@ -199,7 +218,13 @@ public class PinotEvaluateLiteralRule {
     // not values, for example the Sarg of a SEARCH
     Object[] arguments = new Object[argumentTypes.length];
     for (int i = 0; i < numArguments; i++) {
-      arguments[i] = getArgumentValue((RexLiteral) operands.get(i), argumentTypes[i]);
+      RexLiteral literal = (RexLiteral) operands.get(i);
+      if (TransformFunctionType.isJsonExtractScalar(canonicalName) && i == 3) {
+        RexExpression.Literal defaultLiteral = RexExpressionUtils.fromJsonExtractScalarDefaultLiteral(literal);
+        arguments[i] = defaultLiteral.getDataType().toExternal(defaultLiteral.getValue());
+      } else {
+        arguments[i] = getArgumentValue(literal, argumentTypes[i]);
+      }
     }
     if (castTargetType != null) {
       arguments[1] = castTargetType;
@@ -251,10 +276,18 @@ public class PinotEvaluateLiteralRule {
     }
     try {
       if (rexNodeType instanceof ArraySqlType) {
-        // Scalar functions may return a primitive array (e.g. generateArray returns long[]), which cannot be cast to
-        // Object[]. Read the elements reflectively instead, which boxes them the same way either kind of array does.
-        int length = Array.getLength(resultValue);
         RelDataType componentType = rexNodeType.getComponentType();
+        // ArrayLiteralTransformFunction does not support BIG_DECIMAL components. Keep the function call so the
+        // jsonExtractScalar transform produces the BigDecimal array directly on the leaf.
+        if (componentType != null && componentType.getSqlTypeName() == SqlTypeName.DECIMAL) {
+          return rexCall;
+        }
+        int length = Array.getLength(resultValue);
+        if (length == 0) {
+          // An empty ARRAY constructor executes as Object[], which cannot represent Pinot's primitive arrays.
+          return rexCall;
+        }
+        // Read primitive and object arrays reflectively, boxing and converting each element in one pass.
         List<Object> resultValues = new ArrayList<>(length);
         for (int i = 0; i < length; i++) {
           resultValues.add(convertResultValue(Array.get(resultValue, i), componentType));
@@ -439,6 +472,10 @@ public class PinotEvaluateLiteralRule {
   private static Object convertResultValue(@Nullable Object resultValue, RelDataType relDataType) {
     if (resultValue == null) {
       return null;
+    }
+    if (relDataType.getSqlTypeName() == SqlTypeName.BOOLEAN) {
+      // Scalar BOOLEAN is stored as Integer 0/1. Calcite literals need a Boolean.
+      return BooleanUtils.toBoolean(resultValue);
     }
     if (relDataType.getSqlTypeName() == SqlTypeName.TIMESTAMP) {
       // Return millis since epoch for TIMESTAMP
