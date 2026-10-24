@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.index.creator;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.util.HashMap;
 import org.apache.commons.io.FileUtils;
@@ -36,12 +37,18 @@ import org.apache.lucene.index.NumericDocValues;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
+import org.apache.pinot.segment.local.segment.index.readers.text.LuceneTextIndexBufferReader;
 import org.apache.pinot.segment.local.segment.index.readers.text.LuceneTextIndexReader;
 import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
+import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
+import org.apache.pinot.segment.spi.index.TextIndexConfig.DocIdTranslatorMode;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -160,6 +167,48 @@ public class LuceneTextIndexCreatorTest {
     }
   }
 
+  @DataProvider
+  public Object[][] combinedMappingModes() {
+    return new Object[][]{{null}, {DocIdTranslatorMode.Default}, {DocIdTranslatorMode.TryOptimize},
+        {DocIdTranslatorMode.Skip}};
+  }
+
+  @Test(dataProvider = "combinedMappingModes")
+  public void testCombinedIndexMapping(DocIdTranslatorMode translatorMode)
+      throws IOException {
+    String column = "combined";
+    TextIndexConfig config = new TextIndexConfigBuilder().setStoreInSegmentFile(true)
+        .withDocIdTranslatorMode(translatorMode == null ? null : translatorMode.name()).build();
+    try (LuceneTextIndexCreator creator =
+        new LuceneTextIndexCreator(column, INDEX_DIR, true, false, null, false, null, true, config)) {
+      creator.add("alpha");
+      creator.add("beta");
+      creator.add("gamma");
+      creator.seal();
+      try (DirectoryReader reader = DirectoryReader.open(creator.getIndexWriter())) {
+        assertNull(MultiDocValues.getNumericValues(reader, LuceneTextIndexCreator.PINOT_DOC_ID_DOC_VALUES_FIELD_NAME));
+      }
+    }
+
+    File combinedFile = new File(INDEX_DIR, column + V1Constants.Indexes.LUCENE_COMBINE_TEXT_INDEX_FILE_EXTENSION);
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapFile(combinedFile, true, 0, combinedFile.length(),
+        ByteOrder.LITTLE_ENDIAN, "combined text index test")) {
+      boolean mappingExpected = translatorMode == null || translatorMode == DocIdTranslatorMode.Default;
+      assertEquals(LuceneTextIndexBufferReader.hasFile(buffer,
+          column + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION), mappingExpected);
+      DocIdTranslatorMode persistedMode =
+          translatorMode == DocIdTranslatorMode.TryOptimize ? DocIdTranslatorMode.Skip : translatorMode;
+      assertEquals(LuceneTextIndexBufferReader.extractProperties(buffer, column)
+              .getProperty(FieldConfig.TEXT_INDEX_LUCENE_DOC_ID_TRANSLATOR_MODE),
+          persistedMode == null ? null : persistedMode.name());
+      try (LuceneTextIndexReader reader = new LuceneTextIndexReader(column, buffer, 3, config)) {
+        assertEquals(reader.getDocIds("alpha", null).toArray(), new int[]{0});
+        assertEquals(reader.getDocIds("gamma", null).toArray(), new int[]{2});
+        assertEquals(reader.getDocIds("*:*", null).toArray(), new int[]{0, 1, 2});
+      }
+    }
+  }
+
   @Test
   public void testDocValuesFieldNameColumnWithEmptyValues()
       throws IOException {
@@ -199,10 +248,21 @@ public class LuceneTextIndexCreatorTest {
     }
   }
 
-  /// Regression test for the AIOOB triggered when a prior segment-conversion attempt left stale
-  /// Lucene files at the v1 destination directory and the reuse-mutable-index path is taken.
-  @Test
-  public void testConvertMutableSegmentCleansStaleDestFiles()
+  @DataProvider
+  public Object[][] mutableMappingModes() {
+    return new Object[][]{
+        {null, new int[]{0, 1, 2}, null, true},
+        {DocIdTranslatorMode.TryOptimize, new int[]{0, 1, 2}, null, false},
+        {DocIdTranslatorMode.TryOptimize, new int[]{0, 1, 2}, new int[]{2, 0, 1}, true},
+        // Only the final immutable IDs are sequential in this case.
+        {DocIdTranslatorMode.TryOptimize, new int[]{2, 0, 1}, new int[]{1, 2, 0}, false}
+    };
+  }
+
+  /// Regression test for stale destination files, including mappings made identity or nonidentity by conversion.
+  @Test(dataProvider = "mutableMappingModes")
+  public void testConvertMutableSegmentCleansStaleDestFiles(DocIdTranslatorMode translatorMode, int[] mutableDocIds,
+      int[] mutableToImmutableDocIdMap, boolean mappingExpected)
       throws Exception {
     String column = "foo";
     String segmentName = "regSeg";
@@ -217,7 +277,12 @@ public class LuceneTextIndexCreatorTest {
       File mutableIndexDir = new File(new File(consumerDir, segmentName),
           column + V1Constants.Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION);
       FileUtils.forceMkdir(mutableIndexDir);
-      writeLuceneDocs(mutableIndexDir, /* startDocId */ 0, numMutableDocs, /* multiSegment */ false);
+      try (Directory directory = FSDirectory.open(mutableIndexDir.toPath());
+          IndexWriter writer = new IndexWriter(directory, new IndexWriterConfig(new StandardAnalyzer()))) {
+        for (int mutableDocId : mutableDocIds) {
+          writer.addDocument(buildDoc(mutableDocId));
+        }
+      }
 
       // 2. segmentIndexDir's parent
       File tmpSegmentParent = new File(scratch, "tmp-" + segmentName + "-1");
@@ -236,10 +301,11 @@ public class LuceneTextIndexCreatorTest {
 
       // 4. commit=true && realtimeConversion=true && reuseMutableIndex=true triggers
       //    convertMutableSegment.
-      TextIndexConfig config = new TextIndexConfigBuilder().withReuseMutableIndex(true).build();
+      TextIndexConfig config = new TextIndexConfigBuilder().withReuseMutableIndex(true)
+          .withDocIdTranslatorMode(translatorMode == null ? null : translatorMode.name()).build();
       try (LuceneTextIndexCreator creator = new LuceneTextIndexCreator(column, segmentIndexDir,
           /* commit */ true, /* realtimeConversion */ true, consumerDir,
-          /* mutableSegmentCompacted */ false, /* immutableToMutableIdMap */ null,
+          /* mutableSegmentCompacted */ false, mutableToImmutableDocIdMap,
           /* combineAndCleanupFiles */ false, config)) {
         // Constructor performs the conversion; no add()/seal() on the reuse path.
       }
@@ -263,14 +329,23 @@ public class LuceneTextIndexCreatorTest {
       //     segment's numDocs at read time - a mismatch here is what produced AIOOB in production.
       File mappingFile = new File(segmentIndexDir,
           column + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
-      assertTrue(mappingFile.exists(), "DocId mapping file should be built during conversion");
-      assertEquals(mappingFile.length(), (long) Integer.BYTES * numMutableDocs,
-          "DocId mapping file must be sized for the segment's numDocs only");
+      assertEquals(mappingFile.exists(), mappingExpected);
+      if (mappingExpected) {
+        assertEquals(mappingFile.length(), (long) Integer.BYTES * numMutableDocs,
+            "DocId mapping file must be sized for the segment's numDocs only");
+      }
+      if (translatorMode == DocIdTranslatorMode.TryOptimize) {
+        File propertiesFile = new File(destIndexDir, V1Constants.Indexes.LUCENE_TEXT_INDEX_PROPERTIES_FILE);
+        assertEquals(TextIndexUtils.getUpdatedConfigFromPropertiesFile(propertiesFile, config).getDocIdTranslatorMode(),
+            mappingExpected ? DocIdTranslatorMode.Default : DocIdTranslatorMode.Skip);
+      }
 
       // 5d. End-to-end read
       try (LuceneTextIndexReader reader = new LuceneTextIndexReader(column, segmentIndexDir,
           numMutableDocs, config)) {
         assertEquals(reader.getDocIds("doc", null).toArray(), new int[]{0, 1, 2});
+        assertEquals(reader.getDocIds("0", null).toArray(),
+            new int[]{mutableToImmutableDocIdMap == null ? 0 : mutableToImmutableDocIdMap[0]});
       }
     } finally {
       FileUtils.deleteDirectory(scratch);
