@@ -70,12 +70,13 @@ import org.slf4j.LoggerFactory;
 ///
 /// Liveness of a cached channel is not left to the kernel's retransmission timeout, which takes many minutes to
 /// notice a half-open socket while `isActive()` still reports `true`:
-///   - a request write that the kernel does not accept within [NettyConfig#WRITE_TIMEOUT_MS] closes the channel
+///   - pending writes that make no socket progress for [NettyConfig#WRITE_TIMEOUT_MS] close the channel
 ///     ([RequestWriteTimeoutHandler]);
 ///   - on the Epoll transport, data unacknowledged for [NettyConfig#TCP_USER_TIMEOUT_MS] makes the kernel close it;
 ///   - a channel whose outbound queue is above [NettyConfig#WRITE_BUFFER_HIGH_WATER_MARK_BYTES] rejects requests
 ///     instead of queueing them in direct memory ([#sendRequest]);
-///   - the routing manager evicts the cached channel of a server it re-enables after a restart ([#evictChannel]).
+///   - the routing manager evicts the cached channels of a server when it enables it, as after a restart, or sees it
+///     removed from the cluster ([#evictChannel]).
 @ThreadSafe
 public class ServerChannels {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerChannels.class);
@@ -173,12 +174,15 @@ public class ServerChannels {
       ServerRoutingInstance serverRoutingInstance, InstanceRequest instanceRequest, long timeoutMs)
       throws Exception {
     byte[] requestBytes = THREAD_LOCAL_T_SERIALIZER.get().serialize(instanceRequest);
+    // One deadline for the whole call: a sender that races an eviction retries on a fresh entry, but the lock waits
+    // and connects of all its attempts together stay within the caller's timeout.
+    long deadlineMs = System.currentTimeMillis() + timeoutMs;
     for (int attempt = 1; attempt <= MAX_SEND_ATTEMPTS; attempt++) {
       ServerChannel serverChannel = _serverToChannelMap.computeIfAbsent(serverRoutingInstance, ServerChannel::new);
       // This server is now query-carrying, whoever opened the channel. See [#hasChannel].
       serverChannel._openedByQuery = true;
-      Channel channel =
-          serverChannel.sendRequest(rawTableName, asyncQueryResponse, serverRoutingInstance, requestBytes, timeoutMs);
+      Channel channel = serverChannel.sendRequest(rawTableName, asyncQueryResponse, serverRoutingInstance,
+          requestBytes, Math.max(0L, deadlineMs - System.currentTimeMillis()));
       if (channel != null) {
         return channel;
       }
@@ -351,17 +355,20 @@ public class ServerChannels {
     }
 
     /// Returns the channel the request was written to, or `null` if this entry was evicted before the request could
-    /// be written, in which case the caller retries on a fresh entry.
+    /// be written, in which case the caller retries on a fresh entry. The lock wait and the connect together take at
+    /// most `timeoutMs`.
     @Nullable
     Channel sendRequest(String rawTableName, AsyncQueryResponse asyncQueryResponse,
         ServerRoutingInstance serverRoutingInstance, byte[] requestBytes, long timeoutMs)
         throws InterruptedException, TimeoutException {
+      long deadlineMs = System.currentTimeMillis() + timeoutMs;
       if (_channelLock.tryLock(timeoutMs, TimeUnit.MILLISECONDS)) {
         try {
           if (_evicted) {
             return null;
           }
-          connectWithoutLocking(timeoutMs);
+          // The connect gets whatever the lock wait left of the budget
+          connectWithoutLocking(Math.max(0L, deadlineMs - System.currentTimeMillis()));
           if (_evicted) {
             // Evicted while connecting: do not leave a channel open on an entry that has left the map
             closeChannel();
