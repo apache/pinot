@@ -3180,6 +3180,48 @@ public class PinotLLCRealtimeSegmentManagerTest {
     assertTrue(exception.getMessage().contains(donePartialErrorSegment), exception.getMessage());
     verify(mockControllerMetrics).setOrUpdateTableGauge(REALTIME_TABLE_NAME,
         ControllerGauge.PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT, 2L);
+    // The failed re-ingestion trigger and the failed reset are each metered
+    verify(mockControllerMetrics, times(2)).addMeteredTableValue(REALTIME_TABLE_NAME,
+        ControllerMeter.LLC_ERROR_SEGMENT_REPAIR_FAILURES, 1L);
+  }
+
+  @Test
+  public void testRepairSegmentsInErrorStateMetersFailedResetsOnNonPauselessTable() {
+    PinotHelixResourceManager mockHelixResourceManager = mock(PinotHelixResourceManager.class);
+    ControllerMetrics mockControllerMetrics = mock(ControllerMetrics.class);
+    FakePinotLLCRealtimeSegmentManager segmentManager =
+        new FakePinotLLCRealtimeSegmentManager(mockHelixResourceManager, mockControllerMetrics);
+    IdealState idealState = new IdealState(REALTIME_TABLE_NAME);
+    ExternalView externalView = new ExternalView(REALTIME_TABLE_NAME);
+    String failedSegment = addSegmentForErrorRepair(mockHelixResourceManager, idealState, externalView, 0, 0,
+        Status.DONE, SegmentStateModel.ONLINE, SegmentStateModel.ERROR);
+    String otherFailedSegment = addSegmentForErrorRepair(mockHelixResourceManager, idealState, externalView, 1, 0,
+        Status.DONE, SegmentStateModel.ERROR, SegmentStateModel.ONLINE);
+    String repairedSegment = addSegmentForErrorRepair(mockHelixResourceManager, idealState, externalView, 2, 0,
+        Status.DONE, SegmentStateModel.ERROR, SegmentStateModel.ONLINE);
+    segmentManager._idealState = idealState;
+    when(mockHelixResourceManager.getTableExternalView(REALTIME_TABLE_NAME)).thenReturn(externalView);
+    Set<String> segmentsToReset = Set.of(failedSegment, otherFailedSegment, repairedSegment);
+    Set<String> failedSegments = Set.of(failedSegment, otherFailedSegment);
+    when(mockHelixResourceManager.resetErrorReplicas(REALTIME_TABLE_NAME, segmentsToReset)).thenReturn(
+        failedSegments);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
+        .setNumReplicas(2)
+        .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
+        .build();
+
+    // The three segments are reset in one batch. The two failed ones are metered by their count, which a
+    // non-pauseless table has no unrecoverable gauge for, and fail the pass as before.
+    RuntimeException exception = expectThrows(RuntimeException.class,
+        () -> segmentManager.repairSegmentsInErrorState(tableConfig, false));
+    for (String segmentName : failedSegments) {
+      assertTrue(exception.getMessage().contains(segmentName), exception.getMessage());
+    }
+    verify(mockHelixResourceManager).resetErrorReplicas(REALTIME_TABLE_NAME, segmentsToReset);
+    verify(mockControllerMetrics).addMeteredTableValue(REALTIME_TABLE_NAME,
+        ControllerMeter.LLC_ERROR_SEGMENT_REPAIR_FAILURES, 2L);
+    verify(mockControllerMetrics, never()).setOrUpdateTableGauge(eq(REALTIME_TABLE_NAME),
+        eq(ControllerGauge.PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT), anyLong());
   }
 
   @Test
