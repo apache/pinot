@@ -64,10 +64,10 @@ public class ConfigUtils {
     }
     try {
       return (T) JsonUtils.jsonNodeToObject(jsonNode, configTemplate.getClass());
-    } catch (IOException e) {
+    } catch (IOException ignored) {
       throw new RuntimeException(String
-          .format("Unable to read JsonConfig to class [%s] after applying environment variables, jsonConfig is: '%s'.",
-              configTemplate.getClass().getName(), jsonNode.toString()), e);
+          .format("Unable to read JsonConfig to class [%s] after applying environment variables.",
+              configTemplate.getClass().getName()));
     }
   }
 

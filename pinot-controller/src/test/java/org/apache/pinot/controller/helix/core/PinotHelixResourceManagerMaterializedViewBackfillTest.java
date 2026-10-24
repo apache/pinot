@@ -104,6 +104,8 @@ public class PinotHelixResourceManagerMaterializedViewBackfillTest {
     try (MockedStatic<ZKMetadataProvider> zk = Mockito.mockStatic(ZKMetadataProvider.class);
          MockedStatic<MaterializedViewDefinitionMetadataUtils> def =
              Mockito.mockStatic(MaterializedViewDefinitionMetadataUtils.class)) {
+      zk.when(() -> ZKMetadataProvider.getTableConfig(propertyStore, mvWithType, false, false))
+          .thenReturn(mvConfig);
       zk.when(() -> ZKMetadataProvider.getTableConfig(propertyStore, mvWithType)).thenReturn(mvConfig);
       // Source TableConfig missing — phase 2's persistMaterializedViewDefinitionMetadataBestEffort
       // bails out internally with a logged WARN. Phase 1's in-memory registration is still
@@ -142,6 +144,8 @@ public class PinotHelixResourceManagerMaterializedViewBackfillTest {
     try (MockedStatic<ZKMetadataProvider> zk = Mockito.mockStatic(ZKMetadataProvider.class);
          MockedStatic<MaterializedViewDefinitionMetadataUtils> def =
              Mockito.mockStatic(MaterializedViewDefinitionMetadataUtils.class)) {
+      zk.when(() -> ZKMetadataProvider.getTableConfig(propertyStore, mvWithType, false, false))
+          .thenReturn(mvConfig);
       zk.when(() -> ZKMetadataProvider.getTableConfig(propertyStore, mvWithType)).thenReturn(mvConfig);
       def.when(() -> MaterializedViewDefinitionMetadataUtils.fetch(propertyStore, mvWithType))
           .thenReturn(existingDef);
@@ -177,6 +181,10 @@ public class PinotHelixResourceManagerMaterializedViewBackfillTest {
     try (MockedStatic<ZKMetadataProvider> zk = Mockito.mockStatic(ZKMetadataProvider.class);
          MockedStatic<MaterializedViewDefinitionMetadataUtils> def =
              Mockito.mockStatic(MaterializedViewDefinitionMetadataUtils.class)) {
+      zk.when(() -> ZKMetadataProvider.getTableConfig(propertyStore, healthyMv, false, false))
+          .thenReturn(healthyConfig);
+      zk.when(() -> ZKMetadataProvider.getTableConfig(propertyStore, brokenMv, false, false))
+          .thenReturn(brokenConfig);
       zk.when(() -> ZKMetadataProvider.getTableConfig(propertyStore, healthyMv)).thenReturn(healthyConfig);
       zk.when(() -> ZKMetadataProvider.getTableConfig(propertyStore, brokenMv)).thenReturn(brokenConfig);
       // Source TableConfig lookup for the healthy MV's source returns null so phase 2 bails
@@ -217,6 +225,8 @@ public class PinotHelixResourceManagerMaterializedViewBackfillTest {
     try (MockedStatic<ZKMetadataProvider> zk = Mockito.mockStatic(ZKMetadataProvider.class);
          MockedStatic<MaterializedViewDefinitionMetadataUtils> def =
              Mockito.mockStatic(MaterializedViewDefinitionMetadataUtils.class)) {
+      zk.when(() -> ZKMetadataProvider.getTableConfig(propertyStore, mvWithType, false, false))
+          .thenReturn(mvConfig);
       zk.when(() -> ZKMetadataProvider.getTableConfig(propertyStore, mvWithType)).thenReturn(mvConfig);
       def.when(() -> MaterializedViewDefinitionMetadataUtils.fetch(propertyStore, mvWithType))
           .thenReturn(null);
@@ -291,7 +301,8 @@ public class PinotHelixResourceManagerMaterializedViewBackfillTest {
     try (MockedStatic<ZKMetadataProvider> zk = Mockito.mockStatic(ZKMetadataProvider.class);
          MockedStatic<MaterializedViewDefinitionMetadataUtils> def =
              Mockito.mockStatic(MaterializedViewDefinitionMetadataUtils.class)) {
-      zk.when(() -> ZKMetadataProvider.getTableConfig(propertyStore, mvWithType)).thenReturn(mvConfig);
+      zk.when(() -> ZKMetadataProvider.getTableConfig(propertyStore, mvWithType, false, false))
+          .thenReturn(mvConfig);
       // Definition znode absent — the failure mode the new fallback covers.
       def.when(() -> MaterializedViewDefinitionMetadataUtils.fetch(propertyStore, mvWithType))
           .thenReturn(null);
