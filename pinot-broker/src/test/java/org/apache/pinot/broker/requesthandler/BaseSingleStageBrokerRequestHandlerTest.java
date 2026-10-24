@@ -69,6 +69,7 @@ import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.auth.TableRowColAccessResult;
 import org.apache.pinot.spi.auth.TableRowColAccessResultImpl;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
+import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -517,11 +518,25 @@ public class BaseSingleStageBrokerRequestHandlerTest {
 
   private BaseSingleStageBrokerRequestHandler createHybridHandlerWithTimeBoundary(
       AtomicReference<TableRouteInfo> capturedRouteInfo) {
-    return createHybridHandlerWithTimeBoundary(capturedRouteInfo, new PinotConfiguration());
+    return createHybridHandlerWithTimeBoundary(capturedRouteInfo, new PinotConfiguration(), null, null);
   }
 
   private BaseSingleStageBrokerRequestHandler createHybridHandlerWithTimeBoundary(
       AtomicReference<TableRouteInfo> capturedRouteInfo, PinotConfiguration config) {
+    return createHybridHandlerWithTimeBoundary(capturedRouteInfo, config, null, null);
+  }
+
+  private BaseSingleStageBrokerRequestHandler createHybridHandlerWithTimeBoundary(
+      AtomicReference<TableRouteInfo> capturedRouteInfo, @Nullable Long offlineQueryTimeoutMs,
+      @Nullable Long realtimeQueryTimeoutMs) {
+    return createHybridHandlerWithTimeBoundary(capturedRouteInfo, new PinotConfiguration(), offlineQueryTimeoutMs,
+        realtimeQueryTimeoutMs);
+  }
+
+  /// `offlineQueryTimeoutMs` / `realtimeQueryTimeoutMs` go into the table configs' query config when not null.
+  private BaseSingleStageBrokerRequestHandler createHybridHandlerWithTimeBoundary(
+      AtomicReference<TableRouteInfo> capturedRouteInfo, PinotConfiguration config,
+      @Nullable Long offlineQueryTimeoutMs, @Nullable Long realtimeQueryTimeoutMs) {
     String offlineTableName = "myTable_OFFLINE";
     String realtimeTableName = "myTable_REALTIME";
 
@@ -540,6 +555,14 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     TenantConfig tenant = new TenantConfig("tier_BROKER", "tier_SERVER", null);
     when(offlineTableCfg.getTenantConfig()).thenReturn(tenant);
     when(realtimeTableCfg.getTenantConfig()).thenReturn(tenant);
+    if (offlineQueryTimeoutMs != null) {
+      when(offlineTableCfg.getQueryConfig()).thenReturn(
+          new QueryConfig(offlineQueryTimeoutMs, null, null, null, null, null));
+    }
+    if (realtimeQueryTimeoutMs != null) {
+      when(realtimeTableCfg.getQueryConfig()).thenReturn(
+          new QueryConfig(realtimeQueryTimeoutMs, null, null, null, null, null));
+    }
     when(tableCache.getTableConfig(offlineTableName)).thenReturn(offlineTableCfg);
     when(tableCache.getTableConfig(realtimeTableName)).thenReturn(realtimeTableCfg);
 
@@ -1257,6 +1280,134 @@ public class BaseSingleStageBrokerRequestHandlerTest {
         CommonConstants.Broker.Request.QueryOptionKey.MATERIALIZED_VIEW_REWRITE),
         "User-supplied materializedViewRewrite option must be stripped before compile but options were: "
             + serverOptions);
+  }
+
+  /// The broker stamps every server request with its own deadline (`requestDeadlineMs`, epoch millis) next to the
+  /// remaining timeout, overwriting a user-supplied value: the server uses it to tell a request that sat in a
+  /// stalled connection from a live one instead of granting it a fresh timeout budget from its arrival.
+  @Test
+  public void testRequestDeadlineSetOnServerQueryOptions()
+      throws Exception {
+    String offlineTable = "myTable_OFFLINE";
+    String rawTable = "myTable";
+    String userSql = "SET requestDeadlineMs = 1; SELECT ts, SUM(revenue) FROM myTable GROUP BY ts LIMIT 100";
+
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName(rawTable)
+        .addSingleValueDimension("ts", DataType.STRING)
+        .addMetric("revenue", DataType.DOUBLE)
+        .build();
+
+    TableCache tableCache = mock(TableCache.class);
+    when(tableCache.getActualTableName(rawTable)).thenReturn(rawTable);
+    when(tableCache.getSchema(rawTable)).thenReturn(schema);
+    when(tableCache.getColumnNameMap(anyString())).thenReturn(Map.of("ts", "ts", "revenue", "revenue"));
+    TableConfig tableConfig = mock(TableConfig.class);
+    when(tableConfig.getTenantConfig()).thenReturn(new TenantConfig("t_BROKER", "t_SERVER", null));
+    when(tableCache.getTableConfig(offlineTable)).thenReturn(tableConfig);
+
+    BrokerRoutingManager routingManager = mock(BrokerRoutingManager.class);
+    when(routingManager.routingExists(offlineTable)).thenReturn(true);
+    when(routingManager.getQueryTimeoutMs(anyString())).thenReturn(10000L);
+    RoutingTable routingTable = mock(RoutingTable.class);
+    when(routingTable.getServerInstanceToSegmentsMap()).thenReturn(
+        Map.of(new ServerInstance(new InstanceConfig("server01_9000")),
+            new SegmentsToQuery(List.of("seg01"), List.of())));
+    when(routingManager.getRoutingTable(any(), Mockito.anyLong())).thenReturn(routingTable);
+
+    QueryQuotaManager quotaManager = mock(QueryQuotaManager.class);
+    when(quotaManager.acquireDatabase(anyString())).thenReturn(true);
+    when(quotaManager.acquireApplication(anyString())).thenReturn(true);
+    when(quotaManager.acquire(anyString())).thenReturn(true);
+
+    BrokerMetrics.register(mock(BrokerMetrics.class));
+    PinotConfiguration config = new PinotConfiguration();
+    BrokerQueryEventListenerFactory.init(config);
+
+    // What goes on the wire is the route's per-type request, see QueryRouter#submitQuery
+    AtomicReference<Map<String, String>> capturedServerOptions = new AtomicReference<>();
+    BaseSingleStageBrokerRequestHandler handler =
+        new BaseSingleStageBrokerRequestHandler(config, "broker1", new BrokerRequestIdGenerator(),
+            routingManager, new AllowAllAccessControlFactory(), quotaManager, tableCache,
+            ThreadAccountantUtils.getNoOpAccountant(), null, /*materializedViewHandler*/ null) {
+          @Override
+          public void start() {
+          }
+
+          @Override
+          public void shutDown() {
+          }
+
+          @Override
+          protected BrokerResponseNative processBrokerRequest(long requestId,
+              BrokerRequest originalBrokerRequest, BrokerRequest serverBrokerRequest,
+              TableRouteInfo route, long timeoutMs, ServerStats serverStats,
+              RequestContext requestContext) {
+            capturedServerOptions.set(Map.copyOf(route.getOfflineBrokerRequest().getPinotQuery().getQueryOptions()));
+            return BrokerResponseNative.empty();
+          }
+
+          @Override
+          protected BrokerResponseNative processMaterializedViewSplitBrokerRequest(long requestId,
+              long materializedViewRequestId, BrokerRequest originalBrokerRequest, TableRouteInfo baseRoute,
+              TableRouteInfo materializedViewRoute, long timeoutMs, ServerStats serverStats,
+              RequestContext requestContext) {
+            return BrokerResponseNative.empty();
+          }
+        };
+
+    long beforeMs = System.currentTimeMillis();
+    handler.handleRequest(userSql);
+    long afterMs = System.currentTimeMillis();
+
+    Map<String, String> serverOptions = capturedServerOptions.get();
+    Assert.assertNotNull(serverOptions, "processBrokerRequest should have been reached and captured server options");
+    String timeoutMsString = serverOptions.get(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS);
+    Assert.assertNotNull(timeoutMsString, "remaining timeout must be set, options were: " + serverOptions);
+    long timeoutMs = Long.parseLong(timeoutMsString);
+    Assert.assertTrue(timeoutMs > 0 && timeoutMs <= Broker.DEFAULT_BROKER_TIMEOUT_MS,
+        "remaining timeout: " + timeoutMs);
+    String deadlineMsString = serverOptions.get(CommonConstants.Broker.Request.QueryOptionKey.REQUEST_DEADLINE_MS);
+    Assert.assertNotNull(deadlineMsString, "request deadline must be set, options were: " + serverOptions);
+    long deadlineMs = Long.parseLong(deadlineMsString);
+    // Set as now + remaining timeout while the request was handled, so the user's value of 1 is gone
+    Assert.assertTrue(deadlineMs >= beforeMs + timeoutMs && deadlineMs <= afterMs + timeoutMs,
+        String.format("deadline %d not within [%d, %d]", deadlineMs, beforeMs + timeoutMs, afterMs + timeoutMs));
+  }
+
+  /// A hybrid table whose two sides have different timeouts: each side's request gets its own remaining `timeoutMs`,
+  /// but the broker waits for the longer of the two, so the deadline stamped on both sides is the same and follows
+  /// the longer one. Otherwise the side with the shorter timeout would be dropped by the server while the broker was
+  /// still waiting for it.
+  @Test
+  public void testRequestDeadlineOnHybridTableFollowsTheLongerTimeout()
+      throws Exception {
+    AtomicReference<TableRouteInfo> capturedRouteInfo = new AtomicReference<>();
+    BaseSingleStageBrokerRequestHandler handler =
+        createHybridHandlerWithTimeBoundary(capturedRouteInfo, 5_000L, 60_000L);
+
+    long beforeMs = System.currentTimeMillis();
+    handler.handleRequest("SELECT * FROM myTable WHERE created_15min > 1772106300000 LIMIT 10");
+    long afterMs = System.currentTimeMillis();
+
+    TableRouteInfo routeInfo = capturedRouteInfo.get();
+    Assert.assertNotNull(routeInfo, "processBrokerRequest should have been called");
+    Map<String, String> offlineOptions = routeInfo.getOfflineBrokerRequest().getPinotQuery().getQueryOptions();
+    Map<String, String> realtimeOptions = routeInfo.getRealtimeBrokerRequest().getPinotQuery().getQueryOptions();
+    long offlineTimeoutMs =
+        Long.parseLong(offlineOptions.get(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS));
+    long realtimeTimeoutMs =
+        Long.parseLong(realtimeOptions.get(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS));
+    Assert.assertTrue(offlineTimeoutMs <= 5_000L && realtimeTimeoutMs > 5_000L && realtimeTimeoutMs <= 60_000L,
+        "offline: " + offlineTimeoutMs + ", realtime: " + realtimeTimeoutMs);
+    String deadline = offlineOptions.get(CommonConstants.Broker.Request.QueryOptionKey.REQUEST_DEADLINE_MS);
+    Assert.assertNotNull(deadline, "offline options: " + offlineOptions);
+    Assert.assertEquals(realtimeOptions.get(CommonConstants.Broker.Request.QueryOptionKey.REQUEST_DEADLINE_MS),
+        deadline, "both sides must carry the same deadline");
+    long deadlineMs = Long.parseLong(deadline);
+    Assert.assertTrue(deadlineMs >= beforeMs + realtimeTimeoutMs && deadlineMs <= afterMs + realtimeTimeoutMs,
+        String.format("deadline %d not within [%d, %d]", deadlineMs, beforeMs + realtimeTimeoutMs,
+            afterMs + realtimeTimeoutMs));
   }
 
   /// Pins the C1 fix: FULL_REWRITE is skipped at the broker layer when the base table has a

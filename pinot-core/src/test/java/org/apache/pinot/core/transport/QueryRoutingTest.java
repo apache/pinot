@@ -41,7 +41,9 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.metrics.BrokerMeter;
@@ -479,6 +481,65 @@ public class QueryRoutingTest {
     _requestCount += 2;
     waitForStatsUpdate(_requestCount);
     assertEquals(_serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverId).intValue(), 0);
+  }
+
+  /// End to end over Netty: a request that reaches the server after the broker's deadline for it (the
+  /// `requestDeadlineMs` option) is answered with a scheduling-timeout error right away and never handed to the
+  /// scheduler, while a request whose deadline is still ahead is executed as usual. This is what keeps the backlog
+  /// of a stalled connection from being executed once the connection recovers.
+  @Test
+  public void testRequestPastDeadlineIsAnsweredWithoutExecution()
+      throws Exception {
+    long requestId = 123;
+    DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
+    dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
+    DataBuffer queryResponse = dataTable.toDataBuffer();
+    AtomicInteger submitted = new AtomicInteger();
+    _queryServer = QueryServerTestUtils.newQueryServer(queryRequest -> {
+      submitted.incrementAndGet();
+      return Futures.immediateFuture(queryResponse);
+    });
+    initializeTestFixtures(startAndGetPort(_queryServer));
+    String serverId = _serverInstance.getInstanceId();
+
+    // The deadline is already 5 seconds in the past when the request is written: the server must not execute it.
+    AsyncQueryResponse asyncQueryResponse = _queryRouter.submitQuery(requestId, "testTable",
+        brokerRequestWithDeadline(System.currentTimeMillis() - 5_000L), _routingTable, null, null, 10_000L);
+    Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
+    assertEquals(asyncQueryResponse.getStatus(), QueryResponse.Status.COMPLETED);
+    ServerResponse serverResponse = response.get(_offlineServerRoutingInstance);
+    assertNotNull(serverResponse.getDataTable());
+    Map<Integer, String> exceptions = serverResponse.getDataTable().getExceptions();
+    assertEquals(exceptions.keySet(), Set.of(QueryErrorCode.QUERY_SCHEDULING_TIMEOUT.getId()));
+    assertTrue(exceptions.get(QueryErrorCode.QUERY_SCHEDULING_TIMEOUT.getId()).contains("after the broker deadline"),
+        String.valueOf(exceptions));
+    assertEquals(submitted.get(), 0);
+    _requestCount += 2;
+    waitForStatsUpdate(_requestCount);
+
+    // The deadline is still a minute ahead: executed as usual.
+    asyncQueryResponse = _queryRouter.submitQuery(requestId, "testTable",
+        brokerRequestWithDeadline(System.currentTimeMillis() + 60_000L), _routingTable, null, null, 10_000L);
+    response = asyncQueryResponse.getFinalResponses();
+    serverResponse = response.get(_offlineServerRoutingInstance);
+    assertNotNull(serverResponse.getDataTable());
+    assertTrue(serverResponse.getDataTable().getExceptions().isEmpty());
+    assertEquals(submitted.get(), 1);
+    _requestCount += 2;
+    waitForStatsUpdate(_requestCount);
+    assertEquals(_serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverId).intValue(), 0);
+  }
+
+  /// The request the broker builds: the remaining timeout next to the absolute deadline, as
+  /// `BaseSingleStageBrokerRequestHandler#setQueryTimeout` sets them.
+  private static BrokerRequest brokerRequestWithDeadline(long requestDeadlineMs) {
+    BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM testTable");
+    Map<String, String> queryOptions = new HashMap<>();
+    queryOptions.put(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS, "10000");
+    queryOptions.put(CommonConstants.Broker.Request.QueryOptionKey.REQUEST_DEADLINE_MS,
+        Long.toString(requestDeadlineMs));
+    brokerRequest.getPinotQuery().setQueryOptions(queryOptions);
+    return brokerRequest;
   }
 
   @Test
