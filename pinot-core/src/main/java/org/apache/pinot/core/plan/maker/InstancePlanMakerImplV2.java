@@ -110,6 +110,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   public static final int DEFAULT_GROUPBY_TRIM_THRESHOLD = Server.DEFAULT_QUERY_EXECUTOR_GROUPBY_TRIM_THRESHOLD;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(InstancePlanMakerImplV2.class);
+  private static final Object EXPRESSION_HINTS_REWRITTEN_KEY = new Object();
   // Cap planning work independently of the query's configurable group limit.
   private static final int MAX_GROUPING_SETS_DICTIONARY_SCAN_ENTRIES = 1 << 20;
 
@@ -221,6 +222,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   @Override
   public Plan makeInstancePlan(List<SegmentContext> segmentContexts, QueryContext queryContext,
       ExecutorService executorService) {
+    rewriteQueryContextWithHints(queryContext, segmentContexts);
     applyQueryOptions(queryContext);
     boundGroupingSetsBaseAggregation(segmentContexts, queryContext);
 
@@ -427,6 +429,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   @Override
   public Plan makeStreamingInstancePlan(List<SegmentContext> segmentContexts, QueryContext queryContext,
       ExecutorService executorService, ResultsBlockStreamer streamer) {
+    rewriteQueryContextWithHints(queryContext, segmentContexts);
     applyQueryOptions(queryContext);
     boundGroupingSetsBaseAggregation(segmentContexts, queryContext);
 
@@ -657,27 +660,63 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     return true;
   }
 
-  /// In-place rewrite QueryContext based on the information from local IndexSegment.
-  ///
-  /// @param queryContext
-  /// @param indexSegment
+  /// Rewrites the shared context before fetch planning, using only columns available on every selected segment.
+  /// A partially reloaded timestamp index must leave the original expression executable on all segments.
   @VisibleForTesting
-  public static void rewriteQueryContextWithHints(QueryContext queryContext, IndexSegment indexSegment) {
-    Map<ExpressionContext, ExpressionContext> expressionOverrideHints = queryContext.getExpressionOverrideHints();
-    if (MapUtils.isEmpty(expressionOverrideHints)) {
+  static void rewriteQueryContextWithHints(QueryContext queryContext, List<SegmentContext> segmentContexts) {
+    Map<ExpressionContext, ExpressionContext> hints = queryContext.getExpressionOverrideHints();
+    if (MapUtils.isEmpty(hints) || segmentContexts.isEmpty()) {
       return;
     }
+    queryContext.getOrComputeSharedValue(Boolean.class, EXPRESSION_HINTS_REWRITTEN_KEY, ignored -> {
+      Set<String> columns = getOverrideColumns(hints);
+      for (SegmentContext segmentContext : segmentContexts) {
+        columns.retainAll(segmentContext.getIndexSegment().getColumnNames());
+      }
+      rewriteQueryContextWithHints(queryContext, columns);
+      return true;
+    });
+  }
 
+  /// Rewrites a standalone segment plan once; instance plans first constrain the rewrite across all their segments.
+  @VisibleForTesting
+  public static void rewriteQueryContextWithHints(QueryContext queryContext, IndexSegment indexSegment) {
+    if (MapUtils.isEmpty(queryContext.getExpressionOverrideHints())) {
+      return;
+    }
+    queryContext.getOrComputeSharedValue(Boolean.class, EXPRESSION_HINTS_REWRITTEN_KEY, ignored -> {
+      Set<String> columns = getOverrideColumns(queryContext.getExpressionOverrideHints());
+      columns.retainAll(indexSegment.getColumnNames());
+      rewriteQueryContextWithHints(queryContext, columns);
+      return true;
+    });
+  }
+
+  private static Set<String> getOverrideColumns(Map<ExpressionContext, ExpressionContext> hints) {
+    Set<String> columns = new HashSet<>();
+    for (ExpressionContext expression : hints.values()) {
+      if (expression.getIdentifier() != null) {
+        columns.add(expression.getIdentifier());
+      }
+    }
+    return columns;
+  }
+
+  private static void rewriteQueryContextWithHints(QueryContext queryContext, Set<String> columns) {
+    if (columns.isEmpty()) {
+      return;
+    }
+    Map<ExpressionContext, ExpressionContext> expressionOverrideHints = queryContext.getExpressionOverrideHints();
     List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
     selectExpressions.replaceAll(
-        expression -> overrideWithExpressionHints(expression, indexSegment, expressionOverrideHints));
+        expression -> overrideWithExpressionHints(expression, columns, expressionOverrideHints));
 
     List<Pair<AggregationFunction, FilterContext>> filtAggrFuns = queryContext.getFilteredAggregationFunctions();
     if (filtAggrFuns != null) {
       for (Pair<AggregationFunction, FilterContext> filteredAggregationFunction : filtAggrFuns) {
         FilterContext right = filteredAggregationFunction.getRight();
         if (right != null) {
-          overrideWithExpressionHints(right, indexSegment, expressionOverrideHints);
+          overrideWithExpressionHints(right, columns, expressionOverrideHints);
         }
       }
     }
@@ -685,58 +724,66 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
     if (CollectionUtils.isNotEmpty(groupByExpressions)) {
       groupByExpressions.replaceAll(
-          expression -> overrideWithExpressionHints(expression, indexSegment, expressionOverrideHints));
+          expression -> overrideWithExpressionHints(expression, columns, expressionOverrideHints));
     }
 
     List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
     if (CollectionUtils.isNotEmpty(orderByExpressions)) {
       orderByExpressions.replaceAll(expression -> new OrderByExpressionContext(
-          overrideWithExpressionHints(expression.getExpression(), indexSegment, expressionOverrideHints),
+          overrideWithExpressionHints(expression.getExpression(), columns, expressionOverrideHints),
           expression.isAsc()));
     }
 
-    // In-place override
     FilterContext filter = queryContext.getFilter();
     if (filter != null) {
-      overrideWithExpressionHints(filter, indexSegment, expressionOverrideHints);
+      overrideWithExpressionHints(filter, columns, expressionOverrideHints);
     }
-
-    // In-place override
     FilterContext havingFilter = queryContext.getHavingFilter();
     if (havingFilter != null) {
-      overrideWithExpressionHints(havingFilter, indexSegment, expressionOverrideHints);
+      overrideWithExpressionHints(havingFilter, columns, expressionOverrideHints);
     }
+    // Aggregation constructors capture their input expressions; AST replacement alone leaves those inputs stale.
+    // Rebuilding also repairs hash-map keys whose FunctionContext arguments were changed in place.
+    queryContext.refreshAfterExpressionRewrite();
   }
 
   @VisibleForTesting
   public static void overrideWithExpressionHints(FilterContext filter, IndexSegment indexSegment,
       Map<ExpressionContext, ExpressionContext> expressionOverrideHints) {
+    overrideWithExpressionHints(filter, indexSegment.getColumnNames(), expressionOverrideHints);
+  }
+
+  private static void overrideWithExpressionHints(FilterContext filter, Set<String> columns,
+      Map<ExpressionContext, ExpressionContext> expressionOverrideHints) {
     if (filter.getChildren() != null) {
-      // AND, OR, NOT
       for (FilterContext child : filter.getChildren()) {
-        overrideWithExpressionHints(child, indexSegment, expressionOverrideHints);
+        overrideWithExpressionHints(child, columns, expressionOverrideHints);
       }
     } else {
-      // PREDICATE
       Predicate predicate = filter.getPredicate();
-      predicate.setLhs(overrideWithExpressionHints(predicate.getLhs(), indexSegment, expressionOverrideHints));
+      predicate.setLhs(overrideWithExpressionHints(predicate.getLhs(), columns, expressionOverrideHints));
     }
   }
 
   @VisibleForTesting
   public static ExpressionContext overrideWithExpressionHints(ExpressionContext expression, IndexSegment indexSegment,
       Map<ExpressionContext, ExpressionContext> expressionOverrideHints) {
+    return overrideWithExpressionHints(expression, indexSegment.getColumnNames(), expressionOverrideHints);
+  }
+
+  private static ExpressionContext overrideWithExpressionHints(ExpressionContext expression, Set<String> columns,
+      Map<ExpressionContext, ExpressionContext> expressionOverrideHints) {
     if (expression.getType() != ExpressionContext.Type.FUNCTION) {
       return expression;
     }
     ExpressionContext overrideExpression = expressionOverrideHints.get(expression);
-    if (overrideExpression != null && overrideExpression.getIdentifier() != null && indexSegment.getColumnNames()
-        .contains(overrideExpression.getIdentifier())) {
+    if (overrideExpression != null && overrideExpression.getIdentifier() != null
+        && columns.contains(overrideExpression.getIdentifier())) {
       return overrideExpression;
     }
     expression.getFunction()
         .getArguments()
-        .replaceAll(argument -> overrideWithExpressionHints(argument, indexSegment, expressionOverrideHints));
+        .replaceAll(argument -> overrideWithExpressionHints(argument, columns, expressionOverrideHints));
     return expression;
   }
 }

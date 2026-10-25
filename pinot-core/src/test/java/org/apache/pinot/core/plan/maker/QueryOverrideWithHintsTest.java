@@ -22,6 +22,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -29,19 +31,28 @@ import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.executor.ResultsBlockStreamer;
+import org.apache.pinot.core.query.reduce.ReducerDataSchemaUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.mockito.Mockito;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotEquals;
+import static org.testng.Assert.assertSame;
 
 
 public class QueryOverrideWithHintsTest {
@@ -188,5 +199,124 @@ public class QueryOverrideWithHintsTest {
     InstancePlanMakerImplV2.rewriteQueryContextWithHints(queryContext, _indexSegment);
     assertEquals(queryContext.getSelectExpressions().get(0).getFunction(),
         queryContext.getExpressionOverrideHints().keySet().iterator().next().getFunction());
+  }
+
+  @DataProvider
+  public Object[][] aggregationRewriteCases() {
+    return new Object[][]{{false, false}, {true, false}, {false, true}, {true, true}};
+  }
+
+  @Test(dataProvider = "aggregationRewriteCases")
+  public void testRewriteCompiledAggregation(boolean nullHandlingEnabled, boolean filtered) {
+    String filter = filtered ? " FILTER(WHERE DATETRUNC('MONTH', ts, 'MILLISECONDS') > 0)" : "";
+    QueryContext queryContext = aggregationQuery(
+        "SELECT DISTINCTCOUNT(DATETRUNC('MONTH', ts, 'MILLISECONDS'))" + filter
+            + " AS active_days FROM myTable", "MONTH", nullHandlingEnabled);
+    InstancePlanMakerImplV2.rewriteQueryContextWithHints(queryContext, _indexSegment);
+
+    ExpressionContext derived = ExpressionContext.forIdentifier("$ts$MONTH");
+    assertEquals(queryContext.getAggregationFunctions()[0].getInputExpressions(), List.of(derived));
+    assertEquals(queryContext.getColumns(), Set.of("$ts$MONTH"));
+    assertEquals(queryContext.getAliasList(), List.of("active_days"));
+    assertEquals(queryContext.isNullHandlingEnabled(), nullHandlingEnabled);
+    assertEquals(queryContext.hasFilteredAggregations(), filtered);
+    var pair = queryContext.getFilteredAggregationFunctions().get(0);
+    if (filtered) {
+      assertEquals(pair.getRight().getPredicate().getLhs(), derived);
+    }
+    FunctionContext function = queryContext.getSelectExpressions().get(0).getFunction();
+    if (filtered) {
+      function = function.getArguments().get(0).getFunction();
+    }
+    assertEquals(queryContext.getFilteredAggregationsIndexMap().get(Pair.of(function, pair.getRight())),
+        Integer.valueOf(0));
+
+    AggregationFunction[] functions = queryContext.getAggregationFunctions();
+    InstancePlanMakerImplV2.rewriteQueryContextWithHints(queryContext, _indexSegment);
+    assertSame(queryContext.getAggregationFunctions(), functions);
+  }
+
+  @Test
+  public void testRewritePreservesAggregationSlots() {
+    String sql = "SELECT DISTINCTCOUNT(DATETRUNC('MONTH', ts, 'MILLISECONDS')) AS days, "
+        + "DISTINCTCOUNT(DATETRUNC('MONTH', ts, 'MILLISECONDS')) AS duplicate_days FROM myTable "
+        + "HAVING DISTINCTCOUNT(\"$ts$MONTH\") > 0 ORDER BY DISTINCTCOUNT(\"$ts$MONTH\")";
+    QueryContext queryContext = aggregationQuery(sql, "MONTH", false);
+    QueryContext brokerContext = aggregationQuery(sql, "MONTH", false);
+    assertEquals(queryContext.getAggregationFunctions().length, 3);
+    InstancePlanMakerImplV2.rewriteQueryContextWithHints(queryContext, _indexSegment);
+    // Converging SELECT and HAVING/ORDER-BY expressions must keep their original wire slots.
+    assertEquals(queryContext.getAggregationFunctions().length, 3);
+    assertEquals(queryContext.getFilteredAggregationFunctions().size(), 3);
+    for (AggregationFunction function : queryContext.getAggregationFunctions()) {
+      assertEquals(function.getInputExpressions(), List.of(ExpressionContext.forIdentifier("$ts$MONTH")));
+    }
+    FunctionContext having = queryContext.getHavingFilter().getPredicate().getLhs().getFunction();
+    assertEquals(queryContext.getFilteredAggregationsIndexMap().get(Pair.of(having, null)), Integer.valueOf(2));
+    assertEquals(queryContext.getAliasList(), List.of("days", "duplicate_days"));
+    String[] physicalNames = new String[3];
+    String[] logicalNames = new String[3];
+    ColumnDataType[] types = new ColumnDataType[3];
+    for (int i = 0; i < 3; i++) {
+      physicalNames[i] = queryContext.getAggregationFunctions()[i].getResultColumnName();
+      logicalNames[i] = brokerContext.getAggregationFunctions()[i].getResultColumnName();
+      types[i] = queryContext.getAggregationFunctions()[i].getIntermediateResultColumnType();
+    }
+    DataSchema canonical = ReducerDataSchemaUtils.canonicalizeDataSchemaForAggregation(brokerContext,
+        new DataSchema(physicalNames, types));
+    assertEquals(canonical.getColumnNames(), logicalNames);
+    assertEquals(canonical.getColumnDataTypes(), types);
+  }
+
+  @Test
+  public void testMissingIndexRetainsCompiledAggregation() {
+    QueryContext queryContext = aggregationQuery(
+        "SELECT DISTINCTCOUNT(DATETRUNC('DAY', ts, 'MILLISECONDS')) AS active_days FROM myTable", "DAY", false);
+    AggregationFunction[] functions = queryContext.getAggregationFunctions();
+    List<ExpressionContext> inputs = functions[0].getInputExpressions();
+    InstancePlanMakerImplV2.rewriteQueryContextWithHints(queryContext, _indexSegment);
+    assertSame(queryContext.getAggregationFunctions(), functions);
+    assertEquals(queryContext.getAggregationFunctions()[0].getInputExpressions(), inputs);
+    assertEquals(queryContext.getColumns(), Set.of("ts"));
+    assertEquals(queryContext.getAliasList(), List.of("active_days"));
+  }
+
+  @DataProvider
+  public Object[][] instanceRewriteCases() {
+    return new Object[][]{{false, false}, {true, false}, {false, true}, {true, true}};
+  }
+
+  @Test(dataProvider = "instanceRewriteCases")
+  public void testInstanceRewriteRequiresIndexOnEverySegment(boolean streaming, boolean allIndexed) {
+    QueryContext queryContext = aggregationQuery(
+        "SELECT DISTINCTCOUNT(DATETRUNC('MONTH', ts, 'MILLISECONDS')) AS active_days FROM myTable", "MONTH", false);
+    IndexSegment second = mock(IndexSegment.class);
+    when(second.getColumnNames()).thenReturn(allIndexed ? Set.of("ts", "$ts$MONTH") : Set.of("ts"));
+    List<SegmentContext> segments = List.of(new SegmentContext(_indexSegment), new SegmentContext(second));
+    InstancePlanMakerImplV2 planMaker = new InstancePlanMakerImplV2();
+    ExecutorService executor = mock(ExecutorService.class);
+    if (streaming) {
+      planMaker.makeStreamingInstancePlan(segments, queryContext, executor, mock(ResultsBlockStreamer.class));
+    } else {
+      planMaker.makeInstancePlan(segments, queryContext, executor);
+    }
+    AggregationFunction<?, ?> aggregation = queryContext.getAggregationFunctions()[0];
+    ExpressionContext input = aggregation.getInputExpressions().get(0);
+    if (allIndexed) {
+      assertEquals(input, ExpressionContext.forIdentifier("$ts$MONTH"));
+      assertEquals(queryContext.getColumns(), Set.of("$ts$MONTH"));
+    } else {
+      assertEquals(input.getFunction().getFunctionName(), "datetrunc");
+      assertEquals(queryContext.getColumns(), Set.of("ts"));
+    }
+  }
+
+  private static QueryContext aggregationQuery(String sql, String granularity, boolean nullHandlingEnabled) {
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+    pinotQuery.setQueryOptions(Map.of("enableNullHandling", Boolean.toString(nullHandlingEnabled)));
+    pinotQuery.setExpressionOverrideHints(Map.of(
+        CalciteSqlParser.compileToExpression("DATETRUNC('" + granularity + "', ts, 'MILLISECONDS')"),
+        RequestUtils.getIdentifierExpression("$ts$" + granularity)));
+    return QueryContextConverterUtils.getQueryContext(pinotQuery);
   }
 }

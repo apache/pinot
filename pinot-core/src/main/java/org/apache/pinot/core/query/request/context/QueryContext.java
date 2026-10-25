@@ -89,6 +89,9 @@ public class QueryContext implements QueryScopedCache {
   private AggregationFunction[] _aggregationFunctions;
   private List<Pair<AggregationFunction, FilterContext>> _filteredAggregationFunctions;
   private Map<Pair<FunctionContext, FilterContext>, Integer> _filteredAggregationsIndexMap;
+  // Retain the original wire slots only for queries whose expressions can be rewritten during planning.
+  @Nullable
+  private List<Pair<FunctionContext, FilterContext>> _aggregationFunctionContexts;
   private boolean _hasFilteredAggregations;
   // Set by the instance planner after bounding all local BASE and derived grouping-set keys.
   private boolean _groupingSetsBaseAggregationAllowed = true;
@@ -351,6 +354,28 @@ public class QueryContext implements QueryScopedCache {
   /// Returns the expression override hints.
   public Map<ExpressionContext, ExpressionContext> getExpressionOverrideHints() {
     return _expressionOverrideHints;
+  }
+
+  /// Recompiles execution inputs after an in-place expression rewrite, before any segment operators are built.
+  /// The original aggregation slots are retained even when formerly distinct HAVING/ORDER-BY inputs become equal.
+  public void refreshAfterExpressionRewrite() {
+    if (_aggregationFunctionContexts != null && !_aggregationFunctionContexts.isEmpty()) {
+      int numAggregations = _aggregationFunctionContexts.size();
+      _aggregationFunctions = new AggregationFunction[numAggregations];
+      _filteredAggregationFunctions = new ArrayList<>(numAggregations);
+      _filteredAggregationsIndexMap = new HashMap<>();
+      _hasFilteredAggregations = false;
+      for (int i = 0; i < numAggregations; i++) {
+        Pair<FunctionContext, FilterContext> context = _aggregationFunctionContexts.get(i);
+        AggregationFunction aggregationFunction =
+            AggregationFunctionFactory.getAggregationFunction(context.getLeft(), _nullHandlingEnabled);
+        _aggregationFunctions[i] = aggregationFunction;
+        _filteredAggregationFunctions.add(Pair.of(aggregationFunction, context.getRight()));
+        _filteredAggregationsIndexMap.put(context, i);
+        _hasFilteredAggregations |= context.getRight() != null;
+      }
+    }
+    Builder.extractColumns(this);
   }
 
   /// Returns `true` if the query is an EXPLAIN query, `false` otherwise.
@@ -883,6 +908,10 @@ public class QueryContext implements QueryScopedCache {
     private void generateAggregationFunctions(QueryContext queryContext) {
       List<Pair<AggregationFunction, FilterContext>> filteredAggregationFunctions = new ArrayList<>();
       Map<Pair<FunctionContext, FilterContext>, Integer> filteredAggregationsIndexMap = new HashMap<>();
+      List<Pair<FunctionContext, FilterContext>> aggregationFunctionContexts =
+          queryContext._expressionOverrideHints != null && !queryContext._expressionOverrideHints.isEmpty()
+              ? new ArrayList<>() : null;
+      queryContext._aggregationFunctionContexts = aggregationFunctionContexts;
 
       // Add aggregation functions in the SELECT clause
       // NOTE: DO NOT deduplicate the aggregation functions in the SELECT clause because that involves protocol change.
@@ -898,6 +927,9 @@ public class QueryContext implements QueryScopedCache {
             AggregationFunctionFactory.getAggregationFunction(aggregation, queryContext._nullHandlingEnabled);
         filteredAggregationFunctions.add(Pair.of(aggregationFunction, filter));
         filteredAggregationsIndexMap.put(Pair.of(aggregation, filter), functionIndex);
+        if (aggregationFunctionContexts != null) {
+          aggregationFunctionContexts.add(pair);
+        }
       }
 
       // Add aggregation functions in the HAVING and ORDER-BY clause but not in the SELECT clause
@@ -919,6 +951,9 @@ public class QueryContext implements QueryScopedCache {
               AggregationFunctionFactory.getAggregationFunction(aggregation, queryContext._nullHandlingEnabled);
           filteredAggregationFunctions.add(Pair.of(aggregationFunction, filter));
           filteredAggregationsIndexMap.put(Pair.of(aggregation, filter), functionIndex);
+          if (aggregationFunctionContexts != null) {
+            aggregationFunctionContexts.add(pair);
+          }
         }
       }
 
@@ -986,7 +1021,7 @@ public class QueryContext implements QueryScopedCache {
     }
 
     /// Helper method to extract the columns (IDENTIFIER expressions) for the query.
-    private void extractColumns(QueryContext query) {
+    private static void extractColumns(QueryContext query) {
       Set<String> columns = new HashSet<>();
 
       for (ExpressionContext expression : query._selectExpressions) {
