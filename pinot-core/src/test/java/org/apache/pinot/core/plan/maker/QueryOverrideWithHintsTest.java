@@ -174,7 +174,8 @@ public class QueryOverrideWithHintsTest {
   @Test
   public void testRewriteExpressionsWithHints() {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(
-        "SELECT datetrunc('MONTH', ts), count(*), sum(abc) from myTable group by datetrunc('MONTH', ts) ");
+        "SELECT datetrunc('MONTH', ts), count(*), sum(datetrunc('MONTH', ts)) from myTable"
+            + " group by datetrunc('MONTH', ts)");
     Expression dateTruncFunctionExpr =
         RequestUtils.getFunctionExpression("datetrunc", RequestUtils.getLiteralExpression("MONTH"),
             RequestUtils.getIdentifierExpression("ts"));
@@ -184,6 +185,8 @@ public class QueryOverrideWithHintsTest {
     InstancePlanMakerImplV2.rewriteQueryContextWithHints(queryContext, _indexSegment);
     assertEquals(queryContext.getSelectExpressions().get(0).getIdentifier(), "$ts$MONTH");
     assertEquals(queryContext.getGroupByExpressions().get(0).getIdentifier(), "$ts$MONTH");
+    assertEquals(queryContext.getAggregationFunctions()[1].getInputExpressions(),
+        List.of(ExpressionContext.forIdentifier("$ts$MONTH")));
   }
 
   @Test
