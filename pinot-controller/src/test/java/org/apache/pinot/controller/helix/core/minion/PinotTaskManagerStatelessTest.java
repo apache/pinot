@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import org.apache.helix.task.TaskState;
@@ -54,6 +55,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -71,6 +73,90 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
   public void setUp()
       throws Exception {
     startZk();
+  }
+
+  @DataProvider
+  public Object[][] effectiveMinionTags() {
+    return new Object[][]{{true, null}, {true, "dedicated_minion"},
+        {true, CommonConstants.Helix.UNTAGGED_MINION_INSTANCE}, {true, "other_minion"},
+        {false, CommonConstants.Helix.UNTAGGED_MINION_INSTANCE}};
+  }
+
+  @Test(dataProvider = "effectiveMinionTags")
+  public void testValidatesEffectiveMinionTagBeforeGeneration(boolean enforceTag, String override)
+      throws Exception {
+    setupTest();
+    try {
+      String dedicatedTag = "dedicated_minion";
+      for (String tag : List.of(dedicatedTag, "other_minion")) {
+        _helixAdmin.addInstanceTag(getHelixClusterName(), MINION_INSTANCE_ID_PREFIX + "0", tag);
+        TestUtils.waitForCondition(value -> !_helixResourceManager.getInstancesWithTag(tag).isEmpty(),
+            TIMEOUT_IN_MS, "Minion tag must be visible before scheduling");
+      }
+      String taskType = "ValidateTag" + enforceTag + (override == null ? "default" : override.replace("_", ""));
+      Map<String, String> taskConfigs = new HashMap<>(Map.of("minionInstanceTag", dedicatedTag));
+      TableConfig table = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+          .setTaskConfig(new TableTaskConfig(Map.of(taskType, taskConfigs))).build();
+      waitForEVToDisappear(table.getTableName());
+      getOrCreateAdminClient().getTableClient().createTable(table.toJsonString(), "TASK");
+      PinotTaskManager taskManager = _controllerStarter.getTaskManager();
+      PinotHelixTaskResourceManager taskResources = _controllerStarter.getHelixTaskResourceManager();
+      AtomicInteger generated = new AtomicInteger();
+      BaseTaskGenerator generator = enforceTag ? new BaseTaskGenerator() {
+        @Override
+        public String getTaskType() {
+          return taskType;
+        }
+
+        @Override
+        public List<PinotTaskConfig> generateTasks(List<TableConfig> tables) {
+          generated.incrementAndGet();
+          return List.of(new PinotTaskConfig(taskType, new HashMap<>()));
+        }
+
+        @Override
+        public void validateMinionInstanceTag(TableConfig tableConfig, String effectiveTag) {
+          if (!dedicatedTag.equals(effectiveTag)) {
+            throw new IllegalArgumentException("Effective minion tag must be " + dedicatedTag);
+          }
+        }
+      } : createFakeTaskGenerator(taskType, 1, 1);
+      generator.init(taskManager.getClusterInfoAccessor());
+      taskManager.registerTaskGenerator(generator);
+      taskResources.ensureTaskQueueExists(taskType);
+      TaskSchedulingContext context = new TaskSchedulingContext().setTablesToSchedule(Set.of(TABLE_NAME_WITH_TYPE))
+          .setTasksToSchedule(Set.of(taskType)).setMinionInstanceTag(override);
+      RuntimeException failure = null;
+      TaskSchedulingInfo result = null;
+      try {
+        result = taskManager.scheduleTasks(context).get(taskType);
+      } catch (RuntimeException e) {
+        failure = e;
+      }
+      int submitted = taskResources.getTaskStates(taskType).size();
+      LOGGER.info("Effective tag witness: enforced={}, override={}, generated={}, submitted={}", enforceTag,
+          override, generated.get(), submitted);
+      if (enforceTag && override != null && !dedicatedTag.equals(override)) {
+        assertEquals(generated.get(), 0, "Reject an incompatible override before generator side effects");
+        assertEquals(submitted, 0, "An incompatible override must not submit a task");
+        assertNotNull(failure);
+        assertTrue(failure.getMessage().contains(TABLE_NAME_WITH_TYPE));
+        assertTrue(failure.getMessage().contains("Effective minion tag must be " + dedicatedTag));
+      } else {
+        assertNull(failure);
+        assertNotNull(result);
+        assertTrue(result.getGenerationErrors().isEmpty());
+        assertTrue(result.getSchedulingErrors().isEmpty());
+        assertEquals(submitted, 1);
+        if (enforceTag) {
+          assertEquals(generated.get(), 1);
+        }
+      }
+    } finally {
+      dropOfflineTable(RAW_TABLE_NAME);
+      stopFakeInstances();
+      stopController();
+    }
   }
 
   @Test

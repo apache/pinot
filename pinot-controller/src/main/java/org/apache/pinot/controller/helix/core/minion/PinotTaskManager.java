@@ -945,6 +945,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
         }
         String minionInstanceTag = minionInstanceTagForTask != null ? minionInstanceTagForTask
             : taskGenerator.getMinionInstanceTag(tableConfig);
+        taskGenerator.validateMinionInstanceTag(tableConfig, minionInstanceTag);
         List<PinotTaskConfig> presentTaskConfig =
             minionInstanceTagToTaskConfigs.computeIfAbsent(minionInstanceTag, k -> new ArrayList<>());
 
