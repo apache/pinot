@@ -206,9 +206,11 @@ public class QueryRouter {
   /// The reachability probe the failure detector uses when pings are off. Re-establishes every channel this broker
   /// has queried the server over, one per table type: reconnects the ones that are down and replaces the ones marked
   /// suspect (see [ServerChannels#recordUnansweredQuery]) with a fresh connection, so that a half-open socket that
-  /// still reports active is never vouched for. Returns `true` if every such channel is connected afterwards. It used
-  /// to open the OFFLINE channel only, so on a realtime-only cluster a handshake to a freshly restarted process passed
-  /// the probe while the channel that carried the queries was dead. Startup pre-connect uses [#preConnect] instead.
+  /// still reports active is never vouched for. Returns `true` if every such channel is connected afterwards, which
+  /// includes the vacuous case of a server with no such channel: callers that need "reachable" must check
+  /// [#hasChannel] first, as `retryUnhealthyServer` does. It used to open the OFFLINE channel only, so on a
+  /// realtime-only cluster a handshake to a freshly restarted process passed the probe while the channel that carried
+  /// the queries was dead. Startup pre-connect uses [#preConnect] instead.
   public boolean connect(ServerInstance serverInstance) {
     try {
       ServerChannels serverChannels = channels();
