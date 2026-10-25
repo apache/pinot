@@ -58,6 +58,7 @@ import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
+import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
@@ -73,8 +74,9 @@ import org.slf4j.LoggerFactory;
 
 
 @ThreadSafe
-public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
+public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler, PinotClusterConfigChangeListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseBrokerRequestHandler.class);
+  private static final String ALL_ROLES_QUERY_FINGERPRINTING = "pinot.all.enable.query.fingerprinting";
   protected final PinotConfiguration _config;
   protected final String _brokerId;
   protected final RoutingManager _routingManager;
@@ -89,6 +91,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected final long _brokerTimeoutMs;
   protected final boolean _enableRowColumnLevelAuth;
   protected final QueryLogger _queryLogger;
+  private final boolean _queryFingerprintingBrokerDefault;
+  protected volatile boolean _enableQueryFingerprinting;
   @Nullable
   protected final String _enableNullHandling;
   @Nullable
@@ -128,6 +132,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _enableRowColumnLevelAuth = config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH,
         Broker.DEFAULT_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH);
     _queryLogger = new QueryLogger(config);
+    _queryFingerprintingBrokerDefault = config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_FINGERPRINTING,
+        Broker.DEFAULT_BROKER_ENABLE_QUERY_FINGERPRINTING);
+    updateQueryFingerprinting(_queryFingerprintingBrokerDefault);
     _enableNullHandling = config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_ENABLE_NULL_HANDLING);
     _regexDictSizeThreshold = config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_REGEX_DICT_SIZE_THRESHOLD);
     _enableQueryCancellation = config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION,
@@ -147,6 +154,36 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   /// with the cluster config change handler so that the defaults reload without a restart.
   public ApproximateFunctionOverrideProvider getApproximateFunctionOverrideProvider() {
     return _approximateFunctionOverrideProvider;
+  }
+
+  /// Applies the live cluster override. Removing it restores the broker configuration (enabled by default).
+  /// Literal-value SQL redaction always requires fingerprinting, including when the override is `false`.
+  @Override
+  public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
+    if (!changedConfigs.contains(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_FINGERPRINTING)
+        && !changedConfigs.contains(ALL_ROLES_QUERY_FINGERPRINTING)) {
+      return;
+    }
+    String key = clusterConfigs.containsKey(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_FINGERPRINTING)
+        ? Broker.CONFIG_OF_BROKER_ENABLE_QUERY_FINGERPRINTING : ALL_ROLES_QUERY_FINGERPRINTING;
+    String enabled = clusterConfigs.get(key);
+    if (enabled != null && !"true".equalsIgnoreCase(enabled.trim()) && !"false".equalsIgnoreCase(enabled.trim())) {
+      LOGGER.warn("Ignoring invalid value '{}' for {}", enabled, key);
+      return;
+    }
+    updateQueryFingerprinting(
+        enabled != null ? Boolean.parseBoolean(enabled.trim()) : _queryFingerprintingBrokerDefault);
+    LOGGER.info("Updated query fingerprinting: enabled: {}", _enableQueryFingerprinting);
+  }
+
+  private void updateQueryFingerprinting(boolean enabled) {
+    boolean redactionNeedsFingerprinting =
+        _queryLogger.getSqlRedactionMode() == QueryLogger.SqlRedactionMode.LITERAL_VALUES;
+    if (redactionNeedsFingerprinting && !enabled) {
+      LOGGER.warn("SQL redaction mode 'literal_values' requires query fingerprinting. "
+          + "Enabling query fingerprinting automatically.");
+    }
+    _enableQueryFingerprinting = enabled || redactionNeedsFingerprinting;
   }
 
   @Override

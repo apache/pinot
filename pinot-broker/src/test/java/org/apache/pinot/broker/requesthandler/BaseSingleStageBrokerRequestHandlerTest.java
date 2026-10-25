@@ -78,6 +78,7 @@ import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.LoggerConstants;
+import org.apache.pinot.spi.trace.QueryFingerprint;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.RequestScope;
 import org.apache.pinot.spi.trace.Tracing;
@@ -101,6 +102,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 
 
 public class BaseSingleStageBrokerRequestHandlerTest {
@@ -439,24 +443,85 @@ public class BaseSingleStageBrokerRequestHandlerTest {
   }
 
   @Test
-  public void testQueryHashAddedToQueryOptions() {
-    String query = "SELECT * FROM myTable WHERE col = 100";
-    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-    String queryHash = "generated_hash_xyz";
-    pinotQuery.putToQueryOptions(
-        CommonConstants.Broker.Request.QueryOptionKey.QUERY_HASH,
-        queryHash);
-    Assert.assertTrue(pinotQuery.getQueryOptions().containsKey(
-        CommonConstants.Broker.Request.QueryOptionKey.QUERY_HASH),
-        "QueryHash should be added to queryOptions");
-    Assert.assertEquals(
-        pinotQuery.getQueryOptions().get(CommonConstants.Broker.Request.QueryOptionKey.QUERY_HASH),
-        queryHash,
-        "QueryOptions should contain the correct queryHash value");
+  public void testQueryFingerprintingReloadsWithoutRecreatingHandler()
+      throws Exception {
+    AtomicReference<TableRouteInfo> capturedRouteInfo = new AtomicReference<>();
+    BaseSingleStageBrokerRequestHandler handler = createHybridHandlerWithTimeBoundary(capturedRouteInfo);
+    String key = Broker.CONFIG_OF_BROKER_ENABLE_QUERY_FINGERPRINTING;
+
+    assertQueryFingerprint(handler, capturedRouteInfo, true);
+    handler.onChange(Set.of(key), Map.of(key, "false"));
+    assertQueryFingerprint(handler, capturedRouteInfo, false);
+    handler.onChange(Set.of(key), Map.of(key, "true"));
+    assertQueryFingerprint(handler, capturedRouteInfo, true);
+    handler.onChange(Set.of(key), Map.of(key, "false"));
+    assertQueryFingerprint(handler, capturedRouteInfo, false);
+    handler.onChange(Set.of(key), Map.of());
+    assertQueryFingerprint(handler, capturedRouteInfo, true);
+
+    String alias = "pinot.all.enable.query.fingerprinting";
+    handler.onChange(Set.of(alias), Map.of(alias, "false"));
+    assertQueryFingerprint(handler, capturedRouteInfo, false);
+    handler.onChange(Set.of(key), Map.of(key, "true", alias, "false"));
+    assertQueryFingerprint(handler, capturedRouteInfo, true);
+    handler.onChange(Set.of(key), Map.of(alias, "false"));
+    assertQueryFingerprint(handler, capturedRouteInfo, false);
+    handler.onChange(Set.of(alias), Map.of());
+    assertQueryFingerprint(handler, capturedRouteInfo, true);
+  }
+
+  @Test
+  public void testQueryFingerprintingReloadPreservesBrokerFallbackAndRedaction()
+      throws Exception {
+    String key = Broker.CONFIG_OF_BROKER_ENABLE_QUERY_FINGERPRINTING;
+    PinotConfiguration config = new PinotConfiguration();
+    config.setProperty(key, false);
+    AtomicReference<TableRouteInfo> capturedRouteInfo = new AtomicReference<>();
+    BaseSingleStageBrokerRequestHandler handler = createHybridHandlerWithTimeBoundary(capturedRouteInfo, config);
+    assertQueryFingerprint(handler, capturedRouteInfo, false);
+    handler.onChange(Set.of(key), Map.of(key, "true"));
+    assertQueryFingerprint(handler, capturedRouteInfo, true);
+    handler.onChange(Set.of(key), Map.of());
+    assertQueryFingerprint(handler, capturedRouteInfo, false);
+
+    config.setProperty(Broker.CONFIG_OF_BROKER_QUERY_LOG_SQL_REDACTION, "literal_values");
+    BaseSingleStageBrokerRequestHandler redactingHandler =
+        createHybridHandlerWithTimeBoundary(capturedRouteInfo, config);
+    redactingHandler.onChange(Set.of(key), Map.of(key, "false"));
+    assertQueryFingerprint(redactingHandler, capturedRouteInfo, true);
+  }
+
+  private static void assertQueryFingerprint(BaseSingleStageBrokerRequestHandler handler,
+      AtomicReference<TableRouteInfo> capturedRouteInfo, boolean expected)
+      throws Exception {
+    ObjectNode request = JsonUtils.newObjectNode().put(Broker.Request.SQL,
+        "SELECT created_15min FROM myTable WHERE created_15min > 1772106300000 LIMIT 10");
+    capturedRouteInfo.set(null);
+    try (RequestScope requestContext = Tracing.getTracer().createRequestScope()) {
+      requestContext.setRequestArrivalTimeMillis(System.currentTimeMillis());
+      BrokerResponse response = handler.handleRequest(request, null, null, requestContext, null);
+      assertEquals(response.getExceptions().size(), 0);
+      assertNotNull(capturedRouteInfo.get(), "The query must reach the server request path");
+      String serverQueryHash = capturedRouteInfo.get().getOfflineBrokerRequest().getPinotQuery()
+          .getQueryOptions().get(Broker.Request.QueryOptionKey.QUERY_HASH);
+      QueryFingerprint fingerprint = requestContext.getQueryFingerprint();
+      if (expected) {
+        assertNotNull(fingerprint);
+        assertEquals(serverQueryHash, fingerprint.getQueryHash());
+      } else {
+        assertNull(fingerprint);
+        assertNull(serverQueryHash);
+      }
+    }
   }
 
   private BaseSingleStageBrokerRequestHandler createHybridHandlerWithTimeBoundary(
       AtomicReference<TableRouteInfo> capturedRouteInfo) {
+    return createHybridHandlerWithTimeBoundary(capturedRouteInfo, new PinotConfiguration());
+  }
+
+  private BaseSingleStageBrokerRequestHandler createHybridHandlerWithTimeBoundary(
+      AtomicReference<TableRouteInfo> capturedRouteInfo, PinotConfiguration config) {
     String offlineTableName = "myTable_OFFLINE";
     String realtimeTableName = "myTable_REALTIME";
 
@@ -497,7 +562,6 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     when(queryQuotaManager.acquireApplication(anyString())).thenReturn(true);
 
     BrokerMetrics.register(mock(BrokerMetrics.class));
-    PinotConfiguration config = new PinotConfiguration();
     BrokerQueryEventListenerFactory.init(config);
 
     return new BaseSingleStageBrokerRequestHandler(config, "testBrokerId", new BrokerRequestIdGenerator(),

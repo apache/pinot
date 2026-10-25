@@ -180,7 +180,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   protected final int _defaultQueryLimit;
   protected final boolean _enableMultistageMigrationMetric;
   protected final boolean _useMSEToFillEmptyResponseSchema;
-  protected final boolean _enableQueryFingerprinting;
   protected final AuthProvider _serverAdminAuthProvider;
   protected ExecutorService _multistageCompileExecutor;
   protected BlockingQueue<Pair<String, String>> _multistageCompileQueryQueue;
@@ -226,15 +225,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
     _enableMultistageMigrationMetric = _config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_MULTISTAGE_MIGRATION_METRIC,
         Broker.DEFAULT_ENABLE_MULTISTAGE_MIGRATION_METRIC);
-    boolean fingerprintingConfigured = _config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_FINGERPRINTING,
-        Broker.DEFAULT_BROKER_ENABLE_QUERY_FINGERPRINTING);
-    boolean redactionNeedsFingerprinting =
-        _queryLogger.getSqlRedactionMode() == QueryLogger.SqlRedactionMode.LITERAL_VALUES;
-    if (redactionNeedsFingerprinting && !fingerprintingConfigured) {
-      LOGGER.warn("SQL redaction mode 'literal_values' requires query fingerprinting. "
-          + "Enabling query fingerprinting automatically.");
-    }
-    _enableQueryFingerprinting = fingerprintingConfigured || redactionNeedsFingerprinting;
     if (_enableMultistageMigrationMetric) {
       _multistageCompileExecutor = Executors.newSingleThreadExecutor();
       _multistageCompileQueryQueue = new LinkedBlockingQueue<>(1000);
@@ -1134,13 +1124,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
 
     // Add queryHash to pinotQuery so it gets passed to servers for observability
-    if (_enableQueryFingerprinting) {
-      QueryFingerprint queryFingerprint = requestContext.getQueryFingerprint();
-      if (queryFingerprint != null) {
-        pinotQuery.putToQueryOptions(
-              CommonConstants.Broker.Request.QueryOptionKey.QUERY_HASH,
-              queryFingerprint.getQueryHash());
-      }
+    QueryFingerprint queryFingerprint = requestContext.getQueryFingerprint();
+    if (queryFingerprint != null) {
+      pinotQuery.putToQueryOptions(CommonConstants.Broker.Request.QueryOptionKey.QUERY_HASH,
+          queryFingerprint.getQueryHash());
     }
 
     if (isDefaultQueryResponseLimitEnabled() && !pinotQuery.isSetLimit()) {
