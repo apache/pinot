@@ -478,7 +478,9 @@ public abstract class BaseBrokerRoutingManager
 
     // Calculate new enabled and disabled servers
     Set<String> enabledServers = new HashSet<>();
-    // Every server that still has an instance config, enabled or not
+    // Every server that still has an instance config, enabled or not. Holds the raw ids from the records, while
+    // _enabledServerInstanceMap and _disabledServers are keyed by the interned ids: lookups compare ids with equals(),
+    // so the two match by value; interning only gives those maps an identity fast path.
     Set<String> presentServers = new HashSet<>();
     List<String> newEnabledServers = new ArrayList<>();
     for (ZNRecord instanceConfigZNRecord : instanceConfigZNRecords) {
