@@ -231,6 +231,11 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     // Remove all white-spaces from the list of zkServers (if any).
     _zkServers = brokerConf.getProperty(Helix.CONFIG_OF_ZOOKEEPER_SERVER).replaceAll("\\s+", "");
     _clusterName = brokerConf.getProperty(Helix.CONFIG_OF_CLUSTER_NAME);
+    // Keep the component fallback separate from cluster values: the live listener applies the cluster override and
+    // must restore this value when that override is removed, including when it was already present at startup.
+    _brokerConf.setProperty(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_FINGERPRINTING,
+        _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_FINGERPRINTING,
+            Broker.DEFAULT_BROKER_ENABLE_QUERY_FINGERPRINTING));
     ServiceStartableUtils.applyClusterConfig(_brokerConf, _zkServers, _clusterName, ServiceRole.BROKER);
     applyCustomConfigs(brokerConf);
     TableSamplerFactory.init(_brokerConf.subset(CommonConstants.Broker.TABLE_SAMPLER_CONFIG_PREFIX));
@@ -662,9 +667,11 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     // which is set up below and still runs before the broker starts serving traffic.
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(
         singleStageBrokerRequestHandler.getApproximateFunctionOverrideProvider());
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(singleStageBrokerRequestHandler);
     if (multiStageBrokerRequestHandler != null) {
       _clusterConfigChangeHandler.registerClusterConfigChangeListener(
           multiStageBrokerRequestHandler.getApproximateFunctionOverrideProvider());
+      _clusterConfigChangeHandler.registerClusterConfigChangeListener(multiStageBrokerRequestHandler);
     }
     _brokerRequestHandler.start();
 

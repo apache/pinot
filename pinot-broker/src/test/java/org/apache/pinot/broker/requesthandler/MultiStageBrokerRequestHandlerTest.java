@@ -55,19 +55,27 @@ import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
 import org.apache.pinot.spi.query.QueryThreadContext;
+import org.apache.pinot.spi.trace.QueryFingerprint;
 import org.apache.pinot.spi.trace.RequestContext;
+import org.apache.pinot.spi.trace.RequestScope;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.PlannerRuleNames;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.NetUtils;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
@@ -278,6 +286,74 @@ public class MultiStageBrokerRequestHandlerTest extends QueryEnvironmentTestBase
     assertEquals(MultiStageBrokerRequestHandler.getDefaultDisabledPlannerRules(config), Set.of());
   }
 
+  @Test
+  public void testQueryFingerprintingReloadsWithoutRecreatingHandler()
+      throws Exception {
+    MultiStageBrokerRequestHandler handler = newHandler(new PinotConfiguration());
+    handler.getQueryDispatcher().start();
+    String key = CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_QUERY_FINGERPRINTING;
+    try {
+      assertQueryFingerprint(handler, true);
+      handler.onChange(Set.of(key), Map.of(key, "false"));
+      assertQueryFingerprint(handler, false);
+      handler.onChange(Set.of(key), Map.of(key, "true"));
+      assertQueryFingerprint(handler, true);
+      handler.onChange(Set.of(key), Map.of(key, "false"));
+      assertQueryFingerprint(handler, false);
+      handler.onChange(Set.of(key), Map.of());
+      assertQueryFingerprint(handler, true);
+    } finally {
+      handler.shutDown();
+    }
+  }
+
+  @Test
+  public void testQueryHashStillPropagatesWhenFingerprintingDisabledDuringRequest()
+      throws Exception {
+    MultiStageBrokerRequestHandler handler = newHandler(new PinotConfiguration());
+    handler.getQueryDispatcher().start();
+    String key = CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_QUERY_FINGERPRINTING;
+    try (RequestScope requestContext = spy(Tracing.getTracer().createRequestScope())) {
+      // Turn fingerprinting off immediately after this query generates its fingerprint, before compilation.
+      doAnswer(invocation -> {
+        invocation.callRealMethod();
+        handler.onChange(Set.of(key), Map.of(key, "false"));
+        return null;
+      }).when(requestContext).setQueryFingerprint(any(QueryFingerprint.class));
+      assertQueryFingerprint(handler, requestContext, true);
+      assertQueryFingerprint(handler, false);
+    } finally {
+      handler.shutDown();
+    }
+  }
+
+  private static void assertQueryFingerprint(MultiStageBrokerRequestHandler handler, boolean expected)
+      throws Exception {
+    try (RequestScope requestContext = Tracing.getTracer().createRequestScope()) {
+      assertQueryFingerprint(handler, requestContext, expected);
+    }
+  }
+
+  private static void assertQueryFingerprint(MultiStageBrokerRequestHandler handler, RequestScope requestContext,
+      boolean expected)
+      throws Exception {
+    String sql = "SELECT col FROM missingTable WHERE col = 100";
+    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sql);
+    requestContext.setRequestArrivalTimeMillis(System.currentTimeMillis());
+    // The missing table stops planning before dispatch; fingerprint generation and propagation still run.
+    handler.handleRequest(1L, sql, sqlNodeAndOptions, JsonUtils.newObjectNode(), null, requestContext, null,
+        new AllowAllAccessControlFactory().create());
+    QueryFingerprint fingerprint = requestContext.getQueryFingerprint();
+    String workerQueryHash = sqlNodeAndOptions.getOptions().get(QueryOptionKey.QUERY_HASH);
+    if (expected) {
+      assertNotNull(fingerprint);
+      assertEquals(workerQueryHash, fingerprint.getQueryHash());
+    } else {
+      assertNull(fingerprint);
+      assertNull(workerQueryHash);
+    }
+  }
+
   private static MultiStageBrokerRequestHandler newHandlerWithStreamingGroupByFlushThreshold(
       @Nullable String streamingGroupByFlushThreshold)
       throws Exception {
@@ -327,6 +403,7 @@ public class MultiStageBrokerRequestHandlerTest extends QueryEnvironmentTestBase
 
       @Override
       public void shutDown() {
+        super.shutDown();
       }
     };
   }

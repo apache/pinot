@@ -416,9 +416,12 @@ public class CommonConstants {
         "pinot.broker.query.regex.dict.size.threshold";
     public static final String CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION = "pinot.broker.enable.query.cancellation";
     public static final boolean DEFAULT_BROKER_ENABLE_QUERY_CANCELLATION = true;
+    /// Enabled by default. A cluster-config value overrides the broker configuration without a restart; removing it
+    /// restores the broker value. This key takes precedence over `pinot.all.enable.query.fingerprinting` in cluster
+    /// config. Literal-value SQL redaction always requires fingerprinting, even if this is false.
     public static final String CONFIG_OF_BROKER_ENABLE_QUERY_FINGERPRINTING =
         "pinot.broker.enable.query.fingerprinting";
-    public static final boolean DEFAULT_BROKER_ENABLE_QUERY_FINGERPRINTING = false;
+    public static final boolean DEFAULT_BROKER_ENABLE_QUERY_FINGERPRINTING = true;
     public static final String DEFAULT_QUERY_HASH = "";
     public static final double DEFAULT_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND = 10_000d;
     public static final String CONFIG_OF_BROKER_TIMEOUT_MS = "pinot.broker.timeoutMs";
