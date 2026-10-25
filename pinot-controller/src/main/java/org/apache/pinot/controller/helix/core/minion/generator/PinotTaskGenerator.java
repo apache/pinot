@@ -20,6 +20,7 @@ package org.apache.pinot.controller.helix.core.minion.generator;
 
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.helix.task.JobConfig;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.core.common.MinionConstants;
@@ -95,6 +96,16 @@ public interface PinotTaskGenerator {
   /// Gets the minionInstanceTag for the tableConfig
   default String getMinionInstanceTag(TableConfig tableConfig) {
     return CommonConstants.Helix.UNTAGGED_MINION_INSTANCE;
+  }
+
+  /// Validates the effective minion instance tag before scheduled task generation.
+  /// The effective tag includes any scheduling request override. The default implementation permits every tag.
+  /// Implementations must only validate: scheduling paths may invoke this hook more than once.
+  ///
+  /// @param tableConfig table whose tasks are being scheduled
+  /// @param minionInstanceTag effective tag, which may be null
+  /// @throws IllegalArgumentException if the tag is incompatible with the table's tasks
+  default void validateMinionInstanceTag(TableConfig tableConfig, @Nullable String minionInstanceTag) {
   }
 
   /// Performs task type specific validations for the given task type.
