@@ -496,7 +496,7 @@ public class QueryRoutingTest {
       assertTrue(response.containsKey(_offlineServerRoutingInstance));
       serverResponse = response.get(_offlineServerRoutingInstance);
       assertNull(serverResponse.getDataTable());
-      assertTrue(serverResponse.getSubmitDelayMs() >= -1);
+      assertEquals(serverResponse.getSubmitDelayMs(), -1);
       assertEquals(serverResponse.getResponseDelayMs(), -1);
       assertEquals(serverResponse.getResponseSize(), 0);
       assertEquals(serverResponse.getDeserializationTimeMs(), 0);

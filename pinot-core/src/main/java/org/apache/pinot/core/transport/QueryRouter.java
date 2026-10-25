@@ -345,7 +345,9 @@ public class QueryRouter {
     }
   }
 
-  // Issue #18866: Notify in-flight queries about server DataTable deserialization failure
+  // Unlike receiveDataTable, a deserialization failure cannot be tied to a single requestId (the bytes didn't
+  // parse), so this method must broadcast to every in-flight query on the server. This is consistent with
+  // markServerUnavailable and safe because the channel is closed immediately after.
   void markServerDeserializationError(ServerRoutingInstance serverRoutingInstance, Exception exception,
       int responseSize, int deserializationTimeMs) {
     for (AsyncQueryResponse asyncQueryResponse : _asyncQueryResponseMap.values()) {
