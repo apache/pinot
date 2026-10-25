@@ -19,7 +19,9 @@
 package org.apache.pinot.core.query.scheduler;
 
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -64,14 +66,20 @@ public abstract class AbstractSchedulerGroup implements SchedulerGroup {
   }
 
   @Override
-  public void trimExpired(long deadlineMillis) {
+  public List<SchedulerQueryContext> trimExpired(long deadlineMillis) {
+    List<SchedulerQueryContext> expired = List.of();
     Iterator<SchedulerQueryContext> iter = _pendingQueries.iterator();
     while (iter.hasNext()) {
       SchedulerQueryContext next = iter.next();
       if (next.getArrivalTimeMs() < deadlineMillis) {
         iter.remove();
+        if (expired.isEmpty()) {
+          expired = new ArrayList<>();
+        }
+        expired.add(next);
       }
     }
+    return expired;
   }
 
   @Override
