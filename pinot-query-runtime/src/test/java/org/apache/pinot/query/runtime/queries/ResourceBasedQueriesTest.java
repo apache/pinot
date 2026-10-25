@@ -50,6 +50,7 @@ import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.utils.config.SchemaSerDeUtils;
 import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.core.data.manager.offline.DimensionTableDataManager;
+import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryServerEnclosure;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -103,6 +104,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   private static final int DEFAULT_NUM_PARTITIONS = 4;
 
   private final Map<String, Set<String>> _tableToSegmentMap = new HashMap<>();
+  private QueryEnvironment _mergeCapableEnvironment;
   private boolean _isRunIgnored;
   private TimeZone _currentSystemTimeZone;
 
@@ -274,6 +276,9 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     _queryEnvironment = QueryEnvironmentTestBase.getQueryEnvironment(_reducerPort, server1.getPort(), server2.getPort(),
         factory1.getRegisteredSchemaMap(), factory1.buildTableSegmentNameMap(), factory2.buildTableSegmentNameMap(),
         partitionedSegmentsMap);
+    _mergeCapableEnvironment = QueryEnvironmentTestBase.getQueryEnvironment(_reducerPort, server1.getPort(),
+        server2.getPort(), factory1.getRegisteredSchemaMap(), factory1.buildTableSegmentNameMap(),
+        factory2.buildTableSegmentNameMap(), partitionedSegmentsMap, true);
   }
 
   private void addSegments(MockInstanceDataManagerFactory factory1, MockInstanceDataManagerFactory factory2,
@@ -405,7 +410,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       @Nullable String expectErrorMsg, boolean keepOutputRowOrder, boolean ignoreV2Optimizer, boolean ignoreLiteMode)
       throws Exception {
     // query pinot
-    runQuery(sql, expectErrorMsg, false).ifPresent(queryResult -> {
+    runQuery(testCaseName, sql, expectErrorMsg, false).ifPresent(queryResult -> {
       try {
         Assert.assertNull(queryResult.getProcessingException(), "Expected no exception");
         compareRowEquals(queryResult.getResultTable(), queryH2(h2Sql), keepOutputRowOrder);
@@ -426,7 +431,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
           "Ignoring query for test-case with v2 optimizer, testCase: " + testCaseName + ", SQL: " + sql);
     }
     sql = String.format("SET usePhysicalOptimizer=true; %s", sql);
-    runQuery(sql, expect, false).ifPresent(queryResult -> {
+    runQuery(testCaseName, sql, expect, false).ifPresent(queryResult -> {
       try {
         compareRowEquals(queryResult.getResultTable(), queryH2(h2Sql), keepOutputRowOrder);
       } catch (Exception e) {
@@ -440,7 +445,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       List<Object[]> expectedRows, String expect, boolean keepOutputRowOrder, boolean ignoreV2Optimizer,
       boolean ignoreLiteMode)
       throws Exception {
-    runQuery(sql, expect, false).ifPresent(
+    runQuery(testCaseName, sql, expect, false).ifPresent(
         queryResult -> compareRowEquals(queryResult.getResultTable(), expectedRows, keepOutputRowOrder));
   }
 
@@ -454,7 +459,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
           "Ignoring query for test-case with v2 optimizer, testCase: " + testCaseName + ", SQL: " + sql);
     }
     final String finalSql = String.format("SET usePhysicalOptimizer=true; %s", sql);
-    runQuery(finalSql, expect, false).ifPresent(
+    runQuery(testCaseName, finalSql, expect, false).ifPresent(
         queryResult -> compareRowEquals(queryResult.getResultTable(), expectedRows, keepOutputRowOrder));
   }
 
@@ -468,7 +473,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
           "Ignoring query for test-case with lite mode, testCase: " + testCaseName + ", SQL: " + sql);
     }
     final String finalSql = String.format("SET usePhysicalOptimizer=true; SET useLiteMode=true; %s", sql);
-    runQuery(finalSql, expect, false).ifPresent(
+    runQuery(testCaseName, finalSql, expect, false).ifPresent(
         queryResult -> compareRowEquals(queryResult.getResultTable(), expectedRows, keepOutputRowOrder));
   }
 
@@ -507,7 +512,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   public void testQueryTestCasesWithMetadata(String testCaseName, boolean isIgnored, String sql, String h2Sql,
       String expect, int numSegments)
       throws Exception {
-    runQuery(sql, expect, true).ifPresent(queryResult -> {
+    runQuery(testCaseName, sql, expect, true).ifPresent(queryResult -> {
       BrokerResponseNativeV2 brokerResponseNative = new BrokerResponseNativeV2();
       for (MultiStageQueryStats.StageStats.Closed stageStats : queryResult.getQueryStats()) {
         stageStats.forEach((type, stats) -> type.mergeInto(brokerResponseNative, stats));
@@ -531,11 +536,15 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     });
   }
 
-  private Optional<QueryDispatcher.QueryResult> runQuery(String sql, @Nullable String expectedErrorMsg, boolean trace)
+  private Optional<QueryDispatcher.QueryResult> runQuery(String testCaseName, String sql,
+      @Nullable String expectedErrorMsg, boolean trace)
       throws Exception {
     try {
       // query pinot
-      QueryDispatcher.QueryResult queryResult = queryRunner(sql, trace);
+      // Only SortedMergeJoin.json's three cases opt in; unrelated resource cases keep the unsupported default.
+      QueryEnvironment environment = testCaseName.equals("sorted_merge_join") ? _mergeCapableEnvironment
+          : _queryEnvironment;
+      QueryDispatcher.QueryResult queryResult = queryRunner(sql, trace, Map.of(), environment);
       if (expectedErrorMsg == null) {
         Assert.assertTrue(queryResult.getProcessingException() == null,
             "Unexpected exception: " + JsonUtils.objectToPrettyString(queryResult.getProcessingException()));
