@@ -284,6 +284,51 @@ public class BrokerRoutingManagerTest {
   }
 
   @Test
+  public void testDisabledServerWithNonEmptyExcludedServers() {
+    String serverA = "Server_localhost_8000";
+    String serverB = "Server_localhost_8001";
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT), anyInt(), anyInt()))
+        .thenReturn(List.of(createEnabledServerZNRecord(serverA), createEnabledServerZNRecord(serverB)));
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    assertTrue(_routingManager.getEnabledServerInstanceMap().containsKey(serverA));
+    assertTrue(_routingManager.getEnabledServerInstanceMap().containsKey(serverB));
+
+    _routingManager.excludeServerFromRouting(serverA);
+    assertTrue(_routingManager.getRoutableServerInstanceMap().containsKey(serverB));
+    assertFalse(_routingManager.getRoutableServerInstanceMap().containsKey(serverA));
+
+    // Disable serverB while serverA is excluded
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT), anyInt(), anyInt()))
+        .thenReturn(List.of(createEnabledServerZNRecord(serverA)));
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+
+    assertFalse(_routingManager.getEnabledServerInstanceMap().containsKey(serverB));
+    assertFalse(_routingManager.getRoutableServerInstanceMap().containsKey(serverB));
+    assertTrue(_routingManager.getEnabledServerInstanceMap().containsKey(serverA));
+    assertFalse(_routingManager.getRoutableServerInstanceMap().containsKey(serverA));
+  }
+
+  @Test
+  public void testDisabledServerAlreadyExcludedCleansUpEnabledMap() {
+    String serverA = "Server_localhost_8000";
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT), anyInt(), anyInt()))
+        .thenReturn(List.of(createEnabledServerZNRecord(serverA)));
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    assertTrue(_routingManager.getEnabledServerInstanceMap().containsKey(serverA));
+
+    _routingManager.excludeServerFromRouting(serverA);
+    assertFalse(_routingManager.getRoutableServerInstanceMap().containsKey(serverA));
+
+    // Disable serverA while already excluded (changedServers is empty -> early return path)
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT), anyInt(), anyInt()))
+        .thenReturn(List.of());
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+
+    // Must be removed from _enabledServerInstanceMap even on early return
+    assertFalse(_routingManager.getEnabledServerInstanceMap().containsKey(serverA));
+  }
+
+  @Test
   public void testServerReenableCallbackInvokedWhenExcludedServerReenabled() {
     // Set up callback
     _routingManager.setServerReenableCallback(_serverReenableCallback);

@@ -493,8 +493,9 @@ public abstract class BaseBrokerRoutingManager
       enabledServers.removeAll(_excludedServers);
       // NOTE: All new enabled servers are routable
       changedServers.addAll(newEnabledServers);
+      // Only servers not already in _excludedServers have changed their routability upon being disabled (Issue #19081)
       for (String newDisabledServer : newDisabledServers) {
-        if (_excludedServers.contains(newDisabledServer)) {
+        if (!_excludedServers.contains(newDisabledServer)) {
           changedServers.add(newDisabledServer);
         }
       }
@@ -502,44 +503,47 @@ public abstract class BaseBrokerRoutingManager
     _routableServerInstanceMap = buildRoutableServerInstanceMap(enabledServers);
     long calculateChangedServersEndTimeMs = System.currentTimeMillis();
 
-    // Early terminate if there is no changed servers
-    if (changedServers.isEmpty()) {
-      LOGGER.info("Processed instance config change in {}ms "
-              + "(fetch {} instance configs: {}ms, calculate changed servers: {}ms) without instance change",
-          calculateChangedServersEndTimeMs - startTimeMs, instanceConfigZNRecords.size(),
-          fetchInstanceConfigsEndTimeMs - startTimeMs,
-          calculateChangedServersEndTimeMs - fetchInstanceConfigsEndTimeMs);
-      return;
-    }
+    try {
+      // Early terminate if there is no changed servers
+      if (changedServers.isEmpty()) {
+        LOGGER.info("Processed instance config change in {}ms "
+                + "(fetch {} instance configs: {}ms, calculate changed servers: {}ms) without instance change",
+            calculateChangedServersEndTimeMs - startTimeMs, instanceConfigZNRecords.size(),
+            fetchInstanceConfigsEndTimeMs - startTimeMs,
+            calculateChangedServersEndTimeMs - fetchInstanceConfigsEndTimeMs);
+        return;
+      }
 
-    // Update routing entry for all tables
-    for (RoutingEntry routingEntry : _routingEntryMap.values()) {
-      String tableNameWithType = routingEntry.getTableNameWithType();
-      try {
-        Object tableLock = getRoutingTableBuildLock(tableNameWithType);
-        synchronized (tableLock) {
-          updateRoutingEntryOnInstancesChange(routingEntry, _routableServerInstanceMap.keySet(), changedServers);
+      // Update routing entry for all tables
+      for (RoutingEntry routingEntry : _routingEntryMap.values()) {
+        String tableNameWithType = routingEntry.getTableNameWithType();
+        try {
+          Object tableLock = getRoutingTableBuildLock(tableNameWithType);
+          synchronized (tableLock) {
+            updateRoutingEntryOnInstancesChange(routingEntry, _routableServerInstanceMap.keySet(), changedServers);
+          }
+        } catch (Exception e) {
+          LOGGER.error("Caught unexpected exception while updating routing entry on instances change for table: {}",
+              tableNameWithType, e);
         }
-      } catch (Exception e) {
-        LOGGER.error("Caught unexpected exception while updating routing entry on instances change for table: {}",
-            tableNameWithType, e);
+      }
+      long updateRoutingEntriesEndTimeMs = System.currentTimeMillis();
+
+      LOGGER.info("Processed instance config change in {}ms "
+              + "(fetch {} instance configs: {}ms, calculate changed servers: {}ms, update {} routing entries: {}ms), "
+              + "new enabled servers: {}, new disabled servers: {}, excluded servers: {}",
+          updateRoutingEntriesEndTimeMs - startTimeMs, instanceConfigZNRecords.size(),
+          fetchInstanceConfigsEndTimeMs - startTimeMs, calculateChangedServersEndTimeMs - fetchInstanceConfigsEndTimeMs,
+          _routingEntryMap.size(), updateRoutingEntriesEndTimeMs - calculateChangedServersEndTimeMs, newEnabledServers,
+          newDisabledServers, _excludedServers);
+    } finally {
+      // Remove new disabled servers from _enabledServerInstanceMap after updating all routing entries to ensure it
+      // always contains the selected servers. Placing this in a finally block guarantees cleanup even on early return
+      // or exceptions (Issue #19081).
+      for (String newDisabledInstance : newDisabledServers) {
+        _enabledServerInstanceMap.remove(newDisabledInstance);
       }
     }
-    long updateRoutingEntriesEndTimeMs = System.currentTimeMillis();
-
-    // Remove new disabled servers from _enabledServerInstanceMap after updating all routing entries to ensure it
-    // always contains the selected servers
-    for (String newDisabledInstance : newDisabledServers) {
-      _enabledServerInstanceMap.remove(newDisabledInstance);
-    }
-
-    LOGGER.info("Processed instance config change in {}ms "
-            + "(fetch {} instance configs: {}ms, calculate changed servers: {}ms, update {} routing entries: {}ms), "
-            + "new enabled servers: {}, new disabled servers: {}, excluded servers: {}",
-        updateRoutingEntriesEndTimeMs - startTimeMs, instanceConfigZNRecords.size(),
-        fetchInstanceConfigsEndTimeMs - startTimeMs, calculateChangedServersEndTimeMs - fetchInstanceConfigsEndTimeMs,
-        _routingEntryMap.size(), updateRoutingEntriesEndTimeMs - calculateChangedServersEndTimeMs, newEnabledServers,
-        newDisabledServers, _excludedServers);
   }
 
   private static boolean isEnabledServer(ZNRecord instanceConfigZNRecord) {
