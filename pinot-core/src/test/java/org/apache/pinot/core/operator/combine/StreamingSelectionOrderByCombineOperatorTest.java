@@ -78,6 +78,7 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.intellij.lang.annotations.Language;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -944,18 +945,34 @@ public class StreamingSelectionOrderByCombineOperatorTest {
     assertEveryAcquireReleased(children);
   }
 
-  @Test
-  public void testLimitReachedReleasesSegmentsStillHeld() {
-    // 60 rows end around sortedCol 55, where segments 0 and 1 are both active and neither is drained, so finish()
-    // is the only thing that can release them. Segment 2 starts at 100 and must never be acquired.
-    QueryContext queryContext =
-        hintedContext("SELECT sortedCol, valCol FROM testTable ORDER BY sortedCol, valCol LIMIT 60");
-    queryContext.setSortedSelectionMergeBlockSize(1000);
+  @DataProvider
+  public Object[][] globalLimitOutputBlockSizes() {
+    return new Object[][]{{60}, {64}};
+  }
+
+  @Test(dataProvider = "globalLimitOutputBlockSizes")
+  public void testLimitReachedReleasesSegmentsStillHeld(int blockSize) {
+    // The server keeps LIMIT + OFFSET = 60 rows. The final row is child 1's fifth run; its sixth run is irrelevant.
+    String query = String.format(ONE_ROW_PER_BLOCK_QUERY, 55) + " OFFSET 5";
+    QueryContext queryContext = hintedContext(query);
+    queryContext.setSortedSelectionMergeBlockSize(blockSize);
     List<InstrumentedSegmentOperator> children = instrument(_sortedSegments, queryContext);
+    children.get(1)._interceptor = (blockNumber, block) -> {
+      if (blockNumber == 6) {
+        throw new IllegalStateException("Read after the global LIMIT + OFFSET budget");
+      }
+      return block;
+    };
     List<BaseResultsBlock> blocks = drain(combineOver(children, queryContext));
-    assertEquals(rowsOf(blocks).size(), 60);
     assertEquals(numAcquired(children), 2, "Only the two segments overlapping the first 60 rows may be acquired");
     assertEveryAcquireReleased(children);
+    assertEquals(children.get(1)._numBlocks, 5, "The final needed run must not fetch its successor");
+    assertTrue(blocks.getLast() instanceof MetadataResultsBlock, "Expected terminal metadata after the full budget");
+    List<Object[]> rows = rowsOf(blocks);
+    assertEquals(rows.size(), 60);
+    assertEquals(rows.getLast(), new Object[]{54, 96, 1_000_004});
+    assertSorted(rows, orderByComparator(query, false));
+    assertMultisetEquals(rows, run(_sortedSegments, query, false, false, false, 0)._rows);
   }
 
   @Test

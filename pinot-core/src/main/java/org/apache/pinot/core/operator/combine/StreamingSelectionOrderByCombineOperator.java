@@ -322,6 +322,9 @@ public class StreamingSelectionOrderByCombineOperator extends BaseStreamingCombi
         }
         _outputRows.add(leader.currentHead());
         _numRowsEmitted++;
+        if (_numRowsEmitted >= _numRowsToKeep) {
+          break;
+        }
         leader.advance();
         if (leader.currentHead() == null) {
           leader = null;
