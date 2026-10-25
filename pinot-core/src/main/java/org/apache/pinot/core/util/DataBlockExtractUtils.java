@@ -42,6 +42,12 @@ public final class DataBlockExtractUtils {
   }
 
   public static List<Object[]> extractRows(DataBlock dataBlock) {
+    return extractRows(dataBlock, dataBlock.getNumberOfRows());
+  }
+
+  /// Extracts at most the first {@code maxRows} rows without decoding the rest of the block.
+  public static List<Object[]> extractRows(DataBlock dataBlock, int maxRows) {
+    Preconditions.checkArgument(maxRows >= 0, "maxRows must be non-negative");
     DataSchema dataSchema = dataBlock.getDataSchema();
     ColumnDataType[] storedTypes = dataSchema.getStoredColumnDataTypes();
     int numColumns = storedTypes.length;
@@ -49,7 +55,7 @@ public final class DataBlockExtractUtils {
     for (int colId = 0; colId < numColumns; colId++) {
       nullBitmaps[colId] = dataBlock.getNullRowIds(colId);
     }
-    int numRows = dataBlock.getNumberOfRows();
+    int numRows = Math.min(dataBlock.getNumberOfRows(), maxRows);
     List<Object[]> rows = new ArrayList<>(numRows);
     for (int rowId = 0; rowId < numRows; rowId++) {
       Object[] row = new Object[numColumns];

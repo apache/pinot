@@ -31,16 +31,26 @@ public class MailboxReceiveNode extends BaseMailboxReceiveNode {
   private final List<RelFieldCollation> _collations;
   private final boolean _sort;
   private final boolean _sortedOnSender;
+  private final boolean _autoProfile;
 
   // NOTE: null List is converted to empty List because there is no way to differentiate them in proto during ser/de.
   public MailboxReceiveNode(int stageId, DataSchema dataSchema, int senderStageId,
       PinotRelExchangeType exchangeType, RelDistribution.Type distributionType, @Nullable List<Integer> keys,
       @Nullable List<RelFieldCollation> collations, boolean sort, boolean sortedOnSender,
       @Nullable MailboxSendNode sender) {
+    this(stageId, dataSchema, senderStageId, exchangeType, distributionType, keys, collations, sort,
+        sortedOnSender, false, sender);
+  }
+
+  public MailboxReceiveNode(int stageId, DataSchema dataSchema, int senderStageId,
+      PinotRelExchangeType exchangeType, RelDistribution.Type distributionType, @Nullable List<Integer> keys,
+      @Nullable List<RelFieldCollation> collations, boolean sort, boolean sortedOnSender, boolean autoProfile,
+      @Nullable MailboxSendNode sender) {
     super(stageId, dataSchema, senderStageId, exchangeType, distributionType, keys, sender);
     _collations = collations != null ? collations : List.of();
     _sort = sort;
     _sortedOnSender = sortedOnSender;
+    _autoProfile = autoProfile;
   }
 
   public List<RelFieldCollation> getCollations() {
@@ -59,9 +69,14 @@ public class MailboxReceiveNode extends BaseMailboxReceiveNode {
     return _sortedOnSender;
   }
 
+  /// Whether this receiver gathers bounded order samples for AUTO strategy selection.
+  public boolean isAutoProfile() {
+    return _autoProfile;
+  }
+
   @Override
   public String explain() {
-    return "MAIL_RECEIVE(" + getDistributionType() + ")";
+    return "MAIL_RECEIVE(" + getDistributionType() + ")" + (_autoProfile ? "[WINDOW_SORT_AUTO_PROFILE]" : "");
   }
 
   @Override
@@ -72,7 +87,7 @@ public class MailboxReceiveNode extends BaseMailboxReceiveNode {
   @Override
   public MailboxReceiveNode withSender(MailboxSendNode sender) {
     return new MailboxReceiveNode(_stageId, _dataSchema, sender.getStageId(), getExchangeType(), getDistributionType(),
-        getKeys(), _collations, _sort, _sortedOnSender, sender);
+        getKeys(), _collations, _sort, _sortedOnSender, _autoProfile, sender);
   }
 
   @Override
@@ -87,12 +102,12 @@ public class MailboxReceiveNode extends BaseMailboxReceiveNode {
       return false;
     }
     MailboxReceiveNode that = (MailboxReceiveNode) o;
-    return _sort == that._sort && _sortedOnSender == that._sortedOnSender
+    return _sort == that._sort && _sortedOnSender == that._sortedOnSender && _autoProfile == that._autoProfile
         && Objects.equals(_collations, that._collations);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(super.hashCode(), _collations, _sort, _sortedOnSender);
+    return Objects.hash(super.hashCode(), _collations, _sort, _sortedOnSender, _autoProfile);
   }
 }

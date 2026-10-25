@@ -113,6 +113,16 @@ public class QueryOptionsUtilsTest {
   }
 
   @Test
+  public void shouldResolveWindowKWayMergeModeOverDefault() {
+    assertEquals(QueryOptionsUtils.getWindowKWayMergeMode(Map.of(), "false"), "false");
+    assertEquals(QueryOptionsUtils.getWindowKWayMergeMode(Map.of(), "auto"), "auto");
+    assertEquals(QueryOptionsUtils.getWindowKWayMergeMode(Map.of(WINDOW_K_WAY_MERGE, " AUTO "), "false"), "auto");
+    assertEquals(QueryOptionsUtils.getWindowKWayMergeMode(Map.of(WINDOW_K_WAY_MERGE, "false"), "auto"), "false");
+    expectThrows(IllegalArgumentException.class,
+        () -> QueryOptionsUtils.getWindowKWayMergeMode(Map.of(WINDOW_K_WAY_MERGE, "invalid"), "false"));
+  }
+
+  @Test
   public void shouldResolveWindowKWayMergeOptionOverDefault() {
     assertFalse(QueryOptionsUtils.isWindowKWayMerge(Map.of(), false));
     assertTrue(QueryOptionsUtils.isWindowKWayMerge(Map.of(), true));
