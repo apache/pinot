@@ -249,7 +249,7 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
   }
 
   /// Build a mapping from final Lucene ids to Pinot ids, applying mutable-to-immutable remapping during conversion.
-  /// New immutable indexes persist either the mapping or a verified Skip setting for older readers.
+  /// New immutable indexes persist either the mapping or a verified Skip setting for Pinot 1.4.0 and later readers.
   /// @param segmentIndexDir segment index directory
   /// @param column column name
   /// @param directory directory of the index
