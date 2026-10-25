@@ -24,9 +24,11 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.segment.creator.impl.bloom.OnHeapGuavaBloomFilterCreator;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
+import org.apache.pinot.segment.local.segment.index.readers.bloom.GuavaBloomFilterReaderUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
@@ -54,6 +56,8 @@ import org.slf4j.LoggerFactory;
 public class BloomFilterHandler extends BaseIndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BloomFilterHandler.class);
 
+  private static final int VERSION_OFFSET = 4;
+
   private final Map<String, BloomFilterConfig> _bloomFilterConfigs;
 
   public BloomFilterHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> fieldIndexConfigs,
@@ -72,6 +76,11 @@ public class BloomFilterHandler extends BaseIndexHandler {
       if (!columnsToAddBF.remove(column)) {
         LOGGER.info("Need to remove existing bloom filter from segment: {}, column: {}", segmentName, column);
         return true;
+      } else {
+        // Bloom filter exists for this column; check if fpp config changed by comparing numHashFunctions
+        if (isFppChanged(segmentReader, segmentName, column)) {
+          return true;
+        }
       }
     }
     // Check if any new bloomfilter need to be added.
@@ -83,6 +92,77 @@ public class BloomFilterHandler extends BaseIndexHandler {
       }
     }
     return false;
+  }
+
+  /**
+   * Checks whether the effective fpp config has changed for an existing bloom filter index.
+   *
+   * <p>V2 segments (VERSION_V2 = 2, current write format) store the effective fpp explicitly in the header;
+   * the comparison is exact.
+   *
+   * <p>V1 segments (VERSION = 1, legacy) do not store fpp in the header. Fpp change detection is skipped for
+   * these segments — they will be upgraded to V2 the next time they are rebuilt for any other reason.
+   *
+   * <p>Accepts both Reader and Writer since Writer extends Reader, allowing this method to be called from
+   * both needUpdateIndices and updateIndices.
+   */
+  private boolean isFppChanged(SegmentDirectory.Reader segmentReader, String segmentName, String column) {
+    try {
+      PinotDataBuffer dataBuffer = segmentReader.getIndexFor(column, StandardIndexes.bloomFilter());
+      int version = dataBuffer.getInt(VERSION_OFFSET);
+
+      if (version == OnHeapGuavaBloomFilterCreator.VERSION_V2) {
+        // V2 header stores the effective fpp explicitly — compare directly.
+        double storedFpp = dataBuffer.getDouble(OnHeapGuavaBloomFilterCreator.FPP_OFFSET);
+        double expectedFpp = computeEffectiveFpp(_segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column),
+            _bloomFilterConfigs.get(column));
+        if (Double.compare(storedFpp, expectedFpp) != 0) {
+          LOGGER.info("Bloom filter fpp config changed for segment: {}, column: {}, stored fpp: {}, "
+                  + "expected fpp: {}. Index needs to be rebuilt.",
+              segmentName, column, storedFpp, expectedFpp);
+          return true;
+        }
+        return false;
+      }
+
+      if (version == OnHeapGuavaBloomFilterCreator.VERSION) {
+        // V1 legacy segments do not embed fpp in the header; fpp change detection is not possible.
+        // The segment will be upgraded to V2 (which embeds the fpp) on the next rebuild triggered by
+        // other criteria. Log at WARN so operators are aware that an fpp config change is deferred.
+        LOGGER.warn("Cannot detect fpp change for legacy v1 bloom filter in segment: {}, column: {}. "
+                + "The segment will be upgraded to v2 format on the next rebuild.",
+            segmentName, column);
+        return false;
+      }
+
+      // Unrecognized version — force rebuild rather than silently reading bytes at wrong offsets.
+      LOGGER.warn("Unrecognized bloom filter version {} for segment: {}, column: {}; forcing rebuild.",
+          version, segmentName, column);
+      return true;
+    } catch (Exception e) {
+      LOGGER.warn("Failed to read existing bloom filter for segment: {}, column: {}", segmentName, column, e);
+      return false;
+    }
+  }
+
+  /**
+   * Computes the effective fpp for a new bloom filter: applies the {@code maxSizeInBytes} cap if set.
+   * This matches the fpp computation in {@link OnHeapGuavaBloomFilterCreator}.
+   */
+  private double computeEffectiveFpp(ColumnMetadata columnMetadata, BloomFilterConfig bloomFilterConfig) {
+    double fpp = bloomFilterConfig.getFpp();
+    int maxSizeInBytes = bloomFilterConfig.getMaxSizeInBytes();
+    if (maxSizeInBytes > 0 && columnMetadata != null) {
+      int cardinality = columnMetadata.getCardinality();
+      if (cardinality <= 0) {
+        cardinality = columnMetadata.getTotalNumberOfEntries();
+      }
+      if (cardinality > 0) {
+        double minFpp = GuavaBloomFilterReaderUtils.computeFPP(maxSizeInBytes, cardinality);
+        fpp = Math.max(fpp, minFpp);
+      }
+    }
+    return fpp;
   }
 
   @Override
@@ -97,6 +177,15 @@ public class BloomFilterHandler extends BaseIndexHandler {
         LOGGER.info("Removing existing bloom filter from segment: {}, column: {}", segmentName, column);
         segmentWriter.removeIndex(column, StandardIndexes.bloomFilter());
         LOGGER.info("Removed existing bloom filter from segment: {}, column: {}", segmentName, column);
+      } else {
+        // Bloom filter exists for this column; check if fpp config changed
+        if (isFppChanged(segmentWriter, segmentName, column)) {
+          LOGGER.info("Deleting existing bloom filter for segment: {}, column: {} before rebuilding.", segmentName,
+              column);
+          segmentWriter.removeIndex(column, StandardIndexes.bloomFilter());
+          LOGGER.info("Removed existing bloom filter from segment: {}, column: {}", segmentName, column);
+          columnsToAddBF.add(column);
+        }
       }
     }
     for (String column : columnsToAddBF) {
