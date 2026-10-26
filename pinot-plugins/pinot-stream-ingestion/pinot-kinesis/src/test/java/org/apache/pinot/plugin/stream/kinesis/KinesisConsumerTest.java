@@ -23,10 +23,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorReporter;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+import software.amazon.awssdk.awscore.exception.AwsErrorDetails;
 import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.services.kinesis.KinesisClient;
 import software.amazon.awssdk.services.kinesis.model.GetRecordsRequest;
@@ -37,6 +39,7 @@ import software.amazon.awssdk.services.kinesis.model.ProvisionedThroughputExceed
 import software.amazon.awssdk.services.kinesis.model.Record;
 import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
 
+import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorAssertions.assertSourceRead;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -44,6 +47,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
 
@@ -275,6 +279,73 @@ public class KinesisConsumerTest {
     assertEquals(requestRateLimiter.getTimeoutMsList(), List.of(5000L, 1000L));
     verify(kinesisClient, times(1)).getShardIterator(any(GetShardIteratorRequest.class));
     verify(kinesisClient, times(0)).getRecords(any(GetRecordsRequest.class));
+  }
+
+  @Test
+  public void testReportsThrottlingThatExhaustsMoreThanFiveFetchesInARow() {
+    // As the SDK raises it, with Kinesis's error code
+    ProvisionedThroughputExceededException throttled = (ProvisionedThroughputExceededException)
+        ProvisionedThroughputExceededException.builder().awsErrorDetails(
+                AwsErrorDetails.builder().errorCode("ProvisionedThroughputExceededException").build())
+            .statusCode(400).message("Rate exceeded for shard shardId-000000000000").build();
+    boolean[] throttling = {true};
+    KinesisClient kinesisClient = mock(KinesisClient.class);
+    when(kinesisClient.getShardIterator(any(GetShardIteratorRequest.class))).thenReturn(
+        GetShardIteratorResponse.builder().shardIterator(PLACEHOLDER).build());
+    when(kinesisClient.getRecords(any(GetRecordsRequest.class))).thenAnswer(invocation -> {
+      if (throttling[0]) {
+        throw throttled;
+      }
+      return GetRecordsResponse.builder().nextShardIterator(PLACEHOLDER).records(List.of()).build();
+    });
+    TestKinesisConsumer kinesisConsumer =
+        new TestKinesisConsumer(_kinesisConfig, kinesisClient, NO_OP_REQUEST_RATE_LIMITER);
+    KinesisPartitionGroupOffset startOffset = new KinesisPartitionGroupOffset("0", "1");
+
+    List<Throwable> reported = new ArrayList<>();
+    try (IngestionSourceErrorReporter.Scope ignored = IngestionSourceErrorReporter.listen(reported::add)) {
+      // Five exhausted fetches and then one that isn't: the consume loop rides that out, so nothing is reported
+      for (int i = 0; i < 5; i++) {
+        assertEquals(kinesisConsumer.fetchMessages(startOffset, 2500).getMessageCount(), 0);
+      }
+      throttling[0] = false;
+      kinesisConsumer.fetchMessages(startOffset, 2500);
+      throttling[0] = true;
+      for (int i = 0; i < 5; i++) {
+        kinesisConsumer.fetchMessages(startOffset, 2500);
+      }
+      assertTrue(reported.isEmpty(), reported.toString());
+
+      // The sixth in a row is reported, and so is every further one
+      assertEquals(kinesisConsumer.fetchMessages(startOffset, 2500).getMessageCount(), 0);
+      assertEquals(reported.size(), 1);
+      assertSame(reported.get(0), throttled);
+      assertSourceRead(reported.get(0), null);
+      kinesisConsumer.fetchMessages(startOffset, 2500);
+      assertEquals(reported.size(), 2);
+
+      // Our own request limiter timing out is not the source's failure
+      TestKinesisConsumer limitedConsumer = new TestKinesisConsumer(_kinesisConfig, kinesisClient,
+          (streamName, shardId, requestType, rpsLimit, timeoutMs) -> false);
+      for (int i = 0; i < 7; i++) {
+        assertEquals(limitedConsumer.fetchMessages(startOffset, 2500).getMessageCount(), 0);
+      }
+      assertEquals(reported.size(), 2);
+
+      // ...nor a sign the source recovered: between throttled fetches it neither reports nor starts the count over
+      boolean[] limited = {false};
+      TestKinesisConsumer sometimesLimited = new TestKinesisConsumer(_kinesisConfig, kinesisClient,
+          (streamName, shardId, requestType, rpsLimit, timeoutMs) -> !limited[0]);
+      for (int i = 0; i < 5; i++) {
+        sometimesLimited.fetchMessages(startOffset, 2500);
+      }
+      limited[0] = true;
+      sometimesLimited.fetchMessages(startOffset, 2500);
+      limited[0] = false;
+      assertEquals(reported.size(), 2);
+      sometimesLimited.fetchMessages(startOffset, 2500);
+      assertEquals(reported.size(), 3);
+    }
   }
 
   @Test

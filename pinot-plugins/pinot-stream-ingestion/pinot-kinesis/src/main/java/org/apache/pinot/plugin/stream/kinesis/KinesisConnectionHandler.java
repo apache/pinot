@@ -24,11 +24,15 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Supplier;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.spi.ingestion.error.IngestionSourceCredentialMode;
+import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorEvidence;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.http.apache.ApacheSdkHttpService;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.kinesis.KinesisClient;
@@ -47,16 +51,44 @@ import software.amazon.awssdk.services.sts.model.AssumeRoleRequest;
 public class KinesisConnectionHandler implements Closeable {
   protected final KinesisConfig _config;
   protected final KinesisClient _kinesisClient;
+  // Whose credential the client signs with: the same AWS credential code is the table's bad key under STATIC and
+  // Pinot's own identity under AMBIENT. It records the mode and whether a role is assumed, never a key or the ARN.
+  private final IngestionSourceErrorEvidence _credentialEvidence;
 
   public KinesisConnectionHandler(KinesisConfig config) {
     _config = config;
+    _credentialEvidence = credentialEvidence(config);
     _kinesisClient = createClient();
   }
 
   @VisibleForTesting
   public KinesisConnectionHandler(KinesisConfig config, KinesisClient kinesisClient) {
     _config = config;
+    _credentialEvidence = credentialEvidence(config);
     _kinesisClient = kinesisClient;
+  }
+
+  private static boolean hasStaticKeys(KinesisConfig config) {
+    return StringUtils.isNotBlank(config.getAccessKey()) && StringUtils.isNotBlank(config.getSecretKey());
+  }
+
+  private static IngestionSourceErrorEvidence credentialEvidence(KinesisConfig config) {
+    return new IngestionSourceErrorEvidence().setCredentialMode(
+            hasStaticKeys(config) ? IngestionSourceCredentialMode.STATIC : IngestionSourceCredentialMode.AMBIENT)
+        .setRoleArnConfigured(config.isIamRoleBasedAccess());
+  }
+
+  /// Makes a call on the Kinesis client. An SDK failure leaves with the credential evidence attached, including the
+  /// raw `StsException` the assume-role provider raises from inside the call.
+  protected <T> T callKinesis(Supplier<T> call) {
+    try {
+      return call.get();
+    } catch (SdkException e) {
+      // The SDK builds a new exception for every failed call (checked against SDK 2.57): services unmarshal one per
+      // response, the credential cache rethrows each refresh's own failure, and the default chain summarizes its
+      // providers' failures in a new exception. So the evidence goes on the SDK's exception and its type is kept.
+      throw IngestionSourceErrorEvidence.attach(e, _credentialEvidence);
+    }
   }
 
   private KinesisClient createClient() {
@@ -65,7 +97,7 @@ public class KinesisConnectionHandler implements Closeable {
     AwsCredentialsProvider awsCredentialsProvider;
     String accessKey = _config.getAccessKey();
     String secretKey = _config.getSecretKey();
-    if (StringUtils.isNotBlank(accessKey) && StringUtils.isNotBlank(secretKey)) {
+    if (hasStaticKeys(_config)) {
       AwsBasicCredentials awsBasicCredentials = AwsBasicCredentials.create(accessKey, secretKey);
       awsCredentialsProvider = StaticCredentialsProvider.create(awsBasicCredentials);
     } else {
@@ -109,8 +141,8 @@ public class KinesisConnectionHandler implements Closeable {
 
   /// Lists all shards of the stream
   public List<Shard> getShards() {
-    ListShardsResponse listShardsResponse =
-        _kinesisClient.listShards(ListShardsRequest.builder().streamName(_config.getStreamTopicName()).build());
+    ListShardsResponse listShardsResponse = callKinesis(
+        () -> _kinesisClient.listShards(ListShardsRequest.builder().streamName(_config.getStreamTopicName()).build()));
     return listShardsResponse.shards();
   }
 
@@ -118,7 +150,8 @@ public class KinesisConnectionHandler implements Closeable {
     final int limit = 1000; // default value for the API is 100
     try {
       List<String> allStreamNames = new ArrayList<>();
-      ListStreamsResponse response = _kinesisClient.listStreams(ListStreamsRequest.builder().limit(limit).build());
+      ListStreamsResponse response =
+          callKinesis(() -> _kinesisClient.listStreams(ListStreamsRequest.builder().limit(limit).build()));
 
       while (response != null && response.streamNames() != null) {
         allStreamNames.addAll(response.streamNames());
@@ -128,10 +161,11 @@ public class KinesisConnectionHandler implements Closeable {
         }
 
         // Fetch the next page
-        response = _kinesisClient.listStreams(ListStreamsRequest.builder()
+        ListStreamsRequest nextPageRequest = ListStreamsRequest.builder()
             .exclusiveStartStreamName(allStreamNames.get(allStreamNames.size() - 1))
             .limit(limit)
-            .build());
+            .build();
+        response = callKinesis(() -> _kinesisClient.listStreams(nextPageRequest));
       }
 
       return allStreamNames;

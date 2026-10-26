@@ -27,6 +27,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorReporter;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
@@ -157,11 +158,17 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
           } catch (PulsarClientException pce) {
             LOGGER.warn("Error encountered while calculating partition group metadata for topic {} partition {}",
                 _config.getPulsarTopicName(), partitionedTopicNameList.get(p), pce);
+            // Swallowed so the other partitions proceed; reported, or a new partition the source refuses silently
+            // never gets a segment
+            IngestionSourceErrorReporter.report(pce);
           }
         }
       }
     } catch (Exception e) {
       LOGGER.warn("Error encountered when trying to fetch partition list for pulsar topic {}", _topic, e);
+      // Swallowed so the existing partitions keep consuming; reported, or a new table the source refuses silently
+      // never gets a segment
+      IngestionSourceErrorReporter.report(e);
     }
     return newPartitionGroupMetadataList;
   }
