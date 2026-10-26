@@ -28,7 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nullable;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
@@ -117,28 +116,6 @@ public abstract class CustomDataQueryClusterIntegrationTest extends BaseClusterI
 
     waitForAllDocsLoaded(60_000);
     LOGGER.warn("Finished setting up integration test class: {}", getClass().getSimpleName());
-  }
-
-  /// Requires one consecutive successful document count check per server, since some servers can finish loading
-  /// their segments before others.
-  @Override
-  protected void waitForAllDocsLoaded(String tableName, long timeoutMs) {
-    long countStarResult = getCountStarResult();
-    int numServers = getSharedServerStarters().size();
-    AtomicInteger consecutiveSuccesses = new AtomicInteger();
-    TestUtils.waitForCondition(() -> {
-      try {
-        if (getCurrentCountStarResult(tableName) != countStarResult) {
-          consecutiveSuccesses.set(0);
-          return false;
-        }
-        return consecutiveSuccesses.incrementAndGet() >= numServers;
-      } catch (Exception e) {
-        consecutiveSuccesses.set(0);
-        throw e;
-      }
-    }, 100L, timeoutMs, "Failed to load " + countStarResult + " documents on all servers",
-        Duration.ofMillis(timeoutMs / 10));
   }
 
   /// Initializes the controller request URL builder for the shared suite.
