@@ -992,7 +992,8 @@ public class CommonConstants {
 
         /// Selects the streaming k-way-merge selection ORDER BY combine over sorted segments. One of
         /// [Server.SortedSelectionMergeMode] (case-insensitive); defaults to
-        /// [Server#DEFAULT_SORTED_SELECTION_MERGE_MODE].
+        /// [Server#DEFAULT_SORTED_SELECTION_MERGE_MODE]. [Server.SortedSelectionMergeMode#ON] and
+        /// [Server.SortedSelectionMergeMode#AUTO] are experimental.
         public static final String SORTED_SELECTION_MERGE_MODE = "sortedSelectionMergeMode";
         /// Minimum fraction of segments that must be physically sorted on the leading ORDER BY column for
         /// [Server.SortedSelectionMergeMode#AUTO] to select the streaming merge. Overrides
@@ -1741,6 +1742,9 @@ public class CommonConstants {
       /// [Broker.Request.QueryOptionKey#SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO] of the queried segments are
       /// physically sorted on the leading ORDER BY column. Decided from segment metadata alone, without acquiring
       /// any segment.
+      ///
+      /// Experimental, like [#ON]: the default ratio is not measured yet, and the check ignores segment size and
+      /// overlap, so it does not predict a speedup (#19924).
       AUTO
     }
 

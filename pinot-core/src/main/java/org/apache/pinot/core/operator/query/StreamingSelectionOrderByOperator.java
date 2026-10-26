@@ -86,7 +86,8 @@ import org.roaringbitmap.RoaringBitmap;
 /// Like [SelectionOrderByOperator] it preserves the two-phase projection optimization: when there are output
 /// expressions that are not order-by expressions, the forward scan only fetches the order-by expressions plus the
 /// document id, and the non-order-by expressions are fetched in a second pass over the retained document ids of each
-/// emitted block.
+/// emitted block. This fetch is the operator's own and needs no query option. The materialized sorted-prefix
+/// operators late-materialize the same way since #20003; a shared helper is tracked in #19923 (item A2).
 ///
 /// This operator is stateful across [#getNextBlock()] calls and is **not** thread-safe; a single consumer
 /// must drive it.
