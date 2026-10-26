@@ -151,12 +151,9 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
       StreamPartitionMsgOffset newStartOffset;
       StreamPartitionMsgOffset currentEndOffset = currentPartitionGroupConsumptionStatus.getEndOffset();
       if (currentEndOffset != null) { // Segment DONE (committing/committed)
-        String endingSequenceNumber = shard.sequenceNumberRange().endingSequenceNumber();
-        if (endingSequenceNumber != null) { // Shard has ended, check if we're also done consuming it
-          if (consumedEndOfShard(currentEndOffset, currentPartitionGroupConsumptionStatus)) {
-            shardsEnded.add(shardId);
-            continue; // Shard ended and we're done consuming it. Skip
-          }
+        if (isEndOfShardConsumed(shard, currentEndOffset, currentPartitionGroupConsumptionStatus)) {
+          shardsEnded.add(shardId);
+          continue; // Shard ended and we're done consuming it. Skip
         }
         newStartOffset = currentEndOffset;
       } else { // Segment IN_PROGRESS
@@ -206,6 +203,37 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
       boolean forceGetOffsetFromStream)
       throws IOException, TimeoutException {
     return computePartitionGroupMetadata(clientId, streamConfig, partitionGroupConsumptionStatuses, timeoutMillis);
+  }
+
+  /// A shard reached end of life when it is closed (e.g. after a split or merge) and was consumed up to its end. An
+  /// expired shard is not reported, because it was not fully consumed and its data loss should stay visible.
+  @Override
+  public Set<Integer> fetchEndOfLifePartitionGroupIds(StreamConfig streamConfig,
+      List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatuses, int timeoutMillis)
+      throws IOException, TimeoutException {
+    Map<String, Shard> shardIdToShardMap = _kinesisConnectionHandler.getShards().stream()
+        .collect(Collectors.toMap(Shard::shardId, s -> s, (s1, s2) -> s1));
+    Set<Integer> endOfLifePartitionGroupIds = new HashSet<>();
+    for (PartitionGroupConsumptionStatus partitionGroupConsumptionStatus : partitionGroupConsumptionStatuses) {
+      StreamPartitionMsgOffset endOffset = partitionGroupConsumptionStatus.getEndOffset();
+      if (endOffset == null) {
+        continue;
+      }
+      String shardId = ((KinesisPartitionGroupOffset) partitionGroupConsumptionStatus.getStartOffset()).getShardId();
+      Shard shard = shardIdToShardMap.get(shardId);
+      if (shard != null && isEndOfShardConsumed(shard, endOffset, partitionGroupConsumptionStatus)) {
+        endOfLifePartitionGroupIds.add(partitionGroupConsumptionStatus.getPartitionGroupId());
+      }
+    }
+    return endOfLifePartitionGroupIds;
+  }
+
+  private boolean isEndOfShardConsumed(Shard shard, StreamPartitionMsgOffset endOffset,
+      PartitionGroupConsumptionStatus partitionGroupConsumptionStatus)
+      throws IOException, TimeoutException {
+    // The ending sequence number is only set once the shard is closed
+    return shard.sequenceNumberRange().endingSequenceNumber() != null
+        && consumedEndOfShard(endOffset, partitionGroupConsumptionStatus);
   }
 
   /// Converts a shardId string to a partitionGroupId integer by parsing the digits of the shardId

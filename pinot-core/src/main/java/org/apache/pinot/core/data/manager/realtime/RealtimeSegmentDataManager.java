@@ -1641,6 +1641,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   public void goOnlineFromConsuming(SegmentZKMetadata segmentZKMetadata)
       throws InterruptedException {
     _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING, 0);
+    boolean replaced = false;
     try {
       // Remove the segment file before we do anything else.
       removeSegmentFile();
@@ -1756,10 +1757,17 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           downloadSegmentAndReplace(segmentZKMetadata);
           break;
       }
+      replaced = true;
     } catch (Exception e) {
       Utils.rethrowException(e);
     } finally {
-      _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING, 0);
+      // The partition will never consume again once the stream reported its end, so stop reporting it as consuming
+      if (replaced && segmentZKMetadata.isEndOfPartitionGroup()) {
+        _segmentLogger.info("Partition group reached end of life, removing its consuming gauge");
+        _serverMetrics.removeTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING);
+      } else {
+        _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING, 0);
+      }
     }
   }
 

@@ -22,6 +22,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import org.apache.pinot.spi.stream.BytesStreamMessage;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
@@ -44,6 +46,9 @@ import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
 import static org.apache.pinot.plugin.stream.kinesis.KinesisStreamMetadataProvider.SHARD_ID_PREFIX;
 import static org.apache.pinot.spi.stream.OffsetCriteria.LARGEST_OFFSET_CRITERIA;
 import static org.apache.pinot.spi.stream.OffsetCriteria.SMALLEST_OFFSET_CRITERIA;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -214,6 +219,46 @@ public class KinesisStreamMetadataProviderTest {
     Assert.assertEquals(partitionGroupMetadataCapture.getValue().getSequenceNumber(), 1);
     Assert.assertEquals(result.get(1).getPartitionGroupId(), 1);
     Assert.assertEquals(partitionGroupMetadataCapture.getValue().getSequenceNumber(), 1);
+  }
+
+  @Test
+  public void testFetchEndOfLifePartitionGroupIds()
+      throws Exception {
+    // Shard 0 is closed and was consumed to its end, shard 1 is closed but has messages left, shard 2 is open, and
+    // shard 3 has expired
+    Shard shard0 = Shard.builder().shardId("0").sequenceNumberRange(
+        SequenceNumberRange.builder().startingSequenceNumber("1").endingSequenceNumber("5").build()).build();
+    Shard shard1 = Shard.builder().shardId("1").sequenceNumberRange(
+        SequenceNumberRange.builder().startingSequenceNumber("1").endingSequenceNumber("5").build()).build();
+    Shard shard2 = Shard.builder().shardId("2")
+        .sequenceNumberRange(SequenceNumberRange.builder().startingSequenceNumber("1").build()).build();
+    when(_kinesisConnectionHandler.getShards()).thenReturn(List.of(shard0, shard1, shard2));
+    PartitionGroupConsumer consumerAtEnd = mock(PartitionGroupConsumer.class);
+    when(consumerAtEnd.fetchMessages(any(), anyInt())).thenReturn(
+        new KinesisMessageBatch(new ArrayList<>(), new KinesisPartitionGroupOffset("0", "5"), true, 0));
+    PartitionGroupConsumer consumerWithMessages = mock(PartitionGroupConsumer.class);
+    KinesisPartitionGroupOffset offset1 = new KinesisPartitionGroupOffset("1", "3");
+    BytesStreamMessage message = new BytesStreamMessage(new byte[0], new byte[0], mock(StreamMessageMetadata.class));
+    when(consumerWithMessages.fetchMessages(any(), anyInt())).thenReturn(
+        new KinesisMessageBatch(List.of(message), offset1, false, 0));
+    when(_streamConsumerFactory.createPartitionGroupConsumer(anyString(), any())).thenAnswer(invocation -> {
+      PartitionGroupConsumptionStatus status = invocation.getArgument(1);
+      return status.getPartitionGroupId() == 0 ? consumerAtEnd : consumerWithMessages;
+    });
+
+    List<PartitionGroupConsumptionStatus> statuses = new ArrayList<>();
+    for (String shardId : List.of("0", "1", "2", "3")) {
+      KinesisPartitionGroupOffset startOffset = new KinesisPartitionGroupOffset(shardId, "1");
+      KinesisPartitionGroupOffset endOffset = new KinesisPartitionGroupOffset(shardId, "3");
+      statuses.add(new PartitionGroupConsumptionStatus(Integer.parseInt(shardId), 1, startOffset, endOffset, "DONE"));
+    }
+    // A segment that is still consuming has no end offset
+    statuses.add(new PartitionGroupConsumptionStatus(0, 2, new KinesisPartitionGroupOffset("0", "3"), null,
+        "IN_PROGRESS"));
+
+    Assert.assertEquals(
+        _kinesisStreamMetadataProvider.fetchEndOfLifePartitionGroupIds(getStreamConfig(), statuses, TIMEOUT),
+        Set.of(0));
   }
 
   @Test

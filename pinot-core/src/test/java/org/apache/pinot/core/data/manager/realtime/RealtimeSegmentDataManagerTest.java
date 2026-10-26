@@ -40,6 +40,8 @@ import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.MetricValueUtils;
+import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
@@ -676,6 +678,63 @@ public class RealtimeSegmentDataManagerTest {
   }
 
   // Tests to go online from consuming state
+
+  @Test
+  public void testOnlineTransitionRemovesConsumingGaugeAtEndOfPartitionGroup()
+      throws Exception {
+    // The last segment of a partition group that ended goes ONLINE: the gauge is removed instead of staying at 0
+    for (RealtimeSegmentDataManager.State state : new RealtimeSegmentDataManager.State[]{
+        RealtimeSegmentDataManager.State.COMMITTED, RealtimeSegmentDataManager.State.DISCARDED,
+        RealtimeSegmentDataManager.State.CATCHING_UP
+    }) {
+      ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+      try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(false, new TimeSupplier(),
+          null, null, null, serverMetrics)) {
+        goOnlineFromConsuming(segmentDataManager, state, true);
+        Assert.assertFalse(MetricValueUtils.tableGaugeExists(serverMetrics, segmentDataManager._clientId,
+            ServerGauge.LLC_PARTITION_CONSUMING), "Gauge kept in state: " + state);
+      }
+    }
+
+    // Other segments keep the gauge at 0 until the next consuming segment of the partition sets it
+    ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(false, new TimeSupplier(), null,
+        null, null, serverMetrics)) {
+      goOnlineFromConsuming(segmentDataManager, RealtimeSegmentDataManager.State.DISCARDED, false);
+      assertConsumingGaugeIsZero(serverMetrics, segmentDataManager);
+    }
+
+    // When the replace fails, the gauge stays at 0 to show the partition is stuck
+    serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(false, new TimeSupplier(), null,
+        null, null, serverMetrics)) {
+      segmentDataManager._failDownloadAndReplace = true;
+      Assert.assertThrows(RuntimeException.class,
+          () -> goOnlineFromConsuming(segmentDataManager, RealtimeSegmentDataManager.State.DISCARDED, true));
+      assertConsumingGaugeIsZero(serverMetrics, segmentDataManager);
+    }
+  }
+
+  private static void goOnlineFromConsuming(FakeRealtimeSegmentDataManager segmentDataManager,
+      RealtimeSegmentDataManager.State state, boolean endOfPartitionGroup)
+      throws Exception {
+    SegmentZKMetadata metadata = new SegmentZKMetadata(SEGMENT_NAME_STR);
+    metadata.setEndOffset(new LongMsgOffset(START_OFFSET_VALUE + 600).toString());
+    metadata.setEndOfPartitionGroup(endOfPartitionGroup);
+    segmentDataManager.getConsumerSemaphoreAcquired().set(true);
+    segmentDataManager._stopWaitTimeMs = 0;
+    segmentDataManager._state.set(segmentDataManager, state);
+    segmentDataManager.setCurrentOffset(START_OFFSET_VALUE + 600);
+    segmentDataManager.goOnlineFromConsuming(metadata);
+  }
+
+  private static void assertConsumingGaugeIsZero(ServerMetrics serverMetrics,
+      FakeRealtimeSegmentDataManager segmentDataManager) {
+    Assert.assertTrue(MetricValueUtils.tableGaugeExists(serverMetrics, segmentDataManager._clientId,
+        ServerGauge.LLC_PARTITION_CONSUMING));
+    assertEquals(MetricValueUtils.getTableGaugeValue(serverMetrics, segmentDataManager._clientId,
+        ServerGauge.LLC_PARTITION_CONSUMING), 0L);
+  }
 
   // If the state is COMMITTED or RETAINED, nothing to do
   // If discarded or error state, then downloadAndReplace the segment
@@ -1689,6 +1748,7 @@ public class RealtimeSegmentDataManagerTest {
     public boolean _buildSegmentCalled = false;
     public boolean _failSegmentBuild = false;
     public boolean _buildAndReplaceCalled = false;
+    public boolean _failDownloadAndReplace = false;
     public int _stopWaitTimeMs = 100;
     private boolean _downloadAndReplaceCalled = false;
     private boolean _notifySegmentBuildFailedWithDeterministicErrorCalled = false;
@@ -1946,6 +2006,9 @@ public class RealtimeSegmentDataManagerTest {
       _downloadAndReplaceCalled = true;
       if (_useRealDownloadAndReplace) {
         super.downloadSegmentAndReplace(metadata);
+      }
+      if (_failDownloadAndReplace) {
+        throw new RuntimeException("Failed to download segment");
       }
     }
 

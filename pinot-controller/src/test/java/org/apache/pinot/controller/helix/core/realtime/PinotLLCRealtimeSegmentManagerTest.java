@@ -29,6 +29,7 @@ import java.net.URISyntaxException;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -71,6 +72,7 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.metrics.MetricValueUtils;
 import org.apache.pinot.common.restlet.resources.BatchConfig;
 import org.apache.pinot.common.restlet.resources.PauseStatusDetails;
 import org.apache.pinot.common.restlet.resources.TableLLCSegmentUploadResponse;
@@ -102,6 +104,7 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.LongMsgOffsetFactory;
 import org.apache.pinot.spi.stream.OffsetCriteria;
@@ -322,6 +325,68 @@ public class PinotLLCRealtimeSegmentManagerTest {
     segmentManager.makeConsumingInstancePartitions();
     segmentManager._numPartitions = numPartitions;
     segmentManager.setUpNewTable();
+  }
+
+  @Test
+  public void testEndOfPartitionGroup() {
+    ControllerMetrics controllerMetrics = new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+    FakePinotLLCRealtimeSegmentManager segmentManager =
+        new FakePinotLLCRealtimeSegmentManager(mock(PinotHelixResourceManager.class), controllerMetrics);
+    setUpNewTable(segmentManager, 2, 5, 4);
+    StreamMetadata allPartitions =
+        segmentManager.getNewStreamMetadataList(segmentManager._streamConfigs, List.of(), mock(IdealState.class))
+            .get(0);
+    List<PartitionGroupMetadata> partitionsWithout0And1 =
+        new ArrayList<>(allPartitions.getPartitionGroupMetadataList());
+    partitionsWithout0And1.removeIf(partition -> partition.getPartitionGroupId() < 2);
+    segmentManager._streamMetadataList = List.of(
+        new StreamMetadata(allPartitions.getStreamConfig(), allPartitions.getNumPartitions(), partitionsWithout0And1));
+    String lastSegmentOfPartition0 = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+    String lastSegmentOfPartition1 = new LLCSegmentName(RAW_TABLE_NAME, 1, 0, CURRENT_TIME_MS).getSegmentName();
+
+    // Partitions 0 and 1 are gone from the stream metadata, but the stream only reports partition 1 as ended
+    segmentManager._endOfLifePartitionGroupIds = Set.of(1);
+    segmentManager.commitSegmentMetadata(REALTIME_TABLE_NAME,
+        createCommittingSegmentDescriptor(lastSegmentOfPartition0));
+    segmentManager.commitSegmentMetadata(REALTIME_TABLE_NAME,
+        createCommittingSegmentDescriptor(lastSegmentOfPartition1));
+    assertFalse(segmentManager._segmentZKMetadataMap.get(lastSegmentOfPartition0).isEndOfPartitionGroup());
+    assertNull(getPartitionEndOfLife(controllerMetrics, 0));
+    assertTrue(segmentManager._segmentZKMetadataMap.get(lastSegmentOfPartition1).isEndOfPartitionGroup());
+    assertEquals(getPartitionEndOfLife(controllerMetrics, 1), 1L);
+
+    // Once the stream reports partition 0 as ended too, the validation task marks it, and only asks about partition 0
+    segmentManager._endOfLifePartitionGroupIds = Set.of(0, 1);
+    segmentManager._endOfLifePartitionGroupIdsAsked.clear();
+    segmentManager._exceededMaxSegmentCompletionTime = true;
+    segmentManager.ensureAllPartitionsConsuming();
+    assertEquals(segmentManager._endOfLifePartitionGroupIdsAsked, List.of(0));
+    assertTrue(segmentManager._segmentZKMetadataMap.get(lastSegmentOfPartition0).isEndOfPartitionGroup());
+    assertEquals(getPartitionEndOfLife(controllerMetrics, 0), 1L);
+    for (int partitionId = 2; partitionId < 4; partitionId++) {
+      assertNull(getPartitionEndOfLife(controllerMetrics, partitionId));
+    }
+
+    // A controller that no longer leads the table removes the gauges, and the next leader emits them again from the
+    // segment ZK metadata without asking the stream
+    segmentManager.removePartitionEndOfLifeGauges(REALTIME_TABLE_NAME);
+    assertNull(getPartitionEndOfLife(controllerMetrics, 0));
+    assertNull(getPartitionEndOfLife(controllerMetrics, 1));
+    segmentManager._endOfLifePartitionGroupIdsAsked.clear();
+    segmentManager.ensureAllPartitionsConsuming();
+    assertTrue(segmentManager._endOfLifePartitionGroupIdsAsked.isEmpty());
+    assertEquals(getPartitionEndOfLife(controllerMetrics, 0), 1L);
+    assertEquals(getPartitionEndOfLife(controllerMetrics, 1), 1L);
+
+    // The metrics registry is shared across tests
+    segmentManager.removePartitionEndOfLifeGauges(REALTIME_TABLE_NAME);
+  }
+
+  @Nullable
+  private static Long getPartitionEndOfLife(ControllerMetrics controllerMetrics, int partitionId) {
+    return MetricValueUtils.partitionGaugeExists(controllerMetrics, REALTIME_TABLE_NAME, partitionId,
+        ControllerGauge.PARTITION_END_OF_LIFE) ? MetricValueUtils.getPartitionGaugeValue(controllerMetrics,
+        REALTIME_TABLE_NAME, partitionId, ControllerGauge.PARTITION_END_OF_LIFE) : null;
   }
 
   @Test
@@ -3464,6 +3529,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
     boolean _exceededMaxSegmentCompletionTime = false;
     // Segments that exceed the max segment completion time even when _exceededMaxSegmentCompletionTime is false
     Set<String> _segmentsExceedingMaxSegmentCompletionTime = new HashSet<>();
+    // Partition groups the stream reports as ended, and the partition groups it was asked about
+    Set<Integer> _endOfLifePartitionGroupIds = Set.of();
+    List<Integer> _endOfLifePartitionGroupIdsAsked = new ArrayList<>();
     // Whether to list the LLC segments in reverse order
     boolean _reverseLLCSegments = false;
     // Number of upcoming IdealState updates on segment completion that fail without being applied
@@ -3618,6 +3686,20 @@ public class PinotLLCRealtimeSegmentManagerTest {
         stat.setMtime(_segmentZKMetadataModifiedTimeMap.getOrDefault(segmentName, CURRENT_TIME_MS));
       }
       return new SegmentZKMetadata(new ZNRecord(_segmentZKMetadataMap.get(segmentName).toZNRecord()));
+    }
+
+    @Override
+    Set<Integer> fetchEndOfLifePartitionGroupIds(List<StreamConfig> streamConfigs,
+        Collection<SegmentZKMetadata> completedSegmentsZKMetadata) {
+      Set<Integer> endOfLifePartitionGroupIds = new HashSet<>();
+      for (SegmentZKMetadata segmentZKMetadata : completedSegmentsZKMetadata) {
+        int partitionGroupId = new LLCSegmentName(segmentZKMetadata.getSegmentName()).getPartitionGroupId();
+        _endOfLifePartitionGroupIdsAsked.add(partitionGroupId);
+        if (_endOfLifePartitionGroupIds.contains(partitionGroupId)) {
+          endOfLifePartitionGroupIds.add(partitionGroupId);
+        }
+      }
+      return endOfLifePartitionGroupIds;
     }
 
     @Override
