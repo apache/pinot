@@ -19,9 +19,10 @@
 package org.apache.pinot.core.data.manager.realtime;
 
 import java.util.Collection;
+import java.util.EnumMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -48,9 +49,12 @@ public class IngestionSourceErrorRecorder {
 
   private final ServerMetrics _serverMetrics;
   private final String _tableNameWithType;
-  private final Set<Integer> _partitionsWritten = ConcurrentHashMap.newKeySet();
-  private final Map<IngestionSourceErrorCategory, Long> _lastLoggedMs = new ConcurrentHashMap<>();
-  private volatile boolean _closed;
+  // Guarded by this: gauge writes and close() are serialized, so once close() returns nothing writes or removes a gauge
+  // of this table again, even for a table recreated under the same name
+  private final Set<Integer> _partitionsWritten = new HashSet<>();
+  private final Map<IngestionSourceErrorCategory, Long> _lastLoggedMs =
+      new EnumMap<>(IngestionSourceErrorCategory.class);
+  private boolean _closed;
 
   public IngestionSourceErrorRecorder(ServerMetrics serverMetrics, String tableNameWithType) {
     _serverMetrics = serverMetrics;
@@ -64,7 +68,7 @@ public class IngestionSourceErrorRecorder {
   /// @param givingUp whether Pinot gives up on the source with this failure, rather than retrying it
   public void record(String site, Throwable failure, boolean givingUp, String topic,
       Collection<Integer> partitionIds) {
-    if (_closed || partitionIds.isEmpty()) {
+    if (partitionIds.isEmpty()) {
       return;
     }
     try {
@@ -79,19 +83,24 @@ public class IngestionSourceErrorRecorder {
       }
       ServerGauge gauge = gaugeOf(category);
       long nowMs = System.currentTimeMillis();
-      for (int partitionId : partitionIds) {
-        _partitionsWritten.add(partitionId);
-        _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, partitionId, gauge,
-            TimeUnit.MILLISECONDS.toSeconds(nowMs));
+      boolean logDue;
+      synchronized (this) {
+        // A consumer thread can outlive the table's shutdown
+        if (_closed) {
+          return;
+        }
+        for (int partitionId : partitionIds) {
+          _partitionsWritten.add(partitionId);
+          _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, partitionId, gauge,
+              TimeUnit.MILLISECONDS.toSeconds(nowMs));
+        }
+        Long lastLoggedMs = _lastLoggedMs.get(category);
+        logDue = lastLoggedMs == null || nowMs - lastLoggedMs >= LOG_INTERVAL_MS;
+        if (logDue) {
+          _lastLoggedMs.put(category, nowMs);
+        }
       }
-      if (_closed) {
-        // The table shut down while this was being written: a consumer thread can outlive the shutdown
-        removeMetrics();
-        return;
-      }
-      Long lastLoggedMs = _lastLoggedMs.get(category);
-      if (lastLoggedMs == null || nowMs - lastLoggedMs >= LOG_INTERVAL_MS) {
-        _lastLoggedMs.put(category, nowMs);
+      if (logDue) {
         LOGGER.warn("Ingestion source {} failure for table: {}, topic: {}, partitions: {}, at: {}: {}", category,
             _tableNameWithType, topic, partitionIds, site, classification);
       }
@@ -100,13 +109,9 @@ public class IngestionSourceErrorRecorder {
     }
   }
 
-  /// Stops recording and removes the gauges of every partition written so far.
-  public void close() {
+  /// Stops recording and removes the gauges of every partition written so far. Waits for a write in progress.
+  public synchronized void close() {
     _closed = true;
-    removeMetrics();
-  }
-
-  private void removeMetrics() {
     for (int partitionId : _partitionsWritten) {
       for (IngestionSourceErrorCategory category : IngestionSourceErrorCategory.values()) {
         _serverMetrics.removePartitionGauge(_tableNameWithType, partitionId, gaugeOf(category));

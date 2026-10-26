@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
+import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorReporter;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,7 +40,6 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
   private final boolean _forceGetOffsetFromStream;
   private final List<StreamMetadata> _streamMetadataList = new ArrayList<>();
   private final List<Integer> _pausedTopicIndices;
-  private final List<Exception> _skippedTopicExceptions = new ArrayList<>();
 
   private Exception _exception;
 
@@ -68,11 +68,6 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
     return _exception;
   }
 
-  /// The permanent failures of the topics a multi-topic fetch skipped so that the remaining topics could proceed.
-  public List<Exception> getSkippedTopicExceptions() {
-    return Collections.unmodifiableList(_skippedTopicExceptions);
-  }
-
   /// Callable to fetch the [StreamMetadata] list from the streams.
   /// The stream requires the list of [PartitionGroupConsumptionStatus] to compute the new
   /// [PartitionGroupMetadata]
@@ -80,7 +75,6 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
   public Boolean call()
       throws Exception {
     _streamMetadataList.clear();
-    _skippedTopicExceptions.clear();
     _exception = null;
     return _streamConfigs.size() == 1 ? fetchSingleStream() : fetchMultipleStreams();
   }
@@ -158,7 +152,9 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
         // continue — the caller emits a metric and healthy topics proceed normally.
         LOGGER.warn("Permanent failure fetching StreamMetadata for topic {}, skipping in multi-topic fetch",
             topicName, e);
-        _skippedTopicExceptions.add(e);
+        // Skipped so that the healthy topics proceed: report it to the calling site, which records it now, whatever
+        // the remaining topics do
+        IngestionSourceErrorReporter.report(e);
       } catch (Exception e) {
         LOGGER.warn("Could not get StreamMetadata for topic {}", topicName, e);
         _exception = e;

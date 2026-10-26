@@ -144,6 +144,29 @@ public class PinotTableIdealStateBuilderSourceErrorTest {
   }
 
   @Test
+  public void topicSkippedBeforeAnotherTopicFailsIsStillRecorded()
+      throws Exception {
+    String table = "skippedThenRefusedTable_REALTIME";
+    StreamConsumerFactory unreachable = factory(invocation -> {
+      throw new PermanentConsumerException(new ConnectException("Connection refused"));
+    });
+    StreamConsumerFactory refused = factory(invocation -> {
+      throw new RefusedException();
+    });
+    StreamConfig unreachableTopic = streamConfig("unreachable", table);
+    try (MockedStatic<StreamConsumerFactoryProvider> provider = Mockito.mockStatic(
+        StreamConsumerFactoryProvider.class)) {
+      provider.when(() -> StreamConsumerFactoryProvider.create(any(StreamConfig.class))).thenReturn(refused);
+      provider.when(() -> StreamConsumerFactoryProvider.create(argThat(config -> config == unreachableTopic)))
+          .thenReturn(unreachable);
+      expectThrows(RuntimeException.class, () -> PinotTableIdealStateBuilder.getStreamMetadataList(
+          List.of(unreachableTopic, streamConfig("refused", table)), List.of(), List.of(), false));
+    }
+    assertNotNull(gauge(ControllerGauge.INGESTION_SOURCE_READ_FAILURE_TIME_SECONDS, table));
+    assertNotNull(gauge(ControllerGauge.INGESTION_SOURCE_AUTH_FAILURE_TIME_SECONDS, table));
+  }
+
+  @Test
   public void failureThePluginSwallowsAndReportsIsRecorded()
       throws Exception {
     String table = "reportedTable_REALTIME";

@@ -105,13 +105,11 @@ public class PinotTableIdealStateBuilder {
     PartitionGroupMetadataFetcher partitionGroupMetadataFetcher = new PartitionGroupMetadataFetcher(
         streamConfigs, partitionGroupConsumptionStatusList, pausedTopicIndices, forceGetOffsetFromStream);
     String tableNameWithType = streamConfigs.get(0).getTableNameWithType();
-    // A plugin that answers with a partial result reports the source failure it swallowed
+    // Failures swallowed so that the fetch can proceed (a topic skipped as permanently failed, a plugin answering with
+    // a partial result) are reported as they happen
     try (IngestionSourceErrorReporter.Scope ignored = IngestionSourceErrorReporter.listen(
         failure -> recordSourceFailure(tableNameWithType, failure))) {
       DEFAULT_IDEALSTATE_UPDATE_RETRY_POLICY.attempt(partitionGroupMetadataFetcher);
-      for (Exception skipped : partitionGroupMetadataFetcher.getSkippedTopicExceptions()) {
-        recordSourceFailure(tableNameWithType, skipped);
-      }
       return partitionGroupMetadataFetcher.getStreamMetadataList();
     } catch (Exception e) {
       Exception fetcherException = partitionGroupMetadataFetcher.getException();
