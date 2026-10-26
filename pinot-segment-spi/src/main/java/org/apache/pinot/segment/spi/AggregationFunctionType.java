@@ -429,6 +429,7 @@ public enum AggregationFunctionType {
   }
 
   /// Returns DOUBLE, or the type of the data argument for the explicit data type form MODE(expr, reducer, dataType).
+  /// Only a leaf stage that returns final results uses it; the query's result type comes from Calcite's MODE (ARG0).
   private static class ModeFinalReturnTypeInference implements SqlReturnTypeInference {
     @Override
     public RelDataType inferReturnType(SqlOperatorBinding opBinding) {
