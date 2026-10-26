@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
@@ -58,11 +59,13 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
   // Exhausted throttling returns an empty batch, which the consume loop counts as a successful fetch. Like the consume
   // loop's own tolerance for fetch errors, this many in a row are tolerated; each further one is reported.
   private static final int MAX_CONSECUTIVE_THROTTLED_FETCHES = 5;
+  // Fetches in a row that throttling exhausted, by stream and shard. Kept outside the consumer: every empty batch
+  // counts toward the consume loop's idle timeout, which recreates the consumer.
+  private static final Map<String, Integer> CONSECUTIVE_THROTTLED_FETCHES = new ConcurrentHashMap<>();
 
   private final ThrottledLogger _throttledLogger = new ThrottledLogger(LOGGER, RATE_LIMIT_LOG_RATE_PER_MIN);
   private String _nextStartSequenceNumber = null;
   private String _nextShardIterator = null;
-  private int _consecutiveThrottledFetches = 0;
   private final RequestRateLimiter _requestRateLimiter;
 
   public KinesisConsumer(KinesisConfig config) {
@@ -97,22 +100,20 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
     long deadlineMs = currentTimeMillis() + Math.max(timeoutMs, 0);
     int attempts = 0;
     KinesisRateLimitException lastRateLimitException = null;
-    // The count this fetch reaches if throttling exhausts it; any other outcome, a failure included, leaves it reset,
-    // apart from our own request limiter timing out
-    int throttledFetches = _consecutiveThrottledFetches + 1;
-    _consecutiveThrottledFetches = 0;
     while (true) {
       if (lastRateLimitException != null && currentTimeMillis() >= deadlineMs) {
-        return throttleExhausted(startOffset, attempts, lastRateLimitException, throttledFetches);
+        return throttleExhausted(startOffset, attempts, lastRateLimitException);
       }
       try {
-        return getKinesisMessageBatch(startOffset, deadlineMs);
+        KinesisMessageBatch messageBatch = getKinesisMessageBatch(startOffset, deadlineMs);
+        CONSECUTIVE_THROTTLED_FETCHES.remove(throttleKey(startOffset));
+        return messageBatch;
       } catch (KinesisRateLimitException e) {
         lastRateLimitException = e;
         attempts++;
         long remainingMs = deadlineMs - currentTimeMillis();
         if (remainingMs <= 0) {
-          return throttleExhausted(startOffset, attempts, e, throttledFetches);
+          return throttleExhausted(startOffset, attempts, e);
         }
         long backoffMs = Math.min(computeRateLimitBackoffMs(attempts), remainingMs);
         _throttledLogger.warn(
@@ -122,9 +123,11 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
                 _config.getRpsLimitPerSecond(), attempts, backoffMs), e.getCause());
         sleep(backoffMs);
       } catch (KinesisRequestTimeoutException e) {
-        // Our own request limiter, not the source: nothing to report, and no sign the source recovered either, so the
-        // count of throttled fetches is kept as it was
-        _consecutiveThrottledFetches = throttledFetches - 1;
+        if (lastRateLimitException != null) {
+          // Kinesis throttled this fetch before our own limiter ran out of time for the retry
+          return throttleExhausted(startOffset, attempts, lastRateLimitException);
+        }
+        // Our own request limiter, not the source: nothing to report, and no sign the source recovered either
         logRequestLimiterTimeout(startOffset, e);
         return new KinesisMessageBatch(List.of(), startOffset, false, 0);
       }
@@ -134,13 +137,17 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
   /// Kinesis kept throttling the fetch until its timeout. The empty batch hides the failure from the consume loop, so
   /// once more than [#MAX_CONSECUTIVE_THROTTLED_FETCHES] fetches in a row end this way, each is reported.
   private KinesisMessageBatch throttleExhausted(KinesisPartitionGroupOffset startOffset, int attempts,
-      KinesisRateLimitException rateLimitException, int throttledFetches) {
+      KinesisRateLimitException rateLimitException) {
     logRateLimitTimeout(startOffset, attempts, rateLimitException);
-    _consecutiveThrottledFetches = throttledFetches;
-    if (throttledFetches > MAX_CONSECUTIVE_THROTTLED_FETCHES) {
+    if (CONSECUTIVE_THROTTLED_FETCHES.merge(throttleKey(startOffset), 1, Integer::sum)
+        > MAX_CONSECUTIVE_THROTTLED_FETCHES) {
       IngestionSourceErrorReporter.report(rateLimitException.getCause());
     }
     return new KinesisMessageBatch(List.of(), startOffset, false, 0);
+  }
+
+  private String throttleKey(KinesisPartitionGroupOffset offset) {
+    return _config.getStreamTopicName() + "/" + offset.getShardId();
   }
 
   private KinesisMessageBatch getKinesisMessageBatch(KinesisPartitionGroupOffset startMsgOffset, long deadlineMs) {

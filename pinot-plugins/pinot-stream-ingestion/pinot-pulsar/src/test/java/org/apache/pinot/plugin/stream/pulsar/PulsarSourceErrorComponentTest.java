@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -168,12 +169,14 @@ public class PulsarSourceErrorComponentTest {
       }
       disconnectedAtMs = System.currentTimeMillis();
       // Driven the way the consume loop drives it, which has no idle timer here: fetch until the transient exception
-      while (true) {
+      long deadlineMs = disconnectedAtMs + PulsarPartitionLevelConsumer.MAX_DISCONNECTED_MS + 5 * FETCH_TIMEOUT_MS;
+      gaveUpAtMs = -1;
+      while (gaveUpAtMs < 0) {
+        assertTrue(System.currentTimeMillis() < deadlineMs, "The reader neither reconnected nor gave up");
         try {
           offset = consumer.fetchMessages(offset, FETCH_TIMEOUT_MS).getOffsetOfNextBatch();
         } catch (TransientConsumerException e) {
           gaveUpAtMs = System.currentTimeMillis();
-          break;
         }
       }
     }
@@ -193,13 +196,13 @@ public class PulsarSourceErrorComponentTest {
   @Test(timeOut = 120_000)
   public void metadataReportsTheRefusalsItSwallows()
       throws Exception {
-    // No grant: the partition list itself is refused
-    assertRefusalReported(STRANGER_ROLE);
+    // No grant: the partition list itself is refused, and reported from its future
+    assertRefusalReported(STRANGER_ROLE, ExecutionException.class);
     // Produce only: the partitions can be listed, but the new one can't be subscribed to
-    assertRefusalReported(PRODUCER_ROLE);
+    assertRefusalReported(PRODUCER_ROLE, PulsarClientException.class);
   }
 
-  private void assertRefusalReported(String role)
+  private void assertRefusalReported(String role, Class<? extends Throwable> reportedType)
       throws Exception {
     StreamConfig streamConfig = streamConfig(token(_signingKey, role));
     List<Throwable> reported = new ArrayList<>();
@@ -212,6 +215,7 @@ public class PulsarSourceErrorComponentTest {
     assertEquals(metadata.stream().map(PartitionGroupMetadata::getPartitionGroupId).collect(Collectors.toList()),
         List.of(0));
     assertEquals(reported.size(), 1, role + ": " + reported);
+    assertTrue(reportedType.isInstance(reported.get(0)), role + ": " + reported.get(0));
     assertAuth(reported.get(0), IngestionSourceErrorSubReason.AUTHORIZATION, TARGET_BROKER);
   }
 

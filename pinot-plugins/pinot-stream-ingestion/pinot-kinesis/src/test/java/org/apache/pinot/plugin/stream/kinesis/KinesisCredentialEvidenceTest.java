@@ -148,12 +148,14 @@ public class KinesisCredentialEvidenceTest {
       assertAuth(rejected, IngestionSourceErrorSubReason.AUTHENTICATION, null);
     }
     // The controller's partition metadata, and the server's partition count
-    KinesisStreamMetadataProvider metadataProvider = new KinesisStreamMetadataProvider("clientId", streamConfig);
-    assertAuth(expectThrows(KinesisException.class,
-            () -> metadataProvider.computePartitionGroupMetadata("clientId", streamConfig, List.of(), TIMEOUT_MS)),
-        IngestionSourceErrorSubReason.AUTHENTICATION, null);
-    assertAuth(expectThrows(RuntimeException.class, () -> metadataProvider.fetchPartitionCount(TIMEOUT_MS)),
-        IngestionSourceErrorSubReason.AUTHENTICATION, null);
+    try (KinesisStreamMetadataProvider metadataProvider =
+        new KinesisStreamMetadataProvider("clientId", streamConfig)) {
+      assertAuth(expectThrows(KinesisException.class,
+              () -> metadataProvider.computePartitionGroupMetadata("clientId", streamConfig, List.of(), TIMEOUT_MS)),
+          IngestionSourceErrorSubReason.AUTHENTICATION, null);
+      assertAuth(expectThrows(RuntimeException.class, () -> metadataProvider.fetchPartitionCount(TIMEOUT_MS)),
+          IngestionSourceErrorSubReason.AUTHENTICATION, null);
+    }
   }
 
   @Test
