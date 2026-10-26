@@ -22,22 +22,32 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
+import javax.annotation.Nullable;
+import javax.security.auth.login.AppConfigurationEntry;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.common.config.SaslConfigs;
+import org.apache.kafka.common.config.types.Password;
+import org.apache.kafka.common.errors.AuthenticationException;
 import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.header.Headers;
+import org.apache.kafka.common.security.JaasContext;
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.pinot.plugin.stream.kafka.KafkaMessageBatch;
 import org.apache.pinot.plugin.stream.kafka.KafkaPartitionLevelStreamConfig;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamMessageMetadata;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.ingestion.error.IngestionSourceCredentialMode;
+import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorEvidence;
 import org.apache.pinot.spi.stream.BytesStreamMessage;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
+import org.apache.pinot.spi.stream.TransientConsumerException;
 import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,6 +56,11 @@ import org.slf4j.LoggerFactory;
 public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHandler
     implements PartitionGroupConsumer {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaPartitionLevelConsumer.class);
+  // The SASL mechanism of the aws-msk-iam-auth login module, and the JAAS options it reads for an assumed role.
+  private static final String AWS_MSK_IAM = "AWS_MSK_IAM";
+  private static final String MSK_ROLE_ARN = "awsRoleArn";
+  private static final String MSK_ROLE_ACCESS_KEY_ID = "awsRoleAccessKeyId";
+  private static final String MSK_ROLE_SECRET_ACCESS_KEY = "awsRoleSecretAccessKey";
 
   // Offset the consumer is positioned to read NEXT. -1 means the consumer has not been
   // positioned for any caller-requested startOffset yet (we have not issued a seek).
@@ -73,6 +88,9 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
   // construction (the value is final per consumer) and reused on every fetch instead of
   // re-resolving the StreamConfig each time.
   private final boolean _isReadCommitted = isReadCommitted(_config);
+  // Whose AWS identity signs an MSK IAM table's SASL handshake; null for any other table.
+  @Nullable
+  private final IngestionSourceErrorEvidence _mskIamEvidence = mskIamEvidence(_consumerProp);
 
   public KafkaPartitionLevelConsumer(String clientId, StreamConfig streamConfig, int partition) {
     super(clientId, streamConfig, partition);
@@ -113,7 +131,17 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
       _nextReadOffset = startOffset;
     }
 
-    ConsumerRecords<Bytes, Bytes> consumerRecords = _consumer.poll(Duration.ofMillis(timeoutMs));
+    ConsumerRecords<Bytes, Bytes> consumerRecords;
+    try {
+      consumerRecords = _consumer.poll(Duration.ofMillis(timeoutMs));
+    } catch (AuthenticationException e) {
+      if (_mskIamEvidence == null) {
+        throw e;
+      }
+      // MSK IAM reports a policy denial as an authentication failure, so record whose identity was refused. Kafka
+      // can throw the same instance on every poll, so the evidence goes on a wrapper of our own.
+      throw IngestionSourceErrorEvidence.attach(new TransientConsumerException(e), _mskIamEvidence);
+    }
     List<ConsumerRecord<Bytes, Bytes>> records = consumerRecords.records(_topicPartition);
     _lastFetchStartOffset = startOffset;
     _lastFetchReturnedRecords = !records.isEmpty();
@@ -193,6 +221,36 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
           + "(this can mask genuine data loss if it persists)", _topicPartition, e);
       return Long.MIN_VALUE;
     }
+  }
+
+  /// For an MSK IAM table, whose identity aws-msk-iam-auth signs with: the process's own AWS credential chain
+  /// (AMBIENT), optionally to assume `awsRoleArn`. Static keys given for that role are a credential configured on the
+  /// table (STATIC). Only the presence of these options is recorded, and the JAAS config is never logged.
+  @Nullable
+  private static IngestionSourceErrorEvidence mskIamEvidence(Properties consumerProp) {
+    if (!AWS_MSK_IAM.equals(consumerProp.getProperty(SaslConfigs.SASL_MECHANISM))) {
+      return null;
+    }
+    Map<String, ?> options = Map.of();
+    String jaasConfig = consumerProp.getProperty(SaslConfigs.SASL_JAAS_CONFIG);
+    if (jaasConfig != null) {
+      try {
+        // Kafka's own parser, as the login module receives it.
+        List<AppConfigurationEntry> entries =
+            JaasContext.loadClientContext(Map.of(SaslConfigs.SASL_JAAS_CONFIG, new Password(jaasConfig)))
+                .configurationEntries();
+        options = entries.get(0).getOptions();
+      } catch (RuntimeException e) {
+        // Not parsable here, e.g. a config provider reference: assume no options, so the process's own chain. The
+        // message can quote the config, so it is dropped.
+      }
+    }
+    boolean roleArnConfigured = options.containsKey(MSK_ROLE_ARN);
+    boolean staticRoleKeys = roleArnConfigured && options.containsKey(MSK_ROLE_ACCESS_KEY_ID)
+        && options.containsKey(MSK_ROLE_SECRET_ACCESS_KEY);
+    IngestionSourceCredentialMode credentialMode =
+        staticRoleKeys ? IngestionSourceCredentialMode.STATIC : IngestionSourceCredentialMode.AMBIENT;
+    return new IngestionSourceErrorEvidence().setCredentialMode(credentialMode).setRoleArnConfigured(roleArnConfigured);
   }
 
   private static boolean isReadCommitted(KafkaPartitionLevelStreamConfig config) {

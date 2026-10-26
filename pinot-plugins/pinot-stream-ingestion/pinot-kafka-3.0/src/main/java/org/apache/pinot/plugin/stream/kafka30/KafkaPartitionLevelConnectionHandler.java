@@ -106,6 +106,7 @@ public abstract class KafkaPartitionLevelConnectionHandler {
     Properties filteredConsumerProp =
         KafkaConfigUtils.filterAndValidateKafkaProperties(consumerProp, CONSUMER_CONFIG_NAMES);
     AtomicReference<Consumer<Bytes, Bytes>> consumer = new AtomicReference<>();
+    AtomicReference<Exception> lastAttemptFailure = new AtomicReference<>();
     try {
       retryPolicy.attempt(() -> {
         try {
@@ -113,10 +114,15 @@ public abstract class KafkaPartitionLevelConnectionHandler {
           return true;
         } catch (Exception e) {
           LOGGER.warn("Caught exception while creating Kafka consumer, retrying.", e);
+          lastAttemptFailure.set(e);
           return false;
         }
       });
     } catch (AttemptsExceededException | RetriableOperationException e) {
+      // The retry policy gives up without the failures it retried; keep the last one as the cause.
+      if (e instanceof AttemptsExceededException && lastAttemptFailure.get() != null) {
+        e.initCause(lastAttemptFailure.get());
+      }
       LOGGER.error("Caught exception while creating Kafka consumer, giving up", e);
       throw new RuntimeException(e);
     }
