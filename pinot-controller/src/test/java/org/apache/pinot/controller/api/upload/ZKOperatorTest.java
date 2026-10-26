@@ -23,12 +23,14 @@ import java.net.URI;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.tier.TimeBasedTierSegmentSelector;
 import org.apache.pinot.common.utils.FileUploadDownloadClient.FileUploadType;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.TarCompressionUtils;
@@ -38,6 +40,7 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.retention.strategy.TimeRetentionStrategy;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.SegmentMetadata;
@@ -52,6 +55,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
+import org.joda.time.Interval;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -82,6 +86,13 @@ public class ZKOperatorTest {
           .setTimeColumnName(TIME_COLUMN)
           .setStreamConfigs(getStreamConfigs())
           .setNumReplicas(1)
+          .build();
+  private static final TableConfig REALTIME_UPSERT_TABLE_CONFIG =
+      new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
+          .setTimeColumnName(TIME_COLUMN)
+          .setStreamConfigs(getStreamConfigs())
+          .setNumReplicas(1)
+          .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
           .build();
   private static final Schema SCHEMA = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
       .addDateTime(TIME_COLUMN, DataType.TIMESTAMP, "1:MILLISECONDS:TIMESTAMP", "1:MILLISECONDS")
@@ -400,12 +411,6 @@ public class ZKOperatorTest {
   public void testSameCrcRefreshKeepsCreationTimeForUpsertTable()
       throws Exception {
     ZKOperator zkOperator = new ZKOperator(_resourceManager, mock(ControllerConf.class), mock(ControllerMetrics.class));
-    TableConfig upsertTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
-        .setTimeColumnName(TIME_COLUMN)
-        .setStreamConfigs(getStreamConfigs())
-        .setNumReplicas(1)
-        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
-        .build();
     // Upsert tables need a partition id for an uploaded segment, so use the uploaded real-time segment name format.
     String segmentName = new UploadedRealtimeSegmentName(RAW_TABLE_NAME, 2, 1717027200000L, "uploaded", "0")
         .getSegmentName();
@@ -415,8 +420,8 @@ public class ZKOperatorTest {
     when(segmentMetadata.getCrc()).thenReturn(12345L);
     when(segmentMetadata.getDataCrc()).thenReturn(432L);
     when(segmentMetadata.getIndexCreationTime()).thenReturn(123L);
-    zkOperator.completeSegmentOperations(upsertTableConfig, segmentMetadata, FileUploadType.SEGMENT, null, null,
-        "downloadUrl", "downloadUrl", null, 10, true, true, mock(HttpHeaders.class));
+    zkOperator.completeSegmentOperations(REALTIME_UPSERT_TABLE_CONFIG, segmentMetadata, FileUploadType.SEGMENT, null,
+        null, "downloadUrl", "downloadUrl", null, 10, true, true, mock(HttpHeaders.class));
 
     SegmentZKMetadata segmentZKMetadata = _resourceManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentName);
     assertNotNull(segmentZKMetadata);
@@ -425,8 +430,8 @@ public class ZKOperatorTest {
     // Refresh with the same CRC but a different creation time. Servers don't reload the segment, so creation time
     // should not change, while refresh time and download URL should.
     when(segmentMetadata.getIndexCreationTime()).thenReturn(456L);
-    zkOperator.completeSegmentOperations(upsertTableConfig, segmentMetadata, FileUploadType.SEGMENT, null, null,
-        "otherDownloadUrl", "otherDownloadUrl", null, 10, true, true, mock(HttpHeaders.class));
+    zkOperator.completeSegmentOperations(REALTIME_UPSERT_TABLE_CONFIG, segmentMetadata, FileUploadType.SEGMENT, null,
+        null, "otherDownloadUrl", "otherDownloadUrl", null, 10, true, true, mock(HttpHeaders.class));
 
     segmentZKMetadata = _resourceManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentName);
     assertNotNull(segmentZKMetadata);
@@ -438,13 +443,58 @@ public class ZKOperatorTest {
     // Refresh with a different CRC. Servers reload the segment, so creation time should change.
     when(segmentMetadata.getCrc()).thenReturn(23456L);
     when(segmentMetadata.getIndexCreationTime()).thenReturn(789L);
-    zkOperator.completeSegmentOperations(upsertTableConfig, segmentMetadata, FileUploadType.SEGMENT, null, null,
-        "otherDownloadUrl", "otherDownloadUrl", null, 10, true, true, mock(HttpHeaders.class));
+    zkOperator.completeSegmentOperations(REALTIME_UPSERT_TABLE_CONFIG, segmentMetadata, FileUploadType.SEGMENT, null,
+        null, "otherDownloadUrl", "otherDownloadUrl", null, 10, true, true, mock(HttpHeaders.class));
 
     segmentZKMetadata = _resourceManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentName);
     assertNotNull(segmentZKMetadata);
     assertEquals(segmentZKMetadata.getCrc(), 23456L);
     assertEquals(segmentZKMetadata.getCreationTime(), 789L);
+  }
+
+  @Test
+  public void testSameCrcRefreshKeepsRetentionAndTierDecisionsForUpsertTable()
+      throws Exception {
+    ZKOperator zkOperator = new ZKOperator(_resourceManager, mock(ControllerConf.class), mock(ControllerMetrics.class));
+    String segmentName = new UploadedRealtimeSegmentName(RAW_TABLE_NAME, 2, 1717027200000L, "uploaded", "1")
+        .getSegmentName();
+    // The segment holds 30-day-old data and was built 30 days ago.
+    long oldTimeMs = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(30);
+
+    SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
+    when(segmentMetadata.getName()).thenReturn(segmentName);
+    when(segmentMetadata.getCrc()).thenReturn(12345L);
+    when(segmentMetadata.getDataCrc()).thenReturn(432L);
+    when(segmentMetadata.getIndexCreationTime()).thenReturn(oldTimeMs);
+    when(segmentMetadata.getTimeInterval()).thenReturn(new Interval(oldTimeMs, oldTimeMs + 1000L));
+    zkOperator.completeSegmentOperations(REALTIME_UPSERT_TABLE_CONFIG, segmentMetadata, FileUploadType.SEGMENT, null,
+        null, "downloadUrl", "downloadUrl", null, 10, true, true, mock(HttpHeaders.class));
+
+    // Retention and the default tier selector read the end time. The creation time fallback only applies when the end
+    // time is invalid, so turning it on here shouldn't matter. The creationTime tier selector reads the creation time.
+    TimeRetentionStrategy retentionStrategy = new TimeRetentionStrategy(TimeUnit.DAYS, 7, true);
+    TimeBasedTierSegmentSelector endTimeTierSelector = new TimeBasedTierSegmentSelector("7d");
+    TimeBasedTierSegmentSelector creationTimeTierSelector =
+        new TimeBasedTierSegmentSelector("7d", TimeBasedTierSegmentSelector.AgeField.CREATION_TIME);
+    SegmentZKMetadata segmentZKMetadata = _resourceManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentName);
+    assertNotNull(segmentZKMetadata);
+    assertTrue(retentionStrategy.isPurgeable(REALTIME_TABLE_NAME, segmentZKMetadata));
+    assertTrue(endTimeTierSelector.selectSegment(REALTIME_TABLE_NAME, segmentZKMetadata));
+    assertTrue(creationTimeTierSelector.selectSegment(REALTIME_TABLE_NAME, segmentZKMetadata));
+
+    // Re-upload the same data rebuilt today. The segment should stay purgeable and stay on the tier, including the
+    // creationTime tier, because the creation time doesn't move.
+    when(segmentMetadata.getIndexCreationTime()).thenReturn(System.currentTimeMillis());
+    zkOperator.completeSegmentOperations(REALTIME_UPSERT_TABLE_CONFIG, segmentMetadata, FileUploadType.SEGMENT, null,
+        null, "otherDownloadUrl", "otherDownloadUrl", null, 10, true, true, mock(HttpHeaders.class));
+
+    segmentZKMetadata = _resourceManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentName);
+    assertNotNull(segmentZKMetadata);
+    assertEquals(segmentZKMetadata.getDownloadUrl(), "otherDownloadUrl");
+    assertEquals(segmentZKMetadata.getCreationTime(), oldTimeMs);
+    assertTrue(retentionStrategy.isPurgeable(REALTIME_TABLE_NAME, segmentZKMetadata));
+    assertTrue(endTimeTierSelector.selectSegment(REALTIME_TABLE_NAME, segmentZKMetadata));
+    assertTrue(creationTimeTierSelector.selectSegment(REALTIME_TABLE_NAME, segmentZKMetadata));
   }
 
   @AfterClass

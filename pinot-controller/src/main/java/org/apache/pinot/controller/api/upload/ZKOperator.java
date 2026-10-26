@@ -47,6 +47,7 @@ import org.apache.pinot.controller.api.resources.ResourceUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -306,13 +307,14 @@ public class ZKOperator {
             "New segment crc '{}' is the same as existing segment crc for segment '{}'. Updating ZK metadata without "
                 + "refreshing the segment.", newCrc, segmentName);
         // NOTE: Even though we don't need to refresh the segment, we should still update the following fields:
-        // - Creation time (not included in the crc), except for upsert tables
+        // - Creation time (not included in the crc), except for real-time upsert tables
         // - Refresh time
         // - Custom map
-        // Upsert servers copy the ZK creation time when they load a segment and use it to break comparison ties.
-        // Servers don't reload a segment with the same crc, so changing it here would let a restarted replica break
-        // ties differently from a running one.
-        if (!tableConfig.isUpsertEnabled()) {
+        // Real-time upsert servers copy the ZK creation time when they load a segment and use it to break comparison
+        // ties. Servers don't reload a segment with the same crc, so changing it here would let a restarted replica
+        // break ties differently from a running one. Offline upsert tables break ties on push time, which a refresh
+        // never changes, so they keep today's behaviour.
+        if (tableConfig.getTableType() != TableType.REALTIME || !tableConfig.isUpsertEnabled()) {
           segmentZKMetadata.setCreationTime(segmentMetadata.getIndexCreationTime());
         }
         segmentZKMetadata.setRefreshTime(System.currentTimeMillis());
