@@ -44,6 +44,10 @@ message PlanNode {
     // serialized by an older-version broker can still be deserialized. No current broker sets this field.
     EnrichedJoinNode enrichedJoinNode = 17 [deprecated = true];
     UnnestNode unnestNode = 18;
+    // Rolling upgrade: a server that predates this field reads it as NODE_NOT_SET and throws
+    // "Unsupported PlanNode type". The broker gate (query option useMvAggregate, broker config
+    // pinot.broker.multistage.use.mv.aggregate) controls whether a broker emits it.
+    MvAggregateNode mvAggregateNode = 19;
   }
 }
 
@@ -91,6 +95,15 @@ message AggregateNode {
   // collapsed/wrong results (missing subtotal/grand-total rows). Upgrade all servers before issuing grouping-set
   // queries.
   repeated GroupingSet groupingSets = 8;
+}
+
+// An aggregate that groups each row by every element of its multi-value group keys (single-stage engine
+// semantics: one group per element, cartesian product across several multi-value keys).
+message MvAggregateNode {
+  // Everything but the multi-value keys. Grouping sets are not supported and must be empty.
+  AggregateNode aggregate = 1;
+  // Positions in aggregate.groupKeys of the multi-value keys, ascending.
+  repeated int32 mvKeyIndexes = 2;
 }
 
 message FilterNode {

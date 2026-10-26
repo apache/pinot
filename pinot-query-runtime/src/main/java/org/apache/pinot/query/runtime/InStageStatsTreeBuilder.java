@@ -38,6 +38,7 @@ import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.MvAggregateNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
@@ -374,6 +375,12 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, InSt
   @Override
   public ObjectNode visitUnnest(UnnestNode node, Context context) {
     return recursiveCase(node, MultiStageOperator.Type.UNNEST, context);
+  }
+
+  @Override
+  public ObjectNode visitMvAggregate(MvAggregateNode node, Context context) {
+    // TODO: switch to the dedicated MV aggregate operator type once the runtime operator exists.
+    return recursiveCase(node, MultiStageOperator.Type.AGGREGATE, context);
   }
 
   public static class Context {
