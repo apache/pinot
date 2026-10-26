@@ -321,8 +321,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final TransformPipeline _transformPipeline;
   private PartitionGroupConsumer _partitionGroupConsumer = null;
   private final IngestionSourceErrorRecorder _sourceErrors;
-  // Failures the stream plugin swallows on purpose during a fetch, and reports
+  // Failures the stream plugin swallows on purpose during a fetch or a checkpoint, and reports
   private final Consumer<Throwable> _reportedFetchErrors;
+  private final Consumer<Throwable> _reportedCheckpointErrors;
   private StreamMetadataProvider _partitionMetadataProvider = null;
   private final File _resourceTmpDir;
   private final String _tableNameWithType;
@@ -1995,6 +1996,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _sourceErrors = sourceErrors != null ? sourceErrors : new IngestionSourceErrorRecorder(serverMetrics,
         _tableNameWithType);
     _reportedFetchErrors = failure -> recordSourceError("fetch", failure, true);
+    _reportedCheckpointErrors = failure -> recordSourceError("checkpoint", failure, true);
     if (indexLoadingConfig.isRealtimeOffHeapAllocation() && !indexLoadingConfig.isDirectRealtimeOffHeapAllocation()) {
       _memoryManager =
           new MmapMemoryManager(_realtimeTableDataManager.getConsumerDir(), _segmentNameStr, _serverMetrics);
@@ -2312,9 +2314,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   }
 
   /// Checkpoints the stream consumer at the current offset. A source that can't take the checkpoint is a source
-  /// failure Pinot gives up on.
+  /// failure Pinot gives up on, and so is one the plugin reports while it checkpoints.
   private StreamPartitionMsgOffset checkpoint() {
-    try {
+    try (IngestionSourceErrorReporter.Scope ignored = IngestionSourceErrorReporter.listen(_reportedCheckpointErrors)) {
       return _partitionGroupConsumer.checkpoint(_currentOffset);
     } catch (RuntimeException e) {
       recordSourceError("checkpoint", e, true);

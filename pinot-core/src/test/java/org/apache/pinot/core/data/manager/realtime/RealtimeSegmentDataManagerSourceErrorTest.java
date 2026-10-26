@@ -41,6 +41,7 @@ import org.apache.pinot.segment.local.segment.creator.Fixtures;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorClassifier;
+import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorReporter;
 import org.apache.pinot.spi.ingestion.error.RefusedBySourceException;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.stream.BytesStreamMessage;
@@ -89,6 +90,7 @@ public class RealtimeSegmentDataManagerSourceErrorTest {
   /// What each fetch does, in order: throw a failure, or return a batch of these payloads (empty for none).
   private static final Deque<Object> SCRIPT = new ConcurrentLinkedDeque<>();
   private static volatile boolean _decoderInitRefused;
+  private static volatile boolean _checkpointReportsRefusal;
 
   public static class ScriptedConsumerFactory extends FakeStreamConsumerFactory {
     @Override
@@ -108,6 +110,15 @@ public class RealtimeSegmentDataManagerSourceErrorTest {
           @SuppressWarnings("unchecked")
           List<String> payloads = (List<String>) step;
           return batch(payloads, ((LongMsgOffset) startOffset).getOffset());
+        }
+
+        @Override
+        public StreamPartitionMsgOffset checkpoint(StreamPartitionMsgOffset lastOffset) {
+          // A plugin that validates on checkpoint and swallows what it finds, as Pub/Sub's snapshot validator does
+          if (_checkpointReportsRefusal) {
+            IngestionSourceErrorReporter.report(new RefusedBySourceException());
+          }
+          return lastOffset;
         }
 
         @Override
@@ -196,6 +207,7 @@ public class RealtimeSegmentDataManagerSourceErrorTest {
   public void resetScript() {
     SCRIPT.clear();
     _decoderInitRefused = false;
+    _checkpointReportsRefusal = false;
   }
 
   private RealtimeSegmentDataManagerTest.FakeRealtimeSegmentDataManager createSegmentDataManager(
@@ -253,6 +265,21 @@ public class RealtimeSegmentDataManagerSourceErrorTest {
     // CONSUMING -> OFFLINE removes the partition's other metrics, but the record of the refusal stays.
     segmentDataManager.close();
     assertNotNull(serverMetrics.getGaugeValue(AUTH_GAUGE));
+  }
+
+  @Test
+  public void refusalThePluginReportsWhileCheckpointingIsRecorded()
+      throws Exception {
+    // A transient fetch failure makes the consume loop checkpoint and recreate the consumer
+    Collections.addAll(SCRIPT, new RuntimeException("transient"), List.of());
+    _checkpointReportsRefusal = true;
+    ServerMetrics serverMetrics = newServerMetrics();
+    RealtimeSegmentDataManagerTest.FakeRealtimeSegmentDataManager segmentDataManager =
+        createSegmentDataManager(serverMetrics);
+    expectThrows(PermanentConsumerException.class, segmentDataManager::consumeLoop);
+    assertTrue(SCRIPT.isEmpty());
+    assertNotNull(serverMetrics.getGaugeValue(AUTH_GAUGE));
+    segmentDataManager.close();
   }
 
   @Test
