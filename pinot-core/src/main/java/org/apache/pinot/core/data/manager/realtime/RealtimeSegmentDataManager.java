@@ -39,6 +39,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -89,6 +90,7 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorReporter;
 import org.apache.pinot.spi.metrics.PinotMeter;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
@@ -318,6 +320,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   final String _clientId;
   private final TransformPipeline _transformPipeline;
   private PartitionGroupConsumer _partitionGroupConsumer = null;
+  private final IngestionSourceErrorRecorder _sourceErrors;
+  // Failures the stream plugin swallows on purpose during a fetch, and reports
+  private final Consumer<Throwable> _reportedFetchErrors;
   private StreamMetadataProvider _partitionMetadataProvider = null;
   private final File _resourceTmpDir;
   private final String _tableNameWithType;
@@ -454,6 +459,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private void handleTransientStreamErrors(Exception e)
       throws Exception {
     _consecutiveErrorCount++;
+    // A refusal is recorded on sight: an auth failure interleaved with empty fetches never reaches the give-up below.
+    recordSourceError("fetch", e, _consecutiveErrorCount > MAX_CONSECUTIVE_ERROR_COUNT);
     _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);
     _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS,
         1L);
@@ -511,7 +518,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       // Consume for the next readTime ms, or we get to final offset, whichever happens earlier,
       // Update _currentOffset upon return from this method
       MessageBatch messageBatch;
-      try {
+      try (IngestionSourceErrorReporter.Scope ignored = IngestionSourceErrorReporter.listen(_reportedFetchErrors)) {
         messageBatch = _partitionGroupConsumer.fetchMessages(_currentOffset, _streamConfig.getFetchTimeoutMillis());
         //track realtime rows fetched on a table level. This included valid + invalid rows
         _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_FETCHED,
@@ -527,6 +534,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         _endOfPartitionGroup = messageBatch.getMessageCount() == 0 && messageBatch.isEndOfPartitionGroup();
         _consecutiveErrorCount = 0;
       } catch (PermanentConsumerException e) {
+        recordSourceError("fetch", e, true);
         _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);
         _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);
         _segmentLogger.warn("Permanent exception from stream when fetching messages, stopping consumption", e);
@@ -664,6 +672,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       StreamPartitionMsgOffset nextOffset = metadata.getNextOffset();
       int rowSizeInBytes = metadata.getRecordSerializedSize();
       if (decodedRow.getException() != null) {
+        // A failed schema-registry lookup drops the row, so every failed row is classified and written at once.
+        recordSourceError("decode", decodedRow.getException(), true);
         String errorMessage = "Stopping consumption due to decode error at offset: " + offset;
         if (_stopOnDecodeError) {
           _segmentLogger.error(errorMessage, decodedRow.getException());
@@ -967,7 +977,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             }
             case COMMIT: {
               _state = State.COMMITTING;
-              _currentOffset = _partitionGroupConsumer.checkpoint(_currentOffset);
+              _currentOffset = checkpoint();
               // Lock the segment to avoid multiple threads touching the same segment.
               Lock segmentLock = _realtimeTableDataManager.getSegmentLock(_segmentNameStr);
               // NOTE: We need to lock interruptibly because the lock might already be held by the Helix thread for the
@@ -1980,6 +1990,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
     _segmentLogger = LoggerFactory.getLogger(RealtimeSegmentDataManager.class.getName() + "_" + _segmentNameStr);
     _tableStreamName = _tableNameWithType + "_" + streamTopic;
+    IngestionSourceErrorRecorder sourceErrors = realtimeTableDataManager.getIngestionSourceErrorRecorder();
+    _sourceErrors = sourceErrors != null ? sourceErrors : new IngestionSourceErrorRecorder(serverMetrics,
+        _tableNameWithType);
+    _reportedFetchErrors = failure -> recordSourceError("fetch", failure, true);
     if (indexLoadingConfig.isRealtimeOffHeapAllocation() && !indexLoadingConfig.isDirectRealtimeOffHeapAllocation()) {
       _memoryManager =
           new MmapMemoryManager(_realtimeTableDataManager.getConsumerDir(), _segmentNameStr, _serverMetrics);
@@ -2040,6 +2054,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig, _schema);
     RetryPolicy retryPolicy = RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 1.2f);
     AtomicReference<StreamDataDecoder> localStreamDataDecoder = new AtomicReference<>();
+    AtomicReference<Exception> lastDecoderInitFailure = new AtomicReference<>();
     try {
       retryPolicy.attempt(() -> {
         try {
@@ -2049,10 +2064,18 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           return true;
         } catch (Exception e) {
           _segmentLogger.warn("Failed to initialize the StreamMessageDecoder: ", e);
+          lastDecoderInitFailure.set(e);
           return false;
         }
       });
     } catch (Exception e) {
+      // The retry policy's exception has no cause: keep the last attempt's failure, so it can be classified and shows
+      // in the segment error.
+      Exception lastFailure = lastDecoderInitFailure.get();
+      if (lastFailure != null && e.getCause() == null) {
+        e.initCause(lastFailure);
+      }
+      recordSourceError("decoder_init", e, true);
       _realtimeTableDataManager.addSegmentError(_segmentNameStr,
           new SegmentErrorInfo(now(), "Failed to initialize the StreamMessageDecoder", e));
       throw e;
@@ -2261,6 +2284,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     } catch (Exception e) {
       _segmentLogger.error("Faced exception while trying to create stream consumer for topic partition {} reason {}",
           _clientId, reason, e);
+      recordSourceError("create", e, true);
       _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.STREAM_CONSUMER_CREATE_EXCEPTIONS, 1L);
       throw e;
     }
@@ -2270,7 +2294,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   /// Assumes there is a valid instance of [PartitionGroupConsumer]
   private void recreateStreamConsumer(String reason) {
     _segmentLogger.info("Recreating stream consumer for topic partition {}, reason: {}", _clientId, reason);
-    _currentOffset = _partitionGroupConsumer.checkpoint(_currentOffset);
+    _currentOffset = checkpoint();
     closePartitionGroupConsumer();
     try {
       _partitionGroupConsumer =
@@ -2280,9 +2304,25 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     } catch (Exception e) {
       _segmentLogger.error("Faced exception while trying to recreate stream consumer for topic partition {}", _clientId,
           e);
+      recordSourceError("create", e, true);
       _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.STREAM_CONSUMER_CREATE_EXCEPTIONS, 1L);
       throw e;
     }
+  }
+
+  /// Checkpoints the stream consumer at the current offset. A source that can't take the checkpoint is a source
+  /// failure Pinot gives up on.
+  private StreamPartitionMsgOffset checkpoint() {
+    try {
+      return _partitionGroupConsumer.checkpoint(_currentOffset);
+    } catch (RuntimeException e) {
+      recordSourceError("checkpoint", e, true);
+      throw e;
+    }
+  }
+
+  private void recordSourceError(String site, Throwable failure, boolean givingUp) {
+    _sourceErrors.record(site, failure, givingUp, _streamConfig.getTopicName(), List.of(_partitionGroupId));
   }
 
   /// Creates a new stream metadata provider
@@ -2357,8 +2397,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       decoder.init(fieldsToRead, _streamConfig, _tableConfig, _schema);
       return decoder;
     } catch (Exception e) {
-      throw new RuntimeException(
-          "Caught exception while creating StreamMessageDecoder from stream config: " + _streamConfig, e);
+      // Never put the stream config in the message: its values can hold credentials, and the exception reaches the
+      // segment error and logs.
+      throw new RuntimeException("Caught exception while creating StreamMessageDecoder: " + decoderClass, e);
     }
   }
 

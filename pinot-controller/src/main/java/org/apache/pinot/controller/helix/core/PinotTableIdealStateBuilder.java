@@ -24,6 +24,7 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.model.builder.CustomModeISBuilder;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorReporter;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.PartitionGroupMetadataFetcher;
 import org.apache.pinot.spi.stream.StreamConfig;
@@ -92,18 +93,24 @@ public class PinotTableIdealStateBuilder {
       boolean forceGetOffsetFromStream) {
     PartitionGroupMetadataFetcher partitionGroupMetadataFetcher = new PartitionGroupMetadataFetcher(
         streamConfigs, partitionGroupConsumptionStatusList, pausedTopicIndices, forceGetOffsetFromStream);
-    try {
+    String tableNameWithType = streamConfigs.get(0).getTableNameWithType();
+    // A plugin that answers with a partial result reports the source failure it swallowed
+    try (IngestionSourceErrorReporter.Scope ignored = IngestionSourceErrorReporter.listen(
+        failure -> TableIngestionSourceErrorRecorder.record(tableNameWithType, "plugin_report", failure))) {
       DEFAULT_IDEALSTATE_UPDATE_RETRY_POLICY.attempt(partitionGroupMetadataFetcher);
+      for (Exception skipped : partitionGroupMetadataFetcher.getSkippedTopicExceptions()) {
+        TableIngestionSourceErrorRecorder.record(tableNameWithType, "metadata_fetch", skipped);
+      }
       return partitionGroupMetadataFetcher.getStreamMetadataList();
     } catch (Exception e) {
       Exception fetcherException = partitionGroupMetadataFetcher.getException();
-      String tableNameWithType = streamConfigs.get(0).getTableNameWithType();
       LOGGER.error("Could not get StreamMetadata for topic: {} of table: {}",
           streamConfigs.stream().map(StreamConfig::getTopicName).collect(Collectors.joining(",")),
           tableNameWithType, fetcherException);
       ControllerMetrics controllerMetrics = ControllerMetrics.get();
       controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.PARTITION_GROUP_METADATA_FETCH_ERROR,
           1L);
+      TableIngestionSourceErrorRecorder.record(tableNameWithType, "metadata_fetch", fetcherException);
       throw new RuntimeException(fetcherException);
     }
   }
