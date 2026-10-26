@@ -264,7 +264,7 @@
     <kafka4.version>4.2.0</kafka4.version>
     <confluent.version>8.2.0</confluent.version>
     <wire.version>7.1.0</wire.version>
-    <pulsar.version>5.0.0</pulsar.version>
+    <pulsar.version>5.0.1</pulsar.version>
     <flink.version>2.3.0</flink.version>
 
     <!-- Apache Commons Libraries -->
