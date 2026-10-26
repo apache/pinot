@@ -38,6 +38,7 @@ import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.MvAggregateNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
@@ -173,6 +174,43 @@ class PlanNodeMerger {
         return null;
       }
       if (node.getOrdinalityIndex() != otherNode.getOrdinalityIndex()) {
+        return null;
+      }
+      List<PlanNode> children = mergeChildren(node, context);
+      if (children == null) {
+        return null;
+      }
+      return node.withInputs(children);
+    }
+
+    @Override
+    public PlanNode visitMvAggregate(MvAggregateNode node, PlanNode context) {
+      if (context.getClass() != MvAggregateNode.class) {
+        return null;
+      }
+      MvAggregateNode otherNode = (MvAggregateNode) context;
+      if (!node.getAggCalls().equals(otherNode.getAggCalls())) {
+        return null;
+      }
+      if (!node.getFilterArgs().equals(otherNode.getFilterArgs())) {
+        return null;
+      }
+      if (!node.getGroupKeys().equals(otherNode.getGroupKeys())) {
+        return null;
+      }
+      if (node.getAggType() != otherNode.getAggType()) {
+        return null;
+      }
+      if (node.isLeafReturnFinalResult() != otherNode.isLeafReturnFinalResult()) {
+        return null;
+      }
+      if (!node.getCollations().equals(otherNode.getCollations())) {
+        return null;
+      }
+      if (node.getLimit() != otherNode.getLimit()) {
+        return null;
+      }
+      if (!node.getMvKeyIndexes().equals(otherNode.getMvKeyIndexes())) {
         return null;
       }
       List<PlanNode> children = mergeChildren(node, context);

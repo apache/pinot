@@ -29,6 +29,7 @@ import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.MvAggregateNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
@@ -168,6 +169,13 @@ public class ArrayToMvValidationVisitor implements PlanNodeVisitor<Void, Boolean
 
   @Override
   public Void visitUnnest(UnnestNode node, Boolean isIntermediateStage) {
+    node.getInputs().forEach(e -> e.visit(this, isIntermediateStage));
+    return null;
+  }
+
+  @Override
+  public Void visitMvAggregate(MvAggregateNode node, Boolean isIntermediateStage) {
+    // TODO: check that MV keys are array-typed in the input and scalar in the output (added with the rewrite rule).
     node.getInputs().forEach(e -> e.visit(this, isIntermediateStage));
     return null;
   }

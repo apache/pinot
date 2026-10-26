@@ -112,4 +112,10 @@ public abstract class DefaultPostOrderTraversalVisitor<T, C> implements PlanNode
     node.getInputs().get(0).visit(this, context);
     return process(node, context);
   }
+
+  @Override
+  public T visitMvAggregate(MvAggregateNode node, C context) {
+    node.getInputs().get(0).visit(this, context);
+    return process(node, context);
+  }
 }

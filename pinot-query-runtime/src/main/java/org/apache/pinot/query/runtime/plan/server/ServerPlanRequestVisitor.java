@@ -38,6 +38,7 @@ import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.MvAggregateNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
@@ -339,6 +340,12 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
       context.setLeafStageBoundaryNode(node.getInputs().get(0));
     }
     return null;
+  }
+
+  @Override
+  public Void visitMvAggregate(MvAggregateNode node, ServerPlanRequestContext context) {
+    // TODO: translate the MV aggregate to a single-stage GROUP BY on the array expressions.
+    throw new UnsupportedOperationException("MvAggregateNode is not supported in the leaf stage yet");
   }
 
   private boolean visit(PlanNode node, ServerPlanRequestContext context) {

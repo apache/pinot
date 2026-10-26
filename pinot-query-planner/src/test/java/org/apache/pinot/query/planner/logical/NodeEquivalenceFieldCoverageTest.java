@@ -34,6 +34,7 @@ import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.MvAggregateNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
@@ -79,6 +80,8 @@ public class NodeEquivalenceFieldCoverageTest {
       Map.entry(PlanNode.NodeHint.class, List.of("_hintOptions")),
       Map.entry(AggregateNode.class, List.of("_aggCalls", "_filterArgs", "_groupKeys", "_aggType",
           "_leafReturnFinalResult", "_groupingSets", "_collations", "_limit")),
+      Map.entry(MvAggregateNode.class, List.of("_aggCalls", "_filterArgs", "_groupKeys", "_aggType",
+          "_leafReturnFinalResult", "_collations", "_limit", "_mvKeyIndexes")),
       Map.entry(FilterNode.class, List.of("_condition")),
       Map.entry(JoinNode.class, List.of("_joinType", "_leftKeys", "_rightKeys", "_nonEquiConditions", "_joinStrategy",
           "_matchCondition")),
