@@ -156,6 +156,25 @@ public class IngestionSourceErrorClassifierTest {
   }
 
   @Test
+  public void causeSharedByTwoBranchesIsReadUnderEachBranchsEvidence() {
+    // Whose credential was refused decides: our ambient identity is none, the customer's static key is AUTH.
+    register((node, below, evidence) -> !(node instanceof RefusedException) ? null
+        : evidence != null && evidence.getCredentialMode() == IngestionSourceCredentialMode.AMBIENT
+            ? IngestionSourceErrorVerdict.none("ours")
+            : IngestionSourceErrorVerdict.auth(IngestionSourceErrorSubReason.AUTHENTICATION, "refused", null));
+    Throwable shared = new RefusedException(null);
+    Throwable ambient = IngestionSourceErrorEvidence.attach(new RuntimeException("first attempt", shared),
+        new IngestionSourceErrorEvidence().setCredentialMode(IngestionSourceCredentialMode.AMBIENT));
+    Throwable customer = IngestionSourceErrorEvidence.attach(new RuntimeException("second attempt", shared),
+        new IngestionSourceErrorEvidence().setCredentialMode(IngestionSourceCredentialMode.STATIC));
+    for (List<Throwable> branches : List.of(List.of(ambient, customer), List.of(customer, ambient))) {
+      Throwable failure = new RuntimeException("all attempts failed");
+      branches.forEach(failure::addSuppressed);
+      assertEquals(categoryOf(failure), Optional.of(IngestionSourceErrorCategory.AUTH));
+    }
+  }
+
+  @Test
   public void registrationOrderNeverChangesTheOutcome() {
     IngestionSourceErrorRule readRule = (node, below, evidence) -> node instanceof MissingException
         ? IngestionSourceErrorVerdict.sourceRead("read", null) : null;

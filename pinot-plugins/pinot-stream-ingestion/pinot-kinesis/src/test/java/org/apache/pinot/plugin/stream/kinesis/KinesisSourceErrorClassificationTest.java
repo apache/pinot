@@ -19,16 +19,26 @@
 package org.apache.pinot.plugin.stream.kinesis;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.ConnectException;
+import java.net.InetAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.net.URI;
 import java.net.UnknownHostException;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceCredentialMode;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorEvidence;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorSubReason;
 import org.testng.annotations.Test;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.awscore.exception.AwsErrorDetails;
 import software.amazon.awssdk.awscore.exception.AwsServiceException;
 import software.amazon.awssdk.core.exception.ApiCallTimeoutException;
 import software.amazon.awssdk.core.exception.SdkClientException;
+import software.amazon.awssdk.http.apache.ApacheHttpClient;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.kinesis.KinesisClient;
 import software.amazon.awssdk.services.kinesis.model.AccessDeniedException;
 import software.amazon.awssdk.services.kinesis.model.ExpiredIteratorException;
 import software.amazon.awssdk.services.kinesis.model.KinesisException;
@@ -50,6 +60,7 @@ import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorAssertion
 import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorAssertions.assertSourceRead;
 import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorVerdict.TARGET_KMS;
 import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorVerdict.TARGET_STS;
+import static org.testng.Assert.expectThrows;
 
 
 /// Pins the classifier's AWS rules (the code table, the credential-mode logic and the message carve-outs) against the
@@ -226,6 +237,36 @@ public class KinesisSourceErrorClassificationTest {
     assertSourceRead(underPinot(SdkClientException.create("Unable to execute HTTP request: kinesis.example",
         new UnknownHostException("kinesis.us-east-1.amazonaws.example"))), null);
     assertSourceRead(ApiCallTimeoutException.create(5000), null);
+  }
+
+  @Test
+  public void endpointThatClosesWithoutAnsweringIsSourceRead()
+      throws IOException {
+    // A load balancer or proxy that drops every request: the SDK's Apache client gets no response, retries, and gives
+    // up with that failure as the cause.
+    try (ServerSocket endpoint = new ServerSocket(0, 50, InetAddress.getLoopbackAddress())) {
+      Thread dropper = new Thread(() -> {
+        while (true) {
+          try (Socket connection = endpoint.accept(); InputStream request = connection.getInputStream()) {
+            request.read(new byte[8192]);
+          } catch (IOException e) {
+            return;
+          }
+        }
+      });
+      dropper.setDaemon(true);
+      dropper.start();
+      try (KinesisClient client = KinesisClient.builder()
+          .endpointOverride(URI.create("http://127.0.0.1:" + endpoint.getLocalPort()))
+          .region(Region.US_EAST_1)
+          .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create("test", "test")))
+          .httpClientBuilder(ApacheHttpClient.builder())
+          .build()) {
+        SdkClientException failure =
+            expectThrows(SdkClientException.class, () -> client.listShards(request -> request.streamName("stream")));
+        assertSourceRead(underPinot(failure), null);
+      }
+    }
   }
 
   @Test
