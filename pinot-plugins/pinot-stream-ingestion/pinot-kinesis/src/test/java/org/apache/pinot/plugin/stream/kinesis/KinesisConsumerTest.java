@@ -298,10 +298,11 @@ public class KinesisConsumerTest {
       }
       return GetRecordsResponse.builder().nextShardIterator(PLACEHOLDER).records(List.of()).build();
     });
+    // The count is kept per consumer client id and shard, across recreation
+    String clientId = "throttledTable_REALTIME-stream-0";
     TestKinesisConsumer kinesisConsumer =
-        new TestKinesisConsumer(_kinesisConfig, kinesisClient, NO_OP_REQUEST_RATE_LIMITER);
-    // A shard of its own: the count is kept per stream and shard, across consumers
-    KinesisPartitionGroupOffset startOffset = new KinesisPartitionGroupOffset("throttledShard", "1");
+        new TestKinesisConsumer(_kinesisConfig, kinesisClient, NO_OP_REQUEST_RATE_LIMITER, clientId);
+    KinesisPartitionGroupOffset startOffset = new KinesisPartitionGroupOffset("0", "1");
 
     List<Throwable> reported = new ArrayList<>();
     try (IngestionSourceErrorReporter.Scope ignored = IngestionSourceErrorReporter.listen(reported::add)) {
@@ -327,19 +328,38 @@ public class KinesisConsumerTest {
 
       // The consume loop recreates a consumer that keeps returning empty batches; the new one carries on the count
       TestKinesisConsumer recreatedConsumer =
-          new TestKinesisConsumer(_kinesisConfig, kinesisClient, NO_OP_REQUEST_RATE_LIMITER);
+          new TestKinesisConsumer(_kinesisConfig, kinesisClient, NO_OP_REQUEST_RATE_LIMITER, clientId);
       recreatedConsumer.fetchMessages(startOffset, 2500);
       assertEquals(reported.size(), 3);
 
       // Our own request limiter timing out is not the source's failure, nor a sign it recovered
       TestKinesisConsumer limitedConsumer = new TestKinesisConsumer(_kinesisConfig, kinesisClient,
-          (streamName, shardId, requestType, rpsLimit, timeoutMs) -> false);
+          (streamName, shardId, requestType, rpsLimit, timeoutMs) -> false, clientId);
       for (int i = 0; i < 7; i++) {
         assertEquals(limitedConsumer.fetchMessages(startOffset, 2500).getMessageCount(), 0);
       }
       assertEquals(reported.size(), 3);
       recreatedConsumer.fetchMessages(startOffset, 2500);
       assertEquals(reported.size(), 4);
+    }
+
+    // Another table's healthy consumer of the same stream and shard, interleaved, never resets this one's count
+    KinesisClient healthyClient = mock(KinesisClient.class);
+    when(healthyClient.getShardIterator(any(GetShardIteratorRequest.class))).thenReturn(
+        GetShardIteratorResponse.builder().shardIterator(PLACEHOLDER).build());
+    when(healthyClient.getRecords(any(GetRecordsRequest.class))).thenReturn(
+        GetRecordsResponse.builder().nextShardIterator(PLACEHOLDER).records(List.of()).build());
+    TestKinesisConsumer throttledConsumer = new TestKinesisConsumer(_kinesisConfig, kinesisClient,
+        NO_OP_REQUEST_RATE_LIMITER, "otherThrottledTable_REALTIME-stream-0");
+    TestKinesisConsumer healthyConsumer = new TestKinesisConsumer(_kinesisConfig, healthyClient,
+        NO_OP_REQUEST_RATE_LIMITER, "healthyTable_REALTIME-stream-0");
+    reported.clear();
+    try (IngestionSourceErrorReporter.Scope ignored = IngestionSourceErrorReporter.listen(reported::add)) {
+      for (int i = 0; i < 6; i++) {
+        throttledConsumer.fetchMessages(startOffset, 2500);
+        healthyConsumer.fetchMessages(startOffset, 2500);
+      }
+      assertEquals(reported.size(), 1);
     }
   }
 
@@ -377,6 +397,11 @@ public class KinesisConsumerTest {
     TestKinesisConsumer(KinesisConfig config, KinesisClient kinesisClient,
         KinesisConsumer.RequestRateLimiter requestRateLimiter) {
       super(config, kinesisClient, requestRateLimiter);
+    }
+
+    TestKinesisConsumer(KinesisConfig config, KinesisClient kinesisClient,
+        KinesisConsumer.RequestRateLimiter requestRateLimiter, String clientId) {
+      super(config, kinesisClient, requestRateLimiter, clientId);
     }
 
     @Override

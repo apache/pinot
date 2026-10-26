@@ -31,6 +31,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.ThrottledLogger;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorReporter;
 import org.apache.pinot.spi.stream.BytesStreamMessage;
@@ -59,18 +60,26 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
   // Exhausted throttling returns an empty batch, which the consume loop counts as a successful fetch. Like the consume
   // loop's own tolerance for fetch errors, this many in a row are tolerated; each further one is reported.
   private static final int MAX_CONSECUTIVE_THROTTLED_FETCHES = 5;
-  // Fetches in a row that throttling exhausted, by stream and shard. Kept outside the consumer: every empty batch
-  // counts toward the consume loop's idle timeout, which recreates the consumer.
+  // Fetches in a row that throttling exhausted, by consumer and shard. Kept outside the consumer instance: every empty
+  // batch counts toward the consume loop's idle timeout, which recreates the consumer under the same client id.
   private static final Map<String, Integer> CONSECUTIVE_THROTTLED_FETCHES = new ConcurrentHashMap<>();
 
   private final ThrottledLogger _throttledLogger = new ThrottledLogger(LOGGER, RATE_LIMIT_LOG_RATE_PER_MIN);
   private String _nextStartSequenceNumber = null;
   private String _nextShardIterator = null;
+  // Identifies this consumer across recreation, and apart from other tables' consumers of the same stream
+  private final String _throttleKeyPrefix;
   private final RequestRateLimiter _requestRateLimiter;
 
   public KinesisConsumer(KinesisConfig config) {
+    this(config, (String) null);
+  }
+
+  /// @param clientId the consume loop's id for this consumer, the same when it recreates it
+  public KinesisConsumer(KinesisConfig config, @Nullable String clientId) {
     super(config);
     _requestRateLimiter = SHARED_REQUEST_RATE_LIMITER;
+    _throttleKeyPrefix = throttleKeyPrefix(config, clientId);
     LOGGER.info("Created Kinesis consumer with topic: {}, RPS limit: {}, max records per fetch: {}",
         config.getStreamTopicName(), config.getRpsLimitPerSecond(), config.getNumMaxRecordsToFetch());
   }
@@ -82,8 +91,20 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
 
   @VisibleForTesting
   KinesisConsumer(KinesisConfig config, KinesisClient kinesisClient, RequestRateLimiter requestRateLimiter) {
+    this(config, kinesisClient, requestRateLimiter, null);
+  }
+
+  @VisibleForTesting
+  KinesisConsumer(KinesisConfig config, KinesisClient kinesisClient, RequestRateLimiter requestRateLimiter,
+      @Nullable String clientId) {
     super(config, kinesisClient);
     _requestRateLimiter = requestRateLimiter;
+    _throttleKeyPrefix = throttleKeyPrefix(config, clientId);
+  }
+
+  private static String throttleKeyPrefix(KinesisConfig config, @Nullable String clientId) {
+    return clientId != null ? clientId
+        : config.getAwsRegion() + "/" + config.getEndpoint() + "/" + config.getStreamTopicName();
   }
 
   /// Based on Kinesis documentation, we might get a response with empty records but a non-null nextShardIterator.
@@ -147,7 +168,7 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
   }
 
   private String throttleKey(KinesisPartitionGroupOffset offset) {
-    return _config.getStreamTopicName() + "/" + offset.getShardId();
+    return _throttleKeyPrefix + "/" + offset.getShardId();
   }
 
   private KinesisMessageBatch getKinesisMessageBatch(KinesisPartitionGroupOffset startMsgOffset, long deadlineMs) {
