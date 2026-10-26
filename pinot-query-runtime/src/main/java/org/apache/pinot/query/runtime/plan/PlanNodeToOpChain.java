@@ -440,8 +440,16 @@ public class PlanNodeToOpChain {
 
     @Override
     public MultiStageOperator visitMvAggregate(MvAggregateNode node, OpChainExecutionContext context) {
-      // TODO: build the MV aggregate operator for intermediate stages.
-      throw new UnsupportedOperationException("MvAggregateNode is not supported in intermediate stages yet");
+      MultiStageOperator child = null;
+      try {
+        PlanNode input = node.getInputs().get(0);
+        child = visit(input, context);
+        AggregateOperatorFactory aggregateOperatorFactory =
+            context.getQueryOperatorFactoryProvider().getAggregateOperatorFactory();
+        return aggregateOperatorFactory.createMvAggregateOperator(context, child, input, node);
+      } catch (Exception e) {
+        return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage(), child);
+      }
     }
   }
 }

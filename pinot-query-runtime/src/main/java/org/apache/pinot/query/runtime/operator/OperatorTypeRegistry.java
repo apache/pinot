@@ -85,7 +85,7 @@ public final class OperatorTypeRegistry {
   }
 
   /// Returns the descriptor registered for the given id, or `null` if no descriptor has that id.
-  /// Built-in types (ids 0–15) are always present. Plugin types are available if their jar was on the classpath at
+  /// Built-in types (ids 0–17) are always present. Plugin types are available if their jar was on the classpath at
   /// startup.
   @Nullable
   public static OperatorTypeDescriptor fromId(int id) {

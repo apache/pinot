@@ -96,7 +96,8 @@ public class MultiStageQueryStatsTest {
   public static MultiStageQueryStats[] stats() {
     return new MultiStageQueryStats[] {
         stats1(),
-        stats2()
+        stats2(),
+        stats3()
     };
   }
 
@@ -175,6 +176,39 @@ public class MultiStageQueryStatsTest {
                         .merge(MailboxSendOperator.StatKey.STAGE, 2)
                         .merge(MailboxSendOperator.StatKey.EXECUTION_TIME_MS, 60)
                         .merge(MailboxSendOperator.StatKey.EMITTED_ROWS, 10))
+                .close())
+        .build();
+  }
+
+  public static MultiStageQueryStats stats3() {
+    return new MultiStageQueryStats.Builder(1)
+        .customizeOpen(open ->
+            open.addLastOperator(MultiStageOperator.Type.MAILBOX_RECEIVE,
+                    new StatMap<>(BaseMailboxReceiveOperator.StatKey.class)
+                        .merge(BaseMailboxReceiveOperator.StatKey.EXECUTION_TIME_MS, 50)
+                        .merge(BaseMailboxReceiveOperator.StatKey.EMITTED_ROWS, 20))
+                .addLastOperator(MultiStageOperator.Type.MAILBOX_SEND,
+                    new StatMap<>(MailboxSendOperator.StatKey.class)
+                        .merge(MailboxSendOperator.StatKey.STAGE, 1)
+                        .merge(MailboxSendOperator.StatKey.EXECUTION_TIME_MS, 40)
+                        .merge(MailboxSendOperator.StatKey.EMITTED_ROWS, 15))
+        )
+        .addLast(stageStats ->
+            stageStats.addLastOperator(MultiStageOperator.Type.MAILBOX_RECEIVE,
+                    new StatMap<>(BaseMailboxReceiveOperator.StatKey.class)
+                        .merge(BaseMailboxReceiveOperator.StatKey.EXECUTION_TIME_MS, 80)
+                        .merge(BaseMailboxReceiveOperator.StatKey.EMITTED_ROWS, 30))
+                .addLastOperator(MultiStageOperator.Type.MV_AGGREGATE,
+                    new StatMap<>(AggregateOperator.StatKey.class)
+                        .merge(AggregateOperator.StatKey.EXECUTION_TIME_MS, 25)
+                        .merge(AggregateOperator.StatKey.EMITTED_ROWS, 12)
+                        .merge(AggregateOperator.StatKey.NUM_GROUPS, 12L)
+                        .merge(AggregateOperator.StatKey.NUM_GROUPS_LIMIT_REACHED, true))
+                .addLastOperator(MultiStageOperator.Type.MAILBOX_SEND,
+                    new StatMap<>(MailboxSendOperator.StatKey.class)
+                        .merge(MailboxSendOperator.StatKey.STAGE, 2)
+                        .merge(MailboxSendOperator.StatKey.EXECUTION_TIME_MS, 60)
+                        .merge(MailboxSendOperator.StatKey.EMITTED_ROWS, 12))
                 .close())
         .build();
   }
