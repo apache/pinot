@@ -43,7 +43,8 @@ import javax.annotation.Nullable;
 /// 1. walking from the root cause up, the first source-specific rule that decides wins. A rule that says the failure
 ///    is not the source's verdict (our clock, our ambient identity, a credential that failed to load) therefore
 ///    decides only when no source exception sits beneath it, and a wrapper above it can't reinstate a category;
-/// 2. generic `java.net` / `javax.net.ssl` rules apply only when no source rule decided the chain.
+/// 2. generic rules, which read the transport rather than a source's answer (`java.net` / `javax.net.ssl`, and any
+///    registered with [#registerGenericRule]), apply only when no source rule decided the chain.
 ///
 /// Across chains [IngestionSourceErrorCategory#AUTH] beats [IngestionSourceErrorCategory#SOURCE_READ]: a refusal
 /// recorded as a suppressed exception still surfaces.
@@ -59,6 +60,7 @@ public final class IngestionSourceErrorClassifier {
   // Bounds the walk over pathological exception graphs; real failures are a few dozen nodes.
   private static final int MAX_NODES = 1_000;
   private static final Set<IngestionSourceErrorRule> REGISTERED_RULES = new CopyOnWriteArraySet<>();
+  private static final Set<IngestionSourceErrorRule> REGISTERED_GENERIC_RULES = new CopyOnWriteArraySet<>();
 
   private IngestionSourceErrorClassifier() {
   }
@@ -108,14 +110,25 @@ public final class IngestionSourceErrorClassifier {
     REGISTERED_RULES.remove(rule);
   }
 
+  /// Adds generic rules: ones that read the transport rather than a source's answer, such as a file missing under a
+  /// path the caller knows is remote. Like the built-in network rules, they apply to a chain only when no source rule,
+  /// built-in or registered, decided it, and after the built-in network rules on each exception.
+  public static void registerGenericRule(IngestionSourceErrorRule rule) {
+    REGISTERED_GENERIC_RULES.add(rule);
+  }
+
+  public static void unregisterGenericRule(IngestionSourceErrorRule rule) {
+    REGISTERED_GENERIC_RULES.remove(rule);
+  }
+
   /// The decision of the registered rules on `node`. When they disagree, "not the source's verdict" beats
   /// [IngestionSourceErrorCategory#AUTH], which beats [IngestionSourceErrorCategory#SOURCE_READ], and remaining ties
   /// break on sub-reason, code and target, so registration order never matters.
   @Nullable
-  private static IngestionSourceErrorVerdict decideRegistered(Throwable node, List<Throwable> below,
-      @Nullable IngestionSourceErrorEvidence evidence) {
+  private static IngestionSourceErrorVerdict decideRegistered(Set<IngestionSourceErrorRule> rules, Throwable node,
+      List<Throwable> below, @Nullable IngestionSourceErrorEvidence evidence) {
     IngestionSourceErrorVerdict decided = null;
-    for (IngestionSourceErrorRule rule : REGISTERED_RULES) {
+    for (IngestionSourceErrorRule rule : rules) {
       IngestionSourceErrorVerdict verdict;
       try {
         verdict = rule.decide(node, below, evidence);
@@ -252,7 +265,7 @@ public final class IngestionSourceErrorClassifier {
           verdict = IngestionSourceErrorRules.matchSource(node, below, nearest);
         }
         if (verdict == null) {
-          verdict = decideRegistered(node, below, nearest);
+          verdict = decideRegistered(REGISTERED_RULES, node, below, nearest);
         }
         if (verdict != null) {
           return new Decision(verdict, node, nearest);
@@ -262,9 +275,14 @@ public final class IngestionSourceErrorClassifier {
         if (!isEligible(chain, i)) {
           continue;
         }
-        IngestionSourceErrorVerdict verdict = IngestionSourceErrorRules.matchGeneric(nodes.get(i));
+        Throwable node = nodes.get(i);
+        IngestionSourceErrorVerdict verdict = IngestionSourceErrorRules.matchGeneric(node);
+        if (verdict == null) {
+          verdict = decideRegistered(REGISTERED_GENERIC_RULES, node, nodes.subList(i + 1, nodes.size()),
+              chain._nearest.get(i));
+        }
         if (verdict != null) {
-          return new Decision(verdict, nodes.get(i), chain._nearest.get(i));
+          return new Decision(verdict, node, chain._nearest.get(i));
         }
       }
       return null;
