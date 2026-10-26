@@ -80,6 +80,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.function.scalar.StringFunctions.*;
+import static org.apache.pinot.integration.tests.ClusterIntegrationTestUtils.getBrokerQueryApiUrl;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
@@ -1130,13 +1131,34 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertEquals(results.get(10).asText(), "hello!");
   }
 
-  @Test
-  public void testMultiValueColumnGroupBy()
+  @DataProvider(name = "useMvAggregate")
+  public Object[][] useMvAggregate() {
+    return new Object[][]{{true}, {false}};
+  }
+
+  @Test(dataProvider = "useMvAggregate")
+  public void testMultiValueColumnGroupBy(boolean useMvAggregate)
       throws Exception {
-    String pinotQuery = "SELECT count(*), ARRAY_TO_MV(RandomAirports) FROM mytable "
-        + "GROUP BY ARRAY_TO_MV(RandomAirports)";
+    String pinotQuery = "SET useMvAggregate=" + useMvAggregate + "; "
+        + "SELECT count(*), ARRAY_TO_MV(RandomAirports) FROM mytable GROUP BY ARRAY_TO_MV(RandomAirports)";
     JsonNode jsonNode = postQuery(pinotQuery);
     Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 154);
+  }
+
+  /// A leaf-stage `GROUP BY ARRAY_TO_MV(col)` returns the same groups and counts as the single-stage
+  /// `GROUP BY col`, with the MV aggregate on and off.
+  @Test(dataProvider = "useMvAggregate")
+  public void testMultiValueColumnGroupByMatchesSingleStageEngine(boolean useMvAggregate)
+      throws Exception {
+    JsonNode singleStage = postQuery("SELECT RandomAirports, count(*) FROM mytable GROUP BY RandomAirports LIMIT 1000",
+        getBrokerQueryApiUrl(getBrokerBaseApiUrl(), false), null, getExtraQueryProperties());
+    assertNoError(singleStage);
+    JsonNode multiStage = postQuery("SET useMvAggregate=" + useMvAggregate + "; "
+        + "SELECT ARRAY_TO_MV(RandomAirports), count(*) FROM mytable GROUP BY ARRAY_TO_MV(RandomAirports)");
+    assertNoError(multiStage);
+    List<List<String>> expectedRows = sortedRows(singleStage.get("resultTable").get("rows"));
+    assertEquals(expectedRows.size(), 154);
+    assertEquals(sortedRows(multiStage.get("resultTable").get("rows")), expectedRows);
   }
 
   @Test
@@ -1152,10 +1174,11 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
             Assertions.assertThat(message).contains("Use ARRAY_TO_MV() to group by multi-value column"));
   }
 
-  @Test
-  public void testVariadicFunction()
+  @Test(dataProvider = "useMvAggregate")
+  public void testVariadicFunction(boolean useMvAggregate)
       throws Exception {
-    String sqlQuery = "SELECT ARRAY_TO_MV(VALUE_IN(RandomAirports, 'MFR', 'SUN', 'GTR')) as airport, count(*) "
+    String sqlQuery = "SET useMvAggregate=" + useMvAggregate + "; "
+        + "SELECT ARRAY_TO_MV(VALUE_IN(RandomAirports, 'MFR', 'SUN', 'GTR')) as airport, count(*) "
         + "FROM mytable WHERE ARRAY_TO_MV(RandomAirports) IN ('MFR', 'SUN', 'GTR') GROUP BY airport";
     JsonNode jsonNode = postQuery(sqlQuery);
     assertNoError(jsonNode);
@@ -1281,12 +1304,12 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     Assert.assertNotEquals(jsonNode.get("resultTable").get("rows").size(), 0);
   }
 
-  @Test
-  public void testMultiValueColumnGroupByOrderBy()
+  @Test(dataProvider = "useMvAggregate")
+  public void testMultiValueColumnGroupByOrderBy(boolean useMvAggregate)
       throws Exception {
-    String pinotQuery =
-        "SELECT count(*), ARRAY_TO_MV(RandomAirports) FROM mytable GROUP BY ARRAY_TO_MV(RandomAirports) "
-            + "ORDER BY ARRAY_TO_MV(RandomAirports) DESC";
+    String pinotQuery = "SET useMvAggregate=" + useMvAggregate + "; "
+        + "SELECT count(*), ARRAY_TO_MV(RandomAirports) FROM mytable GROUP BY ARRAY_TO_MV(RandomAirports) "
+        + "ORDER BY ARRAY_TO_MV(RandomAirports) DESC";
     JsonNode jsonNode = postQuery(pinotQuery);
     Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 154);
   }

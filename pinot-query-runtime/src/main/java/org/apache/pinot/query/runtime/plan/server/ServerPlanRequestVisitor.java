@@ -30,6 +30,7 @@ import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.query.parser.CalciteRexExpressionParser;
+import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
@@ -71,47 +72,70 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
   @Override
   public Void visitAggregate(AggregateNode node, ServerPlanRequestContext context) {
     if (visit(node.getInputs().get(0), context)) {
-      PinotQuery pinotQuery = context.getPinotQuery();
-      List<Expression> groupByList = CalciteRexExpressionParser.convertInputRefs(node.getGroupKeys(), pinotQuery);
-      if (!groupByList.isEmpty()) {
-        pinotQuery.setGroupByList(groupByList);
-      }
-      // GROUP BY GROUPING SETS / ROLLUP / CUBE: push the per-set row expansion down to the single-stage engine. The
-      // per-set column-index lists are over groupByList (== node.getGroupKeys()), so they transfer directly. The
-      // single-stage leaf expands each row across the sets and appends the synthetic $groupingId ordinal column; the
-      // multi-stage final stage then groups on it (it is one of the group keys), keeping the grouping sets distinct.
-      if (node.isGroupingSets()) {
-        pinotQuery.setGroupingSets(node.getGroupingSets());
-      }
-      List<Expression> selectList =
-          CalciteRexExpressionParser.convertAggregateList(groupByList, node.getAggCalls(), node.getFilterArgs(),
-              pinotQuery.getSelectList());
-      for (Expression expression : selectList) {
-        applyTimestampIndex(expression, pinotQuery);
-      }
-      pinotQuery.setSelectList(selectList);
-      if (node.getAggType() == AggregateNode.AggType.DIRECT) {
-        pinotQuery.putToQueryOptions(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true");
-      } else if (node.isLeafReturnFinalResult()) {
-        // SERVER_RETURN_FINAL_RESULT_KEY_UNPARTITIONED only applies to group-by queries.
-        if (groupByList.isEmpty()) {
-          pinotQuery.putToQueryOptions(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true");
-        } else {
-          pinotQuery.putToQueryOptions(QueryOptionKey.SERVER_RETURN_FINAL_RESULT_KEY_UNPARTITIONED, "true");
-        }
-      }
-      int limit = node.getLimit();
-      if (limit > 0) {
-        List<RelFieldCollation> collations = node.getCollations();
-        if (!collations.isEmpty()) {
-          pinotQuery.setOrderByList(CalciteRexExpressionParser.convertOrderByList(collations, pinotQuery));
-        }
-        pinotQuery.setLimit(limit);
-      }
-      // There cannot be any more modification of PinotQuery post agg, thus this is the last one possible.
-      context.setLeafStageBoundaryNode(node);
+      applyAggregate(node, node.getGroupKeys(), node.getGroupingSets(), node.getAggCalls(), node.getFilterArgs(),
+          node.getAggType(), node.isLeafReturnFinalResult(), node.getCollations(), node.getLimit(), context);
     }
     return null;
+  }
+
+  /// Pushes the MV aggregate to the single-stage engine as a plain `GROUP BY` on its keys. The planner rewrote each
+  /// MV key to the array expression under the aggregate (the `ARRAY_TO_MV` call is gone), so the group-by list holds
+  /// the multi-value column or the array transform. The single-stage engine groups by each element of an MV key, which
+  /// is the MV aggregate semantics, and types the key with its single-value type, which matches the node schema.
+  ///
+  /// When the input already set the leaf boundary (for example a lookup join), the node is not pushed down. It then
+  /// runs above the boundary as an `MvAggregateOperator`.
+  @Override
+  public Void visitMvAggregate(MvAggregateNode node, ServerPlanRequestContext context) {
+    if (visit(node.getInputs().get(0), context)) {
+      applyAggregate(node, node.getGroupKeys(), List.of(), node.getAggCalls(), node.getFilterArgs(), node.getAggType(),
+          node.isLeafReturnFinalResult(), node.getCollations(), node.getLimit(), context);
+    }
+    return null;
+  }
+
+  /// Translates an aggregate into the group-by, select list, options, order and limit of the leaf [PinotQuery] and
+  /// sets the aggregate as the leaf boundary.
+  private void applyAggregate(PlanNode node, List<Integer> groupKeys, List<List<Integer>> groupingSets,
+      List<RexExpression.FunctionCall> aggCalls, List<Integer> filterArgs, AggregateNode.AggType aggType,
+      boolean leafReturnFinalResult, List<RelFieldCollation> collations, int limit,
+      ServerPlanRequestContext context) {
+    PinotQuery pinotQuery = context.getPinotQuery();
+    List<Expression> groupByList = CalciteRexExpressionParser.convertInputRefs(groupKeys, pinotQuery);
+    if (!groupByList.isEmpty()) {
+      pinotQuery.setGroupByList(groupByList);
+    }
+    /// GROUP BY GROUPING SETS / ROLLUP / CUBE: push the per-set row expansion down to the single-stage engine. The
+    /// per-set column-index lists are over groupByList (== groupKeys), so they transfer directly. The
+    /// single-stage leaf expands each row across the sets and appends the synthetic $groupingId ordinal column; the
+    /// multi-stage final stage then groups on it (it is one of the group keys), keeping the grouping sets distinct.
+    if (!groupingSets.isEmpty()) {
+      pinotQuery.setGroupingSets(groupingSets);
+    }
+    List<Expression> selectList =
+        CalciteRexExpressionParser.convertAggregateList(groupByList, aggCalls, filterArgs, pinotQuery.getSelectList());
+    for (Expression expression : selectList) {
+      applyTimestampIndex(expression, pinotQuery);
+    }
+    pinotQuery.setSelectList(selectList);
+    if (aggType == AggregateNode.AggType.DIRECT) {
+      pinotQuery.putToQueryOptions(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true");
+    } else if (leafReturnFinalResult) {
+      // SERVER_RETURN_FINAL_RESULT_KEY_UNPARTITIONED only applies to group-by queries.
+      if (groupByList.isEmpty()) {
+        pinotQuery.putToQueryOptions(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true");
+      } else {
+        pinotQuery.putToQueryOptions(QueryOptionKey.SERVER_RETURN_FINAL_RESULT_KEY_UNPARTITIONED, "true");
+      }
+    }
+    if (limit > 0) {
+      if (!collations.isEmpty()) {
+        pinotQuery.setOrderByList(CalciteRexExpressionParser.convertOrderByList(collations, pinotQuery));
+      }
+      pinotQuery.setLimit(limit);
+    }
+    // There cannot be any more modification of PinotQuery post agg, thus this is the last one possible.
+    context.setLeafStageBoundaryNode(node);
   }
 
   @Override
@@ -340,12 +364,6 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
       context.setLeafStageBoundaryNode(node.getInputs().get(0));
     }
     return null;
-  }
-
-  @Override
-  public Void visitMvAggregate(MvAggregateNode node, ServerPlanRequestContext context) {
-    // TODO: translate the MV aggregate to a single-stage GROUP BY on the array expressions.
-    throw new UnsupportedOperationException("MvAggregateNode is not supported in the leaf stage yet");
   }
 
   private boolean visit(PlanNode node, ServerPlanRequestContext context) {
