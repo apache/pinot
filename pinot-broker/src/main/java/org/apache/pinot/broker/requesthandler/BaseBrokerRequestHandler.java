@@ -29,7 +29,6 @@ import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -362,19 +361,18 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler, 
   ///  Acquires the QPS quota of the given table (name with or without type suffix) and returns true only if the quota
   ///  is breached and the table's enforcement mode requires rejecting the query.
   protected boolean isTableQpsQuotaBreachEnforced(String tableName) {
-    return isQpsQuotaBreachEnforced(tableName, _queryQuotaManager::acquire);
+    return !_queryQuotaManager.acquire(tableName) && shouldEnforceQpsQuotaBreach(tableName);
   }
 
   ///  Same as [#isTableQpsQuotaBreachEnforced(String)] for a logical table.
   protected boolean isLogicalTableQpsQuotaBreachEnforced(String logicalTableName) {
-    return isQpsQuotaBreachEnforced(logicalTableName, _queryQuotaManager::acquireLogicalTable);
+    return !_queryQuotaManager.acquireLogicalTable(logicalTableName)
+        && shouldEnforceQpsQuotaBreach(logicalTableName);
   }
 
-  private boolean isQpsQuotaBreachEnforced(String tableName, Predicate<String> acquire) {
-    if (acquire.test(tableName)) {
-      return false;
-    }
-    // Only resolve the enforcement mode on a breach, so that queries within quota do not pay for it
+  /// Meters a QPS quota breach of the given table and returns whether its enforcement mode requires rejecting the
+  /// query. The mode is only resolved on a breach, so that queries within quota do not pay for it.
+  private boolean shouldEnforceQpsQuotaBreach(String tableName) {
     QuotaEnforcementMode enforcementMode = _queryQuotaManager.getQueryQuotaEnforcementMode(tableName);
     if (enforcementMode == QuotaEnforcementMode.DISABLED) {
       return false;

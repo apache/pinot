@@ -199,20 +199,18 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
     boolean isQuotaExceeded = _storageQuotaChecker.isTableStorageQuotaExceeded(tableConfig);
     QuotaEnforcementMode enforcementMode = _storageQuotaChecker.getEnforcementMode(tableConfig);
-    if (isQuotaExceeded && enforcementMode != QuotaEnforcementMode.ENFORCED) {
-      if (enforcementMode == QuotaEnforcementMode.SHADOW) {
-        // The breach meter is already emitted by StorageQuotaChecker
-        LOGGER.warn("Storage quota exceeded for table: {}, but enforcement mode is SHADOW, not pausing consumption",
-            tableNameWithType);
-      }
-      // DISABLED or SHADOW: don't treat the breach as exceeded for pause/resume purposes
-      isQuotaExceeded = false;
+    if (isQuotaExceeded && enforcementMode == QuotaEnforcementMode.SHADOW) {
+      // The breach meter is already emitted by StorageQuotaChecker
+      LOGGER.warn("Storage quota exceeded for table: {}, but enforcement mode is SHADOW, not pausing consumption",
+          tableNameWithType);
     }
-    if (isQuotaExceeded == isTablePaused) {
+    // Only an enforced breach pauses consumption; a breach in SHADOW or DISABLED mode is treated as within quota
+    boolean shouldPauseForQuota = isQuotaExceeded && enforcementMode == QuotaEnforcementMode.ENFORCED;
+    if (shouldPauseForQuota == isTablePaused) {
       return !isTablePaused;
     }
     // if quota breach and pause flag is not in sync, update the IS
-    if (isQuotaExceeded) {
+    if (shouldPauseForQuota) {
       String storageQuota = tableConfig.getQuotaConfig() != null ? tableConfig.getQuotaConfig().getStorage() : "NA";
       // as quota is breached pause the consumption right away
       _llcRealtimeSegmentManager.pauseConsumption(tableNameWithType, PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED,
@@ -222,7 +220,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
       _llcRealtimeSegmentManager.updatePauseStateInIdealState(tableNameWithType, false,
           PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED, "Table storage within quota limits");
     }
-    return !isQuotaExceeded;
+    return !shouldPauseForQuota;
   }
 
   private void runSegmentLevelValidation(TableConfig tableConfig) {
