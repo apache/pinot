@@ -125,8 +125,7 @@ public class PinotAggregateTypeArgumentRewriteRule extends RelOptRule {
     List<Integer> argList = aggCall.getArgList();
     String name = AggregationFunctionType.getNormalizedAggregationFunctionName(aggCall.getAggregation().getName());
     if (name.equals(AggregationFunctionType.MODE.name())) {
-      // BOOLEAN and TIMESTAMP already return their own type, cast from the DOUBLE result. The leaf stage may still
-      // rewrite them in the single-stage optimizer, which keeps the same INT/LONG count maps.
+      // BOOLEAN and TIMESTAMP already return their own type, cast from the DOUBLE result.
       return argList.size() == 1 && SqlTypeName.CHAR_TYPES.contains(getSqlTypeName(input, argList.get(0)))
           ? List.of("MIN", "STRING") : null;
     }

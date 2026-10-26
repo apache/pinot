@@ -106,19 +106,21 @@ public class AggregateFunctionRewriteOptimizerTest {
   public void testModeInfersNonNumericDataType() {
     assertRewrite("SELECT MODE(stringCol), MODE(jsonCol), MODE(boolCol, 'MAX'), MODE(timestampCol, 'AVG') "
             + "FROM testTable",
-        "SELECT MODE(stringCol, 'MIN', 'STRING'), MODE(jsonCol, 'MIN', 'STRING'), MODE(boolCol, 'MAX', 'BOOLEAN'), "
-            + "MODE(timestampCol, 'AVG', 'TIMESTAMP') FROM testTable");
+        "SELECT MODE(stringCol, 'MIN', 'STRING'), MODE(jsonCol, 'MIN', 'STRING'), MODE(boolCol, 'MAX'), "
+            + "MODE(timestampCol, 'AVG') FROM testTable");
     assertRewrite("SELECT intCol, MODE(stringCol) FILTER (WHERE boolCol) AS m FROM testTable GROUP BY intCol "
             + "HAVING MODE(boolCol) = true ORDER BY MODE(timestampCol, 'MAX')",
         "SELECT intCol, MODE(stringCol, 'MIN', 'STRING') FILTER (WHERE boolCol) AS m FROM testTable GROUP BY intCol "
-            + "HAVING MODE(boolCol, 'MIN', 'BOOLEAN') = true ORDER BY MODE(timestampCol, 'MAX', 'TIMESTAMP')");
+            + "HAVING MODE(boolCol) = true ORDER BY MODE(timestampCol, 'MAX')");
   }
 
   @Test
   public void testModeKeepsOtherInputs() {
-    // Numeric MODE keeps its DOUBLE result
+    // Numeric, BOOLEAN and TIMESTAMP MODE keep their DOUBLE results
     assertUnchanged("SELECT MODE(intCol), MODE(longCol, 'AVG'), MODE(floatCol, 'MAX'), MODE(doubleCol) FROM testTable");
-    for (String column : new String[]{"bytesCol", "uuidCol", "mvStringCol", "missingCol", "trim(stringCol)"}) {
+    for (String column : new String[]{
+        "boolCol", "timestampCol", "bytesCol", "uuidCol", "mvStringCol", "missingCol", "trim(stringCol)"
+    }) {
       assertUnchanged("SELECT MODE(" + column + ") FROM testTable");
     }
     assertUnchanged("SELECT MODE(stringCol, 'MAX', 'STRING') FROM testTable");

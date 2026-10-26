@@ -418,7 +418,7 @@ public class ModeQueriesTest extends BaseQueriesTest {
 
   @Test(dataProvider = "testNonNumericAggregationOnlyDataProvider")
   public void testNonNumericAggregationOnly(String query, Object[] expectedRow) {
-    // The optimizer supplies the data type, so the result keeps the column's type
+    // STRING is inferred; BOOLEAN and TIMESTAMP use the explicit typed form
     ResultTable resultTable = getBrokerResponseForOptimizedQuery(query, SCHEMA).getResultTable();
     assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{
         "mode(stringColumn)", "mode(stringNoDictColumn)", "mode(booleanColumn)", "mode(booleanNoDictColumn)",
@@ -443,15 +443,18 @@ public class ModeQueriesTest extends BaseQueriesTest {
     };
     return new Object[][]{
         {
-            "SELECT MODE(stringColumn), MODE(stringNoDictColumn), MODE(booleanColumn), MODE(booleanNoDictColumn), "
-                + "MODE(timestampColumn), MODE(timestampNoDictColumn), MODE(jsonColumn) FROM testTable", expectedMinRow
+            "SELECT MODE(stringColumn), MODE(stringNoDictColumn), MODE(booleanColumn, 'MIN', 'BOOLEAN'), "
+                + "MODE(booleanNoDictColumn, 'MIN', 'BOOLEAN'), MODE(timestampColumn, 'MIN', 'TIMESTAMP'), "
+                + "MODE(timestampNoDictColumn, 'MIN', 'TIMESTAMP'), MODE(jsonColumn) FROM testTable", expectedMinRow
         }, {
-            "SELECT MODE(stringColumn, 'MIN'), MODE(stringNoDictColumn, 'MIN'), MODE(booleanColumn, 'MIN'), "
-                + "MODE(booleanNoDictColumn, 'MIN'), MODE(timestampColumn, 'MIN'), MODE(timestampNoDictColumn, 'MIN'), "
+            "SELECT MODE(stringColumn, 'MIN'), MODE(stringNoDictColumn, 'MIN'), MODE(booleanColumn, 'MIN', 'BOOLEAN'), "
+                + "MODE(booleanNoDictColumn, 'MIN', 'BOOLEAN'), MODE(timestampColumn, 'MIN', 'TIMESTAMP'), "
+                + "MODE(timestampNoDictColumn, 'MIN', 'TIMESTAMP'), "
                 + "MODE(jsonColumn, 'MIN') FROM testTable", expectedMinRow
         }, {
-            "SELECT MODE(stringColumn, 'MAX'), MODE(stringNoDictColumn, 'MAX'), MODE(booleanColumn, 'MAX'), "
-                + "MODE(booleanNoDictColumn, 'MAX'), MODE(timestampColumn, 'MAX'), MODE(timestampNoDictColumn, 'MAX'), "
+            "SELECT MODE(stringColumn, 'MAX'), MODE(stringNoDictColumn, 'MAX'), MODE(booleanColumn, 'MAX', 'BOOLEAN'), "
+                + "MODE(booleanNoDictColumn, 'MAX', 'BOOLEAN'), MODE(timestampColumn, 'MAX', 'TIMESTAMP'), "
+                + "MODE(timestampNoDictColumn, 'MAX', 'TIMESTAMP'), "
                 + "MODE(jsonColumn, 'MAX') FROM testTable", expectedMaxRow
         }
     };
@@ -484,21 +487,42 @@ public class ModeQueriesTest extends BaseQueriesTest {
   public Object[][] testNonNumericAggregationGroupByDataProvider() {
     return new Object[][]{
         {
-            "SELECT intColumn, MODE(stringColumn), MODE(stringNoDictColumn), MODE(booleanColumn), "
-                + "MODE(booleanNoDictColumn, 'MAX'), MODE(timestampColumn), MODE(timestampNoDictColumn, 'MAX') "
+            "SELECT intColumn, MODE(stringColumn), MODE(stringNoDictColumn), MODE(booleanColumn, 'MIN', 'BOOLEAN'), "
+                + "MODE(booleanNoDictColumn, 'MAX', 'BOOLEAN'), MODE(timestampColumn, 'MIN', 'TIMESTAMP'), "
+                + "MODE(timestampNoDictColumn, 'MAX', 'TIMESTAMP') "
                 + "FROM testTable GROUP BY intColumn ORDER BY MODE(stringColumn) LIMIT 1000"
         }, {
-            "SELECT intMVColumn, MODE(stringColumn), MODE(stringNoDictColumn), MODE(booleanColumn), "
-                + "MODE(booleanNoDictColumn, 'MAX'), MODE(timestampColumn), MODE(timestampNoDictColumn, 'MAX') "
+            "SELECT intMVColumn, MODE(stringColumn), MODE(stringNoDictColumn), MODE(booleanColumn, 'MIN', 'BOOLEAN'), "
+                + "MODE(booleanNoDictColumn, 'MAX', 'BOOLEAN'), MODE(timestampColumn, 'MIN', 'TIMESTAMP'), "
+                + "MODE(timestampNoDictColumn, 'MAX', 'TIMESTAMP') "
                 + "FROM testTable GROUP BY intMVColumn ORDER BY MODE(stringNoDictColumn) LIMIT 1000"
         }
     };
   }
 
   @Test
+  public void testBooleanTimestampKeepLegacySemantics() {
+    String query = "SELECT intColumn, MODE(booleanColumn), MODE(timestampColumn, 'AVG'), "
+        + "MODE(timestampColumn) + 1, CAST(MODE(booleanColumn) AS STRING) FROM testTable "
+        + "GROUP BY intColumn HAVING MODE(booleanColumn) = 1.0 ORDER BY intColumn LIMIT 1000";
+    ResultTable table = getBrokerResponseForOptimizedQuery(query, SCHEMA).getResultTable();
+    assertEquals(table.getDataSchema().getColumnDataTypes(), new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.OBJECT
+    });
+    List<Integer> expectedKeys = _values.keySet().stream().filter(key -> key % 3 == 0).sorted().toList();
+    assertEquals(table.getRows().size(), expectedKeys.size());
+    for (int i = 0; i < expectedKeys.size(); i++) {
+      int key = expectedKeys.get(i);
+      assertEquals(table.getRows().get(i), new Object[]{
+          key, 1.0, (double) (TIMESTAMP_BASE + key), (double) (TIMESTAMP_BASE + key + 1), "1.0"
+      });
+    }
+  }
+
+  @Test
   public void testNonNumericEmptyInput() {
-    String query = "SELECT MODE(stringColumn), MODE(stringNoDictColumn), MODE(booleanColumn), "
-        + "MODE(timestampNoDictColumn) FROM testTable WHERE intColumn < 0";
+    String query = "SELECT MODE(stringColumn), MODE(stringNoDictColumn), MODE(booleanColumn, 'MIN', 'BOOLEAN'), "
+        + "MODE(timestampNoDictColumn, 'MIN', 'TIMESTAMP') FROM testTable WHERE intColumn < 0";
     List<Object[]> rows = getBrokerResponseForOptimizedQuery(query, SCHEMA).getResultTable().getRows();
     assertEquals(rows.size(), 1);
     assertEquals(rows.get(0), new Object[]{null, null, null, null});
@@ -507,7 +531,8 @@ public class ModeQueriesTest extends BaseQueriesTest {
   @Test
   public void testNonNumericRejectsAvg() {
     for (String column : new String[]{STRING_COLUMN, BOOLEAN_COLUMN, TIMESTAMP_COLUMN}) {
-      String query = "SELECT MODE(" + column + ", 'AVG') FROM testTable";
+      String dataType = SCHEMA.getFieldSpecFor(column).getDataType().name();
+      String query = "SELECT MODE(" + column + ", 'AVG', '" + dataType + "') FROM testTable";
       BadQueryRequestException exception =
           expectThrows(BadQueryRequestException.class, () -> getBrokerResponseForOptimizedQuery(query, SCHEMA));
       assertTrue(exception.getMessage().contains("Unsupported MODE reducer for"), exception.getMessage());
@@ -532,8 +557,9 @@ public class ModeQueriesTest extends BaseQueriesTest {
   public void testNonNumericOrderByEmptyGroup() {
     // With null handling disabled, MODE of an empty group is null, which sorts last for ASC and first for DESC
     for (boolean asc : new boolean[]{true, false}) {
-      String query = "SELECT intColumn, MODE(booleanColumn) FILTER (WHERE intColumn < 5) FROM testTable "
-          + "GROUP BY intColumn ORDER BY MODE(booleanColumn) FILTER (WHERE intColumn < 5) " + (asc ? "ASC" : "DESC")
+      String query = "SELECT intColumn, MODE(booleanColumn, 'MIN', 'BOOLEAN') FILTER (WHERE intColumn < 5) "
+          + "FROM testTable GROUP BY intColumn "
+          + "ORDER BY MODE(booleanColumn, 'MIN', 'BOOLEAN') FILTER (WHERE intColumn < 5) " + (asc ? "ASC" : "DESC")
           + ", intColumn LIMIT 3";
       Comparator<Boolean> modeOrder = asc ? Comparator.nullsLast(Comparator.<Boolean>naturalOrder())
           : Comparator.nullsFirst(Comparator.<Boolean>reverseOrder());

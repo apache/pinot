@@ -36,7 +36,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 /// Always applied:
 /// - FIRST_WITH_TIME(dataColumn, timeColumn) -> FIRST_WITH_TIME(dataColumn, timeColumn, 'dataType')
 /// - LAST_WITH_TIME(dataColumn, timeColumn) -> LAST_WITH_TIME(dataColumn, timeColumn, 'dataType')
-/// - MODE(nonNumericColumn[, 'MIN'|'MAX']) -> MODE(nonNumericColumn, 'MIN'|'MAX', 'dataType')
+/// - MODE(stringColumn[, 'MIN'|'MAX']) -> MODE(stringColumn, 'MIN'|'MAX', 'STRING')
 ///
 /// Applied only when enabled through the `autoRewriteAggregationType` query option:
 /// - MIN(stringType) -> MINSTRING
@@ -139,7 +139,7 @@ public class AggregateFunctionRewriteOptimizer implements StatementOptimizer {
         functionName, fieldSpec.isSingleValueField() ? "" : "multi-value ", fieldSpec.getDataType()));
   }
 
-  /// Appends the default tie reducer when missing, then the data column's logical type when it is non-numeric.
+  /// Appends the default tie reducer when missing, then STRING for a STRING or JSON column.
   private static void addModeDataTypeArgument(Function function, FieldSpec fieldSpec) {
     if (!fieldSpec.isSingleValueField()) {
       return;
@@ -147,8 +147,6 @@ public class AggregateFunctionRewriteOptimizer implements StatementOptimizer {
     String dataType;
     switch (fieldSpec.getDataType()) {
       case STRING:
-      case BOOLEAN:
-      case TIMESTAMP:
         dataType = fieldSpec.getDataType().name();
         break;
       case JSON:
