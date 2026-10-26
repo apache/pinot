@@ -59,9 +59,13 @@ import org.slf4j.LoggerFactory;
 /// and realtime from [org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndex]
 public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
   private static final Logger LOGGER = LoggerFactory.getLogger(LuceneTextIndexCreator.class);
+  /// Stored Pinot document ID used by mutable and legacy immutable indexes.
+  /// Also the alternate numeric doc-values field when the TEXT column is named "PinotDocID".
   public static final String PINOT_DOC_ID_STORED_FIELD_NAME = "DocID";
+
+  /// Preferred numeric doc-values field holding the Pinot document ID in freshly built immutable indexes.
+  /// Used to build the Lucene-to-Pinot mapping; omitted when explicitly configured with Skip.
   public static final String PINOT_DOC_ID_DOC_VALUES_FIELD_NAME = "PinotDocID";
-  public static final String LUCENE_INDEX_DOC_ID_COLUMN_NAME = PINOT_DOC_ID_STORED_FIELD_NAME;
 
   private final String _textColumn;
   private final boolean _commitOnClose;

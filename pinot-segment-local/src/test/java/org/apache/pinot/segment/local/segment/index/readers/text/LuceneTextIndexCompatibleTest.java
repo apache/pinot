@@ -183,7 +183,7 @@ public class LuceneTextIndexCompatibleTest {
         Document document = new Document();
         document.add(new TextField(COLUMN, "matchall " + tokens[i], Field.Store.NO));
         document.add(new StringField("key", tokens[i], Field.Store.NO));
-        document.add(new StoredField(LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME, PINOT_IDS[i]));
+        document.add(new StoredField(LuceneTextIndexCreator.PINOT_DOC_ID_STORED_FIELD_NAME, PINOT_IDS[i]));
         if (docValuesMode.equals("all") || docValuesMode.equals("mixed") && i == 1) {
           document.add(
               new NumericDocValuesField(LuceneTextIndexCreator.PINOT_DOC_ID_DOC_VALUES_FIELD_NAME, PINOT_IDS[i]));

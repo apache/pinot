@@ -152,7 +152,7 @@ public class LuceneTextIndexCreatorTest {
         DirectoryReader reader = DirectoryReader.open(directory)) {
       NumericDocValues ids =
           MultiDocValues.getNumericValues(reader, LuceneTextIndexCreator.PINOT_DOC_ID_DOC_VALUES_FIELD_NAME);
-      assertNull(MultiDocValues.getNumericValues(reader, LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME));
+      assertNull(MultiDocValues.getNumericValues(reader, LuceneTextIndexCreator.PINOT_DOC_ID_STORED_FIELD_NAME));
       assertEquals(reader.maxDoc(), 4);
       for (int i = 0; i < reader.maxDoc(); i++) {
         assertTrue(ids.advanceExact(i));
@@ -282,7 +282,7 @@ public class LuceneTextIndexCreatorTest {
       try (DirectoryReader reader = DirectoryReader.open(creator.getIndexWriter())) {
         assertNull(MultiDocValues.getNumericValues(reader, LuceneTextIndexCreator.PINOT_DOC_ID_DOC_VALUES_FIELD_NAME));
         assertEquals(reader.storedFields().document(0)
-            .get(LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME), "0");
+            .get(LuceneTextIndexCreator.PINOT_DOC_ID_STORED_FIELD_NAME), "0");
       }
       try (LuceneTextIndexReader reader = new LuceneTextIndexReader(column, INDEX_DIR, 2, config)) {
         assertEquals(reader.getDocIds("alpha", null).toArray(), new int[]{0});
@@ -408,7 +408,7 @@ public class LuceneTextIndexCreatorTest {
         IndexWriter writer = new IndexWriter(directory, new IndexWriterConfig(new StandardAnalyzer()))) {
       writer.addDocument(buildDoc(0));
       Document corruptDocument = buildDoc(1);
-      corruptDocument.removeField(LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME);
+      corruptDocument.removeField(LuceneTextIndexCreator.PINOT_DOC_ID_STORED_FIELD_NAME);
       writer.addDocument(corruptDocument);
       writer.commit();
     }
@@ -455,7 +455,7 @@ public class LuceneTextIndexCreatorTest {
   private static Document buildDoc(int docId) {
     Document doc = new Document();
     doc.add(new TextField("foo", "doc " + docId, Field.Store.NO));
-    doc.add(new StoredField(LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME, docId));
+    doc.add(new StoredField(LuceneTextIndexCreator.PINOT_DOC_ID_STORED_FIELD_NAME, docId));
     return doc;
   }
 }
