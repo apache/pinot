@@ -25,6 +25,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
@@ -59,9 +60,10 @@ import org.apache.pinot.query.runtime.plan.PlanNodeToOpChain;
 import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -119,15 +121,15 @@ public class ServerPlanRequestVisitorMvAggregateTest {
   }
 
   /// The single-stage engine types an MV group key with its single-value type, so the stored types of its result
-  /// equal the stored types of the MV aggregate schema and `LeafOperator` does not convert the rows. This also holds
-  /// for nullable MV keys: [ColumnDataType] carries no nullability.
+  /// equal the stored types of the MV aggregate schema and `LeafOperator` does not convert the rows. The test runs
+  /// without null handling. [ColumnDataType] carries no nullability, so the stored types do not depend on it.
   @Test
   public void testSingleStageResultSchemaMatchesNodeSchema()
       throws Exception {
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE)
-        .addSingleValueDimension("sv", FieldSpec.DataType.INT)
-        .addMultiValueDimension("mvStr", FieldSpec.DataType.STRING)
-        .addMultiValueDimension("mvLong", FieldSpec.DataType.LONG)
+        .addSingleValueDimension("sv", DataType.INT)
+        .addMultiValueDimension("mvStr", DataType.STRING)
+        .addMultiValueDimension("mvLong", DataType.LONG)
         .build();
     MockInstanceDataManagerFactory factory = new MockInstanceDataManagerFactory("server");
     factory.registerTable(schema, TABLE + "_OFFLINE");
@@ -200,9 +202,58 @@ public class ServerPlanRequestVisitorMvAggregateTest {
     context.setLeafStageContext(serverContext);
     Map<PlanNode, MultiStageOperator> operators = new HashMap<>();
     MultiStageOperator root = PlanNodeToOpChain.convert(mvAggregate, context, operators::put).getRoot();
+    try {
+      assertTrue(root instanceof MvAggregateOperator, "Unexpected root operator: " + root);
+      assertTrue(operators.get(right) instanceof LeafOperator,
+          "Unexpected boundary operator: " + operators.get(right));
+    } finally {
+      root.close();
+    }
+  }
 
-    assertTrue(root instanceof MvAggregateOperator, "Unexpected root operator: " + root);
-    assertTrue(operators.get(right) instanceof LeafOperator, "Unexpected boundary operator: " + operators.get(right));
+  /// `SELECT ARRAY_TO_MV(mvStr), sv, COUNT(*) FILTER (WHERE sv > 1) AS cnt FROM e GROUP BY 1, 2 ORDER BY cnt DESC
+  /// LIMIT 10` with `is_leaf_return_final_result`: the leaf query carries the final-result option, the order and limit
+  /// for group trimming, and the filtered aggregate.
+  @Test
+  public void testMvAggregateWithFinalResultCollationLimitAndFilter() {
+    TableScanNode scan = new TableScanNode(1, SCAN_SCHEMA, PlanNode.NodeHint.EMPTY, List.of(), TABLE,
+        List.of("sv", "mvStr", "mvLong"));
+    DataSchema projectSchema = new DataSchema(new String[]{"mvKey", "sv", "$f2"},
+        new ColumnDataType[]{ColumnDataType.STRING_ARRAY, ColumnDataType.INT, ColumnDataType.BOOLEAN});
+    RexExpression svGreaterThanOne = new RexExpression.FunctionCall(ColumnDataType.BOOLEAN,
+        SqlKind.GREATER_THAN.name(),
+        List.of(new RexExpression.InputRef(0), new RexExpression.Literal(ColumnDataType.INT, 1)));
+    ProjectNode project = new ProjectNode(1, projectSchema, PlanNode.NodeHint.EMPTY, List.of(scan),
+        List.of(new RexExpression.InputRef(1), new RexExpression.InputRef(0), svGreaterThanOne));
+    DataSchema aggSchema = new DataSchema(new String[]{"mvKey", "sv", "cnt"},
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.LONG});
+    List<RelFieldCollation> collations = List.of(
+        new RelFieldCollation(2, RelFieldCollation.Direction.DESCENDING, RelFieldCollation.NullDirection.FIRST));
+    MvAggregateNode mvAggregate = new MvAggregateNode(1, aggSchema, PlanNode.NodeHint.EMPTY, List.of(project),
+        List.of(countStar()), List.of(2), List.of(0, 1), AggType.LEAF, true, collations, 10, List.of(0));
+
+    ServerPlanRequestContext context = walk(mvAggregate);
+
+    assertSame(context.getLeafStageBoundaryNode(), mvAggregate);
+    PinotQuery pinotQuery = context.getPinotQuery();
+    assertEquals(pinotQuery.getQueryOptions().get(QueryOptionKey.SERVER_RETURN_FINAL_RESULT_KEY_UNPARTITIONED),
+        "true");
+    assertFalse(pinotQuery.getQueryOptions().containsKey(QueryOptionKey.SERVER_RETURN_FINAL_RESULT));
+    assertEquals(pinotQuery.getGroupByList(),
+        List.of(RequestUtils.getIdentifierExpression("mvStr"), RequestUtils.getIdentifierExpression("sv")));
+
+    List<Expression> selectList = pinotQuery.getSelectList();
+    assertEquals(selectList.size(), 3);
+    Expression filteredCount = selectList.get(2);
+    assertEquals(filteredCount.getFunctionCall().getOperator(), "filter");
+    List<Expression> filterOperands = filteredCount.getFunctionCall().getOperands();
+    assertEquals(filterOperands.get(0).getFunctionCall().getOperator(), "count");
+    Expression filterCondition = filterOperands.get(1);
+    assertEquals(filterCondition.getFunctionCall().getOperands(),
+        List.of(RequestUtils.getIdentifierExpression("sv"), RequestUtils.getLiteralExpression(1)));
+
+    assertEquals(pinotQuery.getOrderByList(), List.of(RequestUtils.getFunctionExpression("desc", filteredCount)));
+    assertEquals(pinotQuery.getLimit(), 10);
   }
 
   /// Builds `MvAggregate(LEAF, group by [0, 1], mvKeys [0], COUNT(*)) <- Project(mvKey, sv) <- Scan(e)`.
