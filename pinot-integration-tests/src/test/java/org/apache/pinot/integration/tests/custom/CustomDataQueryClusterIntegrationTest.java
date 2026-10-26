@@ -232,14 +232,9 @@ public abstract class CustomDataQueryClusterIntegrationTest extends BaseClusterI
   }
 
   @Override
-  protected int getNumServers() {
-    return 2;
-  }
-
-  @Override
   protected void startServer()
       throws Exception {
-    startServers(getNumServers());
+    startServers(2);
   }
 
   @Override

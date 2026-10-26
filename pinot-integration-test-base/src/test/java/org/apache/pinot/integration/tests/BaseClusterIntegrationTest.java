@@ -143,10 +143,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   /// The following getters can be overridden to change default settings.
 
-  protected int getNumServers() {
-    return _serverStarters.size();
-  }
-
   protected String getTableName() {
     return DEFAULT_TABLE_NAME;
   }
@@ -1030,7 +1026,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   /// since servers can finish loading their segments at different times.
   protected void waitForAllDocsLoaded(String tableName, long timeoutMs) {
     long countStarResult = getCountStarResult();
-    int numServers = getNumServers();
     AtomicInteger consecutiveSuccesses = new AtomicInteger();
     TestUtils.waitForCondition(() -> {
       try {
@@ -1038,6 +1033,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
           consecutiveSuccesses.set(0);
           return false;
         }
+        long numServers = getOrCreateAdminClient().getInstanceClient().listInstances().stream()
+            .filter(instance -> instance.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)).count();
         return consecutiveSuccesses.incrementAndGet() >= numServers;
       } catch (Exception e) {
         consecutiveSuccesses.set(0);
