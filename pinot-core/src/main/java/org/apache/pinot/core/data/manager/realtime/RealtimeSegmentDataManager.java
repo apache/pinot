@@ -1990,6 +1990,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
     _segmentLogger = LoggerFactory.getLogger(RealtimeSegmentDataManager.class.getName() + "_" + _segmentNameStr);
     _tableStreamName = _tableNameWithType + "_" + streamTopic;
+    // The table data manager owns the recorder; one that has none (a test double) gets a local one
     IngestionSourceErrorRecorder sourceErrors = realtimeTableDataManager.getIngestionSourceErrorRecorder();
     _sourceErrors = sourceErrors != null ? sourceErrors : new IngestionSourceErrorRecorder(serverMetrics,
         _tableNameWithType);

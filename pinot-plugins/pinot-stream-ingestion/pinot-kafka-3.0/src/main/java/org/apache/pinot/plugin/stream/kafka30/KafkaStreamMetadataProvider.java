@@ -43,8 +43,8 @@ import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.TimeoutException;
 import org.apache.pinot.plugin.stream.kafka.KafkaConsumerPartitionLag;
 import org.apache.pinot.plugin.stream.kafka.KafkaPartitionSubsetUtils;
+import org.apache.pinot.plugin.stream.kafka.KafkaSourceErrorEvidence;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorEvidence;
-import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorVerdict;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.OffsetCriteria;
@@ -66,13 +66,6 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
     implements StreamMetadataProvider {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaStreamMetadataProvider.class);
-  // Templates: IngestionSourceErrorEvidence.attach copies them onto each failure.
-  private static final IngestionSourceErrorEvidence TOPIC_MISSING_EVIDENCE = new IngestionSourceErrorEvidence()
-      .setTarget(IngestionSourceErrorVerdict.TARGET_BROKER)
-      .setEvidence(0, IngestionSourceErrorEvidence.UNKNOWN_TOPIC_OR_PARTITION);
-  private static final IngestionSourceErrorEvidence BROKER_UNREACHABLE_EVIDENCE = new IngestionSourceErrorEvidence()
-      .setTarget(IngestionSourceErrorVerdict.TARGET_BROKER)
-      .setEvidence(0, IngestionSourceErrorEvidence.UNREACHABLE);
   /// Immutable partition ID subset from table config. Read once at construction; does not change during the
   /// provider's lifetime. Empty when no subset is configured (consume all partitions).
   private final List<Integer> _partitionIdSubset;
@@ -405,8 +398,6 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
     long deadlineMs = System.currentTimeMillis() + timeoutMillis;
     List<PartitionInfo> partitionInfos = null;
     Exception lastError = null;
-    // The last failure actually thrown while retrying; lastError can also hold the synthesized "does not exist".
-    Exception lastThrownError = null;
     boolean topicMissing = false;
     while (System.currentTimeMillis() < deadlineMs) {
       long remainingMs = deadlineMs - System.currentTimeMillis();
@@ -415,7 +406,6 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
         partitionInfos = _consumer.partitionsFor(_topic, Duration.ofMillis(requestTimeoutMs));
       } catch (TimeoutException e) {
         lastError = e;
-        lastThrownError = e;
       }
 
       if (CollectionUtils.isNotEmpty(partitionInfos)) {
@@ -425,16 +415,13 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
       try {
         if (!topicExists(requestTimeoutMs)) {
           topicMissing = true;
-          lastError = new RuntimeException("Topic does not exist: " + _topic);
         } else {
           topicMissing = false;
         }
       } catch (TransientConsumerException e) {
         lastError = e;
-        lastThrownError = e;
       } catch (RuntimeException e) {
         lastError = e;
-        lastThrownError = e;
       }
 
       if (System.currentTimeMillis() >= deadlineMs) {
@@ -448,17 +435,17 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
       }
     }
 
-    if (lastError != null) {
-      if (topicMissing) {
-        // The broker's metadata lacks the topic: record that, which the synthesized exception doesn't say, and keep
-        // the last failure seen while retrying.
-        RuntimeException topicDoesNotExist = new RuntimeException("Topic does not exist: " + _topic);
-        if (lastThrownError != null) {
-          topicDoesNotExist.addSuppressed(lastThrownError);
-        }
-        throw new PermanentConsumerException(
-            IngestionSourceErrorEvidence.attach(topicDoesNotExist, TOPIC_MISSING_EVIDENCE));
+    if (topicMissing) {
+      // The broker's metadata lacks the topic: record that, which the synthesized exception doesn't say, and keep the
+      // last failure seen while retrying.
+      RuntimeException topicDoesNotExist = new RuntimeException("Topic does not exist: " + _topic);
+      if (lastError != null) {
+        topicDoesNotExist.addSuppressed(lastError);
       }
+      throw new PermanentConsumerException(
+          IngestionSourceErrorEvidence.attach(topicDoesNotExist, KafkaSourceErrorEvidence.TOPIC_MISSING));
+    }
+    if (lastError != null) {
       if (lastError instanceof TransientConsumerException) {
         throw (TransientConsumerException) lastError;
       }
@@ -506,7 +493,8 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
       throw new TransientConsumerException(e);
     } catch (java.util.concurrent.TimeoutException e) {
       // The broker never answered the listing in time; on its own this cause says nothing about the source.
-      throw IngestionSourceErrorEvidence.attach(new TransientConsumerException(e), BROKER_UNREACHABLE_EVIDENCE);
+      throw IngestionSourceErrorEvidence.attach(new TransientConsumerException(e),
+          KafkaSourceErrorEvidence.BROKER_UNREACHABLE);
     }
   }
 }

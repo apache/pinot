@@ -41,9 +41,7 @@ import org.apache.pinot.segment.local.segment.creator.Fixtures;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorClassifier;
-import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorRule;
-import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorSubReason;
-import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorVerdict;
+import org.apache.pinot.spi.ingestion.error.RefusedBySourceException;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.stream.BytesStreamMessage;
 import org.apache.pinot.spi.stream.LongMsgOffset;
@@ -92,17 +90,6 @@ public class RealtimeSegmentDataManagerSourceErrorTest {
   private static final Deque<Object> SCRIPT = new ConcurrentLinkedDeque<>();
   private static volatile boolean _decoderInitRefused;
 
-  /// A source's refusal. A registered rule recognises it, since the built-in rules need SDKs this module doesn't ship.
-  public static class RefusedException extends RuntimeException {
-    public RefusedException() {
-      super(REFUSED);
-    }
-  }
-
-  private static final IngestionSourceErrorRule REFUSED_RULE =
-      (node, below, evidence) -> node instanceof RefusedException
-          ? IngestionSourceErrorVerdict.auth(IngestionSourceErrorSubReason.AUTHORIZATION, REFUSED, null) : null;
-
   public static class ScriptedConsumerFactory extends FakeStreamConsumerFactory {
     @Override
     public PartitionGroupConsumer createPartitionGroupConsumer(String clientId,
@@ -135,7 +122,7 @@ public class RealtimeSegmentDataManagerSourceErrorTest {
     @Override
     public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName) {
       if (_decoderInitRefused) {
-        throw new RefusedException();
+        throw new RefusedBySourceException();
       }
     }
 
@@ -143,7 +130,7 @@ public class RealtimeSegmentDataManagerSourceErrorTest {
     public GenericRow decode(byte[] payload, GenericRow destination) {
       String value = new String(payload, StandardCharsets.UTF_8);
       if (value.equals(REFUSED)) {
-        throw new RefusedException();
+        throw new RefusedBySourceException();
       }
       if (value.equals(MALFORMED)) {
         throw new IllegalArgumentException("Unknown magic byte");
@@ -195,12 +182,12 @@ public class RealtimeSegmentDataManagerSourceErrorTest {
   public void setUp() {
     FileUtils.deleteQuietly(TEMP_DIR);
     SegmentBuildTimeLeaseExtender.initExecutor();
-    IngestionSourceErrorClassifier.registerRule(REFUSED_RULE);
+    IngestionSourceErrorClassifier.registerRule(RefusedBySourceException.RULE);
   }
 
   @AfterClass
   public void tearDown() {
-    IngestionSourceErrorClassifier.unregisterRule(REFUSED_RULE);
+    IngestionSourceErrorClassifier.unregisterRule(RefusedBySourceException.RULE);
     SegmentBuildTimeLeaseExtender.shutdownExecutor();
     FileUtils.deleteQuietly(TEMP_DIR);
   }
@@ -254,7 +241,7 @@ public class RealtimeSegmentDataManagerSourceErrorTest {
   public void refusalInterleavedWithEmptyFetchesIsRecordedAtOnce()
       throws Exception {
     // Every empty fetch resets the consume loop's error count, so it never gives up on this stream.
-    Collections.addAll(SCRIPT, new RefusedException(), List.of(), new RefusedException(), List.of());
+    Collections.addAll(SCRIPT, new RefusedBySourceException(), List.of(), new RefusedBySourceException(), List.of());
     ServerMetrics serverMetrics = newServerMetrics();
     RealtimeSegmentDataManagerTest.FakeRealtimeSegmentDataManager segmentDataManager =
         createSegmentDataManager(serverMetrics);
@@ -333,7 +320,7 @@ public class RealtimeSegmentDataManagerSourceErrorTest {
     assertNotNull(serverMetrics.getGaugeValue(AUTH_GAUGE));
     // The retry policy's own exception has no cause; the last attempt's failure is kept under it.
     assertTrue(failure.getCause() instanceof RuntimeException);
-    assertTrue(failure.getCause().getCause() instanceof RefusedException);
+    assertTrue(failure.getCause().getCause() instanceof RefusedBySourceException);
     // The stream config's values never reach the exception, which lands in the segment error and the logs.
     assertFalse(failure.getCause().getMessage().contains("broker:7777"),
         "The decoder init failure must not carry stream config values");

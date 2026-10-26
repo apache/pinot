@@ -25,8 +25,9 @@ import java.util.function.Consumer;
 /// partial result, so that the Pinot site that called the plugin can still classify it.
 ///
 /// The site installs a listener around its call into the plugin with [#listen]. [#report] hands the failure to the
-/// listener installed on the calling thread, and does nothing when there is none. A reported failure counts as Pinot
-/// having given up on the source, so report only what the plugin won't retry itself.
+/// listener installed on the calling thread, and does nothing when there is none, so a plugin reports from the thread
+/// Pinot called it on: a failure seen on a client's callback thread is handed back to that thread first. A reported
+/// failure counts as Pinot having given up on the source, so report only what the plugin won't retry itself.
 public final class IngestionSourceErrorReporter {
   private static final ThreadLocal<Consumer<Throwable>> LISTENER = new ThreadLocal<>();
 
