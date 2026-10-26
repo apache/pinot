@@ -154,6 +154,59 @@ public class MultiStageBrokerRequestHandlerTest extends QueryEnvironmentTestBase
   }
 
   @Test
+  public void testUseMvAggregateBrokerConfig()
+      throws Exception {
+    // Off by default.
+    MultiStageBrokerRequestHandler handler = newHandler(new PinotConfiguration());
+    Assert.assertFalse(handler.isUseMvAggregate());
+    Assert.assertFalse(handler.getQueryEnvConf(null, Map.of(), 1L).defaultUseMvAggregate());
+
+    handler = newHandler(mvAggregateConfig("true"));
+    Assert.assertTrue(handler.isUseMvAggregate());
+    Assert.assertTrue(handler.getQueryEnvConf(null, Map.of(), 1L).defaultUseMvAggregate());
+  }
+
+  @Test
+  public void testUseMvAggregateClusterConfigAppliesWithoutRestart()
+      throws Exception {
+    String key = CommonConstants.Broker.CONFIG_OF_USE_MV_AGGREGATE;
+    MultiStageBrokerRequestHandler handler = newHandler(new PinotConfiguration());
+
+    // The cluster config wins over the broker config, in both directions, and applies to the next query.
+    handler.onChange(Set.of(key), Map.of(key, "true"));
+    Assert.assertTrue(handler.isUseMvAggregate());
+    Assert.assertTrue(handler.getQueryEnvConf(null, Map.of(), 1L).defaultUseMvAggregate());
+    handler.onChange(Set.of(key), Map.of(key, " FALSE "));
+    Assert.assertFalse(handler.getQueryEnvConf(null, Map.of(), 1L).defaultUseMvAggregate());
+
+    // A change of another key keeps the value.
+    handler.onChange(Set.of(key), Map.of(key, "true"));
+    handler.onChange(Set.of("some.other.key"), Map.of(key, "true", "some.other.key", "x"));
+    Assert.assertTrue(handler.isUseMvAggregate());
+
+    // A removed key restores the broker config value.
+    handler.onChange(Set.of(key), Map.of());
+    Assert.assertFalse(handler.isUseMvAggregate());
+
+    handler = newHandler(mvAggregateConfig("true"));
+    handler.onChange(Set.of(key), Map.of(key, "false"));
+    Assert.assertFalse(handler.isUseMvAggregate());
+    handler.onChange(Set.of(key), Map.of());
+    Assert.assertTrue(handler.isUseMvAggregate());
+
+    // An invalid value falls back to the broker config value.
+    handler.onChange(Set.of(key), Map.of(key, "false"));
+    handler.onChange(Set.of(key), Map.of(key, "sometimes"));
+    Assert.assertTrue(handler.isUseMvAggregate());
+  }
+
+  private static PinotConfiguration mvAggregateConfig(String value) {
+    PinotConfiguration config = new PinotConfiguration();
+    config.setProperty(CommonConstants.Broker.CONFIG_OF_USE_MV_AGGREGATE, value);
+    return config;
+  }
+
+  @Test
   public void testApplyBrokerDefaultQueryOptionsInjectsStreamingGroupByFlushThreshold()
       throws Exception {
     MultiStageBrokerRequestHandler handler = newHandlerWithStreamingGroupByFlushThreshold("5000");

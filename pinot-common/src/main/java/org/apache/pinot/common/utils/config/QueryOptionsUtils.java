@@ -811,6 +811,26 @@ public class QueryOptionsUtils {
     return option != null ? Boolean.parseBoolean(option) : defaultValue;
   }
 
+  /// Reads the `useMvAggregate` query option: `true` or `false`, case-insensitive. Returns `defaultValue`, the broker
+  /// config, when the query does not set it. See [QueryOptionKey#USE_MV_AGGREGATE].
+  ///
+  /// @throws org.apache.pinot.spi.exception.QueryException with [QueryErrorCode#QUERY_VALIDATION] for any other value
+  public static boolean isUseMvAggregate(Map<String, String> queryOptions, boolean defaultValue) {
+    String option = queryOptions.get(QueryOptionKey.USE_MV_AGGREGATE);
+    if (option == null) {
+      return defaultValue;
+    }
+    switch (option.trim().toLowerCase(Locale.ROOT)) {
+      case "true":
+        return true;
+      case "false":
+        return false;
+      default:
+        throw QueryErrorCode.QUERY_VALIDATION.asException("Invalid value '" + option + "' for query option '"
+            + QueryOptionKey.USE_MV_AGGREGATE + "', must be one of [true, false]");
+    }
+  }
+
   /// Reads the `streamStats` query option that opts a single query into the `SubmitWithStream`
   /// dispatch path. See [QueryOptionKey#STREAM_STATS].
   public static boolean isStreamStats(Map<String, String> queryOptions, boolean defaultValue) {

@@ -33,6 +33,7 @@ import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.util.ImmutableBitSet;
+import org.apache.pinot.calcite.sql.fun.PinotOperatorTable;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 
 
@@ -41,9 +42,9 @@ import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 /// once per copy, an empty array contributes to no group, and several MV keys give the cartesian product.
 ///
 /// [#getMvKeyIndexes()] holds positions in the group set (ascending). The input column of an MV key is an array;
-/// the output column is its component type, with the nullability of the input column. Every other field of the row
-/// type is the one of a plain [Aggregate], so a parent that referenced a plain aggregate over `ARRAY_TO_MV(e)`
-/// keeps its references.
+/// the output column is its component type, nullable when the array or its component is nullable, as the type of
+/// `ARRAY_TO_MV(array)`. Every other field of the row type is the one of a plain [Aggregate], so a parent that
+/// referenced a plain aggregate over `ARRAY_TO_MV(e)` keeps its references.
 ///
 /// This class does not extend [PinotLogicalAggregate] on purpose: a rule or converter that only knows the plain
 /// aggregate must not treat an MV aggregate as one. Grouping sets are not supported.
@@ -131,12 +132,12 @@ public class PinotLogicalMvAggregate extends Aggregate {
     }
     for (int mvKeyIndex : _mvKeyIndexes) {
       RelDataType arrayType = types.get(mvKeyIndex);
-      RelDataType componentType = arrayType.getComponentType();
-      if (componentType == null) {
+      if (arrayType.getComponentType() == null) {
         throw new IllegalStateException(
             "MV key at group position " + mvKeyIndex + " must be an array, got: " + arrayType.getFullTypeString());
       }
-      types.set(mvKeyIndex, typeFactory.createTypeWithNullability(componentType, arrayType.isNullable()));
+      // Same type as ARRAY_TO_MV(array), so the MV aggregate keeps the row type of the aggregate it replaces.
+      types.set(mvKeyIndex, PinotOperatorTable.arrayToMvReturnType(typeFactory, arrayType));
     }
     return typeFactory.createStructType(types, names);
   }
@@ -144,6 +145,7 @@ public class PinotLogicalMvAggregate extends Aggregate {
   @Override
   public RelWriter explainTerms(RelWriter pw) {
     RelWriter relWriter = super.explainTerms(pw);
+    // mvKeys lists positions in the group keys, not input column indexes.
     relWriter.item("mvKeys", _mvKeyIndexes);
     relWriter.item("aggType", _aggType);
     relWriter.itemIf("leafReturnFinalResult", true, _leafReturnFinalResult);

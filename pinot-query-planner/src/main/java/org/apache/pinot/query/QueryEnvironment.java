@@ -216,6 +216,9 @@ public class QueryEnvironment {
             inferAnyValueType);
       }
     }
+    // Rejects an invalid useMvAggregate value with QUERY_VALIDATION before planning. The planner rule reads it again,
+    // and an error thrown there would surface as QUERY_PLANNING.
+    QueryOptionsUtils.isUseMvAggregate(options, _envConfig.defaultUseMvAggregate());
     int sortExchangeCopyLimit = QueryOptionsUtils.getSortExchangeCopyThreshold(options,
         _envConfig.defaultSortExchangeCopyLimit());
     boolean usePhysicalOptimizer = QueryOptionsUtils.isUsePhysicalOptimizer(options,
@@ -870,6 +873,17 @@ public class QueryEnvironment {
     @Value.Default
     default boolean defaultUsePhysicalOptimizer() {
       return CommonConstants.Broker.DEFAULT_USE_PHYSICAL_OPTIMIZER;
+    }
+
+    /// Whether to plan `GROUP BY ARRAY_TO_MV(col)` as an MV aggregate by default.
+    ///
+    /// This is treated as the default value for the broker and it is expected to be obtained from a Pinot
+    /// configuration ([CommonConstants.Broker#CONFIG_OF_USE_MV_AGGREGATE]).
+    /// This default value can be always overridden at query level by the query option
+    /// [CommonConstants.Broker.Request.QueryOptionKey#USE_MV_AGGREGATE].
+    @Value.Default
+    default boolean defaultUseMvAggregate() {
+      return CommonConstants.Broker.DEFAULT_USE_MV_AGGREGATE;
     }
 
     /// Whether to use lite mode by default.

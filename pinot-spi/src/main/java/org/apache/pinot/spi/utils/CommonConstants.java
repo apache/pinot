@@ -731,6 +731,28 @@ public class CommonConstants {
     public static final String CONFIG_OF_USE_PHYSICAL_OPTIMIZER = "pinot.broker.multistage.use.physical.optimizer";
     public static final boolean DEFAULT_USE_PHYSICAL_OPTIMIZER = false;
 
+    /// Whether the multi-stage planner plans `GROUP BY ARRAY_TO_MV(col)` as an MV aggregate by default. The MV
+    /// aggregate groups each row by every element of the multi-value key in every stage, as the single-stage engine
+    /// does. When false (the default), such a group-by runs only when it is fully pushed down to the leaf stage.
+    ///
+    /// A server that predates the MV aggregate cannot run it. Set this to true only when every server runs a version
+    /// with the MV aggregate.
+    ///
+    /// The value can also be set in the cluster config, under the same key. The cluster config wins over the broker
+    /// config, and a change applies to the next query without a broker restart. When the key is removed from the
+    /// cluster config, the broker config applies again.
+    ///
+    /// The query option [Request.QueryOptionKey#USE_MV_AGGREGATE] overrides this value for one query.
+    ///
+    /// Setting this to false stops only the rewrite into the MV aggregate. These planner changes stay active
+    /// regardless of this value:
+    /// - The stricter validation of `ARRAY_TO_MV` and its error messages.
+    /// - The leaf-stage check that rejects a plain `GROUP BY` on a multi-value column.
+    /// - The classification of the nodes above a lookup join as intermediate stage nodes.
+    /// - The nullability of `ARRAY_TO_MV`: its result is nullable when the array or its component is nullable.
+    public static final String CONFIG_OF_USE_MV_AGGREGATE = "pinot.broker.multistage.use.mv.aggregate";
+    public static final boolean DEFAULT_USE_MV_AGGREGATE = false;
+
     /// Whether to use lite mode by default.
     /// This value can always be overridden by [Request.QueryOptionKey#USE_LITE_MODE] query option
     public static final String CONFIG_OF_USE_LITE_MODE = "pinot.broker.multistage.use.lite.mode";
@@ -1011,6 +1033,11 @@ public class CommonConstants {
         public static final String APPLICATION_NAME = "applicationName";
         public static final String USE_SPOOLS = "useSpools";
         public static final String USE_PHYSICAL_OPTIMIZER = "usePhysicalOptimizer";
+        // When true, the multi-stage planner plans GROUP BY ARRAY_TO_MV(col) as an MV aggregate that groups by every
+        // element of the multi-value key in every stage. When false, it never does. It overrides the broker config
+        // Broker#CONFIG_OF_USE_MV_AGGREGATE. The value is case-insensitive. Other values fail the query with
+        // QUERY_VALIDATION.
+        public static final String USE_MV_AGGREGATE = "useMvAggregate";
         // When true, the multi-stage planner prunes input (passthrough) columns - notably the unnested source array -
         // from the UNNEST output when they are not referenced downstream, avoiding copying them into every exploded
         // row. Defaults to false: enabling it makes the broker emit a smaller UNNEST output schema, which an
