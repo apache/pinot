@@ -208,6 +208,9 @@ public class IngestionSourceErrorClassifierTest {
     register((node, below, evidence) -> {
       throw new NoClassDefFoundError("sdk class missing");
     });
+    register((node, below, evidence) -> {
+      throw new Error("plain error");
+    });
     register(TEST_RULES);
     assertEquals(categoryOf(new MissingException()), Optional.of(IngestionSourceErrorCategory.SOURCE_READ));
   }

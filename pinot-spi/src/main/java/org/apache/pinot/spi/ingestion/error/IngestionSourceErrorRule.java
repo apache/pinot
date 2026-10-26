@@ -55,7 +55,8 @@ public interface IngestionSourceErrorRule {
     try {
       String message = throwable.getMessage();
       return message != null ? message : "";
-    } catch (Exception | LinkageError | AssertionError | StackOverflowError e) {
+    } catch (Throwable t) {
+      IngestionSourceErrorClassifier.rethrowIfFatal(t);
       return "";
     }
   }
@@ -67,7 +68,8 @@ public interface IngestionSourceErrorRule {
       Method method = target.getClass().getMethod(methodName);
       method.trySetAccessible();
       return method.invoke(target);
-    } catch (Exception | LinkageError | AssertionError | StackOverflowError e) {
+    } catch (Throwable t) {
+      IngestionSourceErrorClassifier.rethrowIfFatal(t);
       return null;
     }
   }

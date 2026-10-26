@@ -23,9 +23,12 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.security.cert.CertificateException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import javax.net.ssl.SSLHandshakeException;
+import org.apache.kafka.common.errors.SerializationException;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorCategory;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorSubReason;
@@ -145,6 +148,28 @@ public class ConfluentSchemaRegistrySourceErrorClassificationTest {
     // The schema is served but the bytes don't match it.
     assertNotClassified(decodeFailure(registryAnswering(200, VALID_SCHEMA_RESPONSE),
         payload(1, new byte[]{(byte) 0xff, (byte) 0xff, (byte) 0xff, (byte) 0xff, (byte) 0xff, (byte) 0xff})));
+  }
+
+  @Test
+  public void ourTlsOrConfigFailureIsClassifiedByItsCause() {
+    // We couldn't verify the registry's certificate: the endpoint, never our credential.
+    Throwable pkix = new SerializationException("Error retrieving Avro value schema for id 1",
+        new SSLHandshakeException("PKIX path building failed",
+            new CertificateException("unable to find valid certification path to requested target")));
+    assertEquals(classify(pkix).getCategory(), IngestionSourceErrorCategory.SOURCE_READ);
+    // A decoder config the client rejects before any request, and a client class missing from the plugin.
+    Map<String, String> badSsl = new HashMap<>();
+    badSsl.put("schema.registry.rest.url", "https://localhost:8081");
+    badSsl.put("schema.registry.ssl.keystore.location", "/nonexistent/keystore.jks");
+    badSsl.put("schema.registry.ssl.keystore.password", "fixture-only");
+    try {
+      new KafkaConfluentSchemaRegistryAvroMessageDecoder().init(badSsl, Set.of("id"), TOPIC);
+      fail("Expected the decoder init to fail");
+    } catch (Exception e) {
+      assertNotClassified(new RuntimeException("Pinot wrapper", e));
+    }
+    assertNotClassified(new NoClassDefFoundError(
+        "org/apache/kafka/common/security/oauthbearer/JwtRetriever"));
   }
 
   private String registryAnswering(int status, String body)

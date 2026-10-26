@@ -51,7 +51,8 @@ import javax.annotation.Nullable;
 /// the hierarchy, because SDKs load in plugin classloaders, sometimes in two versions at once. They read codes
 /// reflectively and fail closed. A plugin for another SDK adds rules with [#registerRule].
 ///
-/// [#classify] is pure and never throws.
+/// [#classify] is pure and never throws, apart from rethrowing the JVM's own fatal errors (`OutOfMemoryError`,
+/// `InternalError`).
 public final class IngestionSourceErrorClassifier {
   // Bounds the walk over pathological exception graphs; real failures are a few dozen nodes.
   private static final int MAX_NODES = 1_000;
@@ -82,11 +83,16 @@ public final class IngestionSourceErrorClassifier {
           decided._evidence));
     } catch (Throwable t) {
       // Observation only: a classification bug, or a hostile exception, must never change how the failure itself is
-      // handled. Running out of memory is not ours to swallow.
-      if (t instanceof VirtualMachineError && !(t instanceof StackOverflowError)) {
-        throw (VirtualMachineError) t;
-      }
+      // handled.
+      rethrowIfFatal(t);
       return Optional.empty();
+    }
+  }
+
+  /// Running out of memory or a broken JVM is not ours to swallow; a stack overflow from a hostile exception is.
+  static void rethrowIfFatal(Throwable t) {
+    if (t instanceof VirtualMachineError && !(t instanceof StackOverflowError)) {
+      throw (VirtualMachineError) t;
     }
   }
 
@@ -111,8 +117,9 @@ public final class IngestionSourceErrorClassifier {
       IngestionSourceErrorVerdict verdict;
       try {
         verdict = rule.decide(node, below, evidence);
-      } catch (Exception | LinkageError | AssertionError | StackOverflowError e) {
-        // A rule that throws, even a checked exception it smuggles out, counts as no decision.
+      } catch (Throwable t) {
+        // A rule that throws anything, even a checked exception it smuggles out, counts as no decision.
+        rethrowIfFatal(t);
         continue;
       }
       if (verdict != null && (decided == null || PRECEDENCE.compare(verdict, decided) < 0)) {
