@@ -40,6 +40,8 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.helix.zookeeper.util.GZipCompressionUtil;
+import org.apache.pinot.common.version.PinotVersion;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
@@ -303,5 +305,46 @@ public class HelixHelperTest {
     static ObjectMapper get() {
       return mapper;
     }
+  }
+
+  @Test
+  public void testUpdateCapabilities() {
+    InstanceCapability serverCapability = new InstanceCapability("TEST_SERVER_CAPABILITY", InstanceType.SERVER, 2);
+    InstanceCapability brokerCapability = new InstanceCapability("TEST_BROKER_CAPABILITY", InstanceType.BROKER, 1);
+    List<InstanceCapability> capabilities = List.of(serverCapability, brokerCapability);
+    InstanceConfig instanceConfig = new InstanceConfig("Server_localhost_1234");
+    assertTrue(HelixHelper.updatePinotVersion(instanceConfig));
+    assertTrue(HelixHelper.updateCapabilities(instanceConfig, InstanceType.SERVER, capabilities));
+    // Only the capabilities of the instance type, and the version stamp.
+    Map<String, String> expected = Map.of("TEST_SERVER_CAPABILITY", "2",
+        CommonConstants.Helix.Instance.CAPABILITIES_PINOT_VERSION_KEY, PinotVersion.VERSION);
+    Map<String, String> mapField =
+        instanceConfig.getRecord().getMapField(CommonConstants.Helix.Instance.CAPABILITIES_KEY);
+    assertEquals(mapField, expected);
+    // The stamp is the version in the simple field pinotVersion, so a reader uses the capabilities.
+    assertEquals(mapField.get(CommonConstants.Helix.Instance.CAPABILITIES_PINOT_VERSION_KEY),
+        instanceConfig.getRecord().getSimpleField(CommonConstants.Helix.Instance.PINOT_VERSION_KEY));
+    assertEquals(InstanceCapabilityTracker.readRevisions(instanceConfig, capabilities), Map.of(serverCapability, 2));
+    // Writing the same capabilities again does not change the instance config.
+    assertFalse(HelixHelper.updateCapabilities(instanceConfig, InstanceType.SERVER, capabilities));
+
+    // An older revision is replaced by the current one.
+    instanceConfig.getRecord().setMapField(CommonConstants.Helix.Instance.CAPABILITIES_KEY,
+        Map.of("TEST_SERVER_CAPABILITY", "1", CommonConstants.Helix.Instance.CAPABILITIES_PINOT_VERSION_KEY,
+            PinotVersion.VERSION));
+    assertTrue(HelixHelper.updateCapabilities(instanceConfig, InstanceType.SERVER, capabilities));
+    assertEquals(instanceConfig.getRecord().getMapField(CommonConstants.Helix.Instance.CAPABILITIES_KEY), expected);
+
+    // Capabilities written by another version get the stamp of this version.
+    instanceConfig.getRecord().setMapField(CommonConstants.Helix.Instance.CAPABILITIES_KEY,
+        Map.of("TEST_SERVER_CAPABILITY", "2", CommonConstants.Helix.Instance.CAPABILITIES_PINOT_VERSION_KEY, "0.0.1"));
+    assertTrue(HelixHelper.updateCapabilities(instanceConfig, InstanceType.SERVER, capabilities));
+    assertEquals(instanceConfig.getRecord().getMapField(CommonConstants.Helix.Instance.CAPABILITIES_KEY), expected);
+
+    // Without capabilities for the instance type, the map holds only the version stamp.
+    InstanceConfig minionConfig = new InstanceConfig("Minion_localhost_1234");
+    assertTrue(HelixHelper.updateCapabilities(minionConfig, InstanceType.MINION, capabilities));
+    assertEquals(minionConfig.getRecord().getMapField(CommonConstants.Helix.Instance.CAPABILITIES_KEY),
+        Map.of(CommonConstants.Helix.Instance.CAPABILITIES_PINOT_VERSION_KEY, PinotVersion.VERSION));
   }
 }

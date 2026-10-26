@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.common.utils.helix;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -714,6 +716,33 @@ public class HelixHelper {
     String oldVer = record.getSimpleField(CommonConstants.Helix.Instance.PINOT_VERSION_KEY);
     if (!currentVer.equals(oldVer)) {
       record.setSimpleField(CommonConstants.Helix.Instance.PINOT_VERSION_KEY, currentVer);
+      return true;
+    }
+    return false;
+  }
+
+  /// Writes the capabilities that an instance of the given type advertises in this version
+  /// ([InstanceCapability#values()]) to the map field `capabilities` of the instance config, together with the
+  /// reserved entry `pinotVersion` ([CommonConstants.Helix.Instance#CAPABILITIES_PINOT_VERSION_KEY]) set to the Pinot
+  /// version of this build. Readers ignore the capabilities when that entry differs from the simple field
+  /// `pinotVersion`, which [#updatePinotVersion] writes. Any instance type can call it. Returns whether the field
+  /// changed.
+  public static boolean updateCapabilities(InstanceConfig instanceConfig,
+      org.apache.pinot.spi.config.instance.InstanceType instanceType) {
+    return updateCapabilities(instanceConfig, instanceType, InstanceCapability.values());
+  }
+
+  /// Same as [#updateCapabilities(InstanceConfig, org.apache.pinot.spi.config.instance.InstanceType)] with the given
+  /// capabilities instead of [InstanceCapability#values()].
+  @VisibleForTesting
+  static boolean updateCapabilities(InstanceConfig instanceConfig,
+      org.apache.pinot.spi.config.instance.InstanceType instanceType, Collection<InstanceCapability> capabilities) {
+    ZNRecord record = instanceConfig.getRecord();
+    Map<String, String> currentCapabilities = InstanceCapability.toMapField(capabilities, instanceType);
+    currentCapabilities.put(CommonConstants.Helix.Instance.CAPABILITIES_PINOT_VERSION_KEY, PinotVersion.VERSION);
+    Map<String, String> oldCapabilities = record.getMapField(CommonConstants.Helix.Instance.CAPABILITIES_KEY);
+    if (!currentCapabilities.equals(oldCapabilities)) {
+      record.setMapField(CommonConstants.Helix.Instance.CAPABILITIES_KEY, currentCapabilities);
       return true;
     }
     return false;

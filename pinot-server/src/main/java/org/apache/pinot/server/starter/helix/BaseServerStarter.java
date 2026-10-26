@@ -530,6 +530,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
           serverConf.getMultiStageMailboxPort());
     }
     updated |= HelixHelper.updatePinotVersion(instanceConfig);
+    updated |= HelixHelper.updateCapabilities(instanceConfig,
+        org.apache.pinot.spi.config.instance.InstanceType.SERVER);
 
     // Update environment properties
     if (_pinotEnvironmentProvider != null) {
