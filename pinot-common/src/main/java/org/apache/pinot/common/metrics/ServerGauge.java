@@ -186,7 +186,14 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   /// See `OpenStructColumnSplitter#emitMetrics`.
   OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT("documents", false,
       "Docs in which an OPEN_STRUCT key was present in the most recently sealed segment; "
-          + "divide by openStructLastSegmentDocCount for the fill rate");
+          + "divide by openStructLastSegmentDocCount for the fill rate"),
+  /// Set when the partition's stream, or its schema registry, refuses our credential or permission. Written on every
+  /// refusal and never cleared on success: a recent value means a recent refusal.
+  INGESTION_SOURCE_AUTH_FAILURE_TIME_SECONDS("seconds", false,
+      "Epoch seconds of the latest refusal of this partition's credential or permission by its stream source"),
+  /// Set when Pinot gives up reading the partition's stream: missing, unreachable or throttled after retries.
+  INGESTION_SOURCE_READ_FAILURE_TIME_SECONDS("seconds", false,
+      "Epoch seconds of the latest time Pinot gave up reading this partition's stream source");
 
   private final String _gaugeName;
   private final String _unit;
