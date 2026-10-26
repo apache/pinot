@@ -300,7 +300,8 @@ public class KinesisConsumerTest {
     });
     TestKinesisConsumer kinesisConsumer =
         new TestKinesisConsumer(_kinesisConfig, kinesisClient, NO_OP_REQUEST_RATE_LIMITER);
-    KinesisPartitionGroupOffset startOffset = new KinesisPartitionGroupOffset("0", "1");
+    // A shard of its own: the count is kept per stream and shard, across consumers
+    KinesisPartitionGroupOffset startOffset = new KinesisPartitionGroupOffset("throttledShard", "1");
 
     List<Throwable> reported = new ArrayList<>();
     try (IngestionSourceErrorReporter.Scope ignored = IngestionSourceErrorReporter.listen(reported::add)) {
@@ -324,27 +325,21 @@ public class KinesisConsumerTest {
       kinesisConsumer.fetchMessages(startOffset, 2500);
       assertEquals(reported.size(), 2);
 
-      // Our own request limiter timing out is not the source's failure
+      // The consume loop recreates a consumer that keeps returning empty batches; the new one carries on the count
+      TestKinesisConsumer recreatedConsumer =
+          new TestKinesisConsumer(_kinesisConfig, kinesisClient, NO_OP_REQUEST_RATE_LIMITER);
+      recreatedConsumer.fetchMessages(startOffset, 2500);
+      assertEquals(reported.size(), 3);
+
+      // Our own request limiter timing out is not the source's failure, nor a sign it recovered
       TestKinesisConsumer limitedConsumer = new TestKinesisConsumer(_kinesisConfig, kinesisClient,
           (streamName, shardId, requestType, rpsLimit, timeoutMs) -> false);
       for (int i = 0; i < 7; i++) {
         assertEquals(limitedConsumer.fetchMessages(startOffset, 2500).getMessageCount(), 0);
       }
-      assertEquals(reported.size(), 2);
-
-      // ...nor a sign the source recovered: between throttled fetches it neither reports nor starts the count over
-      boolean[] limited = {false};
-      TestKinesisConsumer sometimesLimited = new TestKinesisConsumer(_kinesisConfig, kinesisClient,
-          (streamName, shardId, requestType, rpsLimit, timeoutMs) -> !limited[0]);
-      for (int i = 0; i < 5; i++) {
-        sometimesLimited.fetchMessages(startOffset, 2500);
-      }
-      limited[0] = true;
-      sometimesLimited.fetchMessages(startOffset, 2500);
-      limited[0] = false;
-      assertEquals(reported.size(), 2);
-      sometimesLimited.fetchMessages(startOffset, 2500);
       assertEquals(reported.size(), 3);
+      recreatedConsumer.fetchMessages(startOffset, 2500);
+      assertEquals(reported.size(), 4);
     }
   }
 
