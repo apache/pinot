@@ -21,21 +21,20 @@ package org.apache.pinot.spi.ingestion.error;
 import javax.annotation.Nullable;
 
 
-/// The result of [IngestionSourceErrorClassifier#classify]: the category, plus bounded detail for a log line. It holds
-/// no message text: source messages carry account ids, principals and endpoints.
+/// The result of [IngestionSourceErrorClassifier#classify]: the category, plus bounded detail for a log line. The
+/// detail and [#toString] hold no message text, which carries account ids, principals and endpoints; a caller that
+/// needs more reads the deciding exception itself.
 public final class IngestionSourceErrorClassification {
   private final IngestionSourceErrorVerdict _verdict;
-  private final String _exceptionClass;
+  private final Throwable _exception;
   @Nullable
-  private final IngestionSourceCredentialMode _credentialMode;
-  private final boolean _roleArnConfigured;
+  private final IngestionSourceErrorEvidence _evidence;
 
-  IngestionSourceErrorClassification(IngestionSourceErrorVerdict verdict, String exceptionClass,
+  IngestionSourceErrorClassification(IngestionSourceErrorVerdict verdict, Throwable exception,
       @Nullable IngestionSourceErrorEvidence evidence) {
     _verdict = verdict;
-    _exceptionClass = exceptionClass;
-    _credentialMode = evidence != null ? evidence.getCredentialMode() : null;
-    _roleArnConfigured = evidence != null && evidence.isRoleArnConfigured();
+    _exception = exception;
+    _evidence = evidence;
   }
 
   public IngestionSourceErrorCategory getCategory() {
@@ -61,25 +60,37 @@ public final class IngestionSourceErrorClassification {
     return _verdict.getTarget();
   }
 
+  /// The exception that decided.
+  public Throwable getException() {
+    return _exception;
+  }
+
   /// The class of the exception that decided.
   public String getExceptionClass() {
-    return _exceptionClass;
+    return _exception.getClass().getName();
+  }
+
+  /// The evidence nearest above the exception that decided, in its own chain, or null.
+  @Nullable
+  public IngestionSourceErrorEvidence getEvidence() {
+    return _evidence;
   }
 
   /// Whose credential the client used, when it recorded it.
   @Nullable
   public IngestionSourceCredentialMode getCredentialMode() {
-    return _credentialMode;
+    return _evidence != null ? _evidence.getCredentialMode() : null;
   }
 
   /// Whether the client assumed a role on top of its base credential.
   public boolean isRoleArnConfigured() {
-    return _roleArnConfigured;
+    return _evidence != null && _evidence.isRoleArnConfigured();
   }
 
   @Override
   public String toString() {
-    return _verdict + " exception=" + _exceptionClass + (_credentialMode != null ? " credentialMode=" + _credentialMode
-        : "") + (_roleArnConfigured ? " roleArnConfigured" : "");
+    IngestionSourceCredentialMode credentialMode = getCredentialMode();
+    return _verdict + " exception=" + getExceptionClass() + (credentialMode != null ? " credentialMode="
+        + credentialMode : "") + (isRoleArnConfigured() ? " roleArnConfigured" : "");
   }
 }
