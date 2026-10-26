@@ -179,12 +179,19 @@ public class InvertedIndexFilterOperator extends BaseColumnFilterOperator {
   /// can hold documents at or above `numDocs`, which is read at planning time. These documents must be dropped: the
   /// flip for exclusive predicates only covers `[0, numDocs)`, so they would stay in the result, and the AND and count
   /// paths don't check the document range again.
+  ///
+  /// This applies the same limit as `FilterOperatorUtils.limitToNumDocs()`, which always copies the bitmap it trims.
+  /// Here, a [MutableRoaringBitmap] is trimmed in place instead, see below.
   private ImmutableRoaringBitmap getDocIds(int dictId) {
     ImmutableRoaringBitmap docIds = _invertedIndexReader.getDocIds(dictId);
     if (docIds.isEmpty() || docIds.last() < _numDocs) {
       return docIds;
     }
-    // Only a mutable inverted index can hold such documents, and it returns a copy of its bitmap
+    // A MutableRoaringBitmap from the reader is taken as a copy this operator may modify, as the in-place flip in
+    // getNextBlockWithoutNullHandling() already does. The mutable inverted index, whose bitmaps hold the documents to
+    // drop, returns a fresh clone on every call (RealtimeInvertedIndex.getDocIds() through
+    // ThreadSafeMutableRoaringBitmap.getMutableRoaringBitmap()), so it is trimmed without another copy. Any other
+    // bitmap is copied first.
     MutableRoaringBitmap mutableDocIds =
         docIds instanceof MutableRoaringBitmap ? (MutableRoaringBitmap) docIds : docIds.toMutableRoaringBitmap();
     mutableDocIds.remove(_numDocs, 0x100000000L);
