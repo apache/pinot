@@ -1,0 +1,406 @@
+{
+  "mv_aggregate_planning_tests": {
+    "queries": [
+      {
+        "description": "MV key on a scan",
+        "sql": "SET useMvAggregate=true; EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(mcol1), COUNT(*) FROM e GROUP BY ARRAY_TO_MV(mcol1)",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash[0]])",
+          "\n    PinotLogicalMvAggregate(group=[{0}], agg#0=[COUNT()], mvKeys=[[0]], aggType=[LEAF])",
+          "\n      LogicalProject(EXPR$0=[$7])",
+          "\n        PinotLogicalTableScan(table=[[default, e]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Two MV keys and one SV key",
+        "sql": "SET useMvAggregate=true; EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(mcol1), col2, ARRAY_TO_MV(mcol2), SUM(col3) FROM e GROUP BY ARRAY_TO_MV(mcol1), col2, ARRAY_TO_MV(mcol2)",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{0, 1, 2}], agg#0=[$SUM0($3)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash[0, 1, 2]])",
+          "\n    PinotLogicalMvAggregate(group=[{0, 1, 2}], agg#0=[$SUM0($3)], mvKeys=[[0, 2]], aggType=[LEAF])",
+          "\n      LogicalProject(EXPR$0=[$7], col2=[$1], EXPR$2=[$8], col3=[$2])",
+          "\n        PinotLogicalTableScan(table=[[default, e]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "MV key above a join",
+        "sql": "SET useMvAggregate=true; EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(e.mcol1), COUNT(*) FROM e JOIN a ON e.col1 = a.col1 GROUP BY ARRAY_TO_MV(e.mcol1)",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash[0]])",
+          "\n    PinotLogicalMvAggregate(group=[{0}], agg#0=[COUNT()], mvKeys=[[0]], aggType=[LEAF])",
+          "\n      LogicalProject(EXPR$0=[$1])",
+          "\n        LogicalJoin(condition=[=($0, $2)], joinType=[inner])",
+          "\n          PinotLogicalExchange(distribution=[hash[0]])",
+          "\n            LogicalProject(col1=[$0], mcol1=[$7])",
+          "\n              PinotLogicalTableScan(table=[[default, e]])",
+          "\n          PinotLogicalExchange(distribution=[hash[0]])",
+          "\n            LogicalProject(col1=[$0])",
+          "\n              PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "MV key and SV key above a join",
+        "sql": "SET useMvAggregate=true; EXPLAIN PLAN FOR SELECT SUM(a.col3) AS sumCol3, ARRAY_TO_MV(e.mcol1), a.col2 FROM a JOIN e ON a.col1 = e.col1 GROUP BY ARRAY_TO_MV(e.mcol1), a.col2",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(sumCol3=[$2], EXPR$1=[$0], col2=[$1])",
+          "\n  PinotLogicalAggregate(group=[{0, 1}], agg#0=[$SUM0($2)], aggType=[FINAL])",
+          "\n    PinotLogicalExchange(distribution=[hash[0, 1]])",
+          "\n      PinotLogicalMvAggregate(group=[{0, 1}], agg#0=[$SUM0($2)], mvKeys=[[0]], aggType=[LEAF])",
+          "\n        LogicalProject(EXPR$1=[$4], col2=[$1], col3=[$2])",
+          "\n          LogicalJoin(condition=[=($0, $3)], joinType=[inner])",
+          "\n            PinotLogicalExchange(distribution=[hash[0]])",
+          "\n              LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n                PinotLogicalTableScan(table=[[default, a]])",
+          "\n            PinotLogicalExchange(distribution=[hash[0]])",
+          "\n              LogicalProject(col1=[$0], mcol1=[$7])",
+          "\n                PinotLogicalTableScan(table=[[default, e]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "MV key in a subquery",
+        "sql": "SET useMvAggregate=true; EXPLAIN PLAN FOR SELECT k, cnt FROM (SELECT ARRAY_TO_MV(mcol1) AS k, COUNT(*) AS cnt FROM e GROUP BY ARRAY_TO_MV(mcol1)) WHERE cnt > 1",
+        "output": [
+          "Execution Plan",
+          "\nLogicalFilter(condition=[>($1, 1)])",
+          "\n  PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])",
+          "\n    PinotLogicalExchange(distribution=[hash[0]])",
+          "\n      PinotLogicalMvAggregate(group=[{0}], agg#0=[COUNT()], mvKeys=[[0]], aggType=[LEAF])",
+          "\n        LogicalProject(k=[$7])",
+          "\n          PinotLogicalTableScan(table=[[default, e]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "MV key with ORDER BY and LIMIT, group trim",
+        "sql": "SET useMvAggregate=true; EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_enable_group_trim='true') */ ARRAY_TO_MV(mcol1), COUNT(*) FROM e GROUP BY ARRAY_TO_MV(mcol1) ORDER BY ARRAY_TO_MV(mcol1) DESC LIMIT 10",
+        "output": [
+          "Execution Plan",
+          "\nLogicalSort(sort0=[$0], dir0=[DESC], offset=[0], fetch=[10])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0 DESC]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n    LogicalSort(sort0=[$0], dir0=[DESC], fetch=[10])",
+          "\n      PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL], collations=[[0 DESC]], limit=[10])",
+          "\n        PinotLogicalExchange(distribution=[hash[0]])",
+          "\n          PinotLogicalMvAggregate(group=[{0}], agg#0=[COUNT()], mvKeys=[[0]], aggType=[LEAF], collations=[[0 DESC]], limit=[10])",
+          "\n            LogicalProject(EXPR$0=[$7])",
+          "\n              PinotLogicalTableScan(table=[[default, e]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "MV key with ORDER BY aggregate and LIMIT, group trim",
+        "sql": "SET useMvAggregate=true; EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_enable_group_trim='true') */ COUNT(*) AS cnt, ARRAY_TO_MV(mcol1) FROM e GROUP BY ARRAY_TO_MV(mcol1) ORDER BY cnt DESC LIMIT 10",
+        "output": [
+          "Execution Plan",
+          "\nLogicalSort(sort0=[$0], dir0=[DESC], offset=[0], fetch=[10])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0 DESC]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n    LogicalSort(sort0=[$0], dir0=[DESC], fetch=[10])",
+          "\n      LogicalProject(cnt=[$1], EXPR$1=[$0])",
+          "\n        PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL], collations=[[1 DESC]], limit=[10])",
+          "\n          PinotLogicalExchange(distribution=[hash[0]])",
+          "\n            PinotLogicalMvAggregate(group=[{0}], agg#0=[COUNT()], mvKeys=[[0]], aggType=[LEAF], collations=[[1 DESC]], limit=[10])",
+          "\n              LogicalProject(EXPR$1=[$7])",
+          "\n                PinotLogicalTableScan(table=[[default, e]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "DISTINCT on an MV key",
+        "sql": "SET useMvAggregate=true; EXPLAIN PLAN FOR SELECT DISTINCT ARRAY_TO_MV(mcol1) FROM e",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{0}], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash[0]])",
+          "\n    PinotLogicalMvAggregate(group=[{0}], mvKeys=[[0]], aggType=[LEAF])",
+          "\n      LogicalProject(EXPR$0=[$7])",
+          "\n        PinotLogicalTableScan(table=[[default, e]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Hint is_skip_leaf_stage_group_by is ignored for an MV key",
+        "sql": "SET useMvAggregate=true; EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ ARRAY_TO_MV(mcol1), COUNT(*) FROM e GROUP BY ARRAY_TO_MV(mcol1)",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash[0]])",
+          "\n    PinotLogicalMvAggregate(group=[{0}], agg#0=[COUNT()], mvKeys=[[0]], aggType=[LEAF])",
+          "\n      LogicalProject(EXPR$0=[$7])",
+          "\n        PinotLogicalTableScan(table=[[default, e]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Hint is_partitioned_by_group_by_keys is ignored for an MV key",
+        "sql": "SET useMvAggregate=true; EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ ARRAY_TO_MV(mcol1), COUNT(*) FROM e GROUP BY ARRAY_TO_MV(mcol1)",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash[0]])",
+          "\n    PinotLogicalMvAggregate(group=[{0}], agg#0=[COUNT()], mvKeys=[[0]], aggType=[LEAF])",
+          "\n      LogicalProject(EXPR$0=[$7])",
+          "\n        PinotLogicalTableScan(table=[[default, e]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Hint is_leaf_return_final_result is honored for an MV key",
+        "sql": "SET useMvAggregate=true; EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_leaf_return_final_result='true') */ ARRAY_TO_MV(mcol1), AVG(col3) FROM e GROUP BY ARRAY_TO_MV(mcol1)",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[$0], EXPR$1=[/(CAST($1):DOUBLE NOT NULL, $2)])",
+          "\n  PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], agg#1=[COUNT($2)], aggType=[FINAL], leafReturnFinalResult=[true])",
+          "\n    PinotLogicalExchange(distribution=[hash[0]])",
+          "\n      PinotLogicalMvAggregate(group=[{0}], agg#0=[$SUM0($1)], agg#1=[COUNT()], mvKeys=[[0]], aggType=[LEAF], leafReturnFinalResult=[true])",
+          "\n        LogicalProject(EXPR$0=[$7], col3=[$2])",
+          "\n          PinotLogicalTableScan(table=[[default, e]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "MV key over an array function",
+        "sql": "SET useMvAggregate=true; EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(VALUE_IN(mcol1, 'a', 'b')), COUNT(*) FROM e GROUP BY ARRAY_TO_MV(VALUE_IN(mcol1, 'a', 'b'))",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash[0]])",
+          "\n    PinotLogicalMvAggregate(group=[{0}], agg#0=[COUNT()], mvKeys=[[0]], aggType=[LEAF])",
+          "\n      LogicalProject(EXPR$0=[VALUEIN($7, _UTF-8'a', _UTF-8'b')])",
+          "\n        PinotLogicalTableScan(table=[[default, e]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "MV key with a leaf WHERE on ARRAY_TO_MV",
+        "sql": "SET useMvAggregate=true; EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(mcol1), COUNT(*) FROM e WHERE ARRAY_TO_MV(mcol1) IN ('a', 'b') GROUP BY ARRAY_TO_MV(mcol1)",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash[0]])",
+          "\n    PinotLogicalMvAggregate(group=[{0}], agg#0=[COUNT()], mvKeys=[[0]], aggType=[LEAF])",
+          "\n      LogicalProject(EXPR$0=[$7])",
+          "\n        LogicalFilter(condition=[OR(=(ARRAY_TO_MV($7), _UTF-8'a'), =(ARRAY_TO_MV($7), _UTF-8'b'))])",
+          "\n          PinotLogicalTableScan(table=[[default, e]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Gate off: MV key on a scan keeps the plain aggregate",
+        "sql": "SET useMvAggregate=false; EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(mcol1), COUNT(*) FROM e GROUP BY ARRAY_TO_MV(mcol1)",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash[0]])",
+          "\n    PinotLogicalAggregate(group=[{0}], agg#0=[COUNT()], aggType=[LEAF])",
+          "\n      LogicalProject(EXPR$0=[ARRAY_TO_MV($7)])",
+          "\n        PinotLogicalTableScan(table=[[default, e]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Nested CAST(ARRAY_TO_MV()) key on a scan is not an MV key",
+        "sql": "SET useMvAggregate=true; EXPLAIN PLAN FOR SELECT CAST(ARRAY_TO_MV(mcol2) AS VARCHAR), COUNT(*) FROM e GROUP BY CAST(ARRAY_TO_MV(mcol2) AS VARCHAR)",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash[0]])",
+          "\n    PinotLogicalAggregate(group=[{0}], agg#0=[COUNT()], aggType=[LEAF])",
+          "\n      LogicalProject(EXPR$0=[CAST(ARRAY_TO_MV($8)):VARCHAR CHARACTER SET \"UTF-8\" NOT NULL])",
+          "\n        PinotLogicalTableScan(table=[[default, e]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Nested CASE WHEN ARRAY_TO_MV() key on a scan is not an MV key",
+        "sql": "SET useMvAggregate=true; EXPLAIN PLAN FOR SELECT COUNT(*) FROM e GROUP BY CASE WHEN ARRAY_TO_MV(mcol1) = 'a' THEN 1 ELSE 0 END",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[$1])",
+          "\n  PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])",
+          "\n    PinotLogicalExchange(distribution=[hash[0]])",
+          "\n      PinotLogicalAggregate(group=[{0}], agg#0=[COUNT()], aggType=[LEAF])",
+          "\n        LogicalProject($f0=[CASE(=(ARRAY_TO_MV($7), _UTF-8'a'), 1, 0)])",
+          "\n          PinotLogicalTableScan(table=[[default, e]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Nested LOWER(ARRAY_TO_MV()) key on a scan is not an MV key",
+        "sql": "SET useMvAggregate=true; EXPLAIN PLAN FOR SELECT COUNT(*) FROM e GROUP BY LOWER(ARRAY_TO_MV(mcol1))",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[$1])",
+          "\n  PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])",
+          "\n    PinotLogicalExchange(distribution=[hash[0]])",
+          "\n      PinotLogicalAggregate(group=[{0}], agg#0=[COUNT()], aggType=[LEAF])",
+          "\n        LogicalProject($f0=[LOWER(ARRAY_TO_MV($7))])",
+          "\n          PinotLogicalTableScan(table=[[default, e]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Nullable MV key on a scan with column-based null handling",
+        "sql": "SET useMvAggregate=true; EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(mcol1), COUNT(*) FROM f GROUP BY ARRAY_TO_MV(mcol1)",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash[0]])",
+          "\n    PinotLogicalMvAggregate(group=[{0}], agg#0=[COUNT()], mvKeys=[[0]], aggType=[LEAF])",
+          "\n      LogicalProject(EXPR$0=[$7])",
+          "\n        PinotLogicalTableScan(table=[[default, f]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Nullable MV key with ORDER BY aggregate and LIMIT, group trim",
+        "sql": "SET useMvAggregate=true; EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_enable_group_trim='true') */ COUNT(*) AS cnt, ARRAY_TO_MV(mcol1) FROM f GROUP BY ARRAY_TO_MV(mcol1) ORDER BY cnt DESC LIMIT 10",
+        "output": [
+          "Execution Plan",
+          "\nLogicalSort(sort0=[$0], dir0=[DESC], offset=[0], fetch=[10])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0 DESC]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n    LogicalSort(sort0=[$0], dir0=[DESC], fetch=[10])",
+          "\n      LogicalProject(cnt=[$1], EXPR$1=[$0])",
+          "\n        PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL], collations=[[1 DESC]], limit=[10])",
+          "\n          PinotLogicalExchange(distribution=[hash[0]])",
+          "\n            PinotLogicalMvAggregate(group=[{0}], agg#0=[COUNT()], mvKeys=[[0]], aggType=[LEAF], collations=[[1 DESC]], limit=[10])",
+          "\n              LogicalProject(EXPR$1=[$7])",
+          "\n                PinotLogicalTableScan(table=[[default, f]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Nullable MV key above a join",
+        "sql": "SET useMvAggregate=true; EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(f.mcol1), COUNT(*) FROM f JOIN a ON f.col1 = a.col1 GROUP BY ARRAY_TO_MV(f.mcol1)",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash[0]])",
+          "\n    PinotLogicalMvAggregate(group=[{0}], agg#0=[COUNT()], mvKeys=[[0]], aggType=[LEAF])",
+          "\n      LogicalProject(EXPR$0=[$1])",
+          "\n        LogicalJoin(condition=[=($0, $2)], joinType=[inner])",
+          "\n          PinotLogicalExchange(distribution=[hash[0]])",
+          "\n            LogicalProject(col1=[$0], mcol1=[$7])",
+          "\n              PinotLogicalTableScan(table=[[default, f]])",
+          "\n          PinotLogicalExchange(distribution=[hash[0]])",
+          "\n            LogicalProject(col1=[$0])",
+          "\n              PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "MV key above a lookup join",
+        "sql": "SET useMvAggregate=true; EXPLAIN PLAN FOR SELECT /*+ joinOptions(join_strategy='lookup') */ ARRAY_TO_MV(e.mcol1), COUNT(*) FROM e JOIN a ON e.col1 = a.col1 GROUP BY ARRAY_TO_MV(e.mcol1)",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash[0]])",
+          "\n    PinotLogicalMvAggregate(group=[{0}], agg#0=[COUNT()], mvKeys=[[0]], aggType=[LEAF])",
+          "\n      LogicalProject(EXPR$0=[$1])",
+          "\n        LogicalJoin(condition=[=($0, $2)], joinType=[inner])",
+          "\n          PinotLogicalExchange(distribution=[single])",
+          "\n            LogicalProject(col1=[$0], mcol1=[$7])",
+          "\n              PinotLogicalTableScan(table=[[default, e]])",
+          "\n          LogicalProject(col1=[$0])",
+          "\n            PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "MV key also used as an aggregate argument keeps the plain aggregate",
+        "sql": "SET useMvAggregate=true; EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(mcol2), SUM(ARRAY_TO_MV(mcol2)) FROM e GROUP BY ARRAY_TO_MV(mcol2)",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash[0]])",
+          "\n    PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($0)], aggType=[LEAF])",
+          "\n      LogicalProject(EXPR$0=[ARRAY_TO_MV($8)])",
+          "\n        PinotLogicalTableScan(table=[[default, e]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Gate off: MV key above a join fails",
+        "sql": "SET useMvAggregate=false; EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(e.mcol1), COUNT(*) FROM e JOIN a ON e.col1 = a.col1 GROUP BY ARRAY_TO_MV(e.mcol1)",
+        "expectedException": ".*ARRAY_TO_MV found in PROJECT in the intermediate stage.*ARRAY_TO_MV is supported only.*"
+      },
+      {
+        "description": "Nested CASE WHEN ARRAY_TO_MV() key above a join fails",
+        "sql": "SET useMvAggregate=true; EXPLAIN PLAN FOR SELECT COUNT(*) FROM e JOIN a ON e.col1 = a.col1 GROUP BY CASE WHEN ARRAY_TO_MV(e.mcol1) = 'a' THEN 1 ELSE 0 END",
+        "expectedException": ".*ARRAY_TO_MV is supported only.*"
+      },
+      {
+        "description": "Nested LOWER(ARRAY_TO_MV()) key above a join fails",
+        "sql": "SET useMvAggregate=true; EXPLAIN PLAN FOR SELECT COUNT(*) FROM e JOIN a ON e.col1 = a.col1 GROUP BY LOWER(ARRAY_TO_MV(e.mcol1))",
+        "expectedException": ".*ARRAY_TO_MV is supported only.*"
+      },
+      {
+        "description": "Nested CAST(ARRAY_TO_MV()) key above a join fails",
+        "sql": "SET useMvAggregate=true; EXPLAIN PLAN FOR SELECT COUNT(*) FROM e JOIN a ON e.col1 = a.col1 GROUP BY CAST(ARRAY_TO_MV(e.mcol2) AS VARCHAR)",
+        "expectedException": ".*ARRAY_TO_MV is supported only.*"
+      },
+      {
+        "description": "ARRAY_TO_MV in the SELECT list fails",
+        "sql": "SET useMvAggregate=true; EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(mcol1) FROM e",
+        "expectedException": ".*ARRAY_TO_MV found in PROJECT in the leaf stage.*ARRAY_TO_MV is supported only.*"
+      },
+      {
+        "description": "ARRAY_TO_MV in a filter above a join fails",
+        "sql": "SET useMvAggregate=true; EXPLAIN PLAN FOR SELECT COUNT(*) FROM e JOIN a ON e.col1 = a.col1 WHERE ARRAY_TO_MV(e.mcol1) = a.col2",
+        "expectedException": ".*ARRAY_TO_MV is supported only.*"
+      },
+      {
+        "description": "ARRAY_TO_MV in an aggregate argument above a join fails",
+        "sql": "SET useMvAggregate=true; EXPLAIN PLAN FOR SELECT SUM(ARRAY_TO_MV(e.mcol2)) FROM e JOIN a ON e.col1 = a.col1",
+        "expectedException": ".*ARRAY_TO_MV is supported only.*"
+      },
+      {
+        "description": "Plain GROUP BY on a multi-value column fails",
+        "sql": "SET useMvAggregate=true; EXPLAIN PLAN FOR SELECT mcol1, COUNT(*) FROM e GROUP BY mcol1",
+        "expectedException": ".*Use ARRAY_TO_MV\\(\\) to group by multi-value column.*ARRAY_TO_MV is supported only.*"
+      },
+      {
+        "description": "MV key and the same column as a plain key fails",
+        "sql": "SET useMvAggregate=true; EXPLAIN PLAN FOR SELECT COUNT(*) FROM e GROUP BY ARRAY_TO_MV(mcol1), mcol1",
+        "expectedException": ".*Use ARRAY_TO_MV\\(\\) to group by multi-value column.*ARRAY_TO_MV is supported only.*"
+      },
+      {
+        "description": "Nested LOWER(ARRAY_TO_MV()) key above a lookup join fails",
+        "sql": "SET useMvAggregate=true; EXPLAIN PLAN FOR SELECT /*+ joinOptions(join_strategy='lookup') */ COUNT(*) FROM e JOIN a ON e.col1 = a.col1 GROUP BY LOWER(ARRAY_TO_MV(e.mcol1))",
+        "expectedException": ".*ARRAY_TO_MV found in PROJECT in the intermediate stage.*ARRAY_TO_MV is supported only.*"
+      },
+      {
+        "description": "MV key with GROUPING SETS on a scan keeps the plain aggregate: grouping sets are not supported by the MV aggregate",
+        "sql": "SET useMvAggregate=true; EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(mcol1), COUNT(*) FROM e GROUP BY GROUPING SETS ((ARRAY_TO_MV(mcol1)), ())",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[$0], EXPR$1=[$2])",
+          "\n  PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL])",
+          "\n    PinotLogicalExchange(distribution=[hash[0, 1]])",
+          "\n      PinotLogicalAggregate(group=[{0}], groups=[[{0}, {}]], agg#0=[COUNT()], aggType=[LEAF])",
+          "\n        LogicalProject(EXPR$0=[ARRAY_TO_MV($7)])",
+          "\n          PinotLogicalTableScan(table=[[default, e]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "MV key with GROUPING SETS above a join fails: grouping sets are not supported by the MV aggregate",
+        "sql": "SET useMvAggregate=true; EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(e.mcol1), COUNT(*) FROM e JOIN a ON e.col1 = a.col1 GROUP BY GROUPING SETS ((ARRAY_TO_MV(e.mcol1)), ())",
+        "expectedException": ".*ARRAY_TO_MV found in PROJECT in the intermediate stage.*ARRAY_TO_MV is supported only.*"
+      },
+      {
+        "description": "MV key with a WITHIN GROUP ordered aggregate fails",
+        "sql": "SET useMvAggregate=true; EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(mcol1), LISTAGG(col2, ',') WITHIN GROUP (ORDER BY col2) FROM e GROUP BY ARRAY_TO_MV(mcol1)",
+        "expectedException": ".*GROUP BY ARRAY_TO_MV\\(\\) is not supported with WITHIN GROUP ordered aggregates.*"
+      }
+    ]
+  }
+}

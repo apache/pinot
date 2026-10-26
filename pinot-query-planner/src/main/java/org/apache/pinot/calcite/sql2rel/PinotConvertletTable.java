@@ -45,6 +45,7 @@ import org.apache.calcite.sql2rel.StandardConvertletTable;
 import org.apache.calcite.util.Litmus;
 import org.apache.calcite.util.Sarg;
 import org.apache.pinot.calcite.rex.PinotRexExecutor;
+import org.apache.pinot.calcite.sql.fun.ArrayToMvFunctionName;
 import org.apache.pinot.calcite.sql.fun.PinotInListOperator;
 
 
@@ -129,8 +130,8 @@ public class PinotConvertletTable implements SqlRexConvertletTable {
 
     @Override
     public RexNode convertCall(SqlRexContext cx, SqlCall call) {
-      if (call.operand(0) instanceof SqlCall && ((SqlCall) call.operand(0)).getOperator().getName()
-          .equals("ARRAY_TO_MV")) {
+      if (call.operand(0) instanceof SqlCall
+          && ArrayToMvFunctionName.matches(((SqlCall) call.operand(0)).getOperator().getName())) {
         RexBuilder rexBuilder = cx.getRexBuilder();
 
         SqlBetweenOperator betweenOperator = (SqlBetweenOperator) call.getOperator();

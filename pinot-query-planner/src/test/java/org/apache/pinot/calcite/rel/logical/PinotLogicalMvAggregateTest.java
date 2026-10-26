@@ -33,6 +33,7 @@ import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.util.ImmutableBitSet;
+import org.apache.pinot.calcite.sql.fun.PinotOperatorTable;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.testng.annotations.Test;
 
@@ -86,6 +87,34 @@ public class PinotLogicalMvAggregateTest {
     assertTrue(nullableArrKeyType.isNullable());
     // Aggregate call unchanged
     assertEquals(rowType.getFieldList().get(3).getType().getSqlTypeName(), SqlTypeName.BIGINT);
+  }
+
+  /// The MV key type must equal the type of `ARRAY_TO_MV(array)` for every nullability combination, or the rule that
+  /// replaces a plain aggregate over `ARRAY_TO_MV(array)` with the MV aggregate fails Calcite's type check.
+  @Test
+  public void testMvKeyTypeEqualsArrayToMvType() {
+    RelDataType varchar = _typeFactory.createSqlType(SqlTypeName.VARCHAR);
+    RelDataType nullableVarchar = _typeFactory.createTypeWithNullability(varchar, true);
+    List<RelDataType> arrayTypes = List.of(
+        _typeFactory.createArrayType(varchar, -1),
+        _typeFactory.createTypeWithNullability(_typeFactory.createArrayType(varchar, -1), true),
+        _typeFactory.createArrayType(nullableVarchar, -1),
+        _typeFactory.createTypeWithNullability(_typeFactory.createArrayType(nullableVarchar, -1), true));
+    List<Boolean> expectedNullable = List.of(false, true, true, true);
+    RexBuilder rexBuilder = _cluster.getRexBuilder();
+    for (int i = 0; i < arrayTypes.size(); i++) {
+      RelDataType inputType = _typeFactory.builder().add("arr", arrayTypes.get(i)).build();
+      RelNode values = LogicalValues.createEmpty(_cluster, inputType);
+      RelDataType arrayToMvType =
+          rexBuilder.makeCall(PinotOperatorTable.ARRAY_TO_MV, rexBuilder.makeInputRef(values, 0)).getType();
+      PinotLogicalMvAggregate mvAggregate =
+          new PinotLogicalMvAggregate(_cluster, values.getTraitSet(), List.of(), values, ImmutableBitSet.of(0), null,
+              List.of(), AggType.LEAF, false, null, 0, List.of(0));
+      RelDataType keyType = mvAggregate.getRowType().getFieldList().get(0).getType();
+      assertEquals(keyType, arrayToMvType, "array type: " + arrayTypes.get(i).getFullTypeString());
+      assertEquals(keyType.isNullable(), (boolean) expectedNullable.get(i),
+          "array type: " + arrayTypes.get(i).getFullTypeString());
+    }
   }
 
   @Test

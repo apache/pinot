@@ -104,8 +104,8 @@
           "\nLogicalProject(sumCol3=[$1], EXPR$1=[$0])",
           "\n  PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], aggType=[FINAL])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
-          "\n      PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], aggType=[LEAF])",
-          "\n        LogicalProject(EXPR$1=[ARRAY_TO_MV($7)], col3=[$2])",
+          "\n      PinotLogicalMvAggregate(group=[{0}], agg#0=[$SUM0($1)], mvKeys=[[0]], aggType=[LEAF])",
+          "\n        LogicalProject(EXPR$1=[$7], col3=[$2])",
           "\n          PinotLogicalTableScan(table=[[default, e]])",
           "\n"
         ]

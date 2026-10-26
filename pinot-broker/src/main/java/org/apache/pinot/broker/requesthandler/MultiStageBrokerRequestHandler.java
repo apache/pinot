@@ -156,6 +156,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final Set<String> _defaultDisabledPlannerRules;
   protected final long _extraPassiveTimeoutMs;
   private final boolean _streamStatsDefault;
+  // The broker config value of CONFIG_OF_USE_MV_AGGREGATE. The cluster config overrides it.
+  private final boolean _useMvAggregateBrokerConf;
+  // Written by the cluster config change callback, read by query threads.
+  private volatile boolean _useMvAggregate;
   @Nullable
   protected final String _defaultStreamingGroupByFlushThreshold;
   @Nullable
@@ -215,6 +219,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     boolean dispatchKeepAliveWithoutCalls = config.getProperty(
         CommonConstants.MultiStageQueryRunner.KEY_OF_DISPATCH_CHANNEL_KEEP_ALIVE_WITHOUT_CALLS,
         CommonConstants.MultiStageQueryRunner.DEFAULT_OF_DISPATCH_CHANNEL_KEEP_ALIVE_WITHOUT_CALLS);
+    _useMvAggregateBrokerConf = _config.getProperty(CommonConstants.Broker.CONFIG_OF_USE_MV_AGGREGATE,
+        CommonConstants.Broker.DEFAULT_USE_MV_AGGREGATE);
+    _useMvAggregate = _useMvAggregateBrokerConf;
     _streamStatsDefault = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_STREAM_STATS,
         CommonConstants.Broker.DEFAULT_STREAM_STATS);
@@ -544,7 +551,38 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
   }
 
-  private ImmutableQueryEnvironment.Config getQueryEnvConf(HttpHeaders httpHeaders, Map<String, String> queryOptions,
+  /// Applies [CommonConstants.Broker#CONFIG_OF_USE_MV_AGGREGATE] from the cluster config, so that a change applies to
+  /// the next query without a broker restart. The cluster config wins over the broker config. A removed key restores
+  /// the broker config value. An invalid value is logged and falls back to the broker config value.
+  @Override
+  public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
+    super.onChange(changedConfigs, clusterConfigs);
+    if (!changedConfigs.contains(CommonConstants.Broker.CONFIG_OF_USE_MV_AGGREGATE)) {
+      return;
+    }
+    String value = clusterConfigs.get(CommonConstants.Broker.CONFIG_OF_USE_MV_AGGREGATE);
+    boolean useMvAggregate = _useMvAggregateBrokerConf;
+    if (value != null) {
+      String trimmed = value.trim();
+      if ("true".equalsIgnoreCase(trimmed) || "false".equalsIgnoreCase(trimmed)) {
+        useMvAggregate = Boolean.parseBoolean(trimmed);
+      } else {
+        LOGGER.error("Ignoring invalid value '{}' for cluster config: {}, falling back to the broker config: {}", value,
+            CommonConstants.Broker.CONFIG_OF_USE_MV_AGGREGATE, _useMvAggregateBrokerConf);
+      }
+    }
+    _useMvAggregate = useMvAggregate;
+    LOGGER.info("Updated {}: {}", CommonConstants.Broker.CONFIG_OF_USE_MV_AGGREGATE, useMvAggregate);
+  }
+
+  /// The value of [CommonConstants.Broker#CONFIG_OF_USE_MV_AGGREGATE] that the next query uses.
+  @VisibleForTesting
+  boolean isUseMvAggregate() {
+    return _useMvAggregate;
+  }
+
+  @VisibleForTesting
+  ImmutableQueryEnvironment.Config getQueryEnvConf(@Nullable HttpHeaders httpHeaders, Map<String, String> queryOptions,
       long requestId) {
     String database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptions, httpHeaders);
     boolean inferPartitionHint = _config.getProperty(CommonConstants.Broker.CONFIG_OF_INFER_PARTITION_HINT,
@@ -624,6 +662,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .approximateFunctionPercentileParams(approximateFunctionSettings._percentileParams)
         .defaultEnableDynamicFilteringSemiJoin(defaultEnableDynamicFilteringSemiJoin)
         .defaultUsePhysicalOptimizer(defaultUsePhysicalOptimizer)
+        .defaultUseMvAggregate(_useMvAggregate)
         .defaultUseLiteMode(defaultUseLiteMode)
         .defaultRunInBroker(defaultRunInBroker)
         .defaultUseBrokerPruning(defaultUseBrokerPruning)
