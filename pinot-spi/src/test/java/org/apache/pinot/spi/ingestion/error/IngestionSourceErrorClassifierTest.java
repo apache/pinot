@@ -355,6 +355,41 @@ public class IngestionSourceErrorClassifierTest {
     assertEquals(categoryOf(unsuppressible), Optional.of(IngestionSourceErrorCategory.SOURCE_READ));
   }
 
+  private static <T extends Throwable> T sourceCall(T failure) {
+    return IngestionSourceErrorEvidence.attach(failure, new IngestionSourceErrorEvidence().setBoundary(true));
+  }
+
+  @Test
+  public void boundaryLimitsTheReadToTheSourcesBranches() {
+    register(TEST_RULES);
+    // A source read beside a refusal from storage that isn't the source, such as Pinot's own deep store
+    Throwable failure = new RuntimeException("task failed");
+    failure.addSuppressed(sourceCall(new RuntimeException("source read failed", new MissingException())));
+    failure.addSuppressed(new RuntimeException("deep store read failed", new RefusedException(null)));
+    assertEquals(categoryOf(failure), Optional.of(IngestionSourceErrorCategory.SOURCE_READ));
+
+    // A failure suppressed onto the source call (closing a stream on our side) doesn't inherit its boundary.
+    Throwable sourceFailure = sourceCall(new RuntimeException("source call failed", new IllegalStateException()));
+    sourceFailure.addSuppressed(new RuntimeException("close failed", new ConnectException("refused")));
+    assertEquals(categoryOf(sourceFailure), Optional.empty());
+    // Without a boundary anywhere, the caller vouches for the whole failure.
+    Throwable unmarked = new RuntimeException("source call failed", new IllegalStateException());
+    unmarked.addSuppressed(new RuntimeException("close failed", new ConnectException("refused")));
+    assertEquals(categoryOf(unmarked), Optional.of(IngestionSourceErrorCategory.SOURCE_READ));
+  }
+
+  @Test
+  public void classificationNamesTheDecidingExceptionAndItsEvidence() {
+    register(TEST_RULES);
+    RefusedException refusal = new RefusedException(null);
+    IngestionSourceErrorEvidence evidence =
+        new IngestionSourceErrorEvidence().setCredentialMode(IngestionSourceCredentialMode.STATIC);
+    IngestionSourceErrorClassification classification = IngestionSourceErrorClassifier.classify(
+        IngestionSourceErrorEvidence.attach(new RuntimeException("wrapper", refusal), evidence)).get();
+    assertSame(classification.getException(), refusal);
+    assertEquals(classification.getEvidence().getCredentialMode(), IngestionSourceCredentialMode.STATIC);
+  }
+
   @Test
   public void evidenceKeepsTheInnermostClientsRecord() {
     Throwable failure = new RuntimeException();

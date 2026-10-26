@@ -36,7 +36,9 @@ import javax.annotation.Nullable;
 /// codes are only evidence for that verdict, read per source.
 ///
 /// The exception tree is split into chains: the failure with its causes, and each suppressed exception with its own
-/// causes. Within a chain:
+/// causes. When an exception in the tree carries boundary evidence ([IngestionSourceErrorEvidence#setBoundary]), only
+/// the parts of chains at or beneath a boundary are read; otherwise the caller vouches that the whole failure came
+/// from the source. Within a chain:
 ///
 /// 1. walking from the root cause up, the first source-specific rule that decides wins. A rule that says the failure
 ///    is not the source's verdict (our clock, our ambient identity, a credential that failed to load) therefore
@@ -66,6 +68,7 @@ public final class IngestionSourceErrorClassifier {
     try {
       Walk walk = new Walk();
       walk.visit(failure);
+      walk.decide();
       Decision decided = null;
       for (Decision decision : walk._decisions) {
         if (decision._verdict.getCategory() == IngestionSourceErrorCategory.AUTH) {
@@ -79,8 +82,7 @@ public final class IngestionSourceErrorClassifier {
       if (decided == null) {
         return Optional.empty();
       }
-      return Optional.of(new IngestionSourceErrorClassification(decided._verdict, decided._node.getClass().getName(),
-          decided._evidence));
+      return Optional.of(new IngestionSourceErrorClassification(decided._verdict, decided._node, decided._evidence));
     } catch (Throwable t) {
       // Observation only: a classification bug, or a hostile exception, must never change how the failure itself is
       // handled.
@@ -152,10 +154,22 @@ public final class IngestionSourceErrorClassifier {
     }
   }
 
+  /// One chain of the tree: an exception and its causes, with the evidence each node carries and the evidence nearest
+  /// above it.
+  private static final class Chain {
+    final List<Throwable> _nodes = new ArrayList<>();
+    final List<IngestionSourceErrorEvidence> _direct = new ArrayList<>();
+    final List<IngestionSourceErrorEvidence> _nearest = new ArrayList<>();
+    // Whether a boundary sits at or above each node
+    final List<Boolean> _withinBoundary = new ArrayList<>();
+  }
+
   private static final class Walk {
     final Set<Throwable> _heads = Collections.newSetFromMap(new IdentityHashMap<>());
+    final List<Chain> _chains = new ArrayList<>();
     final List<Decision> _decisions = new ArrayList<>();
     int _visited;
+    boolean _hasBoundary;
 
     /// Decides the chain starting at `failure`, then every chain hanging off it as a suppressed exception, depth
     /// first. A work stack rather than recursion: suppressed exceptions can nest arbitrarily deep.
@@ -174,15 +188,14 @@ public final class IngestionSourceErrorClassifier {
       }
     }
 
-    /// Decides the chain starting at `head` and returns the heads of the chains suppressed along it. Chains may share
+    /// Records the chain starting at `head` and returns the heads of the chains suppressed along it. Chains may share
     /// causes, and each reads a shared cause under its own evidence, so only a cycle within the chain ends it early.
     private List<Throwable> visitChain(Throwable head) {
-      List<Throwable> chain = new ArrayList<>();
-      List<IngestionSourceErrorEvidence> direct = new ArrayList<>();
-      List<IngestionSourceErrorEvidence> nearest = new ArrayList<>();
+      Chain chain = new Chain();
       List<Throwable> suppressedHeads = new ArrayList<>();
       Set<Throwable> inChain = Collections.newSetFromMap(new IdentityHashMap<>());
       IngestionSourceErrorEvidence current = null;
+      boolean withinBoundary = false;
       for (Throwable node = head; node != null && _visited < MAX_NODES && inChain.add(node);
           node = node.getCause()) {
         _visited++;
@@ -199,43 +212,66 @@ public final class IngestionSourceErrorClassifier {
         }
         if (own != null) {
           current = own;
+          if (own.isBoundary()) {
+            withinBoundary = true;
+            _hasBoundary = true;
+          }
         }
-        chain.add(node);
-        direct.add(own);
-        nearest.add(current);
+        chain._nodes.add(node);
+        chain._direct.add(own);
+        chain._nearest.add(current);
+        chain._withinBoundary.add(withinBoundary);
       }
-      Decision decision = decide(chain, direct, nearest);
-      if (decision != null) {
-        _decisions.add(decision);
-      }
+      _chains.add(chain);
       return suppressedHeads;
     }
 
-    @Nullable
-    private static Decision decide(List<Throwable> chain, List<IngestionSourceErrorEvidence> direct,
-        List<IngestionSourceErrorEvidence> nearest) {
-      for (int i = chain.size() - 1; i >= 0; i--) {
-        Throwable node = chain.get(i);
-        List<Throwable> below = chain.subList(i + 1, chain.size());
-        IngestionSourceErrorVerdict verdict =
-            direct.get(i) != null ? IngestionSourceErrorRules.matchEvidence(direct.get(i)) : null;
-        if (verdict == null) {
-          verdict = IngestionSourceErrorRules.matchSource(node, below, nearest.get(i));
-        }
-        if (verdict == null) {
-          verdict = decideRegistered(node, below, nearest.get(i));
-        }
-        if (verdict != null) {
-          return new Decision(verdict, node, nearest.get(i));
+    /// Decides every chain visited. In a tree with a boundary, only the exceptions within one are read.
+    void decide() {
+      for (Chain chain : _chains) {
+        Decision decision = decide(chain);
+        if (decision != null) {
+          _decisions.add(decision);
         }
       }
-      for (int i = chain.size() - 1; i >= 0; i--) {
-        IngestionSourceErrorVerdict verdict = IngestionSourceErrorRules.matchGeneric(chain.get(i));
+    }
+
+    @Nullable
+    private Decision decide(Chain chain) {
+      List<Throwable> nodes = chain._nodes;
+      for (int i = nodes.size() - 1; i >= 0; i--) {
+        if (!isEligible(chain, i)) {
+          continue;
+        }
+        Throwable node = nodes.get(i);
+        List<Throwable> below = nodes.subList(i + 1, nodes.size());
+        IngestionSourceErrorEvidence direct = chain._direct.get(i);
+        IngestionSourceErrorEvidence nearest = chain._nearest.get(i);
+        IngestionSourceErrorVerdict verdict = direct != null ? IngestionSourceErrorRules.matchEvidence(direct) : null;
+        if (verdict == null) {
+          verdict = IngestionSourceErrorRules.matchSource(node, below, nearest);
+        }
+        if (verdict == null) {
+          verdict = decideRegistered(node, below, nearest);
+        }
         if (verdict != null) {
-          return new Decision(verdict, chain.get(i), nearest.get(i));
+          return new Decision(verdict, node, nearest);
+        }
+      }
+      for (int i = nodes.size() - 1; i >= 0; i--) {
+        if (!isEligible(chain, i)) {
+          continue;
+        }
+        IngestionSourceErrorVerdict verdict = IngestionSourceErrorRules.matchGeneric(nodes.get(i));
+        if (verdict != null) {
+          return new Decision(verdict, nodes.get(i), chain._nearest.get(i));
         }
       }
       return null;
+    }
+
+    private boolean isEligible(Chain chain, int index) {
+      return !_hasBoundary || chain._withinBoundary.get(index);
     }
   }
 }

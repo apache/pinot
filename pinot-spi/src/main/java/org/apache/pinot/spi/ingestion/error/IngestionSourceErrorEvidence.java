@@ -64,6 +64,7 @@ public final class IngestionSourceErrorEvidence extends RuntimeException {
   @Nullable
   private String _resource;
   private boolean _customerConfigured = true;
+  private boolean _boundary;
 
   public IngestionSourceErrorEvidence() {
     super(null, null, false, false);
@@ -180,11 +181,26 @@ public final class IngestionSourceErrorEvidence extends RuntimeException {
     return this;
   }
 
+  /// Whether the failure this evidence is attached to marks a call into the source; see [#setBoundary].
+  public boolean isBoundary() {
+    return _boundary;
+  }
+
+  /// Marks the failure this evidence is attached to as a call into the source. When any exception of a failure carries
+  /// boundary evidence, only the exceptions at or beneath a boundary in their own chain are read as the source's, and a
+  /// suppressed exception counts only through a boundary of its own. A caller whose one operation also reads storage
+  /// that isn't the source, such as Pinot's own deep store, marks each source call this way. A stream client, whose
+  /// whole failure comes from the source, doesn't need to.
+  public IngestionSourceErrorEvidence setBoundary(boolean boundary) {
+    _boundary = boundary;
+    return this;
+  }
+
   /// A copy to attach to one failure: a stack trace prints a throwable it meets twice as a circular reference.
   private IngestionSourceErrorEvidence copy() {
     IngestionSourceErrorEvidence copy = new IngestionSourceErrorEvidence().setTarget(_target)
         .setEvidence(_status, _code).setCredentialMode(_credentialMode).setRoleArnConfigured(_roleArnConfigured)
-        .setCustomerConfigured(_customerConfigured);
+        .setCustomerConfigured(_customerConfigured).setBoundary(_boundary);
     copy._resource = _resource;
     return copy;
   }
@@ -228,6 +244,9 @@ public final class IngestionSourceErrorEvidence extends RuntimeException {
     }
     if (!_customerConfigured) {
       sb.append(" notCustomerConfigured");
+    }
+    if (_boundary) {
+      sb.append(" boundary");
     }
     return sb.toString();
   }
