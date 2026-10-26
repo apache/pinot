@@ -643,10 +643,10 @@ public class ArrayFunctions {
   }
 
   /// Length of the `float` sequence `start, start + inc, ...` bounded by `end`, inclusive. The step count is computed
-  /// in `float` arithmetic, as the single-stage engine always did.
+  /// in double precision; the rounding tolerance is based on the ULPs of the original float inputs.
   private static int generatedArrayLength(float start, float end, float inc) {
     checkFloatingPointArguments(start, end, inc);
-    // Keep float arithmetic for the step count, but use double precision to compare its error with the input ULPs.
+    // Use double precision for the step count and compare its error with ULPs of the original float inputs.
     double steps = (end - start) / inc;
     return generatedFloatingArrayLength(steps, Math.ulp(start), Math.ulp(end), Math.ulp(inc), inc);
   }
