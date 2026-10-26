@@ -18,14 +18,11 @@
  */
 package org.apache.pinot.core.data.manager.realtime;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import java.util.function.LongSupplier;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorCategory;
@@ -36,12 +33,12 @@ import org.slf4j.LoggerFactory;
 
 
 /// Records the stream source failures a realtime table's consumers and its ingestion delay tracker see: a timestamp
-/// gauge per partition and category, and a WARN line per write, rate-limited per partition.
+/// gauge per partition and category, and a WARN line per write, rate-limited per category.
 ///
 /// [IngestionSourceErrorCategory#AUTH] is written at every refusal, whether or not Pinot retries.
 /// [IngestionSourceErrorCategory#SOURCE_READ] is written only once Pinot gives up on the source, so a transient
 /// failure it recovers from writes nothing. The gauges record when a failure last happened: they are never cleared on
-/// success or when a partition stops consuming, only when the table data manager shuts down.
+/// success or when a partition stops consuming, only when the table data manager shuts down ([#close]).
 ///
 /// Recording never throws, so it never changes consumption. The WARN line carries no exception message, which can
 /// hold principals, ARNs or account ids.
@@ -51,20 +48,13 @@ public class IngestionSourceErrorRecorder {
 
   private final ServerMetrics _serverMetrics;
   private final String _tableNameWithType;
-  private final LongSupplier _clock;
   private final Set<Integer> _partitionsWritten = ConcurrentHashMap.newKeySet();
-  // Keyed by partition and category
-  private final Map<String, Long> _lastLoggedMs = new ConcurrentHashMap<>();
+  private final Map<IngestionSourceErrorCategory, Long> _lastLoggedMs = new ConcurrentHashMap<>();
+  private volatile boolean _closed;
 
   public IngestionSourceErrorRecorder(ServerMetrics serverMetrics, String tableNameWithType) {
-    this(serverMetrics, tableNameWithType, System::currentTimeMillis);
-  }
-
-  @VisibleForTesting
-  IngestionSourceErrorRecorder(ServerMetrics serverMetrics, String tableNameWithType, LongSupplier clock) {
     _serverMetrics = serverMetrics;
     _tableNameWithType = tableNameWithType;
-    _clock = clock;
   }
 
   /// Classifies a failure from the stream source of `topic` and records it for `partitionIds` if it is the source's
@@ -72,57 +62,60 @@ public class IngestionSourceErrorRecorder {
   ///
   /// @param site where Pinot saw the failure, for the log line
   /// @param givingUp whether Pinot gives up on the source with this failure, rather than retrying it
-  /// @return the category written, or null when nothing was written
-  @Nullable
-  public IngestionSourceErrorCategory record(String site, Throwable failure, boolean givingUp, String topic,
+  public void record(String site, Throwable failure, boolean givingUp, String topic,
       Collection<Integer> partitionIds) {
+    if (_closed || partitionIds.isEmpty()) {
+      return;
+    }
     try {
       IngestionSourceErrorClassification classification =
           IngestionSourceErrorClassifier.classify(failure).orElse(null);
-      if (classification == null || partitionIds.isEmpty()) {
-        return null;
+      if (classification == null) {
+        return;
       }
       IngestionSourceErrorCategory category = classification.getCategory();
       if (category == IngestionSourceErrorCategory.SOURCE_READ && !givingUp) {
-        return null;
+        return;
       }
-      ServerGauge gauge = category == IngestionSourceErrorCategory.AUTH
-          ? ServerGauge.INGESTION_SOURCE_AUTH_FAILURE_TIME_SECONDS
-          : ServerGauge.INGESTION_SOURCE_READ_FAILURE_TIME_SECONDS;
-      long nowMs = _clock.getAsLong();
-      boolean logDue = false;
+      ServerGauge gauge = gaugeOf(category);
+      long nowMs = System.currentTimeMillis();
       for (int partitionId : partitionIds) {
         _partitionsWritten.add(partitionId);
         _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, partitionId, gauge,
             TimeUnit.MILLISECONDS.toSeconds(nowMs));
-        Long lastLoggedMs = _lastLoggedMs.get(partitionId + "/" + category);
-        if (lastLoggedMs == null || nowMs - lastLoggedMs >= LOG_INTERVAL_MS) {
-          logDue = true;
-        }
       }
-      if (logDue) {
-        for (int partitionId : partitionIds) {
-          _lastLoggedMs.put(partitionId + "/" + category, nowMs);
-        }
+      if (_closed) {
+        // The table shut down while this was being written: a consumer thread can outlive the shutdown
+        removeMetrics();
+        return;
+      }
+      Long lastLoggedMs = _lastLoggedMs.get(category);
+      if (lastLoggedMs == null || nowMs - lastLoggedMs >= LOG_INTERVAL_MS) {
+        _lastLoggedMs.put(category, nowMs);
         LOGGER.warn("Ingestion source {} failure for table: {}, topic: {}, partitions: {}, at: {}: {}", category,
             _tableNameWithType, topic, partitionIds, site, classification);
       }
-      return category;
     } catch (RuntimeException e) {
       LOGGER.debug("Failed to record an ingestion source failure for table: {}", _tableNameWithType, e);
-      return null;
     }
   }
 
-  /// Removes the gauges of every partition written so far.
-  public void removeMetrics() {
+  /// Stops recording and removes the gauges of every partition written so far.
+  public void close() {
+    _closed = true;
+    removeMetrics();
+  }
+
+  private void removeMetrics() {
     for (int partitionId : _partitionsWritten) {
-      _serverMetrics.removePartitionGauge(_tableNameWithType, partitionId,
-          ServerGauge.INGESTION_SOURCE_AUTH_FAILURE_TIME_SECONDS);
-      _serverMetrics.removePartitionGauge(_tableNameWithType, partitionId,
-          ServerGauge.INGESTION_SOURCE_READ_FAILURE_TIME_SECONDS);
+      for (IngestionSourceErrorCategory category : IngestionSourceErrorCategory.values()) {
+        _serverMetrics.removePartitionGauge(_tableNameWithType, partitionId, gaugeOf(category));
+      }
     }
-    _partitionsWritten.clear();
-    _lastLoggedMs.clear();
+  }
+
+  private static ServerGauge gaugeOf(IngestionSourceErrorCategory category) {
+    return category == IngestionSourceErrorCategory.AUTH ? ServerGauge.INGESTION_SOURCE_AUTH_FAILURE_TIME_SECONDS
+        : ServerGauge.INGESTION_SOURCE_READ_FAILURE_TIME_SECONDS;
   }
 }

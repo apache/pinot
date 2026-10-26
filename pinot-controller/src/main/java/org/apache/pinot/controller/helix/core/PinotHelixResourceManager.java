@@ -124,6 +124,7 @@ import org.apache.pinot.common.messages.TableDeletionMessage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataUtils;
+import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
@@ -2723,6 +2724,14 @@ public class PinotHelixResourceManager {
 
     // Remove COMMITTING segment list
     if (tableType == TableType.REALTIME) {
+      // A table whose stream refused its creation was never led by this controller, so SegmentStatusChecker won't
+      // remove the source failure gauges its setup recorded
+      if (_controllerMetrics != null) {
+        for (ControllerGauge gauge : List.of(ControllerGauge.INGESTION_SOURCE_AUTH_FAILURE_TIME_SECONDS,
+            ControllerGauge.INGESTION_SOURCE_READ_FAILURE_TIME_SECONDS)) {
+          _controllerMetrics.removeTableGauge(tableNameWithType, gauge);
+        }
+      }
       if (ZKMetadataProvider.removePauselessDebugMetadata(_propertyStore, tableNameWithType)) {
         LOGGER.info("Deleting table {}: Removed pauseless debug metadata", tableNameWithType);
       } else {

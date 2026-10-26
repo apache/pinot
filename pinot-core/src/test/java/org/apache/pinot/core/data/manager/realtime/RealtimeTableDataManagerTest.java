@@ -61,9 +61,8 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorClassifier;
-import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorRule;
-import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorSubReason;
-import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorVerdict;
+import org.apache.pinot.spi.ingestion.error.RefusedBySourceException;
+import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
@@ -94,6 +93,7 @@ import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
@@ -110,28 +110,28 @@ public class RealtimeTableDataManagerTest {
   @Test
   public void testShutdownRemovesTheSourceErrorRecord()
       throws Exception {
-    ServerMetrics.register(mock(ServerMetrics.class));
+    ServerMetrics.deregister();
+    ServerMetrics.register(new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()));
     ServerMetrics metrics = ServerMetrics.get();
-    clearInvocations(metrics);
-    IngestionSourceErrorRule refusal =
-        (node, below, evidence) -> node instanceof RealtimeSegmentDataManagerSourceErrorTest.RefusedException
-            ? IngestionSourceErrorVerdict.auth(IngestionSourceErrorSubReason.AUTHORIZATION, "refused", null) : null;
-    IngestionSourceErrorClassifier.registerRule(refusal);
+    IngestionSourceErrorClassifier.registerRule(RefusedBySourceException.RULE);
     try {
       LifecycleTableDataManager table =
           new LifecycleTableDataManager(Files.createTempDirectory("source-error").toFile(),
               mock(RealtimeSegmentDataManager.class), false, () -> { });
-      String tableNameWithType = table.getTableName();
-      table.getIngestionSourceErrorRecorder().record("fetch",
-          new RealtimeSegmentDataManagerSourceErrorTest.RefusedException(), false, "topic", List.of(3));
-      verify(metrics).setValueOfPartitionGauge(eq(tableNameWithType), eq(3),
-          eq(ServerGauge.INGESTION_SOURCE_AUTH_FAILURE_TIME_SECONDS), anyLong());
+      String authGauge =
+          ServerGauge.INGESTION_SOURCE_AUTH_FAILURE_TIME_SECONDS.getGaugeName() + "." + table.getTableName() + ".3";
+      IngestionSourceErrorRecorder recorder = table.getIngestionSourceErrorRecorder();
+      recorder.record("fetch", new RefusedBySourceException(), false, "topic", List.of(3));
+      assertNotNull(metrics.getGaugeValue(authGauge));
 
       table.shutDown();
-      verify(metrics).removePartitionGauge(tableNameWithType, 3,
-          ServerGauge.INGESTION_SOURCE_AUTH_FAILURE_TIME_SECONDS);
+      assertNull(metrics.getGaugeValue(authGauge));
+      // A consumer thread that outlives the shutdown writes nothing back
+      recorder.record("fetch", new RefusedBySourceException(), false, "topic", List.of(3));
+      assertNull(metrics.getGaugeValue(authGauge));
     } finally {
-      IngestionSourceErrorClassifier.unregisterRule(refusal);
+      IngestionSourceErrorClassifier.unregisterRule(RefusedBySourceException.RULE);
+      ServerMetrics.deregister();
     }
   }
 

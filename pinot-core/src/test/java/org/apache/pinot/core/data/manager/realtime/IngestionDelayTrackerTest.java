@@ -44,8 +44,7 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorClassifier;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorRule;
-import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorSubReason;
-import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorVerdict;
+import org.apache.pinot.spi.ingestion.error.RefusedBySourceException;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
@@ -525,9 +524,7 @@ public class IngestionDelayTrackerTest {
         + REALTIME_TABLE_NAME + ".0";
     String authGauge = ServerGauge.INGESTION_SOURCE_AUTH_FAILURE_TIME_SECONDS.getGaugeName() + "."
         + REALTIME_TABLE_NAME + ".0";
-    IngestionSourceErrorRule refusal =
-        (node, below, evidence) -> node instanceof RealtimeSegmentDataManagerSourceErrorTest.RefusedException
-            ? IngestionSourceErrorVerdict.auth(IngestionSourceErrorSubReason.AUTHORIZATION, "refused", null) : null;
+    IngestionSourceErrorRule refusal = RefusedBySourceException.RULE;
     IngestionSourceErrorClassifier.registerRule(refusal);
     // Not ready to serve queries, so the tracker's own schedule never refreshes concurrently with the test
     MockIngestionDelayTracker tracker =
@@ -537,7 +534,6 @@ public class IngestionDelayTrackerTest {
       StreamMetadataProvider provider = mock(StreamMetadataProvider.class);
       when(provider.supportsOffsetLag()).thenReturn(true);
       tracker._streamConfigIndexToStreamMetadataProvider.put(0, provider);
-      tracker._partitionsHostedByThisServer.put(0, true);
       Set<Integer> partitionsHosted = Set.of(0);
       RuntimeException unreachable = new RuntimeException(new ConnectException("Connection refused"));
 
@@ -558,7 +554,7 @@ public class IngestionDelayTrackerTest {
 
       // A refusal is recorded at once.
       assertNull(serverMetrics.getGaugeValue(authGauge));
-      doThrow(new RealtimeSegmentDataManagerSourceErrorTest.RefusedException()).when(provider)
+      doThrow(new RefusedBySourceException()).when(provider)
           .fetchLatestStreamOffset(anySet(), anyLong());
       tracker.updateLatestStreamOffset(partitionsHosted);
       assertNotNull(serverMetrics.getGaugeValue(authGauge));

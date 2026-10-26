@@ -120,7 +120,7 @@ public abstract class KafkaPartitionLevelConnectionHandler {
       });
     } catch (AttemptsExceededException | RetriableOperationException e) {
       // The retry policy gives up without the failures it retried; keep the last one as the cause.
-      if (e instanceof AttemptsExceededException && lastAttemptFailure.get() != null) {
+      if (lastAttemptFailure.get() != null && e.getCause() == null) {
         e.initCause(lastAttemptFailure.get());
       }
       LOGGER.error("Caught exception while creating Kafka consumer, giving up", e);

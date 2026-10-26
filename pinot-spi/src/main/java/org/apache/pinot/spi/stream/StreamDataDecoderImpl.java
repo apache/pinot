@@ -41,7 +41,7 @@ public class StreamDataDecoderImpl implements StreamDataDecoder {
 
   private final StreamMessageDecoder _valueDecoder;
   private final boolean _isKeyBytesType;
-  private long _lastDecodeErrorLogMs = Long.MIN_VALUE;
+  private long _lastDecodeErrorLogMs;
   private long _decodeErrorsSinceLastLog;
   private final GenericRow _reuse = new GenericRow();
 
@@ -103,7 +103,7 @@ public class StreamDataDecoderImpl implements StreamDataDecoder {
   private void logDecodeError(Exception e) {
     _decodeErrorsSinceLastLog++;
     long nowMs = System.currentTimeMillis();
-    if (_lastDecodeErrorLogMs == Long.MIN_VALUE || nowMs - _lastDecodeErrorLogMs >= DECODE_ERROR_LOG_INTERVAL_MS) {
+    if (nowMs - _lastDecodeErrorLogMs >= DECODE_ERROR_LOG_INTERVAL_MS) {
       LOGGER.error("Failed to decode StreamMessage ({} failures since the last such line)", _decodeErrorsSinceLastLog,
           e);
       _lastDecodeErrorLogMs = nowMs;
