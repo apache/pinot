@@ -32,11 +32,15 @@ import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.failuredetector.FailureDetector;
+import org.apache.pinot.common.failuredetector.FailureDetectorFactory;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.core.routing.MultiClusterRoutingContext;
 import org.apache.pinot.core.routing.RoutingManager;
+import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
@@ -67,6 +71,8 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
+import org.apache.pinot.util.TestUtils;
+import org.mockito.MockedConstruction;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -75,7 +81,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockConstruction;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
@@ -383,6 +393,12 @@ public class MultiStageBrokerRequestHandlerTest extends QueryEnvironmentTestBase
 
   private static MultiStageBrokerRequestHandler newHandler(PinotConfiguration config)
       throws Exception {
+    return newHandler(config, mock(RoutingManager.class), mock(FailureDetector.class), null);
+  }
+
+  private static MultiStageBrokerRequestHandler newHandler(PinotConfiguration config, RoutingManager routingManager,
+      FailureDetector failureDetector, @Nullable MultiClusterRoutingContext multiClusterRoutingContext)
+      throws Exception {
     config.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, "localhost");
     config.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, Integer.toString(NetUtils.findOpenPort()));
     BrokerQueryEventListenerFactory.init(config);
@@ -394,9 +410,10 @@ public class MultiStageBrokerRequestHandlerTest extends QueryEnvironmentTestBase
     when(queryQuotaManager.acquireApplication(anyString())).thenReturn(true);
 
     return new MultiStageBrokerRequestHandler(config, "testBrokerId", new BrokerRequestIdGenerator(),
-        mock(RoutingManager.class), new AllowAllAccessControlFactory(), queryQuotaManager,
-        mock(TableCache.class), mock(MultiStageQueryThrottler.class), mock(FailureDetector.class),
-        ThreadAccountantUtils.getNoOpAccountant(), null, mock(WorkerManager.class), mock(WorkerManager.class)) {
+        routingManager, new AllowAllAccessControlFactory(), queryQuotaManager,
+        mock(TableCache.class), mock(MultiStageQueryThrottler.class), failureDetector,
+        ThreadAccountantUtils.getNoOpAccountant(), multiClusterRoutingContext, mock(WorkerManager.class),
+        mock(WorkerManager.class)) {
       @Override
       public void start() {
       }
@@ -406,6 +423,94 @@ public class MultiStageBrokerRequestHandlerTest extends QueryEnvironmentTestBase
         super.shutDown();
       }
     };
+  }
+
+  /// The failure detector keeps an instance unhealthy while any retrier returns UNHEALTHY for it. A multi-stage worker
+  /// that is not an enabled server of the routing manager, for example a server of a remote cluster, must recover
+  /// once the dispatch channel to it is READY, with the retriers of all request handlers registered.
+  @Test
+  public void testFailureDetectorRecoversWorkerOutsideRoutingManager()
+      throws Exception {
+    String workerId = "Server_remote_8098";
+    PinotConfiguration failureDetectorConfig = new PinotConfiguration();
+    failureDetectorConfig.setProperty(CommonConstants.Broker.FailureDetector.CONFIG_OF_TYPE,
+        CommonConstants.Broker.FailureDetector.Type.CONNECTION.name());
+    failureDetectorConfig.setProperty(CommonConstants.Broker.FailureDetector.CONFIG_OF_RETRY_INITIAL_DELAY_MS, 100);
+    failureDetectorConfig.setProperty(CommonConstants.Broker.FailureDetector.CONFIG_OF_RETRY_DELAY_FACTOR, 1);
+    // Recover only through the retriers, not because the retries ran out
+    failureDetectorConfig.setProperty(CommonConstants.Broker.FailureDetector.CONFIG_OF_MAX_RETRIES, 1_000);
+    FailureDetector failureDetector =
+        FailureDetectorFactory.getFailureDetector(failureDetectorConfig, BrokerMetrics.noop());
+    failureDetector.registerHealthyServerNotifier(instanceId -> {
+    });
+    failureDetector.registerUnhealthyServerNotifier(instanceId -> {
+    });
+    failureDetector.start();
+    RoutingManager routingManager = mock(RoutingManager.class);
+    when(routingManager.getEnabledServerInstanceMap()).thenReturn(Map.of());
+    BrokerQueryEventListenerFactory.init(new PinotConfiguration());
+    // Like the broker starter, register the retriers of the single-stage handlers first
+    SingleConnectionBrokerRequestHandler singleConnectionHandler =
+        new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), "testBrokerId",
+            new BrokerRequestIdGenerator(), routingManager, new AllowAllAccessControlFactory(), null, null, null, null,
+            mock(ServerRoutingStatsManager.class), failureDetector, ThreadAccountantUtils.getNoOpAccountant(), null,
+            null);
+    GrpcBrokerRequestHandler grpcHandler =
+        new GrpcBrokerRequestHandler(new PinotConfiguration(), "testBrokerId", new BrokerRequestIdGenerator(),
+            routingManager, new AllowAllAccessControlFactory(), null, null, failureDetector,
+            ThreadAccountantUtils.getNoOpAccountant(), null);
+    AtomicReference<FailureDetector.ServerState> workerState =
+        new AtomicReference<>(FailureDetector.ServerState.UNHEALTHY);
+    try (MockedConstruction<QueryDispatcher> dispatchers = mockConstruction(QueryDispatcher.class,
+        (dispatcher, context) -> when(dispatcher.checkConnectivityToInstance(workerId)).thenAnswer(
+            invocation -> workerState.get()))) {
+      newHandler(new PinotConfiguration(), routingManager, failureDetector, null);
+      QueryDispatcher dispatcher = dispatchers.constructed().get(0);
+      failureDetector.markServerUnhealthy(workerId, "remote");
+
+      // The dispatch channel to the worker is not READY
+      verify(dispatcher, timeout(5_000L).atLeast(3)).checkConnectivityToInstance(workerId);
+      assertEquals(failureDetector.getUnhealthyServers(), Set.of(workerId));
+
+      workerState.set(FailureDetector.ServerState.HEALTHY);
+      TestUtils.waitForCondition(aVoid -> failureDetector.getUnhealthyServers().isEmpty(), 5_000L,
+          "The worker did not recover");
+    } finally {
+      failureDetector.stop();
+      singleConnectionHandler.shutDown();
+      grpcHandler.shutDown();
+    }
+  }
+
+  /// The retrier checks a server at its current address, in this cluster or with multi-cluster routing in a remote
+  /// cluster. It checks other instances at the address that a query was last dispatched to.
+  @Test
+  public void testRetryUnhealthyServerChecksCurrentAddress()
+      throws Exception {
+    ServerInstance localServer = mock(ServerInstance.class);
+    ServerInstance remoteServer = mock(ServerInstance.class);
+    RoutingManager routingManager = mock(RoutingManager.class);
+    when(routingManager.getEnabledServerInstanceMap()).thenReturn(Map.of("Server_local_8098", localServer));
+    RoutingManager multiClusterRoutingManager = mock(RoutingManager.class);
+    when(multiClusterRoutingManager.getEnabledServerInstanceMap()).thenReturn(
+        Map.of("Server_local_8098", localServer, "Server_remote_8098", remoteServer));
+    MultiClusterRoutingContext multiClusterRoutingContext =
+        new MultiClusterRoutingContext(Map.of(), routingManager, multiClusterRoutingManager, Set.of());
+    try (MockedConstruction<QueryDispatcher> dispatchers = mockConstruction(QueryDispatcher.class)) {
+      MultiStageBrokerRequestHandler handler = newHandler(new PinotConfiguration(), routingManager,
+          mock(FailureDetector.class), multiClusterRoutingContext);
+      QueryDispatcher dispatcher = dispatchers.constructed().get(0);
+      when(dispatcher.checkConnectivityToInstance(localServer)).thenReturn(FailureDetector.ServerState.HEALTHY);
+      when(dispatcher.checkConnectivityToInstance(remoteServer)).thenReturn(FailureDetector.ServerState.UNHEALTHY);
+      when(dispatcher.checkConnectivityToInstance("Server_worker_8098")).thenReturn(
+          FailureDetector.ServerState.HEALTHY);
+
+      assertEquals(handler.retryUnhealthyServer("Server_local_8098"), FailureDetector.ServerState.HEALTHY);
+      assertEquals(handler.retryUnhealthyServer("Server_remote_8098"), FailureDetector.ServerState.UNHEALTHY);
+      assertEquals(handler.retryUnhealthyServer("Server_worker_8098"), FailureDetector.ServerState.HEALTHY);
+      verify(dispatcher, never()).checkConnectivityToInstance("Server_local_8098");
+      verify(dispatcher, never()).checkConnectivityToInstance("Server_remote_8098");
+    }
   }
 
   // Timeout guards against deadlock: if rewriteReduceStageForEmptyLeaves fails to inline
