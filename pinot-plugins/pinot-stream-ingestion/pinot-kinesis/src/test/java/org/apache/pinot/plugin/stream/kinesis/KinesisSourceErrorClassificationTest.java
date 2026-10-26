@@ -26,6 +26,8 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.URI;
 import java.net.UnknownHostException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceCredentialMode;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorEvidence;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorSubReason;
@@ -52,6 +54,7 @@ import software.amazon.awssdk.services.kinesis.model.LimitExceededException;
 import software.amazon.awssdk.services.kinesis.model.ProvisionedThroughputExceededException;
 import software.amazon.awssdk.services.kinesis.model.ResourceInUseException;
 import software.amazon.awssdk.services.kinesis.model.ResourceNotFoundException;
+import software.amazon.awssdk.services.sts.StsClient;
 import software.amazon.awssdk.services.sts.model.RegionDisabledException;
 import software.amazon.awssdk.services.sts.model.StsException;
 
@@ -60,6 +63,8 @@ import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorAssertion
 import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorAssertions.assertSourceRead;
 import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorVerdict.TARGET_KMS;
 import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorVerdict.TARGET_STS;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
 
@@ -239,33 +244,80 @@ public class KinesisSourceErrorClassificationTest {
     assertSourceRead(ApiCallTimeoutException.create(5000), null);
   }
 
-  @Test
-  public void endpointThatClosesWithoutAnsweringIsSourceRead()
+  /// A load balancer or proxy that reads each request in full and closes the connection without answering.
+  private static ServerSocket droppingEndpoint()
       throws IOException {
-    // A load balancer or proxy that drops every request: the SDK's Apache client gets no response, retries, and gives
-    // up with that failure as the cause.
-    try (ServerSocket endpoint = new ServerSocket(0, 50, InetAddress.getLoopbackAddress())) {
-      Thread dropper = new Thread(() -> {
-        while (true) {
-          try (Socket connection = endpoint.accept(); InputStream request = connection.getInputStream()) {
-            request.read(new byte[8192]);
-          } catch (IOException e) {
+    ServerSocket endpoint = new ServerSocket(0, 50, InetAddress.getLoopbackAddress());
+    Thread dropper = new Thread(() -> {
+      while (true) {
+        try (Socket connection = endpoint.accept(); InputStream request = connection.getInputStream()) {
+          readRequest(request);
+        } catch (IOException e) {
+          if (endpoint.isClosed()) {
             return;
           }
         }
-      });
-      dropper.setDaemon(true);
-      dropper.start();
-      try (KinesisClient client = KinesisClient.builder()
-          .endpointOverride(URI.create("http://127.0.0.1:" + endpoint.getLocalPort()))
-          .region(Region.US_EAST_1)
-          .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create("test", "test")))
-          .httpClientBuilder(ApacheHttpClient.builder())
-          .build()) {
-        SdkClientException failure =
-            expectThrows(SdkClientException.class, () -> client.listShards(request -> request.streamName("stream")));
-        assertSourceRead(underPinot(failure), null);
       }
+    });
+    dropper.setDaemon(true);
+    dropper.start();
+    return endpoint;
+  }
+
+  private static void readRequest(InputStream request)
+      throws IOException {
+    StringBuilder headers = new StringBuilder();
+    while (headers.indexOf("\r\n\r\n") < 0) {
+      int b = request.read();
+      if (b < 0) {
+        return;
+      }
+      headers.append((char) b);
+    }
+    Matcher contentLength = CONTENT_LENGTH.matcher(headers);
+    long remaining = contentLength.find() ? Long.parseLong(contentLength.group(1)) : 0;
+    while (remaining > 0 && request.read() >= 0) {
+      remaining--;
+    }
+  }
+
+  private static final Pattern CONTENT_LENGTH =
+      Pattern.compile("(?i)\r\ncontent-length:\\s*(\\d+)");
+
+  private static boolean hasCause(Throwable failure, String className) {
+    for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+      if (cause.getClass().getName().equals(className)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  @Test
+  public void endpointThatClosesWithoutAnsweringIsSourceRead()
+      throws IOException {
+    // The SDK retries, then gives up with the HTTP client's no-response failure as the cause. Kinesis is built on the
+    // Apache 4 client; STS takes the SDK's default, Apache 5.
+    try (ServerSocket endpoint = droppingEndpoint();
+        KinesisClient kinesis = KinesisClient.builder()
+            .endpointOverride(URI.create("http://127.0.0.1:" + endpoint.getLocalPort()))
+            .region(Region.US_EAST_1)
+            .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create("test", "test")))
+            .httpClientBuilder(ApacheHttpClient.builder())
+            .build();
+        StsClient sts = StsClient.builder()
+            .endpointOverride(URI.create("http://127.0.0.1:" + endpoint.getLocalPort()))
+            .region(Region.US_EAST_1)
+            .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create("test", "test")))
+            .build()) {
+      SdkClientException kinesisFailure =
+          expectThrows(SdkClientException.class, () -> kinesis.listShards(request -> request.streamName("stream")));
+      assertTrue(hasCause(kinesisFailure, "org.apache.http.NoHttpResponseException"));
+      assertEquals(assertSourceRead(underPinot(kinesisFailure), null).getCode(), "NoHttpResponseException");
+
+      SdkClientException stsFailure = expectThrows(SdkClientException.class, sts::getCallerIdentity);
+      assertTrue(hasCause(stsFailure, "org.apache.hc.core5.http.NoHttpResponseException"));
+      assertEquals(assertSourceRead(underPinot(stsFailure), null).getCode(), "NoHttpResponseException");
     }
   }
 

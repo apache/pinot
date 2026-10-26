@@ -176,7 +176,9 @@ final class IngestionSourceErrorRules {
   private static final String AWS_CLIENT_EXCEPTION = "software.amazon.awssdk.core.exception.SdkClientException";
   private static final String AWS_STS_EXCEPTION = "software.amazon.awssdk.services.sts.model.StsException";
   private static final String AWS_ABORTED = "software.amazon.awssdk.core.exception.AbortedException";
-  private static final String APACHE_NO_HTTP_RESPONSE = "org.apache.http.NoHttpResponseException";
+  // The SDK's Apache HTTP clients, 4 and 5: the endpoint closed the connection without answering
+  private static final Set<String> APACHE_NO_HTTP_RESPONSE = Set.of("org.apache.http.NoHttpResponseException",
+      "org.apache.hc.core5.http.NoHttpResponseException");
   private static final Set<String> AWS_CALL_TIMEOUTS = Set.of(
       "software.amazon.awssdk.core.exception.ApiCallTimeoutException",
       "software.amazon.awssdk.core.exception.ApiCallAttemptTimeoutException");
@@ -299,8 +301,7 @@ final class IngestionSourceErrorRules {
       if (isUnreachable(cause)) {
         return unreachable(cause, message);
       }
-      // The SDK's Apache HTTP client: the endpoint closed the connection without answering.
-      if (hasClass(cause.getClass(), APACHE_NO_HTTP_RESPONSE)) {
+      if (hasAnyClass(cause.getClass(), APACHE_NO_HTTP_RESPONSE)) {
         return sourceRead(cause.getClass().getSimpleName(), null);
       }
     }
