@@ -354,6 +354,10 @@ public class ControllerConf extends PinotConfiguration {
   public static final String CONTROLLER_ENABLE_INSTANCE_CHANGE_PROPAGATION =
       "controller.enable.instance.change.propagation";
   public static final String DELETED_SEGMENTS_RETENTION_IN_DAYS = "controller.deleted.segments.retentionInDays";
+  // When enabled, a segment's metadata sidecar (<segment>.metadata.tar.gz) is kept under
+  // Deleted_Segments/<table>/metadata/ when the segment is deleted with retention > 0; otherwise (or when disabled) it
+  // is deleted with the segment.
+  public static final String DELETED_SEGMENTS_PRESERVE_METADATA = "controller.deleted.segments.preserveMetadata";
   public static final String TABLE_MIN_REPLICAS = "table.minReplicas";
   public static final String JERSEY_ADMIN_API_PORT = "jersey.admin.api.port";
   public static final String JERSEY_ADMIN_IS_PRIMARY = "jersey.admin.isprimary";
@@ -407,6 +411,7 @@ public class ControllerConf extends PinotConfiguration {
   public static final int DEFAULT_SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS = 30;
   public static final int DEFAULT_MINION_ADMIN_REQUEST_TIMEOUT_SECONDS = 30;
   public static final int DEFAULT_DELETED_SEGMENTS_RETENTION_IN_DAYS = 7;
+  public static final boolean DEFAULT_DELETED_SEGMENTS_PRESERVE_METADATA = false;
   public static final int DEFAULT_TABLE_MIN_REPLICAS = 1;
   public static final int DEFAULT_JERSEY_ADMIN_PORT = 21000;
   public static final boolean DEFAULT_INGEST_FROM_URI_ALLOW_LOCAL_FILE_SYSTEM = false;
@@ -1118,6 +1123,10 @@ public class ControllerConf extends PinotConfiguration {
 
   public void setDeletedSegmentsRetentionInDays(int retentionInDays) {
     setProperty(DELETED_SEGMENTS_RETENTION_IN_DAYS, retentionInDays);
+  }
+
+  public boolean isDeletedSegmentsPreserveMetadata() {
+    return getProperty(DELETED_SEGMENTS_PRESERVE_METADATA, DEFAULT_DELETED_SEGMENTS_PRESERVE_METADATA);
   }
 
   public boolean isSkipLateCronSchedule() {

@@ -92,4 +92,16 @@ public interface InstanceDataManagerConfig {
   boolean shouldCheckCRCOnSegmentLoad();
 
   boolean isDimensionTablePreloadDisabled();
+
+  default boolean isUploadSegmentMetadataTarGz() {
+    return false;
+  }
+
+  /// Default for [#getUploadSegmentMetadataTarGzTimeoutMs].
+  int DEFAULT_UPLOAD_SEGMENT_METADATA_TAR_GZ_TIMEOUT_MS = 10_000;
+
+  /// Maximum time the segment commit waits for the best-effort metadata tar upload.
+  default int getUploadSegmentMetadataTarGzTimeoutMs() {
+    return DEFAULT_UPLOAD_SEGMENT_METADATA_TAR_GZ_TIMEOUT_MS;
+  }
 }

@@ -425,7 +425,7 @@ public class PinotHelixResourceManager {
   protected SegmentDeletionManager createSegmentDeletionManager(String dataDir, HelixAdmin helixAdmin,
       String helixClusterName, ZkHelixPropertyStore<ZNRecord> propertyStore, int deletedSegmentsRetentionInDays) {
     return new SegmentDeletionManager(dataDir, helixAdmin, helixClusterName, propertyStore,
-        deletedSegmentsRetentionInDays);
+        deletedSegmentsRetentionInDays, _controllerConf != null && _controllerConf.isDeletedSegmentsPreserveMetadata());
   }
 
   /// Get the Helix manager.

@@ -64,6 +64,7 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   // are not counted.
   LLC_ERROR_SEGMENT_REPAIR_FAILURES("failures", false),
   DELETED_TMP_SEGMENT_COUNT("DeletedTmpSegmentCount", false),
+  REALTIME_METADATA_TAR_MOVE_FAILURE("RealtimeMetadataTarMoveFailure", false),
   TABLE_REBALANCE_FAILURE_DETECTED("TableRebalanceFailureDetected", false),
   TABLE_REBALANCE_RETRY("TableRebalanceRetry", false),
   TABLE_REBALANCE_RETRY_TOO_MANY_TIMES("TableRebalanceRetryTooManyTimes", false),
