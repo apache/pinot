@@ -77,6 +77,11 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
   protected static BaseLogicalTableIntegrationTest _sharedClusterTestSuite = null;
   protected List<File> _avroFiles;
 
+  @Override
+  protected int getNumServers() {
+    return 2;
+  }
+
   @BeforeSuite
   public void setUpSuite()
       throws Exception {
@@ -90,7 +95,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     startKafka();
     startController();
     startBroker();
-    startServers(2);
+    startServers(getNumServers());
     LOGGER.info("Finished setting up integration test suite");
   }
 
