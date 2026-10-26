@@ -66,7 +66,7 @@ public class InvertedIndexFilterOperator extends BaseColumnFilterOperator {
       return EmptyDocIdSet.unscanned();
     }
     if (numDictIds == 1) {
-      ImmutableRoaringBitmap docIds = _invertedIndexReader.getDocIds(dictIds[0]);
+      ImmutableRoaringBitmap docIds = getDocIds(dictIds[0]);
       if (_exclusive) {
         if (docIds instanceof MutableRoaringBitmap) {
           MutableRoaringBitmap mutableRoaringBitmap = (MutableRoaringBitmap) docIds;
@@ -81,7 +81,7 @@ public class InvertedIndexFilterOperator extends BaseColumnFilterOperator {
     } else {
       ImmutableRoaringBitmap[] bitmaps = new ImmutableRoaringBitmap[numDictIds];
       for (int i = 0; i < numDictIds; i++) {
-        bitmaps[i] = _invertedIndexReader.getDocIds(dictIds[i]);
+        bitmaps[i] = getDocIds(dictIds[i]);
       }
       MutableRoaringBitmap docIds = ImmutableRoaringBitmap.or(bitmaps);
       if (_exclusive) {
@@ -121,11 +121,11 @@ public class InvertedIndexFilterOperator extends BaseColumnFilterOperator {
       count = 0;
       if (nullBitmap == null) {
         for (int dictId : dictIds) {
-          count += _invertedIndexReader.getDocIds(dictId).getCardinality();
+          count += getDocIds(dictId).getCardinality();
         }
       } else {
         for (int dictId : dictIds) {
-          ImmutableRoaringBitmap docIds = _invertedIndexReader.getDocIds(dictId);
+          ImmutableRoaringBitmap docIds = getDocIds(dictId);
           count += docIds.getCardinality();
           numNulls += ImmutableRoaringBitmap.andCardinality(docIds, nullBitmap);
         }
@@ -139,18 +139,17 @@ public class InvertedIndexFilterOperator extends BaseColumnFilterOperator {
         case 0:
           break;
         case 1:
-          count = _invertedIndexReader.getDocIds(dictIds[0]).getCardinality();
+          count = getDocIds(dictIds[0]).getCardinality();
           break;
         case 2:
-          count = ImmutableRoaringBitmap.orCardinality(_invertedIndexReader.getDocIds(dictIds[0]),
-              _invertedIndexReader.getDocIds(dictIds[1]));
+          count = ImmutableRoaringBitmap.orCardinality(getDocIds(dictIds[0]), getDocIds(dictIds[1]));
           break;
         default:
           // Union lazily and finalize once at the end: the fold still materializes the union, but skips per-union
           // cardinality maintenance
           MutableRoaringBitmapUnion union = new MutableRoaringBitmapUnion();
           for (int dictId : dictIds) {
-            union.add(_invertedIndexReader.getDocIds(dictId));
+            union.add(getDocIds(dictId));
           }
           count = union.get().getCardinality();
           break;
@@ -169,9 +168,27 @@ public class InvertedIndexFilterOperator extends BaseColumnFilterOperator {
     int[] dictIds = _exclusive ? _predicateEvaluator.getNonMatchingDictIds() : _predicateEvaluator.getMatchingDictIds();
     ImmutableRoaringBitmap[] bitmaps = new ImmutableRoaringBitmap[dictIds.length];
     for (int i = 0; i < dictIds.length; i++) {
-      bitmaps[i] = _invertedIndexReader.getDocIds(dictIds[i]);
+      bitmaps[i] = getDocIds(dictIds[i]);
     }
     return new BitmapCollection(_numDocs, _exclusive, bitmaps).excludingNulls(getNullBitmap());
+  }
+
+  /// Returns the documents for the given dictionary id, limited to `[0, numDocs)`.
+  ///
+  /// On a consuming segment, rows keep being indexed after the query is planned, so the bitmap read at execution time
+  /// can hold documents at or above `numDocs`, which is read at planning time. These documents must be dropped: the
+  /// flip for exclusive predicates only covers `[0, numDocs)`, so they would stay in the result, and the AND and count
+  /// paths don't check the document range again.
+  private ImmutableRoaringBitmap getDocIds(int dictId) {
+    ImmutableRoaringBitmap docIds = _invertedIndexReader.getDocIds(dictId);
+    if (docIds.isEmpty() || docIds.last() < _numDocs) {
+      return docIds;
+    }
+    // Only a mutable inverted index can hold such documents, and it returns a copy of its bitmap
+    MutableRoaringBitmap mutableDocIds =
+        docIds instanceof MutableRoaringBitmap ? (MutableRoaringBitmap) docIds : docIds.toMutableRoaringBitmap();
+    mutableDocIds.remove(_numDocs, 0x100000000L);
+    return mutableDocIds;
   }
 
   @Override

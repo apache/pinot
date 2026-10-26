@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.filter;
 
+import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -135,7 +136,35 @@ public class InvertedIndexFilterOperatorTest {
     assertEquals(operator.getNumMatchingDocs(), 4);
   }
 
+  // On a consuming segment, the mutable inverted index returns its live bitmaps, which can hold documents ingested
+  // after numDocs was read at planning time. Those documents are left out of the matches, the count and the bitmaps, on
+  // both sides of exclusive. Each check uses a new operator so that it reads untrimmed bitmaps.
+  @Test
+  public void testDocsAtOrAboveNumDocsAreIgnored() {
+    int[] dictIds = {0, 1};
+    for (boolean singleValue : new boolean[]{true, false}) {
+      assertEquals(TestUtils.getDocIds(
+          newOperator(singleValue, false, dictIds, liveBitmaps()).nextBlock().getBlockDocIdSet()), List.of(1, 2, 3));
+      assertEquals(newOperator(singleValue, false, dictIds, liveBitmaps()).getNumMatchingDocs(), 3);
+      assertEquals(newOperator(singleValue, false, dictIds, liveBitmaps()).getBitmaps().reduce().toArray(),
+          new int[]{1, 2, 3});
+
+      List<Integer> docIds =
+          TestUtils.getDocIds(newOperator(singleValue, true, dictIds, liveBitmaps()).nextBlock().getBlockDocIdSet());
+      assertEquals(docIds.size(), NUM_DOCS - 3);
+      assertEquals((int) docIds.get(docIds.size() - 1), NUM_DOCS - 1);
+      assertEquals(newOperator(singleValue, true, dictIds, liveBitmaps()).getNumMatchingDocs(), NUM_DOCS - 3);
+      assertEquals(newOperator(singleValue, true, dictIds, liveBitmaps()).getBitmaps().getCardinality(),
+          NUM_DOCS - 3);
+    }
+  }
+
   // ----- helpers -----
+
+  /// Bitmaps for dictionary ids 0 and 1 as read from a consuming segment, with documents at and above [#NUM_DOCS]
+  private static ImmutableRoaringBitmap[] liveBitmaps() {
+    return new ImmutableRoaringBitmap[]{bitmap(1, 2, NUM_DOCS, NUM_DOCS + 1), bitmap(3, NUM_DOCS + 2)};
+  }
 
   private static ImmutableRoaringBitmap bitmap(int... docIds) {
     MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
