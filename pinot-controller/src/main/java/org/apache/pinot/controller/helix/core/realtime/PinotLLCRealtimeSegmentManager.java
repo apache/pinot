@@ -1002,8 +1002,8 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
   }
 
   /// Marks the last segment of a partition group that reached end of life in its ZK metadata, so that servers stop
-  /// reporting the partition as consuming when the segment goes ONLINE, and sets the PARTITION_END_OF_LIFE gauge.
-  private void markEndOfPartitionGroup(String realtimeTableName, String segmentName) {
+  /// reporting the partition as consuming, and sets the PARTITION_END_OF_LIFE gauge. Returns whether it is marked.
+  private boolean markEndOfPartitionGroup(String realtimeTableName, String segmentName) {
     try {
       Stat stat = new Stat();
       SegmentZKMetadata segmentZKMetadata = getSegmentZKMetadata(realtimeTableName, segmentName, stat);
@@ -1015,11 +1015,22 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
       }
       _controllerMetrics.setValueOfPartitionGauge(realtimeTableName,
           new LLCSegmentName(segmentName).getPartitionGroupId(), ControllerGauge.PARTITION_END_OF_LIFE, 1);
+      return true;
     } catch (Exception e) {
       // The validation task marks it on a later run
       LOGGER.warn("Failed to mark segment: {} of table: {} as the end of its partition group", segmentName,
           realtimeTableName, e);
+      return false;
     }
+  }
+
+  /// Tells the servers that moved the segment to ONLINE before it was marked as the end of its partition group to stop
+  /// reporting the partition as consuming. They only read the mark on the CONSUMING to ONLINE transition.
+  private void sendPartitionEndOfLifeMessage(String realtimeTableName, String segmentName) {
+    int numMessagesSent = MessagingServiceUtils.send(_helixManager.getMessagingService(),
+        new IngestionMetricsRemoveMessage(true), realtimeTableName, segmentName, null);
+    LOGGER.info("Sent {} partition end of life messages for segment: {} of table: {}", numMessagesSent, segmentName,
+        realtimeTableName);
   }
 
   /// Removes the PARTITION_END_OF_LIFE gauges of the table, e.g. when this controller no longer leads it.
@@ -2096,6 +2107,8 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     // Latest segments of partitions that stopped because they are not in the stream metadata anymore, and are not yet
     // marked as the end of their partition group. The stream is asked below whether they reached end of life.
     List<SegmentZKMetadata> endOfLifeCandidates = new ArrayList<>();
+    // Candidates that are already ONLINE on their servers, which have to be told once the candidate is marked
+    Set<String> onlineEndOfLifeCandidates = new HashSet<>();
 
     for (Map.Entry<Integer, SegmentZKMetadata> entry : latestSegmentZKMetadataMap.entrySet()) {
       int partitionId = entry.getKey();
@@ -2196,6 +2209,7 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
                 latestSegmentName);
             if (allInstancesOnlineAndMetadataNotInProgress && !latestSegmentZKMetadata.isEndOfPartitionGroup()) {
               endOfLifeCandidates.add(latestSegmentZKMetadata);
+              onlineEndOfLifeCandidates.add(latestSegmentName);
             }
             continue;
           }
@@ -2283,20 +2297,32 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     if (!endOfLifeCandidates.isEmpty()) {
       Set<Integer> endOfLifePartitionGroupIds = fetchEndOfLifePartitionGroupIds(streamConfigs, endOfLifeCandidates);
       for (SegmentZKMetadata segmentZKMetadata : endOfLifeCandidates) {
-        if (endOfLifePartitionGroupIds.contains(
-            new LLCSegmentName(segmentZKMetadata.getSegmentName()).getPartitionGroupId())) {
-          markEndOfPartitionGroup(realtimeTableName, segmentZKMetadata.getSegmentName());
+        String segmentName = segmentZKMetadata.getSegmentName();
+        if (endOfLifePartitionGroupIds.contains(new LLCSegmentName(segmentName).getPartitionGroupId())
+            && markEndOfPartitionGroup(realtimeTableName, segmentName)) {
           segmentZKMetadata.setEndOfPartitionGroup(true);
+          if (onlineEndOfLifeCandidates.contains(segmentName)) {
+            sendPartitionEndOfLifeMessage(realtimeTableName, segmentName);
+          }
         }
       }
     }
-    // Emit the gauge from the segment ZK metadata, which also restores it after a controller restart or leadership move
+    // Emit the gauge from the segment ZK metadata, which also restores it after a controller restart or leadership
+    // move. Remove it once the partition consumes again or has no segment left. Keep it while the latest segment is not
+    // consuming, because a commit might be marking that segment right now.
+    Set<Integer> partitionIdsToKeepEndOfLifeGauge = new HashSet<>();
     for (Map.Entry<Integer, SegmentZKMetadata> entry : latestSegmentZKMetadataMap.entrySet()) {
-      if (entry.getValue().isEndOfPartitionGroup()) {
+      SegmentZKMetadata latestSegmentZKMetadata = entry.getValue();
+      if (latestSegmentZKMetadata.isEndOfPartitionGroup()) {
         _controllerMetrics.setValueOfPartitionGauge(realtimeTableName, entry.getKey(),
             ControllerGauge.PARTITION_END_OF_LIFE, 1);
       }
+      if (latestSegmentZKMetadata.getStatus() != Status.IN_PROGRESS) {
+        partitionIdsToKeepEndOfLifeGauge.add(entry.getKey());
+      }
     }
+    _controllerMetrics.retainPartitionGauges(realtimeTableName, ControllerGauge.PARTITION_END_OF_LIFE,
+        partitionIdsToKeepEndOfLifeGauge);
 
     return idealState;
   }

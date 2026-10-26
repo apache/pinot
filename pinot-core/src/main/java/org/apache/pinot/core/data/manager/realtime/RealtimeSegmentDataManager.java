@@ -1517,6 +1517,15 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _serverMetrics.removeTableMeter(_clientId, ServerMeter.SEGMENT_BUILD_FAILURE);
   }
 
+  /// Returns the client id of a stream partition, which also keys its metrics such as LLC_PARTITION_CONSUMING.
+  static String getClientId(String tableNameWithType, String streamTopic, int streamPartitionId,
+      @Nullable InstanceDataManagerConfig instanceDataManagerConfig) {
+    String clientId = tableNameWithType + "-" + streamTopic + "-" + streamPartitionId;
+    String clientIdSuffix =
+        instanceDataManagerConfig != null ? instanceDataManagerConfig.getConsumerClientIdSuffix() : null;
+    return StringUtils.isNotBlank(clientIdSuffix) ? clientId + "-" + clientIdSuffix : clientId;
+  }
+
   protected void hold()
       throws InterruptedException {
     Thread.sleep(SegmentCompletionProtocol.MAX_HOLD_TIME_MS);
@@ -1978,14 +1987,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             _segmentZKMetadata.getEndOffset() == null ? null
                 : _streamPartitionMsgOffsetFactory.create(_segmentZKMetadata.getEndOffset()),
             _segmentZKMetadata.getStatus().toString());
-    InstanceDataManagerConfig instanceDataManagerConfig = indexLoadingConfig.getInstanceDataManagerConfig();
-    String clientIdSuffix =
-        instanceDataManagerConfig != null ? instanceDataManagerConfig.getConsumerClientIdSuffix() : null;
-    if (StringUtils.isNotBlank(clientIdSuffix)) {
-      _clientId = _tableNameWithType + "-" + streamTopic + "-" + _streamPartitionId + "-" + clientIdSuffix;
-    } else {
-      _clientId = _tableNameWithType + "-" + streamTopic + "-" + _streamPartitionId;
-    }
+    _clientId = getClientId(_tableNameWithType, streamTopic, _streamPartitionId,
+        indexLoadingConfig.getInstanceDataManagerConfig());
     _segmentLogger = LoggerFactory.getLogger(RealtimeSegmentDataManager.class.getName() + "_" + _segmentNameStr);
     _tableStreamName = _tableNameWithType + "_" + streamTopic;
     if (indexLoadingConfig.isRealtimeOffHeapAllocation() && !indexLoadingConfig.isDirectRealtimeOffHeapAllocation()) {

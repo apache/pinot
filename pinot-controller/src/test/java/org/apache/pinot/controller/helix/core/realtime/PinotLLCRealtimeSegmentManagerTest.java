@@ -66,6 +66,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.messages.IngestionMetricsRemoveMessage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -330,8 +331,20 @@ public class PinotLLCRealtimeSegmentManagerTest {
   @Test
   public void testEndOfPartitionGroup() {
     ControllerMetrics controllerMetrics = new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+    PinotHelixResourceManager resourceManager = FakePinotLLCRealtimeSegmentManager.createMockedResourceManager();
+    ClusterMessagingService messagingService = resourceManager.getHelixZkManager().getMessagingService();
     FakePinotLLCRealtimeSegmentManager segmentManager =
-        new FakePinotLLCRealtimeSegmentManager(mock(PinotHelixResourceManager.class), controllerMetrics);
+        new FakePinotLLCRealtimeSegmentManager(resourceManager, controllerMetrics);
+    try {
+      testEndOfPartitionGroup(segmentManager, controllerMetrics, messagingService);
+    } finally {
+      // The metrics registry is shared across tests
+      segmentManager.removePartitionEndOfLifeGauges(REALTIME_TABLE_NAME);
+    }
+  }
+
+  private void testEndOfPartitionGroup(FakePinotLLCRealtimeSegmentManager segmentManager,
+      ControllerMetrics controllerMetrics, ClusterMessagingService messagingService) {
     setUpNewTable(segmentManager, 2, 5, 4);
     StreamMetadata allPartitions =
         segmentManager.getNewStreamMetadataList(segmentManager._streamConfigs, List.of(), mock(IdealState.class))
@@ -355,7 +368,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     assertTrue(segmentManager._segmentZKMetadataMap.get(lastSegmentOfPartition1).isEndOfPartitionGroup());
     assertEquals(getPartitionEndOfLife(controllerMetrics, 1), 1L);
 
-    // Once the stream reports partition 0 as ended too, the validation task marks it, and only asks about partition 0
+    // Once the stream reports partition 0 as ended too, the validation task marks it, and only asks about partition 0.
+    // Its servers moved it to ONLINE without the mark, so they are told to stop reporting it as consuming.
     segmentManager._endOfLifePartitionGroupIds = Set.of(0, 1);
     segmentManager._endOfLifePartitionGroupIdsAsked.clear();
     segmentManager._exceededMaxSegmentCompletionTime = true;
@@ -366,9 +380,14 @@ public class PinotLLCRealtimeSegmentManagerTest {
     for (int partitionId = 2; partitionId < 4; partitionId++) {
       assertNull(getPartitionEndOfLife(controllerMetrics, partitionId));
     }
+    verify(messagingService).send(argThat(criteria -> lastSegmentOfPartition0.equals(criteria.getPartition())),
+        argThat(message -> message instanceof IngestionMetricsRemoveMessage
+            && ((IngestionMetricsRemoveMessage) message).isEndOfPartitionGroup()));
+    verify(messagingService, never()).send(
+        argThat(criteria -> lastSegmentOfPartition1.equals(criteria.getPartition())), any());
 
     // A controller that no longer leads the table removes the gauges, and the next leader emits them again from the
-    // segment ZK metadata without asking the stream
+    // segment ZK metadata without asking the stream or the servers
     segmentManager.removePartitionEndOfLifeGauges(REALTIME_TABLE_NAME);
     assertNull(getPartitionEndOfLife(controllerMetrics, 0));
     assertNull(getPartitionEndOfLife(controllerMetrics, 1));
@@ -377,9 +396,22 @@ public class PinotLLCRealtimeSegmentManagerTest {
     assertTrue(segmentManager._endOfLifePartitionGroupIdsAsked.isEmpty());
     assertEquals(getPartitionEndOfLife(controllerMetrics, 0), 1L);
     assertEquals(getPartitionEndOfLife(controllerMetrics, 1), 1L);
+    verify(messagingService, times(1)).send(any(), any());
 
-    // The metrics registry is shared across tests
-    segmentManager.removePartitionEndOfLifeGauges(REALTIME_TABLE_NAME);
+    // The gauge goes away when the partition has no segment left, e.g. after retention
+    segmentManager._idealState.getRecord().getMapFields().remove(lastSegmentOfPartition1);
+    segmentManager._segmentZKMetadataMap.remove(lastSegmentOfPartition1);
+    segmentManager.ensureAllPartitionsConsuming();
+    assertNull(getPartitionEndOfLife(controllerMetrics, 1));
+    assertEquals(getPartitionEndOfLife(controllerMetrics, 0), 1L);
+
+    // The gauge goes away when the partition consumes again. The first run creates the consuming segment, and the
+    // next one sees it.
+    segmentManager._streamMetadataList = List.of(allPartitions);
+    segmentManager.ensureAllPartitionsConsuming();
+    assertEquals(getPartitionEndOfLife(controllerMetrics, 0), 1L);
+    segmentManager.ensureAllPartitionsConsuming();
+    assertNull(getPartitionEndOfLife(controllerMetrics, 0));
   }
 
   @Nullable

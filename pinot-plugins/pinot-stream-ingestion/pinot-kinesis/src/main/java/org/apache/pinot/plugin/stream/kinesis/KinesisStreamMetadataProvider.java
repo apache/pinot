@@ -301,6 +301,7 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
 
   @Override
   public void close() {
+    _kinesisConnectionHandler.close();
   }
 
   @Override
