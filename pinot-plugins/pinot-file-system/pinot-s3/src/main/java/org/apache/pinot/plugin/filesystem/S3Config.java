@@ -70,6 +70,9 @@ public class S3Config {
   public static final String MIN_OBJECT_SIZE_FOR_MULTI_PART_UPLOAD = "minObjectSizeForMultiPartUpload";
   public static final String MULTI_PART_UPLOAD_PART_SIZE = "multiPartUploadPartSize";
   private static final String DEFAULT_MULTI_PART_UPLOAD_PART_SIZE = "128MB";
+  // Number of parts of one multipart upload sent at the same time. 1 keeps the parts sequential.
+  public static final String MULTI_PART_UPLOAD_PARALLELISM = "multiPartUploadParallelism";
+  private static final String DEFAULT_MULTI_PART_UPLOAD_PARALLELISM = "1";
   public static final String DEFAULT_IAM_ROLE_BASED_ACCESS_ENABLED = "false";
   public static final String DEFAULT_SESSION_DURATION_SECONDS = "900";
   public static final String DEFAULT_ASYNC_SESSION_UPDATED_ENABLED = "true";
@@ -106,6 +109,7 @@ public class S3Config {
   private boolean _asyncSessionUpdateEnabled;
   private final long _minObjectSizeForMultiPartUpload;
   private final long _multiPartUploadPartSize;
+  private final int _multiPartUploadParallelism;
   private final ApacheHttpClient.Builder _httpClientBuilder;
   private final boolean _enableCrossRegionAccess;
   private final boolean _anonymousCredentialsProvider;
@@ -161,6 +165,10 @@ public class S3Config {
         pinotConfig.getProperty(MULTI_PART_UPLOAD_PART_SIZE, DEFAULT_MULTI_PART_UPLOAD_PART_SIZE));
     Preconditions.checkArgument(_multiPartUploadPartSize > MULTI_PART_UPLOAD_MIN_PART_SIZE,
         "The part size for multipart upload must be larger than 5MB");
+    _multiPartUploadParallelism = Integer.parseInt(
+        pinotConfig.getProperty(MULTI_PART_UPLOAD_PARALLELISM, DEFAULT_MULTI_PART_UPLOAD_PARALLELISM));
+    Preconditions.checkArgument(_multiPartUploadParallelism > 0,
+        "The parallelism for multipart upload must be positive");
     if (_iamRoleBasedAccess) {
       Preconditions.checkNotNull(_roleArn, "Must provide 'roleArn' if iamRoleBasedAccess is enabled");
     }
@@ -284,6 +292,10 @@ public class S3Config {
 
   public long getMultiPartUploadPartSize() {
     return _multiPartUploadPartSize;
+  }
+
+  public int getMultiPartUploadParallelism() {
+    return _multiPartUploadParallelism;
   }
 
   public ApacheHttpClient.Builder getHttpClientBuilder() {

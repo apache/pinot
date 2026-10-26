@@ -410,11 +410,13 @@ public class S3PinotFSTest {
       // Make a file of 11MB to upload in parts, whose min required size is 5MB.
       createDummyFile(fileToCopy, 11 * 1024 * 1024);
       _s3PinotFS.setMultiPartUploadConfigs(1, 5 * 1024 * 1024);
+      _s3PinotFS.setMultiPartUploadParallelism(2);
       try {
         _s3PinotFS.copyFromLocalFile(fileToCopy, URI.create(String.format(FILE_FORMAT, scheme, BUCKET, fileName)));
       } finally {
         // disable multipart upload again for the other UT cases.
         _s3PinotFS.setMultiPartUploadConfigs(-1, 128 * 1024 * 1024);
+        _s3PinotFS.setMultiPartUploadParallelism(1);
       }
       HeadObjectResponse headObjectResponse = _s3Client.headObject(S3TestUtils.getHeadObjectRequest(BUCKET, fileName));
       Assert.assertEquals(headObjectResponse.contentLength(), (Long) fileToCopy.length());

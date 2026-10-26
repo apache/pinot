@@ -20,18 +20,28 @@ package org.apache.pinot.plugin.filesystem;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.io.ByteStreams;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.channels.Channels;
+import java.nio.channels.FileChannel;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -51,6 +61,7 @@ import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.checksums.RequestChecksumCalculation;
 import software.amazon.awssdk.core.checksums.ResponseChecksumValidation;
+import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.core.sync.ResponseTransformer;
 import software.amazon.awssdk.regions.Region;
@@ -103,7 +114,8 @@ public class S3PinotFS extends BasePinotFS {
   public static final String SCHEME_SEPARATOR = "://";
   public static final int DELETE_BATCH_SIZE = 1000;
 
-  private S3Client _s3Client;
+  // Volatile because parallel multipart upload threads read it while a credential refresh may replace it.
+  private volatile S3Client _s3Client;
   private S3Config _s3Config;
   private boolean _disableAcl;
   private ServerSideEncryption _serverSideEncryption = null;
@@ -111,6 +123,7 @@ public class S3PinotFS extends BasePinotFS {
   private String _ssekmsEncryptionContext;
   private long _minObjectSizeToUploadInParts;
   private long _multiPartUploadPartSize;
+  private int _multiPartUploadParallelism = 1;
   private @Nullable StorageClass _storageClass;
   private StsClient _stsClient;
   private StsAssumeRoleCredentialsProvider _stsCredentialsProvider;
@@ -889,14 +902,14 @@ public class S3PinotFS extends BasePinotFS {
     CreateMultipartUploadResponse multipartUpload = retryWithS3CredentialRefresh(() ->
         _s3Client.createMultipartUpload(createMultipartUploadRequestBuilder.build()));
     String uploadId = multipartUpload.uploadId();
-    // Upload parts sequentially to overcome the 5GB limit of a single PutObject call.
-    // TODO: parts can be uploaded in parallel for higher throughput, given a thread pool.
-    try (FileInputStream inputStream = FileUtils.openInputStream(srcFile)) {
-      long totalUploaded = 0;
+    // Parts are uploaded by up to _multiPartUploadParallelism threads, each reading its own range of the file. The
+    // pool lives only for this upload, so idle FS instances hold no threads.
+    ExecutorService executor = null;
+    List<Future<CompletedPart>> futures = new ArrayList<>();
+    try {
       long fileSize = srcFile.length();
       // The part number must start from 1 and no more than the max part num allowed, 10000 by default.
       // The default configs can upload a single file of 1TB, so the if-branch should rarely happen.
-      int partNum = 1;
       long partSizeToUse = _multiPartUploadPartSize;
       if (partSizeToUse * S3Config.MULTI_PART_UPLOAD_MAX_PART_NUM < fileSize) {
         partSizeToUse =
@@ -904,18 +917,30 @@ public class S3PinotFS extends BasePinotFS {
         LOGGER.info("Increased part size from {} to {} for large file size {} due to max allowed uploads {}",
             _multiPartUploadPartSize, partSizeToUse, fileSize, S3Config.MULTI_PART_UPLOAD_MAX_PART_NUM);
       }
-      List<CompletedPart> parts = new ArrayList<>();
-      while (totalUploaded < srcFile.length()) {
-        long nextPartSize = Math.min(partSizeToUse, fileSize - totalUploaded);
-        UploadPartResponse uploadPartResponse = _s3Client.uploadPart(
-            UploadPartRequest.builder().bucket(bucket).key(prefix).uploadId(uploadId).partNumber(partNum).build(),
-            RequestBody.fromInputStream(inputStream, nextPartSize));
-        parts.add(CompletedPart.builder().partNumber(partNum).eTag(uploadPartResponse.eTag()).build());
-        totalUploaded += nextPartSize;
-        LOGGER.debug("Uploaded part {} of size {}, with total uploaded {} and file size {}", partNum, nextPartSize,
-            totalUploaded, fileSize);
-        // set counters to upload the next part.
-        partNum++;
+      int numParts = (int) ((fileSize + partSizeToUse - 1) / partSizeToUse);
+      int parallelism = Math.min(_multiPartUploadParallelism, numParts);
+      LOGGER.info("Uploading {} bytes to {} in {} parts of {} bytes with parallelism {}", fileSize, dstUri, numParts,
+          partSizeToUse, parallelism);
+      List<CompletedPart> parts = new ArrayList<>(numParts);
+      if (parallelism <= 1) {
+        for (int partNum = 1; partNum <= numParts; partNum++) {
+          long offset = (partNum - 1) * partSizeToUse;
+          parts.add(uploadPart(srcFile, bucket, prefix, uploadId, partNum, offset,
+              Math.min(partSizeToUse, fileSize - offset)));
+        }
+      } else {
+        executor = Executors.newFixedThreadPool(parallelism,
+            new ThreadFactoryBuilder().setNameFormat("s3-multipart-upload-%d").setDaemon(true).build());
+        for (int partNum = 1; partNum <= numParts; partNum++) {
+          int partNumber = partNum;
+          long offset = (partNum - 1) * partSizeToUse;
+          long partSize = Math.min(partSizeToUse, fileSize - offset);
+          futures.add(executor.submit(() -> uploadPart(srcFile, bucket, prefix, uploadId, partNumber, offset,
+              partSize)));
+        }
+        for (Future<CompletedPart> future : futures) {
+          parts.add(getPartResult(future));
+        }
       }
       // complete the multipart upload
       retryWithS3CredentialRefresh(() -> _s3Client.completeMultipartUpload(
@@ -923,14 +948,86 @@ public class S3PinotFS extends BasePinotFS {
               .multipartUpload(CompletedMultipartUpload.builder().parts(parts).build()).build()));
     } catch (Exception e) {
       LOGGER.error("Failed to upload file {} to {} in parts. Abort upload request: {}", srcFile, dstUri, uploadId, e);
+      if (executor != null) {
+        // Stop the remaining parts before aborting, so no part lands after the abort and keeps storage allocated.
+        futures.forEach(future -> future.cancel(true));
+        executor.shutdownNow();
+        if (!executor.awaitTermination(1, TimeUnit.MINUTES)) {
+          LOGGER.warn("Timed out waiting for part uploads of {} to stop before aborting upload {}", dstUri, uploadId);
+        }
+      }
       _s3Client.abortMultipartUpload(
           AbortMultipartUploadRequest.builder().uploadId(uploadId).bucket(bucket).key(prefix).build());
       throw e;
+    } finally {
+      if (executor != null) {
+        executor.shutdownNow();
+      }
+    }
+  }
+
+  private static CompletedPart getPartResult(Future<CompletedPart> future)
+      throws Exception {
+    try {
+      return future.get();
+    } catch (ExecutionException e) {
+      Throwable cause = e.getCause();
+      throw cause instanceof Exception ? (Exception) cause : e;
+    }
+  }
+
+  /// Uploads one part read straight from its range of the file. The SDK reopens the range if it retries.
+  private CompletedPart uploadPart(File srcFile, String bucket, String key, String uploadId, int partNum, long offset,
+      long partSize)
+      throws IOException {
+    UploadPartRequest request =
+        UploadPartRequest.builder().bucket(bucket).key(key).uploadId(uploadId).partNumber(partNum).build();
+    RequestBody requestBody = RequestBody.fromContentProvider(() -> {
+      try {
+        FileChannel channel = FileChannel.open(srcFile.toPath(), StandardOpenOption.READ).position(offset);
+        return ByteStreams.limit(Channels.newInputStream(channel), partSize);
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);
+      }
+    }, partSize, "application/octet-stream");
+    UploadPartResponse response = uploadPartWithCredentialRefresh(request, requestBody);
+    LOGGER.debug("Uploaded part {} of size {} at offset {} for upload {}", partNum, partSize, offset, uploadId);
+    return CompletedPart.builder().partNumber(partNum).eTag(response.eTag()).build();
+  }
+
+  /// Like [#retryWithS3CredentialRefresh], but only the first failing part refreshes the client. Parts whose client
+  /// was replaced by another part's refresh retry once on the new client, whatever the error.
+  private UploadPartResponse uploadPartWithCredentialRefresh(UploadPartRequest request, RequestBody requestBody)
+      throws IOException {
+    S3Client client = _s3Client;
+    try {
+      return client.uploadPart(request, requestBody);
+    } catch (SdkException | IllegalStateException e) {
+      boolean authFailure = e instanceof S3Exception
+          && (((S3Exception) e).statusCode() == 401 || ((S3Exception) e).statusCode() == 403);
+      if (!authFailure && client == _s3Client) {
+        throw e;
+      }
+      if (authFailure) {
+        synchronized (_clientLock) {
+          if (client == _s3Client) {
+            LOGGER.warn("Caught S3 authentication/authorization exception ({}) uploading part {}, "
+                + "attempting to refresh credentials and retry", ((S3Exception) e).statusCode(), request.partNumber());
+            initOrRefreshS3Client();
+          }
+        }
+      }
+      try {
+        return _s3Client.uploadPart(request, requestBody);
+      } catch (Exception retryException) {
+        throw new IOException("Unexpected exception during S3 part upload after credential refresh", retryException);
+      }
     }
   }
 
   private void setMultiPartUploadConfigs(S3Config s3Config) {
     setMultiPartUploadConfigs(s3Config.getMinObjectSizeForMultiPartUpload(), s3Config.getMultiPartUploadPartSize());
+    _multiPartUploadParallelism = s3Config.getMultiPartUploadParallelism();
   }
 
   private void setDisableAcl(S3Config s3Config) {
@@ -941,6 +1038,11 @@ public class S3PinotFS extends BasePinotFS {
   void setMultiPartUploadConfigs(long minObjectSizeToUploadInParts, long multiPartUploadPartSize) {
     _minObjectSizeToUploadInParts = minObjectSizeToUploadInParts;
     _multiPartUploadPartSize = multiPartUploadPartSize;
+  }
+
+  @VisibleForTesting
+  void setMultiPartUploadParallelism(int multiPartUploadParallelism) {
+    _multiPartUploadParallelism = multiPartUploadParallelism;
   }
 
   @Override
