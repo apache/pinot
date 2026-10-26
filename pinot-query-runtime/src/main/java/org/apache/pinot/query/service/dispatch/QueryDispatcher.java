@@ -127,6 +127,10 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
   /// Last known dispatch address of each instance, by instance id. [#onServerEnabled] sets it for the servers of the
   /// routing manager, and uses it to retire the dispatch client of an address a server has left. Each dispatch sets it
   /// too, so that [#checkConnectivityToInstance(String)] can check instances that no routing manager knows.
+  ///
+  /// Entries are never removed. There is one for each instance id that a query was dispatched to, or that
+  /// [#onServerEnabled] saw, so the number of instances bounds the size as long as instance ids are stable, as Helix
+  /// instance ids are. [#onServerEnabled] scans the values, but it runs only when a server is enabled.
   private final Map<String, String> _dispatchAddressByInstanceId = new ConcurrentHashMap<>();
   @Nullable
   private final TlsConfig _tlsConfig;
