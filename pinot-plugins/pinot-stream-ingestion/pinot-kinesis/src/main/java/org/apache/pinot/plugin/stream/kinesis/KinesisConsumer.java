@@ -31,6 +31,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import org.apache.pinot.common.utils.ThrottledLogger;
+import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorReporter;
 import org.apache.pinot.spi.stream.BytesStreamMessage;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
@@ -54,10 +55,14 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
   private static final int RATE_LIMIT_BACKOFF_JITTER_BOUND_MS = 250;
   private static final RequestRateLimiter SHARED_REQUEST_RATE_LIMITER = new SharedKinesisRequestRateLimiter();
   private static final double RATE_LIMIT_LOG_RATE_PER_MIN = 5.0;
+  // Exhausted throttling returns an empty batch, which the consume loop counts as a successful fetch. Like the consume
+  // loop's own tolerance for fetch errors, this many in a row are tolerated; each further one is reported.
+  private static final int MAX_CONSECUTIVE_THROTTLED_FETCHES = 5;
 
   private final ThrottledLogger _throttledLogger = new ThrottledLogger(LOGGER, RATE_LIMIT_LOG_RATE_PER_MIN);
   private String _nextStartSequenceNumber = null;
   private String _nextShardIterator = null;
+  private int _consecutiveThrottledFetches = 0;
   private final RequestRateLimiter _requestRateLimiter;
 
   public KinesisConsumer(KinesisConfig config) {
@@ -92,10 +97,13 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
     long deadlineMs = currentTimeMillis() + Math.max(timeoutMs, 0);
     int attempts = 0;
     KinesisRateLimitException lastRateLimitException = null;
+    // The count this fetch reaches if throttling exhausts it; any other outcome, a failure included, leaves it reset,
+    // apart from our own request limiter timing out
+    int throttledFetches = _consecutiveThrottledFetches + 1;
+    _consecutiveThrottledFetches = 0;
     while (true) {
       if (lastRateLimitException != null && currentTimeMillis() >= deadlineMs) {
-        logRateLimitTimeout(startOffset, attempts, lastRateLimitException);
-        return new KinesisMessageBatch(List.of(), startOffset, false, 0);
+        return throttleExhausted(startOffset, attempts, lastRateLimitException, throttledFetches);
       }
       try {
         return getKinesisMessageBatch(startOffset, deadlineMs);
@@ -104,8 +112,7 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
         attempts++;
         long remainingMs = deadlineMs - currentTimeMillis();
         if (remainingMs <= 0) {
-          logRateLimitTimeout(startOffset, attempts, e);
-          return new KinesisMessageBatch(List.of(), startOffset, false, 0);
+          return throttleExhausted(startOffset, attempts, e, throttledFetches);
         }
         long backoffMs = Math.min(computeRateLimitBackoffMs(attempts), remainingMs);
         _throttledLogger.warn(
@@ -115,10 +122,25 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
                 _config.getRpsLimitPerSecond(), attempts, backoffMs), e.getCause());
         sleep(backoffMs);
       } catch (KinesisRequestTimeoutException e) {
+        // Our own request limiter, not the source: nothing to report, and no sign the source recovered either, so the
+        // count of throttled fetches is kept as it was
+        _consecutiveThrottledFetches = throttledFetches - 1;
         logRequestLimiterTimeout(startOffset, e);
         return new KinesisMessageBatch(List.of(), startOffset, false, 0);
       }
     }
+  }
+
+  /// Kinesis kept throttling the fetch until its timeout. The empty batch hides the failure from the consume loop, so
+  /// once more than [#MAX_CONSECUTIVE_THROTTLED_FETCHES] fetches in a row end this way, each is reported.
+  private KinesisMessageBatch throttleExhausted(KinesisPartitionGroupOffset startOffset, int attempts,
+      KinesisRateLimitException rateLimitException, int throttledFetches) {
+    logRateLimitTimeout(startOffset, attempts, rateLimitException);
+    _consecutiveThrottledFetches = throttledFetches;
+    if (throttledFetches > MAX_CONSECUTIVE_THROTTLED_FETCHES) {
+      IngestionSourceErrorReporter.report(rateLimitException.getCause());
+    }
+    return new KinesisMessageBatch(List.of(), startOffset, false, 0);
   }
 
   private KinesisMessageBatch getKinesisMessageBatch(KinesisPartitionGroupOffset startMsgOffset, long deadlineMs) {
@@ -185,7 +207,7 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
       throw new KinesisRequestTimeoutException(requestType);
     }
     try {
-      return requestSupplier.get();
+      return callKinesis(requestSupplier);
     } catch (ProvisionedThroughputExceededException pte) {
       throw new KinesisRateLimitException(requestType, pte);
     }

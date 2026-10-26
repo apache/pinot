@@ -18,14 +18,19 @@
  */
 package org.apache.pinot.plugin.stream.pulsar;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.pinot.spi.stream.BytesStreamMessage;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
+import org.apache.pinot.spi.stream.TransientConsumerException;
+import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.client.api.Reader;
@@ -37,8 +42,16 @@ import org.slf4j.LoggerFactory;
 public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnectionHandler
     implements PartitionGroupConsumer {
   private static final Logger LOGGER = LoggerFactory.getLogger(PulsarPartitionLevelConsumer.class);
+  // A reader disconnected this long is given up on, so that the consume loop recreates it: the client retries the
+  // reconnect forever and only logs why the broker refuses it, while the fresh handshake fails with the refusal. 30 s
+  // is the client's default operation timeout, after which a caught-up reader in the same state already fails with a
+  // timeout. A broker restart or a topic unload reconnects well within it.
+  @VisibleForTesting
+  static final long MAX_DISCONNECTED_MS = 30_000L;
+
   private final Reader<byte[]> _reader;
   private MessageId _nextMessageId = null;
+  private long _disconnectedSinceMs = -1;
 
   public PulsarPartitionLevelConsumer(String clientId, StreamConfig streamConfig, int partition) {
     super(clientId, streamConfig);
@@ -58,7 +71,9 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
   @Override
   public synchronized PulsarMessageBatch fetchMessages(StreamPartitionMsgOffset startOffset, int timeoutMs) {
     MessageId startMessageId = ((MessageIdStreamOffset) startOffset).getMessageId();
-    long endTimeMs = System.currentTimeMillis() + timeoutMs;
+    long nowMs = System.currentTimeMillis();
+    checkConnected(nowMs);
+    long endTimeMs = nowMs + timeoutMs;
     List<BytesStreamMessage> messages = new ArrayList<>();
 
     // Seek to the start message id if necessary
@@ -74,8 +89,18 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
     long batchSizeInBytes = 0;
     // Read messages until all available messages are read, or we run out of time
     try {
-      while (_reader.hasMessageAvailable() && System.currentTimeMillis() < endTimeMs) {
-        BytesStreamMessage bytesStreamMessage = PulsarUtils.buildPulsarStreamMessage(_reader.readNext(), _config);
+      while (_reader.hasMessageAvailable()) {
+        long remainingMs = endTimeMs - System.currentTimeMillis();
+        if (remainingMs <= 0) {
+          break;
+        }
+        // Bounded by the deadline: a lagging reader answers hasMessageAvailable() from its cache, and once its
+        // connection drops an unbounded read waits forever
+        Message<byte[]> message = _reader.readNext((int) remainingMs, TimeUnit.MILLISECONDS);
+        if (message == null) {
+          break;
+        }
+        BytesStreamMessage bytesStreamMessage = PulsarUtils.buildPulsarStreamMessage(message, _config);
         batchSizeInBytes += bytesStreamMessage.getMetadata().getRecordSerializedSize();
         messages.add(bytesStreamMessage);
       }
@@ -91,6 +116,20 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
     }
     _nextMessageId = offsetOfNextBatch.getMessageId();
     return new PulsarMessageBatch(messages, offsetOfNextBatch, _reader.hasReachedEndOfTopic(), batchSizeInBytes);
+  }
+
+  /// Throws a transient exception once the reader has stayed disconnected for [#MAX_DISCONNECTED_MS], so that the
+  /// consume loop recreates it whether or not idle recreation is enabled.
+  private void checkConnected(long nowMs) {
+    if (_reader.isConnected()) {
+      _disconnectedSinceMs = -1;
+    } else if (_disconnectedSinceMs < 0) {
+      _disconnectedSinceMs = nowMs;
+    } else if (nowMs - _disconnectedSinceMs >= MAX_DISCONNECTED_MS) {
+      throw new TransientConsumerException(new TimeoutException(
+          String.format("Pulsar reader for topic: %s has been disconnected from the broker for %d ms",
+              _reader.getTopic(), nowMs - _disconnectedSinceMs)));
+    }
   }
 
   @Override
