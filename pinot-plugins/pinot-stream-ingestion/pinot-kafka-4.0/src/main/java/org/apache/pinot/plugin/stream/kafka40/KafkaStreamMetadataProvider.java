@@ -452,8 +452,9 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
       }
     }
 
+    // Keep the last failure: on its own the message says nothing about the source
     throw new TransientConsumerException(
-        new RuntimeException("Failed to fetch partition information for topic: " + _topic));
+        new RuntimeException("Failed to fetch partition information for topic: " + _topic, lastError));
   }
 
   private void validatePartitionIds(List<Integer> subset) {
