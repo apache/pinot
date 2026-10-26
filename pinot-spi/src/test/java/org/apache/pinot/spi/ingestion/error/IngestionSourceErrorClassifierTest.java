@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.ingestion.error;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.BindException;
 import java.net.ConnectException;
@@ -171,6 +172,26 @@ public class IngestionSourceErrorClassifierTest {
       Throwable failure = new RuntimeException("all attempts failed");
       branches.forEach(failure::addSuppressed);
       assertEquals(categoryOf(failure), Optional.of(IngestionSourceErrorCategory.AUTH));
+    }
+  }
+
+  @Test
+  public void genericRuleAppliesOnlyWhereNoSourceRuleDecidedTheChain() {
+    // A file missing under a path the caller knows is remote: the transport's word, not a source's answer
+    IngestionSourceErrorRule remoteFileMissing = (node, below, evidence) -> node instanceof FileNotFoundException
+        ? IngestionSourceErrorVerdict.sourceRead("FileNotFoundException", null) : null;
+    IngestionSourceErrorClassifier.registerGenericRule(remoteFileMissing);
+    try {
+      register(TEST_RULES);
+      assertEquals(categoryOf(new RuntimeException(new FileNotFoundException("s3://bucket/input"))),
+          Optional.of(IngestionSourceErrorCategory.SOURCE_READ));
+      // A source exception above it decides the chain, even our own failure that says it isn't the source's verdict
+      assertEquals(categoryOf(new RefusedException(new FileNotFoundException("s3://bucket/input"))),
+          Optional.of(IngestionSourceErrorCategory.AUTH));
+      assertEquals(categoryOf(new OurFailureException().initCause(new FileNotFoundException("s3://bucket/input"))),
+          Optional.empty());
+    } finally {
+      IngestionSourceErrorClassifier.unregisterGenericRule(remoteFileMissing);
     }
   }
 
