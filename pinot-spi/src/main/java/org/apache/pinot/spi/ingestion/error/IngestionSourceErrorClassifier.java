@@ -153,31 +153,39 @@ public final class IngestionSourceErrorClassifier {
   }
 
   private static final class Walk {
-    final Set<Throwable> _seen = Collections.newSetFromMap(new IdentityHashMap<>());
+    final Set<Throwable> _heads = Collections.newSetFromMap(new IdentityHashMap<>());
     final List<Decision> _decisions = new ArrayList<>();
+    int _visited;
 
     /// Decides the chain starting at `failure`, then every chain hanging off it as a suppressed exception, depth
     /// first. A work stack rather than recursion: suppressed exceptions can nest arbitrarily deep.
     void visit(Throwable failure) {
       Deque<Throwable> pending = new ArrayDeque<>();
       pending.push(failure);
-      while (!pending.isEmpty()) {
-        List<Throwable> suppressedHeads = visitChain(pending.pop());
+      while (!pending.isEmpty() && _visited < MAX_NODES) {
+        Throwable head = pending.pop();
+        if (!_heads.add(head)) {
+          continue;
+        }
+        List<Throwable> suppressedHeads = visitChain(head);
         for (int i = suppressedHeads.size() - 1; i >= 0; i--) {
           pending.push(suppressedHeads.get(i));
         }
       }
     }
 
-    /// Decides the chain starting at `head` and returns the heads of the chains suppressed along it.
+    /// Decides the chain starting at `head` and returns the heads of the chains suppressed along it. Chains may share
+    /// causes, and each reads a shared cause under its own evidence, so only a cycle within the chain ends it early.
     private List<Throwable> visitChain(Throwable head) {
       List<Throwable> chain = new ArrayList<>();
       List<IngestionSourceErrorEvidence> direct = new ArrayList<>();
       List<IngestionSourceErrorEvidence> nearest = new ArrayList<>();
       List<Throwable> suppressedHeads = new ArrayList<>();
+      Set<Throwable> inChain = Collections.newSetFromMap(new IdentityHashMap<>());
       IngestionSourceErrorEvidence current = null;
-      for (Throwable node = head; node != null && _seen.size() < MAX_NODES && _seen.add(node);
+      for (Throwable node = head; node != null && _visited < MAX_NODES && inChain.add(node);
           node = node.getCause()) {
+        _visited++;
         IngestionSourceErrorEvidence own = null;
         for (Throwable suppressed : node.getSuppressed()) {
           if (suppressed instanceof IngestionSourceErrorEvidence) {
