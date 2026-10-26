@@ -528,6 +528,29 @@ public class ModeQueriesTest extends BaseQueriesTest {
     }
   }
 
+  @Test
+  public void testNonNumericOrderByEmptyGroup() {
+    // With null handling disabled, MODE of an empty group is null, which sorts last for ASC and first for DESC
+    for (boolean asc : new boolean[]{true, false}) {
+      String query = "SELECT intColumn, MODE(booleanColumn) FILTER (WHERE intColumn < 5) FROM testTable "
+          + "GROUP BY intColumn ORDER BY MODE(booleanColumn) FILTER (WHERE intColumn < 5) " + (asc ? "ASC" : "DESC")
+          + ", intColumn LIMIT 3";
+      Comparator<Boolean> modeOrder = asc ? Comparator.nullsLast(Comparator.<Boolean>naturalOrder())
+          : Comparator.nullsFirst(Comparator.<Boolean>reverseOrder());
+      List<Integer> expectedKeys = _values.keySet().stream()
+          .sorted(Comparator.comparing((Integer key) -> key < 5 ? key % 3 == 0 : null, modeOrder)
+              .thenComparing(Comparator.naturalOrder()))
+          .limit(3)
+          .toList();
+      List<Object[]> rows = getBrokerResponseForOptimizedQuery(query, SCHEMA).getResultTable().getRows();
+      assertEquals(rows.size(), 3, query);
+      for (int i = 0; i < 3; i++) {
+        int key = expectedKeys.get(i);
+        assertEquals(rows.get(i), new Object[]{key, key < 5 ? (Object) (key % 3 == 0) : null}, query);
+      }
+    }
+  }
+
   @AfterClass
   public void tearDown()
       throws IOException {

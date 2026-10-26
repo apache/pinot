@@ -137,7 +137,7 @@
         "outputs": [[false, "b", "2020-01-01 08:32:12.0"], [true, "a", "2020-01-01 03:10:12.0"]]
       },
       {
-        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ int_col, MODE(string_col), MODE(bool_col), MODE(timestamp_col) FROM {tbl} GROUP BY int_col",
+        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ int_col, MODE(string_col), MODE(bool_col), MODE(timestamp_col) FROM {tbl} GROUP BY int_col",
         "outputs": [[2, "a", true, "2020-01-01 03:10:12.0"], [3, "b", false, "2020-01-01 08:32:12.0"], [100, "b", false, "2020-02-06 03:32:12.0"], [101, "c", false, "2020-05-01 03:32:12.0"], [150, "c", false, "2020-02-03 03:32:12.0"], [175, "c", true, "2020-01-02 03:32:12.0"]]
       },
       {
