@@ -374,20 +374,21 @@
         ]
       },
       {
-        "description": "The data type argument goes into every input of a union, next to the other literal arguments",
+        "description": "The data type argument stays above a union alongside literals common to every branch",
         "sql": "EXPLAIN PLAN FOR SELECT ARRAY_AGG(x), PERCENTILE(x, 50), ARRAY_AGG(DISTINCT x, 'INT') FROM (SELECT a.col3 x FROM a UNION ALL SELECT b.col3 FROM b)",
         "output": [
           "Execution Plan",
           "\nPinotLogicalAggregate(group=[{}], agg#0=[ARRAYAGG($0, _UTF-8'INT')], agg#1=[PERCENTILE($1, 50)], agg#2=[ARRAYAGG($2, _UTF-8'INT', true)], aggType=[FINAL])",
           "\n  PinotLogicalExchange(distribution=[hash])",
           "\n    PinotLogicalAggregate(group=[{}], agg#0=[ARRAYAGG($0, _UTF-8'INT')], agg#1=[PERCENTILE($0, 50)], agg#2=[ARRAYAGG($0, _UTF-8'INT', true)], aggType=[LEAF])",
-          "\n      LogicalUnion(all=[true])",
-          "\n        PinotLogicalExchange(distribution=[single])",
-          "\n          LogicalProject($f0=[$2], $f1=[50], $f2=[_UTF-8'INT'], $f3=[_UTF-8'INT'])",
-          "\n            PinotLogicalTableScan(table=[[default, a]])",
-          "\n        PinotLogicalExchange(distribution=[single])",
-          "\n          LogicalProject($f0=[$2], $f1=[50], $f2=[_UTF-8'INT'], $f3=[_UTF-8'INT'])",
-          "\n            PinotLogicalTableScan(table=[[default, b]])",
+          "\n      LogicalProject($f0=[$0], $f1=[50], $f2=[_UTF-8'INT'], $f3=[_UTF-8'INT'])",
+          "\n        LogicalUnion(all=[true])",
+          "\n          PinotLogicalExchange(distribution=[single])",
+          "\n            LogicalProject(x=[$2], $f1=[50], $f2=[_UTF-8'INT'])",
+          "\n              PinotLogicalTableScan(table=[[default, a]])",
+          "\n          PinotLogicalExchange(distribution=[single])",
+          "\n            LogicalProject(x=[$2], $f1=[50], $f2=[_UTF-8'INT'])",
+          "\n              PinotLogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -399,7 +400,7 @@
           "\nPinotLogicalAggregate(group=[{}], agg#0=[FIRSTWITHTIME($0, $0, _UTF-8'INT')], agg#1=[ARRAYAGG($1, _UTF-8'INT')], aggType=[FINAL])",
           "\n  PinotLogicalExchange(distribution=[hash])",
           "\n    PinotLogicalAggregate(group=[{}], agg#0=[FIRSTWITHTIME($0, $1, _UTF-8'INT')], agg#1=[ARRAYAGG($0, _UTF-8'INT')], aggType=[LEAF])",
-          "\n      LogicalProject($f0=[$0], $f1=[$1], $f2=[_UTF-8'INT'])",
+          "\n      LogicalProject($f0=[$0], $f1=[$1], $f2=[_UTF-8'INT'], $f3=[_UTF-8'INT'])",
           "\n        LogicalUnion(all=[true])",
           "\n          PinotLogicalExchange(distribution=[single])",
           "\n            LogicalProject(col3=[$2], ts=[$7])",

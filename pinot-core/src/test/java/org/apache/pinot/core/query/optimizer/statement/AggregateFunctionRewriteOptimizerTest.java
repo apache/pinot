@@ -25,6 +25,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.apache.pinot.sql.parsers.SqlCompilationException;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -107,6 +108,14 @@ public class AggregateFunctionRewriteOptimizerTest {
     assertRewrite("SELECT ARRAY_AGG(" + column + "), arrayAgg(" + column + ", true) FROM testTable",
         "SELECT ARRAY_AGG(" + column + ", '" + dataType + "'), arrayAgg(" + column + ", '" + dataType + "', true) "
             + "FROM testTable");
+  }
+
+  @Test
+  public void testArrayAggRejectsDistinctKeyword() {
+    for (String arguments : new String[]{"intCol", "intCol, false", "intCol, 'INT'"}) {
+      expectThrows(SqlCompilationException.class,
+          () -> CalciteSqlParser.compileToPinotQuery("SELECT ARRAY_AGG(DISTINCT " + arguments + ") FROM testTable"));
+    }
   }
 
   @Test

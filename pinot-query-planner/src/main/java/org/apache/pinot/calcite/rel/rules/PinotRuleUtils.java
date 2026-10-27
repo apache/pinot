@@ -89,22 +89,10 @@ public class PinotRuleUtils {
     }
   }
 
-  /// Appends aggregate literal arguments without hiding literals already projected beneath a union. If a union has
-  /// no projected literals, keeps one project above it; otherwise recurses through nested unions to their projects.
+  /// Appends literal arguments in one project, retaining a union column as a literal only when every branch projects
+  /// that same literal. Branch-specific constants remain input references.
   public static RelNode appendAggregateLiterals(RelNode input, List<RexNode> literals) {
-    return appendAggregateLiterals(input, literals, false);
-  }
-
-  private static RelNode appendAggregateLiterals(RelNode input, List<RexNode> literals, boolean insideUnion) {
     RelNode rel = unboxRel(input);
-    if (rel instanceof Union && (insideUnion || hasProjectedLiterals(rel))) {
-      Union union = (Union) rel;
-      List<RelNode> inputs = new ArrayList<>(union.getInputs().size());
-      for (RelNode unionInput : union.getInputs()) {
-        inputs.add(appendAggregateLiterals(unionInput, literals, true));
-      }
-      return union.copy(union.getTraitSet(), inputs);
-    }
     if (rel instanceof Project) {
       Project project = (Project) rel;
       List<RexNode> projects = new ArrayList<>(project.getProjects());
@@ -114,18 +102,32 @@ public class PinotRuleUtils {
     RexBuilder rexBuilder = input.getCluster().getRexBuilder();
     List<RexNode> projects = new ArrayList<>(input.getRowType().getFieldCount() + literals.size());
     for (int i = 0; i < input.getRowType().getFieldCount(); i++) {
-      projects.add(rexBuilder.makeInputRef(input, i));
+      RexLiteral literal = rel instanceof Union ? commonLiteral(rel, i) : null;
+      projects.add(literal != null ? literal : rexBuilder.makeInputRef(input, i));
     }
     projects.addAll(literals);
     return LogicalProject.create(input, List.of(), projects, (List<String>) null, Set.of());
   }
 
-  private static boolean hasProjectedLiterals(RelNode input) {
+  @Nullable
+  private static RexLiteral commonLiteral(RelNode input, int index) {
     RelNode rel = unboxRel(input);
     if (rel instanceof Project) {
-      return ((Project) rel).getProjects().stream().anyMatch(project -> project instanceof RexLiteral);
+      RexNode expression = ((Project) rel).getProjects().get(index);
+      return expression instanceof RexLiteral ? (RexLiteral) expression : null;
     }
-    return rel instanceof Union && rel.getInputs().stream().anyMatch(PinotRuleUtils::hasProjectedLiterals);
+    if (rel instanceof Union) {
+      RexLiteral common = null;
+      for (RelNode branch : rel.getInputs()) {
+        RexLiteral literal = commonLiteral(branch, index);
+        if (literal == null || (common != null && !common.equals(literal))) {
+          return null;
+        }
+        common = literal;
+      }
+      return common;
+    }
+    return null;
   }
 
   public static boolean isExchange(RelNode rel) {

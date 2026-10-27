@@ -1242,6 +1242,10 @@ public class CalciteSqlParser {
 
   private static Expression compileFunctionExpression(SqlBasicCall functionNode) {
     SqlKind functionKind = functionNode.getKind();
+    if (functionKind == SqlKind.ARRAY_AGG && functionNode.getFunctionQuantifier() != null
+        && "DISTINCT".equals(functionNode.getFunctionQuantifier().toString())) {
+      throw new SqlCompilationException("Function 'ARRAY_AGG' on DISTINCT is not supported.");
+    }
     boolean negated = false;
     String canonicalName;
     switch (functionKind) {

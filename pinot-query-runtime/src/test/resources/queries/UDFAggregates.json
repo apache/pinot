@@ -45,6 +45,11 @@
       }
     },
     "queries": [
+      {"sql": "SELECT MODE(CASE WHEN int_col > 3 THEN string_col END) FROM {tbl}", "outputs": [["c"]]},
+      {"sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ bool_col, MODE(CASE WHEN int_col > 3 THEN string_col END) FROM {tbl} GROUP BY bool_col", "outputs": [[true, "c"], [false, "c"]]},
+      {"sql": "SET inferAnyValueType=true; SELECT src, ANY_VALUE(x) FROM (SELECT 'a' src, 1 x FROM {tbl} UNION ALL SELECT 'b', 2 FROM {tbl}) GROUP BY src", "outputs": [["a", 1], ["b", 2]]},
+      {"sql": "SELECT LASTWITHTIME(x, t) FROM (SELECT int_col x, CAST('2019-01-01 00:00:00' AS TIMESTAMP) t FROM {tbl} UNION ALL SELECT int_col, timestamp_col FROM {tbl})", "outputs": [[101]]},
+      {"sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ src, k, MODE(s) FROM (SELECT 'a' src, int_col k, string_col s FROM {tbl} UNION ALL SELECT 'b', int_col, string_col FROM {tbl}) WHERE k = 2 GROUP BY src, k", "outputs": [["a", 2, "a"], ["b", 2, "a"]]},
       {
         "sql": "SELECT FIRSTWITHTIME(int_col, timestamp_col, 'INT'), FIRSTWITHTIME(string_col, timestamp_col, 'STRING'), first_with_time(bool_col, CAST(long_col AS TIMESTAMP), 'BOOLEAN') FROM {tbl}",
         "outputs": [[2, "a", true]]

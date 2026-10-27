@@ -130,6 +130,18 @@ public class ApproximateAggregateRewriteTest extends QueryEnvironmentTestBase {
     }
   }
 
+  @Test
+  public void testApproximateParamsKeepBranchSpecificUnionColumns() {
+    QueryEnvironment env = newQueryEnvironment(true, "threshold=17", "threshold=23");
+    String query = "EXPLAIN PLAN FOR SELECT DISTINCTCOUNT(x), COVARPOP(x, y) FROM "
+        + "(SELECT col3 x, 1.0 y FROM a UNION ALL SELECT col3, CAST(col7 AS DOUBLE) FROM b)";
+    String plan = env.compile(query, CalciteSqlParser.compileToSqlNodeAndOptions(query))
+        .explain(RANDOM_REQUEST_ID_GEN.nextLong(), null).getExplainPlan();
+    String leaf = plan.lines().filter(line -> line.contains("aggType=[LEAF]")).findFirst().orElse("");
+    assertTrue(leaf.contains("_UTF-8'threshold=17'"), plan);
+    assertFalse(leaf.contains("1.0"), plan);
+  }
+
   /// `AggregateCaseToFilterRule` turns `COUNT(DISTINCT CASE WHEN c THEN x END)` into `COUNT(DISTINCT x) FILTER (WHERE
   /// c)`, so the rows that fail `c` add nothing to the count. It only matches a single-argument call, so the rewrite
   /// has to run after it: with the parameters appended first, the CASE stays and its NULL counts as one more value.

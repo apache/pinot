@@ -613,7 +613,7 @@ public class QueryEnvironment {
       // Supplies the data type argument before AggregateCaseToFilter, which rewrites only one-argument calls: its
       // ARRAY_AGG(expression) FILTER (WHERE condition) form of ARRAY_AGG(CASE WHEN ...) fails at runtime.
       if (relOptRule.toString().equals(CommonConstants.Broker.PlannerRuleNames.AGGREGATE_CASE_TO_FILTER)) {
-        hepProgramBuilder.addRuleInstance(PinotAggregateTypeArgumentRewriteRule.WITHOUT_ANY_VALUE);
+        hepProgramBuilder.addRuleInstance(PinotAggregateTypeArgumentRewriteRule.ARRAY_AGG_ONLY);
       }
       hepProgramBuilder.addRuleInstance(relOptRule);
     }

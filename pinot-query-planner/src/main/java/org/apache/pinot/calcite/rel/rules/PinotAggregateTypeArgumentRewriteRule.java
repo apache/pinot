@@ -64,20 +64,27 @@ public class PinotAggregateTypeArgumentRewriteRule extends RelOptRule {
           ColumnDataType.BYTES, ColumnDataType.UUID);
 
   public static final PinotAggregateTypeArgumentRewriteRule INSTANCE =
-      new PinotAggregateTypeArgumentRewriteRule(true, PinotRuleUtils.PINOT_REL_FACTORY, null);
+      new PinotAggregateTypeArgumentRewriteRule(true, false, PinotRuleUtils.PINOT_REL_FACTORY, null);
   /// Leaves ANY_VALUE without the data type argument.
   public static final PinotAggregateTypeArgumentRewriteRule WITHOUT_ANY_VALUE =
-      new PinotAggregateTypeArgumentRewriteRule(false, PinotRuleUtils.PINOT_REL_FACTORY,
+      new PinotAggregateTypeArgumentRewriteRule(false, false, PinotRuleUtils.PINOT_REL_FACTORY,
           "PinotAggregateTypeArgumentRewriteRuleWithoutAnyValue");
 
+  /// Runs before CASE-to-FILTER without changing other aggregation functions.
+  public static final PinotAggregateTypeArgumentRewriteRule ARRAY_AGG_ONLY =
+      new PinotAggregateTypeArgumentRewriteRule(false, true, PinotRuleUtils.PINOT_REL_FACTORY,
+          "PinotAggregateTypeArgumentRewriteRuleArrayAggOnly");
+
+  private final boolean _arrayAggOnly;
   private final boolean _rewriteAnyValue;
 
   // Matches with RelOptRule operands, like the other aggregate rewrite rules, instead of a RelRule config.
   @SuppressWarnings("deprecation")
-  private PinotAggregateTypeArgumentRewriteRule(boolean rewriteAnyValue, RelBuilderFactory factory,
-      @Nullable String description) {
+  private PinotAggregateTypeArgumentRewriteRule(boolean rewriteAnyValue, boolean arrayAggOnly,
+      RelBuilderFactory factory, @Nullable String description) {
     super(operand(LogicalAggregate.class, any()), factory, description);
     _rewriteAnyValue = rewriteAnyValue;
+    _arrayAggOnly = arrayAggOnly;
   }
 
   @Override
@@ -141,6 +148,9 @@ public class PinotAggregateTypeArgumentRewriteRule extends RelOptRule {
         return List.of(RelToPlanNodeConverter.convertToColumnDataType(aggCall.getType()).toDataType().name());
       }
       return List.of(getDataTypeArgument(name, dataType.getSqlTypeName()));
+    }
+    if (_arrayAggOnly) {
+      return null;
     }
     if (name.equals(AggregationFunctionType.MODE.name())) {
       // BOOLEAN and TIMESTAMP already return their own type, cast from the DOUBLE result.
