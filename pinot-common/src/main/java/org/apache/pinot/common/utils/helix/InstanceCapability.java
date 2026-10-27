@@ -18,11 +18,14 @@
  */
 package org.apache.pinot.common.utils.helix;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.spi.config.instance.InstanceType;
 
 
@@ -52,7 +55,8 @@ import org.apache.pinot.spi.config.instance.InstanceType;
 ///
 /// Two capabilities are equal when their names are equal. Instances are immutable and thread-safe.
 public final class InstanceCapability {
-  private static final List<InstanceCapability> VALUES = List.of();
+  // Declare the constants above this field: it reads them when the class initializes.
+  private static final List<InstanceCapability> VALUES = checkUniqueNames(List.of());
 
   private final String _name;
   private final InstanceType _instanceType;
@@ -104,6 +108,16 @@ public final class InstanceCapability {
       }
     }
     return mapField;
+  }
+
+  /// Fails when two capabilities have the same name. Equality is by name, so a duplicate name is a definition error.
+  @VisibleForTesting
+  static List<InstanceCapability> checkUniqueNames(List<InstanceCapability> capabilities) {
+    Set<String> names = new HashSet<>();
+    for (InstanceCapability capability : capabilities) {
+      Preconditions.checkState(names.add(capability._name), "Duplicate capability name: %s", capability._name);
+    }
+    return capabilities;
   }
 
   @Override

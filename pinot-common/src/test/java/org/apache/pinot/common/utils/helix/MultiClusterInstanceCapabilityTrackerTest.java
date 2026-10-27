@@ -75,6 +75,20 @@ public class MultiClusterInstanceCapabilityTrackerTest {
   }
 
   @Test
+  public void testClusterMarkedUnavailableDuringReadIsRevisionZero() {
+    MultiClusterInstanceCapabilityTracker tracker =
+        new MultiClusterInstanceCapabilityTracker(InstanceType.SERVER, List.of(CAPABILITY));
+    InstanceCapabilityTracker local = clusterTracker("local", 1);
+    tracker.addCluster(local);
+    // Simulates another thread that marks a cluster unavailable while getMinRevision reads the trackers.
+    when(local.getMinRevision(CAPABILITY)).thenAnswer(invocation -> {
+      tracker.addUnavailableCluster("remote");
+      return 1;
+    });
+    assertEquals(tracker.getMinRevision(CAPABILITY), 0);
+  }
+
+  @Test
   public void testFailedRegistrationIsRevisionZero()
       throws Exception {
     MultiClusterInstanceCapabilityTracker tracker =

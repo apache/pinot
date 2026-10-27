@@ -107,7 +107,8 @@ public class MultiClusterInstanceCapabilityTracker {
     for (InstanceCapabilityTracker tracker : _trackers) {
       minRevision = Math.min(minRevision, tracker.getMinRevision(capability));
     }
-    return minRevision;
+    // A cluster marked unavailable while the loop ran must not let a higher revision through.
+    return _unavailableClusters.isEmpty() ? minRevision : 0;
   }
 
   /// Removes the Helix listeners of every tracker. Call it before the Helix managers disconnect.
