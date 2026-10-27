@@ -648,6 +648,8 @@ public class SegmentDictionaryCreator implements IndexCreator {
   /// A miss means the index pass saw a value the stats pass did not. Mapping it to id 0 would corrupt the index.
   private IllegalStateException valueNotInDictionary(Object value) {
     return new IllegalStateException(
-        "Value: " + value + " is not in the dictionary for column: " + _columnName + " (" + _storedType + ")");
+        "Value: " + value + " is not in the dictionary for column: " + _columnName + " (" + _storedType + "). The "
+            + "input, or a volatile ingestion transform such as now() or rand(), gave different values on the stats "
+            + "and index passes.");
   }
 }

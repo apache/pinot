@@ -227,7 +227,8 @@ public class DoubleOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
 
   @Override
   protected boolean equalsValueAt(int dictId, Object value, byte[] serializedValue) {
-    return getDoubleValue(dictId) == (Double) value;
+    // Compare bits like Double.equals() and the on-heap dictionary, so NaN matches itself and gets one dictionary id.
+    return Double.doubleToLongBits(getDoubleValue(dictId)) == Double.doubleToLongBits((Double) value);
   }
 
   @Override

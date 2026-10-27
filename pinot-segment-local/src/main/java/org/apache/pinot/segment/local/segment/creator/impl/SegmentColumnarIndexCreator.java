@@ -129,10 +129,10 @@ public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
       return;
     }
 
+    int onDiskDocId = 0;
     try (PinotSegmentColumnReader colReader = new PinotSegmentColumnReader(segment, columnName)) {
       ColumnIndexCreators colIndexes = _colIndexes.get(columnName);
       if (sortedDocIds != null) {
-        int onDiskDocId = 0;
         for (int docId : sortedDocIds) {
           if (validDocIds == null || validDocIds.contains(docId)) {
             indexColumnValue(colReader, columnName, fieldSpec, colIndexes, docId, onDiskDocId);
@@ -140,7 +140,6 @@ public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
           }
         }
       } else {
-        int onDiskDocId = 0;
         for (int docId = 0; docId < numDocs; docId++) {
           if (validDocIds == null || validDocIds.contains(docId)) {
             indexColumnValue(colReader, columnName, fieldSpec, colIndexes, docId, onDiskDocId);
@@ -148,6 +147,17 @@ public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
           }
         }
       }
+    }
+    checkNumDocsIndexed(columnName, onDiskDocId);
+  }
+
+  /// Fails when a column indexed a different number of docs than the stats pass counted, which would leave its
+  /// indexes out of step with the segment metadata.
+  private void checkNumDocsIndexed(String columnName, int numDocsIndexed) {
+    if (numDocsIndexed != _totalDocs) {
+      throw new IllegalStateException(
+          "Column: " + columnName + " indexed " + numDocsIndexed + " docs but the stats pass counted " + _totalDocs
+              + " docs");
     }
   }
 
@@ -201,6 +211,8 @@ public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
     PinotDataType destDataType = PinotDataType.getPinotDataTypeForIngestion(fieldSpec);
 
     int numDocs = columnReader.getTotalDocs();
+    // Both loops below index exactly numDocs values, so checking up front keeps a short or long column off disk.
+    checkNumDocsIndexed(columnName, numDocs);
 
     // Typed fast path: for a single-value INT/LONG/FLOAT/DOUBLE column the reader can serve a primitive
     // directly (ColumnReader.getValueType()), the dictionary offers indexOfSV(primitive), and every index

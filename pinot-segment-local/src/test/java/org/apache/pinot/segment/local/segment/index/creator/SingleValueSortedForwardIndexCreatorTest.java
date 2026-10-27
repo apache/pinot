@@ -81,6 +81,19 @@ public class SingleValueSortedForwardIndexCreatorTest {
     }
   }
 
+  // Dictionary id 0 coming back after id 1 would give id 0 the range (0, 2), which overlaps id 1 at doc 1.
+  @Test
+  public void testPutDictIdFailsWhenOutOfOrder()
+      throws Exception {
+    try (SingleValueSortedForwardIndexCreator creator = new SingleValueSortedForwardIndexCreator(TEMP_DIR, COLUMN, 2)) {
+      creator.putDictId(0);
+      creator.putDictId(1);
+      IllegalStateException e = expectThrows(IllegalStateException.class, () -> creator.putDictId(0));
+      assertEquals(e.getMessage(),
+          "Sorted column: " + COLUMN + " got dictionary id: 0 at doc id: 2 after dictionary id: 1");
+    }
+  }
+
   private static int[] readIndexFile()
       throws IOException {
     File indexFile = new File(TEMP_DIR, COLUMN + V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION);

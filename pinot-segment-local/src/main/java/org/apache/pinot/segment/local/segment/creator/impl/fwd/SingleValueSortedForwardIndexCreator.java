@@ -36,6 +36,7 @@ public class SingleValueSortedForwardIndexCreator implements ForwardIndexCreator
   private final int[] _maxDocIds;
 
   private int _nextDocId = 0;
+  private int _previousDictId = 0;
 
   public SingleValueSortedForwardIndexCreator(File outputDir, String column, int cardinality)
       throws Exception {
@@ -66,6 +67,14 @@ public class SingleValueSortedForwardIndexCreator implements ForwardIndexCreator
 
   @Override
   public void putDictId(int dictId) {
+    // Each dictionary id owns one contiguous doc id range only if rows arrive in dictionary order. Out of order, the
+    // ranges overlap and a query on one value also returns rows of another.
+    if (dictId < _previousDictId) {
+      throw new IllegalStateException(
+          "Sorted column: " + _column + " got dictionary id: " + dictId + " at doc id: " + _nextDocId
+              + " after dictionary id: " + _previousDictId);
+    }
+    _previousDictId = dictId;
     int docId = _nextDocId++;
     if (_minDocIds[dictId] > docId) {
       _minDocIds[dictId] = docId;

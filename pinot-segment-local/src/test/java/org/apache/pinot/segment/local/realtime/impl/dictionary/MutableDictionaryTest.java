@@ -153,6 +153,29 @@ public class MutableDictionaryTest implements PinotBuffersAfterClassCheckRule {
     }
   }
 
+  // Off-heap and on-heap dictionaries must agree with Float.equals() and Double.equals(): every NaN shares one id,
+  // and -0.0 and 0.0 keep separate ids. A dictionary with one id per NaN row would leave the committed segment with
+  // dictionary ids that own no rows.
+  @Test
+  public void testFloatingPointKeysMatchBoxedEquals() {
+    for (FieldSpec.DataType dataType : new FieldSpec.DataType[]{FieldSpec.DataType.FLOAT, FieldSpec.DataType.DOUBLE}) {
+      Object nan = dataType == FieldSpec.DataType.FLOAT ? (Object) Float.NaN : (Object) Double.NaN;
+      Object negativeZero = dataType == FieldSpec.DataType.FLOAT ? (Object) (-0.0f) : (Object) (-0.0d);
+      Object positiveZero = dataType == FieldSpec.DataType.FLOAT ? (Object) 0.0f : (Object) 0.0d;
+      try (MutableDictionary onHeap = MutableDictionaryFactory.getMutableDictionary(dataType, false, null, 0, 0, null);
+          MutableDictionary offHeap = makeOffHeapDictionary(EST_CARDINALITY, 0, dataType)) {
+        for (MutableDictionary dictionary : List.of(onHeap, offHeap)) {
+          int nanDictId = dictionary.index(nan);
+          Assert.assertEquals(dictionary.index(nan), nanDictId, dataType + " " + dictionary.getClass().getSimpleName());
+          Assert.assertNotEquals(dictionary.index(negativeZero), dictionary.index(positiveZero));
+          Assert.assertEquals(dictionary.length(), 3);
+        }
+      } catch (Exception e) {
+        Assert.fail("Failed for data type: " + dataType, e);
+      }
+    }
+  }
+
   private void testMutableDictionary(MutableDictionary dictionary, FieldSpec.DataType dataType) {
     Map<Object, Integer> valueToDictId = new HashMap<>();
     int numEntries = 0;

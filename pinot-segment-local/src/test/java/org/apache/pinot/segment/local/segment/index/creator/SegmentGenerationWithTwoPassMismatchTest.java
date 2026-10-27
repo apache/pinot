@@ -21,18 +21,26 @@ package org.apache.pinot.segment.local.segment.index.creator;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.segment.creator.ColumnarSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.segment.readers.DefaultValueColumnReader;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.ColumnReader;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
@@ -50,7 +58,7 @@ import static org.testng.Assert.expectThrows;
 // The segment build reads its record reader twice: a stats pass that sizes the dictionaries and writes total docs,
 // and an index pass that writes the rows. When the index pass drops the only row of a sorted column value, that
 // dictionary id owns no document and the sorted index used to seal with an invalid (MAX_VALUE, MIN_VALUE) range.
-// The build must fail instead.
+// The build must fail instead, and so must every other way the two passes can disagree.
 public class SegmentGenerationWithTwoPassMismatchTest {
   private static final File TEMP_DIR =
       new File(FileUtils.getTempDirectory(), SegmentGenerationWithTwoPassMismatchTest.class.getSimpleName());
@@ -60,7 +68,6 @@ public class SegmentGenerationWithTwoPassMismatchTest {
   private static final String BUCKET = "bucket";
   private static final String TS = "ts";
   private static final int NUM_ROWS_IN_STATS_PASS = 10;
-  private static final int NUM_ROWS_INDEXED = 9;
 
   private Schema _schema;
   private TableConfig _tableConfig;
@@ -95,15 +102,15 @@ public class SegmentGenerationWithTwoPassMismatchTest {
   @Test
   public void testBuildFailsWhenIndexPassReadsFewerRows()
       throws Exception {
-    TwoPassMismatchRecordReader recordReader = new TwoPassMismatchRecordReader(_rows);
+    TwoPassRecordReader recordReader = new TwoPassRecordReader(_rows, _rows.subList(0, NUM_ROWS_IN_STATS_PASS - 1));
     IllegalStateException e = expectThrows(IllegalStateException.class, () -> build(recordReader));
 
     // The injected condition really happened: 10 rows read for stats, 9 rows read for the index.
-    assertEquals(recordReader.getRowsReadPerPass(), List.of(NUM_ROWS_IN_STATS_PASS, NUM_ROWS_INDEXED));
+    assertEquals(recordReader.getRowsReadPerPass(), List.of(NUM_ROWS_IN_STATS_PASS, NUM_ROWS_IN_STATS_PASS - 1));
     assertTrue(e.getMessage().contains("Segment: " + SEGMENT_NAME), e.getMessage());
     assertTrue(e.getMessage().contains(
-        "indexed " + NUM_ROWS_INDEXED + " rows but the stats pass counted " + NUM_ROWS_IN_STATS_PASS + " rows"),
-        e.getMessage());
+        "indexed " + (NUM_ROWS_IN_STATS_PASS - 1) + " rows but the stats pass counted " + NUM_ROWS_IN_STATS_PASS
+            + " rows"), e.getMessage());
 
     // Closing the half-built sorted index also fails on the empty dictionary id. That stays attached to the build
     // failure instead of replacing it.
@@ -112,6 +119,104 @@ public class SegmentGenerationWithTwoPassMismatchTest {
     assertTrue(e.getSuppressed()[0].getMessage().contains("Dictionary id: 1 of sorted column: " + ORG_ID),
         e.getSuppressed()[0].getMessage());
 
+    assertFalse(new File(TEMP_DIR, SEGMENT_NAME).exists());
+  }
+
+  // An extra row would write past every index creator sized for the stats-pass total, so the build stops before
+  // indexing it.
+  @Test
+  public void testBuildFailsWhenIndexPassReadsMoreRows()
+      throws Exception {
+    List<GenericRow> indexPassRows = new ArrayList<>(_rows);
+    indexPassRows.add(_rows.get(NUM_ROWS_IN_STATS_PASS - 1));
+    TwoPassRecordReader recordReader = new TwoPassRecordReader(_rows, indexPassRows);
+    IllegalStateException e = expectThrows(IllegalStateException.class, () -> build(recordReader));
+
+    assertEquals(recordReader.getRowsReadPerPass(), List.of(NUM_ROWS_IN_STATS_PASS, NUM_ROWS_IN_STATS_PASS + 1));
+    assertTrue(e.getMessage().contains(
+        "indexed more than " + NUM_ROWS_IN_STATS_PASS + " rows but the stats pass counted " + NUM_ROWS_IN_STATS_PASS
+            + " rows"), e.getMessage());
+    assertEquals(e.getSuppressed().length, 0);
+    assertFalse(new File(TEMP_DIR, SEGMENT_NAME).exists());
+  }
+
+  // The same rows in a different order keep the count and every value, but a sorted column would get overlapping
+  // doc id ranges.
+  @Test
+  public void testBuildFailsWhenIndexPassReordersRows()
+      throws Exception {
+    List<GenericRow> indexPassRows = new ArrayList<>(_rows);
+    indexPassRows.add(0, indexPassRows.remove(NUM_ROWS_IN_STATS_PASS - 1));
+    TwoPassRecordReader recordReader = new TwoPassRecordReader(_rows, indexPassRows);
+    IllegalStateException e = expectThrows(IllegalStateException.class, () -> build(recordReader));
+
+    assertTrue(e.getMessage().contains("after dictionary id: 1"), e.getMessage());
+    assertFalse(new File(TEMP_DIR, SEGMENT_NAME).exists());
+  }
+
+  // now() runs once per pass, so the index pass computes values the stats pass never put in the dictionary.
+  @Test
+  public void testBuildFailsOnVolatileTransform() {
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("ingestTs", "now()")));
+    _tableConfig.setIngestionConfig(ingestionConfig);
+    _schema.addField(new DimensionFieldSpec("ingestTs", DataType.LONG, true));
+    // Sleeping between the passes keeps every index-pass now() value later than every stats-pass value.
+    GenericRowRecordReader recordReader = new GenericRowRecordReader(_rows) {
+      @Override
+      public void rewind() {
+        try {
+          Thread.sleep(20);
+        } catch (InterruptedException e) {
+          throw new RuntimeException(e);
+        }
+        super.rewind();
+      }
+    };
+    IllegalStateException e = expectThrows(IllegalStateException.class, () -> build(recordReader));
+
+    assertTrue(e.getMessage().contains("is not in the dictionary for column: ingestTs"), e.getMessage());
+    assertTrue(e.getMessage().contains("volatile ingestion transform"), e.getMessage());
+  }
+
+  // The column-major build has no record reader to count, so each column checks its own count. A column reader that
+  // reports one doc fewer on the index pass would otherwise leave that column's indexes a doc short.
+  @Test
+  public void testColumnarBuildFailsWhenColumnShrinks()
+      throws Exception {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension(ORG_ID, DataType.STRING)
+        .addSingleValueDimension(BUCKET, DataType.INT)
+        .build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    Map<String, ColumnReader> columnReaders = new HashMap<>();
+    columnReaders.put(BUCKET,
+        new DefaultValueColumnReader(BUCKET, NUM_ROWS_IN_STATS_PASS, schema.getFieldSpecFor(BUCKET)));
+    columnReaders.put(ORG_ID,
+        new DefaultValueColumnReader(ORG_ID, NUM_ROWS_IN_STATS_PASS, schema.getFieldSpecFor(ORG_ID)) {
+          private boolean _rewound;
+
+          @Override
+          public void rewind() {
+            _rewound = true;
+          }
+
+          @Override
+          public int getTotalDocs() {
+            return _rewound ? NUM_ROWS_IN_STATS_PASS - 1 : NUM_ROWS_IN_STATS_PASS;
+          }
+        });
+
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    config.setOutDir(TEMP_DIR.getAbsolutePath());
+    config.setSegmentName(SEGMENT_NAME);
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    driver.init(config, new ColumnarSegmentCreationDataSource(columnReaders), null);
+    IllegalStateException e = expectThrows(IllegalStateException.class, driver::build);
+
+    assertEquals(e.getMessage(),
+        "Column: " + ORG_ID + " indexed " + (NUM_ROWS_IN_STATS_PASS - 1) + " docs but the stats pass counted "
+            + NUM_ROWS_IN_STATS_PASS + " docs");
     assertFalse(new File(TEMP_DIR, SEGMENT_NAME).exists());
   }
 
@@ -135,20 +240,22 @@ public class SegmentGenerationWithTwoPassMismatchTest {
     driver.build();
   }
 
-  // Yields every row on the first pass and drops the last row on every pass after that. The driver rewinds once
+  // Yields the stats-pass rows until its second rewind and the index-pass rows after that. The driver rewinds once
   // inside init() before the stats pass, then again before the index pass.
-  private static class TwoPassMismatchRecordReader implements RecordReader {
-    private final List<GenericRow> _rows;
+  private static class TwoPassRecordReader implements RecordReader {
+    private final List<GenericRow> _statsPassRows;
+    private final List<GenericRow> _indexPassRows;
     private final List<Integer> _rowsReadPerPass = new ArrayList<>();
 
+    private List<GenericRow> _rows;
     private int _numRewinds;
-    private int _limit;
     private int _nextRowId;
     private int _rowsReadThisPass;
 
-    TwoPassMismatchRecordReader(List<GenericRow> rows) {
-      _rows = rows;
-      _limit = rows.size();
+    TwoPassRecordReader(List<GenericRow> statsPassRows, List<GenericRow> indexPassRows) {
+      _statsPassRows = statsPassRows;
+      _indexPassRows = indexPassRows;
+      _rows = statsPassRows;
     }
 
     List<Integer> getRowsReadPerPass() {
@@ -166,7 +273,7 @@ public class SegmentGenerationWithTwoPassMismatchTest {
 
     @Override
     public boolean hasNext() {
-      return _nextRowId < _limit;
+      return _nextRowId < _rows.size();
     }
 
     @Override
@@ -184,7 +291,7 @@ public class SegmentGenerationWithTwoPassMismatchTest {
       _rowsReadThisPass = 0;
       _nextRowId = 0;
       _numRewinds++;
-      _limit = _numRewinds >= 2 ? _rows.size() - 1 : _rows.size();
+      _rows = _numRewinds >= 2 ? _indexPassRows : _statsPassRows;
     }
 
     @Override
