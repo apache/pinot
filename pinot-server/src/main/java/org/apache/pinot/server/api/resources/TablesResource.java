@@ -311,6 +311,8 @@ public class TablesResource {
               // table-level per-index-type total and does not honour the `columns=` filter, unlike columnIndexSizeMap
               // above. Sizes come from the keys persisted at seal time, so a segment built without
               // indexSizeStatsEnabled contributes nothing and is not counted.
+              // Sum across columns first so each index type counts this segment once, not once per column.
+              Map<String, Long> segmentIndexSizes = new HashMap<>();
               for (String column : allSegmentColumns) {
                 ColumnMetadata metadata = segmentMetadata.getColumnMetadataMap().get(column);
                 if (metadata == null) {
@@ -318,13 +320,15 @@ public class TablesResource {
                 }
                 for (Map.Entry<String, Long> entry : metadata.getPersistedIndexSizesInBytes().entrySet()) {
                   long size = entry.getValue();
-                  if (size < 0) {
-                    continue;
+                  if (size >= 0) {
+                    segmentIndexSizes.merge(entry.getKey(), size, Long::sum);
                   }
-                  long[] total = indexSizeTotals.computeIfAbsent(entry.getKey(), k -> new long[2]);
-                  total[0] += size;
-                  total[1]++;
                 }
+              }
+              for (Map.Entry<String, Long> entry : segmentIndexSizes.entrySet()) {
+                long[] total = indexSizeTotals.computeIfAbsent(entry.getKey(), k -> new long[2]);
+                total[0] += entry.getValue();
+                total[1]++;
               }
             }
           }

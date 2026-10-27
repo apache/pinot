@@ -118,6 +118,8 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
   protected File _indexDir;
   protected Map<String, ColumnIndexCreators> _colIndexes;
   protected String _segmentName;
+  /// Per-column, per-index-type on-disk sizes handed from [#flushColIndexes()] to [#writeMetadata()].
+  private Map<String, Map<String, Long>> _indexSizes = Map.of();
 
   @Override
   public void init(SegmentGeneratorConfig config, int totalDocs, TreeMap<String, ColumnStatistics> columnStatisticsMap,
@@ -411,11 +413,17 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     return rawValue;
   }
 
-  /// Writes segment metadata to disk.
+  /// Writes segment metadata to disk. Kept as a no-argument protected hook so existing subclasses that override it
+  /// (or call `super.writeMetadata()`) continue to compile and be dispatched to.
+  protected void writeMetadata()
+      throws ConfigurationException {
+    writeMetadata(_indexSizes);
+  }
+
   /// Writes `metadata.properties`. `indexSizes` maps column to [IndexType#getId()] to on-disk size in bytes and is
   /// empty unless `indexSizeStatsEnabled` is set; when populated, the sizes are written as
   /// `column.<column>.indexSizeInBytes.<indexTypeId>` in this same single pass.
-  protected void writeMetadata(Map<String, Map<String, Long>> indexSizes)
+  private void writeMetadata(Map<String, Map<String, Long>> indexSizes)
       throws ConfigurationException {
     File metadataFile = new File(_indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
     PropertiesConfiguration properties = CommonsConfigurationUtils.fromFile(metadataFile);
@@ -889,7 +897,8 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     }
     // Index files are still in V1 layout here, not yet packed into `columns.psf`, so their sizes can be read straight
     // off the filesystem and persisted in the same single metadata write.
-    writeMetadata(collectIndexSizes());
+    _indexSizes = collectIndexSizes();
+    writeMetadata();
   }
 
   /// Returns the on-disk size in bytes of each index, keyed by column then by [IndexType#getId()]. Empty unless

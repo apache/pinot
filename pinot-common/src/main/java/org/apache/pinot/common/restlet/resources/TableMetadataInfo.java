@@ -80,6 +80,17 @@ public class TableMetadataInfo {
     _compressionStats = compressionStats;
   }
 
+  /// Constructor for callers that predate the per-index-type size breakdown.
+  public TableMetadataInfo(String tableName, long sizeInBytes, long numSegments, long numRows,
+      Map<String, Double> columnLengthMap, Map<String, Double> columnCardinalityMap,
+      Map<String, Double> maxNumMultiValuesMap, Map<String, Map<String, Double>> columnIndexSizeMap,
+      Map<Integer, Map<String, Long>> partitionToServerPrimaryKeyCountMap,
+      @Nullable List<ColumnCompressionStatsInfo> columnCompressionStats,
+      @Nullable CompressionStatsSummary compressionStats) {
+    this(tableName, sizeInBytes, numSegments, numRows, columnLengthMap, columnCardinalityMap, maxNumMultiValuesMap,
+        columnIndexSizeMap, partitionToServerPrimaryKeyCountMap, columnCompressionStats, null, compressionStats);
+  }
+
   /// Constructor for callers that provide column compression statistics but not the aggregate summary.
   public TableMetadataInfo(String tableName, long sizeInBytes, long numSegments, long numRows,
       Map<String, Double> columnLengthMap, Map<String, Double> columnCardinalityMap,

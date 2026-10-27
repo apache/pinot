@@ -79,6 +79,14 @@ public class SegmentSizeInfo {
         indexSizeInBytes);
   }
 
+  public SegmentSizeInfo(String segmentName, long sizeBytes,
+      @Nullable Long compressionStatsUncompressedValueSizeInBytes,
+      @Nullable Long compressionStatsForwardIndexAndDictionaryStorageSizeInBytes,
+      @Nullable Map<String, ColumnCompressionStatsInfo> columnCompressionStats) {
+    this(segmentName, sizeBytes, compressionStatsUncompressedValueSizeInBytes,
+        compressionStatsForwardIndexAndDictionaryStorageSizeInBytes, columnCompressionStats, null);
+  }
+
   @JsonCreator
   public SegmentSizeInfo(@JsonProperty("segmentName") String segmentName,
       @JsonProperty("diskSizeInBytes") long sizeBytes,

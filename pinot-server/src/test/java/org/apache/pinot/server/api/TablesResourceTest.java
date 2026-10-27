@@ -191,16 +191,16 @@ public class TablesResourceTest extends BaseResourceTest {
 
     JsonNode withoutParam =
         JsonUtils.stringToJsonNode(_webTarget.path(tableMetadataPath).request().get(String.class));
-    Assert.assertFalse(withoutParam.has("indexSizeBreakdown"),
+    assertFalse(withoutParam.has("indexSizeBreakdown"),
         "indexSizeBreakdown must be omitted entirely when not requested, payload was: " + withoutParam);
 
     JsonNode withParam = JsonUtils.stringToJsonNode(_webTarget.path(tableMetadataPath)
         .queryParam("includeIndexSizeStats", "true")
         .request()
         .get(String.class));
-    Assert.assertTrue(withParam.has("indexSizeBreakdown"),
+    assertTrue(withParam.has("indexSizeBreakdown"),
         "indexSizeBreakdown must be present when requested, payload was: " + withParam);
-    Assert.assertTrue(withParam.get("indexSizeBreakdown").isEmpty(),
+    assertTrue(withParam.get("indexSizeBreakdown").isEmpty(),
         "These segments carry no persisted index sizes, so the breakdown must be empty rather than fabricated: "
             + withParam.get("indexSizeBreakdown"));
 
@@ -210,10 +210,55 @@ public class TablesResourceTest extends BaseResourceTest {
         .queryParam("columns", "column1")
         .request()
         .get(String.class));
-    Assert.assertTrue(withColumnFilter.has("indexSizeBreakdown"),
+    assertTrue(withColumnFilter.has("indexSizeBreakdown"),
         "indexSizeBreakdown must survive a columns= filter, payload was: " + withColumnFilter);
-    Assert.assertEquals(withColumnFilter.get("indexSizeBreakdown"), withParam.get("indexSizeBreakdown"),
+    assertEquals(withColumnFilter.get("indexSizeBreakdown"), withParam.get("indexSizeBreakdown"),
         "indexSizeBreakdown is a table-level aggregate and must be identical with and without columns=");
+  }
+
+  /// `segmentsWithStats` counts segments per index type, not `(column, indexType)` entries: every column of these
+  /// segments has a forward index, so a per-entry count would be a multiple of the segment count.
+  @Test
+  public void getTableMetadataIndexSizeBreakdownCountsSegmentsNotColumns()
+      throws Exception {
+    String tableName = "indexSizeBreakdownCount_OFFLINE";
+    List<ImmutableSegment> segments = new ArrayList<>();
+    addTable(tableName);
+    TableDataManager tableDataManager = _tableDataManagerMap.get(tableName);
+    try {
+      for (int i = 0; i < 2; i++) {
+        setUpSegment(tableName, null, "sized" + i, segments, false, true);
+      }
+      String forwardIndexId = StandardIndexes.forward().getId();
+      long expectedForwardIndexBytes = 0;
+      int numColumnsWithForwardIndex = 0;
+      for (ImmutableSegment segment : segments) {
+        numColumnsWithForwardIndex = 0;
+        for (var columnMetadata : segment.getSegmentMetadata().getColumnMetadataMap().values()) {
+          Long size = columnMetadata.getPersistedIndexSizesInBytes().get(forwardIndexId);
+          if (size != null) {
+            expectedForwardIndexBytes += size;
+            numColumnsWithForwardIndex++;
+          }
+        }
+      }
+      assertTrue(numColumnsWithForwardIndex > 1, "Fixture must have several forward-indexed columns per segment");
+
+      JsonNode response = JsonUtils.stringToJsonNode(_webTarget.path("/tables/" + tableName + "/metadata")
+          .queryParam("includeIndexSizeStats", "true")
+          .request()
+          .get(String.class));
+      JsonNode forwardIndex = response.get("indexSizeBreakdown").get(forwardIndexId);
+      assertNotNull(forwardIndex, "Missing forward index entry in: " + response);
+      assertEquals(forwardIndex.get("segmentsWithStats").asInt(), segments.size());
+      assertEquals(forwardIndex.get("sizePerReplicaInBytes").asLong(), expectedForwardIndexBytes);
+    } finally {
+      for (ImmutableSegment segment : segments) {
+        tableDataManager.offloadSegment(segment.getSegmentName());
+      }
+      tableDataManager.shutDown();
+      _tableDataManagerMap.remove(tableName);
+    }
   }
 
   @Test
