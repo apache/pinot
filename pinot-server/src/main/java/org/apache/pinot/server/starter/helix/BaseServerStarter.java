@@ -44,7 +44,6 @@ import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
-import org.apache.helix.InstanceType;
 import org.apache.helix.SystemPropertyKeys;
 import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.model.ExternalView;
@@ -123,6 +122,7 @@ import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.accounting.WorkloadBudgetManagerFactory;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -295,8 +295,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     LOGGER.info("Initializing Helix manager with zkAddress: {}, clusterName: {}, instanceId: {}", _zkAddress,
         _helixClusterName, _instanceId);
-    _helixManager =
-        HelixManagerFactory.getZKHelixManager(_helixClusterName, _instanceId, InstanceType.PARTICIPANT, _zkAddress);
+    _helixManager = HelixManagerFactory.getZKHelixManager(_helixClusterName, _instanceId,
+        org.apache.helix.InstanceType.PARTICIPANT, _zkAddress);
 
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(ContinuousJfrStarter.INSTANCE);
     initTransitionThreadPoolManager();
@@ -530,8 +530,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
           serverConf.getMultiStageMailboxPort());
     }
     updated |= HelixHelper.updatePinotVersion(instanceConfig);
-    updated |= HelixHelper.updateCapabilities(instanceConfig,
-        org.apache.pinot.spi.config.instance.InstanceType.SERVER);
+    updated |= HelixHelper.updateCapabilities(instanceConfig, InstanceType.SERVER);
 
     // Update environment properties
     if (_pinotEnvironmentProvider != null) {
@@ -766,11 +765,10 @@ public abstract class BaseServerStarter implements ServiceStartable {
             Server.DEFAULT_THREAD_ALLOCATED_BYTES_MEASUREMENT));
     // Initialize workload budget manager and thread accountant. Workload budget manager must be initialized first
     // because it might be used by the accountant.
-    PinotConfiguration accountingConfig = ThreadAccountantUtils.extractAccountingConfig(_serverConf,
-        org.apache.pinot.spi.config.instance.InstanceType.SERVER);
+    PinotConfiguration accountingConfig =
+        ThreadAccountantUtils.extractAccountingConfig(_serverConf, InstanceType.SERVER);
     WorkloadBudgetManagerFactory.register(accountingConfig);
-    _threadAccountant = ThreadAccountantUtils.createAccountant(accountingConfig, _instanceId,
-        org.apache.pinot.spi.config.instance.InstanceType.SERVER);
+    _threadAccountant = ThreadAccountantUtils.createAccountant(accountingConfig, _instanceId, InstanceType.SERVER);
 
     // Initialize scan-based query killing
     PinotConfiguration schedulerConfig = _serverConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX);

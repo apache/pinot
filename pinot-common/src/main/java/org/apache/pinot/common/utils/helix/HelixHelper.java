@@ -39,7 +39,6 @@ import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.HelixProperty;
-import org.apache.helix.InstanceType;
 import org.apache.helix.PropertyKey.Builder;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.HelixConfigScope;
@@ -55,6 +54,7 @@ import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.tls.ZooKeeperSslContextSupplier;
 import org.apache.pinot.common.version.PinotVersion;
 import org.apache.pinot.common.workload.WorkloadChangeListener;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.LogicalTableConfig;
@@ -86,8 +86,8 @@ public class HelixHelper {
 
   /// Creates a ZooKeeper-backed manager with Pinot's TLS bootstrap policy applied before construction.
   /// Callers retain responsibility for the manager's connect/disconnect lifecycle.
-  public static HelixManager createZkHelixManager(String clusterName, String instanceName, InstanceType instanceType,
-      String zkAddress) {
+  public static HelixManager createZkHelixManager(String clusterName, String instanceName,
+      org.apache.helix.InstanceType instanceType, String zkAddress) {
     ZooKeeperSslContextSupplier.initialize();
     return HelixManagerFactory.getZKHelixManager(clusterName, instanceName, instanceType, zkAddress);
   }
@@ -727,16 +727,15 @@ public class HelixHelper {
   /// version of this build. Readers ignore the capabilities when that entry differs from the simple field
   /// `pinotVersion`, which [#updatePinotVersion] writes. Any instance type can call it. Returns whether the field
   /// changed.
-  public static boolean updateCapabilities(InstanceConfig instanceConfig,
-      org.apache.pinot.spi.config.instance.InstanceType instanceType) {
+  public static boolean updateCapabilities(InstanceConfig instanceConfig, InstanceType instanceType) {
     return updateCapabilities(instanceConfig, instanceType, InstanceCapability.values());
   }
 
-  /// Same as [#updateCapabilities(InstanceConfig, org.apache.pinot.spi.config.instance.InstanceType)] with the given
-  /// capabilities instead of [InstanceCapability#values()].
+  /// Same as [#updateCapabilities(InstanceConfig, InstanceType)] with the given capabilities instead of
+  /// [InstanceCapability#values()].
   @VisibleForTesting
-  static boolean updateCapabilities(InstanceConfig instanceConfig,
-      org.apache.pinot.spi.config.instance.InstanceType instanceType, Collection<InstanceCapability> capabilities) {
+  static boolean updateCapabilities(InstanceConfig instanceConfig, InstanceType instanceType,
+      Collection<InstanceCapability> capabilities) {
     ZNRecord record = instanceConfig.getRecord();
     Map<String, String> currentCapabilities = InstanceCapability.toMapField(capabilities, instanceType);
     currentCapabilities.put(CommonConstants.Helix.Instance.CAPABILITIES_PINOT_VERSION_KEY, PinotVersion.VERSION);
