@@ -50,6 +50,7 @@ public class AggregateFunctionRewriteOptimizerTest {
       .addSingleValueDimension("timeCol", DataType.LONG)
       .build();
   private static final String AUTO_REWRITE = "SET autoRewriteAggregationType=true; ";
+  private static final String INFER_ANY_VALUE_TYPE = "SET inferAnyValueType=true; ";
 
   @DataProvider
   public Object[][] dataTypes() {
@@ -100,6 +101,53 @@ public class AggregateFunctionRewriteOptimizerTest {
             + "FIRST_WITH_TIME(doubleCol, timeCol, 'DOUBLE') FILTER (WHERE boolCol) "
             + "FROM testTable GROUP BY intCol HAVING FIRST_WITH_TIME(longCol, timeCol, 'LONG') > 1 "
             + "ORDER BY LAST_WITH_TIME(timestampCol, timeCol, 'TIMESTAMP')");
+  }
+
+  @Test(dataProvider = "dataTypes")
+  public void testAnyValueInfersDataType(String column, String dataType) {
+    for (String function : new String[]{"ANY_VALUE", "anyValue"}) {
+      assertRewrite(INFER_ANY_VALUE_TYPE + "SELECT " + function + "(" + column + ") FROM testTable",
+          INFER_ANY_VALUE_TYPE + "SELECT " + function + "(" + column + ", '" + dataType + "') FROM testTable");
+    }
+  }
+
+  @Test
+  public void testAnyValueRejectsMultiValueColumn() {
+    PinotQuery query =
+        CalciteSqlParser.compileToPinotQuery(INFER_ANY_VALUE_TYPE + "SELECT ANY_VALUE(mvCol) FROM testTable");
+    BadQueryRequestException exception = expectThrows(BadQueryRequestException.class,
+        () -> new AggregateFunctionRewriteOptimizer().optimize(query, SCHEMA));
+    assertEquals(exception.getMessage(), "Unsupported data type for ANYVALUE(expr): multi-value INT");
+    assertUnchanged("SELECT ANY_VALUE(mvCol) FROM testTable");
+  }
+
+  @Test
+  public void testAnyValueKeepsArgumentsWithoutSchemaType() {
+    for (String column : new String[]{"missingCol", "trim(stringCol)"}) {
+      assertUnchanged(INFER_ANY_VALUE_TYPE + "SELECT ANY_VALUE(" + column + ") FROM testTable");
+    }
+    assertUnchanged(INFER_ANY_VALUE_TYPE + "SELECT ANY_VALUE(intCol, 'LONG') FROM testTable");
+  }
+
+  @Test
+  public void testRewritesNestedAnyValueConsistently() {
+    assertRewrite(INFER_ANY_VALUE_TYPE + "SELECT intCol, ANY_VALUE(stringCol) AS v1, ANY_VALUE(doubleCol) FILTER "
+            + "(WHERE boolCol) FROM testTable GROUP BY intCol HAVING ANY_VALUE(longCol) > 1 "
+            + "ORDER BY ANY_VALUE(timestampCol)",
+        INFER_ANY_VALUE_TYPE + "SELECT intCol, ANY_VALUE(stringCol, 'STRING') AS v1, ANY_VALUE(doubleCol, 'DOUBLE') "
+            + "FILTER (WHERE boolCol) FROM testTable GROUP BY intCol HAVING ANY_VALUE(longCol, 'LONG') > 1 "
+            + "ORDER BY ANY_VALUE(timestampCol, 'TIMESTAMP')");
+  }
+
+  @Test
+  public void testAnyValueDataTypeRequiresQueryOption() {
+    String query = "SELECT ANY_VALUE(intCol), FIRST_WITH_TIME(intCol, timeCol) FROM testTable";
+    String expectedQuery = "SELECT ANY_VALUE(intCol, 'INT'), FIRST_WITH_TIME(intCol, timeCol, 'INT') FROM testTable";
+    assertRewrite(INFER_ANY_VALUE_TYPE + query, INFER_ANY_VALUE_TYPE + expectedQuery);
+    // The option only applies to ANY_VALUE.
+    String unchangedAnyValue = "SELECT ANY_VALUE(intCol), FIRST_WITH_TIME(intCol, timeCol, 'INT') FROM testTable";
+    assertRewrite(query, unchangedAnyValue);
+    assertRewrite("SET inferAnyValueType=false; " + query, "SET inferAnyValueType=false; " + unchangedAnyValue);
   }
 
   @Test

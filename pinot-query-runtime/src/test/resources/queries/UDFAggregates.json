@@ -150,6 +150,31 @@
         "outputs": [[1, "a", true, "2020-01-01 00:00:00.0"], [3, "c", false, "2020-01-02 00:00:00.0"], [4, "e", false, "2020-01-04 00:00:00.0"], [7, "d", true, "2020-01-06 00:00:00.0"]]
       },
       {
+        "comment": "The data type argument of ANY_VALUE is inferred when omitted and inferAnyValueType is true",
+        "sql": "SET inferAnyValueType=true; SELECT ANY_VALUE(int_col), ANY_VALUE(long_col), ANY_VALUE(float_col), ANY_VALUE(double_col), ANY_VALUE(string_col), ANY_VALUE(bool_col), ANY_VALUE(timestamp_col) FROM {tbl} WHERE int_col = 175",
+        "outputs": [[175, 175, 1.75, 1.75, "c", true, "2020-01-02 03:32:12.0"]]
+      },
+      {
+        "sql": "SET inferAnyValueType=true; SELECT int_col, ANY_VALUE(string_col), ANY_VALUE(bool_col), ANY_VALUE(timestamp_col) FROM {tbl} WHERE int_col IN (3, 175) GROUP BY int_col",
+        "outputs": [[3, "b", false, "2020-01-01 08:32:12.0"], [175, "c", true, "2020-01-02 03:32:12.0"]]
+      },
+      {
+        "sql": "SET inferAnyValueType=true; SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ int_col, ANY_VALUE(string_col), ANY_VALUE(bool_col), ANY_VALUE(timestamp_col) FROM {tbl} WHERE int_col IN (3, 175) GROUP BY int_col",
+        "outputs": [[3, "b", false, "2020-01-01 08:32:12.0"], [175, "c", true, "2020-01-02 03:32:12.0"]]
+      },
+      {
+        "sql": "SELECT ANY_VALUE(int_col, 'INT'), ANY_VALUE(bool_col, 'BOOLEAN'), ANY_VALUE(timestamp_col, 'TIMESTAMP') FROM {tbl} WHERE int_col = 175",
+        "outputs": [[175, true, "2020-01-02 03:32:12.0"]]
+      },
+      {
+        "sql": "SET inferAnyValueType=true; SELECT ANY_VALUE(bool_col), ANY_VALUE(timestamp_col) FROM {tbl} WHERE int_col < 0",
+        "outputs": [[null, null]]
+      },
+      {
+        "sql": "SELECT int_col, ANY_VALUE(bool_col), ANY_VALUE(timestamp_col) FROM {tbl} WHERE int_col = 175 GROUP BY int_col",
+        "outputs": [[175, true, "2020-01-02 03:32:12.0"]]
+      },
+      {
         "sql": "SELECT SUMPRECISION(decimal_col) FROM {tbl}",
         "outputs": [["10000000000100000000110000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000.00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000011000000001"]]
       },
@@ -196,6 +221,47 @@
       {
         "sql": "select /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ string_col, distinct_avg(int_col), distinctAvg(long_col), DISTINCT_AVG(float_col), DISTINCTAVG(double_col) FROM {tbl} GROUP BY string_col",
         "outputs": [["a", 2.0, 2.0, 350.0, 350.0], ["b", 51.5, 51.5, 50.5, 50.5], ["c", 142.0, 142.0, 1.42, 1.42]]
+      }
+    ]
+  },
+  "pinot_any_value_tests": {
+    "tables": {
+      "tbl": {
+        "schema": [
+          {"name": "int_col", "type": "INT"},
+          {"name": "decimal_col", "type": "BIG_DECIMAL"},
+          {"name": "bytes_col", "type": "BYTES"},
+          {"name": "uuid_col", "type": "UUID"}
+        ],
+        "inputs": [
+          [1, "1.5", "DEADBEEF", "123e4567-e89b-12d3-a456-426614174000"],
+          [1, "1.5", "DEADBEEF", "123e4567-e89b-12d3-a456-426614174000"],
+          [2, "2.5", "CAFE", "123e4567-e89b-12d3-a456-426614174001"]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "comment": "ANY_VALUE over the types that only ANY_VALUE infers a data type for",
+        "sql": "SET inferAnyValueType=true; SELECT ANY_VALUE(decimal_col), ANY_VALUE(bytes_col), ANY_VALUE(uuid_col), ANY_VALUE(int_col * 1.5) FROM {tbl} WHERE int_col = 1",
+        "outputs": [["1.5", "deadbeef", "123e4567-e89b-12d3-a456-426614174000", 1.5]]
+      },
+      {
+        "sql": "SET inferAnyValueType=true; SELECT int_col, ANY_VALUE(decimal_col), ANY_VALUE(bytes_col), ANY_VALUE(uuid_col), ANY_VALUE(int_col * 1.5) FROM {tbl} GROUP BY int_col",
+        "outputs": [[1, "1.5", "deadbeef", "123e4567-e89b-12d3-a456-426614174000", 1.5], [2, "2.5", "cafe", "123e4567-e89b-12d3-a456-426614174001", 3.0]]
+      },
+      {
+        "sql": "SET inferAnyValueType=true; SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ int_col, ANY_VALUE(decimal_col), ANY_VALUE(bytes_col), ANY_VALUE(uuid_col), ANY_VALUE(int_col * 1.5) FROM {tbl} GROUP BY int_col",
+        "outputs": [[1, "1.5", "deadbeef", "123e4567-e89b-12d3-a456-426614174000", 1.5], [2, "2.5", "cafe", "123e4567-e89b-12d3-a456-426614174001", 3.0]]
+      },
+      {
+        "comment": "The infinite value of int_col = 1 is in the same block as the returned group",
+        "sql": "SET inferAnyValueType=true; SELECT int_col, ANY_VALUE(int_col / (int_col - 1.0)) FROM {tbl} GROUP BY int_col HAVING COUNT(*) = 1",
+        "outputs": [[2, 2.0]]
+      },
+      {
+        "sql": "SET inferAnyValueType=true; SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ int_col, ANY_VALUE(int_col / (int_col - 1.0)) FROM {tbl} GROUP BY int_col HAVING COUNT(*) = 1",
+        "outputs": [[2, 2.0]]
       }
     ]
   },

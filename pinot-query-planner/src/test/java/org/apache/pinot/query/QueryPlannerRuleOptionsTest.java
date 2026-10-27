@@ -36,8 +36,9 @@ import static org.testng.Assert.*;
 public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
 
   private String explainQueryWithRuleDisabled(String query, String ruleToSkip) {
-    SqlNode sqlNode = CalciteSqlParser.compileToSqlNodeAndOptions(query).getSqlNode();
-    Map<String, String> options = new HashMap<>();
+    SqlNodeAndOptions parsed = CalciteSqlParser.compileToSqlNodeAndOptions(query);
+    SqlNode sqlNode = parsed.getSqlNode();
+    Map<String, String> options = new HashMap<>(parsed.getOptions());
     // disable rule
     options.put(CommonConstants.Broker.Request.QueryOptionKey.SKIP_PLANNER_RULES, ruleToSkip);
     SqlNodeAndOptions sqlNodeAndOptions =
@@ -97,10 +98,19 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
   @Test
   public void testTypeArgumentRewriteIgnoresSkipPlannerRules() {
     // The servers require the data type argument, so naming the rule in skipPlannerRules does not turn it off.
-    String query = "EXPLAIN PLAN FOR SELECT FIRST_WITH_TIME(col1, ts) FROM a";
-    String explain = explainQueryWithRuleDisabled(query, PinotAggregateTypeArgumentRewriteRule.INSTANCE.toString());
+    String query = "EXPLAIN PLAN FOR SELECT FIRST_WITH_TIME(col1, ts), ANY_VALUE(col3) FROM a";
+    String explain =
+        explainQueryWithRuleDisabled(query, PinotAggregateTypeArgumentRewriteRule.WITHOUT_ANY_VALUE.toString());
     assertEquals(explain, _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong()));
     assertTrue(explain.contains("FIRSTWITHTIME($0, $1, _UTF-8'STRING')"), explain);
+    assertTrue(explain.contains("ANYVALUE($2)"), explain);
+
+    // With inferAnyValueType, the program runs the rule that also rewrites ANY_VALUE
+    query = "SET inferAnyValueType=true; " + query;
+    explain = explainQueryWithRuleDisabled(query, PinotAggregateTypeArgumentRewriteRule.INSTANCE.toString());
+    assertEquals(explain, _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong()));
+    assertTrue(explain.contains("FIRSTWITHTIME($0, $1, _UTF-8'STRING')"), explain);
+    assertTrue(explain.contains("ANYVALUE($2, _UTF-8'INT')"), explain);
   }
 
   @Test
