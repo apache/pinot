@@ -224,6 +224,78 @@
         ]
       },
       {
+        "description": "ANY_VALUE without a data type infers it from its argument",
+        "sql": "SET inferAnyValueType=true; EXPLAIN PLAN FOR SELECT ANY_VALUE(a.col1), ANY_VALUE(a.col3), ANY_VALUE(a.col4), ANY_VALUE(a.col5), ANY_VALUE(a.col7), ANY_VALUE(a.ts_timestamp) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{}], agg#0=[ANYVALUE($0, _UTF-8'STRING')], agg#1=[ANYVALUE($1, _UTF-8'INT')], agg#2=[ANYVALUE($2, _UTF-8'BIG_DECIMAL')], agg#3=[ANYVALUE($3, _UTF-8'BOOLEAN')], agg#4=[ANYVALUE($4, _UTF-8'LONG')], agg#5=[ANYVALUE($5, _UTF-8'TIMESTAMP')], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash])",
+          "\n    PinotLogicalAggregate(group=[{}], agg#0=[ANYVALUE($0, _UTF-8'STRING')], agg#1=[ANYVALUE($1, _UTF-8'INT')], agg#2=[ANYVALUE($2, _UTF-8'BIG_DECIMAL')], agg#3=[ANYVALUE($3, _UTF-8'BOOLEAN')], agg#4=[ANYVALUE($4, _UTF-8'LONG')], agg#5=[ANYVALUE($5, _UTF-8'TIMESTAMP')], aggType=[LEAF])",
+          "\n      LogicalProject($f0=[$0], $f1=[$2], $f2=[$3], $f3=[$4], $f4=[$6], $f5=[$8], $f6=[_UTF-8'STRING'], $f7=[_UTF-8'INT'], $f8=[_UTF-8'BIG_DECIMAL'], $f9=[_UTF-8'BOOLEAN'], $f10=[_UTF-8'LONG'], $f11=[_UTF-8'TIMESTAMP'])",
+          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Inferred ANY_VALUE data type for a transform and a filtered aggregate in a grouped aggregate",
+        "sql": "SET inferAnyValueType=true; EXPLAIN PLAN FOR SELECT a.col2, ANY_VALUE(a.col3 + 1), ANY_VALUE(a.col5) FILTER (WHERE a.col3 > 0), ANY_VALUE(a.col1, 'STRING') FROM a GROUP BY a.col2",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{0}], agg#0=[ANYVALUE($1, _UTF-8'INT')], agg#1=[ANYVALUE($2, _UTF-8'BOOLEAN')], agg#2=[ANYVALUE($3, _UTF-8'STRING')], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash[0]])",
+          "\n    PinotLogicalAggregate(group=[{0}], agg#0=[ANYVALUE($1, _UTF-8'INT')], agg#1=[ANYVALUE($2, _UTF-8'BOOLEAN') FILTER $3], agg#2=[ANYVALUE($4, _UTF-8'STRING')], aggType=[LEAF])",
+          "\n      LogicalProject($f0=[$1], $f1=[+($2, 1)], $f2=[$4], $f3=[>($2, 0)], $f4=[$0], $f5=[_UTF-8'STRING'], $f6=[_UTF-8'INT'], $f7=[_UTF-8'BOOLEAN'])",
+          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "ANY_VALUE over a DECIMAL expression takes the type the expression is read as",
+        "sql": "SET inferAnyValueType=true; EXPLAIN PLAN FOR SELECT ANY_VALUE(a.col3 * 1.5), ANY_VALUE(CAST(a.col3 AS DECIMAL(10, 0))) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{}], agg#0=[ANYVALUE($0, _UTF-8'DOUBLE')], agg#1=[ANYVALUE($1, _UTF-8'INT')], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash])",
+          "\n    PinotLogicalAggregate(group=[{}], agg#0=[ANYVALUE($0, _UTF-8'DOUBLE')], agg#1=[ANYVALUE($1, _UTF-8'INT')], aggType=[LEAF])",
+          "\n      LogicalProject($f0=[*($2, 1.5:DECIMAL(2, 1))], $f1=[CAST($2):DECIMAL(10, 0) NOT NULL], $f2=[_UTF-8'DOUBLE'], $f3=[_UTF-8'INT'])",
+          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "ANY_VALUE without a data type rejects a multi-value argument",
+        "sql": "SET inferAnyValueType=true; EXPLAIN PLAN FOR SELECT ANY_VALUE(e.mcol1) FROM e",
+        "expectedException": ".*Unsupported data type for ANYVALUE\\(expr\\): ARRAY.*"
+      },
+      {
+        "description": "ANY_VALUE rejects a data type that does not match its argument",
+        "sql": "EXPLAIN PLAN FOR SELECT ANY_VALUE(a.col3, 'STRING') FROM a",
+        "expectedException": ".*Unsupported data type for ANYVALUE\\(expr, 'dataType'\\) with expr of type INTEGER: STRING.*"
+      },
+      {
+        "description": "ANY_VALUE rejects a data type that does not match its argument when inferAnyValueType is true",
+        "sql": "SET inferAnyValueType=true; EXPLAIN PLAN FOR SELECT ANY_VALUE(a.col5, 'INT') FROM a",
+        "expectedException": ".*Unsupported data type for ANYVALUE\\(expr, 'dataType'\\) with expr of type BOOLEAN: INT.*"
+      },
+      {
+        "description": "ANY_VALUE rejects a data type argument that is not a literal",
+        "sql": "EXPLAIN PLAN FOR SELECT ANY_VALUE(a.col3, a.col1) FROM a",
+        "expectedException": ".*ANYVALUE expects a literal data type argument, got: \\$.*"
+      },
+      {
+        "description": "ANY_VALUE keeps the form without a data type by default",
+        "sql": "EXPLAIN PLAN FOR SELECT ANY_VALUE(a.col5), FIRST_WITH_TIME(a.col5, a.ts) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{}], agg#0=[ANYVALUE($0)], agg#1=[FIRSTWITHTIME($1, $1, _UTF-8'BOOLEAN')], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash])",
+          "\n    PinotLogicalAggregate(group=[{}], agg#0=[ANYVALUE($0)], agg#1=[FIRSTWITHTIME($0, $1, _UTF-8'BOOLEAN')], aggType=[LEAF])",
+          "\n      LogicalProject($f0=[$4], $f1=[$7], $f2=[_UTF-8'BOOLEAN'])",
+          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
         "description": "MIN on STRING column rewritten to MINSTRING",
         "sql": "SET autoRewriteAggregationType=true; EXPLAIN PLAN FOR SELECT MIN(a.col1) FROM a",
         "output": [

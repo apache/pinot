@@ -23,6 +23,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -37,6 +38,9 @@ import org.apache.pinot.spi.utils.CommonConstants;
 /// - FIRST_WITH_TIME(dataColumn, timeColumn) -> FIRST_WITH_TIME(dataColumn, timeColumn, 'dataType')
 /// - LAST_WITH_TIME(dataColumn, timeColumn) -> LAST_WITH_TIME(dataColumn, timeColumn, 'dataType')
 /// - MODE(stringColumn[, 'MIN'|'MAX']) -> MODE(stringColumn, 'MIN'|'MAX', 'STRING')
+///
+/// Applied only when enabled through the `inferAnyValueType` query option:
+/// - ANY_VALUE(column) -> ANY_VALUE(column, 'dataType')
 ///
 /// Applied only when enabled through the `autoRewriteAggregationType` query option:
 /// - MIN(stringType) -> MINSTRING
@@ -57,22 +61,25 @@ public class AggregateFunctionRewriteOptimizer implements StatementOptimizer {
 
     boolean rewriteToTypedVariants = pinotQuery.getQueryOptions() != null && Boolean.parseBoolean(
         pinotQuery.getQueryOptions().get(CommonConstants.Broker.Request.QueryOptionKey.AUTO_REWRITE_AGGREGATION_TYPE));
-    rewrite(pinotQuery.getSelectList(), schema, rewriteToTypedVariants);
-    rewrite(pinotQuery.getGroupByList(), schema, rewriteToTypedVariants);
-    rewrite(pinotQuery.getOrderByList(), schema, rewriteToTypedVariants);
-    rewrite(pinotQuery.getFilterExpression(), schema, rewriteToTypedVariants);
-    rewrite(pinotQuery.getHavingExpression(), schema, rewriteToTypedVariants);
+    boolean inferAnyValueType = QueryOptionsUtils.isInferAnyValueType(pinotQuery.getQueryOptions());
+    rewrite(pinotQuery.getSelectList(), schema, rewriteToTypedVariants, inferAnyValueType);
+    rewrite(pinotQuery.getGroupByList(), schema, rewriteToTypedVariants, inferAnyValueType);
+    rewrite(pinotQuery.getOrderByList(), schema, rewriteToTypedVariants, inferAnyValueType);
+    rewrite(pinotQuery.getFilterExpression(), schema, rewriteToTypedVariants, inferAnyValueType);
+    rewrite(pinotQuery.getHavingExpression(), schema, rewriteToTypedVariants, inferAnyValueType);
   }
 
-  private static void rewrite(@Nullable List<Expression> expressions, Schema schema, boolean rewriteToTypedVariants) {
+  private static void rewrite(@Nullable List<Expression> expressions, Schema schema, boolean rewriteToTypedVariants,
+      boolean inferAnyValueType) {
     if (expressions != null) {
       for (Expression expression : expressions) {
-        rewrite(expression, schema, rewriteToTypedVariants);
+        rewrite(expression, schema, rewriteToTypedVariants, inferAnyValueType);
       }
     }
   }
 
-  private static void rewrite(@Nullable Expression expression, Schema schema, boolean rewriteToTypedVariants) {
+  private static void rewrite(@Nullable Expression expression, Schema schema, boolean rewriteToTypedVariants,
+      boolean inferAnyValueType) {
     if (expression == null || !expression.isSetFunctionCall()) {
       return;
     }
@@ -80,7 +87,7 @@ public class AggregateFunctionRewriteOptimizer implements StatementOptimizer {
     Function function = expression.getFunctionCall();
     String functionName = function.getOperator();
     if (!AggregationFunctionType.isAggregationFunction(functionName)) {
-      rewrite(function.getOperands(), schema, rewriteToTypedVariants);
+      rewrite(function.getOperands(), schema, rewriteToTypedVariants, inferAnyValueType);
       return;
     }
 
@@ -96,7 +103,13 @@ public class AggregateFunctionRewriteOptimizer implements StatementOptimizer {
     String normalizedName = AggregationFunctionType.getNormalizedAggregationFunctionName(functionName);
     if ((normalizedName.equals(AggregationFunctionType.FIRSTWITHTIME.name())
         || normalizedName.equals(AggregationFunctionType.LASTWITHTIME.name())) && function.getOperandsSize() == 2) {
-      addDataTypeArgument(function, normalizedName, fieldSpec);
+      addDataTypeArgument(function, normalizedName + "(dataColumn, timeColumn)", fieldSpec);
+      return;
+    }
+    if (normalizedName.equals(AggregationFunctionType.ANYVALUE.name()) && function.getOperandsSize() == 1) {
+      if (inferAnyValueType) {
+        addDataTypeArgument(function, normalizedName + "(expr)", fieldSpec);
+      }
       return;
     }
     if (normalizedName.equals(AggregationFunctionType.MODE.name()) && function.getOperandsSize() <= 2) {
@@ -112,7 +125,7 @@ public class AggregateFunctionRewriteOptimizer implements StatementOptimizer {
 
   /// Appends the data column's logical type. The supported types match `PinotAggregateTypeArgumentRewriteRule` in the
   /// multi-stage engine.
-  private static void addDataTypeArgument(Function function, String functionName, FieldSpec fieldSpec) {
+  private static void addDataTypeArgument(Function function, String call, FieldSpec fieldSpec) {
     if (fieldSpec.isSingleValueField()) {
       switch (fieldSpec.getDataType()) {
         case INT:
@@ -135,8 +148,8 @@ public class AggregateFunctionRewriteOptimizer implements StatementOptimizer {
           break;
       }
     }
-    throw new BadQueryRequestException(String.format("Unsupported data type for %s(dataColumn, timeColumn): %s%s",
-        functionName, fieldSpec.isSingleValueField() ? "" : "multi-value ", fieldSpec.getDataType()));
+    throw new BadQueryRequestException(String.format("Unsupported data type for %s: %s%s", call,
+        fieldSpec.isSingleValueField() ? "" : "multi-value ", fieldSpec.getDataType()));
   }
 
   /// Appends the default tie reducer when missing, then STRING for a STRING or JSON column.
