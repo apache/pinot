@@ -56,6 +56,8 @@ public class ParquetUtils {
   /// Number of days from the Julian day epoch (4713-01-01 BC) to the Unix day epoch (1970-01-01).
   public static final long JULIAN_DAY_NUMBER_FOR_UNIX_EPOCH = 2440588;
 
+  private static final long SECONDS_PER_DAY = TimeUnit.DAYS.toSeconds(1);
+  private static final long NANOS_PER_SECOND = TimeUnit.SECONDS.toNanos(1);
   private static final long NANOS_PER_DAY = TimeUnit.DAYS.toNanos(1);
 
   /// Returns a ParquetReader with the given path.
@@ -166,9 +168,9 @@ public class ParquetUtils {
     ByteBuffer buffer = ByteBuffer.wrap(int96Bytes).order(ByteOrder.LITTLE_ENDIAN);
     long days = buffer.getInt(8) - JULIAN_DAY_NUMBER_FOR_UNIX_EPOCH;
     long nanosOfDay = buffer.getLong(0);
-    long epochSeconds = days * 86_400L + Math.floorDiv(nanosOfDay, 1_000_000_000L);
+    long epochSeconds = days * SECONDS_PER_DAY + Math.floorDiv(nanosOfDay, NANOS_PER_SECOND);
     Timestamp timestamp = new Timestamp(epochSeconds * 1_000L);
-    timestamp.setNanos((int) Math.floorMod(nanosOfDay, 1_000_000_000L));
+    timestamp.setNanos((int) Math.floorMod(nanosOfDay, NANOS_PER_SECOND));
     return timestamp;
   }
 
