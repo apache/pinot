@@ -41,6 +41,9 @@ import org.apache.pinot.spi.data.readers.RecordReader;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 /// TODO: add test for other logical types
@@ -172,6 +175,35 @@ public class ParquetReaderLogicalTypesTest {
       GenericRow row = recordReader.next();
       assertEquals((Object[]) row.getValue("uint32_list"), new Object[]{largeUnsigned, 7L});
       assertEquals(((Map<?, ?>) row.getValue("uint32_struct")).get("value"), largeUnsigned);
+    } finally {
+      FileUtils.deleteQuietly(dataFile);
+    }
+  }
+
+  @Test
+  public void testNativeReaderAdvancesPastRejectedUnsignedInt64()
+      throws IOException {
+    MessageType schema = MessageTypeParser.parseMessageType(
+        "message m { required int64 value (INTEGER(64, false)); }");
+    File dataFile = new File(FileUtils.getTempDirectory(), "rejected-uint64-" + System.nanoTime() + ".parquet");
+    try {
+      try (ParquetWriter<Group> writer = ExampleParquetWriter.builder(new Path(dataFile.getAbsolutePath()))
+          .withType(schema).build()) {
+        SimpleGroupFactory groups = new SimpleGroupFactory(schema);
+        for (long value : new long[]{-1L, 7L, Long.MIN_VALUE}) {
+          writer.write(groups.newGroup().append("value", value));
+        }
+      }
+      try (ParquetNativeRecordReader reader = new ParquetNativeRecordReader()) {
+        reader.init(dataFile, null, null);
+        assertTrue(reader.hasNext());
+        expectThrows(IllegalArgumentException.class, () -> reader.next(new GenericRow()));
+        assertTrue(reader.hasNext());
+        assertEquals(reader.next(new GenericRow()).getValue("value"), 7L);
+        assertTrue(reader.hasNext());
+        expectThrows(IllegalArgumentException.class, () -> reader.next(new GenericRow()));
+        assertFalse(reader.hasNext(), "Rejected records must count toward the consumed row group");
+      }
     } finally {
       FileUtils.deleteQuietly(dataFile);
     }
