@@ -610,10 +610,14 @@ public class QueryEnvironment {
     // Run the Calcite CORE rules using 1 HepInstruction per rule. We use 1 HepInstruction per rule for simplicity:
     // the rules used here can rest assured that they are the only ones evaluated in a dedicated graph-traversal.
     for (RelOptRule relOptRule : basicRules) {
+      // Supplies the data type argument before AggregateCaseToFilter, which rewrites only one-argument calls: its
+      // ARRAY_AGG(expression) FILTER (WHERE condition) form of ARRAY_AGG(CASE WHEN ...) fails at runtime.
+      if (relOptRule.toString().equals(CommonConstants.Broker.PlannerRuleNames.AGGREGATE_CASE_TO_FILTER)) {
+        hepProgramBuilder.addRuleInstance(PinotAggregateTypeArgumentRewriteRule.WITHOUT_ANY_VALUE);
+      }
       hepProgramBuilder.addRuleInstance(relOptRule);
     }
-    // Required for FIRST_WITH_TIME / LAST_WITH_TIME without a data type and MODE on strings, so the rule options
-    // do not filter it.
+    // Required for FIRST_WITH_TIME, LAST_WITH_TIME, ARRAY_AGG and string MODE, so the rule options do not filter it.
     hepProgramBuilder.addRuleInstance(inferAnyValueType ? PinotAggregateTypeArgumentRewriteRule.INSTANCE
         : PinotAggregateTypeArgumentRewriteRule.WITHOUT_ANY_VALUE);
 

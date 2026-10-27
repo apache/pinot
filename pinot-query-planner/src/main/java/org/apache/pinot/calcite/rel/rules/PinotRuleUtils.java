@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.calcite.plan.Contexts;
 import org.apache.calcite.plan.RelTraitSet;
@@ -35,9 +36,12 @@ import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.RelFactories;
 import org.apache.calcite.rel.core.TableScan;
+import org.apache.calcite.rel.core.Union;
 import org.apache.calcite.rel.core.Window;
 import org.apache.calcite.rel.logical.LogicalAsofJoin;
 import org.apache.calcite.rel.logical.LogicalJoin;
+import org.apache.calcite.rel.logical.LogicalProject;
+import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
@@ -83,6 +87,45 @@ public class PinotRuleUtils {
     } else {
       return rel;
     }
+  }
+
+  /// Appends aggregate literal arguments without hiding literals already projected beneath a union. If a union has
+  /// no projected literals, keeps one project above it; otherwise recurses through nested unions to their projects.
+  public static RelNode appendAggregateLiterals(RelNode input, List<RexNode> literals) {
+    return appendAggregateLiterals(input, literals, false);
+  }
+
+  private static RelNode appendAggregateLiterals(RelNode input, List<RexNode> literals, boolean insideUnion) {
+    RelNode rel = unboxRel(input);
+    if (rel instanceof Union && (insideUnion || hasProjectedLiterals(rel))) {
+      Union union = (Union) rel;
+      List<RelNode> inputs = new ArrayList<>(union.getInputs().size());
+      for (RelNode unionInput : union.getInputs()) {
+        inputs.add(appendAggregateLiterals(unionInput, literals, true));
+      }
+      return union.copy(union.getTraitSet(), inputs);
+    }
+    if (rel instanceof Project) {
+      Project project = (Project) rel;
+      List<RexNode> projects = new ArrayList<>(project.getProjects());
+      projects.addAll(literals);
+      return LogicalProject.create(project.getInput(), project.getHints(), projects, (List<String>) null, Set.of());
+    }
+    RexBuilder rexBuilder = input.getCluster().getRexBuilder();
+    List<RexNode> projects = new ArrayList<>(input.getRowType().getFieldCount() + literals.size());
+    for (int i = 0; i < input.getRowType().getFieldCount(); i++) {
+      projects.add(rexBuilder.makeInputRef(input, i));
+    }
+    projects.addAll(literals);
+    return LogicalProject.create(input, List.of(), projects, (List<String>) null, Set.of());
+  }
+
+  private static boolean hasProjectedLiterals(RelNode input) {
+    RelNode rel = unboxRel(input);
+    if (rel instanceof Project) {
+      return ((Project) rel).getProjects().stream().anyMatch(project -> project instanceof RexLiteral);
+    }
+    return rel instanceof Union && rel.getInputs().stream().anyMatch(PinotRuleUtils::hasProjectedLiterals);
   }
 
   public static boolean isExchange(RelNode rel) {

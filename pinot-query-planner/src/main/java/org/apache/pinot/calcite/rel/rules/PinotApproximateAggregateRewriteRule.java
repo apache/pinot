@@ -29,7 +29,6 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.logical.LogicalAggregate;
-import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlAggFunction;
@@ -101,29 +100,22 @@ public class PinotApproximateAggregateRewriteRule extends RelOptRule {
     // indices of every call stay valid. With no parameters configured the plan keeps the shape it had before, with no
     // extra project.
     //
-    // Invariant: this project has to stay directly beneath the aggregate. Both PinotAggregateExchangeNodeInsertRule
-    // and AggregatePushdownRule inline the literal only through findImmediateProjects(input), so anything that puts a
-    // node between them would leave the leaf with a column reference where the function expects a parameter string.
-    // Nothing in the later phases does: AggregateProjectMergeRule needs an all-input-ref project and the literals
-    // block it, and ProjectMergeRule collapses into a single project that stays adjacent.
+    // Keep existing literal arguments visible to the aggregate split rules, including those projected in union inputs.
     RelNode newInput = input;
     int distinctCountParamsIndex = -1;
     int percentileParamsIndex = -1;
     if (!distinctCountParams.isEmpty() || !percentileParams.isEmpty()) {
       RexBuilder rexBuilder = aggRel.getCluster().getRexBuilder();
-      List<RexNode> projects = new ArrayList<>(numInputFields + 2);
-      for (int i = 0; i < numInputFields; i++) {
-        projects.add(rexBuilder.makeInputRef(input, i));
-      }
+      List<RexNode> literals = new ArrayList<>(2);
       if (!distinctCountParams.isEmpty()) {
-        distinctCountParamsIndex = projects.size();
-        projects.add(rexBuilder.makeLiteral(distinctCountParams));
+        distinctCountParamsIndex = numInputFields + literals.size();
+        literals.add(rexBuilder.makeLiteral(distinctCountParams));
       }
       if (!percentileParams.isEmpty()) {
-        percentileParamsIndex = projects.size();
-        projects.add(rexBuilder.makeLiteral(percentileParams));
+        percentileParamsIndex = numInputFields + literals.size();
+        literals.add(rexBuilder.makeLiteral(percentileParams));
       }
-      newInput = LogicalProject.create(input, List.of(), projects, (List<String>) null);
+      newInput = PinotRuleUtils.appendAggregateLiterals(input, literals);
     }
 
     List<AggregateCall> rewrittenAggCalls = new ArrayList<>(aggRel.getAggCallList().size());

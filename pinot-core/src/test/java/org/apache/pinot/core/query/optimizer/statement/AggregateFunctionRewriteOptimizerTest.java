@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.core.query.optimizer.statement;
 
+import java.util.Map;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
@@ -48,6 +50,9 @@ public class AggregateFunctionRewriteOptimizerTest {
       .addMultiValueDimension("mvCol", DataType.INT)
       .addMultiValueDimension("mvStringCol", DataType.STRING)
       .addSingleValueDimension("timeCol", DataType.LONG)
+      .addComplex("mapCol", DataType.MAP, Map.of(
+          "key", new DimensionFieldSpec("key", DataType.STRING, true),
+          "value", new DimensionFieldSpec("value", DataType.INT, true)))
       .build();
   private static final String AUTO_REWRITE = "SET autoRewriteAggregationType=true; ";
   private static final String INFER_ANY_VALUE_TYPE = "SET inferAnyValueType=true; ";
@@ -86,6 +91,36 @@ public class AggregateFunctionRewriteOptimizerTest {
     }
     assertUnchanged("SELECT FIRST_WITH_TIME(stringCol, timeCol, 'STRING'), LAST_WITH_TIME(intCol, timeCol, 'LONG') "
         + "FROM testTable");
+  }
+
+  @DataProvider
+  public Object[][] arrayAggDataTypes() {
+    return new Object[][]{
+        {"intCol", "INT"}, {"longCol", "LONG"}, {"floatCol", "FLOAT"}, {"doubleCol", "DOUBLE"},
+        {"bigDecimalCol", "BIG_DECIMAL"}, {"stringCol", "STRING"}, {"jsonCol", "STRING"}, {"boolCol", "BOOLEAN"},
+        {"timestampCol", "TIMESTAMP"}, {"bytesCol", "BYTES"}, {"uuidCol", "UUID"}, {"mvCol", "INT"}
+    };
+  }
+
+  @Test(dataProvider = "arrayAggDataTypes")
+  public void testArrayAggInfersDataType(String column, String dataType) {
+    assertRewrite("SELECT ARRAY_AGG(" + column + "), arrayAgg(" + column + ", true) FROM testTable",
+        "SELECT ARRAY_AGG(" + column + ", '" + dataType + "'), arrayAgg(" + column + ", '" + dataType + "', true) "
+            + "FROM testTable");
+  }
+
+  @Test
+  public void testArrayAggRejectsUnsupportedColumn() {
+    PinotQuery query = CalciteSqlParser.compileToPinotQuery("SELECT ARRAY_AGG(mapCol) FROM testTable");
+    BadQueryRequestException exception = expectThrows(BadQueryRequestException.class,
+        () -> new AggregateFunctionRewriteOptimizer().optimize(query, SCHEMA));
+    assertEquals(exception.getMessage(), "Unsupported data type for ARRAYAGG(expression): MAP");
+  }
+
+  @Test
+  public void testArrayAggKeepsExplicitFormsAndColumnsWithoutSchemaType() {
+    assertUnchanged("SELECT ARRAY_AGG(intCol, 'LONG'), ARRAY_AGG(intCol, 'LONG', true), ARRAY_AGG(intCol, 1), "
+        + "ARRAY_AGG(missingCol), ARRAY_AGG(trim(stringCol), true) FROM testTable");
   }
 
   @Test

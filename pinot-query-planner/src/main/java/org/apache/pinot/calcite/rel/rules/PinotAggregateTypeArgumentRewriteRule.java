@@ -31,9 +31,7 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.core.Project;
-import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.rel.logical.LogicalAggregate;
-import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexLiteral;
@@ -48,16 +46,17 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 /// Supplies the explicit data type argument from the type of the data argument:
 /// - FIRST_WITH_TIME(dataColumn, timeColumn) -> FIRST_WITH_TIME(dataColumn, timeColumn, 'dataType')
 /// - LAST_WITH_TIME(dataColumn, timeColumn) -> LAST_WITH_TIME(dataColumn, timeColumn, 'dataType')
+/// - ARRAY_AGG(expression[, isDistinct]) -> ARRAY_AGG(expression, 'dataType'[, isDistinct])
 /// - MODE(stringColumn) -> MODE(stringColumn, 'MIN', 'STRING')
 /// - ANY_VALUE(expr) -> ANY_VALUE(expr, 'dataType'), except by [#WITHOUT_ANY_VALUE]
 ///
 /// The result type of the call is unchanged. The literals are projected directly beneath the aggregate, appended to
 /// the existing project when there is one, because [PinotAggregateExchangeNodeInsertRule] and `AggregatePushdownRule`
-/// inline literal arguments only from the immediate project.
+/// inline literal arguments from the immediate project or the inputs of a union.
 ///
-/// The servers require the data type argument of FIRST_WITH_TIME / LAST_WITH_TIME, so the rule is required rather than
-/// an optimization: `QueryEnvironment` always applies [#WITHOUT_ANY_VALUE], or [#INSTANCE] when the `inferAnyValueType`
-/// query option is true, and `skipPlannerRules` cannot turn it off.
+/// The servers require type arguments for FIRST_WITH_TIME, LAST_WITH_TIME and ARRAY_AGG. `QueryEnvironment` always
+/// applies [#WITHOUT_ANY_VALUE], or [#INSTANCE] when `inferAnyValueType` is true, regardless of `skipPlannerRules`.
+
 public class PinotAggregateTypeArgumentRewriteRule extends RelOptRule {
   private static final Set<ColumnDataType> ANY_VALUE_DATA_TYPES =
       EnumSet.of(ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.FLOAT, ColumnDataType.DOUBLE,
@@ -93,26 +92,9 @@ public class PinotAggregateTypeArgumentRewriteRule extends RelOptRule {
   public void onMatch(RelOptRuleCall call) {
     Aggregate aggRel = call.rel(0);
     RelNode input = aggRel.getInput();
-    RelNode unboxedInput = PinotRuleUtils.unboxRel(input);
     RexBuilder rexBuilder = aggRel.getCluster().getRexBuilder();
-
-    List<RexNode> projects;
-    RelNode projectInput;
-    List<RelHint> hints;
-    if (unboxedInput instanceof Project) {
-      Project project = (Project) unboxedInput;
-      projects = new ArrayList<>(project.getProjects());
-      projectInput = project.getInput();
-      hints = project.getHints();
-    } else {
-      int numFields = input.getRowType().getFieldCount();
-      projects = new ArrayList<>(numFields + 1);
-      for (int i = 0; i < numFields; i++) {
-        projects.add(rexBuilder.makeInputRef(input, i));
-      }
-      projectInput = input;
-      hints = List.of();
-    }
+    int numInputFields = input.getRowType().getFieldCount();
+    List<RexNode> literals = new ArrayList<>();
 
     // Appending keeps the existing field indexes, so the group set and the other calls are unaffected.
     List<AggregateCall> orgAggCalls = aggRel.getAggCallList();
@@ -125,16 +107,18 @@ public class PinotAggregateTypeArgumentRewriteRule extends RelOptRule {
         continue;
       }
       List<Integer> argList = new ArrayList<>(aggCall.getArgList());
+      int argumentPosition = isArrayAgg(aggCall) ? 1 : argList.size();
       for (String literalArgument : literalArguments) {
-        argList.add(literalIndexes.computeIfAbsent(literalArgument, literal -> {
-          projects.add(rexBuilder.makeLiteral(literal));
-          return projects.size() - 1;
-        }));
+        int literalIndex = literalIndexes.computeIfAbsent(literalArgument, literal -> {
+          literals.add(rexBuilder.makeLiteral(literal));
+          return numInputFields + literals.size() - 1;
+        });
+        argList.add(argumentPosition++, literalIndex);
       }
       // Keeps the original result type, so the rewrite does not change the result schema.
       aggCalls.add(aggCall.withArgList(argList));
     }
-    RelNode newInput = LogicalProject.create(projectInput, hints, projects, (List<String>) null, Set.of());
+    RelNode newInput = PinotRuleUtils.appendAggregateLiterals(input, literals);
     call.transformTo(
         aggRel.copy(aggRel.getTraitSet(), newInput, aggRel.getGroupSet(), aggRel.getGroupSets(), aggCalls));
   }
@@ -144,6 +128,20 @@ public class PinotAggregateTypeArgumentRewriteRule extends RelOptRule {
   private List<String> getLiteralArguments(AggregateCall aggCall, RelNode input) {
     List<Integer> argList = aggCall.getArgList();
     String name = AggregationFunctionType.getNormalizedAggregationFunctionName(aggCall.getAggregation().getName());
+    if (isArrayAgg(aggCall)) {
+      if (argList.size() != 1 && (argList.size() != 2
+          || getSqlTypeName(input, argList.get(1)) != SqlTypeName.BOOLEAN)) {
+        return null;
+      }
+      RelDataType dataType = input.getRowType().getFieldList().get(argList.get(0)).getType();
+      if (dataType.getComponentType() != null) {
+        dataType = dataType.getComponentType();
+      }
+      if (dataType.getSqlTypeName() == SqlTypeName.DECIMAL) {
+        return List.of(RelToPlanNodeConverter.convertToColumnDataType(aggCall.getType()).toDataType().name());
+      }
+      return List.of(getDataTypeArgument(name, dataType.getSqlTypeName()));
+    }
     if (name.equals(AggregationFunctionType.MODE.name())) {
       // BOOLEAN and TIMESTAMP already return their own type, cast from the DOUBLE result.
       return argList.size() == 1 && SqlTypeName.CHAR_TYPES.contains(getSqlTypeName(input, argList.get(0)))
@@ -202,7 +200,9 @@ public class PinotAggregateTypeArgumentRewriteRule extends RelOptRule {
         return "UUID";
       default:
         throw new IllegalArgumentException(
-            String.format("Unsupported data type for %s(dataColumn, timeColumn): %s", name, dataType));
+            String.format("Unsupported data type for %s%s: %s", name,
+                name.equals(AggregationFunctionType.ARRAYAGG.name()) ? "(expression)" : "(dataColumn, timeColumn)",
+                dataType));
     }
   }
 
@@ -235,5 +235,10 @@ public class PinotAggregateTypeArgumentRewriteRule extends RelOptRule {
           String.format("Unsupported data type for %s(expr, 'dataType') with expr of type %s: %s", name,
               relDataType.getSqlTypeName(), explicitDataType != null ? explicitDataType : dataTypeArgument));
     }
+  }
+
+  private static boolean isArrayAgg(AggregateCall aggCall) {
+    return AggregationFunctionType.getNormalizedAggregationFunctionName(aggCall.getAggregation().getName())
+        .equals(AggregationFunctionType.ARRAYAGG.name());
   }
 }
