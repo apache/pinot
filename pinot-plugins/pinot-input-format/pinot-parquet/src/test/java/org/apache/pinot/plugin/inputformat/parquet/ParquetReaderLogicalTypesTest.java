@@ -181,11 +181,11 @@ public class ParquetReaderLogicalTypesTest {
   }
 
   @Test
-  public void testNativeReaderAdvancesPastRejectedUnsignedInt64()
+  public void testReadersPreserveUnsignedInt64Bits()
       throws IOException {
     MessageType schema = MessageTypeParser.parseMessageType(
         "message m { required int64 value (INTEGER(64, false)); }");
-    File dataFile = new File(FileUtils.getTempDirectory(), "rejected-uint64-" + System.nanoTime() + ".parquet");
+    File dataFile = new File(FileUtils.getTempDirectory(), "unsigned-int64-" + System.nanoTime() + ".parquet");
     try {
       try (ParquetWriter<Group> writer = ExampleParquetWriter.builder(new Path(dataFile.getAbsolutePath()))
           .withType(schema).build()) {
@@ -194,15 +194,15 @@ public class ParquetReaderLogicalTypesTest {
           writer.write(groups.newGroup().append("value", value));
         }
       }
-      try (ParquetNativeRecordReader reader = new ParquetNativeRecordReader()) {
-        reader.init(dataFile, null, null);
-        assertTrue(reader.hasNext());
-        expectThrows(IllegalArgumentException.class, () -> reader.next(new GenericRow()));
-        assertTrue(reader.hasNext());
-        assertEquals(reader.next(new GenericRow()).getValue("value"), 7L);
-        assertTrue(reader.hasNext());
-        expectThrows(IllegalArgumentException.class, () -> reader.next(new GenericRow()));
-        assertFalse(reader.hasNext(), "Rejected records must count toward the consumed row group");
+      for (RecordReader reader : List.of(new ParquetNativeRecordReader(), new ParquetAvroRecordReader())) {
+        try (reader) {
+          reader.init(dataFile, null, null);
+          for (long value : new long[]{-1L, 7L, Long.MIN_VALUE}) {
+            assertTrue(reader.hasNext());
+            assertEquals(reader.next(new GenericRow()).getValue("value"), value);
+          }
+          assertFalse(reader.hasNext());
+        }
       }
     } finally {
       FileUtils.deleteQuietly(dataFile);
@@ -210,7 +210,7 @@ public class ParquetReaderLogicalTypesTest {
   }
 
   @Test
-  public void testAvroReaderAdvancesPastRejectedInt96()
+  public void testReadersAdvancePastRejectedInt96()
       throws IOException {
     MessageType schema = MessageTypeParser.parseMessageType("message m { required int96 value; }");
     File dataFile = new File(FileUtils.getTempDirectory(), "rejected-int96-" + System.nanoTime() + ".parquet");
@@ -222,21 +222,24 @@ public class ParquetReaderLogicalTypesTest {
         writer.write(groups.newGroup().append("value", new NanoTime(2305448, 0L)));
         writer.write(groups.newGroup().append("value", new NanoTime(2440588, 7L)));
       }
-      ParquetRecordReaderConfig config = new ParquetRecordReaderConfig();
-      config.setUseParquetAvroRecordReader(true);
-      config.setExtractRawTimeValues(true);
-      try (ParquetRecordReader reader = new ParquetRecordReader()) {
-        reader.init(dataFile, null, config);
-        assertTrue(reader.useAvroParquetRecordReader());
-        for (int iteration = 0; iteration < 2; iteration++) {
-          if (iteration > 0) {
-            reader.rewind();
+      for (boolean useAvro : new boolean[]{false, true}) {
+        ParquetRecordReaderConfig config = new ParquetRecordReaderConfig();
+        config.setUseParquetAvroRecordReader(useAvro);
+        config.setUseParquetNativeRecordReader(!useAvro);
+        config.setExtractRawTimeValues(true);
+        try (ParquetRecordReader reader = new ParquetRecordReader()) {
+          reader.init(dataFile, null, config);
+          assertEquals(reader.useAvroParquetRecordReader(), useAvro);
+          for (int iteration = 0; iteration < 2; iteration++) {
+            if (iteration > 0) {
+              reader.rewind();
+            }
+            assertTrue(reader.hasNext());
+            expectThrows(IllegalArgumentException.class, () -> reader.next(new GenericRow()));
+            assertTrue(reader.hasNext());
+            assertEquals(reader.next(new GenericRow()).getValue("value"), 7L);
+            assertFalse(reader.hasNext(), "Extraction failures must not retry the rejected record");
           }
-          assertTrue(reader.hasNext());
-          expectThrows(IllegalArgumentException.class, () -> reader.next(new GenericRow()));
-          assertTrue(reader.hasNext());
-          assertEquals(reader.next(new GenericRow()).getValue("value"), 7L);
-          assertFalse(reader.hasNext(), "Extraction failures must not retry the rejected Avro record");
         }
       }
     } finally {

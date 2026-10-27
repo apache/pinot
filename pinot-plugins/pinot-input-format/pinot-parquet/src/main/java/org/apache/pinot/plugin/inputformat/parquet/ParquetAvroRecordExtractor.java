@@ -35,8 +35,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 ///   nested in a struct, list or map are still read as signed ints by this reader; [ParquetNativeRecordReader]
 ///   widens them at every level.
 ///
-/// Unsigned 64-bit overflow validation requires the original Parquet annotation and is only implemented by
-/// [ParquetNativeRecordReader]. This Avro reader still exposes signed `long` bits for unsigned 64-bit fields.
+/// Unsigned 64-bit fields preserve their signed `Long` bit pattern, matching [ParquetNativeRecordReader].
 public class ParquetAvroRecordExtractor extends AvroRecordExtractor {
   private static final int INT96_BYTE_SIZE = 12;
   private static final String INT96_DOC = "INT96 represented as byte[12]";
