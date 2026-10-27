@@ -662,6 +662,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
 
   /// Rewrites the shared context before fetch planning, using only columns available on every selected segment.
   /// A partially reloaded timestamp index must leave the original expression executable on all segments.
+  /// Rewriting per segment would mutate the expressions shared by already constructed segment plans.
   @VisibleForTesting
   static void rewriteQueryContextWithHints(QueryContext queryContext, List<SegmentContext> segmentContexts) {
     Map<ExpressionContext, ExpressionContext> hints = queryContext.getExpressionOverrideHints();
@@ -678,7 +679,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     });
   }
 
-  /// Rewrites a standalone segment plan once; instance plans first constrain the rewrite across all their segments.
+  /// Rewrites a standalone single-segment context once; do not reuse it across segments with different columns.
+  /// Instance planning first rewrites against the common columns, making this overload a no-op afterward.
   @VisibleForTesting
   public static void rewriteQueryContextWithHints(QueryContext queryContext, IndexSegment indexSegment) {
     if (MapUtils.isEmpty(queryContext.getExpressionOverrideHints())) {

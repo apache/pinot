@@ -356,7 +356,8 @@ public class QueryContext implements QueryScopedCache {
     return _expressionOverrideHints;
   }
 
-  /// Recompiles execution inputs after an in-place expression rewrite, before any segment operators are built.
+  /// Internal planning hook that recompiles execution inputs after an in-place expression rewrite.
+  /// Must run before fetch planning or construction of any segment operators.
   /// The original aggregation slots are retained even when formerly distinct HAVING/ORDER-BY inputs become equal.
   public void refreshAfterExpressionRewrite() {
     if (_aggregationFunctionContexts != null && !_aggregationFunctionContexts.isEmpty()) {
