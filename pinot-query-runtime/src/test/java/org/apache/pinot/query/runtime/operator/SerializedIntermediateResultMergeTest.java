@@ -127,7 +127,7 @@ public class SerializedIntermediateResultMergeTest {
   }
 
   private static MultistageAggregationExecutor newAggregationExecutor() {
-    return new MultistageAggregationExecutor(newFunctions(), new int[]{-1, -1}, -1, AggType.FINAL,
+    return new MultistageAggregationExecutor(newFunctions(), new int[]{-1, -1}, -1, AggType.FINAL, false,
         AGGREGATION_RESULT_SCHEMA);
   }
 

@@ -96,6 +96,14 @@
         "sql": "SELECT /*+ aggOptions(is_leaf_return_final_result='true') */ {tbl1}.name, COUNT(*), SUM({tbl1}.num), COUNT(DISTINCT {tbl1}.num) FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4', partition_parallelism='2') */ GROUP BY {tbl1}.name"
       },
       {
+        "description": "Aggregate on partition column without group by with hint",
+        "sql": "SELECT /*+ aggOptions(is_leaf_return_final_result='true') */ COUNT(*), SUM({tbl1}.num), COUNT(DISTINCT {tbl1}.num) FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */"
+      },
+      {
+        "description": "Aggregate on partition column without group by with partition parallelism and hint",
+        "sql": "SELECT /*+ aggOptions(is_leaf_return_final_result='true') */ COUNT(*), SUM({tbl1}.num), COUNT(DISTINCT {tbl1}.num) FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4', partition_parallelism='2') */"
+      },
+      {
         "description": "Skip leaf stage aggregation with GROUP BY hint",
         "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ {tbl1}.name, COUNT(*), SUM({tbl1}.num), MIN({tbl1}.num), COUNT(DISTINCT {tbl1}.num) FROM {tbl1} WHERE {tbl1}.num >= 0 GROUP BY {tbl1}.name"
       },
