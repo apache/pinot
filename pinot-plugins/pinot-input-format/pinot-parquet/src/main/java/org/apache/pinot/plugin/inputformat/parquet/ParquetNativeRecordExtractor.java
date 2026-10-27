@@ -186,7 +186,8 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
           // INT96 has no Parquet logical-type spec, but its physical encoding (nanos-of-day + Julian day) is
           // nanosecond-precision, so nanos is the natural raw unit.
           byte[] bytes = from.getInt96(fieldIndex, index).getBytes();
-          return _extractRawTimeValues ? ParquetUtils.convertInt96ToEpochNanos(bytes)
+          return _extractRawTimeValues
+              ? ParquetUtils.convertInt96ToEpochNanos(bytes)
               : ParquetUtils.convertInt96ToTimestamp(bytes);
         }
         case FLOAT:

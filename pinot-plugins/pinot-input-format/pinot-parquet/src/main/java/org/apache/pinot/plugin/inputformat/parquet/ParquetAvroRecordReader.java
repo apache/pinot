@@ -72,13 +72,16 @@ public class ParquetAvroRecordReader implements RecordReader {
   @Override
   public GenericRow next(GenericRow reuse)
       throws IOException {
-    // Data parsing: extract current record into GenericRow.
-    _recordExtractor.extract(_nextRecord, reuse);
-    // Record fetch: read next Parquet Avro record.
     try {
-      _nextRecord = _parquetReader.read();
-    } catch (IOException e) {
-      throw new RecordFetchException("Failed to read next Parquet Avro record", e);
+      // Data parsing: extract current record into GenericRow.
+      _recordExtractor.extract(_nextRecord, reuse);
+    } finally {
+      // Advance even if extraction fails and the caller skips the rejected record.
+      try {
+        _nextRecord = _parquetReader.read();
+      } catch (IOException e) {
+        throw new RecordFetchException("Failed to read next Parquet Avro record", e);
+      }
     }
     return reuse;
   }

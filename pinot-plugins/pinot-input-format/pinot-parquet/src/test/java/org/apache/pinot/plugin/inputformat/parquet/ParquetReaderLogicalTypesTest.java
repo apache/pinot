@@ -209,6 +209,41 @@ public class ParquetReaderLogicalTypesTest {
     }
   }
 
+  @Test
+  public void testAvroReaderAdvancesPastRejectedInt96()
+      throws IOException {
+    MessageType schema = MessageTypeParser.parseMessageType("message m { required int96 value; }");
+    File dataFile = new File(FileUtils.getTempDirectory(), "rejected-int96-" + System.nanoTime() + ".parquet");
+    try {
+      try (ParquetWriter<Group> writer = ExampleParquetWriter.builder(new Path(dataFile.getAbsolutePath()))
+          .withType(schema).build()) {
+        SimpleGroupFactory groups = new SimpleGroupFactory(schema);
+        // Year 1600 cannot be represented as signed Long epoch nanos; the next row is in range.
+        writer.write(groups.newGroup().append("value", new NanoTime(2305448, 0L)));
+        writer.write(groups.newGroup().append("value", new NanoTime(2440588, 7L)));
+      }
+      ParquetRecordReaderConfig config = new ParquetRecordReaderConfig();
+      config.setUseParquetAvroRecordReader(true);
+      config.setExtractRawTimeValues(true);
+      try (ParquetRecordReader reader = new ParquetRecordReader()) {
+        reader.init(dataFile, null, config);
+        assertTrue(reader.useAvroParquetRecordReader());
+        for (int iteration = 0; iteration < 2; iteration++) {
+          if (iteration > 0) {
+            reader.rewind();
+          }
+          assertTrue(reader.hasNext());
+          expectThrows(IllegalArgumentException.class, () -> reader.next(new GenericRow()));
+          assertTrue(reader.hasNext());
+          assertEquals(reader.next(new GenericRow()).getValue("value"), 7L);
+          assertFalse(reader.hasNext(), "Extraction failures must not retry the rejected Avro record");
+        }
+      }
+    } finally {
+      FileUtils.deleteQuietly(dataFile);
+    }
+  }
+
   /// Write the given row object to a random parquet file and return the path of the file
   private String writeToFile(String schemaStr, Map<String, Object> rowObject)
       throws IOException {

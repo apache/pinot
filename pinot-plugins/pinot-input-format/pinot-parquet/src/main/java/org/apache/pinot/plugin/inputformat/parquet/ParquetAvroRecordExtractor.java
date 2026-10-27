@@ -28,8 +28,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 
 /// The type matrix is inherited from [AvroRecordExtractor], with two overrides:
 /// - INT96 timestamp (which parquet-avro surfaces as `fixed(12)` with `doc = "INT96 represented as byte[12]"`) →
-///   `Timestamp` (or `Long` epoch nanos when `extractRawTimeValues` is `true`) via
-///   [ParquetUtils].
+///   `Timestamp` (or `Long` epoch nanos when `extractRawTimeValues` is `true`) via [ParquetUtils].
 /// - Top-level unsigned 32-bit integer fields (`INTEGER(32, false)` / legacy `UINT_32`), which parquet-avro surfaces
 ///   as a signed Avro `int` → `Long` via [Integer#toUnsignedLong]. The field names come from the Parquet file schema
 ///   (see [ParquetUtils#getUnsignedInt32FieldNames]) since the Avro schema carries no signedness. Unsigned values
@@ -69,7 +68,8 @@ public class ParquetAvroRecordExtractor extends AvroRecordExtractor {
     if (schema.getType() == Schema.Type.FIXED && schema.getFixedSize() == INT96_BYTE_SIZE
         && INT96_DOC.equals(schema.getDoc())) {
       byte[] bytes = ((GenericFixed) value).bytes();
-      return _extractRawTimeValues ? ParquetUtils.convertInt96ToEpochNanos(bytes)
+      return _extractRawTimeValues
+          ? ParquetUtils.convertInt96ToEpochNanos(bytes)
           : ParquetUtils.convertInt96ToTimestamp(bytes);
     }
     return super.convertSingleValue(schema, value);
