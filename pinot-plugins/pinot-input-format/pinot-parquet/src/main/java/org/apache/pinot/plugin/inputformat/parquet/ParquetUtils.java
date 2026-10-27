@@ -184,6 +184,7 @@ public class ParquetUtils {
     // the positive day fraction brings the sum back into range, so multiplyExact followed by addExact is wrong.
     long product = days * NANOS_PER_DAY;
     long nanos = product + nanosOfDay;
+    // Unsigned low-word overflow produces a carry; nanosOfDay >> 63 sign-extends the addend into the high word.
     long carry = Long.compareUnsigned(nanos, product) < 0 ? 1 : 0;
     long high = Math.multiplyHigh(days, NANOS_PER_DAY) + (nanosOfDay >> 63) + carry;
     if (high != (nanos >> 63)) {
