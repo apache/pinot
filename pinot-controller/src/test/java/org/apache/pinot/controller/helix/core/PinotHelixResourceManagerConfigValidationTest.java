@@ -20,17 +20,22 @@ package org.apache.pinot.controller.helix.core;
 
 import java.lang.reflect.Field;
 import java.util.List;
+import java.util.Map;
 import java.util.TreeMap;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.helix.zookeeper.zkclient.DataUpdater;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.controller.helix.core.lineage.LineageManager;
 import org.apache.pinot.spi.config.instance.Instance;
 import org.apache.pinot.spi.config.instance.InstanceConfigValidatorRegistry;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.exception.ConfigValidationException;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mockito;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -115,6 +120,44 @@ public class PinotHelixResourceManagerConfigValidationTest {
     }
 
     // Verify config was NOT persisted
+    verify(_helixDataAccessor, never()).setProperty(any(PropertyKey.class), any(InstanceConfig.class));
+  }
+
+  @Test
+  public void testUpdateInstancePreservesFieldsWrittenAfterInitialRead() {
+    Instance original =
+        new Instance("localhost", 1234, InstanceType.SERVER, List.of("DefaultTenant_OFFLINE"), null,
+            0, 0, 0, 0, false);
+    InstanceConfig initiallyReadConfig = InstanceUtils.toHelixInstanceConfig(original);
+    initiallyReadConfig.getRecord().setSimpleField("pinotVersion", "old-version");
+    initiallyReadConfig.getRecord().setMapField("capabilities", Map.of("pinotVersion", "old-version"));
+    when(_helixDataAccessor.getProperty(any(PropertyKey.class))).thenReturn(initiallyReadConfig);
+
+    // Model a participant restart after updateInstance's read but before its write.
+    InstanceConfig latestConfig = InstanceUtils.toHelixInstanceConfig(original);
+    latestConfig.getRecord().setSimpleField("pinotVersion", "new-version");
+    latestConfig.getRecord().setMapField("capabilities", Map.of("pinotVersion", "new-version", "feature", "1"));
+    latestConfig.getRecord().setSimpleField(CommonConstants.Helix.QUERIES_DISABLED, Boolean.TRUE.toString());
+    ZNRecord[] persistedRecord = new ZNRecord[1];
+    when(_helixDataAccessor.updateProperty(any(PropertyKey.class),
+        ArgumentMatchers.<DataUpdater<ZNRecord>>any(), any(InstanceConfig.class))).thenAnswer(invocation -> {
+          DataUpdater<ZNRecord> updater = invocation.getArgument(1);
+          persistedRecord[0] = updater.update(latestConfig.getRecord());
+          return true;
+        });
+
+    Instance updated =
+        new Instance("localhost", 1234, InstanceType.SERVER, List.of("UpdatedTenant_OFFLINE"), null,
+            0, 0, 0, 0, false);
+    _resourceManager.updateInstance("Server_localhost_1234", updated, false);
+
+    assertNotNull(persistedRecord[0]);
+    assertEquals(persistedRecord[0].getSimpleField("pinotVersion"), "new-version");
+    assertEquals(persistedRecord[0].getMapField("capabilities"),
+        Map.of("pinotVersion", "new-version", "feature", "1"));
+    assertEquals(persistedRecord[0].getListField(InstanceConfig.InstanceConfigProperty.TAG_LIST.name()),
+        List.of("UpdatedTenant_OFFLINE"));
+    assertEquals(persistedRecord[0].getSimpleField(CommonConstants.Helix.QUERIES_DISABLED), Boolean.TRUE.toString());
     verify(_helixDataAccessor, never()).setProperty(any(PropertyKey.class), any(InstanceConfig.class));
   }
 
