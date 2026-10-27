@@ -23,6 +23,25 @@
           [150, 150, 1.5, 1.5, "c", false, "1E+317", "2020-02-03 03:32:12", "DEADBE01", "00000000-0000-0000-0000-000000000006"],
           [175, 175, 1.75, 1.75, "c", true, "1E+328", "2020-01-02 03:32:12", "DEADBE02", "00000000-0000-0000-0000-000000000007"]
         ]
+      },
+      "partitioned_tbl": {
+        "schema": [
+          {"name": "num", "type": "INT"},
+          {"name": "name", "type": "STRING"},
+          {"name": "flag", "type": "BOOLEAN"},
+          {"name": "event_ts", "type": "TIMESTAMP"}
+        ],
+        "inputs": [
+          [1, "a", true, "2020-01-01 00:00:00"],
+          [3, "c", false, "2020-01-02 00:00:00"],
+          [3, "yyy", true, "2020-01-03 00:00:00"],
+          [4, "e", true, "2020-01-04 00:00:00"],
+          [4, "e", false, "2020-01-04 00:00:00"],
+          [4, "f", false, "2020-01-05 00:00:00"],
+          [7, "f", true, "2020-01-07 00:00:00"],
+          [7, "d", true, "2020-01-06 00:00:00"]
+        ],
+        "partitionColumns": ["num"]
       }
     },
     "queries": [
@@ -107,6 +126,28 @@
       {
         "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ string_col, FIRST_WITH_TIME(decimal_col, timestamp_col), LAST_WITH_TIME(decimal_col, timestamp_col), FIRST_WITH_TIME(bytes_col, timestamp_col), LAST_WITH_TIME(bytes_col, timestamp_col) FROM {tbl} GROUP BY string_col",
         "outputs": [["a", "1E-307", "1E+307", "deadbeef", "fdeadbee"], ["b", "1E-308", "1E+308", "efdeadbe", "beefdead"], ["c", "1E+328", "1E-317", "deadbe02", "adbeefde"]]
+      },
+      {
+        "comment": "MODE returns the type of a non-numeric argument, with ties broken by the smallest value",
+        "sql": "SELECT MODE(string_col), MODE(UPPER(string_col)), MODE(bool_col), MODE(timestamp_col), MODE(int_col) FROM {tbl}",
+        "outputs": [["c", "C", false, "2020-01-01 03:10:12.0", 2]]
+      },
+      {
+        "sql": "SELECT bool_col, MODE(string_col), MODE(timestamp_col) FROM {tbl} GROUP BY bool_col",
+        "outputs": [[false, "b", "2020-01-01 08:32:12.0"], [true, "a", "2020-01-01 03:10:12.0"]]
+      },
+      {
+        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ int_col, MODE(string_col), MODE(bool_col), MODE(timestamp_col) FROM {tbl} GROUP BY int_col",
+        "outputs": [[2, "a", true, "2020-01-01 03:10:12.0"], [3, "b", false, "2020-01-01 08:32:12.0"], [100, "b", false, "2020-02-06 03:32:12.0"], [101, "c", false, "2020-05-01 03:32:12.0"], [150, "c", false, "2020-02-03 03:32:12.0"], [175, "c", true, "2020-01-02 03:32:12.0"]]
+      },
+      {
+        "sql": "SELECT MODE(string_col) FROM {tbl} WHERE int_col < 0",
+        "outputs": [[null]]
+      },
+      {
+        "comment": "The leaf returns the final MODE, which keeps the input type",
+        "sql": "SELECT /*+ aggOptions(is_leaf_return_final_result='true') */ {partitioned_tbl}.num, MODE({partitioned_tbl}.name), MODE({partitioned_tbl}.flag), MODE({partitioned_tbl}.event_ts) FROM {partitioned_tbl} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ GROUP BY {partitioned_tbl}.num",
+        "outputs": [[1, "a", true, "2020-01-01 00:00:00.0"], [3, "c", false, "2020-01-02 00:00:00.0"], [4, "e", false, "2020-01-04 00:00:00.0"], [7, "d", true, "2020-01-06 00:00:00.0"]]
       },
       {
         "sql": "SELECT SUMPRECISION(decimal_col) FROM {tbl}",

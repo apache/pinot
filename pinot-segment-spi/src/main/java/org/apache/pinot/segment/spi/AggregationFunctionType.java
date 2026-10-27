@@ -63,7 +63,7 @@ public enum AggregationFunctionType {
   SUMLONG("sumLong", ReturnTypes.AGG_SUM, OperandTypes.or(OperandTypes.INTEGER, OperandTypes.ARRAY_OF_INTEGER)),
   SUMPRECISION("sumPrecision", ReturnTypes.explicit(SqlTypeName.DECIMAL), OperandTypes.ANY, SqlTypeName.OTHER),
   AVG("avg", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
-  MODE("mode", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
+  MODE("mode", null, null, ReturnTypes.explicit(SqlTypeName.OTHER), new ModeFinalReturnTypeInference()),
   ANYVALUE("anyValue", ReturnTypes.ARG0, OperandTypes.ANY, SqlTypeName.OTHER),
   FIRSTWITHTIME("firstWithTime", ReturnTypes.ARG0, OperandTypes.or(
       OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY),
@@ -425,6 +425,16 @@ public enum AggregationFunctionType {
       } catch (IllegalArgumentException e) {
         throw new IllegalArgumentException("Invalid aggregation function name: " + functionName);
       }
+    }
+  }
+
+  /// Returns DOUBLE, or the type of the data argument for the explicit data type form MODE(expr, reducer, dataType).
+  /// Only a leaf stage that returns final results uses it; the query's result type comes from Calcite's MODE (ARG0).
+  private static class ModeFinalReturnTypeInference implements SqlReturnTypeInference {
+    @Override
+    public RelDataType inferReturnType(SqlOperatorBinding opBinding) {
+      return opBinding.getOperandCount() == 3 ? ReturnTypes.ARG0.inferReturnType(opBinding)
+          : opBinding.getTypeFactory().createSqlType(SqlTypeName.DOUBLE);
     }
   }
 

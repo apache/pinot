@@ -43,9 +43,10 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 /// Supplies the explicit data type argument from the type of the data argument:
 /// - FIRST_WITH_TIME(dataColumn, timeColumn) -> FIRST_WITH_TIME(dataColumn, timeColumn, 'dataType')
 /// - LAST_WITH_TIME(dataColumn, timeColumn) -> LAST_WITH_TIME(dataColumn, timeColumn, 'dataType')
+/// - MODE(stringColumn) -> MODE(stringColumn, 'MIN', 'STRING')
 ///
-/// The result type of the call is unchanged. The literal is projected directly beneath the aggregate, appended to the
-/// existing project when there is one, because [PinotAggregateExchangeNodeInsertRule] and `AggregatePushdownRule`
+/// The result type of the call is unchanged. The literals are projected directly beneath the aggregate, appended to
+/// the existing project when there is one, because [PinotAggregateExchangeNodeInsertRule] and `AggregatePushdownRule`
 /// inline literal arguments only from the immediate project.
 ///
 /// The servers require the data type argument, so the rule is required rather than an optimization: `QueryEnvironment`
@@ -65,7 +66,7 @@ public class PinotAggregateTypeArgumentRewriteRule extends RelOptRule {
     // Requiring a call without its data type is also what makes the rule terminate.
     Aggregate aggRel = call.rel(0);
     RelNode input = aggRel.getInput();
-    return aggRel.getAggCallList().stream().anyMatch(aggCall -> getDataTypeArgument(aggCall, input) != null);
+    return aggRel.getAggCallList().stream().anyMatch(aggCall -> getLiteralArguments(aggCall, input) != null);
   }
 
   @Override
@@ -96,18 +97,20 @@ public class PinotAggregateTypeArgumentRewriteRule extends RelOptRule {
     // Appending keeps the existing field indexes, so the group set and the other calls are unaffected.
     List<AggregateCall> orgAggCalls = aggRel.getAggCallList();
     List<AggregateCall> aggCalls = new ArrayList<>(orgAggCalls.size());
-    Map<String, Integer> literalIndexByDataType = new HashMap<>();
+    Map<String, Integer> literalIndexes = new HashMap<>();
     for (AggregateCall aggCall : orgAggCalls) {
-      String dataType = getDataTypeArgument(aggCall, input);
-      if (dataType == null) {
+      List<String> literalArguments = getLiteralArguments(aggCall, input);
+      if (literalArguments == null) {
         aggCalls.add(aggCall);
         continue;
       }
       List<Integer> argList = new ArrayList<>(aggCall.getArgList());
-      argList.add(literalIndexByDataType.computeIfAbsent(dataType, type -> {
-        projects.add(rexBuilder.makeLiteral(type));
-        return projects.size() - 1;
-      }));
+      for (String literalArgument : literalArguments) {
+        argList.add(literalIndexes.computeIfAbsent(literalArgument, literal -> {
+          projects.add(rexBuilder.makeLiteral(literal));
+          return projects.size() - 1;
+        }));
+      }
       // Keeps the original result type, so the rewrite does not change the result schema.
       aggCalls.add(aggCall.withArgList(argList));
     }
@@ -116,20 +119,30 @@ public class PinotAggregateTypeArgumentRewriteRule extends RelOptRule {
         aggRel.copy(aggRel.getTraitSet(), newInput, aggRel.getGroupSet(), aggRel.getGroupSets(), aggCalls));
   }
 
-  /// Returns the data type argument to append, or `null` when the call already has one or is not such a call. Throws
-  /// for a data argument without an explicit form, such as an array from a multi-value column.
+  /// Returns the literal arguments to append, or `null` when the call already has them or is not such a call.
   @Nullable
-  private static String getDataTypeArgument(AggregateCall aggCall, RelNode input) {
-    if (aggCall.getArgList().size() != 2) {
-      return null;
-    }
+  private static List<String> getLiteralArguments(AggregateCall aggCall, RelNode input) {
+    List<Integer> argList = aggCall.getArgList();
     String name = AggregationFunctionType.getNormalizedAggregationFunctionName(aggCall.getAggregation().getName());
-    if (!name.equals(AggregationFunctionType.FIRSTWITHTIME.name())
-        && !name.equals(AggregationFunctionType.LASTWITHTIME.name())) {
-      return null;
+    if (name.equals(AggregationFunctionType.MODE.name())) {
+      // BOOLEAN and TIMESTAMP already return their own type, cast from the DOUBLE result.
+      return argList.size() == 1 && SqlTypeName.CHAR_TYPES.contains(getSqlTypeName(input, argList.get(0)))
+          ? List.of("MIN", "STRING") : null;
     }
-    SqlTypeName dataType =
-        input.getRowType().getFieldList().get(aggCall.getArgList().get(0)).getType().getSqlTypeName();
+    if (argList.size() == 2 && (name.equals(AggregationFunctionType.FIRSTWITHTIME.name())
+        || name.equals(AggregationFunctionType.LASTWITHTIME.name()))) {
+      return List.of(getDataTypeArgument(name, getSqlTypeName(input, argList.get(0))));
+    }
+    return null;
+  }
+
+  private static SqlTypeName getSqlTypeName(RelNode input, int fieldIndex) {
+    return input.getRowType().getFieldList().get(fieldIndex).getType().getSqlTypeName();
+  }
+
+  /// Returns the data type argument of FIRST_WITH_TIME / LAST_WITH_TIME. Throws for a data argument without an
+  /// explicit form, such as an array from a multi-value column.
+  private static String getDataTypeArgument(String name, SqlTypeName dataType) {
     switch (dataType) {
       case TINYINT:
       case SMALLINT:

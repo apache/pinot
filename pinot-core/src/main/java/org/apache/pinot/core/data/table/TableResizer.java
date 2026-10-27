@@ -104,16 +104,22 @@ public class TableResizer {
     _orderByValueExtractors = new OrderByValueExtractor[_numOrderByExpressions];
     Comparator[] comparators = new Comparator[_numOrderByExpressions];
     int[] nullComparisonResults = new int[_numOrderByExpressions];
-    for (int i = 0; i < _numOrderByExpressions; i++) {
-      OrderByExpressionContext orderByExpression = orderByExpressions.get(i);
-      _orderByValueExtractors[i] = getOrderByValueExtractor(orderByExpression.getExpression());
-      comparators[i] = orderByExpression.isAsc() ? Comparator.naturalOrder() : Comparator.reverseOrder();
-      nullComparisonResults[i] = orderByExpression.isNullsLast() ? -1 : 1;
-    }
     /// Grouping-set queries produce genuine null group-key values for rolled-up columns regardless of the
     /// user's null-handling option, so ORDER BY over a grouping column must use the null-safe comparator.
-    boolean nullHandlingEnabled = queryContext.requiresNullAwareKeyEvaluation();
-    if (nullHandlingEnabled) {
+    boolean nullAwareComparison = queryContext.requiresNullAwareKeyEvaluation();
+    for (int i = 0; i < _numOrderByExpressions; i++) {
+      OrderByExpressionContext orderByExpression = orderByExpressions.get(i);
+      ExpressionContext expression = orderByExpression.getExpression();
+      _orderByValueExtractors[i] = getOrderByValueExtractor(expression);
+      comparators[i] = orderByExpression.isAsc() ? Comparator.naturalOrder() : Comparator.reverseOrder();
+      nullComparisonResults[i] = orderByExpression.isNullsLast() ? -1 : 1;
+      // Aggregation results can be null with null handling disabled too, e.g. MINSTRING over an empty group.
+      if (expression.getType() != ExpressionContext.Type.LITERAL && !_groupByExpressionIndexMap.containsKey(
+          expression)) {
+        nullAwareComparison = true;
+      }
+    }
+    if (nullAwareComparison) {
       _intermediateRecordComparator = (o1, o2) -> {
         for (int i = 0; i < _numOrderByExpressions; i++) {
           Object v1 = o1._values[i];
