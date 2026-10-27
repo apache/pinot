@@ -1828,7 +1828,7 @@ public class PinotHelixTaskResourceManager {
     private TaskCount _taskCount = new TaskCount();
     private Map<String, Long> _subtaskWaitingTimes = new HashMap<>(); // subtask ID -> waiting time in milliseconds
     private Map<String, Long> _subtaskRunningTimes = new HashMap<>(); // subtask ID -> running time in milliseconds
-    // Time since a subtask of the job last started or finished; 0 when the table has no waiting subtask
+    // Time since a subtask of the job last started or finished; left at 0 unless the table has a waiting subtask
     private long _queueStallTimeMs;
 
     public TaskCount getTaskCount() {
