@@ -29,12 +29,15 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 /// The type matrix is inherited from [AvroRecordExtractor], with two overrides:
 /// - INT96 timestamp (which parquet-avro surfaces as `fixed(12)` with `doc = "INT96 represented as byte[12]"`) →
 ///   `Timestamp` (or `Long` epoch nanos when `extractRawTimeValues` is `true`) via
-///   [ParquetUtils#convertInt96ToEpochNanos].
+///   [ParquetUtils].
 /// - Top-level unsigned 32-bit integer fields (`INTEGER(32, false)` / legacy `UINT_32`), which parquet-avro surfaces
 ///   as a signed Avro `int` → `Long` via [Integer#toUnsignedLong]. The field names come from the Parquet file schema
 ///   (see [ParquetUtils#getUnsignedInt32FieldNames]) since the Avro schema carries no signedness. Unsigned values
 ///   nested in a struct, list or map are still read as signed ints by this reader; [ParquetNativeRecordReader]
 ///   widens them at every level.
+///
+/// Unsigned 64-bit overflow validation requires the original Parquet annotation and is only implemented by
+/// [ParquetNativeRecordReader]. This Avro reader still exposes signed `long` bits for unsigned 64-bit fields.
 public class ParquetAvroRecordExtractor extends AvroRecordExtractor {
   private static final int INT96_BYTE_SIZE = 12;
   private static final String INT96_DOC = "INT96 represented as byte[12]";

@@ -73,6 +73,50 @@ public class ParquetNativeRecordExtractorTest {
   }
 
   @Test
+  public void testUnsignedInt64Range() {
+    for (String annotation : new String[]{"UINT_64", "INTEGER(64,false)"}) {
+      MessageType schema = MessageTypeParser.parseMessageType(
+          "message R { required int64 col (" + annotation + "); }");
+      for (long value : new long[]{0L, 1L, Long.MAX_VALUE}) {
+        assertEquals(extract(schema, g -> g.add(0, value)), value, annotation);
+      }
+      for (long value : new long[]{Long.MIN_VALUE, -1L}) {
+        IllegalArgumentException exception = expectThrows(IllegalArgumentException.class,
+            () -> extract(schema, g -> g.add(0, value)));
+        assertEquals(exception.getMessage().contains(Long.toUnsignedString(value)), true, exception.getMessage());
+      }
+    }
+    MessageType signed = MessageTypeParser.parseMessageType("message R { required int64 col; }");
+    assertEquals(extract(signed, g -> g.add(0, -1L)), -1L);
+    assertEquals(extract(signed, g -> g.add(0, Long.MIN_VALUE)), Long.MIN_VALUE);
+  }
+
+  @Test
+  public void testNestedUnsignedInt64OverflowRejected() {
+    MessageType list = MessageTypeParser.parseMessageType("message R { required group col (LIST) {"
+        + " repeated group list { required int64 element (UINT_64); } } }");
+    MessageType struct = MessageTypeParser.parseMessageType(
+        "message R { required group col { required int64 value (UINT_64); } }");
+    MessageType map = MessageTypeParser.parseMessageType("message R { required group col (MAP) {"
+        + " repeated group key_value { required int64 key (UINT_64); optional int64 value (UINT_64); } } }");
+    for (long value : new long[]{Long.MIN_VALUE, -1L}) {
+      expectThrows(IllegalArgumentException.class,
+          () -> extract(list, g -> g.addGroup(0).addGroup(0).add(0, value)));
+      expectThrows(IllegalArgumentException.class, () -> extract(struct, g -> g.addGroup(0).add(0, value)));
+      expectThrows(IllegalArgumentException.class, () -> extract(map, g -> {
+        Group entry = g.addGroup(0).addGroup(0);
+        entry.add(0, value);
+        entry.add(1, 0L);
+      }));
+      expectThrows(IllegalArgumentException.class, () -> extract(map, g -> {
+        Group entry = g.addGroup(0).addGroup(0);
+        entry.add(0, 0L);
+        entry.add(1, value);
+      }));
+    }
+  }
+
+  @Test
   public void testInt96ExtractedAsTimestamp() {
     long epochMillis = 1_649_924_302_123L;
     MessageType schema = MessageTypeParser.parseMessageType("message R { required int96 col; }");

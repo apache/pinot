@@ -44,7 +44,7 @@ import org.apache.pinot.spi.utils.UuidUtils;
 /// - `BOOLEAN` → `Boolean`
 /// - `INT32` → `Integer`, or `Long` when annotated as unsigned 32-bit (`INTEGER(32, false)` / legacy `UINT_32`),
 ///   since values above `Integer.MAX_VALUE` do not fit in a signed `int`
-/// - `INT64` → `Long`
+/// - `INT64` → `Long`; unsigned 64-bit values above `Long.MAX_VALUE` are rejected instead of wrapping negative
 /// - `FLOAT` → `Float`
 /// - `DOUBLE` → `Double`
 /// - `BINARY` with `STRING` / `ENUM` annotation → `String`
@@ -148,6 +148,11 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
           return intValue;
         case INT64:
           long longValue = from.getLong(fieldIndex, index);
+          if (logicalTypeAnnotation instanceof LogicalTypeAnnotation.IntLogicalTypeAnnotation integerType
+              && integerType.getBitWidth() == 64 && !integerType.isSigned() && longValue < 0) {
+            throw new IllegalArgumentException("Parquet UINT64 field " + fieldType.getName() + " value "
+                + Long.toUnsignedString(longValue) + " exceeds the signed Long range");
+          }
           if (logicalTypeAnnotation instanceof LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) {
             LogicalTypeAnnotation.DecimalLogicalTypeAnnotation decimalLogicalTypeAnnotation =
                 (LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) logicalTypeAnnotation;
