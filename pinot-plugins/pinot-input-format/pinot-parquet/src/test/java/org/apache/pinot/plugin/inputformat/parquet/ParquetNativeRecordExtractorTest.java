@@ -22,6 +22,7 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.Map;
@@ -42,6 +43,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.expectThrows;
 
 
 /// Tests [ParquetNativeRecordExtractor] — see its class Javadoc for the Parquet primitive + logical-type
@@ -272,6 +274,33 @@ public class ParquetNativeRecordExtractorTest {
     MessageType schema = MessageTypeParser.parseMessageType("message R { required int96 col; }");
     assertEquals(extract(schema, g -> g.add(0, Binary.fromConstantByteArray(int96Bytes(epochMillis))), rawConfig()),
         epochMillis * 1_000_000L);
+  }
+
+  @Test
+  public void testInt96RangeAndNanosecondBoundaries() {
+    MessageType schema = MessageTypeParser.parseMessageType("message R { required int96 col; }");
+    for (String text : new String[]{"1970-01-01T00:00:00Z", "1969-12-31T23:59:59.999999999Z",
+        "1677-09-21T00:12:43.145224192Z", "2262-04-11T23:47:16.854775807Z",
+        "1677-09-21T00:12:43.145224191Z", "2262-04-11T23:47:16.854775808Z",
+        "1600-01-01T00:00:00.123456789Z", "2300-01-01T00:00:00.123456789Z"}) {
+      Instant instant = Instant.parse(text);
+      long day = Math.floorDiv(instant.getEpochSecond(), 86_400L);
+      byte[] bytes = ByteBuffer.allocate(12).order(ByteOrder.LITTLE_ENDIAN)
+          .putLong(Math.floorMod(instant.getEpochSecond(), 86_400L) * 1_000_000_000L + instant.getNano())
+          .putInt(Math.toIntExact(day + ParquetUtils.JULIAN_DAY_NUMBER_FOR_UNIX_EPOCH)).array();
+      assertEquals(extract(schema, g -> g.add(0, Binary.fromConstantByteArray(bytes))), Timestamp.from(instant), text);
+      BigDecimal nanos = BigDecimal.valueOf(instant.getEpochSecond()).movePointRight(9)
+          .add(BigDecimal.valueOf(instant.getNano()));
+      if (nanos.compareTo(BigDecimal.valueOf(Long.MIN_VALUE)) >= 0
+          && nanos.compareTo(BigDecimal.valueOf(Long.MAX_VALUE)) <= 0) {
+        assertEquals(extract(schema, g -> g.add(0, Binary.fromConstantByteArray(bytes)), rawConfig()),
+            nanos.longValueExact(), text);
+      } else {
+        IllegalArgumentException exception = expectThrows(IllegalArgumentException.class,
+            () -> extract(schema, g -> g.add(0, Binary.fromConstantByteArray(bytes)), rawConfig()));
+        assertEquals(exception.getMessage().contains(instant.toString()), true, exception.getMessage());
+      }
+    }
   }
 
   // === LIST — standard 3-level wrapper and legacy forms ===

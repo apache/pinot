@@ -24,7 +24,6 @@ import org.apache.avro.generic.GenericFixed;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractor;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.utils.TimestampUtils;
 
 
 /// The type matrix is inherited from [AvroRecordExtractor], with two overrides:
@@ -66,8 +65,9 @@ public class ParquetAvroRecordExtractor extends AvroRecordExtractor {
   protected Object convertSingleValue(Schema schema, Object value) {
     if (schema.getType() == Schema.Type.FIXED && schema.getFixedSize() == INT96_BYTE_SIZE
         && INT96_DOC.equals(schema.getDoc())) {
-      long nanos = ParquetUtils.convertInt96ToEpochNanos(((GenericFixed) value).bytes());
-      return _extractRawTimeValues ? nanos : TimestampUtils.fromNanosSinceEpoch(nanos);
+      byte[] bytes = ((GenericFixed) value).bytes();
+      return _extractRawTimeValues ? ParquetUtils.convertInt96ToEpochNanos(bytes)
+          : ParquetUtils.convertInt96ToTimestamp(bytes);
     }
     return super.convertSingleValue(schema, value);
   }
