@@ -140,6 +140,13 @@ public class BasePartitionUpsertMetadataManagerTest {
     zkMetadata.setCreationTime(2000L);
     assertFalse(manager.canPreloadSegment(tableDataManager, tableConfig, "seg", zkMetadata));
 
+    // With TTL the metadata refresh reloads from the snapshot too, so the snapshot is still preloaded
+    when(context.getDeletedKeysTTL()).thenReturn(10.0);
+    when(context.getComparisonColumns()).thenReturn(List.of("ts"));
+    DummyPartitionUpsertMetadataManager ttlManager =
+        new DummyPartitionUpsertMetadataManager("myTable_REALTIME", 0, context);
+    assertTrue(ttlManager.canPreloadSegment(tableDataManager, tableConfig, "seg", zkMetadata));
+
     // Snapshots without the tie time, e.g. written by an older server, are preloaded as before
     segment.persistDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME,
         createDocIds(1, 2).getBytesAndCardinality(), null);

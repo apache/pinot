@@ -312,7 +312,11 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
     // A same-CRC push can move the segment time in ZK after the snapshot was taken. The snapshot then holds ties
     // decided with the old time, so add the segment later with full comparisons, the same way a running server
-    // reloads it on the metadata refresh message.
+    // reloads it on the metadata refresh message. With TTL that reload starts from the snapshot as well (see
+    // doReplaceSegment), so keep preloading the snapshot to keep the same rows.
+    if (isTTLEnabled()) {
+      return true;
+    }
     DocIdsSnapshot.Metadata snapshotMetadata =
         SegmentPreloadUtils.getValidDocIdsSnapshotMetadata(tableDataManager, tableConfig, segmentName, tier);
     Long snapshotTieTimeMs = snapshotMetadata != null ? snapshotMetadata.upsertTieTimeMs() : null;
