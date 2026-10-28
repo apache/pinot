@@ -222,7 +222,7 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
       // subsequent reads in the same chunk. The old DELTA/DELTADELTA branch allocated a separate
       // buffer without installing it in the context, causing all same-chunk reads after the first
       // one to observe the untouched context buffer.
-      decompressedBuffer = _dataBuffer.withByteBuffer(chunkPosition, chunkSize, compressedBuffer -> {
+      decompressedBuffer = _dataBuffer.readWithByteBuffer(chunkPosition, chunkSize, compressedBuffer -> {
         _chunkDecompressor.decompress(compressedBuffer, chunkBuffer);
         return chunkBuffer;
       });

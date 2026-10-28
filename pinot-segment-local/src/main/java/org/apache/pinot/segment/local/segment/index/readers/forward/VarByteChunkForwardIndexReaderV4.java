@@ -427,7 +427,7 @@ public class VarByteChunkForwardIndexReaderV4
     protected byte[] processChunkAndReadFirstValue(int docId, long offset, long limit)
         throws IOException {
       _decompressedBuffer.clear();
-      return _chunks.withByteBuffer(offset, (int) (limit - offset), compressed -> {
+      return _chunks.readWithByteBuffer(offset, (int) (limit - offset), compressed -> {
         if (_regularChunk) {
           decompressChunk(compressed);
           return readSmallUncompressedValue(docId);

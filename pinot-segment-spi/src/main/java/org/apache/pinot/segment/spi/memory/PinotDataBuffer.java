@@ -656,7 +656,7 @@ public abstract class PinotDataBuffer implements DataBuffer {
   /// and limit, but must not modify the contents, release the buffer, or retain or return the buffer or any alias.
   /// The callback must not recursively access or release this receiver or its views. The borrowed buffer is only
   /// valid during the callback; the result must be independent of it.
-  public <T> T withByteBuffer(long offset, int size, IOFunction<ByteBuffer, T> reader)
+  public <T> T readWithByteBuffer(long offset, int size, IOFunction<ByteBuffer, T> reader)
       throws IOException {
     return reader.apply(toDirectByteBuffer(offset, size));
   }
