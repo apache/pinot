@@ -355,11 +355,6 @@ public class QueryContext implements QueryScopedCache {
     return _expressionOverrideHints;
   }
 
-  /// Returns the logical aggregation slots, in their original SELECT/HAVING/ORDER-BY order.
-  public List<Pair<FunctionContext, FilterContext>> getAggregationFunctionContexts() {
-    return _aggregationFunctionContexts;
-  }
-
   /// Prepares derived execution state after logical expressions change, before fetch or segment planning.
   /// Reuses compiled aggregations whose input trees did not change. The supplied set uses function identity because
   /// expression rewrites can mutate function arguments, including their hash codes, in place.

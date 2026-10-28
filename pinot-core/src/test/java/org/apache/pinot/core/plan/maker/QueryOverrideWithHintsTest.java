@@ -31,6 +31,7 @@ import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
+import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.common.utils.DataSchema;
@@ -211,19 +212,30 @@ public class QueryOverrideWithHintsTest {
 
   @DataProvider
   public Object[][] aggregationRewriteCases() {
-    return new Object[][]{{false, false, false}, {true, false, false}, {false, true, false}, {true, true, false},
-        {false, false, true}, {true, false, true}, {false, true, true}, {true, true, true}};
+    List<Object[]> cases = new ArrayList<>();
+    for (boolean nullHandling : new boolean[]{false, true}) {
+      for (boolean nested : new boolean[]{false, true}) {
+        for (String predicate : List.of("", "DATETRUNC('MONTH', ts, 'MILLISECONDS') > 0", "TRUE", "FALSE")) {
+          cases.add(new Object[]{nullHandling, predicate, nested});
+        }
+      }
+    }
+    return cases.toArray(new Object[0][]);
   }
 
   @Test(dataProvider = "aggregationRewriteCases")
-  public void testRewriteCompiledAggregation(boolean nullHandlingEnabled, boolean filtered, boolean nested) {
-    String filter = filtered ? " FILTER(WHERE DATETRUNC('MONTH', ts, 'MILLISECONDS') > 0)" : "";
+  public void testRewriteCompiledAggregation(boolean nullHandlingEnabled, String predicate, boolean nested) {
+    boolean filtered = !predicate.isEmpty();
+    String filter = filtered ? " FILTER(WHERE " + predicate + ")" : "";
     String input = "DATETRUNC('MONTH', ts, 'MILLISECONDS')";
     if (nested) {
       input = "ADD(" + input + ", 1)";
     }
     QueryContext queryContext = aggregationQuery(
         "SELECT DISTINCTCOUNT(" + input + ")" + filter + " AS active_days FROM myTable", "MONTH", nullHandlingEnabled);
+    if (predicate.equals("TRUE") || predicate.equals("FALSE")) {
+      assertEquals(queryContext.getFilteredAggregationFunctions().get(0).getRight().isConstant(), true);
+    }
     InstancePlanMakerImplV2.rewriteQueryContextWithHints(queryContext, List.of(new SegmentContext(_indexSegment)));
 
     ExpressionContext derived = ExpressionContext.forIdentifier("$ts$MONTH");
@@ -236,7 +248,13 @@ public class QueryOverrideWithHintsTest {
     assertEquals(queryContext.hasFilteredAggregations(), filtered);
     var pair = queryContext.getFilteredAggregationFunctions().get(0);
     if (filtered) {
-      assertEquals(pair.getRight().getPredicate().getLhs(), derived);
+      if (predicate.equals("TRUE") || predicate.equals("FALSE")) {
+        assertEquals(pair.getRight().isConstant(), true);
+        assertEquals(pair.getRight().isConstantTrue(), Boolean.parseBoolean(predicate));
+        assertEquals(pair.getRight().isConstantFalse(), !Boolean.parseBoolean(predicate));
+      } else {
+        assertEquals(pair.getRight().getPredicate().getLhs(), derived);
+      }
     }
     FunctionContext function = queryContext.getSelectExpressions().get(0).getFunction();
     if (filtered) {
@@ -245,9 +263,43 @@ public class QueryOverrideWithHintsTest {
     assertEquals(queryContext.getFilteredAggregationsIndexMap().get(Pair.of(function, pair.getRight())),
         Integer.valueOf(0));
 
-    AggregationFunction[] functions = queryContext.getAggregationFunctions();
+    AggregationFunction compiled = queryContext.getAggregationFunctions()[0];
     InstancePlanMakerImplV2.rewriteQueryContextWithHints(queryContext, List.of(new SegmentContext(_indexSegment)));
-    assertSame(queryContext.getAggregationFunctions(), functions);
+    assertSame(queryContext.getAggregationFunctions()[0], compiled);
+  }
+
+  @DataProvider
+  public Object[][] orderByRewriteCases() {
+    List<Object[]> cases = new ArrayList<>();
+    for (String expression : List.of("ts", "DATETRUNC('MONTH', ts, 'MILLISECONDS')",
+        "ADD(DATETRUNC('MONTH', ts, 'MILLISECONDS'), 1)")) {
+      for (String ordering : List.of("ASC NULLS FIRST", "ASC NULLS LAST", "DESC NULLS FIRST", "DESC NULLS LAST")) {
+        cases.add(new Object[]{expression, ordering});
+      }
+    }
+    return cases.toArray(new Object[0][]);
+  }
+
+  @Test(dataProvider = "orderByRewriteCases")
+  public void testRewritePreservesNullOrdering(String expression, String ordering) {
+    QueryContext context = aggregationQuery(
+        "SELECT DATETRUNC('MONTH', ts, 'MILLISECONDS') FROM myTable ORDER BY " + expression + " " + ordering,
+        "MONTH", true);
+    OrderByExpressionContext original = context.getOrderByExpressions().get(0);
+    InstancePlanMakerImplV2.rewriteQueryContextWithHints(context, List.of(new SegmentContext(_indexSegment)));
+    OrderByExpressionContext rewritten = context.getOrderByExpressions().get(0);
+    assertEquals(rewritten.isAsc(), original.isAsc());
+    assertEquals(rewritten.isNullsLast(), original.isNullsLast());
+    if (expression.startsWith("DATETRUNC")) {
+      assertEquals(rewritten.getExpression(), ExpressionContext.forIdentifier("$ts$MONTH"));
+      assertNotSame(rewritten, original);
+    } else {
+      assertSame(rewritten, original);
+      if (expression.startsWith("ADD")) {
+        assertEquals(rewritten.getExpression().getFunction().getArguments().get(0),
+            ExpressionContext.forIdentifier("$ts$MONTH"));
+      }
+    }
   }
 
   @Test
@@ -255,7 +307,7 @@ public class QueryOverrideWithHintsTest {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT COUNT(*), SUM(ts) FROM myTable");
     AggregationFunction count = queryContext.getAggregationFunctions()[0];
     AggregationFunction sum = queryContext.getAggregationFunctions()[1];
-    FunctionContext sumContext = queryContext.getAggregationFunctionContexts().get(1).getLeft();
+    FunctionContext sumContext = queryContext.getSelectExpressions().get(1).getFunction();
     sumContext.getArguments().set(0, ExpressionContext.forIdentifier("other"));
     Set<FunctionContext> changed = Collections.newSetFromMap(new IdentityHashMap<>());
     changed.add(sumContext);
@@ -303,10 +355,10 @@ public class QueryOverrideWithHintsTest {
   public void testMissingIndexRetainsCompiledAggregation() {
     QueryContext queryContext = aggregationQuery(
         "SELECT DISTINCTCOUNT(DATETRUNC('DAY', ts, 'MILLISECONDS')) AS active_days FROM myTable", "DAY", false);
-    AggregationFunction[] functions = queryContext.getAggregationFunctions();
-    List<ExpressionContext> inputs = functions[0].getInputExpressions();
+    AggregationFunction function = queryContext.getAggregationFunctions()[0];
+    List<ExpressionContext> inputs = function.getInputExpressions();
     InstancePlanMakerImplV2.rewriteQueryContextWithHints(queryContext, List.of(new SegmentContext(_indexSegment)));
-    assertSame(queryContext.getAggregationFunctions(), functions);
+    assertSame(queryContext.getAggregationFunctions()[0], function);
     assertEquals(queryContext.getAggregationFunctions()[0].getInputExpressions(), inputs);
     assertEquals(queryContext.getColumns(), Set.of("ts"));
     assertEquals(queryContext.getAliasList(), List.of("active_days"));
@@ -324,6 +376,8 @@ public class QueryOverrideWithHintsTest {
     IndexSegment second = mock(IndexSegment.class);
     when(second.getColumnNames()).thenReturn(allIndexed ? Set.of("ts", "$ts$MONTH") : Set.of("ts"));
     List<SegmentContext> segments = List.of(new SegmentContext(_indexSegment), new SegmentContext(second));
+    Map<ExpressionContext, ExpressionContext> hints = queryContext.getExpressionOverrideHints();
+    Map<ExpressionContext, ExpressionContext> originalHints = Map.copyOf(hints);
     InstancePlanMakerImplV2 planMaker = new InstancePlanMakerImplV2();
     ExecutorService executor = mock(ExecutorService.class);
     if (streaming) {
@@ -331,6 +385,8 @@ public class QueryOverrideWithHintsTest {
     } else {
       planMaker.makeInstancePlan(segments, queryContext, executor);
     }
+    assertSame(queryContext.getExpressionOverrideHints(), hints);
+    assertEquals(hints, originalHints);
     AggregationFunction<?, ?> aggregation = queryContext.getAggregationFunctions()[0];
     ExpressionContext input = aggregation.getInputExpressions().get(0);
     if (allIndexed) {
