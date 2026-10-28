@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.net.ConnectException;
 import java.security.KeyPairGenerator;
 import java.util.List;
+import javax.net.ssl.SSLHandshakeException;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceCredentialMode;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorEvidence;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorSubReason;
@@ -130,6 +131,15 @@ public class GoogleCloudSourceErrorClassificationTest {
         "User not authorized to perform this action.")), IngestionSourceErrorSubReason.AUTHORIZATION, null);
     assertAuth(Status.PERMISSION_DENIED.withDescription("Request is prohibited by organization's policy")
         .asRuntimeException(), IngestionSourceErrorSubReason.AUTHORIZATION, null);
+  }
+
+  @Test
+  public void peerRejectingOurCertificateBeneathUnavailable() {
+    // gRPC surfaces a TLS handshake the server refused as UNAVAILABLE with the SSL failure as its cause
+    assertAuth(Status.UNAVAILABLE.withCause(new SSLHandshakeException("Received fatal alert: bad_certificate"))
+        .asRuntimeException(), IngestionSourceErrorSubReason.AUTHENTICATION, null);
+    assertSourceRead(Status.UNAVAILABLE.withCause(new SSLHandshakeException("Received fatal alert: handshake_failure"))
+        .asRuntimeException(), null);
   }
 
   @Test

@@ -123,11 +123,11 @@ final class IngestionSourceErrorRules {
     }
     if (hasClass(clazz, GAX_API_EXCEPTION)) {
       Object statusCode = invoke(node, "getStatusCode");
-      return grpc(statusCode != null ? invoke(statusCode, "getCode") : null, node, evidence);
+      return grpc(statusCode != null ? invoke(statusCode, "getCode") : null, node, below, evidence);
     }
     if (hasClass(clazz, GRPC_STATUS_RUNTIME_EXCEPTION) || hasClass(clazz, GRPC_STATUS_EXCEPTION)) {
       Object status = invoke(node, "getStatus");
-      return grpc(status != null ? invoke(status, "getCode") : null, node, evidence);
+      return grpc(status != null ? invoke(status, "getCode") : null, node, below, evidence);
     }
     if (hasClass(clazz, GOOGLE_AUTH_EXCEPTION)) {
       return googleAuth(node, below, evidence);
@@ -662,7 +662,7 @@ final class IngestionSourceErrorRules {
   private static final String GOOGLE_CLOCK_SKEW = "short-lived token";
 
   @Nullable
-  private static IngestionSourceErrorVerdict grpc(@Nullable Object codeValue, Throwable node,
+  private static IngestionSourceErrorVerdict grpc(@Nullable Object codeValue, Throwable node, List<Throwable> below,
       @Nullable IngestionSourceErrorEvidence evidence) {
     if (!(codeValue instanceof Enum)) {
       return null;
@@ -680,6 +680,15 @@ final class IngestionSourceErrorRules {
       case "NOT_FOUND":
         if (messageOf(node).contains(GOOGLE_MISSING_OR_DENIED)) {
           return auth(IngestionSourceErrorSubReason.MISSING_OR_DENIED, code, null);
+        }
+        return sourceRead(code, null);
+      case "UNAVAILABLE":
+        // The transport failed, unless the peer rejected the certificate we presented
+        for (Throwable cause : below) {
+          IngestionSourceErrorVerdict refused = tlsAlert(cause, null);
+          if (refused != null) {
+            return refused;
+          }
         }
         return sourceRead(code, null);
       default:
