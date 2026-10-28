@@ -278,6 +278,56 @@ public class PinotRexExecutorTest {
     }
   }
 
+  @DataProvider
+  public Object[][] numericLiterals() {
+    List<Object[]> cases = new ArrayList<>();
+    for (SqlTypeName target : List.of(SqlTypeName.FLOAT, SqlTypeName.REAL, SqlTypeName.DOUBLE)) {
+      for (String value : new String[]{"0", "1", "-7", "0.1", "-2.5", "0.123456789123", "3.4028235E38", "1E39",
+          "1E308"}) {
+        cases.add(new Object[]{target, value});
+      }
+    }
+    return cases.toArray(new Object[0][]);
+  }
+
+  @Test(dataProvider = "numericLiterals")
+  public void testNumericToApproximateCastsMatchCalcite(SqlTypeName targetType, String value) {
+    LiteralRexBuilder builder = new LiteralRexBuilder();
+    RelDataType target = builder.getTypeFactory().createSqlType(targetType);
+    // Large values are DOUBLE literals in SQL, since they do not fit the exact (DECIMAL) literal precision
+    BigDecimal number = new BigDecimal(value);
+    RexNode literal = value.contains("E") ? builder.makeApproxLiteral(number) : builder.makeExactLiteral(number);
+    RexNode expression = builder.makeAbstractCast(target, literal, false);
+    List<RexNode> input = List.of(expression);
+    CountingFallback fallback = new CountingFallback(CALCITE_EXECUTOR);
+    List<RexNode> expected = reduce(CALCITE_EXECUTOR, builder, input);
+    List<RexNode> actual = reduce(new PinotRexExecutor(fallback), builder, input);
+    assertEquals(actual, expected);
+    assertEquals(actual.get(0).getType(), expected.get(0).getType());
+    // Only a cast that overflows to infinity is left to the fallback
+    double converted = targetType == SqlTypeName.REAL ? Float.parseFloat(value) : Double.parseDouble(value);
+    assertEquals(fallback._calls.get(), Double.isFinite(converted) ? 0 : 1);
+  }
+
+  @Test
+  public void testQueryVectorIsReducedWithoutFallback() {
+    LiteralRexBuilder builder = new LiteralRexBuilder();
+    RelDataType real = builder.getTypeFactory().createSqlType(SqlTypeName.REAL);
+    List<RexNode> elements = new ArrayList<>();
+    List<RexNode> casts = new ArrayList<>();
+    for (int i = 0; i < 768; i++) {
+      RexNode cast = builder.makeAbstractCast(real, builder.makeExactLiteral(new BigDecimal("0.0" + i)), false);
+      casts.add(cast);
+      elements.add(reduce(CALCITE_EXECUTOR, builder, List.of(cast)).get(0));
+    }
+    // A vector of literals arrives either as its element casts or as an array of already reduced literals
+    assertEquals(reduce(new PinotRexExecutor(FAILING_FALLBACK), builder, casts), elements);
+    RexNode array = builder.makeCall(SqlStdOperatorTable.ARRAY_VALUE_CONSTRUCTOR, elements);
+    List<RexNode> actual = reduce(new PinotRexExecutor(FAILING_FALLBACK), builder, List.of(array));
+    assertSame(actual.get(0), array);
+    assertEquals(actual, reduce(CALCITE_EXECUTOR, builder, List.of(array)));
+  }
+
   @Test
   public void testUnsupportedExpressionsDelegateTheWholeBatchInOrder() {
     LiteralRexBuilder builder = new LiteralRexBuilder();

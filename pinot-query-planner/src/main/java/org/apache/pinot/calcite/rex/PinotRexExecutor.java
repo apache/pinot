@@ -87,11 +87,8 @@ public final class PinotRexExecutor implements RexExecutor {
         if (isNumericToApproximateCast(expression)) {
           // CAST(<numeric literal> AS DOUBLE/FLOAT/REAL), e.g. every element of a query vector: round the value the
           // way the cast would, without generating code
-          RexLiteral numeric = (RexLiteral) ((RexCall) expression).getOperands().get(0);
-          BigDecimal value = numeric.getValueAs(BigDecimal.class);
-          double rounded = expression.getType().getSqlTypeName() == SqlTypeName.DOUBLE ? value.doubleValue()
-              : value.floatValue();
-          literals.add(rexBuilder.makeApproxLiteral(new BigDecimal(rounded), expression.getType()));
+          literals.add(rexBuilder.makeApproxLiteral(new BigDecimal(approximateValue((RexCall) expression)),
+              expression.getType()));
           continue;
         }
         RexLiteral operand = (RexLiteral) ((RexCall) expression).getOperands().get(0);
@@ -123,7 +120,8 @@ public final class PinotRexExecutor implements RexExecutor {
     });
   }
 
-  /// Returns whether the expression casts a non-null numeric literal to an approximate type (DOUBLE, FLOAT, REAL).
+  /// Returns whether the expression casts a non-null numeric literal to an approximate type (DOUBLE, FLOAT, REAL) and
+  /// the result is finite. Overflow to infinity is left to the fallback, which decides how to represent it.
   @VisibleForTesting
   static boolean isNumericToApproximateCast(RexNode expression) {
     if (!(expression instanceof RexCall)) {
@@ -136,7 +134,14 @@ public final class PinotRexExecutor implements RexExecutor {
     }
     RexNode operand = call.getOperands().get(0);
     return operand instanceof RexLiteral && !((RexLiteral) operand).isNull()
-        && SqlTypeUtil.isNumeric(operand.getType());
+        && SqlTypeUtil.isNumeric(operand.getType()) && Double.isFinite(approximateValue(call));
+  }
+
+  /// The value of `CAST(<numeric literal> AS <approximate type>)`: REAL rounds to single precision, while FLOAT and
+  /// DOUBLE are both double precision in Calcite.
+  private static double approximateValue(RexCall cast) {
+    BigDecimal value = ((RexLiteral) cast.getOperands().get(0)).getValueAs(BigDecimal.class);
+    return cast.getType().getSqlTypeName() == SqlTypeName.REAL ? value.floatValue() : value.doubleValue();
   }
 
   /// Returns whether the expression is an `ARRAY[...]` constructor whose elements are all non-null literals.
