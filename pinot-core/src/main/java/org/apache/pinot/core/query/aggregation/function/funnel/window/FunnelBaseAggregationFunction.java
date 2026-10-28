@@ -47,7 +47,7 @@ import org.apache.pinot.spi.query.QueryThreadContext;
 /// satisfied wherever a boolean is consumed, so a null step already means that step did not match and the row still
 /// belongs to the funnel. A null timestamp is different: the event has no position in the window, and an aggregate
 /// ignores a row whose input is null.
-public abstract class FunnelBaseAggregationFunction<F extends Comparable>
+public abstract class FunnelBaseAggregationFunction<F>
     extends BaseAggregationFunction<PriorityQueue<FunnelStepEvent>, F> {
   protected final ExpressionContext _timestampExpression;
   protected final long _windowSize;
