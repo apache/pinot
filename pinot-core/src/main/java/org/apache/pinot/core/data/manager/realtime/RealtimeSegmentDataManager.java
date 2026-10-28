@@ -321,9 +321,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final TransformPipeline _transformPipeline;
   private PartitionGroupConsumer _partitionGroupConsumer = null;
   private final IngestionSourceErrorRecorder _sourceErrors;
-  // Failures the stream plugin swallows on purpose during a fetch or a checkpoint, and reports
+  // Failures the stream plugin swallows on purpose during a fetch, a checkpoint or consumer creation, and reports
   private final Consumer<Throwable> _reportedFetchErrors;
   private final Consumer<Throwable> _reportedCheckpointErrors;
+  private final Consumer<Throwable> _reportedCreateErrors;
   private StreamMetadataProvider _partitionMetadataProvider = null;
   private final File _resourceTmpDir;
   private final String _tableNameWithType;
@@ -1997,6 +1998,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         _tableNameWithType);
     _reportedFetchErrors = failure -> recordSourceError("fetch", failure, true);
     _reportedCheckpointErrors = failure -> recordSourceError("checkpoint", failure, true);
+    _reportedCreateErrors = failure -> recordSourceError("create", failure, true);
     if (indexLoadingConfig.isRealtimeOffHeapAllocation() && !indexLoadingConfig.isDirectRealtimeOffHeapAllocation()) {
       _memoryManager =
           new MmapMemoryManager(_realtimeTableDataManager.getConsumerDir(), _segmentNameStr, _serverMetrics);
@@ -2072,13 +2074,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         }
       });
     } catch (Exception e) {
-      // The retry policy's exception has no cause: keep the last attempt's failure, so it can be classified and shows
-      // in the segment error.
+      // Classified by the last attempt's failure, which the retry policy's own exception doesn't carry. It stays out
+      // of the segment error, which the server's debug API serves: a decoder's exception can quote stream config
+      // values.
       Exception lastFailure = lastDecoderInitFailure.get();
-      if (lastFailure != null && e.getCause() == null) {
-        e.initCause(lastFailure);
-      }
-      recordSourceError("decoder_init", e, true);
+      recordSourceError("decoder_init", lastFailure != null ? lastFailure : e, true);
       _realtimeTableDataManager.addSegmentError(_segmentNameStr,
           new SegmentErrorInfo(now(), "Failed to initialize the StreamMessageDecoder", e));
       throw e;
@@ -2280,7 +2280,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       closePartitionGroupConsumer();
     }
     _segmentLogger.info("Creating new stream consumer for topic partition {} , reason: {}", _clientId, reason);
-    try {
+    try (IngestionSourceErrorReporter.Scope ignored = IngestionSourceErrorReporter.listen(_reportedCreateErrors)) {
       _partitionGroupConsumer =
           _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus);
       _partitionGroupConsumer.start(_currentOffset);
@@ -2299,7 +2299,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _segmentLogger.info("Recreating stream consumer for topic partition {}, reason: {}", _clientId, reason);
     _currentOffset = checkpoint();
     closePartitionGroupConsumer();
-    try {
+    try (IngestionSourceErrorReporter.Scope ignored = IngestionSourceErrorReporter.listen(_reportedCreateErrors)) {
       _partitionGroupConsumer =
           _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus,
               CONSUMER_RECREATE_RETRY_POLICY);

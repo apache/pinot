@@ -99,8 +99,8 @@ import static org.testng.Assert.assertTrue;
 /// Every test starts its own embedded Kafka with a SASL/PLAIN listener and the standard authorizer, with a fresh
 /// super-user for setup and a fresh principal for Pinot, so breaking one test's broker or ACLs touches nothing another
 /// test uses. A table created with bad credentials is rejected and deleted, so each case first creates a table that
-/// consumes and then breaks it the way a source does. The credentials are random and fake, and never go into a log line
-/// or an assertion message.
+/// consumes and then breaks it the way a source does. The credentials are random, fake and used only by this test. The
+/// test never logs them or puts them in an assertion message, though Pinot's own logs may print the stream config.
 ///
 /// The server's delay tracker refreshes the latest offsets every 30 seconds and records SOURCE_READ only after 6
 /// failures in a row, so each SOURCE_READ case takes about 3.5 minutes.
