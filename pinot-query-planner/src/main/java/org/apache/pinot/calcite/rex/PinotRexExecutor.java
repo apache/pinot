@@ -21,6 +21,7 @@ package org.apache.pinot.calcite.rex;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -68,7 +69,8 @@ public final class PinotRexExecutor implements RexExecutor {
     // Calcite treats reduction as all-or-nothing. Delegate the entire batch if any expression is unsupported, so a
     // failure in the fallback cannot leave the batch partially reduced.
     for (RexNode expression : constExps) {
-      if (!isSupportedStringCast(expression)) {
+      if (!isSupportedStringCast(expression) && !isLiteralArray(expression)
+          && !isNumericToApproximateCast(expression)) {
         _fallback.reduce(rexBuilder, constExps, reducedValues);
         return;
       }
@@ -76,6 +78,22 @@ public final class PinotRexExecutor implements RexExecutor {
     List<RexNode> literals = new ArrayList<>(constExps.size());
     try {
       for (RexNode expression : constExps) {
+        if (isLiteralArray(expression)) {
+          // Already in its final form: the fallback would compile a class per query just to rebuild it, which takes
+          // hundreds of milliseconds for a query vector of hundreds of elements
+          literals.add(expression);
+          continue;
+        }
+        if (isNumericToApproximateCast(expression)) {
+          // CAST(<numeric literal> AS DOUBLE/FLOAT/REAL), e.g. every element of a query vector: round the value the
+          // way the cast would, without generating code
+          RexLiteral numeric = (RexLiteral) ((RexCall) expression).getOperands().get(0);
+          BigDecimal value = numeric.getValueAs(BigDecimal.class);
+          double rounded = expression.getType().getSqlTypeName() == SqlTypeName.DOUBLE ? value.doubleValue()
+              : value.floatValue();
+          literals.add(rexBuilder.makeApproxLiteral(new BigDecimal(rounded), expression.getType()));
+          continue;
+        }
         RexLiteral operand = (RexLiteral) ((RexCall) expression).getOperands().get(0);
         Object value = null;
         if (!operand.isNull()) {
@@ -103,6 +121,40 @@ public final class PinotRexExecutor implements RexExecutor {
       RexNode cast = builder.makeAbstractCast(target, builder.makeInputRef(source, 0), false);
       return RexExecutorImpl.getExecutable(builder, List.of(cast), rowType).getFunction();
     });
+  }
+
+  /// Returns whether the expression casts a non-null numeric literal to an approximate type (DOUBLE, FLOAT, REAL).
+  @VisibleForTesting
+  static boolean isNumericToApproximateCast(RexNode expression) {
+    if (!(expression instanceof RexCall)) {
+      return false;
+    }
+    RexCall call = (RexCall) expression;
+    if (call.getOperator() != SqlStdOperatorTable.CAST || call.getOperands().size() != 1
+        || !SqlTypeUtil.isApproximateNumeric(call.getType())) {
+      return false;
+    }
+    RexNode operand = call.getOperands().get(0);
+    return operand instanceof RexLiteral && !((RexLiteral) operand).isNull()
+        && SqlTypeUtil.isNumeric(operand.getType());
+  }
+
+  /// Returns whether the expression is an `ARRAY[...]` constructor whose elements are all non-null literals.
+  @VisibleForTesting
+  static boolean isLiteralArray(RexNode expression) {
+    if (!(expression instanceof RexCall)) {
+      return false;
+    }
+    RexCall call = (RexCall) expression;
+    if (call.getOperator() != SqlStdOperatorTable.ARRAY_VALUE_CONSTRUCTOR || call.getOperands().isEmpty()) {
+      return false;
+    }
+    for (RexNode operand : call.getOperands()) {
+      if (!(operand instanceof RexLiteral) || ((RexLiteral) operand).isNull()) {
+        return false;
+      }
+    }
+    return true;
   }
 
   private static boolean isSupportedStringCast(RexNode expression) {
