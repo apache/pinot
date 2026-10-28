@@ -18,11 +18,14 @@
  */
 package org.apache.pinot.segment.local.segment.index.creator;
 
+import it.unimi.dsi.fastutil.ints.Int2FloatMap;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Random;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.function.scalar.VectorFunctions;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.HnswVectorIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.vector.HnswVectorIndexReader;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
@@ -177,6 +180,56 @@ public class HnswVectorIndexCreatorTest {
       Assert.assertEquals(debugInfo.get("effectiveHnswUseBoundedQueue"), Boolean.FALSE);
       Assert.assertEquals(debugInfo.get("supportsPreFilter"), reader.supportsPreFilter(),
           "Debug info must report the reader's actual pre-filter capability, not a hardcoded literal");
+    }
+  }
+
+  /// A COSINE index serves `cosineDistance` for the documents its search returns, also after a filtered search with
+  /// the same vector; other distance functions serve none.
+  @Test
+  public void testServesCosineDistances()
+      throws IOException {
+    File indexDir = new File(INDEX_DIR, "cosine");
+    FileUtils.forceMkdir(indexDir);
+    float[][] vectors = new float[200][8];
+    Random random = new Random(7);
+    for (float[] vector : vectors) {
+      for (int d = 0; d < vector.length; d++) {
+        vector[d] = random.nextFloat() - 0.5f;
+      }
+    }
+    for (String distanceFunction : new String[]{"COSINE", "EUCLIDEAN"}) {
+      Map<String, String> properties = new HashMap<>();
+      properties.put("vectorIndexType", "HNSW");
+      properties.put("vectorDimension", "8");
+      properties.put("vectorDistanceFunction", distanceFunction);
+      VectorIndexConfig config = new VectorIndexConfig(properties);
+      FileUtils.cleanDirectory(indexDir);
+      try (HnswVectorIndexCreator creator = new HnswVectorIndexCreator("baz", indexDir, config)) {
+        for (float[] vector : vectors) {
+          creator.add(vector);
+        }
+        creator.seal();
+      }
+      try (HnswVectorIndexReader reader = new HnswVectorIndexReader("baz", indexDir, vectors.length, config)) {
+        float[] query = vectors[3];
+        if (distanceFunction.equals("EUCLIDEAN")) {
+          Assert.assertNull(reader.getDocDistances(query, 5));
+          continue;
+        }
+        MutableRoaringBitmap allowed = new MutableRoaringBitmap();
+        allowed.add(10L, 60L);
+        int[] filtered = reader.getDocIds(query, 5, allowed).toArray();
+        Int2FloatMap distances = reader.getDocDistances(query, 5);
+        for (int docId : filtered) {
+          Assert.assertTrue(distances.containsKey(docId), "Filtered search result " + docId + " must be reused");
+        }
+        distances = reader.getDocDistances(query, 20);
+        Assert.assertTrue(distances.size() >= 20);
+        for (Int2FloatMap.Entry entry : distances.int2FloatEntrySet()) {
+          Assert.assertEquals(entry.getFloatValue(),
+              VectorFunctions.cosineDistance(vectors[entry.getIntKey()], query), 1e-5);
+        }
+      }
     }
   }
 }

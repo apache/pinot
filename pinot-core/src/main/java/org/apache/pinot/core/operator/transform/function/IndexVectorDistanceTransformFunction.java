@@ -33,11 +33,11 @@ import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
 /// Implements `VECTOR_DISTANCE(column, ARRAY[...], k)`: the cosine distance of each document from the query vector,
 /// served by the column's vector index for the `k` documents closest to the query vector.
 ///
-/// Paired with `VECTOR_SIMILARITY(column, ARRAY[...], k)` on the same vector and `k`, it returns the same values as
-/// `cosineDistance(column, ARRAY[...])` without reading the vectors of the matched documents from the forward index:
-/// the distances come from the index search the filter already ran. A document the index search did not return
-/// (e.g. when the column's index does not serve distances) falls back to computing the distance from the forward
-/// index.
+/// Paired with `VECTOR_SIMILARITY(column, ARRAY[...], k)` on the same vector and `k`, it returns the values of
+/// `cosineDistance(column, ARRAY[...])` (up to the index's single-precision arithmetic) without reading the vectors
+/// of the matched documents from the forward index: the distances come from the index search the filter already ran.
+/// A document the index search did not return (e.g. when the column's index does not serve distances) falls back to
+/// computing the distance from the forward index.
 ///
 /// Not thread-safe: like other transform functions, an instance serves one segment on one thread.
 public class IndexVectorDistanceTransformFunction extends BaseTransformFunction {
