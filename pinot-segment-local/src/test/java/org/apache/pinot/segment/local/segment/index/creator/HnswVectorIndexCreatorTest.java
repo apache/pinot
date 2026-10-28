@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.HnswVectorIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.vector.HnswVectorIndexReader;
@@ -31,6 +32,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
@@ -178,5 +180,50 @@ public class HnswVectorIndexCreatorTest {
       Assert.assertEquals(debugInfo.get("supportsPreFilter"), reader.supportsPreFilter(),
           "Debug info must report the reader's actual pre-filter capability, not a hardcoded literal");
     }
+  }
+
+  @DataProvider
+  public Object[][] parallelBuilds() {
+    // buildThreads, forceMerge, parallelBuildMaxDocs: the last case outgrows the buffer and falls back to one writer
+    return new Object[][]{{1, true, 50_000}, {4, true, 50_000}, {4, false, 50_000}, {3, true, 100}};
+  }
+
+  /// Every build mode, including the default single writer, must index each row under its own doc id: searching for a
+  /// stored vector finds that row.
+  @Test(dataProvider = "parallelBuilds")
+  public void testParallelBuildKeepsDocIds(int buildThreads, boolean forceMerge, int parallelBuildMaxDocs)
+      throws IOException {
+    File indexDir = new File(INDEX_DIR, "parallel");
+    FileUtils.forceMkdir(indexDir);
+    Map<String, String> properties = new HashMap<>();
+    properties.put("vectorIndexType", "HNSW");
+    properties.put("vectorDimension", "8");
+    properties.put("buildThreads", String.valueOf(buildThreads));
+    properties.put("forceMerge", String.valueOf(forceMerge));
+    properties.put("parallelBuildMaxDocs", String.valueOf(parallelBuildMaxDocs));
+    VectorIndexConfig config = new VectorIndexConfig(properties);
+    int numDocs = 1000;
+    float[][] vectors = new float[numDocs][8];
+    Random random = new Random(42);
+    try (HnswVectorIndexCreator creator = new HnswVectorIndexCreator("bar", indexDir, config)) {
+      float[] reused = new float[8];
+      for (int i = 0; i < numDocs; i++) {
+        for (int d = 0; d < 8; d++) {
+          vectors[i][d] = random.nextFloat();
+          reused[d] = vectors[i][d];
+        }
+        // The creator must copy the row, since callers reuse the array
+        creator.add(reused);
+      }
+      creator.seal();
+    }
+    try (HnswVectorIndexReader reader = new HnswVectorIndexReader("bar", indexDir, numDocs, config)) {
+      for (int docId = 0; docId < numDocs; docId += 37) {
+        // k widens the HNSW search beam; with k = 1 the approximate search can miss even an exact match
+        Assert.assertTrue(reader.getDocIds(vectors[docId], 10).contains(docId), "Doc " + docId + " not found");
+      }
+    }
+    String[] leftovers = indexDir.list((dir, name) -> name.contains(".hnsw.part"));
+    Assert.assertEquals(leftovers.length, 0, "Per-thread build directories must be removed");
   }
 }
