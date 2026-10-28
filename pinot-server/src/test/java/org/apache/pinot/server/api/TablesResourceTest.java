@@ -499,7 +499,7 @@ public class TablesResourceTest extends BaseResourceTest {
           new ThreadSafeMutableRoaringBitmap(segment.loadDocIdsFromSnapshot(fileType.getKey()));
       ThreadSafeMutableRoaringBitmap.CardinalityAndBytes docIds = bitmap.getBytesAndCardinality();
       segment.persistDocIdsSnapshot(fileType.getKey(), docIds,
-          DocIdsSnapshot.metadata(docIds, fileType.getValue(), trigger));
+          DocIdsSnapshot.metadata(docIds, fileType.getValue(), trigger, 1_700_000_000_000L));
     }
     long beforeRequest = System.currentTimeMillis();
     String response = _webTarget.path("/tables/" + REALTIME_TABLE_NAME + "/validDocIdsMetadata")
@@ -523,6 +523,7 @@ public class TablesResourceTest extends BaseResourceTest {
     assertTrue(diagnostics.get("snapshotAgeMs").asLong() <= afterRequest - capturedAt);
     assertEquals(diagnostics.get("snapshotConsumingSegmentName").asText(), trigger.consumingSegmentName());
     assertEquals(diagnostics.get("snapshotConsumedUpToOffset").asText(), trigger.consumedUpToOffset());
+    assertEquals(diagnostics.get("upsertTieTimeMs").asLong(), 1_700_000_000_000L);
     assertEquals(diagnostics.get("docIdsType").asText(),
         expectedType.equals("SNAPSHOT") ? "VALID_DOC_IDS" : "QUERYABLE_DOC_IDS");
     assertEquals(diagnostics.get("docIdsCrc").asLong(),

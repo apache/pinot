@@ -37,6 +37,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
@@ -102,6 +103,47 @@ public class BasePartitionUpsertMetadataManagerTest {
       assertFalse(upsertMetadataManager.isPreloading());
       upsertMetadataManager.stop();
     }
+  }
+
+  @Test
+  public void testCanPreloadSegmentOnlyWhenSnapshotTieTimeMatchesZK()
+      throws IOException {
+    UpsertContext context = mock(UpsertContext.class);
+    when(context.isSnapshotEnabled()).thenReturn(true);
+    TableDataManager tableDataManager = mock(TableDataManager.class);
+    when(context.getTableDataManager()).thenReturn(tableDataManager);
+    Lock segmentLock = mock(Lock.class);
+    when(tableDataManager.getSegmentLock(anyString())).thenReturn(segmentLock);
+    when(segmentLock.tryLock()).thenReturn(true);
+    TableConfig tableConfig = mock(TableConfig.class);
+    File segDir = new File(TEMP_DIR, "seg");
+    when(tableDataManager.getSegmentDataDir("seg", null, tableConfig)).thenReturn(segDir);
+    DummyPartitionUpsertMetadataManager manager =
+        new DummyPartitionUpsertMetadataManager("myTable_REALTIME", 0, context);
+    SegmentZKMetadata zkMetadata = new SegmentZKMetadata("seg");
+    zkMetadata.setCreationTime(1000L);
+    assertFalse(manager.canPreloadSegment(tableDataManager, tableConfig, "seg", zkMetadata));
+
+    // The snapshot records the ZK creation time the segment broke ties with
+    ImmutableSegmentImpl segment = createImmutableSegment("seg", segDir, new ArrayList<>(), null);
+    when(((SegmentMetadataImpl) segment.getSegmentMetadata()).getZkCreationTime()).thenReturn(1000L);
+    segment.enableUpsert(manager, createDocIds(1, 2), null);
+    manager.trackSegment(segment);
+    manager.markSegmentAsUpdated(segment);
+    manager.addRecord(mock(MutableSegmentImpl.class), mock(RecordInfo.class));
+    manager.takeSnapshot();
+    assertEquals(segment.loadDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME).metadata().upsertTieTimeMs(),
+        Long.valueOf(1000L));
+    assertTrue(manager.canPreloadSegment(tableDataManager, tableConfig, "seg", zkMetadata));
+
+    // A same-CRC push moved the creation time after the snapshot, so the segment is added later with full comparisons
+    zkMetadata.setCreationTime(2000L);
+    assertFalse(manager.canPreloadSegment(tableDataManager, tableConfig, "seg", zkMetadata));
+
+    // Snapshots without the tie time, e.g. written by an older server, are preloaded as before
+    segment.persistDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME,
+        createDocIds(1, 2).getBytesAndCardinality(), null);
+    assertTrue(manager.canPreloadSegment(tableDataManager, tableConfig, "seg", zkMetadata));
   }
 
   @Test

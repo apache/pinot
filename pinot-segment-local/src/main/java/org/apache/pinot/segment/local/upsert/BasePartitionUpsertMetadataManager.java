@@ -43,6 +43,7 @@ import java.util.zip.CRC32;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.helix.HelixManager;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -294,14 +295,34 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       throws Exception {
     TableConfig tableConfig = indexLoadingConfig.getTableConfig();
     SegmentPreloadUtils.preloadSegments(tableDataManager, _partitionId, indexLoadingConfig, helixManager,
-        segmentPreloadExecutor, (segmentName, segmentZKMetadata) -> {
-          String tier = segmentZKMetadata.getTier();
-          if (SegmentPreloadUtils.hasValidDocIdsSnapshot(tableDataManager, tableConfig, segmentName, tier)) {
-            return true;
-          }
-          _logger.info("Skip segment: {} on tier: {} as it has no validDocIds snapshot", segmentName, tier);
-          return false;
-        });
+        segmentPreloadExecutor,
+        (segmentName, segmentZKMetadata) -> canPreloadSegment(tableDataManager, tableConfig, segmentName,
+            segmentZKMetadata));
+  }
+
+  /// Returns whether the segment can be preloaded with its validDocIds snapshot. Otherwise it's added later with full
+  /// upsert comparisons.
+  @VisibleForTesting
+  boolean canPreloadSegment(TableDataManager tableDataManager, TableConfig tableConfig, String segmentName,
+      SegmentZKMetadata segmentZKMetadata) {
+    String tier = segmentZKMetadata.getTier();
+    if (!SegmentPreloadUtils.hasValidDocIdsSnapshot(tableDataManager, tableConfig, segmentName, tier)) {
+      _logger.info("Skip segment: {} on tier: {} as it has no validDocIds snapshot", segmentName, tier);
+      return false;
+    }
+    // A same-CRC push can move the segment time in ZK after the snapshot was taken. The snapshot then holds ties
+    // decided with the old time, so add the segment later with full comparisons, the same way a running server
+    // reloads it on the metadata refresh message.
+    DocIdsSnapshot.Metadata snapshotMetadata =
+        SegmentPreloadUtils.getValidDocIdsSnapshotMetadata(tableDataManager, tableConfig, segmentName, tier);
+    Long snapshotTieTimeMs = snapshotMetadata != null ? snapshotMetadata.upsertTieTimeMs() : null;
+    long zkTieTimeMs = getAuthoritativeUpdateOrCreationTime(segmentZKMetadata);
+    if (snapshotTieTimeMs != null && zkTieTimeMs != Long.MIN_VALUE && snapshotTieTimeMs != zkTieTimeMs) {
+      _logger.info("Skip segment: {} as its validDocIds snapshot has upsert tie time: {} but ZK has: {}", segmentName,
+          snapshotTieTimeMs, zkTieTimeMs);
+      return false;
+    }
+    return true;
   }
 
   @Override
@@ -1092,11 +1113,12 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
           continue;
         }
         ThreadSafeMutableRoaringBitmap validDocIds = segment.getValidDocIds();
+        long upsertTieTimeMs = getAuthoritativeUpdateOrCreationTime(segment);
         // NOTE: Segment out of TTL without snapshot might have null validDocIds
         if (validDocIds != null) {
           ThreadSafeMutableRoaringBitmap.CardinalityAndBytes validDocIdsSnapshot = validDocIds.getBytesAndCardinality();
           segment.persistDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME, validDocIdsSnapshot,
-              DocIdsSnapshot.metadata(validDocIdsSnapshot, DocIdsType.VALID_DOC_IDS, trigger));
+              DocIdsSnapshot.metadata(validDocIdsSnapshot, DocIdsType.VALID_DOC_IDS, trigger, upsertTieTimeMs));
           numPrimaryKeysInSnapshot += validDocIdsSnapshot.getCardinality();
         }
         if (_deleteRecordColumn != null) {
@@ -1105,7 +1127,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
             ThreadSafeMutableRoaringBitmap.CardinalityAndBytes queryableDocIdsSnapshot =
                 queryableDocIds.getBytesAndCardinality();
             segment.persistDocIdsSnapshot(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME, queryableDocIdsSnapshot,
-                DocIdsSnapshot.metadata(queryableDocIdsSnapshot, DocIdsType.QUERYABLE_DOC_IDS, trigger));
+                DocIdsSnapshot.metadata(queryableDocIdsSnapshot, DocIdsType.QUERYABLE_DOC_IDS, trigger,
+                    upsertTieTimeMs));
             numQueryableDocIdsInSnapshot += queryableDocIdsSnapshot.getCardinality();
           }
         }
@@ -1143,12 +1166,13 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
             continue;
           }
           ThreadSafeMutableRoaringBitmap validDocIds = segment.getValidDocIds();
+          long upsertTieTimeMs = getAuthoritativeUpdateOrCreationTime(segment);
           // NOTE: Segment out of TTL without snapshot might have null validDocIds
           if (validDocIds != null) {
             ThreadSafeMutableRoaringBitmap.CardinalityAndBytes validDocIdsSnapshot =
                 validDocIds.getBytesAndCardinality();
             segment.persistDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME, validDocIdsSnapshot,
-                DocIdsSnapshot.metadata(validDocIdsSnapshot, DocIdsType.VALID_DOC_IDS, trigger));
+                DocIdsSnapshot.metadata(validDocIdsSnapshot, DocIdsType.VALID_DOC_IDS, trigger, upsertTieTimeMs));
             // The segment has its validDocIds snapshot file on disk now, so handle it as a segment with snapshot
             // from now on, even if persisting the queryableDocIds snapshot below fails.
             _segmentsWithSnapshot.add(segment);
@@ -1160,7 +1184,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
               ThreadSafeMutableRoaringBitmap.CardinalityAndBytes queryableDocIdsSnapshot =
                   queryableDocIds.getBytesAndCardinality();
               segment.persistDocIdsSnapshot(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME, queryableDocIdsSnapshot,
-                  DocIdsSnapshot.metadata(queryableDocIdsSnapshot, DocIdsType.QUERYABLE_DOC_IDS, trigger));
+                  DocIdsSnapshot.metadata(queryableDocIdsSnapshot, DocIdsType.QUERYABLE_DOC_IDS, trigger,
+                      upsertTieTimeMs));
               numQueryableDocIdsInSnapshot += queryableDocIdsSnapshot.getCardinality();
             }
           }
@@ -1528,6 +1553,16 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
     // Fall back to local creation time if ZK creation time is not set
     return segmentMetadata.getIndexCreationTime();
+  }
+
+  /// Returns the time [#getAuthoritativeUpdateOrCreationTime(IndexSegment)] reads once the segment is loaded with
+  /// this ZK metadata, or Long.MIN_VALUE when ZK has neither time and upsert falls back to the local creation time.
+  protected long getAuthoritativeUpdateOrCreationTime(SegmentZKMetadata segmentZKMetadata) {
+    // Mirrors BaseTableDataManager.setZkOperationTimeIfAvailable(), which copies only positive ZK times
+    if (_tableType == TableType.OFFLINE && segmentZKMetadata.getPushTime() > 0) {
+      return segmentZKMetadata.getPushTime();
+    }
+    return segmentZKMetadata.getCreationTime() > 0 ? segmentZKMetadata.getCreationTime() : Long.MIN_VALUE;
   }
 
   protected abstract int getPrevKeyToRecordLocationSize();

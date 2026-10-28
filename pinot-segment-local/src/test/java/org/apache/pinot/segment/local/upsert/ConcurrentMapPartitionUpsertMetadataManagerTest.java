@@ -619,10 +619,30 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     checkRecordLocation(restartedMetadataManager._primaryKeyToRecordLocationMap, 0, restartedSegmentA, 0, 100,
         HashFunction.NONE);
 
+    // A server that restarts before its next snapshot preloads segment B, whose snapshot still holds the key. Preload
+    // skips segment A as its snapshot has the old creation time, so it's added later with full comparisons.
+    ConcurrentMapPartitionUpsertMetadataManager preloadedMetadataManager =
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0,
+            _contextBuilder.setHashFunction(HashFunction.NONE).build());
+    ThreadSafeMutableRoaringBitmap preloadedValidDocIdsB = new ThreadSafeMutableRoaringBitmap();
+    ImmutableSegmentImpl preloadedSegmentB =
+        mockUploadedImmutableSegment("b", preloadedValidDocIdsB, null, getPrimaryKeyList(1, primaryKeys), 2000L);
+    preloadedMetadataManager.doPreloadSegment(preloadedSegmentB, preloadedValidDocIdsB, null,
+        recordInfoList.iterator());
+    ThreadSafeMutableRoaringBitmap preloadedValidDocIdsA = new ThreadSafeMutableRoaringBitmap();
+    ImmutableSegmentImpl preloadedSegmentA =
+        mockUploadedSegmentWithZkCreationTime("a", preloadedValidDocIdsA, primaryKeys, 3000L);
+    preloadedMetadataManager.addSegment(preloadedSegmentA, preloadedValidDocIdsA, null, recordInfoList.iterator());
+    checkRecordLocation(preloadedMetadataManager._primaryKeyToRecordLocationMap, 0, preloadedSegmentA, 0, 100,
+        HashFunction.NONE);
+    assertTrue(preloadedValidDocIdsB.getMutableRoaringBitmap().isEmpty());
+
     upsertMetadataManager.stop();
     upsertMetadataManager.close();
     restartedMetadataManager.stop();
     restartedMetadataManager.close();
+    preloadedMetadataManager.stop();
+    preloadedMetadataManager.close();
   }
 
   /// Mocks an uploaded segment whose name carries creation time 1000 but whose ZK creation time moved on a re-push

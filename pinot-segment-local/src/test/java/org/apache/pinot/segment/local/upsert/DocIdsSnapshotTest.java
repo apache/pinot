@@ -39,6 +39,8 @@ import static org.testng.Assert.assertTrue;
 
 
 public class DocIdsSnapshotTest {
+  private static final long UPSERT_TIE_TIME_MS = 1_700_000_000_000L;
+
   @Test
   public void testCaptureAndLegacyReaders()
       throws Exception {
@@ -54,6 +56,7 @@ public class DocIdsSnapshotTest {
     assertTrue(snapshot.metadata().snapshotCapturedAtMs() <= after);
     assertEquals(snapshot.metadata().snapshotConsumedUpToOffset(), "123");
     assertEquals(snapshot.metadata().snapshotConsumingSegmentName(), "table__0__2__0");
+    assertEquals(snapshot.metadata().upsertTieTimeMs(), Long.valueOf(UPSERT_TIE_TIME_MS));
     // Both reader styles used by old servers and snapshot consumers ignore the trailer.
     assertEquals(new ImmutableRoaringBitmap(ByteBuffer.wrap(bytes)).toMutableRoaringBitmap(), snapshot.docIds());
     MutableRoaringBitmap legacy = new MutableRoaringBitmap();
@@ -104,8 +107,24 @@ public class DocIdsSnapshotTest {
   }
 
   @Test
+  public void testTrailerWithoutUpsertTieTimeHasNoTieTime()
+      throws Exception {
+    // Servers before the tie time was added wrote the same trailer without the field
+    String bytes = new String(fileBytes(bitmap(1, 2, 3), null), StandardCharsets.ISO_8859_1);
+    String older = bytes.replace(",\"upsertTieTimeMs\":" + UPSERT_TIE_TIME_MS, "");
+    assertNotEquals(older, bytes);
+    DocIdsSnapshot.Metadata metadata = DocIdsSnapshot.fromBytes(older.getBytes(StandardCharsets.ISO_8859_1)).metadata();
+    assertNotNull(metadata);
+    assertNull(metadata.upsertTieTimeMs());
+    assertFalse(metadata.toResponse(System.currentTimeMillis()).containsKey("upsertTieTimeMs"));
+    assertEquals(DocIdsSnapshot.fromBytes(bytes.getBytes(StandardCharsets.ISO_8859_1)).metadata()
+        .toResponse(System.currentTimeMillis()).get("upsertTieTimeMs"), UPSERT_TIE_TIME_MS);
+  }
+
+  @Test
   public void testAgeAndAbsentTrigger() {
-    DocIdsSnapshot.Metadata metadata = new DocIdsSnapshot.Metadata(1L, DocIdsType.QUERYABLE_DOC_IDS, 100L, null, null);
+    DocIdsSnapshot.Metadata metadata =
+        new DocIdsSnapshot.Metadata(1L, DocIdsType.QUERYABLE_DOC_IDS, 100L, null, null, null);
     assertEquals(metadata.toResponse(130L).get("snapshotAgeMs"), 30L);
     assertEquals(metadata.toResponse(130L).get("docIdsType"), "QUERYABLE_DOC_IDS");
     assertFalse(metadata.toResponse(99L).containsKey("snapshotAgeMs"));
@@ -122,7 +141,8 @@ public class DocIdsSnapshotTest {
       throws Exception {
     ThreadSafeMutableRoaringBitmap.CardinalityAndBytes docIds = bitmap.getBytesAndCardinality();
     ByteArrayOutputStream out = new ByteArrayOutputStream();
-    DocIdsSnapshot.write(out, docIds.getBytes(), DocIdsSnapshot.metadata(docIds, DocIdsType.VALID_DOC_IDS, trigger));
+    DocIdsSnapshot.write(out, docIds.getBytes(),
+        DocIdsSnapshot.metadata(docIds, DocIdsType.VALID_DOC_IDS, trigger, UPSERT_TIE_TIME_MS));
     return out.toByteArray();
   }
 
