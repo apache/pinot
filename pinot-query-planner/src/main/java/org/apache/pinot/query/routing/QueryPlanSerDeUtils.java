@@ -86,10 +86,15 @@ public class QueryPlanSerDeUtils {
     Map<String, String> customProperties = protoWorkerMetadata.getCustomPropertyMap();
     String tableSegmentsJson = customProperties.get(WorkerMetadata.TABLE_SEGMENTS_MAP_KEY);
     String logicalTableSegmentsJson = customProperties.get(WorkerMetadata.LOGICAL_TABLE_SEGMENTS_MAP_KEY);
+    String optionalTableSegmentsJson = customProperties.get(WorkerMetadata.OPTIONAL_TABLE_SEGMENTS_MAP_KEY);
+    String optionalLogicalTableSegmentsJson =
+        customProperties.get(WorkerMetadata.OPTIONAL_LOGICAL_TABLE_SEGMENTS_MAP_KEY);
     if (tableSegmentsJson != null || logicalTableSegmentsJson != null) {
       Map<String, String> strippedProperties = new HashMap<>(customProperties);
       strippedProperties.remove(WorkerMetadata.TABLE_SEGMENTS_MAP_KEY);
       strippedProperties.remove(WorkerMetadata.LOGICAL_TABLE_SEGMENTS_MAP_KEY);
+      strippedProperties.remove(WorkerMetadata.OPTIONAL_TABLE_SEGMENTS_MAP_KEY);
+      strippedProperties.remove(WorkerMetadata.OPTIONAL_LOGICAL_TABLE_SEGMENTS_MAP_KEY);
       customProperties = Collections.unmodifiableMap(strippedProperties);
     }
     WorkerMetadata workerMetadata =
@@ -99,11 +104,23 @@ public class QueryPlanSerDeUtils {
     } else if (tableSegmentsJson != null) {
       workerMetadata.setTableSegmentsMapJson(tableSegmentsJson);
     }
+    if (protoWorkerMetadata.hasOptionalTableSegmentsMap()) {
+      workerMetadata.setOptionalTableSegmentsMap(
+          fromProtoSegmentsMap(protoWorkerMetadata.getOptionalTableSegmentsMap()));
+    } else if (optionalTableSegmentsJson != null) {
+      workerMetadata.setOptionalTableSegmentsMapJson(optionalTableSegmentsJson);
+    }
     if (protoWorkerMetadata.hasLogicalTableSegmentsMap()) {
       workerMetadata.setLogicalTableSegmentsMap(
           fromProtoSegmentsMap(protoWorkerMetadata.getLogicalTableSegmentsMap()));
     } else if (logicalTableSegmentsJson != null) {
       workerMetadata.setLogicalTableSegmentsMapJson(logicalTableSegmentsJson);
+    }
+    if (protoWorkerMetadata.hasOptionalLogicalTableSegmentsMap()) {
+      workerMetadata.setOptionalLogicalTableSegmentsMap(
+          fromProtoSegmentsMap(protoWorkerMetadata.getOptionalLogicalTableSegmentsMap()));
+    } else if (optionalLogicalTableSegmentsJson != null) {
+      workerMetadata.setOptionalLogicalTableSegmentsMapJson(optionalLogicalTableSegmentsJson);
     }
     return workerMetadata;
   }

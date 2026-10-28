@@ -1215,7 +1215,9 @@ public class WorkerManager {
     }
     Map<String, List<String>> optionalSegmentsMap = new HashMap<>();
     for (Map.Entry<String, Set<String>> entry : tableToOptionalSegmentsMap.entrySet()) {
-      optionalSegmentsMap.put(entry.getKey(), new ArrayList<>(entry.getValue()));
+      if (!entry.getValue().isEmpty()) {
+        optionalSegmentsMap.put(entry.getKey(), new ArrayList<>(entry.getValue()));
+      }
     }
 
     Preconditions.checkState(!segmentsMap.isEmpty(), "Unable to find segments for table: %s", tableName);

@@ -44,6 +44,10 @@ public class QueryPlanSerDeUtilsTest {
       Map.of("OFFLINE", List.of("seg_0", "seg_1"), "REALTIME", List.of("seg__0__0__20240101T0000Z"));
   private static final Map<String, List<String>> LOGICAL_TABLE_SEGMENTS_MAP =
       Map.of("t1_OFFLINE", List.of("t1_seg_0"), "t2_REALTIME", List.of("t2_seg_0", "t2_seg_1"));
+  private static final Map<String, List<String>> OPTIONAL_TABLE_SEGMENTS_MAP =
+      Map.of("OFFLINE", List.of("seg_2", "seg_3"), "REALTIME", List.of("seg__0__0__20250101T0000Z"));
+  private static final Map<String, List<String>> OPTIONAL_LOGICAL_TABLE_SEGMENTS_MAP =
+      Map.of("t1_OFFLINE", List.of("t1_seg_1"), "t2_REALTIME", List.of("t2_seg_2", "t2_seg_3"));
 
   @DataProvider
   public static Object[][] encodings() {
@@ -53,7 +57,7 @@ public class QueryPlanSerDeUtilsTest {
   @Test(dataProvider = "encodings")
   public void testLeafWorkerRoundTrip(boolean protoSegmentList)
       throws Exception {
-    WorkerMetadata workerMetadata = leafWorker(TABLE_SEGMENTS_MAP, null);
+    WorkerMetadata workerMetadata = leafWorker(TABLE_SEGMENTS_MAP, null, null, null);
 
     Worker.WorkerMetadata proto = toProto(workerMetadata, protoSegmentList);
     assertEquals(proto.hasTableSegmentsMap(), protoSegmentList);
@@ -78,7 +82,7 @@ public class QueryPlanSerDeUtilsTest {
   @Test(dataProvider = "encodings")
   public void testLogicalTableLeafWorkerRoundTrip(boolean protoSegmentList)
       throws Exception {
-    WorkerMetadata workerMetadata = leafWorker(null, LOGICAL_TABLE_SEGMENTS_MAP);
+    WorkerMetadata workerMetadata = leafWorker(null, LOGICAL_TABLE_SEGMENTS_MAP, null, null);
 
     Worker.WorkerMetadata proto = toProto(workerMetadata, protoSegmentList);
     assertFalse(proto.hasTableSegmentsMap());
@@ -99,7 +103,8 @@ public class QueryPlanSerDeUtilsTest {
     // A padded worker of a partitioned table scans no segment but must still run the leaf stage.
     Map<String, List<String>> emptySegments = Map.of("OFFLINE", new ArrayList<>());
     WorkerMetadata decoded =
-        QueryPlanSerDeUtils.fromProtoWorkerMetadata(toProto(leafWorker(emptySegments, null), protoSegmentList));
+        QueryPlanSerDeUtils.fromProtoWorkerMetadata(
+            toProto(leafWorker(emptySegments, null, null, null), protoSegmentList));
     assertEquals(decoded.getTableSegmentsMap(), emptySegments);
     assertTrue(decoded.isLeafStageWorker());
   }
@@ -110,7 +115,7 @@ public class QueryPlanSerDeUtilsTest {
   @Test(dataProvider = "encodings")
   public void testZeroEntrySegmentsMapStillMarksLeafWorker(boolean protoSegmentList)
       throws Exception {
-    Worker.WorkerMetadata proto = toProto(leafWorker(Map.of(), Map.of()), protoSegmentList);
+    Worker.WorkerMetadata proto = toProto(leafWorker(Map.of(), Map.of(), Map.of(), Map.of()), protoSegmentList);
     assertEquals(proto.hasTableSegmentsMap(), protoSegmentList);
     assertEquals(proto.hasLogicalTableSegmentsMap(), protoSegmentList);
 
@@ -126,7 +131,8 @@ public class QueryPlanSerDeUtilsTest {
   public void testDecodedCustomPropertiesAreUnmodifiable(boolean protoSegmentList)
       throws Exception {
     WorkerMetadata leaf =
-        QueryPlanSerDeUtils.fromProtoWorkerMetadata(toProto(leafWorker(TABLE_SEGMENTS_MAP, null), protoSegmentList));
+        QueryPlanSerDeUtils.fromProtoWorkerMetadata(
+            toProto(leafWorker(TABLE_SEGMENTS_MAP, null, null, null), protoSegmentList));
     assertThrows(UnsupportedOperationException.class, () -> leaf.getCustomProperties().put("k", "v"));
 
     WorkerMetadata intermediate = QueryPlanSerDeUtils.fromProtoWorkerMetadata(
@@ -211,13 +217,15 @@ public class QueryPlanSerDeUtilsTest {
   public void testLegacyEncodingIsTheJacksonJsonOlderServersParse()
       throws Exception {
     Map<String, List<String>> segmentsMap = Map.of("OFFLINE", List.of("seg_0", "seg-1.tar.gz", "s\u00ebg_2"));
-    Worker.WorkerMetadata proto = toProto(leafWorker(segmentsMap, null), false);
+    Worker.WorkerMetadata proto = toProto(leafWorker(segmentsMap, null, null, null), false);
     assertEquals(proto.getCustomPropertyMap().get(WorkerMetadata.TABLE_SEGMENTS_MAP_KEY),
         "{\"OFFLINE\":[\"seg_0\",\"seg-1.tar.gz\",\"s\u00ebg_2\"]}");
   }
 
   private static WorkerMetadata leafWorker(@Nullable Map<String, List<String>> tableSegmentsMap,
-      @Nullable Map<String, List<String>> logicalTableSegmentsMap) {
+      @Nullable Map<String, List<String>> logicalTableSegmentsMap,
+      @Nullable Map<String, List<String>> optionalTableSegmentsMap,
+      @Nullable Map<String, List<String>> optionalLogicalTableSegmentsMap) {
     MailboxInfos mailboxInfos = new MailboxInfos(new MailboxInfo("localhost", 1234, List.of(0, 1)));
     WorkerMetadata workerMetadata = new WorkerMetadata(3, Map.of(2, mailboxInfos), new HashMap<>(CUSTOM_PROPERTIES));
     if (tableSegmentsMap != null) {
@@ -225,6 +233,12 @@ public class QueryPlanSerDeUtilsTest {
     }
     if (logicalTableSegmentsMap != null) {
       workerMetadata.setLogicalTableSegmentsMap(logicalTableSegmentsMap);
+    }
+    if (optionalTableSegmentsMap != null) {
+      workerMetadata.setOptionalTableSegmentsMap(optionalTableSegmentsMap);
+    }
+    if (optionalLogicalTableSegmentsMap != null) {
+      workerMetadata.setOptionalLogicalTableSegmentsMap(optionalLogicalTableSegmentsMap);
     }
     return workerMetadata;
   }
@@ -235,5 +249,54 @@ public class QueryPlanSerDeUtilsTest {
     Worker.WorkerMetadata proto =
         QueryPlanSerDeUtils.toProtoWorkerMetadataList(List.of(workerMetadata), protoSegmentList).get(0);
     return Worker.WorkerMetadata.parseFrom(proto.toByteString());
+  }
+
+  @Test(dataProvider = "encodings")
+  public void testOptionalTableLeafWorkerRoundTrip(boolean protoSegmentList)
+      throws Exception {
+    WorkerMetadata workerMetadata = leafWorker(TABLE_SEGMENTS_MAP, null, OPTIONAL_TABLE_SEGMENTS_MAP, null);
+
+    Worker.WorkerMetadata proto = toProto(workerMetadata, protoSegmentList);
+    assertFalse(proto.hasLogicalTableSegmentsMap());
+    assertFalse(proto.hasOptionalLogicalTableSegmentsMap());
+    assertEquals(proto.hasTableSegmentsMap(), protoSegmentList);
+    assertEquals(proto.getCustomPropertyMap().containsKey(WorkerMetadata.TABLE_SEGMENTS_MAP_KEY),
+        !protoSegmentList);
+    assertEquals(proto.hasOptionalTableSegmentsMap(), protoSegmentList);
+    assertEquals(proto.getCustomPropertyMap().containsKey(WorkerMetadata.OPTIONAL_TABLE_SEGMENTS_MAP_KEY),
+        !protoSegmentList);
+
+    WorkerMetadata decoded = QueryPlanSerDeUtils.fromProtoWorkerMetadata(proto);
+    assertNull(decoded.getOptionalLogicalTableSegmentsMap());
+    assertNull(decoded.getLogicalTableSegmentsMap());
+    assertEquals(decoded.getTableSegmentsMap(), TABLE_SEGMENTS_MAP);
+    assertEquals(decoded.getOptionalTableSegmentsMap(), OPTIONAL_TABLE_SEGMENTS_MAP);
+    assertTrue(decoded.isLeafStageWorker());
+    assertEquals(decoded.getCustomProperties(), CUSTOM_PROPERTIES);
+  }
+
+  @Test(dataProvider = "encodings")
+  public void testOptionalLogicalTableLeafWorkerRoundTrip(boolean protoSegmentList)
+      throws Exception {
+    WorkerMetadata workerMetadata =
+        leafWorker(null, LOGICAL_TABLE_SEGMENTS_MAP, null, OPTIONAL_LOGICAL_TABLE_SEGMENTS_MAP);
+
+    Worker.WorkerMetadata proto = toProto(workerMetadata, protoSegmentList);
+    assertFalse(proto.hasTableSegmentsMap());
+    assertFalse(proto.hasOptionalTableSegmentsMap());
+    assertEquals(proto.hasLogicalTableSegmentsMap(), protoSegmentList);
+    assertEquals(proto.getCustomPropertyMap().containsKey(WorkerMetadata.LOGICAL_TABLE_SEGMENTS_MAP_KEY),
+        !protoSegmentList);
+    assertEquals(proto.hasOptionalLogicalTableSegmentsMap(), protoSegmentList);
+    assertEquals(proto.getCustomPropertyMap().containsKey(WorkerMetadata.OPTIONAL_LOGICAL_TABLE_SEGMENTS_MAP_KEY),
+        !protoSegmentList);
+
+    WorkerMetadata decoded = QueryPlanSerDeUtils.fromProtoWorkerMetadata(proto);
+    assertNull(decoded.getOptionalTableSegmentsMap());
+    assertNull(decoded.getTableSegmentsMap());
+    assertEquals(decoded.getLogicalTableSegmentsMap(), LOGICAL_TABLE_SEGMENTS_MAP);
+    assertEquals(decoded.getOptionalLogicalTableSegmentsMap(), OPTIONAL_LOGICAL_TABLE_SEGMENTS_MAP);
+    assertTrue(decoded.isLeafStageWorker());
+    assertEquals(decoded.getCustomProperties(), CUSTOM_PROPERTIES);
   }
 }

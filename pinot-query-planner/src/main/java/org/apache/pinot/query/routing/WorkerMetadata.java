@@ -131,6 +131,12 @@ public class WorkerMetadata {
     _tableSegmentsMapJson = tableSegmentsMapJson;
   }
 
+  /// Stores the legacy JSON encoding of the table segments map, to be parsed by [#getOptionalTableSegmentsMap()] on
+  /// first access.
+  void setOptionalTableSegmentsMapJson(String optionalTableSegmentsMapJson) {
+    _optionalTableSegmentsMapJson = optionalTableSegmentsMapJson;
+  }
+
   /// Segments to scan keyed by physical table name (with type suffix), or `null` for a worker that scans no logical
   /// table.
   @Nullable
@@ -152,6 +158,12 @@ public class WorkerMetadata {
   /// [#getLogicalTableSegmentsMap] on first access.
   void setLogicalTableSegmentsMapJson(String logicalTableSegmentsMapJson) {
     _logicalTableSegmentsMapJson = logicalTableSegmentsMapJson;
+  }
+
+  /// Stores the legacy JSON encoding of the logical table segments map, to be parsed by
+  /// [#getOptionalLogicalTableSegmentsMap] on first access.
+  void setOptionalLogicalTableSegmentsMapJson(String optionalLogicalTableSegmentsMapJson) {
+    _optionalLogicalTableSegmentsMapJson = optionalLogicalTableSegmentsMapJson;
   }
 
   /// A leaf-stage worker carries a (possibly empty) segment map, parsed or not; an intermediate-stage worker carries
@@ -187,7 +199,7 @@ public class WorkerMetadata {
   public Map<String, List<String>> getOptionalLogicalTableSegmentsMap() {
     Map<String, List<String>> optionalLogicalTableSegmentsMap = _optionalLogicalTableSegmentsMap;
     if (optionalLogicalTableSegmentsMap == null && _optionalLogicalTableSegmentsMapJson != null) {
-      optionalLogicalTableSegmentsMap = decodeSegmentsMapJson(_optionalTableSegmentsMapJson);
+      optionalLogicalTableSegmentsMap = decodeSegmentsMapJson(_optionalLogicalTableSegmentsMapJson);
       _optionalLogicalTableSegmentsMap = optionalLogicalTableSegmentsMap;
     }
     return optionalLogicalTableSegmentsMap;
