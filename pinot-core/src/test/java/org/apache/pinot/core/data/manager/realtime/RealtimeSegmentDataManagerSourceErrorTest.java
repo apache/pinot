@@ -20,6 +20,7 @@ package org.apache.pinot.core.data.manager.realtime;
 
 import java.io.File;
 import java.net.ConnectException;
+import java.net.SocketException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -29,6 +30,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
@@ -90,16 +92,26 @@ public class RealtimeSegmentDataManagerSourceErrorTest {
   // Stands in for a stream config value a decoder's exception can quote
   private static final String DECODER_CANARY = "fake-canary-value";
 
-  /// What each fetch does, in order: throw a failure, or return a batch of these payloads (empty for none).
+  /// What each fetch does, in order: throw a failure, or return a batch of these payloads (empty for none). A
+  /// runnable runs during the fetch, before the next step decides it.
   private static final Deque<Object> SCRIPT = new ConcurrentLinkedDeque<>();
   private static volatile boolean _decoderInitRefused;
   private static volatile boolean _checkpointReportsRefusal;
   private static volatile boolean _createReportsRefusal;
+  // Runs when a consumer is created, as the segment is told to stop mid-creation
+  private static volatile Runnable _duringCreate;
 
   public static class ScriptedConsumerFactory extends FakeStreamConsumerFactory {
     @Override
     public PartitionGroupConsumer createPartitionGroupConsumer(String clientId,
         PartitionGroupConsumptionStatus partitionGroupConsumptionStatus) {
+      Runnable duringCreate = _duringCreate;
+      if (duringCreate != null) {
+        // Interrupted retries: the plugin reports the failure its last attempt saw, and gives up
+        duringCreate.run();
+        IngestionSourceErrorReporter.report(new ConnectException("Connection refused"));
+        throw new IllegalStateException("Failed to create the consumer");
+      }
       if (_createReportsRefusal) {
         // A plugin that reports the failure it retried and throws without it, as Kafka's consumer creation does
         IngestionSourceErrorReporter.report(new RefusedBySourceException());
@@ -109,6 +121,10 @@ public class RealtimeSegmentDataManagerSourceErrorTest {
         @Override
         public MessageBatch fetchMessages(StreamPartitionMsgOffset startOffset, int timeoutMs) {
           Object step = SCRIPT.poll();
+          if (step instanceof Runnable) {
+            ((Runnable) step).run();
+            step = SCRIPT.poll();
+          }
           if (step == null) {
             throw new PermanentConsumerException(new IllegalStateException("End of the test script"));
           }
@@ -218,6 +234,15 @@ public class RealtimeSegmentDataManagerSourceErrorTest {
     _decoderInitRefused = false;
     _checkpointReportsRefusal = false;
     _createReportsRefusal = false;
+    _duringCreate = null;
+  }
+
+  private static void stop(RealtimeSegmentDataManagerTest.FakeRealtimeSegmentDataManager segmentDataManager) {
+    try {
+      segmentDataManager._shouldStop.set(segmentDataManager, true);
+    } catch (IllegalAccessException e) {
+      throw new IllegalStateException(e);
+    }
   }
 
   private RealtimeSegmentDataManagerTest.FakeRealtimeSegmentDataManager createSegmentDataManager(
@@ -317,6 +342,37 @@ public class RealtimeSegmentDataManagerSourceErrorTest {
     expectThrows(ConnectException.class, segmentDataManager::consumeLoop);
     assertNotNull(serverMetrics.getGaugeValue(READ_GAUGE));
     assertNull(serverMetrics.getGaugeValue(AUTH_GAUGE));
+    segmentDataManager.close();
+  }
+
+  @Test
+  public void failureWhileConsumptionIsStoppingIsNotRecorded()
+      throws Exception {
+    // Five transient failures, then the segment is told to stop, and the stop's interrupt surfaces as the sixth
+    AtomicReference<RealtimeSegmentDataManagerTest.FakeRealtimeSegmentDataManager> stopping = new AtomicReference<>();
+    for (int i = 0; i < 5; i++) {
+      SCRIPT.add(new ConnectException("Connection refused"));
+    }
+    SCRIPT.add((Runnable) () -> stop(stopping.get()));
+    SCRIPT.add(new SocketException("Socket closed"));
+    ServerMetrics serverMetrics = newServerMetrics();
+    stopping.set(createSegmentDataManager(serverMetrics));
+    expectThrows(SocketException.class, stopping.get()::consumeLoop);
+    assertNull(serverMetrics.getGaugeValue(READ_GAUGE));
+    stopping.get().close();
+  }
+
+  @Test
+  public void failureWhileStoppingDuringConsumerRecreationIsNotRecorded()
+      throws Exception {
+    // A transient failure makes the consume loop recreate its consumer, and the segment is told to stop meanwhile
+    SCRIPT.add(new ConnectException("Connection refused"));
+    ServerMetrics serverMetrics = newServerMetrics();
+    RealtimeSegmentDataManagerTest.FakeRealtimeSegmentDataManager segmentDataManager =
+        createSegmentDataManager(serverMetrics);
+    _duringCreate = () -> stop(segmentDataManager);
+    expectThrows(IllegalStateException.class, segmentDataManager::consumeLoop);
+    assertNull(serverMetrics.getGaugeValue(READ_GAUGE));
     segmentDataManager.close();
   }
 

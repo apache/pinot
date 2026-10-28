@@ -2325,6 +2325,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   }
 
   private void recordSourceError(String site, Throwable failure, boolean givingUp) {
+    // A failure while consumption is being stopped is usually the stop's own interrupt, not the source's
+    if (_shouldStop) {
+      return;
+    }
     _sourceErrors.record(site, failure, givingUp, _streamConfig.getTopicName(), List.of(_partitionGroupId));
   }
 
