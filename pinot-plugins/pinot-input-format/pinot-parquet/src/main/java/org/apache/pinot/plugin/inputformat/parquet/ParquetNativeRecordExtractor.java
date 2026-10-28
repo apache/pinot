@@ -34,7 +34,6 @@ import org.apache.parquet.schema.Type;
 import org.apache.pinot.spi.data.readers.BaseRecordExtractor;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
-import org.apache.pinot.spi.utils.TimestampUtils;
 import org.apache.pinot.spi.utils.UuidUtils;
 
 
@@ -45,7 +44,7 @@ import org.apache.pinot.spi.utils.UuidUtils;
 /// - `BOOLEAN` → `Boolean`
 /// - `INT32` → `Integer`, or `Long` when annotated as unsigned 32-bit (`INTEGER(32, false)` / legacy `UINT_32`),
 ///   since values above `Integer.MAX_VALUE` do not fit in a signed `int`
-/// - `INT64` → `Long`
+/// - `INT64` → `Long`, preserving the signed bit pattern for unsigned 64-bit values
 /// - `FLOAT` → `Float`
 /// - `DOUBLE` → `Double`
 /// - `BINARY` with `STRING` / `ENUM` annotation → `String`
@@ -181,8 +180,10 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
         case INT96: {
           // INT96 has no Parquet logical-type spec, but its physical encoding (nanos-of-day + Julian day) is
           // nanosecond-precision, so nanos is the natural raw unit.
-          long nanos = ParquetUtils.convertInt96ToEpochNanos(from.getInt96(fieldIndex, index).getBytes());
-          return _extractRawTimeValues ? nanos : TimestampUtils.fromNanosSinceEpoch(nanos);
+          byte[] bytes = from.getInt96(fieldIndex, index).getBytes();
+          return _extractRawTimeValues
+              ? ParquetUtils.convertInt96ToEpochNanos(bytes)
+              : ParquetUtils.convertInt96ToTimestamp(bytes);
         }
         case FLOAT:
           return from.getFloat(fieldIndex, index);
