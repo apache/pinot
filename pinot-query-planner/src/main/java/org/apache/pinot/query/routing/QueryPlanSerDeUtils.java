@@ -165,12 +165,27 @@ public class QueryPlanSerDeUtils {
     if (optionalTableSegmentsMap != null) {
       if (protoSegmentList) {
         builder.setOptionalTableSegmentsMap(toProtoSegmentsMap(optionalTableSegmentsMap));
+      } else {
+        builder.putCustomProperty(WorkerMetadata.OPTIONAL_TABLE_SEGMENTS_MAP_KEY,
+            encodeSegmentsMapJson(optionalTableSegmentsMap));
+      }
+    }
+    Map<String, List<String>> logicalTableSegmentsMap = workerMetadata.getLogicalTableSegmentsMap();
+    if (logicalTableSegmentsMap != null) {
+      if (protoSegmentList) {
+        builder.setLogicalTableSegmentsMap(toProtoSegmentsMap(logicalTableSegmentsMap));
+      } else {
+        builder.putCustomProperty(WorkerMetadata.LOGICAL_TABLE_SEGMENTS_MAP_KEY,
+            encodeSegmentsMapJson(logicalTableSegmentsMap));
       }
     }
     Map<String, List<String>> optionalLogicalTableSegmentsMap = workerMetadata.getOptionalLogicalTableSegmentsMap();
     if (optionalLogicalTableSegmentsMap != null) {
       if (protoSegmentList) {
-        builder.setLogicalTableSegmentsMap(toProtoSegmentsMap(optionalLogicalTableSegmentsMap));
+        builder.setOptionalLogicalTableSegmentsMap(toProtoSegmentsMap(optionalLogicalTableSegmentsMap));
+      } else {
+        builder.putCustomProperty(WorkerMetadata.OPTIONAL_LOGICAL_TABLE_SEGMENTS_MAP_KEY,
+            encodeSegmentsMapJson(optionalLogicalTableSegmentsMap));
       }
     }
     return builder.build();

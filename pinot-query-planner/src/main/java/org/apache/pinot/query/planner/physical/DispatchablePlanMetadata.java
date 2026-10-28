@@ -142,11 +142,11 @@ public class DispatchablePlanMetadata implements Serializable {
 
   @Nullable
   public Map<String, List<String>> getReplicatedOptionalSegments() {
-    return _replicatedSegments;
+    return _replicatedOptionalSegments;
   }
 
-  public void setReplicatedOptionalSegments(Map<String, List<String>> replicatedSegments) {
-    _replicatedSegments = replicatedSegments;
+  public void setReplicatedOptionalSegments(Map<String, List<String>> replicatedOptionalSegments) {
+    _replicatedOptionalSegments = replicatedOptionalSegments;
   }
 
   public Map<Integer, Map<Integer, MailboxInfos>> getWorkerIdToMailboxesMap() {

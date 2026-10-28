@@ -54,6 +54,8 @@ public class WorkerMetadata {
   /// broker/server versions keep working; never present in [#getCustomProperties()] of a decoded instance.
   public static final String TABLE_SEGMENTS_MAP_KEY = "tableSegmentsMap";
   public static final String LOGICAL_TABLE_SEGMENTS_MAP_KEY = "logicalTableSegmentsMap";
+  public static final String OPTIONAL_TABLE_SEGMENTS_MAP_KEY = "optionalTableSegmentsMap";
+  public static final String OPTIONAL_LOGICAL_TABLE_SEGMENTS_MAP_KEY = "optionalLogicalTableSegmentsMap";
 
   private static final TypeReference<Map<String, List<String>>> SEGMENTS_MAP_TYPE = new TypeReference<>() {
   };
@@ -75,6 +77,13 @@ public class WorkerMetadata {
   /// The legacy JSON encoding of [#_logicalTableSegmentsMap] as received from the broker, parsed on first access.
   @Nullable
   private String _logicalTableSegmentsMapJson;
+  /// The legacy JSON encoding of [#_optionalTableSegmentsMap] as received from the broker, parsed on first access.
+  @Nullable
+  private String _optionalTableSegmentsMapJson;
+  /// The legacy JSON encoding of [#_optionalLogicalTableSegmentsMap] as received from the broker, parsed on first
+  /// access.
+  @Nullable
+  private String _optionalLogicalTableSegmentsMapJson;
 
   public WorkerMetadata(int workerId, Map<Integer, MailboxInfos> mailboxInfosMap) {
     this(workerId, mailboxInfosMap, new HashMap<>());
@@ -162,7 +171,12 @@ public class WorkerMetadata {
 
   @Nullable
   public Map<String, List<String>> getOptionalTableSegmentsMap() {
-    return _optionalTableSegmentsMap;
+    Map<String, List<String>> optionalTableSegmentsMap = _optionalTableSegmentsMap;
+    if (optionalTableSegmentsMap == null && _optionalTableSegmentsMapJson != null) {
+      optionalTableSegmentsMap = decodeSegmentsMapJson(_optionalTableSegmentsMapJson);
+      _optionalTableSegmentsMap = optionalTableSegmentsMap;
+    }
+    return optionalTableSegmentsMap;
   }
 
   public void setOptionalTableSegmentsMap(Map<String, List<String>> optionalTableSegmentsMap) {
@@ -171,7 +185,12 @@ public class WorkerMetadata {
 
   @Nullable
   public Map<String, List<String>> getOptionalLogicalTableSegmentsMap() {
-    return _optionalLogicalTableSegmentsMap;
+    Map<String, List<String>> optionalLogicalTableSegmentsMap = _optionalLogicalTableSegmentsMap;
+    if (optionalLogicalTableSegmentsMap == null && _optionalLogicalTableSegmentsMapJson != null) {
+      optionalLogicalTableSegmentsMap = decodeSegmentsMapJson(_optionalTableSegmentsMapJson);
+      _optionalLogicalTableSegmentsMap = optionalLogicalTableSegmentsMap;
+    }
+    return optionalLogicalTableSegmentsMap;
   }
 
   public void setOptionalLogicalTableSegmentsMap(Map<String, List<String>> optionalLogicalTableSegmentsMap) {
