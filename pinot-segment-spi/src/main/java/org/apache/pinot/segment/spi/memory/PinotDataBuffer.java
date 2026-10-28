@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.commons.io.function.IOFunction;
 import org.apache.pinot.segment.spi.memory.unsafe.UnsafePinotBufferFactory;
 import org.apache.pinot.segment.spi.utils.JavaVersion;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -654,16 +655,9 @@ public abstract class PinotDataBuffer implements DataBuffer {
   /// and limit, but must not modify the contents, release the buffer, or retain or return the buffer or any alias.
   /// The callback must not recursively access or release this receiver or its views. The borrowed buffer is only
   /// valid during the callback; the result must be independent of it.
-  public <T> T readWithByteBuffer(long offset, int size, ByteBufferReader<T> reader)
+  public <T> T readWithByteBuffer(long offset, int size, IOFunction<ByteBuffer, T> reader)
       throws IOException {
-    return reader.read(toDirectByteBuffer(offset, size));
-  }
-
-  /// Consumes borrowed bytes synchronously and returns a result independent of the borrowed buffer.
-  @FunctionalInterface
-  public interface ByteBufferReader<T> {
-    T read(ByteBuffer buffer)
-        throws IOException;
+    return reader.apply(toDirectByteBuffer(offset, size));
   }
 
   @Override
