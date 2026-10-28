@@ -20,6 +20,12 @@ package org.apache.pinot.segment.local.segment.creator.impl.vector;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.document.Document;
@@ -55,6 +61,18 @@ public class HnswVectorIndexCreator implements VectorIndexCreator {
   private final Directory _indexDirectory;
   private final IndexWriter _indexWriter;
 
+  /// With `buildThreads` > 1, vectors are buffered and indexed from that many threads on seal: each thread fills its
+  /// own in-memory Lucene segment, so the graphs build in parallel. With `forceMerge=false` the graphs are kept as
+  /// separate Lucene segments (searched together) instead of being rebuilt into one.
+  private final int _buildThreads;
+  private final boolean _forceMerge;
+  private final VectorIndexConfig _vectorIndexConfig;
+  /// Above this many vectors the buffered ones are indexed on the calling thread and buffering stops, so large
+  /// segments keep the single-writer path (and its memory profile).
+  private final int _parallelBuildMaxDocs;
+  @Nullable
+  private List<float[]> _bufferedVectors;
+
   private int _nextDocId = 0;
 
   public HnswVectorIndexCreator(String column, File segmentIndexDir, VectorIndexConfig vectorIndexConfig) {
@@ -63,6 +81,12 @@ public class HnswVectorIndexCreator implements VectorIndexCreator {
     _vectorSimilarityFunction = VectorIndexUtils.toSimilarityFunction(vectorIndexConfig.getVectorDistanceFunction());
     _storeInSegmentFile = vectorIndexConfig.isStoreInSegmentFile();
     _segmentIndexDir = segmentIndexDir;
+    Map<String, String> properties = vectorIndexConfig.getProperties();
+    _buildThreads = Math.max(1, Integer.parseInt(properties.getOrDefault("buildThreads", "1")));
+    _forceMerge = Boolean.parseBoolean(properties.getOrDefault("forceMerge", "true"));
+    _parallelBuildMaxDocs = Integer.parseInt(properties.getOrDefault("parallelBuildMaxDocs", "50000"));
+    _bufferedVectors = _buildThreads > 1 ? new ArrayList<>() : null;
+    _vectorIndexConfig = vectorIndexConfig;
     // Segment generation is always in V1 and later we convert (as part of post creation processing) to V3 if
     // segmentVersion is set to V3 in SegmentGeneratorConfig.
     _hnswIndexDir =
@@ -100,24 +124,94 @@ public class HnswVectorIndexCreator implements VectorIndexCreator {
 
   @Override
   public void add(float[] document) {
+    if (_bufferedVectors != null) {
+      // Callers may reuse the array for the next row
+      _bufferedVectors.add(document.clone());
+      if (_bufferedVectors.size() <= _parallelBuildMaxDocs) {
+        return;
+      }
+      for (float[] buffered : _bufferedVectors) {
+        addDocument(buffered, _nextDocId++);
+      }
+      _bufferedVectors = null;
+      return;
+    }
+    addDocument(document, _nextDocId++);
+  }
+
+  private Document toDocument(float[] vector, int docId) {
     Document docToIndex = new Document();
-    XKnnFloatVectorField xKnnFloatVectorField =
-        new XKnnFloatVectorField(_vectorColumn, document, _vectorSimilarityFunction);
-    docToIndex.add(xKnnFloatVectorField);
-    docToIndex.add(new StoredField(VECTOR_INDEX_DOC_ID_COLUMN_NAME, _nextDocId++));
+    docToIndex.add(new XKnnFloatVectorField(_vectorColumn, vector, _vectorSimilarityFunction));
+    docToIndex.add(new StoredField(VECTOR_INDEX_DOC_ID_COLUMN_NAME, docId));
+    return docToIndex;
+  }
+
+  private void addDocument(float[] vector, int docId) {
     try {
-      _indexWriter.addDocument(docToIndex);
+      _indexWriter.addDocument(toDocument(vector, docId));
     } catch (Exception e) {
       throw new RuntimeException(
           "Caught exception while adding a new document to the HNSW index for column: " + _vectorColumn, e);
     }
   }
 
+  /// Indexes the buffered vectors from `_buildThreads` threads, each a contiguous range of doc ids written by its own
+  /// IndexWriter, so each graph is also finished (flushed) on its own thread; the per-thread indexes are then attached
+  /// to the main index as separate Lucene segments without rebuilding them.
+  private void addBufferedInParallel()
+      throws Exception {
+    int numDocs = _bufferedVectors.size();
+    int numThreads = Math.min(_buildThreads, Math.max(1, numDocs));
+    ExecutorService executor = Executors.newFixedThreadPool(numThreads);
+    Directory[] partDirectories = new Directory[numThreads];
+    File[] partDirs = new File[numThreads];
+    try {
+      List<Future<?>> futures = new ArrayList<>(numThreads);
+      for (int t = 0; t < numThreads; t++) {
+        int from = (int) ((long) numDocs * t / numThreads);
+        int to = (int) ((long) numDocs * (t + 1) / numThreads);
+        partDirs[t] = new File(_segmentIndexDir, _vectorColumn + ".hnsw.part" + t);
+        partDirectories[t] = FSDirectory.open(partDirs[t].toPath());
+        Directory partDirectory = partDirectories[t];
+        futures.add(executor.submit(() -> {
+          try (IndexWriter partWriter = new IndexWriter(partDirectory,
+              VectorIndexUtils.getIndexWriterConfig(_vectorIndexConfig))) {
+            for (int docId = from; docId < to; docId++) {
+              partWriter.addDocument(toDocument(_bufferedVectors.get(docId), docId));
+            }
+            partWriter.commit();
+          }
+          return null;
+        }));
+      }
+      for (Future<?> future : futures) {
+        future.get();
+      }
+      _indexWriter.addIndexes(partDirectories);
+    } finally {
+      executor.shutdownNow();
+      IOUtils.close(partDirectories);
+      for (File partDir : partDirs) {
+        if (partDir != null) {
+          FileUtils.deleteQuietly(partDir);
+        }
+      }
+    }
+    _nextDocId = numDocs;
+    _bufferedVectors.clear();
+  }
+
   @Override
   public void seal() {
     try {
-      LOGGER.info("Sealing HNSW index for column: {}", _vectorColumn);
-      _indexWriter.forceMerge(1);
+      LOGGER.info("Sealing HNSW index for column: {} (buildThreads: {}, forceMerge: {})", _vectorColumn,
+          _buildThreads, _forceMerge);
+      if (_bufferedVectors != null) {
+        addBufferedInParallel();
+      }
+      if (_forceMerge) {
+        _indexWriter.forceMerge(1);
+      }
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while sealing the HNSW index for column: " + _vectorColumn, e);
     }
