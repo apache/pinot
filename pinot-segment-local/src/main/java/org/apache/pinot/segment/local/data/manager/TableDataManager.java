@@ -169,15 +169,41 @@ public interface TableDataManager {
   /// `forceDownload` flag is true.
   /// This operation is conducted within a failure handling framework and made transparent to ongoing queries, because
   /// the segment is in online serving state.
-  void reloadSegment(String segmentName, boolean forceDownload, String reloadJobId)
+  default void reloadSegment(String segmentName, boolean forceDownload, String reloadJobId)
+      throws Exception {
+    reloadSegment(segmentName, forceDownload, false, reloadJobId);
+  }
+
+  /// Same as [#reloadSegment(String, boolean, String)], but when `onlyIfNeeded` is true (and `forceDownload` is false)
+  /// the segment is skipped if its loaded copy is already up to date: same CRC as ZK, already on the target tier, and
+  /// no preprocessing needed under the current table config and schema. Consuming segments are always skipped in this
+  /// mode. Skipped segments are recorded in the reload job status and reported as successful.
+  ///
+  /// This does not cover settings that only take effect when a segment is loaded (e.g. read mode or tier storage
+  /// properties) or rebuilding derived state such as upsert metadata; a full reload is still needed for those.
+  void reloadSegment(String segmentName, boolean forceDownload, boolean onlyIfNeeded, String reloadJobId)
       throws Exception;
 
   /// Reloads all segments.
-  void reloadAllSegments(boolean forceDownload, String reloadJobId)
+  default void reloadAllSegments(boolean forceDownload, String reloadJobId)
+      throws Exception {
+    reloadAllSegments(forceDownload, false, reloadJobId);
+  }
+
+  /// Reloads all segments, skipping up-to-date ones when `onlyIfNeeded` is true. See
+  /// [#reloadSegment(String, boolean, boolean, String)].
+  void reloadAllSegments(boolean forceDownload, boolean onlyIfNeeded, String reloadJobId)
       throws Exception;
 
   /// Reloads a list of segments.
-  void reloadSegments(List<String> segmentNames, boolean forceDownload, String reloadJobId)
+  default void reloadSegments(List<String> segmentNames, boolean forceDownload, String reloadJobId)
+      throws Exception {
+    reloadSegments(segmentNames, forceDownload, false, reloadJobId);
+  }
+
+  /// Reloads a list of segments, skipping up-to-date ones when `onlyIfNeeded` is true. See
+  /// [#reloadSegment(String, boolean, boolean, String)].
+  void reloadSegments(List<String> segmentNames, boolean forceDownload, boolean onlyIfNeeded, String reloadJobId)
       throws Exception;
 
   /// Get the segment data directory, considering the segment tier if provided.

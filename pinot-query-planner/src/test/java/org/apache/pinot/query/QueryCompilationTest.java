@@ -33,6 +33,7 @@ import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.pinot.query.QueryEnvironment.CompiledQuery;
 import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
@@ -45,6 +46,7 @@ import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
+import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.spi.exception.QueryErrorCode;
@@ -195,6 +197,123 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         assertEquals(_queryEnvironment.compile(query).getRelRoot().validatedRowType.getFieldList().get(0).getType()
             .getSqlTypeName(), SqlTypeName.INTEGER, query);
       }
+    }
+  }
+
+  /// All-literal `jsonExtractScalar` is deterministic, so `PinotEvaluateLiteralRule` folds it. The
+  /// folder must accept INTEGER-as-BOOLEAN and primitive arrays (`int[]`, `long[]`, `float[]`).
+  /// Column-input queries do not exercise this path.
+  @Test
+  public void testJsonExtractScalarAllLiteralFolds() {
+    List<String> queries = List.of(
+        "SELECT jsonExtractScalar('{\"v\":true}', '$.v', 'BOOLEAN') FROM a",
+        "SELECT jsonExtractScalar('{\"v\":[1,2]}', '$.v', 'INT_ARRAY') FROM a",
+        "SELECT jsonExtractScalar('{\"v\":[1,2]}', '$.v', 'LONG_ARRAY') FROM a",
+        "SELECT jsonExtractScalar('{\"v\":[1.5,2.5]}', '$.v', 'FLOAT_ARRAY') FROM a",
+        "SELECT jsonExtractScalar('{\"v\":[1.5,2.5]}', '$.v', 'DOUBLE_ARRAY') FROM a",
+        "SELECT jsonExtractScalar('{\"v\":[true,false]}', '$.v', 'BOOLEAN_ARRAY') FROM a",
+        "SELECT arraySum(jsonExtractScalar('{\"v\":[true,false]}', '$.v', 'BOOLEAN_ARRAY')) FROM a",
+        "SELECT jsonExtractScalar('{\"v\":[1514805173000]}', '$.v', 'TIMESTAMP_ARRAY') FROM a",
+        "SELECT jsonExtractScalar('{\"v\":null}', '$.v', 'INT', 7) FROM a"
+    );
+    for (String query : queries) {
+      try (CompiledQuery compiledQuery = _queryEnvironment.compile(query)) {
+        assertNotNull(compiledQuery.planQuery(0).getQueryPlan(), query);
+      }
+      String explain = explainCompiledQuery("EXPLAIN PLAN FOR " + query, RANDOM_REQUEST_ID_GEN.nextLong());
+      assertFalse(explain.toUpperCase().contains("JSONEXTRACTSCALAR"),
+          "all-literal call must fold away the function, but plan still has it: " + explain);
+    }
+    String booleanExplain = explainCompiledQuery(
+        "EXPLAIN PLAN FOR SELECT jsonExtractScalar('{\"v\":true}', '$.v', 'BOOLEAN') FROM a",
+        RANDOM_REQUEST_ID_GEN.nextLong());
+    assertTrue(booleanExplain.contains("true"), booleanExplain);
+    String arrayExplain = explainCompiledQuery(
+        "EXPLAIN PLAN FOR SELECT jsonExtractScalar('{\"v\":[1,2]}', '$.v', 'INT_ARRAY') FROM a",
+        RANDOM_REQUEST_ID_GEN.nextLong());
+    assertTrue(arrayExplain.contains("1") && arrayExplain.contains("2"), arrayExplain);
+    String longArrayExplain = explainCompiledQuery(
+        "EXPLAIN PLAN FOR SELECT jsonExtractScalar('{\"v\":[9007199254740993]}', '$.v', 'LONG_ARRAY') FROM a",
+        RANDOM_REQUEST_ID_GEN.nextLong());
+    assertFalse(longArrayExplain.toUpperCase().contains("JSONEXTRACTSCALAR"), longArrayExplain);
+    assertTrue(longArrayExplain.contains("9007199254740993"), longArrayExplain);
+    String floatArrayExplain = explainCompiledQuery(
+        "EXPLAIN PLAN FOR SELECT jsonExtractScalar('{\"v\":[1.5]}', '$.v', 'FLOAT_ARRAY') FROM a",
+        RANDOM_REQUEST_ID_GEN.nextLong());
+    assertFalse(floatArrayExplain.toUpperCase().contains("JSONEXTRACTSCALAR"), floatArrayExplain);
+    assertTrue(floatArrayExplain.contains("1.5"), floatArrayExplain);
+    String booleanArrayExplain = explainCompiledQuery(
+        "EXPLAIN PLAN FOR SELECT jsonExtractScalar('{\"v\":[true,false]}', '$.v', 'BOOLEAN_ARRAY') FROM a",
+        RANDOM_REQUEST_ID_GEN.nextLong());
+    assertFalse(booleanArrayExplain.toUpperCase().contains("JSONEXTRACTSCALAR"), booleanArrayExplain);
+    assertTrue(booleanArrayExplain.contains("true") && booleanArrayExplain.contains("false"), booleanArrayExplain);
+    String timestampArrayExplain = explainCompiledQuery(
+        "EXPLAIN PLAN FOR SELECT jsonExtractScalar('{\"v\":[1514805173000]}', '$.v', 'TIMESTAMP_ARRAY') FROM a",
+        RANDOM_REQUEST_ID_GEN.nextLong());
+    assertFalse(timestampArrayExplain.toUpperCase().contains("JSONEXTRACTSCALAR"), timestampArrayExplain);
+    assertTrue(timestampArrayExplain.contains("2018-01-01 11:12:53"), timestampArrayExplain);
+    String defaultExplain = explainCompiledQuery(
+        "EXPLAIN PLAN FOR SELECT jsonExtractScalar('{\"v\":null}', '$.v', 'INT', 7) FROM a",
+        RANDOM_REQUEST_ID_GEN.nextLong());
+    assertFalse(defaultExplain.toUpperCase().contains("JSONEXTRACTSCALAR"), defaultExplain);
+    assertTrue(defaultExplain.contains("[7]"), defaultExplain);
+    String nullDefaultExplain = explainCompiledQuery(
+        "EXPLAIN PLAN FOR SELECT jsonExtractScalar('{\"v\":null}', '$.v', 'INT', NULL) FROM a",
+        RANDOM_REQUEST_ID_GEN.nextLong());
+    assertTrue(nullDefaultExplain.toUpperCase().contains("JSONEXTRACTSCALAR"), nullDefaultExplain);
+
+    String emptyArrayQuery = "SELECT jsonExtractScalar('{}', '$.missing', 'INT_ARRAY') FROM a";
+    try (CompiledQuery compiledQuery = _queryEnvironment.compile(emptyArrayQuery)) {
+      assertNotNull(compiledQuery.planQuery(0).getQueryPlan());
+    }
+    String emptyArrayExplain = explainCompiledQuery("EXPLAIN PLAN FOR " + emptyArrayQuery,
+        RANDOM_REQUEST_ID_GEN.nextLong());
+    assertTrue(emptyArrayExplain.toUpperCase().contains("JSONEXTRACTSCALAR"), emptyArrayExplain);
+
+    String timestampDefaultExplain = explainCompiledQuery(
+        "EXPLAIN PLAN FOR SELECT jsonExtractScalar('{}', '$.missing', 'STRING', "
+            + "TIMESTAMP '2018-01-01 11:12:53') FROM a",
+        RANDOM_REQUEST_ID_GEN.nextLong());
+    assertFalse(timestampDefaultExplain.toUpperCase().contains("JSONEXTRACTSCALAR"), timestampDefaultExplain);
+    assertTrue(timestampDefaultExplain.contains("2018-01-01 11:12:53"), timestampDefaultExplain);
+    assertFalse(timestampDefaultExplain.contains("1514805173000"), timestampDefaultExplain);
+
+    for (String[] testCase : new String[][]{
+        {"DATE '2024-02-29'", "2024-02-29"},
+        {"TIME '11:12:53'", "11:12:53"},
+        {"UUID '123e4567-e89b-12d3-a456-426614174000'", "123e4567-e89b-12d3-a456-426614174000"}
+    }) {
+      String canonicalDefaultExplain = explainCompiledQuery(
+          "EXPLAIN PLAN FOR SELECT jsonExtractScalar('{}', '$.missing', 'STRING', " + testCase[0] + ") FROM a",
+          RANDOM_REQUEST_ID_GEN.nextLong());
+      assertFalse(canonicalDefaultExplain.toUpperCase().contains("JSONEXTRACTSCALAR"), canonicalDefaultExplain);
+      assertTrue(canonicalDefaultExplain.contains(testCase[1]), canonicalDefaultExplain);
+    }
+
+    String decimalDefaultExplain = explainCompiledQuery(
+        "EXPLAIN PLAN FOR SELECT jsonExtractScalar('{}', '$.missing', 'LONG', 9007199254740993.0) FROM a",
+        RANDOM_REQUEST_ID_GEN.nextLong());
+    assertFalse(decimalDefaultExplain.toUpperCase().contains("JSONEXTRACTSCALAR"), decimalDefaultExplain);
+    assertTrue(decimalDefaultExplain.contains("9007199254740992"), decimalDefaultExplain);
+    assertFalse(decimalDefaultExplain.contains("9007199254740993"), decimalDefaultExplain);
+
+    String decimalArrayDefaultExplain = explainCompiledQuery(
+        "EXPLAIN PLAN FOR SELECT jsonExtractScalar('{\"v\":[null]}', '$.v', 'LONG_ARRAY', "
+            + "9007199254740993.0) FROM a",
+        RANDOM_REQUEST_ID_GEN.nextLong());
+    assertFalse(decimalArrayDefaultExplain.toUpperCase().contains("JSONEXTRACTSCALAR"), decimalArrayDefaultExplain);
+    assertTrue(decimalArrayDefaultExplain.contains("9007199254740992"), decimalArrayDefaultExplain);
+    assertFalse(decimalArrayDefaultExplain.contains("9007199254740993"), decimalArrayDefaultExplain);
+
+    String nullInputExplain = explainCompiledQuery(
+        "EXPLAIN PLAN FOR SELECT jsonExtractScalar(CAST(NULL AS VARCHAR), '$.missing', 'INT', 7) FROM a",
+        RANDOM_REQUEST_ID_GEN.nextLong());
+    assertTrue(nullInputExplain.toUpperCase().contains("JSONEXTRACTSCALAR"), nullInputExplain);
+  }
+
+  private String explainCompiledQuery(String query, long requestId) {
+    try (CompiledQuery compiledQuery = _queryEnvironment.compile(query)) {
+      return compiledQuery.explain(requestId, null).getExplainPlan();
     }
   }
 
@@ -1189,6 +1308,96 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     return null;
   }
 
+  /// A Sort without fetch/offset over a hash-partitioned exchange orders each partition only. It feeds a
+  /// `PARTITION BY ... ORDER BY` window or a `WITHIN GROUP` aggregate, so its stage must keep the partitioned worker
+  /// assignment (one worker per server, times `stageParallelism`) instead of the single worker of a final ORDER BY.
+  @Test(dataProvider = "partitionedSortQueries")
+  public void testSortOverPartitionedExchangeKeepsPartitionedWorkers(String query, int expectedNumWorkers) {
+    Map<SortNode, DispatchablePlanFragment> sortStages = findSortOverReceiveStages(_queryEnvironment.planQuery(query));
+    assertEquals(sortStages.size(), 1, "Expected one Sort over a mailbox receive");
+    Map.Entry<SortNode, DispatchablePlanFragment> entry = sortStages.entrySet().iterator().next();
+    assertTrue(isOverPartitionedReceive(entry.getKey()), "Expected the Sort to read a hash-partitioned exchange");
+    DispatchablePlanFragment sortStage = entry.getValue();
+    assertEquals(sortStage.getServerInstanceToWorkerIdMap().size(), 2, "Sort stage should run on every server");
+    assertEquals(sortStage.getWorkerMetadataList().size(), expectedNumWorkers);
+  }
+
+  @DataProvider(name = "partitionedSortQueries")
+  public Object[][] partitionedSortQueries() {
+    return new Object[][]{
+        {"SELECT col1, ROW_NUMBER() OVER (PARTITION BY col1 ORDER BY col3 DESC) FROM a", 2},
+        {"SELECT col1, SUM(col3) OVER (PARTITION BY col1 ORDER BY col3) FROM a", 2},
+        {"SET stageParallelism=2; SELECT col1, ROW_NUMBER() OVER (PARTITION BY col1 ORDER BY col3 DESC) FROM a", 4},
+        {"SELECT col1, LISTAGG(col2, ',') WITHIN GROUP (ORDER BY col3) FROM a GROUP BY col1", 2},
+        {"SET stageParallelism=2; SELECT col1, LISTAGG(col2, ',') WITHIN GROUP (ORDER BY col3) FROM a GROUP BY col1",
+            4}
+    };
+  }
+
+  /// A Sort that trims (fetch/offset) or reads a keyless exchange establishes a total order, so its stage must run on
+  /// a single worker even when `stageParallelism` asks for more.
+  @Test(dataProvider = "globalSortQueries")
+  public void testSortOverGlobalExchangeUsesSingletonWorker(String query) {
+    Map<SortNode, DispatchablePlanFragment> sortStages = findSortOverReceiveStages(_queryEnvironment.planQuery(query));
+    assertEquals(sortStages.size(), 1, "Expected one Sort over a mailbox receive");
+    Map.Entry<SortNode, DispatchablePlanFragment> entry = sortStages.entrySet().iterator().next();
+    assertFalse(isOverPartitionedReceive(entry.getKey()), "Expected the Sort to read a keyless exchange");
+    assertEquals(entry.getValue().getWorkerMetadataList().size(), 1, "Global sort stage should use a single worker");
+  }
+
+  @DataProvider(name = "globalSortQueries")
+  public Object[][] globalSortQueries() {
+    return new Object[][]{
+        {"SET stageParallelism=2; SELECT * FROM a ORDER BY col1"},
+        {"SET stageParallelism=2; SELECT * FROM a ORDER BY col1 LIMIT 10"},
+        {"SET stageParallelism=2; SELECT col1, ROW_NUMBER() OVER (ORDER BY col3) FROM a"},
+        {"SET stageParallelism=2; SELECT LISTAGG(col2, ',') WITHIN GROUP (ORDER BY col3) FROM a"}
+    };
+  }
+
+  /// A partitioned window under a final ORDER BY: the window's Sort keeps the partitioned workers, and the final Sort
+  /// still runs on a single worker.
+  @Test
+  public void testPartitionedWindowUnderFinalOrderBy() {
+    String query = "SET stageParallelism=2; SELECT col1, ROW_NUMBER() OVER (PARTITION BY col1 ORDER BY col3) AS rn "
+        + "FROM a ORDER BY rn";
+    Map<SortNode, DispatchablePlanFragment> sortStages = findSortOverReceiveStages(_queryEnvironment.planQuery(query));
+    assertEquals(sortStages.size(), 2, "Expected the window Sort and the final Sort");
+    for (Map.Entry<SortNode, DispatchablePlanFragment> entry : sortStages.entrySet()) {
+      int expectedNumWorkers = isOverPartitionedReceive(entry.getKey()) ? 4 : 1;
+      assertEquals(entry.getValue().getWorkerMetadataList().size(), expectedNumWorkers);
+    }
+  }
+
+  /// Maps each Sort that reads straight from a mailbox to the stage that runs it.
+  private static Map<SortNode, DispatchablePlanFragment> findSortOverReceiveStages(
+      DispatchableSubPlan dispatchableSubPlan) {
+    Map<SortNode, DispatchablePlanFragment> sortStages = new HashMap<>();
+    for (DispatchablePlanFragment fragment : dispatchableSubPlan.getQueryStages()) {
+      List<SortNode> sortNodes = new ArrayList<>();
+      collectSortsOverReceive(fragment.getPlanFragment().getFragmentRoot(), sortNodes);
+      for (SortNode sortNode : sortNodes) {
+        sortStages.put(sortNode, fragment);
+      }
+    }
+    return sortStages;
+  }
+
+  private static void collectSortsOverReceive(PlanNode node, List<SortNode> sortNodes) {
+    if (node instanceof SortNode && node.getInputs().get(0) instanceof MailboxReceiveNode) {
+      sortNodes.add((SortNode) node);
+    }
+    for (PlanNode input : node.getInputs()) {
+      collectSortsOverReceive(input, sortNodes);
+    }
+  }
+
+  private static boolean isOverPartitionedReceive(SortNode sortNode) {
+    MailboxReceiveNode receiveNode = (MailboxReceiveNode) sortNode.getInputs().get(0);
+    return receiveNode.getDistributionType() == RelDistribution.Type.HASH_DISTRIBUTED
+        && !receiveNode.getKeys().isEmpty();
+  }
+
   /// Tests that FULL OUTER JOIN with only non-equi conditions uses a singleton worker for the join stage, to ensure
   /// correctness of unmatched row tracking. With multiple workers, the broadcast right table would be on each worker
   /// but each worker only sees a subset of left rows, leading to incorrect unmatched-right-rows output.
@@ -1721,6 +1930,17 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         expectThrows(QueryException.class, () -> _queryEnvironment.validate(sqlNodeAndOptions));
     assertEquals(exception.getErrorCode(), QueryErrorCode.QUERY_VALIDATION);
     assertTrue(exception.getMessage().contains(QueryOptionKey.INFER_PARTITION_HINT), exception.getMessage());
+  }
+
+  @Test
+  public void testValueWithTimeRejectsUnsupportedDataArgument() {
+    // The two-argument form infers the data type from the data argument, which cannot be multi-value.
+    QueryException exception = expectThrows(QueryException.class, () -> _queryEnvironment.explainQuery(
+        "SELECT FIRST_WITH_TIME(mcol1, ts) FROM e", RANDOM_REQUEST_ID_GEN.nextLong()));
+    assertEquals(exception.getErrorCode(), QueryErrorCode.QUERY_PLANNING);
+    assertTrue(
+        exception.getMessage().contains("Unsupported data type for FIRSTWITHTIME(dataColumn, timeColumn): ARRAY"),
+        exception.getMessage());
   }
 
   @DataProvider(name = "testQueryExceptionDataProvider")

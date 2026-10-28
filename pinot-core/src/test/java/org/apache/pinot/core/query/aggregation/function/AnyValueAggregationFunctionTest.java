@@ -18,32 +18,41 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.queries.FluentQueryTest;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertThrows;
 
 public class AnyValueAggregationFunctionTest extends AbstractAggregationFunctionTest {
-  @DataProvider(name = "bytesValueSources")
-  Object[][] bytesValueSources() {
+  private static final ExpressionContext EXPRESSION = ExpressionContext.forIdentifier("myField");
+
+  @DataProvider(name = "dictionaryEncoded")
+  Object[][] dictionaryEncoded() {
     return new Object[][]{{false}, {true}};
   }
 
-  @Test(dataProvider = "bytesValueSources")
+  @Test(dataProvider = "dictionaryEncoded")
   void testBytesIntermediateResultRoundTrip(boolean dictionaryEncoded) {
     ExpressionContext expression = ExpressionContext.forIdentifier("myField");
     AnyValueAggregationFunction function = new AnyValueAggregationFunction(List.of(expression), true);
@@ -240,6 +249,23 @@ public class AnyValueAggregationFunctionTest extends AbstractAggregationFunction
     validateAnyValueBehavior(result, true); // Should return non-null (unique_value exists)
   }
 
+  @Test
+  void testAllNullSegmentDoesNotEvaluateExpression() {
+    // Casting the null placeholder of a STRING column to INT throws, so a segment whose rows are all null must not
+    // evaluate the expression.
+    new DataTypeScenario(DataType.STRING).getDeclaringTable(true)
+        .onFirstInstance("myField", "null", "null")
+        .andSegment("myField", "5", "5")
+        .whenQuery("select anyValue(cast(myField as int)) from testTable")
+        .thenResultIs("STRING", "5")
+        .whenQuery("select 'k', anyValue(cast(myField as int)) from testTable group by 'k'")
+        .thenResultIs("STRING | STRING", "k | 5")
+        .whenQuery("select anyValue(cast(myField as int), 'INT') from testTable")
+        .thenResultIs("INT", "5")
+        .whenQuery("select 'k', anyValue(cast(myField as int), 'INT') from testTable group by 'k'")
+        .thenResultIs("STRING | INT", "k | 5");
+  }
+
   // GROUP BY tests with different data types
   @Test
   void testGroupByWithMultipleGroups() {
@@ -356,5 +382,120 @@ public class AnyValueAggregationFunctionTest extends AbstractAggregationFunction
       // For cases where all values are null, ANY_VALUE should return null
       queryResult.thenResultIs(EXPECTED_COLUMN_TYPES, EXPECTED_NULL_RESULT);
     }
+  }
+
+  @DataProvider(name = "dataTypes")
+  Object[][] dataTypes() {
+    return new Object[][]{
+        {"INT", ColumnDataType.INT, ColumnDataType.INT},
+        {"LONG", ColumnDataType.LONG, ColumnDataType.LONG},
+        {"FLOAT", ColumnDataType.FLOAT, ColumnDataType.FLOAT},
+        {"DOUBLE", ColumnDataType.DOUBLE, ColumnDataType.DOUBLE},
+        {"BIG_DECIMAL", ColumnDataType.BIG_DECIMAL, ColumnDataType.BIG_DECIMAL},
+        {"BOOLEAN", ColumnDataType.INT, ColumnDataType.BOOLEAN},
+        {"TIMESTAMP", ColumnDataType.LONG, ColumnDataType.TIMESTAMP},
+        {"STRING", ColumnDataType.STRING, ColumnDataType.STRING},
+        {"BYTES", ColumnDataType.BYTES, ColumnDataType.BYTES},
+        {"uuid", ColumnDataType.BYTES, ColumnDataType.UUID}
+    };
+  }
+
+  @Test(dataProvider = "dataTypes")
+  void testDataTypeArgumentFixesResultTypes(String dataType, ColumnDataType intermediateResultType,
+      ColumnDataType finalResultType) {
+    // The types are known before any input, so an empty result is typed as well.
+    AnyValueAggregationFunction function = createFunction(dataType);
+    assertEquals(function.getIntermediateResultColumnType(), intermediateResultType);
+    assertEquals(function.getFinalResultColumnType(), finalResultType);
+    assertEquals(function.getResultColumnName(), "anyvalue(myField,'" + dataType.toUpperCase() + "')");
+    assertEquals(function.getInputExpressions(), List.of(EXPRESSION));
+    assertNull(function.extractAggregationResult(function.createAggregationResultHolder()));
+  }
+
+  @Test
+  void testDataTypeArgumentRejectsInvalidArguments() {
+    assertThrows(IllegalArgumentException.class, () -> createFunction("JSON"));
+    assertThrows(BadQueryRequestException.class, () -> createFunction("NOT_A_TYPE"));
+    assertThrows(IllegalArgumentException.class,
+        () -> new AnyValueAggregationFunction(List.of(EXPRESSION, ExpressionContext.forIdentifier("INT")), false));
+    assertThrows(IllegalArgumentException.class, () -> new AnyValueAggregationFunction(
+        List.of(EXPRESSION, ExpressionContext.forLiteral(DataType.STRING, "INT"), EXPRESSION), false));
+  }
+
+  @Test(dataProvider = "dictionaryEncoded")
+  void testDataTypeArgumentReadsBoundStoredType(boolean dictionaryEncoded) {
+    // A segment that still stores the column as INT after the schema widened it to LONG
+    AnyValueAggregationFunction function = createFunction("LONG");
+    BlockValSet valueSet = mock(BlockValSet.class);
+    when(valueSet.getValueType()).thenReturn(DataType.INT);
+    if (dictionaryEncoded) {
+      Dictionary dictionary = mock(Dictionary.class);
+      when(dictionary.getLongValue(0)).thenReturn(5L);
+      when(valueSet.isDictionaryEncoded()).thenReturn(true);
+      when(valueSet.getDictionary()).thenReturn(dictionary);
+      when(valueSet.getDictionaryIdsSV()).thenReturn(new int[]{0});
+    } else {
+      when(valueSet.getLongValuesSV()).thenReturn(new long[]{5L});
+    }
+    Map<ExpressionContext, BlockValSet> values = Map.of(EXPRESSION, valueSet);
+
+    AggregationResultHolder holder = function.createAggregationResultHolder();
+    function.aggregate(1, holder, values);
+    assertEquals(function.extractAggregationResult(holder), 5L);
+    GroupByResultHolder groupHolder = function.createGroupByResultHolder(1, 1);
+    function.aggregateGroupBySV(1, new int[]{0}, groupHolder, values);
+    assertEquals(function.extractGroupByResult(groupHolder, 0), 5L);
+    assertEquals(function.getIntermediateResultColumnType(), ColumnDataType.LONG);
+  }
+
+  @Test
+  void testGroupByReadsValuesOncePerBlock() {
+    AnyValueAggregationFunction function = createFunction("LONG");
+    BlockValSet valueSet = mock(BlockValSet.class);
+    when(valueSet.getValueType()).thenReturn(DataType.LONG);
+    when(valueSet.getLongValuesSV()).thenReturn(new long[]{1L, 2L, 3L});
+    GroupByResultHolder holder = function.createGroupByResultHolder(2, 2);
+    function.aggregateGroupBySV(3, new int[]{0, 1, 0}, holder, Map.of(EXPRESSION, valueSet));
+    assertEquals(function.extractGroupByResult(holder, 0), 1L);
+    assertEquals(function.extractGroupByResult(holder, 1), 2L);
+    // Some block value sets build the value array on each call
+    verify(valueSet, times(1)).getLongValuesSV();
+  }
+
+  @Test
+  void testDataTypeArgumentSerializedMerge() {
+    // One server found a value and the other did not.
+    AnyValueAggregationFunction function = createFunction("BOOLEAN");
+    BlockValSet valueSet = mock(BlockValSet.class);
+    when(valueSet.getValueType()).thenReturn(DataType.BOOLEAN);
+    when(valueSet.getIntValuesSV()).thenReturn(new int[]{1});
+    AggregationResultHolder holder = function.createAggregationResultHolder();
+    function.aggregate(1, holder, Map.of(EXPRESSION, valueSet));
+    CustomObject found = serialize(function, function.extractAggregationResult(holder));
+    CustomObject empty =
+        serialize(function, function.extractAggregationResult(function.createAggregationResultHolder()));
+
+    Object merged = AggregationFunctionUtils.mergeSerialized(function, null, empty);
+    assertNull(merged);
+    merged = AggregationFunctionUtils.mergeSerialized(function, merged, found);
+    merged = AggregationFunctionUtils.mergeSerialized(function, merged, empty);
+    assertEquals(merged, 1);
+    assertEquals(function.getFinalResultColumnType().convert(function.extractFinalResult(merged)), true);
+
+    AnyValueAggregationFunction bigDecimalFunction = createFunction("BIG_DECIMAL");
+    BigDecimal value = new BigDecimal("12345678901234567890.123");
+    assertEquals(bigDecimalFunction.merge(bigDecimalFunction.deserializeIntermediateResult(
+        serialize(bigDecimalFunction, value)), new BigDecimal("1")), value);
+  }
+
+  private static AnyValueAggregationFunction createFunction(String dataType) {
+    return new AnyValueAggregationFunction(List.of(EXPRESSION, ExpressionContext.forLiteral(DataType.STRING, dataType)),
+        true);
+  }
+
+  private static CustomObject serialize(AnyValueAggregationFunction function, Object intermediateResult) {
+    AggregationFunction.SerializedIntermediateResult serialized =
+        function.serializeIntermediateResult(intermediateResult);
+    return new CustomObject(serialized.getType(), ByteBuffer.wrap(serialized.getBytes()));
   }
 }

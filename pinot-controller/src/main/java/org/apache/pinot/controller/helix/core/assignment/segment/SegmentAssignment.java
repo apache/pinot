@@ -22,8 +22,8 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.helix.HelixManager;
+import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.assignment.InstancePartitions;
-import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.restlet.resources.RebalanceConfig;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -36,26 +36,30 @@ public interface SegmentAssignment {
   /// Initializes the segment assignment.
   /// @param helixManager Helix manager
   /// @param tableConfig Table config
-  void init(HelixManager helixManager, TableConfig tableConfig, @Nullable ControllerMetrics controllerMetrics);
+  void init(HelixManager helixManager, TableConfig tableConfig);
 
   /// Assigns segment to instances.
   ///
+  /// For a partition-pinned table (see [org.apache.pinot.common.assignment.PartitionAssignmentUtils]), the segment is
+  /// assigned to the instances of its partition, and the partition assignment of the given ideal state is updated
+  /// when the partition has no entry yet. The caller adds the segment to the ideal state with the returned instances.
+  ///
   /// @param segmentName Name of the segment to be assigned
-  /// @param currentAssignment Current segment assignment of the table (map from segment name to instance state map)
+  /// @param idealState Current ideal state of the table
   /// @param instancePartitionsMap Map from type (OFFLINE|CONSUMING|COMPLETED) to instance partitions
   /// @return List of instances to assign the segment to
-  List<String> assignSegment(String segmentName, Map<String, Map<String, String>> currentAssignment,
+  List<String> assignSegment(String segmentName, IdealState idealState,
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap);
 
   /// Rebalances the segment assignment for a table.
   ///
-  /// @param currentAssignment Current segment assignment of the table (map from segment name to instance state map)
+  /// @param idealState Current ideal state of the table
   /// @param instancePartitionsMap Map from type (OFFLINE|CONSUMING|COMPLETED) to instance partitions
   /// @param sortedTiers List of Tiers sorted as per priority
   /// @param tierInstancePartitionsMap Map from tierName to instance partitions
   /// @param config Configuration for the rebalance
-  /// @return Rebalanced assignment for the segments
-  Map<String, Map<String, String>> rebalanceTable(Map<String, Map<String, String>> currentAssignment,
+  /// @return Rebalanced assignment of the segments and of the partitions
+  TableAssignment rebalanceTable(IdealState idealState,
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap, @Nullable List<Tier> sortedTiers,
       @Nullable Map<String, InstancePartitions> tierInstancePartitionsMap, RebalanceConfig config);
 }

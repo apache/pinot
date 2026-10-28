@@ -180,7 +180,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   protected final int _defaultQueryLimit;
   protected final boolean _enableMultistageMigrationMetric;
   protected final boolean _useMSEToFillEmptyResponseSchema;
-  protected final boolean _enableQueryFingerprinting;
   protected final AuthProvider _serverAdminAuthProvider;
   protected ExecutorService _multistageCompileExecutor;
   protected BlockingQueue<Pair<String, String>> _multistageCompileQueryQueue;
@@ -226,15 +225,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
     _enableMultistageMigrationMetric = _config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_MULTISTAGE_MIGRATION_METRIC,
         Broker.DEFAULT_ENABLE_MULTISTAGE_MIGRATION_METRIC);
-    boolean fingerprintingConfigured = _config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_FINGERPRINTING,
-        Broker.DEFAULT_BROKER_ENABLE_QUERY_FINGERPRINTING);
-    boolean redactionNeedsFingerprinting =
-        _queryLogger.getSqlRedactionMode() == QueryLogger.SqlRedactionMode.LITERAL_VALUES;
-    if (redactionNeedsFingerprinting && !fingerprintingConfigured) {
-      LOGGER.warn("SQL redaction mode 'literal_values' requires query fingerprinting. "
-          + "Enabling query fingerprinting automatically.");
-    }
-    _enableQueryFingerprinting = fingerprintingConfigured || redactionNeedsFingerprinting;
     if (_enableMultistageMigrationMetric) {
       _multistageCompileExecutor = Executors.newSingleThreadExecutor();
       _multistageCompileQueryQueue = new LinkedBlockingQueue<>(1000);
@@ -684,13 +674,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     HandlerContext handlerContext =
         getHandlerContext(offlineTableQueryConfig, realtimeTableQueryConfig, pinotQuery.getQueryOptions());
     validateGroovyScript(serverPinotQuery, handlerContext._disableGroovy);
-    boolean approximateFunctionApplied = false;
     if (handlerContext._useApproximateFunction) {
-      approximateFunctionApplied = handleApproximateFunctionOverride(serverPinotQuery,
-          handlerContext._distinctCountParams, handlerContext._percentileParams);
-      if (approximateFunctionApplied) {
-        _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.APPROXIMATE_FUNCTION_OVERRIDES, 1);
-      }
+      handleApproximateFunctionOverride(serverPinotQuery, handlerContext._distinctCountParams,
+          handlerContext._percentileParams);
     }
 
     // Validate the request
@@ -1059,6 +1045,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     if (brokerResponse.isGroupsTrimmed()) {
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_GROUPS_TRIMMED, 1);
     }
+    if (brokerResponse.isApproximatedResult()) {
+      _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_APPROXIMATED_RESULT, 1);
+    }
 
     // server returns STRING as default dataType for all columns in (some) scenarios where no rows are returned
     // this is an attempt to return more faithful information based on other sources
@@ -1096,7 +1085,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
 
     brokerResponse.setRLSFiltersApplied(rlsFiltersApplied.get());
-    brokerResponse.setApproximateFunctionApplied(approximateFunctionApplied);
 
     // Record per-server stats on the SSE BrokerResponse so downstream consumers can read it.
     brokerResponse.setServerStats(serverStats.getServerStats());
@@ -1136,13 +1124,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
 
     // Add queryHash to pinotQuery so it gets passed to servers for observability
-    if (_enableQueryFingerprinting) {
-      QueryFingerprint queryFingerprint = requestContext.getQueryFingerprint();
-      if (queryFingerprint != null) {
-        pinotQuery.putToQueryOptions(
-              CommonConstants.Broker.Request.QueryOptionKey.QUERY_HASH,
-              queryFingerprint.getQueryHash());
-      }
+    QueryFingerprint queryFingerprint = requestContext.getQueryFingerprint();
+    if (queryFingerprint != null) {
+      pinotQuery.putToQueryOptions(CommonConstants.Broker.Request.QueryOptionKey.QUERY_HASH,
+          queryFingerprint.getQueryHash());
     }
 
     if (isDefaultQueryResponseLimitEnabled() && !pinotQuery.isSetLimit()) {
@@ -1666,6 +1651,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
             .putIfAbsent(QueryOptionKey.AUTO_REWRITE_AGGREGATION_TYPE, _enableAutoRewriteAggregationType);
       }
 
+      if (_inferAnyValueTypeProvider.isEnabled()) {
+        sqlNodeAndOptions.getOptions().putIfAbsent(QueryOptionKey.INFER_ANY_VALUE_TYPE, "true");
+      }
+
       if (_regexDictSizeThreshold != null) {
         sqlNodeAndOptions.getOptions().putIfAbsent(QueryOptionKey.REGEX_DICT_SIZE_THRESHOLD, _regexDictSizeThreshold);
       }
@@ -2006,7 +1995,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   /// The rewritten functions stay exact until an accumulator crosses their conversion threshold, which the
   /// parameters carry. An empty parameter string appends nothing, so the aggregation function defaults apply.
   ///
-  /// @return true if at least one function was rewritten, which makes the result of the query approximate
+  /// @return true if at least one function was rewritten
   @VisibleForTesting
   static boolean handleApproximateFunctionOverride(PinotQuery pinotQuery, String distinctCountParams,
       String percentileParams) {

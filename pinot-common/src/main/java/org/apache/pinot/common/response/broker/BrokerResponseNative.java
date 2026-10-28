@@ -56,7 +56,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
     "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tablesQueried",
     "offlineThreadMemAllocatedBytes", "realtimeThreadMemAllocatedBytes", "offlineResponseSerMemAllocatedBytes",
     "realtimeResponseSerMemAllocatedBytes", "offlineTotalMemAllocatedBytes", "realtimeTotalMemAllocatedBytes", "pools",
-    "rlsFiltersApplied", "approximateFunctionApplied", "groupsTrimmed", "materializedViewQueried", "serverStats"
+    "rlsFiltersApplied", "approximatedResult", "groupsTrimmed", "materializedViewQueried", "serverStats"
 })
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class BrokerResponseNative implements BrokerResponse {
@@ -124,7 +124,7 @@ public class BrokerResponseNative implements BrokerResponse {
 
   private Set<Integer> _pools = Set.of();
   private boolean _rlsFiltersApplied = false;
-  private boolean _approximateFunctionApplied = false;
+  private boolean _approximatedResult = false;
 
   @Nullable
   private String _materializedViewQueried;
@@ -681,16 +681,15 @@ public class BrokerResponseNative implements BrokerResponse {
     return _rlsFiltersApplied;
   }
 
-  @JsonProperty("approximateFunctionApplied")
-  @Override
-  public void setApproximateFunctionApplied(boolean approximateFunctionApplied) {
-    _approximateFunctionApplied = approximateFunctionApplied;
+  @JsonProperty("approximatedResult")
+  public void setApproximatedResult(boolean approximatedResult) {
+    _approximatedResult = approximatedResult;
   }
 
-  @JsonProperty("approximateFunctionApplied")
+  @JsonProperty("approximatedResult")
   @Override
-  public boolean isApproximateFunctionApplied() {
-    return _approximateFunctionApplied;
+  public boolean isApproximatedResult() {
+    return _approximatedResult;
   }
 
   @JsonProperty("materializedViewQueried")

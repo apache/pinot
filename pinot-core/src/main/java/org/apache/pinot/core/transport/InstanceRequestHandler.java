@@ -133,6 +133,10 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
       _serverMetrics.addMeteredGlobalValue(ServerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS, 1);
       return;
     }
+    if (instanceRequest.isPing()) {
+      sendPingResponse(ctx, instanceRequest.getRequestId());
+      return;
+    }
     ServerQueryRequest queryRequest;
     try {
       queryRequest = new ServerQueryRequest(instanceRequest, _serverMetrics, queryArrivalTimeMs);
@@ -157,6 +161,21 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
       LOGGER.error("Caught exception while submitting query request: {}", requestId, e);
       sendErrorResponse(ctx, requestId, tableNameWithType, queryArrivalTimeMs,
           DataTableBuilderFactory.getEmptyDataTable(), e);
+    }
+  }
+
+  /// Answers a broker's ping with an empty data table carrying its request id, which is all the broker waits for.
+  ///
+  /// The reply is written straight from this event loop and never goes through the query scheduler. The broker pings a
+  /// server after a query to it timed out, to ask whether the server is alive at all; a server that is merely busy must
+  /// still answer promptly, so the reply cannot wait behind queued queries.
+  private void sendPingResponse(ChannelHandlerContext ctx, long requestId) {
+    try {
+      DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
+      dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
+      ctx.writeAndFlush(Unpooled.wrappedBuffer(dataTable.toBytes()));
+    } catch (Exception e) {
+      LOGGER.warn("Failed to answer ping request: {}", requestId, e);
     }
   }
 

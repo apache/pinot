@@ -268,9 +268,14 @@
         "h2Sql": "SELECT COUNT(*) FROM {nullable} WHERE intCol NOT IN (SELECT intCol FROM {tbl} WHERE intCol < 0)"
       },
       {
-        "description": "A literal value is left to the runtime instead of being folded at planning time",
+        "description": "A literal value is evaluated at planning time",
         "sql": "SELECT COUNT(*) FROM {tbl} WHERE IN_ID_SET(2, 'ATowAAABAAAAAAACABAAAAACAAQABgA=') = 1",
         "h2Sql": "SELECT COUNT(*) FROM {tbl} WHERE 2 IN (2, 4, 6)"
+      },
+      {
+        "description": "A BIGINT literal value is evaluated at planning time; the LONG set holds 10000000001 to 10000000006",
+        "sql": "SELECT COUNT(*) FROM {tbl} WHERE IN_ID_SET(10000000002, 'AgAAAAABAAAAAjowAAABAAAAC1QFABAAAAAB5ALkA+QE5AXkBuQ=') = 1",
+        "h2Sql": "SELECT COUNT(*) FROM {tbl} WHERE 10000000002 IN (10000000001, 10000000002, 10000000003, 10000000004, 10000000005, 10000000006)"
       }
     ]
   },

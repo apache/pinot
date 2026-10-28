@@ -26,6 +26,7 @@ import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.math.BigDecimal;
 import java.util.Arrays;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
@@ -185,6 +186,28 @@ public class ArrayFunctions {
     return set.toArray(new String[0]);
   }
 
+  /// Same as [#arrayUnionInt], but ignores a `null` array instead of returning `null`. Returns `null` only when both
+  /// arrays are `null`.
+  @Nullable
+  @ScalarFunction(nullableParameters = true)
+  public static int[] arrayUnionIntIgnoreNulls(@Nullable int[] values1, @Nullable int[] values2) {
+    if (values1 == null) {
+      return values2 != null ? arrayDistinctInt(values2) : null;
+    }
+    return values2 != null ? arrayUnionInt(values1, values2) : arrayDistinctInt(values1);
+  }
+
+  /// Same as [#arrayUnionString], but ignores a `null` array instead of returning `null`. Returns `null` only when both
+  /// arrays are `null`.
+  @Nullable
+  @ScalarFunction(nullableParameters = true)
+  public static String[] arrayUnionStringIgnoreNulls(@Nullable String[] values1, @Nullable String[] values2) {
+    if (values1 == null) {
+      return values2 != null ? arrayDistinctString(values2) : null;
+    }
+    return values2 != null ? arrayUnionString(values1, values2) : arrayDistinctString(values1);
+  }
+
   @ScalarFunction
   public static int[] arrayConcatInt(int[] values1, int[] values2) {
     return ArrayUtils.addAll(values1, values2);
@@ -208,6 +231,61 @@ public class ArrayFunctions {
   @ScalarFunction
   public static String[] arrayConcatString(String[] values1, String[] values2) {
     return ArrayUtils.addAll(values1, values2);
+  }
+
+  /// Same as [#arrayConcatInt], but ignores a `null` array instead of returning `null`. Returns `null` only when both
+  /// arrays are `null`.
+  @Nullable
+  @ScalarFunction(nullableParameters = true)
+  public static int[] arrayConcatIntIgnoreNulls(@Nullable int[] values1, @Nullable int[] values2) {
+    if (values1 == null) {
+      return values2;
+    }
+    return values2 != null ? arrayConcatInt(values1, values2) : values1;
+  }
+
+  /// Same as [#arrayConcatLong], but ignores a `null` array instead of returning `null`. Returns `null` only when both
+  /// arrays are `null`.
+  @Nullable
+  @ScalarFunction(nullableParameters = true)
+  public static long[] arrayConcatLongIgnoreNulls(@Nullable long[] values1, @Nullable long[] values2) {
+    if (values1 == null) {
+      return values2;
+    }
+    return values2 != null ? arrayConcatLong(values1, values2) : values1;
+  }
+
+  /// Same as [#arrayConcatFloat], but ignores a `null` array instead of returning `null`. Returns `null` only when both
+  /// arrays are `null`.
+  @Nullable
+  @ScalarFunction(nullableParameters = true)
+  public static float[] arrayConcatFloatIgnoreNulls(@Nullable float[] values1, @Nullable float[] values2) {
+    if (values1 == null) {
+      return values2;
+    }
+    return values2 != null ? arrayConcatFloat(values1, values2) : values1;
+  }
+
+  /// Same as [#arrayConcatDouble], but ignores a `null` array instead of returning `null`. Returns `null` only when
+  /// both arrays are `null`.
+  @Nullable
+  @ScalarFunction(nullableParameters = true)
+  public static double[] arrayConcatDoubleIgnoreNulls(@Nullable double[] values1, @Nullable double[] values2) {
+    if (values1 == null) {
+      return values2;
+    }
+    return values2 != null ? arrayConcatDouble(values1, values2) : values1;
+  }
+
+  /// Same as [#arrayConcatString], but ignores a `null` array instead of returning `null`. Returns `null` only when
+  /// both arrays are `null`.
+  @Nullable
+  @ScalarFunction(nullableParameters = true)
+  public static String[] arrayConcatStringIgnoreNulls(@Nullable String[] values1, @Nullable String[] values2) {
+    if (values1 == null) {
+      return values2;
+    }
+    return values2 != null ? arrayConcatString(values1, values2) : values1;
   }
 
   @ScalarFunction
@@ -235,6 +313,61 @@ public class ArrayFunctions {
     return ArrayUtils.add(values, element);
   }
 
+  /// Same as [#arrayPushBackInt], but ignores a `null` array or element instead of returning `null`. Returns `null`
+  /// only when both are `null`.
+  @Nullable
+  @ScalarFunction(nullableParameters = true)
+  public static int[] arrayPushBackIntIgnoreNulls(@Nullable int[] values, @Nullable Integer element) {
+    if (element == null) {
+      return values;
+    }
+    return values != null ? arrayPushBackInt(values, element) : new int[]{element};
+  }
+
+  /// Same as [#arrayPushBackLong], but ignores a `null` array or element instead of returning `null`. Returns `null`
+  /// only when both are `null`.
+  @Nullable
+  @ScalarFunction(nullableParameters = true)
+  public static long[] arrayPushBackLongIgnoreNulls(@Nullable long[] values, @Nullable Long element) {
+    if (element == null) {
+      return values;
+    }
+    return values != null ? arrayPushBackLong(values, element) : new long[]{element};
+  }
+
+  /// Same as [#arrayPushBackFloat], but ignores a `null` array or element instead of returning `null`. Returns `null`
+  /// only when both are `null`.
+  @Nullable
+  @ScalarFunction(nullableParameters = true)
+  public static float[] arrayPushBackFloatIgnoreNulls(@Nullable float[] values, @Nullable Float element) {
+    if (element == null) {
+      return values;
+    }
+    return values != null ? arrayPushBackFloat(values, element) : new float[]{element};
+  }
+
+  /// Same as [#arrayPushBackDouble], but ignores a `null` array or element instead of returning `null`. Returns `null`
+  /// only when both are `null`.
+  @Nullable
+  @ScalarFunction(nullableParameters = true)
+  public static double[] arrayPushBackDoubleIgnoreNulls(@Nullable double[] values, @Nullable Double element) {
+    if (element == null) {
+      return values;
+    }
+    return values != null ? arrayPushBackDouble(values, element) : new double[]{element};
+  }
+
+  /// Same as [#arrayPushBackString], but ignores a `null` array or element instead of returning `null`. Returns `null`
+  /// only when both are `null`.
+  @Nullable
+  @ScalarFunction(nullableParameters = true)
+  public static String[] arrayPushBackStringIgnoreNulls(@Nullable String[] values, @Nullable String element) {
+    if (element == null) {
+      return values;
+    }
+    return values != null ? arrayPushBackString(values, element) : new String[]{element};
+  }
+
   @ScalarFunction
   public static int[] arrayPushFrontInt(int[] values, int element) {
     return ArrayUtils.insert(0, values, element);
@@ -258,6 +391,61 @@ public class ArrayFunctions {
   @ScalarFunction
   public static String[] arrayPushFrontString(String[] values, String element) {
     return ArrayUtils.insert(0, values, element);
+  }
+
+  /// Same as [#arrayPushFrontInt], but ignores a `null` array or element instead of returning `null`. Returns `null`
+  /// only when both are `null`.
+  @Nullable
+  @ScalarFunction(nullableParameters = true)
+  public static int[] arrayPushFrontIntIgnoreNulls(@Nullable int[] values, @Nullable Integer element) {
+    if (element == null) {
+      return values;
+    }
+    return values != null ? arrayPushFrontInt(values, element) : new int[]{element};
+  }
+
+  /// Same as [#arrayPushFrontLong], but ignores a `null` array or element instead of returning `null`. Returns `null`
+  /// only when both are `null`.
+  @Nullable
+  @ScalarFunction(nullableParameters = true)
+  public static long[] arrayPushFrontLongIgnoreNulls(@Nullable long[] values, @Nullable Long element) {
+    if (element == null) {
+      return values;
+    }
+    return values != null ? arrayPushFrontLong(values, element) : new long[]{element};
+  }
+
+  /// Same as [#arrayPushFrontFloat], but ignores a `null` array or element instead of returning `null`. Returns `null`
+  /// only when both are `null`.
+  @Nullable
+  @ScalarFunction(nullableParameters = true)
+  public static float[] arrayPushFrontFloatIgnoreNulls(@Nullable float[] values, @Nullable Float element) {
+    if (element == null) {
+      return values;
+    }
+    return values != null ? arrayPushFrontFloat(values, element) : new float[]{element};
+  }
+
+  /// Same as [#arrayPushFrontDouble], but ignores a `null` array or element instead of returning `null`. Returns `null`
+  /// only when both are `null`.
+  @Nullable
+  @ScalarFunction(nullableParameters = true)
+  public static double[] arrayPushFrontDoubleIgnoreNulls(@Nullable double[] values, @Nullable Double element) {
+    if (element == null) {
+      return values;
+    }
+    return values != null ? arrayPushFrontDouble(values, element) : new double[]{element};
+  }
+
+  /// Same as [#arrayPushFrontString], but ignores a `null` array or element instead of returning `null`. Returns `null`
+  /// only when both are `null`.
+  @Nullable
+  @ScalarFunction(nullableParameters = true)
+  public static String[] arrayPushFrontStringIgnoreNulls(@Nullable String[] values, @Nullable String element) {
+    if (element == null) {
+      return values;
+    }
+    return values != null ? arrayPushFrontString(values, element) : new String[]{element};
   }
 
   @ScalarFunction

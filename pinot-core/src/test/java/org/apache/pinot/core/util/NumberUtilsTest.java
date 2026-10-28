@@ -80,6 +80,10 @@ public class NumberUtilsTest {
     assertJsonLong("1e15", 1000000000000000L);
     assertJsonLong("1.1e10", 11000000000L);
     assertJsonLong("1.1E10", 11000000000L);
+    assertJsonLong("9007199254740993", 9007199254740993L);
+    assertJsonLong("9007199254740993.0E0", 9007199254740993L);
+    assertJsonLong("9.223372036854775807E18", Long.MAX_VALUE);
+    assertJsonLong("-9.223372036854775808E18", Long.MIN_VALUE);
 
     assertJsonLongError(null);
     assertJsonLongError("");
@@ -106,10 +110,18 @@ public class NumberUtilsTest {
     //with exponent
     assertJsonLongError("2E+");
     assertJsonLongError("2E-");
+    assertJsonLongError("2E19");
     assertJsonLongError("2E20");
     assertJsonLongError("2E100");
     assertJsonLongError("2E100.123");
     assertJsonLongError("2E-1");
+    assertJsonLongError("10E18");
+    assertJsonLongError("2.0E19");
+    assertJsonLongError("1.0E20");
+    assertJsonLongError("1.123E20");
+    assertJsonLongError("-2.0E19");
+    assertJsonLongError("9.223372036854775808E18");
+    assertJsonLongError("-9.223372036854775809E18");
   }
 
   private void assertLong(String input, long expected) {

@@ -40,7 +40,8 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   private String _replicasPerPartition;
   private String _timeColumnName;
   private TimeUnit _timeType;
-  @Deprecated  // Use SegmentAssignmentConfig instead
+  // Superseded by the instance assignment config and the segment assignment config, still accepted and honored
+  @Deprecated(since = "1.3.0", forRemoval = true)
   private ReplicaGroupStrategyConfig _replicaGroupStrategyConfig;
   private CompletionConfig _completionConfig;
   private String _crypterClassName;
@@ -233,13 +234,15 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
     _replicasPerPartition = replicasPerPartition;
   }
 
-  /// @deprecated Use [org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig] instead.
+  /// @deprecated Configure the instance assignment in `instanceAssignmentConfigMap` with
+  /// [org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig] and the partition column in
+  /// `segmentAssignmentConfigMap` instead. This config is still accepted and honored.
   @Deprecated(since = "1.3.0", forRemoval = true)
   public ReplicaGroupStrategyConfig getReplicaGroupStrategyConfig() {
     return _replicaGroupStrategyConfig;
   }
 
-  @Deprecated
+  @Deprecated(since = "1.3.0", forRemoval = true)
   public void setReplicaGroupStrategyConfig(ReplicaGroupStrategyConfig replicaGroupStrategyConfig) {
     _replicaGroupStrategyConfig = replicaGroupStrategyConfig;
   }

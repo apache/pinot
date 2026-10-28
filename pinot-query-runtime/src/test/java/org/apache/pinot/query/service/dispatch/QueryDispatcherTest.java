@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.query.service.dispatch;
 
+import io.grpc.ConnectivityState;
+import io.grpc.ManagedChannel;
 import io.grpc.stub.StreamObserver;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -29,9 +31,11 @@ import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
+import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.proto.Worker;
+import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
@@ -135,6 +139,144 @@ public class QueryDispatcherTest extends QueryTestSet {
     } finally {
       dispatcher.shutdown();
     }
+  }
+
+  /// When a server becomes routable, the dispatch channel to it resolves the hostname again, and the channel to an
+  /// address it left is shut down.
+  @Test
+  public void testServerEnabledRefreshesAndRetiresChannels() {
+    QueryDispatcher dispatcher =
+        new QueryDispatcher(Mockito.mock(MailboxService.class), Mockito.mock(FailureDetector.class), null, false,
+            Duration.ofSeconds(1));
+    try {
+      // Nothing listens there
+      int port = QueryTestUtils.getAvailablePort();
+      QueryServerInstance server = new QueryServerInstance("Server_localhost_8098", "localhost", port, 8101);
+      DispatchClient client = dispatcher.getOrCreateDispatchClient(server);
+      ManagedChannel channel = client.getChannel();
+      // Connecting fails, but takes the channel out of IDLE
+      channel.getState(true);
+      dispatcher.onServerEnabled(serverInstance("Server_localhost_8098", port));
+      Assert.assertSame(dispatcher.getOrCreateDispatchClient(server), client);
+      TestUtils.waitForCondition(aVoid -> channel.getState(false) == ConnectivityState.IDLE, 10_000L,
+          "The channel did not go back to IDLE");
+      Assert.assertFalse(channel.isShutdown());
+
+      // The server restarted on another port
+      dispatcher.onServerEnabled(serverInstance("Server_localhost_8098", port + 1));
+      Assert.assertTrue(channel.isShutdown());
+      Assert.assertNotSame(dispatcher.getOrCreateDispatchClient(server), client);
+    } finally {
+      dispatcher.shutdown();
+    }
+  }
+
+  /// The dispatch channel to an address stays when the server that had the address moves away, if another server has
+  /// taken the address over.
+  @Test
+  public void testServerEnabledKeepsChannelToAddressTakenOver() {
+    QueryDispatcher dispatcher =
+        new QueryDispatcher(Mockito.mock(MailboxService.class), Mockito.mock(FailureDetector.class), null, false,
+            Duration.ofSeconds(1));
+    try {
+      int port = QueryTestUtils.getAvailablePort();
+      dispatcher.onServerEnabled(serverInstance("Server_localhost_8098", port));
+      DispatchClient client = dispatcher.getOrCreateDispatchClient(
+          new QueryServerInstance("Server_localhost_8098", "localhost", port, 8101));
+
+      // Another server takes over the address, then the server that had it comes back on another port
+      dispatcher.onServerEnabled(serverInstance("Server_localhost_8099", port));
+      dispatcher.onServerEnabled(serverInstance("Server_localhost_8098", port + 1));
+
+      Assert.assertFalse(client.getChannel().isShutdown());
+      Assert.assertSame(dispatcher.getOrCreateDispatchClient(
+          new QueryServerInstance("Server_localhost_8099", "localhost", port, 8101)), client);
+    } finally {
+      dispatcher.shutdown();
+    }
+  }
+
+  /// Each refresh drops the connection that the previous one opened, so a channel is refreshed at most once a second.
+  @Test
+  public void testDispatchChannelRefreshIsDebounced() {
+    DispatchClient client = new DispatchClient("localhost", QueryTestUtils.getAvailablePort(), null);
+    try {
+      Assert.assertTrue(client.refreshChannel());
+      Assert.assertFalse(client.refreshChannel());
+      TestUtils.waitForCondition(aVoid -> client.refreshChannel(), 10_000L, "The channel was not refreshed again");
+    } finally {
+      client.getChannel().shutdownNow();
+    }
+  }
+
+  /// The failure detector checks an instance that the routing manager does not know, for example a server of a remote
+  /// cluster, at the address where a query was last dispatched to it.
+  @Test
+  public void testCheckConnectivityToInstanceAtLastDispatchAddress() {
+    QueryDispatcher dispatcher =
+        new QueryDispatcher(Mockito.mock(MailboxService.class), Mockito.mock(FailureDetector.class), null, false,
+            Duration.ofSeconds(1));
+    String instanceId = "Server_remote_8098";
+    // Nothing listens there until the server starts
+    int port = QueryTestUtils.getAvailablePort();
+    QueryServerInstance instance = new QueryServerInstance(instanceId, "localhost", port, 8101);
+    QueryServer queryServer = new QueryServer(port, Mockito.mock(QueryRunner.class));
+    try {
+      Assert.assertEquals(dispatcher.checkConnectivityToInstance(instanceId), FailureDetector.ServerState.UNKNOWN);
+
+      // What a dispatch does
+      dispatcher.recordDispatchAddress(instance);
+      ManagedChannel channel = dispatcher.getOrCreateDispatchClient(instance).getChannel();
+      Assert.assertEquals(dispatcher.checkConnectivityToInstance(instanceId), FailureDetector.ServerState.UNHEALTHY);
+      TestUtils.waitForCondition(aVoid -> channel.getState(false) == ConnectivityState.TRANSIENT_FAILURE, 10_000L,
+          "Connecting did not fail");
+      Assert.assertEquals(dispatcher.checkConnectivityToInstance(instanceId), FailureDetector.ServerState.UNHEALTHY);
+
+      queryServer.start();
+      TestUtils.waitForCondition(
+          aVoid -> dispatcher.checkConnectivityToInstance(instanceId) == FailureDetector.ServerState.HEALTHY, 10_000L,
+          "The instance did not become healthy after its server started");
+
+      // A request other than a dispatch, for example a cancel, does not change the address to check
+      QueryServerInstance movedInstance =
+          new QueryServerInstance(instanceId, "localhost", QueryTestUtils.getAvailablePort(), 8101);
+      dispatcher.getOrCreateDispatchClient(movedInstance);
+      Assert.assertEquals(dispatcher.checkConnectivityToInstance(instanceId), FailureDetector.ServerState.HEALTHY);
+
+      // A dispatch does: the instance moved to another port, where nothing listens
+      dispatcher.recordDispatchAddress(movedInstance);
+      Assert.assertEquals(dispatcher.checkConnectivityToInstance(instanceId), FailureDetector.ServerState.UNHEALTHY);
+    } finally {
+      dispatcher.shutdown();
+      queryServer.shutdown();
+    }
+  }
+
+  /// Each dispatch records the address of the instances it reaches, for the failure detector.
+  @Test
+  public void testDispatchRecordsInstanceAddress()
+      throws Exception {
+    Set<QueryServerInstance> servers = new HashSet<>();
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery("SELECT * FROM a");
+    try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
+      _queryDispatcher.submit(REQUEST_ID_GEN.getAndIncrement(), dispatchableSubPlan, 10_000L, servers, Map.of());
+    }
+    Assert.assertFalse(servers.isEmpty());
+    for (QueryServerInstance server : servers) {
+      Assert.assertEquals(_queryDispatcher.checkConnectivityToInstance(server.getInstanceId()),
+          FailureDetector.ServerState.HEALTHY);
+    }
+  }
+
+  private static ServerInstance serverInstance(String instanceId, int queryServerPort) {
+    InstanceConfig instanceConfig = new InstanceConfig(instanceId);
+    instanceConfig.setHostName("localhost");
+    instanceConfig.setPort(instanceId.substring(instanceId.lastIndexOf('_') + 1));
+    instanceConfig.getRecord()
+        .setIntField(CommonConstants.Helix.Instance.MULTI_STAGE_QUERY_ENGINE_SERVICE_PORT_KEY, queryServerPort);
+    instanceConfig.getRecord()
+        .setIntField(CommonConstants.Helix.Instance.MULTI_STAGE_QUERY_ENGINE_MAILBOX_PORT_KEY, 8101);
+    return new ServerInstance(instanceConfig);
   }
 
   @AfterClass

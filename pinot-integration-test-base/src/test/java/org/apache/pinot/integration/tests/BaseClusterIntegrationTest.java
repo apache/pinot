@@ -38,6 +38,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
@@ -73,7 +74,6 @@ import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
-import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -305,11 +305,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return null;
   }
 
-  @Nullable
-  protected ReplicaGroupStrategyConfig getReplicaGroupStrategyConfig() {
-    return null;
-  }
-
   /// Creates a new schema.
   protected Schema createSchema()
       throws IOException {
@@ -475,8 +470,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setStreamConfigs(getStreamConfigs())
         .setNullHandlingEnabled(getNullHandlingEnabled())
         .setSegmentPartitionConfig(getSegmentPartitionConfig())
-        .setOptimizeNoDictStatsCollection(true)
-        .setReplicaGroupStrategyConfig(getReplicaGroupStrategyConfig());
+        .setOptimizeNoDictStatsCollection(true);
   }
 
   /// Creates a new Upsert enabled table config.
@@ -504,7 +498,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setRoutingConfig(
             new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
         .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap))
-        .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(primaryKeyColumn, 1))
         .setOptimizeNoDictStatsCollection(true)
         .setUpsertConfig(upsertConfig)
         .build();
@@ -563,7 +556,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setRoutingConfig(
             new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
         .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap))
-        .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(primaryKeyColumn, 1))
         .setOptimizeNoDictStatsCollection(true)
         .setUpsertConfig(upsertConfig)
         .build();
@@ -589,7 +581,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setRoutingConfig(
             new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
         .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap))
-        .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(primaryKeyColumn, 1))
         .setDedupConfig(new DedupConfig())
         .setOptimizeNoDictStatsCollection(true)
         .build();
@@ -1031,10 +1022,25 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     waitForAllDocsLoaded(getTableName(), timeoutMs);
   }
 
+  /// Requires as many consecutive successful document count checks as there are servers in the cluster,
+  /// since servers can finish loading their segments at different times.
   protected void waitForAllDocsLoaded(String tableName, long timeoutMs) {
     long countStarResult = getCountStarResult();
-    TestUtils.waitForCondition(() -> getCurrentCountStarResult(tableName) == countStarResult, 100L, timeoutMs,
-        "Failed to load " + countStarResult + " documents", Duration.ofMillis(timeoutMs / 10));
+    int numServers = _serverStarters.size();
+    AtomicInteger consecutiveSuccesses = new AtomicInteger();
+    TestUtils.waitForCondition(() -> {
+      try {
+        if (getCurrentCountStarResult(tableName) != countStarResult) {
+          consecutiveSuccesses.set(0);
+          return false;
+        }
+        return consecutiveSuccesses.incrementAndGet() >= numServers;
+      } catch (Exception e) {
+        consecutiveSuccesses.set(0);
+        throw e;
+      }
+    }, 100L, timeoutMs, "Failed to load " + countStarResult + " documents on all servers",
+        Duration.ofMillis(timeoutMs / 10));
   }
 
   protected void waitForAnyDocLoaded(String tableName, long timeoutMs) {

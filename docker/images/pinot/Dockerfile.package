@@ -23,7 +23,7 @@ FROM apachepinot/pinot-base-runtime:${PINOT_RUNTIME_IMAGE_TAG}
 LABEL MAINTAINER=dev@pinot.apache.org
 
 ENV PINOT_HOME=/opt/pinot
-ENV JAVA_OPTS="-Xms4G -Xmx4G -Dpinot.admin.system.exit=false"
+ENV JAVA_OPTS="-Xms4G -Xmx4G -Dpinot.admin.system.exit=true"
 
 VOLUME ["${PINOT_HOME}/configs", "${PINOT_HOME}/data"]
 

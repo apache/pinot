@@ -297,8 +297,9 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     ExecutionStatistics executionStatistics = selectionOrderByOperator.getExecutionStatistics();
     assertEquals(executionStatistics.getNumDocsScanned(), 30000L);
     assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
-    // 30000 * (3 columns)
-    assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 90000L);
+    // The scan reads only the order-by column (30000 * 1); column1 and column11 are fetched just for the
+    // 10 rows that survive the limit (10 * 2). Before late materialisation this was 30000 * 3.
+    assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 30000L + 20L);
     assertEquals(executionStatistics.getNumTotalDocs(), 30000L);
     DataSchema dataSchema = resultsBlock.getDataSchema();
     assertEquals(dataSchema.getColumnNames(), new String[]{"column5", "column1", "column11"});
@@ -724,5 +725,47 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
     assertEquals(brokerResponse.getOfflineThreadMemAllocatedBytes(), 0);
     assertEquals(brokerResponse.getRealtimeThreadMemAllocatedBytes(), 0);
+  }
+
+  @Test
+  public void testLateMaterializationWithUnsortedOrderBySuffix() {
+    BaseOperator<SelectionResultsBlock> operator = getOperator(
+        "SELECT column5, column1, ADD(column1, 1) FROM testTable ORDER BY column5, column6, column1");
+    assertTrue(operator instanceof SelectionPartiallyOrderedByLinearOperator);
+    SelectionResultsBlock block = operator.nextBlock();
+    assertEquals(block.getDataSchema().getColumnNames(),
+        new String[]{"column5", "column6", "column1", "add(column1,'1')"});
+    assertEquals(block.getDataSchema().getColumnDataTypes(),
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.INT, ColumnDataType.DOUBLE});
+    List<Object[]> rows = block.getRows();
+    assertEquals(rows.size(), 10);
+    for (Object[] row : rows) {
+      assertEquals(row[3], ((Integer) row[2]).doubleValue() + 1);
+    }
+    assertEquals(rows.get(9), new Object[]{"gFuH", 6043515, 10542595, 10542596.0});
+    assertEquals(operator.getExecutionStatistics().getNumDocsScanned(), 30000L);
+    // The transform rereads column1 for the selected rows after scanning the three order-by columns.
+    assertEquals(operator.getExecutionStatistics().getNumEntriesScannedPostFilter(), 90010L);
+  }
+
+  @Test
+  public void testLateMaterializationWithTransformProjection() {
+    BaseOperator<SelectionResultsBlock> operator = getOperator(
+        "SET allowReverseOrder = false; SELECT column5, ADD(column1, 1), column11 FROM testTable "
+            + "ORDER BY column5 DESC, column1, column11 LIMIT 5 OFFSET 3");
+    assertTrue(operator instanceof SelectionPartiallyOrderedByDescOperation);
+    SelectionResultsBlock block = operator.nextBlock();
+    assertEquals(block.getDataSchema().getColumnNames(),
+        new String[]{"column5", "column1", "column11", "add(column1,'1')"});
+    assertEquals(block.getDataSchema().getColumnDataTypes(),
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.DOUBLE});
+    List<Object[]> rows = block.getRows();
+    // Segment operators retain limit + offset rows; the broker applies the offset.
+    assertEquals(rows.size(), 8);
+    for (Object[] row : rows) {
+      assertEquals(row[3], ((Integer) row[1]).doubleValue() + 1);
+    }
+    assertEquals(operator.getExecutionStatistics().getNumDocsScanned(), 30000L);
+    assertEquals(operator.getExecutionStatistics().getNumEntriesScannedPostFilter(), 90008L);
   }
 }

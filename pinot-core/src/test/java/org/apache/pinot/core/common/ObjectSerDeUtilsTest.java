@@ -30,8 +30,10 @@ import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
+import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
+import java.math.BigDecimal;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -60,6 +62,8 @@ import org.apache.pinot.core.query.aggregation.function.PercentileEstAggregation
 import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.funnel.FunnelStepEvent;
 import org.apache.pinot.segment.local.customobject.AvgPair;
+import org.apache.pinot.segment.local.customobject.BigDecimalLongPair;
+import org.apache.pinot.segment.local.customobject.BytesLongPair;
 import org.apache.pinot.segment.local.customobject.CpcSketchAccumulator;
 import org.apache.pinot.segment.local.customobject.DoubleLongPair;
 import org.apache.pinot.segment.local.customobject.FloatLongPair;
@@ -76,6 +80,7 @@ import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigest.Centroid;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigestAccumulator;
 import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -408,6 +413,36 @@ public class ObjectSerDeUtilsTest {
   }
 
   @Test
+  public void testBigDecimalValueTimePair() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      ValueLongPair<BigDecimal> expected =
+          new BigDecimalLongPair(BigDecimal.valueOf(RANDOM.nextLong(), RANDOM.nextInt(20)), RANDOM.nextLong());
+
+      byte[] bytes = ObjectSerDeUtils.serialize(expected);
+      ValueLongPair<BigDecimal> actual =
+          ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.BigDecimalLongPair);
+
+      assertEquals(actual.getValue(), expected.getValue(), ERROR_MESSAGE);
+      assertEquals(actual.getTime(), expected.getTime(), ERROR_MESSAGE);
+    }
+  }
+
+  @Test
+  public void testBytesValueTimePair() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      byte[] value = new byte[RANDOM.nextInt(32)];
+      RANDOM.nextBytes(value);
+      ValueLongPair<ByteArray> expected = new BytesLongPair(new ByteArray(value), RANDOM.nextLong());
+
+      byte[] bytes = ObjectSerDeUtils.serialize(expected);
+      ValueLongPair<ByteArray> actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.BytesLongPair);
+
+      assertEquals(actual.getValue(), expected.getValue(), ERROR_MESSAGE);
+      assertEquals(actual.getTime(), expected.getTime(), ERROR_MESSAGE);
+    }
+  }
+
+  @Test
   public void testHyperLogLog() {
     for (int i = 0; i < NUM_ITERATIONS; i++) {
       HyperLogLog expected = new HyperLogLog(7);
@@ -645,6 +680,22 @@ public class ObjectSerDeUtilsTest {
 
       byte[] bytes = ObjectSerDeUtils.serialize(expected);
       Double2LongOpenHashMap actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.Double2LongMap);
+
+      assertEquals(actual, expected, ERROR_MESSAGE);
+    }
+  }
+
+  @Test
+  public void testString2LongMap() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      int size = RANDOM.nextInt(100);
+      Object2LongOpenHashMap<String> expected = new Object2LongOpenHashMap<>(size);
+      for (int j = 0; j < size; j++) {
+        expected.put(RandomStringUtils.secure().next(RANDOM.nextInt(5)), RANDOM.nextLong());
+      }
+
+      byte[] bytes = ObjectSerDeUtils.STRING_2_LONG_MAP_SER_DE.serialize(expected);
+      Object2LongOpenHashMap<String> actual = ObjectSerDeUtils.deserialize(bytes, ObjectType.String2LongMap);
 
       assertEquals(actual, expected, ERROR_MESSAGE);
     }

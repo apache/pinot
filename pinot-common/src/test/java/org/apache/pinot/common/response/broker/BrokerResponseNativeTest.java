@@ -72,6 +72,19 @@ public class BrokerResponseNativeTest {
     assertEquals(deserialized.getDirectRemoteAccessBytes(), 20L);
   }
 
+  /// The flag is serialized as `approximatedResult`, survives a round trip, and is carried into a cursor response.
+  @Test
+  public void testApproximatedResult()
+      throws IOException {
+    BrokerResponseNative response = new BrokerResponseNative();
+    assertFalse(JsonUtils.stringToJsonNode(response.toJsonString()).get("approximatedResult").asBoolean());
+
+    response.setApproximatedResult(true);
+    assertTrue(JsonUtils.stringToJsonNode(response.toJsonString()).get("approximatedResult").asBoolean());
+    assertTrue(BrokerResponseNative.fromJsonString(response.toJsonString()).isApproximatedResult());
+    assertTrue(new CursorResponseNative(response).isApproximatedResult());
+  }
+
   @Test
   public void testNullResponse()
       throws IOException {

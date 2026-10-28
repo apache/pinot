@@ -120,6 +120,7 @@ import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
+import org.apache.pinot.segment.local.utils.TableConfigUtils.ValidationType;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableConfigValidatorRegistry;
 import org.apache.pinot.spi.config.table.TableStatsHumanReadable;
@@ -217,11 +218,12 @@ public class PinotTableRestletResource {
   @ApiOperation(value = "Adds a table", notes = "Adds a table")
   @ManualAuthorization // performed after parsing table configs
   public ConfigSuccessResponse addTable(String tableConfigStr,
-      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
+      @ApiParam(value = TableConfigValidationUtils.VALIDATION_TYPES_TO_SKIP_DESCRIPTION)
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip,
       @DefaultValue("false") @QueryParam("ignoreActiveTasks") boolean ignoreActiveTasks,
       @Context HttpHeaders httpHeaders, @Context Request request)
       throws IOException {
+    EnumSet<ValidationType> skipTypes = TableConfigValidationUtils.parseValidationTypesToSkip(typesToSkip);
     // TODO introduce a table config ctor with json string.
     Pair<TableConfig, Map<String, Object>> tableConfigAndUnrecognizedProperties;
     TableConfig tableConfig;
@@ -251,7 +253,7 @@ public class PinotTableRestletResource {
       TableConfigTunerUtils.applyTunerConfigs(_pinotHelixResourceManager, tableConfig, schema, Map.of());
 
       TableConfigValidationUtils.validateTableConfig(
-          tableConfig, schema, typesToSkip, _pinotHelixResourceManager, _controllerConf, _pinotTaskManager);
+          tableConfig, schema, skipTypes, _pinotHelixResourceManager, _controllerConf, _pinotTaskManager);
     } catch (TableAlreadyExistsException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT, e);
     } catch (Exception e) {
@@ -761,13 +763,14 @@ public class PinotTableRestletResource {
   @ApiOperation(value = "Updates table config for a table", notes = "Updates table config for a table")
   public ConfigSuccessResponse updateTableConfig(
       @ApiParam(value = "Name of the table to update", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
+      @ApiParam(value = TableConfigValidationUtils.VALIDATION_TYPES_TO_SKIP_DESCRIPTION)
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip,
       @ApiParam(value = "Force config changes")
       @QueryParam("force") @DefaultValue("false") boolean force,
       @Context HttpHeaders headers,
       String tableConfigString)
       throws Exception {
+    EnumSet<ValidationType> skipTypes = TableConfigValidationUtils.parseValidationTypesToSkip(typesToSkip);
     Pair<TableConfig, Map<String, Object>> tableConfigAndUnrecognizedProperties;
     TableConfig tableConfig;
     String tableNameWithType;
@@ -788,9 +791,8 @@ public class PinotTableRestletResource {
 
       schema = _pinotHelixResourceManager.getTableSchema(tableNameWithType);
       Preconditions.checkState(schema != null, "Failed to find schema for table: %s", tableNameWithType);
-      TableConfigValidationUtils.validateTableConfig(
-          tableConfig, schema, typesToSkip, _pinotHelixResourceManager, _controllerConf, _pinotTaskManager,
-          _pinotHelixResourceManager.getTableConfig(tableNameWithType));
+      TableConfigValidationUtils.validateTableConfig(tableConfig, schema, skipTypes, _pinotHelixResourceManager,
+          _controllerConf, _pinotTaskManager, _pinotHelixResourceManager.getTableConfig(tableNameWithType));
     } catch (Exception e) {
       String msg = String.format("Invalid table config: %s with error: %s", tableName, e.getMessage());
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
@@ -827,7 +829,7 @@ public class PinotTableRestletResource {
           + " This allows us to validate table config before apply.")
   @ManualAuthorization // performed after parsing TableConfig
   public ObjectNode checkTableConfig(String tableConfigStr,
-      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
+      @ApiParam(value = TableConfigValidationUtils.VALIDATION_TYPES_TO_SKIP_DESCRIPTION)
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, @Context HttpHeaders httpHeaders,
       @Context Request request) {
     Pair<TableConfig, Map<String, Object>> tableConfigAndUnrecognizedProperties;
@@ -843,26 +845,27 @@ public class PinotTableRestletResource {
     tableConfig.setTableName(tableNameWithType);
 
     // validate permission
-    ResourceUtils.checkPermissionAndAccess(tableNameWithType, request, httpHeaders,
-        AccessType.READ, Actions.Table.VALIDATE_TABLE_CONFIGS, _accessControlFactory, LOGGER);
+    ResourceUtils.checkPermissionAndAccess(tableNameWithType, request, httpHeaders, AccessType.READ,
+        Actions.Table.VALIDATE_TABLE_CONFIGS, _accessControlFactory, LOGGER);
 
-    ObjectNode validationResponse = validateConfig(tableConfig, typesToSkip);
+    ObjectNode validationResponse =
+        validateConfig(tableConfig, TableConfigValidationUtils.parseValidationTypesToSkip(typesToSkip));
     validationResponse.set("unrecognizedProperties",
         JsonUtils.objectToJsonNode(tableConfigAndUnrecognizedProperties.getRight()));
     return validationResponse;
   }
 
   @VisibleForTesting
-  ObjectNode validateConfig(TableConfig tableConfig, @Nullable String typesToSkip) {
+  ObjectNode validateConfig(TableConfig tableConfig, @Nullable EnumSet<ValidationType> skipTypes) {
     String tableNameWithType = tableConfig.getTableName();
     try {
       Schema schema = _pinotHelixResourceManager.getTableSchema(tableNameWithType);
       if (schema == null) {
         throw new SchemaNotFoundException("Failed to find schema for table: " + tableNameWithType);
       }
-      TableConfigUtils.validate(tableConfig, schema, typesToSkip,
+      TableConfigUtils.validate(tableConfig, schema, skipTypes,
           _pinotHelixResourceManager.getTableConfig(tableNameWithType));
-      TaskConfigUtils.validateTaskConfigs(tableConfig, schema, _pinotTaskManager, typesToSkip);
+      TaskConfigUtils.validateTaskConfigs(tableConfig, schema, _pinotTaskManager, skipTypes);
       TableConfigValidatorRegistry.validate(tableConfig, schema);
       ObjectNode tableConfigValidateStr = JsonUtils.newObjectNode();
       if (tableConfig.getTableType() == TableType.OFFLINE) {

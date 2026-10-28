@@ -124,7 +124,7 @@ public class BrokerRoutingManagerTest {
   private PropertyKey _instanceConfigsKey;
 
   @Mock
-  private Consumer<ServerInstance> _serverReenableCallback;
+  private Consumer<ServerInstance> _serverEnabledCallback;
 
   private BrokerRoutingManager _routingManager;
 
@@ -284,9 +284,9 @@ public class BrokerRoutingManagerTest {
   }
 
   @Test
-  public void testServerReenableCallbackInvokedWhenExcludedServerReenabled() {
+  public void testServerEnabledCallbackInvokedWhenExcludedServerReenabled() {
     // Set up callback
-    _routingManager.setServerReenableCallback(_serverReenableCallback);
+    _routingManager.setServerEnabledCallback(_serverEnabledCallback);
 
     // First, enable the server by processing instance config change
     List<ZNRecord> instanceConfigs = List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID));
@@ -312,29 +312,40 @@ public class BrokerRoutingManagerTest {
         anyInt(), anyInt())).thenReturn(instanceConfigs);
     _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
 
-    // Verify callback was invoked with correct ServerInstance
+    // Verify callback was invoked with correct ServerInstance: when the server was first enabled, and when it was
+    // enabled again
     ArgumentCaptor<ServerInstance> captor = ArgumentCaptor.forClass(ServerInstance.class);
-    verify(_serverReenableCallback).accept(captor.capture());
+    verify(_serverEnabledCallback, times(2)).accept(captor.capture());
 
     ServerInstance capturedInstance = captor.getValue();
     assertEquals(capturedInstance.getHostname(), SERVER_HOST);
     assertEquals(capturedInstance.getPort(), SERVER_PORT);
   }
 
+  /// A server that restarts without having been excluded is disabled while it shuts down and enabled again once it
+  /// is ready. It may be back at a new address, so the callback must run for it too, to refresh the channel to it.
   @Test
-  public void testServerReenableCallbackNotInvokedForNewServer() {
-    // Set up callback
-    _routingManager.setServerReenableCallback(_serverReenableCallback);
+  public void testServerEnabledCallbackInvokedWhenRestartedServerReenabled() {
+    _routingManager.setServerEnabledCallback(_serverEnabledCallback);
 
-    // Enable a new server (never excluded)
     List<ZNRecord> instanceConfigs = List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID));
     when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
         anyInt(), anyInt())).thenReturn(instanceConfigs);
-
     _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    verify(_serverEnabledCallback, times(1)).accept(any());
 
-    // Verify callback was NOT invoked (server was never excluded)
-    verify(_serverReenableCallback, never()).accept(any());
+    // A change that leaves the server enabled does not call it again
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    verify(_serverEnabledCallback, times(1)).accept(any());
+
+    // Disabled while it restarts, then enabled again
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(List.of());
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(instanceConfigs);
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    verify(_serverEnabledCallback, times(2)).accept(any());
   }
 
   @Test
@@ -858,6 +869,36 @@ public class BrokerRoutingManagerTest {
     // Routable map contains the server again.
     assertTrue(_routingManager.getEnabledServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
     assertTrue(_routingManager.getRoutableServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
+  }
+
+  @Test
+  public void testShuttingDownServerRemovedFromRoutingWhileAnotherServerIsExcluded()
+      throws Exception {
+    // Enable three servers, then exclude one of them (simulating FailureDetector marking it unhealthy)
+    String excludedServer = "Server_excludedhost_8000";
+    String healthyServer = "Server_healthyhost_8000";
+    ZNRecord serverConfig = createEnabledServerZNRecord(SERVER_INSTANCE_ID);
+    ZNRecord excludedServerConfig = createEnabledServerZNRecord(excludedServer);
+    ZNRecord healthyServerConfig = createEnabledServerZNRecord(healthyServer);
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT), anyInt(), anyInt()))
+        .thenReturn(List.of(serverConfig, excludedServerConfig, healthyServerConfig));
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    _routingManager.excludeServerFromRouting(excludedServer);
+    InstanceSelector instanceSelector = mock(InstanceSelector.class);
+    putRoutingEntry(TEST_TABLE, createRoutingEntry(TEST_TABLE, null, null, Map.of(), instanceSelector, false));
+
+    // The server starts shutting down while the other server is still excluded
+    ZNRecord shuttingDownServerConfig = createEnabledServerZNRecord(SERVER_INSTANCE_ID);
+    shuttingDownServerConfig.setSimpleField(Helix.IS_SHUTDOWN_IN_PROGRESS, "true");
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT), anyInt(), anyInt()))
+        .thenReturn(List.of(shuttingDownServerConfig, excludedServerConfig, healthyServerConfig));
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+
+    // The routing entry must stop selecting the shutting down server, and only the healthy server stays routable
+    verify(instanceSelector).onInstancesChange(Set.of(healthyServer), List.of(SERVER_INSTANCE_ID));
+    assertEquals(_routingManager.getRoutableServerInstanceMap().keySet(), Set.of(healthyServer));
+    // The excluded server stays enabled
+    assertEquals(_routingManager.getEnabledServerInstanceMap().keySet(), Set.of(excludedServer, healthyServer));
   }
 
   @Test

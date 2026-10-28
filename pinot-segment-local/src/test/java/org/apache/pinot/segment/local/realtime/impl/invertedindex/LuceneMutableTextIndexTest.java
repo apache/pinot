@@ -27,11 +27,13 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.core.KeywordTokenizer;
 import org.apache.lucene.queryparser.classic.QueryParser;
+import org.apache.lucene.search.ReferenceManager.RefreshListener;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
@@ -295,9 +297,45 @@ public class LuceneMutableTextIndexTest {
       index.add(new String[]{"foo bar"});
       index.add(new String[]{"baz qux"});
 
-      // Block until the refresh attempt completes so the listener has recorded the current doc count
+      // Block until the documents are visible to the current searcher.
       index.getSearcherManager().maybeRefreshBlocking();
 
+      assertEquals(index.getSearchableDocCount(), 3);
+    } finally {
+      index.close();
+    }
+  }
+
+  @Test
+  public void testGetSearchableDocCountWhenDocumentIsAddedDuringRefresh()
+      throws IOException {
+    TextIndexConfig config = new TextIndexConfigBuilder().withUseANDForMultiTermQueries(false).build();
+    RealtimeLuceneTextIndex index = new RealtimeLuceneTextIndex(TEXT_COLUMN_NAME, INDEX_DIR,
+        "table__0__" + SEGMENT_NAME_SUFFIX_COUNTER.getAndIncrement() + "__20240601T1818Z", config);
+    try {
+      index.add("hello world");
+      index.add("foo bar");
+      AtomicBoolean documentAdded = new AtomicBoolean();
+      index.getSearcherManager().addListener(new RefreshListener() {
+        @Override
+        public void beforeRefresh() {
+          // The production listener has captured two docs, but the refreshed reader will include this third doc.
+          if (documentAdded.compareAndSet(false, true)) {
+            index.add("baz qux");
+          }
+        }
+
+        @Override
+        public void afterRefresh(boolean didRefresh) {
+        }
+      });
+      index.getSearcherManager().maybeRefreshBlocking();
+
+      assertEquals(index.getDocIds("baz"), ImmutableRoaringBitmap.bitmapOf(2));
+      assertEquals(index.getSearchableDocCount(), 3);
+
+      // A refresh with no further writes must retain the full searchable document count.
+      index.getSearcherManager().maybeRefreshBlocking();
       assertEquals(index.getSearchableDocCount(), 3);
     } finally {
       index.close();

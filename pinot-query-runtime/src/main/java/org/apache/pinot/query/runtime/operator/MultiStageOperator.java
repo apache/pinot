@@ -368,6 +368,7 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
         response.mergeNumGroupsLimitReached(stats.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_LIMIT_REACHED));
         response.mergeNumGroupsWarningLimitReached(
             stats.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_WARNING_LIMIT_REACHED));
+        response.mergeApproximatedResult(stats.getBoolean(AggregateOperator.StatKey.APPROXIMATED_RESULT));
         response.mergeNumGroups(stats.getLong(AggregateOperator.StatKey.NUM_GROUPS));
         response.mergeMaxRowsInOperator(stats.getLong(AggregateOperator.StatKey.EMITTED_ROWS));
       }
