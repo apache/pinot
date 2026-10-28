@@ -218,9 +218,10 @@ public class ParquetReaderLogicalTypesTest {
       try (ParquetWriter<Group> writer = ExampleParquetWriter.builder(new Path(dataFile.getAbsolutePath()))
           .withType(schema).build()) {
         SimpleGroupFactory groups = new SimpleGroupFactory(schema);
-        // Year 1600 cannot be represented as signed Long epoch nanos; the next row is in range.
+        // Year 1600 cannot fit signed Long epoch nanos; the valid middle row is followed by another rejection.
         writer.write(groups.newGroup().append("value", new NanoTime(2305448, 0L)));
         writer.write(groups.newGroup().append("value", new NanoTime(2440588, 7L)));
+        writer.write(groups.newGroup().append("value", new NanoTime(2305448, 0L)));
       }
       for (boolean useAvro : new boolean[]{false, true}) {
         ParquetRecordReaderConfig config = new ParquetRecordReaderConfig();
@@ -238,6 +239,8 @@ public class ParquetReaderLogicalTypesTest {
             expectThrows(IllegalArgumentException.class, () -> reader.next(new GenericRow()));
             assertTrue(reader.hasNext());
             assertEquals(reader.next(new GenericRow()).getValue("value"), 7L);
+            assertTrue(reader.hasNext());
+            expectThrows(IllegalArgumentException.class, () -> reader.next(new GenericRow()));
             assertFalse(reader.hasNext(), "Extraction failures must not retry the rejected record");
           }
         }
