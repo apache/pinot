@@ -42,7 +42,7 @@ public class FunctionRegistryTest {
       TransformFunctionType.SCALAR,
       // Special functions that requires index
       TransformFunctionType.JSON_EXTRACT_INDEX, TransformFunctionType.MAP_VALUE,
-      TransformFunctionType.LOOKUP, TransformFunctionType.TEXT_MATCH,
+      TransformFunctionType.LOOKUP, TransformFunctionType.TEXT_MATCH, TransformFunctionType.VECTOR_DISTANCE,
       // TODO: Support these functions
       TransformFunctionType.IN, TransformFunctionType.NOT_IN, TransformFunctionType.IS_TRUE,
       TransformFunctionType.IS_NOT_TRUE, TransformFunctionType.IS_FALSE, TransformFunctionType.IS_NOT_FALSE,
