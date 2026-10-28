@@ -112,18 +112,18 @@ public class ApproximateAggregateRewriteTest extends QueryEnvironmentTestBase {
   }
 
   /// The parameters are appended to the project beneath the aggregate, so the literals already in it, here the data
-  /// type argument of FIRST_WITH_TIME and the percentile, are still inlined when ProjectMerge is skipped.
+  /// type argument of FIRST_WITH_TIME, are still inlined when ProjectMerge is skipped.
   @Test
   public void testKeepsOtherLiteralsInlinedWithoutProjectMerge() {
     for (boolean usePhysicalOptimizer : List.of(false, true)) {
       QueryEnvironment env = newQueryEnvironment(true, "threshold=17", "threshold=23", usePhysicalOptimizer);
       for (String input : List.of("a", "(SELECT * FROM a UNION ALL SELECT * FROM b UNION ALL SELECT * FROM c)")) {
         String query = "SET skipPlannerRules='ProjectMerge'; EXPLAIN PLAN FOR SELECT col2, "
-            + "FIRST_WITH_TIME(col3, ts), DISTINCTCOUNT(col1), PERCENTILE(col3, 90) FROM " + input + " GROUP BY col2";
+            + "FIRST_WITH_TIME(col3, ts), DISTINCTCOUNT(col1) FROM " + input + " GROUP BY col2";
         String plan = env.compile(query, CalciteSqlParser.compileToSqlNodeAndOptions(query))
             .explain(RANDOM_REQUEST_ID_GEN.nextLong(), null).getExplainPlan();
         String leafAggregate = plan.lines().filter(line -> line.contains("aggType=[LEAF]")).findFirst().orElse("");
-        for (String literal : List.of("_UTF-8'INT'", "_UTF-8'threshold=17'", "_UTF-8'threshold=23'", ", 90, ")) {
+        for (String literal : List.of("_UTF-8'INT'", "_UTF-8'threshold=17'")) {
           assertTrue(leafAggregate.contains(literal), "Expected " + literal + " in the leaf aggregate of:\n" + plan);
         }
       }

@@ -259,6 +259,16 @@ public class ArrayAggQueriesTest extends BaseQueriesTest {
     }
   }
 
+  @Test
+  public void testArrayAggDistinctKeyword() {
+    for (String arguments : new String[]{"intColumn", "intColumn, false", "intColumn, 'INT'",
+        "intColumn, 'INT', true", "intColumn, 'INT', false"}) {
+      ResultTable result = getBrokerResponseForOptimizedQuery(
+          "SELECT ARRAY_AGG(DISTINCT " + arguments + ") FROM testTable", SCHEMA).getResultTable();
+      assertEquals(((int[]) result.getRows().get(0)[0]).length, _expectedCardinalityResults[0]);
+    }
+  }
+
   @AfterClass
   public void tearDown()
       throws IOException {

@@ -1242,10 +1242,6 @@ public class CalciteSqlParser {
 
   private static Expression compileFunctionExpression(SqlBasicCall functionNode) {
     SqlKind functionKind = functionNode.getKind();
-    if (functionKind == SqlKind.ARRAY_AGG && functionNode.getFunctionQuantifier() != null
-        && "DISTINCT".equals(functionNode.getFunctionQuantifier().toString())) {
-      throw new SqlCompilationException("Function 'ARRAY_AGG' on DISTINCT is not supported.");
-    }
     boolean negated = false;
     String canonicalName;
     switch (functionKind) {
@@ -1310,6 +1306,16 @@ public class CalciteSqlParser {
         }
       } else {
         operands.add(toExpression(childNode));
+      }
+    }
+    if (functionKind == SqlKind.ARRAY_AGG && functionNode.getFunctionQuantifier() != null
+        && "DISTINCT".equals(functionNode.getFunctionQuantifier().toString())) {
+      Expression distinct = RequestUtils.getLiteralExpression(true);
+      if (operands.size() == 1 || (operands.size() == 2 && operands.get(1).isSetLiteral()
+          && operands.get(1).getLiteral().isSetStringValue())) {
+        operands.add(distinct);
+      } else if (operands.size() == 2 || operands.size() == 3) {
+        operands.set(operands.size() - 1, distinct);
       }
     }
     ParserUtils.validateFunction(canonicalName, operands);

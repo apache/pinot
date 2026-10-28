@@ -36,7 +36,6 @@ import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.RelFactories;
 import org.apache.calcite.rel.core.TableScan;
-import org.apache.calcite.rel.core.Union;
 import org.apache.calcite.rel.core.Window;
 import org.apache.calcite.rel.logical.LogicalAsofJoin;
 import org.apache.calcite.rel.logical.LogicalJoin;
@@ -89,8 +88,7 @@ public class PinotRuleUtils {
     }
   }
 
-  /// Appends literal arguments in one project, retaining a union column as a literal only when every branch projects
-  /// that same literal. Branch-specific constants remain input references.
+  /// Appends literal arguments to the immediate project, preserving existing column references.
   public static RelNode appendAggregateLiterals(RelNode input, List<RexNode> literals) {
     RelNode rel = unboxRel(input);
     if (rel instanceof Project) {
@@ -102,32 +100,10 @@ public class PinotRuleUtils {
     RexBuilder rexBuilder = input.getCluster().getRexBuilder();
     List<RexNode> projects = new ArrayList<>(input.getRowType().getFieldCount() + literals.size());
     for (int i = 0; i < input.getRowType().getFieldCount(); i++) {
-      RexLiteral literal = rel instanceof Union ? commonLiteral(rel, i) : null;
-      projects.add(literal != null ? literal : rexBuilder.makeInputRef(input, i));
+      projects.add(rexBuilder.makeInputRef(input, i));
     }
     projects.addAll(literals);
     return LogicalProject.create(input, List.of(), projects, (List<String>) null, Set.of());
-  }
-
-  @Nullable
-  private static RexLiteral commonLiteral(RelNode input, int index) {
-    RelNode rel = unboxRel(input);
-    if (rel instanceof Project) {
-      RexNode expression = ((Project) rel).getProjects().get(index);
-      return expression instanceof RexLiteral ? (RexLiteral) expression : null;
-    }
-    if (rel instanceof Union) {
-      RexLiteral common = null;
-      for (RelNode branch : rel.getInputs()) {
-        RexLiteral literal = commonLiteral(branch, index);
-        if (literal == null || (common != null && !common.equals(literal))) {
-          return null;
-        }
-        common = literal;
-      }
-      return common;
-    }
-    return null;
   }
 
   public static boolean isExchange(RelNode rel) {
