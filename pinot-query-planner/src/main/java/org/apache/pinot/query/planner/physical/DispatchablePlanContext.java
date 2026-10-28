@@ -225,7 +225,7 @@ public class DispatchablePlanContext {
           if (workerIdToOptionalTableSegmentsMap != null) {
             Map<String, List<String>> optionalLogical = workerIdToOptionalTableSegmentsMap.get(workerId);
             if (optionalLogical != null && !optionalLogical.isEmpty()) {
-              workerMetadata.setOptionalTableSegmentsMap(optionalLogical);
+              workerMetadata.setOptionalLogicalTableSegmentsMap(optionalLogical);
             }
           }
         }

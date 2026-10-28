@@ -67,6 +67,8 @@ public class WorkerMetadata {
   private volatile Map<String, List<String>> _logicalTableSegmentsMap;
   @Nullable
   private volatile Map<String, List<String>> _optionalTableSegmentsMap;
+  @Nullable
+  private volatile Map<String, List<String>> _optionalLogicalTableSegmentsMap;
   /// The legacy JSON encoding of [#_tableSegmentsMap] as received from the broker, parsed on first access.
   @Nullable
   private String _tableSegmentsMapJson;
@@ -165,5 +167,14 @@ public class WorkerMetadata {
 
   public void setOptionalTableSegmentsMap(Map<String, List<String>> optionalTableSegmentsMap) {
     _optionalTableSegmentsMap = optionalTableSegmentsMap;
+  }
+
+  @Nullable
+  public Map<String, List<String>> getOptionalLogicalTableSegmentsMap() {
+    return _optionalLogicalTableSegmentsMap;
+  }
+
+  public void setOptionalLogicalTableSegmentsMap(Map<String, List<String>> optionalLogicalTableSegmentsMap) {
+    _optionalLogicalTableSegmentsMap = optionalLogicalTableSegmentsMap;
   }
 }

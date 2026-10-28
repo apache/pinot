@@ -31,7 +31,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
@@ -642,17 +641,23 @@ public class WorkerManager {
     for (PlanFragment child : children) {
       DispatchablePlanMetadata childMetadata = metadataMap.get(child.getFragmentId());
       Map<String, List<String>> replicatedSegments = childMetadata.getReplicatedSegments();
+      Map<String, List<String>> optionalReplicatedSegments = childMetadata.getReplicatedOptionalSegments();
       if (replicatedSegments != null) {
         // Fill worker ids for the replicated
         assert
             childMetadata.getWorkerIdToServerInstanceMap() == null && childMetadata.getWorkerIdToSegmentsMap() == null;
         Map<Integer, QueryServerInstance> childWorkerIdToServerInstanceMap;
         Map<Integer, Map<String, List<String>>> childWorkerIdToSegmentsMap;
+        Map<Integer, Map<String, List<String>>> childWorkerIdToOptionalSegmentsMap;
         if (localExchangeChildMetadata != null) {
           childWorkerIdToServerInstanceMap = localExchangeChildMetadata.getWorkerIdToServerInstanceMap();
           childWorkerIdToSegmentsMap = Maps.newHashMapWithExpectedSize(childWorkerIdToServerInstanceMap.size());
+          childWorkerIdToOptionalSegmentsMap = Maps.newHashMapWithExpectedSize(childWorkerIdToServerInstanceMap.size());
           for (Integer workerId : childWorkerIdToServerInstanceMap.keySet()) {
             childWorkerIdToSegmentsMap.put(workerId, replicatedSegments);
+            if (MapUtils.isNotEmpty(optionalReplicatedSegments)) {
+              childWorkerIdToOptionalSegmentsMap.put(workerId, optionalReplicatedSegments);
+            }
           }
         } else {
           List<QueryServerInstance> replicatedLeafServers =
@@ -660,13 +665,20 @@ public class WorkerManager {
           int numWorkers = replicatedLeafServers.size();
           childWorkerIdToServerInstanceMap = Maps.newHashMapWithExpectedSize(numWorkers);
           childWorkerIdToSegmentsMap = Maps.newHashMapWithExpectedSize(numWorkers);
+          childWorkerIdToOptionalSegmentsMap = Maps.newHashMapWithExpectedSize(numWorkers);
           for (int workerId = 0; workerId < numWorkers; workerId++) {
             childWorkerIdToServerInstanceMap.put(workerId, replicatedLeafServers.get(workerId));
             childWorkerIdToSegmentsMap.put(workerId, replicatedSegments);
+            if (MapUtils.isNotEmpty(optionalReplicatedSegments)) {
+              childWorkerIdToOptionalSegmentsMap.put(workerId, optionalReplicatedSegments);
+            }
           }
         }
         childMetadata.setWorkerIdToServerInstanceMap(childWorkerIdToServerInstanceMap);
         childMetadata.setWorkerIdToSegmentsMap(childWorkerIdToSegmentsMap);
+        if (MapUtils.isNotEmpty(childWorkerIdToOptionalSegmentsMap)) {
+          childMetadata.setWorkerIdToOptionalSegmentsMap(childWorkerIdToOptionalSegmentsMap);
+        }
         // With a local exchange peer the worker map is copied from it, so the classes come along; without one it comes
         // from the candidate servers, whose worker ids are not classes at all.
         childMetadata.setPartitionClassIds(
@@ -1172,7 +1184,40 @@ public class WorkerManager {
   private void setSegmentsForReplicatedLeafFragment(DispatchablePlanMetadata metadata,
       DispatchablePlanContext context) {
     String tableName = metadata.getScannedTables().get(0);
-    Map<String, List<String>> segmentsMap = getSegments(tableName, context.getPlannerContext().getOptions());
+
+    Map<String, RoutingTable> routingTableMap =
+        getRoutingTable(tableName, context.getRequestId(), context.getPlannerContext().getOptions());
+    Map<String, Set<String>> tableToSegmentsMap = new HashMap<>();
+    Map<String, Set<String>> tableToOptionalSegmentsMap = new HashMap<>();
+    for (Map.Entry<String, RoutingTable> routingEntry : routingTableMap.entrySet()) {
+      RoutingTable routingTable = routingEntry.getValue();
+      String tableNameWithType = routingEntry.getKey();
+      if (!routingTable.getUnavailableSegments().isEmpty()) {
+        metadata.addUnavailableSegments(tableName, routingTable.getUnavailableSegments());
+      }
+      List<String> segments = routingTable.getServerInstanceToSegmentsMap().values().stream().map(
+          SegmentsToQuery::getSegments).flatMap(List::stream).toList();
+      List<String> optionalSegments = routingTable.getServerInstanceToSegmentsMap().values().stream().map(
+          SegmentsToQuery::getOptionalSegments).flatMap(List::stream).toList();
+      if (!tableToSegmentsMap.containsKey(tableNameWithType)) {
+        tableToSegmentsMap.put(tableNameWithType, new HashSet<>());
+      }
+      if (!tableToOptionalSegmentsMap.containsKey(tableNameWithType)) {
+        tableToOptionalSegmentsMap.put(tableNameWithType, new HashSet<>());
+      }
+      tableToSegmentsMap.get(tableNameWithType).addAll(segments);
+      tableToOptionalSegmentsMap.get(tableNameWithType).addAll(optionalSegments);
+    }
+
+    Map<String, List<String>> segmentsMap = new HashMap<>();
+    for (Map.Entry<String, Set<String>> entry : tableToSegmentsMap.entrySet()) {
+      segmentsMap.put(entry.getKey(), new ArrayList<>(entry.getValue()));
+    }
+    Map<String, List<String>> optionalSegmentsMap = new HashMap<>();
+    for (Map.Entry<String, Set<String>> entry : tableToOptionalSegmentsMap.entrySet()) {
+      optionalSegmentsMap.put(entry.getKey(), new ArrayList<>(entry.getValue()));
+    }
+
     Preconditions.checkState(!segmentsMap.isEmpty(), "Unable to find segments for table: %s", tableName);
 
     // Acquire time boundary info if it is a hybrid table.
@@ -1184,20 +1229,15 @@ public class WorkerManager {
       } else {
         // Remove offline table segments if no time boundary info is acquired.
         segmentsMap.remove(TableType.OFFLINE.name());
+        optionalSegmentsMap.remove(TableType.OFFLINE.name());
       }
     }
 
+    if (MapUtils.isNotEmpty(optionalSegmentsMap)) {
+      metadata.setReplicatedOptionalSegments(optionalSegmentsMap);
+    }
     metadata.setReplicatedSegments(segmentsMap);
     filterReplicatedLeafStageSegments(context, metadata);
-
-    Map<String, RoutingTable> routingTableMap =
-        getRoutingTable(tableName, context.getRequestId(), context.getPlannerContext().getOptions());
-    for (Map.Entry<String, RoutingTable> routingEntry : routingTableMap.entrySet()) {
-      RoutingTable routingTable = routingEntry.getValue();
-      if (!routingTable.getUnavailableSegments().isEmpty()) {
-        metadata.addUnavailableSegments(tableName, routingTable.getUnavailableSegments());
-      }
-    }
   }
 
   /// Extension point to filter the non-replicated leaf-stage per-worker segment assignment; no-op by default.
@@ -1364,7 +1404,7 @@ public class WorkerManager {
     Map<Integer, QueryServerInstance> workerIdToServerInstanceMap = Maps.newHashMapWithExpectedSize(numWorkers);
     Map<Integer, Map<String, List<String>>> workerIdToLogicalTableSegmentsMap =
         Maps.newHashMapWithExpectedSize(numWorkers);
-    Map<Integer, Map<String, List<String>>> workerIdTOptionalLogicalTableSegmentsMap =
+    Map<Integer, Map<String, List<String>>> workerIdToptionalLogicalTableSegmentsMap =
         Maps.newHashMapWithExpectedSize(numWorkers);
 
     for (int workerId = 0; workerId < numWorkers; workerId++) {
@@ -1379,7 +1419,7 @@ public class WorkerManager {
       if (serverInstanceToLogicalOptionalSegmentsMap.containsKey(server)) {
         Map<String, List<String>> optionalSegmentsMap = serverInstanceToLogicalOptionalSegmentsMap.get(server);
         if (MapUtils.isNotEmpty(optionalSegmentsMap)) {
-          workerIdTOptionalLogicalTableSegmentsMap.put(workerId,
+          workerIdToptionalLogicalTableSegmentsMap.put(workerId,
               optionalSegmentsMap);
         }
       }
@@ -1387,8 +1427,8 @@ public class WorkerManager {
 
     metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
     metadata.setWorkerIdToTableSegmentsMap(workerIdToLogicalTableSegmentsMap);
-    if (MapUtils.isNotEmpty(workerIdTOptionalLogicalTableSegmentsMap)) {
-      metadata.setWorkerIdToOptionalSegmentsMap(workerIdTOptionalLogicalTableSegmentsMap);
+    if (MapUtils.isNotEmpty(workerIdToptionalLogicalTableSegmentsMap)) {
+      metadata.setWorkerIdToOptionalTableSegmentsMap(workerIdToptionalLogicalTableSegmentsMap);
     }
   }
 

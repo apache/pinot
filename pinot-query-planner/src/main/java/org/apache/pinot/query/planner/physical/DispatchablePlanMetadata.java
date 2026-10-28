@@ -70,6 +70,8 @@ public class DispatchablePlanMetadata implements Serializable {
   private Map<Integer, Map<String, List<String>>> _workerIdToSegmentsMap;
   // Map from tableType -> segments, available when 'is_replicated' hint is set to true
   private Map<String, List<String>> _replicatedSegments;
+  // Map from tableType -> optional segments, available when 'is_replicated' hint is set to true
+  private Map<String, List<String>> _replicatedOptionalSegments;
   private TimeBoundaryInfo _timeBoundaryInfo;
   private int _partitionParallelism = 1;
   private final Map<String, Set<String>> _tableToUnavailableSegmentsMap = new HashMap<>();
@@ -135,6 +137,15 @@ public class DispatchablePlanMetadata implements Serializable {
   }
 
   public void setReplicatedSegments(Map<String, List<String>> replicatedSegments) {
+    _replicatedSegments = replicatedSegments;
+  }
+
+  @Nullable
+  public Map<String, List<String>> getReplicatedOptionalSegments() {
+    return _replicatedSegments;
+  }
+
+  public void setReplicatedOptionalSegments(Map<String, List<String>> replicatedSegments) {
     _replicatedSegments = replicatedSegments;
   }
 

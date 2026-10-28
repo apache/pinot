@@ -431,7 +431,7 @@ public class ServerPlanRequestUtils {
     List<TableSegmentsInfo> offlineTableRouteInfoList = new ArrayList<>();
     List<TableSegmentsInfo> realtimeTableRouteInfoList = new ArrayList<>();
     Map<String, List<String>> optionalLogicalTableSegmentsMap =
-        executionContext.getWorkerMetadata().getOptionalTableSegmentsMap();
+        executionContext.getWorkerMetadata().getOptionalLogicalTableSegmentsMap();
 
     Preconditions.checkNotNull(logicalTableSegmentsMap);
     for (Map.Entry<String, List<String>> entry : logicalTableSegmentsMap.entrySet()) {
