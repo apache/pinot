@@ -78,10 +78,19 @@ public class BloomFilterSegmentPruner extends ValueBasedSegmentPruner {
   @Override
   public List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query,
       @Nullable ExecutorService executorService) {
-    if (segments.isEmpty() || !query.isEnablePrefetch()) {
+    if (segments.isEmpty() || !query.isEnablePrefetch() || !anyRequiresFetch(segments)) {
       return super.prune(segments, query, executorService);
     }
     return prefetch(segments, query, fetchContexts -> super.prune(segments, query, executorService, fetchContexts));
+  }
+
+  private static boolean anyRequiresFetch(List<IndexSegment> segments) {
+    for (IndexSegment segment : segments) {
+      if (segment.requiresFetch()) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private List<IndexSegment> prefetch(List<IndexSegment> segments, QueryContext query,
@@ -89,9 +98,12 @@ public class BloomFilterSegmentPruner extends ValueBasedSegmentPruner {
     int numSegments = segments.size();
     FetchContext[] fetchContexts = new FetchContext[numSegments];
     try {
-      // Prefetch bloom filter for columns within the EQ/IN predicate if exists
+      // Prefetch bloom filter for columns within the EQ/IN predicate if exists, for the segments that need a fetch
       for (int i = 0; i < numSegments; i++) {
         IndexSegment segment = segments.get(i);
+        if (!segment.requiresFetch()) {
+          continue;
+        }
         FetchContext fetchContext = _fetchPlanner.planFetchForPruning(segment, query);
         if (!fetchContext.isEmpty()) {
           segment.prefetch(fetchContext);

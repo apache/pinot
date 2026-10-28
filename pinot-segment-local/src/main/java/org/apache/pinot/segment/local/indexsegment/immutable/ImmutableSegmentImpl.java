@@ -342,6 +342,11 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   }
 
   @Override
+  public boolean requiresFetch() {
+    return _segmentDirectory.requiresFetch();
+  }
+
+  @Override
   public void prefetch(FetchContext fetchContext) {
     _segmentDirectory.prefetch(fetchContext);
   }

@@ -110,6 +110,14 @@ public abstract class SegmentDirectory implements Closeable {
   /// @return a set of columns with such index type.
   public abstract Set<String> getColumnsWithIndex(IndexType<?, ?, ?> type);
 
+  /// Returns whether this segment directory serves buffers through [#prefetch], [#acquire] and [#release]. When it
+  /// returns false, those calls are no-ops, so query execution can skip planning a [FetchContext] for the segment and
+  /// skip the fetch lifecycle altogether. Directories that override the fetch calls must return true. The value must
+  /// not change over the lifetime of the directory.
+  public boolean requiresFetch() {
+    return false;
+  }
+
   /// This is a hint to the segment directory, to begin prefetching buffers for given context.
   /// Typically, this should be an async call made before operating on the segment.
   /// @param fetchContext context for this segment's fetch

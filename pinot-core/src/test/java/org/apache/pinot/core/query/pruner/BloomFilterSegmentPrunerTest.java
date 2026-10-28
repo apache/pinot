@@ -369,6 +369,31 @@ public class BloomFilterSegmentPrunerTest {
     }
   }
 
+  @Test
+  public void testPrefetchSkipsSegmentsThatNeedNoFetch()
+      throws Exception {
+    // Local segments (no fetch needed) are pruned without any fetch call; only the fetching segment gets the lifecycle
+    IndexSegment localKept = mockIndexSegment(new String[]{"1.0"});
+    when(localKept.requiresFetch()).thenReturn(false);
+    IndexSegment localPruned = mockIndexSegment(new String[]{"2.0"});
+    when(localPruned.requiresFetch()).thenReturn(false);
+    IndexSegment remoteKept = mockIndexSegment(new String[]{"1.0"});
+    List<IndexSegment> segments = List.of(localKept, localPruned, remoteKept);
+
+    assertEquals(PRUNER.prune(segments, prefetchQuery()), List.of(localKept, remoteKept));
+    for (IndexSegment local : List.of(localKept, localPruned)) {
+      verify(local, never()).prefetch(any(FetchContext.class));
+      verify(local, never()).acquire(any(FetchContext.class));
+      verify(local, never()).release(any(FetchContext.class));
+    }
+    assertReleasedPrefetch(remoteKept, 1);
+
+    // With only local segments, pruning is unchanged and still makes no fetch call
+    assertEquals(PRUNER.prune(List.of(localKept, localPruned), prefetchQuery()), List.of(localKept));
+    verify(localKept, never()).prefetch(any(FetchContext.class));
+    verify(localPruned, never()).prefetch(any(FetchContext.class));
+  }
+
   private QueryContext prefetchQuery() {
     QueryContext query = QueryContextConverterUtils.getQueryContext(
         "SELECT COUNT(*) FROM testTable WHERE column = 1.0");
@@ -465,6 +490,8 @@ public class BloomFilterSegmentPrunerTest {
   private IndexSegment mockIndexSegment(String[] values)
       throws IOException {
     IndexSegment indexSegment = mock(IndexSegment.class);
+    // Stands for a segment whose bloom filters are fetched; see testPrefetchSkipsSegmentsThatNeedNoFetch for the others
+    when(indexSegment.requiresFetch()).thenReturn(true);
     when(indexSegment.getColumnNames()).thenReturn(ImmutableSet.of("column"));
     SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
     when(segmentMetadata.getTotalDocs()).thenReturn(20);

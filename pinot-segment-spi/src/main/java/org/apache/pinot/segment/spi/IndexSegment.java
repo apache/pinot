@@ -122,6 +122,14 @@ public interface IndexSegment {
   /// values from the same segment.
   Object getValue(int docId, String column);
 
+  /// Returns whether this segment serves buffers through [#prefetch], [#acquire] and [#release]. When it returns false,
+  /// those calls are no-ops, so query execution skips planning a [FetchContext] for the segment and skips the fetch
+  /// lifecycle altogether. Segments that override the fetch calls must return true. The value must not change over the
+  /// lifetime of the segment.
+  default boolean requiresFetch() {
+    return false;
+  }
+
   /// Hints the segment to begin prefetching buffers for specified columns.
   /// Typically, this should be an async call made before operating on the segment.
   /// @param fetchContext context for this segment's fetch
