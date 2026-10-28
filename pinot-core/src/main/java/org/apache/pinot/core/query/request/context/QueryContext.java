@@ -89,8 +89,7 @@ public class QueryContext implements QueryScopedCache {
   private AggregationFunction[] _aggregationFunctions;
   private List<Pair<AggregationFunction, FilterContext>> _filteredAggregationFunctions;
   private Map<Pair<FunctionContext, FilterContext>, Integer> _filteredAggregationsIndexMap;
-  // Retain the original wire slots only for queries whose expressions can be rewritten during planning.
-  @Nullable
+  // Logical aggregation slots are fixed before expression rewrites to preserve the broker/server result layout.
   private List<Pair<FunctionContext, FilterContext>> _aggregationFunctionContexts;
   private boolean _hasFilteredAggregations;
   // Set by the instance planner after bounding all local BASE and derived grouping-set keys.
@@ -356,27 +355,40 @@ public class QueryContext implements QueryScopedCache {
     return _expressionOverrideHints;
   }
 
-  /// Internal planning hook that recompiles execution inputs after an in-place expression rewrite.
-  /// Must run before fetch planning or construction of any segment operators.
-  /// The original aggregation slots are retained even when formerly distinct HAVING/ORDER-BY inputs become equal.
-  public void refreshAfterExpressionRewrite() {
-    if (_aggregationFunctionContexts != null && !_aggregationFunctionContexts.isEmpty()) {
-      int numAggregations = _aggregationFunctionContexts.size();
-      _aggregationFunctions = new AggregationFunction[numAggregations];
+  /// Returns the logical aggregation slots, in their original SELECT/HAVING/ORDER-BY order.
+  public List<Pair<FunctionContext, FilterContext>> getAggregationFunctionContexts() {
+    return _aggregationFunctionContexts;
+  }
+
+  /// Prepares derived execution state after logical expressions change, before fetch or segment planning.
+  /// Reuses compiled aggregations whose input trees did not change. The supplied set uses function identity because
+  /// expression rewrites can mutate function arguments, including their hash codes, in place.
+  public void prepareForExecution(Set<FunctionContext> changedFunctions) {
+    int numAggregations = _aggregationFunctionContexts.size();
+    if (numAggregations > 0) {
+      boolean initialPreparation = _aggregationFunctions == null;
+      if (initialPreparation) {
+        _aggregationFunctions = new AggregationFunction[numAggregations];
+      }
       _filteredAggregationFunctions = new ArrayList<>(numAggregations);
       _filteredAggregationsIndexMap = new HashMap<>();
       _hasFilteredAggregations = false;
       for (int i = 0; i < numAggregations; i++) {
         Pair<FunctionContext, FilterContext> context = _aggregationFunctionContexts.get(i);
-        AggregationFunction aggregationFunction =
-            AggregationFunctionFactory.getAggregationFunction(context.getLeft(), _nullHandlingEnabled);
-        _aggregationFunctions[i] = aggregationFunction;
-        _filteredAggregationFunctions.add(Pair.of(aggregationFunction, context.getRight()));
+        if (initialPreparation || changedFunctions.contains(context.getLeft())) {
+          _aggregationFunctions[i] =
+              AggregationFunctionFactory.getAggregationFunction(context.getLeft(), _nullHandlingEnabled);
+        }
+        _filteredAggregationFunctions.add(Pair.of(_aggregationFunctions[i], context.getRight()));
         _filteredAggregationsIndexMap.put(context, i);
         _hasFilteredAggregations |= context.getRight() != null;
       }
     }
     Builder.extractColumns(this);
+    if (_groupByExpressions != null) {
+      _isUnsafeTrim = isGroupingSets() || !isSameOrderAndGroupByColumns(this) || _havingFilter != null;
+      _effectiveSegmentGroupTrimSize = calculateEffectiveSegmentGroupTrimSize();
+    }
   }
 
   /// Returns `true` if the query is an EXPLAIN query, `false` otherwise.
@@ -876,20 +888,14 @@ public class QueryContext implements QueryScopedCache {
       }
 
       // Pre-calculate the aggregation functions and columns for the query
-      generateAggregationFunctions(queryContext);
-      extractColumns(queryContext);
+      extractAggregationFunctionContexts(queryContext);
 
       // Pre-calculate group-by configs
       if (queryContext.getGroupByExpressions() != null) {
-        /// Grouping-set queries expand each row into multiple groups; force the unsafe-trim path so the
-        /// sort-aggregate fast path (which assumes a single flat grouping) is not taken.
-        queryContext._isUnsafeTrim = queryContext.isGroupingSets()
-            || !queryContext.isSameOrderAndGroupByColumns(queryContext) || queryContext.getHavingFilter() != null;
         Integer sortAggregateLimitThreshold = QueryOptionsUtils.getSortAggregateLimitThreshold(_queryOptions);
         if (sortAggregateLimitThreshold != null) {
           queryContext.setSortAggregateLimitThreshold(sortAggregateLimitThreshold);
         }
-        queryContext.setEffectiveSegmentGroupTrimSize(queryContext.calculateEffectiveSegmentGroupTrimSize());
 
         // sortAggregateSequentialCombineNumSegmentsThreshold is defaulted to hardware concurrency
         // if not specified. this allows one more parallel thread (the main thread) to do only combine
@@ -902,80 +908,33 @@ public class QueryContext implements QueryScopedCache {
         }
       }
 
+      queryContext.prepareForExecution(Set.of());
       return queryContext;
     }
 
-    /// Helper method to generate the aggregation functions for the query.
-    private void generateAggregationFunctions(QueryContext queryContext) {
-      List<Pair<AggregationFunction, FilterContext>> filteredAggregationFunctions = new ArrayList<>();
-      Map<Pair<FunctionContext, FilterContext>, Integer> filteredAggregationsIndexMap = new HashMap<>();
-      List<Pair<FunctionContext, FilterContext>> aggregationFunctionContexts =
-          queryContext._expressionOverrideHints != null && !queryContext._expressionOverrideHints.isEmpty()
-              ? new ArrayList<>() : null;
-      queryContext._aggregationFunctionContexts = aggregationFunctionContexts;
-
-      // Add aggregation functions in the SELECT clause
-      // NOTE: DO NOT deduplicate the aggregation functions in the SELECT clause because that involves protocol change.
-      List<Pair<FunctionContext, FilterContext>> filteredAggregations = new ArrayList<>();
+    /// Captures logical aggregation slots before rewriting; execution preparation must not deduplicate them again.
+    private void extractAggregationFunctionContexts(QueryContext queryContext) {
+      List<Pair<FunctionContext, FilterContext>> contexts = new ArrayList<>();
+      // SELECT duplicates are protocol-visible and must retain independent result slots.
       for (ExpressionContext selectExpression : queryContext._selectExpressions) {
-        getAggregations(selectExpression, filteredAggregations);
+        getAggregations(selectExpression, contexts);
       }
-      for (Pair<FunctionContext, FilterContext> pair : filteredAggregations) {
-        FunctionContext aggregation = pair.getLeft();
-        FilterContext filter = pair.getRight();
-        int functionIndex = filteredAggregationFunctions.size();
-        AggregationFunction aggregationFunction =
-            AggregationFunctionFactory.getAggregationFunction(aggregation, queryContext._nullHandlingEnabled);
-        filteredAggregationFunctions.add(Pair.of(aggregationFunction, filter));
-        filteredAggregationsIndexMap.put(Pair.of(aggregation, filter), functionIndex);
-        if (aggregationFunctionContexts != null) {
-          aggregationFunctionContexts.add(pair);
-        }
-      }
-
-      // Add aggregation functions in the HAVING and ORDER-BY clause but not in the SELECT clause
-      filteredAggregations.clear();
+      Set<Pair<FunctionContext, FilterContext>> existing = new HashSet<>(contexts);
+      List<Pair<FunctionContext, FilterContext>> otherAggregations = new ArrayList<>();
       if (queryContext._havingFilter != null) {
-        getAggregations(queryContext._havingFilter, filteredAggregations);
+        getAggregations(queryContext._havingFilter, otherAggregations);
       }
       if (queryContext._orderByExpressions != null) {
         for (OrderByExpressionContext orderByExpression : queryContext._orderByExpressions) {
-          getAggregations(orderByExpression.getExpression(), filteredAggregations);
+          getAggregations(orderByExpression.getExpression(), otherAggregations);
         }
       }
-      for (Pair<FunctionContext, FilterContext> pair : filteredAggregations) {
-        if (!filteredAggregationsIndexMap.containsKey(pair)) {
-          FunctionContext aggregation = pair.getLeft();
-          FilterContext filter = pair.getRight();
-          int functionIndex = filteredAggregationFunctions.size();
-          AggregationFunction aggregationFunction =
-              AggregationFunctionFactory.getAggregationFunction(aggregation, queryContext._nullHandlingEnabled);
-          filteredAggregationFunctions.add(Pair.of(aggregationFunction, filter));
-          filteredAggregationsIndexMap.put(Pair.of(aggregation, filter), functionIndex);
-          if (aggregationFunctionContexts != null) {
-            aggregationFunctionContexts.add(pair);
-          }
+      for (Pair<FunctionContext, FilterContext> context : otherAggregations) {
+        if (existing.add(context)) {
+          contexts.add(context);
         }
       }
-
-      if (!filteredAggregationFunctions.isEmpty()) {
-        int numAggregations = filteredAggregationFunctions.size();
-        AggregationFunction[] aggregationFunctions = new AggregationFunction[numAggregations];
-        for (int i = 0; i < numAggregations; i++) {
-          Pair<AggregationFunction, FilterContext> pair = filteredAggregationFunctions.get(i);
-          aggregationFunctions[i] = pair.getLeft();
-          // NOTE: Compute the flag over all the collected aggregations (SELECT, HAVING and ORDER-BY) instead of only
-          //       the SELECT ones. A FILTER clause on an aggregation that is referenced only in HAVING or ORDER-BY
-          //       must still be honored, else the plan nodes pick the non-filtered operator and silently evaluate the
-          //       aggregation over the main filter alone.
-          if (pair.getRight() != null) {
-            queryContext._hasFilteredAggregations = true;
-          }
-        }
-        queryContext._aggregationFunctions = aggregationFunctions;
-        queryContext._filteredAggregationFunctions = filteredAggregationFunctions;
-        queryContext._filteredAggregationsIndexMap = filteredAggregationsIndexMap;
-      }
+      queryContext._aggregationFunctionContexts = contexts;
     }
 
     /// Helper method to extract AGGREGATION FunctionContexts and FILTER FilterContexts from the given expression.
