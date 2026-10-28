@@ -22,6 +22,7 @@ import java.io.File;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -314,17 +315,43 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
         new BrokerReduceService(new PinotConfiguration(Map.of(Broker.CONFIG_OF_MAX_REDUCE_THREADS_PER_QUERY, 2)));
   }
 
+  private ResultTable getPrefetchEnabledResulTable(ResultTable resultTable) {
+    // TODO does not work for cases where different segments have different plans (more than 1 PLAN_START rows)
+    List<Object[]> newRows = new ArrayList<>();
+    int acquireOpParentId = -1;
+
+    Iterator<Object[]> it = resultTable.getRows().iterator();
+    // After each PLAN_START, we need to add ACQUIRE_RELEASE_COLUMNS_SEGMENT (unles ALL_SEGMENTS_PRUNED_ON_SERVER),
+    // and all following op should have their ids incremented
+
+    while (it.hasNext()) {
+      Object[] row = it.next();
+      String op = row[0].toString();
+      newRows.add(row);
+      acquireOpParentId = Math.max(acquireOpParentId, (int) row[1]);
+      if (op.startsWith("PLAN_START")) {
+        newRows.add(new Object[]{"ACQUIRE_RELEASE_COLUMNS_SEGMENT", acquireOpParentId + 1, acquireOpParentId});
+        break;
+      }
+    }
+
+    while (it.hasNext()) {
+      Object[] row = it.next();
+      newRows.add(new Object[]{row[0].toString(), ((int) row[1] + 1), ((int) row[2]) + 1});
+    }
+
+    return new ResultTable(resultTable.getDataSchema(), newRows);
+  }
+
   /// Checks the correctness of EXPLAIN PLAN output.
   private void check(String query, ResultTable expected) {
     check(query, expected, false);
   }
 
-  /// With `checkPrefetchEnabled`, also checks that enabling prefetch leaves the plan unchanged: these segments are
-  /// local and need no fetch, so they get no ACQUIRE_RELEASE_COLUMNS_SEGMENT wrapper.
   private void check(String query, ResultTable expected, boolean checkPrefetchEnabled) {
     checkWithQueryExecutor(query, expected, _queryExecutor);
     if (checkPrefetchEnabled) {
-      checkWithQueryExecutor(query, expected, _queryExecutorWithPrefetchEnabled);
+      checkWithQueryExecutor(query, getPrefetchEnabledResulTable(expected), _queryExecutorWithPrefetchEnabled);
     }
   }
 

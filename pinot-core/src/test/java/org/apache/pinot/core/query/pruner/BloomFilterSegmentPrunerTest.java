@@ -37,6 +37,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.apache.pinot.core.query.prefetch.DefaultFetchPlanner;
+import org.apache.pinot.core.query.prefetch.FetchPlanner;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -370,18 +372,34 @@ public class BloomFilterSegmentPrunerTest {
   }
 
   @Test
-  public void testPrefetchSkipsSegmentsThatNeedNoFetch()
+  public void testPrefetchSkipsSegmentsWithoutPlannedFetch()
       throws Exception {
-    // Local segments (no fetch needed) are pruned without any fetch call; only the fetching segment gets the lifecycle
+    // The planner returns null for the local segments (no fetch needed): they are pruned without any fetch call, while
+    // the remote segment keeps the lifecycle
     IndexSegment localKept = mockIndexSegment(new String[]{"1.0"});
-    when(localKept.requiresFetch()).thenReturn(false);
     IndexSegment localPruned = mockIndexSegment(new String[]{"2.0"});
-    when(localPruned.requiresFetch()).thenReturn(false);
     IndexSegment remoteKept = mockIndexSegment(new String[]{"1.0"});
-    List<IndexSegment> segments = List.of(localKept, localPruned, remoteKept);
+    Set<IndexSegment> localSegments = Set.of(localKept, localPruned);
+    FetchPlanner defaultPlanner = new DefaultFetchPlanner();
+    BloomFilterSegmentPruner pruner = new BloomFilterSegmentPruner();
+    pruner.init(new PinotConfiguration());
+    pruner.setFetchPlanner(new FetchPlanner() {
+      @Override
+      public FetchContext planFetchForPruning(IndexSegment indexSegment, QueryContext queryContext) {
+        return localSegments.contains(indexSegment) ? null
+            : defaultPlanner.planFetchForPruning(indexSegment, queryContext);
+      }
 
-    assertEquals(PRUNER.prune(segments, prefetchQuery()), List.of(localKept, remoteKept));
-    for (IndexSegment local : List.of(localKept, localPruned)) {
+      @Override
+      public FetchContext planFetchForProcessing(IndexSegment indexSegment, QueryContext queryContext) {
+        return localSegments.contains(indexSegment) ? null
+            : defaultPlanner.planFetchForProcessing(indexSegment, queryContext);
+      }
+    });
+
+    assertEquals(pruner.prune(List.of(localKept, localPruned, remoteKept), prefetchQuery()),
+        List.of(localKept, remoteKept));
+    for (IndexSegment local : localSegments) {
       verify(local, never()).prefetch(any(FetchContext.class));
       verify(local, never()).acquire(any(FetchContext.class));
       verify(local, never()).release(any(FetchContext.class));
@@ -389,7 +407,7 @@ public class BloomFilterSegmentPrunerTest {
     assertReleasedPrefetch(remoteKept, 1);
 
     // With only local segments, pruning is unchanged and still makes no fetch call
-    assertEquals(PRUNER.prune(List.of(localKept, localPruned), prefetchQuery()), List.of(localKept));
+    assertEquals(pruner.prune(List.of(localKept, localPruned), prefetchQuery()), List.of(localKept));
     verify(localKept, never()).prefetch(any(FetchContext.class));
     verify(localPruned, never()).prefetch(any(FetchContext.class));
   }
@@ -490,8 +508,6 @@ public class BloomFilterSegmentPrunerTest {
   private IndexSegment mockIndexSegment(String[] values)
       throws IOException {
     IndexSegment indexSegment = mock(IndexSegment.class);
-    // Stands for a segment whose bloom filters are fetched; see testPrefetchSkipsSegmentsThatNeedNoFetch for the others
-    when(indexSegment.requiresFetch()).thenReturn(true);
     when(indexSegment.getColumnNames()).thenReturn(ImmutableSet.of("column"));
     SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
     when(segmentMetadata.getTotalDocs()).thenReturn(20);

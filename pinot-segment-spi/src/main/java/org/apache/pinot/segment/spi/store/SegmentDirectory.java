@@ -111,9 +111,9 @@ public abstract class SegmentDirectory implements Closeable {
   public abstract Set<String> getColumnsWithIndex(IndexType<?, ?, ?> type);
 
   /// Returns whether this segment directory serves buffers through [#prefetch], [#acquire] and [#release]. When it
-  /// returns false, those calls are no-ops, so query execution can skip planning a [FetchContext] for the segment and
-  /// skip the fetch lifecycle altogether. Directories that override the fetch calls must return true. The value must
-  /// not change over the lifetime of the directory.
+  /// returns false, those calls are no-ops, so a fetch planner can skip planning a [FetchContext] for the segment,
+  /// letting query execution skip the fetch lifecycle altogether. Directories that override the fetch calls must
+  /// return true. The value must not change over the lifetime of the directory.
   public boolean requiresFetch() {
     return false;
   }

@@ -22,11 +22,14 @@ import java.io.File;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
+import org.apache.pinot.core.query.prefetch.DefaultFetchPlanner;
+import org.apache.pinot.core.query.prefetch.FetchPlanner;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -52,17 +55,16 @@ import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeastOnce;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
-/// With prefetch enabled, [InstancePlanMakerImplV2] plans fetches and runs the fetch lifecycle only for segments that
-/// require a fetch ([IndexSegment#requiresFetch]); other segments are planned and executed as without prefetch.
+/// With prefetch enabled, [InstancePlanMakerImplV2] runs the fetch lifecycle only for segments for which the
+/// [FetchPlanner] plans a fetch context. A segment for which the planner returns null (it needs no fetch) is planned
+/// and executed as without prefetch.
 public class InstancePlanMakerPrefetchTest {
   private static final String TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testSegment";
@@ -72,7 +74,6 @@ public class InstancePlanMakerPrefetchTest {
   private static final long MATCHES_PER_SEGMENT = NUM_DOCS / 10;
   private static final double SUM_PER_SEGMENT = 3 + 13 + 23 + 33 + 43 + 53 + 63 + 73 + 83 + 93;
 
-  private final InstancePlanMakerImplV2 _planMaker = new InstancePlanMakerImplV2();
   private File _tempDir;
   private ImmutableSegment _segment;
   private ExecutorService _executorService;
@@ -113,18 +114,12 @@ public class InstancePlanMakerPrefetchTest {
   }
 
   @Test
-  public void testLocalSegmentRequiresNoFetch() {
-    assertFalse(_segment.requiresFetch(), "A segment in a local directory must not require a fetch");
-  }
-
-  @Test
-  public void testPrefetchRunsFetchLifecycleOnlyForSegmentsThatRequireFetch()
+  public void testPrefetchRunsFetchLifecycleOnlyForPlannedSegments()
       throws Exception {
     IndexSegment local = spy(_segment);
     IndexSegment remote = spy(_segment);
-    doReturn(true).when(remote).requiresFetch();
 
-    assertResult(execute(List.of(local, remote), true), 2);
+    assertResult(execute(plannerSkipping(Set.of(local)), List.of(local, remote), true), 2);
 
     ArgumentCaptor<FetchContext> fetchContext = ArgumentCaptor.forClass(FetchContext.class);
     verify(remote).prefetch(fetchContext.capture());
@@ -135,29 +130,62 @@ public class InstancePlanMakerPrefetchTest {
   }
 
   @Test
-  public void testPrefetchWithOnlyLocalSegmentsRunsNoFetchLifecycle()
+  public void testPrefetchWithoutPlannedSegmentsRunsNoFetchLifecycle()
       throws Exception {
     IndexSegment first = spy(_segment);
     IndexSegment second = spy(_segment);
 
-    assertResult(execute(List.of(first, second), true), 2);
+    assertResult(execute(plannerSkipping(Set.of(first, second)), List.of(first, second), true), 2);
 
     verifyNoFetch(first);
     verifyNoFetch(second);
   }
 
   @Test
-  public void testDisabledPrefetchRunsNoFetchLifecycleForSegmentsThatRequireFetch()
+  public void testDisabledPrefetchRunsNoFetchLifecycle()
       throws Exception {
-    IndexSegment remote = spy(_segment);
-    doReturn(true).when(remote).requiresFetch();
+    IndexSegment segment = spy(_segment);
 
-    assertResult(execute(List.of(remote), false), 1);
+    assertResult(execute(plannerSkipping(Set.of()), List.of(segment), false), 1);
 
-    verifyNoFetch(remote);
+    verifyNoFetch(segment);
   }
 
-  private DataTable execute(List<IndexSegment> segments, boolean enablePrefetch)
+  /// The default planner never returns null, so every segment keeps the fetch lifecycle as before.
+  @Test
+  public void testDefaultPlannerRunsFetchLifecycleForEverySegment()
+      throws Exception {
+    IndexSegment first = spy(_segment);
+    IndexSegment second = spy(_segment);
+
+    assertResult(execute(new DefaultFetchPlanner(), List.of(first, second), true), 2);
+
+    for (IndexSegment segment : List.of(first, second)) {
+      verify(segment).prefetch(any());
+      verify(segment).acquire(any());
+      verify(segment, atLeastOnce()).release(any());
+    }
+  }
+
+  /// A planner that plans with the default planner, except for the given segments, which need no fetch.
+  private static FetchPlanner plannerSkipping(Set<IndexSegment> segmentsWithoutFetch) {
+    FetchPlanner defaultPlanner = new DefaultFetchPlanner();
+    return new FetchPlanner() {
+      @Override
+      public FetchContext planFetchForPruning(IndexSegment indexSegment, QueryContext queryContext) {
+        return segmentsWithoutFetch.contains(indexSegment) ? null
+            : defaultPlanner.planFetchForPruning(indexSegment, queryContext);
+      }
+
+      @Override
+      public FetchContext planFetchForProcessing(IndexSegment indexSegment, QueryContext queryContext) {
+        return segmentsWithoutFetch.contains(indexSegment) ? null
+            : defaultPlanner.planFetchForProcessing(indexSegment, queryContext);
+      }
+    };
+  }
+
+  private DataTable execute(FetchPlanner fetchPlanner, List<IndexSegment> segments, boolean enablePrefetch)
       throws Exception {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(QUERY);
     queryContext.setEndTimeMs(System.currentTimeMillis() + 60_000);
@@ -167,8 +195,8 @@ public class InstancePlanMakerPrefetchTest {
       segmentContexts.add(new SegmentContext(segment));
     }
     try (QueryThreadContext ignored = QueryThreadContext.openForSseTest()) {
-      InstanceResponseBlock responseBlock =
-          _planMaker.makeInstancePlan(segmentContexts, queryContext, _executorService).execute();
+      InstanceResponseBlock responseBlock = new InstancePlanMakerImplV2(fetchPlanner)
+          .makeInstancePlan(segmentContexts, queryContext, _executorService).execute();
       assertTrue(responseBlock.getExceptions().isEmpty(), "Query failed: " + responseBlock.getExceptions());
       return responseBlock.toDataTable();
     }

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.pruner;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -78,19 +79,15 @@ public class BloomFilterSegmentPruner extends ValueBasedSegmentPruner {
   @Override
   public List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query,
       @Nullable ExecutorService executorService) {
-    if (segments.isEmpty() || !query.isEnablePrefetch() || !anyRequiresFetch(segments)) {
+    if (segments.isEmpty() || !query.isEnablePrefetch()) {
       return super.prune(segments, query, executorService);
     }
     return prefetch(segments, query, fetchContexts -> super.prune(segments, query, executorService, fetchContexts));
   }
 
-  private static boolean anyRequiresFetch(List<IndexSegment> segments) {
-    for (IndexSegment segment : segments) {
-      if (segment.requiresFetch()) {
-        return true;
-      }
-    }
-    return false;
+  @VisibleForTesting
+  void setFetchPlanner(FetchPlanner fetchPlanner) {
+    _fetchPlanner = fetchPlanner;
   }
 
   private List<IndexSegment> prefetch(List<IndexSegment> segments, QueryContext query,
@@ -98,14 +95,12 @@ public class BloomFilterSegmentPruner extends ValueBasedSegmentPruner {
     int numSegments = segments.size();
     FetchContext[] fetchContexts = new FetchContext[numSegments];
     try {
-      // Prefetch bloom filter for columns within the EQ/IN predicate if exists, for the segments that need a fetch
+      // Prefetch bloom filter for columns within the EQ/IN predicate if exists. The planner returns null for a segment
+      // that needs no fetch, which is then pruned without the fetch lifecycle.
       for (int i = 0; i < numSegments; i++) {
         IndexSegment segment = segments.get(i);
-        if (!segment.requiresFetch()) {
-          continue;
-        }
         FetchContext fetchContext = _fetchPlanner.planFetchForPruning(segment, query);
-        if (!fetchContext.isEmpty()) {
+        if (fetchContext != null && !fetchContext.isEmpty()) {
           segment.prefetch(fetchContext);
           fetchContexts[i] = fetchContext;
         }

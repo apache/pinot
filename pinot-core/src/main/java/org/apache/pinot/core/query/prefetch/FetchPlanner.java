@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.prefetch;
 
+import javax.annotation.Nullable;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -27,6 +28,10 @@ import org.apache.pinot.segment.spi.IndexSegment;
 /// read from some slow storage backend, to reduce the query latency. Although the plan methods take in an indexSegment
 /// object, it should mainly access the segment metadata like what types of index it has, as the index data may not be
 /// available, but leaving this to the implementations to check and handle per their own need.
+///
+/// A planner can return null for a segment that needs no fetch, e.g. one whose data is all local, so its fetch calls
+/// would be no-ops. The caller then skips the fetch lifecycle (prefetch, acquire, release) for that segment entirely.
+/// A non-null context, even an empty one, keeps the lifecycle.
 /// TODO: this interface and the dependent classes like QueryContext should be moved to query-spi pkg, yet to be added.
 public interface FetchPlanner {
   /// Plan what index data to prefetch to help prune the segment before processing it. For example, one can fetch bloom
@@ -34,7 +39,8 @@ public interface FetchPlanner {
   ///
   /// @param indexSegment     segment to be pruned.
   /// @param queryContext     context extracted from the query.
-  /// @return context to guide data prefetching.
+  /// @return context to guide data prefetching, or null if the segment needs no fetch.
+  @Nullable
   FetchContext planFetchForPruning(IndexSegment indexSegment, QueryContext queryContext);
 
   /// Plan what index data to prefetch to process it. For example, one can fetch all types of index for columns tracked
@@ -42,6 +48,7 @@ public interface FetchPlanner {
   ///
   /// @param indexSegment segment to be processed.
   /// @param queryContext context extracted from the query.
-  /// @return context to guide data prefetching.
+  /// @return context to guide data prefetching, or null if the segment needs no fetch.
+  @Nullable
   FetchContext planFetchForProcessing(IndexSegment indexSegment, QueryContext queryContext);
 }

@@ -114,7 +114,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   // Cap planning work independently of the query's configurable group limit.
   private static final int MAX_GROUPING_SETS_DICTIONARY_SCAN_ENTRIES = 1 << 20;
 
-  private final FetchPlanner _fetchPlanner = FetchPlannerRegistry.getPlanner();
+  private final FetchPlanner _fetchPlanner;
   private int _maxExecutionThreads = Server.DEFAULT_QUERY_EXECUTOR_MAX_EXECUTION_THREADS;
   private int _defaultExecutionThreads = Server.DEFAULT_QUERY_EXECUTOR_DEFAULT_EXECUTION_THREADS;
   private int _maxInitialResultHolderCapacity = Server.DEFAULT_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY;
@@ -219,18 +219,27 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     _groupByTrimThreshold = groupByTrimThreshold;
   }
 
-  /// Adds one plan node per segment to `planNodes`. With prefetch enabled, a segment that requires a fetch
-  /// ([IndexSegment#requiresFetch]) gets a planned [FetchContext] and a plan node that acquires and releases its
-  /// buffers around execution, and is added to `fetchSegmentContexts` with its context added to `fetchContexts` at the
-  /// same position. Any other segment gets the plain plan node, without fetch planning.
+  public InstancePlanMakerImplV2() {
+    this(FetchPlannerRegistry.getPlanner());
+  }
+
+  @VisibleForTesting
+  InstancePlanMakerImplV2(FetchPlanner fetchPlanner) {
+    _fetchPlanner = fetchPlanner;
+  }
+
+  /// Adds one plan node per segment to `planNodes`. With prefetch enabled, a segment for which the [FetchPlanner]
+  /// plans a [FetchContext] gets a plan node that acquires and releases its buffers around execution, and is added to
+  /// `fetchSegmentContexts` with its context added to `fetchContexts` at the same position. A segment for which the
+  /// planner returns null (it needs no fetch) gets the plain plan node, as without prefetch.
   private void addSegmentPlanNodes(List<SegmentContext> segmentContexts, QueryContext queryContext,
       Function<SegmentContext, PlanNode> segmentPlanNodeMaker, List<PlanNode> planNodes,
       List<SegmentContext> fetchSegmentContexts, List<FetchContext> fetchContexts) {
     boolean enablePrefetch = queryContext.isEnablePrefetch();
     for (SegmentContext segmentContext : segmentContexts) {
-      IndexSegment indexSegment = segmentContext.getIndexSegment();
-      if (enablePrefetch && indexSegment.requiresFetch()) {
-        FetchContext fetchContext = _fetchPlanner.planFetchForProcessing(indexSegment, queryContext);
+      FetchContext fetchContext =
+          enablePrefetch ? _fetchPlanner.planFetchForProcessing(segmentContext.getIndexSegment(), queryContext) : null;
+      if (fetchContext != null) {
         fetchSegmentContexts.add(segmentContext);
         fetchContexts.add(fetchContext);
         planNodes.add(new AcquireReleaseColumnsSegmentPlanNode(segmentPlanNodeMaker.apply(segmentContext),

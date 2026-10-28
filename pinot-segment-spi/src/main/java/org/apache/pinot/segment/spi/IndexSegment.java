@@ -123,9 +123,9 @@ public interface IndexSegment {
   Object getValue(int docId, String column);
 
   /// Returns whether this segment serves buffers through [#prefetch], [#acquire] and [#release]. When it returns false,
-  /// those calls are no-ops, so query execution skips planning a [FetchContext] for the segment and skips the fetch
-  /// lifecycle altogether. Segments that override the fetch calls must return true. The value must not change over the
-  /// lifetime of the segment.
+  /// those calls are no-ops, so a fetch planner can skip planning a [FetchContext] for the segment, letting query
+  /// execution skip the fetch lifecycle altogether. Segments that override the fetch calls must return true. The value
+  /// must not change over the lifetime of the segment.
   default boolean requiresFetch() {
     return false;
   }
