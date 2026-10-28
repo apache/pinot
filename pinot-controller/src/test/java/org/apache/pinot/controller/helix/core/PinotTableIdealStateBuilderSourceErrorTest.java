@@ -50,6 +50,7 @@ import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.mockito.stubbing.Answer;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -88,6 +89,12 @@ public class PinotTableIdealStateBuilderSourceErrorTest {
     ControllerMetrics.register(new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry()));
     _controllerMetrics = ControllerMetrics.get();
     IngestionSourceErrorClassifier.registerRule(REFUSED_RULE);
+  }
+
+  @AfterMethod
+  public void forgetTablesWithSourceFailures() {
+    // The remembered tables are static: leave none for the next test class in this JVM
+    PinotTableIdealStateBuilder.removeSourceFailureGaugesOfDeletedTables(table -> false, _controllerMetrics);
   }
 
   @AfterClass

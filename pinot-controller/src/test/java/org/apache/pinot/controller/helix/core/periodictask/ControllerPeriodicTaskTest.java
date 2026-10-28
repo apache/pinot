@@ -176,4 +176,29 @@ public class ControllerPeriodicTaskTest {
     assertFalse(_stopTaskCalled.get());
     assertTrue(_task.isStarted());
   }
+
+  @Test
+  public void testFailedCleanupOnEveryRunStillProcessesTables() {
+    AtomicInteger tablesProcessed = new AtomicInteger();
+    ControllerPeriodicTask<Void> task = new ControllerPeriodicTask<>("FailingCleanupTask", RUN_FREQUENCY_IN_SECONDS,
+        _controllerConf.getPeriodicTaskInitialDelayInSeconds(), null, _resourceManager, _leadControllerManager,
+        _controllerMetrics) {
+      @Override
+      protected void cleanupOnEveryRun() {
+        throw new IllegalStateException("cleanup failed");
+      }
+
+      @Override
+      public void processTable(String tableNameWithType) {
+        tablesProcessed.getAndIncrement();
+      }
+    };
+    task.start();
+    try {
+      task.run();
+      assertEquals(tablesProcessed.get(), _numTables);
+    } finally {
+      task.stop();
+    }
+  }
 }
