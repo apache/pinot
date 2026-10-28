@@ -335,7 +335,7 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
       Int2FloatOpenHashMap pinotScores = new Int2FloatOpenHashMap(luceneScores.size());
       for (Int2FloatMap.Entry entry : luceneScores.int2FloatEntrySet()) {
         Document document = indexSearcher.storedFields().document(entry.getIntKey());
-        int pinotDocId = Integer.parseInt(document.get(LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME));
+        int pinotDocId = Integer.parseInt(document.get(LuceneTextIndexCreator.PINOT_DOC_ID_STORED_FIELD_NAME));
         pinotScores.put(pinotDocId, entry.getFloatValue());
       }
       return pinotScores;
