@@ -20,6 +20,7 @@ package org.apache.pinot.core.plan.maker;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -180,8 +181,13 @@ public class QueryOverrideWithHintsTest {
         ExpressionContext.forLiteral(FieldSpec.DataType.INT, 1000));
   }
 
-  @Test
-  public void testRewriteExpressionsWithHints() {
+  @DataProvider
+  public Object[][] multiHintCases() {
+    return new Object[][]{{false}, {true}};
+  }
+
+  @Test(dataProvider = "multiHintCases")
+  public void testRewriteExpressionsWithHints(boolean includeUnavailableHint) {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(
         "SELECT datetrunc('MONTH', ts), count(*), sum(datetrunc('MONTH', ts)) from myTable"
             + " WHERE datetrunc('MONTH', ts) > 0 group by datetrunc('MONTH', ts)");
@@ -189,8 +195,13 @@ public class QueryOverrideWithHintsTest {
         RequestUtils.getFunctionExpression("datetrunc", RequestUtils.getLiteralExpression("MONTH"),
             RequestUtils.getIdentifierExpression("ts"));
     Expression timestampIndexColumn = RequestUtils.getIdentifierExpression("$ts$MONTH");
-    pinotQuery.setExpressionOverrideHints(Map.of(dateTruncFunctionExpr, timestampIndexColumn,
+    Map<Expression, Expression> hints = new HashMap<>(Map.of(dateTruncFunctionExpr, timestampIndexColumn,
         CalciteSqlParser.compileToExpression("DATETRUNC('MONTH', ts, 'MILLISECONDS')"), timestampIndexColumn));
+    if (includeUnavailableHint) {
+      hints.put(CalciteSqlParser.compileToExpression("DATETRUNC('DAY', ts)"),
+          RequestUtils.getIdentifierExpression("$ts$DAY"));
+    }
+    pinotQuery.setExpressionOverrideHints(hints);
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
     AggregationFunction count = queryContext.getAggregationFunctions()[0];
     var filteredAggregations = queryContext.getFilteredAggregationFunctions();
@@ -215,6 +226,7 @@ public class QueryOverrideWithHintsTest {
     assertEquals(queryContext.getGroupByExpressions().get(0).getIdentifier(), "$ts$MONTH");
     assertEquals(queryContext.getAggregationFunctions()[1].getInputExpressions(),
         List.of(ExpressionContext.forIdentifier("$ts$MONTH")));
+    assertEquals(queryContext.getExpressionOverrideHints().size(), includeUnavailableHint ? 3 : 2);
   }
 
   @Test
@@ -360,6 +372,20 @@ public class QueryOverrideWithHintsTest {
     assertEquals(queryContext.getAggregationFunctions()[1].getInputExpressions(),
         List.of(ExpressionContext.forIdentifier("other")));
     assertEquals(queryContext.getColumns(), Set.of("ts", "other"));
+
+    ExpressionContext first = ExpressionContext.forIdentifier("first");
+    ExpressionContext second = ExpressionContext.forIdentifier("second");
+    for (Pair<List<ExpressionContext>, Boolean> testCase : List.of(Pair.of(List.of(first), false),
+        Pair.of(List.of(second), true), Pair.of(List.of(first, second), false),
+        Pair.of(List.of(first, first, second), false))) {
+      List<ExpressionContext> groupKeys = testCase.getLeft();
+      List<OrderByExpressionContext> orderKeys = groupKeys.size() == 1
+          ? List.of(new OrderByExpressionContext(first, true))
+          : List.of(new OrderByExpressionContext(second, true), new OrderByExpressionContext(first, true));
+      QueryContext grouped = new QueryContext.Builder().setSelectExpressions(List.of(first, second))
+          .setGroupByExpressions(groupKeys).setOrderByExpressions(orderKeys).build();
+      assertEquals(grouped.isUnsafeTrim(), testCase.getRight().booleanValue());
+    }
   }
 
   @Test
@@ -436,6 +462,10 @@ public class QueryOverrideWithHintsTest {
   public void testMissingIndexRetainsCompiledAggregation() {
     QueryContext queryContext = aggregationQuery(
         "SELECT DISTINCTCOUNT(DATETRUNC('DAY', ts, 'MILLISECONDS')) AS active_days FROM myTable", "DAY", false);
+    assertEquals(queryContext.getExpressionOverrideHints().size(), 1);
+    assertEquals(queryContext.getExpressionOverrideHints().get(RequestContextUtils.getExpression(
+        CalciteSqlParser.compileToExpression("DATETRUNC('DAY', ts, 'MILLISECONDS')"))),
+        ExpressionContext.forIdentifier("$ts$DAY"));
     AggregationFunction function = queryContext.getAggregationFunctions()[0];
     List<ExpressionContext> inputs = function.getInputExpressions();
     IndexSegment later = mock(IndexSegment.class);

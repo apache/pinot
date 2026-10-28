@@ -190,6 +190,10 @@ public class QueryContextConverterUtils {
     Map<Expression, Expression> expressionOverrideHints = pinotQuery.getExpressionOverrideHints();
     if (expressionOverrideHints == null || expressionOverrideHints.isEmpty()) {
       expressionContextOverrideHints = Map.of();
+    } else if (expressionOverrideHints.size() == 1) {
+      Map.Entry<Expression, Expression> entry = expressionOverrideHints.entrySet().iterator().next();
+      expressionContextOverrideHints = Map.of(RequestContextUtils.getExpression(entry.getKey()),
+          RequestContextUtils.getExpression(entry.getValue()));
     } else {
       expressionContextOverrideHints = new HashMap<>();
       for (Map.Entry<Expression, Expression> entry : expressionOverrideHints.entrySet()) {

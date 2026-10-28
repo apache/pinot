@@ -192,6 +192,9 @@ public class QueryContext implements QueryScopedCache {
       return false;
     }
 
+    if (groupByKeys.size() == 1 && orderByKeys.size() == 1) {
+      return groupByKeys.get(0).equals(orderByKeys.get(0).getExpression());
+    }
     Set<ExpressionContext> groupByKeyIdentSet = new HashSet<>(groupByKeys);
     Set<ExpressionContext> orderByKeyIdentSet = new HashSet<>();
     orderByKeys.forEach(key -> orderByKeyIdentSet.add(key.getExpression()));
@@ -921,20 +924,22 @@ public class QueryContext implements QueryScopedCache {
       for (ExpressionContext selectExpression : queryContext._selectExpressions) {
         getAggregations(selectExpression, contexts);
       }
-      List<Pair<FunctionContext, FilterContext>> otherAggregations = new ArrayList<>();
-      if (queryContext._havingFilter != null) {
-        getAggregations(queryContext._havingFilter, otherAggregations);
-      }
-      if (queryContext._orderByExpressions != null) {
-        for (OrderByExpressionContext orderByExpression : queryContext._orderByExpressions) {
-          getAggregations(orderByExpression.getExpression(), otherAggregations);
+      if (queryContext._havingFilter != null || queryContext._orderByExpressions != null) {
+        List<Pair<FunctionContext, FilterContext>> otherAggregations = new ArrayList<>();
+        if (queryContext._havingFilter != null) {
+          getAggregations(queryContext._havingFilter, otherAggregations);
         }
-      }
-      if (!otherAggregations.isEmpty()) {
-        Set<Pair<FunctionContext, FilterContext>> existing = new HashSet<>(contexts);
-        for (Pair<FunctionContext, FilterContext> context : otherAggregations) {
-          if (existing.add(context)) {
-            contexts.add(context);
+        if (queryContext._orderByExpressions != null) {
+          for (OrderByExpressionContext orderByExpression : queryContext._orderByExpressions) {
+            getAggregations(orderByExpression.getExpression(), otherAggregations);
+          }
+        }
+        if (!otherAggregations.isEmpty()) {
+          Set<Pair<FunctionContext, FilterContext>> existing = new HashSet<>(contexts);
+          for (Pair<FunctionContext, FilterContext> context : otherAggregations) {
+            if (existing.add(context)) {
+              contexts.add(context);
+            }
           }
         }
       }

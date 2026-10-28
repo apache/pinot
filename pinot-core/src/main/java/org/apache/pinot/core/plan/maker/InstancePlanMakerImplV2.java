@@ -697,12 +697,16 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     for (ExpressionContext target : hints.values()) {
       availableColumns.add(getOverrideColumn(target));
     }
+    int numTargets = availableColumns.size();
     for (SegmentContext segmentContext : segmentContexts) {
       Set<String> columns = segmentContext.getIndexSegment().getColumnNames();
       availableColumns.removeIf(column -> !columns.contains(column));
       if (availableColumns.isEmpty()) {
         return Map.of();
       }
+    }
+    if (availableColumns.size() == numTargets) {
+      return hints;
     }
     Map<ExpressionContext, ExpressionContext> applicableHints = new HashMap<>();
     for (Map.Entry<ExpressionContext, ExpressionContext> hint : hints.entrySet()) {
@@ -744,9 +748,9 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     Set<FunctionContext> changedFunctions = Collections.newSetFromMap(new IdentityHashMap<>());
     Map<String, Set<Integer>> hintFunctionArities = getHintFunctionArities(hints);
     // FILTER predicates have separate contexts; aggregation inputs are visited through SELECT/HAVING/ORDER-BY.
-    List<Pair<AggregationFunction, FilterContext>> filteredAggregations =
-        queryContext.getFilteredAggregationFunctions();
-    if (filteredAggregations != null) {
+    if (queryContext.hasFilteredAggregations()) {
+      List<Pair<AggregationFunction, FilterContext>> filteredAggregations =
+          queryContext.getFilteredAggregationFunctions();
       for (Pair<AggregationFunction, FilterContext> aggregation : filteredAggregations) {
         if (aggregation.getRight() != null) {
           overrideWithExpressionHints(aggregation.getRight(), hints, hintFunctionArities, changedFunctions);
