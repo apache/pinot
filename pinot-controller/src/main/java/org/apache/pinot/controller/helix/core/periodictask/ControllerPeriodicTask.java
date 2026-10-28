@@ -80,6 +80,7 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask impleme
   protected final void runTask(Properties periodicTaskProperties) {
     _controllerMetrics.addMeteredTableValue(_taskName, ControllerMeter.CONTROLLER_PERIODIC_TASK_RUN, 1L);
     try {
+      cleanupOnEveryRun();
       List<String> allTables = getTablesToProcess(periodicTaskProperties);
 
       Set<String> currentLeaderOfTables = allTables.stream()
@@ -161,6 +162,11 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask impleme
 
   /// Can be overridden to perform cleanups after processing the tables lead by the current controller.
   protected void postprocess() {
+  }
+
+  /// Can be overridden to perform cleanups on every run of the task, whether or not the current controller leads any
+  /// table.
+  protected void cleanupOnEveryRun() {
   }
 
   /// Can be overridden to perform cleanups for tables the current controller lost the leadership.
