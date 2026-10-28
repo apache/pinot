@@ -19,11 +19,14 @@
 package org.apache.pinot.segment.local.segment.index.readers.vector;
 
 import com.google.common.base.Preconditions;
+import it.unimi.dsi.fastutil.ints.Int2FloatMap;
+import it.unimi.dsi.fastutil.ints.Int2FloatOpenHashMap;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteOrder;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -53,6 +56,7 @@ import org.slf4j.LoggerFactory;
 
 
 public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSearchAware {
+  private static final int MAX_RECENT_SEARCHES = 64;
 
   private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(HnswVectorIndexReader.class);
 
@@ -64,11 +68,24 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
   private final ThreadLocal<Integer> _efSearchOverride = new ThreadLocal<>();
   private final ThreadLocal<Boolean> _useRelativeDistanceOverride = new ThreadLocal<>();
   private final ThreadLocal<Boolean> _useBoundedQueueOverride = new ThreadLocal<>();
+  /// Lucene returns cosine similarity scores, which convert exactly to `cosineDistance`; other functions use scaled
+  /// scores, so distances are only served for COSINE.
+  private final boolean _servesDistances;
+  /// Distances from the most recent searches, so a projection right after the filter reuses the filter's search.
+  private final Map<Integer, RecentSearch> _recentSearches = Collections.synchronizedMap(
+      new LinkedHashMap<>(16, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<Integer, RecentSearch> eldest) {
+          return size() > MAX_RECENT_SEARCHES;
+        }
+      });
 
   /// File-backed constructor: opens a [FSDirectory] from the Lucene HNSW index directory
   /// found under `indexDir`.
   public HnswVectorIndexReader(String column, File indexDir, int numDocs, VectorIndexConfig config) {
     _column = column;
+    _servesDistances = config != null
+        && config.getVectorDistanceFunction() == VectorIndexConfig.VectorDistanceFunction.COSINE;
     try {
       File indexFile = getVectorIndexFile(indexDir);
       _indexDirectory = FSDirectory.open(indexFile.toPath());
@@ -98,6 +115,8 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
   /// @param config      vector index configuration
   public HnswVectorIndexReader(String column, PinotDataBuffer indexBuffer, int numDocs, VectorIndexConfig config) {
     _column = column;
+    _servesDistances = config != null
+        && config.getVectorDistanceFunction() == VectorIndexConfig.VectorDistanceFunction.COSINE;
     try {
       _indexDirectory = HnswVectorIndexBufferReader.createLuceneDirectory(indexBuffer, column);
       _indexReader = DirectoryReader.open(_indexDirectory);
@@ -184,7 +203,7 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
   @Override
   public MutableRoaringBitmap getDocIds(float[] searchQuery, int topK) {
     try {
-      return translateTopDocs(search(searchQuery, topK, null));
+      return translateTopDocs(searchAndRemember(searchQuery, topK, null));
     } catch (RuntimeException e) {
       throw e;
     } catch (Exception e) {
@@ -206,7 +225,7 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
     }
     try {
       Query filterQuery = new RoaringBitmapFilterQuery(preFilterBitmap, _docIdTranslator);
-      return translateTopDocs(search(searchQuery, topK, filterQuery));
+      return translateTopDocs(searchAndRemember(searchQuery, topK, filterQuery));
     } catch (RuntimeException e) {
       throw e;
     } catch (Exception e) {
@@ -256,6 +275,55 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
       docIds.add(_docIdTranslator.getPinotDocId(scoreDoc.doc));
     }
     return docIds;
+  }
+
+  @Nullable
+  @Override
+  public Int2FloatMap getDocDistances(float[] vector, int topK) {
+    if (!_servesDistances) {
+      return null;
+    }
+    RecentSearch recent = _recentSearches.get(Arrays.hashCode(vector));
+    if (recent != null && Arrays.equals(recent._vector, vector) && recent._topK >= topK) {
+      return recent._distances;
+    }
+    try {
+      return toDistances(vector, topK, search(vector, topK, null));
+    } catch (IOException e) {
+      throw new RuntimeException("Caught exception while searching the HNSW index for column: " + _column, e);
+    }
+  }
+
+  /// Converts Lucene COSINE scores (`(1 + cos) / 2`) to `cosineDistance` (`1 - cos`), and remembers them for
+  /// [#getDocDistances]. Distances do not depend on the filter, so a filtered search is remembered too.
+  private Int2FloatMap toDistances(float[] vector, int topK, TopDocs topDocs) {
+    Int2FloatOpenHashMap distances = new Int2FloatOpenHashMap(topDocs.scoreDocs.length);
+    for (ScoreDoc scoreDoc : topDocs.scoreDocs) {
+      distances.put(_docIdTranslator.getPinotDocId(scoreDoc.doc), 2 - 2 * scoreDoc.score);
+    }
+    _recentSearches.put(Arrays.hashCode(vector), new RecentSearch(vector, topK, distances));
+    return distances;
+  }
+
+  private TopDocs searchAndRemember(float[] vector, int topK, @Nullable Query filterQuery)
+      throws IOException {
+    TopDocs topDocs = search(vector, topK, filterQuery);
+    if (_servesDistances) {
+      toDistances(vector, topK, topDocs);
+    }
+    return topDocs;
+  }
+
+  private static final class RecentSearch {
+    final float[] _vector;
+    final int _topK;
+    final Int2FloatMap _distances;
+
+    RecentSearch(float[] vector, int topK, Int2FloatMap distances) {
+      _vector = vector;
+      _topK = topK;
+      _distances = distances;
+    }
   }
 
   /// Lucene docIDs are not same as pinot docIDs. The internal implementation
