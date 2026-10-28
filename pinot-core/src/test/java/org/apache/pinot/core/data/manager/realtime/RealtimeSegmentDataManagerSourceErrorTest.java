@@ -31,6 +31,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.locks.Lock;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -86,16 +87,24 @@ public class RealtimeSegmentDataManagerSourceErrorTest {
       ServerGauge.INGESTION_SOURCE_READ_FAILURE_TIME_SECONDS.getGaugeName() + "." + REALTIME_TABLE_NAME + ".0";
   private static final String REFUSED = "refused";
   private static final String MALFORMED = "malformed";
+  // Stands in for a stream config value a decoder's exception can quote
+  private static final String DECODER_CANARY = "fake-canary-value";
 
   /// What each fetch does, in order: throw a failure, or return a batch of these payloads (empty for none).
   private static final Deque<Object> SCRIPT = new ConcurrentLinkedDeque<>();
   private static volatile boolean _decoderInitRefused;
   private static volatile boolean _checkpointReportsRefusal;
+  private static volatile boolean _createReportsRefusal;
 
   public static class ScriptedConsumerFactory extends FakeStreamConsumerFactory {
     @Override
     public PartitionGroupConsumer createPartitionGroupConsumer(String clientId,
         PartitionGroupConsumptionStatus partitionGroupConsumptionStatus) {
+      if (_createReportsRefusal) {
+        // A plugin that reports the failure it retried and throws without it, as Kafka's consumer creation does
+        IngestionSourceErrorReporter.report(new RefusedBySourceException());
+        throw new IllegalStateException("Failed to create the consumer");
+      }
       return new PartitionGroupConsumer() {
         @Override
         public MessageBatch fetchMessages(StreamPartitionMsgOffset startOffset, int timeoutMs) {
@@ -133,7 +142,7 @@ public class RealtimeSegmentDataManagerSourceErrorTest {
     @Override
     public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName) {
       if (_decoderInitRefused) {
-        throw new RefusedBySourceException();
+        throw new IllegalStateException("Registry refused " + DECODER_CANARY, new RefusedBySourceException());
       }
     }
 
@@ -208,6 +217,7 @@ public class RealtimeSegmentDataManagerSourceErrorTest {
     SCRIPT.clear();
     _decoderInitRefused = false;
     _checkpointReportsRefusal = false;
+    _createReportsRefusal = false;
   }
 
   private RealtimeSegmentDataManagerTest.FakeRealtimeSegmentDataManager createSegmentDataManager(
@@ -338,18 +348,24 @@ public class RealtimeSegmentDataManagerSourceErrorTest {
   }
 
   @Test
-  public void decoderInitRefusedOnEveryAttemptIsClassifiedByItsCause()
+  public void decoderInitRefusedOnEveryAttemptIsClassifiedButKeptOutOfTheSegmentError()
       throws Exception {
     _decoderInitRefused = true;
     ServerMetrics serverMetrics = newServerMetrics();
     AttemptsExceededException failure =
         expectThrows(AttemptsExceededException.class, () -> createSegmentDataManager(serverMetrics));
     assertNotNull(serverMetrics.getGaugeValue(AUTH_GAUGE));
-    // The retry policy's own exception has no cause; the last attempt's failure is kept under it.
-    assertTrue(failure.getCause() instanceof RuntimeException);
-    assertTrue(failure.getCause().getCause() instanceof RefusedBySourceException);
-    // The stream config's values never reach the exception, which lands in the segment error and the logs.
-    assertFalse(failure.getCause().getMessage().contains("broker:7777"),
-        "The decoder init failure must not carry stream config values");
+    // The thrown exception is the segment error, which the server's debug API serves
+    String segmentError = ExceptionUtils.getStackTrace(failure);
+    assertFalse(segmentError.contains(DECODER_CANARY), segmentError);
+  }
+
+  @Test
+  public void failureReportedWhileCreatingTheConsumerIsRecorded()
+      throws Exception {
+    _createReportsRefusal = true;
+    ServerMetrics serverMetrics = newServerMetrics();
+    expectThrows(IllegalStateException.class, () -> createSegmentDataManager(serverMetrics));
+    assertNotNull(serverMetrics.getGaugeValue(AUTH_GAUGE));
   }
 }

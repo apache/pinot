@@ -19,7 +19,9 @@
 package org.apache.pinot.plugin.stream.kafka;
 
 import java.net.ServerSocket;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.exception.ExceptionUtils;
@@ -33,6 +35,7 @@ import org.apache.kafka.common.utils.Bytes;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceCredentialMode;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorClassification;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorEvidence;
+import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorReporter;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorSubReason;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
@@ -50,6 +53,7 @@ import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorAssertion
 import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorVerdict.TARGET_BROKER;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
@@ -85,12 +89,19 @@ public abstract class BaseKafkaSourceErrorEvidenceTest {
       throws Exception;
 
   @Test
-  public void recreateGivesUpWithTheLastAttemptsFailure() {
+  public void recreateReportsTheLastAttemptsFailureAndThrowsWithoutIt() {
     StreamConfig streamConfig = streamConfig("no-such-broker.invalid:9092", Map.of());
-    RuntimeException giveUp = expectThrows(RuntimeException.class,
-        () -> createConsumer(streamConfig, RetryPolicies.noDelayRetryPolicy(2)));
+    List<Throwable> reported = new ArrayList<>();
+    RuntimeException giveUp;
+    try (IngestionSourceErrorReporter.Scope ignored = IngestionSourceErrorReporter.listen(reported::add)) {
+      giveUp = expectThrows(RuntimeException.class,
+          () -> createConsumer(streamConfig, RetryPolicies.noDelayRetryPolicy(2)));
+    }
+    // Kafka's own messages can quote config values, and the thrown exception reaches the segment error
     assertTrue(giveUp.getCause() instanceof AttemptsExceededException, ExceptionUtils.getStackTrace(giveUp));
-    assertEquals(assertSourceRead(giveUp, TARGET_BROKER).getCode(), "ConfigException");
+    assertNull(giveUp.getCause().getCause(), ExceptionUtils.getStackTrace(giveUp));
+    assertEquals(reported.size(), 1);
+    assertEquals(assertSourceRead(reported.get(0), TARGET_BROKER).getCode(), "ConfigException");
   }
 
   @Test
