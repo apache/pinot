@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
+import javax.net.ssl.SSLHandshakeException;
 import javax.security.auth.login.LoginException;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
@@ -106,6 +107,20 @@ public class IngestionSourceErrorClassifierTest {
     IngestionSourceErrorClassification classification = IngestionSourceErrorClassifier.classify(failure).get();
     assertEquals(classification.getCategory(), IngestionSourceErrorCategory.SOURCE_READ);
     assertEquals(classification.getExceptionClass(), ConnectException.class.getName());
+  }
+
+  @Test
+  public void peerRejectingOurCertificateIsAuthOverAnyTransport() {
+    // A schema registry, Pulsar or any HTTP source with mutual TLS, as for a Kafka broker
+    IngestionSourceErrorClassification rejected = IngestionSourceErrorClassifier.classify(new RuntimeException(
+        "Error retrieving Avro schema", new SSLHandshakeException("Received fatal alert: bad_certificate"))).get();
+    assertEquals(rejected.getCategory(), IngestionSourceErrorCategory.AUTH);
+    assertEquals(rejected.getSubReason(), IngestionSourceErrorSubReason.AUTHENTICATION);
+    assertEquals(categoryOf(new RuntimeException(new SSLHandshakeException("Received fatal alert: access_denied"))),
+        Optional.of(IngestionSourceErrorCategory.AUTH));
+    // Any other handshake failure: the TLS connection to the endpoint failed
+    assertEquals(categoryOf(new RuntimeException(new SSLHandshakeException("Received fatal alert: handshake_failure"))),
+        Optional.of(IngestionSourceErrorCategory.SOURCE_READ));
   }
 
   @Test

@@ -138,7 +138,29 @@ final class IngestionSourceErrorRules {
   /// Generic transport rules, applied only when no source-specific rule decided the chain.
   @Nullable
   static IngestionSourceErrorVerdict matchGeneric(Throwable node) {
+    IngestionSourceErrorVerdict refused = tlsAlert(node, null);
+    if (refused != null) {
+      return refused;
+    }
     return isUnreachable(node) ? unreachable(node, "") : null;
+  }
+
+  /// A TLS peer's alert rejecting the certificate we presented, or denying us access, or null for any other failure.
+  @Nullable
+  private static IngestionSourceErrorVerdict tlsAlert(Throwable node, @Nullable String target) {
+    if (!(node instanceof SSLException)) {
+      return null;
+    }
+    Matcher alert = TLS_ALERT.matcher(messageOf(node));
+    if (!alert.find()) {
+      return null;
+    }
+    String name = alert.group(1);
+    if (TLS_CERTIFICATE_REJECTED_ALERTS.contains(name)) {
+      return auth(IngestionSourceErrorSubReason.AUTHENTICATION, name, target);
+    }
+    return TLS_ACCESS_DENIED_ALERT.equals(name) ? auth(IngestionSourceErrorSubReason.AUTHORIZATION, name, target)
+        : null;
   }
 
   /// Whether `throwable` means the endpoint never answered: DNS, connect, TLS or a socket timeout.
@@ -399,15 +421,9 @@ final class IngestionSourceErrorRules {
       }
     }
     for (Throwable cause : below) {
-      Matcher alert = TLS_ALERT.matcher(messageOf(cause));
-      if (cause instanceof SSLException && alert.find()) {
-        String name = alert.group(1);
-        if (TLS_CERTIFICATE_REJECTED_ALERTS.contains(name)) {
-          return auth(IngestionSourceErrorSubReason.AUTHENTICATION, name, TARGET_BROKER);
-        }
-        if (TLS_ACCESS_DENIED_ALERT.equals(name)) {
-          return auth(IngestionSourceErrorSubReason.AUTHORIZATION, name, TARGET_BROKER);
-        }
+      IngestionSourceErrorVerdict refused = tlsAlert(cause, TARGET_BROKER);
+      if (refused != null) {
+        return refused;
       }
     }
     // Any other handshake failure: the TLS connection to the endpoint failed.
