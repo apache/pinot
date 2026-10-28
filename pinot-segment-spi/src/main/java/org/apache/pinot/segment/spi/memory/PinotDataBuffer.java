@@ -650,12 +650,13 @@ public abstract class PinotDataBuffer implements DataBuffer {
     return toDirectByteBuffer(offset, size, order());
   }
 
-  /// Reads a range synchronously through a borrowed direct buffer with this receiver's byte order.
+  /// Reads a range synchronously through a borrowed ByteBuffer with this receiver's byte order.
+  /// The buffer may be heap-backed or direct, depending on the receiver.
   /// The callback receives a buffer positioned at zero with its limit set to `size`. It may change the position
   /// and limit, but must not modify the contents, release the buffer, or retain or return the buffer or any alias.
   /// The callback must not recursively access or release this receiver or its views. The borrowed buffer is only
   /// valid during the callback; the result must be independent of it.
-  public <T> T readWithByteBuffer(long offset, int size, IOFunction<ByteBuffer, T> reader)
+  public <T> T withByteBuffer(long offset, int size, IOFunction<ByteBuffer, T> reader)
       throws IOException {
     return reader.apply(toDirectByteBuffer(offset, size));
   }
