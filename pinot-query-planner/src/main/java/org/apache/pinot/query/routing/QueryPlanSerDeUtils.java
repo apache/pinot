@@ -89,7 +89,8 @@ public class QueryPlanSerDeUtils {
     String optionalTableSegmentsJson = customProperties.get(WorkerMetadata.OPTIONAL_TABLE_SEGMENTS_MAP_KEY);
     String optionalLogicalTableSegmentsJson =
         customProperties.get(WorkerMetadata.OPTIONAL_LOGICAL_TABLE_SEGMENTS_MAP_KEY);
-    if (tableSegmentsJson != null || logicalTableSegmentsJson != null) {
+    if (tableSegmentsJson != null || logicalTableSegmentsJson != null || optionalTableSegmentsJson != null
+        || optionalLogicalTableSegmentsJson != null) {
       Map<String, String> strippedProperties = new HashMap<>(customProperties);
       strippedProperties.remove(WorkerMetadata.TABLE_SEGMENTS_MAP_KEY);
       strippedProperties.remove(WorkerMetadata.LOGICAL_TABLE_SEGMENTS_MAP_KEY);
