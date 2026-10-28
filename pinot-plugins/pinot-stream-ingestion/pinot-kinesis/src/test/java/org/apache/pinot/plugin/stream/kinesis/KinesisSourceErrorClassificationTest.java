@@ -28,6 +28,7 @@ import java.net.URI;
 import java.net.UnknownHostException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.net.ssl.SSLHandshakeException;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceCredentialMode;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorEvidence;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorSubReason;
@@ -242,6 +243,10 @@ public class KinesisSourceErrorClassificationTest {
     assertSourceRead(underPinot(SdkClientException.create("Unable to execute HTTP request: kinesis.example",
         new UnknownHostException("kinesis.us-east-1.amazonaws.example"))), null);
     assertSourceRead(ApiCallTimeoutException.create(5000), null);
+    // The endpoint answered, rejecting the client certificate we presented
+    assertAuth(SdkClientException.create("Unable to execute HTTP request",
+        new SSLHandshakeException("Received fatal alert: bad_certificate")),
+        IngestionSourceErrorSubReason.AUTHENTICATION, null);
   }
 
   /// A load balancer or proxy that reads each request in full and closes the connection without answering.

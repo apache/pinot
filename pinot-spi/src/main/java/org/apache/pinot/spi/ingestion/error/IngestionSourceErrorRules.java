@@ -40,7 +40,8 @@ import javax.net.ssl.SSLException;
 /// its own (a schema registry, Pulsar's admin API, an OAuth token endpoint) or AWS returned none. They read a message
 /// only where the client stringified its evidence or the class covers both our side and the source's; each such match
 /// is commented at its rule and pinned by a fixture test against the SDK version Pinot ships. A phrase an SDK upgrade
-/// changes leaves the failure unclassified, never in the wrong category.
+/// changes can move a failure to another category or leave it unclassified, so an upgrade of these SDKs reruns those
+/// fixtures against real clients where they can.
 ///
 /// They never key on Pinot's own wrappers, an outer plugin message, a bare Kafka `SerializationException` or
 /// `InvalidConfigurationException`, or which exceptions a client considers retriable.
@@ -320,6 +321,10 @@ final class IngestionSourceErrorRules {
       return sourceRead(clazz.getSimpleName(), null);
     }
     for (Throwable cause : below) {
+      IngestionSourceErrorVerdict refused = tlsAlert(cause, null);
+      if (refused != null) {
+        return refused;
+      }
       if (isUnreachable(cause)) {
         return unreachable(cause, message);
       }
