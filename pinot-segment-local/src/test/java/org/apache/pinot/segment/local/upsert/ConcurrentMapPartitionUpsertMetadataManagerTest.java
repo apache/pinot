@@ -577,6 +577,66 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   }
 
   @Test
+  public void testReplaceWithNewerCreationTimeDecidesTiesLikeARestart()
+      throws IOException {
+    // Two uploaded segments hold the same primary key with the same comparison value, so the later creation time wins
+    int[] primaryKeys = new int[]{0};
+    List<RecordInfo> recordInfoList = getRecordInfoList(1, primaryKeys, new int[]{100}, null);
+    ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0,
+            _contextBuilder.setHashFunction(HashFunction.NONE).build());
+    Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
+    ThreadSafeMutableRoaringBitmap validDocIdsA = new ThreadSafeMutableRoaringBitmap();
+    ImmutableSegmentImpl segmentA =
+        mockUploadedImmutableSegment("a", validDocIdsA, null, getPrimaryKeyList(1, primaryKeys), 1000L);
+    ThreadSafeMutableRoaringBitmap validDocIdsB = new ThreadSafeMutableRoaringBitmap();
+    ImmutableSegmentImpl segmentB =
+        mockUploadedImmutableSegment("b", validDocIdsB, null, getPrimaryKeyList(1, primaryKeys), 2000L);
+    upsertMetadataManager.addSegment(segmentA, validDocIdsA, null, recordInfoList.iterator());
+    upsertMetadataManager.addSegment(segmentB, validDocIdsB, null, recordInfoList.iterator());
+    checkRecordLocation(recordLocationMap, 0, segmentB, 0, 100, HashFunction.NONE);
+
+    // Segment A is pushed again with the same data and a ZK creation time later than segment B. Replacing it, as the
+    // segment metadata refresh does by reloading the local copy, moves the key to it.
+    ThreadSafeMutableRoaringBitmap newValidDocIdsA = new ThreadSafeMutableRoaringBitmap();
+    ImmutableSegmentImpl newSegmentA = mockUploadedSegmentWithZkCreationTime("a", newValidDocIdsA, primaryKeys, 3000L);
+    upsertMetadataManager.replaceSegment(newSegmentA, newValidDocIdsA, null, recordInfoList.iterator(), segmentA);
+    checkRecordLocation(recordLocationMap, 0, newSegmentA, 0, 100, HashFunction.NONE);
+    assertTrue(validDocIdsB.getMutableRoaringBitmap().isEmpty());
+
+    // A restarted server loads both segments with the new creation time and picks the same winner
+    ConcurrentMapPartitionUpsertMetadataManager restartedMetadataManager =
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0,
+            _contextBuilder.setHashFunction(HashFunction.NONE).build());
+    ThreadSafeMutableRoaringBitmap restartedValidDocIdsB = new ThreadSafeMutableRoaringBitmap();
+    ImmutableSegmentImpl restartedSegmentB =
+        mockUploadedImmutableSegment("b", restartedValidDocIdsB, null, getPrimaryKeyList(1, primaryKeys), 2000L);
+    ThreadSafeMutableRoaringBitmap restartedValidDocIdsA = new ThreadSafeMutableRoaringBitmap();
+    ImmutableSegmentImpl restartedSegmentA =
+        mockUploadedSegmentWithZkCreationTime("a", restartedValidDocIdsA, primaryKeys, 3000L);
+    restartedMetadataManager.addSegment(restartedSegmentB, restartedValidDocIdsB, null, recordInfoList.iterator());
+    restartedMetadataManager.addSegment(restartedSegmentA, restartedValidDocIdsA, null, recordInfoList.iterator());
+    checkRecordLocation(restartedMetadataManager._primaryKeyToRecordLocationMap, 0, restartedSegmentA, 0, 100,
+        HashFunction.NONE);
+
+    upsertMetadataManager.stop();
+    upsertMetadataManager.close();
+    restartedMetadataManager.stop();
+    restartedMetadataManager.close();
+  }
+
+  /// Mocks an uploaded segment whose name carries creation time 1000 but whose ZK creation time moved on a re-push
+  private ImmutableSegmentImpl mockUploadedSegmentWithZkCreationTime(String suffix,
+      ThreadSafeMutableRoaringBitmap validDocIds, int[] primaryKeys, long zkCreationTimeMs) {
+    ImmutableSegmentImpl segment =
+        mockUploadedImmutableSegment(suffix, validDocIds, null, getPrimaryKeyList(primaryKeys.length, primaryKeys),
+            1000L);
+    SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) segment.getSegmentMetadata();
+    when(segmentMetadata.getZkCreationTime()).thenReturn(zkCreationTimeMs);
+    return segment;
+  }
+
+  @Test
   public void verifyAddReplaceUploadedSegment1()
       throws IOException {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =

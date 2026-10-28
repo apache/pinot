@@ -116,6 +116,7 @@ import org.apache.pinot.common.messages.DatabaseConfigRefreshMessage;
 import org.apache.pinot.common.messages.LogicalTableConfigRefreshMessage;
 import org.apache.pinot.common.messages.RoutingTableRebuildMessage;
 import org.apache.pinot.common.messages.RunPeriodicTaskMessage;
+import org.apache.pinot.common.messages.SegmentMetadataRefreshMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
 import org.apache.pinot.common.messages.TableConfigRefreshMessage;
@@ -3685,6 +3686,21 @@ public class PinotHelixResourceManager {
         LOGGER.warn("No segment refresh message sent to brokers for segment: {} of table: {}", segmentName,
             tableNameWithType);
       }
+    }
+  }
+
+  /// Sends a segment metadata refresh message to the servers hosting the segment, so that they apply a ZK metadata
+  /// change that came without a data (CRC) change. Like the segment refresh message, it does not wait for acks.
+  public void sendSegmentMetadataRefreshMessage(String tableNameWithType, String segmentName) {
+    SegmentMetadataRefreshMessage message = new SegmentMetadataRefreshMessage(tableNameWithType, segmentName);
+    int numMessagesSent = MessagingServiceUtils.send(_helixZkManager.getMessagingService(), message,
+        tableNameWithType, segmentName, null);
+    if (numMessagesSent > 0) {
+      LOGGER.info("Sent {} segment metadata refresh messages to servers for segment: {} of table: {}", numMessagesSent,
+          segmentName, tableNameWithType);
+    } else {
+      LOGGER.warn("No segment metadata refresh message sent to servers for segment: {} of table: {}", segmentName,
+          tableNameWithType);
     }
   }
 

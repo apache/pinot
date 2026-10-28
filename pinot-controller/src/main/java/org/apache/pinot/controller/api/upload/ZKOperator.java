@@ -47,7 +47,6 @@ import org.apache.pinot.controller.api.resources.ResourceUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -307,16 +306,10 @@ public class ZKOperator {
             "New segment crc '{}' is the same as existing segment crc for segment '{}'. Updating ZK metadata without "
                 + "refreshing the segment.", newCrc, segmentName);
         // NOTE: Even though we don't need to refresh the segment, we should still update the following fields:
-        // - Creation time (not included in the crc), except for real-time upsert tables
+        // - Creation time (not included in the crc)
         // - Refresh time
         // - Custom map
-        // Real-time upsert servers copy the ZK creation time when they load a segment and use it to break comparison
-        // ties. Servers don't reload a segment with the same crc, so changing it here would let a restarted replica
-        // break ties differently from a running one. Offline upsert tables break ties on push time, which a refresh
-        // never changes, so they keep today's behaviour.
-        if (tableConfig.getTableType() != TableType.REALTIME || !tableConfig.isUpsertEnabled()) {
-          segmentZKMetadata.setCreationTime(segmentMetadata.getIndexCreationTime());
-        }
+        segmentZKMetadata.setCreationTime(segmentMetadata.getIndexCreationTime());
         segmentZKMetadata.setRefreshTime(System.currentTimeMillis());
         if (customMapModifier != null) {
           segmentZKMetadata.setCustomMap(customMapModifier.modifyMap(segmentZKMetadata.getCustomMap()));
@@ -344,6 +337,11 @@ public class ZKOperator {
           throw new RuntimeException(
               String.format("Failed to update ZK metadata for segment: %s, table: %s, expected version: %d",
                   segmentName, tableNameWithType, expectedVersion));
+        }
+        // Upsert servers copy the creation (or push) time when they load a segment and use it to break comparison
+        // ties, so tell them to pick up the new one. Other tables don't read these times on servers.
+        if (tableConfig.isUpsertEnabled()) {
+          _pinotHelixResourceManager.sendSegmentMetadataRefreshMessage(tableNameWithType, segmentName);
         }
       } else {
         // New segment is different with the existing one, update ZK metadata and refresh the segment

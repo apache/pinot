@@ -617,6 +617,51 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   @Override
+  public void refreshSegmentMetadata(String segmentName)
+      throws Exception {
+    Preconditions.checkState(!_shutDown,
+        "Table data manager is already shut down, cannot refresh metadata of segment: %s in table: %s", segmentName,
+        _tableNameWithType);
+    // Only upsert uses ZK times copied when the segment was loaded, to break comparison ties
+    if (!isUpsertEnabled()) {
+      return;
+    }
+    SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
+    if (!(segmentDataManager instanceof ImmutableSegmentDataManager)) {
+      _logger.warn("Failed to find immutable segment: {}, skipping refreshing its metadata", segmentName);
+      return;
+    }
+    SegmentMetadata localMetadata = segmentDataManager.getSegment().getSegmentMetadata();
+    SegmentZKMetadata zkMetadata = fetchZKMetadata(segmentName);
+    if (!hasSameCRC(zkMetadata, localMetadata)) {
+      // The data changed as well, so the segment refresh message replaces the segment
+      _logger.info("Segment: {} has CRC: {} different from ZK CRC: {}, skipping refreshing its metadata", segmentName,
+          localMetadata.getCrc(), zkMetadata.getCrc());
+      return;
+    }
+    if (!hasUpsertTieTimeChanged(zkMetadata, localMetadata)) {
+      _logger.info("Segment: {} has the same upsert tie time as in ZK, skipping refreshing its metadata", segmentName);
+      return;
+    }
+    // Reload from the local copy so that upsert decides the comparison ties of this segment again with the new time,
+    // the same way a restarted server does
+    _logger.info("Reloading segment: {} from its local copy to pick up the new upsert tie time from ZK", segmentName);
+    reloadSegment(segmentDataManager, fetchIndexLoadingConfig(), false);
+  }
+
+  /// Returns whether ZK has a different time from the one upsert copied at load to break comparison ties. Mirrors
+  /// `BasePartitionUpsertMetadataManager.getAuthoritativeUpdateOrCreationTime()`.
+  private boolean hasUpsertTieTimeChanged(SegmentZKMetadata zkMetadata, SegmentMetadata localMetadata) {
+    if (!(localMetadata instanceof SegmentMetadataImpl segmentMetadataImpl)) {
+      return false;
+    }
+    if (TableNameBuilder.isOfflineTableResource(_tableNameWithType) && zkMetadata.getPushTime() > 0) {
+      return zkMetadata.getPushTime() != segmentMetadataImpl.getZkPushTime();
+    }
+    return zkMetadata.getCreationTime() > 0 && zkMetadata.getCreationTime() != segmentMetadataImpl.getZkCreationTime();
+  }
+
+  @Override
   public void offloadSegment(String segmentName) {
     // NOTE: Do not throw exception when data manager has been shut down. This is regular flow when a table is deleted.
     if (_shutDown) {
