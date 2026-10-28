@@ -426,6 +426,62 @@ public class AggregateOperatorTest {
     assertTrue(result.nextBlock().isSuccess());
   }
 
+  /// Each leaf returns the final results over its own partition of values, and the final stage merges them.
+  @Test
+  public void testLeafReturnFinalResultWithoutGroupBy() {
+    OpChainExecutionContext context = OperatorTestUtil.getContext(Map.of());
+    List<RexExpression.FunctionCall> aggCalls =
+        List.of(new RexExpression.FunctionCall(INT, "DISTINCTCOUNT", List.of(new RexExpression.InputRef(0))),
+            new RexExpression.FunctionCall(DOUBLE, "SUM", List.of(new RexExpression.InputRef(1))));
+    DataSchema inputSchema = new DataSchema(new String[]{"value", "num"}, new ColumnDataType[]{INT, INT});
+    DataSchema resultSchema = new DataSchema(new String[]{"distinctCount", "sum"}, new ColumnDataType[]{INT, DOUBLE});
+    BlockListMultiStageOperator.Builder partials = new BlockListMultiStageOperator.Builder(context, resultSchema);
+    // Each leaf has 5 values of its own, each appearing twice.
+    for (int partition = 0; partition < 2; partition++) {
+      BlockListMultiStageOperator.Builder input = new BlockListMultiStageOperator.Builder(context, inputSchema);
+      for (int value = 0; value < 5; value++) {
+        input.addRow(partition * 10 + value, 1);
+        input.addRow(partition * 10 + value, 1);
+      }
+      AggregateOperator leaf = new AggregateOperator(context, input.buildWithEos(),
+          new AggregateNode(-1, resultSchema, PlanNode.NodeHint.EMPTY, List.of(), aggCalls, List.of(-1, -1), List.of(),
+              AggType.LEAF, true, null, 0));
+      MseBlock leafBlock = leaf.nextBlock();
+      List<Object[]> leafRows = ((MseBlock.Data) leafBlock).asRowHeap().getRows();
+      assertEquals(leafRows.size(), 1);
+      assertEquals(leafRows.get(0), new Object[]{5, 10.0});
+      partials.addBlock(leafBlock);
+      assertTrue(leaf.nextBlock().isSuccess());
+    }
+    AggregateOperator result = new AggregateOperator(context, partials.buildWithEos(),
+        new AggregateNode(-1, resultSchema, PlanNode.NodeHint.EMPTY, List.of(), aggCalls, List.of(-1, -1), List.of(),
+            AggType.FINAL, true, null, 0));
+
+    List<Object[]> rows = ((MseBlock.Data) result.nextBlock()).asRowHeap().getRows();
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0), new Object[]{10, 20.0});
+    assertTrue(result.nextBlock().isSuccess());
+  }
+
+  /// Without any input row, the final stage returns the results of the empty input.
+  @Test
+  public void testLeafReturnFinalResultWithoutGroupByEmptyInput() {
+    OpChainExecutionContext context = OperatorTestUtil.getContext(Map.of());
+    List<RexExpression.FunctionCall> aggCalls =
+        List.of(new RexExpression.FunctionCall(INT, "DISTINCTCOUNT", List.of(new RexExpression.InputRef(0))),
+            new RexExpression.FunctionCall(DOUBLE, "SUM", List.of(new RexExpression.InputRef(1))));
+    DataSchema resultSchema = new DataSchema(new String[]{"distinctCount", "sum"}, new ColumnDataType[]{INT, DOUBLE});
+    AggregateOperator result = new AggregateOperator(context,
+        new BlockListMultiStageOperator.Builder(context, resultSchema).buildWithEos(),
+        new AggregateNode(-1, resultSchema, PlanNode.NodeHint.EMPTY, List.of(), aggCalls, List.of(-1, -1), List.of(),
+            AggType.FINAL, true, null, 0));
+
+    List<Object[]> rows = ((MseBlock.Data) result.nextBlock()).asRowHeap().getRows();
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0), new Object[]{0, null});
+    assertTrue(result.nextBlock().isSuccess());
+  }
+
   @DataProvider
   public Object[][] approximatedResultCases() {
     return new Object[][]{{true, 1, true}, {true, 10, false}, {false, 1, true}, {false, 10, false}};
