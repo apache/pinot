@@ -162,6 +162,70 @@ public class PinotHelixResourceManagerConfigValidationTest {
   }
 
   @Test
+  public void testUpdateInstanceRetriesAgainstLatestRecord() {
+    Instance original =
+        new Instance("localhost", 1234, InstanceType.SERVER, List.of("DefaultTenant_OFFLINE"), null,
+            0, 0, 0, 0, false);
+    when(_helixDataAccessor.getProperty(any(PropertyKey.class)))
+        .thenReturn(InstanceUtils.toHelixInstanceConfig(original));
+
+    InstanceConfig firstAttemptConfig = InstanceUtils.toHelixInstanceConfig(original);
+    firstAttemptConfig.getRecord().setSimpleField("pinotVersion", "v2");
+    firstAttemptConfig.getRecord().setMapField("capabilities", Map.of("pinotVersion", "v2", "feature", "1"));
+    firstAttemptConfig.getRecord().setSimpleField(CommonConstants.Helix.QUERIES_DISABLED, Boolean.TRUE.toString());
+
+    // A concurrent writer wins the first CAS and re-enables queries before the updater is retried.
+    InstanceConfig retryConfig = InstanceUtils.toHelixInstanceConfig(original);
+    retryConfig.getRecord().setSimpleField("pinotVersion", "v3");
+    retryConfig.getRecord().setMapField("capabilities", Map.of("pinotVersion", "v3", "feature", "2"));
+    retryConfig.getRecord().setSimpleField(CommonConstants.Helix.QUERIES_DISABLED, Boolean.FALSE.toString());
+    ZNRecord[] attemptedRecords = new ZNRecord[2];
+    when(_helixDataAccessor.updateProperty(any(PropertyKey.class),
+        ArgumentMatchers.<DataUpdater<ZNRecord>>any(), any(InstanceConfig.class))).thenAnswer(invocation -> {
+          DataUpdater<ZNRecord> updater = invocation.getArgument(1);
+          attemptedRecords[0] = updater.update(firstAttemptConfig.getRecord());
+          attemptedRecords[1] = updater.update(retryConfig.getRecord());
+          return true;
+        });
+
+    Instance updated =
+        new Instance("localhost", 1234, InstanceType.SERVER, List.of("UpdatedTenant_OFFLINE"), null,
+            0, 0, 0, 0, false);
+    _resourceManager.updateInstance("Server_localhost_1234", updated, false);
+
+    assertNotNull(attemptedRecords[0]);
+    assertEquals(attemptedRecords[0].getSimpleField("pinotVersion"), "v2");
+    assertEquals(attemptedRecords[0].getMapField("capabilities"),
+        Map.of("pinotVersion", "v2", "feature", "1"));
+    assertEquals(attemptedRecords[0].getListField(InstanceConfig.InstanceConfigProperty.TAG_LIST.name()),
+        List.of("UpdatedTenant_OFFLINE"));
+    assertEquals(attemptedRecords[0].getSimpleField(CommonConstants.Helix.QUERIES_DISABLED), Boolean.TRUE.toString());
+
+    assertNotNull(attemptedRecords[1]);
+    assertEquals(attemptedRecords[1].getSimpleField("pinotVersion"), "v3");
+    assertEquals(attemptedRecords[1].getMapField("capabilities"),
+        Map.of("pinotVersion", "v3", "feature", "2"));
+    assertEquals(attemptedRecords[1].getListField(InstanceConfig.InstanceConfigProperty.TAG_LIST.name()),
+        List.of("UpdatedTenant_OFFLINE"));
+    assertNull(attemptedRecords[1].getSimpleField(CommonConstants.Helix.QUERIES_DISABLED));
+  }
+
+  @Test
+  public void testUpdateInstanceThrowsWhenWriteFails() {
+    Instance instance =
+        new Instance("localhost", 1234, InstanceType.SERVER, List.of("DefaultTenant_OFFLINE"), null,
+            0, 0, 0, 0, false);
+    when(_helixDataAccessor.getProperty(any(PropertyKey.class)))
+        .thenReturn(InstanceUtils.toHelixInstanceConfig(instance));
+    when(_helixDataAccessor.updateProperty(any(PropertyKey.class),
+        ArgumentMatchers.<DataUpdater<ZNRecord>>any(), any(InstanceConfig.class))).thenReturn(false);
+
+    RuntimeException exception = expectThrows(RuntimeException.class,
+        () -> _resourceManager.updateInstance("Server_localhost_1234", instance, false));
+    assertEquals(exception.getMessage(), "Failed to update instance config for instance: Server_localhost_1234");
+  }
+
+  @Test
   public void testUpdateInstanceTagsRejectsOnValidation() {
     // getHelixInstanceConfig returns an existing server config with pool tags
     TreeMap<String, Integer> pools = new TreeMap<>();
