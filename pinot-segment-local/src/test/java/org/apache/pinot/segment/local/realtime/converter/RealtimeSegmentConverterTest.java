@@ -1645,8 +1645,10 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
   public static Object[][] noDictSortedAggregationKeyParams() {
     List<Object[]> params = new ArrayList<>();
     for (DataType dataType : new DataType[]{DataType.INT, DataType.LONG, DataType.STRING, DataType.BYTES}) {
-      params.add(new Object[]{dataType, false});  // row-major segment builder
-      params.add(new Object[]{dataType, true});   // column-major segment builder
+      for (boolean legacyAggregateMetrics : new boolean[]{false, true}) {
+        params.add(new Object[]{dataType, false, legacyAggregateMetrics});  // row-major segment builder
+        params.add(new Object[]{dataType, true, legacyAggregateMetrics});   // column-major segment builder
+      }
     }
     return params.toArray(new Object[0][]);
   }
@@ -1654,15 +1656,17 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
   /// A sorted DIMENSION column configured as no-dictionary gets no inverted index in the consuming segment, but
   /// ingestion aggregation forces a dictionary on it because it is part of the aggregation key. The sort step at seal
   /// time used to take the inverted-index path because the column had a dictionary, and failed with an NPE. This
-  /// test verifies that the segment builds, the rows aggregate, and the sorted column stays sorted and raw.
+  /// test verifies that the segment builds, the rows aggregate, and the sorted column stays sorted and raw. It covers
+  /// both the ingestion `aggregationConfigs` and the legacy `aggregateMetrics` flag (SUM on every metric).
   @Test(dataProvider = "noDictSortedAggregationKeyParams")
-  public void testNoDictSortedColumnAsIngestionAggregationKey(DataType dataType, boolean columnMajorSegmentBuilder)
+  public void testNoDictSortedColumnAsIngestionAggregationKey(DataType dataType, boolean columnMajorSegmentBuilder,
+      boolean legacyAggregateMetrics)
       throws Exception {
-    File tmpDir = new File(TMP_DIR,
-        "tmp_sorted_agg_" + dataType + "_" + columnMajorSegmentBuilder + "_" + System.nanoTime());
+    File tmpDir = new File(TMP_DIR, "tmp_sorted_agg_" + dataType + "_" + columnMajorSegmentBuilder + "_"
+        + legacyAggregateMetrics + "_" + System.nanoTime());
     String sortedColumn = "sorted_col";
-    List<AggregationConfig> aggregationConfigs =
-        List.of(new AggregationConfig(LONG_COLUMN4, "SUM(" + LONG_COLUMN4 + ")"));
+    List<AggregationConfig> aggregationConfigs = legacyAggregateMetrics ? List.of()
+        : List.of(new AggregationConfig(LONG_COLUMN4, "SUM(" + LONG_COLUMN4 + ")"));
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setAggregationConfigs(aggregationConfigs);
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
@@ -1671,6 +1675,7 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
         .setSortedColumn(sortedColumn)
         .setNoDictionaryColumns(List.of(sortedColumn, LONG_COLUMN4))
         .setIngestionConfig(ingestionConfig)
+        .setAggregateMetrics(legacyAggregateMetrics)
         .setColumnMajorSegmentBuilderEnabled(columnMajorSegmentBuilder)
         .build();
     Schema schema = new Schema.SchemaBuilder()
@@ -1691,6 +1696,7 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
         .setTimeColumnName(DATE_TIME_COLUMN)
         .setCapacity(1000)
         .setIngestionAggregationConfigs(aggregationConfigs)
+        .setAggregateMetrics(legacyAggregateMetrics)
         .setSegmentZKMetadata(getSegmentZKMetadata(segmentName))
         .setOffHeap(true)
         .setMemoryManager(new DirectMemoryManager(segmentName))
@@ -1700,19 +1706,31 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
 
     MutableSegmentImpl mutableSegment = new MutableSegmentImpl(realtimeSegmentConfig, null);
     try {
-      // Insert each key twice, in reverse sorted order, so that rows aggregate and the conversion must reorder them.
-      // Row i carries metric value i + 1, so the aggregated value for key i is 2 * (i + 1).
+      // Key i has (i % 3) + 1 distinct time values, so the sort buckets have unequal sizes (1, 2 or 3 docs). Each
+      // (key, time) pair is inserted twice, keys in reverse sorted order, so that rows aggregate and the conversion
+      // must reorder them. For one key, the docIds follow the time order, so a stable sort keeps the times ascending.
+      // Row (i, t) carries metric value i + 1, so the aggregated value for each (key i, time) pair is 2 * (i + 1).
       int numKeys = 10;
+      int maxTimesPerKey = 3;
+      long baseTime = 1697814309L;
+      int expectedNumDocs = 0;
+      for (int i = 0; i < numKeys; i++) {
+        expectedNumDocs += numTimes(i, maxTimesPerKey);
+      }
       for (int round = 0; round < 2; round++) {
-        for (int i = numKeys - 1; i >= 0; i--) {
-          GenericRow row = new GenericRow();
-          row.putValue(sortedColumn, sortedValue(dataType, i, numKeys));
-          row.putValue(LONG_COLUMN4, (long) (i + 1));
-          row.putValue(DATE_TIME_COLUMN, 1697814309L);
-          mutableSegment.index(row, null);
+        for (int t = 0; t < maxTimesPerKey; t++) {
+          for (int i = numKeys - 1; i >= 0; i--) {
+            if (t < numTimes(i, maxTimesPerKey)) {
+              GenericRow row = new GenericRow();
+              row.putValue(sortedColumn, sortedValue(dataType, i, numKeys));
+              row.putValue(LONG_COLUMN4, (long) (i + 1));
+              row.putValue(DATE_TIME_COLUMN, baseTime + t);
+              mutableSegment.index(row, null);
+            }
+          }
         }
       }
-      assertEquals(mutableSegment.getNumDocsIndexed(), numKeys);
+      assertEquals(mutableSegment.getNumDocsIndexed(), expectedNumDocs);
 
       File outputDir = new File(tmpDir, "outputDir");
       SegmentZKPropsConfig segmentZKPropsConfig = new SegmentZKPropsConfig();
@@ -1725,7 +1743,7 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
 
       File indexDir = new File(outputDir, segmentName);
       SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
-      assertEquals(segmentMetadata.getTotalDocs(), numKeys);
+      assertEquals(segmentMetadata.getTotalDocs(), expectedNumDocs);
       ColumnMetadata sortedColMeta = segmentMetadata.getColumnMetadataFor(sortedColumn);
       assertTrue(sortedColMeta.isSorted(), "Sorted column must have isSorted=true");
       assertFalse(sortedColMeta.hasDictionary(), "Sorted column must stay no-dictionary in the immutable segment");
@@ -1742,11 +1760,16 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
           new ImmutableSegmentImpl(segmentDir, segmentMetadata, indexContainerMap, null);
       try {
         DataType storedType = dataType.getStoredType();
-        for (int docId = 0; docId < numKeys; docId++) {
-          assertEquals(compareValues(storedType, immutableSegment.getValue(docId, sortedColumn),
-              sortedValue(dataType, docId, numKeys)), 0, "Unexpected sorted column value at docId=" + docId);
-          assertEquals(immutableSegment.getValue(docId, LONG_COLUMN4), 2L * (docId + 1),
-              "Unexpected aggregated metric value at docId=" + docId);
+        int docId = 0;
+        for (int i = 0; i < numKeys; i++) {
+          for (int t = 0; t < numTimes(i, maxTimesPerKey); t++, docId++) {
+            assertEquals(compareValues(storedType, immutableSegment.getValue(docId, sortedColumn),
+                sortedValue(dataType, i, numKeys)), 0, "Unexpected sorted column value at docId=" + docId);
+            assertEquals(immutableSegment.getValue(docId, DATE_TIME_COLUMN), baseTime + t,
+                "Unexpected time value at docId=" + docId);
+            assertEquals(immutableSegment.getValue(docId, LONG_COLUMN4), 2L * (i + 1),
+                "Unexpected aggregated metric value at docId=" + docId);
+          }
         }
       } finally {
         immutableSegment.destroy();
@@ -1754,6 +1777,10 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
     } finally {
       mutableSegment.destroy();
     }
+  }
+
+  private static int numTimes(int key, int maxTimesPerKey) {
+    return key % maxTimesPerKey + 1;
   }
 
   private List<GenericRow> generateTestData() {
