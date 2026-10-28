@@ -18,11 +18,8 @@
  */
 package org.apache.pinot.broker.routing.instanceselector;
 
-import java.util.List;
+import java.util.Collection;
 import java.util.Map;
-import java.util.Set;
-import org.apache.helix.model.ExternalView;
-import org.apache.helix.model.IdealState;
 import org.apache.pinot.broker.routing.adaptiveserverselector.ServerSelectionContext;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 
@@ -30,16 +27,15 @@ import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 /// Instance selector for strict replica-group routing strategy.
 ///
 /// The strict replica-group routing strategy always routes same-partition segments to the same instance. During
-/// routing state construction, [#updateSegmentMapsForUpsertTable(IdealState, ExternalView, Set, Map)] removes from
-/// every segment in a partition any replica that is unavailable for any old segment in that partition. Consequently,
-/// all same-partition segments have identical, ordered candidate identities.
+/// routing state construction (see [SegmentGroupsBuilder]), any replica that is unavailable for any old segment in a
+/// partition is removed from every segment in that partition. Consequently, all same-partition segments have identical,
+/// ordered candidate identities.
 ///
 /// Adaptive routing relies on two parent-selector contracts:
-/// - [#selectWithContext(List, int, SegmentStates, ServerSelectionContext)] obtains one ranking snapshot before
+/// - [#selectWithContext(Collection, int, SegmentStates, ServerSelectionContext)] obtains one ranking snapshot before
 ///   iterating the query's segments; it must not re-rank per segment.
-/// - [#selectServers(List, int, SegmentStates, Map, ServerSelectionContext)] resolves equal-ranked candidates using
-///   its strictly-less-than (`rank < bestRank`) comparison. It consequently retains the first candidate in the shared
-///   ordered candidate list.
+/// - The adaptive selection resolves equal-ranked candidates using its strictly-less-than (`rank < bestRank`)
+///   comparison. It consequently retains the first candidate in the shared ordered candidate list.
 ///
 /// Since same-partition old segments have identical ordered candidates, these contracts ensure they select the same
 /// instance. Changing either contract requires revisiting strict replica-group routing. Different partitions may
@@ -50,27 +46,20 @@ import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSelector {
 
   @Override
-  void updateSegmentMaps(IdealState idealState, ExternalView externalView, Set<String> onlineSegments,
-      Map<String, Long> newSegmentCreationTimeMap) {
-    super.updateSegmentMapsForUpsertTable(idealState, externalView, onlineSegments, newSegmentCreationTimeMap);
+  boolean isStrictReplicaGroupRouting() {
+    return true;
   }
 
   @Override
-  public InstanceMapping select(List<String> segments, int requestId,
-      SegmentStates segmentStates, Map<String, String> queryOptions) {
+  public SelectionResult select(Collection<String> segments, int requestId, SegmentStates segmentStates,
+      Map<String, String> queryOptions) {
     ServerSelectionContext ctx = new ServerSelectionContext(queryOptions, _config);
-    if (_adaptiveServerSelector != null && _priorityPoolInstanceSelector != null) {
-      if (ctx.isUseFixedReplica()) {
-        // Fixed-replica routing configured on the broker or table disables adaptive routing in InstanceSelectorFactory.
-        // This fixed replica config can still be set per query, in which case we'll prefer that over adaptive routing.
-        return selectServers(segments, requestId, segmentStates, null, ctx);
-      }
-      if (QueryOptionsUtils.getNumReplicaGroupsToQuery(ctx.getQueryOptions()) != null) {
-        // This option intentionally fans segments across replica groups, so preserve the non-adaptive behavior.
-        // This contradicts the behaviour specified by StrictReplicaGroup, so we should eventually reject / ignore
-        // this combination.
-        return selectServers(segments, requestId, segmentStates, null, ctx);
-      }
+    if (_priorityPoolInstanceSelector != null
+        && QueryOptionsUtils.getNumReplicaGroupsToQuery(ctx.getQueryOptions()) != null) {
+      // This option intentionally fans segments across replica groups, so preserve the non-adaptive behavior.
+      // This contradicts the behaviour specified by StrictReplicaGroup, so we should eventually reject / ignore
+      // this combination.
+      return selectServers(segments, requestId, segmentStates, ctx);
     }
     return selectWithContext(segments, requestId, segmentStates, ctx);
   }

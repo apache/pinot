@@ -756,8 +756,8 @@ public abstract class BaseBrokerRoutingManager
   ///
   /// Only the routing entry's own selector is asked. The per-sampler selectors see a subset of the table's
   /// segments and share its name, so reporting from them would overwrite the table's real values with
-  /// numbers measured over that subset. They still measure their own subset - the wasted work is a counter
-  /// per sampled segment, cheap enough not to be worth a switch that could be set wrong.
+  /// numbers measured over that subset. They still measure their own subset - the wasted work is a few
+  /// counter updates per candidate group, cheap enough not to be worth a switch that could be set wrong.
   ///
   /// Callers must hold the table's routing build lock: that is what makes the `_disabled` read below see the
   /// value written by the assignment change, and what keeps two changes from interleaving a report with a
@@ -1048,8 +1048,8 @@ public abstract class BaseBrokerRoutingManager
     Set<String> onlineSegments = new HashSet<>(HashUtil.getHashMapCapacity(segmentAssignment.size()));
     for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {
       Map<String, String> instanceStateMap = entry.getValue();
-      if (instanceStateMap.containsValue(SegmentStateModel.ONLINE) || instanceStateMap.containsValue(
-          SegmentStateModel.CONSUMING)) {
+      if (instanceStateMap.containsValue(SegmentStateModel.ONLINE)
+          || instanceStateMap.containsValue(SegmentStateModel.CONSUMING)) {
         onlineSegments.add(entry.getKey());
       }
     }
@@ -1234,33 +1234,29 @@ public abstract class BaseBrokerRoutingManager
 
   private Map<ServerInstance, SegmentsToQuery> getServerInstanceToSegmentsMap(String tableNameWithType,
       InstanceSelector.SelectionResult selectionResult) {
-    Map<ServerInstance, SegmentsToQuery> merged = new HashMap<>();
-    // Flat selection maps can traverse their arrays directly without allocating an entry object per segment.
-    selectionResult.getSegmentToInstanceMap().forEach((segment, instanceId) -> {
-      ServerInstance serverInstance = _enabledServerInstanceMap.get(instanceId);
+    Map<String, SegmentsToQuery> instanceToSegmentsMap = selectionResult.getInstanceToSegmentsMap();
+    Map<ServerInstance, SegmentsToQuery> serverInstanceToSegmentsMap =
+        Maps.newHashMapWithExpectedSize(instanceToSegmentsMap.size());
+    for (Map.Entry<String, SegmentsToQuery> entry : instanceToSegmentsMap.entrySet()) {
+      SegmentsToQuery segmentsToQuery = entry.getValue();
+      int numSegments = segmentsToQuery.getSegments().size();
+      // Skip servers that don't have non-optional segments, so that servers always get some non-optional segments
+      // to process, to be backward compatible.
+      // TODO: allow servers only with optional segments
+      if (numSegments == 0) {
+        continue;
+      }
+      // The server instance is looked up per query, because an instance config change replaces it
+      ServerInstance serverInstance = _enabledServerInstanceMap.get(entry.getKey());
       if (serverInstance != null) {
-        SegmentsToQuery segmentsToQuery =
-            merged.computeIfAbsent(serverInstance, k -> new SegmentsToQuery(new ArrayList<>(), new ArrayList<>()));
-        segmentsToQuery.getSegments().add(segment);
+        serverInstanceToSegmentsMap.put(serverInstance, segmentsToQuery);
       } else {
         // Should not happen in normal case unless encountered unexpected exception when updating routing entries
-        _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.SERVER_MISSING_FOR_ROUTING, 1L);
+        _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.SERVER_MISSING_FOR_ROUTING, numSegments);
+        // TODO: Report missing server metrics for optional segments when we allow servers only with optional segments.
       }
-    });
-    selectionResult.getOptionalSegmentToInstanceMap().forEach((segment, instanceId) -> {
-      ServerInstance serverInstance = _enabledServerInstanceMap.get(instanceId);
-      if (serverInstance != null) {
-        SegmentsToQuery segmentsToQuery = merged.get(serverInstance);
-        // Skip servers that don't have non-optional segments, so that servers always get some non-optional segments
-        // to process, to be backward compatible.
-        // TODO: allow servers only with optional segments
-        if (segmentsToQuery != null) {
-          segmentsToQuery.getOptionalSegments().add(segment);
-        }
-      }
-      // TODO: Report missing server metrics when we allow servers only with optional segments.
-    });
-    return merged;
+    }
+    return serverInstanceToSegmentsMap;
   }
 
   @Nullable
@@ -1605,7 +1601,7 @@ public abstract class BaseBrokerRoutingManager
       int numPrunedSegments = selectedSegments.getNumPruned();
       if (!survivingSegments.isEmpty()) {
         InstanceSelector.SelectionResult selectionResult =
-            instanceSelector.select(brokerRequest, new ArrayList<>(survivingSegments), requestId);
+            instanceSelector.select(brokerRequest, survivingSegments, requestId);
         selectionResult.setNumPrunedSegments(numPrunedSegments);
         return selectionResult;
       } else {

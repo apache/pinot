@@ -64,6 +64,9 @@ public class ImmutableSortedArrayMapTest {
     assertEquals(new ArrayList<>(map.keySet()), new ArrayList<>(expected.keySet()));
     assertEquals(new ArrayList<>(map.values()), new ArrayList<>(expected.values()));
     assertEquals(new ArrayList<>(map.entrySet()), new ArrayList<>(expected.entrySet()));
+    Map<String, String> iterated = new LinkedHashMap<>();
+    map.forEach(iterated::put);
+    assertEquals(new ArrayList<>(iterated.entrySet()), new ArrayList<>(expected.entrySet()));
     assertEquals(map.toString(), expected.toString());
     assertEquals(map.firstKey(), expected.firstKey());
     assertEquals(map.lastKey(), expected.lastKey());
