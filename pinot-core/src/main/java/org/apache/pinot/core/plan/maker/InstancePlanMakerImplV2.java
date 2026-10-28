@@ -676,52 +676,105 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     }
   }
 
-  /// Makes a private copy so segment availability checks never mutate the broker-provided hint map.
+  /// Keeps availability checks local to this segment set without changing the broker-provided hints.
   private static Map<ExpressionContext, ExpressionContext> getApplicableHints(
       Map<ExpressionContext, ExpressionContext> hints, List<SegmentContext> segmentContexts) {
-    Map<ExpressionContext, ExpressionContext> applicableHints = new HashMap<>(hints);
-    applicableHints.values().removeIf(expression -> expression.getType() != ExpressionContext.Type.IDENTIFIER);
+    if (hints.isEmpty()) {
+      return Map.of();
+    }
+    if (hints.size() == 1) {
+      Map.Entry<ExpressionContext, ExpressionContext> hint = hints.entrySet().iterator().next();
+      String column = getOverrideColumn(hint.getValue());
+      for (SegmentContext segmentContext : segmentContexts) {
+        if (!segmentContext.getIndexSegment().getColumnNames().contains(column)) {
+          return Map.of();
+        }
+      }
+      // The single-entry map uses equality directly, avoiding recursive hashing of unrelated expression trees.
+      return Map.of(hint.getKey(), hint.getValue());
+    }
+    Set<String> availableColumns = new HashSet<>();
+    for (ExpressionContext target : hints.values()) {
+      availableColumns.add(getOverrideColumn(target));
+    }
     for (SegmentContext segmentContext : segmentContexts) {
       Set<String> columns = segmentContext.getIndexSegment().getColumnNames();
-      applicableHints.values().removeIf(expression -> !columns.contains(expression.getIdentifier()));
+      availableColumns.removeIf(column -> !columns.contains(column));
+      if (availableColumns.isEmpty()) {
+        return Map.of();
+      }
+    }
+    Map<ExpressionContext, ExpressionContext> applicableHints = new HashMap<>();
+    for (Map.Entry<ExpressionContext, ExpressionContext> hint : hints.entrySet()) {
+      if (availableColumns.contains(hint.getValue().getIdentifier())) {
+        applicableHints.put(hint.getKey(), hint.getValue());
+      }
+    }
+    if (applicableHints.size() == 1) {
+      Map.Entry<ExpressionContext, ExpressionContext> hint = applicableHints.entrySet().iterator().next();
+      return Map.of(hint.getKey(), hint.getValue());
     }
     return applicableHints;
+  }
+
+  private static String getOverrideColumn(ExpressionContext target) {
+    Preconditions.checkArgument(target.getType() == ExpressionContext.Type.IDENTIFIER,
+        "Expression override target must be an identifier");
+    return target.getIdentifier();
+  }
+
+  /// Gates structural hashing by function name and arity; expression hashes cannot be cached across mutations.
+  @Nullable
+  private static Map<String, Set<Integer>> getHintFunctionArities(Map<ExpressionContext, ExpressionContext> hints) {
+    if (hints.size() <= 1) {
+      return null;
+    }
+    Map<String, Set<Integer>> arities = new HashMap<>();
+    for (ExpressionContext expression : hints.keySet()) {
+      FunctionContext function = expression.getFunction();
+      if (function != null) {
+        arities.computeIfAbsent(function.getFunctionName(), key -> new HashSet<>()).add(function.getArguments().size());
+      }
+    }
+    return arities;
   }
 
   private static void rewriteQueryContextWithHints(QueryContext queryContext,
       Map<ExpressionContext, ExpressionContext> hints) {
     Set<FunctionContext> changedFunctions = Collections.newSetFromMap(new IdentityHashMap<>());
+    Map<String, Set<Integer>> hintFunctionArities = getHintFunctionArities(hints);
     // FILTER predicates have separate contexts; aggregation inputs are visited through SELECT/HAVING/ORDER-BY.
     List<Pair<AggregationFunction, FilterContext>> filteredAggregations =
         queryContext.getFilteredAggregationFunctions();
     if (filteredAggregations != null) {
       for (Pair<AggregationFunction, FilterContext> aggregation : filteredAggregations) {
         if (aggregation.getRight() != null) {
-          overrideWithExpressionHints(aggregation.getRight(), hints, changedFunctions);
+          overrideWithExpressionHints(aggregation.getRight(), hints, hintFunctionArities, changedFunctions);
         }
       }
     }
     queryContext.getSelectExpressions().replaceAll(
-        expression -> overrideWithExpressionHints(expression, hints, changedFunctions));
+        expression -> overrideWithExpressionHints(expression, hints, hintFunctionArities, changedFunctions));
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
     if (CollectionUtils.isNotEmpty(groupByExpressions)) {
       groupByExpressions.replaceAll(
-          expression -> overrideWithExpressionHints(expression, hints, changedFunctions));
+          expression -> overrideWithExpressionHints(expression, hints, hintFunctionArities, changedFunctions));
     }
     List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
     if (CollectionUtils.isNotEmpty(orderByExpressions)) {
       orderByExpressions.replaceAll(orderBy -> {
         ExpressionContext expression = orderBy.getExpression();
-        ExpressionContext rewritten = overrideWithExpressionHints(expression, hints, changedFunctions);
+        ExpressionContext rewritten =
+            overrideWithExpressionHints(expression, hints, hintFunctionArities, changedFunctions);
         return rewritten == expression ? orderBy
             : new OrderByExpressionContext(rewritten, orderBy.isAsc(), orderBy.isNullsLast());
       });
     }
     if (queryContext.getFilter() != null) {
-      overrideWithExpressionHints(queryContext.getFilter(), hints, changedFunctions);
+      overrideWithExpressionHints(queryContext.getFilter(), hints, hintFunctionArities, changedFunctions);
     }
     if (queryContext.getHavingFilter() != null) {
-      overrideWithExpressionHints(queryContext.getHavingFilter(), hints, changedFunctions);
+      overrideWithExpressionHints(queryContext.getHavingFilter(), hints, hintFunctionArities, changedFunctions);
     }
     if (!changedFunctions.isEmpty()) {
       queryContext.prepareForExecution(changedFunctions);
@@ -731,50 +784,59 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   @VisibleForTesting
   public static void overrideWithExpressionHints(FilterContext filter, IndexSegment indexSegment,
       Map<ExpressionContext, ExpressionContext> expressionOverrideHints) {
-    overrideWithExpressionHints(filter,
-        getApplicableHints(expressionOverrideHints, List.of(new SegmentContext(indexSegment))),
+    Map<ExpressionContext, ExpressionContext> hints =
+        getApplicableHints(expressionOverrideHints, List.of(new SegmentContext(indexSegment)));
+    overrideWithExpressionHints(filter, hints, getHintFunctionArities(hints),
         Collections.newSetFromMap(new IdentityHashMap<>()));
   }
 
   private static void overrideWithExpressionHints(FilterContext filter,
-      Map<ExpressionContext, ExpressionContext> expressionOverrideHints, Set<FunctionContext> changedFunctions) {
+      Map<ExpressionContext, ExpressionContext> expressionOverrideHints,
+      @Nullable Map<String, Set<Integer>> hintFunctionArities, Set<FunctionContext> changedFunctions) {
     if (filter.isConstant()) {
       return;
     }
     if (filter.getChildren() != null) {
       for (FilterContext child : filter.getChildren()) {
-        overrideWithExpressionHints(child, expressionOverrideHints, changedFunctions);
+        overrideWithExpressionHints(child, expressionOverrideHints, hintFunctionArities, changedFunctions);
       }
     } else {
       Predicate predicate = filter.getPredicate();
-      predicate.setLhs(
-          overrideWithExpressionHints(predicate.getLhs(), expressionOverrideHints, changedFunctions));
+      ExpressionContext rewritten = overrideWithExpressionHints(predicate.getLhs(), expressionOverrideHints,
+          hintFunctionArities, changedFunctions);
+      predicate.setLhs(rewritten);
     }
   }
 
   @VisibleForTesting
   public static ExpressionContext overrideWithExpressionHints(ExpressionContext expression, IndexSegment indexSegment,
       Map<ExpressionContext, ExpressionContext> expressionOverrideHints) {
-    return overrideWithExpressionHints(expression,
-        getApplicableHints(expressionOverrideHints, List.of(new SegmentContext(indexSegment))),
+    Map<ExpressionContext, ExpressionContext> hints =
+        getApplicableHints(expressionOverrideHints, List.of(new SegmentContext(indexSegment)));
+    return overrideWithExpressionHints(expression, hints, getHintFunctionArities(hints),
         Collections.newSetFromMap(new IdentityHashMap<>()));
   }
 
   private static ExpressionContext overrideWithExpressionHints(ExpressionContext expression,
-      Map<ExpressionContext, ExpressionContext> expressionOverrideHints, Set<FunctionContext> changedFunctions) {
+      Map<ExpressionContext, ExpressionContext> expressionOverrideHints,
+      @Nullable Map<String, Set<Integer>> hintFunctionArities, Set<FunctionContext> changedFunctions) {
     if (expression.getType() != ExpressionContext.Type.FUNCTION) {
       return expression;
     }
-    ExpressionContext overrideExpression = expressionOverrideHints.get(expression);
-    if (overrideExpression != null) {
-      changedFunctions.add(expression.getFunction());
-      return overrideExpression;
-    }
     FunctionContext function = expression.getFunction();
     List<ExpressionContext> arguments = function.getArguments();
+    Set<Integer> arities = hintFunctionArities != null ? hintFunctionArities.get(function.getFunctionName()) : null;
+    if (hintFunctionArities == null || arities != null && arities.contains(arguments.size())) {
+      ExpressionContext overrideExpression = expressionOverrideHints.get(expression);
+      if (overrideExpression != null) {
+        changedFunctions.add(function);
+        return overrideExpression;
+      }
+    }
     for (int i = 0; i < arguments.size(); i++) {
       ExpressionContext argument = arguments.get(i);
-      ExpressionContext rewritten = overrideWithExpressionHints(argument, expressionOverrideHints, changedFunctions);
+      ExpressionContext rewritten =
+          overrideWithExpressionHints(argument, expressionOverrideHints, hintFunctionArities, changedFunctions);
       if (rewritten != argument || changedFunctions.contains(argument.getFunction())) {
         changedFunctions.add(function);
       }

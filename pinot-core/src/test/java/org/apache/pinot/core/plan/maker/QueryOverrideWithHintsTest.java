@@ -20,6 +20,7 @@ package org.apache.pinot.core.plan.maker;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -52,6 +53,10 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotEquals;
@@ -179,16 +184,33 @@ public class QueryOverrideWithHintsTest {
   public void testRewriteExpressionsWithHints() {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(
         "SELECT datetrunc('MONTH', ts), count(*), sum(datetrunc('MONTH', ts)) from myTable"
-            + " group by datetrunc('MONTH', ts)");
+            + " WHERE datetrunc('MONTH', ts) > 0 group by datetrunc('MONTH', ts)");
     Expression dateTruncFunctionExpr =
         RequestUtils.getFunctionExpression("datetrunc", RequestUtils.getLiteralExpression("MONTH"),
             RequestUtils.getIdentifierExpression("ts"));
     Expression timestampIndexColumn = RequestUtils.getIdentifierExpression("$ts$MONTH");
-    pinotQuery.setExpressionOverrideHints(Map.of(dateTruncFunctionExpr, timestampIndexColumn));
+    pinotQuery.setExpressionOverrideHints(Map.of(dateTruncFunctionExpr, timestampIndexColumn,
+        CalciteSqlParser.compileToExpression("DATETRUNC('MONTH', ts, 'MILLISECONDS')"), timestampIndexColumn));
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
     AggregationFunction count = queryContext.getAggregationFunctions()[0];
-    InstancePlanMakerImplV2.rewriteQueryContextWithHints(queryContext, List.of(new SegmentContext(_indexSegment)));
+    var filteredAggregations = queryContext.getFilteredAggregationFunctions();
+    var countPair = filteredAggregations.get(0);
+    var sumPair = filteredAggregations.get(1);
+    IndexSegment first = mock(IndexSegment.class);
+    Set<String> columns = spy(new HashSet<>(Set.of("$ts$MONTH")));
+    when(first.getColumnNames()).thenReturn(columns);
+    IndexSegment second = mock(IndexSegment.class);
+    when(second.getColumnNames()).thenReturn(Set.of("$ts$MONTH"));
+    InstancePlanMakerImplV2.rewriteQueryContextWithHints(queryContext,
+        List.of(new SegmentContext(first), new SegmentContext(second)));
+    verify(columns, times(1)).contains("$ts$MONTH");
+    verify(second, times(1)).getColumnNames();
     assertSame(queryContext.getAggregationFunctions()[0], count);
+    assertSame(queryContext.getFilteredAggregationFunctions(), filteredAggregations);
+    assertSame(filteredAggregations.get(0), countPair);
+    assertNotSame(filteredAggregations.get(1), sumPair);
+    assertEquals(queryContext.getFilter().getPredicate().getLhs(), ExpressionContext.forIdentifier("$ts$MONTH"));
+    assertEquals(queryContext.getColumns(), Set.of("$ts$MONTH"));
     assertEquals(queryContext.getSelectExpressions().get(0).getIdentifier(), "$ts$MONTH");
     assertEquals(queryContext.getGroupByExpressions().get(0).getIdentifier(), "$ts$MONTH");
     assertEquals(queryContext.getAggregationFunctions()[1].getInputExpressions(),
@@ -203,11 +225,20 @@ public class QueryOverrideWithHintsTest {
         RequestUtils.getFunctionExpression("datetrunc", RequestUtils.getLiteralExpression("DAY"),
             RequestUtils.getIdentifierExpression("ts"));
     Expression timestampIndexColumn = RequestUtils.getIdentifierExpression("$ts$DAY");
-    pinotQuery.setExpressionOverrideHints(Map.of(dateTruncFunctionExpr, timestampIndexColumn));
+    pinotQuery.setExpressionOverrideHints(Map.of(dateTruncFunctionExpr, timestampIndexColumn,
+        CalciteSqlParser.compileToExpression("DATETRUNC('DAY', ts, 'MILLISECONDS')"), timestampIndexColumn));
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
-    InstancePlanMakerImplV2.rewriteQueryContextWithHints(queryContext, List.of(new SegmentContext(_indexSegment)));
-    assertEquals(queryContext.getSelectExpressions().get(0).getFunction(),
-        queryContext.getExpressionOverrideHints().keySet().iterator().next().getFunction());
+    IndexSegment first = mock(IndexSegment.class);
+    Set<String> columns = spy(new HashSet<>(Set.of("ts")));
+    when(first.getColumnNames()).thenReturn(columns);
+    IndexSegment later = mock(IndexSegment.class);
+    Map<ExpressionContext, ExpressionContext> originalHints = Map.copyOf(queryContext.getExpressionOverrideHints());
+    InstancePlanMakerImplV2.rewriteQueryContextWithHints(queryContext,
+        List.of(new SegmentContext(first), new SegmentContext(later)));
+    verify(columns, times(1)).contains("$ts$DAY");
+    verify(later, never()).getColumnNames();
+    assertEquals(queryContext.getExpressionOverrideHints(), originalHints);
+    assertEquals(queryContext.getSelectExpressions().get(0).getFunction().getFunctionName(), "datetrunc");
   }
 
   @DataProvider
@@ -304,7 +335,14 @@ public class QueryOverrideWithHintsTest {
 
   @Test
   public void testPreparationWithoutHints() {
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT COUNT(*), SUM(ts) FROM myTable");
+    QueryContext queryContext =
+        QueryContextConverterUtils.getQueryContext("SELECT COUNT(*), SUM(ts), SUM(ts) FROM myTable");
+    assertEquals(queryContext.getAggregationFunctions().length, 3);
+    var filteredAggregations = queryContext.getFilteredAggregationFunctions();
+    var countPair = filteredAggregations.get(0);
+    var sumPair = filteredAggregations.get(1);
+    var duplicatePair = filteredAggregations.get(2);
+    var indexMap = queryContext.getFilteredAggregationsIndexMap();
     AggregationFunction count = queryContext.getAggregationFunctions()[0];
     AggregationFunction sum = queryContext.getAggregationFunctions()[1];
     FunctionContext sumContext = queryContext.getSelectExpressions().get(1).getFunction();
@@ -313,10 +351,53 @@ public class QueryOverrideWithHintsTest {
     changed.add(sumContext);
     queryContext.prepareForExecution(changed);
     assertSame(queryContext.getAggregationFunctions()[0], count);
+    assertSame(queryContext.getFilteredAggregationFunctions(), filteredAggregations);
+    assertSame(queryContext.getFilteredAggregationsIndexMap(), indexMap);
+    assertSame(filteredAggregations.get(0), countPair);
+    assertNotSame(filteredAggregations.get(1), sumPair);
+    assertSame(filteredAggregations.get(2), duplicatePair);
     assertNotSame(queryContext.getAggregationFunctions()[1], sum);
     assertEquals(queryContext.getAggregationFunctions()[1].getInputExpressions(),
         List.of(ExpressionContext.forIdentifier("other")));
-    assertEquals(queryContext.getColumns(), Set.of("other"));
+    assertEquals(queryContext.getColumns(), Set.of("ts", "other"));
+  }
+
+  @Test
+  public void testFilterOnlyRewriteRetainsAggregationEntries() {
+    for (boolean aggregationFilter : new boolean[]{false, true}) {
+      String predicate = "DATETRUNC('MONTH', ts, 'MILLISECONDS') > 0";
+      String sql = aggregationFilter ? "SELECT SUM(ts) FILTER(WHERE " + predicate + ") FROM myTable"
+          : "SELECT SUM(ts) FROM myTable WHERE " + predicate;
+      QueryContext context = aggregationQuery(sql, "MONTH", false);
+      var aggregations = context.getFilteredAggregationFunctions();
+      var pair = aggregations.get(0);
+      var indexMap = context.getFilteredAggregationsIndexMap();
+      AggregationFunction function = context.getAggregationFunctions()[0];
+      InstancePlanMakerImplV2.rewriteQueryContextWithHints(context, List.of(new SegmentContext(_indexSegment)));
+      assertSame(context.getFilteredAggregationFunctions(), aggregations);
+      assertSame(aggregations.get(0), pair);
+      assertSame(context.getAggregationFunctions()[0], function);
+      assertSame(context.getFilteredAggregationsIndexMap(), indexMap);
+      assertEquals(context.hasFilteredAggregations(), aggregationFilter);
+      FilterContext filter = aggregationFilter ? pair.getRight() : context.getFilter();
+      assertEquals(filter.getPredicate().getLhs(), ExpressionContext.forIdentifier("$ts$MONTH"));
+      FunctionContext aggregation = context.getSelectExpressions().get(0).getFunction();
+      if (aggregationFilter) {
+        aggregation = aggregation.getArguments().get(0).getFunction();
+      }
+      assertEquals(indexMap.get(Pair.of(aggregation, pair.getRight())), Integer.valueOf(0));
+      assertEquals(context.getColumns(), Set.of("ts", "$ts$MONTH"));
+    }
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class,
+      expectedExceptionsMessageRegExp = "Expression override target must be an identifier")
+  public void testRejectNonIdentifierOverrideTarget() {
+    PinotQuery query = CalciteSqlParser.compileToPinotQuery("SELECT DATETRUNC('MONTH', ts) FROM myTable");
+    query.setExpressionOverrideHints(Map.of(CalciteSqlParser.compileToExpression("DATETRUNC('MONTH', ts)"),
+        RequestUtils.getLiteralExpression(0)));
+    InstancePlanMakerImplV2.rewriteQueryContextWithHints(QueryContextConverterUtils.getQueryContext(query),
+        List.of(new SegmentContext(_indexSegment)));
   }
 
   @Test
@@ -357,7 +438,10 @@ public class QueryOverrideWithHintsTest {
         "SELECT DISTINCTCOUNT(DATETRUNC('DAY', ts, 'MILLISECONDS')) AS active_days FROM myTable", "DAY", false);
     AggregationFunction function = queryContext.getAggregationFunctions()[0];
     List<ExpressionContext> inputs = function.getInputExpressions();
-    InstancePlanMakerImplV2.rewriteQueryContextWithHints(queryContext, List.of(new SegmentContext(_indexSegment)));
+    IndexSegment later = mock(IndexSegment.class);
+    InstancePlanMakerImplV2.rewriteQueryContextWithHints(queryContext,
+        List.of(new SegmentContext(_indexSegment), new SegmentContext(later)));
+    verify(later, never()).getColumnNames();
     assertSame(queryContext.getAggregationFunctions()[0], function);
     assertEquals(queryContext.getAggregationFunctions()[0].getInputExpressions(), inputs);
     assertEquals(queryContext.getColumns(), Set.of("ts"));

@@ -364,24 +364,31 @@ public class QueryContext implements QueryScopedCache {
       boolean initialPreparation = _aggregationFunctions == null;
       if (initialPreparation) {
         _aggregationFunctions = new AggregationFunction[numAggregations];
+        _filteredAggregationFunctions = new ArrayList<>(numAggregations);
+        _filteredAggregationsIndexMap = new HashMap<>();
+      } else {
+        // FILTER-only changes can mutate keys even when no aggregation function is recompiled.
+        _filteredAggregationsIndexMap.clear();
       }
-      _filteredAggregationFunctions = new ArrayList<>(numAggregations);
-      _filteredAggregationsIndexMap = new HashMap<>();
-      _hasFilteredAggregations = false;
       for (int i = 0; i < numAggregations; i++) {
         Pair<FunctionContext, FilterContext> context = _aggregationFunctionContexts.get(i);
         if (initialPreparation || changedFunctions.contains(context.getLeft())) {
-          _aggregationFunctions[i] =
+          AggregationFunction function =
               AggregationFunctionFactory.getAggregationFunction(context.getLeft(), _nullHandlingEnabled);
+          if (initialPreparation) {
+            _filteredAggregationFunctions.add(Pair.of(function, context.getRight()));
+            _hasFilteredAggregations |= context.getRight() != null;
+          } else if (function != _aggregationFunctions[i]) {
+            _filteredAggregationFunctions.set(i, Pair.of(function, context.getRight()));
+          }
+          _aggregationFunctions[i] = function;
         }
-        _filteredAggregationFunctions.add(Pair.of(_aggregationFunctions[i], context.getRight()));
         _filteredAggregationsIndexMap.put(context, i);
-        _hasFilteredAggregations |= context.getRight() != null;
       }
     }
     Builder.extractColumns(this);
     if (_groupByExpressions != null) {
-      _isUnsafeTrim = isGroupingSets() || !isSameOrderAndGroupByColumns(this) || _havingFilter != null;
+      _isUnsafeTrim = isGroupingSets() || _havingFilter != null || !isSameOrderAndGroupByColumns(this);
       _effectiveSegmentGroupTrimSize = calculateEffectiveSegmentGroupTrimSize();
     }
   }
@@ -914,7 +921,6 @@ public class QueryContext implements QueryScopedCache {
       for (ExpressionContext selectExpression : queryContext._selectExpressions) {
         getAggregations(selectExpression, contexts);
       }
-      Set<Pair<FunctionContext, FilterContext>> existing = new HashSet<>(contexts);
       List<Pair<FunctionContext, FilterContext>> otherAggregations = new ArrayList<>();
       if (queryContext._havingFilter != null) {
         getAggregations(queryContext._havingFilter, otherAggregations);
@@ -924,9 +930,12 @@ public class QueryContext implements QueryScopedCache {
           getAggregations(orderByExpression.getExpression(), otherAggregations);
         }
       }
-      for (Pair<FunctionContext, FilterContext> context : otherAggregations) {
-        if (existing.add(context)) {
-          contexts.add(context);
+      if (!otherAggregations.isEmpty()) {
+        Set<Pair<FunctionContext, FilterContext>> existing = new HashSet<>(contexts);
+        for (Pair<FunctionContext, FilterContext> context : otherAggregations) {
+          if (existing.add(context)) {
+            contexts.add(context);
+          }
         }
       }
       queryContext._aggregationFunctionContexts = contexts;

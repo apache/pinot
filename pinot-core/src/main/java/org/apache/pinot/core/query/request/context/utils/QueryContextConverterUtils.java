@@ -186,9 +186,12 @@ public class QueryContextConverterUtils {
     }
 
     // EXPRESSION OVERRIDE HINTS
-    Map<ExpressionContext, ExpressionContext> expressionContextOverrideHints = new HashMap<>();
+    Map<ExpressionContext, ExpressionContext> expressionContextOverrideHints;
     Map<Expression, Expression> expressionOverrideHints = pinotQuery.getExpressionOverrideHints();
-    if (expressionOverrideHints != null) {
+    if (expressionOverrideHints == null || expressionOverrideHints.isEmpty()) {
+      expressionContextOverrideHints = Map.of();
+    } else {
+      expressionContextOverrideHints = new HashMap<>();
       for (Map.Entry<Expression, Expression> entry : expressionOverrideHints.entrySet()) {
         expressionContextOverrideHints.put(RequestContextUtils.getExpression(entry.getKey()),
             RequestContextUtils.getExpression(entry.getValue()));
