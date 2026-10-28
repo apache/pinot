@@ -30,6 +30,7 @@ import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.query.prefetch.DefaultFetchPlanner;
 import org.apache.pinot.core.query.prefetch.FetchPlanner;
+import org.apache.pinot.core.query.prefetch.FetchPlannerRegistry;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -49,12 +50,14 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.mockito.ArgumentCaptor;
+import org.mockito.MockedStatic;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
@@ -195,10 +198,18 @@ public class InstancePlanMakerPrefetchTest {
       segmentContexts.add(new SegmentContext(segment));
     }
     try (QueryThreadContext ignored = QueryThreadContext.openForSseTest()) {
-      InstanceResponseBlock responseBlock = new InstancePlanMakerImplV2(fetchPlanner)
+      InstanceResponseBlock responseBlock = planMakerWith(fetchPlanner)
           .makeInstancePlan(segmentContexts, queryContext, _executorService).execute();
       assertTrue(responseBlock.getExceptions().isEmpty(), "Query failed: " + responseBlock.getExceptions());
       return responseBlock.toDataTable();
+    }
+  }
+
+  /// The plan maker takes the registered planner at construction.
+  private static InstancePlanMakerImplV2 planMakerWith(FetchPlanner fetchPlanner) {
+    try (MockedStatic<FetchPlannerRegistry> registry = mockStatic(FetchPlannerRegistry.class)) {
+      registry.when(FetchPlannerRegistry::getPlanner).thenReturn(fetchPlanner);
+      return new InstancePlanMakerImplV2();
     }
   }
 

@@ -39,6 +39,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.pinot.core.query.prefetch.DefaultFetchPlanner;
 import org.apache.pinot.core.query.prefetch.FetchPlanner;
+import org.apache.pinot.core.query.prefetch.FetchPlannerRegistry;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -68,6 +69,7 @@ import org.apache.pinot.spi.query.RemoteAccessStats;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.mockito.ArgumentCaptor;
+import org.mockito.MockedStatic;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -76,6 +78,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -381,9 +384,7 @@ public class BloomFilterSegmentPrunerTest {
     IndexSegment remoteKept = mockIndexSegment(new String[]{"1.0"});
     Set<IndexSegment> localSegments = Set.of(localKept, localPruned);
     FetchPlanner defaultPlanner = new DefaultFetchPlanner();
-    BloomFilterSegmentPruner pruner = new BloomFilterSegmentPruner();
-    pruner.init(new PinotConfiguration());
-    pruner.setFetchPlanner(new FetchPlanner() {
+    FetchPlanner fetchPlanner = new FetchPlanner() {
       @Override
       public FetchContext planFetchForPruning(IndexSegment indexSegment, QueryContext queryContext) {
         return localSegments.contains(indexSegment) ? null
@@ -395,7 +396,13 @@ public class BloomFilterSegmentPrunerTest {
         return localSegments.contains(indexSegment) ? null
             : defaultPlanner.planFetchForProcessing(indexSegment, queryContext);
       }
-    });
+    };
+    BloomFilterSegmentPruner pruner = new BloomFilterSegmentPruner();
+    // The pruner takes the registered planner at init
+    try (MockedStatic<FetchPlannerRegistry> registry = mockStatic(FetchPlannerRegistry.class)) {
+      registry.when(FetchPlannerRegistry::getPlanner).thenReturn(fetchPlanner);
+      pruner.init(new PinotConfiguration());
+    }
 
     assertEquals(pruner.prune(List.of(localKept, localPruned, remoteKept), prefetchQuery()),
         List.of(localKept, remoteKept));

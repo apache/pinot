@@ -114,7 +114,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   // Cap planning work independently of the query's configurable group limit.
   private static final int MAX_GROUPING_SETS_DICTIONARY_SCAN_ENTRIES = 1 << 20;
 
-  private final FetchPlanner _fetchPlanner;
+  private final FetchPlanner _fetchPlanner = FetchPlannerRegistry.getPlanner();
   private int _maxExecutionThreads = Server.DEFAULT_QUERY_EXECUTOR_MAX_EXECUTION_THREADS;
   private int _defaultExecutionThreads = Server.DEFAULT_QUERY_EXECUTOR_DEFAULT_EXECUTION_THREADS;
   private int _maxInitialResultHolderCapacity = Server.DEFAULT_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY;
@@ -217,15 +217,6 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   @VisibleForTesting
   public void setGroupByTrimThreshold(int groupByTrimThreshold) {
     _groupByTrimThreshold = groupByTrimThreshold;
-  }
-
-  public InstancePlanMakerImplV2() {
-    this(FetchPlannerRegistry.getPlanner());
-  }
-
-  @VisibleForTesting
-  InstancePlanMakerImplV2(FetchPlanner fetchPlanner) {
-    _fetchPlanner = fetchPlanner;
   }
 
   /// Adds one plan node per segment to `planNodes`. With prefetch enabled, a segment for which the [FetchPlanner]

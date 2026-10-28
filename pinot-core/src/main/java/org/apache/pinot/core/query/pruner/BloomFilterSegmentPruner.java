@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.pruner;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -83,11 +82,6 @@ public class BloomFilterSegmentPruner extends ValueBasedSegmentPruner {
       return super.prune(segments, query, executorService);
     }
     return prefetch(segments, query, fetchContexts -> super.prune(segments, query, executorService, fetchContexts));
-  }
-
-  @VisibleForTesting
-  void setFetchPlanner(FetchPlanner fetchPlanner) {
-    _fetchPlanner = fetchPlanner;
   }
 
   private List<IndexSegment> prefetch(List<IndexSegment> segments, QueryContext query,
