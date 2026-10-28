@@ -196,6 +196,37 @@ public class IngestionSourceErrorClassifierTest {
   }
 
   @Test
+  public void registeredGenericRulesKeepTheContractOfTheOthers() {
+    IngestionSourceErrorRule missingIsRead = (node, below, evidence) -> node instanceof FileNotFoundException
+        ? IngestionSourceErrorVerdict.sourceRead("FileNotFoundException", null) : null;
+    IngestionSourceErrorRule missingIsAuth = (node, below, evidence) -> node instanceof FileNotFoundException
+        ? IngestionSourceErrorVerdict.auth(IngestionSourceErrorSubReason.AUTHORIZATION, "FileNotFoundException", null)
+        : null;
+    IngestionSourceErrorRule connectIsAuth = (node, below, evidence) -> node instanceof ConnectException
+        ? IngestionSourceErrorVerdict.auth(IngestionSourceErrorSubReason.UNSPECIFIED, "ConnectException", null) : null;
+    IngestionSourceErrorRule failing = (node, below, evidence) -> {
+      throw new IllegalStateException("rule bug");
+    };
+    List<IngestionSourceErrorRule> rules = List.of(failing, missingIsRead, missingIsAuth, connectIsAuth);
+    rules.forEach(IngestionSourceErrorClassifier::registerGenericRule);
+    try {
+      // A failing rule is no decision, and the stronger verdict wins, not the first registered
+      assertEquals(categoryOf(new RuntimeException(new FileNotFoundException("s3://bucket/input"))),
+          Optional.of(IngestionSourceErrorCategory.AUTH));
+      // The built-in network rules decide an exception first
+      assertEquals(categoryOf(new RuntimeException(new ConnectException("refused"))),
+          Optional.of(IngestionSourceErrorCategory.SOURCE_READ));
+      // In a tree with a boundary, nothing outside it is read
+      Throwable failure = new RuntimeException("task failed");
+      failure.addSuppressed(sourceCall(new RuntimeException("source read failed", new IllegalStateException())));
+      failure.addSuppressed(new RuntimeException("deep store read failed", new FileNotFoundException("/segments/a")));
+      assertEquals(categoryOf(failure), Optional.empty());
+    } finally {
+      rules.forEach(IngestionSourceErrorClassifier::unregisterGenericRule);
+    }
+  }
+
+  @Test
   public void registrationOrderNeverChangesTheOutcome() {
     IngestionSourceErrorRule readRule = (node, below, evidence) -> node instanceof MissingException
         ? IngestionSourceErrorVerdict.sourceRead("read", null) : null;
