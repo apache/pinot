@@ -45,6 +45,7 @@
       }
     },
     "queries": [
+      {"sql": "SELECT CARDINALITY(ARRAY_AGG(x)), DISTINCTCOUNT(x), COVARPOP(x, y) FROM (SELECT int_col x, 1.0 y FROM {tbl} UNION ALL SELECT int_col, CAST(long_col AS DOUBLE) FROM {tbl})", "outputs": [[14, 6, 2339.918367346939]]},
       {"sql": "SELECT MODE(CASE WHEN int_col > 3 THEN string_col END) FROM {tbl}", "outputs": [["c"]]},
       {"sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ bool_col, MODE(CASE WHEN int_col > 3 THEN string_col END) FROM {tbl} GROUP BY bool_col", "outputs": [[true, "c"], [false, "c"]]},
       {"sql": "SET inferAnyValueType=true; SELECT src, ANY_VALUE(x) FROM (SELECT 'a' src, 1 x FROM {tbl} UNION ALL SELECT 'b', 2 FROM {tbl}) GROUP BY src", "outputs": [["a", 1], ["b", 2]]},
