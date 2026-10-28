@@ -48,6 +48,7 @@ import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.helix.core.realtime.MissingConsumingSegmentFinder;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
@@ -134,6 +135,14 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       removeMetricsForTable(tableNameWithType);
     }
     context._processedTables.add(tableNameWithType);
+  }
+
+  @Override
+  protected void cleanupOnEveryRun() {
+    // Existence only: a config that exists but fails to read is still a live table
+    PinotTableIdealStateBuilder.removeSourceFailureGaugesOfDeletedTables(
+        tableNameWithType -> ZKMetadataProvider.isTableConfigExists(_pinotHelixResourceManager.getPropertyStore(),
+            tableNameWithType), _controllerMetrics);
   }
 
   @Override

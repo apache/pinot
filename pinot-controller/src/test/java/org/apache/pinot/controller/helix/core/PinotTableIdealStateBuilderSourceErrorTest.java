@@ -18,10 +18,21 @@
  */
 package org.apache.pinot.controller.helix.core;
 
+import com.google.common.util.concurrent.Uninterruptibles;
 import java.net.ConnectException;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import org.apache.helix.AccessOption;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.LeadControllerManager;
+import org.apache.pinot.controller.helix.SegmentStatusChecker;
+import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorClassifier;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorReporter;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorRule;
@@ -53,6 +64,7 @@ import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
 
@@ -163,6 +175,81 @@ public class PinotTableIdealStateBuilderSourceErrorTest {
           List.of(unreachableTopic, streamConfig("refused", table)), List.of(), List.of(), false));
     }
     assertNotNull(gauge(ControllerGauge.INGESTION_SOURCE_READ_FAILURE_TIME_SECONDS, table));
+    assertNotNull(gauge(ControllerGauge.INGESTION_SOURCE_AUTH_FAILURE_TIME_SECONDS, table));
+  }
+
+  @Test
+  public void gaugeWrittenAfterItsTableIsDeletedIsRemovedByTheStatusChecker()
+      throws Exception {
+    String deleted = "deletedDuringFetchTable_REALTIME";
+    String live = "liveTable_REALTIME";
+    // The deletion removes the table's gauges while its fetch is still running, so the failure lands after it
+    StreamConsumerFactory deletedThenRefused = factory(invocation -> {
+      PinotTableIdealStateBuilder.removeSourceFailureGauges(deleted, _controllerMetrics);
+      throw new RefusedException();
+    });
+    StreamConsumerFactory refused = factory(invocation -> {
+      throw new RefusedException();
+    });
+    StreamConfig deletedTopic = streamConfig("topic", deleted);
+    try (MockedStatic<StreamConsumerFactoryProvider> provider = Mockito.mockStatic(
+        StreamConsumerFactoryProvider.class)) {
+      provider.when(() -> StreamConsumerFactoryProvider.create(any(StreamConfig.class))).thenReturn(refused);
+      provider.when(() -> StreamConsumerFactoryProvider.create(argThat(config -> config == deletedTopic)))
+          .thenReturn(deletedThenRefused);
+      expectThrows(RuntimeException.class,
+          () -> PinotTableIdealStateBuilder.getStreamMetadataList(List.of(deletedTopic), List.of(), List.of(), false));
+      expectThrows(RuntimeException.class, () -> PinotTableIdealStateBuilder.getStreamMetadataList(
+          List.of(streamConfig("topic", live)), List.of(), List.of(), false));
+    }
+    assertNotNull(gauge(ControllerGauge.INGESTION_SOURCE_AUTH_FAILURE_TIME_SECONDS, deleted));
+
+    // The checker runs on a controller that leads no table, as one whose last table was the deleted one. Only the live
+    // table's config still exists, though it can't be read.
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    when(resourceManager.getAllTables()).thenReturn(List.of(live));
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
+    when(propertyStore.exists(ZKMetadataProvider.constructPropertyStorePathForResourceConfig(live),
+        AccessOption.PERSISTENT)).thenReturn(true);
+    when(resourceManager.getPropertyStore()).thenReturn(propertyStore);
+    SegmentStatusChecker checker = new SegmentStatusChecker(resourceManager, mock(LeadControllerManager.class),
+        mock(ControllerConf.class), _controllerMetrics, mock(TableSizeReader.class));
+    checker.start();
+    checker.run();
+    assertNull(gauge(ControllerGauge.INGESTION_SOURCE_AUTH_FAILURE_TIME_SECONDS, deleted));
+    assertNotNull(gauge(ControllerGauge.INGESTION_SOURCE_AUTH_FAILURE_TIME_SECONDS, live));
+  }
+
+  @Test
+  public void tableCreatedAgainWhileItsGaugeIsBeingRemovedKeepsItsNewRecord()
+      throws Exception {
+    String table = "recreatedTable_REALTIME";
+    PinotTableIdealStateBuilder.recordSourceFailure(table, new RefusedException());
+    CountDownLatch sweepFoundTableGone = new CountDownLatch(1);
+    CountDownLatch resumeSweep = new CountDownLatch(1);
+    Thread sweep = new Thread(() -> PinotTableIdealStateBuilder.removeSourceFailureGaugesOfDeletedTables(
+        tableNameWithType -> {
+          if (!tableNameWithType.equals(table)) {
+            return true;
+          }
+          sweepFoundTableGone.countDown();
+          Uninterruptibles.awaitUninterruptibly(resumeSweep);
+          return false;
+        }, _controllerMetrics));
+    sweep.start();
+    assertTrue(sweepFoundTableGone.await(10, TimeUnit.SECONDS));
+
+    // The table is created again and records a failure while the sweep holds its decision that the table is gone
+    Thread recreated = new Thread(() -> PinotTableIdealStateBuilder.recordSourceFailure(table, new RefusedException()));
+    recreated.start();
+    long deadlineMs = System.currentTimeMillis() + 10_000;
+    while (recreated.getState() != Thread.State.BLOCKED && recreated.isAlive()
+        && System.currentTimeMillis() < deadlineMs) {
+      Thread.sleep(10);
+    }
+    resumeSweep.countDown();
+    sweep.join(10_000);
+    recreated.join(10_000);
     assertNotNull(gauge(ControllerGauge.INGESTION_SOURCE_AUTH_FAILURE_TIME_SECONDS, table));
   }
 

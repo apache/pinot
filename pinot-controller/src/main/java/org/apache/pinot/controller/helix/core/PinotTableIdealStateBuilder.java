@@ -18,10 +18,14 @@
  */
 package org.apache.pinot.controller.helix.core;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.helix.model.IdealState;
@@ -53,6 +57,12 @@ public class PinotTableIdealStateBuilder {
   // Source failure WARN lines already logged in the last minute, by table and category
   private static final Cache<String, Boolean> RECENT_SOURCE_FAILURE_LOGS =
       CacheBuilder.newBuilder().expireAfterWrite(1, TimeUnit.MINUTES).build();
+  // Tables this controller has written a source failure gauge for, so that one written after its table was deleted
+  // can be found and removed. A table's write and its removal are atomic with each other, through this map.
+  private static final Map<String, Boolean> TABLES_WITH_SOURCE_FAILURES = new ConcurrentHashMap<>();
+  private static final List<ControllerGauge> SOURCE_FAILURE_GAUGES =
+      List.of(ControllerGauge.INGESTION_SOURCE_AUTH_FAILURE_TIME_SECONDS,
+          ControllerGauge.INGESTION_SOURCE_READ_FAILURE_TIME_SECONDS);
 
   public static IdealState buildEmptyIdealStateFor(String tableNameWithType, int numReplicas) {
     CustomModeISBuilder customModeIdealStateBuilder = new CustomModeISBuilder(tableNameWithType);
@@ -124,12 +134,36 @@ public class PinotTableIdealStateBuilder {
     }
   }
 
+  /// Removes a table's source failure gauges.
+  public static void removeSourceFailureGauges(String tableNameWithType, ControllerMetrics controllerMetrics) {
+    for (ControllerGauge gauge : SOURCE_FAILURE_GAUGES) {
+      controllerMetrics.removeTableGauge(tableNameWithType, gauge);
+    }
+  }
+
+  /// Removes the source failure gauges this controller wrote for tables that no longer exist. A metadata fetch still
+  /// running when its table is deleted, on this controller or another, writes its gauge after the deletion removed it.
+  public static void removeSourceFailureGaugesOfDeletedTables(Predicate<String> tableExists,
+      ControllerMetrics controllerMetrics) {
+    for (String tableNameWithType : TABLES_WITH_SOURCE_FAILURES.keySet()) {
+      // Checked and removed atomically with the table's writes, so a table created again meanwhile keeps its gauge
+      TABLES_WITH_SOURCE_FAILURES.computeIfPresent(tableNameWithType, (table, remembered) -> {
+        if (tableExists.test(table)) {
+          return remembered;
+        }
+        removeSourceFailureGauges(table, controllerMetrics);
+        return null;
+      });
+    }
+  }
+
   /// Records a stream source failure the metadata fetch gave up on (it exhausted its retries, a topic was skipped as
   /// permanently failed, or the plugin reported a failure it swallows): the table's timestamp gauge for its category,
   /// and a WARN line rate-limited per table and category. The gauges are never cleared on success;
   /// [org.apache.pinot.controller.helix.SegmentStatusChecker] and table deletion remove them. Never throws, and the
   /// line carries no exception message.
-  private static void recordSourceFailure(String tableNameWithType, @Nullable Throwable failure) {
+  @VisibleForTesting
+  static void recordSourceFailure(String tableNameWithType, @Nullable Throwable failure) {
     if (failure == null) {
       return;
     }
@@ -143,8 +177,11 @@ public class PinotTableIdealStateBuilder {
       ControllerGauge gauge = category == IngestionSourceErrorCategory.AUTH
           ? ControllerGauge.INGESTION_SOURCE_AUTH_FAILURE_TIME_SECONDS
           : ControllerGauge.INGESTION_SOURCE_READ_FAILURE_TIME_SECONDS;
-      ControllerMetrics.get().setValueOfTableGauge(tableNameWithType, gauge,
-          TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis()));
+      TABLES_WITH_SOURCE_FAILURES.compute(tableNameWithType, (table, remembered) -> {
+        ControllerMetrics.get().setValueOfTableGauge(table, gauge,
+            TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis()));
+        return Boolean.TRUE;
+      });
       if (RECENT_SOURCE_FAILURE_LOGS.asMap().putIfAbsent(tableNameWithType + "/" + category, Boolean.TRUE) == null) {
         LOGGER.warn("Ingestion source {} failure for table: {}, at: metadata_fetch: {}", category, tableNameWithType,
             classification);
