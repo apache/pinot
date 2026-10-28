@@ -41,6 +41,7 @@ import org.apache.pinot.core.operator.docvalsets.FilteredRowBasedBlockValSet;
 import org.apache.pinot.core.operator.docvalsets.RowBasedBlockValSet;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.function.CountAggregationFunction;
 import org.apache.pinot.core.util.DataBlockExtractUtils;
 import org.apache.pinot.core.util.GroupByUtils;
@@ -135,12 +136,12 @@ public class AggregateOperator extends MultiStageOperator {
 
     // Initialize the appropriate executor.
     AggregateNode.AggType aggType = node.getAggType();
-    // TODO: Allow leaf return final result for non-group-by queries
     boolean leafReturnFinalResult = node.isLeafReturnFinalResult();
     _isGroupBy = !groupKeys.isEmpty();
     if (!_isGroupBy) {
       _aggregationExecutor =
-          new MultistageAggregationExecutor(_aggFunctions, filterArgIds, maxFilterArgId, aggType, _resultSchema);
+          new MultistageAggregationExecutor(_aggFunctions, filterArgIds, maxFilterArgId, aggType, leafReturnFinalResult,
+              _resultSchema);
       _groupByExecutor = null;
     } else {
       _groupByExecutor =
@@ -237,7 +238,9 @@ public class AggregateOperator extends MultiStageOperator {
   private MseBlock produceAggregatedBlock() {
     if (!_isGroupBy) {
       assert _aggregationExecutor != null;
-      return new RowHeapDataBlock(_aggregationExecutor.getResult(), _resultSchema, _aggFunctions);
+      List<Object[]> rows = _aggregationExecutor.getResult();
+      recordApproximatedResult();
+      return new RowHeapDataBlock(rows, _resultSchema, _aggFunctions);
     } else {
       assert _groupByExecutor != null;
       List<Object[]> rows;
@@ -246,6 +249,7 @@ public class AggregateOperator extends MultiStageOperator {
       } else {
         rows = _groupByExecutor.getResult(_groupTrimSize);
       }
+      recordApproximatedResult();
 
       // Record stat before we check for limit so we can propagate to query response
       _statMap.merge(StatKey.NUM_GROUPS, _groupByExecutor.getNumGroups());
@@ -268,12 +272,20 @@ public class AggregateOperator extends MultiStageOperator {
           }
         }
         if (_groupByExecutor.getNumGroups() >= _groupByExecutor.getNumGroupsWarningLimit()) {
-          LOGGER.warn("numGroups reached warning limit: {} (actual: {})",
-              _groupByExecutor.getNumGroupsWarningLimit(), _groupByExecutor.getNumGroups());
+          LOGGER.warn("numGroups reached warning limit: {} (actual: {})", _groupByExecutor.getNumGroupsWarningLimit(),
+              _groupByExecutor.getNumGroups());
           _statMap.merge(StatKey.NUM_GROUPS_WARNING_LIMIT_REACHED, true);
         }
         return dataBlock;
       }
+    }
+  }
+
+  /// Records a function that returned an approximate final result while the executor extracted the results, see
+  /// [AggregationFunction#hasApproximatedResult()].
+  private void recordApproximatedResult() {
+    if (AggregationFunctionUtils.hasApproximatedResult(_aggFunctions)) {
+      _statMap.merge(StatKey.APPROXIMATED_RESULT, true);
     }
   }
 
@@ -518,7 +530,10 @@ public class AggregateOperator extends MultiStageOperator {
     /// Allocated memory in bytes for this operator or its children in the same stage.
     ALLOCATED_MEMORY_BYTES(StatMap.Type.LONG),
     /// Time spent on GC while this operator or its children in the same stage were running.
-    GC_TIME_MS(StatMap.Type.LONG);
+    GC_TIME_MS(StatMap.Type.LONG),
+    /// Whether a function that can answer exactly returned an approximate final result, for example a SMART function
+    /// that switched to a sketch.
+    APPROXIMATED_RESULT(StatMap.Type.BOOLEAN);
 
     private final StatMap.Type _type;
 

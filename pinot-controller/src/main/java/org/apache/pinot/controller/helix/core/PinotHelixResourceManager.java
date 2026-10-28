@@ -91,9 +91,12 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.helix.zookeeper.impl.client.ZkClient;
+import org.apache.helix.zookeeper.zkclient.exception.ZkException;
+import org.apache.helix.zookeeper.zkclient.exception.ZkNoNodeException;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
+import org.apache.pinot.common.assignment.PartitionAssignmentUtils;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.config.provider.ZkTableCache;
@@ -211,6 +214,8 @@ import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.apache.pinot.spi.utils.retry.RetryPolicy;
+import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.Op;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -221,6 +226,7 @@ public class PinotHelixResourceManager {
   private static final long CACHE_ENTRY_EXPIRE_TIME_HOURS = 6L;
   private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 2.0f);
   private static final int DEFAULT_SEGMENT_LINEAGE_UPDATE_NUM_RETRY = 5;
+  private static final int MAX_SEGMENT_ZK_METADATA_REMOVAL_ATTEMPTS = 5;
   public static final String APPEND = "APPEND";
   private static final int DEFAULT_LINEAGE_UPDATER_LOCKERS_SIZE = 500;
   private static final String API_REQUEST_ID_PREFIX = "api-";
@@ -1521,6 +1527,10 @@ public class PinotHelixResourceManager {
           }
         }
       }
+      // The instances of the partition assignment are in use although they might host no segment
+      if (CollectionUtils.containsAny(taggedInstances, PartitionAssignmentUtils.getAllInstances(tableIdealState))) {
+        return false;
+      }
     }
     return true;
   }
@@ -2278,6 +2288,90 @@ public class PinotHelixResourceManager {
     }
   }
 
+  /// Removes the ZK metadata of the given segments that are IN_PROGRESS and not in the IdealState of the table, i.e.
+  /// new consuming segments that were not added to the IdealState, and returns the segments whose ZK metadata was
+  /// removed.
+  ///
+  /// The removal is submitted in one ZK `multi()` transaction with version-checked deletes of the segment ZK metadata
+  /// read here, and a version-checked write of the unchanged IdealState:
+  /// - An IdealState update that read the IdealState before the transaction fails its version check. An updater that
+  ///   reads the segment ZK metadata again when it retries, like the one of RealtimeSegmentValidationManager, then no
+  ///   longer finds the removed segments.
+  /// - If the IdealState, or the ZK metadata of one of the segments, is updated after it was read here, the transaction
+  ///   fails and is retried.
+  ///
+  /// The data versions cannot tell a segment ZK metadata deleted and recreated with the same name since it was read,
+  /// e.g. by an upload under the same name, from the one that was read. As the IdealState is outside the property
+  /// store, the transaction uses the multi-write ZkClient directly instead of [ZkMultiWriteBuilder].
+  public Set<String> removeInProgressSegmentsZKMetadataNotInIdealState(String tableNameWithType,
+      Collection<String> segmentNames) {
+    return removeInProgressSegmentsZKMetadataNotInIdealState(tableNameWithType, segmentNames, () -> {
+    });
+  }
+
+  /// @param afterRead Runs after reading the IdealState and the segment ZK metadata, before removing it
+  @VisibleForTesting
+  Set<String> removeInProgressSegmentsZKMetadataNotInIdealState(String tableNameWithType,
+      Collection<String> segmentNames, Runnable afterRead) {
+    ZkClient zkClient = getOrBuildMultiWriteZkClient();
+    String idealStatePath = PropertyPathBuilder.idealState(_helixClusterName, tableNameWithType);
+    String propertyStoreRoot = PropertyPathBuilder.propertyStore(_helixClusterName);
+    for (int attempt = 1; ; attempt++) {
+      Stat idealStateStat = new Stat();
+      ZNRecord idealState;
+      try {
+        idealState = zkClient.readData(idealStatePath, idealStateStat);
+      } catch (ZkNoNodeException e) {
+        idealState = null;
+      }
+      if (idealState == null) {
+        // The table was deleted
+        return Set.of();
+      }
+      List<Op> segmentDeletes = new ArrayList<>();
+      Set<String> segmentsToRemove = new HashSet<>();
+      for (String segmentName : segmentNames) {
+        if (idealState.getMapFields().containsKey(segmentName)) {
+          continue;
+        }
+        String segmentPath =
+            propertyStoreRoot + ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, segmentName);
+        Stat segmentStat = new Stat();
+        ZNRecord segmentRecord;
+        try {
+          segmentRecord = zkClient.readData(segmentPath, segmentStat);
+        } catch (ZkNoNodeException e) {
+          continue;
+        }
+        if (new SegmentZKMetadata(segmentRecord).getStatus() == CommonConstants.Segment.Realtime.Status.IN_PROGRESS) {
+          segmentDeletes.add(Op.delete(segmentPath, segmentStat.getVersion()));
+          segmentsToRemove.add(segmentName);
+        }
+      }
+      if (segmentsToRemove.isEmpty()) {
+        return segmentsToRemove;
+      }
+      afterRead.run();
+      List<Op> ops = new ArrayList<>(segmentDeletes.size() + 1);
+      ops.add(Op.setData(idealStatePath, zkClient.serialize(idealState, idealStatePath), idealStateStat.getVersion()));
+      ops.addAll(segmentDeletes);
+      try {
+        zkClient.multi(ops);
+        return segmentsToRemove;
+      } catch (ZkException e) {
+        // As in ZkMultiWriteBuilder#execute(), the ZkClient wraps the KeeperException of an atomic rollback. A version
+        // mismatch or a missing node means that the IdealState or a segment ZK metadata changed concurrently.
+        boolean concurrentChange = e.getCause() instanceof KeeperException.BadVersionException
+            || e.getCause() instanceof KeeperException.NoNodeException;
+        if (!concurrentChange || attempt == MAX_SEGMENT_ZK_METADATA_REMOVAL_ATTEMPTS) {
+          throw e;
+        }
+        LOGGER.info("Retrying to remove segment ZK metadata for segments: {} of table: {} after a concurrent change",
+            segmentsToRemove, tableNameWithType);
+      }
+    }
+  }
+
   public boolean createZKNode(String path, ZNRecord record, int accessOption, long ttl) {
     return _helixDataAccessor.getBaseDataAccessor().create(path, record, accessOption, ttl);
   }
@@ -2949,8 +3043,7 @@ public class PinotHelixResourceManager {
         instancePartitionsMap = fetchOrComputeInstancePartitions(tableNameWithType, tableConfig);
       }
 
-      SegmentAssignment segmentAssignment =
-          SegmentAssignmentFactory.getSegmentAssignment(_helixZkManager, tableConfig, _controllerMetrics);
+      SegmentAssignment segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(_helixZkManager, tableConfig);
       HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, idealState -> {
         assert idealState != null;
         Map<String, Map<String, String>> currentAssignment = idealState.getRecord().getMapFields();
@@ -2959,7 +3052,7 @@ public class PinotHelixResourceManager {
               tableNameWithType);
         } else {
           List<String> assignedInstances =
-              segmentAssignment.assignSegment(segmentName, currentAssignment, instancePartitionsMap);
+              segmentAssignment.assignSegment(segmentName, idealState, instancePartitionsMap);
           LOGGER.info("Assigning segment: {} to instances: {} for table: {}", segmentName, assignedInstances,
               tableNameWithType);
           currentAssignment.put(segmentName,
@@ -3019,8 +3112,7 @@ public class PinotHelixResourceManager {
         tierToInstancePartitionsMap = null;
       }
 
-      SegmentAssignment segmentAssignment =
-          SegmentAssignmentFactory.getSegmentAssignment(_helixZkManager, tableConfig, _controllerMetrics);
+      SegmentAssignment segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(_helixZkManager, tableConfig);
       long segmentAssignmentStartMs = System.currentTimeMillis();
       HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, idealState -> {
         assert idealState != null;
@@ -3039,7 +3131,7 @@ public class PinotHelixResourceManager {
               instancePartitionsMap = tierToInstancePartitionsMap.get(segmentZKMetadata.getTier());
             }
             List<String> assignedInstances =
-                segmentAssignment.assignSegment(segmentName, currentAssignment, instancePartitionsMap);
+                segmentAssignment.assignSegment(segmentName, idealState, instancePartitionsMap);
             LOGGER.info("Assigning segment: {} to instances: {} for table: {}", segmentName, assignedInstances,
                 tableNameWithType);
             currentAssignment.put(segmentName,
@@ -3197,15 +3289,22 @@ public class PinotHelixResourceManager {
 
   public Map<String, Integer> reloadSegments(String tableNameWithType, boolean forceDownload,
       Map<String, List<String>> instanceToSegmentsMap, String reloadJobId) {
-    LOGGER.info("Sending reload messages for table: {} with forceDownload: {}, and instanceToSegmentsMap: {}",
-        tableNameWithType, forceDownload, instanceToSegmentsMap);
+    return reloadSegments(tableNameWithType, forceDownload, false, instanceToSegmentsMap, reloadJobId);
+  }
+
+  /// Sends reload messages for the given segments to their target instances. When `onlyIfNeeded` is true, servers
+  /// reload only the segments whose loaded copy is out of date and skip the rest.
+  public Map<String, Integer> reloadSegments(String tableNameWithType, boolean forceDownload, boolean onlyIfNeeded,
+      Map<String, List<String>> instanceToSegmentsMap, String reloadJobId) {
+    LOGGER.info("Sending reload messages for table: {} with forceDownload: {}, onlyIfNeeded: {}, and "
+        + "instanceToSegmentsMap: {}", tableNameWithType, forceDownload, onlyIfNeeded, instanceToSegmentsMap);
 
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
     Map<String, Integer> instanceMsgInfoMap = new HashMap<>();
     for (Map.Entry<String, List<String>> entry : instanceToSegmentsMap.entrySet()) {
       String targetInstance = entry.getKey();
       SegmentReloadMessage message =
-          new SegmentReloadMessage(tableNameWithType, entry.getValue(), forceDownload, reloadJobId);
+          new SegmentReloadMessage(tableNameWithType, entry.getValue(), forceDownload, onlyIfNeeded, reloadJobId);
       int numMessagesSent =
           MessagingServiceUtils.send(messagingService, message, tableNameWithType, null, targetInstance);
       if (numMessagesSent > 0) {
@@ -3221,11 +3320,19 @@ public class PinotHelixResourceManager {
 
   public Pair<Integer, String> reloadAllSegments(String tableNameWithType, boolean forceDownload,
       @Nullable String targetInstance) {
-    LOGGER.info("Sending reload message for table: {} with forceDownload: {}, and target: {}", tableNameWithType,
-        forceDownload, targetInstance == null ? "every instance" : targetInstance);
+    return reloadAllSegments(tableNameWithType, forceDownload, false, targetInstance);
+  }
+
+  /// Sends a reload message for all segments of the table. When `onlyIfNeeded` is true, servers reload only the
+  /// segments whose loaded copy is out of date and skip the rest.
+  public Pair<Integer, String> reloadAllSegments(String tableNameWithType, boolean forceDownload,
+      boolean onlyIfNeeded, @Nullable String targetInstance) {
+    LOGGER.info("Sending reload message for table: {} with forceDownload: {}, onlyIfNeeded: {}, and target: {}",
+        tableNameWithType, forceDownload, onlyIfNeeded, targetInstance == null ? "every instance" : targetInstance);
 
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
-    SegmentReloadMessage message = new SegmentReloadMessage(tableNameWithType, forceDownload);
+    SegmentReloadMessage message =
+        new SegmentReloadMessage(tableNameWithType, null, forceDownload, onlyIfNeeded, null);
     int numMessagesSent =
         MessagingServiceUtils.send(messagingService, message, tableNameWithType, null, targetInstance);
     if (numMessagesSent > 0) {
@@ -3239,11 +3346,20 @@ public class PinotHelixResourceManager {
 
   public Pair<Integer, String> reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload,
       @Nullable String targetInstance) {
-    LOGGER.info("Sending reload message for segment: {} in table: {} with forceDownload: {}, and target: {}",
-        segmentName, tableNameWithType, forceDownload, targetInstance == null ? "every instance" : targetInstance);
+    return reloadSegment(tableNameWithType, segmentName, forceDownload, false, targetInstance);
+  }
+
+  /// Sends a reload message for a single segment. When `onlyIfNeeded` is true, servers skip the reload if the loaded
+  /// copy is already up to date.
+  public Pair<Integer, String> reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload,
+      boolean onlyIfNeeded, @Nullable String targetInstance) {
+    LOGGER.info("Sending reload message for segment: {} in table: {} with forceDownload: {}, onlyIfNeeded: {}, and "
+            + "target: {}", segmentName, tableNameWithType, forceDownload, onlyIfNeeded,
+        targetInstance == null ? "every instance" : targetInstance);
 
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
-    SegmentReloadMessage message = new SegmentReloadMessage(tableNameWithType, List.of(segmentName), forceDownload);
+    SegmentReloadMessage message =
+        new SegmentReloadMessage(tableNameWithType, List.of(segmentName), forceDownload, onlyIfNeeded, null);
     int numMessagesSent =
         MessagingServiceUtils.send(messagingService, message, tableNameWithType, segmentName, targetInstance);
     if (numMessagesSent > 0) {
@@ -3333,6 +3449,55 @@ public class PinotHelixResourceManager {
     }
   }
 
+  /// Resets the replicas of the given segments that are in ERROR state, leaving the other replicas untouched. The ideal
+  /// state and external view are read once, when the resets are sent, to find the ERROR replicas; a replica on an
+  /// instance the ideal state no longer assigns the segment to is skipped. The resets are sent in one batch per
+  /// instance, only for the segments still in ERROR in the instance's current state, and the instance discards a reset
+  /// if the segment has left ERROR by the time it processes it.
+  ///
+  /// @return the segments whose reset failed on at least one instance
+  public Set<String> resetErrorReplicas(String tableNameWithType, Set<String> segmentNames) {
+    IdealState idealState = getTableIdealState(tableNameWithType);
+    Preconditions.checkState(idealState != null, "Could not find ideal state for table: %s", tableNameWithType);
+    ExternalView externalView = getTableExternalView(tableNameWithType);
+    Preconditions.checkState(externalView != null, "Could not find external view for table: %s", tableNameWithType);
+
+    Map<String, Set<String>> instanceToResetSegmentsMap = new HashMap<>();
+    for (String segmentName : segmentNames) {
+      Map<String, String> externalViewStateMap = externalView.getStateMap(segmentName);
+      Map<String, String> idealStateMap = idealState.getInstanceStateMap(segmentName);
+      if (externalViewStateMap == null || idealStateMap == null) {
+        continue;
+      }
+      for (Map.Entry<String, String> entry : externalViewStateMap.entrySet()) {
+        String instance = entry.getKey();
+        if (!SegmentStateModel.ERROR.equals(entry.getValue())) {
+          continue;
+        }
+        if (idealStateMap.containsKey(instance)) {
+          instanceToResetSegmentsMap.computeIfAbsent(instance, i -> new HashSet<>()).add(segmentName);
+        } else {
+          LOGGER.warn("Skipping reset of ERROR segment: {} of table: {} on instance: {} which the ideal state no "
+              + "longer assigns it to", segmentName, tableNameWithType, instance);
+        }
+      }
+    }
+
+    Set<String> failedSegments = new HashSet<>();
+    for (Map.Entry<String, Set<String>> entry : instanceToResetSegmentsMap.entrySet()) {
+      String instance = entry.getKey();
+      Set<String> resetSegments = entry.getValue();
+      try {
+        resetPartitions(instance, tableNameWithType, resetSegments, true);
+      } catch (Exception e) {
+        LOGGER.error("Failed to reset ERROR segments: {} of table: {} on instance: {}", resetSegments,
+            tableNameWithType, instance, e);
+        failedSegments.addAll(resetSegments);
+      }
+    }
+    return failedSegments;
+  }
+
   private void resetPartitionAllState(String instance, String tableNameWithType, Set<String> segmentNames,
       List<String> failedInstances) {
     try {
@@ -3360,9 +3525,22 @@ public class PinotHelixResourceManager {
   /// However instead of resetting only the ERROR state to its initial state. we reset all state regardless.
   @VisibleForTesting
   void resetPartitionAllState(String instanceName, String resourceName, Set<String> resetPartitionNames) {
+    resetPartitions(instanceName, resourceName, resetPartitionNames, false);
+  }
+
+  /// Resets the given partitions on the instance to the initial state.
+  ///
+  /// With `errorStateOnly`, like [HelixAdmin#resetPartition(String, String, String, List)], only the partitions in
+  /// ERROR state in the instance's current state are reset, and each message is sent from ERROR, so the instance
+  /// discards it if the partition has left ERROR by the time it processes it. A partition with a pending state
+  /// transition message is skipped. Otherwise every partition is reset from its current state, and a pending state
+  /// transition message for any of them fails the call.
+  @VisibleForTesting
+  void resetPartitions(String instanceName, String resourceName, Set<String> resetPartitionNames,
+      boolean errorStateOnly) {
     LOGGER.info("Resetting partitions: {} for resource: {} on instance: {}", resetPartitionNames, resourceName,
         instanceName);
-    HelixDataAccessor accessor = _helixZkManager.getHelixDataAccessor();
+    HelixDataAccessor accessor = getHelixZkManager().getHelixDataAccessor();
     PropertyKey.Builder keyBuilder = accessor.keyBuilder();
 
     // check the instance is alive
@@ -3385,6 +3563,7 @@ public class PinotHelixResourceManager {
     CurrentState curState = accessor.getProperty(keyBuilder.currentState(instanceName, sessionId, resourceName));
 
     // check there is no pending messages for the partitions exist
+    Set<String> partitionsWithPendingMessage = new HashSet<>();
     List<Message> messages = accessor.getChildValues(keyBuilder.messages(instanceName), true);
     for (Message message : messages) {
       if (!Message.MessageType.STATE_TRANSITION.name().equalsIgnoreCase(message.getMsgType()) || !sessionId.equals(
@@ -3392,9 +3571,12 @@ public class PinotHelixResourceManager {
           || !resetPartitionNames.contains(message.getPartitionName())) {
         continue;
       }
-      throw new RuntimeException(
-          "Can't reset state for " + resourceName + "." + resetPartitionNames + " on " + instanceName
-              + ", because a pending message " + message + " exists for resource " + message.getResourceName());
+      if (!errorStateOnly) {
+        throw new RuntimeException(
+            "Can't reset state for " + resourceName + "." + resetPartitionNames + " on " + instanceName
+                + ", because a pending message " + message + " exists for resource " + message.getResourceName());
+      }
+      partitionsWithPendingMessage.add(message.getPartitionName());
     }
 
     String adminName;
@@ -3409,6 +3591,19 @@ public class PinotHelixResourceManager {
     List<Message> resetMessages = new ArrayList<>();
     List<PropertyKey> messageKeys = new ArrayList<>();
     for (String partitionName : resetPartitionNames) {
+      String fromState = curState.getState(partitionName);
+      if (errorStateOnly) {
+        if (!SegmentStateModel.ERROR.equals(fromState)) {
+          LOGGER.info("Skipping reset of partition: {} for resource: {} on instance: {} in state: {}", partitionName,
+              resourceName, instanceName, fromState);
+          continue;
+        }
+        if (partitionsWithPendingMessage.contains(partitionName)) {
+          LOGGER.info("Skipping reset of partition: {} for resource: {} on instance: {} with a pending message",
+              partitionName, resourceName, instanceName);
+          continue;
+        }
+      }
       // send currentState to initialState message
       String msgId = UUID.randomUUID().toString();
       Message message = new Message(Message.MessageType.STATE_TRANSITION, msgId);
@@ -3419,7 +3614,7 @@ public class PinotHelixResourceManager {
       message.setResourceName(resourceName);
       message.setTgtSessionId(sessionId);
       message.setStateModelDef(stateModelDef);
-      message.setFromState(curState.getState(partitionName));
+      message.setFromState(fromState);
       message.setToState(stateModel.getInitialState());
       message.setStateModelFactoryName(idealState.getStateModelFactoryName());
 
@@ -3434,7 +3629,21 @@ public class PinotHelixResourceManager {
       messageKeys.add(keyBuilder.message(instanceName, message.getId()));
     }
 
-    accessor.setChildren(messageKeys, resetMessages);
+    if (resetMessages.isEmpty()) {
+      return;
+    }
+    boolean[] results = accessor.setChildren(messageKeys, resetMessages);
+    List<String> failedPartitions = new ArrayList<>();
+    for (int i = 0; i < results.length; i++) {
+      if (!results[i]) {
+        failedPartitions.add(resetMessages.get(i).getPartitionName());
+      }
+    }
+    if (!failedPartitions.isEmpty()) {
+      throw new RuntimeException(
+          "Failed to send reset messages for partitions: " + failedPartitions + " of resource: " + resourceName
+              + " on instance: " + instanceName);
+    }
   }
 
   /// Sends a segment refresh message to:
@@ -4044,15 +4253,24 @@ public class PinotHelixResourceManager {
     if (!InstanceTypeUtils.isMinion(instanceName)) {
       getAllResources().forEach(resource -> {
         IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, resource);
-        for (String partition : idealState.getPartitionSet()) {
-          if (idealState.getInstanceSet(partition).contains(instanceName)) {
-            response.putIssue(OperationValidationResponse.ErrorCode.CONTAINS_RESOURCE, instanceName, resource);
-            break;
-          }
+        if (isInstanceInIdealState(idealState, instanceName)) {
+          response.putIssue(OperationValidationResponse.ErrorCode.CONTAINS_RESOURCE, instanceName, resource);
         }
       });
     }
     return response.setSafe(response.getIssues().isEmpty());
+  }
+
+  /// Returns whether the given instance is in the given IdealState: it is assigned a partition (a segment of a table),
+  /// or it is in the partition assignment of a table (see [PartitionAssignmentUtils]), whose new segments are assigned
+  /// to the instances of their partition.
+  private static boolean isInstanceInIdealState(IdealState idealState, String instanceName) {
+    for (String partition : idealState.getPartitionSet()) {
+      if (idealState.getInstanceSet(partition).contains(instanceName)) {
+        return true;
+      }
+    }
+    return PartitionAssignmentUtils.getAllInstances(idealState).contains(instanceName);
   }
 
   /// Restores previous tags for a drained minion instance if applicable.

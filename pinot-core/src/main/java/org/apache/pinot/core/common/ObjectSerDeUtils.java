@@ -49,6 +49,8 @@ import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
+import it.unimi.dsi.fastutil.objects.Object2LongMap;
+import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
@@ -85,6 +87,8 @@ import org.apache.pinot.core.query.aggregation.utils.exprminmax.ExprMinMaxObject
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
 import org.apache.pinot.segment.local.customobject.AvgPair;
+import org.apache.pinot.segment.local.customobject.BigDecimalLongPair;
+import org.apache.pinot.segment.local.customobject.BytesLongPair;
 import org.apache.pinot.segment.local.customobject.CovarianceTuple;
 import org.apache.pinot.segment.local.customobject.CpcSketchAccumulator;
 import org.apache.pinot.segment.local.customobject.DoubleLongPair;
@@ -173,7 +177,10 @@ public class ObjectSerDeUtils {
     FunnelStepEventAccumulator(51),
     BigDecimalArrayList(52),
     BigDecimalSet(53),
-    BytesArrayList(54);
+    BytesArrayList(54),
+    BigDecimalLongPair(55),
+    BytesLongPair(56),
+    String2LongMap(57);
 
     private final int _value;
 
@@ -287,6 +294,10 @@ public class ObjectSerDeUtils {
         return ObjectType.DoubleLongPair;
       } else if (value instanceof StringLongPair) {
         return ObjectType.StringLongPair;
+      } else if (value instanceof BigDecimalLongPair) {
+        return ObjectType.BigDecimalLongPair;
+      } else if (value instanceof BytesLongPair) {
+        return ObjectType.BytesLongPair;
       } else if (value instanceof CovarianceTuple) {
         return ObjectType.CovarianceTuple;
       } else if (value instanceof VarianceTuple) {
@@ -808,6 +819,41 @@ public class ObjectSerDeUtils {
     @Override
     public StringLongPair deserialize(ByteBuffer byteBuffer) {
       return StringLongPair.fromByteBuffer(byteBuffer);
+    }
+  };
+  public static final ObjectSerDe<BigDecimalLongPair> BIG_DECIMAL_LONG_PAIR_SER_DE =
+      new ObjectSerDe<BigDecimalLongPair>() {
+
+        @Override
+        public byte[] serialize(BigDecimalLongPair bigDecimalLongPair) {
+          return bigDecimalLongPair.toBytes();
+        }
+
+        @Override
+        public BigDecimalLongPair deserialize(byte[] bytes) {
+          return BigDecimalLongPair.fromBytes(bytes);
+        }
+
+        @Override
+        public BigDecimalLongPair deserialize(ByteBuffer byteBuffer) {
+          return BigDecimalLongPair.fromByteBuffer(byteBuffer);
+        }
+      };
+  public static final ObjectSerDe<BytesLongPair> BYTES_LONG_PAIR_SER_DE = new ObjectSerDe<BytesLongPair>() {
+
+    @Override
+    public byte[] serialize(BytesLongPair bytesLongPair) {
+      return bytesLongPair.toBytes();
+    }
+
+    @Override
+    public BytesLongPair deserialize(byte[] bytes) {
+      return BytesLongPair.fromBytes(bytes);
+    }
+
+    @Override
+    public BytesLongPair deserialize(ByteBuffer byteBuffer) {
+      return BytesLongPair.fromByteBuffer(byteBuffer);
     }
   };
 
@@ -1637,6 +1683,53 @@ public class ObjectSerDeUtils {
         }
       };
 
+  public static final ObjectSerDe<Object2LongMap<String>> STRING_2_LONG_MAP_SER_DE =
+      new ObjectSerDe<Object2LongMap<String>>() {
+
+        @Override
+        public byte[] serialize(Object2LongMap<String> map) {
+          int size = map.size();
+          // Besides the key bytes, we store: size, length for each key, value for each key
+          long bufferSize = Integer.BYTES + (long) size * (Integer.BYTES + Long.BYTES);
+          byte[][] keyBytesArray = new byte[size][];
+          long[] values = new long[size];
+          int index = 0;
+          for (Object2LongMap.Entry<String> entry : map.object2LongEntrySet()) {
+            byte[] keyBytes = entry.getKey().getBytes(UTF_8);
+            bufferSize += keyBytes.length;
+            keyBytesArray[index] = keyBytes;
+            values[index++] = entry.getLongValue();
+          }
+          Preconditions.checkState(bufferSize <= Integer.MAX_VALUE, "Buffer size exceeds 2GB");
+          byte[] bytes = new byte[(int) bufferSize];
+          ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+          byteBuffer.putInt(size);
+          for (int i = 0; i < size; i++) {
+            byteBuffer.putInt(keyBytesArray[i].length);
+            byteBuffer.put(keyBytesArray[i]);
+            byteBuffer.putLong(values[i]);
+          }
+          return bytes;
+        }
+
+        @Override
+        public Object2LongOpenHashMap<String> deserialize(byte[] bytes) {
+          return deserialize(ByteBuffer.wrap(bytes));
+        }
+
+        @Override
+        public Object2LongOpenHashMap<String> deserialize(ByteBuffer byteBuffer) {
+          int size = byteBuffer.getInt();
+          Object2LongOpenHashMap<String> map = new Object2LongOpenHashMap<>(size);
+          for (int i = 0; i < size; i++) {
+            byte[] keyBytes = new byte[byteBuffer.getInt()];
+            byteBuffer.get(keyBytes);
+            map.put(new String(keyBytes, UTF_8), byteBuffer.getLong());
+          }
+          return map;
+        }
+      };
+
   public static final ObjectSerDe<Int2LongMap> INT_2_LONG_MAP_SER_DE = new ObjectSerDe<Int2LongMap>() {
 
     @Override
@@ -2089,6 +2182,9 @@ public class ObjectSerDeUtils {
       BIG_DECIMAL_ARRAY_LIST_SER_DE,
       BIG_DECIMAL_SET_SER_DE,
       BYTES_ARRAY_LIST_SER_DE,
+      BIG_DECIMAL_LONG_PAIR_SER_DE,
+      BYTES_LONG_PAIR_SER_DE,
+      STRING_2_LONG_MAP_SER_DE,
   };
   //@formatter:on
 

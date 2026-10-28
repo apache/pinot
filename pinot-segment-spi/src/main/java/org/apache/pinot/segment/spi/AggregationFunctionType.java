@@ -26,23 +26,14 @@ import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
-import org.apache.calcite.sql.SqlCall;
-import org.apache.calcite.sql.SqlCallBinding;
 import org.apache.calcite.sql.SqlKind;
-import org.apache.calcite.sql.SqlNode;
-import org.apache.calcite.sql.SqlOperandCountRange;
-import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.SqlOperatorBinding;
-import org.apache.calcite.sql.fun.SqlStdOperatorTable;
-import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.ReturnTypes;
-import org.apache.calcite.sql.type.SqlOperandCountRanges;
 import org.apache.calcite.sql.type.SqlOperandTypeChecker;
 import org.apache.calcite.sql.type.SqlReturnTypeInference;
 import org.apache.calcite.sql.type.SqlTypeFamily;
 import org.apache.calcite.sql.type.SqlTypeName;
-import org.apache.calcite.sql.type.SqlTypeUtil;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Strings;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -72,12 +63,16 @@ public enum AggregationFunctionType {
   SUMLONG("sumLong", ReturnTypes.AGG_SUM, OperandTypes.or(OperandTypes.INTEGER, OperandTypes.ARRAY_OF_INTEGER)),
   SUMPRECISION("sumPrecision", ReturnTypes.explicit(SqlTypeName.DECIMAL), OperandTypes.ANY, SqlTypeName.OTHER),
   AVG("avg", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
-  MODE("mode", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
-  ANYVALUE("anyValue", ReturnTypes.ARG0, OperandTypes.ANY, SqlTypeName.OTHER),
-  FIRSTWITHTIME("firstWithTime", ReturnTypes.ARG0,
-      OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), SqlTypeName.OTHER),
-  LASTWITHTIME("lastWithTime", ReturnTypes.ARG0,
-      OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), SqlTypeName.OTHER),
+  MODE("mode", null, null, ReturnTypes.explicit(SqlTypeName.OTHER), new ModeFinalReturnTypeInference()),
+  ANYVALUE("anyValue", ReturnTypes.ARG0,
+      OperandTypes.or(OperandTypes.ANY, OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER)),
+      SqlTypeName.OTHER),
+  FIRSTWITHTIME("firstWithTime", ReturnTypes.ARG0, OperandTypes.or(
+      OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY),
+      OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER)), SqlTypeName.OTHER),
+  LASTWITHTIME("lastWithTime", ReturnTypes.ARG0, OperandTypes.or(
+      OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY),
+      OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER)), SqlTypeName.OTHER),
   MINMAXRANGE("minMaxRange", ReturnTypes.DOUBLE, OperandTypes.ANY, SqlTypeName.OTHER, SqlTypeName.DOUBLE),
 
   /// for all distinct count family functions:
@@ -198,7 +193,7 @@ public enum AggregationFunctionType {
       ReturnTypes.ARG1, OperandTypes.VARIADIC, SqlTypeName.OTHER, SqlTypeName.BIGINT),
 
   // Array aggregate functions
-  ARRAYAGG("arrayAgg", new ArrayOfComponentReturnTypeInference(), new ArrayAggOperandTypeChecker(), SqlTypeName.OTHER),
+  ARRAYAGG("arrayAgg", new ArrayOfComponentReturnTypeInference(), OperandTypes.VARIADIC, SqlTypeName.OTHER),
   LISTAGG("listAgg", SqlTypeName.OTHER, SqlTypeName.VARCHAR),
 
   SUMARRAYLONG("sumArrayLong", new ArrayReturnTypeInference(SqlTypeName.BIGINT), OperandTypes.ARRAY, SqlTypeName.OTHER),
@@ -435,6 +430,16 @@ public enum AggregationFunctionType {
     }
   }
 
+  /// Returns DOUBLE, or the type of the data argument for the explicit data type form MODE(expr, reducer, dataType).
+  /// Only a leaf stage that returns final results uses it; the query's result type comes from Calcite's MODE (ARG0).
+  private static class ModeFinalReturnTypeInference implements SqlReturnTypeInference {
+    @Override
+    public RelDataType inferReturnType(SqlOperatorBinding opBinding) {
+      return opBinding.getOperandCount() == 3 ? ReturnTypes.ARG0.inferReturnType(opBinding)
+          : opBinding.getTypeFactory().createSqlType(SqlTypeName.DOUBLE);
+    }
+  }
+
   private static class ArrayReturnTypeInference implements SqlReturnTypeInference {
     final SqlTypeName _sqlTypeName;
 
@@ -462,106 +467,6 @@ public enum AggregationFunctionType {
         return typeFactory.createArrayType(componentType, -1);
       }
       return typeFactory.createArrayType(operandType, -1);
-    }
-  }
-
-  /// Casts the value of `ARRAY_AGG(value, 'dataType'[, isDistinct])` to the data type, so that the return type that
-  /// [ArrayOfComponentReturnTypeInference] infers from the value is the type of the returned array. The function picks
-  /// its accumulator by the data type, not by the type of the value: for example, `ARRAY_AGG(intCol, 'LONG')` returns
-  /// longs. The cast changes the operand instead of the return type inference, because Calcite infers the type of an
-  /// aggregate call again after the validation (e.g. `Aggregate.typeMatchesInferred()`), and it cannot read the value
-  /// of a literal operand then.
-  private static class ArrayAggOperandTypeChecker implements SqlOperandTypeChecker {
-    @Override
-    public boolean checkOperandTypes(SqlCallBinding callBinding, boolean throwOnFailure) {
-      if (callBinding.getOperandCount() < 2 || !callBinding.isOperandLiteral(1, false)
-          || !SqlTypeUtil.inCharFamily(callBinding.getOperandType(1))) {
-        // The function fails at runtime without a data type
-        return true;
-      }
-      String dataTypeName = callBinding.getOperandLiteralValue(1, String.class);
-      if (dataTypeName == null) {
-        return true;
-      }
-      RelDataTypeFactory typeFactory = callBinding.getTypeFactory();
-      RelDataType dataType = toRelDataType(dataTypeName, typeFactory);
-      RelDataType valueType = callBinding.getOperandType(0);
-      // Keep multi-value columns, for which the return type inference uses the type of the elements. If the validation
-      // checks the call again, the value already has the data type, so needsCast() prevents a second cast.
-      if (dataType == null || valueType.getComponentType() != null || !needsCast(valueType, dataType)) {
-        return true;
-      }
-      RelDataType castType = typeFactory.createTypeWithNullability(dataType, valueType.isNullable());
-      SqlCall call = callBinding.getCall();
-      SqlNode cast = SqlStdOperatorTable.CAST.createCall(SqlParserPos.ZERO, call.operand(0),
-          SqlTypeUtil.convertTypeToSpec(castType).withNullable(castType.isNullable()));
-      call.setOperand(0, cast);
-      callBinding.getValidator().setValidatedNodeType(cast, castType);
-      return true;
-    }
-
-    /// Returns the SQL type of a Pinot data type name, or `null` when it is not a data type that ARRAY_AGG supports.
-    @Nullable
-    private static RelDataType toRelDataType(String dataTypeName, RelDataTypeFactory typeFactory) {
-      switch (dataTypeName.toUpperCase()) {
-        case "INT":
-          return typeFactory.createSqlType(SqlTypeName.INTEGER);
-        case "LONG":
-          return typeFactory.createSqlType(SqlTypeName.BIGINT);
-        case "FLOAT":
-          return typeFactory.createSqlType(SqlTypeName.REAL);
-        case "DOUBLE":
-          return typeFactory.createSqlType(SqlTypeName.DOUBLE);
-        case "BIG_DECIMAL":
-          return typeFactory.createSqlType(SqlTypeName.DECIMAL);
-        case "BOOLEAN":
-          return typeFactory.createSqlType(SqlTypeName.BOOLEAN);
-        case "TIMESTAMP":
-          return typeFactory.createSqlType(SqlTypeName.TIMESTAMP);
-        case "STRING":
-        case "JSON":
-          return typeFactory.createSqlType(SqlTypeName.VARCHAR);
-        case "BYTES":
-          return typeFactory.createSqlType(SqlTypeName.VARBINARY);
-        case "UUID":
-          return typeFactory.createSqlType(SqlTypeName.UUID);
-        default:
-          return null;
-      }
-    }
-
-    private static boolean needsCast(RelDataType valueType, RelDataType dataType) {
-      SqlTypeName valueTypeName = valueType.getSqlTypeName();
-      switch (valueTypeName) {
-        case ANY:
-        case OTHER:
-          // The type is not known, so a cast cannot help
-          return false;
-        case CHAR:
-        case BINARY:
-          // Arrays of CHAR and BINARY values are STRING and BYTES arrays, like arrays of VARCHAR and VARBINARY values
-          return valueTypeName.getFamily() != dataType.getSqlTypeName().getFamily();
-        case DECIMAL:
-          if (dataType.getSqlTypeName() != SqlTypeName.DECIMAL) {
-            return true;
-          }
-          // The multi-stage engine converts the BIG_DECIMAL values of ARRAY_AGG to the array type of the plan. It can
-          // do this for the array type of every DECIMAL value, except DECIMAL(p, 0) with p <= 18, whose array type is
-          // an INT or LONG array (see RelToPlanNodeConverter.resolveDecimal()).
-          return valueType.getScale() == 0 && valueType.getPrecision() <= 18;
-        default:
-          return valueTypeName != dataType.getSqlTypeName();
-      }
-    }
-
-    @Override
-    public SqlOperandCountRange getOperandCountRange() {
-      return SqlOperandCountRanges.any();
-    }
-
-    @Override
-    public String getAllowedSignatures(SqlOperator op, String opName) {
-      return opName + "(<VALUE>, <DATA_TYPE>[, <IS_DISTINCT>])";
     }
   }
 

@@ -697,7 +697,7 @@ public class RexExpressionUtilsTest {
             call(SqlKind.LESS_THAN_OR_EQUAL, ref(), intLiteral(10)))));
   }
 
-  /// BIG_DECIMAL points next to a range stay comparisons, because older servers match IN values with `equals`.
+  /// BIG_DECIMAL points next to a range stay comparisons, because intermediate stages match IN values with `equals`.
   @Test
   public void testHandleSearchBigDecimalPointsAndRange() {
     RexInputRef inputRef = _rexBuilder.makeInputRef(_typeFactory.createSqlType(SqlTypeName.DECIMAL, 38, 2), 0);
@@ -714,26 +714,6 @@ public class RexExpressionUtilsTest {
     for (RexExpression operand : or.getFunctionOperands()) {
       Assert.assertNotEquals(((RexExpression.FunctionCall) operand).getFunctionName(), SqlKind.IN.name());
     }
-  }
-
-  /// `x IN (1, 2)` on BIG_DECIMAL values becomes `x = 1 OR x = 2`, because older servers match IN values with
-  /// `equals`, which depends on the scale of the value (e.g. a SUM of 1.0 does not equal 1).
-  @Test
-  public void testHandleSearchBigDecimalPoints() {
-    RexExpression points = call(SqlKind.OR, call(SqlKind.EQUALS, ref(), bigDecimalLiteral(1)),
-        call(SqlKind.EQUALS, ref(), bigDecimalLiteral(2)));
-    Assert.assertEquals(convertBigDecimalSearch(RexUnknownAs.UNKNOWN, points(1, 2)), points);
-    Assert.assertEquals(convertBigDecimalSearch(RexUnknownAs.FALSE, points(1, 2)),
-        call(SqlKind.AND, points, call(SqlKind.IS_NOT_NULL, ref())));
-  }
-
-  /// `x NOT IN (1, 2)` on BIG_DECIMAL values becomes `x <> 1 AND x <> 2`.
-  @Test
-  public void testHandleSearchBigDecimalComplementedPoints() {
-    ImmutableRangeSet<BigDecimal> rangeSet = ImmutableRangeSet.copyOf(points(1, 2).complement());
-    Assert.assertEquals(convertBigDecimalSearch(RexUnknownAs.UNKNOWN, rangeSet),
-        call(SqlKind.AND, call(SqlKind.NOT_EQUALS, ref(), bigDecimalLiteral(1)),
-            call(SqlKind.NOT_EQUALS, ref(), bigDecimalLiteral(2))));
   }
 
   /// Point ranges for the values `from` to `to`, both included.
@@ -767,20 +747,6 @@ public class RexExpressionUtilsTest {
       operands[i - from + 1] = intLiteral(i);
     }
     return call(kind, operands);
-  }
-
-  private RexExpression convertBigDecimalSearch(RexUnknownAs nullAs, ImmutableRangeSet<BigDecimal> rangeSet) {
-    // DECIMAL(19, 0) is a BIG_DECIMAL type
-    RexInputRef inputRef = _rexBuilder.makeInputRef(_typeFactory.createSqlType(SqlTypeName.DECIMAL, 19, 0), 0);
-    Sarg<BigDecimal> sarg = Sarg.of(nullAs, rangeSet);
-    RexLiteral searchLiteral =
-        _rexBuilder.makeSearchArgumentLiteral(sarg, _typeFactory.createSqlType(SqlTypeName.DECIMAL, 19, 0));
-    return RexExpressionUtils.fromRexCall(
-        (RexCall) _rexBuilder.makeCall(SqlStdOperatorTable.SEARCH, inputRef, searchLiteral));
-  }
-
-  private static RexExpression bigDecimalLiteral(int value) {
-    return new RexExpression.Literal(ColumnDataType.BIG_DECIMAL, BigDecimal.valueOf(value));
   }
 
   private RexExpression convertIntSearch(RexUnknownAs nullAs, ImmutableRangeSet<BigDecimal> rangeSet) {

@@ -220,8 +220,9 @@ public class FieldConfig extends BaseJsonConfig {
     return _encodingType;
   }
 
+  /// @deprecated Use `fieldConfigList[].indexTypes` instead.
   @Nullable
-  @Deprecated
+  @Deprecated(since = "0.9.0", forRemoval = true)
   public IndexType getIndexType() {
     return !_indexTypes.isEmpty() ? _indexTypes.get(0) : null;
   }

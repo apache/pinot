@@ -5,11 +5,7 @@
     "timeColumnName": "mtime",
     "timeType": "MILLISECONDS",
     "segmentPushType": "APPEND",
-    "replicasPerPartition": "1",
-    "replicaGroupStrategyConfig": {
-      "partitionColumn": "event_id",
-      "numInstancesPerPartition": 1
-    }
+    "replicasPerPartition": "1"
   },
   "tenants": {},
   "tableIndexConfig": {

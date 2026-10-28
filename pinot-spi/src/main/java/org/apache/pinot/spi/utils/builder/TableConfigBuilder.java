@@ -85,7 +85,7 @@ public class TableConfigBuilder {
   @Deprecated
   private String _segmentPushType = DEFAULT_SEGMENT_PUSH_TYPE;
   private String _peerSegmentDownloadScheme;
-  @Deprecated
+  @Deprecated(since = "1.3.0", forRemoval = true)
   private ReplicaGroupStrategyConfig _replicaGroupStrategyConfig;
   private CompletionConfig _completionConfig;
   private String _crypterClassName;
@@ -242,6 +242,7 @@ public class TableConfigBuilder {
     return this;
   }
 
+  @Deprecated(since = "1.3.0", forRemoval = true)
   public TableConfigBuilder setReplicaGroupStrategyConfig(ReplicaGroupStrategyConfig replicaGroupStrategyConfig) {
     _replicaGroupStrategyConfig = replicaGroupStrategyConfig;
     return this;

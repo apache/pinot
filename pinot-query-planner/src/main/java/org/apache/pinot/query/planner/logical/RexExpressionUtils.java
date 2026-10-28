@@ -51,11 +51,15 @@ import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.validate.SqlNameMatchers;
 import org.apache.calcite.tools.RelBuilder;
+import org.apache.calcite.util.DateString;
 import org.apache.calcite.util.NlsString;
 import org.apache.calcite.util.Sarg;
+import org.apache.calcite.util.TimeString;
 import org.apache.calcite.util.TimestampString;
 import org.apache.pinot.calcite.rex.PinotSealedSearchOperator;
 import org.apache.pinot.calcite.sql.fun.PinotOperatorTable;
+import org.apache.pinot.common.function.FunctionRegistry;
+import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.function.scalar.arithmetic.NegateScalarFunction;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.utils.BooleanUtils;
@@ -329,8 +333,52 @@ public class RexExpressionUtils {
         return new RexExpression.FunctionCall(RelToPlanNodeConverter.convertToColumnDataType(rexCall.type),
             NegateScalarFunction.FUNCTION_NAME, fromRexNodes(rexCall.operands));
       default:
+        String functionName = getFunctionName(rexCall.op);
+        List<RexExpression> operands = fromRexNodes(rexCall.operands);
+        if (TransformFunctionType.isJsonExtractScalar(FunctionRegistry.canonicalize(functionName))
+            && rexCall.operands.size() == 4
+            && rexCall.operands.get(3) instanceof RexLiteral) {
+          operands.set(3, fromJsonExtractScalarDefaultLiteral((RexLiteral) rexCall.operands.get(3)));
+        }
         return new RexExpression.FunctionCall(RelToPlanNodeConverter.convertToColumnDataType(rexCall.type),
-            getFunctionName(rexCall.op), fromRexNodes(rexCall.operands));
+            functionName, operands);
+    }
+  }
+
+  /// Converts a `jsonExtractScalar` default to the representation produced by `RequestUtils#getLiteral(SqlLiteral)`.
+  /// The single-stage parser keeps temporal and UUID literals as their canonical source text rather than their
+  /// internal epoch/byte representations. Numeric literals retain the parser's historical narrowing and overflow
+  /// behavior. Both constant folding and runtime Rex serialization must use this bridge to stay engine-compatible.
+  public static RexExpression.Literal fromJsonExtractScalarDefaultLiteral(RexLiteral rexLiteral) {
+    if (rexLiteral.isNull()) {
+      return fromRexLiteral(rexLiteral);
+    }
+    switch (rexLiteral.getTypeName()) {
+      case DATE:
+        return new RexExpression.Literal(ColumnDataType.STRING,
+            Preconditions.checkNotNull(rexLiteral.getValueAs(DateString.class)).toString());
+      case TIME:
+        return new RexExpression.Literal(ColumnDataType.STRING,
+            Preconditions.checkNotNull(rexLiteral.getValueAs(TimeString.class)).toString());
+      case TIMESTAMP:
+        return new RexExpression.Literal(ColumnDataType.STRING,
+            Preconditions.checkNotNull(rexLiteral.getValueAs(TimestampString.class)).toString());
+      case UUID:
+        return new RexExpression.Literal(ColumnDataType.STRING,
+            Preconditions.checkNotNull(rexLiteral.getValueAs(UUID.class)).toString());
+      case DECIMAL:
+        // Exact integers narrow through longValue() (including its historical overflow behavior), while exact
+        // non-integers become DOUBLE.
+        BigDecimal decimalValue = (BigDecimal) rexLiteral.getValue();
+        if (rexLiteral.getType().getScale() == 0) {
+          long longValue = decimalValue.longValue();
+          return longValue <= Integer.MAX_VALUE && longValue >= Integer.MIN_VALUE
+              ? new RexExpression.Literal(ColumnDataType.INT, (int) longValue)
+              : new RexExpression.Literal(ColumnDataType.LONG, longValue);
+        }
+        return new RexExpression.Literal(ColumnDataType.DOUBLE, decimalValue.doubleValue());
+      default:
+        return fromRexLiteral(rexLiteral);
     }
   }
 
@@ -367,18 +415,9 @@ public class RexExpressionUtils {
     // CAST is being rewritten into "rexCall.CAST<targetType>(inputValue)",
     //   - e.g. result type has already been converted into the CAST RexCall, so we assert single operand.
     assert rexCall.operands.size() == 1;
-    RexNode operand = rexCall.operands.get(0);
-    RexExpression value = fromRexNode(operand);
-    if (RelToPlanNodeConverter.isCastThroughLong(rexCall.type, operand.getType())) {
-      // Drop the fraction, which a CAST to BIG_DECIMAL keeps
-      value = cast(value, ColumnDataType.LONG);
-    }
-    return cast(value, RelToPlanNodeConverter.convertToColumnDataType(rexCall.type));
-  }
-
-  private static RexExpression.FunctionCall cast(RexExpression value, ColumnDataType castType) {
     List<RexExpression> operands = new ArrayList<>(2);
-    operands.add(value);
+    operands.add(fromRexNode(rexCall.operands.get(0)));
+    ColumnDataType castType = RelToPlanNodeConverter.convertToColumnDataType(rexCall.type);
     operands.add(new RexExpression.Literal(ColumnDataType.STRING, castType.name()));
     return new RexExpression.FunctionCall(castType, SqlKind.CAST.name(), operands);
   }
@@ -397,20 +436,15 @@ public class RexExpressionUtils {
       if (leftOperand instanceof RexLiteral) {
         return evaluateLiteralIn((RexLiteral) leftOperand, sarg.rangeSet.asRanges(), sarg.nullAs);
       }
-      RexExpression inExpr = dataType == ColumnDataType.BIG_DECIMAL
-          ? convertPoints(SqlKind.OR, SqlKind.EQUALS, leftOperand, sarg.rangeSet.asRanges(), dataType)
-          : new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.IN.name(),
-              toSearchFunctionOperands(leftOperand, sarg.rangeSet.asRanges(), dataType));
+      RexExpression inExpr = new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.IN.name(),
+          toSearchFunctionOperands(leftOperand, sarg.rangeSet.asRanges(), dataType));
       return addNullCheckIfRequired(leftOperand, sarg.nullAs, inExpr);
     } else if (sarg.isComplementedPoints()) {
       if (leftOperand instanceof RexLiteral) {
         return evaluateLiteralNotIn((RexLiteral) leftOperand, sarg.rangeSet.complement().asRanges(), sarg.nullAs);
       }
-      Set<Range> points = sarg.rangeSet.complement().asRanges();
-      RexExpression notInExpr = dataType == ColumnDataType.BIG_DECIMAL
-          ? convertPoints(SqlKind.AND, SqlKind.NOT_EQUALS, leftOperand, points, dataType)
-          : new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.NOT_IN.name(),
-              toSearchFunctionOperands(leftOperand, points, dataType));
+      RexExpression notInExpr = new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.NOT_IN.name(),
+          toSearchFunctionOperands(leftOperand, sarg.rangeSet.complement().asRanges(), dataType));
       return addNullCheckIfRequired(leftOperand, sarg.nullAs, notInExpr);
     } else {
       if (leftOperand instanceof RexLiteral) {
@@ -435,7 +469,8 @@ public class RexExpressionUtils {
   ///   result is `AND(NOT_IN(x, <list>), x > 0)`.
   /// - When both forms apply, the one with fewer values is used.
   ///
-  /// `BIG_DECIMAL` ranges always become comparisons, like single `BIG_DECIMAL` values (see [#convertPoints]).
+  /// `BIG_DECIMAL` ranges always become comparisons: an intermediate stage matches `IN` values with `equals`, which
+  /// depends on the scale of the value.
   private static RexExpression convertRanges(ColumnDataType dataType, RexNode leftOperand, RangeSet rangeSet) {
     Set<Range> ranges = rangeSet.asRanges();
     if (dataType == ColumnDataType.BIG_DECIMAL) {
@@ -474,21 +509,6 @@ public class RexExpressionUtils {
       return combine(SqlKind.AND, terms);
     }
     return convertRangesToOr(dataType, leftOperand, ranges);
-  }
-
-  /// Converts single values to one comparison each, e.g. `OR(x = 1, x = 2)` for `x IN (1, 2)` and
-  /// `AND(x <> 1, x <> 2)` for `x NOT IN (1, 2)`. Used for `BIG_DECIMAL` values: an intermediate stage of an older
-  /// server matches `IN` values with `equals`, which depends on the scale of the value (1.0 does not equal 1), and a
-  /// comparison does not.
-  private static RexExpression convertPoints(SqlKind combineKind, SqlKind comparisonKind, RexNode leftOperand,
-      Set<Range> points, ColumnDataType dataType) {
-    RexExpression convertedLeftOperand = fromRexNode(leftOperand);
-    List<RexExpression> terms = new ArrayList<>(points.size());
-    for (Range point : points) {
-      terms.add(new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, comparisonKind.name(),
-          List.of(convertedLeftOperand, fromRexLiteralValue(dataType, point.lowerEndpoint()))));
-    }
-    return combine(combineKind, terms);
   }
 
   private static RexExpression combine(SqlKind kind, List<RexExpression> terms) {

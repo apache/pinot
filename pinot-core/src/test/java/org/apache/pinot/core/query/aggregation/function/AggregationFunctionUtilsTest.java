@@ -18,10 +18,19 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.io.IOException;
+import java.util.UUID;
+import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.core.common.datatable.DataTableBuilder;
+import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -33,7 +42,8 @@ import static org.testng.Assert.fail;
 
 
 /// Unit test for {@link AggregationFunctionUtils#getAggregationResult}, the metadata/dictionary based aggregation
-/// result resolver used by the non-scan based and partial metadata based aggregation paths.
+/// result resolver used by the non-scan based and partial metadata based aggregation paths, and for
+/// {@link AggregationFunctionUtils#getConvertedFinalResult}.
 @SuppressWarnings("rawtypes")
 public class AggregationFunctionUtilsTest {
 
@@ -113,5 +123,18 @@ public class AggregationFunctionUtilsTest {
     assertThrows(NullPointerException.class,
           () -> AggregationFunctionUtils.getAggregationResult(mockFunction(AggregationFunctionType.MIN), null, 100,
             "TEST"));
+  }
+
+  @Test
+  public void testConvertedFinalResultForUuid()
+      throws IOException {
+    UUID uuid = UUID.randomUUID();
+    DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(
+        new DataSchema(new String[]{"uuid"}, new ColumnDataType[]{ColumnDataType.UUID}));
+    dataTableBuilder.startRow();
+    dataTableBuilder.setColumn(0, new ByteArray(UuidUtils.toBytes(uuid)));
+    dataTableBuilder.finishRow();
+    DataTable dataTable = dataTableBuilder.build();
+    assertEquals(AggregationFunctionUtils.getConvertedFinalResult(dataTable, ColumnDataType.UUID, 0, 0), uuid);
   }
 }

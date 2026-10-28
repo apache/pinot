@@ -40,7 +40,8 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   private String _replicasPerPartition;
   private String _timeColumnName;
   private TimeUnit _timeType;
-  @Deprecated  // Use SegmentAssignmentConfig instead
+  // Superseded by the instance assignment config and the segment assignment config, still accepted and honored
+  @Deprecated(since = "1.3.0", forRemoval = true)
   private ReplicaGroupStrategyConfig _replicaGroupStrategyConfig;
   private CompletionConfig _completionConfig;
   private String _crypterClassName;
@@ -185,7 +186,7 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
 
   /// @deprecated Use `segmentIngestionFrequency` from
   ///     [org.apache.pinot.spi.config.table.ingestion.IngestionConfig#getBatchIngestionConfig()]
-  @Deprecated
+  @Deprecated(since = "0.8.0", forRemoval = true)
   public String getSegmentPushFrequency() {
     return _segmentPushFrequency;
   }
@@ -197,7 +198,7 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
 
   /// @deprecated Use `segmentIngestionType` from
   ///     [org.apache.pinot.spi.config.table.ingestion.IngestionConfig#getBatchIngestionConfig()]
-  @Deprecated
+  @Deprecated(since = "0.8.0", forRemoval = true)
   public String getSegmentPushType() {
     return _segmentPushType;
   }
@@ -220,7 +221,7 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   /// @deprecated Use \_replication instead
   ///
   /// Will be deleted in future version of Pinot
-  @Deprecated
+  @Deprecated(since = "1.1.0", forRemoval = true)
   public String getReplicasPerPartition() {
     return _replicasPerPartition;
   }
@@ -233,13 +234,15 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
     _replicasPerPartition = replicasPerPartition;
   }
 
-  /// @deprecated Use [org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig] instead.
-  @Deprecated
+  /// @deprecated Configure the instance assignment in `instanceAssignmentConfigMap` with
+  /// [org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig] and the partition column in
+  /// `segmentAssignmentConfigMap` instead. This config is still accepted and honored.
+  @Deprecated(since = "1.3.0", forRemoval = true)
   public ReplicaGroupStrategyConfig getReplicaGroupStrategyConfig() {
     return _replicaGroupStrategyConfig;
   }
 
-  @Deprecated
+  @Deprecated(since = "1.3.0", forRemoval = true)
   public void setReplicaGroupStrategyConfig(ReplicaGroupStrategyConfig replicaGroupStrategyConfig) {
     _replicaGroupStrategyConfig = replicaGroupStrategyConfig;
   }
@@ -269,7 +272,7 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   }
 
   /// @deprecated Use [org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig] instead
-  @Deprecated
+  @Deprecated(since = "1.3.0", forRemoval = true)
   public boolean isMinimizeDataMovement() {
     return _minimizeDataMovement;
   }

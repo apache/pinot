@@ -22,22 +22,25 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
+import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionRegistry;
@@ -84,6 +87,7 @@ import org.apache.pinot.spi.config.table.TimestampConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
 import org.apache.pinot.spi.config.table.assignment.SegmentAssignmentConfig;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
@@ -141,9 +145,10 @@ public final class TableConfigUtils {
   private static final String KINESIS_STREAM_TYPE = "kinesis";
   private static final String CONSUMING_SEGMENT_TIER = "consuming";
 
-  private static final Set<String> UPSERT_DEDUP_ALLOWED_ROUTING_STRATEGIES =
-      ImmutableSet.of(RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
-          RoutingConfig.MULTI_STAGE_REPLICA_GROUP_SELECTOR_TYPE);
+  private static final Set<String> UPSERT_DEDUP_ALLOWED_ROUTING_STRATEGIES = Set.of(
+      RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
+      RoutingConfig.MULTI_STAGE_REPLICA_GROUP_SELECTOR_TYPE
+  );
 
   private static boolean _disableGroovy;
 
@@ -157,7 +162,7 @@ public final class TableConfigUtils {
     _enforcePoolBasedAssignment = enforcePoolBasedAssignment;
   }
 
-  /// @see TableConfigUtils#validate(TableConfig, Schema, String)
+  /// @see TableConfigUtils#validate(TableConfig, Schema, EnumSet)
   public static void validate(TableConfig tableConfig, Schema schema) {
     validate(tableConfig, schema, null);
   }
@@ -170,17 +175,18 @@ public final class TableConfigUtils {
   /// 5. Field Config List
   /// 6. Instance pool and replica group, if enabled
   ///
+  /// The validation types in `skipTypes` are skipped, or none when it is `null`, see [ValidationType].
+  ///
   /// TODO: Add more validations for each section (e.g. validate conditions are met for aggregateMetrics)
-  public static void validate(TableConfig tableConfig, Schema schema, @Nullable String typesToSkip) {
-    validate(tableConfig, schema, typesToSkip, null);
+  public static void validate(TableConfig tableConfig, Schema schema, @Nullable EnumSet<ValidationType> skipTypes) {
+    validate(tableConfig, schema, skipTypes, null);
   }
 
-  public static void validate(TableConfig tableConfig, Schema schema, @Nullable String typesToSkip,
+  public static void validate(TableConfig tableConfig, Schema schema, @Nullable EnumSet<ValidationType> skipTypes,
       @Nullable TableConfig existingTableConfig) {
     Preconditions.checkArgument(schema != null, "Schema should not be null for table: %s", tableConfig.getTableName());
-    Set<ValidationType> skipTypes = parseTypesToSkipString(typesToSkip);
     validateEffectiveTableConfig(tableConfig, schema, skipTypes, existingTableConfig);
-    if (skipTypes.contains(ValidationType.ALL) || !hasConsumingSegmentTierOverwriteForRealtimeTable(tableConfig)) {
+    if (ValidationType.ALL.isSkipped(skipTypes) || !hasConsumingSegmentTierOverwriteForRealtimeTable(tableConfig)) {
       return;
     }
     try {
@@ -193,11 +199,11 @@ public final class TableConfigUtils {
   }
 
   private static void validateEffectiveTableConfig(TableConfig tableConfig, Schema schema,
-      Set<ValidationType> skipTypes, @Nullable TableConfig existingTableConfig) {
+      @Nullable EnumSet<ValidationType> skipTypes, @Nullable TableConfig existingTableConfig) {
     // Sanitize the table config before validation
     sanitize(tableConfig);
 
-    if (skipTypes.contains(ValidationType.ALL)) {
+    if (ValidationType.ALL.isSkipped(skipTypes)) {
       return;
     }
 
@@ -211,7 +217,8 @@ public final class TableConfigUtils {
         existingOverriddenColumns);
 
     validateValidationConfig(tableConfig, schema);
-    validateSegmentAssignmentConfig(tableConfig);
+    validateSegmentAssignmentConfigs(tableConfig);
+    validatePartitionColumnConsistency(tableConfig);
     validateIngestionConfig(tableConfig, schema, existingTableConfig);
     if (tableConfig.getTableType() == TableType.REALTIME) {
       validateStreamConfigMaps(tableConfig);
@@ -221,9 +228,17 @@ public final class TableConfigUtils {
     validateInstancePartitionsTypeMapConfig(tableConfig);
     validatePartitionedReplicaGroupInstance(tableConfig);
     validateInstanceAssignmentConfigs(tableConfig);
+    validateStrictReplicaGroupRouting(tableConfig);
 
-    if (!skipTypes.contains(ValidationType.UPSERT)) {
-      validateUpsertAndDedupConfig(tableConfig, schema, existingTableConfig);
+    boolean upsertEnabled = tableConfig.isUpsertEnabled();
+    boolean dedupEnabled = tableConfig.isDedupEnabled();
+    Preconditions.checkState(!(upsertEnabled && dedupEnabled),
+        "A table can have either Upsert or Dedup enabled, but not both");
+    if (upsertEnabled && !ValidationType.UPSERT.isSkipped(skipTypes)) {
+      validateUpsertConfig(tableConfig, schema, existingTableConfig);
+    }
+    if (dedupEnabled && !ValidationType.DEDUP.isSkipped(skipTypes)) {
+      validateDedupConfig(tableConfig, schema);
     }
 
     validateTaskConfig(tableConfig);
@@ -271,14 +286,16 @@ public final class TableConfigUtils {
         "Instance pool and replica group configurations must be enabled");
   }
 
-  public static Set<ValidationType> parseTypesToSkipString(@Nullable String typesToSkipStr) {
+  /// Parses the comma separated validation types to skip, ignoring case and surrounding whitespace. Returns `null` when
+  /// there is nothing to skip, that is when the input is `null` or blank.
+  @Nullable
+  public static EnumSet<ValidationType> parseTypesToSkipString(@Nullable String typesToSkipStr) {
     if (StringUtils.isBlank(typesToSkipStr)) {
-      return Set.of();
+      return null;
     }
-    String[] split = StringUtils.split(typesToSkipStr, ',');
-    Set<ValidationType> typesToSkip = Sets.newHashSetWithExpectedSize(split.length);
-    for (String type : split) {
-      typesToSkip.add(ValidationType.valueOf(type.trim().toUpperCase()));
+    EnumSet<ValidationType> typesToSkip = EnumSet.noneOf(ValidationType.class);
+    for (String type : StringUtils.split(typesToSkipStr, ',')) {
+      typesToSkip.add(ValidationType.valueOf(type.trim().toUpperCase(Locale.ROOT)));
     }
     return typesToSkip;
   }
@@ -431,26 +448,76 @@ public final class TableConfigUtils {
     validateRetentionConfig(tableConfig);
   }
 
-  private static void validateSegmentAssignmentConfig(TableConfig tableConfig) {
+  /// Validates the segment assignment configs: the strategy must be a known one (`allservers` for a dimension table),
+  /// and the partition column, which only applies to partition based strategies, must be a column of the segment
+  /// partition config.
+  @VisibleForTesting
+  static void validateSegmentAssignmentConfigs(TableConfig tableConfig) {
     Map<String, SegmentAssignmentConfig> segmentAssignmentConfigMap = tableConfig.getSegmentAssignmentConfigMap();
-    if (segmentAssignmentConfigMap == null) {
+    if (MapUtils.isEmpty(segmentAssignmentConfigMap)) {
       return;
     }
-    if (tableConfig.isDimTable()) {
-      SegmentAssignmentConfig segmentAssignmentConfig =
-          segmentAssignmentConfigMap.get(InstancePartitionsType.OFFLINE.toString());
-      if (segmentAssignmentConfig == null) {
-        return;
+    String tableName = tableConfig.getTableName();
+    boolean isDimTable = tableConfig.isDimTable();
+    for (Map.Entry<String, SegmentAssignmentConfig> entry : segmentAssignmentConfigMap.entrySet()) {
+      String key = entry.getKey();
+      SegmentAssignmentConfig segmentAssignmentConfig = entry.getValue();
+      String assignmentStrategy = segmentAssignmentConfig.getAssignmentStrategy();
+      boolean partitionBased = !isDimTable;
+      if (assignmentStrategy != null) {
+        assignmentStrategy = assignmentStrategy.toLowerCase(Locale.ROOT);
+        if (isDimTable) {
+          Preconditions.checkState(assignmentStrategy.equals(AssignmentStrategy.DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY),
+              "Dimension table: %s can only use '%s' segment assignment strategy, found: %s", tableName,
+              AssignmentStrategy.DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY, assignmentStrategy);
+        } else {
+          Preconditions.checkState(AssignmentStrategy.CONFIGURABLE_STRATEGIES.contains(assignmentStrategy),
+              "Invalid segment assignment strategy: %s for: %s of table: %s", assignmentStrategy, key, tableName);
+        }
+        partitionBased = AssignmentStrategy.PARTITION_BASED_STRATEGIES.contains(assignmentStrategy);
       }
-      String segmentAssignmentStrategy = segmentAssignmentConfig.getAssignmentStrategy();
-      if (segmentAssignmentStrategy != null
-          && !segmentAssignmentStrategy.equalsIgnoreCase(AssignmentStrategy.DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY)) {
-        throw new IllegalStateException(
-            String.format("Dimension table: %s can only use '%s' segment assignment strategy, found: %s",
-                tableConfig.getTableName(),
-                CommonConstants.Segment.AssignmentStrategy.DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY,
-                segmentAssignmentStrategy));
+      String partitionColumn = segmentAssignmentConfig.getPartitionColumn();
+      if (StringUtils.isNotEmpty(partitionColumn)) {
+        Preconditions.checkState(partitionBased,
+            "Partition column: %s does not apply to the segment assignment strategy for: %s of table: %s",
+            partitionColumn, key, tableName);
+        validatePartitionColumnInSegmentPartitionConfig(tableConfig, partitionColumn);
       }
+    }
+  }
+
+  /// Validates that every place that configures the partition column for segment assignment names the same column:
+  /// the segment assignment configs, and the deprecated instance assignment configs and `replicaGroupStrategyConfig`
+  /// that existing tables may still carry. The column is resolved table-wide, so a disagreement would be settled by
+  /// precedence and map iteration order.
+  @VisibleForTesting
+  static void validatePartitionColumnConsistency(TableConfig tableConfig) {
+    Set<String> partitionColumns = new TreeSet<>();
+    Map<String, SegmentAssignmentConfig> segmentAssignmentConfigMap = tableConfig.getSegmentAssignmentConfigMap();
+    if (segmentAssignmentConfigMap != null) {
+      for (SegmentAssignmentConfig segmentAssignmentConfig : segmentAssignmentConfigMap.values()) {
+        addIfNotEmpty(partitionColumns, segmentAssignmentConfig.getPartitionColumn());
+      }
+    }
+    Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = tableConfig.getInstanceAssignmentConfigMap();
+    if (instanceAssignmentConfigMap != null) {
+      for (InstanceAssignmentConfig instanceAssignmentConfig : instanceAssignmentConfigMap.values()) {
+        addIfNotEmpty(partitionColumns, instanceAssignmentConfig.getReplicaGroupPartitionConfig().getPartitionColumn());
+      }
+    }
+    ReplicaGroupStrategyConfig replicaGroupStrategyConfig =
+        tableConfig.getValidationConfig().getReplicaGroupStrategyConfig();
+    if (replicaGroupStrategyConfig != null) {
+      addIfNotEmpty(partitionColumns, replicaGroupStrategyConfig.getPartitionColumn());
+    }
+    Preconditions.checkState(partitionColumns.size() <= 1,
+        "Table: %s must configure the same partition column in segmentAssignmentConfigMap, instanceAssignmentConfigMap "
+            + "and replicaGroupStrategyConfig, found: %s", tableConfig.getTableName(), partitionColumns);
+  }
+
+  private static void addIfNotEmpty(Set<String> values, @Nullable String value) {
+    if (StringUtils.isNotEmpty(value)) {
+      values.add(value);
     }
   }
 
@@ -1001,30 +1068,12 @@ public final class TableConfigUtils {
     }
   }
 
-  /// Validates the upsert- and dedup-related configuration. Returns early when neither is enabled; otherwise checks
-  /// the shared requirements (upsert and dedup are mutually exclusive, primary keys exist and are single-valued,
-  /// strict replica-group routing, no COMPLETED instance partitions, valid tenant tag override for REALTIME, OFFLINE
-  /// restrictions) and then, per the enabled mode:
-  /// - Upsert: no multi-tier / star-tree, comparison / delete-record / out-of-order columns are valid, deleted-keys
-  ///   compaction consistency, post-partial-upsert transforms, consistency-mode constraints, and delegates to
-  ///   [#validateTTLForUpsertConfig] and [#validatePartialUpsertStrategies]; rejects MD5 when disabled.
-  /// - Dedup: delegates to [#validateTTLForDedupConfig]; rejects MD5 when disabled.
-  @VisibleForTesting
-  static void validateUpsertAndDedupConfig(TableConfig tableConfig, Schema schema) {
-    validateUpsertAndDedupConfig(tableConfig, schema, null);
-  }
-
-  static void validateUpsertAndDedupConfig(TableConfig tableConfig, Schema schema,
-      @Nullable TableConfig existingTableConfig) {
-    boolean upsertEnabled = tableConfig.isUpsertEnabled();
-    boolean dedupEnabled = tableConfig.isDedupEnabled();
-    if (!upsertEnabled && !dedupEnabled) {
-      return;
-    }
-
-    // check both upsert and dedup are not enabled simultaneously
-    Preconditions.checkState(!(upsertEnabled && dedupEnabled),
-        "A table can have either Upsert or Dedup enabled, but not both");
+  /// Validates the requirements shared by upsert and dedup tables: the primary key columns exist in the schema and are
+  /// single-valued, the routing uses strict replica-group, and a REALTIME table has no tenant tag override.
+  ///
+  /// The segment assignment requirements shared with strict replica-group routing (one instance per partition, no
+  /// COMPLETED segment relocation) are validated by [#validateStrictReplicaGroupRouting].
+  private static void validateUpsertAndDedupCommonConfig(TableConfig tableConfig, Schema schema) {
     // primary key exists
     Preconditions.checkState(CollectionUtils.isNotEmpty(schema.getPrimaryKeyColumns()),
         "Upsert/Dedup table must have primary key columns in the schema");
@@ -1040,22 +1089,30 @@ public final class TableConfigUtils {
     Preconditions.checkState(
         tableConfig.getRoutingConfig() != null && isRoutingStrategyAllowedForUpsert(tableConfig.getRoutingConfig()),
         "Upsert/Dedup table must use strict replica-group (i.e. strictReplicaGroup) based routing");
-
-    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
-    DedupConfig dedupConfig = tableConfig.getDedupConfig();
     if (tableConfig.getTableType() == TableType.REALTIME) {
       Preconditions.checkState(tableConfig.getTenantConfig().getTagOverrideConfig() == null || (
               tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeConsuming() == null
                   && tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeCompleted() == null),
           "Invalid tenant tag override used for Upsert/Dedup table");
-      Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = tableConfig.getInstanceAssignmentConfigMap();
-      Preconditions.checkState(instanceAssignmentConfigMap == null || !instanceAssignmentConfigMap.containsKey(
-              InstancePartitionsType.COMPLETED.name()),
-          "COMPLETED instance partitions can't be configured for upsert / dedup tables");
-    } else {
-      Preconditions.checkState(!dedupEnabled,
-          "Dedup is not supported for OFFLINE table. Only upsert is supported for OFFLINE table");
-      assert upsertConfig != null;
+    }
+  }
+
+  /// Validates the upsert config of a table with upsert enabled: checks the requirements shared with dedup (see
+  /// [#validateUpsertAndDedupCommonConfig]), the OFFLINE restrictions (no partial upsert, segment partition config,
+  /// comparison or time column), no multi-tier / star-tree, comparison / delete-record / out-of-order columns are
+  /// valid, deleted-keys compaction consistency, post-partial-upsert transforms, consistency-mode constraints, and
+  /// delegates to [#validateTTLForUpsertConfig] and [#validatePartialUpsertStrategies]; rejects MD5 when disabled.
+  @VisibleForTesting
+  static void validateUpsertConfig(TableConfig tableConfig, Schema schema) {
+    validateUpsertConfig(tableConfig, schema, null);
+  }
+
+  static void validateUpsertConfig(TableConfig tableConfig, Schema schema, @Nullable TableConfig existingTableConfig) {
+    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+    assert upsertConfig != null;
+    validateUpsertAndDedupCommonConfig(tableConfig, schema);
+
+    if (tableConfig.getTableType() == TableType.OFFLINE) {
       Preconditions.checkState(upsertConfig.getMode() != UpsertConfig.Mode.PARTIAL,
           "Partial upsert is not supported for OFFLINE table");
       // Offline upsert tables require segment partition config so that segments are assigned to servers
@@ -1070,174 +1127,168 @@ public final class TableConfigUtils {
       // A comparison column is required, same as realtime upsert. It resolves to the configured comparison columns, or
       // the table's time column when comparison columns are not set. Unlike realtime, offline tables do not require a
       // time column, so reject the case where neither is configured (no implicit segment creation time fallback).
-      Preconditions.checkState(
-          CollectionUtils.isNotEmpty(upsertConfig.getComparisonColumns())
+      Preconditions.checkState(CollectionUtils.isNotEmpty(upsertConfig.getComparisonColumns())
               || tableConfig.getValidationConfig().getTimeColumnName() != null,
           "Offline upsert table must have a comparison column or a time column configured");
     }
 
-    if (upsertEnabled) {
-      // specifically for upsert
-      assert upsertConfig != null;
+    // Currently, only one tier is allowed for upsert table, as the committed segments can't be moved to other tiers.
+    Preconditions.checkState(tableConfig.getTierConfigsList() == null, "The upsert table cannot have multi-tiers");
+    // no startree index
+    Preconditions.checkState(CollectionUtils.isEmpty(tableConfig.getIndexingConfig().getStarTreeIndexConfigs())
+        && !tableConfig.getIndexingConfig().isEnableDefaultStarTree(), "The upsert table cannot have star-tree index.");
 
-      // Currently, only one tier is allowed for upsert table, as the committed segments can't be moved to other tiers.
-      Preconditions.checkState(tableConfig.getTierConfigsList() == null, "The upsert table cannot have multi-tiers");
-      // no startree index
-      Preconditions.checkState(CollectionUtils.isEmpty(tableConfig.getIndexingConfig().getStarTreeIndexConfigs())
-              && !tableConfig.getIndexingConfig().isEnableDefaultStarTree(),
-          "The upsert table cannot have star-tree index.");
-
-      // comparison column exists
-      List<String> comparisonColumns = upsertConfig.getComparisonColumns();
-      if (comparisonColumns != null) {
-        for (String column : comparisonColumns) {
-          Preconditions.checkState(schema.hasColumn(column), "The comparison column does not exist on schema");
-        }
+    // comparison column exists
+    List<String> comparisonColumns = upsertConfig.getComparisonColumns();
+    if (comparisonColumns != null) {
+      for (String column : comparisonColumns) {
+        Preconditions.checkState(schema.hasColumn(column), "The comparison column does not exist on schema");
       }
-
-      // Delete record column exist and is a BOOLEAN field
-      String deleteRecordColumn = upsertConfig.getDeleteRecordColumn();
-      if (deleteRecordColumn != null) {
-        FieldSpec fieldSpec = schema.getFieldSpecFor(deleteRecordColumn);
-        Preconditions.checkState(fieldSpec != null,
-            String.format("Column %s specified in deleteRecordColumn does not exist", deleteRecordColumn));
-        Preconditions.checkState(fieldSpec.isSingleValueField(),
-            String.format("The deleteRecordColumn - %s must be a single-valued column", deleteRecordColumn));
-        DataType dataType = fieldSpec.getDataType();
-        Preconditions.checkState(dataType == DataType.BOOLEAN || dataType == DataType.STRING || dataType.isNumeric(),
-            String.format("The deleteRecordColumn - %s must be of type: String / Boolean / Numeric",
-                deleteRecordColumn));
-      }
-
-      String outOfOrderRecordColumn = upsertConfig.getOutOfOrderRecordColumn();
-      if (outOfOrderRecordColumn != null) {
-        Preconditions.checkState(!upsertConfig.isDropOutOfOrderRecord(),
-            "outOfOrderRecordColumn and dropOutOfOrderRecord shouldn't exist together for upsert table");
-        FieldSpec fieldSpec = schema.getFieldSpecFor(outOfOrderRecordColumn);
-        Preconditions.checkState(
-            fieldSpec != null && fieldSpec.isSingleValueField() && fieldSpec.getDataType() == DataType.BOOLEAN,
-            "The outOfOrderRecordColumn must be a single-valued BOOLEAN column");
-      }
-
-      if (upsertConfig.isEnableDeletedKeysCompactionConsistency()) {
-        // enableDeletedKeysCompactionConsistency shouldn't exist with metadataTTL
-        Preconditions.checkState(upsertConfig.getMetadataTTL() == 0,
-            "enableDeletedKeysCompactionConsistency and metadataTTL shouldn't exist together for upsert table");
-
-        // enableDeletedKeysCompactionConsistency shouldn't exist with preload enabled
-        Preconditions.checkState(upsertConfig.getPreload() != Enablement.ENABLE,
-            "enableDeletedKeysCompactionConsistency and preload shouldn't exist together for upsert table");
-
-        // enableDeletedKeysCompactionConsistency should exist with deletedKeysTTL
-        Preconditions.checkState(upsertConfig.getDeletedKeysTTL() > 0,
-            "enableDeletedKeysCompactionConsistency should exist with deletedKeysTTL for upsert table");
-
-        // enableDeletedKeysCompactionConsistency should exist with snapshot enabled
-        // NOTE: Allow snapshot to be DEFAULT because it might be enabled at server level.
-        Preconditions.checkState(upsertConfig.getSnapshot() != Enablement.DISABLE,
-            "enableDeletedKeysCompactionConsistency should exist with snapshot for upsert table");
-
-        // enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask / UpsertCompactMergeTask
-        TableTaskConfig taskConfig = tableConfig.getTaskConfig();
-        Preconditions.checkState(
-            taskConfig != null && (taskConfig.getTaskTypeConfigsMap().containsKey(UPSERT_COMPACTION_TASK_TYPE)
-                || taskConfig.getTaskTypeConfigsMap().containsKey(UPSERT_COMPACT_MERGE_TASK_TYPE)),
-            "enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask"
-                + " / UpsertCompactMergeTask for upsert table");
-      }
-
-      // Validate post-partial-upsert transform configs
-      List<TransformConfig> postPartialUpsertTransformConfigs =
-          upsertConfig.getPostPartialUpsertTransformConfigs();
-      if (postPartialUpsertTransformConfigs != null) {
-        List<TransformConfig> existingPostPartialUpsertTransformConfigs =
-            getPostPartialUpsertTransformConfigs(existingTableConfig);
-        Preconditions.checkState(upsertConfig.getMode() == UpsertConfig.Mode.PARTIAL,
-            "postPartialUpsertTransformConfigs can only be configured for PARTIAL upsert tables");
-        Set<String> primaryKeyColumns = new HashSet<>(schema.getPrimaryKeyColumns());
-        Set<String> transformColumns = new HashSet<>();
-        for (TransformConfig transformConfig : postPartialUpsertTransformConfigs) {
-          String columnName = transformConfig.getColumnName();
-          String transformFunction = transformConfig.getTransformFunction();
-          if (columnName == null || transformFunction == null) {
-            throw new IllegalStateException(
-                "columnName/transformFunction cannot be null in postPartialUpsertTransformConfigs "
-                    + transformConfig);
-          }
-          Preconditions.checkState(!primaryKeyColumns.contains(columnName),
-              "Post-partial-upsert transform cannot target primary key column '%s'", columnName);
-          Preconditions.checkState(comparisonColumns == null || !comparisonColumns.contains(columnName),
-              "Post-partial-upsert transform cannot target comparison column '%s'", columnName);
-          Preconditions.checkState(!columnName.equals(deleteRecordColumn),
-              "Post-partial-upsert transform cannot target delete record column '%s'", columnName);
-          Preconditions.checkState(!columnName.equals(outOfOrderRecordColumn),
-              "Post-partial-upsert transform cannot target out-of-order record column '%s'", columnName);
-          if (!transformColumns.add(columnName)) {
-            throw new IllegalStateException(
-                "Duplicate post-partial-upsert transform config found for column '" + columnName + "'");
-          }
-          Preconditions.checkState(schema.hasColumn(columnName),
-              "The destination column '%s' of the post-partial-upsert transform function must be present in the "
-                  + "schema", columnName);
-          if (_disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(transformFunction)) {
-            throw new IllegalStateException(
-                "Groovy transform functions are disabled. Found '" + transformFunction + "' for column '"
-                    + columnName + "' in postPartialUpsertTransformConfigs");
-          }
-          try {
-            validateIngestionTransformFunctionVolatility(transformConfig,
-                existingPostPartialUpsertTransformConfigs);
-            FunctionEvaluator expressionEvaluator =
-                FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction);
-            List<String> arguments = expressionEvaluator.getArguments();
-            if (arguments.contains(columnName)) {
-              throw new IllegalStateException(
-                  "Arguments of a post-partial-upsert transform function '" + arguments
-                      + "' cannot contain the destination column '" + columnName + "'");
-            }
-          } catch (IllegalStateException e) {
-            throw e;
-          } catch (Exception e) {
-            throw new IllegalStateException(
-                "Invalid post-partial-upsert transform function '" + transformFunction + "' for column '"
-                    + columnName + "'", e);
-          }
-        }
-      }
-
-      if (upsertConfig.getConsistencyMode() != UpsertConfig.ConsistencyMode.NONE) {
-        Preconditions.checkState(upsertConfig.getNewSegmentTrackingTimeMs() > 0,
-            "Positive newSegmentTrackingTimeMs is required to enable consistency mode: "
-                + upsertConfig.getConsistencyMode());
-        // dropOutOfOrderRecord and outOfOrderRecordColumn are not supported with SYNC/SNAPSHOT consistency mode
-        // because records must be indexed before metadata is updated. By the time we know if a record is
-        // out-of-order, it's already indexed - As of today, we can't skip indexing or update the
-        // out-of-order column value.
-        Preconditions.checkState(!upsertConfig.isDropOutOfOrderRecord(),
-            "dropOutOfOrderRecord cannot be enabled when consistencyMode is %s. "
-                + "Out-of-order records can only be dropped in NONE consistency mode.",
-            upsertConfig.getConsistencyMode());
-        Preconditions.checkState(upsertConfig.getOutOfOrderRecordColumn() == null,
-            "outOfOrderRecordColumn cannot be configured when consistencyMode is %s. "
-                + "Out-of-order record marking is only supported in NONE consistency mode.",
-            upsertConfig.getConsistencyMode());
-      }
-
-      validateTTLForUpsertConfig(tableConfig, schema);
-      validatePartialUpsertStrategies(tableConfig, schema);
-      validateConsumptionDuringUpsertRevert(tableConfig);
-      Preconditions.checkState(
-          !(PinotMd5Mode.isPinotMd5Disabled() && upsertConfig.getHashFunction() == HashFunction.MD5),
-          "Upsert hash function MD5 is disabled via '%s=true'", CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED);
-    } else {
-      // specifically for dedup
-      assert dedupConfig != null;
-
-      validateTTLForDedupConfig(tableConfig, schema);
-      Preconditions.checkState(
-          !(PinotMd5Mode.isPinotMd5Disabled() && dedupConfig.getHashFunction() == HashFunction.MD5),
-          "Dedup hash function MD5 is disabled via '%s=true'", CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED);
     }
+
+    // Delete record column exist and is a BOOLEAN field
+    String deleteRecordColumn = upsertConfig.getDeleteRecordColumn();
+    if (deleteRecordColumn != null) {
+      FieldSpec fieldSpec = schema.getFieldSpecFor(deleteRecordColumn);
+      Preconditions.checkState(fieldSpec != null,
+          String.format("Column %s specified in deleteRecordColumn does not exist", deleteRecordColumn));
+      Preconditions.checkState(fieldSpec.isSingleValueField(),
+          String.format("The deleteRecordColumn - %s must be a single-valued column", deleteRecordColumn));
+      DataType dataType = fieldSpec.getDataType();
+      Preconditions.checkState(dataType == DataType.BOOLEAN || dataType == DataType.STRING || dataType.isNumeric(),
+          String.format("The deleteRecordColumn - %s must be of type: String / Boolean / Numeric", deleteRecordColumn));
+    }
+
+    String outOfOrderRecordColumn = upsertConfig.getOutOfOrderRecordColumn();
+    if (outOfOrderRecordColumn != null) {
+      Preconditions.checkState(!upsertConfig.isDropOutOfOrderRecord(),
+          "outOfOrderRecordColumn and dropOutOfOrderRecord shouldn't exist together for upsert table");
+      FieldSpec fieldSpec = schema.getFieldSpecFor(outOfOrderRecordColumn);
+      Preconditions.checkState(
+          fieldSpec != null && fieldSpec.isSingleValueField() && fieldSpec.getDataType() == DataType.BOOLEAN,
+          "The outOfOrderRecordColumn must be a single-valued BOOLEAN column");
+    }
+
+    if (upsertConfig.isEnableDeletedKeysCompactionConsistency()) {
+      // enableDeletedKeysCompactionConsistency shouldn't exist with metadataTTL
+      Preconditions.checkState(upsertConfig.getMetadataTTL() == 0,
+          "enableDeletedKeysCompactionConsistency and metadataTTL shouldn't exist together for upsert table");
+
+      // enableDeletedKeysCompactionConsistency shouldn't exist with preload enabled
+      Preconditions.checkState(upsertConfig.getPreload() != Enablement.ENABLE,
+          "enableDeletedKeysCompactionConsistency and preload shouldn't exist together for upsert table");
+
+      // enableDeletedKeysCompactionConsistency should exist with deletedKeysTTL
+      Preconditions.checkState(upsertConfig.getDeletedKeysTTL() > 0,
+          "enableDeletedKeysCompactionConsistency should exist with deletedKeysTTL for upsert table");
+
+      // enableDeletedKeysCompactionConsistency should exist with snapshot enabled
+      // NOTE: Allow snapshot to be DEFAULT because it might be enabled at server level.
+      Preconditions.checkState(upsertConfig.getSnapshot() != Enablement.DISABLE,
+          "enableDeletedKeysCompactionConsistency should exist with snapshot for upsert table");
+
+      // enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask / UpsertCompactMergeTask
+      TableTaskConfig taskConfig = tableConfig.getTaskConfig();
+      Preconditions.checkState(
+          taskConfig != null && (taskConfig.getTaskTypeConfigsMap().containsKey(UPSERT_COMPACTION_TASK_TYPE)
+              || taskConfig.getTaskTypeConfigsMap().containsKey(UPSERT_COMPACT_MERGE_TASK_TYPE)),
+          "enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask"
+              + " / UpsertCompactMergeTask for upsert table");
+    }
+
+    // Validate post-partial-upsert transform configs
+    List<TransformConfig> postPartialUpsertTransformConfigs = upsertConfig.getPostPartialUpsertTransformConfigs();
+    if (postPartialUpsertTransformConfigs != null) {
+      List<TransformConfig> existingPostPartialUpsertTransformConfigs =
+          getPostPartialUpsertTransformConfigs(existingTableConfig);
+      Preconditions.checkState(upsertConfig.getMode() == UpsertConfig.Mode.PARTIAL,
+          "postPartialUpsertTransformConfigs can only be configured for PARTIAL upsert tables");
+      Set<String> primaryKeyColumns = new HashSet<>(schema.getPrimaryKeyColumns());
+      Set<String> transformColumns = new HashSet<>();
+      for (TransformConfig transformConfig : postPartialUpsertTransformConfigs) {
+        String columnName = transformConfig.getColumnName();
+        String transformFunction = transformConfig.getTransformFunction();
+        if (columnName == null || transformFunction == null) {
+          throw new IllegalStateException(
+              "columnName/transformFunction cannot be null in postPartialUpsertTransformConfigs " + transformConfig);
+        }
+        Preconditions.checkState(!primaryKeyColumns.contains(columnName),
+            "Post-partial-upsert transform cannot target primary key column '%s'", columnName);
+        Preconditions.checkState(comparisonColumns == null || !comparisonColumns.contains(columnName),
+            "Post-partial-upsert transform cannot target comparison column '%s'", columnName);
+        Preconditions.checkState(!columnName.equals(deleteRecordColumn),
+            "Post-partial-upsert transform cannot target delete record column '%s'", columnName);
+        Preconditions.checkState(!columnName.equals(outOfOrderRecordColumn),
+            "Post-partial-upsert transform cannot target out-of-order record column '%s'", columnName);
+        if (!transformColumns.add(columnName)) {
+          throw new IllegalStateException(
+              "Duplicate post-partial-upsert transform config found for column '" + columnName + "'");
+        }
+        Preconditions.checkState(schema.hasColumn(columnName),
+            "The destination column '%s' of the post-partial-upsert transform function must be present in the "
+                + "schema", columnName);
+        if (_disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(transformFunction)) {
+          throw new IllegalStateException(
+              "Groovy transform functions are disabled. Found '" + transformFunction + "' for column '" + columnName
+                  + "' in postPartialUpsertTransformConfigs");
+        }
+        try {
+          validateIngestionTransformFunctionVolatility(transformConfig, existingPostPartialUpsertTransformConfigs);
+          FunctionEvaluator expressionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction);
+          List<String> arguments = expressionEvaluator.getArguments();
+          if (arguments.contains(columnName)) {
+            throw new IllegalStateException("Arguments of a post-partial-upsert transform function '" + arguments
+                + "' cannot contain the destination column '" + columnName + "'");
+          }
+        } catch (IllegalStateException e) {
+          throw e;
+        } catch (Exception e) {
+          throw new IllegalStateException(
+              "Invalid post-partial-upsert transform function '" + transformFunction + "' for column '" + columnName
+                  + "'", e);
+        }
+      }
+    }
+
+    if (upsertConfig.getConsistencyMode() != UpsertConfig.ConsistencyMode.NONE) {
+      Preconditions.checkState(upsertConfig.getNewSegmentTrackingTimeMs() > 0,
+          "Positive newSegmentTrackingTimeMs is required to enable consistency mode: "
+              + upsertConfig.getConsistencyMode());
+      // dropOutOfOrderRecord and outOfOrderRecordColumn are not supported with SYNC/SNAPSHOT consistency mode
+      // because records must be indexed before metadata is updated. By the time we know if a record is
+      // out-of-order, it's already indexed - As of today, we can't skip indexing or update the
+      // out-of-order column value.
+      Preconditions.checkState(!upsertConfig.isDropOutOfOrderRecord(),
+          "dropOutOfOrderRecord cannot be enabled when consistencyMode is %s. "
+              + "Out-of-order records can only be dropped in NONE consistency mode.",
+          upsertConfig.getConsistencyMode());
+      Preconditions.checkState(upsertConfig.getOutOfOrderRecordColumn() == null,
+          "outOfOrderRecordColumn cannot be configured when consistencyMode is %s. "
+              + "Out-of-order record marking is only supported in NONE consistency mode.",
+          upsertConfig.getConsistencyMode());
+    }
+
+    validateTTLForUpsertConfig(tableConfig, schema);
+    validatePartialUpsertStrategies(tableConfig, schema);
+    validateConsumptionDuringUpsertRevert(tableConfig);
+    Preconditions.checkState(!(PinotMd5Mode.isPinotMd5Disabled() && upsertConfig.getHashFunction() == HashFunction.MD5),
+        "Upsert hash function MD5 is disabled via '%s=true'", CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED);
+  }
+
+  /// Validates the dedup config of a table with dedup enabled: checks the requirements shared with upsert (see
+  /// [#validateUpsertAndDedupCommonConfig]), rejects OFFLINE tables, delegates to [#validateTTLForDedupConfig], and
+  /// rejects MD5 when disabled.
+  @VisibleForTesting
+  static void validateDedupConfig(TableConfig tableConfig, Schema schema) {
+    DedupConfig dedupConfig = tableConfig.getDedupConfig();
+    assert dedupConfig != null;
+    validateUpsertAndDedupCommonConfig(tableConfig, schema);
+    Preconditions.checkState(tableConfig.getTableType() == TableType.REALTIME,
+        "Dedup is not supported for OFFLINE table. Only upsert is supported for OFFLINE table");
+
+    validateTTLForDedupConfig(tableConfig, schema);
+    Preconditions.checkState(!(PinotMd5Mode.isPinotMd5Disabled() && dedupConfig.getHashFunction() == HashFunction.MD5),
+        "Dedup hash function MD5 is disabled via '%s=true'", CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED);
   }
 
   /// Rejects consuming the next segment during a download on tables that revert upsert metadata in PROTECTED mode,
@@ -1426,6 +1477,18 @@ public final class TableConfigUtils {
     if (tableConfig.getInstanceAssignmentConfigMap() == null) {
       return;
     }
+    // Keys of the instance assignment configs that place OFFLINE segments: the OFFLINE instance partitions and the
+    // tiers of an OFFLINE table
+    Set<String> offlineSegmentKeys = new HashSet<>();
+    if (tableConfig.getTableType() == TableType.OFFLINE) {
+      offlineSegmentKeys.add(InstancePartitionsType.OFFLINE.name());
+      List<TierConfig> tierConfigs = tableConfig.getTierConfigsList();
+      if (tierConfigs != null) {
+        for (TierConfig tierConfig : tierConfigs) {
+          offlineSegmentKeys.add(tierConfig.getName());
+        }
+      }
+    }
     for (Map.Entry<String, InstanceAssignmentConfig> instanceAssignmentConfigMapEntry
         : tableConfig.getInstanceAssignmentConfigMap()
         .entrySet()) {
@@ -1448,7 +1511,169 @@ public final class TableConfigUtils {
             "numInstancesPerPartition must be 1 when using IMPLICIT_REALTIME_TABLE_PARTITION_SELECTOR");
       }
       // TODO: Add more validations for other partition selectors here
+
+      InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig =
+          instanceAssignmentConfig.getReplicaGroupPartitionConfig();
+      // Explicitly partitioned instance partitions require the OFFLINE segments to be placed by partition
+      if (offlineSegmentKeys.contains(instancePartitionsType) && replicaGroupPartitionConfig.isReplicaGroupBased()
+          && replicaGroupPartitionConfig.getNumPartitions() > 1) {
+        validatePartitionedSegmentAssignment(tableConfig, instancePartitionsType);
+      }
     }
+  }
+
+  /// Validates that OFFLINE segments are placed by partition for the given instance partitions type or tier, which
+  /// is required when its instance partitions have multiple partitions. The segment assignment strategy configured
+  /// for it, if any, must be partition based, and the partition column must be resolvable: the column configured
+  /// for segment assignment must be a column of the segment partition config, and without a configured column the
+  /// segment partition config must have exactly one column, which is how the partition id of a segment is read from
+  /// its metadata. The OFFLINE instance partitions may also be pre-configured, in which case the controller runs
+  /// this validation on the fetched ones. Dimension tables are exempt, since their segments are assigned to all
+  /// servers regardless of the instance partitions.
+  public static void validatePartitionedSegmentAssignment(TableConfig tableConfig, String key) {
+    if (tableConfig.isDimTable()) {
+      return;
+    }
+    Map<String, SegmentAssignmentConfig> segmentAssignmentConfigMap = tableConfig.getSegmentAssignmentConfigMap();
+    SegmentAssignmentConfig segmentAssignmentConfig =
+        segmentAssignmentConfigMap != null ? segmentAssignmentConfigMap.get(key) : null;
+    String assignmentStrategy =
+        segmentAssignmentConfig != null ? segmentAssignmentConfig.getAssignmentStrategy() : null;
+    if (assignmentStrategy != null) {
+      Preconditions.checkState(
+          AssignmentStrategy.PARTITION_BASED_STRATEGIES.contains(assignmentStrategy.toLowerCase(Locale.ROOT)),
+          "Segment assignment strategy: %s for: %s of table: %s must be partition based because the instance "
+              + "partitions are partitioned", assignmentStrategy, key, tableConfig.getTableName());
+    }
+    Map<String, ColumnPartitionConfig> columnPartitionMap = getColumnPartitionMap(tableConfig);
+    Preconditions.checkState(!columnPartitionMap.isEmpty(),
+        "Offline table with partitioned instance partitions must have segment partition config "
+            + "(segmentPartitionConfig in the indexingConfig) to resolve the partition of a segment");
+    String partitionColumn = getPartitionColumn(tableConfig);
+    if (partitionColumn != null) {
+      validatePartitionColumnInSegmentPartitionConfig(tableConfig, partitionColumn);
+    } else {
+      Preconditions.checkState(columnPartitionMap.size() == 1,
+          "Offline table with partitioned instance partitions must configure the partition column (partitionColumn in "
+              + "the segment assignment config) when segment partition config has multiple columns");
+    }
+  }
+
+  private static void validatePartitionColumnInSegmentPartitionConfig(TableConfig tableConfig,
+      String partitionColumn) {
+    Preconditions.checkState(getColumnPartitionMap(tableConfig).containsKey(partitionColumn),
+        "Partition column: %s configured for segment assignment is not found in segment partition config",
+        partitionColumn);
+  }
+
+  /// Validates that a table using strict replica-group routing has a segment assignment that places all segments of
+  /// a partition on exactly one instance per replica-group. Strict replica-group routing routes all segments with the
+  /// same instances in the ideal state to the same instance, which only provides partition level consistency when the
+  /// segment assignment keeps each partition on one instance per replica-group. Upsert and dedup tables rely on the
+  /// same property and are validated regardless of the configured instance selector.
+  ///
+  /// - OFFLINE: the OFFLINE instance assignment must be replica-group based with one instance per partition, and the
+  ///   OFFLINE segment assignment strategy, if configured, must be partition based (`replicagroup` or
+  ///   `roundrobinreplicagroup`), since the other strategies ignore the partition. The partition column of a
+  ///   partitioned instance assignment is validated by [#validatePartitionedSegmentAssignment]. The instance
+  ///   assignment can also come from the deprecated `replicaGroupStrategyConfig`, which takes effect only together with
+  ///   the `replicagroup` strategy.
+  /// - REALTIME: CONSUMING segments are placed by their stream partition, which keeps each partition on one instance
+  ///   per replica-group when the CONSUMING instance partitions have a single partition or one instance per
+  ///   partition. COMPLETED segments must not be relocated, which would split each partition between its CONSUMING
+  ///   and COMPLETED instances.
+  ///
+  /// The layout of pre-configured instance partitions lives in ZK and is not visible here, so the controller validates
+  /// it on the fetched instance partitions instead. Dimension tables are exempt because every server hosts every
+  /// segment.
+  @VisibleForTesting
+  static void validateStrictReplicaGroupRouting(TableConfig tableConfig) {
+    if (!requiresStrictReplicaGroupAssignment(tableConfig)) {
+      return;
+    }
+    if (tableConfig.getTableType() == TableType.OFFLINE) {
+      validateStrictReplicaGroupOfflineInstanceAssignment(tableConfig);
+    } else {
+      validateStrictReplicaGroupRealtimeInstanceAssignment(tableConfig);
+    }
+  }
+
+  /// Returns `true` if the segment assignment of the table must place all segments of a partition on exactly one
+  /// instance per replica-group: the table uses strict replica-group routing, or is an upsert/dedup table, whose
+  /// allowed instance selectors all rely on this property. Dimension tables are excluded because every server hosts
+  /// every segment.
+  public static boolean requiresStrictReplicaGroupAssignment(TableConfig tableConfig) {
+    if (tableConfig.isDimTable()) {
+      return false;
+    }
+    if (tableConfig.isUpsertEnabled() || tableConfig.isDedupEnabled()) {
+      return true;
+    }
+    RoutingConfig routingConfig = tableConfig.getRoutingConfig();
+    String instanceSelectorType = routingConfig != null ? routingConfig.getInstanceSelectorType() : null;
+    return RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE.equalsIgnoreCase(instanceSelectorType);
+  }
+
+  /// Validates the OFFLINE instance assignment config for strict replica-group routing.
+  private static void validateStrictReplicaGroupOfflineInstanceAssignment(TableConfig tableConfig) {
+    SegmentAssignmentConfig segmentAssignmentConfig =
+        MapUtils.emptyIfNull(tableConfig.getSegmentAssignmentConfigMap()).get(InstancePartitionsType.OFFLINE.name());
+    String assignmentStrategy =
+        segmentAssignmentConfig != null ? segmentAssignmentConfig.getAssignmentStrategy() : null;
+    Preconditions.checkState(assignmentStrategy == null
+            || AssignmentStrategy.PARTITION_BASED_STRATEGIES.contains(assignmentStrategy.toLowerCase(Locale.ROOT)),
+        "Table using strict replica-group routing can only use '%s' or '%s' OFFLINE segment assignment strategy, "
+            + "found: %s", AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY,
+        AssignmentStrategy.ROUND_ROBIN_REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY, assignmentStrategy);
+    if (InstancePartitionsUtils.hasPreConfiguredInstancePartitions(tableConfig, InstancePartitionsType.OFFLINE)) {
+      return;
+    }
+    // The instance assignment config comes from instanceAssignmentConfigMap, or from the deprecated
+    // replicaGroupStrategyConfig when the replica-group segment assignment strategy is configured
+    Preconditions.checkState(
+        InstanceAssignmentConfigUtils.allowInstanceAssignment(tableConfig, InstancePartitionsType.OFFLINE),
+        "Table using strict replica-group routing must have OFFLINE instance assignment config "
+            + "(instanceAssignmentConfigMap) to ensure all segments of a partition are assigned to the same server");
+    InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig =
+        InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(tableConfig, InstancePartitionsType.OFFLINE)
+            .getReplicaGroupPartitionConfig();
+    Preconditions.checkState(replicaGroupPartitionConfig.isReplicaGroupBased(),
+        "Table using strict replica-group routing must use replica-group based OFFLINE instance assignment to ensure "
+            + "all segments of a partition are assigned to the same server");
+    Preconditions.checkState(getNumInstancesPerPartition(replicaGroupPartitionConfig) <= 1,
+        "Table using strict replica-group routing must have one instance per partition (numInstancesPerPartition, or "
+            + "numInstancesPerReplicaGroup when it is not set) in OFFLINE instance assignment config to ensure all "
+            + "segments of a partition are assigned to the same server");
+  }
+
+  /// Validates the REALTIME instance assignment config for strict replica-group routing.
+  private static void validateStrictReplicaGroupRealtimeInstanceAssignment(TableConfig tableConfig) {
+    Preconditions.checkState(!InstanceAssignmentConfigUtils.shouldRelocateCompletedSegments(tableConfig),
+        "Table using strict replica-group routing must not relocate COMPLETED segments (tagOverrideConfig with a "
+            + "different realtimeCompleted tag, instanceAssignmentConfigMap.COMPLETED or "
+            + "instancePartitionsMap.COMPLETED) to ensure all segments of a partition are assigned to the same server");
+    InstanceAssignmentConfig consumingInstanceAssignmentConfig =
+        MapUtils.emptyIfNull(tableConfig.getInstanceAssignmentConfigMap()).get(InstancePartitionsType.CONSUMING.name());
+    if (consumingInstanceAssignmentConfig != null) {
+      InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig =
+          consumingInstanceAssignmentConfig.getReplicaGroupPartitionConfig();
+      Preconditions.checkState(!replicaGroupPartitionConfig.isReplicaGroupBased()
+              || replicaGroupPartitionConfig.getNumPartitions() <= 1
+              || getNumInstancesPerPartition(replicaGroupPartitionConfig) <= 1,
+          "Table using strict replica-group routing must have one instance per partition (numInstancesPerPartition, or "
+              + "numInstancesPerReplicaGroup when it is not set) in CONSUMING instance assignment config with multiple "
+              + "partitions to ensure all segments of a partition are assigned to the same server");
+    }
+  }
+
+  /// Returns the number of instances per partition the instance assignment config resolves to: the configured
+  /// `numInstancesPerPartition`, or `numInstancesPerReplicaGroup` when it is not set, since each partition then gets
+  /// every instance of its replica-group. Returns 0 when neither is set, in which case the count depends on the
+  /// instances in the pool and is validated on the computed instance partitions by the controller.
+  private static int getNumInstancesPerPartition(InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig) {
+    int numInstancesPerPartition = replicaGroupPartitionConfig.getNumInstancesPerPartition();
+    return numInstancesPerPartition > 0 ? numInstancesPerPartition
+        : replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup();
   }
 
   /// Validates the partial upsert-related configurations:
@@ -2261,13 +2486,32 @@ public final class TableConfigUtils {
         || upsertConfig.getOutOfOrderRecordColumn() != null);
   }
 
-  // enum of all the skip-able validation types.
-  // ACTIVE_TASKS is retained for backward compatibility: it is still accepted as a validationTypesToSkip value so
-  // existing clients do not break, but it is no longer consumed by any production path. Active-task validation runs
-  // only on the create/update path (see PinotTableRestletResource.tableTasksValidation, gated by ignoreActiveTasks),
-  // not on the validate/tune preflight endpoints, so passing ACTIVE_TASKS there is a no-op.
+  /// Validation types that can be skipped through the `validationTypesToSkip` parameter. A type is skipped when the
+  /// types to skip contain it or `ALL`, see [#isSkipped].
   public enum ValidationType {
-    ALL, TASK, UPSERT, TENANT, MINION_INSTANCES, ACTIVE_TASKS
+    /// Every type below, and the whole table config validation in [TableConfigUtils#validate]
+    ALL,
+    /// Validation of the task configs
+    TASK,
+    /// Validation of the upsert config of an upsert table
+    UPSERT,
+    /// Validation of the dedup config of a dedup table
+    DEDUP,
+    /// Validation of the instance assignment on table creation and update: the controller computes the instance
+    /// partitions the table would get from the current instances, and validates them
+    INSTANCE_ASSIGNMENT,
+    /// Validation of the tenants on the validate and tune endpoints; creating or updating a table always validates
+    /// them
+    TENANT,
+    /// Validation of the minion instances for the task configs on the validate and tune endpoints; creating or
+    /// updating a table always validates them
+    MINION_INSTANCES;
+
+    /// Returns whether this validation type is skipped, that is whether the given types to skip contain it or `ALL`.
+    /// `null` skips nothing.
+    public boolean isSkipped(@Nullable EnumSet<ValidationType> skipTypes) {
+      return skipTypes != null && (skipTypes.contains(this) || skipTypes.contains(ALL));
+    }
   }
 
   /// needsEmptySegmentPruner checks if EmptySegmentPruner is needed for a TableConfig.
@@ -2594,26 +2838,36 @@ public final class TableConfigUtils {
     return tierOverwrites != null && tierOverwrites.isObject() ? tierOverwrites.get(tier) : null;
   }
 
-  /// Get the partition column from tableConfig instance assignment config map.
-  /// @param tableConfig table config
-  /// @return partition column
+  /// Returns the partition column configured for segment assignment, or `null` if none is configured. The column is
+  /// read from the segment assignment configs, falling back to the deprecated partition column of the instance
+  /// assignment configs and then to the deprecated `replicaGroupStrategyConfig`.
+  @Nullable
   public static String getPartitionColumn(TableConfig tableConfig) {
-    // check InstanceAssignmentConfigMap is null or empty,
-    if (!MapUtils.isEmpty(tableConfig.getInstanceAssignmentConfigMap())) {
-      for (InstanceAssignmentConfig instanceAssignmentConfig : tableConfig.getInstanceAssignmentConfigMap().values()) {
-        //check InstanceAssignmentConfig has the InstanceReplicaGroupPartitionConfig with non-empty partitionColumn
-        if (StringUtils.isNotEmpty(instanceAssignmentConfig.getReplicaGroupPartitionConfig().getPartitionColumn())) {
-          return instanceAssignmentConfig.getReplicaGroupPartitionConfig().getPartitionColumn();
+    // TODO: Revisit to resolve the partition column per key (instance partitions type or tier) instead of returning
+    //   the first configured one across all entries.
+    Map<String, SegmentAssignmentConfig> segmentAssignmentConfigMap = tableConfig.getSegmentAssignmentConfigMap();
+    if (segmentAssignmentConfigMap != null) {
+      for (SegmentAssignmentConfig segmentAssignmentConfig : segmentAssignmentConfigMap.values()) {
+        String partitionColumn = segmentAssignmentConfig.getPartitionColumn();
+        if (StringUtils.isNotEmpty(partitionColumn)) {
+          return partitionColumn;
         }
       }
     }
-
-    // for backward-compatibility, If partitionColumn value isn't there in InstanceReplicaGroupPartitionConfig
-    // check ReplicaGroupStrategyConfig for partitionColumn
-    //noinspection deprecation
+    Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = tableConfig.getInstanceAssignmentConfigMap();
+    if (instanceAssignmentConfigMap != null) {
+      for (InstanceAssignmentConfig instanceAssignmentConfig : instanceAssignmentConfigMap.values()) {
+        String partitionColumn = instanceAssignmentConfig.getReplicaGroupPartitionConfig().getPartitionColumn();
+        if (StringUtils.isNotEmpty(partitionColumn)) {
+          return partitionColumn;
+        }
+      }
+    }
     ReplicaGroupStrategyConfig replicaGroupStrategyConfig =
         tableConfig.getValidationConfig().getReplicaGroupStrategyConfig();
-    return replicaGroupStrategyConfig != null ? replicaGroupStrategyConfig.getPartitionColumn() : null;
+    String partitionColumn =
+        replicaGroupStrategyConfig != null ? replicaGroupStrategyConfig.getPartitionColumn() : null;
+    return StringUtils.isNotEmpty(partitionColumn) ? partitionColumn : null;
   }
 
   public static Set<String> getRelevantTags(TableConfig tableConfig) {

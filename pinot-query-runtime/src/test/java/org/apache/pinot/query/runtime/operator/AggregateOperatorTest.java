@@ -27,6 +27,7 @@ import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.datatable.StatMap;
+import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
@@ -423,6 +424,97 @@ public class AggregateOperatorTest {
         ? Map.of(2, 4L, 3, 6L, 4, 8L, 5, 10L, 6, 12L)
         : Map.of(1, 2L, 2, 4L, 3, 6L, 4, 8L, 5, 10L, 6, 12L));
     assertTrue(result.nextBlock().isSuccess());
+  }
+
+  /// Each leaf returns the final results over its own partition of values, and the final stage merges them.
+  @Test
+  public void testLeafReturnFinalResultWithoutGroupBy() {
+    OpChainExecutionContext context = OperatorTestUtil.getContext(Map.of());
+    List<RexExpression.FunctionCall> aggCalls =
+        List.of(new RexExpression.FunctionCall(INT, "DISTINCTCOUNT", List.of(new RexExpression.InputRef(0))),
+            new RexExpression.FunctionCall(DOUBLE, "SUM", List.of(new RexExpression.InputRef(1))));
+    DataSchema inputSchema = new DataSchema(new String[]{"value", "num"}, new ColumnDataType[]{INT, INT});
+    DataSchema resultSchema = new DataSchema(new String[]{"distinctCount", "sum"}, new ColumnDataType[]{INT, DOUBLE});
+    BlockListMultiStageOperator.Builder partials = new BlockListMultiStageOperator.Builder(context, resultSchema);
+    // Each leaf has 5 values of its own, each appearing twice.
+    for (int partition = 0; partition < 2; partition++) {
+      BlockListMultiStageOperator.Builder input = new BlockListMultiStageOperator.Builder(context, inputSchema);
+      for (int value = 0; value < 5; value++) {
+        input.addRow(partition * 10 + value, 1);
+        input.addRow(partition * 10 + value, 1);
+      }
+      AggregateOperator leaf = new AggregateOperator(context, input.buildWithEos(),
+          new AggregateNode(-1, resultSchema, PlanNode.NodeHint.EMPTY, List.of(), aggCalls, List.of(-1, -1), List.of(),
+              AggType.LEAF, true, null, 0));
+      MseBlock leafBlock = leaf.nextBlock();
+      List<Object[]> leafRows = ((MseBlock.Data) leafBlock).asRowHeap().getRows();
+      assertEquals(leafRows.size(), 1);
+      assertEquals(leafRows.get(0), new Object[]{5, 10.0});
+      partials.addBlock(leafBlock);
+      assertTrue(leaf.nextBlock().isSuccess());
+    }
+    AggregateOperator result = new AggregateOperator(context, partials.buildWithEos(),
+        new AggregateNode(-1, resultSchema, PlanNode.NodeHint.EMPTY, List.of(), aggCalls, List.of(-1, -1), List.of(),
+            AggType.FINAL, true, null, 0));
+
+    List<Object[]> rows = ((MseBlock.Data) result.nextBlock()).asRowHeap().getRows();
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0), new Object[]{10, 20.0});
+    assertTrue(result.nextBlock().isSuccess());
+  }
+
+  /// Without any input row, the final stage returns the results of the empty input.
+  @Test
+  public void testLeafReturnFinalResultWithoutGroupByEmptyInput() {
+    OpChainExecutionContext context = OperatorTestUtil.getContext(Map.of());
+    List<RexExpression.FunctionCall> aggCalls =
+        List.of(new RexExpression.FunctionCall(INT, "DISTINCTCOUNT", List.of(new RexExpression.InputRef(0))),
+            new RexExpression.FunctionCall(DOUBLE, "SUM", List.of(new RexExpression.InputRef(1))));
+    DataSchema resultSchema = new DataSchema(new String[]{"distinctCount", "sum"}, new ColumnDataType[]{INT, DOUBLE});
+    AggregateOperator result = new AggregateOperator(context,
+        new BlockListMultiStageOperator.Builder(context, resultSchema).buildWithEos(),
+        new AggregateNode(-1, resultSchema, PlanNode.NodeHint.EMPTY, List.of(), aggCalls, List.of(-1, -1), List.of(),
+            AggType.FINAL, true, null, 0));
+
+    List<Object[]> rows = ((MseBlock.Data) result.nextBlock()).asRowHeap().getRows();
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0), new Object[]{0, null});
+    assertTrue(result.nextBlock().isSuccess());
+  }
+
+  @DataProvider
+  public Object[][] approximatedResultCases() {
+    return new Object[][]{{true, 1, true}, {true, 10, false}, {false, 1, true}, {false, 10, false}};
+  }
+
+  /// A SMART function that switches to a sketch is reported in the operator stats, which the broker reads.
+  @Test(dataProvider = "approximatedResultCases")
+  public void testApproximatedResultStat(boolean groupBy, int threshold, boolean expected) {
+    OpChainExecutionContext context = OperatorTestUtil.getContext(Map.of());
+    List<RexExpression.FunctionCall> aggCalls = List.of(new RexExpression.FunctionCall(INT, "DISTINCTCOUNTSMARTHLL",
+        List.of(new RexExpression.InputRef(1), new RexExpression.Literal(STRING, "threshold=" + threshold))));
+    DataSchema inputSchema = new DataSchema(new String[]{"group", "value"}, new ColumnDataType[]{INT, INT});
+    BlockListMultiStageOperator.Builder input = new BlockListMultiStageOperator.Builder(context, inputSchema);
+    for (int value = 0; value < 3; value++) {
+      input.addRow(1, value);
+    }
+    List<Integer> groupKeys = groupBy ? List.of(0) : List.of();
+    DataSchema resultSchema = groupBy
+        ? new DataSchema(new String[]{"group", "distinctCount"}, new ColumnDataType[]{INT, INT})
+        : new DataSchema(new String[]{"distinctCount"}, new ColumnDataType[]{INT});
+    AggregateOperator operator = new AggregateOperator(context, input.buildWithEos(),
+        new AggregateNode(-1, resultSchema, PlanNode.NodeHint.EMPTY, List.of(), aggCalls, List.of(-1), groupKeys,
+            AggType.DIRECT, false, null, 0));
+
+    assertEquals(((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows().size(), 1);
+    assertTrue(operator.nextBlock().isSuccess());
+    StatMap<AggregateOperator.StatKey> statMap =
+        OperatorTestUtil.getStatMap(AggregateOperator.StatKey.class, operator.calculateStats());
+    assertEquals(statMap.getBoolean(AggregateOperator.StatKey.APPROXIMATED_RESULT), expected);
+
+    BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
+    MultiStageOperator.Type.AGGREGATE.mergeInto(brokerResponse, statMap);
+    assertEquals(brokerResponse.isApproximatedResult(), expected);
   }
 
   @Test

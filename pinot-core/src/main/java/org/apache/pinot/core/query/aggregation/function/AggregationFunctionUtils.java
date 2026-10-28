@@ -77,6 +77,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.UuidUtils;
 
 
 /// The `AggregationFunctionUtils` class provides utility methods for aggregation function.
@@ -172,6 +173,20 @@ public class AggregationFunctionUtils {
       return finalResult1;
     }
     return aggregationFunction.mergeFinalResult(finalResult1, finalResult2);
+  }
+
+  /// Returns whether any of the functions has returned an approximate final result, see
+  /// [AggregationFunction#hasApproximatedResult()].
+  public static boolean hasApproximatedResult(@Nullable AggregationFunction[] aggregationFunctions) {
+    if (aggregationFunctions == null) {
+      return false;
+    }
+    for (AggregationFunction aggregationFunction : aggregationFunctions) {
+      if (aggregationFunction.hasApproximatedResult()) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /// Creates a map from expression required by the [AggregationFunction] to [BlockValSet] fetched from the
@@ -341,6 +356,8 @@ public class AggregationFunctionUtils {
         return dataTable.getString(rowId, colId);
       case BYTES:
         return dataTable.getBytes(rowId, colId).getBytes();
+      case UUID:
+        return UuidUtils.toUUID(dataTable.getBytes(rowId, colId));
       case INT_ARRAY:
         return dataTable.getIntArray(rowId, colId);
       case LONG_ARRAY:

@@ -44,7 +44,15 @@ public class PinotHintOptions {
 
   public static class AggregateOptions {
     public static final String IS_PARTITIONED_BY_GROUP_BY_KEYS = "is_partitioned_by_group_by_keys";
+
+    /// Asks the leaf stage to return final results instead of intermediate results for aggregations, and the final
+    /// stage to merge the final results. Can be applied to aggregation and group-by queries where the aggregated values
+    /// are partitioned across the leaf stage workers, but the group keys (if any) are not. A leaf stage worker
+    /// finalizes the OFFLINE and REALTIME parts of a hybrid table separately, so the aggregated values must be
+    /// partitioned between them as well. Similar to the `serverReturnFinalResultKeyUnpartitioned` (group-by) and
+    /// `serverReturnFinalResult` (aggregation) query options of the single-stage engine.
     public static final String IS_LEAF_RETURN_FINAL_RESULT = "is_leaf_return_final_result";
+
     public static final String IS_SKIP_LEAF_STAGE_GROUP_BY = "is_skip_leaf_stage_group_by";
 
     /// Enables trimming of aggregation intermediate results by pushing down order by and limit,

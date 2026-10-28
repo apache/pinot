@@ -26,7 +26,10 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationOperator;
@@ -53,6 +56,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -684,6 +688,39 @@ public class IdSetQueriesTest extends BaseQueriesTest {
     BadQueryRequestException exception = expectThrows(BadQueryRequestException.class, () -> getOperator(query));
     assertTrue(exception.getMessage().contains("Cannot look up LONG values in an IdSet built from INT values"),
         exception.getMessage());
+  }
+
+  /// `IN_ID_SET` on a literal value is evaluated when the query is compiled.
+  @Test
+  public void testInIdSetOnLiteralValue()
+      throws IOException {
+    IdSet intIdSet = IdSets.create(DataType.INT);
+    intIdSet.add(1);
+    IdSet longIdSet = IdSets.create(DataType.LONG);
+    longIdSet.add(10_000_000_001L);
+    String intIdSetLiteral = "'" + intIdSet.toBase64String() + "'";
+    String longIdSetLiteral = "'" + longIdSet.toBase64String() + "'";
+
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT IN_ID_SET(1, " + intIdSetLiteral + "), IN_ID_SET(2, " + intIdSetLiteral + "), IN_ID_SET(10000000001, "
+            + longIdSetLiteral + ") FROM testTable");
+    List<Expression> selectList = pinotQuery.getSelectList();
+    assertEquals(selectList.get(0).getLiteral(), RequestUtils.getLiteral(true));
+    assertEquals(selectList.get(1).getLiteral(), RequestUtils.getLiteral(false));
+    assertEquals(selectList.get(2).getLiteral(), RequestUtils.getLiteral(true));
+
+    // 2 instances with 2 segments each
+    int numRecords = 4 * NUM_RECORDS;
+    assertLiteralValueCount("IN_ID_SET(1, " + intIdSetLiteral + ") = 1", numRecords);
+    assertLiteralValueCount("IN_ID_SET(1, " + intIdSetLiteral + ") = 0", 0);
+    assertLiteralValueCount("IN_ID_SET(2, " + intIdSetLiteral + ") = 1", 0);
+    assertLiteralValueCount("IN_ID_SET(10000000001, " + longIdSetLiteral + ") = 1", numRecords);
+  }
+
+  private void assertLiteralValueCount(String filter, long expectedCount) {
+    BrokerResponseNative brokerResponse = getBrokerResponse("SELECT COUNT(*) FROM testTable WHERE " + filter);
+    assertTrue(brokerResponse.getExceptions().isEmpty(), brokerResponse.getExceptions().toString());
+    assertEquals(brokerResponse.getResultTable().getRows().get(0)[0], expectedCount, filter);
   }
 
   /// As with an `IN` subquery, no value is in an empty IdSet, not even NULL. With null handling enabled, `IN_ID_SET` is
