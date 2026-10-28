@@ -141,11 +141,35 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
     return _segmentMetadata;
   }
 
+  /// Called only during preprocessing, before the segment is queryable; replacing and closing metadata is not
+  /// synchronized with serving readers.
   @Override
   public void reloadMetadata()
       throws Exception {
-    _segmentMetadata = new SegmentMetadataImpl(_indexDir);
-    _columnIndexDirectory.setSegmentMetadata(_segmentMetadata);
+    SegmentMetadataImpl metadata = new SegmentMetadataImpl(_indexDir);
+    _columnIndexDirectory.setSegmentMetadata(metadata);
+    SegmentMetadataImpl previous = _segmentMetadata;
+    _segmentMetadata = metadata;
+    previous.close();
+  }
+
+  /// Replaces mutable metadata with the mapped representation after preprocessing and before the segment is queryable.
+  public void loadMappedMetadata()
+      throws IOException {
+    if (_segmentMetadata.isMapped()) {
+      return;
+    }
+    SegmentMetadataImpl metadata;
+    try {
+      metadata = SegmentMetadataImpl.loadMapped(_indexDir, _readMode);
+    } catch (IOException | ConfigurationException | RuntimeException e) {
+      LOGGER.warn("Failed to load mapped metadata for segment: {}. Using eager metadata.", _indexDir, e);
+      return;
+    }
+    _columnIndexDirectory.setSegmentMetadata(metadata);
+    SegmentMetadataImpl previous = _segmentMetadata;
+    _segmentMetadata = metadata;
+    previous.close();
   }
 
   private File getSegmentPath(File segmentDirectory, SegmentVersion segmentVersion) {
@@ -286,15 +310,24 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
   @Override
   public void close()
       throws IOException {
-    _segmentLock.close();
-    synchronized (this) {
-      if (_columnIndexDirectory != null) {
-        _columnIndexDirectory.close();
-        _columnIndexDirectory = null;
+    try {
+      try {
+        _segmentLock.close();
+      } finally {
+        synchronized (this) {
+          if (_columnIndexDirectory != null) {
+            _columnIndexDirectory.close();
+            _columnIndexDirectory = null;
+          }
+          if (_starTreeIndexReader != null) {
+            _starTreeIndexReader.close();
+            _starTreeIndexReader = null;
+          }
+        }
       }
-      if (_starTreeIndexReader != null) {
-        _starTreeIndexReader.close();
-        _starTreeIndexReader = null;
+    } finally {
+      if (_segmentMetadata != null) {
+        _segmentMetadata.close();
       }
     }
   }

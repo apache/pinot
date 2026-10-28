@@ -40,6 +40,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BooleanSupplier;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixManager;
@@ -67,6 +68,7 @@ import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.LogicalTableConfig;
@@ -527,7 +529,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         return null;
       }
       try {
-        return segmentDataManager.getSegment().getSegmentMetadata();
+        return detachMappedMetadata(segmentDataManager);
       } finally {
         tableDataManager.releaseSegment(segmentDataManager);
       }
@@ -545,7 +547,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       try {
         List<SegmentMetadata> segmentsMetadata = new ArrayList<>(segmentDataManagers.size());
         for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-          segmentsMetadata.add(segmentDataManager.getSegment().getSegmentMetadata());
+          segmentsMetadata.add(detachMappedMetadata(segmentDataManager));
         }
         return segmentsMetadata;
       } finally {
@@ -554,6 +556,19 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         }
       }
     }
+  }
+
+  private static SegmentMetadata detachMappedMetadata(SegmentDataManager segmentDataManager) {
+    SegmentMetadata metadata = segmentDataManager.getSegment().getSegmentMetadata();
+    if (metadata instanceof SegmentMetadataImpl segmentMetadata && segmentMetadata.isMapped()) {
+      try {
+        return segmentMetadata.detachedCopy();
+      } catch (IOException | ConfigurationException e) {
+        throw new IllegalStateException("Failed to detach metadata for segment: " + segmentDataManager.getSegmentName(),
+            e);
+      }
+    }
+    return metadata;
   }
 
   /// Assemble the path to segment dir directly, when table mgr object is not

@@ -39,7 +39,6 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
-import org.apache.pinot.segment.local.segment.index.loader.LoaderTest;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
@@ -78,7 +77,8 @@ import static org.testng.Assert.assertNull;
 
 // Tests primary key lookups for BYTES work
 public class DimensionTableDataBytesPrimaryKeyTest {
-  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), LoaderTest.class.getName());
+  private static final File TEMP_DIR =
+      new File(FileUtils.getTempDirectory(), DimensionTableDataBytesPrimaryKeyTest.class.getName());
   private static final String RAW_TABLE_NAME = "dimAsset";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
   private static final String CSV_DATA_PATH = "data/dimAsset.csv";
