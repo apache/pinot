@@ -110,6 +110,7 @@ import org.apache.pinot.spi.trace.DefaultRequestContext;
 import org.apache.pinot.spi.trace.QueryFingerprint;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.MvAggregateMode;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.PinotSqlType;
@@ -157,9 +158,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   protected final long _extraPassiveTimeoutMs;
   private final boolean _streamStatsDefault;
   // The broker config value of CONFIG_OF_USE_MV_AGGREGATE. The cluster config overrides it.
-  private final boolean _useMvAggregateBrokerConf;
+  private final MvAggregateMode _mvAggregateModeBrokerConf;
   // Written by the cluster config change callback, read by query threads.
-  private volatile boolean _useMvAggregate;
+  private volatile MvAggregateMode _mvAggregateMode;
   @Nullable
   protected final String _defaultStreamingGroupByFlushThreshold;
   @Nullable
@@ -219,9 +220,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     boolean dispatchKeepAliveWithoutCalls = config.getProperty(
         CommonConstants.MultiStageQueryRunner.KEY_OF_DISPATCH_CHANNEL_KEEP_ALIVE_WITHOUT_CALLS,
         CommonConstants.MultiStageQueryRunner.DEFAULT_OF_DISPATCH_CHANNEL_KEEP_ALIVE_WITHOUT_CALLS);
-    _useMvAggregateBrokerConf = _config.getProperty(CommonConstants.Broker.CONFIG_OF_USE_MV_AGGREGATE,
-        CommonConstants.Broker.DEFAULT_USE_MV_AGGREGATE);
-    _useMvAggregate = _useMvAggregateBrokerConf;
+    _mvAggregateModeBrokerConf = MvAggregateMode.fromString(_config.getProperty(
+        CommonConstants.Broker.CONFIG_OF_USE_MV_AGGREGATE, CommonConstants.Broker.DEFAULT_USE_MV_AGGREGATE));
+    _mvAggregateMode = _mvAggregateModeBrokerConf;
     _streamStatsDefault = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_STREAM_STATS,
         CommonConstants.Broker.DEFAULT_STREAM_STATS);
@@ -561,24 +562,23 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       return;
     }
     String value = clusterConfigs.get(CommonConstants.Broker.CONFIG_OF_USE_MV_AGGREGATE);
-    boolean useMvAggregate = _useMvAggregateBrokerConf;
+    MvAggregateMode mvAggregateMode = _mvAggregateModeBrokerConf;
     if (value != null) {
-      String trimmed = value.trim();
-      if ("true".equalsIgnoreCase(trimmed) || "false".equalsIgnoreCase(trimmed)) {
-        useMvAggregate = Boolean.parseBoolean(trimmed);
-      } else {
+      try {
+        mvAggregateMode = MvAggregateMode.fromString(value);
+      } catch (IllegalArgumentException e) {
         LOGGER.error("Ignoring invalid value '{}' for cluster config: {}, falling back to the broker config: {}", value,
-            CommonConstants.Broker.CONFIG_OF_USE_MV_AGGREGATE, _useMvAggregateBrokerConf);
+            CommonConstants.Broker.CONFIG_OF_USE_MV_AGGREGATE, _mvAggregateModeBrokerConf);
       }
     }
-    _useMvAggregate = useMvAggregate;
-    LOGGER.info("Updated {}: {}", CommonConstants.Broker.CONFIG_OF_USE_MV_AGGREGATE, useMvAggregate);
+    _mvAggregateMode = mvAggregateMode;
+    LOGGER.info("Updated {}: {}", CommonConstants.Broker.CONFIG_OF_USE_MV_AGGREGATE, mvAggregateMode);
   }
 
   /// The value of [CommonConstants.Broker#CONFIG_OF_USE_MV_AGGREGATE] that the next query uses.
   @VisibleForTesting
-  boolean isUseMvAggregate() {
-    return _useMvAggregate;
+  MvAggregateMode getMvAggregateMode() {
+    return _mvAggregateMode;
   }
 
   @VisibleForTesting
@@ -662,7 +662,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .approximateFunctionPercentileParams(approximateFunctionSettings._percentileParams)
         .defaultEnableDynamicFilteringSemiJoin(defaultEnableDynamicFilteringSemiJoin)
         .defaultUsePhysicalOptimizer(defaultUsePhysicalOptimizer)
-        .defaultUseMvAggregate(_useMvAggregate)
+        .defaultMvAggregateMode(_mvAggregateMode)
         .defaultUseLiteMode(defaultUseLiteMode)
         .defaultRunInBroker(defaultRunInBroker)
         .defaultUseBrokerPruning(defaultUseBrokerPruning)

@@ -24,10 +24,12 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Broker.CONFIG_OF_ALLOWED_TABLES_FOR_EMITTING_METRICS;
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.CONFIG_OF_USE_MV_AGGREGATE;
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.DEFAULT_USE_MV_AGGREGATE;
 import static org.testng.Assert.assertEquals;
 
 
-/// Tests the list configs that [BaseBrokerStarter] reads. The cluster config test sets the value with
+/// Tests the configs that [BaseBrokerStarter] reads. For the list configs: The cluster config test sets the value with
 /// [PinotConfiguration#setProperty], as `ServiceStartableUtils.applyClusterConfig` does. That value is not split on
 /// commas.
 public class BaseBrokerStarterTest {
@@ -49,5 +51,20 @@ public class BaseBrokerStarterTest {
   @Test
   public void testAllowedTablesForEmittingMetricsUnset() {
     assertEquals(BaseBrokerStarter.getAllowedTablesForEmittingMetrics(new PinotConfiguration()), List.of());
+  }
+
+  @Test
+  public void testPinLiveClusterConfigDefaults() {
+    // Without a broker value, the default is pinned. A cluster config value applied at startup, which
+    // ServiceStartableUtils.applyClusterConfig adds only when the key is absent, then does not become the broker
+    // value that the live listener restores when the cluster key is removed.
+    PinotConfiguration brokerConf = new PinotConfiguration();
+    BaseBrokerStarter.pinLiveClusterConfigDefaults(brokerConf);
+    assertEquals(brokerConf.getProperty(CONFIG_OF_USE_MV_AGGREGATE), DEFAULT_USE_MV_AGGREGATE);
+
+    // A broker value stays.
+    brokerConf = new PinotConfiguration(Map.of(CONFIG_OF_USE_MV_AGGREGATE, "false"));
+    BaseBrokerStarter.pinLiveClusterConfigDefaults(brokerConf);
+    assertEquals(brokerConf.getProperty(CONFIG_OF_USE_MV_AGGREGATE), "false");
   }
 }

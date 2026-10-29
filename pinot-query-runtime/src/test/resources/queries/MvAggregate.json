@@ -139,6 +139,36 @@
         "ignoreV2Optimizer": true
       },
       {
+        "description": "A filter on the MV key in HAVING keeps only the matching element above a self-join",
+        "sql": "SET useMvAggregate=true; SELECT ARRAY_TO_MV(t1.strMv), COUNT(*) FROM {tbl} t1 JOIN {tbl} t2 ON t1.k = t2.k GROUP BY ARRAY_TO_MV(t1.strMv) HAVING ARRAY_TO_MV(t1.strMv) = 'b'",
+        "outputs": [["b", 2]],
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "A filter on the MV key in HAVING keeps only the matching element on a scan with the gate off",
+        "sql": "SET useMvAggregate=false; SELECT ARRAY_TO_MV(strMv), COUNT(*) FROM {tbl} GROUP BY ARRAY_TO_MV(strMv) HAVING ARRAY_TO_MV(strMv) = 'b'",
+        "outputs": [["b", 2]],
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "A filter on the MV key in an outer query keeps only the matching element",
+        "sql": "SELECT key, cnt FROM (SELECT ARRAY_TO_MV(strMv) AS key, COUNT(*) AS cnt FROM {tbl} GROUP BY ARRAY_TO_MV(strMv)) WHERE key = 'b'",
+        "outputs": [["b", 2]],
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "The default mode, auto, plans the MV aggregate above a self-join because the query fails without it",
+        "sql": "SELECT ARRAY_TO_MV(t1.strMv), COUNT(*) FROM {tbl} t1 JOIN {tbl} t2 ON t1.k = t2.k GROUP BY ARRAY_TO_MV(t1.strMv)",
+        "outputs": [["a", 3], ["b", 2], ["c", 1], [null, 1]],
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "The default mode, auto, plans the MV aggregate above CROSS JOIN UNNEST: one group per element of strMv for each unnested row",
+        "sql": "SELECT ARRAY_TO_MV({tbl}.strMv), COUNT(*) FROM {tbl} CROSS JOIN UNNEST({tbl}.intMv) AS u(e) GROUP BY ARRAY_TO_MV({tbl}.strMv)",
+        "outputs": [["a", 6], ["b", 3], ["c", 1]],
+        "ignoreV2Optimizer": true
+      },
+      {
         "description": "MV key with HAVING above a self-join",
         "sql": "SET useMvAggregate=true; SELECT ARRAY_TO_MV(t1.strMv), COUNT(*) FROM {tbl} t1 JOIN {tbl} t2 ON t1.k = t2.k GROUP BY ARRAY_TO_MV(t1.strMv) HAVING COUNT(*) > 1",
         "outputs": [["a", 3], ["b", 2]],
@@ -197,7 +227,7 @@
     ]
   },
   "mv_aggregate_null_handling": {
-    "comment": "With column-based null handling the MV column is nullable. A null row forms one null group, as in the single-stage engine. CROSS JOIN UNNEST differs here: it drops the null row. ARRAY_TO_MV of a nullable column is nullable, so ARRAY_TO_MV(col) IS NOT NULL is not folded to TRUE and filters out the null row.",
+    "comment": "With column-based null handling the MV column is nullable. A null row forms one null group, as in the single-stage engine. CROSS JOIN UNNEST differs here: it drops the null row. ARRAY_TO_MV has the component type of the array, as before the MV aggregate, in every mode. So the planner folds ARRAY_TO_MV(col) IS NOT NULL to TRUE and removes COALESCE around it.",
     "extraProps": {
       "enableColumnBasedNullHandling": true
     },
@@ -234,8 +264,32 @@
         "ignoreV2Optimizer": true
       },
       {
-        "description": "ARRAY_TO_MV(col) IS NOT NULL is not folded to TRUE and drops the null row",
+        "description": "ARRAY_TO_MV(col) IS NOT NULL is folded to TRUE and keeps the null row",
         "sql": "SET enableNullHandling=true; SELECT COUNT(*) FROM {tbl} WHERE ARRAY_TO_MV(strMv) IS NOT NULL",
+        "outputs": [[3]],
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "COALESCE around an MV key is removed, in the default mode",
+        "sql": "SET enableNullHandling=true; SELECT COALESCE(ARRAY_TO_MV(strMv), 'none'), COUNT(*) FROM {tbl} GROUP BY 1",
+        "outputs": [["a", 2], ["b", 1], [null, 1]],
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "COALESCE around an MV key is removed, with the gate on",
+        "sql": "SET enableNullHandling=true; SET useMvAggregate=true; SELECT COALESCE(ARRAY_TO_MV(strMv), 'none'), COUNT(*) FROM {tbl} GROUP BY 1",
+        "outputs": [["a", 2], ["b", 1], [null, 1]],
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "COALESCE around an MV key is removed above a self-join",
+        "sql": "SET enableNullHandling=true; SELECT COALESCE(ARRAY_TO_MV(t1.strMv), 'none'), COUNT(*) FROM {tbl} t1 JOIN {tbl} t2 ON t1.k = t2.k GROUP BY 1",
+        "outputs": [["a", 2], ["b", 1], [null, 1]],
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "COALESCE around ARRAY_TO_MV in a filter is removed",
+        "sql": "SET enableNullHandling=true; SELECT COUNT(*) FROM {tbl} WHERE COALESCE(ARRAY_TO_MV(strMv), 'x') = 'a'",
         "outputs": [[2]],
         "ignoreV2Optimizer": true
       }

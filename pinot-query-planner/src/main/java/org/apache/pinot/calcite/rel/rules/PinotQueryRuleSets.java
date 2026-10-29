@@ -20,6 +20,8 @@ package org.apache.pinot.calcite.rel.rules;
 
 import java.util.List;
 import org.apache.calcite.plan.RelOptRule;
+import org.apache.calcite.rel.core.Aggregate;
+import org.apache.calcite.rel.core.Filter;
 import org.apache.calcite.rel.rules.AggregateCaseToFilterRule;
 import org.apache.calcite.rel.rules.AggregateJoinTransposeRule;
 import org.apache.calcite.rel.rules.AggregateProjectMergeRule;
@@ -65,14 +67,23 @@ public class PinotQueryRuleSets {
   private PinotQueryRuleSets() {
   }
 
+  /// Pushes a filter through an aggregate, except through an aggregate that groups by `ARRAY_TO_MV(expr)` (see
+  /// [ArrayToMvGroupKeys#detect]). Below such an aggregate, a filter on the MV key becomes a multi-value predicate.
+  /// That predicate keeps the whole row when any value matches, so the other values of the row keep their groups.
+  private static final RelOptRule FILTER_AGGREGATE_TRANSPOSE_RULE = FilterAggregateTransposeRule.Config.DEFAULT
+      .withOperandSupplier(b0 -> b0.operand(Filter.class).oneInput(b1 -> b1.operand(Aggregate.class)
+          .predicate(aggregate -> ArrayToMvGroupKeys.detect(aggregate).isEmpty()).anyInputs()))
+      .withDescription(PlannerRuleNames.FILTER_AGGREGATE_TRANSPOSE)
+      .as(FilterAggregateTransposeRule.Config.class)
+      .toRule();
+
   //@formatter:off
   public static final List<RelOptRule> BASIC_RULES = List.of(
       // push a filter into a join
       PinotFilterIntoJoinRule
           .instanceWithDescription(PlannerRuleNames.FILTER_INTO_JOIN),
       // push filter through an aggregation
-      FilterAggregateTransposeRule.Config.DEFAULT
-          .withDescription(PlannerRuleNames.FILTER_AGGREGATE_TRANSPOSE).toRule(),
+      FILTER_AGGREGATE_TRANSPOSE_RULE,
       // push filter through set operation
       FilterSetOpTransposeRule.Config.DEFAULT
           .withDescription(PlannerRuleNames.FILTER_SET_OP_TRANSPOSE).toRule(),
@@ -191,8 +202,7 @@ public class PinotQueryRuleSets {
   public static final List<RelOptRule> FILTER_PUSHDOWN_RULES = List.of(
       PinotFilterIntoJoinRule
           .instanceWithDescription(PlannerRuleNames.FILTER_INTO_JOIN),
-      FilterAggregateTransposeRule.Config.DEFAULT
-          .withDescription(PlannerRuleNames.FILTER_AGGREGATE_TRANSPOSE).toRule(),
+      FILTER_AGGREGATE_TRANSPOSE_RULE,
       FilterSetOpTransposeRule.Config.DEFAULT
           .withDescription(PlannerRuleNames.FILTER_SET_OP_TRANSPOSE).toRule(),
       FilterProjectTransposeRule.Config.DEFAULT
