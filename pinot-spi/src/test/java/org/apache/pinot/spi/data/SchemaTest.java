@@ -26,6 +26,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.TimeGranularitySpec.TimeFormat;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -38,6 +39,9 @@ import org.testng.annotations.Test;
 import org.testng.collections.Lists;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 @SuppressWarnings("deprecation")
@@ -840,5 +844,41 @@ public class SchemaTest {
     Assert.assertEquals(fs.getDataType(), FieldSpec.DataType.OPEN_STRUCT);
     ComplexFieldSpec cfs = (ComplexFieldSpec) fs;
     Assert.assertEquals(cfs.getChildFieldSpec("count").getDataType(), FieldSpec.DataType.INT);
+  }
+
+  @Test
+  public void testConfigMigrationVersionMarker()
+      throws Exception {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("test")
+        .addSingleValueDimension("svDimension", DataType.INT)
+        .build();
+    // Default marker is 0 and is not emitted, so schemas that predate the framework serialize unchanged. Assert via
+    // both toJsonObject() and the full objectToString() path (Schema uses @JsonValue, so both go through toJsonObject).
+    assertEquals(schema.getConfigMigrationVersion(), 0);
+    assertFalse(schema.toJsonObject().has("configMigrationVersion"));
+    assertFalse(JsonUtils.objectToString(schema).contains("configMigrationVersion"));
+
+    schema.setConfigMigrationVersion(2);
+    assertTrue(schema.toJsonObject().has("configMigrationVersion"));
+    assertTrue(JsonUtils.objectToString(schema).contains("configMigrationVersion"));
+
+    // The marker survives a JSON round-trip.
+    Schema deserialized = JsonUtils.stringToObject(JsonUtils.objectToString(schema), Schema.class);
+    assertEquals(deserialized.getConfigMigrationVersion(), 2);
+
+    // Backward/forward compatibility: JSON carrying the marker plus an unknown future field still deserializes
+    // (older readers ignore both via @JsonIgnoreProperties(ignoreUnknown = true)).
+    String json = "{\"schemaName\":\"test\",\"configMigrationVersion\":4,\"someFutureField\":\"x\","
+        + "\"dimensionFieldSpecs\":[{\"name\":\"svDimension\",\"dataType\":\"INT\"}]}";
+    Schema fromFutureJson = JsonUtils.stringToObject(json, Schema.class);
+    assertEquals(fromFutureJson.getConfigMigrationVersion(), 4);
+
+    // The marker is bookkeeping, not identity: two schemas differing only by marker are equal.
+    Schema other = new Schema.SchemaBuilder().setSchemaName("test")
+        .addSingleValueDimension("svDimension", DataType.INT)
+        .build();
+    other.setConfigMigrationVersion(5);
+    assertEquals(schema, other);
+    assertEquals(schema.hashCode(), other.hashCode());
   }
 }

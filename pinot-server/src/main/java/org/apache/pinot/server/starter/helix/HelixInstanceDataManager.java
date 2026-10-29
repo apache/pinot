@@ -376,6 +376,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   @VisibleForTesting
   TableDataManager createTableDataManager(String tableNameWithType) {
     LOGGER.info("Creating table data manager for table: {}", tableNameWithType);
+    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
+    Preconditions.checkState(schema != null, "Failed to find schema for table: %s", tableNameWithType);
     TableConfig tableConfig;
     Long tableDeleteTimeMs = _recentlyDeletedTables.getIfPresent(tableNameWithType);
     if (tableDeleteTimeMs != null) {
@@ -395,8 +397,6 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
       Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", tableNameWithType);
     }
-    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
-    Preconditions.checkState(schema != null, "Failed to find schema for table: %s", tableNameWithType);
     TimestampIndexUtils.applyTimestampIndex(tableConfig, schema);
     TableDataManager tableDataManager =
         _tableDataManagerProvider.getTableDataManager(tableConfig, schema, _segmentReloadSemaphore,

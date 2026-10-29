@@ -57,6 +57,7 @@ import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.EmptyIndexSegment;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.recordtransformer.ExpressionTransformer;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -81,8 +82,11 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.TimestampConfig;
 import org.apache.pinot.spi.config.table.TimestampIndexGranularity;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.crypt.PinotCrypter;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -101,7 +105,9 @@ import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
@@ -1576,6 +1582,40 @@ public class BaseTableDataManagerTest {
     assertTrue(indexed.getFieldIndexConfig("id").getConfig(StandardIndexes.inverted()).isEnabled());
     assertFalse(first.getFieldIndexConfig("id").getConfig(StandardIndexes.inverted()).isEnabled());
     assertSame(indexed.getFieldIndexConfig("id"), manager.getCachedIndexLoadingConfig().getFieldIndexConfig("id"));
+  }
+
+  @Test
+  @SuppressWarnings("deprecation") // Reproduce a stored transform moving from the schema to the table config.
+  public void testFetchIndexLoadingConfigDuringSchemaTransformMigration()
+      throws Exception {
+    TableConfig table = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = createSchemaReuseSchema();
+    DimensionFieldSpec derived = new DimensionFieldSpec("derived", DataType.STRING, true);
+    derived.setTransformFunction("lower(raw)");
+    schema.addField(derived);
+    BaseTableDataManager manager = createSchemaReuseManager(table, schema);
+    TableConfig migratedTable = new TableConfig(table);
+    IngestionConfig ingestion = new IngestionConfig();
+    ingestion.setTransformConfigs(List.of(new TransformConfig("derived", "lower(raw)")));
+    migratedTable.setIngestionConfig(ingestion);
+    Schema migratedSchema = Schema.fromString(schema.toSingleLineJsonString());
+    migratedSchema.getFieldSpecFor("derived").setTransformFunction(null);
+    AtomicBoolean migrate = new AtomicBoolean(true);
+    doAnswer(invocation -> {
+      Object record = invocation.callRealMethod();
+      if (migrate.compareAndSet(true, false)) {
+        // Commit between the two reads, returning the first record from before migration.
+        ZKMetadataProvider.setTableConfig(manager._propertyStore, migratedTable);
+        ZKMetadataProvider.setSchema(manager._propertyStore, migratedSchema);
+      }
+      return record;
+    }).when(manager._propertyStore).get(anyString(), any(), anyInt());
+
+    IndexLoadingConfig config = manager.fetchIndexLoadingConfig();
+    GenericRow row = new GenericRow();
+    row.putValue("raw", "VALUE");
+    new ExpressionTransformer(config.getTableConfig(), config.getSchema()).transform(row);
+    assertEquals(row.getValue("derived"), "value");
   }
 
   @Test
