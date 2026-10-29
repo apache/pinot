@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.index.creator;
 import it.unimi.dsi.fastutil.ints.Int2FloatMap;
 import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
@@ -183,8 +184,8 @@ public class HnswVectorIndexCreatorTest {
     }
   }
 
-  /// A COSINE index serves `cosineDistance` for the documents its search returns, also after a filtered search with
-  /// the same vector; other distance functions serve none.
+  /// A COSINE index returns the cosine distances of the documents each search returns, the same documents as
+  /// `getDocIds`, and keeps nothing between searches; other distance functions return none.
   @Test
   public void testServesCosineDistances()
       throws IOException {
@@ -212,24 +213,41 @@ public class HnswVectorIndexCreatorTest {
       }
       try (HnswVectorIndexReader reader = new HnswVectorIndexReader("baz", indexDir, vectors.length, config)) {
         float[] query = vectors[3];
-        if (distanceFunction.equals("EUCLIDEAN")) {
-          Assert.assertNull(reader.getDocDistances(query, 5));
-          continue;
-        }
         MutableRoaringBitmap allowed = new MutableRoaringBitmap();
         allowed.add(10L, 60L);
-        int[] filtered = reader.getDocIds(query, 5, allowed).toArray();
-        Int2FloatMap distances = reader.getDocDistances(query, 5);
-        for (int docId : filtered) {
-          Assert.assertTrue(distances.containsKey(docId), "Filtered search result " + docId + " must be reused");
+        if (distanceFunction.equals("EUCLIDEAN")) {
+          Assert.assertNull(reader.getDocDistances(query, 5));
+          Assert.assertNull(reader.getDocDistances(query, 5, allowed));
+          continue;
         }
-        distances = reader.getDocDistances(query, 20);
-        Assert.assertTrue(distances.size() >= 20);
-        for (Int2FloatMap.Entry entry : distances.int2FloatEntrySet()) {
-          Assert.assertEquals(entry.getFloatValue(),
-              VectorFunctions.cosineDistance(vectors[entry.getIntKey()], query), 1e-5);
+        Int2FloatMap distances = reader.getDocDistances(query, 20);
+        Assert.assertEquals(sortedDocIds(distances), reader.getDocIds(query, 20).toArray());
+        assertCosineDistances(distances, vectors, query);
+
+        Int2FloatMap filtered = reader.getDocDistances(query, 5, allowed);
+        Assert.assertEquals(sortedDocIds(filtered), reader.getDocIds(query, 5, allowed).toArray());
+        for (int docId : filtered.keySet()) {
+          Assert.assertTrue(allowed.contains(docId), "Filtered search returned doc outside the filter: " + docId);
         }
+        assertCosineDistances(filtered, vectors, query);
+        Assert.assertTrue(reader.getDocDistances(query, 5, new MutableRoaringBitmap()).isEmpty());
+
+        // Stateless: a later search does not see the documents of an earlier one.
+        Assert.assertEquals(reader.getDocDistances(query, 3).size(), 3);
       }
+    }
+  }
+
+  private static int[] sortedDocIds(Int2FloatMap distances) {
+    int[] docIds = distances.keySet().toIntArray();
+    Arrays.sort(docIds);
+    return docIds;
+  }
+
+  private static void assertCosineDistances(Int2FloatMap distances, float[][] vectors, float[] query) {
+    for (Int2FloatMap.Entry entry : distances.int2FloatEntrySet()) {
+      Assert.assertEquals(entry.getFloatValue(), VectorFunctions.cosineDistance(vectors[entry.getIntKey()], query),
+          1e-5);
     }
   }
 }

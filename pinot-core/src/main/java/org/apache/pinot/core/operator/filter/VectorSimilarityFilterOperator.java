@@ -20,6 +20,8 @@ package org.apache.pinot.core.operator.filter;
 
 import com.google.common.base.CaseFormat;
 import com.google.common.base.Preconditions;
+import it.unimi.dsi.fastutil.ints.Int2FloatMap;
+import it.unimi.dsi.fastutil.ints.IntIterator;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -106,6 +108,8 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
   private volatile ImmutableRoaringBitmap _effectiveAllowedDocIds;
   private volatile VectorSearchMode _vectorSearchMode;
   private volatile boolean _candidateGenerationSkipped;
+  @Nullable
+  private VectorSearchDistances _searchDistances;
 
   /// Backward-compatible constructor that uses default search params and no forward index.
   /// Existing callers that do not pass query options continue to work unchanged.
@@ -218,6 +222,14 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
     recomputeEffectiveAllowedDocIds();
     _candidateGenerationSkipped = hasRequiredCandidateScope() && _effectiveAllowedDocIds.isEmpty();
     refreshExplainContext();
+  }
+
+  /// Sets the query's [VectorSearchDistances]. When a projection has requested the distances of this search, the
+  /// operator asks the index for them and hands them over instead of only collecting the matching doc ids.
+  ///
+  /// This method must be called before any search execution (getTrues, getBitmaps, etc.).
+  public void setSearchDistances(@Nullable VectorSearchDistances searchDistances) {
+    _searchDistances = searchDistances;
   }
 
   @Override
@@ -385,17 +397,31 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
       // 3. Execute ANN search (with pre-filter if available)
       ImmutableRoaringBitmap preFilter = effectiveAllowedDocIds;
       ImmutableRoaringBitmap annResults;
+      // A projection of VECTOR_DISTANCE on this search asked for its distances: get them along with the doc ids.
+      VectorSearchDistances.Request distancesRequest =
+          _searchDistances != null ? _searchDistances.getRequest(_vectorIndexReader, queryVector) : null;
+      Int2FloatMap distances = null;
       searchExecuted = true;
       if (preFilter != null && _readerSupportsPreFilter) {
         FilterAwareVectorIndexReader filterAwareReader = (FilterAwareVectorIndexReader) _vectorIndexReader;
         _vectorSearchMode = VectorSearchMode.FILTER_THEN_ANN;
-        annResults = filterAwareReader.getDocIds(queryVector, searchCount, preFilter);
+        if (distancesRequest != null) {
+          distances = filterAwareReader.getDocDistances(queryVector, searchCount, preFilter);
+        }
+        annResults = distances != null ? toBitmap(distances)
+            : filterAwareReader.getDocIds(queryVector, searchCount, preFilter);
         LOGGER.debug("Pre-filter ANN search on column: {}, filterCardinality: {}, filterSelectivity: {}",
             column, preFilter.getCardinality(),
             _numDocs > 0 ? (double) preFilter.getCardinality() / _numDocs : 0.0);
       } else {
         _vectorSearchMode = VectorSearchMode.POST_FILTER_ANN;
-        annResults = _vectorIndexReader.getDocIds(queryVector, searchCount);
+        if (distancesRequest != null) {
+          distances = _vectorIndexReader.getDocDistances(queryVector, searchCount);
+        }
+        annResults = distances != null ? toBitmap(distances) : _vectorIndexReader.getDocIds(queryVector, searchCount);
+      }
+      if (distances != null) {
+        distancesRequest.setDistances(distances);
       }
       int annCandidateCount = annResults.getCardinality();
       _annCandidateCount = annCandidateCount;
@@ -574,6 +600,15 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
     return result;
   }
 
+
+  private static MutableRoaringBitmap toBitmap(Int2FloatMap distances) {
+    MutableRoaringBitmap docIds = new MutableRoaringBitmap();
+    IntIterator iterator = distances.keySet().iterator();
+    while (iterator.hasNext()) {
+      docIds.add(iterator.nextInt());
+    }
+    return docIds;
+  }
 
   /// Returns a human-readable name for the backend (for logging).
   private String getBackendName() {

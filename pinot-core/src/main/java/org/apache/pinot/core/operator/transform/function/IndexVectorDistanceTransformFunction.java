@@ -22,22 +22,31 @@ import it.unimi.dsi.fastutil.ints.Int2FloatMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.function.scalar.VectorFunctions;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
+import org.apache.pinot.core.operator.filter.VectorDistanceUtils;
+import org.apache.pinot.core.operator.filter.VectorSearchDistances;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig.VectorDistanceFunction;
 import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
 
 
-/// Implements `VECTOR_DISTANCE(column, ARRAY[...], k)`: the cosine distance of each document from the query vector,
-/// served by the column's vector index for the `k` documents closest to the query vector.
+/// Implements `VECTOR_DISTANCE(column, ARRAY[...], k)`: the distance of each document from the query vector under the
+/// column's configured vector distance function, i.e. the distance `VECTOR_SIMILARITY` ranks by and
+/// `vectorDistanceThreshold` applies to:
+/// - `COSINE`: `1 - cosine similarity`, as `cosineDistance(column, ARRAY[...])`
+/// - `EUCLIDEAN` / `L2`: Euclidean distance, as `euclideanDistance(column, ARRAY[...])`
+/// - `INNER_PRODUCT` / `DOT_PRODUCT`: the negated dot product, as `-dotProduct(column, ARRAY[...])`
 ///
-/// Paired with `VECTOR_SIMILARITY(column, ARRAY[...], k)` on the same vector and `k`, it returns the values of
-/// `cosineDistance(column, ARRAY[...])` (up to the index's single-precision arithmetic) without reading the vectors
-/// of the matched documents from the forward index: the distances come from the index search the filter already ran.
-/// A document the index search did not return (e.g. when the column's index does not serve distances) falls back to
-/// computing the distance from the forward index.
+/// A column without a vector index config uses EUCLIDEAN, like `VECTOR_SIMILARITY`.
+///
+/// Paired with `VECTOR_SIMILARITY(column, ARRAY[...], k)` on the same column and vector, it takes the distances from
+/// the index search the filter runs (up to the index's single-precision arithmetic) instead of reading the vectors of
+/// the matched documents from the forward index. The distances are handed over through the query's
+/// [VectorSearchDistances], so nothing outlives the query. When the index returns no distances (e.g. it does not
+/// support the column's distance function) or misses a document, the distances are computed from the forward index.
 ///
 /// Not thread-safe: like other transform functions, an instance serves one segment on one thread.
 public class IndexVectorDistanceTransformFunction extends BaseTransformFunction {
@@ -46,11 +55,10 @@ public class IndexVectorDistanceTransformFunction extends BaseTransformFunction 
   private TransformFunction _columnTransformFunction;
   @Nullable
   private VectorIndexReader _vectorIndexReader;
+  private VectorDistanceFunction _distanceFunction;
   private float[] _queryVector;
-  private int _topK;
   @Nullable
-  private Int2FloatMap _distances;
-  private boolean _distancesLoaded;
+  private VectorSearchDistances.Request _distancesRequest;
 
   @Override
   public String getName() {
@@ -72,6 +80,8 @@ public class IndexVectorDistanceTransformFunction extends BaseTransformFunction 
     String columnName = ((IdentifierTransformFunction) _columnTransformFunction).getColumnName();
     DataSource dataSource = columnContextMap.get(columnName).getDataSource();
     _vectorIndexReader = dataSource != null ? dataSource.getVectorIndex() : null;
+    _distanceFunction =
+        VectorDistanceUtils.resolveDistanceFunction(dataSource != null ? dataSource.getVectorIndexConfig() : null);
 
     TransformFunction vectorArgument = arguments.get(1);
     if (!(vectorArgument instanceof ArrayLiteralTransformFunction)) {
@@ -83,9 +93,20 @@ public class IndexVectorDistanceTransformFunction extends BaseTransformFunction 
     if (!(topKArgument instanceof LiteralTransformFunction)) {
       throw new IllegalArgumentException("The third argument of VECTOR_DISTANCE must be an integer literal");
     }
-    _topK = ((LiteralTransformFunction) topKArgument).getIntLiteral();
-    if (_topK <= 0) {
-      throw new IllegalArgumentException("The third argument of VECTOR_DISTANCE must be positive, got: " + _topK);
+    // `k` mirrors the paired VECTOR_SIMILARITY; the distances come from that filter's search, whatever its `k`.
+    int topK = ((LiteralTransformFunction) topKArgument).getIntLiteral();
+    if (topK <= 0) {
+      throw new IllegalArgumentException("The third argument of VECTOR_DISTANCE must be positive, got: " + topK);
+    }
+  }
+
+  @Override
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap,
+      QueryContext queryContext) {
+    super.init(arguments, columnContextMap, queryContext);
+    if (_vectorIndexReader != null) {
+      // Ask a VECTOR_SIMILARITY filter on this column and vector to hand over the distances of its search.
+      _distancesRequest = VectorSearchDistances.of(queryContext).request(_vectorIndexReader, _queryVector);
     }
   }
 
@@ -119,7 +140,7 @@ public class IndexVectorDistanceTransformFunction extends BaseTransformFunction 
   public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
     initDoubleValuesSV(length);
-    Int2FloatMap distances = getDistances();
+    Int2FloatMap distances = _distancesRequest != null ? _distancesRequest.getDistances() : null;
     int[] docIds = valueBlock.getDocIds();
     if (distances != null && docIds != null) {
       boolean allServed = true;
@@ -136,17 +157,8 @@ public class IndexVectorDistanceTransformFunction extends BaseTransformFunction 
     }
     float[][] vectors = _columnTransformFunction.transformToFloatValuesMV(valueBlock);
     for (int i = 0; i < length; i++) {
-      _doubleValuesSV[i] = VectorFunctions.cosineDistance(vectors[i], _queryVector);
+      _doubleValuesSV[i] = VectorDistanceUtils.computeDoubleDistance(vectors[i], _queryVector, _distanceFunction);
     }
     return _doubleValuesSV;
-  }
-
-  @Nullable
-  private Int2FloatMap getDistances() {
-    if (!_distancesLoaded) {
-      _distances = _vectorIndexReader != null ? _vectorIndexReader.getDocDistances(_queryVector, _topK) : null;
-      _distancesLoaded = true;
-    }
-    return _distances;
   }
 }
