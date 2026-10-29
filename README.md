@@ -193,8 +193,9 @@ opt-outs remain in effect. Corruption and ordinary I/O errors fail loading inste
 ### Lucene 10 upgrade
 
 This version uses Lucene 10.0.0 and retains support for existing Lucene 8 text and Lucene 9 text/HNSW indexes.
-New text and HNSW indexes use the Lucene 10 format; rollback requires the Lucene 9.12 recovery support from #19900
-and retained forward indexes, as described above. Unpatched releases, including Pinot 1.5.0, cannot read these indexes.
+New text and HNSW indexes use the Lucene 10 format, which Pinot 1.5.x and earlier cannot read. Pinot 1.6.0 is the
+earliest supported rollback target: it rebuilds these indexes during segment loading, as described above, when the
+original forward indexes are retained. Upgrade to Pinot 1.6.0 before upgrading to this version.
 
 Lucene 10 removes complement syntax (`~`) from regular expressions in `TEXT_MATCH`; FST/IFST `REGEXP_LIKE` retains it.
 See the [Lucene migration guide](https://lucene.apache.org/core/10_0_0/MIGRATE.html) for analyzer and query changes.

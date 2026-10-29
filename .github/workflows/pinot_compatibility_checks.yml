@@ -198,8 +198,10 @@ jobs:
       fail-fast: false
       matrix:
         test_suite: [ "compatibility-verifier/sample-test-suite" ]
-        # Lucene 10 requires the index recovery support merged into master in #19900.
-        old_commit: [ "master" ]
+        # Releases before 1.6.0 cannot roll back from Lucene 10 text/HNSW indexes.
+        old_commit: [
+          "release-1.6.0", "master"
+        ]
     name: Pinot Compatibility Regression Testing against ${{ matrix.old_commit }} on ${{ matrix.test_suite }}
     steps:
       - uses: actions/checkout@v7.0.1
@@ -256,8 +258,10 @@ jobs:
       fail-fast: false
       matrix:
         test_suite: [ "compatibility-verifier/multi-stage-query-engine-test-suite" ]
-        # Lucene 10 requires the index recovery support merged into master in #19900.
-        old_commit: [ "master" ]
+        # Releases before 1.6.0 cannot roll back from Lucene 10 text/HNSW indexes.
+        old_commit: [
+          "release-1.6.0", "master"
+        ]
     name: Pinot Multi-Stage Query Engine Compatibility Regression Testing against ${{ matrix.old_commit }} on ${{ matrix.test_suite }}
     steps:
       - uses: actions/checkout@v7.0.1
