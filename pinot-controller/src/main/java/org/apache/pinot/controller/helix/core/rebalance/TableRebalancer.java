@@ -22,6 +22,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.Sets;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
@@ -606,6 +608,17 @@ public class TableRebalancer {
           Map<String, Map<String, String>> oldAssignment = currentAssignment;
           Map<Integer, List<String>> oldPartitionAssignment = currentPartitionAssignment;
           currentAssignment = idealStateRecord.getMapFields();
+          if (!forceCommittedPartitions.isEmpty()) {
+            // Another writer can move consumption before our assignment update succeeds. That consumes the force
+            // commit too: a further movement needs a fresh commit. Ignore segment names so a rollover on the same
+            // instances preserves the force commit for the pending movement.
+            Int2ObjectMap<Set<Set<String>>> oldConsumingInstances =
+                getConsumingInstancesByPartition(oldAssignment, forceCommittedPartitions);
+            Int2ObjectMap<Set<Set<String>>> currentConsumingInstances =
+                getConsumingInstancesByPartition(currentAssignment, forceCommittedPartitions);
+            forceCommittedPartitions.removeIf((int partitionId) ->
+                !Objects.equals(oldConsumingInstances.get(partitionId), currentConsumingInstances.get(partitionId)));
+          }
           currentPartitionAssignment = PartitionAssignmentUtils.getPartitionAssignment(idealState);
           expectedVersion = idealStateRecord.getVersion();
 
@@ -2393,6 +2406,24 @@ public class TableRebalancer {
       }
     }
     return movingConsumingSegments;
+  }
+
+  /// Returns consuming placements for the given partitions, ignoring segment names. Retains each distinct
+  /// instance set instead of flattening the instances of a partition's consuming segments.
+  private static Int2ObjectMap<Set<Set<String>>> getConsumingInstancesByPartition(
+      Map<String, Map<String, String>> assignment, IntSet partitions) {
+    Int2ObjectMap<Set<Set<String>>> consumingInstances = new Int2ObjectOpenHashMap<>();
+    for (Map.Entry<String, Map<String, String>> entry : assignment.entrySet()) {
+      Map<String, String> instanceStateMap = entry.getValue();
+      if (instanceStateMap.containsValue(SegmentStateModel.CONSUMING)) {
+        int partitionId = new LLCSegmentName(entry.getKey()).getPartitionGroupId();
+        if (partitions.contains(partitionId)) {
+          consumingInstances.computeIfAbsent(partitionId, k -> new HashSet<>())
+              .add(Set.copyOf(instanceStateMap.keySet()));
+        }
+      }
+    }
+    return consumingInstances;
   }
 
   private IdealState forceCommitConsumingSegmentsAndWait(String tableNameWithType, Set<String> segmentsToCommit,
