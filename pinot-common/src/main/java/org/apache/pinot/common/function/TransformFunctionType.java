@@ -243,9 +243,8 @@ public enum TransformFunctionType {
   INNER_PRODUCT("innerProduct", ReturnTypes.DOUBLE, OperandTypes.ARRAY_ARRAY),
   L1_DISTANCE("l1Distance", ReturnTypes.DOUBLE, OperandTypes.ARRAY_ARRAY),
   L2_DISTANCE("l2Distance", ReturnTypes.DOUBLE, OperandTypes.ARRAY_ARRAY),
-  // Cosine distance served by the column's vector index for the top-k documents (see VECTOR_SIMILARITY)
-  VECTOR_DISTANCE("vectorDistance", ReturnTypes.DOUBLE,
-      OperandTypes.family(SqlTypeFamily.ARRAY, SqlTypeFamily.ARRAY, SqlTypeFamily.INTEGER)),
+  // Distance under the column's vector distance function, taken from a paired VECTOR_SIMILARITY search when possible
+  VECTOR_DISTANCE("vectorDistance", ReturnTypes.DOUBLE, OperandTypes.ARRAY_ARRAY),
   VECTOR_DIMS("vectorDims", ReturnTypes.INTEGER, OperandTypes.ARRAY),
   VECTOR_NORM("vectorNorm", ReturnTypes.DOUBLE, OperandTypes.ARRAY),
 

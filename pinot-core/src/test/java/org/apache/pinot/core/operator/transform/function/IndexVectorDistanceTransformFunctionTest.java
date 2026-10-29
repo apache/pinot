@@ -52,7 +52,6 @@ import static org.testng.Assert.expectThrows;
 /// `VECTOR_DISTANCE` returns the distances a `VECTOR_SIMILARITY` search hands over through the query, and otherwise
 /// computes them under the column's configured distance function.
 public class IndexVectorDistanceTransformFunctionTest extends BaseTransformFunctionTest {
-  private static final int TOP_K = 10;
 
   /// A column without a vector index config ranks by EUCLIDEAN in VECTOR_SIMILARITY, so VECTOR_DISTANCE uses it too.
   @Test
@@ -160,7 +159,7 @@ public class IndexVectorDistanceTransformFunctionTest extends BaseTransformFunct
       literal.append(i == 0 ? "" : ",").append(i % 3);
     }
     ExpressionContext expression = RequestContextUtils.getExpression(
-        "vectorDistance(vector1, " + literal.append(']') + ", " + TOP_K + ")");
+        "vectorDistance(vector1, " + literal.append(']') + ")");
     double[] actual =
         TransformFunctionFactory.get(expression, _dataSourceMap).transformToDoubleValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -172,10 +171,10 @@ public class IndexVectorDistanceTransformFunctionTest extends BaseTransformFunct
   public void testRejectsInvalidArguments() {
     String vector = toLiteral(_vector2Values[0]);
     for (String expression : new String[]{
-        "vectorDistance(vector1, " + vector + ")",
-        "vectorDistance(intSV, " + vector + ", 10)",
-        "vectorDistance(vector1, vector2, 10)",
-        "vectorDistance(vector1, " + vector + ", 0)"}) {
+        "vectorDistance(vector1)",
+        "vectorDistance(vector1, " + vector + ", 10)",
+        "vectorDistance(intSV, " + vector + ")",
+        "vectorDistance(vector1, vector2)"}) {
       expectThrows(Exception.class,
           () -> TransformFunctionFactory.get(RequestContextUtils.getExpression(expression), _dataSourceMap));
     }
@@ -188,7 +187,7 @@ public class IndexVectorDistanceTransformFunctionTest extends BaseTransformFunct
   private static TransformFunction create(Map<String, DataSource> dataSourceMap, float[] query,
       QueryContext queryContext) {
     ExpressionContext expression =
-        RequestContextUtils.getExpression("vectorDistance(vector1, " + toLiteral(query) + ", " + TOP_K + ")");
+        RequestContextUtils.getExpression("vectorDistance(vector1, " + toLiteral(query) + ")");
     Map<String, ColumnContext> columnContextMap = new HashMap<>();
     dataSourceMap.forEach(
         (column, dataSource) -> columnContextMap.put(column, ColumnContext.fromDataSource(dataSource)));
