@@ -89,19 +89,23 @@ public class IndexVectorDistanceTransformFunction extends BaseTransformFunction 
     }
   }
 
-  /// Float array literals are rare in SQL (`ARRAY[0.1, ...]` parses as DOUBLE); narrow like VECTOR_SIMILARITY does.
+  /// Float array literals are rare in SQL (`ARRAY[0.1, ...]` parses as DOUBLE, `ARRAY[1, 0]` as INT); narrow every
+  /// numeric array like VECTOR_SIMILARITY does, so the same vector literal works in both.
   private static float[] toFloatArray(ArrayLiteralTransformFunction literal) {
     float[] floats = literal.getFloatArrayLiteral();
     if (floats != null) {
       return floats;
     }
     double[] doubles = literal.getDoubleArrayLiteral();
-    if (doubles == null) {
+    int[] ints = literal.getIntArrayLiteral();
+    long[] longs = literal.getLongArrayLiteral();
+    int length = doubles != null ? doubles.length : ints != null ? ints.length : longs != null ? longs.length : -1;
+    if (length < 0) {
       throw new IllegalArgumentException("The second argument of VECTOR_DISTANCE must be a numeric array literal");
     }
-    floats = new float[doubles.length];
-    for (int i = 0; i < doubles.length; i++) {
-      floats[i] = (float) doubles[i];
+    floats = new float[length];
+    for (int i = 0; i < length; i++) {
+      floats[i] = doubles != null ? (float) doubles[i] : ints != null ? ints[i] : (float) longs[i];
     }
     return floats;
   }
