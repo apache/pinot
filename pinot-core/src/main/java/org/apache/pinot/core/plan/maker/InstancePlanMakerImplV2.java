@@ -79,40 +79,6 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   public static final int DEFAULT_NUM_THREADS_EXTRACT_FINAL_RESULT = 1;
   public static final int DEFAULT_CHUNK_SIZE_EXTRACT_FINAL_RESULT = 10_000;
 
-  // The following fields are deprecated and will be removed after 1.4 release
-  // Use CommonConstants.Server.* instead
-  @Deprecated
-  public static final String MAX_EXECUTION_THREADS_KEY = Server.MAX_EXECUTION_THREADS;
-  @Deprecated
-  public static final int DEFAULT_MAX_EXECUTION_THREADS = Server.DEFAULT_QUERY_EXECUTOR_MAX_EXECUTION_THREADS;
-  @Deprecated
-  public static final String MAX_INITIAL_RESULT_HOLDER_CAPACITY_KEY = Server.MAX_INITIAL_RESULT_HOLDER_CAPACITY;
-  @Deprecated
-  public static final int DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY =
-      Server.DEFAULT_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY;
-  @Deprecated
-  public static final String MIN_INITIAL_INDEXED_TABLE_CAPACITY_KEY = Server.MIN_INITIAL_INDEXED_TABLE_CAPACITY;
-  @Deprecated
-  public static final int DEFAULT_MIN_INITIAL_INDEXED_TABLE_CAPACITY =
-      Server.DEFAULT_QUERY_EXECUTOR_MIN_INITIAL_INDEXED_TABLE_CAPACITY;
-  @Deprecated
-  public static final String NUM_GROUPS_LIMIT_KEY = Server.NUM_GROUPS_LIMIT;
-  @Deprecated
-  public static final int DEFAULT_NUM_GROUPS_LIMIT = Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_LIMIT;
-  @Deprecated
-  public static final String MIN_SEGMENT_GROUP_TRIM_SIZE_KEY = Server.MIN_SEGMENT_GROUP_TRIM_SIZE;
-  @Deprecated
-  public static final int DEFAULT_MIN_SEGMENT_GROUP_TRIM_SIZE =
-      Server.DEFAULT_QUERY_EXECUTOR_MIN_SEGMENT_GROUP_TRIM_SIZE;
-  @Deprecated
-  public static final String MIN_SERVER_GROUP_TRIM_SIZE_KEY = Server.MIN_SERVER_GROUP_TRIM_SIZE;
-  @Deprecated
-  public static final int DEFAULT_MIN_SERVER_GROUP_TRIM_SIZE = Server.DEFAULT_QUERY_EXECUTOR_MIN_SERVER_GROUP_TRIM_SIZE;
-  @Deprecated
-  public static final String GROUPBY_TRIM_THRESHOLD_KEY = Server.GROUPBY_TRIM_THRESHOLD;
-  @Deprecated
-  public static final int DEFAULT_GROUPBY_TRIM_THRESHOLD = Server.DEFAULT_QUERY_EXECUTOR_GROUPBY_TRIM_THRESHOLD;
-
   private static final Logger LOGGER = LoggerFactory.getLogger(InstancePlanMakerImplV2.class);
   // Cap planning work independently of the query's configurable group limit.
   private static final int MAX_GROUPING_SETS_DICTIONARY_SCAN_ENTRIES = 1 << 20;
