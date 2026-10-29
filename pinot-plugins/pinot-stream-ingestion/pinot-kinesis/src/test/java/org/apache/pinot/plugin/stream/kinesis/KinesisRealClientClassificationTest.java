@@ -29,8 +29,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.apache.pinot.spi.ingestion.error.IngestionSourceCredentialMode;
-import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorEvidence;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorSubReason;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
@@ -43,18 +41,16 @@ import software.amazon.awssdk.services.kinesis.model.KinesisException;
 import software.amazon.awssdk.services.sts.model.StsException;
 
 import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorAssertions.assertAuth;
-import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorAssertions.assertNotClassified;
 import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorVerdict.TARGET_STS;
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotSame;
 import static org.testng.Assert.expectThrows;
 
 
 /// Drives the plugin's real Kinesis client, and for an assumed role its real STS client, against a local stub that
-/// answers with AWS's own error codes; LocalStack enforces no IAM. The same credential code is the table's bad key
-/// under static keys and Pinot's own identity under the default chain, and only the evidence the plugin attaches tells
-/// them apart. The keys are fake, and nothing here prints them.
-public class KinesisCredentialEvidenceTest {
+/// answers with AWS's own error codes; LocalStack enforces no IAM. A rejected credential is AUTH whichever identity
+/// signed, and an STS refusal reaches the consumer as the raw `StsException`. The keys are fake, and nothing here
+/// prints them.
+public class KinesisRealClientClassificationTest {
   private static final String FAKE_ACCESS_KEY = "FAKEACCESSKEYFORSTUB";
   private static final String FAKE_SECRET_KEY = "fake-secret-key-for-a-local-stub";
   private static final String FAKE_ROLE_ARN = "arn:aws:iam::000000000000:role/fake-table-role";
@@ -159,48 +155,41 @@ public class KinesisCredentialEvidenceTest {
   }
 
   @Test
-  public void kinesisRejectingOurOwnIdentityIsNotTheSource()
+  public void kinesisRejectingPinotsOwnIdentityIsAuth()
       throws Throwable {
     // With no keys on the table the default chain signs with Pinot's own identity; system properties come first in it
     withSystemProperties(Map.of("aws.accessKeyId", FAKE_ACCESS_KEY, "aws.secretAccessKey", FAKE_SECRET_KEY), () -> {
       try (KinesisConsumer consumer = new KinesisConsumer(new KinesisConfig(streamConfig(Map.of())))) {
         KinesisException rejected =
             expectThrows(KinesisException.class, () -> consumer.fetchMessages(START_OFFSET, TIMEOUT_MS));
-        assertEquals(IngestionSourceErrorEvidence.of(rejected).getCredentialMode(),
-            IngestionSourceCredentialMode.AMBIENT);
-        assertNotClassified(rejected);
+        assertAuth(rejected, IngestionSourceErrorSubReason.AUTHENTICATION, null);
       }
     });
   }
 
   @Test
-  public void assumeRoleRefusalLeavesAsTheRawStsExceptionWithEvidence()
+  public void assumeRoleRefusalLeavesAsTheRawStsException()
       throws Throwable {
     Map<String, String> credentials =
         Map.of(KinesisConfig.ACCESS_KEY, FAKE_ACCESS_KEY, KinesisConfig.SECRET_KEY, FAKE_SECRET_KEY,
             KinesisConfig.IAM_ROLE_BASED_ACCESS_ENABLED, "true", KinesisConfig.ROLE_ARN, FAKE_ROLE_ARN);
     withSystemProperties(Map.of(STS_ENDPOINT_PROPERTY, _endpoint), () -> {
       try (KinesisConsumer consumer = new KinesisConsumer(new KinesisConfig(streamConfig(credentials)))) {
-        // STS rejects the table's base keys. The credential cache fails each refresh with a new exception, so the
-        // evidence can go on the SDK's own instance.
+        // STS rejects the table's base keys
         _stsErrorCode = "InvalidClientTokenId";
         StsException rejected =
             expectThrows(StsException.class, () -> consumer.fetchMessages(START_OFFSET, TIMEOUT_MS));
         assertAuth(rejected, IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_STS);
-        assertNotSame(expectThrows(StsException.class, () -> consumer.fetchMessages(START_OFFSET, TIMEOUT_MS)),
-            rejected);
 
         // The table's role refuses the assumption
         _stsErrorCode = "AccessDenied";
         StsException denied =
             expectThrows(StsException.class, () -> consumer.fetchMessages(START_OFFSET, TIMEOUT_MS));
-        assertEquals(IngestionSourceErrorEvidence.of(denied).getCredentialMode(),
-            IngestionSourceCredentialMode.STATIC);
         assertAuth(denied, IngestionSourceErrorSubReason.AUTHORIZATION, TARGET_STS);
       }
     });
     // No credential, so no request ever reached Kinesis
-    assertEquals(_stsRequests.get(), 3);
+    assertEquals(_stsRequests.get(), 2);
     assertEquals(_kinesisRequests.get(), 0);
   }
 

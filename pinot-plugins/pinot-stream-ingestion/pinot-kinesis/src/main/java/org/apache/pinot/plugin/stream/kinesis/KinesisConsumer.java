@@ -238,7 +238,7 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
       throw new KinesisRequestTimeoutException(requestType);
     }
     try {
-      return callKinesis(requestSupplier);
+      return requestSupplier.get();
     } catch (ProvisionedThroughputExceededException pte) {
       throw new KinesisRateLimitException(requestType, pte);
     }
