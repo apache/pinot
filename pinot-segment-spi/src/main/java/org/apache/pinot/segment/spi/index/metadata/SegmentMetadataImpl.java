@@ -147,12 +147,14 @@ public class SegmentMetadataImpl implements SegmentMetadata, Closeable {
   /// If segment metadata file exists in multiple segment version, load the one in highest segment version.
   public SegmentMetadataImpl(File indexDir)
       throws IOException, ConfigurationException {
+    this(indexDir, SegmentMetadataUtils.getPropertiesConfiguration(indexDir));
+  }
+
+  SegmentMetadataImpl(File indexDir, PropertiesConfiguration segmentMetadataPropertiesConfiguration)
+      throws IOException, ConfigurationException {
     _indexDir = indexDir;
     _columnMetadataMap = new TreeMap<>();
     _schema = new Schema();
-
-    PropertiesConfiguration segmentMetadataPropertiesConfiguration =
-        SegmentMetadataUtils.getPropertiesConfiguration(indexDir);
     init(segmentMetadataPropertiesConfiguration);
     setTimeInfo(segmentMetadataPropertiesConfiguration);
 
@@ -206,6 +208,11 @@ public class SegmentMetadataImpl implements SegmentMetadata, Closeable {
   /// Identifies the local mapped metadata sidecar and its incomplete temporary files.
   public static boolean isMappedMetadataSidecarFileName(String fileName) {
     return MappedSegmentMetadataStore.isSidecarFileName(fileName);
+  }
+
+  /// Identifies an incomplete mapped metadata sidecar, which should not be copied during segment reload.
+  public static boolean isMappedMetadataTemporaryFileName(String fileName) {
+    return MappedSegmentMetadataStore.isTempFileName(fileName);
   }
 
   private SegmentMetadataImpl(File indexDir, ReadMode readMode)

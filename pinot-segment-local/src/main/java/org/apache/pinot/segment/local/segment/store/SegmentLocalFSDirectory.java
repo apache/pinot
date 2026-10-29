@@ -121,7 +121,9 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
       src = new File(parentDir, _indexDir.getName() + CommonConstants.Segment.SEGMENT_BACKUP_DIR_SUFFIX);
     }
     if (src.exists() && !src.equals(dest)) {
-      FileUtils.copyDirectory(src, dest);
+      File sourceDir = src;
+      FileUtils.copyDirectory(src, dest, file -> !file.isFile() || !file.getParentFile().equals(sourceDir)
+          || !SegmentMetadataImpl.isMappedMetadataTemporaryFileName(file.getName()));
     }
   }
 

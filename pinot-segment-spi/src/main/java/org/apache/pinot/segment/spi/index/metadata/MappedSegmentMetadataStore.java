@@ -87,8 +87,11 @@ final class MappedSegmentMetadataStore implements Closeable {
   private static final String TEMP_FILE_SUFFIX = ".tmp";
 
   static boolean isSidecarFileName(String fileName) {
-    return FILE_NAME.equals(fileName)
-        || (fileName.startsWith(TEMP_FILE_PREFIX) && fileName.endsWith(TEMP_FILE_SUFFIX));
+    return FILE_NAME.equals(fileName) || isTempFileName(fileName);
+  }
+
+  static boolean isTempFileName(String fileName) {
+    return fileName.startsWith(TEMP_FILE_PREFIX) && fileName.endsWith(TEMP_FILE_SUFFIX);
   }
 
   private static final int MAGIC = 0x504d4431; // PMD1
@@ -368,8 +371,8 @@ final class MappedSegmentMetadataStore implements Closeable {
   private static byte[] build(File indexDir, Fingerprint propertiesFingerprint, Fingerprint indexMapFingerprint,
       IndexService indexService)
       throws IOException, ConfigurationException {
-    SegmentMetadataImpl source = new SegmentMetadataImpl(indexDir);
     PropertiesConfiguration config = SegmentMetadataUtils.getPropertiesConfiguration(indexDir);
+    SegmentMetadataImpl source = new SegmentMetadataImpl(indexDir, config);
     List<String> columns = new ArrayList<>(source.getColumnMetadataMap().keySet());
     columns.sort(Comparator.naturalOrder());
     if ((long) columns.size() * RECORD_SIZE + HEADER_SIZE > Integer.MAX_VALUE) {
