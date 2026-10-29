@@ -26,6 +26,10 @@ import com.google.api.client.testing.http.MockLowLevelHttpRequest;
 import com.google.api.client.testing.http.MockLowLevelHttpResponse;
 import com.google.api.gax.grpc.GrpcStatusCode;
 import com.google.api.gax.rpc.ApiExceptionFactory;
+import com.google.auth.Credentials;
+import com.google.auth.oauth2.AccessToken;
+import com.google.auth.oauth2.GoogleCredentials;
+import com.google.auth.oauth2.ImpersonatedCredentials;
 import com.google.auth.oauth2.ServiceAccountCredentials;
 import io.grpc.Attributes;
 import io.grpc.CallCredentials;
@@ -39,6 +43,7 @@ import java.io.InputStream;
 import java.net.ConnectException;
 import java.net.UnknownHostException;
 import java.security.KeyPairGenerator;
+import java.util.Date;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.net.ssl.SSLHandshakeException;
@@ -49,6 +54,7 @@ import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorAssertion
 import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorAssertions.assertNotClassified;
 import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorAssertions.assertSourceRead;
 import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorVerdict.TARGET_IDP;
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 
 
@@ -120,6 +126,24 @@ public class GoogleCloudSourceErrorClassificationTest {
         // google-auth's backoff would only slow the test: retrying doesn't change which failure is reported
         .setDefaultRetriesEnabled(false)
         .build();
+    return callFailure(credentials);
+  }
+
+  /// What a gRPC call reports when an impersonated credential's IAM token request fails: google-auth wraps the HTTP
+  /// response in a plain IOException, with no GoogleAuthException between.
+  private static Throwable impersonationFailure(int status)
+      throws Exception {
+    GoogleCredentials source =
+        GoogleCredentials.create(new AccessToken("fixture-token", new Date(System.currentTimeMillis() + 3_600_000L)));
+    ImpersonatedCredentials credentials = ImpersonatedCredentials.newBuilder().setSourceCredentials(source)
+        .setTargetPrincipal("target@fixture-project.iam.gserviceaccount.com")
+        .setScopes(List.of("https://www.googleapis.com/auth/pubsub"))
+        .setHttpTransportFactory(() -> tokenEndpoint(status, "{\"error\":{\"code\":" + status + "}}"))
+        .build();
+    return callFailure(credentials);
+  }
+
+  private static Throwable callFailure(Credentials credentials) {
     AtomicReference<Status> failed = new AtomicReference<>();
     MoreCallCredentials.from(credentials).applyRequestMetadata(PULL, Runnable::run,
         new CallCredentials.MetadataApplier() {
@@ -160,6 +184,9 @@ public class GoogleCloudSourceErrorClassificationTest {
       }
     };
     assertSourceRead(tokenRefreshFailure(unreachable), null);
+    // An impersonated credential whose IAM endpoint failed, or refused.
+    assertEquals(assertSourceRead(impersonationFailure(503), TARGET_IDP).getCode(), "503");
+    assertAuth(impersonationFailure(403), IngestionSourceErrorSubReason.AUTHENTICATION, null);
     // grpc-auth reports a metadata server it couldn't find as UNAUTHENTICATED, over the network failure.
     assertSourceRead(Status.UNAUTHENTICATED.withCause(new IOException(
         "ComputeEngineCredentials cannot find the metadata server.", new UnknownHostException(
