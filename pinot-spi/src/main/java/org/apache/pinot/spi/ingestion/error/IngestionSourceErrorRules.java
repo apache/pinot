@@ -37,7 +37,7 @@ import javax.net.ssl.SSLException;
 ///
 /// Rules key on the source's own class and code first, and on an HTTP status only where the source has no code of
 /// its own (a schema registry, Pulsar's admin API, an OAuth token endpoint) or AWS returned none. They read a message
-/// only where the client stringified its evidence or the class covers both our side and the source's; each such match
+/// only where the client stringified its evidence or the class covers several failures; each such match
 /// is commented at its rule and pinned by a fixture test against the SDK version Pinot ships. A phrase an SDK upgrade
 /// changes can move a failure to another category or leave it unclassified, so an upgrade of these SDKs reruns those
 /// fixtures against real clients where they can.
@@ -270,12 +270,9 @@ final class IngestionSourceErrorRules {
       return sourceRead(clazz.getSimpleName(), null);
     }
     for (Throwable cause : below) {
-      IngestionSourceErrorVerdict refused = tlsAlert(cause, null);
-      if (refused != null) {
-        return refused;
-      }
-      if (isNetworkFailure(cause)) {
-        return sourceRead(cause.getClass().getSimpleName(), null);
+      IngestionSourceErrorVerdict transport = matchGeneric(cause);
+      if (transport != null) {
+        return transport;
       }
       if (hasAnyClass(cause.getClass(), APACHE_NO_HTTP_RESPONSE)) {
         return sourceRead(cause.getClass().getSimpleName(), null);
@@ -596,7 +593,7 @@ final class IngestionSourceErrorRules {
     if (simple.equals("ConnectException") || simple.equals("TimeoutException")) {
       return sourceRead(simple, TARGET_ADMIN);
     }
-    if (simple.equals("GettingAuthenticationDataException")) {
+    if (PULSAR_AUTHENTICATION_SETUP.contains(simple)) {
       return auth(IngestionSourceErrorSubReason.AUTHENTICATION, simple, null);
     }
     if (node.getClass().getName().equals(PULSAR_ADMIN_EXCEPTION) && invoke(node, "getHttpError") == null) {
@@ -614,8 +611,8 @@ final class IngestionSourceErrorRules {
   private static final String GRPC_STATUS_EXCEPTION = "io.grpc.StatusException";
   private static final String GOOGLE_AUTH_EXCEPTION = "com.google.auth.oauth2.GoogleAuthException";
   private static final String GOOGLE_HTTP_RESPONSE_EXCEPTION = "com.google.api.client.http.HttpResponseException";
-  private static final Set<String> GRPC_SOURCE_READ = Set.of("NOT_FOUND", "FAILED_PRECONDITION",
-      "RESOURCE_EXHAUSTED", "UNAVAILABLE", "DEADLINE_EXCEEDED", "INTERNAL", "INVALID_ARGUMENT", "ALREADY_EXISTS");
+  private static final Set<String> GRPC_SOURCE_READ = Set.of("FAILED_PRECONDITION", "RESOURCE_EXHAUSTED",
+      "DEADLINE_EXCEEDED", "INTERNAL", "INVALID_ARGUMENT", "ALREADY_EXISTS");
   // Google Cloud's deliberate conflation of a missing project with a denied one.
   private static final String GOOGLE_MISSING_OR_DENIED = "not found or user does not have access";
 
@@ -646,12 +643,11 @@ final class IngestionSourceErrorRules {
           }
         }
         return sourceRead(code, null);
+      case "CANCELLED":
+        // Our cancellation.
+        return none(code);
       default:
-        if (GRPC_SOURCE_READ.contains(code)) {
-          return sourceRead(code, null);
-        }
-        // CANCELLED: our cancellation.
-        return code.equals("CANCELLED") ? none(code) : null;
+        return GRPC_SOURCE_READ.contains(code) ? sourceRead(code, null) : null;
     }
   }
 

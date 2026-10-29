@@ -27,14 +27,16 @@ import java.util.Locale;
 /// denied permission is invisible (MSK IAM reports a policy denial as a SASL authentication failure, Pulsar's admin
 /// client maps 401 and 403 to one class), and both route to the same owner.
 public enum IngestionSourceErrorSubReason {
-  /// The identity was rejected: a wrong, expired or revoked credential, a bad signature, the wrong auth mechanism.
+  /// The identity was rejected or couldn't be presented: a wrong, expired or revoked credential, a bad signature, the
+  /// wrong auth mechanism, or a credential the client couldn't load, read or build.
   AUTHENTICATION,
   /// The identity was accepted but a policy denied the request: an ACL, IAM, a role grant, a trust policy, a network
   /// policy the source enforces.
   AUTHORIZATION,
   /// The source refused to say whether the object exists ("does not exist or not authorized"). Check both.
   MISSING_OR_DENIED,
-  /// The source refused us but gave no finer reason, or its reason is known to be unreliable.
+  /// Authentication or authorization failed with no finer reason, such as STS refusing an AssumeRole request it
+  /// finds invalid.
   UNSPECIFIED;
 
   /// The lower-case name used in log lines.

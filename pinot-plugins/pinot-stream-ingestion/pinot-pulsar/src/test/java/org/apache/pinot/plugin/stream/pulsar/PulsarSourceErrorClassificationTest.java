@@ -86,6 +86,10 @@ public class PulsarSourceErrorClassificationTest {
     assertAuth(new PulsarClientException.AuthenticationException(
         "Unable to obtain an access token: Access denied (access_denied)"), IngestionSourceErrorSubReason.AUTHORIZATION,
         TARGET_IDP);
+    // The endpoint refusing the token request itself.
+    assertAuth(new PulsarClientException.AuthenticationException(
+            "Unable to obtain an access token: Missing parameter (invalid_request)"),
+        IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_IDP);
     // An error we don't recognise could be a refusal: it decides nothing.
     assertNotClassified(new PulsarClientException.AuthenticationException(
         "Unable to obtain an access token: Something new (novel_error)"));
@@ -96,9 +100,6 @@ public class PulsarSourceErrorClassificationTest {
     // Authentication failed before the broker judged anything.
     assertAuth(new PulsarClientException.AuthenticationException("Unable to read private key: no such file"),
         IngestionSourceErrorSubReason.AUTHENTICATION, null);
-    assertAuth(new PulsarClientException.AuthenticationException(
-            "Unable to obtain an access token: Missing parameter (invalid_request)"),
-        IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_IDP);
     assertAuth(new PulsarClientException.UnsupportedAuthenticationException("bad auth plugin"),
         IngestionSourceErrorSubReason.AUTHENTICATION, null);
     // The client's config: the read failed all the same.

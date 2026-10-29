@@ -22,7 +22,7 @@ import javax.annotation.Nullable;
 
 
 /// A rule's decision on one throwable: a category, or [#none] when the throwable shows the failure is not a failure to
-/// access the source (Pinot's own cancellation).
+/// access the source (Pinot's own cancellation, or a client Pinot closed).
 ///
 /// The code and target are bounded tokens, safe for log lines: SDK codes are short identifiers, but a configured
 /// endpoint can answer with anything.
@@ -60,13 +60,15 @@ public final class IngestionSourceErrorVerdict {
     _target = token(target);
   }
 
-  /// The source refused us. `target` names the service that answered when it isn't the source itself.
+  /// Authentication or authorization failed. `target` names the service that answered when it isn't the source
+  /// itself, or is null when no service answered (a credential that couldn't be loaded or built).
   public static IngestionSourceErrorVerdict auth(IngestionSourceErrorSubReason subReason, @Nullable String code,
       @Nullable String target) {
     return new IngestionSourceErrorVerdict(IngestionSourceErrorCategory.AUTH, subReason, code, target);
   }
 
-  /// The source couldn't serve us, or never answered.
+  /// Reading from the source failed otherwise: it couldn't serve the request or rejected it, never answered, or the
+  /// client couldn't be set up.
   public static IngestionSourceErrorVerdict sourceRead(@Nullable String code, @Nullable String target) {
     return new IngestionSourceErrorVerdict(IngestionSourceErrorCategory.SOURCE_READ, null, code, target);
   }

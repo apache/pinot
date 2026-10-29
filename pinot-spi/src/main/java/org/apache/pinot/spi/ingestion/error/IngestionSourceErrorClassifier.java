@@ -46,8 +46,8 @@ import org.slf4j.LoggerFactory;
 /// from the source. Within a chain:
 ///
 /// 1. walking from the root cause up, the first source-specific rule that decides wins. A rule that says the failure
-///    is not a failure to access the source (Pinot's own cancellation) therefore decides only when no source
-///    exception sits beneath it, and a wrapper above it can't reinstate a category;
+///    is not a failure to access the source (Pinot's own cancellation, or a client Pinot closed) therefore decides
+///    only when no source exception sits beneath it, and a wrapper above it can't reinstate a category;
 /// 2. generic rules, which read the transport rather than a source's answer (`java.net` / `javax.net.ssl`, and any
 ///    registered with [#registerGenericRule]), apply only when no source rule decided the chain.
 ///
