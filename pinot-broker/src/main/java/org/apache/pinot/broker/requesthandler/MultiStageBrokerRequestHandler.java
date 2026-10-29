@@ -533,9 +533,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
   }
 
-  /// Stamps the RLS filters of each table into `queryOptions`. Returns `true` iff a filter was stamped for at least
-  /// one table. As in the single-stage engine, an empty filter list is treated like no filter list, because the
-  /// rewriter attaches no predicate for it.
+  /// Returns `true` if an RLS filter was added for at least one table.
   @VisibleForTesting
   boolean applyRlsFilters(@Nullable RequesterIdentity requesterIdentity, Set<String> tables,
       Map<String, String> queryOptions) {
