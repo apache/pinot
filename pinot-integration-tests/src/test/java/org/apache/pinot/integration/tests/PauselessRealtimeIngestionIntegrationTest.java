@@ -46,6 +46,16 @@ public class PauselessRealtimeIngestionIntegrationTest extends BasePauselessReal
   private Scenario _scenario;
 
   @Override
+  protected void pushAvroIntoKafka(List<File> avroFiles)
+      throws Exception {
+    try (BatchedKafkaDataProducer producer =
+        new BatchedKafkaDataProducer("localhost:" + getKafkaPort(), getMaxNumKafkaMessagesPerBatch())) {
+      ClusterIntegrationTestUtils.pushAvroIntoKafka(avroFiles, getKafkaTopic(), getMaxNumKafkaMessagesPerBatch(),
+          getKafkaMessageHeader(), getPartitionColumn(), injectTombstones(), producer);
+    }
+  }
+
+  @Override
   protected String getFailurePoint() {
     return _scenario._failurePoint;
   }
