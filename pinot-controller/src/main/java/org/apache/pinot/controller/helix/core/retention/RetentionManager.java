@@ -360,7 +360,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
       TableConfig offlineTableConfig = _pinotHelixResourceManager.getOfflineTableConfig(rawTableName);
       // hybrid table check should be performed before the realtime table check.
-      if (_isHybridTableRetentionStrategyEnabled && offlineTableConfig != null) {
+      if (offlineTableConfig != null && shouldEnableHybridTableRetentionStrategy(tableConfig, offlineTableConfig)) {
         // TODO: handle the orphan segment deletion for hybrid table
         manageRetentionForHybridTable(tableConfig, offlineTableConfig);
       } else {
@@ -368,6 +368,11 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
             untrackedSegmentsRetentionStrategy);
       }
     }
+  }
+
+  protected boolean shouldEnableHybridTableRetentionStrategy(TableConfig realtimeTableConfig,
+      TableConfig offlineTableConfig) {
+    return _isHybridTableRetentionStrategyEnabled;
   }
 
   private void manageRetentionForOfflineTable(String offlineTableName, RetentionStrategy retentionStrategy,
