@@ -43,6 +43,9 @@ public class QueryServerTestUtils {
   }
 
   /// Builds an unstarted query server whose scheduler answers each query with the future `responder` returns for it.
+  ///
+  /// `responder` runs on the server's network threads, which also answer pings. To model a slow or stuck query
+  /// engine, return a future that completes later or never: a `responder` that blocks holds back pings as well.
   public static QueryServer newQueryServer(Function<ServerQueryRequest, ListenableFuture<DataBuffer>> responder) {
     return newQueryServer(0, responder);
   }
