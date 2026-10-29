@@ -105,7 +105,8 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
   }
 
   private static String throttleKeyPrefix(KinesisConfig config, @Nullable String clientId) {
-    return clientId != null ? clientId
+    return clientId != null
+        ? clientId
         : config.getAwsRegion() + "/" + config.getEndpoint() + "/" + config.getStreamTopicName();
   }
 
