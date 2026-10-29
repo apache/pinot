@@ -160,7 +160,8 @@ final class IngestionSourceErrorRules {
     if (TLS_CERTIFICATE_REJECTED_ALERTS.contains(name)) {
       return auth(IngestionSourceErrorSubReason.AUTHENTICATION, name, target);
     }
-    return TLS_ACCESS_DENIED_ALERT.equals(name) ? auth(IngestionSourceErrorSubReason.AUTHORIZATION, name, target)
+    return TLS_ACCESS_DENIED_ALERT.equals(name)
+        ? auth(IngestionSourceErrorSubReason.AUTHORIZATION, name, target)
         : null;
   }
 
@@ -179,7 +180,8 @@ final class IngestionSourceErrorRules {
   /// by the network exception or by the client wrapping it.
   private static IngestionSourceErrorVerdict unreachable(Throwable cause, String wrapperMessage) {
     String code = cause.getClass().getSimpleName();
-    return namesMetadataEndpoint(messageOf(cause)) || namesMetadataEndpoint(wrapperMessage) ? none(code)
+    return namesMetadataEndpoint(messageOf(cause)) || namesMetadataEndpoint(wrapperMessage)
+        ? none(code)
         : sourceRead(code, null);
   }
 
@@ -694,7 +696,8 @@ final class IngestionSourceErrorRules {
         // A rejected credential is the table owner's only when it was the table's: under the process's own
         // identity, grpc-auth reports our failed token refresh this way.
         return evidence != null && evidence.getCredentialMode() == IngestionSourceCredentialMode.STATIC
-            ? auth(IngestionSourceErrorSubReason.AUTHENTICATION, code, null) : none(code);
+            ? auth(IngestionSourceErrorSubReason.AUTHENTICATION, code, null)
+            : none(code);
       case "PERMISSION_DENIED":
         return auth(IngestionSourceErrorSubReason.AUTHORIZATION, code, null);
       case "NOT_FOUND":

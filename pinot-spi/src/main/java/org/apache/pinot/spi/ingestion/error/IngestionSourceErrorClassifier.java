@@ -70,17 +70,7 @@ public final class IngestionSourceErrorClassifier {
     try {
       Walk walk = new Walk();
       walk.visit(failure);
-      walk.decide();
-      Decision decided = null;
-      for (Decision decision : walk._decisions) {
-        if (decision._verdict.getCategory() == IngestionSourceErrorCategory.AUTH) {
-          decided = decision;
-          break;
-        }
-        if (decided == null && decision._verdict.getCategory() == IngestionSourceErrorCategory.SOURCE_READ) {
-          decided = decision;
-        }
-      }
+      Decision decided = walk.decide();
       if (decided == null) {
         return Optional.empty();
       }
@@ -173,14 +163,13 @@ public final class IngestionSourceErrorClassifier {
     final List<Throwable> _nodes = new ArrayList<>();
     final List<IngestionSourceErrorEvidence> _direct = new ArrayList<>();
     final List<IngestionSourceErrorEvidence> _nearest = new ArrayList<>();
-    // Whether a boundary sits at or above each node
-    final List<Boolean> _withinBoundary = new ArrayList<>();
+    // The first node with a boundary: it and every node beneath it are within the boundary
+    int _firstBoundary = -1;
   }
 
   private static final class Walk {
     final Set<Throwable> _heads = Collections.newSetFromMap(new IdentityHashMap<>());
     final List<Chain> _chains = new ArrayList<>();
-    final List<Decision> _decisions = new ArrayList<>();
     int _visited;
     boolean _hasBoundary;
 
@@ -208,7 +197,6 @@ public final class IngestionSourceErrorClassifier {
       List<Throwable> suppressedHeads = new ArrayList<>();
       Set<Throwable> inChain = Collections.newSetFromMap(new IdentityHashMap<>());
       IngestionSourceErrorEvidence current = null;
-      boolean withinBoundary = false;
       for (Throwable node = head; node != null && _visited < MAX_NODES && inChain.add(node);
           node = node.getCause()) {
         _visited++;
@@ -225,33 +213,41 @@ public final class IngestionSourceErrorClassifier {
         }
         if (own != null) {
           current = own;
-          if (own.isBoundary()) {
-            withinBoundary = true;
+          if (own.isBoundary() && chain._firstBoundary < 0) {
+            chain._firstBoundary = chain._nodes.size();
             _hasBoundary = true;
           }
         }
         chain._nodes.add(node);
         chain._direct.add(own);
         chain._nearest.add(current);
-        chain._withinBoundary.add(withinBoundary);
       }
       _chains.add(chain);
       return suppressedHeads;
     }
 
-    /// Decides every chain visited. In a tree with a boundary, only the exceptions within one are read.
-    void decide() {
+    /// Decides every chain visited and returns the first AUTH decision, else the first SOURCE_READ one. In a tree with
+    /// a boundary, only the exceptions within one are read.
+    @Nullable
+    Decision decide() {
+      Decision decided = null;
       for (Chain chain : _chains) {
         Decision decision = decide(chain);
-        if (decision != null) {
-          _decisions.add(decision);
+        if (decision == null || decision._verdict.isNone()) {
+          continue;
+        }
+        if (decided == null || (decision._verdict.getCategory() == IngestionSourceErrorCategory.AUTH
+            && decided._verdict.getCategory() != IngestionSourceErrorCategory.AUTH)) {
+          decided = decision;
         }
       }
+      return decided;
     }
 
     @Nullable
     private Decision decide(Chain chain) {
-      List<Throwable> nodes = chain._nodes;
+      // Rules read the nodes beneath theirs but never change them
+      List<Throwable> nodes = Collections.unmodifiableList(chain._nodes);
       for (int i = nodes.size() - 1; i >= 0; i--) {
         if (!isEligible(chain, i)) {
           continue;
@@ -289,7 +285,7 @@ public final class IngestionSourceErrorClassifier {
     }
 
     private boolean isEligible(Chain chain, int index) {
-      return !_hasBoundary || chain._withinBoundary.get(index);
+      return !_hasBoundary || (chain._firstBoundary >= 0 && index >= chain._firstBoundary);
     }
   }
 }

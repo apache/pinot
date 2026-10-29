@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.spi.ingestion.error;
 
-import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 
 
@@ -41,7 +40,7 @@ public final class IngestionSourceErrorVerdict {
   /// The target for an admin endpoint of the source, e.g. Pulsar's admin API.
   public static final String TARGET_ADMIN = "admin";
 
-  private static final Pattern TOKEN_UNSAFE = Pattern.compile("[^A-Za-z0-9_.:/-]");
+  private static final String TOKEN_PUNCTUATION = "_.:/-";
   private static final int MAX_TOKEN_LENGTH = 64;
 
   @Nullable
@@ -106,14 +105,25 @@ public final class IngestionSourceErrorVerdict {
     return _target;
   }
 
-  /// `value` with every character outside `[A-Za-z0-9_.:/-]` replaced and its length capped, or null.
+  /// `value` with every character outside `[A-Za-z0-9_.:/-]` replaced and its length capped, or null. Reads no further
+  /// than the cap: a configured endpoint can answer with a code of any length.
   @Nullable
   static String token(@Nullable String value) {
     if (value == null) {
       return null;
     }
-    String token = TOKEN_UNSAFE.matcher(value).replaceAll("_");
-    return token.length() > MAX_TOKEN_LENGTH ? token.substring(0, MAX_TOKEN_LENGTH) : token;
+    StringBuilder token = new StringBuilder(Math.min(value.length(), MAX_TOKEN_LENGTH));
+    for (int i = 0; i < value.length() && token.length() < MAX_TOKEN_LENGTH; ) {
+      int codePoint = value.codePointAt(i);
+      token.append(isTokenSafe(codePoint) ? (char) codePoint : '_');
+      i += Character.charCount(codePoint);
+    }
+    return token.toString();
+  }
+
+  private static boolean isTokenSafe(int codePoint) {
+    return (codePoint >= 'A' && codePoint <= 'Z') || (codePoint >= 'a' && codePoint <= 'z')
+        || (codePoint >= '0' && codePoint <= '9') || TOKEN_PUNCTUATION.indexOf(codePoint) >= 0;
   }
 
   @Override

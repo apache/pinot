@@ -100,15 +100,19 @@ public class KinesisSourceErrorClassificationTest {
     return new RuntimeException("Pinot wrapper", failure);
   }
 
-  @Test
-  public void permissionDenied() {
-    Throwable denied = AccessDeniedException.builder().awsErrorDetails(details("Kinesis", "AccessDeniedException"))
+  /// A new exception for each use: evidence attached to one keeps the first record.
+  private static Throwable streamAccessDenied() {
+    return AccessDeniedException.builder().awsErrorDetails(details("Kinesis", "AccessDeniedException"))
         .statusCode(400).message("User: arn is not authorized to perform: kinesis:GetRecords on resource: stream")
         .build();
-    assertAuth(underPinot(withCredentials(denied, IngestionSourceCredentialMode.STATIC, false)),
+  }
+
+  @Test
+  public void permissionDenied() {
+    assertAuth(underPinot(withCredentials(streamAccessDenied(), IngestionSourceCredentialMode.STATIC, false)),
         IngestionSourceErrorSubReason.AUTHORIZATION, null);
     // A denial of the process's own identity is still a permission someone must grant.
-    assertAuth(underPinot(withCredentials(denied, IngestionSourceCredentialMode.AMBIENT, false)),
+    assertAuth(underPinot(withCredentials(streamAccessDenied(), IngestionSourceCredentialMode.AMBIENT, false)),
         IngestionSourceErrorSubReason.AUTHORIZATION, null);
     // The denied action names the key that encrypts the stream.
     assertAuth(kinesis("AccessDeniedException", "User: arn is not authorized to perform: kms:Decrypt on resource: "
