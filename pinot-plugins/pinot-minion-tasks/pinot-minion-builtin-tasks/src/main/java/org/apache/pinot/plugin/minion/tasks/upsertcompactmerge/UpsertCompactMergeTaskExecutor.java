@@ -77,8 +77,8 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
     long startMillis = System.currentTimeMillis();
 
     String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
-    TableConfig tableConfig = getTableConfig(tableNameWithType);
     Schema schema = getSchema(tableNameWithType);
+    TableConfig tableConfig = getTableConfig(tableNameWithType);
 
     SegmentProcessorConfig.Builder segmentProcessorConfigBuilder =
         new SegmentProcessorConfig.Builder().setTableConfig(tableConfig).setSchema(schema);
