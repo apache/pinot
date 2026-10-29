@@ -18,12 +18,13 @@
  */
 package org.apache.pinot.broker.routing.instanceselector;
 
+import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.HashCommon;
 import it.unimi.dsi.fastutil.ints.Int2IntMap;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenCustomHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -75,44 +76,35 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ReplicaGroupInstanceSelector.class);
 
-  // Immutable key for instance groups that reduces hash collisions.
-  static final class InstanceSetKey implements Comparable<InstanceSetKey> {
-    private final String[] _instances;
-    private final int _hashCode;
+  // Assignment maps can have different iteration orders for the same instance group.
+  // Hashing must be order-independent to preserve Set equality semantics.
+  // Two commutative mixed sums reduce collisions without copying or sorting keys.
+  // The backing assignment maps must remain unchanged throughout a rebuild.
+  static final Hash.Strategy<Set<String>> INSTANCE_SET_STRATEGY =
+      new Hash.Strategy<>() {
+        @Override
+        public int hashCode(Set<String> instances) {
+          if (instances == null) {
+            return 0;
+          }
 
-    InstanceSetKey(Set<String> instances) {
-      _instances = instances.toArray(new String[0]);
-      Arrays.sort(_instances);
+          int first = 0;
+          int second = 0;
+          for (String instance : instances) {
+            int hash = instance.hashCode();
+            first += HashCommon.mix(hash);
+            second += HashCommon.mix(hash ^ 0x9e3779b9);
+          }
 
-      int hash = 1;
-      for (String instance : _instances) {
-        hash = 31 * hash + HashCommon.mix(instance.hashCode());
-      }
-      _hashCode = hash;
-    }
+          return HashCommon.mix(first ^ Integer.rotateLeft(second, 16) ^ instances.size());
+        }
 
-    @Override
-    public int hashCode() {
-      return _hashCode;
-    }
+        @Override
+        public boolean equals(Set<String> left, Set<String> right) {
+          return left == right || (left != null && right != null && left.equals(right));
+        }
+      };
 
-    @Override
-    public boolean equals(Object object) {
-      if (this == object) {
-        return true;
-      }
-      if (!(object instanceof InstanceSetKey)) {
-        return false;
-      }
-      InstanceSetKey other = (InstanceSetKey) object;
-      return _hashCode == other._hashCode && Arrays.equals(_instances, other._instances);
-    }
-
-    @Override
-    public int compareTo(InstanceSetKey other) {
-      return Arrays.compare(_instances, other._instances);
-    }
-  }
 
   @Override
   public InstanceMapping select(List<String> segments, int requestId,
@@ -275,7 +267,8 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
 
     // Calculate the unavailable instances based on the old segments' online instances for each combination of instances
     // in the ideal state
-    Map<InstanceSetKey, Set<String>> unavailableInstancesMap = new HashMap<>();
+    Map<Set<String>, Set<String>> unavailableInstancesMap =
+        new Object2ObjectOpenCustomHashMap<>(INSTANCE_SET_STRATEGY);
     for (Map.Entry<String, InstanceStateMaps> entry : oldSegmentToInstanceStateMaps.entrySet()) {
       String segment = entry.getKey();
       InstanceStateMaps instanceStateMaps = entry.getValue();
@@ -289,7 +282,7 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       Set<String> instancesInIdealState = idealStateInstanceStateMap.keySet();
 
       Set<String> unavailableInstances = unavailableInstancesMap.computeIfAbsent(
-          new InstanceSetKey(instancesInIdealState), k -> new HashSet<>());
+          instancesInIdealState, k -> new HashSet<>());
 
       for (String instance : instancesInIdealState) {
         if (!onlineInstances.contains(instance)) {
@@ -315,7 +308,7 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       if (candidates == null) {
         Set<String> onlineInstances = instanceStateMaps._onlineInstances;
         Set<String> unavailableInstances = unavailableInstancesMap.get(
-            new InstanceSetKey(idealStateInstanceStateMap.keySet()));
+            idealStateInstanceStateMap.keySet());
         candidates = new ArrayList<>(onlineInstances.size());
         int idealStateReplicaId = 0;
         for (String instance : sortByKeyIfNeeded(idealStateInstanceStateMap).keySet()) {
@@ -337,7 +330,7 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       Map<String, String> idealStateInstanceStateMap = idealStateAssignment.get(segment);
       Map<String, String> sortedIdealStateInstanceStateMap = sortByKeyIfNeeded(idealStateInstanceStateMap);
       Set<String> unavailableInstances = unavailableInstancesMap.getOrDefault(
-          new InstanceSetKey(idealStateInstanceStateMap.keySet()), Set.of());
+          idealStateInstanceStateMap.keySet(), Set.of());
       List<SegmentInstanceCandidate> candidates = new ArrayList<>(idealStateInstanceStateMap.size());
       int idealStateReplicaId = 0;
       for (String instance : sortedIdealStateInstanceStateMap.keySet()) {

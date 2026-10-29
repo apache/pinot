@@ -20,6 +20,8 @@ package org.apache.pinot.broker.routing.instanceselector;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
+import it.unimi.dsi.fastutil.Hash;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenCustomHashMap;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -43,6 +45,8 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
+import org.apache.helix.zookeeper.util.GZipCompressionUtil;
 import org.apache.pinot.broker.routing.adaptiveserverselector.HybridSelector;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -52,6 +56,8 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.TestClock;
+import org.apache.pinot.common.utils.helix.CompactZNRecordSerializer;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -2609,32 +2615,256 @@ public class InstanceSelectorTest {
   }
 
   @Test
-  public void testReplicaGroupInstanceSetHashCollisions() {
-    Set<String> first = Set.of("Server_1", "Server_4");
-    Set<String> second = Set.of("Server_2", "Server_3");
+  public void testReplicaGroupInstanceSetStrategyEquality() {
+    Hash.Strategy<Set<String>> strategy =
+        ReplicaGroupInstanceSelector.INSTANCE_SET_STRATEGY;
 
-    // Different instance sets collide with the original Set hash.
-    assertEquals(first.hashCode(), second.hashCode());
+    Set<String> first = new HashSet<>(List.of("Server_1", "Server_4"));
+    Set<String> reordered = new java.util.LinkedHashSet<>(
+        List.of("Server_4", "Server_1"));
+    Set<String> different = Set.of("Server_2", "Server_3");
 
-    ReplicaGroupInstanceSelector.InstanceSetKey firstKey =
-        new ReplicaGroupInstanceSelector.InstanceSetKey(first);
-    ReplicaGroupInstanceSelector.InstanceSetKey secondKey =
-        new ReplicaGroupInstanceSelector.InstanceSetKey(second);
+    assertEquals(first, reordered);
+    assertEquals(first.hashCode(), different.hashCode());
 
-    // The new key must distinguish the two instance groups.
-    assertTrue(!firstKey.equals(secondKey));
-    assertTrue(firstKey.hashCode() != secondKey.hashCode());
+    assertTrue(strategy.equals(first, first));
+    assertTrue(strategy.equals(first, reordered));
+    assertTrue(strategy.equals(reordered, first));
 
-    Map<ReplicaGroupInstanceSelector.InstanceSetKey, String> groups =
-        new HashMap<>();
-    groups.put(firstKey, "first");
-    groups.put(secondKey, "second");
+    assertEquals(strategy.hashCode(first),
+        strategy.hashCode(reordered));
+
+    assertTrue(strategy.hashCode(first) != strategy.hashCode(different));
+    assertTrue(!strategy.equals(first, different));
+    assertTrue(!strategy.equals(first, Set.of("Server_1")));
+
+    assertTrue(strategy.equals(null, null));
+    assertTrue(!strategy.equals(first, null));
+    assertTrue(!strategy.equals(null, first));
+    assertEquals(strategy.hashCode(null), 0);
+
+    Map<Set<String>, String> groups =
+        new Object2ObjectOpenCustomHashMap<>(strategy);
+
+    groups.put(first, "group-a");
+    groups.put(different, "group-b");
 
     assertEquals(groups.size(), 2);
-    assertEquals(groups.get(
-        new ReplicaGroupInstanceSelector.InstanceSetKey(first)), "first");
-    assertEquals(groups.get(
-        new ReplicaGroupInstanceSelector.InstanceSetKey(second)), "second");
+    assertEquals(groups.get(reordered), "group-a");
+    assertEquals(groups.get(different), "group-b");
+    assertEquals(groups.get(Set.of("Server_1")), null);
+  }
+
+  @Test
+  public void testReplicaGroupInstanceSetStrategyHashDistribution() {
+    Hash.Strategy<Set<String>> strategy =
+        ReplicaGroupInstanceSelector.INSTANCE_SET_STRATEGY;
+
+    List<String> servers = new ArrayList<>();
+    for (int i = 0; i < 200; i++) {
+      servers.add("Server_pinot-server-" + i
+          + ".pinot-server-headless.ns.svc.cluster.local_8098");
+    }
+
+    Set<Integer> originalHashes = new HashSet<>();
+    Set<Integer> strategyHashes = new HashSet<>();
+
+    int groups = 0;
+    outer:
+    for (int i = 0; i < servers.size() - 2; i++) {
+      for (int j = i + 1; j < servers.size() - 1; j++) {
+        for (int k = j + 1; k < servers.size(); k++) {
+          Set<String> instances =
+              Set.of(servers.get(i), servers.get(j), servers.get(k));
+
+          originalHashes.add(instances.hashCode());
+          strategyHashes.add(strategy.hashCode(instances));
+
+          if (++groups == 100_000) {
+            break outer;
+          }
+        }
+      }
+    }
+
+    assertEquals(groups, 100_000);
+    assertTrue(originalHashes.size() < 5_000);
+    assertTrue(strategyHashes.size() >= 99_000,
+        "Insufficient hash diversity: " + strategyHashes.size());
+    assertTrue(strategyHashes.size() > originalHashes.size() * 20);
+  }
+
+  @Test
+  public void testStrictReplicaGroupReorderedInstanceSets() {
+    String[] forward = {"Server_1", "Server_4"};
+    String[] reversed = {"Server_4", "Server_1"};
+    String[] unrelated = {"Server_2", "Server_3"};
+
+    // These instance groups collide under the original Set hash.
+    assertEquals(Set.of(forward).hashCode(),
+        Set.of(unrelated).hashCode());
+
+    Map<String, Map<String, String>> idealStateMaps = new LinkedHashMap<>();
+    idealStateMaps.put("failed", instanceStateMap(forward, ONLINE, ONLINE));
+    idealStateMaps.put("healthy", instanceStateMap(reversed, ONLINE, ONLINE));
+    idealStateMaps.put("unrelated", instanceStateMap(unrelated, ONLINE, ONLINE));
+
+    Map<String, Map<String, String>> externalViewMaps = new LinkedHashMap<>();
+    externalViewMaps.put("failed", instanceStateMap(forward, OFFLINE, ONLINE));
+    externalViewMaps.put("healthy", instanceStateMap(reversed, ONLINE, ONLINE));
+    externalViewMaps.put("unrelated", instanceStateMap(unrelated, ONLINE, ONLINE));
+
+    Set<String> onlineSegments = new HashSet<>(idealStateMaps.keySet());
+    Set<String> enabledInstances =
+        Set.of("Server_1", "Server_2", "Server_3", "Server_4");
+
+    // Equal replica groups must be recognized regardless of iteration order.
+    assertEquals(idealStateMaps.get("failed").keySet(),
+        idealStateMaps.get("healthy").keySet());
+    assertEquals(new ArrayList<>(idealStateMaps.get("healthy").keySet()),
+        List.of("Server_4", "Server_1"));
+
+    for (int sharingLimit : new int[]{0, 1, 4096}) {
+      IdealState idealState = createInsertionOrderedIdealState(idealStateMaps);
+      ExternalView externalView =
+          createInsertionOrderedExternalView(externalViewMaps);
+
+      BaseInstanceSelector selector = (BaseInstanceSelector)
+          createTestInstanceSelector(
+              STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
+              enabledInstances, idealState, externalView, onlineSegments);
+
+      selector._maxSharedCandidateLists = sharingLimit;
+      selector.onAssignmentChange(idealState, externalView, onlineSegments);
+
+      // Server_1 is unavailable for the entire replica group.
+      assertEquals(describe(selector._segmentStates.getCandidates("failed")),
+          List.of("Server_4/1/true"), "sharingLimit=" + sharingLimit);
+
+      assertEquals(describe(selector._segmentStates.getCandidates("healthy")),
+          List.of("Server_4/1/true"), "sharingLimit=" + sharingLimit);
+
+      // An unrelated replica group must remain unaffected.
+      assertEquals(describe(selector._segmentStates.getCandidates("unrelated")),
+          List.of("Server_2/0/true", "Server_3/1/true"),
+          "sharingLimit=" + sharingLimit);
+    }
+  }
+
+  @Test
+  public void testStrictReplicaGroupSerializedAssignmentRoundTrip()
+      throws Exception {
+    String[] forward = {"Server_1", "Server_4"};
+    String[] reversed = {"Server_4", "Server_1"};
+    String[] unrelated = {"Server_2", "Server_3"};
+
+    Map<String, Map<String, String>> idealMaps = new LinkedHashMap<>();
+    idealMaps.put("failed", instanceStateMap(forward, ONLINE, ONLINE));
+    idealMaps.put("healthy", instanceStateMap(reversed, ONLINE, ONLINE));
+    idealMaps.put("unrelated", instanceStateMap(unrelated, ONLINE, ONLINE));
+
+    Map<String, Map<String, String>> externalMaps = new LinkedHashMap<>();
+    externalMaps.put("failed", instanceStateMap(forward, OFFLINE, ONLINE));
+    externalMaps.put("healthy", instanceStateMap(reversed, ONLINE, ONLINE));
+    externalMaps.put("unrelated", instanceStateMap(unrelated, ONLINE, ONLINE));
+
+    Set<String> onlineSegments = new HashSet<>(idealMaps.keySet());
+    Set<String> enabledInstances =
+        Set.of("Server_1", "Server_2", "Server_3", "Server_4");
+
+    ZNRecordSerializer standard = new ZNRecordSerializer();
+    CompactZNRecordSerializer compact = new CompactZNRecordSerializer();
+
+    for (boolean compressed : new boolean[]{false, true}) {
+      IdealState originalIdeal = createInsertionOrderedIdealState(idealMaps);
+      ExternalView originalExternal =
+          createInsertionOrderedExternalView(externalMaps);
+
+      byte[] idealBytes = standard.serialize(originalIdeal.getRecord());
+      byte[] externalBytes = standard.serialize(originalExternal.getRecord());
+
+      if (compressed) {
+        idealBytes = GZipCompressionUtil.compress(idealBytes);
+        externalBytes = GZipCompressionUtil.compress(externalBytes);
+      }
+
+      ZNRecord idealRecord = (ZNRecord) compact.deserialize(idealBytes);
+      ZNRecord externalRecord = (ZNRecord) compact.deserialize(externalBytes);
+
+      assertTrue(idealRecord != null);
+      assertTrue(externalRecord != null);
+      assertEquals(HelixHelper.isCompact(idealRecord), compressed);
+      assertEquals(HelixHelper.isCompact(externalRecord), compressed);
+
+      assertEquals(idealRecord.getMapFields(),
+          originalIdeal.getRecord().getMapFields());
+      assertEquals(externalRecord.getMapFields(),
+          originalExternal.getRecord().getMapFields());
+
+      IdealState restoredIdeal = HelixHelper.toIdealState(idealRecord);
+      ExternalView restoredExternal = HelixHelper.toExternalView(externalRecord);
+
+      assertEquals(restoredIdeal.getInstanceStateMap("failed").keySet(),
+          restoredIdeal.getInstanceStateMap("healthy").keySet());
+
+      for (int sharingLimit : new int[]{0, 1, 4096}) {
+        BaseInstanceSelector selector = (BaseInstanceSelector)
+            createTestInstanceSelector(
+                STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
+                enabledInstances, restoredIdeal, restoredExternal,
+                onlineSegments);
+
+        selector._maxSharedCandidateLists = sharingLimit;
+        selector.onAssignmentChange(
+            restoredIdeal, restoredExternal, onlineSegments);
+
+        String context = "compressed=" + compressed
+            + ", sharingLimit=" + sharingLimit;
+
+        assertEquals(
+            describe(selector._segmentStates.getCandidates("failed")),
+            List.of("Server_4/1/true"), context);
+        assertEquals(
+            describe(selector._segmentStates.getCandidates("healthy")),
+            List.of("Server_4/1/true"), context);
+        assertEquals(
+            describe(selector._segmentStates.getCandidates("unrelated")),
+            List.of("Server_2/0/true", "Server_3/1/true"), context);
+
+        // Simulate another serialized external-view update and recovery.
+        Map<String, Map<String, String>> recoveredMaps =
+            new LinkedHashMap<>(externalMaps);
+        recoveredMaps.put("failed",
+            instanceStateMap(forward, ONLINE, ONLINE));
+
+        ExternalView recoveredExternal =
+            createInsertionOrderedExternalView(recoveredMaps);
+
+        byte[] recoveredBytes =
+            standard.serialize(recoveredExternal.getRecord());
+
+        if (compressed) {
+          recoveredBytes = GZipCompressionUtil.compress(recoveredBytes);
+        }
+
+        ZNRecord recoveredRecord =
+            (ZNRecord) compact.deserialize(recoveredBytes);
+
+        assertTrue(recoveredRecord != null);
+        assertEquals(HelixHelper.isCompact(recoveredRecord), compressed);
+
+        selector.onAssignmentChange(
+            restoredIdeal, HelixHelper.toExternalView(recoveredRecord),
+            onlineSegments);
+
+        assertEquals(
+            describe(selector._segmentStates.getCandidates("healthy")),
+            List.of("Server_1/0/true", "Server_4/1/true"), context);
+        assertEquals(
+            describe(selector._segmentStates.getCandidates("unrelated")),
+            List.of("Server_2/0/true", "Server_3/1/true"), context);
+      }
+    }
   }
 
   @Test
@@ -2686,47 +2916,5 @@ public class InstanceSelectorTest {
         List.of("Server_1/0/true", "Server_4/1/true"));
     assertEquals(describe(selector._segmentStates.getCandidates("b_healthy")),
         List.of("Server_2/0/true", "Server_3/1/true"));
-  }
-
-  @Test
-  public void testReplicaGroupInstanceSetHashDistribution() {
-    List<String> servers = new ArrayList<>();
-    for (int i = 0; i < 200; i++) {
-      servers.add("Server_pinot-server-" + i
-          + ".pinot-server-headless.ns.svc.cluster.local_8098");
-    }
-
-    Set<Integer> originalHashes = new HashSet<>();
-    Set<Integer> improvedHashes = new HashSet<>();
-
-    int groups = 0;
-    outer:
-    for (int i = 0; i < servers.size() - 2; i++) {
-      for (int j = i + 1; j < servers.size() - 1; j++) {
-        for (int k = j + 1; k < servers.size(); k++) {
-          Set<String> instances =
-              Set.of(servers.get(i), servers.get(j), servers.get(k));
-
-          originalHashes.add(instances.hashCode());
-          improvedHashes.add(
-              new ReplicaGroupInstanceSelector.InstanceSetKey(instances)
-                  .hashCode());
-
-          if (++groups == 100_000) {
-            break outer;
-          }
-        }
-      }
-    }
-
-    assertEquals(groups, 100_000);
-
-    // The original set hashing produces substantial collisions.
-    assertTrue(originalHashes.size() < 5_000);
-
-    // The ordered, mixed hashing should retain most distinct groups.
-    assertTrue(improvedHashes.size() >= 99_000);
-
-    assertTrue(improvedHashes.size() > originalHashes.size() * 20);
   }
 }
