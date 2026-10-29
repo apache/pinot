@@ -35,7 +35,9 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -53,6 +55,8 @@ import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
+import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
 import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.config.table.TableType;
@@ -60,6 +64,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.util.TestUtils;
@@ -140,8 +145,12 @@ public class QueryRoutingTest {
   }
 
   private QueryServer getQueryServer(int responseDelayMs, byte[] responseBytes, int port) {
+    return getQueryServer(responseDelayMs, PinotByteBuffer.wrap(responseBytes), port);
+  }
+
+  private QueryServer getQueryServer(int responseDelayMs, DataBuffer response, int port) {
     InstanceRequestHandler handler = new InstanceRequestHandler("server01", new PinotConfiguration(),
-        mockQueryScheduler(responseDelayMs, responseBytes), mock(AccessControl.class),
+        mockQueryScheduler(responseDelayMs, response), mock(AccessControl.class),
         ThreadAccountantUtils.getNoOpAccountant());
     return new QueryServer(port, null, handler);
   }
@@ -154,11 +163,11 @@ public class QueryRoutingTest {
     return ((InetSocketAddress) server.getChannel().localAddress()).getPort();
   }
 
-  private QueryScheduler mockQueryScheduler(int responseDelayMs, byte[] responseBytes) {
+  private QueryScheduler mockQueryScheduler(int responseDelayMs, DataBuffer response) {
     QueryScheduler queryScheduler = mock(QueryScheduler.class);
-    when(queryScheduler.submit(any())).thenAnswer(invocation -> {
+    when(queryScheduler.submitResponse(any())).thenAnswer(invocation -> {
       Thread.sleep(responseDelayMs);
-      return Futures.immediateFuture(responseBytes);
+      return Futures.immediateFuture(response);
     });
     return queryScheduler;
   }
@@ -229,6 +238,51 @@ public class QueryRoutingTest {
     _requestCount += 4;
     waitForStatsUpdate(_requestCount);
     assertEquals(_serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverId).intValue(), 0);
+  }
+
+  /// The server sends a response that is split into many pages. The broker must receive the same table.
+  @Test
+  public void testPagedResponse()
+      throws Exception {
+    long requestId = 123;
+    DataSchema dataSchema =
+        new DataSchema(new String[]{"bytes"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.BYTES});
+    DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
+    int numRows = 200;
+    for (int rowId = 0; rowId < numRows; rowId++) {
+      dataTableBuilder.startRow();
+      byte[] value = new byte[10_000];
+      Arrays.fill(value, (byte) rowId);
+      dataTableBuilder.setColumn(0, new ByteArray(value));
+      dataTableBuilder.finishRow();
+    }
+    DataTable dataTable = dataTableBuilder.build();
+    dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
+    DataBuffer response = dataTable.toDataBuffer();
+    List<ByteBuffer> responseBuffers = new ArrayList<>();
+    response.appendAsByteBuffers(responseBuffers);
+    assertTrue(responseBuffers.size() > 100, "Expected the response in many pages: " + responseBuffers.size());
+
+    _queryServer = getQueryServer(0, response, 0);
+    initializeTestFixtures(startAndGetPort(_queryServer));
+
+    AsyncQueryResponse asyncQueryResponse =
+        _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, _routingTable, null, null, 600_000L);
+    Map<ServerRoutingInstance, ServerResponse> responses = asyncQueryResponse.getFinalResponses();
+    assertEquals(responses.size(), 1);
+    ServerResponse serverResponse = responses.get(_offlineServerRoutingInstance);
+    assertNotNull(serverResponse);
+    assertEquals(serverResponse.getResponseSize(), response.size());
+    DataTable receivedDataTable = serverResponse.getDataTable();
+    assertNotNull(receivedDataTable);
+    assertEquals(receivedDataTable.getNumberOfRows(), numRows);
+    for (int rowId = 0; rowId < numRows; rowId++) {
+      byte[] expected = new byte[10_000];
+      Arrays.fill(expected, (byte) rowId);
+      assertEquals(receivedDataTable.getBytes(rowId, 0).getBytes(), expected);
+    }
+    _requestCount += 2;
+    waitForStatsUpdate(_requestCount);
   }
 
   @Test
