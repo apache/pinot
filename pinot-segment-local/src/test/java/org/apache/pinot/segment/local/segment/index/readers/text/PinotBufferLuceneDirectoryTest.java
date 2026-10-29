@@ -38,7 +38,10 @@ import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.store.ByteBuffersDirectory;
 import org.apache.lucene.store.IOContext;
 import org.apache.lucene.store.IndexInput;
+import org.apache.pinot.segment.spi.memory.ByteBufferPinotBufferFactory;
+import org.apache.pinot.segment.spi.memory.PinotBufferFactory;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.memory.unsafe.UnsafePinotBufferFactory;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -46,18 +49,25 @@ import static org.testng.Assert.assertEquals;
 
 
 /// Reads a Lucene index packed into a [PinotDataBuffer], as the combined text and vector index files are, through
-/// [PinotBufferLuceneDirectory] in either buffer byte order.
+/// [PinotBufferLuceneDirectory], for both buffer implementations and either byte order.
 public class PinotBufferLuceneDirectoryTest {
   private static final int NUM_DOCS = 500;
   private static final int PADDING = 13;
 
   @DataProvider
-  public Object[][] byteOrders() {
-    return new Object[][]{{ByteOrder.BIG_ENDIAN}, {ByteOrder.LITTLE_ENDIAN}};
+  public Object[][] buffers() {
+    // The ByteBuffer factory backs small column files, the Unsafe one backs files over 2 GB (or every file when
+    // pinot.offheap.prioritize.bytebuffer=false)
+    PinotBufferFactory byteBuffer = new ByteBufferPinotBufferFactory();
+    PinotBufferFactory unsafe = new UnsafePinotBufferFactory();
+    return new Object[][]{
+        {byteBuffer, ByteOrder.BIG_ENDIAN}, {byteBuffer, ByteOrder.LITTLE_ENDIAN},
+        {unsafe, ByteOrder.BIG_ENDIAN}, {unsafe, ByteOrder.LITTLE_ENDIAN}
+    };
   }
 
-  @Test(dataProvider = "byteOrders")
-  public void testSearchesIndexPackedInBuffer(ByteOrder byteOrder)
+  @Test(dataProvider = "buffers")
+  public void testSearchesIndexPackedInBuffer(PinotBufferFactory factory, ByteOrder byteOrder)
       throws Exception {
     try (ByteBuffersDirectory source = new ByteBuffersDirectory()) {
       try (IndexWriter writer = new IndexWriter(source, new IndexWriterConfig(new StandardAnalyzer()))) {
@@ -78,7 +88,7 @@ public class PinotBufferLuceneDirectoryTest {
         fileMap.put(name, new LuceneTextIndexHeader.FileInfo(name, size, length));
         size += length + PADDING;
       }
-      try (PinotDataBuffer buffer = PinotDataBuffer.allocateDirect(size, byteOrder, "test")) {
+      try (PinotDataBuffer buffer = factory.allocateDirect(size, byteOrder)) {
         for (LuceneTextIndexHeader.FileInfo file : fileMap.values()) {
           byte[] bytes = new byte[(int) file.getSize()];
           try (IndexInput input = source.openInput(file.getName(), IOContext.READONCE)) {
