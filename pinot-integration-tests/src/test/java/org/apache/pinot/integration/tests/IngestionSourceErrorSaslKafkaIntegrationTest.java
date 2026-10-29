@@ -93,7 +93,7 @@ import static org.testng.Assert.assertTrue;
 
 
 /// End-to-end proof that a real controller and server record the failures of a stream source as timestamp gauges:
-/// AUTH when the source refuses our credential or permission, SOURCE_READ when it can't serve us. The server writes
+/// AUTH when authentication or authorization fails, SOURCE_READ when reading fails otherwise. The server writes
 /// them per partition, the controller per table.
 ///
 /// Every test starts its own embedded Kafka with a SASL/PLAIN listener and the standard authorizer, with a fresh

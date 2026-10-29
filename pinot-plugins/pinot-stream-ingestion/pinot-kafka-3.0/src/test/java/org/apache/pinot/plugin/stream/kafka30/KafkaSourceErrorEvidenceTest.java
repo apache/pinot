@@ -19,8 +19,6 @@
 package org.apache.pinot.plugin.stream.kafka30;
 
 import java.util.Properties;
-import org.apache.kafka.clients.consumer.Consumer;
-import org.apache.kafka.common.utils.Bytes;
 import org.apache.pinot.plugin.stream.kafka.BaseKafkaSourceErrorEvidenceTest;
 import org.apache.pinot.plugin.stream.kafka30.server.EmbeddedKafkaCluster;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
@@ -32,29 +30,12 @@ import org.apache.pinot.spi.utils.retry.RetryPolicy;
 /// Runs the Kafka source error evidence tests against the kafka-clients 3.x plugin and an in-process broker.
 public class KafkaSourceErrorEvidenceTest extends BaseKafkaSourceErrorEvidenceTest {
   private static final String CLIENT_ID = "clientId";
-  // The handler's constructor calls the consumer hook before a subclass is initialized.
-  private static final ThreadLocal<Consumer<Bytes, Bytes>> KAFKA_CONSUMER = new ThreadLocal<>();
 
   private EmbeddedKafkaCluster _broker;
 
   @Override
   protected PartitionGroupConsumer createConsumer(StreamConfig streamConfig, RetryPolicy retryPolicy) {
     return new KafkaPartitionLevelConsumer(CLIENT_ID, streamConfig, 0, retryPolicy);
-  }
-
-  @Override
-  protected PartitionGroupConsumer createConsumer(StreamConfig streamConfig, Consumer<Bytes, Bytes> kafkaConsumer) {
-    KAFKA_CONSUMER.set(kafkaConsumer);
-    try {
-      return new KafkaPartitionLevelConsumer(CLIENT_ID, streamConfig, 0) {
-        @Override
-        protected Consumer<Bytes, Bytes> createConsumer(Properties consumerProp) {
-          return KAFKA_CONSUMER.get();
-        }
-      };
-    } finally {
-      KAFKA_CONSUMER.remove();
-    }
   }
 
   @Override
