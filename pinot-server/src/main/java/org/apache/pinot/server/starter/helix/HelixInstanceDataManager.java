@@ -40,7 +40,6 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BooleanSupplier;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixManager;
@@ -561,12 +560,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   private static SegmentMetadata detachMappedMetadata(SegmentDataManager segmentDataManager) {
     SegmentMetadata metadata = segmentDataManager.getSegment().getSegmentMetadata();
     if (metadata instanceof SegmentMetadataImpl segmentMetadata && segmentMetadata.isMapped()) {
-      try {
-        return segmentMetadata.detachedCopy();
-      } catch (IOException | ConfigurationException e) {
-        throw new IllegalStateException("Failed to detach metadata for segment: " + segmentDataManager.getSegmentName(),
-            e);
-      }
+      return segmentMetadata.detachedCopy();
     }
     return metadata;
   }

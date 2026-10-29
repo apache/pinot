@@ -660,8 +660,7 @@ public class SegmentMetadataImpl implements SegmentMetadata, Closeable {
 
   /// Returns metadata that remains readable after the mapped segment is released. Eager metadata already owns its
   /// column data; a mapped segment needs an eager copy with its serving-time column overlays and ZK timestamps.
-  public SegmentMetadataImpl detachedCopy()
-      throws IOException, ConfigurationException {
+  public SegmentMetadataImpl detachedCopy() {
     if (_mappedStore == null) {
       return this;
     }
