@@ -151,6 +151,12 @@
         "ignoreV2Optimizer": true
       },
       {
+        "description": "In HAVING, the condition on the MV key keeps only the matching element and the condition on the single-value key filters the rows",
+        "sql": "SELECT ARRAY_TO_MV(strMv), grp, COUNT(*) FROM {tbl} GROUP BY ARRAY_TO_MV(strMv), grp HAVING ARRAY_TO_MV(strMv) = 'b' AND grp = 'g1'",
+        "outputs": [["b", "g1", 2]],
+        "ignoreV2Optimizer": true
+      },
+      {
         "description": "A filter on the MV key in an outer query keeps only the matching element",
         "sql": "SELECT key, cnt FROM (SELECT ARRAY_TO_MV(strMv) AS key, COUNT(*) AS cnt FROM {tbl} GROUP BY ARRAY_TO_MV(strMv)) WHERE key = 'b'",
         "outputs": [["b", 2]],
@@ -227,7 +233,7 @@
     ]
   },
   "mv_aggregate_null_handling": {
-    "comment": "With column-based null handling the MV column is nullable. A null row forms one null group, as in the single-stage engine. CROSS JOIN UNNEST differs here: it drops the null row. ARRAY_TO_MV has the component type of the array, as before the MV aggregate, in every mode. So the planner folds ARRAY_TO_MV(col) IS NOT NULL to TRUE and removes COALESCE around it.",
+    "comment": "With column-based null handling the MV column is nullable. A null row forms one null group, as in the single-stage engine. CROSS JOIN UNNEST differs here: it drops the null row. ARRAY_TO_MV has the component type of the array, as before the MV aggregate, in every mode. So the planner folds ARRAY_TO_MV(col) IS NOT NULL to TRUE and removes COALESCE around it. With null handling, these results are incorrect SQL, because a null row still forms a null group. They match master, and a fix of the type of ARRAY_TO_MV is a follow-up.",
     "extraProps": {
       "enableColumnBasedNullHandling": true
     },
@@ -264,25 +270,25 @@
         "ignoreV2Optimizer": true
       },
       {
-        "description": "ARRAY_TO_MV(col) IS NOT NULL is folded to TRUE and keeps the null row",
+        "description": "ARRAY_TO_MV(col) IS NOT NULL is folded to TRUE and keeps the null row. This matches master, but it is incorrect SQL with null handling: the expected output is 2",
         "sql": "SET enableNullHandling=true; SELECT COUNT(*) FROM {tbl} WHERE ARRAY_TO_MV(strMv) IS NOT NULL",
         "outputs": [[3]],
         "ignoreV2Optimizer": true
       },
       {
-        "description": "COALESCE around an MV key is removed, in the default mode",
+        "description": "COALESCE around an MV key is removed, in the default mode. This matches master, but it is incorrect SQL with null handling: the null group must be none",
         "sql": "SET enableNullHandling=true; SELECT COALESCE(ARRAY_TO_MV(strMv), 'none'), COUNT(*) FROM {tbl} GROUP BY 1",
         "outputs": [["a", 2], ["b", 1], [null, 1]],
         "ignoreV2Optimizer": true
       },
       {
-        "description": "COALESCE around an MV key is removed, with the gate on",
+        "description": "COALESCE around an MV key is removed, with the gate on. This matches master, but it is incorrect SQL with null handling: the null group must be none",
         "sql": "SET enableNullHandling=true; SET useMvAggregate=true; SELECT COALESCE(ARRAY_TO_MV(strMv), 'none'), COUNT(*) FROM {tbl} GROUP BY 1",
         "outputs": [["a", 2], ["b", 1], [null, 1]],
         "ignoreV2Optimizer": true
       },
       {
-        "description": "COALESCE around an MV key is removed above a self-join",
+        "description": "COALESCE around an MV key is removed above a self-join. This matches master, but it is incorrect SQL with null handling: the null group must be none",
         "sql": "SET enableNullHandling=true; SELECT COALESCE(ARRAY_TO_MV(t1.strMv), 'none'), COUNT(*) FROM {tbl} t1 JOIN {tbl} t2 ON t1.k = t2.k GROUP BY 1",
         "outputs": [["a", 2], ["b", 1], [null, 1]],
         "ignoreV2Optimizer": true

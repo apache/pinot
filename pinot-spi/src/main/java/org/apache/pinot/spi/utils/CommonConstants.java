@@ -749,7 +749,7 @@ public class CommonConstants {
     /// - The stricter validation of `ARRAY_TO_MV` and its error messages.
     /// - The leaf-stage check that rejects a plain `GROUP BY` on a multi-value column.
     /// - The classification of the nodes above a lookup join or an `UNNEST` as intermediate stage nodes.
-    /// - A filter on the result of an aggregate that groups by `ARRAY_TO_MV(expr)` stays above the aggregate.
+    /// - A filter condition on an `ARRAY_TO_MV(expr)` group key stays above the aggregate.
     public static final String CONFIG_OF_USE_MV_AGGREGATE = "pinot.broker.multistage.use.mv.aggregate";
     public static final String DEFAULT_USE_MV_AGGREGATE = "auto";
 
@@ -759,9 +759,11 @@ public class CommonConstants {
       TRUE,
       /// Never plan the MV aggregate. A `GROUP BY ARRAY_TO_MV(col)` that does not run whole in the leaf stage fails.
       FALSE,
-      /// Plan the query without the MV aggregate first. If that plan fails the `ARRAY_TO_MV` validation, plan the
-      /// query again with the MV aggregate. A query that plans without the MV aggregate keeps the plan of a broker
-      /// that predates it.
+      /// Plan the query without the MV aggregate first. If that plan fails the `ARRAY_TO_MV` validation and the query
+      /// groups by `ARRAY_TO_MV(expr)`, plan the query again with the MV aggregate. A query that plans without the MV
+      /// aggregate never gets the MV aggregate, so a server that predates it can run the plan. That plan can still
+      /// differ from the plan of a broker that predates the MV aggregate, through the changes that do not depend on
+      /// this value (see [#CONFIG_OF_USE_MV_AGGREGATE]).
       AUTO;
 
       /// Parses `value`, case-insensitive and trimmed.

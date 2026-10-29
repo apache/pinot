@@ -28,6 +28,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.calcite.config.CalciteConnectionConfig;
 import org.apache.calcite.config.CalciteConnectionConfigImpl;
@@ -43,11 +45,9 @@ import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.prepare.CalciteCatalogReader;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
+import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rex.RexBuilder;
-import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexExecutor;
-import org.apache.calcite.rex.RexNode;
-import org.apache.calcite.rex.RexShuttle;
 import org.apache.calcite.runtime.CalciteContextException;
 import org.apache.calcite.sql.SqlExplain;
 import org.apache.calcite.sql.SqlExplainFormat;
@@ -60,6 +60,7 @@ import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.calcite.rel.rules.ArrayToMvGroupKeys;
 import org.apache.pinot.calcite.rel.rules.ImmutablePinotSortExchangeCopyRule;
 import org.apache.pinot.calcite.rel.rules.PinotAggregateTypeArgumentRewriteRule;
 import org.apache.pinot.calcite.rel.rules.PinotImplicitTableHintRule;
@@ -69,7 +70,6 @@ import org.apache.pinot.calcite.rel.rules.PinotRuleUtils;
 import org.apache.pinot.calcite.rel.rules.PinotSortExchangeCopyRule;
 import org.apache.pinot.calcite.rex.PinotRexExecutor;
 import org.apache.pinot.calcite.rex.SearchSealer;
-import org.apache.pinot.calcite.sql.fun.ArrayToMvFunctionName;
 import org.apache.pinot.calcite.sql.fun.PinotOperatorTable;
 import org.apache.pinot.calcite.sql2rel.PinotConvertletTable;
 import org.apache.pinot.calcite.sql2rel.PinotRelDecorrelator;
@@ -586,24 +586,14 @@ public class QueryEnvironment {
   // utils
   // --------------------------------------------------------------------------
 
-  /// Returns whether an expression of `node` or of one of its inputs calls `ARRAY_TO_MV`.
-  private static boolean containsArrayToMv(RelNode node) {
-    boolean[] found = new boolean[1];
-    node.accept(new RexShuttle() {
-      @Override
-      public RexNode visitCall(RexCall call) {
-        if (ArrayToMvFunctionName.matches(call.getOperator().getName())) {
-          found[0] = true;
-          return call;
-        }
-        return super.visitCall(call);
-      }
-    });
-    if (found[0]) {
+  /// Returns whether `node` or one of its inputs is an aggregate that groups by `ARRAY_TO_MV(expr)` (see
+  /// [ArrayToMvGroupKeys#detect]). Only such a query can plan with the MV aggregate.
+  private static boolean groupsByArrayToMv(RelNode node) {
+    if (node instanceof Aggregate && !ArrayToMvGroupKeys.detect((Aggregate) node).isEmpty()) {
       return true;
     }
     for (RelNode input : node.getInputs()) {
-      if (containsArrayToMv(input)) {
+      if (groupsByArrayToMv(input)) {
         return true;
       }
     }
@@ -1074,11 +1064,23 @@ public class QueryEnvironment {
     /// Builds the dispatchable plan. In the auto mode of the MV aggregate, a plan that fails the `ARRAY_TO_MV`
     /// validation is optimized again with the MV aggregate (see [#replanWithMvAggregate]).
     private DispatchableSubPlan toDispatchableSubPlanWithMvAggregateFallback() {
+      return withMvAggregateFallback(() -> toDispatchableSubPlan(_relRoot, _plannerContext));
+    }
+
+    /// Runs `planner`, which builds the dispatchable plan from [#_relRoot]. When it fails the `ARRAY_TO_MV` validation
+    /// and [#replanWithMvAggregate] applies, runs it again on the plan with the MV aggregate. If that also fails, the
+    /// error of the plan with the MV aggregate is thrown, with the first error as a suppressed exception.
+    private <T> T withMvAggregateFallback(Supplier<T> planner) {
       try {
-        return toDispatchableSubPlan(_relRoot, _plannerContext);
+        return planner.get();
       } catch (QueryException e) {
         replanWithMvAggregate(e);
-        return toDispatchableSubPlan(_relRoot, _plannerContext);
+        try {
+          return planner.get();
+        } catch (QueryException e2) {
+          e2.addSuppressed(e);
+          throw e2;
+        }
       }
     }
 
@@ -1096,27 +1098,36 @@ public class QueryEnvironment {
       _relRoot = _unoptimizedRelRoot.withRel(optimizeAndConvert(_unoptimizedRelRoot, _plannerContext));
     }
 
-    /// Whether [#replanWithMvAggregate] can plan this query again with the MV aggregate. The physical optimizer does
-    /// not support the MV aggregate.
+    /// Whether [#replanWithMvAggregate] can plan this query again with the MV aggregate: only in the
+    /// [MvAggregateMode#AUTO] mode, and only for a query that groups by `ARRAY_TO_MV(expr)`. Other `ARRAY_TO_MV`
+    /// errors, such as a plain `GROUP BY mvCol` or `ARRAY_TO_MV` in the SELECT list, fail once, without a second plan.
+    /// The physical optimizer does not support the MV aggregate.
     private boolean canFallBackToMvAggregate() {
       return _plannerContext.getMvAggregateMode() == MvAggregateMode.AUTO && !_plannerContext.isUseMvAggregate()
-          && !_plannerContext.isUsePhysicalOptimizer();
+          && !_plannerContext.isUsePhysicalOptimizer() && groupsByArrayToMv(_unoptimizedRelRoot.rel);
     }
 
     /// The [MvAggregateMode#AUTO] mode for `EXPLAIN PLAN WITHOUT IMPLEMENTATION`, which builds no dispatchable plan:
     /// validates the plan fragments without worker assignment, and plans the query again with the MV aggregate when
-    /// they fail the `ARRAY_TO_MV` validation. So the explained plan is the plan that the query runs.
+    /// they fail the `ARRAY_TO_MV` validation. So the explained plan is the plan that the query runs. Any other error
+    /// of this check is ignored: the query asked for the logical plan only, and it renders as it is.
     private void applyMvAggregateFallbackWithoutImplementation() {
-      if (!canFallBackToMvAggregate() || !containsArrayToMv(_relRoot.rel)) {
+      if (!canFallBackToMvAggregate()) {
         return;
       }
-      Map<String, String> options = _plannerContext.getOptions();
-      SubPlan plan = PinotLogicalQueryPlanner.makePlan(_relRoot, null, useSpools(options),
-          _envConfig.defaultHashFunction(), pruneUnnestColumns(options));
+      ArrayToMvValidationVisitor.ArrayToMvValidationException validationError = null;
       try {
+        Map<String, String> options = _plannerContext.getOptions();
+        SubPlan plan = PinotLogicalQueryPlanner.makePlan(_relRoot, null, useSpools(options),
+            _envConfig.defaultHashFunction(), pruneUnnestColumns(options));
         ArrayToMvValidationVisitor.validateFragments(plan.getSubPlanRoot());
       } catch (ArrayToMvValidationVisitor.ArrayToMvValidationException e) {
-        replanWithMvAggregate(e);
+        validationError = e;
+      } catch (RuntimeException e) {
+        LOGGER.debug("Skipping the MV aggregate check of EXPLAIN PLAN WITHOUT IMPLEMENTATION for: {}", _textQuery, e);
+      }
+      if (validationError != null) {
+        replanWithMvAggregate(validationError);
       }
     }
 
@@ -1158,18 +1169,16 @@ public class QueryEnvironment {
             Map<String, String> options = _sqlNodeAndOptions.getOptions();
             boolean explainPlanVerbose = QueryOptionsUtils.isExplainPlanVerbose(options);
 
-            // A map from the actual PlanNodes to the original RelNode in the logical rel tree
-            TransformationTracker.ByIdentity.Builder<PlanNode, RelNode> nodeTracker =
-                new TransformationTracker.ByIdentity.Builder<>();
+            // A map from the actual PlanNodes to the original RelNode in the logical rel tree. The MV aggregate
+            // fallback plans again, so each attempt starts with a new tracker.
+            AtomicReference<TransformationTracker.ByIdentity.Builder<PlanNode, RelNode>> nodeTrackerRef =
+                new AtomicReference<>();
             // Transform RelNodes into DispatchableSubPlan
-            DispatchableSubPlan dispatchableSubPlan;
-            try {
-              dispatchableSubPlan = toDispatchableSubPlan(_relRoot, _plannerContext, nodeTracker);
-            } catch (QueryException e) {
-              replanWithMvAggregate(e);
-              nodeTracker = new TransformationTracker.ByIdentity.Builder<>();
-              dispatchableSubPlan = toDispatchableSubPlan(_relRoot, _plannerContext, nodeTracker);
-            }
+            DispatchableSubPlan dispatchableSubPlan = withMvAggregateFallback(() -> {
+              nodeTrackerRef.set(new TransformationTracker.ByIdentity.Builder<>());
+              return toDispatchableSubPlan(_relRoot, _plannerContext, nodeTrackerRef.get());
+            });
+            TransformationTracker.ByIdentity.Builder<PlanNode, RelNode> nodeTracker = nodeTrackerRef.get();
 
             AskingServerStageExplainer serversExplainer = new AskingServerStageExplainer(
                 onServerExplainer, explainPlanVerbose, RelBuilder.create(_config));

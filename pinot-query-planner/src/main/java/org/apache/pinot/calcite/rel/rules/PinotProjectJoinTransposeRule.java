@@ -74,7 +74,7 @@ public class PinotProjectJoinTransposeRule extends ProjectJoinTransposeRule {
     }
   }
 
-  private static boolean containsArrayToMv(RexNode expr) {
+  static boolean containsArrayToMv(RexNode expr) {
     if (!(expr instanceof RexCall)) {
       return false;
     }

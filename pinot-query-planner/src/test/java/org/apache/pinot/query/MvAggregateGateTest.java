@@ -115,6 +115,21 @@ public class MvAggregateGateTest extends QueryEnvironmentTestBase {
   }
 
   @Test
+  public void testAutoFallsBackOnlyForArrayToMvGroupKeys() {
+    // A plain GROUP BY mvCol fails the validation, but the MV aggregate cannot help: no second plan.
+    QueryException e = expectThrows(QueryException.class,
+        () -> explain(_queryEnvironment, "EXPLAIN PLAN FOR SELECT mcol1, COUNT(*) FROM e GROUP BY mcol1"));
+    assertTrue(getFullMessage(e).contains(SUPPORTED_USES), getFullMessage(e));
+    assertEquals(e.getSuppressed().length, 0);
+    // Grouping sets keep the plain aggregate in the second plan, so it fails too. The error of the second plan is
+    // thrown, with the error of the first plan as a suppressed exception.
+    e = expectThrows(QueryException.class, () -> explain(_queryEnvironment, "EXPLAIN PLAN FOR SELECT ARRAY_TO_MV("
+        + "e.mcol1), COUNT(*) FROM e JOIN a ON e.col1 = a.col1 GROUP BY GROUPING SETS ((ARRAY_TO_MV(e.mcol1)), ())"));
+    assertTrue(getFullMessage(e).contains(SUPPORTED_USES), getFullMessage(e));
+    assertEquals(e.getSuppressed().length, 1);
+  }
+
+  @Test
   public void testGateOnPlansMvAggregateEverywhere() {
     for (String query : List.of(QUERY, FILTER_QUERY, SEMI_JOIN_QUERY, JOIN_QUERY, LOOKUP_JOIN_QUERY,
         SORTED_SUBQUERY_QUERY, UNNEST_QUERY)) {
@@ -168,6 +183,23 @@ public class MvAggregateGateTest extends QueryEnvironmentTestBase {
     for (QueryEnvironment queryEnvironment : List.of(_queryEnvironment, _gateOnEnvironment, _gateOffEnvironment)) {
       plan = explain(queryEnvironment, outerFilterQuery);
       assertTrue(plan.indexOf("LogicalFilter") < plan.indexOf("Aggregate"), plan);
+    }
+  }
+
+  @Test
+  public void testFilterOnSvKeyGoesBelowTheAggregate() {
+    // The condition on the MV key stays above the aggregate. The condition on the single-value key goes below it, into
+    // the leaf stage. In the plan text, a node comes after its parent.
+    String query = "EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(mcol1), col2, COUNT(*) FROM e "
+        + "GROUP BY ARRAY_TO_MV(mcol1), col2 HAVING ARRAY_TO_MV(mcol1) = 'x' AND col2 = 'y'";
+    for (QueryEnvironment queryEnvironment : List.of(_queryEnvironment, _gateOnEnvironment, _gateOffEnvironment)) {
+      String plan = explain(queryEnvironment, query);
+      int mvCondition = plan.indexOf("'x'");
+      // The planner then pulls col2 = 'y' up as a constant, so 'y' also shows above the aggregate.
+      int svCondition = plan.lastIndexOf("'y'");
+      int firstAggregate = plan.indexOf("Aggregate");
+      assertTrue(mvCondition >= 0 && mvCondition < firstAggregate, plan);
+      assertTrue(svCondition > plan.lastIndexOf("Aggregate"), plan);
     }
   }
 
