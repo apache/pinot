@@ -20,11 +20,20 @@ package org.apache.pinot.core.data.manager.realtime;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.core.LogEvent;
+import org.apache.logging.log4j.core.Logger;
+import org.apache.logging.log4j.core.LoggerContext;
+import org.apache.logging.log4j.core.appender.AbstractAppender;
+import org.apache.logging.log4j.core.config.Property;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorClassifier;
@@ -41,6 +50,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.spy;
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
@@ -99,13 +109,16 @@ public class IngestionSourceErrorRecorderTest {
   }
 
   /// Every consumer thread of every table records through the same process: a failure in recording itself, on many
-  /// threads at once, must still never reach the consume loop.
+  /// threads at once, must never reach the consume loop, and is logged at WARN once per interval for the process.
   @Test(timeOut = 30_000)
-  public void concurrentRecordingFailuresNeverEscape()
+  public void concurrentRecordingFailuresNeverEscapeAndWarnOnce()
       throws Exception {
     ServerMetrics metrics = spy(new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()));
     doThrow(new IllegalStateException("metrics registry closed")).when(metrics)
         .setValueOfPartitionGauge(anyString(), anyInt(), any(ServerGauge.class), anyLong());
+    // As in a fresh process: another test class in this JVM may have logged a recording failure within the interval
+    IngestionSourceErrorRecorder.LAST_RECORDING_FAILURE_LOG_MS.set(0);
+    WarnCapture warnings = WarnCapture.attachTo(IngestionSourceErrorRecorder.class.getName());
     int numThreads = 8;
     ExecutorService executor = Executors.newFixedThreadPool(numThreads);
     try {
@@ -123,6 +136,48 @@ public class IngestionSourceErrorRecorderTest {
       }
     } finally {
       executor.shutdownNow();
+      warnings.detach();
+    }
+    assertEquals(warnings.messagesStartingWith("Failed to record an ingestion source failure").size(), 1);
+  }
+
+  /// Captures the WARN lines of one logger
+  private static final class WarnCapture extends AbstractAppender {
+    private final List<String> _messages = new CopyOnWriteArrayList<>();
+    private final Logger _logger;
+
+    private WarnCapture(Logger logger) {
+      super("IngestionSourceErrorRecorderTestCapture", null, null, true, Property.EMPTY_ARRAY);
+      _logger = logger;
+    }
+
+    static WarnCapture attachTo(String loggerName) {
+      LoggerContext context = (LoggerContext) LogManager.getContext(false);
+      WarnCapture capture = new WarnCapture(context.getLogger(loggerName));
+      capture.start();
+      capture._logger.addAppender(capture);
+      return capture;
+    }
+
+    void detach() {
+      _logger.removeAppender(this);
+      stop();
+      // Attaching registered a LoggerConfig for a logger log4j2.xml doesn't declare: remove it, since test classes
+      // share this JVM
+      LoggerContext context = _logger.getContext();
+      context.getConfiguration().removeLogger(_logger.getName());
+      context.updateLoggers();
+    }
+
+    List<String> messagesStartingWith(String prefix) {
+      return _messages.stream().filter(message -> message.startsWith(prefix)).collect(Collectors.toList());
+    }
+
+    @Override
+    public void append(LogEvent event) {
+      if (event.getLevel() == Level.WARN) {
+        _messages.add(event.getMessage().getFormattedMessage());
+      }
     }
   }
 }

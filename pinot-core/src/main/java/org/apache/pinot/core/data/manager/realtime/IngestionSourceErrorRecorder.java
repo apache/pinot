@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.data.manager.realtime;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.Collection;
 import java.util.EnumMap;
 import java.util.HashSet;
@@ -49,7 +50,8 @@ public class IngestionSourceErrorRecorder {
   private static final long LOG_INTERVAL_MS = TimeUnit.MINUTES.toMillis(1);
   // A failure in recording itself, such as a metrics registry that throws: logged from any consumer thread, at most
   // once per interval for the process
-  private static final AtomicLong LAST_RECORDING_FAILURE_LOG_MS = new AtomicLong();
+  @VisibleForTesting
+  static final AtomicLong LAST_RECORDING_FAILURE_LOG_MS = new AtomicLong();
 
   private final ServerMetrics _serverMetrics;
   private final String _tableNameWithType;
