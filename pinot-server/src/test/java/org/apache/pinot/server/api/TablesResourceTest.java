@@ -177,6 +177,90 @@ public class TablesResourceTest extends BaseResourceTest {
     assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
   }
 
+  /// Spec 6/7a: `indexSizeBreakdown` appears only when `includeIndexSizeStats=true`, and is a table-level aggregate
+  /// that the `columns=` filter does not narrow.
+  ///
+  /// These fixture segments are built without `indexSizeStatsEnabled`, which makes them the right case for pinning the
+  /// distinction the implementation is careful about: absent means the caller did not ask, an empty object means they
+  /// asked and no segment carried persisted sizes. Collapsing the two would make "feature disabled" and "no data" look
+  /// identical to a client.
+  @Test
+  public void getTableMetadataIndexSizeBreakdown()
+      throws Exception {
+    String tableMetadataPath = "/tables/" + OFFLINE_TABLE_NAME + "/metadata";
+
+    JsonNode withoutParam =
+        JsonUtils.stringToJsonNode(_webTarget.path(tableMetadataPath).request().get(String.class));
+    assertFalse(withoutParam.has("indexSizeBreakdown"),
+        "indexSizeBreakdown must be omitted entirely when not requested, payload was: " + withoutParam);
+
+    JsonNode withParam = JsonUtils.stringToJsonNode(_webTarget.path(tableMetadataPath)
+        .queryParam("includeIndexSizeStats", "true")
+        .request()
+        .get(String.class));
+    assertTrue(withParam.has("indexSizeBreakdown"),
+        "indexSizeBreakdown must be present when requested, payload was: " + withParam);
+    assertTrue(withParam.get("indexSizeBreakdown").isEmpty(),
+        "These segments carry no persisted index sizes, so the breakdown must be empty rather than fabricated: "
+            + withParam.get("indexSizeBreakdown"));
+
+    // The columns= filter narrows columnLengthMap and columnIndexSizeMap but must leave the breakdown alone.
+    JsonNode withColumnFilter = JsonUtils.stringToJsonNode(_webTarget.path(tableMetadataPath)
+        .queryParam("includeIndexSizeStats", "true")
+        .queryParam("columns", "column1")
+        .request()
+        .get(String.class));
+    assertTrue(withColumnFilter.has("indexSizeBreakdown"),
+        "indexSizeBreakdown must survive a columns= filter, payload was: " + withColumnFilter);
+    assertEquals(withColumnFilter.get("indexSizeBreakdown"), withParam.get("indexSizeBreakdown"),
+        "indexSizeBreakdown is a table-level aggregate and must be identical with and without columns=");
+  }
+
+  /// `segmentsWithStats` counts segments per index type, not `(column, indexType)` entries: every column of these
+  /// segments has a forward index, so a per-entry count would be a multiple of the segment count.
+  @Test
+  public void getTableMetadataIndexSizeBreakdownCountsSegmentsNotColumns()
+      throws Exception {
+    String tableName = "indexSizeBreakdownCount_OFFLINE";
+    List<ImmutableSegment> segments = new ArrayList<>();
+    addTable(tableName);
+    TableDataManager tableDataManager = _tableDataManagerMap.get(tableName);
+    try {
+      for (int i = 0; i < 2; i++) {
+        setUpSegment(tableName, null, "sized" + i, segments, false, true);
+      }
+      String forwardIndexId = StandardIndexes.forward().getId();
+      long expectedForwardIndexBytes = 0;
+      int numColumnsWithForwardIndex = 0;
+      for (ImmutableSegment segment : segments) {
+        numColumnsWithForwardIndex = 0;
+        for (var columnMetadata : segment.getSegmentMetadata().getColumnMetadataMap().values()) {
+          Long size = columnMetadata.getPersistedIndexSizesInBytes().get(forwardIndexId);
+          if (size != null) {
+            expectedForwardIndexBytes += size;
+            numColumnsWithForwardIndex++;
+          }
+        }
+      }
+      assertTrue(numColumnsWithForwardIndex > 1, "Fixture must have several forward-indexed columns per segment");
+
+      JsonNode response = JsonUtils.stringToJsonNode(_webTarget.path("/tables/" + tableName + "/metadata")
+          .queryParam("includeIndexSizeStats", "true")
+          .request()
+          .get(String.class));
+      JsonNode forwardIndex = response.get("indexSizeBreakdown").get(forwardIndexId);
+      assertNotNull(forwardIndex, "Missing forward index entry in: " + response);
+      assertEquals(forwardIndex.get("segmentsWithStats").asInt(), segments.size());
+      assertEquals(forwardIndex.get("sizePerReplicaInBytes").asLong(), expectedForwardIndexBytes);
+    } finally {
+      for (ImmutableSegment segment : segments) {
+        tableDataManager.offloadSegment(segment.getSegmentName());
+      }
+      tableDataManager.shutDown();
+      _tableDataManagerMap.remove(tableName);
+    }
+  }
+
   @Test
   public void getTableMetadata()
       throws Exception {

@@ -117,6 +117,7 @@ public final class PropertyMapping {
     keys.add("segmentversion");
     keys.add("aggregatemetrics");
     keys.add("compressionstatsenabled");
+    keys.add("indexsizestatsenabled");
     keys.add("description");
     keys.add("tags");
     keys.add("replicasperpartition");
@@ -353,6 +354,9 @@ public final class PropertyMapping {
         return true;
       case "compressionstatsenabled":
         builder.setCompressionStatsEnabled(parseBool(lowerKey, value));
+        return true;
+      case "indexsizestatsenabled":
+        builder.setIndexSizeStatsEnabled(parseBool(lowerKey, value));
         return true;
       case "description":
         builder.setDescription(value);

@@ -29,6 +29,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.restlet.resources.ColumnCompressionStatsContribution;
 import org.apache.pinot.common.restlet.resources.SegmentCompressionStatsContribution;
+import org.apache.pinot.segment.local.segment.index.IndexSizeUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
@@ -157,12 +158,7 @@ final class SegmentCompressionStatsReader {
     if (version == null || version == SegmentVersion.v3 || indexDir == null) {
       return ColumnMetadata.UNAVAILABLE;
     }
-    for (String extension : indexType.getFileExtensions(columnMetadata)) {
-      File indexFile = new File(indexDir, columnMetadata.getColumnName() + extension);
-      if (indexFile.isFile()) {
-        return indexFile.length();
-      }
-    }
-    return ColumnMetadata.UNAVAILABLE;
+    return IndexSizeUtils.sizeOfFileOrDirIndex(indexType, indexDir, columnMetadata.getColumnName(), 0,
+        columnMetadata);
   }
 }

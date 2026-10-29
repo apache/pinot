@@ -334,6 +334,7 @@ public class RoundTripTest {
         .setNullHandlingEnabled(true)
         .setAggregateMetrics(true)
         .setCompressionStatsEnabled(true)
+        .setIndexSizeStatsEnabled(true)
         .setPeerSegmentDownloadScheme("https")
         .setCrypterClassName("org.apache.pinot.crypter.NoOpCrypter")
         .setSegmentVersion("v3")

@@ -98,4 +98,35 @@ public class SegmentSizeInfoTest {
     assertEquals(deserialized.getCompressionStatsUncompressedValueSizeInBytes(), 0L);
     assertEquals(deserialized.getCompressionStatsForwardIndexAndDictionaryStorageSizeInBytes(), 0L);
   }
+
+  @Test
+  public void testEmptyIndexSizeMapIsNormalizedToNull() {
+    SegmentSizeInfo info = new SegmentSizeInfo("seg1", 1_000, Map.of());
+    assertNull(info.getIndexSizeInBytes());
+  }
+
+  @Test
+  public void testIndexSizeMapJsonRoundTrip()
+      throws Exception {
+    SegmentSizeInfo emptyMap = new SegmentSizeInfo("seg1", 1_000, Map.of());
+    JsonNode emptyMapJson = JsonUtils.stringToJsonNode(JsonUtils.objectToString(emptyMap));
+    assertFalse(emptyMapJson.has("indexSizeInBytes"), "An empty indexSizeInBytes map must not be serialized");
+
+    SegmentSizeInfo nonEmptyMap = new SegmentSizeInfo("seg1", 1_000, Map.of("forward_index", 500L));
+    String serialized = JsonUtils.objectToString(nonEmptyMap);
+    JsonNode nonEmptyMapJson = JsonUtils.stringToJsonNode(serialized);
+    assertEquals(nonEmptyMapJson.get("indexSizeInBytes").get("forward_index").asLong(), 500L);
+
+    SegmentSizeInfo deserialized = JsonUtils.stringToObject(serialized, SegmentSizeInfo.class);
+    assertEquals(deserialized.getIndexSizeInBytes(), Map.of("forward_index", 500L));
+  }
+
+  @Test
+  public void testWireEmptyIndexSizeMapDeserializesToNull()
+      throws Exception {
+    // Now that TableSizeResource no longer normalizes on the server side, the @JsonCreator fold is the only
+    // remaining defense against a peer sending "indexSizeInBytes":{} literally on the wire.
+    String json = "{\"segmentName\":\"seg1\",\"diskSizeInBytes\":1000,\"indexSizeInBytes\":{}}";
+    assertNull(JsonUtils.stringToObject(json, SegmentSizeInfo.class).getIndexSizeInBytes());
+  }
 }
