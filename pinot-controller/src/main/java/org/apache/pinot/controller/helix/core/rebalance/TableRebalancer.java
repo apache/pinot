@@ -74,6 +74,7 @@ import org.apache.pinot.common.restlet.resources.RebalanceSummaryResult;
 import org.apache.pinot.common.tier.PinotServerTierStorage;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.tier.TierFactory;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
@@ -554,6 +555,9 @@ public class TableRebalancer {
     // NOTE: Monitor the segments to be moved from both the previous round and this round to ensure the moved segments
     //       in the previous round are also converged.
     List<String> oldSegmentsToMove = segmentsToMove;
+    // A force commit creates a consuming successor in the same partition. Remember completed force commits until
+    // that partition's consuming segment moves, so retrying a version conflict does not commit its successors too.
+    Set<Integer> forceCommittedPartitions = new HashSet<>();
     while (true) {
       boolean segmentsToMoveChanged = oldSegmentsToMove != segmentsToMove;
       if (segmentsToMoveChanged) {
@@ -589,7 +593,6 @@ public class TableRebalancer {
       Map<String, Map<String, String>> nextAssignment;
       Map<Integer, List<String>> nextPartitionAssignment;
       boolean needsRecalculation;
-      boolean shouldForceCommit = forceCommit;
 
       do {
         needsRecalculation = false;
@@ -677,7 +680,7 @@ public class TableRebalancer {
         }
 
         // Step 2: Handle force commit if flag is set, then recalculate if force commit occurred
-        if (shouldForceCommit) {
+        if (forceCommit) {
           try {
             nextAssignment = getNextAssignment(currentAssignment,
                 stepPartitionAssignment ? currentPartitionAssignment : Map.of(), targetTableAssignment,
@@ -691,6 +694,8 @@ public class TableRebalancer {
                 tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
           }
           Set<String> consumingSegmentsToMoveNext = getMovingConsumingSegments(currentAssignment, nextAssignment);
+          consumingSegmentsToMoveNext.removeIf(
+              segment -> forceCommittedPartitions.contains(new LLCSegmentName(segment).getPartitionGroupId()));
 
           if (!consumingSegmentsToMoveNext.isEmpty()) {
             needsRecalculation = true;
@@ -709,11 +714,13 @@ public class TableRebalancer {
               return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED, errorMsg, instancePartitionsMap,
                   tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
             }
+            for (String segment : consumingSegmentsToMoveNext) {
+              forceCommittedPartitions.add(new LLCSegmentName(segment).getPartitionGroupId());
+            }
             idealStateRecord = idealState.getRecord();
             _tableRebalanceObserver.onTrigger(TableRebalanceObserver.Trigger.FORCE_COMMIT_END_TRIGGER, null, null,
                 new TableRebalanceObserver.RebalanceContext(consumingSegmentsToMoveNext.size()));
           }
-          shouldForceCommit = false; // Only attempt force commit once
         }
       } while (needsRecalculation);
 
@@ -791,6 +798,11 @@ public class TableRebalancer {
         Preconditions.checkState(_helixDataAccessor.getBaseDataAccessor()
                 .set(idealStatePropertyKey.getPath(), idealStateRecord, expectedVersion, AccessOption.PERSISTENT),
             "Failed to update IdealState");
+        if (forceCommit) {
+          for (String segment : getMovingConsumingSegments(currentAssignment, nextAssignment)) {
+            forceCommittedPartitions.remove(new LLCSegmentName(segment).getPartitionGroupId());
+          }
+        }
         expectedVersion++;
         currentAssignment = nextAssignment;
         currentPartitionAssignment = nextPartitionAssignment;
