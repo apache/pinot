@@ -21,8 +21,13 @@ package org.apache.pinot.common.utils;
 import java.util.Random;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import org.mockito.ArgumentCaptor;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
@@ -89,6 +94,30 @@ public class ExponentialMovingAverageTest {
     assertEquals(average.getAverage(), 0.51);
     average.compute(1.0);
     assertEquals(average.getAverage(), 0.657);
+  }
+
+  @Test
+  public void testAutoDecayBeforeFirstSample() {
+    ScheduledExecutorService executor = mock(ScheduledExecutorService.class);
+    ExponentialMovingAverage average = new ExponentialMovingAverage(0.5, 1, 0, 10.0, executor);
+    ArgumentCaptor<Runnable> task = ArgumentCaptor.forClass(Runnable.class);
+    verify(executor).scheduleAtFixedRate(task.capture(), eq(0L), eq(1L), eq(TimeUnit.MILLISECONDS));
+
+    task.getValue().run();
+    assertEquals(average.getAverage(), 10.0, "The initial average must not decay before the first sample");
+  }
+
+  @Test
+  public void testAutoDecayWithinWindow() {
+    ScheduledExecutorService executor = mock(ScheduledExecutorService.class);
+    // A non-expiring window lets us test the scheduled callback without sleeps or a race with the scheduler.
+    ExponentialMovingAverage average = new ExponentialMovingAverage(0.5, Long.MAX_VALUE, 0, 10.0, executor);
+    ArgumentCaptor<Runnable> task = ArgumentCaptor.forClass(Runnable.class);
+    verify(executor).scheduleAtFixedRate(task.capture(), eq(0L), eq(Long.MAX_VALUE), eq(TimeUnit.MILLISECONDS));
+
+    average.compute(20.0);
+    task.getValue().run();
+    assertEquals(average.getAverage(), 15.0, "A sample within the decay window must keep its weight");
   }
 
   @Test

@@ -111,7 +111,8 @@ function waitForKafkaReady() {
   while [ $status -ne 0 ]; do
     sleep 1
     echo "Checking port ${KAFKA_PORT} for kafka ready"
-    echo x | nc localhost ${KAFKA_PORT} 1>/dev/null 2>&1
+    # Check TCP readiness without waiting for Kafka to close an incomplete request.
+    nc -z -w 5 localhost "${KAFKA_PORT}" 1>/dev/null 2>&1
     status=$?
   done
 }

@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.integration.tests;
 
+import java.io.File;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.restlet.resources.TenantRebalanceResult;
@@ -31,6 +33,16 @@ import static org.testng.Assert.assertTrue;
 
 
 public class TenantRebalanceIntegrationTest extends BaseHybridClusterIntegrationTest {
+
+  @Override
+  protected void pushAvroIntoKafka(List<File> avroFiles)
+      throws Exception {
+    try (BatchedKafkaDataProducer producer =
+        new BatchedKafkaDataProducer("localhost:" + getKafkaPort(), getMaxNumKafkaMessagesPerBatch())) {
+      ClusterIntegrationTestUtils.pushAvroIntoKafka(avroFiles, getKafkaTopic(), getMaxNumKafkaMessagesPerBatch(),
+          getKafkaMessageHeader(), getPartitionColumn(), injectTombstones(), producer);
+    }
+  }
 
   private TenantRebalanceResult rebalanceTenant(TenantRebalanceConfig config, @Nullable Map<String, String> queryParams)
       throws Exception {

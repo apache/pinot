@@ -26,8 +26,14 @@ ifconfig
 netstat -i
 
 # Unit Tests
-#   - Both test sets run plain `mvn test` (no install, no -am): the modules were already built
-#     and installed by .pinot_tests_build.sh, so only the modules listed here are tested.
+#   - Both test sets run `mvn test` (no install, no -am), so only the listed modules are tested.
+#     .pinot_tests_build.sh has already built and installed their required reactor dependencies.
+#   - The preceding clean install built the same sources with the same JDK/compiler settings.
+#     Use Maven's source/class timestamp check on this second invocation: the default incremental
+#     mode otherwise recompiles whole modules when reactor class directories become installed jars
+#     on the classpath. Missing classes or newer sources still compile, including modules omitted
+#     from the build step. Keep the test lifecycle so named Surefire suites, ScalaTest, resources,
+#     and JaCoCo still run. Do not use this setting for ordinary builds after source/API changes.
 #
 # Parallelism / memory:
 #   - UNIT_TEST_FORK_COUNT (default 3) sets surefire forkCount so test *classes* run in
@@ -67,7 +73,7 @@ if [ "$RUN_TEST_SET" == "1" ]; then
   # pinot-segment-local's tests run in set #2 to balance pinot-core's longer test time in this
   # shard against set #2's longer build. It remains built in set #1 as a pinot-core dependency.
   # No -am on this command, so only the listed modules test.
-  mvn test ${FORK_OPTS} \
+  mvn test ${FORK_OPTS} -Dmaven.compiler.useIncrementalCompilation=false \
       -pl 'pinot-spi' \
       -pl 'pinot-segment-spi' \
       -pl 'pinot-common' \
@@ -78,7 +84,7 @@ if [ "$RUN_TEST_SET" == "1" ]; then
       -P github-actions,no-integration-tests${COVERAGE_PROFILE} || exit 1
 fi
 if [ "$RUN_TEST_SET" == "2" ]; then
-  mvn test ${FORK_OPTS} \
+  mvn test ${FORK_OPTS} -Dmaven.compiler.useIncrementalCompilation=false \
     -pl '!pinot-spi' \
     -pl '!pinot-segment-spi' \
     -pl '!pinot-common' \

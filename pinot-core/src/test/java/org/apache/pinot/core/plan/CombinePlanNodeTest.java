@@ -25,6 +25,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -38,6 +39,7 @@ import org.apache.pinot.spi.exception.TerminationException;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.util.TestUtils;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -47,12 +49,24 @@ import static org.testng.Assert.fail;
 
 
 public class CombinePlanNodeTest {
-  private final QueryContext _queryContext = QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable");
   private final ExecutorService _executorService = Executors.newFixedThreadPool(10);
+
+  @AfterClass(alwaysRun = true)
+  public void tearDown() throws InterruptedException {
+    _executorService.shutdownNow();
+    assertTrue(_executorService.awaitTermination(10, TimeUnit.SECONDS), "Planning executor did not terminate");
+  }
+
+  private static QueryContext getQueryContext(int maxExecutionThreads) {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable");
+    queryContext.setMaxExecutionThreads(maxExecutionThreads);
+    return queryContext;
+  }
 
   /// Tests that the tasks are executed as expected in parallel mode.
   @Test
   public void testParallelExecution() {
+    QueryContext queryContext = getQueryContext(2);
     AtomicInteger count = new AtomicInteger(0);
 
     Random rand = new Random();
@@ -66,8 +80,8 @@ public class CombinePlanNodeTest {
           return null;
         });
       }
-      _queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
-      CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, _queryContext, _executorService, null);
+      queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
+      CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, queryContext, _executorService, null);
       combinePlanNode.run();
       assertEquals(numPlans, count.get());
     }
@@ -75,6 +89,7 @@ public class CombinePlanNodeTest {
 
   @Test
   public void testSlowPlanNode() {
+    QueryContext queryContext = getQueryContext(2);
     AtomicBoolean notInterrupted = new AtomicBoolean();
 
     List<PlanNode> planNodes = new ArrayList<>();
@@ -90,8 +105,8 @@ public class CombinePlanNodeTest {
         return null;
       });
     }
-    _queryContext.setEndTimeMs(System.currentTimeMillis() + 100);
-    CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, _queryContext, _executorService, null);
+    queryContext.setEndTimeMs(System.currentTimeMillis() + 100);
+    CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, queryContext, _executorService, null);
     try {
       combinePlanNode.run();
     } catch (RuntimeException e) {
@@ -108,6 +123,7 @@ public class CombinePlanNodeTest {
   /// calling thread (numTasks == 1), so it observes the QueryThreadContext set up on this thread.
   @Test
   public void testTerminationCheckedDuringPlanning() {
+    QueryContext queryContext = getQueryContext(1);
     try (QueryThreadContext threadContext = QueryThreadContext.openForSseTest()) {
       threadContext.getExecutionContext().terminate(QueryErrorCode.QUERY_CANCELLATION, "terminated for test");
       AtomicInteger count = new AtomicInteger();
@@ -118,8 +134,8 @@ public class CombinePlanNodeTest {
           return null;
         });
       }
-      _queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
-      CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, _queryContext, _executorService, null);
+      queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
+      CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, queryContext, _executorService, null);
       try {
         combinePlanNode.run();
         fail("Should have thrown TerminationException");
@@ -135,16 +151,15 @@ public class CombinePlanNodeTest {
   /// code preserved, instead of being wrapped in a generic RuntimeException.
   @Test
   public void testQueryExceptionPreservedInParallel() {
+    QueryContext queryContext = getQueryContext(2);
     List<PlanNode> planNodes = new ArrayList<>();
     for (int i = 0; i < 20; i++) {
       planNodes.add(() -> {
         throw new BadQueryRequestException("Bad query for test");
       });
     }
-    _queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
-    // Force parallel execution (numTasks > 1) regardless of the number of available processors
-    _queryContext.setMaxExecutionThreads(2);
-    CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, _queryContext, _executorService, null);
+    queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
+    CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, queryContext, _executorService, null);
     try {
       combinePlanNode.run();
       fail("Should have thrown BadQueryRequestException");
@@ -155,14 +170,15 @@ public class CombinePlanNodeTest {
 
   @Test
   public void testPlanNodeThrowException() {
+    QueryContext queryContext = getQueryContext(2);
     List<PlanNode> planNodes = new ArrayList<>();
     for (int i = 0; i < 20; i++) {
       planNodes.add(() -> {
         throw new RuntimeException("Inner exception message.");
       });
     }
-    _queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
-    CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, _queryContext, _executorService, null);
+    queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
+    CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, queryContext, _executorService, null);
     try {
       combinePlanNode.run();
     } catch (RuntimeException e) {
@@ -175,6 +191,7 @@ public class CombinePlanNodeTest {
 
   @Test
   public void testCancelPlanNode() {
+    QueryContext queryContext = getQueryContext(2);
     CountDownLatch ready = new CountDownLatch(20);
     List<PlanNode> planNodes = new ArrayList<>();
     for (int i = 0; i < 20; i++) {
@@ -193,8 +210,8 @@ public class CombinePlanNodeTest {
         throw new RuntimeException(e);
       }
     });
-    _queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
-    CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, _queryContext, _executorService, null);
+    queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
+    CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, queryContext, _executorService, null);
     AtomicReference<Exception> exp = new AtomicReference<>();
     // Avoid early finalization by not using Executors.newSingleThreadExecutor (java <= 20, JDK-8145304)
     ExecutorService combineExecutor = Executors.newFixedThreadPool(1);

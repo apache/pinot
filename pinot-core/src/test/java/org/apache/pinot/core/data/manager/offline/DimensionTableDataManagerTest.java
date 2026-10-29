@@ -25,7 +25,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixManager;
@@ -45,6 +49,7 @@ import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
@@ -69,7 +74,12 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
@@ -413,6 +423,64 @@ public class DimensionTableDataManagerTest {
       fail("Should error out when ErrorOnDuplicatePrimaryKey is configured to true");
     } catch (Exception e) {
       // expected;
+    }
+  }
+
+  /// A newer table-wide lookup rebuild must win over an older reader, which must release its segment when cancelled.
+  @Test(dataProvider = "options")
+  public void testOffloadCancelsOverlappingLookupLoad(boolean disablePreload)
+      throws Exception {
+    TableConfig tableConfig = getTableConfig(disablePreload, false);
+    Schema schema = getSchema();
+    DimensionTableDataManager tableDataManager = makeTableDataManager(tableConfig, schema);
+    ImmutableSegment segment = spy(ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),
+        SEGMENT_OPERATIONS_THROTTLER));
+    String segmentName = segment.getSegmentName();
+    PrimaryKey key = new PrimaryKey(new String[]{"SF"});
+    CountDownLatch readerStarted = new CountDownLatch(1);
+    CountDownLatch resumeReader = new CountDownLatch(1);
+    // Direct addSegment is a test-only seam: normal same-segment online/offload operations share a segment lock.
+    // Distinct segment operations can still overlap their table-wide lookup rebuilds. Pause the older rebuild at real
+    // reader initialization, after it acquired its token and segment reference, while the offload publishes a new one.
+    doAnswer(invocation -> {
+      readerStarted.countDown();
+      assertTrue(resumeReader.await(10, TimeUnit.SECONDS), "The newer offload must release the older reader");
+      return invocation.callRealMethod();
+    }).when(segment).getPhysicalColumnNames();
+
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      Future<?> pendingAdd = executor.submit(() -> tableDataManager.addSegment(segment));
+      assertTrue(readerStarted.await(10, TimeUnit.SECONDS), "The add must reach real record-reader initialization");
+      SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
+      assertNotNull(segmentDataManager);
+      tableDataManager.releaseSegment(segmentDataManager);
+      assertEquals(segmentDataManager.getReferenceCount(), 2,
+          "Registration and the paused lookup each hold a reference");
+
+      tableDataManager.offloadSegment(segmentName);
+      assertFalse(tableDataManager.hasSegment(segmentName), "The offload must unregister the segment");
+      assertFalse(tableDataManager.isPopulated(), "The newer offload must publish an empty lookup table");
+      assertEquals(segmentDataManager.getReferenceCount(), 1,
+          "The older reader must keep its segment alive until done");
+      verify(segment, never()).destroy();
+
+      resumeReader.countDown();
+      pendingAdd.get(10, TimeUnit.SECONDS);
+      assertFalse(tableDataManager.hasSegment(segmentName));
+      assertFalse(tableDataManager.containsKey(key), "The cancelled add must not resurrect the offloaded row");
+      assertNull(tableDataManager.lookupRow(key));
+      assertNull(tableDataManager.lookupValue(key, "teamName"));
+      assertFalse(tableDataManager.isPopulated());
+      assertEquals(segmentDataManager.getReferenceCount(), 0, "Cancellation must release the last segment reference");
+      verify(segment, times(1)).destroy();
+    } finally {
+      resumeReader.countDown();
+      executor.shutdown();
+      if (!executor.awaitTermination(10, TimeUnit.SECONDS)) {
+        executor.shutdownNow();
+        assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS), "The lookup worker must terminate before teardown");
+      }
     }
   }
 
