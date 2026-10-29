@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorCategory;
@@ -46,6 +47,9 @@ import org.slf4j.LoggerFactory;
 public class IngestionSourceErrorRecorder {
   private static final Logger LOGGER = LoggerFactory.getLogger(IngestionSourceErrorRecorder.class);
   private static final long LOG_INTERVAL_MS = TimeUnit.MINUTES.toMillis(1);
+  // A failure in recording itself, such as a metrics registry that throws: logged from any consumer thread, at most
+  // once per interval for the process
+  private static final AtomicLong LAST_RECORDING_FAILURE_LOG_MS = new AtomicLong();
 
   private final ServerMetrics _serverMetrics;
   private final String _tableNameWithType;
@@ -105,7 +109,11 @@ public class IngestionSourceErrorRecorder {
             _tableNameWithType, topic, partitionIds, site, classification);
       }
     } catch (RuntimeException e) {
-      LOGGER.debug("Failed to record an ingestion source failure for table: {}", _tableNameWithType, e);
+      long nowMs = System.currentTimeMillis();
+      long lastLoggedMs = LAST_RECORDING_FAILURE_LOG_MS.get();
+      if (nowMs - lastLoggedMs >= LOG_INTERVAL_MS && LAST_RECORDING_FAILURE_LOG_MS.compareAndSet(lastLoggedMs, nowMs)) {
+        LOGGER.warn("Failed to record an ingestion source failure for table: {}", _tableNameWithType, e);
+      }
     }
   }
 

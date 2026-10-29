@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -52,6 +53,10 @@ public class PinotTableIdealStateBuilder {
   }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotTableIdealStateBuilder.class);
+  // A failure in recording itself, such as a metrics registry that throws: logged from any thread, at most once a
+  // minute for the process
+  private static final long RECORDING_FAILURE_LOG_INTERVAL_MS = TimeUnit.MINUTES.toMillis(1);
+  private static final AtomicLong LAST_RECORDING_FAILURE_LOG_MS = new AtomicLong();
   private static final RetryPolicy DEFAULT_IDEALSTATE_UPDATE_RETRY_POLICY =
       RetryPolicies.randomDelayRetryPolicy(3, 100L, 200L);
   // Source failure WARN lines already logged in the last minute, by table and category
@@ -187,7 +192,12 @@ public class PinotTableIdealStateBuilder {
             classification);
       }
     } catch (RuntimeException e) {
-      LOGGER.debug("Failed to record an ingestion source failure for table: {}", tableNameWithType, e);
+      long nowMs = System.currentTimeMillis();
+      long lastLoggedMs = LAST_RECORDING_FAILURE_LOG_MS.get();
+      if (nowMs - lastLoggedMs >= RECORDING_FAILURE_LOG_INTERVAL_MS
+          && LAST_RECORDING_FAILURE_LOG_MS.compareAndSet(lastLoggedMs, nowMs)) {
+        LOGGER.warn("Failed to record an ingestion source failure for table: {}", tableNameWithType, e);
+      }
     }
   }
 }
