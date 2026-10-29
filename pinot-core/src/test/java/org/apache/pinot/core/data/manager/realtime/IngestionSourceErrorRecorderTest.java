@@ -18,8 +18,12 @@
  */
 package org.apache.pinot.core.data.manager.realtime;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -35,6 +39,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.spy;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
@@ -91,5 +96,33 @@ public class IngestionSourceErrorRecorderTest {
       newTable.record("fetch", new RefusedBySourceException(), false, "topic", List.of(0));
     }
     assertNotNull(metrics.getGaugeValue(authGauge), "The recreated table's record must survive the old shutdown");
+  }
+
+  /// Every consumer thread of every table records through the same process: a failure in recording itself, on many
+  /// threads at once, must still never reach the consume loop.
+  @Test(timeOut = 30_000)
+  public void concurrentRecordingFailuresNeverEscape()
+      throws Exception {
+    ServerMetrics metrics = spy(new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()));
+    doThrow(new IllegalStateException("metrics registry closed")).when(metrics)
+        .setValueOfPartitionGauge(anyString(), anyInt(), any(ServerGauge.class), anyLong());
+    int numThreads = 8;
+    ExecutorService executor = Executors.newFixedThreadPool(numThreads);
+    try {
+      List<Future<?>> writers = new ArrayList<>();
+      for (int i = 0; i < numThreads; i++) {
+        IngestionSourceErrorRecorder recorder = new IngestionSourceErrorRecorder(metrics, "table" + i + "_REALTIME");
+        writers.add(executor.submit(() -> {
+          for (int j = 0; j < 1_000; j++) {
+            recorder.record("fetch", new RefusedBySourceException(), false, "topic", List.of(0));
+          }
+        }));
+      }
+      for (Future<?> writer : writers) {
+        writer.get();
+      }
+    } finally {
+      executor.shutdownNow();
+    }
   }
 }
