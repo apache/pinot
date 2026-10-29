@@ -84,6 +84,24 @@ public class IndexVectorDistanceTransformFunctionTest extends BaseTransformFunct
     }
   }
 
+  /// An integer vector literal (`ARRAY[1, 0, ...]`) is accepted, as VECTOR_SIMILARITY accepts it.
+  @Test
+  public void testAcceptsIntegerVectorLiteral() {
+    StringBuilder literal = new StringBuilder("ARRAY[");
+    float[] query = new float[VECTOR_DIM_SIZE];
+    for (int i = 0; i < VECTOR_DIM_SIZE; i++) {
+      query[i] = i % 3;
+      literal.append(i == 0 ? "" : ",").append(i % 3);
+    }
+    ExpressionContext expression = RequestContextUtils.getExpression(
+        "vectorDistance(vector1, " + literal.append(']') + ", " + TOP_K + ")");
+    double[] actual =
+        TransformFunctionFactory.get(expression, _dataSourceMap).transformToDoubleValuesSV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      assertEquals(actual[i], VectorFunctions.cosineDistance(_vector1Values[i], query), 1e-9);
+    }
+  }
+
   @Test
   public void testRejectsInvalidArguments() {
     String vector = toLiteral(_vector2Values[0]);
