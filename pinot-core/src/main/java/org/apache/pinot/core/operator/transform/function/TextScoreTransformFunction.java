@@ -41,8 +41,12 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 /// documents are strictly positive; constant-score queries such as wildcards score `1`).
 ///
 /// The index is searched once per segment, on the first block, and the doc id to score map is reused for the
-/// remaining blocks of that segment. By default scores use per-segment term statistics (IDF, average field length),
-/// so they rank documents correctly within a segment but are only approximately comparable across segments.
+/// remaining blocks of that segment. The map holds every document of the segment that matches the search query,
+/// regardless of how selective the query's filter is, so its size grows with the number of matches (roughly 10 bytes
+/// per match): a broad search query under a narrow filter still scores every match.
+///
+/// By default scores use per-segment term statistics (IDF, average field length), so they rank documents correctly
+/// within a segment but are only approximately comparable across segments.
 ///
 /// With the optional 4th argument, the serialized [TextScoreStats] returned by
 /// `TEXT_SCORE_STATS(column, 'search query'[, 'options'])` for the same query, every segment scores with those

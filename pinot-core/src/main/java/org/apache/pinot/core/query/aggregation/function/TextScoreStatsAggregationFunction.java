@@ -46,11 +46,17 @@ import org.apache.pinot.segment.spi.index.reader.TextScoreStats;
 /// `AggregationPlanNode`); the filter does not restrict them, only segment pruning does. The function must be the
 /// only aggregation of its query and does not support GROUP BY.
 ///
-/// Because no filter is applied, filters Pinot adds on its own are not applied either: on a hybrid table the
-/// time-boundary split is ignored, so documents present on both the offline and realtime side count twice, and on an
-/// upsert table replaced rows still count toward document count, document frequency and average length. Like
-/// Elasticsearch's index statistics, which also include deleted documents until merged, the statistics are an
-/// approximation of the live corpus; they only rescale scores, so rankings are affected only slightly.
+/// Because no filter is applied, filters Pinot adds on its own are not applied either:
+/// - Hybrid tables: the broker's time-boundary predicate only prunes whole segments, so documents of a segment that
+///   straddles the boundary count on both the offline and the realtime side.
+/// - Upsert tables: replaced rows (not in the valid doc ids) still count toward document count, document frequency
+///   and average field length. Elasticsearch behaves the same way: its index statistics include deleted documents
+///   until segments are merged.
+///
+/// Applying these filters exactly is not possible from index statistics: Lucene does not keep exact per-document
+/// field lengths (norms are lossy), so the length totals cannot be restricted to a subset of documents. The
+/// statistics are therefore an approximation of the live corpus. They only rescale scores (IDF and length
+/// normalization), so they shift rankings only slightly.
 ///
 /// Intermediate and final results are the JSON string; [#merge] sums the counters.
 public class TextScoreStatsAggregationFunction extends BaseSingleInputAggregationFunction<String, String> {

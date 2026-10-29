@@ -21,6 +21,7 @@ package org.apache.pinot.segment.spi.index.reader;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
@@ -66,6 +67,39 @@ public class TextScoreStatsTest {
     expectThrows(IllegalArgumentException.class, () -> TextScoreStats.fromJson("{}"));
     expectThrows(IllegalArgumentException.class,
         () -> TextScoreStats.fromJson("{\"fields\":{\"title\":{\"terms\":{\"usb\":[1]}}}}"));
+    expectThrows(IllegalArgumentException.class,
+        () -> TextScoreStats.fromJson("{\"fields\":{\"title\":{\"terms\":{\"usb\":3}}}}"));
+    expectThrows(IllegalArgumentException.class, () -> TextScoreStats.fromJson("{\"fields\":[]}"));
+  }
+
+  @Test
+  public void testMissingCountersDefaultToZero() {
+    TextScoreStats stats = TextScoreStats.fromJson("{\"fields\":{\"title\":{\"docCount\":3}}}");
+    TextScoreStats.FieldStats title = stats.getField("title");
+    assertEquals(title.getDocCount(), 3);
+    assertEquals(title.getMaxDoc(), 0);
+    assertTrue(title.getTerms().isEmpty());
+  }
+
+  @Test
+  public void testEquality() {
+    TextScoreStats stats = stats("title", 10, 9, 42, 37, "usb", 4, 6);
+    assertEquals(stats, stats);
+    assertEquals(stats.hashCode(), stats("title", 10, 9, 42, 37, "usb", 4, 6).hashCode());
+    assertNotEquals(stats, "not stats");
+    assertNotEquals(stats, stats("descr", 10, 9, 42, 37, "usb", 4, 6));
+    // Each counter, the term set and the term counts take part in equality
+    assertNotEquals(stats, stats("title", 11, 9, 42, 37, "usb", 4, 6));
+    assertNotEquals(stats, stats("title", 10, 8, 42, 37, "usb", 4, 6));
+    assertNotEquals(stats, stats("title", 10, 9, 41, 37, "usb", 4, 6));
+    assertNotEquals(stats, stats("title", 10, 9, 42, 36, "usb", 4, 6));
+    assertNotEquals(stats, stats("title", 10, 9, 42, 37, "hub", 4, 6));
+    assertNotEquals(stats, stats("title", 10, 9, 42, 37, "usb", 3, 6));
+    assertNotEquals(stats, stats("title", 10, 9, 42, 37, "usb", 4, 5));
+    TextScoreStats.FieldStats fieldStats = stats.getField("title");
+    assertEquals(fieldStats, fieldStats);
+    assertNotEquals(fieldStats, "not field stats");
+    assertEquals(stats.toString(), stats.toJson());
   }
 
   private static TextScoreStats stats(String field, long maxDoc, long docCount, long sumTotalTermFreq,
