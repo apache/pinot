@@ -18,16 +18,20 @@
  */
 package org.apache.pinot.core.transport;
 
+import com.google.common.util.concurrent.ListenableFuture;
 import java.net.InetSocketAddress;
+import java.util.concurrent.atomic.LongAccumulator;
+import java.util.function.Function;
+import org.apache.pinot.core.query.executor.QueryExecutor;
+import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
+import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.mockito.stubbing.Answer;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 
 /// Helpers for standing up a real Netty [QueryServer] in a test.
@@ -38,18 +42,31 @@ public class QueryServerTestUtils {
   private QueryServerTestUtils() {
   }
 
-  /// Builds an unstarted query server whose scheduler answers every submission with `submitAnswer`.
-  public static QueryServer newQueryServer(Answer<?> submitAnswer) {
-    return newQueryServer(0, submitAnswer);
+  /// Builds an unstarted query server whose scheduler answers each query with the future `responder` returns for it.
+  public static QueryServer newQueryServer(Function<ServerQueryRequest, ListenableFuture<DataBuffer>> responder) {
+    return newQueryServer(0, responder);
   }
 
-  /// Same as [#newQueryServer(Answer)], on a given port -- for a test that brings a server back where it was.
-  public static QueryServer newQueryServer(int port, Answer<?> submitAnswer) {
-    QueryScheduler queryScheduler = mock(QueryScheduler.class);
-    when(queryScheduler.submit(any())).thenAnswer(submitAnswer);
-    InstanceRequestHandler handler =
-        new InstanceRequestHandler("testServer", new PinotConfiguration(), queryScheduler, mock(AccessControl.class),
-            ThreadAccountantUtils.getNoOpAccountant());
+  /// Same as [#newQueryServer(Function)], on a given port -- for a test that brings a server back where it was.
+  public static QueryServer newQueryServer(int port,
+      Function<ServerQueryRequest, ListenableFuture<DataBuffer>> responder) {
+    PinotConfiguration config = new PinotConfiguration();
+    // A subclass, not a mock: the scheduler sends both submit methods to the one overridden here, so the server gets
+    // this answer whichever one it calls. A mock would answer null from the one not stubbed.
+    QueryScheduler queryScheduler = new QueryScheduler(config, "testServer", mock(QueryExecutor.class),
+        ThreadAccountantUtils.getNoOpAccountant(), new LongAccumulator(Long::max, 0), mock(ResourceManager.class)) {
+      @Override
+      public ListenableFuture<DataBuffer> submitResponse(ServerQueryRequest queryRequest) {
+        return responder.apply(queryRequest);
+      }
+
+      @Override
+      public String name() {
+        return "test";
+      }
+    };
+    InstanceRequestHandler handler = new InstanceRequestHandler("testServer", config, queryScheduler,
+        mock(AccessControl.class), ThreadAccountantUtils.getNoOpAccountant());
     return new QueryServer(port, null, handler);
   }
 
