@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.ingestion.error;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -28,7 +29,11 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /// Folds a failure to reach an ingestion source into [IngestionSourceErrorCategory#AUTH] or
@@ -54,13 +59,20 @@ import javax.annotation.Nullable;
 /// the hierarchy, because SDKs load in plugin classloaders, sometimes in two versions at once. They read codes
 /// reflectively and fail closed. A plugin for another SDK adds rules with [#registerRule].
 ///
-/// [#classify] is pure and never throws, apart from rethrowing the JVM's own fatal errors (`OutOfMemoryError`,
-/// `InternalError`).
+/// [#classify] never throws, apart from rethrowing the JVM's own fatal errors (`OutOfMemoryError`, `InternalError`).
+/// Its only side effect is a WARN, at most once a minute, when a rule or the classification itself fails.
 public final class IngestionSourceErrorClassifier {
   // Bounds the walk over pathological exception graphs; real failures are a few dozen nodes.
   private static final int MAX_NODES = 1_000;
+  private static final Logger LOGGER = LoggerFactory.getLogger(IngestionSourceErrorClassifier.class);
+  // Classification runs on every failed fetch or row, so a broken rule fails just as often
+  private static final long FAILURE_LOG_INTERVAL_MS = TimeUnit.MINUTES.toMillis(1);
+  // Enough to find the failing code
+  private static final int MAX_LOGGED_FRAMES = 10;
   private static final Set<IngestionSourceErrorRule> REGISTERED_RULES = new CopyOnWriteArraySet<>();
   private static final Set<IngestionSourceErrorRule> REGISTERED_GENERIC_RULES = new CopyOnWriteArraySet<>();
+  @VisibleForTesting
+  static final AtomicLong LAST_FAILURE_LOG_MS = new AtomicLong();
 
   private IngestionSourceErrorClassifier() {
   }
@@ -79,8 +91,36 @@ public final class IngestionSourceErrorClassifier {
       // Observation only: a classification bug, or a hostile exception, must never change how the failure itself is
       // handled.
       rethrowIfFatal(t);
+      // The class only: the failure's message is the caller's to log
+      String failureClass = failure != null ? failure.getClass().getName() : null;
+      warnAtMostOnceAMinute("Failed to classify an ingestion source failure: {}, caught: {}", failureClass, t);
       return Optional.empty();
     }
+  }
+
+  /// Logs a failure of classification itself, at most once a minute across all of them. Describing a hostile exception
+  /// can fail in turn, which must not escape either.
+  private static void warnAtMostOnceAMinute(String message, String subject, Throwable t) {
+    long nowMs = System.currentTimeMillis();
+    long lastLoggedMs = LAST_FAILURE_LOG_MS.get();
+    if (nowMs - lastLoggedMs >= FAILURE_LOG_INTERVAL_MS && LAST_FAILURE_LOG_MS.compareAndSet(lastLoggedMs, nowMs)) {
+      try {
+        LOGGER.warn(message, subject, describe(t));
+      } catch (Throwable logFailure) {
+        rethrowIfFatal(logFailure);
+      }
+    }
+  }
+
+  /// The class and first stack frames of what classification caught, without its message, cause or suppressed
+  /// exceptions: any of them can carry the classified failure, whose message is the caller's to log.
+  private static String describe(Throwable t) {
+    StringBuilder description = new StringBuilder(t.getClass().getName());
+    StackTraceElement[] frames = t.getStackTrace();
+    for (int i = 0; i < frames.length && i < MAX_LOGGED_FRAMES; i++) {
+      description.append("\n\tat ").append(frames[i]);
+    }
+    return description.toString();
   }
 
   /// Running out of memory or a broken JVM is not ours to swallow; a stack overflow from a hostile exception is.
@@ -125,6 +165,8 @@ public final class IngestionSourceErrorClassifier {
       } catch (Throwable t) {
         // A rule that throws anything, even a checked exception it smuggles out, counts as no decision.
         rethrowIfFatal(t);
+        warnAtMostOnceAMinute("Ingestion source error rule: {} failed, counting it as no decision, caught: {}",
+            rule.getClass().getName(), t);
         continue;
       }
       if (verdict != null && (decided == null || PRECEDENCE.compare(verdict, decided) < 0)) {
