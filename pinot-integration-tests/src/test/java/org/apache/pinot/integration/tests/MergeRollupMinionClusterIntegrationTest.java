@@ -29,6 +29,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import javax.annotation.Nullable;
+import org.apache.avro.file.DataFileStream;
+import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.task.TaskState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -45,6 +47,7 @@ import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManag
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.minion.TaskSchedulingContext;
 import org.apache.pinot.core.common.MinionConstants;
+import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
@@ -164,17 +167,18 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     addTableConfig(singleLevelConcatProcessAllRealtimeTableConfig);
 
     // Push data into Kafka
-    pushAvroIntoKafka(avroFiles);
-    ClusterIntegrationTestUtils.pushAvroIntoKafka(avroFiles.subList(9, 12), "localhost:" + getKafkaPort(),
-        PROCESS_ALL_MODE_KAFKA_TOPIC, getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn(),
-        injectTombstones());
-    ClusterIntegrationTestUtils.pushAvroIntoKafka(avroFiles.subList(0, 3), "localhost:" + getKafkaPort(),
-        PROCESS_ALL_MODE_KAFKA_TOPIC, getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn(),
-        injectTombstones());
+    pushAvroIntoKafka(avroFiles, getKafkaTopic());
+    pushAvroIntoKafka(avroFiles.subList(9, 12), PROCESS_ALL_MODE_KAFKA_TOPIC);
+    pushAvroIntoKafka(avroFiles.subList(0, 3), PROCESS_ALL_MODE_KAFKA_TOPIC);
     ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles.subList(3, 9),
         singleLevelConcatProcessAllRealtimeTableConfig, schema, 0, _segmentDir5, _tarDir5);
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
+    // The processAll table has its own source subset and must be ready before its expected query is captured.
+    long processAllRecordCount = countRecords(avroFiles.subList(9, 12)) + countRecords(avroFiles.subList(0, 3));
+    TestUtils.waitForCondition(
+        aVoid -> getCurrentCountStarResult(MULTI_LEVEL_CONCAT_PROCESS_ALL_REALTIME_TABLE) == processAllRecordCount,
+        100L, 600_000L, "Failed to load all processAll source records");
 
     // Set up the H2 connection
     setUpH2Connection(avroFiles);
@@ -185,6 +189,29 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     _helixTaskResourceManager = _controllerStarter.getHelixTaskResourceManager();
     _taskManager = _controllerStarter.getTaskManager();
     _pinotHelixResourceManager = _controllerStarter.getHelixResourceManager();
+  }
+
+  private void pushAvroIntoKafka(List<File> avroFiles, String topic)
+      throws Exception {
+    try (BatchedKafkaDataProducer producer =
+        new BatchedKafkaDataProducer("localhost:" + getKafkaPort(), getMaxNumKafkaMessagesPerBatch())) {
+      ClusterIntegrationTestUtils.pushAvroIntoKafka(avroFiles, topic, getMaxNumKafkaMessagesPerBatch(),
+          getKafkaMessageHeader(), getPartitionColumn(), injectTombstones(), producer);
+    }
+  }
+
+  private static long countRecords(List<File> avroFiles)
+      throws Exception {
+    long count = 0L;
+    for (File avroFile : avroFiles) {
+      try (DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile)) {
+        while (reader.hasNext()) {
+          reader.next();
+          count++;
+        }
+      }
+    }
+    return count;
   }
 
   // this override is used by createRealtimeTableConfig
