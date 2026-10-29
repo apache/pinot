@@ -73,6 +73,14 @@ public class PulsarSourceErrorClassificationTest {
   }
 
   @Test
+  public void identityProviderStatusDecidesWithoutAnOAuthError() {
+    // The token client reports any status but 200, 400 and 401 by its number alone.
+    assertAuth(new PulsarClientException.AuthenticationException(
+            "Unable to obtain an access token: Failed to perform HTTP request. res: 403"),
+        IngestionSourceErrorSubReason.AUTHORIZATION, TARGET_IDP);
+  }
+
+  @Test
   public void oauthErrorsDecideByTheirMeaning() {
     // The identity provider refused the grant.
     assertAuth(new PulsarClientException.AuthenticationException(

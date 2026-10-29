@@ -552,10 +552,15 @@ final class IngestionSourceErrorRules {
     if (status == 403) {
       return auth(IngestionSourceErrorSubReason.AUTHORIZATION, code, target);
     }
-    if (status == 404 || status == 408 || status == 429 || status >= 500) {
+    if (status == 404 || isUnavailable(status)) {
       return sourceRead(code, target);
     }
     return null;
+  }
+
+  /// Whether an HTTP status means the server couldn't serve the request now: a timeout, a throttle or a server error.
+  private static boolean isUnavailable(int status) {
+    return status == 408 || status == 429 || status >= 500;
   }
 
   // ---------------------------------------------------------------------------------------------------------------
@@ -572,9 +577,11 @@ final class IngestionSourceErrorRules {
       "InvalidConfigurationException", "InvalidTopicNameException", "UnsupportedAuthenticationException",
       "AlreadyClosedException", "NotSupportedException", "CryptoException", "ChecksumException",
       "GettingAuthenticationDataException");
-  // The OAuth2 plugin's token errors: "Unable to obtain an access token: <description> (<error>)".
+  // The OAuth2 plugin's token errors: "Unable to obtain an access token: <description> (<error>)", or for a status
+  // other than 400 or 401, "Unable to obtain an access token: Failed to perform HTTP request. res: <status>".
   private static final String PULSAR_OAUTH_TOKEN = "Unable to obtain an access token";
   private static final Pattern PULSAR_OAUTH_ERROR = Pattern.compile("\\(([a-z_]{1,64})\\)\\s*$");
+  private static final Pattern PULSAR_OAUTH_STATUS = Pattern.compile("res: (\\d{3})\\s*$");
 
   /// Pulsar's class is its code: the broker's error maps one to one onto a nested subclass. Every subclass of the
   /// base class is matched on its own name and the names of its superclasses up to the base, so
@@ -626,7 +633,14 @@ final class IngestionSourceErrorRules {
         // An error we don't recognise decides nothing: it could be a refusal.
         return oauth(error.group(1), 0);
       }
-      // Without an OAuth error the token endpoint returned another status or never answered.
+      Matcher status = PULSAR_OAUTH_STATUS.matcher(message);
+      if (status.find()) {
+        IngestionSourceErrorVerdict verdict = httpStatus(Integer.parseInt(status.group(1)), TARGET_IDP);
+        if (verdict != null) {
+          return verdict;
+        }
+      }
+      // Otherwise the token endpoint returned a status that decides nothing, or never answered.
       return sourceRead(code, TARGET_IDP);
     }
     // The broker rejected the token: it gives one generic message for every reason.
@@ -658,6 +672,7 @@ final class IngestionSourceErrorRules {
   private static final String GRPC_STATUS_RUNTIME_EXCEPTION = "io.grpc.StatusRuntimeException";
   private static final String GRPC_STATUS_EXCEPTION = "io.grpc.StatusException";
   private static final String GOOGLE_AUTH_EXCEPTION = "com.google.auth.oauth2.GoogleAuthException";
+  private static final String GOOGLE_HTTP_RESPONSE_EXCEPTION = "com.google.api.client.http.HttpResponseException";
   private static final Set<String> GRPC_SOURCE_READ = Set.of("NOT_FOUND", "FAILED_PRECONDITION",
       "RESOURCE_EXHAUSTED", "UNAVAILABLE", "DEADLINE_EXCEEDED", "INTERNAL");
   private static final Set<String> GRPC_NONE = Set.of("CANCELLED", "INVALID_ARGUMENT", "ALREADY_EXISTS");
@@ -705,7 +720,8 @@ final class IngestionSourceErrorRules {
   }
 
   /// A token refresh that failed. Under the process's own identity the token is ours to get; our clock skew is ours
-  /// whoever's key it is. Otherwise the status the transport built above it decides.
+  /// whoever's key it is; a token endpoint that failed couldn't serve us. Otherwise the status the transport built
+  /// above it decides.
   @Nullable
   private static IngestionSourceErrorVerdict googleAuth(Throwable node, List<Throwable> below,
       @Nullable IngestionSourceErrorEvidence evidence) {
@@ -721,6 +737,15 @@ final class IngestionSourceErrorRules {
       String body = content != null ? content.toString() : messageOf(cause);
       if (body.contains(GOOGLE_CLOCK_SKEW)) {
         return none(code);
+      }
+    }
+    // grpc-auth reports a failure google-auth won't retry as UNAUTHENTICATED, a 502 or 504 among them.
+    for (Throwable cause : below) {
+      if (hasClass(cause.getClass(), GOOGLE_HTTP_RESPONSE_EXCEPTION)) {
+        Object status = invoke(cause, "getStatusCode");
+        if (status instanceof Integer && isUnavailable((Integer) status)) {
+          return sourceRead(String.valueOf(status), TARGET_IDP);
+        }
       }
     }
     return null;

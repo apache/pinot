@@ -27,11 +27,19 @@ import com.google.api.client.testing.http.MockLowLevelHttpResponse;
 import com.google.api.gax.grpc.GrpcStatusCode;
 import com.google.api.gax.rpc.ApiExceptionFactory;
 import com.google.auth.oauth2.ServiceAccountCredentials;
+import io.grpc.Attributes;
+import io.grpc.CallCredentials;
+import io.grpc.Metadata;
+import io.grpc.MethodDescriptor;
+import io.grpc.SecurityLevel;
 import io.grpc.Status;
+import io.grpc.auth.MoreCallCredentials;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.ConnectException;
 import java.security.KeyPairGenerator;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.net.ssl.SSLHandshakeException;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceCredentialMode;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorEvidence;
@@ -41,7 +49,8 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorAssertions.assertAuth;
 import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorAssertions.assertNotClassified;
 import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorAssertions.assertSourceRead;
-import static org.testng.Assert.fail;
+import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorVerdict.TARGET_IDP;
+import static org.testng.Assert.assertNotNull;
 
 
 /// Pins the classifier's gRPC, gax and google-auth rules against the Google Cloud client libraries Pinot ships. A
@@ -62,30 +71,75 @@ public class GoogleCloudSourceErrorClassificationTest {
     return ApiExceptionFactory.createException(message, null, GrpcStatusCode.of(code), false);
   }
 
-  /// What grpc-auth reports when the token refresh behind a call fails: UNAUTHENTICATED over a refused token, and
-  /// UNAVAILABLE over a token endpoint that never answered.
+  private static final MethodDescriptor.Marshaller<Object> UNUSED = new MethodDescriptor.Marshaller<>() {
+    @Override
+    public InputStream stream(Object value) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public Object parse(InputStream stream) {
+      throw new UnsupportedOperationException();
+    }
+  };
+  private static final CallCredentials.RequestInfo PULL = new CallCredentials.RequestInfo() {
+    @Override
+    public MethodDescriptor<?, ?> getMethodDescriptor() {
+      return MethodDescriptor.newBuilder(UNUSED, UNUSED).setType(MethodDescriptor.MethodType.UNARY)
+          .setFullMethodName("google.pubsub.v1.Subscriber/Pull").build();
+    }
+
+    @Override
+    public SecurityLevel getSecurityLevel() {
+      return SecurityLevel.PRIVACY_AND_INTEGRITY;
+    }
+
+    @Override
+    public String getAuthority() {
+      return "pubsub.googleapis.com";
+    }
+
+    @Override
+    public Attributes getTransportAttrs() {
+      return Attributes.EMPTY;
+    }
+  };
+
   private static Throwable tokenRefreshFailure(String tokenEndpointBody)
       throws Exception {
-    return tokenRefreshFailure(new MockHttpTransport.Builder().setLowLevelHttpResponse(
-        new MockLowLevelHttpResponse().setStatusCode(400).setContentType("application/json")
-            .setContent(tokenEndpointBody)).build(), Status.UNAUTHENTICATED);
+    return tokenRefreshFailure(tokenEndpoint(400, tokenEndpointBody));
   }
 
-  private static Throwable tokenRefreshFailure(HttpTransport transport, Status status)
+  private static HttpTransport tokenEndpoint(int status, String body) {
+    return new MockHttpTransport.Builder().setLowLevelHttpResponse(new MockLowLevelHttpResponse().setStatusCode(status)
+        .setContentType("application/json").setContent(body)).build();
+  }
+
+  /// What a gRPC call reports when the token refresh behind it fails, as grpc-auth builds it from the failure.
+  private static Throwable tokenRefreshFailure(HttpTransport tokenEndpoint)
       throws Exception {
     ServiceAccountCredentials credentials = ServiceAccountCredentials.newBuilder()
         .setClientEmail("fixture@fixture-project.iam.gserviceaccount.com").setPrivateKeyId("fixture")
         .setPrivateKey(KeyPairGenerator.getInstance("RSA").generateKeyPair().getPrivate())
         .setScopes(List.of("https://www.googleapis.com/auth/pubsub"))
-        .setHttpTransportFactory(() -> transport)
+        .setHttpTransportFactory(() -> tokenEndpoint)
+        // google-auth's backoff would only slow the test: retrying doesn't change which failure is reported
+        .setDefaultRetriesEnabled(false)
         .build();
-    try {
-      credentials.refresh();
-      fail("Expected the token refresh to fail");
-      return null;
-    } catch (IOException e) {
-      return status.withDescription("Failed computing credential metadata").withCause(e).asRuntimeException();
-    }
+    AtomicReference<Status> failed = new AtomicReference<>();
+    MoreCallCredentials.from(credentials).applyRequestMetadata(PULL, Runnable::run,
+        new CallCredentials.MetadataApplier() {
+          @Override
+          public void apply(Metadata headers) {
+          }
+
+          @Override
+          public void fail(Status status) {
+            failed.set(status);
+          }
+        });
+    assertNotNull(failed.get(), "Expected the token refresh to fail");
+    return failed.get().asRuntimeException();
   }
 
   @Test
@@ -110,8 +164,17 @@ public class GoogleCloudSourceErrorClassificationTest {
         };
       }
     };
-    assertSourceRead(withCredentials(tokenRefreshFailure(unreachable, Status.UNAVAILABLE),
-        IngestionSourceCredentialMode.STATIC), null);
+    assertSourceRead(withCredentials(tokenRefreshFailure(unreachable), IngestionSourceCredentialMode.STATIC), null);
+  }
+
+  @Test
+  public void tokenEndpointThatFailedIsSourceRead()
+      throws Exception {
+    // google-auth won't retry a 502 or 504, so grpc-auth reports it as UNAUTHENTICATED; a 500 or 503 as UNAVAILABLE.
+    for (int status : new int[]{502, 504, 500, 503}) {
+      assertSourceRead(withCredentials(tokenRefreshFailure(tokenEndpoint(status, "Bad Gateway")),
+          IngestionSourceCredentialMode.STATIC), TARGET_IDP);
+    }
   }
 
   @Test
