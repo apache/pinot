@@ -343,6 +343,9 @@ public class TextIndexConfig extends IndexConfig {
   /// instead of one document per row. Lucene document ids are translated to dictionary ids. `TEXT_MATCH` returns
   /// matching dictIds that are resolved to docIds through the dictionary-based filter operators. Requires a
   /// dictionary-encoded single-value STRING column and is only applied to immutable segments. Defaults to false.
+  /// Enable only after all servers support dictionary-based text indexes. Before downgrading to an older server,
+  /// disable this option and rebuild every dictionary-based text index: older readers interpret dictionary ids as
+  /// document ids and can silently return incorrect matches.
   public boolean isBuildOnDictionary() {
     return _buildOnDictionary;
   }
