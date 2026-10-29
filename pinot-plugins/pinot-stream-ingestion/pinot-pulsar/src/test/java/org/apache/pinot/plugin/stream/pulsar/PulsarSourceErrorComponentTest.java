@@ -191,6 +191,39 @@ public class PulsarSourceErrorComponentTest {
     assertAuth(refused, IngestionSourceErrorSubReason.AUTHORIZATION, TARGET_BROKER);
   }
 
+  /// A lagging reader the broker drops, with its grant intact, reconnects by itself inside the window and reads on: the
+  /// window never fires on an ordinary reconnect.
+  @Test(timeOut = 120_000)
+  public void droppedLaggingReaderThatReconnectsReadsOn()
+      throws Exception {
+    try (PulsarAdmin admin = admin()) {
+      // The lagging-reader test may already have revoked it
+      admin.namespaces().grantPermissionOnNamespace(NAMESPACE, READER_ROLE, EnumSet.of(AuthAction.consume));
+    }
+    StreamConsumerFactory consumerFactory = StreamConsumerFactoryProvider.create(streamConfig(token(_signingKey,
+        READER_ROLE)));
+    try (PartitionGroupConsumer consumer = consumerFactory.createPartitionGroupConsumer(CLIENT_ID,
+        consumingStatus(0))) {
+      MessageBatch<?> batch = consumer.fetchMessages(new MessageIdStreamOffset(MessageId.earliest), 20);
+      assertTrue(batch.getMessageCount() < NUM_MESSAGES / 2, "The reader must lag");
+      int numConsumed = batch.getMessageCount();
+      StreamPartitionMsgOffset offset = batch.getOffsetOfNextBatch();
+
+      try (PulsarAdmin admin = admin()) {
+        admin.topics().unload(partition(0));
+      }
+      // At most a receiver queue's worth was buffered when the broker dropped the reader, so reading the whole topic
+      // means it reconnected. A fetch throwing here fails the test.
+      long deadlineMs = System.currentTimeMillis() + PulsarPartitionLevelConsumer.MAX_DISCONNECTED_MS;
+      while (numConsumed < NUM_MESSAGES) {
+        assertTrue(System.currentTimeMillis() < deadlineMs, "The reader didn't reconnect: read " + numConsumed);
+        batch = consumer.fetchMessages(offset, FETCH_TIMEOUT_MS);
+        numConsumed += batch.getMessageCount();
+        offset = batch.getOffsetOfNextBatch();
+      }
+    }
+  }
+
   /// Partition 0 is consuming and partition 1 is new. A refusal keeps the partial result, partition 0 only, as before,
   /// and is now reported to the controller.
   @Test(timeOut = 120_000)

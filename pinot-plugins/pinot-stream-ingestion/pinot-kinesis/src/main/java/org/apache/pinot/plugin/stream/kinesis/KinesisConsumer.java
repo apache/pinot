@@ -27,7 +27,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
@@ -61,8 +60,11 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
   // loop's own tolerance for fetch errors, this many in a row are tolerated; each further one is reported.
   private static final int MAX_CONSECUTIVE_THROTTLED_FETCHES = 5;
   // Fetches in a row that throttling exhausted, by consumer and shard. Kept outside the consumer instance: every empty
-  // batch counts toward the consume loop's idle timeout, which recreates the consumer under the same client id.
-  private static final Map<String, Integer> CONSECUTIVE_THROTTLED_FETCHES = new ConcurrentHashMap<>();
+  // batch counts toward the consume loop's idle timeout, which recreates the consumer under the same client id. Idle
+  // entries expire: a consumer the consume loop didn't create, such as the controller's end-of-shard check under a
+  // unique client id per call, never fetches under its key again.
+  private static final Map<String, Integer> CONSECUTIVE_THROTTLED_FETCHES =
+      CacheBuilder.newBuilder().expireAfterAccess(1, TimeUnit.HOURS).<String, Integer>build().asMap();
 
   private final ThrottledLogger _throttledLogger = new ThrottledLogger(LOGGER, RATE_LIMIT_LOG_RATE_PER_MIN);
   private String _nextStartSequenceNumber = null;
