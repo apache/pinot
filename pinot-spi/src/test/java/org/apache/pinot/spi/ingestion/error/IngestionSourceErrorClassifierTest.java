@@ -27,9 +27,18 @@ import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.net.ssl.SSLHandshakeException;
 import javax.security.auth.login.LoginException;
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.core.LogEvent;
+import org.apache.logging.log4j.core.Logger;
+import org.apache.logging.log4j.core.LoggerContext;
+import org.apache.logging.log4j.core.appender.AbstractAppender;
+import org.apache.logging.log4j.core.config.Property;
+import org.apache.logging.log4j.core.layout.PatternLayout;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
@@ -343,6 +352,98 @@ public class IngestionSourceErrorClassifierTest {
     a.initCause(b);
     a.addSuppressed(b);
     assertEquals(categoryOf(a), Optional.empty());
+  }
+
+  @Test
+  public void classificationFailuresWarnAtMostOnceAMinuteWithoutTheFailuresMessage() {
+    String marker = "fixture-secret";
+    // A rule that fails on every node, carrying the node's message in its own, its cause and a suppressed exception
+    IngestionSourceErrorRule brokenRule = (node, below, evidence) -> {
+      IllegalStateException failure = new IllegalStateException("rule failed on: " + node.getMessage(), node);
+      failure.addSuppressed(new RuntimeException(node.getMessage()));
+      throw failure;
+    };
+    register(brokenRule);
+    // As in a fresh process: another test class in this JVM may have logged within the interval
+    IngestionSourceErrorClassifier.LAST_FAILURE_LOG_MS.set(0);
+    WarnCapture warnings = WarnCapture.attachTo(IngestionSourceErrorClassifier.class.getName());
+    try {
+      for (int i = 0; i < 1_000; i++) {
+        assertEquals(categoryOf(new ConnectException(marker)), Optional.of(IngestionSourceErrorCategory.SOURCE_READ));
+      }
+      assertEquals(warnings._rendered.size(), 1, warnings._rendered.toString());
+      String ruleWarning = warnings._rendered.get(0);
+      assertTrue(ruleWarning.startsWith("Ingestion source error rule: " + brokenRule.getClass().getName() + " failed"),
+          ruleWarning);
+      assertTrue(ruleWarning.contains(IllegalStateException.class.getName()), ruleWarning);
+      assertFalse(ruleWarning.contains(marker), ruleWarning);
+
+      // Within the minute nothing more is logged; after it, the next failure is
+      IngestionSourceErrorClassifier.LAST_FAILURE_LOG_MS.set(System.currentTimeMillis() - 50_000);
+      categoryOf(new ConnectException(marker));
+      assertEquals(warnings._rendered.size(), 1, warnings._rendered.toString());
+      IngestionSourceErrorClassifier.LAST_FAILURE_LOG_MS.set(System.currentTimeMillis() - 70_000);
+      categoryOf(new ConnectException(marker));
+      assertEquals(warnings._rendered.size(), 2, warnings._rendered.toString());
+
+      // The walk failing warns too, naming the failure's class only
+      IngestionSourceErrorClassifier.LAST_FAILURE_LOG_MS.set(0);
+      Throwable hostileCause = new RuntimeException(marker) {
+        @Override
+        public synchronized Throwable getCause() {
+          throw new IllegalStateException(marker);
+        }
+      };
+      assertEquals(categoryOf(hostileCause), Optional.empty());
+      assertEquals(warnings._rendered.size(), 3, warnings._rendered.toString());
+      String walkWarning = warnings._rendered.get(2);
+      assertTrue(walkWarning.startsWith(
+          "Failed to classify an ingestion source failure: " + hostileCause.getClass().getName()), walkWarning);
+      assertFalse(walkWarning.contains(marker), walkWarning);
+      // Nor does a null failure escape
+      IngestionSourceErrorClassifier.LAST_FAILURE_LOG_MS.set(0);
+      assertEquals(IngestionSourceErrorClassifier.classify(null), Optional.empty());
+      assertEquals(warnings._rendered.size(), 4, warnings._rendered.toString());
+    } finally {
+      warnings.detach();
+    }
+  }
+
+  /// Collects the WARN events of one logger, rendered with any throwable they carry.
+  private static final class WarnCapture extends AbstractAppender {
+    private static final PatternLayout RENDERING = PatternLayout.newBuilder().withPattern("%m%n%throwable").build();
+    final List<String> _rendered = new CopyOnWriteArrayList<>();
+    private final Logger _logger;
+
+    private WarnCapture(Logger logger) {
+      super("IngestionSourceErrorClassifierTestCapture", null, null, true, Property.EMPTY_ARRAY);
+      _logger = logger;
+    }
+
+    static WarnCapture attachTo(String loggerName) {
+      LoggerContext context = (LoggerContext) LogManager.getContext(false);
+      WarnCapture capture = new WarnCapture(context.getLogger(loggerName));
+      capture.start();
+      capture._logger.addAppender(capture);
+      return capture;
+    }
+
+    void detach() {
+      _logger.removeAppender(this);
+      stop();
+      // Attaching registered a LoggerConfig for a logger log4j2.xml doesn't declare: remove it, since test classes
+      // share this JVM
+      LoggerContext context = _logger.getContext();
+      context.getConfiguration().removeLogger(_logger.getName());
+      context.updateLoggers();
+    }
+
+    @Override
+    public void append(LogEvent event) {
+      if (event.getLevel() == Level.WARN) {
+        _rendered.add(RENDERING.toSerializable(event));
+      }
+    }
   }
 
   @Test
