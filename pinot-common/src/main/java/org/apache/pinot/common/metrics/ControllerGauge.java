@@ -238,8 +238,9 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   // The progress of a certain table rebalance job of a table
   TABLE_REBALANCE_JOB_PROGRESS_PERCENT("percent", false),
 
-  // Epoch seconds of the latest authentication or authorization failure against the table's stream source, seen
-  // while fetching stream metadata. Never cleared on success: a recent value means a recent failure.
+  // Epoch seconds of the latest authentication or authorization failure while fetching the table's stream metadata:
+  // at the stream, or an identity service its client uses. Never cleared on success: a recent value means a recent
+  // failure.
   INGESTION_SOURCE_AUTH_FAILURE_TIME_SECONDS("seconds", false),
   // Epoch seconds of the latest time the controller gave up fetching the table's stream metadata: missing,
   // unreachable or throttled after retries.

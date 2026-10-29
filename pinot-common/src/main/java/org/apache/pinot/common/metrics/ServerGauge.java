@@ -187,8 +187,9 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT("documents", false,
       "Docs in which an OPEN_STRUCT key was present in the most recently sealed segment; "
           + "divide by openStructLastSegmentDocCount for the fill rate"),
-  /// Set when authentication or authorization fails against the partition's stream or its schema registry. Written
-  /// on every such failure and never cleared on success: a recent value means a recent failure.
+  /// Set when authentication or authorization fails while reading the partition's stream: at the stream, its schema
+  /// registry, or an identity service its client uses. Written on every such failure and never cleared on success: a
+  /// recent value means a recent failure.
   INGESTION_SOURCE_AUTH_FAILURE_TIME_SECONDS("seconds", false,
       "Epoch seconds of the latest authentication or authorization failure against this partition's stream source"),
   /// Set when Pinot gives up reading the partition's stream: missing, unreachable or throttled after retries.
