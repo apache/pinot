@@ -125,7 +125,7 @@ public class DictionaryIndexTypeTest {
     }
 
     @Test
-    public void forwardEncodingOverridesRawFieldLevelEncoding()
+    public void conflictingRawFieldLevelEncodingIsRejected()
         throws IOException {
       addFieldIndexConfig("{\n"
           + "    \"name\": \"dimInt\",\n"
@@ -134,7 +134,9 @@ public class DictionaryIndexTypeTest {
           + "      \"forward\": { \"encodingType\": \"DICTIONARY\" }"
           + "    }\n"
           + "}");
-      assertEquals(DictionaryIndexConfig.DEFAULT);
+      IllegalStateException ex = expectThrows(IllegalStateException.class,
+          () -> getActualConfig("dimInt", StandardIndexes.dictionary()));
+      assertTrue(ex.getMessage().contains("Conflicting forward-index encoding"));
     }
 
     @Test

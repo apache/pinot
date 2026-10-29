@@ -151,8 +151,11 @@ More detailed instructions can be found at [Quick Demo](https://docs.pinot.apach
 
 Set per-column forward index settings inside `fieldConfigList[].indexes.forward`. The older field-level
 `fieldConfigList[].encodingType`, `fieldConfigList[].compressionCodec`, and `fieldConfigList[].properties` forms are
-deprecated, and table create/update validation rejects them. Migrate existing configs before submitting them to the
-controller.
+deprecated but remain accepted on table create/update. Existing configs, including `DICTIONARY` values added by older
+serializers, can still be read, edited, and submitted without manual migration. Legacy fields are retained for older
+nodes during rolling upgrades and rollback. Use the new shape after all nodes support it; move index-specific settings
+into the relevant `indexes.<indexName>` block. Legacy `properties` also contains settings used outside index configs,
+so it must not be cleared wholesale.
 
 Use this shape for new table configs:
 

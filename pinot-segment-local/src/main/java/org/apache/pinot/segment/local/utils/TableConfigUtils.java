@@ -2047,15 +2047,6 @@ public final class TableConfigUtils {
         String column = fieldConfig.getName();
         Preconditions.checkState(seenColumns.add(column), "Duplicate FieldConfig for column: %s", column);
         Preconditions.checkState(schema.hasColumn(column), "Failed to find column: %s in schema", column);
-        Preconditions.checkState(!fieldConfig.hasFieldLevelEncodingType(),
-            "FieldConfig.encodingType is deprecated for column: %s. Use fieldConfigList[].indexes.forward.encodingType "
-                + "instead.", column);
-        Preconditions.checkState(!fieldConfig.hasFieldLevelCompressionCodec(),
-            "FieldConfig.compressionCodec is deprecated for column: %s. Use "
-                + "fieldConfigList[].indexes.forward.compressionCodec instead.", column);
-        Preconditions.checkState(!fieldConfig.hasFieldLevelProperties(),
-            "FieldConfig.properties is deprecated for column: %s. Move these settings into the relevant "
-                + "fieldConfigList[].indexes.<indexName> block instead.", column);
       }
     }
 
@@ -2569,7 +2560,8 @@ public final class TableConfigUtils {
     return clone;
   }
 
-  @SuppressWarnings("deprecation")
+  // Legacy setters are required to clear converted fields.
+  @SuppressWarnings({"deprecation", "removal"})
   private static FieldConfig clearDeprecatedFieldConfigOptions(FieldConfig fieldConfig) {
     return new FieldConfig.Builder(fieldConfig)
         .withEncodingType(null)

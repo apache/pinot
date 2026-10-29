@@ -34,6 +34,7 @@ import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.segment.local.utils.TableConfigUtils.ValidationType;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.Constants;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
@@ -1437,7 +1438,8 @@ public class TableConfigUtilsTest {
   }
 
   @Test
-  @SuppressWarnings("deprecation")
+  // Exercise legacy settings intentionally to verify compatibility.
+  @SuppressWarnings({"deprecation", "removal"})
   public void testValidateFieldConfig() {
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addDateTime(TIME_COLUMN, DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
@@ -1457,39 +1459,30 @@ public class TableConfigUtilsTest {
       fail("all nullable fields set for fieldConfig should pass", e);
     }
 
-    try {
-      FieldConfig fieldConfig = new FieldConfig("myCol1", FieldConfig.EncodingType.RAW, null, null, null, null, null);
-      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
-      TableConfigUtils.validate(tableConfig, schema);
-      fail("Should fail for deprecated field-level encoding type");
-    } catch (Exception e) {
-      assertEquals(e.getMessage(), "FieldConfig.encodingType is deprecated for column: myCol1. Use "
-          + "fieldConfigList[].indexes.forward.encodingType instead.");
-    }
+    FieldConfig legacyRaw = new FieldConfig.Builder("myCol1")
+        .withEncodingType(FieldConfig.EncodingType.DICTIONARY)
+        .withCompressionCodec(CompressionCodec.SNAPPY)
+        .withProperties(Map.of(FieldConfig.RAW_INDEX_WRITER_VERSION, "4",
+            FieldConfig.IS_SEGMENT_PARTITIONED_COLUMN_KEY, "true"))
+        .build();
+    tableConfig.setFieldConfigList(List.of(legacyRaw));
+    TableConfigUtils.validate(tableConfig, schema);
+    assertEquals(tableConfig.getFieldConfigList(), List.of(legacyRaw));
+    // Serializer-injected DICTIONARY must still defer to a legacy no-dictionary setting.
+    assertEquals(StandardIndexes.forward().getConfig(tableConfig, schema).get("myCol1").getEncodingType(),
+        FieldConfig.EncodingType.RAW);
 
-    try {
-      FieldConfig fieldConfig = new FieldConfig.Builder("myCol1")
-          .withCompressionCodec(CompressionCodec.SNAPPY)
-          .build();
-      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
-      TableConfigUtils.validate(tableConfig, schema);
-      fail("Should fail for deprecated field-level compression codec");
-    } catch (Exception e) {
-      assertEquals(e.getMessage(), "FieldConfig.compressionCodec is deprecated for column: myCol1. Use "
-          + "fieldConfigList[].indexes.forward.compressionCodec instead.");
-    }
-
-    try {
-      FieldConfig fieldConfig = new FieldConfig.Builder("myCol1")
-          .withProperties(Map.of(FieldConfig.RAW_INDEX_WRITER_VERSION, "4"))
-          .build();
-      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
-      TableConfigUtils.validate(tableConfig, schema);
-      fail("Should fail for deprecated field-level properties");
-    } catch (Exception e) {
-      assertEquals(e.getMessage(), "FieldConfig.properties is deprecated for column: myCol1. Move these settings into "
-          + "the relevant fieldConfigList[].indexes.<indexName> block instead.");
-    }
+    // Tier overrides must continue overriding legacy base settings after a config update.
+    FieldConfig tiered = new FieldConfig.Builder("myCol2").withEncodingType(FieldConfig.EncodingType.RAW)
+        .withTierOverwrites(JsonUtils.newObjectNode().set("cold",
+            JsonUtils.newObjectNode().put("encodingType", "DICTIONARY")))
+        .build();
+    tableConfig.setFieldConfigList(List.of(tiered));
+    TableConfigUtils.validate(tableConfig, schema);
+    assertEquals(tableConfig.getFieldConfigList().get(0), tiered);
+    assertEquals(StandardIndexes.forward().getConfig(
+        TableConfigUtils.overwriteTableConfigForTier(tableConfig, "cold"), schema).get("myCol2").getEncodingType(),
+        FieldConfig.EncodingType.DICTIONARY);
 
     try {
       FieldConfig fieldConfig = fieldConfigBuilderWithForwardEncoding("myCol1", FieldConfig.EncodingType.RAW)

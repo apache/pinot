@@ -28,9 +28,9 @@ Some compatibility-verifier table configs intentionally use deprecated field-lev
 binary before the compatibility run upgrades to the newer binary, and older controllers do not understand the newer
 `fieldConfigList[].indexes.*` blocks.
 
-Those fixtures are not examples for configs submitted to a new controller. New-controller create/update validation
-rejects field-level `encodingType`, `compressionCodec`, and `properties`; production table configs should use the
-corresponding `fieldConfigList[].indexes.*` blocks.
+New-controller create/update validation continues accepting these deprecated fields. They are retained so an unrelated
+config update does not break older nodes during rolling upgrades or rollback. New production configs should use the
+corresponding `fieldConfigList[].indexes.*` blocks after all nodes support them.
 
 ## Usage
 

@@ -109,7 +109,8 @@ public class FieldIndexConfigsUtil {
   }
 
   // Persisted configs from older nodes still carry field-level encoding; retain that fallback on reload.
-  @SuppressWarnings("deprecation")
+  // Legacy API use is required to read or convert persisted configs.
+  @SuppressWarnings({"deprecation", "removal"})
   private static boolean isRawForwardEncoded(@Nullable FieldConfig fieldConfig) {
     if (fieldConfig == null) {
       return false;

@@ -30,7 +30,8 @@ import static org.testng.Assert.assertTrue;
 
 public class FieldConfigTest {
   @Test
-  @SuppressWarnings("deprecation")
+  // Legacy API use is intentional to verify backward-compatible config reads.
+  @SuppressWarnings({"deprecation", "removal"})
   public void missingDeprecatedEncodingTypeDefaultsToDictionaryButDoesNotSerialize()
       throws IOException {
     FieldConfig fieldConfig = JsonUtils.stringToObject("{\"name\":\"col\"}", FieldConfig.class);
@@ -43,7 +44,8 @@ public class FieldConfigTest {
   }
 
   @Test
-  @SuppressWarnings("deprecation")
+  // Legacy API use is intentional to verify backward-compatible config reads.
+  @SuppressWarnings({"deprecation", "removal"})
   public void explicitDeprecatedEncodingTypeIsPreservedForBackwardCompatibility()
       throws IOException {
     FieldConfig fieldConfig = JsonUtils.stringToObject("{\"name\":\"col\",\"encodingType\":\"RAW\"}",
@@ -56,7 +58,8 @@ public class FieldConfigTest {
   }
 
   @Test
-  @SuppressWarnings("deprecation")
+  // Legacy API use is intentional to verify backward-compatible config reads.
+  @SuppressWarnings({"deprecation", "removal"})
   public void explicitDeprecatedCompressionCodecAndPropertiesArePreservedForBackwardCompatibility()
       throws IOException {
     FieldConfig fieldConfig = JsonUtils.stringToObject(

@@ -225,10 +225,11 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
   /// Resolves per-column [ForwardIndexConfig] in a single pass over [TableConfig], reconciling the legacy signals
   /// (`indexingConfig.noDictionaryColumns`, `indexingConfig.noDictionaryConfig`, deprecated
   /// `fieldConfig.encodingType`, `fieldConfig.compressionCodec`) with the modern `fieldConfig.indexes.forward` JSON
-  /// block. When `indexes.forward.encodingType` is present, it is the canonical forward-index encoding and wins over
-  /// legacy top-level signals.
+  /// block. An explicit legacy RAW encoding must agree with the forward block; legacy DICTIONARY may be a
+  /// serializer-injected default and defers to `indexes.forward.encodingType`.
   @Override
-  @SuppressWarnings("deprecation")
+  // Legacy API use is required to read or convert persisted configs.
+  @SuppressWarnings({"deprecation", "removal"})
   protected ColumnConfigDeserializer<ForwardIndexConfig> createDeserializer() {
     return (tableConfig, schema) -> {
       Map<String, ForwardIndexConfig> result = new HashMap<>();
@@ -272,6 +273,15 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
                 column);
 
             JsonNode innerEncodingNode = forwardIndexNode.get(ENCODING_TYPE_CONFIG_KEY);
+
+            // Older serializers inject DICTIONARY even when it was not explicitly configured. RAW is unambiguous.
+            if (fieldConfig.getEncodingType() == FieldConfig.EncodingType.RAW
+                && innerEncodingNode != null && !innerEncodingNode.isNull()) {
+              Preconditions.checkState(FieldConfig.EncodingType.valueOf(innerEncodingNode.asText())
+                      == FieldConfig.EncodingType.RAW,
+                  "Conflicting forward-index encoding for column: %s — FieldConfig.encodingType=RAW but "
+                      + "indexes.forward.encodingType=%s", column, innerEncodingNode.asText());
+            }
 
             // Conflict: compressionCodec mismatch between FieldConfig and indexes.forward.
             JsonNode innerCodecNode = forwardIndexNode.get("compressionCodec");
@@ -330,7 +340,8 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
   ///
   /// Prefer `fieldConfig.indexes.forward.encodingType` when present. Fall back to the deprecated field-level
   /// `fieldConfig.encodingType` for legacy conversion paths that can still inspect configs before validation.
-  @SuppressWarnings("deprecation")
+  // Legacy API use is required to read or convert persisted configs.
+  @SuppressWarnings({"deprecation", "removal"})
   public static FieldConfig.EncodingType getForwardEncodingType(FieldConfig fieldConfig) {
     JsonNode indexes = fieldConfig.getIndexes();
     if (indexes != null && indexes.isObject()) {

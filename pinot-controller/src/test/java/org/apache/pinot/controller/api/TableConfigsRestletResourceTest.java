@@ -30,6 +30,8 @@ import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.TableConfigs;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
+import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -53,6 +55,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 import org.testng.collections.Lists;
 
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.fail;
 
 
@@ -613,44 +616,41 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
   }
 
   @Test
-  @SuppressWarnings("deprecation")
-  public void testUpdateRejectsStoredLegacyFieldLevelConfigOptions()
+  // Deliberately submit deprecated fields to reproduce configs persisted by older controllers.
+  @SuppressWarnings("removal")
+  public void testUpdateAcceptsStoredLegacyFieldLevelConfigOptions()
       throws Exception {
-    assertUpdateRejectsStoredLegacyFieldConfig("testUpdateRejectsLegacyEncodingType",
-        new FieldConfig("dimA", FieldConfig.EncodingType.RAW, null, null, null, null, null),
-        "FieldConfig.encodingType is deprecated for column: dimA. Use "
-            + "fieldConfigList[].indexes.forward.encodingType instead.");
-    assertUpdateRejectsStoredLegacyFieldConfig("testUpdateRejectsLegacyCompressionCodec",
+    assertUpdateAcceptsStoredLegacyFieldConfig("testUpdateLegacyDefaultEncodingType",
+        JsonUtils.stringToObject("{\"name\":\"dimA\",\"encodingType\":\"DICTIONARY\"}", FieldConfig.class));
+    assertUpdateAcceptsStoredLegacyFieldConfig("testUpdateLegacyRawEncodingAndCompression",
         new FieldConfig.Builder("dimA")
-            .withCompressionCodec(FieldConfig.CompressionCodec.SNAPPY)
-            .build(),
-        "FieldConfig.compressionCodec is deprecated for column: dimA. Use "
-            + "fieldConfigList[].indexes.forward.compressionCodec instead.");
-    assertUpdateRejectsStoredLegacyFieldConfig("testUpdateRejectsLegacyProperties",
+            .withEncodingType(EncodingType.RAW)
+            .withCompressionCodec(CompressionCodec.SNAPPY)
+            .build());
+    assertUpdateAcceptsStoredLegacyFieldConfig("testUpdateLegacyProperties",
         new FieldConfig.Builder("dimA")
             .withProperties(Map.of(FieldConfig.RAW_INDEX_WRITER_VERSION, "4"))
-            .build(),
-        "FieldConfig.properties is deprecated for column: dimA. Move these settings into the relevant "
-            + "fieldConfigList[].indexes.<indexName> block instead.");
+            .build());
   }
 
-  private void assertUpdateRejectsStoredLegacyFieldConfig(String tableName, FieldConfig fieldConfig,
-      String expectedMessage)
+  private void assertUpdateAcceptsStoredLegacyFieldConfig(String tableName, FieldConfig fieldConfig)
       throws Exception {
     PinotAdminClient adminClient = getOrCreateAdminClient();
     TableConfig offlineTableConfig = createOfflineTableConfig(tableName);
     offlineTableConfig.setFieldConfigList(List.of(fieldConfig));
-    Schema schema = createDummySchema(tableName);
-    TableConfigs tableConfigs = new TableConfigs(tableName, schema, offlineTableConfig, null);
 
+    // Seed below REST validation to model a config persisted by an older controller.
     DEFAULT_INSTANCE.addDummySchema(tableName);
     DEFAULT_INSTANCE.getHelixResourceManager().addTable(offlineTableConfig);
     try {
-      String msg = Assert.expectThrows(Exception.class,
-              () -> adminClient.getTableClient()
-                  .updateTableConfigs(tableName, tableConfigs.toPrettyJsonString(), null, false, false))
-          .getMessage();
-      Assert.assertTrue(msg.contains(expectedMessage), msg);
+      TableConfigs update = adminClient.getTableClient().getTableConfigsObject(tableName);
+      update.getOffline().setDescription("Updated legacy config");
+      adminClient.getTableClient()
+          .updateTableConfigs(tableName, update.toPrettyJsonString(), null, false, false);
+
+      TableConfig stored = adminClient.getTableClient().getTableConfigsObject(tableName).getOffline();
+      assertEquals(stored.getDescription(), "Updated legacy config");
+      assertEquals(stored.getFieldConfigList(), List.of(fieldConfig));
     } finally {
       adminClient.getTableClient().deleteTableConfigs(tableName, null);
     }
