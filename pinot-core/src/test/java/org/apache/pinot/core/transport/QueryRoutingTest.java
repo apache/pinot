@@ -20,6 +20,7 @@ package org.apache.pinot.core.transport;
 
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.SettableFuture;
+import com.google.common.util.concurrent.Uninterruptibles;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandler;
@@ -31,7 +32,6 @@ import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.util.ReferenceCountUtil;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
@@ -52,12 +52,10 @@ import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
-import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
-import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -74,9 +72,8 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.mockito.ArgumentMatchers.any;
+import static org.apache.pinot.core.transport.QueryServerTestUtils.startAndGetPort;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
 
@@ -149,27 +146,10 @@ public class QueryRoutingTest {
   }
 
   private QueryServer getQueryServer(int responseDelayMs, DataBuffer response, int port) {
-    InstanceRequestHandler handler = new InstanceRequestHandler("server01", new PinotConfiguration(),
-        mockQueryScheduler(responseDelayMs, response), mock(AccessControl.class),
-        ThreadAccountantUtils.getNoOpAccountant());
-    return new QueryServer(port, null, handler);
-  }
-
-  /// Starts the query server and returns the actual bound port. Uses port 0 to let the OS assign a free port,
-  /// avoiding TOCTOU race conditions. [QueryServer#start()] blocks on `bind().sync()`, so the
-  /// server is ready to accept connections when this method returns.
-  private int startAndGetPort(QueryServer server) {
-    server.start();
-    return ((InetSocketAddress) server.getChannel().localAddress()).getPort();
-  }
-
-  private QueryScheduler mockQueryScheduler(int responseDelayMs, DataBuffer response) {
-    QueryScheduler queryScheduler = mock(QueryScheduler.class);
-    when(queryScheduler.submitResponse(any())).thenAnswer(invocation -> {
-      Thread.sleep(responseDelayMs);
+    return QueryServerTestUtils.newQueryServer(port, queryRequest -> {
+      Uninterruptibles.sleepUninterruptibly(responseDelayMs, TimeUnit.MILLISECONDS);
       return Futures.immediateFuture(response);
     });
-    return queryScheduler;
   }
 
   private QueryRouter newIsolatedQueryRouter() {
@@ -850,7 +830,7 @@ public class QueryRoutingTest {
   /// comes back at once even while a query to that server is stuck.
   @Test
   public void testPingIsAnsweredPromptlyWhileTheQueryEngineIsStuck() {
-    _queryServer = QueryServerTestUtils.newQueryServer(invocation -> SettableFuture.<byte[]>create());
+    _queryServer = QueryServerTestUtils.newQueryServer(queryRequest -> SettableFuture.create());
     initializeTestFixtures(startAndGetPort(_queryServer));
     QueryRouter queryRouter = newIsolatedQueryRouter();
     try {
@@ -861,6 +841,9 @@ public class QueryRoutingTest {
       assertTrue(queryRouter.ping(_serverInstance, 5_000L));
       assertTrue(System.currentTimeMillis() - startTimeMs < 2_000L,
           "A server whose query engine is stuck must still answer a ping promptly");
+      // The status stays IN_PROGRESS until the query is waited on, even after the server answers it, so check for an
+      // answer directly.
+      assertEquals(stuckQuery.getNumServersResponded(), 0, "The stuck query must still be unanswered");
       assertEquals(stuckQuery.getStatus(), QueryResponse.Status.IN_PROGRESS);
     } finally {
       queryRouter.shutDown();
