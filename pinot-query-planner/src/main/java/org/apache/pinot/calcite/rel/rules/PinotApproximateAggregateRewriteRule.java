@@ -100,7 +100,7 @@ public class PinotApproximateAggregateRewriteRule extends RelOptRule {
     // indices of every call stay valid. With no parameters configured the plan keeps the shape it had before, with no
     // extra project.
     //
-    // Keep existing literal arguments visible to the aggregate split rules, including those projected in union inputs.
+    // Keep literal arguments in the immediate project visible to the aggregate split rules.
     RelNode newInput = input;
     int distinctCountParamsIndex = -1;
     int percentileParamsIndex = -1;

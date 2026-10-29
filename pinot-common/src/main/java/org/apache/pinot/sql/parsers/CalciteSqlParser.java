@@ -1311,11 +1311,12 @@ public class CalciteSqlParser {
     if (functionKind == SqlKind.ARRAY_AGG && functionNode.getFunctionQuantifier() != null
         && "DISTINCT".equals(functionNode.getFunctionQuantifier().toString())) {
       Expression distinct = RequestUtils.getLiteralExpression(true);
-      if (operands.size() == 1 || (operands.size() == 2 && operands.get(1).isSetLiteral()
-          && operands.get(1).getLiteral().isSetStringValue())) {
+      int lastIndex = operands.size() - 1;
+      if ((operands.size() == 2 || operands.size() == 3) && operands.get(lastIndex).isSetLiteral()
+          && operands.get(lastIndex).getLiteral().isSetBoolValue()) {
+        operands.set(lastIndex, distinct);
+      } else if (operands.size() == 1 || operands.size() == 2) {
         operands.add(distinct);
-      } else if (operands.size() == 2 || operands.size() == 3) {
-        operands.set(operands.size() - 1, distinct);
       }
     }
     ParserUtils.validateFunction(canonicalName, operands);
