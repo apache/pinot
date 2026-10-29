@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.document.Document;
@@ -39,6 +40,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99.HnswV
 import org.apache.pinot.segment.local.segment.store.VectorIndexUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
+import org.apache.pinot.segment.spi.index.creator.VectorIndexConfigValidator;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexCreator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,6 +52,11 @@ import org.slf4j.LoggerFactory;
 public class HnswVectorIndexCreator implements VectorIndexCreator {
   private static final Logger LOGGER = LoggerFactory.getLogger(HnswVectorIndexCreator.class);
   public static final String VECTOR_INDEX_DOC_ID_COLUMN_NAME = "DocID";
+  /// Default heap budget for vectors buffered for a parallel build, so the default doc limit shrinks as the dimension
+  /// grows (about 10k docs at 1536 dims) instead of holding a fixed number of vectors of any size.
+  private static final long DEFAULT_PARALLEL_BUILD_MAX_BYTES = 64L * 1024 * 1024;
+  private static final int DEFAULT_PARALLEL_BUILD_MAX_DOCS = 50_000;
+  private static final long PART_SHUTDOWN_TIMEOUT_SECONDS = 60;
 
   private final String _vectorColumn;
   private final VectorSimilarityFunction _vectorSimilarityFunction;
@@ -61,15 +68,23 @@ public class HnswVectorIndexCreator implements VectorIndexCreator {
   private final Directory _indexDirectory;
   private final IndexWriter _indexWriter;
 
-  /// With `buildThreads` > 1, vectors are buffered and indexed from that many threads on seal: each thread fills its
-  /// own in-memory Lucene segment, so the graphs build in parallel. With `forceMerge=false` the graphs are kept as
-  /// separate Lucene segments (searched together) instead of being rebuilt into one.
+  /// With `buildThreads` > 1 (at most [VectorIndexConfigValidator#MAX_HNSW_BUILD_THREADS]), vectors are buffered and
+  /// indexed from that many threads on seal: each thread fills its own Lucene segment, so the graphs build in
+  /// parallel. With the default `forceMerge=true` they are then merged into one graph using the same number of merge
+  /// workers. With `forceMerge=false` the graphs are kept as separate Lucene segments and searched together: the
+  /// build is faster, but each query searches every graph, so query latency is higher (2-3x in one benchmark with 4
+  /// threads). The number of graphs is at least `buildThreads`, and more when a thread's vectors exceed
+  /// `maxBufferSizeMB` and Lucene flushes it more than once.
   private final int _buildThreads;
   private final boolean _forceMerge;
   private final VectorIndexConfig _vectorIndexConfig;
   /// Above this many vectors the buffered ones are indexed on the calling thread and buffering stops, so large
-  /// segments keep the single-writer path (and its memory profile).
+  /// segments keep the single-writer path. Defaults to as many vectors as fit in 64 MB, at most 50,000. While
+  /// buffering, the build holds the vectors on heap plus up to one `maxBufferSizeMB` per thread.
   private final int _parallelBuildMaxDocs;
+  /// Runs the graph merge workers on seal, when building in parallel with `forceMerge=true`
+  @Nullable
+  private final ExecutorService _mergeExecutor;
   @Nullable
   private List<float[]> _bufferedVectors;
 
@@ -82,10 +97,16 @@ public class HnswVectorIndexCreator implements VectorIndexCreator {
     _storeInSegmentFile = vectorIndexConfig.isStoreInSegmentFile();
     _segmentIndexDir = segmentIndexDir;
     Map<String, String> properties = vectorIndexConfig.getProperties();
-    _buildThreads = Math.max(1, Integer.parseInt(properties.getOrDefault("buildThreads", "1")));
+    // Clamped as well as validated, since configs written before validation covered these keys skip it
+    _buildThreads = Math.min(VectorIndexConfigValidator.MAX_HNSW_BUILD_THREADS,
+        Math.max(1, Integer.parseInt(properties.getOrDefault("buildThreads", "1"))));
     _forceMerge = Boolean.parseBoolean(properties.getOrDefault("forceMerge", "true"));
-    _parallelBuildMaxDocs = Integer.parseInt(properties.getOrDefault("parallelBuildMaxDocs", "50000"));
+    String parallelBuildMaxDocs = properties.get("parallelBuildMaxDocs");
+    _parallelBuildMaxDocs = parallelBuildMaxDocs != null ? Integer.parseInt(parallelBuildMaxDocs)
+        : (int) Math.max(1, Math.min(DEFAULT_PARALLEL_BUILD_MAX_DOCS,
+            DEFAULT_PARALLEL_BUILD_MAX_BYTES / ((long) Float.BYTES * _vectorDimension)));
     _bufferedVectors = _buildThreads > 1 ? new ArrayList<>() : null;
+    _mergeExecutor = _buildThreads > 1 && _forceMerge ? Executors.newFixedThreadPool(_buildThreads) : null;
     _vectorIndexConfig = vectorIndexConfig;
     // Segment generation is always in V1 and later we convert (as part of post creation processing) to V3 if
     // segmentVersion is set to V3 in SegmentGeneratorConfig.
@@ -98,13 +119,18 @@ public class HnswVectorIndexCreator implements VectorIndexCreator {
       indexDirectory = FSDirectory.open(_hnswIndexDir.toPath());
       LOGGER.info("Creating HNSW index for column: {} at path: {} with {} for segment: {}", column,
           _hnswIndexDir.getAbsolutePath(), vectorIndexConfig.getProperties(), segmentIndexDir.getAbsolutePath());
-      indexWriter = new IndexWriter(indexDirectory, VectorIndexUtils.getIndexWriterConfig(vectorIndexConfig));
+      indexWriter = new IndexWriter(indexDirectory, _mergeExecutor != null
+          ? VectorIndexUtils.getIndexWriterConfig(vectorIndexConfig, _buildThreads, _mergeExecutor)
+          : VectorIndexUtils.getIndexWriterConfig(vectorIndexConfig));
     } catch (Exception e) {
       // IndexWriter does not close the Directory passed to it, so both need to be closed.
       try {
         IOUtils.close(indexWriter, indexDirectory);
       } catch (Exception closeEx) {
         e.addSuppressed(closeEx);
+      }
+      if (_mergeExecutor != null) {
+        _mergeExecutor.shutdownNow();
       }
       throw new RuntimeException(
           "Caught exception while instantiating the HnswVectorIndexCreator for column: " + column, e);
@@ -189,7 +215,13 @@ public class HnswVectorIndexCreator implements VectorIndexCreator {
       }
       _indexWriter.addIndexes(partDirectories);
     } finally {
+      // On failure the other part writers may still be running: wait for them before closing and deleting their
+      // directories, so no files are written after the cleanup
       executor.shutdownNow();
+      if (!executor.awaitTermination(PART_SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+        LOGGER.warn("HNSW part writers for column: {} did not stop within {}s", _vectorColumn,
+            PART_SHUTDOWN_TIMEOUT_SECONDS);
+      }
       IOUtils.close(partDirectories);
       for (File partDir : partDirs) {
         if (partDir != null) {
@@ -214,12 +246,22 @@ public class HnswVectorIndexCreator implements VectorIndexCreator {
       }
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while sealing the HNSW index for column: " + _vectorColumn, e);
+    } finally {
+      shutDownMergeExecutor();
+    }
+  }
+
+  private void shutDownMergeExecutor() {
+    if (_mergeExecutor != null) {
+      _mergeExecutor.shutdownNow();
     }
   }
 
   @Override
   public void close()
       throws IOException {
+    // Covers a creator closed without seal()
+    shutDownMergeExecutor();
     try {
       // Based on the commit flag set in IndexWriterConfig, closing the writer will decide to commit or not.
       // IndexWriter does not close the Directory passed to it, so both need to be closed.

@@ -43,7 +43,11 @@ public final class VectorIndexConfigValidator {
   static final Set<String> HNSW_PROPERTIES = Collections.unmodifiableSet(new HashSet<>(
       Arrays.asList("maxCon", "beamWidth", "maxDimensions", "maxBufferSizeMB",
           "useCompoundFile", "mode", "commit", "commitIntervalMs", "commitDocs",
-          "refreshMinIntervalMs", "refreshWaitTimeoutMs")));
+          "refreshMinIntervalMs", "refreshWaitTimeoutMs", "buildThreads", "forceMerge", "parallelBuildMaxDocs")));
+
+  /// Upper bound for the HNSW `buildThreads` property: each thread opens its own Lucene IndexWriter and directory
+  /// during segment build, so an unbounded value can exhaust threads and file handles.
+  public static final int MAX_HNSW_BUILD_THREADS = 32;
 
   // IVF_FLAT-specific property keys
   static final Set<String> IVF_FLAT_PROPERTIES = Collections.unmodifiableSet(new HashSet<>(
@@ -261,6 +265,14 @@ public final class VectorIndexConfigValidator {
     validatePositiveIntProperty(properties, "beamWidth", "HNSW beamWidth");
     validatePositiveIntProperty(properties, "maxDimensions", "HNSW maxDimensions");
     validatePositiveDoubleProperty(properties, "maxBufferSizeMB", "HNSW maxBufferSizeMB");
+    // Parsed at segment build (commit or reload), where a bad value would fail the build instead of the table config
+    Integer buildThreads = parsePositiveIntProperty(properties, "buildThreads", "HNSW buildThreads");
+    if (buildThreads != null && buildThreads > MAX_HNSW_BUILD_THREADS) {
+      throw new IllegalArgumentException(
+          "HNSW buildThreads must be <= " + MAX_HNSW_BUILD_THREADS + ", got: " + buildThreads);
+    }
+    validatePositiveIntProperty(properties, "parallelBuildMaxDocs", "HNSW parallelBuildMaxDocs");
+    validateBooleanProperty(properties, "forceMerge", "HNSW forceMerge");
     // Rejected here rather than only in MutableVectorIndex: the constructor guard runs when a consuming segment is
     // created on the server, which would stop ingestion for the partition instead of failing the table config.
     validateLongProperty(properties, "refreshMinIntervalMs", "HNSW refreshMinIntervalMs", 0L);
@@ -352,6 +364,18 @@ public final class VectorIndexConfigValidator {
   /// Validates that an optional property, if present, is a positive integer.
   private static void validatePositiveIntProperty(Map<String, String> properties, String key, String displayName) {
     parsePositiveIntProperty(properties, key, displayName);
+  }
+
+  /// Validates that an optional property, if present, is `true` or `false` (any case), the only values
+  /// `Boolean.parseBoolean` does not silently read as `false`.
+  private static void validateBooleanProperty(Map<String, String> properties, String key, String displayName) {
+    if (!properties.containsKey(key)) {
+      return;
+    }
+    String value = properties.get(key);
+    if (!"true".equalsIgnoreCase(value) && !"false".equalsIgnoreCase(value)) {
+      throw new IllegalArgumentException(displayName + " must be true or false, got: '" + value + "'");
+    }
   }
 
   /// Validates that an optional property, if present, is a positive double.
