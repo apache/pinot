@@ -22,6 +22,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.Sets;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -557,7 +559,7 @@ public class TableRebalancer {
     List<String> oldSegmentsToMove = segmentsToMove;
     // A force commit creates a consuming successor in the same partition. Remember completed force commits until
     // that partition's consuming segment moves, so retrying a version conflict does not commit its successors too.
-    Set<Integer> forceCommittedPartitions = new HashSet<>();
+    IntSet forceCommittedPartitions = new IntOpenHashSet();
     while (true) {
       boolean segmentsToMoveChanged = oldSegmentsToMove != segmentsToMove;
       if (segmentsToMoveChanged) {
