@@ -64,7 +64,7 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
   public static final String PINOT_DOC_ID_STORED_FIELD_NAME = "DocID";
 
   /// Preferred numeric doc-values field holding the Pinot document ID in freshly built immutable indexes.
-  /// Used to build the Lucene-to-Pinot mapping; omitted when explicitly configured with Skip.
+  /// Used to build the Lucene-to-Pinot mapping; omitted for per-row indexes explicitly configured with Skip.
   public static final String PINOT_DOC_ID_DOC_VALUES_FIELD_NAME = "PinotDocID";
 
   private final String _textColumn;
@@ -271,7 +271,7 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
   private void buildMappingFile(File segmentIndexDir, String column, Directory directory,
       @Nullable int[] mutableToImmutableDocIdMap)
       throws IOException {
-    if (_config.getDocIdTranslatorMode() == DocIdTranslatorMode.Skip) {
+    if (!_buildOnDictionary && _config.getDocIdTranslatorMode() == DocIdTranslatorMode.Skip) {
       return;
     }
     try (IndexReader indexReader = DirectoryReader.open(directory)) {
@@ -363,7 +363,8 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
     if (!_commitOnClose) {
       // Mutable indexes retain the stored field for existing readers and segment conversion.
       document.add(new StoredField(PINOT_DOC_ID_STORED_FIELD_NAME, docId));
-    } else if (_config.getDocIdTranslatorMode() != DocIdTranslatorMode.Skip) {
+    } else if (_buildOnDictionary || _config.getDocIdTranslatorMode() != DocIdTranslatorMode.Skip) {
+      // Dictionary IDs must survive Lucene merges even when the per-row translator is configured with Skip.
       // Avoid sharing the numeric field with the TEXT column, including empty multi-value documents.
       String fieldName = _textColumn.equals(PINOT_DOC_ID_DOC_VALUES_FIELD_NAME)
           ? PINOT_DOC_ID_STORED_FIELD_NAME

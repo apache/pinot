@@ -339,10 +339,10 @@ public class TextIndexConfig extends IndexConfig {
     return _storeInSegmentFile;
   }
 
-  /// Whether the Lucene text index is built over the column's dictionary (one document per distinct value, with the
-  /// Lucene docId equal to the dictId) instead of one document per row. When enabled, `TEXT_MATCH` returns
+  /// Whether the Lucene text index is built over the column's dictionary (one document per distinct value)
+  /// instead of one document per row. Lucene document ids are translated to dictionary ids. `TEXT_MATCH` returns
   /// matching dictIds that are resolved to docIds through the dictionary-based filter operators. Requires a
-  /// dictionary-encoded column and is only applied to immutable segments. Defaults to false.
+  /// dictionary-encoded single-value STRING column and is only applied to immutable segments. Defaults to false.
   public boolean isBuildOnDictionary() {
     return _buildOnDictionary;
   }
