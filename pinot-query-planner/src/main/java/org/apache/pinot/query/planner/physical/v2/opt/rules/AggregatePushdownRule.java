@@ -391,6 +391,15 @@ public class AggregatePushdownRule extends PRelOptRule {
         functionCategory = SqlFunctionCategory.USER_DEFINED_FUNCTION;
       } else if (kind == SqlKind.LISTAGG) {
         rexList.add(input.getCluster().getRexBuilder().makeLiteral(true));
+      } else if (AggregationFunctionType.getNormalizedAggregationFunctionName(functionName)
+          .equals(AggregationFunctionType.ARRAYAGG.name())) {
+        // ARRAY_AGG(expression, 'dataType'[, isDistinct]) takes DISTINCT as its isDistinct argument
+        RexNode isDistinct = input.getCluster().getRexBuilder().makeLiteral(true);
+        if (rexList.size() == 3) {
+          rexList.set(2, isDistinct);
+        } else {
+          rexList.add(isDistinct);
+        }
       }
     }
     SqlReturnTypeInference returnTypeInference = null;
