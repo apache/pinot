@@ -32,15 +32,19 @@ import org.apache.pinot.spi.utils.ByteArray;
 
 public class DataTableBuilderV4 extends BaseDataTableBuilder {
   private final Object2IntOpenHashMap<String> _dictionary = new Object2IntOpenHashMap<>();
+  /// Lower bound of the size of the serialized dictionary: each entry takes an int length plus at least one UTF-8 byte
+  /// per char.
+  private long _dictionarySizeBytes;
 
   public DataTableBuilderV4(DataSchema dataSchema) {
     super(dataSchema, DataTableFactory.VERSION_4);
+    _dictionary.defaultReturnValue(-1);
   }
 
   @Override
   public void setColumn(int colId, String value) {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
-    int dictId = _dictionary.computeIntIfAbsent(value, k -> _dictionary.size());
+    int dictId = getDictId(value);
     _currentRowDataByteBuffer.putInt(dictId);
   }
 
@@ -61,9 +65,24 @@ public class DataTableBuilderV4 extends BaseDataTableBuilder {
     _currentRowDataByteBuffer.putInt(variableSizeDataOffset());
     _currentRowDataByteBuffer.putInt(values.length);
     for (String value : values) {
-      int dictId = _dictionary.computeIntIfAbsent(value, k -> _dictionary.size());
+      int dictId = getDictId(value);
       _variableSizeDataOutputStream.writeInt(dictId);
     }
+  }
+
+  private int getDictId(String value) {
+    int dictId = _dictionary.getInt(value);
+    if (dictId < 0) {
+      dictId = _dictionary.size();
+      _dictionary.put(value, dictId);
+      _dictionarySizeBytes += Integer.BYTES + value.length();
+    }
+    return dictId;
+  }
+
+  @Override
+  protected long getSizeBytes() {
+    return super.getSizeBytes() + _dictionarySizeBytes;
   }
 
   @Override
