@@ -1093,4 +1093,10 @@ public class QueryOptionsUtils {
         uncheckedParseInt(QueryOptionKey.SEALED_IN_LIST_THRESHOLD, threshold != null ? threshold.trim() : null);
     return value != null ? value : defaultValue;
   }
+
+  /// Returns the [QueryOptionKey#PREFER_SELECT_ALIAS_IN_GROUP_BY] option, or `defaultValue` when the option is not set.
+  public static boolean isPreferSelectAliasInGroupBy(Map<String, String> options, boolean defaultValue) {
+    String option = options.get(QueryOptionKey.PREFER_SELECT_ALIAS_IN_GROUP_BY);
+    return option != null ? Boolean.parseBoolean(option) : defaultValue;
+  }
 }

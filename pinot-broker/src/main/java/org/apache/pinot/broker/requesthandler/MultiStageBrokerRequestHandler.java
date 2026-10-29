@@ -596,6 +596,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     int sealedInListThreshold = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_SEALED_IN_LIST_THRESHOLD,
         CommonConstants.Broker.DEFAULT_SEALED_IN_LIST_THRESHOLD);
+    boolean preferSelectAliasInGroupBy = _config.getProperty(
+        CommonConstants.Broker.CONFIG_OF_PREFER_SELECT_ALIAS_IN_GROUP_BY,
+        CommonConstants.Broker.DEFAULT_PREFER_SELECT_ALIAS_IN_GROUP_BY);
     boolean defaultUnnestColumnPruning = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_UNNEST_COLUMN_PRUNING,
         CommonConstants.Broker.DEFAULT_UNNEST_COLUMN_PRUNING);
@@ -635,6 +638,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .defaultDisabledPlannerRules(_defaultDisabledPlannerRules)
         .defaultSortExchangeCopyLimit(sortExchangeCopyThreshold)
         .defaultSealedInListThreshold(sealedInListThreshold)
+        .defaultPreferSelectAliasInGroupBy(preferSelectAliasInGroupBy)
         .build();
   }
 
