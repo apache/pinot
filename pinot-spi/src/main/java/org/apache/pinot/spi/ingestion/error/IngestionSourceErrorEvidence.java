@@ -25,15 +25,15 @@ import java.util.concurrent.ConcurrentMap;
 import javax.annotation.Nullable;
 
 
-/// What a client knew about a failure that its exception does not say: whose credential it used, and any status or
-/// code it is about to discard (a synthesized "topic does not exist", a cause it drops).
+/// What a client knew about a failure that its exception does not say: any status or code it is about to discard (a
+/// synthesized "topic does not exist", a cause it drops), and the endpoint it resolved.
 ///
 /// [#attach] adds it to the failure as a suppressed exception, so the thrown type never changes and the evidence
 /// travels with every wrapper that keeps the cause. [IngestionSourceErrorClassifier] reads it as evidence for the
 /// failure it is attached to and the causes beneath, and never classifies it as a failure of its own.
 ///
-/// It holds only bounded values: enums, a status, a code token, and a resource reduced to scheme, host and port. It
-/// shows up in stack traces and logs, so it must never hold message text, user info or query strings.
+/// It holds only bounded values: a target, a status, a code token, flags, and a resource reduced to scheme, host and
+/// port. It shows up in stack traces and logs, so it must never hold message text, user info or query strings.
 public final class IngestionSourceErrorEvidence extends RuntimeException {
   private static final long serialVersionUID = 1L;
 
@@ -43,8 +43,6 @@ public final class IngestionSourceErrorEvidence extends RuntimeException {
   /// The code for a table credential a client's own check rejected before any request: it can't be parsed, or has
   /// expired.
   public static final String LOCAL_PRECHECK = "local_precheck";
-  /// The code for Pinot's own setup failing before any request reached the source, e.g. a trust store it can't load.
-  public static final String LOCAL_SETUP = "local_setup";
   /// The code a Kafka client records when it synthesizes "topic does not exist" from a metadata answer that lacks the
   /// topic: Kafka's own `UNKNOWN_TOPIC_OR_PARTITION` error, which the synthesized exception doesn't carry.
   public static final String UNKNOWN_TOPIC_OR_PARTITION = "UNKNOWN_TOPIC_OR_PARTITION";
@@ -58,9 +56,6 @@ public final class IngestionSourceErrorEvidence extends RuntimeException {
   private int _status;
   @Nullable
   private String _code;
-  @Nullable
-  private IngestionSourceCredentialMode _credentialMode;
-  private boolean _roleArnConfigured;
   @Nullable
   private String _resource;
   private boolean _customerConfigured = true;
@@ -135,26 +130,6 @@ public final class IngestionSourceErrorEvidence extends RuntimeException {
     return this;
   }
 
-  @Nullable
-  public IngestionSourceCredentialMode getCredentialMode() {
-    return _credentialMode;
-  }
-
-  public IngestionSourceErrorEvidence setCredentialMode(@Nullable IngestionSourceCredentialMode credentialMode) {
-    _credentialMode = credentialMode;
-    return this;
-  }
-
-  /// Whether the client assumes a role on top of its base credential. Only its presence is recorded, never the role.
-  public boolean isRoleArnConfigured() {
-    return _roleArnConfigured;
-  }
-
-  public IngestionSourceErrorEvidence setRoleArnConfigured(boolean roleArnConfigured) {
-    _roleArnConfigured = roleArnConfigured;
-    return this;
-  }
-
   /// The endpoint as the client resolved it, reduced to scheme, host and port, or null. The built-in rules don't read
   /// it; registered rules and log lines can.
   @Nullable
@@ -199,8 +174,7 @@ public final class IngestionSourceErrorEvidence extends RuntimeException {
   /// A copy to attach to one failure: a stack trace prints a throwable it meets twice as a circular reference.
   private IngestionSourceErrorEvidence copy() {
     IngestionSourceErrorEvidence copy = new IngestionSourceErrorEvidence().setTarget(_target)
-        .setEvidence(_status, _code).setCredentialMode(_credentialMode).setRoleArnConfigured(_roleArnConfigured)
-        .setCustomerConfigured(_customerConfigured).setBoundary(_boundary);
+        .setEvidence(_status, _code).setCustomerConfigured(_customerConfigured).setBoundary(_boundary);
     copy._resource = _resource;
     return copy;
   }
@@ -232,12 +206,6 @@ public final class IngestionSourceErrorEvidence extends RuntimeException {
     }
     if (_code != null) {
       sb.append(" code=").append(_code);
-    }
-    if (_credentialMode != null) {
-      sb.append(" credentialMode=").append(_credentialMode);
-    }
-    if (_roleArnConfigured) {
-      sb.append(" roleArnConfigured");
     }
     if (_resource != null) {
       sb.append(" resource=").append(_resource);

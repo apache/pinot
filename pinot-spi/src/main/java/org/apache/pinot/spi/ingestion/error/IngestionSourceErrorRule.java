@@ -34,8 +34,8 @@ import javax.annotation.Nullable;
 @FunctionalInterface
 public interface IngestionSourceErrorRule {
 
-  /// Decides `node`: a category, [IngestionSourceErrorVerdict#none] when it shows the failure is not the source's
-  /// verdict, or null to leave it undecided.
+  /// Decides `node`: a category, [IngestionSourceErrorVerdict#none] when it shows the failure is not a failure to
+  /// access the source, or null to leave it undecided.
   ///
   /// @param node the throwable to decide
   /// @param below the rest of its cause chain, nearest cause first

@@ -108,6 +108,10 @@ public class ConfluentSchemaRegistrySourceErrorClassificationTest {
     // A URL that isn't a registry at all.
     assertSourceRead(decodeFailure(registryAnswering(404, "<html><body>Not Found</body></html>"),
         payload(1, new byte[]{2})), TARGET_SCHEMA_REGISTRY);
+    stopRegistry();
+    // A request the registry rejects.
+    assertSourceRead(decodeFailure(registryAnswering(422, "{\"error_code\":42201,\"message\":\"Invalid schema\"}"),
+        payload(1, new byte[]{2})), TARGET_SCHEMA_REGISTRY);
   }
 
   @Test

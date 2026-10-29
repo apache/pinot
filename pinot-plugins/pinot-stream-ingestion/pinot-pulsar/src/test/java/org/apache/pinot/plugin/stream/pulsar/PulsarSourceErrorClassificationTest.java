@@ -92,17 +92,24 @@ public class PulsarSourceErrorClassificationTest {
   }
 
   @Test
-  public void ourKeyFileOrRequestIsNotTheSource() {
-    assertNotClassified(new PulsarClientException.AuthenticationException("Unable to read private key: no such file"));
-    assertNotClassified(new PulsarClientException.AuthenticationException(
-        "Unable to obtain an access token: Missing parameter (invalid_request)"));
-    assertNotClassified(new PulsarClientException.InvalidConfigurationException("bad config"));
-    assertNotClassified(new PulsarClientException.InvalidServiceURL("Invalid service URL", null));
-    assertNotClassified(new PulsarClientException.InvalidTopicNameException("bad topic"));
-    assertNotClassified(new PulsarClientException.UnsupportedAuthenticationException("bad auth plugin"));
+  public void clientSideFailures() {
+    // Authentication failed before the broker judged anything.
+    assertAuth(new PulsarClientException.AuthenticationException("Unable to read private key: no such file"),
+        IngestionSourceErrorSubReason.AUTHENTICATION, null);
+    assertAuth(new PulsarClientException.AuthenticationException(
+            "Unable to obtain an access token: Missing parameter (invalid_request)"),
+        IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_IDP);
+    assertAuth(new PulsarClientException.UnsupportedAuthenticationException("bad auth plugin"),
+        IngestionSourceErrorSubReason.AUTHENTICATION, null);
+    // The client's config: the read failed all the same.
+    assertSourceRead(new PulsarClientException.InvalidConfigurationException("bad config"), null);
+    assertSourceRead(new PulsarClientException.InvalidServiceURL("Invalid service URL", null), null);
+    assertSourceRead(new PulsarClientException.InvalidTopicNameException("bad topic"), null);
+    // The client's own lookup semaphore reads as the lookup failure it extends.
+    assertSourceRead(new PulsarClientException.TooManyRequestsException("Requests number out of config: 50000"),
+        TARGET_BROKER);
+    // A client Pinot already closed.
     assertNotClassified(new PulsarClientException.AlreadyClosedException("Client already closed"));
-    // The client's own lookup semaphore, not the broker's throttle.
-    assertNotClassified(new PulsarClientException.TooManyRequestsException("Requests number out of config: 50000"));
   }
 
   @Test
