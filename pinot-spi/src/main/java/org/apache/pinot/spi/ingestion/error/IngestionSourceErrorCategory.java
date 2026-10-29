@@ -18,18 +18,18 @@
  */
 package org.apache.pinot.spi.ingestion.error;
 
-/// The verdict an ingestion source (a stream, its schema registry, a file system) gave on a request Pinot made to it,
-/// tested by what change unblocks ingestion.
+/// What failed when Pinot accessed an ingestion source (a stream, its schema registry, a file system). The category
+/// never depends on whose credential failed or who can fix it, which Pinot can't know.
 ///
-/// A failure that is not the source's verdict on our request has no category at all: Pinot's own clock or ambient
-/// identity, local disk or config, content that was read but can't be parsed, or cancellation.
+/// A failure that is not a failure to access the source has no category at all: Pinot's own cancellation, content
+/// that was read but can't be parsed, or an exception no rule recognises.
 public enum IngestionSourceErrorCategory {
-  /// "I won't let you in": the source rejected our identity or denied our permission, including an access policy it
-  /// enforces and a deliberate "does not exist or not authorized" answer. Someone must change a credential, a grant
-  /// or a policy.
+  /// Authentication or authorization failed: a credential, signature or token was rejected, a permission or an access
+  /// policy denied the request, the source answered "does not exist or not authorized", a credential couldn't be
+  /// loaded, read or built, or an identity service refused the request.
   AUTH,
-  /// "You're in, but I can't serve this", or the source never answered: the data is missing or expired, the source
-  /// keeps throttling or failing after our retries, or DNS, connect, TLS or a timeout stopped the request. Someone
-  /// must make the data exist or the endpoint reachable.
+  /// Any other failure to read from the source: the data is missing or expired, the source throttled or failed after
+  /// our retries, it rejected a request as invalid, the client couldn't be set up, or an endpoint, an identity
+  /// service's included, never answered.
   SOURCE_READ
 }

@@ -41,8 +41,6 @@ import java.security.KeyPairGenerator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.net.ssl.SSLHandshakeException;
-import org.apache.pinot.spi.ingestion.error.IngestionSourceCredentialMode;
-import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorEvidence;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorSubReason;
 import org.testng.annotations.Test;
 
@@ -54,18 +52,13 @@ import static org.testng.Assert.assertNotNull;
 
 
 /// Pins the classifier's gRPC, gax and google-auth rules against the Google Cloud client libraries Pinot ships. A
-/// rejected token is the table owner's only when the table's own key was used, and Google reports our clock skew as
-/// a token refusal.
+/// rejected token is AUTH whoever's key it was, our clock skew included; a token endpoint that failed is SOURCE_READ.
 public class GoogleCloudSourceErrorClassificationTest {
   private static final String CLOCK_SKEW = "{\"error\":\"invalid_grant\",\"error_description\":\"Invalid JWT: "
       + "Token must be a short-lived token (60 minutes) and in a reasonable timeframe. Check your iat and exp values "
       + "in the JWT claim.\"}";
   private static final String KEY_REVOKED = "{\"error\":\"invalid_grant\",\"error_description\":\"Invalid JWT "
       + "Signature.\"}";
-
-  private static <T extends Throwable> T withCredentials(T failure, IngestionSourceCredentialMode mode) {
-    return IngestionSourceErrorEvidence.attach(failure, new IngestionSourceErrorEvidence().setCredentialMode(mode));
-  }
 
   private static Throwable gax(Status.Code code, String message) {
     return ApiExceptionFactory.createException(message, null, GrpcStatusCode.of(code), false);
@@ -143,10 +136,11 @@ public class GoogleCloudSourceErrorClassificationTest {
   }
 
   @Test
-  public void tableKeyRejected()
+  public void rejectedTokenIsAuth()
       throws Exception {
-    assertAuth(withCredentials(tokenRefreshFailure(KEY_REVOKED), IngestionSourceCredentialMode.STATIC),
-        IngestionSourceErrorSubReason.AUTHENTICATION, null);
+    assertAuth(tokenRefreshFailure(KEY_REVOKED), IngestionSourceErrorSubReason.AUTHENTICATION, null);
+    // Our clock skew is refused the same way.
+    assertAuth(tokenRefreshFailure(CLOCK_SKEW), IngestionSourceErrorSubReason.AUTHENTICATION, null);
   }
 
   @Test
@@ -164,7 +158,7 @@ public class GoogleCloudSourceErrorClassificationTest {
         };
       }
     };
-    assertSourceRead(withCredentials(tokenRefreshFailure(unreachable), IngestionSourceCredentialMode.STATIC), null);
+    assertSourceRead(tokenRefreshFailure(unreachable), null);
   }
 
   @Test
@@ -172,20 +166,8 @@ public class GoogleCloudSourceErrorClassificationTest {
       throws Exception {
     // google-auth won't retry a 502 or 504, so grpc-auth reports it as UNAUTHENTICATED; a 500 or 503 as UNAVAILABLE.
     for (int status : new int[]{502, 504, 500, 503}) {
-      assertSourceRead(withCredentials(tokenRefreshFailure(tokenEndpoint(status, "Bad Gateway")),
-          IngestionSourceCredentialMode.STATIC), TARGET_IDP);
+      assertSourceRead(tokenRefreshFailure(tokenEndpoint(status, "Bad Gateway")), TARGET_IDP);
     }
-  }
-
-  @Test
-  public void ourIdentityOrClockIsNotTheSource()
-      throws Exception {
-    // The process's own credentials failing to refresh.
-    assertNotClassified(withCredentials(tokenRefreshFailure(KEY_REVOKED), IngestionSourceCredentialMode.AMBIENT));
-    // Our clock skew, even on the table's key.
-    assertNotClassified(withCredentials(tokenRefreshFailure(CLOCK_SKEW), IngestionSourceCredentialMode.STATIC));
-    // Nobody recorded whose credential it was.
-    assertNotClassified(tokenRefreshFailure(KEY_REVOKED));
   }
 
   @Test
@@ -219,11 +201,11 @@ public class GoogleCloudSourceErrorClassificationTest {
     assertSourceRead(gax(Status.Code.RESOURCE_EXHAUSTED, "Quota exceeded"), null);
     assertSourceRead(Status.UNAVAILABLE.withDescription("io exception").asRuntimeException(), null);
     assertSourceRead(gax(Status.Code.DEADLINE_EXCEEDED, "Deadline exceeded"), null);
+    assertSourceRead(gax(Status.Code.INVALID_ARGUMENT, "Invalid resource name"), null);
   }
 
   @Test
-  public void ourCancellationOrRequestIsNotTheSource() {
+  public void ourCancellationIsNotClassified() {
     assertNotClassified(gax(Status.Code.CANCELLED, "Call cancelled"));
-    assertNotClassified(gax(Status.Code.INVALID_ARGUMENT, "Invalid resource name"));
   }
 }

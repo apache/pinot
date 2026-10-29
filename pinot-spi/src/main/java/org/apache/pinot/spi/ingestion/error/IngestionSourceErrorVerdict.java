@@ -21,8 +21,8 @@ package org.apache.pinot.spi.ingestion.error;
 import javax.annotation.Nullable;
 
 
-/// A rule's decision on one throwable: a category, or [#none] when the throwable shows the failure is not the source's
-/// verdict on our request (our clock, our identity, our config).
+/// A rule's decision on one throwable: a category, or [#none] when the throwable shows the failure is not a failure to
+/// access the source (Pinot's own cancellation).
 ///
 /// The code and target are bounded tokens, safe for log lines: SDK codes are short identifiers, but a configured
 /// endpoint can answer with anything.
@@ -71,7 +71,7 @@ public final class IngestionSourceErrorVerdict {
     return new IngestionSourceErrorVerdict(IngestionSourceErrorCategory.SOURCE_READ, null, code, target);
   }
 
-  /// Not the source's verdict on our request. It still decides the chain it was found in, so a wrapper above it can't
+  /// Not a failure to access the source. It still decides the chain it was found in, so a wrapper above it can't
   /// reinstate a category.
   public static IngestionSourceErrorVerdict none(@Nullable String code) {
     return new IngestionSourceErrorVerdict(null, null, code, null);

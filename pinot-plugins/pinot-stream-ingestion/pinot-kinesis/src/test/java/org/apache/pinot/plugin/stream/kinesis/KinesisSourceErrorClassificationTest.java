@@ -29,14 +29,13 @@ import java.net.UnknownHostException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.net.ssl.SSLHandshakeException;
-import org.apache.pinot.spi.ingestion.error.IngestionSourceCredentialMode;
-import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorEvidence;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorSubReason;
 import org.testng.annotations.Test;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.awscore.exception.AwsErrorDetails;
 import software.amazon.awssdk.awscore.exception.AwsServiceException;
+import software.amazon.awssdk.core.exception.AbortedException;
 import software.amazon.awssdk.core.exception.ApiCallTimeoutException;
 import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.http.apache.ApacheHttpClient;
@@ -69,17 +68,10 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
 
-/// Pins the classifier's AWS rules (the code table, the credential-mode logic and the message carve-outs) against the
-/// exception hierarchy of the SDK pinot-kinesis ships. AWS answers almost everything with 400 or 403, so the error code
-/// decides, and for a code that rejects a credential, whose credential it was. Each code below is a row of the rule
-/// table that the batch classifier shares.
+/// Pins the classifier's AWS rules (the code table and the message carve-outs) against the exception hierarchy of the
+/// SDK pinot-kinesis ships. AWS answers almost everything with 400 or 403, so the error code decides, never whose
+/// credential it rejected. Each code below is a row of the rule table that the batch classifier shares.
 public class KinesisSourceErrorClassificationTest {
-
-  private static <T extends Throwable> T withCredentials(T failure, IngestionSourceCredentialMode mode,
-      boolean roleArnConfigured) {
-    return IngestionSourceErrorEvidence.attach(failure,
-        new IngestionSourceErrorEvidence().setCredentialMode(mode).setRoleArnConfigured(roleArnConfigured));
-  }
 
   private static AwsErrorDetails details(String service, String code) {
     return AwsErrorDetails.builder().serviceName(service).errorCode(code).build();
@@ -100,20 +92,11 @@ public class KinesisSourceErrorClassificationTest {
     return new RuntimeException("Pinot wrapper", failure);
   }
 
-  /// A new exception for each use: evidence attached to one keeps the first record.
-  private static Throwable streamAccessDenied() {
-    return AccessDeniedException.builder().awsErrorDetails(details("Kinesis", "AccessDeniedException"))
-        .statusCode(400).message("User: arn is not authorized to perform: kinesis:GetRecords on resource: stream")
-        .build();
-  }
-
   @Test
   public void permissionDenied() {
-    assertAuth(underPinot(withCredentials(streamAccessDenied(), IngestionSourceCredentialMode.STATIC, false)),
-        IngestionSourceErrorSubReason.AUTHORIZATION, null);
-    // A denial of the process's own identity is still a permission someone must grant.
-    assertAuth(underPinot(withCredentials(streamAccessDenied(), IngestionSourceCredentialMode.AMBIENT, false)),
-        IngestionSourceErrorSubReason.AUTHORIZATION, null);
+    assertAuth(underPinot(AccessDeniedException.builder().awsErrorDetails(details("Kinesis", "AccessDeniedException"))
+            .statusCode(400).message("User: arn is not authorized to perform: kinesis:GetRecords on resource: stream")
+            .build()), IngestionSourceErrorSubReason.AUTHORIZATION, null);
     // The denied action names the key that encrypts the stream.
     assertAuth(kinesis("AccessDeniedException", "User: arn is not authorized to perform: kms:Decrypt on resource: "
         + "key"), IngestionSourceErrorSubReason.AUTHORIZATION, TARGET_KMS);
@@ -140,34 +123,20 @@ public class KinesisSourceErrorClassificationTest {
   }
 
   @Test
-  public void staticKeysRejected() {
-    Throwable unknownKey = kinesis("UnrecognizedClientException",
-        "The security token included in the request is invalid.");
-    assertAuth(underPinot(withCredentials(unknownKey, IngestionSourceCredentialMode.STATIC, false)),
+  public void credentialCodesAreAuthWhoeverOwnsTheCredential() {
+    // The table's keys, the process's own identity, or session credentials the SDK minted for an assumed role.
+    assertAuth(underPinot(kinesis("UnrecognizedClientException",
+        "The security token included in the request is invalid.")), IngestionSourceErrorSubReason.AUTHENTICATION, null);
+    assertAuth(kinesis("InvalidSignatureException",
+            "The request signature we calculated does not match the signature you provided."),
         IngestionSourceErrorSubReason.AUTHENTICATION, null);
-    Throwable wrongSecret = kinesis("InvalidSignatureException",
-        "The request signature we calculated does not match the signature you provided.");
-    assertAuth(withCredentials(wrongSecret, IngestionSourceCredentialMode.STATIC, false),
+    assertAuth(kinesis("ExpiredTokenException", "The security token has expired."),
         IngestionSourceErrorSubReason.AUTHENTICATION, null);
-  }
-
-  @Test
-  public void credentialCodesOnOurOwnIdentityAreNotTheSource() {
-    // The process's own identity.
-    assertNotClassified(withCredentials(kinesis("UnrecognizedClientException", "invalid token"),
-        IngestionSourceCredentialMode.AMBIENT, false));
-    // Session credentials the SDK minted for an assumed role: our refresh failed, the role decision would be
-    // AccessDenied.
-    assertNotClassified(withCredentials(kinesis("ExpiredTokenException", "The security token has expired."),
-        IngestionSourceCredentialMode.STATIC, true));
-    // Nobody recorded whose credential it was.
-    assertNotClassified(kinesis("UnrecognizedClientException", "invalid token"));
-    // Our clock, under a signature code.
-    assertNotClassified(withCredentials(kinesis("InvalidSignatureException",
-        "Signature expired: 20260101T000000Z is now earlier than 20260101T000500Z"),
-        IngestionSourceCredentialMode.STATIC, false));
-    assertNotClassified(withCredentials(kinesis("InvalidSignatureException", "Signature not yet current: "
-        + "20260101T001000Z is still later than 20260101T000500Z"), IngestionSourceCredentialMode.STATIC, false));
+    // Our clock, under a signature code or its own.
+    assertAuth(kinesis("InvalidSignatureException",
+            "Signature expired: 20260101T000000Z is now earlier than 20260101T000500Z"),
+        IngestionSourceErrorSubReason.AUTHENTICATION, null);
+    assertAuth(kinesis("RequestExpired", "Request has expired."), IngestionSourceErrorSubReason.AUTHENTICATION, null);
   }
 
   @Test
@@ -176,20 +145,23 @@ public class KinesisSourceErrorClassificationTest {
     Throwable trustDenied = sts("AccessDenied", 403,
         "User: arn:aws:sts::000000000000:assumed-role/node/i-0 is not authorized to perform: sts:AssumeRole on "
             + "resource: arn:aws:iam::111111111111:role/table");
-    assertAuth(underPinot(withCredentials(trustDenied, IngestionSourceCredentialMode.AMBIENT, true)),
-        IngestionSourceErrorSubReason.AUTHORIZATION, TARGET_STS);
-    // The table's base keys are rejected by STS.
-    assertAuth(withCredentials(sts("InvalidClientTokenId", 403, "The security token included in the request is "
-            + "invalid."), IngestionSourceCredentialMode.STATIC, true), IngestionSourceErrorSubReason.AUTHENTICATION,
-        TARGET_STS);
+    assertAuth(underPinot(trustDenied), IngestionSourceErrorSubReason.AUTHORIZATION, TARGET_STS);
+    // The base keys are rejected by STS.
+    assertAuth(sts("InvalidClientTokenId", 403, "The security token included in the request is invalid."),
+        IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_STS);
     assertAuth(RegionDisabledException.builder().awsErrorDetails(details("Sts", "RegionDisabledException"))
         .statusCode(403).message("STS is not activated in this region").build(),
         IngestionSourceErrorSubReason.AUTHORIZATION, TARGET_STS);
-    // Our own web identity, reused by the default chain after its first success.
-    assertNotClassified(sts("AccessDenied", 403, "Not authorized to perform sts:AssumeRoleWithWebIdentity"));
-    assertNotClassified(sts("InvalidIdentityToken", 400, "Couldn't retrieve verification key"));
-    // A role ARN or session duration we built badly.
-    assertNotClassified(sts("ValidationError", 400, "The requested DurationSeconds exceeds the MaxSessionDuration"));
+    // The process's web identity, reused by the default chain after its first success.
+    assertAuth(sts("AccessDenied", 403, "Not authorized to perform sts:AssumeRoleWithWebIdentity"),
+        IngestionSourceErrorSubReason.AUTHORIZATION, TARGET_STS);
+    assertAuth(sts("InvalidIdentityToken", 400, "Couldn't retrieve verification key"),
+        IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_STS);
+    // STS refusing the AssumeRole request itself: a role ARN or session duration it won't accept.
+    assertAuth(sts("ValidationError", 400, "The requested DurationSeconds exceeds the MaxSessionDuration"),
+        IngestionSourceErrorSubReason.UNSPECIFIED, TARGET_STS);
+    // The web identity's provider never answered STS.
+    assertSourceRead(sts("IDPCommunicationError", 400, "The IdP could not be contacted"), TARGET_STS);
   }
 
   @Test
@@ -213,9 +185,8 @@ public class KinesisSourceErrorClassificationTest {
   @Test
   public void glueCodesKeyOnTheCodeNotTheStatus() {
     // Glue is a JSON-protocol service: denial, missing entity and throttling are all 400.
-    assertAuth(withCredentials(AwsServiceException.builder().awsErrorDetails(details("Glue", "AccessDeniedException"))
-            .statusCode(400).message("denied").build(), IngestionSourceCredentialMode.STATIC, false),
-        IngestionSourceErrorSubReason.AUTHORIZATION, null);
+    assertAuth(AwsServiceException.builder().awsErrorDetails(details("Glue", "AccessDeniedException"))
+        .statusCode(400).message("denied").build(), IngestionSourceErrorSubReason.AUTHORIZATION, null);
     assertSourceRead(AwsServiceException.builder().awsErrorDetails(details("Glue", "EntityNotFoundException"))
         .statusCode(400).message("Schema version is not found.").build(), null);
     assertSourceRead(AwsServiceException.builder().awsErrorDetails(details("Glue", "ThrottlingException"))
@@ -223,26 +194,30 @@ public class KinesisSourceErrorClassificationTest {
   }
 
   @Test
-  public void ourRequestOrIteratorIsNotTheSource() {
-    assertNotClassified(ExpiredIteratorException.builder()
-        .awsErrorDetails(details("Kinesis", "ExpiredIteratorException")).statusCode(400).message("expired").build());
-    assertNotClassified(kinesis("InvalidArgumentException", "did not come from this stream"));
+  public void invalidRequestOrExpiredIteratorIsSourceRead() {
+    assertSourceRead(ExpiredIteratorException.builder()
+        .awsErrorDetails(details("Kinesis", "ExpiredIteratorException")).statusCode(400).message("expired").build(),
+        null);
+    assertSourceRead(kinesis("InvalidArgumentException", "did not come from this stream"), null);
   }
 
   @Test
   public void clientSideFailures() {
-    // The process's own credential chain.
-    assertNotClassified(underPinot(SdkClientException.create(
-        "Unable to load credentials from any of the providers in the chain AwsCredentialsProviderChain")));
+    // A credential chain that found no credential.
+    assertAuth(underPinot(SdkClientException.create(
+            "Unable to load credentials from any of the providers in the chain AwsCredentialsProviderChain")),
+        IngestionSourceErrorSubReason.AUTHENTICATION, null);
     // One of its providers, called directly after the chain's first success: IMDS, or the ECS / EKS Pod Identity
     // container endpoint, whatever the network cause.
-    assertNotClassified(SdkClientException.create("Failed to load credentials from IMDS.",
-        new IOException("Connect timed out")));
-    assertNotClassified(SdkClientException.create("Failed to load credentials from metadata service.",
-        new ConnectException("Connection refused")));
-    // An HTTP client naming the metadata endpoint it couldn't reach.
-    assertNotClassified(SdkClientException.create("Unable to execute HTTP request",
-        new ConnectException("Connect to 169.254.169.254:80 [/169.254.169.254] failed: Connection refused")));
+    assertAuth(SdkClientException.create("Failed to load credentials from IMDS.", new IOException("Connect timed out")),
+        IngestionSourceErrorSubReason.AUTHENTICATION, null);
+    assertAuth(SdkClientException.create("Failed to load credentials from metadata service.",
+        new ConnectException("Connection refused")), IngestionSourceErrorSubReason.AUTHENTICATION, null);
+    // Any endpoint that never answered, a metadata endpoint included.
+    assertSourceRead(SdkClientException.create("Unable to execute HTTP request",
+        new ConnectException("Connect to 169.254.169.254:80 [/169.254.169.254] failed: Connection refused")), null);
+    // Our cancellation.
+    assertNotClassified(AbortedException.create("Thread was interrupted"));
     // The endpoint never answered.
     assertSourceRead(underPinot(SdkClientException.create("Unable to execute HTTP request: kinesis.example",
         new UnknownHostException("kinesis.us-east-1.amazonaws.example"))), null);
@@ -333,13 +308,9 @@ public class KinesisSourceErrorClassificationTest {
   @Test
   public void retryRecordsAreNotNetworkFailures() {
     // The SDK attaches one cause-less record per earlier attempt; they must not read as an unreachable endpoint.
-    Throwable ourIterator = ExpiredIteratorException.builder()
-        .awsErrorDetails(details("Kinesis", "ExpiredIteratorException")).statusCode(400).message("expired").build();
-    ourIterator.addSuppressed(SdkClientException.create("Request attempt 1 failure: Unable to execute HTTP request"));
-    assertNotClassified(ourIterator);
-
-    Throwable credentialsGone = SdkClientException.create("Unable to load credentials from any of the providers");
-    credentialsGone.addSuppressed(SdkClientException.create("Request attempt 1 failure: Connect timed out"));
-    assertNotClassified(credentialsGone);
+    Throwable cancelled = AbortedException.create("Thread was interrupted");
+    cancelled.addSuppressed(SdkClientException.create("Request attempt 1 failure: Unable to execute HTTP request"));
+    cancelled.addSuppressed(SdkClientException.create("Request attempt 2 failure: Connect timed out"));
+    assertNotClassified(cancelled);
   }
 }

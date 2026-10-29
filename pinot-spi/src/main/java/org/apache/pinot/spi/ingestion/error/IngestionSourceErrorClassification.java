@@ -76,22 +76,8 @@ public final class IngestionSourceErrorClassification {
     return _evidence;
   }
 
-  /// Whose credential the client used, when it recorded it.
-  @Nullable
-  public IngestionSourceCredentialMode getCredentialMode() {
-    return _evidence != null ? _evidence.getCredentialMode() : null;
-  }
-
-  /// Whether the client assumed a role on top of its base credential.
-  public boolean isRoleArnConfigured() {
-    return _evidence != null && _evidence.isRoleArnConfigured();
-  }
-
   @Override
   public String toString() {
-    IngestionSourceCredentialMode credentialMode = getCredentialMode();
-    return _verdict + " exception=" + getExceptionClass()
-        + (credentialMode != null ? " credentialMode=" + credentialMode : "")
-        + (isRoleArnConfigured() ? " roleArnConfigured" : "");
+    return _verdict + " exception=" + getExceptionClass();
   }
 }

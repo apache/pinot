@@ -36,9 +36,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/// Folds a failure to reach an ingestion source into [IngestionSourceErrorCategory#AUTH] or
-/// [IngestionSourceErrorCategory#SOURCE_READ], from the source's own verdict on our request. Status codes and error
-/// codes are only evidence for that verdict, read per source.
+/// Folds a failure to access an ingestion source into [IngestionSourceErrorCategory#AUTH] or
+/// [IngestionSourceErrorCategory#SOURCE_READ] by what failed: authentication or authorization, or the read. Status
+/// codes and error codes are only evidence, read per source.
 ///
 /// The exception tree is split into chains: the failure with its causes, and each suppressed exception with its own
 /// causes. When an exception in the tree carries boundary evidence ([IngestionSourceErrorEvidence#setBoundary]), only
@@ -46,8 +46,8 @@ import org.slf4j.LoggerFactory;
 /// from the source. Within a chain:
 ///
 /// 1. walking from the root cause up, the first source-specific rule that decides wins. A rule that says the failure
-///    is not the source's verdict (our clock, our ambient identity, a credential that failed to load) therefore
-///    decides only when no source exception sits beneath it, and a wrapper above it can't reinstate a category;
+///    is not a failure to access the source (Pinot's own cancellation) therefore decides only when no source
+///    exception sits beneath it, and a wrapper above it can't reinstate a category;
 /// 2. generic rules, which read the transport rather than a source's answer (`java.net` / `javax.net.ssl`, and any
 ///    registered with [#registerGenericRule]), apply only when no source rule decided the chain.
 ///
@@ -77,7 +77,7 @@ public final class IngestionSourceErrorClassifier {
   private IngestionSourceErrorClassifier() {
   }
 
-  /// Classifies `failure`, or returns empty when it is not the source's verdict on our request.
+  /// Classifies `failure`, or returns empty when it is not a failure to access the source.
   public static Optional<IngestionSourceErrorClassification> classify(Throwable failure) {
     try {
       Walk walk = new Walk();
@@ -151,7 +151,7 @@ public final class IngestionSourceErrorClassifier {
     REGISTERED_GENERIC_RULES.remove(rule);
   }
 
-  /// The decision of the registered rules on `node`. When they disagree, "not the source's verdict" beats
+  /// The decision of the registered rules on `node`. When they disagree, [IngestionSourceErrorVerdict#none] beats
   /// [IngestionSourceErrorCategory#AUTH], which beats [IngestionSourceErrorCategory#SOURCE_READ], and remaining ties
   /// break on sub-reason, code and target, so registration order never matters.
   @Nullable

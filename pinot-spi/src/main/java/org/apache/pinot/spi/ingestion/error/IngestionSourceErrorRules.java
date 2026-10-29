@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.spi.ingestion.error;
 
-import java.net.BindException;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
@@ -46,8 +45,9 @@ import javax.net.ssl.SSLException;
 /// They never key on Pinot's own wrappers, an outer plugin message, a bare Kafka `SerializationException` or
 /// `InvalidConfigurationException`, or which exceptions a client considers retriable.
 ///
-/// A rule returns a verdict to decide its node, [IngestionSourceErrorVerdict#none] when the failure is not the
-/// source's verdict on our request, or null to leave the node undecided.
+/// A rule returns a verdict to decide its node, [IngestionSourceErrorVerdict#none] when the failure is not a failure to
+/// access the source, or null to leave the node undecided. No rule asks whose credential failed or who can fix it:
+/// Pinot's own identity, clock and setup read like the table's.
 final class IngestionSourceErrorRules {
   private IngestionSourceErrorRules() {
   }
@@ -63,12 +63,6 @@ final class IngestionSourceErrorRules {
   private static final Set<String> INTERRUPTS = Set.of("java.lang.InterruptedException",
       "java.io.InterruptedIOException", "java.nio.channels.ClosedByInterruptException",
       "java.util.concurrent.CancellationException");
-  // Metadata endpoints serve the process's own ambient identity: AWS and Azure IMDS, the ECS and EKS Pod Identity
-  // container endpoints, the GCE metadata server.
-  private static final List<String> METADATA_ENDPOINTS = List.of("169.254.169.254", "169.254.170.2",
-      "169.254.170.23", "metadata.google.internal");
-  // Socket failures on our side before any request: ephemeral ports or file descriptors exhausted.
-  private static final String OUR_SOCKETS_EXHAUSTED = "Too many open files";
 
   // ---------------------------------------------------------------------------------------------------------------
   // Evidence recorded by a client that is about to discard it
@@ -81,9 +75,6 @@ final class IngestionSourceErrorRules {
     }
     if (IngestionSourceErrorEvidence.LOCAL_PRECHECK.equals(code)) {
       return auth(IngestionSourceErrorSubReason.AUTHENTICATION, code, evidence.getTarget());
-    }
-    if (IngestionSourceErrorEvidence.LOCAL_SETUP.equals(code)) {
-      return none(code);
     }
     if (IngestionSourceErrorEvidence.UNKNOWN_TOPIC_OR_PARTITION.equals(code)) {
       return sourceRead(code, evidence.getTarget() != null ? evidence.getTarget() : TARGET_BROKER);
@@ -109,7 +100,7 @@ final class IngestionSourceErrorRules {
     if (hasClass(clazz, CONFLUENT_REST_CLIENT_EXCEPTION)) {
       return schemaRegistry(node);
     }
-    IngestionSourceErrorVerdict kafka = kafka(node, below, evidence);
+    IngestionSourceErrorVerdict kafka = kafka(node, below);
     if (kafka != null) {
       return kafka;
     }
@@ -124,14 +115,14 @@ final class IngestionSourceErrorRules {
     }
     if (hasClass(clazz, GAX_API_EXCEPTION)) {
       Object statusCode = invoke(node, "getStatusCode");
-      return grpc(statusCode != null ? invoke(statusCode, "getCode") : null, node, below, evidence);
+      return grpc(statusCode != null ? invoke(statusCode, "getCode") : null, node, below);
     }
     if (hasClass(clazz, GRPC_STATUS_RUNTIME_EXCEPTION) || hasClass(clazz, GRPC_STATUS_EXCEPTION)) {
       Object status = invoke(node, "getStatus");
-      return grpc(status != null ? invoke(status, "getCode") : null, node, below, evidence);
+      return grpc(status != null ? invoke(status, "getCode") : null, node, below);
     }
     if (hasClass(clazz, GOOGLE_AUTH_EXCEPTION)) {
-      return googleAuth(node, below, evidence);
+      return googleAuth(below);
     }
     return null;
   }
@@ -143,7 +134,7 @@ final class IngestionSourceErrorRules {
     if (refused != null) {
       return refused;
     }
-    return isUnreachable(node) ? unreachable(node, "") : null;
+    return isNetworkFailure(node) ? sourceRead(node.getClass().getSimpleName(), null) : null;
   }
 
   /// A TLS peer's alert rejecting the certificate we presented, or denying us access, or null for any other failure.
@@ -165,33 +156,11 @@ final class IngestionSourceErrorRules {
         : null;
   }
 
-  /// Whether `throwable` means the endpoint never answered: DNS, connect, TLS or a socket timeout.
-  private static boolean isUnreachable(Throwable throwable) {
-    if (throwable instanceof BindException
-        || (throwable instanceof SocketException && messageOf(throwable).contains(OUR_SOCKETS_EXHAUSTED))) {
-      return false;
-    }
+  /// Whether `throwable` is a network failure: DNS, connect, TLS, a socket error or a timeout.
+  private static boolean isNetworkFailure(Throwable throwable) {
     return throwable instanceof UnknownHostException || throwable instanceof SocketException
         || throwable instanceof SocketTimeoutException || throwable instanceof HttpTimeoutException
         || throwable instanceof SSLException;
-  }
-
-  /// An endpoint that never answered: the source's, unless it was a metadata endpoint serving our own identity, named
-  /// by the network exception or by the client wrapping it.
-  private static IngestionSourceErrorVerdict unreachable(Throwable cause, String wrapperMessage) {
-    String code = cause.getClass().getSimpleName();
-    return namesMetadataEndpoint(messageOf(cause)) || namesMetadataEndpoint(wrapperMessage)
-        ? none(code)
-        : sourceRead(code, null);
-  }
-
-  private static boolean namesMetadataEndpoint(String message) {
-    for (String endpoint : METADATA_ENDPOINTS) {
-      if (message.contains(endpoint)) {
-        return true;
-      }
-    }
-    return false;
   }
 
   // ---------------------------------------------------------------------------------------------------------------
@@ -207,10 +176,11 @@ final class IngestionSourceErrorRules {
   private static final Set<String> AWS_CALL_TIMEOUTS = Set.of(
       "software.amazon.awssdk.core.exception.ApiCallTimeoutException",
       "software.amazon.awssdk.core.exception.ApiCallAttemptTimeoutException");
-  // Codes that reject a credential. Which credential decides the verdict, see `awsCredentialCode`.
+  // Codes that reject a credential, a web identity token, or a request's signature, our clock's skew included.
   private static final Set<String> AWS_CREDENTIAL_CODES = Set.of("InvalidAccessKeyId", "SignatureDoesNotMatch",
       "InvalidSignatureException", "ExpiredToken", "ExpiredTokenException", "InvalidToken", "TokenRefreshRequired",
-      "InvalidClientTokenId", "IncompleteSignature", "MissingAuthenticationToken", "UnrecognizedClientException");
+      "InvalidClientTokenId", "IncompleteSignature", "MissingAuthenticationToken", "UnrecognizedClientException",
+      "RequestTimeTooSkewed", "RequestExpired", "RequestInTheFuture", "InvalidIdentityToken", "IDPRejectedClaim");
   private static final Set<String> AWS_AUTHORIZATION_CODES = Set.of("RegionDisabledException",
       "GlueEncryptionException", "AccountProblem", "NotSignedUp");
   private static final Set<String> AWS_KMS_AUTHORIZATION_CODES = Set.of("KMSAccessDeniedException",
@@ -220,17 +190,14 @@ final class IngestionSourceErrorRules {
       "IllegalLocationConstraintException", "SlowDown", "ServiceUnavailable", "ServiceUnavailableException",
       "InternalError", "InternalFailure", "Throttling", "ThrottlingException", "EntityNotFoundException",
       "InternalServiceException", "AllAccessDisabled", "InvalidPayer", "ResourceNotFoundException",
-      "ResourceInUseException", "ProvisionedThroughputExceededException", "LimitExceededException");
+      "ResourceInUseException", "ProvisionedThroughputExceededException", "LimitExceededException",
+      "ExpiredIteratorException", "ExpiredNextTokenException", "IDPCommunicationError");
   private static final Set<String> AWS_KMS_SOURCE_READ_CODES = Set.of("KMS.DisabledException",
       "KMS.KMSInvalidStateException", "KMS.NotFoundException", "KMSDisabledException", "KMSInvalidStateException",
       "KMSNotFoundException", "KMSThrottlingException");
-  // Our clock, a request we built badly, our own web identity, or a Kinesis iterator our consumer let expire.
-  private static final Set<String> AWS_NONE_CODES = Set.of("RequestTimeTooSkewed", "RequestExpired",
-      "RequestInTheFuture", "ValidationError", "ValidationException", "MalformedPolicyDocument",
-      "PackedPolicyTooLarge", "InvalidIdentityToken", "IDPRejectedClaim", "IDPCommunicationError",
-      "InvalidInputException", "InvalidArgumentException", "ExpiredIteratorException", "ExpiredNextTokenException");
-  // AWS reports our clock skew under a signature code; only the message tells it from a wrong secret.
-  private static final List<String> AWS_CLOCK_SKEW = List.of("Signature expired", "Signature not yet current");
+  // A request the service rejected as invalid: STS refusing an AssumeRole request, or a source refusing a read.
+  private static final Set<String> AWS_INVALID_REQUEST_CODES = Set.of("ValidationError", "ValidationException",
+      "MalformedPolicyDocument", "PackedPolicyTooLarge", "InvalidInputException", "InvalidArgumentException");
 
   @Nullable
   private static IngestionSourceErrorVerdict awsService(Throwable node,
@@ -258,10 +225,6 @@ final class IngestionSourceErrorRules {
       return null;
     }
     if (code.equals("AccessDenied") || code.equals("AccessDeniedException")) {
-      if (message.contains("AssumeRoleWithWebIdentity")) {
-        // Our own web identity, not the table's role.
-        return none(code);
-      }
       if (message.contains("ciphertext refers to a customer master key that does not exist")) {
         return auth(IngestionSourceErrorSubReason.MISSING_OR_DENIED, code, TARGET_KMS);
       }
@@ -274,12 +237,7 @@ final class IngestionSourceErrorRules {
       return auth(IngestionSourceErrorSubReason.AUTHORIZATION, code, TARGET_KMS);
     }
     if (AWS_CREDENTIAL_CODES.contains(code)) {
-      for (String skew : AWS_CLOCK_SKEW) {
-        if (message.contains(skew)) {
-          return none(code);
-        }
-      }
-      return awsCredentialCode(sts, code, target, evidence);
+      return auth(IngestionSourceErrorSubReason.AUTHENTICATION, code, target);
     }
     if (AWS_KMS_SOURCE_READ_CODES.contains(code)) {
       return sourceRead(code, TARGET_KMS);
@@ -287,24 +245,10 @@ final class IngestionSourceErrorRules {
     if (AWS_SOURCE_READ_CODES.contains(code) || status == 429 || status >= 500) {
       return sourceRead(code, target);
     }
-    if (AWS_NONE_CODES.contains(code)) {
-      return none(code);
+    if (AWS_INVALID_REQUEST_CODES.contains(code)) {
+      return sts ? auth(IngestionSourceErrorSubReason.UNSPECIFIED, code, target) : sourceRead(code, target);
     }
     return null;
-  }
-
-  /// A credential code is the table's bad credential only when the table's static keys were what got rejected: by
-  /// STS on the AssumeRole call when a role is set, or by the service when none is. Our ambient identity, and the
-  /// session credentials the SDK refreshes for an assumed role, are ours: the table owner's role and policy decisions
-  /// arrive as `AccessDenied` instead. With no recorded credential mode the rejected credential is unknown, so it
-  /// fails closed.
-  private static IngestionSourceErrorVerdict awsCredentialCode(boolean sts, String code, @Nullable String target,
-      @Nullable IngestionSourceErrorEvidence evidence) {
-    if (evidence == null || evidence.getCredentialMode() != IngestionSourceCredentialMode.STATIC) {
-      return none(code);
-    }
-    boolean baseKeysRejected = sts || !evidence.isRoleArnConfigured();
-    return baseKeysRejected ? auth(IngestionSourceErrorSubReason.AUTHENTICATION, code, target) : none(code);
   }
 
   /// No service exception sits beneath this node, or it would have decided first.
@@ -312,12 +256,15 @@ final class IngestionSourceErrorRules {
   private static IngestionSourceErrorVerdict awsClient(Throwable node, List<Throwable> below) {
     Class<?> clazz = node.getClass();
     String message = messageOf(node);
-    // The process's own credential chain ("Unable to load credentials from any of the providers ..."), one of its
-    // providers called directly after a first success ("Failed to load credentials from IMDS." or "... from metadata
-    // service."), or our cancellation.
-    if (message.startsWith("Unable to load credentials") || message.startsWith("Failed to load credentials from")
-        || hasClass(clazz, AWS_ABORTED)) {
+    if (hasClass(clazz, AWS_ABORTED)) {
+      // Our cancellation.
       return none(clazz.getSimpleName());
+    }
+    // A credential chain that found no credential ("Unable to load credentials from any of the providers ..."), or one
+    // of its providers called directly after a first success ("Failed to load credentials from IMDS." or "... from
+    // metadata service.").
+    if (message.startsWith("Unable to load credentials") || message.startsWith("Failed to load credentials from")) {
+      return auth(IngestionSourceErrorSubReason.AUTHENTICATION, clazz.getSimpleName(), null);
     }
     if (hasAnyClass(clazz, AWS_CALL_TIMEOUTS)) {
       return sourceRead(clazz.getSimpleName(), null);
@@ -327,8 +274,8 @@ final class IngestionSourceErrorRules {
       if (refused != null) {
         return refused;
       }
-      if (isUnreachable(cause)) {
-        return unreachable(cause, message);
+      if (isNetworkFailure(cause)) {
+        return sourceRead(cause.getClass().getSimpleName(), null);
       }
       if (hasAnyClass(cause.getClass(), APACHE_NO_HTTP_RESPONSE)) {
         return sourceRead(cause.getClass().getSimpleName(), null);
@@ -364,15 +311,14 @@ final class IngestionSourceErrorRules {
   private static final String TLS_ACCESS_DENIED_ALERT = "access_denied";
 
   @Nullable
-  private static IngestionSourceErrorVerdict kafka(Throwable node, List<Throwable> below,
-      @Nullable IngestionSourceErrorEvidence evidence) {
+  private static IngestionSourceErrorVerdict kafka(Throwable node, List<Throwable> below) {
     Class<?> clazz = node.getClass();
     String code = clazz.getSimpleName();
     if (hasClass(clazz, KAFKA_AUTHORIZATION)) {
       return auth(IngestionSourceErrorSubReason.AUTHORIZATION, code, TARGET_BROKER);
     }
     if (hasClass(clazz, KAFKA_AUTHENTICATION)) {
-      return kafkaAuthentication(node, below, evidence);
+      return kafkaAuthentication(node, below);
     }
     if (hasClass(clazz, KAFKA_THROTTLING_QUOTA)) {
       return sourceRead(code, TARGET_SCHEMA_REGISTRY);
@@ -383,20 +329,17 @@ final class IngestionSourceErrorRules {
       return sourceRead(code, below.isEmpty() ? TARGET_BROKER : null);
     }
     if (hasClass(clazz, KAFKA_CONFIG_EXCEPTION)) {
-      // Only an unresolvable bootstrap list is the source's; any other config error is ours.
-      return messageOf(node).startsWith("No resolvable bootstrap urls")
-          ? sourceRead(code, TARGET_BROKER)
-          : none(code);
+      // An unresolvable bootstrap list names the broker; any other config error is the client's own.
+      return sourceRead(code, messageOf(node).startsWith("No resolvable bootstrap urls") ? TARGET_BROKER : null);
     }
     return null;
   }
 
-  /// Kafka's authentication classes say less than they seem to. MSK IAM reports a policy denial as a SASL
-  /// authentication failure, a client-side failure to build the SASL token (our credential chain, our Kerberos setup)
-  /// arrives under the same class with a `SaslException` cause, a broker's connection throttle reuses it, and an SSL
-  /// failure covers both directions of a rejected certificate.
-  private static IngestionSourceErrorVerdict kafkaAuthentication(Throwable node, List<Throwable> below,
-      @Nullable IngestionSourceErrorEvidence evidence) {
+  /// Kafka's authentication classes say less than they seem to. A client-side failure to build the SASL token (a
+  /// credential chain or Kerberos setup) arrives under the same class with a `SaslException` cause, a broker's
+  /// connection throttle reuses it, and an SSL failure covers both directions of a rejected certificate. MSK IAM
+  /// reports a policy denial as an authentication failure too, so the sub-reason follows Kafka's class.
+  private static IngestionSourceErrorVerdict kafkaAuthentication(Throwable node, List<Throwable> below) {
     Class<?> clazz = node.getClass();
     String code = clazz.getSimpleName();
     if (hasClass(clazz, KAFKA_SASL_AUTHENTICATION) && messageOf(node).contains("Too many connects")) {
@@ -407,17 +350,11 @@ final class IngestionSourceErrorRules {
     }
     for (Throwable cause : below) {
       if (hasClass(cause.getClass(), SASL_EXCEPTION)) {
-        // A broker rejection carries no cause; this one failed on our side before the broker judged anything.
-        return none(code);
+        // A broker rejection carries no cause; this one failed in the client before the broker judged anything.
+        return auth(IngestionSourceErrorSubReason.AUTHENTICATION, code, null);
       }
     }
-    // Signing with a cloud identity (MSK IAM with the process's identity or an assumed role), a policy denial arrives
-    // as an authentication failure: the class can't tell which.
-    boolean cloudIdentity = evidence != null
-        && (evidence.getCredentialMode() == IngestionSourceCredentialMode.AMBIENT || evidence.isRoleArnConfigured());
-    IngestionSourceErrorSubReason subReason =
-        cloudIdentity ? IngestionSourceErrorSubReason.UNSPECIFIED : IngestionSourceErrorSubReason.AUTHENTICATION;
-    return auth(subReason, code, TARGET_BROKER);
+    return auth(IngestionSourceErrorSubReason.AUTHENTICATION, code, TARGET_BROKER);
   }
 
   private static IngestionSourceErrorVerdict kafkaTls(String code, List<Throwable> below) {
@@ -454,8 +391,8 @@ final class IngestionSourceErrorRules {
     }
     int status = (Integer) statusValue;
     IngestionSourceErrorVerdict verdict = httpStatus(status, TARGET_SCHEMA_REGISTRY);
-    // Another 4xx: a request Pinot built badly.
-    return verdict != null ? verdict : none(String.valueOf(status));
+    // Any other status: a request the registry rejected.
+    return verdict != null ? verdict : sourceRead(String.valueOf(status), TARGET_SCHEMA_REGISTRY);
   }
 
   // ---------------------------------------------------------------------------------------------------------------
@@ -474,14 +411,14 @@ final class IngestionSourceErrorRules {
   private static final List<String> DUMPED_UNREACHABLE = List.of("java.net.ConnectException",
       "java.net.UnknownHostException", "java.net.SocketTimeoutException", "java.net.NoRouteToHostException",
       "java.net.http.HttpTimeoutException", "javax.net.ssl.SSLHandshakeException");
+  // invalid_request: the endpoint refused the token request itself.
   private static final Set<String> OAUTH_AUTHENTICATION = Set.of("invalid_client", "invalid_grant",
-      "unsupported_grant_type");
+      "unsupported_grant_type", "invalid_request");
   private static final Set<String> OAUTH_AUTHORIZATION = Set.of("unauthorized_client", "invalid_scope",
       "access_denied");
   private static final Set<String> OAUTH_UNAVAILABLE = Set.of("server_error", "temporarily_unavailable");
-  private static final String OAUTH_INVALID_REQUEST = "invalid_request";
   private static final List<String> KERBEROS_UNREACHABLE = List.of("Cannot contact any KDC", "Receive timed out");
-  // Our clock, keytab or krb5 setup.
+  // Our clock, keytab or krb5 setup: the login fails without the KDC rejecting the principal.
   private static final List<String> KERBEROS_LOCAL_FAILURES = List.of("Clock skew too great",
       "Unable to obtain password", "Cannot locate default realm", "Cannot locate KDC");
   // The KDC rejecting the principal: client not found (6), credentials revoked (18), pre-authentication failed (24).
@@ -509,9 +446,9 @@ final class IngestionSourceErrorRules {
         return sourceRead("kdc_unreachable", TARGET_IDP);
       }
     }
-    for (String ours : KERBEROS_LOCAL_FAILURES) {
-      if (message.contains(ours)) {
-        return none(node.getClass().getSimpleName());
+    for (String local : KERBEROS_LOCAL_FAILURES) {
+      if (message.contains(local)) {
+        return auth(IngestionSourceErrorSubReason.AUTHENTICATION, node.getClass().getSimpleName(), null);
       }
     }
     Matcher rejected = KERBEROS_REJECTED.matcher(message);
@@ -534,10 +471,6 @@ final class IngestionSourceErrorRules {
       }
       if (OAUTH_UNAVAILABLE.contains(normalized)) {
         return sourceRead(normalized, TARGET_IDP);
-      }
-      if (OAUTH_INVALID_REQUEST.equals(normalized)) {
-        // A malformed request: ours.
-        return none(normalized);
       }
     }
     return httpStatus(status, TARGET_IDP);
@@ -575,9 +508,12 @@ final class IngestionSourceErrorRules {
       "SubscriptionNotFoundException", "LookupException", "ConnectException", "TimeoutException",
       "BrokerMetadataException", "BrokerPersistenceException", "TopicTerminatedException", "NotAllowedException",
       "ConsumerBusyException", "NotConnectedException");
-  private static final Set<String> PULSAR_NONE = Set.of("InvalidServiceURL", "InvalidServiceURLException",
-      "InvalidConfigurationException", "InvalidTopicNameException", "UnsupportedAuthenticationException",
-      "AlreadyClosedException", "NotSupportedException", "CryptoException", "ChecksumException",
+  // The client's own failures before or beside the broker: its config, its message checks
+  private static final Set<String> PULSAR_CLIENT_SOURCE_READ = Set.of("InvalidServiceURL",
+      "InvalidServiceURLException", "InvalidConfigurationException", "InvalidTopicNameException",
+      "NotSupportedException", "CryptoException", "ChecksumException");
+  // The client couldn't build its authentication data
+  private static final Set<String> PULSAR_AUTHENTICATION_SETUP = Set.of("UnsupportedAuthenticationException",
       "GettingAuthenticationDataException");
   // The OAuth2 plugin's token errors: "Unable to obtain an access token: <description> (<error>)", or for a status
   // other than 400 or 401, "Unable to obtain an access token: Failed to perform HTTP request. res: <status>".
@@ -605,14 +541,17 @@ final class IngestionSourceErrorRules {
       if (simple.equals("AuthorizationException")) {
         return auth(IngestionSourceErrorSubReason.AUTHORIZATION, simple, TARGET_BROKER);
       }
-      if (simple.equals("TooManyRequestsException") && message.contains("Requests number out of config")) {
-        // The client's own lookup semaphore, not the broker's throttle.
-        return none(simple);
-      }
       if (PULSAR_SOURCE_READ.contains(simple)) {
         return sourceRead(simple, TARGET_BROKER);
       }
-      if (PULSAR_NONE.contains(simple)) {
+      if (PULSAR_CLIENT_SOURCE_READ.contains(simple)) {
+        return sourceRead(simple, null);
+      }
+      if (PULSAR_AUTHENTICATION_SETUP.contains(simple)) {
+        return auth(IngestionSourceErrorSubReason.AUTHENTICATION, simple, null);
+      }
+      if (simple.equals("AlreadyClosedException")) {
+        // A client Pinot already closed.
         return none(simple);
       }
     }
@@ -624,7 +563,7 @@ final class IngestionSourceErrorRules {
   private static IngestionSourceErrorVerdict pulsarAuthentication(String message) {
     String code = "AuthenticationException";
     if (message.startsWith("Unable to read private key")) {
-      return none(code);
+      return auth(IngestionSourceErrorSubReason.AUTHENTICATION, code, null);
     }
     if (message.contains("Unable to retrieve OAuth 2.0 server metadata")) {
       return sourceRead(code, TARGET_IDP);
@@ -658,7 +597,7 @@ final class IngestionSourceErrorRules {
       return sourceRead(simple, TARGET_ADMIN);
     }
     if (simple.equals("GettingAuthenticationDataException")) {
-      return none(simple);
+      return auth(IngestionSourceErrorSubReason.AUTHENTICATION, simple, null);
     }
     if (node.getClass().getName().equals(PULSAR_ADMIN_EXCEPTION) && invoke(node, "getHttpError") == null) {
       return null;
@@ -676,16 +615,12 @@ final class IngestionSourceErrorRules {
   private static final String GOOGLE_AUTH_EXCEPTION = "com.google.auth.oauth2.GoogleAuthException";
   private static final String GOOGLE_HTTP_RESPONSE_EXCEPTION = "com.google.api.client.http.HttpResponseException";
   private static final Set<String> GRPC_SOURCE_READ = Set.of("NOT_FOUND", "FAILED_PRECONDITION",
-      "RESOURCE_EXHAUSTED", "UNAVAILABLE", "DEADLINE_EXCEEDED", "INTERNAL");
-  private static final Set<String> GRPC_NONE = Set.of("CANCELLED", "INVALID_ARGUMENT", "ALREADY_EXISTS");
+      "RESOURCE_EXHAUSTED", "UNAVAILABLE", "DEADLINE_EXCEEDED", "INTERNAL", "INVALID_ARGUMENT", "ALREADY_EXISTS");
   // Google Cloud's deliberate conflation of a missing project with a denied one.
   private static final String GOOGLE_MISSING_OR_DENIED = "not found or user does not have access";
-  // "Token must be a short-lived token ... Check your iat and exp values": our clock.
-  private static final String GOOGLE_CLOCK_SKEW = "short-lived token";
 
   @Nullable
-  private static IngestionSourceErrorVerdict grpc(@Nullable Object codeValue, Throwable node, List<Throwable> below,
-      @Nullable IngestionSourceErrorEvidence evidence) {
+  private static IngestionSourceErrorVerdict grpc(@Nullable Object codeValue, Throwable node, List<Throwable> below) {
     if (!(codeValue instanceof Enum)) {
       return null;
     }
@@ -693,11 +628,8 @@ final class IngestionSourceErrorRules {
     String code = ((Enum<?>) codeValue).name();
     switch (code) {
       case "UNAUTHENTICATED":
-        // A rejected credential is the table owner's only when it was the table's: under the process's own
-        // identity, grpc-auth reports our failed token refresh this way.
-        return evidence != null && evidence.getCredentialMode() == IngestionSourceCredentialMode.STATIC
-            ? auth(IngestionSourceErrorSubReason.AUTHENTICATION, code, null)
-            : none(code);
+        // The service's refusal, or grpc-auth's report of a token refresh that failed
+        return auth(IngestionSourceErrorSubReason.AUTHENTICATION, code, null);
       case "PERMISSION_DENIED":
         return auth(IngestionSourceErrorSubReason.AUTHORIZATION, code, null);
       case "NOT_FOUND":
@@ -718,30 +650,15 @@ final class IngestionSourceErrorRules {
         if (GRPC_SOURCE_READ.contains(code)) {
           return sourceRead(code, null);
         }
-        return GRPC_NONE.contains(code) ? none(code) : null;
+        // CANCELLED: our cancellation.
+        return code.equals("CANCELLED") ? none(code) : null;
     }
   }
 
-  /// A token refresh that failed. Under the process's own identity the token is ours to get; our clock skew is ours
-  /// whoever's key it is; a token endpoint that failed couldn't serve us. Otherwise the status the transport built
-  /// above it decides.
+  /// A token refresh that failed. A token endpoint that failed couldn't serve us; otherwise the status the transport
+  /// built above it decides.
   @Nullable
-  private static IngestionSourceErrorVerdict googleAuth(Throwable node, List<Throwable> below,
-      @Nullable IngestionSourceErrorEvidence evidence) {
-    String code = node.getClass().getSimpleName();
-    if (evidence != null && evidence.getCredentialMode() == IngestionSourceCredentialMode.AMBIENT) {
-      return none(code);
-    }
-    if (messageOf(node).contains(GOOGLE_CLOCK_SKEW)) {
-      return none(code);
-    }
-    for (Throwable cause : below) {
-      Object content = invoke(cause, "getContent");
-      String body = content != null ? content.toString() : messageOf(cause);
-      if (body.contains(GOOGLE_CLOCK_SKEW)) {
-        return none(code);
-      }
-    }
+  private static IngestionSourceErrorVerdict googleAuth(List<Throwable> below) {
     // grpc-auth reports a failure google-auth won't retry as UNAUTHENTICATED, a 502 or 504 among them.
     for (Throwable cause : below) {
       if (hasClass(cause.getClass(), GOOGLE_HTTP_RESPONSE_EXCEPTION)) {

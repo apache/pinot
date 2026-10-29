@@ -133,18 +133,16 @@ public class IngestionSourceErrorClassifierTest {
   }
 
   @Test
-  public void ourMetadataEndpointIsNotTheSource() {
-    // The HTTP client's connect failure names the endpoint; the JDK's own doesn't.
+  public void anyNetworkFailureIsSourceReadWhoeverOwnsTheEndpoint() {
+    // A metadata endpoint serving the process's own identity, like any other endpoint.
     assertEquals(categoryOf(new RuntimeException(
         new ConnectException("Connect to 169.254.169.254:80 [/169.254.169.254] failed: Connection refused"))),
-        Optional.empty());
-  }
-
-  @Test
-  public void ourOwnSocketExhaustionIsNotTheSource() {
+        Optional.of(IngestionSourceErrorCategory.SOURCE_READ));
+    // Our own exhausted ports or file descriptors stop the read all the same.
     assertEquals(categoryOf(new RuntimeException(new BindException("Cannot assign requested address"))),
-        Optional.empty());
-    assertEquals(categoryOf(new RuntimeException(new SocketException("Too many open files"))), Optional.empty());
+        Optional.of(IngestionSourceErrorCategory.SOURCE_READ));
+    assertEquals(categoryOf(new RuntimeException(new SocketException("Too many open files"))),
+        Optional.of(IngestionSourceErrorCategory.SOURCE_READ));
     assertEquals(categoryOf(new RuntimeException(new SocketException("Connection reset"))),
         Optional.of(IngestionSourceErrorCategory.SOURCE_READ));
   }
@@ -182,17 +180,17 @@ public class IngestionSourceErrorClassifierTest {
 
   @Test
   public void causeSharedByTwoBranchesIsReadUnderEachBranchsEvidence() {
-    // Whose credential was refused decides: our ambient identity is none, the customer's static key is AUTH.
+    // The evidence above the shared cause decides: one branch's attempt was cancelled, the other's was refused.
     register((node, below, evidence) -> !(node instanceof RefusedException) ? null
-        : evidence != null && evidence.getCredentialMode() == IngestionSourceCredentialMode.AMBIENT
-            ? IngestionSourceErrorVerdict.none("ours")
+        : evidence != null && "cancelled".equals(evidence.getCode())
+            ? IngestionSourceErrorVerdict.none("cancelled")
             : IngestionSourceErrorVerdict.auth(IngestionSourceErrorSubReason.AUTHENTICATION, "refused", null));
     Throwable shared = new RefusedException(null);
-    Throwable ambient = IngestionSourceErrorEvidence.attach(new RuntimeException("first attempt", shared),
-        new IngestionSourceErrorEvidence().setCredentialMode(IngestionSourceCredentialMode.AMBIENT));
-    Throwable customer = IngestionSourceErrorEvidence.attach(new RuntimeException("second attempt", shared),
-        new IngestionSourceErrorEvidence().setCredentialMode(IngestionSourceCredentialMode.STATIC));
-    for (List<Throwable> branches : List.of(List.of(ambient, customer), List.of(customer, ambient))) {
+    Throwable cancelled = IngestionSourceErrorEvidence.attach(new RuntimeException("first attempt", shared),
+        new IngestionSourceErrorEvidence().setEvidence(0, "cancelled"));
+    Throwable refused = IngestionSourceErrorEvidence.attach(new RuntimeException("second attempt", shared),
+        new IngestionSourceErrorEvidence().setTarget(IngestionSourceErrorVerdict.TARGET_BROKER));
+    for (List<Throwable> branches : List.of(List.of(cancelled, refused), List.of(refused, cancelled))) {
       Throwable failure = new RuntimeException("all attempts failed");
       branches.forEach(failure::addSuppressed);
       assertEquals(categoryOf(failure), Optional.of(IngestionSourceErrorCategory.AUTH));
@@ -488,27 +486,17 @@ public class IngestionSourceErrorClassifierTest {
         new IngestionSourceErrorEvidence().setEvidence(0, IngestionSourceErrorEvidence.LOCAL_PRECHECK));
     assertEquals(categoryOf(badKey), Optional.of(IngestionSourceErrorCategory.AUTH));
 
-    // Our own setup failing beneath a network error: not the source.
-    Throwable ourSetup = IngestionSourceErrorEvidence.attach(new IOException("trust store unreadable"),
-        new IngestionSourceErrorEvidence().setEvidence(0, IngestionSourceErrorEvidence.LOCAL_SETUP));
-    assertEquals(categoryOf(new ConnectException().initCause(ourSetup)), Optional.empty());
+    // A code the engine doesn't define is left to registered rules: Pinot's own setup failing beneath a network error
+    // reads as the network error.
+    Throwable ownSetup = IngestionSourceErrorEvidence.attach(new IOException("trust store unreadable"),
+        new IngestionSourceErrorEvidence().setEvidence(0, "local_setup"));
+    assertEquals(categoryOf(new ConnectException().initCause(ownSetup)),
+        Optional.of(IngestionSourceErrorCategory.SOURCE_READ));
 
-    // Credential mode alone decides nothing.
-    Throwable modeOnly = IngestionSourceErrorEvidence.attach(new IllegalStateException(),
-        new IngestionSourceErrorEvidence().setCredentialMode(IngestionSourceCredentialMode.STATIC));
-    assertEquals(categoryOf(modeOnly), Optional.empty());
-  }
-
-  @Test
-  public void classificationCarriesTheNearestCredentialModeAboveTheDecidingNode() {
-    Throwable root = new ConnectException("x");
-    Throwable plugin = IngestionSourceErrorEvidence.attach(new RuntimeException("plugin", root),
-        new IngestionSourceErrorEvidence().setCredentialMode(IngestionSourceCredentialMode.AMBIENT)
-            .setRoleArnConfigured(true));
-    IngestionSourceErrorClassification classification =
-        IngestionSourceErrorClassifier.classify(new RuntimeException("Pinot", plugin)).get();
-    assertEquals(classification.getCredentialMode(), IngestionSourceCredentialMode.AMBIENT);
-    assertTrue(classification.isRoleArnConfigured());
+    // A target alone decides nothing.
+    Throwable targetOnly = IngestionSourceErrorEvidence.attach(new IllegalStateException(),
+        new IngestionSourceErrorEvidence().setTarget(IngestionSourceErrorVerdict.TARGET_BROKER));
+    assertEquals(categoryOf(targetOnly), Optional.empty());
   }
 
   @Test
@@ -551,21 +539,21 @@ public class IngestionSourceErrorClassifierTest {
     register(TEST_RULES);
     RefusedException refusal = new RefusedException(null);
     IngestionSourceErrorEvidence evidence =
-        new IngestionSourceErrorEvidence().setCredentialMode(IngestionSourceCredentialMode.STATIC);
+        new IngestionSourceErrorEvidence().setResource("https://broker.example.com:9093");
     IngestionSourceErrorClassification classification = IngestionSourceErrorClassifier.classify(
         IngestionSourceErrorEvidence.attach(new RuntimeException("wrapper", refusal), evidence)).get();
     assertSame(classification.getException(), refusal);
-    assertEquals(classification.getEvidence().getCredentialMode(), IngestionSourceCredentialMode.STATIC);
+    assertEquals(classification.getEvidence().getResource(), "https://broker.example.com:9093");
   }
 
   @Test
   public void evidenceKeepsTheInnermostClientsRecord() {
     Throwable failure = new RuntimeException();
     IngestionSourceErrorEvidence.attach(failure,
-        new IngestionSourceErrorEvidence().setCredentialMode(IngestionSourceCredentialMode.STATIC));
+        new IngestionSourceErrorEvidence().setTarget(IngestionSourceErrorVerdict.TARGET_BROKER));
     IngestionSourceErrorEvidence.attach(failure,
-        new IngestionSourceErrorEvidence().setCredentialMode(IngestionSourceCredentialMode.AMBIENT));
-    assertEquals(IngestionSourceErrorEvidence.of(failure).getCredentialMode(), IngestionSourceCredentialMode.STATIC);
+        new IngestionSourceErrorEvidence().setTarget(IngestionSourceErrorVerdict.TARGET_IDP));
+    assertEquals(IngestionSourceErrorEvidence.of(failure).getTarget(), IngestionSourceErrorVerdict.TARGET_BROKER);
     assertEquals(failure.getSuppressed().length, 1);
   }
 
