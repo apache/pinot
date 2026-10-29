@@ -102,13 +102,16 @@ public class PulsarSourceErrorClassificationTest {
         IngestionSourceErrorSubReason.AUTHENTICATION, null);
     assertAuth(new PulsarClientException.UnsupportedAuthenticationException("bad auth plugin"),
         IngestionSourceErrorSubReason.AUTHENTICATION, null);
+    // Its authentication data's endpoint never answered: SOURCE_READ, as for any endpoint.
+    assertSourceRead(new PulsarClientException.GettingAuthenticationDataException(
+        new ConnectException("Connection refused")), TARGET_IDP);
     // The client's config: the read failed all the same.
     assertSourceRead(new PulsarClientException.InvalidConfigurationException("bad config"), null);
     assertSourceRead(new PulsarClientException.InvalidServiceURL("Invalid service URL", null), null);
     assertSourceRead(new PulsarClientException.InvalidTopicNameException("bad topic"), null);
-    // The client's own lookup semaphore reads as the lookup failure it extends.
+    // The client's own lookup semaphore: the broker never saw the request.
     assertSourceRead(new PulsarClientException.TooManyRequestsException("Requests number out of config: 50000"),
-        TARGET_BROKER);
+        null);
     // A client Pinot already closed.
     assertNotClassified(new PulsarClientException.AlreadyClosedException("Client already closed"));
   }

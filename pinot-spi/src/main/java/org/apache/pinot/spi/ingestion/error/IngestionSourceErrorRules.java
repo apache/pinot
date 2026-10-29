@@ -108,10 +108,10 @@ final class IngestionSourceErrorRules {
       return login(node);
     }
     if (hasClass(clazz, PULSAR_CLIENT_EXCEPTION) || hasClass(clazz, PULSAR_V5_CLIENT_EXCEPTION)) {
-      return pulsar(node);
+      return pulsar(node, below);
     }
     if (hasClass(clazz, PULSAR_ADMIN_EXCEPTION)) {
-      return pulsarAdmin(node);
+      return pulsarAdmin(node, below);
     }
     if (hasClass(clazz, GAX_API_EXCEPTION)) {
       Object statusCode = invoke(node, "getStatusCode");
@@ -156,6 +156,22 @@ final class IngestionSourceErrorRules {
         : null;
   }
 
+  /// A credential the client couldn't get: authentication failed, unless a network failure beneath it shows that the
+  /// endpoint serving the credential never answered, which is SOURCE_READ as for any other endpoint.
+  private static IngestionSourceErrorVerdict credentialFailure(String code, @Nullable String target,
+      List<Throwable> below) {
+    for (Throwable cause : below) {
+      IngestionSourceErrorVerdict refused = tlsAlert(cause, TARGET_IDP);
+      if (refused != null) {
+        return refused;
+      }
+      if (isNetworkFailure(cause) || hasAnyClass(cause.getClass(), APACHE_NO_HTTP_RESPONSE)) {
+        return sourceRead(cause.getClass().getSimpleName(), TARGET_IDP);
+      }
+    }
+    return auth(IngestionSourceErrorSubReason.AUTHENTICATION, code, target);
+  }
+
   /// Whether `throwable` is a network failure: DNS, connect, TLS, a socket error or a timeout.
   private static boolean isNetworkFailure(Throwable throwable) {
     return throwable instanceof UnknownHostException || throwable instanceof SocketException
@@ -170,6 +186,8 @@ final class IngestionSourceErrorRules {
   private static final String AWS_CLIENT_EXCEPTION = "software.amazon.awssdk.core.exception.SdkClientException";
   private static final String AWS_STS_EXCEPTION = "software.amazon.awssdk.services.sts.model.StsException";
   private static final String AWS_ABORTED = "software.amazon.awssdk.core.exception.AbortedException";
+  // The SDK's own HTTP failures with a status, such as the instance metadata service's, below the AWS service classes
+  private static final String AWS_CORE_SERVICE_EXCEPTION = "software.amazon.awssdk.core.exception.SdkServiceException";
   // The SDK's Apache HTTP clients, 4 and 5: the endpoint closed the connection without answering
   private static final Set<String> APACHE_NO_HTTP_RESPONSE = Set.of("org.apache.http.NoHttpResponseException",
       "org.apache.hc.core5.http.NoHttpResponseException");
@@ -246,7 +264,7 @@ final class IngestionSourceErrorRules {
       return sourceRead(code, target);
     }
     if (AWS_INVALID_REQUEST_CODES.contains(code)) {
-      return sts ? auth(IngestionSourceErrorSubReason.UNSPECIFIED, code, target) : sourceRead(code, target);
+      return sts ? auth(IngestionSourceErrorSubReason.AUTHENTICATION, code, target) : sourceRead(code, target);
     }
     return null;
   }
@@ -264,7 +282,14 @@ final class IngestionSourceErrorRules {
     // of its providers called directly after a first success ("Failed to load credentials from IMDS." or "... from
     // metadata service.").
     if (message.startsWith("Unable to load credentials") || message.startsWith("Failed to load credentials from")) {
-      return auth(IngestionSourceErrorSubReason.AUTHENTICATION, clazz.getSimpleName(), null);
+      for (Throwable cause : below) {
+        Object status = hasClass(cause.getClass(), AWS_CORE_SERVICE_EXCEPTION) ? invoke(cause, "statusCode") : null;
+        if (status instanceof Integer && isUnavailable((Integer) status)) {
+          // The endpoint serving the credential failed.
+          return sourceRead(String.valueOf(status), TARGET_IDP);
+        }
+      }
+      return credentialFailure(clazz.getSimpleName(), null, below);
     }
     if (hasAnyClass(clazz, AWS_CALL_TIMEOUTS)) {
       return sourceRead(clazz.getSimpleName(), null);
@@ -348,7 +373,7 @@ final class IngestionSourceErrorRules {
     for (Throwable cause : below) {
       if (hasClass(cause.getClass(), SASL_EXCEPTION)) {
         // A broker rejection carries no cause; this one failed in the client before the broker judged anything.
-        return auth(IngestionSourceErrorSubReason.AUTHENTICATION, code, null);
+        return credentialFailure(code, null, below);
       }
     }
     return auth(IngestionSourceErrorSubReason.AUTHENTICATION, code, TARGET_BROKER);
@@ -522,7 +547,7 @@ final class IngestionSourceErrorRules {
   /// base class is matched on its own name and the names of its superclasses up to the base, so
   /// `ServiceNotReadyException` and `TooManyRequestsException` read as the `LookupException` they extend.
   @Nullable
-  private static IngestionSourceErrorVerdict pulsar(Throwable node) {
+  private static IngestionSourceErrorVerdict pulsar(Throwable node, List<Throwable> below) {
     String message = messageOf(node);
     for (Class<?> current = node.getClass(); current != null; current = current.getSuperclass()) {
       String name = current.getName();
@@ -538,6 +563,10 @@ final class IngestionSourceErrorRules {
       if (simple.equals("AuthorizationException")) {
         return auth(IngestionSourceErrorSubReason.AUTHORIZATION, simple, TARGET_BROKER);
       }
+      if (simple.equals("TooManyRequestsException") && message.contains("Requests number out of config")) {
+        // The client's own lookup semaphore: the broker never saw the request.
+        return sourceRead(simple, null);
+      }
       if (PULSAR_SOURCE_READ.contains(simple)) {
         return sourceRead(simple, TARGET_BROKER);
       }
@@ -545,7 +574,7 @@ final class IngestionSourceErrorRules {
         return sourceRead(simple, null);
       }
       if (PULSAR_AUTHENTICATION_SETUP.contains(simple)) {
-        return auth(IngestionSourceErrorSubReason.AUTHENTICATION, simple, null);
+        return credentialFailure(simple, null, below);
       }
       if (simple.equals("AlreadyClosedException")) {
         // A client Pinot already closed.
@@ -588,13 +617,13 @@ final class IngestionSourceErrorRules {
   /// The admin client maps both 401 and 403 to `NotAuthorizedException`: only the status tells them apart. The base
   /// class without an HTTP error is a client-side failure that defaults its status to 500, so its status means nothing.
   @Nullable
-  private static IngestionSourceErrorVerdict pulsarAdmin(Throwable node) {
+  private static IngestionSourceErrorVerdict pulsarAdmin(Throwable node, List<Throwable> below) {
     String simple = node.getClass().getSimpleName();
     if (simple.equals("ConnectException") || simple.equals("TimeoutException")) {
       return sourceRead(simple, TARGET_ADMIN);
     }
     if (PULSAR_AUTHENTICATION_SETUP.contains(simple)) {
-      return auth(IngestionSourceErrorSubReason.AUTHENTICATION, simple, null);
+      return credentialFailure(simple, null, below);
     }
     if (node.getClass().getName().equals(PULSAR_ADMIN_EXCEPTION) && invoke(node, "getHttpError") == null) {
       return null;
@@ -625,8 +654,8 @@ final class IngestionSourceErrorRules {
     String code = ((Enum<?>) codeValue).name();
     switch (code) {
       case "UNAUTHENTICATED":
-        // The service's refusal, or grpc-auth's report of a token refresh that failed
-        return auth(IngestionSourceErrorSubReason.AUTHENTICATION, code, null);
+        // The service's refusal, which carries no cause, or grpc-auth's report of a token refresh that failed
+        return credentialFailure(code, null, below);
       case "PERMISSION_DENIED":
         return auth(IngestionSourceErrorSubReason.AUTHORIZATION, code, null);
       case "NOT_FOUND":

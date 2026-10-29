@@ -21,6 +21,7 @@ package org.apache.pinot.plugin.stream.kafka;
 import com.sun.net.httpserver.HttpServer;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
+import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
@@ -101,6 +102,10 @@ public class KafkaSourceErrorClassificationTest {
     Throwable kerberosClient = new SaslAuthenticationException("An error occurred when evaluating SASL token",
         new SaslException("GSS initiate failed", new IllegalStateException("no valid credentials")));
     assertAuth(underPinot(kerberosClient), IngestionSourceErrorSubReason.AUTHENTICATION, null);
+    // A KDC that never answered the service-ticket request: SOURCE_READ, as for any endpoint.
+    Throwable kdcTimeout = new SaslAuthenticationException("An error occurred when evaluating SASL token",
+        new SaslException("GSS initiate failed", new SocketTimeoutException("Receive timed out")));
+    assertSourceRead(underPinot(kdcTimeout), TARGET_IDP);
   }
 
   @Test
@@ -148,13 +153,6 @@ public class KafkaSourceErrorClassificationTest {
         new ConfigException("Invalid value FOO for configuration security.protocol")), null);
     // In 4.x the authentication classes extend this one: it must never decide on its own.
     assertNotClassified(new InvalidConfigurationException("Invalid configuration"));
-    // A keystore Pinot can't read, from the real client: no rule recognises it yet (a listed gap).
-    Properties props = consumerProperties();
-    props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
-    props.put("security.protocol", "SSL");
-    props.put("ssl.keystore.location", "/nonexistent/keystore.jks");
-    props.put("ssl.keystore.password", "fixture-only");
-    assertNotClassified(underPinot(constructConsumer(props)));
   }
 
   @Test

@@ -37,6 +37,7 @@ import io.grpc.auth.MoreCallCredentials;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.ConnectException;
+import java.net.UnknownHostException;
 import java.security.KeyPairGenerator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
@@ -159,6 +160,10 @@ public class GoogleCloudSourceErrorClassificationTest {
       }
     };
     assertSourceRead(tokenRefreshFailure(unreachable), null);
+    // grpc-auth reports a metadata server it couldn't find as UNAUTHENTICATED, over the network failure.
+    assertSourceRead(Status.UNAUTHENTICATED.withCause(new IOException(
+        "ComputeEngineCredentials cannot find the metadata server.", new UnknownHostException(
+            "metadata.google.internal"))).asRuntimeException(), TARGET_IDP);
   }
 
   @Test

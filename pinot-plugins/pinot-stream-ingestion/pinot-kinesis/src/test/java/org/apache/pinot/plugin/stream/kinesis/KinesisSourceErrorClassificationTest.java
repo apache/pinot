@@ -24,6 +24,7 @@ import java.net.ConnectException;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.net.UnknownHostException;
 import java.util.regex.Matcher;
@@ -38,6 +39,7 @@ import software.amazon.awssdk.awscore.exception.AwsServiceException;
 import software.amazon.awssdk.core.exception.AbortedException;
 import software.amazon.awssdk.core.exception.ApiCallTimeoutException;
 import software.amazon.awssdk.core.exception.SdkClientException;
+import software.amazon.awssdk.core.exception.SdkServiceException;
 import software.amazon.awssdk.http.apache.ApacheHttpClient;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.kinesis.KinesisClient;
@@ -61,6 +63,7 @@ import software.amazon.awssdk.services.sts.model.StsException;
 import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorAssertions.assertAuth;
 import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorAssertions.assertNotClassified;
 import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorAssertions.assertSourceRead;
+import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorVerdict.TARGET_IDP;
 import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorVerdict.TARGET_KMS;
 import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorVerdict.TARGET_STS;
 import static org.testng.Assert.assertEquals;
@@ -154,11 +157,11 @@ public class KinesisSourceErrorClassificationTest {
     // The process's web identity, reused by the default chain after its first success.
     assertAuth(sts("AccessDenied", 403, "Not authorized to perform sts:AssumeRoleWithWebIdentity"),
         IngestionSourceErrorSubReason.AUTHORIZATION, TARGET_STS);
-    assertAuth(sts("InvalidIdentityToken", 400, "Couldn't retrieve verification key"),
+    assertAuth(sts("InvalidIdentityToken", 400, "No OpenIDConnect provider found in your account for https://oidc"),
         IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_STS);
     // STS refusing the AssumeRole request itself: a role ARN or session duration it won't accept.
     assertAuth(sts("ValidationError", 400, "The requested DurationSeconds exceeds the MaxSessionDuration"),
-        IngestionSourceErrorSubReason.UNSPECIFIED, TARGET_STS);
+        IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_STS);
     // The web identity's provider never answered STS.
     assertSourceRead(sts("IDPCommunicationError", 400, "The IdP could not be contacted"), TARGET_STS);
   }
@@ -207,11 +210,17 @@ public class KinesisSourceErrorClassificationTest {
             "Unable to load credentials from any of the providers in the chain AwsCredentialsProviderChain")),
         IngestionSourceErrorSubReason.AUTHENTICATION, null);
     // One of its providers, called directly after the chain's first success: IMDS, or the ECS / EKS Pod Identity
-    // container endpoint, whatever the network cause.
-    assertAuth(SdkClientException.create("Failed to load credentials from IMDS.", new IOException("Connect timed out")),
-        IngestionSourceErrorSubReason.AUTHENTICATION, null);
-    assertAuth(SdkClientException.create("Failed to load credentials from metadata service.",
-        new ConnectException("Connection refused")), IngestionSourceErrorSubReason.AUTHENTICATION, null);
+    // container endpoint. One whose endpoint never answered, or failed, is SOURCE_READ like any endpoint.
+    assertAuth(SdkClientException.create("Failed to load credentials from IMDS.",
+            new IOException("Unable to parse the credentials response")), IngestionSourceErrorSubReason.AUTHENTICATION,
+        null);
+    assertEquals(assertSourceRead(SdkClientException.create("Failed to load credentials from IMDS.",
+        new SocketTimeoutException("Connect timed out")), TARGET_IDP).getCode(), "SocketTimeoutException");
+    assertEquals(assertSourceRead(SdkClientException.create("Failed to load credentials from metadata service.",
+        new ConnectException("Connection refused")), TARGET_IDP).getCode(), "ConnectException");
+    assertEquals(assertSourceRead(SdkClientException.create("Failed to load credentials from IMDS.",
+        SdkServiceException.builder().statusCode(500).message("Internal Server Error").build()), TARGET_IDP)
+        .getCode(), "500");
     // Any endpoint that never answered, a metadata endpoint included.
     assertSourceRead(SdkClientException.create("Unable to execute HTTP request",
         new ConnectException("Connect to 169.254.169.254:80 [/169.254.169.254] failed: Connection refused")), null);
