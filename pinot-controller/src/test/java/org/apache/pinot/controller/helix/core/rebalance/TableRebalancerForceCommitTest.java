@@ -97,14 +97,15 @@ public class TableRebalancerForceCommitTest {
 
   @DataProvider
   public Object[][] rebalanceSteps() {
-    return new Object[][]{{0, 0, 1, 0}, {0, 1, 1, 0}, {0, 3, 1, 0}, {1, 0, 2, 0}, {1, 1, 2, 0}, {1, 1, 2, 1}};
+    return new Object[][]{{0, 0, 0}, {0, 1, 0}, {0, 3, 0}, {1, 0, 0}, {1, 1, 0}, {1, 1, 1}};
   }
 
   @Test(dataProvider = "rebalanceSteps")
-  public void testForceCommitForEachMovementStep(int minAvailableReplicas, int numVersionConflicts,
-      int expectedCommitCount, int successfulWritesBeforeConflict)
+  public void testForceCommitOncePerPartitionDuringRebalance(int minAvailableReplicas, int numVersionConflicts,
+      int successfulWritesBeforeConflict)
       throws Exception {
-    assertForceCommits(minAvailableReplicas, numVersionConflicts, expectedCommitCount, ConcurrentChange.VERSION_ONLY,
+    // Retain the force commit across both rejected writes and successful intermediate movement steps.
+    assertForceCommits(minAvailableReplicas, numVersionConflicts, 1, ConcurrentChange.VERSION_ONLY,
         successfulWritesBeforeConflict);
   }
 
@@ -153,19 +154,19 @@ public class TableRebalancerForceCommitTest {
   }
 
   @Test
-  public void testForceCommitAfterConcurrentMovement()
+  public void testRememberForceCommitAfterConcurrentMovement()
       throws Exception {
-    // Another rebalance moves the partition to intermediate instances after the first force commit. Moving it
-    // again from those instances requires a fresh force commit even though our own previous write was rejected.
-    assertForceCommits(1, 1, 2, ConcurrentChange.MOVE_TO_INTERMEDIATE, 0);
+    // Another rebalance moves the partition to intermediate instances after its force commit. This rebalance
+    // still remembers that commit when moving the successor from the intermediate instances to the target.
+    assertForceCommits(1, 1, 1, ConcurrentChange.MOVE_TO_INTERMEDIATE, 0);
   }
 
   @Test
-  public void testForceCommitAfterNonStrictSuccessorRelocation()
+  public void testRememberForceCommitAfterNonStrictSuccessorRelocation()
       throws Exception {
     // A non-pinned successor starts on the current target instances. If instance reassignment changes the target
-    // again during the full recalculation, that successor needs a force commit before its own movement.
-    assertForceCommits(0, 0, 2, ConcurrentChange.VERSION_ONLY, 0,
+    // again during the full recalculation, move the successor without committing the same partition again.
+    assertForceCommits(0, 0, 1, ConcurrentChange.VERSION_ONLY, 0,
         CommitBehavior.RELOCATE_SUCCESSOR_AND_REASSIGN, true);
   }
 
@@ -236,6 +237,7 @@ public class TableRebalancerForceCommitTest {
           if (conflictsInjected.get() < numVersionConflicts
               && successfulWrites.get() >= successfulWritesBeforeConflict) {
             // A concurrent metadata write wins after force commit, before the partition can move.
+            assertEquals(successfulWrites.get(), successfulWritesBeforeConflict);
             conflictsInjected.incrementAndGet();
             IdealState state = storedState.get();
             if (moveFirstPartition) {
@@ -383,13 +385,17 @@ public class TableRebalancerForceCommitTest {
       assertEquals(conflictsInjected.get(), numVersionConflicts);
       assertEquals(delayedPublications.get(),
           commitBehavior == CommitBehavior.PUBLISH_AT_ASSIGNMENT_WRITE ? 1 : 0);
+      if (concurrentChange == ConcurrentChange.VERSION_ONLY && commitBehavior == CommitBehavior.IMMEDIATE) {
+        assertEquals(successfulWrites.get(), minAvailableReplicas == 1 ? 2 : 1,
+            "The force commit must remain remembered across every required movement step");
+      }
       if (commitBehavior == CommitBehavior.ADD_EARLIER_SEGMENT) {
         assertEquals(commitsBeforeFirstWrite.get(), 2);
       }
       if (relocateSuccessor) {
-        assertEquals(forceCommittedInstances, List.of(Set.copyOf(SOURCE_INSTANCES), Set.copyOf(TARGET_INSTANCES)));
-        assertEquals(recalculatedTargets, List.of(TARGET_INSTANCES, REASSIGNED_INSTANCES, REASSIGNED_INSTANCES));
-        assertEquals(commitsBeforeFirstWrite.get(), 2);
+        assertEquals(forceCommittedInstances, List.of(Set.copyOf(SOURCE_INSTANCES)));
+        assertEquals(recalculatedTargets, List.of(TARGET_INSTANCES, REASSIGNED_INSTANCES));
+        assertEquals(commitsBeforeFirstWrite.get(), 1);
       }
       assertEquals(forceCommittedSegments.size(), expectedCommitCount);
       assertEquals(forceCommitStarts.get(), reportedCommitCounts.size());
@@ -402,11 +408,10 @@ public class TableRebalancerForceCommitTest {
         } else if (moveFirstPartition) {
           partitionId = i;
         }
-        int sequenceNumber = numPartitions > 1 ? 11 : 11 + i;
         assertEquals(forceCommittedSegments.get(i),
-            Set.of(new LLCSegmentName("forceCommit", partitionId, sequenceNumber, 0).getSegmentName()));
+            Set.of(new LLCSegmentName("forceCommit", partitionId, 11, 0).getSegmentName()));
       }
-      int finalSequenceNumber = numPartitions > 1 ? 12 : 11 + expectedCommitCount;
+      int finalSequenceNumber = forceCommitEnabled ? 12 : 11;
       for (int partitionId = 0; partitionId < numPartitions; partitionId++) {
         String successor = new LLCSegmentName("forceCommit", partitionId, finalSequenceNumber, 0).getSegmentName();
         assertEquals(storedState.get().getRecord().getMapField(successor),
