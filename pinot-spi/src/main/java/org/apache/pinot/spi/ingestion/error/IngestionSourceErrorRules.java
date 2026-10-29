@@ -156,8 +156,9 @@ final class IngestionSourceErrorRules {
         : null;
   }
 
-  /// A credential the client couldn't get: authentication failed, unless a network failure beneath it shows that the
-  /// endpoint serving the credential never answered, which is SOURCE_READ as for any other endpoint.
+  /// A credential the client couldn't get: authentication failed, unless what lies beneath shows that the endpoint
+  /// serving the credential never answered, or answered 408, 429 or 5xx, which is SOURCE_READ as for any other
+  /// endpoint.
   private static IngestionSourceErrorVerdict credentialFailure(String code, @Nullable String target,
       List<Throwable> below) {
     for (Throwable cause : below) {
@@ -167,6 +168,12 @@ final class IngestionSourceErrorRules {
       }
       if (isNetworkFailure(cause) || hasAnyClass(cause.getClass(), APACHE_NO_HTTP_RESPONSE)) {
         return sourceRead(cause.getClass().getSimpleName(), TARGET_IDP);
+      }
+      // The endpoint's HTTP answer, as google-api-client or the AWS SDK's own HTTP layer keeps it
+      Object status = hasClass(cause.getClass(), GOOGLE_HTTP_RESPONSE_EXCEPTION) ? invoke(cause, "getStatusCode")
+          : hasClass(cause.getClass(), AWS_CORE_SERVICE_EXCEPTION) ? invoke(cause, "statusCode") : null;
+      if (status instanceof Integer && isUnavailable((Integer) status)) {
+        return sourceRead(String.valueOf(status), TARGET_IDP);
       }
     }
     return auth(IngestionSourceErrorSubReason.AUTHENTICATION, code, target);
@@ -200,16 +207,16 @@ final class IngestionSourceErrorRules {
       "InvalidClientTokenId", "IncompleteSignature", "MissingAuthenticationToken", "UnrecognizedClientException",
       "RequestTimeTooSkewed", "RequestExpired", "RequestInTheFuture", "InvalidIdentityToken", "IDPRejectedClaim");
   private static final Set<String> AWS_AUTHORIZATION_CODES = Set.of("RegionDisabledException",
-      "GlueEncryptionException", "AccountProblem", "NotSignedUp");
+      "GlueEncryptionException", "AccountProblem", "NotSignedUp", "AllAccessDisabled", "InvalidPayer");
   private static final Set<String> AWS_KMS_AUTHORIZATION_CODES = Set.of("KMSAccessDeniedException",
       "KMSOptInRequired", "KMSKeyNotAccessibleFault");
   private static final Set<String> AWS_SOURCE_READ_CODES = Set.of("NoSuchKey", "NoSuchBucket", "InvalidObjectState",
       "ObjectNotInActiveTierError", "PermanentRedirect", "AuthorizationHeaderMalformed",
       "IllegalLocationConstraintException", "SlowDown", "ServiceUnavailable", "ServiceUnavailableException",
       "InternalError", "InternalFailure", "Throttling", "ThrottlingException", "EntityNotFoundException",
-      "InternalServiceException", "AllAccessDisabled", "InvalidPayer", "ResourceNotFoundException",
-      "ResourceInUseException", "ProvisionedThroughputExceededException", "LimitExceededException",
-      "ExpiredIteratorException", "ExpiredNextTokenException", "IDPCommunicationError");
+      "InternalServiceException", "ResourceNotFoundException", "ResourceInUseException",
+      "ProvisionedThroughputExceededException", "LimitExceededException", "ExpiredIteratorException",
+      "ExpiredNextTokenException", "IDPCommunicationError");
   private static final Set<String> AWS_KMS_SOURCE_READ_CODES = Set.of("KMS.DisabledException",
       "KMS.KMSInvalidStateException", "KMS.NotFoundException", "KMSDisabledException", "KMSInvalidStateException",
       "KMSNotFoundException", "KMSThrottlingException");
@@ -282,13 +289,6 @@ final class IngestionSourceErrorRules {
     // of its providers called directly after a first success ("Failed to load credentials from IMDS." or "... from
     // metadata service.").
     if (message.startsWith("Unable to load credentials") || message.startsWith("Failed to load credentials from")) {
-      for (Throwable cause : below) {
-        Object status = hasClass(cause.getClass(), AWS_CORE_SERVICE_EXCEPTION) ? invoke(cause, "statusCode") : null;
-        if (status instanceof Integer && isUnavailable((Integer) status)) {
-          // The endpoint serving the credential failed.
-          return sourceRead(String.valueOf(status), TARGET_IDP);
-        }
-      }
       return credentialFailure(clazz.getSimpleName(), null, below);
     }
     if (hasAnyClass(clazz, AWS_CALL_TIMEOUTS)) {

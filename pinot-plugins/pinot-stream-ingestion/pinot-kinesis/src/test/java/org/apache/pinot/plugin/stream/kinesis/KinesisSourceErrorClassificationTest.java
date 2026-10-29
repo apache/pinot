@@ -185,6 +185,17 @@ public class KinesisSourceErrorClassificationTest {
   }
 
   @Test
+  public void accessTheSourceDisabledIsAuthorization() {
+    // S3 answers 403 when it disabled all access to a resource, or to a Requester Pays object for this requester.
+    assertAuth(AwsServiceException.builder().awsErrorDetails(details("S3", "AllAccessDisabled")).statusCode(403)
+        .message("All access to this Amazon S3 resource has been disabled.").build(),
+        IngestionSourceErrorSubReason.AUTHORIZATION, null);
+    assertAuth(AwsServiceException.builder().awsErrorDetails(details("S3", "InvalidPayer")).statusCode(403)
+        .message("All access to this object has been disabled.").build(), IngestionSourceErrorSubReason.AUTHORIZATION,
+        null);
+  }
+
+  @Test
   public void glueCodesKeyOnTheCodeNotTheStatus() {
     // Glue is a JSON-protocol service: denial, missing entity and throttling are all 400.
     assertAuth(AwsServiceException.builder().awsErrorDetails(details("Glue", "AccessDeniedException"))
