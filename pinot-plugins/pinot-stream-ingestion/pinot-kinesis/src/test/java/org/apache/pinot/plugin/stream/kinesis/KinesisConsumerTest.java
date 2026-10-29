@@ -386,6 +386,34 @@ public class KinesisConsumerTest {
     return new TestKinesisConsumer(_kinesisConfig, kinesisClient, NO_OP_REQUEST_RATE_LIMITER);
   }
 
+  @Test
+  public void testThrottledFetchWhoseRetryOurLimiterTimesOutCountsAsThrottled() {
+    boolean[] throttledThisFetch = {false};
+    KinesisClient kinesisClient = mock(KinesisClient.class);
+    when(kinesisClient.getShardIterator(any(GetShardIteratorRequest.class))).thenReturn(
+        GetShardIteratorResponse.builder().shardIterator(PLACEHOLDER).build());
+    when(kinesisClient.getRecords(any(GetRecordsRequest.class))).thenAnswer(invocation -> {
+      throttledThisFetch[0] = true;
+      throw rateLimitException();
+    });
+    // Our limiter grants a fetch's first GetRecords, and runs out of time for the retry after Kinesis throttled it
+    KinesisConsumer.RequestRateLimiter requestRateLimiter = (streamName, shardId, requestType, rpsLimit, timeoutMs) ->
+        requestType != KinesisConsumer.RequestType.GET_RECORDS || !throttledThisFetch[0];
+    TestKinesisConsumer kinesisConsumer = new TestKinesisConsumer(_kinesisConfig, kinesisClient, requestRateLimiter,
+        "limitedRetryTable_REALTIME-stream-0");
+    KinesisPartitionGroupOffset startOffset = new KinesisPartitionGroupOffset("0", "1");
+
+    List<Throwable> reported = new ArrayList<>();
+    try (IngestionSourceErrorReporter.Scope ignored = IngestionSourceErrorReporter.listen(reported::add)) {
+      for (int i = 0; i < 6; i++) {
+        throttledThisFetch[0] = false;
+        assertEquals(kinesisConsumer.fetchMessages(startOffset, 2500).getMessageCount(), 0);
+      }
+    }
+    // Kinesis throttled each of the six, so the sixth is reported
+    assertEquals(reported.size(), 1);
+  }
+
   private ProvisionedThroughputExceededException rateLimitException() {
     return ProvisionedThroughputExceededException.builder().message("throttled").build();
   }
