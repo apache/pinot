@@ -461,7 +461,7 @@ public class ForwardIndexTypeTest {
     }
 
     @Test
-    public void indexesForwardEncodingOverridesFieldConfigEncoding()
+    public void conflictingRawFieldConfigEncodingVsIndexesForward()
         throws IOException {
       addFieldIndexConfig(""
           + " {\n"
@@ -471,7 +471,9 @@ public class ForwardIndexTypeTest {
           + "      \"forward\": { \"encodingType\": \"DICTIONARY\" }"
           + "    }\n"
           + " }");
-      assertEquals(ForwardIndexConfig.getDefault(FieldConfig.EncodingType.DICTIONARY));
+      IllegalStateException ex = expectThrows(IllegalStateException.class,
+          () -> getActualConfig("dimInt", StandardIndexes.forward()));
+      assertTrue(ex.getMessage().contains("Conflicting forward-index encoding"));
     }
 
     @Test

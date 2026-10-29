@@ -503,7 +503,8 @@ public class DictionaryIndexType
   }
 
   @Override
-  @SuppressWarnings("deprecation")
+  // Legacy API use is required to read or convert persisted configs.
+  @SuppressWarnings({"deprecation", "removal"})
   protected void handleIndexSpecificCleanup(TableConfig tableConfig) {
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     List<String> noDictionaryColumns = indexingConfig.getNoDictionaryColumns() == null

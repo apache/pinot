@@ -106,7 +106,8 @@ public class FieldIndexConfigsUtilTest {
   }
 
   // Exercises compatibility with the deprecated field-level encoding setting.
-  @SuppressWarnings("deprecation")
+  // Legacy API use is intentional to verify backward-compatible config reads.
+  @SuppressWarnings({"deprecation", "removal"})
   @Test
   public void testLegacyRawEncodingWithForwardBlockMissingEncodingType()
       throws Exception {
