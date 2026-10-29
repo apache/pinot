@@ -222,7 +222,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   /// Adds one plan node per segment to `planNodes`. With prefetch enabled, a segment for which the [FetchPlanner]
   /// plans a [FetchContext] gets a plan node that acquires and releases its buffers around execution, and is added to
   /// `fetchSegmentContexts` with its context added to `fetchContexts` at the same position. A segment for which the
-  /// planner returns null (it needs no fetch) gets the plain plan node, as without prefetch.
+  /// planner returns null (it needs no fetch) gets the plain plan node, as without prefetch. The fetch lists are only
+  /// written with prefetch enabled, so they can be immutable empty lists otherwise.
   private void addSegmentPlanNodes(List<SegmentContext> segmentContexts, QueryContext queryContext,
       Function<SegmentContext, PlanNode> segmentPlanNodeMaker, List<PlanNode> planNodes,
       List<SegmentContext> fetchSegmentContexts, List<FetchContext> fetchContexts) {
@@ -247,9 +248,11 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     applyQueryOptions(queryContext);
     boundGroupingSetsBaseAggregation(segmentContexts, queryContext);
 
-    List<PlanNode> planNodes = new ArrayList<>(segmentContexts.size());
-    List<SegmentContext> fetchSegmentContexts = new ArrayList<>();
-    List<FetchContext> fetchContexts = new ArrayList<>();
+    int numSegments = segmentContexts.size();
+    List<PlanNode> planNodes = new ArrayList<>(numSegments);
+    boolean enablePrefetch = queryContext.isEnablePrefetch();
+    List<SegmentContext> fetchSegmentContexts = enablePrefetch ? new ArrayList<>(numSegments) : List.of();
+    List<FetchContext> fetchContexts = enablePrefetch ? new ArrayList<>(numSegments) : List.of();
     addSegmentPlanNodes(segmentContexts, queryContext, segmentContext -> makeSegmentPlanNode(segmentContext,
         queryContext), planNodes, fetchSegmentContexts, fetchContexts);
 
@@ -439,9 +442,11 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     applyQueryOptions(queryContext);
     boundGroupingSetsBaseAggregation(segmentContexts, queryContext);
 
-    List<PlanNode> planNodes = new ArrayList<>(segmentContexts.size());
-    List<SegmentContext> fetchSegmentContexts = new ArrayList<>();
-    List<FetchContext> fetchContexts = new ArrayList<>();
+    int numSegments = segmentContexts.size();
+    List<PlanNode> planNodes = new ArrayList<>(numSegments);
+    boolean enablePrefetch = queryContext.isEnablePrefetch();
+    List<SegmentContext> fetchSegmentContexts = enablePrefetch ? new ArrayList<>(numSegments) : List.of();
+    List<FetchContext> fetchContexts = enablePrefetch ? new ArrayList<>(numSegments) : List.of();
     addSegmentPlanNodes(segmentContexts, queryContext, segmentContext -> makeStreamingSegmentPlanNode(segmentContext,
         queryContext), planNodes, fetchSegmentContexts, fetchContexts);
 

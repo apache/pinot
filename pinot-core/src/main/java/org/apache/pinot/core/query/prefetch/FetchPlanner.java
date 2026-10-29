@@ -31,7 +31,6 @@ import org.apache.pinot.segment.spi.IndexSegment;
 ///
 /// A planner can return null for a segment that needs no fetch, e.g. one whose data is all local, so its fetch calls
 /// would be no-ops. The caller then skips the fetch lifecycle (prefetch, acquire, release) for that segment entirely.
-/// A non-null context, even an empty one, keeps the lifecycle.
 /// TODO: this interface and the dependent classes like QueryContext should be moved to query-spi pkg, yet to be added.
 public interface FetchPlanner {
   /// Plan what index data to prefetch to help prune the segment before processing it. For example, one can fetch bloom
