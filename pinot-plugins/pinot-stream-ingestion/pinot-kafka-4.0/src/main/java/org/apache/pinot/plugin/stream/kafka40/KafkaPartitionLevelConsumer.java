@@ -22,27 +22,22 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
-import org.apache.kafka.common.errors.AuthenticationException;
 import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.header.Headers;
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.pinot.plugin.stream.kafka.KafkaMessageBatch;
 import org.apache.pinot.plugin.stream.kafka.KafkaPartitionLevelStreamConfig;
-import org.apache.pinot.plugin.stream.kafka.KafkaSourceErrorEvidence;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamMessageMetadata;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorEvidence;
 import org.apache.pinot.spi.stream.BytesStreamMessage;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
-import org.apache.pinot.spi.stream.TransientConsumerException;
 import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -78,9 +73,6 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
   // construction (the value is final per consumer) and reused on every fetch instead of
   // re-resolving the StreamConfig each time.
   private final boolean _isReadCommitted = isReadCommitted(_config);
-  // Whose AWS identity signs an MSK IAM table's SASL handshake; null for any other table.
-  @Nullable
-  private final IngestionSourceErrorEvidence _mskIamEvidence = KafkaSourceErrorEvidence.mskIam(_consumerProp);
 
   public KafkaPartitionLevelConsumer(String clientId, StreamConfig streamConfig, int partition) {
     super(clientId, streamConfig, partition);
@@ -121,17 +113,7 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
       _nextReadOffset = startOffset;
     }
 
-    ConsumerRecords<Bytes, Bytes> consumerRecords;
-    try {
-      consumerRecords = _consumer.poll(Duration.ofMillis(timeoutMs));
-    } catch (AuthenticationException e) {
-      if (_mskIamEvidence == null) {
-        throw e;
-      }
-      // MSK IAM reports a policy denial as an authentication failure, so record whose identity was refused. Kafka
-      // can throw the same instance on every poll, so the evidence goes on a wrapper of our own.
-      throw IngestionSourceErrorEvidence.attach(new TransientConsumerException(e), _mskIamEvidence);
-    }
+    ConsumerRecords<Bytes, Bytes> consumerRecords = _consumer.poll(Duration.ofMillis(timeoutMs));
     List<ConsumerRecord<Bytes, Bytes>> records = consumerRecords.records(_topicPartition);
     _lastFetchStartOffset = startOffset;
     _lastFetchReturnedRecords = !records.isEmpty();

@@ -23,21 +23,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.apache.commons.lang3.exception.ExceptionUtils;
-import org.apache.kafka.clients.consumer.Consumer;
-import org.apache.kafka.clients.consumer.MockConsumer;
-import org.apache.kafka.clients.consumer.OffsetResetStrategy;
-import org.apache.kafka.common.KafkaException;
-import org.apache.kafka.common.errors.SaslAuthenticationException;
-import org.apache.kafka.common.errors.TopicAuthorizationException;
-import org.apache.kafka.common.utils.Bytes;
-import org.apache.pinot.spi.ingestion.error.IngestionSourceCredentialMode;
-import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorClassification;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorEvidence;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorReporter;
-import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorSubReason;
-import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PermanentConsumerException;
 import org.apache.pinot.spi.stream.StreamConfig;
@@ -48,36 +36,23 @@ import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorAssertions.assertAuth;
 import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorAssertions.assertSourceRead;
 import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorVerdict.TARGET_BROKER;
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
 
 /// Pins that a Kafka plugin hands the classifier what it knows about a failure: the real cause behind a consumer it
 /// gave up recreating, the broker's answer behind a synthesized "topic does not exist" or a topic listing that timed
-/// out, and whose identity signs an MSK IAM table's handshake. Each Kafka module runs it against its own plugin, its
-/// kafka-clients version and a real broker.
+/// out. Each Kafka module runs it against its own plugin, its kafka-clients version and a real broker.
 public abstract class BaseKafkaSourceErrorEvidenceTest {
   private static final String TOPIC = "events";
-  // Fixture values only: an all-zero account and keys that are not keys.
-  private static final String MSK_LOGIN_MODULE = "software.amazon.msk.auth.iam.IAMLoginModule required";
-  private static final String FIXTURE_ROLE_ARN = "arn:aws:iam::000000000000:role/fixture-role";
-  private static final String FIXTURE_ROLE_KEYS =
-      " awsRoleAccessKeyId=\"FIXTUREKEYID\" awsRoleSecretAccessKey=\"fixture-only\"";
 
   /// The module's partition consumer, built through the constructor that creates its Kafka consumer under a retry
   /// policy, as the server does when it recreates a consumer.
   protected abstract PartitionGroupConsumer createConsumer(StreamConfig streamConfig, RetryPolicy retryPolicy);
-
-  /// The module's partition consumer for partition 0, over `kafkaConsumer` instead of a real one.
-  protected abstract PartitionGroupConsumer createConsumer(StreamConfig streamConfig,
-      Consumer<Bytes, Bytes> kafkaConsumer);
 
   protected abstract StreamMetadataProvider createMetadataProvider(StreamConfig streamConfig);
 
@@ -141,68 +116,6 @@ public abstract class BaseKafkaSourceErrorEvidenceTest {
     } finally {
       silentBroker.close();
     }
-  }
-
-  @Test
-  public void mskIamRefusalRecordsWhoseIdentitySigned()
-      throws Exception {
-    Throwable assumedRole = fetchFailure(mskIam(" awsRoleArn=\"" + FIXTURE_ROLE_ARN + "\""), accessDenied());
-    IngestionSourceErrorClassification classification =
-        assertAuth(assumedRole, IngestionSourceErrorSubReason.UNSPECIFIED, TARGET_BROKER);
-    assertEquals(classification.getCredentialMode(), IngestionSourceCredentialMode.AMBIENT);
-    assertTrue(classification.isRoleArnConfigured());
-
-    classification = assertAuth(fetchFailure(mskIam(""), accessDenied()), IngestionSourceErrorSubReason.UNSPECIFIED,
-        TARGET_BROKER);
-    assertEquals(classification.getCredentialMode(), IngestionSourceCredentialMode.AMBIENT);
-    assertFalse(classification.isRoleArnConfigured());
-
-    // Keys configured for the role are the table's credential.
-    Throwable staticKeys =
-        fetchFailure(mskIam(" awsRoleArn=\"" + FIXTURE_ROLE_ARN + "\"" + FIXTURE_ROLE_KEYS), accessDenied());
-    classification = assertAuth(staticKeys, IngestionSourceErrorSubReason.UNSPECIFIED, TARGET_BROKER);
-    assertEquals(classification.getCredentialMode(), IngestionSourceCredentialMode.STATIC);
-    assertTrue(classification.isRoleArnConfigured());
-    // Only the options' presence is recorded.
-    String trace = ExceptionUtils.getStackTrace(staticKeys);
-    assertFalse(trace.contains("fixture-role") || trace.contains("FIXTUREKEYID") || trace.contains("fixture-only"),
-        "JAAS option values reached the failure");
-  }
-
-  @Test
-  public void otherRefusalsAreUntouched()
-      throws Exception {
-    SaslAuthenticationException refusal = new SaslAuthenticationException(
-        "Authentication failed during authentication due to invalid credentials with SASL mechanism PLAIN");
-    StreamConfig plain = streamConfig("localhost:9092", Map.of("security.protocol", "SASL_SSL", "sasl.mechanism",
-        "PLAIN", "sasl.jaas.config", "org.apache.kafka.common.security.plain.PlainLoginModule required "
-            + "username=\"fixture-user\" password=\"fixture-only\";"));
-    Throwable thrown = fetchFailure(plain, refusal);
-    assertSame(thrown, refusal);
-    assertAuth(thrown, IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_BROKER);
-
-    TopicAuthorizationException denied = new TopicAuthorizationException(Set.of(TOPIC));
-    assertSame(fetchFailure(mskIam(""), denied), denied);
-  }
-
-  private Throwable fetchFailure(StreamConfig streamConfig, KafkaException pollFailure)
-      throws Exception {
-    MockConsumer<Bytes, Bytes> kafkaConsumer = new MockConsumer<>(OffsetResetStrategy.EARLIEST);
-    kafkaConsumer.setPollException(pollFailure);
-    try (PartitionGroupConsumer consumer = createConsumer(streamConfig, kafkaConsumer)) {
-      return expectThrows(RuntimeException.class, () -> consumer.fetchMessages(new LongMsgOffset(0), 100));
-    }
-  }
-
-  /// MSK's answer to a signature it rejects, policy denials included.
-  private static SaslAuthenticationException accessDenied() {
-    return new SaslAuthenticationException("[fixture-request-id]: Access denied");
-  }
-
-  private static StreamConfig mskIam(String jaasOptions) {
-    return streamConfig("localhost:9098", Map.of("security.protocol", "SASL_SSL", "sasl.mechanism", "AWS_MSK_IAM",
-        "sasl.jaas.config", MSK_LOGIN_MODULE + jaasOptions + ";", "sasl.client.callback.handler.class",
-        "software.amazon.msk.auth.iam.IAMClientCallbackHandler"));
   }
 
   private static StreamConfig streamConfig(String bootstrapServers, Map<String, String> kafkaConfigs) {
