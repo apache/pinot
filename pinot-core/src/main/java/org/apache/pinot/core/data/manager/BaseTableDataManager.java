@@ -460,10 +460,11 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   @Override
   public IndexLoadingConfig fetchIndexLoadingConfig() {
-    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, _tableNameWithType);
-    Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", _tableNameWithType);
+    // Schema first: a schema-transform migration publishes table transforms before clearing the schema.
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
     Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _tableNameWithType);
+    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, _tableNameWithType);
+    Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", _tableNameWithType);
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig, schema);
     indexLoadingConfig.setTableDataDir(_tableDataDir);
     updateCachedTableConfigAndSchema(tableConfig, schema);

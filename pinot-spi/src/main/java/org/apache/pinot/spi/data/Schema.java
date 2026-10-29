@@ -77,6 +77,12 @@ public final class Schema implements Serializable {
   @Nullable
   private List<String> _tags;
   private boolean _enableColumnBasedNullHandling;
+  // Highest config-migration version applied to this schema by the controller's startup migration
+  // chain (see org.apache.pinot.spi.config.migration). 0 means "written before the migration
+  // framework existed". This is migration bookkeeping, not part of the schema's logical identity, so
+  // it is intentionally excluded from equals()/hashCode(). Older controllers ignore the JSON field
+  // via @JsonIgnoreProperties(ignoreUnknown = true), keeping rollback safe.
+  private int _configMigrationVersion;
   private final List<DimensionFieldSpec> _dimensionFieldSpecs = new ArrayList<>();
   private final List<MetricFieldSpec> _metricFieldSpecs = new ArrayList<>();
   @SuppressWarnings("deprecation")
@@ -206,6 +212,16 @@ public final class Schema implements Serializable {
 
   public void setEnableColumnBasedNullHandling(boolean enableColumnBasedNullHandling) {
     _enableColumnBasedNullHandling = enableColumnBasedNullHandling;
+  }
+
+  /// The highest config-migration version applied to this schema. See
+  /// [org.apache.pinot.spi.config.migration.ConfigMigrationUtils] for how this marker is used.
+  public int getConfigMigrationVersion() {
+    return _configMigrationVersion;
+  }
+
+  public void setConfigMigrationVersion(int configMigrationVersion) {
+    _configMigrationVersion = configMigrationVersion;
   }
 
   @Nullable
@@ -407,6 +423,7 @@ public final class Schema implements Serializable {
     newSchema.setDescription(_description);
     newSchema.setTags(_tags);
     newSchema.setEnableColumnBasedNullHandling(isEnableColumnBasedNullHandling());
+    newSchema.setConfigMigrationVersion(_configMigrationVersion);
     List<String> primaryKeyColumns = getPrimaryKeyColumns();
     if (primaryKeyColumns != null) {
       newSchema.setPrimaryKeyColumns(primaryKeyColumns.stream()
@@ -531,6 +548,11 @@ public final class Schema implements Serializable {
       jsonObject.set("tags", tagsArray);
     }
     jsonObject.set("enableColumnBasedNullHandling", JsonUtils.objectToJsonNode(_enableColumnBasedNullHandling));
+    // Only emit the migration marker once it has advanced past the initial version, so schemas that
+    // predate the migration framework keep serializing to identical JSON.
+    if (_configMigrationVersion != 0) {
+      jsonObject.put("configMigrationVersion", _configMigrationVersion);
+    }
     if (!_dimensionFieldSpecs.isEmpty()) {
       ArrayNode jsonArray = JsonUtils.newArrayNode();
       for (DimensionFieldSpec dimensionFieldSpec : _dimensionFieldSpecs) {

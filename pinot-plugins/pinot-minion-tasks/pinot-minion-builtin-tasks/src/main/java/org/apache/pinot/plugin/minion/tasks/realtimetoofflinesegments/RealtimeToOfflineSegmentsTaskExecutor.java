@@ -120,8 +120,8 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
     String realtimeTableName = configs.get(MinionConstants.TABLE_NAME_KEY);
     String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
-    TableConfig tableConfig = getTableConfig(offlineTableName);
     Schema schema = getSchema(offlineTableName);
+    TableConfig tableConfig = getTableConfig(offlineTableName);
 
     SegmentProcessorConfig.Builder segmentProcessorConfigBuilder =
         new SegmentProcessorConfig.Builder().setTableConfig(tableConfig).setSchema(schema);
