@@ -21,6 +21,7 @@ package org.apache.pinot.core.plan.maker;
 import java.io.File;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -28,6 +29,8 @@ import java.util.concurrent.Executors;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
+import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
+import org.apache.pinot.core.query.executor.ResultsBlockStreamer;
 import org.apache.pinot.core.query.prefetch.DefaultFetchPlanner;
 import org.apache.pinot.core.query.prefetch.FetchPlanner;
 import org.apache.pinot.core.query.prefetch.FetchPlannerRegistry;
@@ -74,6 +77,8 @@ public class InstancePlanMakerPrefetchTest {
   private static final int NUM_DOCS = 100;
   // Every tenth document matches
   private static final String QUERY = "SELECT COUNT(*), SUM(m) FROM testTable WHERE d = 'v3'";
+  // A selection-only query is streamed; the limit keeps every matching row of both segments
+  private static final String STREAMING_QUERY = "SELECT m FROM testTable WHERE d = 'v3' LIMIT 1000";
   private static final long MATCHES_PER_SEGMENT = NUM_DOCS / 10;
   private static final double SUM_PER_SEGMENT = 3 + 13 + 23 + 33 + 43 + 53 + 63 + 73 + 83 + 93;
 
@@ -124,11 +129,27 @@ public class InstancePlanMakerPrefetchTest {
 
     assertResult(execute(plannerSkipping(Set.of(local)), List.of(local, remote), true), 2);
 
-    ArgumentCaptor<FetchContext> fetchContext = ArgumentCaptor.forClass(FetchContext.class);
-    verify(remote).prefetch(fetchContext.capture());
-    verify(remote).acquire(fetchContext.getValue());
-    verify(remote, atLeastOnce()).release(fetchContext.getValue());
-    assertTrue(fetchContext.getValue().getColumnToIndexList().containsKey("d"));
+    verifyFetchLifecycle(remote);
+    verifyNoFetch(local);
+  }
+
+  /// Streaming selection has its own start/stop and per-block fetch lifecycle; only the remote segment gets it.
+  @Test
+  public void testStreamingSelectionRunsFetchLifecycleOnlyForPlannedSegments()
+      throws Exception {
+    IndexSegment local = spy(_segment);
+    IndexSegment remote = spy(_segment);
+
+    List<Long> streamedValues = executeStreaming(plannerSkipping(Set.of(local)), List.of(local, remote));
+
+    // Each segment streams every matching value once
+    List<Long> expectedValues = new ArrayList<>();
+    for (long value = 3; value < NUM_DOCS; value += 10) {
+      expectedValues.add(value);
+      expectedValues.add(value);
+    }
+    assertEquals(streamedValues, expectedValues);
+    verifyFetchLifecycle(remote);
     verifyNoFetch(local);
   }
 
@@ -205,6 +226,32 @@ public class InstancePlanMakerPrefetchTest {
     }
   }
 
+  /// Runs the streaming selection with prefetch enabled, and returns the streamed values of `m` in ascending order.
+  private List<Long> executeStreaming(FetchPlanner fetchPlanner, List<IndexSegment> segments)
+      throws Exception {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(STREAMING_QUERY);
+    queryContext.setEndTimeMs(System.currentTimeMillis() + 60_000);
+    queryContext.setEnablePrefetch(true);
+    List<SegmentContext> segmentContexts = new ArrayList<>(segments.size());
+    for (IndexSegment segment : segments) {
+      segmentContexts.add(new SegmentContext(segment));
+    }
+    List<Long> streamedValues = Collections.synchronizedList(new ArrayList<>());
+    ResultsBlockStreamer streamer = block -> {
+      for (Object[] row : ((SelectionResultsBlock) block).getRows()) {
+        streamedValues.add(((Number) row[0]).longValue());
+      }
+    };
+    try (QueryThreadContext ignored = QueryThreadContext.openForSseTest()) {
+      InstanceResponseBlock responseBlock = planMakerWith(fetchPlanner)
+          .makeStreamingInstancePlan(segmentContexts, queryContext, _executorService, streamer).execute();
+      assertTrue(responseBlock.getExceptions().isEmpty(), "Query failed: " + responseBlock.getExceptions());
+    }
+    List<Long> sortedValues = new ArrayList<>(streamedValues);
+    Collections.sort(sortedValues);
+    return sortedValues;
+  }
+
   /// The plan maker takes the registered planner at construction.
   private static InstancePlanMakerImplV2 planMakerWith(FetchPlanner fetchPlanner) {
     try (MockedStatic<FetchPlannerRegistry> registry = mockStatic(FetchPlannerRegistry.class)) {
@@ -217,6 +264,15 @@ public class InstancePlanMakerPrefetchTest {
     assertEquals(dataTable.getNumberOfRows(), 1);
     assertEquals(dataTable.getLong(0, 0), MATCHES_PER_SEGMENT * numSegments);
     assertEquals(dataTable.getDouble(0, 1), SUM_PER_SEGMENT * numSegments);
+  }
+
+  /// The segment is prefetched, acquired and released with one fetch context planned for the filter column.
+  private static void verifyFetchLifecycle(IndexSegment segment) {
+    ArgumentCaptor<FetchContext> fetchContext = ArgumentCaptor.forClass(FetchContext.class);
+    verify(segment).prefetch(fetchContext.capture());
+    verify(segment).acquire(fetchContext.getValue());
+    verify(segment, atLeastOnce()).release(fetchContext.getValue());
+    assertTrue(fetchContext.getValue().getColumnToIndexList().containsKey("d"));
   }
 
   private static void verifyNoFetch(IndexSegment segment) {
