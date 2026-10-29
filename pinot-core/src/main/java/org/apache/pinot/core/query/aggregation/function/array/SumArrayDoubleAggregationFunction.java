@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.aggregation.function.array;
 
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -176,5 +177,14 @@ public class SumArrayDoubleAggregationFunction
   @Override
   public double[] extractFinalResult(@Nullable DoubleArrayList result) {
     return result != null ? ArrayListUtils.toDoubleArray(result) : null;
+  }
+
+  @Override
+  public double[] mergeFinalResult(double[] finalResult1, double[] finalResult2) {
+    double[] mergedResult = Arrays.copyOf(finalResult1, Math.max(finalResult1.length, finalResult2.length));
+    for (int i = 0; i < finalResult2.length; i++) {
+      mergedResult[i] += finalResult2[i];
+    }
+    return mergedResult;
   }
 }

@@ -26,14 +26,16 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.local.customobject.SerializedHLL;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.utils.BytesUtils;
 
 
 public class DistinctCountRawHLLAggregationFunction
-    extends BaseSingleInputAggregationFunction<HyperLogLog, SerializedHLL> {
+    extends BaseSingleInputAggregationFunction<HyperLogLog, Comparable<?>> {
   private final DistinctCountHLLAggregationFunction _distinctCountHLLAggregationFunction;
 
   public DistinctCountRawHLLAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
@@ -127,5 +129,16 @@ public class DistinctCountRawHLLAggregationFunction
       return null;
     }
     return new SerializedHLL(intermediateResult);
+  }
+
+  /// Merges two final results, which are serialized HLLs in string form, into the string form of the merged HLL.
+  @Override
+  public String mergeFinalResult(Comparable<?> finalResult1, Comparable<?> finalResult2) {
+    HyperLogLog merged = merge(deserializeFinalResult(finalResult1), deserializeFinalResult(finalResult2));
+    return new SerializedHLL(merged).toString();
+  }
+
+  private static HyperLogLog deserializeFinalResult(Comparable<?> finalResult) {
+    return ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes((String) finalResult));
   }
 }
