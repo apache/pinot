@@ -69,7 +69,7 @@ public class IngestionSourceErrorClassifierTest {
     }
   }
 
-  /// Our own failure under a source exception, e.g. a credential that failed to load.
+  /// A failure that is not a failure to access the source, e.g. Pinot's own cancellation.
   private static class OurFailureException extends IOException {
     OurFailureException() {
       super("ours");
@@ -207,7 +207,7 @@ public class IngestionSourceErrorClassifierTest {
       register(TEST_RULES);
       assertEquals(categoryOf(new RuntimeException(new FileNotFoundException("s3://bucket/input"))),
           Optional.of(IngestionSourceErrorCategory.SOURCE_READ));
-      // A source exception above it decides the chain, even our own failure that says it isn't the source's verdict
+      // A source exception above it decides the chain, even a failure that says it isn't a failure to access it
       assertEquals(categoryOf(new RefusedException(new FileNotFoundException("s3://bucket/input"))),
           Optional.of(IngestionSourceErrorCategory.AUTH));
       assertEquals(categoryOf(new OurFailureException().initCause(new FileNotFoundException("s3://bucket/input"))),
@@ -486,11 +486,10 @@ public class IngestionSourceErrorClassifierTest {
         new IngestionSourceErrorEvidence().setEvidence(0, IngestionSourceErrorEvidence.LOCAL_PRECHECK));
     assertEquals(categoryOf(badKey), Optional.of(IngestionSourceErrorCategory.AUTH));
 
-    // A code the engine doesn't define is left to registered rules: Pinot's own setup failing beneath a network error
-    // reads as the network error.
-    Throwable ownSetup = IngestionSourceErrorEvidence.attach(new IOException("trust store unreadable"),
-        new IngestionSourceErrorEvidence().setEvidence(0, "local_setup"));
-    assertEquals(categoryOf(new ConnectException().initCause(ownSetup)),
+    // A code the engine doesn't define decides nothing in the engine: a registered rule, or what lies beneath, does.
+    Throwable unknownCode = IngestionSourceErrorEvidence.attach(new IOException("trust store unreadable"),
+        new IngestionSourceErrorEvidence().setEvidence(0, "some_plugin_code"));
+    assertEquals(categoryOf(new ConnectException().initCause(unknownCode)),
         Optional.of(IngestionSourceErrorCategory.SOURCE_READ));
 
     // A target alone decides nothing.

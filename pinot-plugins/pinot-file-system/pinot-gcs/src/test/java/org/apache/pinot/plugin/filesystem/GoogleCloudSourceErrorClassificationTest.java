@@ -139,7 +139,7 @@ public class GoogleCloudSourceErrorClassificationTest {
   public void rejectedTokenIsAuth()
       throws Exception {
     assertAuth(tokenRefreshFailure(KEY_REVOKED), IngestionSourceErrorSubReason.AUTHENTICATION, null);
-    // Our clock skew is refused the same way.
+    // Our clock skew is refused the same way: no body decides against AUTH.
     assertAuth(tokenRefreshFailure(CLOCK_SKEW), IngestionSourceErrorSubReason.AUTHENTICATION, null);
   }
 

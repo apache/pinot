@@ -80,11 +80,7 @@ public class KafkaSourceErrorClassificationTest {
         IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_BROKER);
     assertAuth(new IllegalSaslStateException("Unexpected handshake request"),
         IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_BROKER);
-  }
-
-  @Test
-  public void cloudIdentityDenialFollowsKafkasClass() {
-    // MSK IAM reports a policy denial as a SASL authentication failure, whichever identity signed the request.
+    // MSK IAM reports a policy denial the same way, whichever identity signed the request.
     assertAuth(underPinot(new SaslAuthenticationException("[uuid]: Access denied")),
         IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_BROKER);
   }
@@ -152,7 +148,7 @@ public class KafkaSourceErrorClassificationTest {
         new ConfigException("Invalid value FOO for configuration security.protocol")), null);
     // In 4.x the authentication classes extend this one: it must never decide on its own.
     assertNotClassified(new InvalidConfigurationException("Invalid configuration"));
-    // A keystore Pinot can't read, from the real client: no rule recognises it.
+    // A keystore Pinot can't read, from the real client: no rule recognises it yet (a listed gap).
     Properties props = consumerProperties();
     props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
     props.put("security.protocol", "SSL");

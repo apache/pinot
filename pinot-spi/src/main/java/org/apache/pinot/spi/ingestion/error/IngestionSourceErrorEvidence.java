@@ -40,8 +40,8 @@ public final class IngestionSourceErrorEvidence extends RuntimeException {
   /// The code for a source that never answered (DNS, connect, TLS, timeout), for a client that drops the cause that
   /// would show it.
   public static final String UNREACHABLE = "unreachable";
-  /// The code for a table credential a client's own check rejected before any request: it can't be parsed, or has
-  /// expired.
+  /// The code for a credential the client couldn't load, or that its own check rejected, before any request: none was
+  /// found, it can't be parsed, or it has expired.
   public static final String LOCAL_PRECHECK = "local_precheck";
   /// The code a Kafka client records when it synthesizes "topic does not exist" from a metadata answer that lacks the
   /// topic: Kafka's own `UNKNOWN_TOPIC_OR_PARTITION` error, which the synthesized exception doesn't carry.
@@ -58,7 +58,6 @@ public final class IngestionSourceErrorEvidence extends RuntimeException {
   private String _code;
   @Nullable
   private String _resource;
-  private boolean _customerConfigured = true;
   private boolean _boundary;
 
   public IngestionSourceErrorEvidence() {
@@ -144,18 +143,6 @@ public final class IngestionSourceErrorEvidence extends RuntimeException {
     return this;
   }
 
-  /// Whether the client talks to a source the table configured, rather than one Pinot itself was configured with
-  /// (a batch reader can fall back to Pinot's deep store). Stream clients always talk to the table's source. The
-  /// built-in rules don't read it; registered rules can.
-  public boolean isCustomerConfigured() {
-    return _customerConfigured;
-  }
-
-  public IngestionSourceErrorEvidence setCustomerConfigured(boolean customerConfigured) {
-    _customerConfigured = customerConfigured;
-    return this;
-  }
-
   /// Whether the failure this evidence is attached to marks a call into the source; see [#setBoundary].
   public boolean isBoundary() {
     return _boundary;
@@ -174,7 +161,7 @@ public final class IngestionSourceErrorEvidence extends RuntimeException {
   /// A copy to attach to one failure: a stack trace prints a throwable it meets twice as a circular reference.
   private IngestionSourceErrorEvidence copy() {
     IngestionSourceErrorEvidence copy = new IngestionSourceErrorEvidence().setTarget(_target)
-        .setEvidence(_status, _code).setCustomerConfigured(_customerConfigured).setBoundary(_boundary);
+        .setEvidence(_status, _code).setBoundary(_boundary);
     copy._resource = _resource;
     return copy;
   }
@@ -209,9 +196,6 @@ public final class IngestionSourceErrorEvidence extends RuntimeException {
     }
     if (_resource != null) {
       sb.append(" resource=").append(_resource);
-    }
-    if (!_customerConfigured) {
-      sb.append(" notCustomerConfigured");
     }
     if (_boundary) {
       sb.append(" boundary");

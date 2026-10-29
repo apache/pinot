@@ -124,7 +124,6 @@ public class KinesisSourceErrorClassificationTest {
 
   @Test
   public void credentialCodesAreAuthWhoeverOwnsTheCredential() {
-    // The table's keys, the process's own identity, or session credentials the SDK minted for an assumed role.
     assertAuth(underPinot(kinesis("UnrecognizedClientException",
         "The security token included in the request is invalid.")), IngestionSourceErrorSubReason.AUTHENTICATION, null);
     assertAuth(kinesis("InvalidSignatureException",
@@ -132,7 +131,7 @@ public class KinesisSourceErrorClassificationTest {
         IngestionSourceErrorSubReason.AUTHENTICATION, null);
     assertAuth(kinesis("ExpiredTokenException", "The security token has expired."),
         IngestionSourceErrorSubReason.AUTHENTICATION, null);
-    // Our clock, under a signature code or its own.
+    // Our clock, under a signature code or its own: no message decides against AUTH.
     assertAuth(kinesis("InvalidSignatureException",
             "Signature expired: 20260101T000000Z is now earlier than 20260101T000500Z"),
         IngestionSourceErrorSubReason.AUTHENTICATION, null);
