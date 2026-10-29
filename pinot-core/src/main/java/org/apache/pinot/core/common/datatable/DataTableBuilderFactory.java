@@ -31,10 +31,14 @@ public class DataTableBuilderFactory {
 
   public static final int DEFAULT_VERSION = DataTableFactory.VERSION_4;
 
+  /// @deprecated The DataTable version is fixed; use [#DEFAULT_VERSION] instead.
+  @Deprecated(since = "1.7.0", forRemoval = true)
   public static int getDataTableVersion() {
     return DEFAULT_VERSION;
   }
 
+  /// @deprecated Only [#DEFAULT_VERSION] is supported; omit version selection.
+  @Deprecated(since = "1.7.0", forRemoval = true)
   public static void setDataTableVersion(int version) {
     Preconditions.checkArgument(version == DEFAULT_VERSION, "Unsupported version: " + version);
   }

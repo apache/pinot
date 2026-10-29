@@ -1989,6 +1989,8 @@ public class CommonConstants {
     public static final String CONFIG_OF_PEER_DOWNLOAD_ENABLED = "pinot.server.peer.download.enabled";
     public static final boolean DEFAULT_PEER_DOWNLOAD_ENABLED = false;
 
+    /// @deprecated Omit this setting; only DataTable version 4 is supported.
+    @Deprecated(since = "1.7.0", forRemoval = true)
     public static final String CONFIG_OF_CURRENT_DATA_TABLE_VERSION = "pinot.server.instance.currentDataTableVersion";
 
     // Environment Provider Configs
