@@ -90,7 +90,8 @@ public final class IngestionSourceErrorClassification {
   @Override
   public String toString() {
     IngestionSourceCredentialMode credentialMode = getCredentialMode();
-    return _verdict + " exception=" + getExceptionClass() + (credentialMode != null ? " credentialMode="
-        + credentialMode : "") + (isRoleArnConfigured() ? " roleArnConfigured" : "");
+    return _verdict + " exception=" + getExceptionClass()
+        + (credentialMode != null ? " credentialMode=" + credentialMode : "")
+        + (isRoleArnConfigured() ? " roleArnConfigured" : "");
   }
 }

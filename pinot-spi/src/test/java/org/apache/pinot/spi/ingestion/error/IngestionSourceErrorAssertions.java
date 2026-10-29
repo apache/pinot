@@ -40,16 +40,18 @@ public final class IngestionSourceErrorAssertions {
   public static IngestionSourceErrorClassification assertAuth(Throwable failure,
       IngestionSourceErrorSubReason subReason, @Nullable String target) {
     IngestionSourceErrorClassification classification = classify(failure);
-    assertEquals(classification.getCategory(), IngestionSourceErrorCategory.AUTH, describe(failure));
-    assertEquals(classification.getSubReason(), subReason, describe(failure));
-    assertEquals(classification.getTarget(), target, describe(failure));
+    String description = describe(failure);
+    assertEquals(classification.getCategory(), IngestionSourceErrorCategory.AUTH, description);
+    assertEquals(classification.getSubReason(), subReason, description);
+    assertEquals(classification.getTarget(), target, description);
     return classification;
   }
 
   public static IngestionSourceErrorClassification assertSourceRead(Throwable failure, @Nullable String target) {
     IngestionSourceErrorClassification classification = classify(failure);
-    assertEquals(classification.getCategory(), IngestionSourceErrorCategory.SOURCE_READ, describe(failure));
-    assertEquals(classification.getTarget(), target, describe(failure));
+    String description = describe(failure);
+    assertEquals(classification.getCategory(), IngestionSourceErrorCategory.SOURCE_READ, description);
+    assertEquals(classification.getTarget(), target, description);
     return classification;
   }
 

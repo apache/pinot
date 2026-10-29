@@ -480,6 +480,9 @@ public class IngestionSourceErrorClassifierTest {
     assertTrue(code.length() <= 64, code);
     assertFalse(code.contains("\n"), code);
     assertEquals(new IngestionSourceErrorEvidence().setResource("broker-1:9092 SASL_SSL").getResource(), "unknown");
+    // One replacement for each character, a supplementary one or a lone surrogate included, and 64 at most.
+    assertEquals(IngestionSourceErrorVerdict.token("a😀b\uD83D c"), "a_b__c");
+    assertEquals(IngestionSourceErrorVerdict.token("😀".repeat(100_000)), "_".repeat(64));
 
     Throwable failure = IngestionSourceErrorEvidence.attach(new RuntimeException(), evidence);
     String printed = IngestionSourceErrorEvidence.of(failure).getMessage();
