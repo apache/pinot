@@ -37,6 +37,9 @@ import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.plannode.ProjectNode;
+import org.apache.pinot.query.planner.plannode.TableScanNode;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.operator.join.JoinedRowView;
@@ -86,7 +89,7 @@ public class LookupJoinOperator extends MultiStageOperator {
   private final LeafOperator _rightInput;
   private final JoinRelType _joinType;
   private final DimensionTableDataManager _rightTable;
-  private final String[] _rightColumns;
+  private final String[] _dimensionColumns;
   private final DataSchema _resultSchema;
   private final int _resultColumnSize;
   private final List<TransformOperand> _nonEquiEvaluators;
@@ -119,7 +122,7 @@ public class LookupJoinOperator extends MultiStageOperator {
     String rightTableName = queryContext.getTableName();
     _rightTable = DimensionTableDataManager.getInstanceByTableName(rightTableName);
     Preconditions.checkState(_rightTable != null, "Failed to find dimension table for name: %s", rightTableName);
-    _rightColumns = _rightInput.getDataSchema().getColumnNames();
+    _dimensionColumns = resolveDimensionColumns(node.getInputs().get(1), rightTableName);
     _resultSchema = node.getDataSchema();
     _resultColumnSize = _resultSchema.size();
     List<RexExpression> nonEquiConditions = node.getNonEquiConditions();
@@ -137,11 +140,41 @@ public class LookupJoinOperator extends MultiStageOperator {
 
     KeyPlan keyPlan =
         compileKeyPlan(node, rightTableName, _rightTable.getPrimaryKeyColumns(), _rightInput.getDataSchema(),
-            _leftColumnSize);
+            _dimensionColumns, _leftColumnSize);
     _keySize = keyPlan._sources.length;
     _keySources = keyPlan._sources;
     _keyConstants = keyPlan._constants;
     _neverMatches = keyPlan._neverMatches;
+  }
+
+  /// Returns the dimension table column that each column of the right input reads.
+  ///
+  /// The planner restricts the right input of a lookup join to `[Project ->] TableScan`, and the Project holds input
+  /// references only. The output names of that Project are not table columns when the query renames a column
+  /// (`SELECT id AS k`) or projects one twice (the planner then makes the second name unique). The dimension table is
+  /// read by column name, so this method follows each Project column to the TableScan column that it references. Using
+  /// the output names instead fails when a renamed column is a key column, and returns nulls or the values of another
+  /// column otherwise.
+  @VisibleForTesting
+  static String[] resolveDimensionColumns(PlanNode rightInput, String tableName) {
+    if (rightInput instanceof TableScanNode) {
+      return ((TableScanNode) rightInput).getColumns().toArray(new String[0]);
+    }
+    Preconditions.checkState(rightInput instanceof ProjectNode && rightInput.getInputs().size() == 1
+            && rightInput.getInputs().get(0) instanceof TableScanNode,
+        "Right input of lookup join on dimension table: %s must be a Project over a TableScan, got: %s", tableName,
+        rightInput.explain());
+    List<String> scanColumns = ((TableScanNode) rightInput.getInputs().get(0)).getColumns();
+    List<RexExpression> projects = ((ProjectNode) rightInput).getProjects();
+    String[] columns = new String[projects.size()];
+    for (int i = 0; i < columns.length; i++) {
+      RexExpression project = projects.get(i);
+      Preconditions.checkState(project instanceof RexExpression.InputRef,
+          "Right input of lookup join on dimension table: %s must project columns only, got: %s at position: %s",
+          tableName, project.getClass().getSimpleName(), i);
+      columns[i] = scanColumns.get(((RexExpression.InputRef) project).getIndex());
+    }
+    return columns;
   }
 
   /// Works out where each value of the lookup key comes from.
@@ -159,12 +192,17 @@ public class LookupJoinOperator extends MultiStageOperator {
   /// The method rejects a join condition that cannot produce exactly one value per primary key column. Every rejected
   /// case returned no rows or wrong rows before this validation existed, so an error is the better outcome. This is
   /// also the contract that the single-stage `lookup` transform function enforces.
+  ///
+  /// `dimensionColumns` holds the dimension table column behind each column of `rightSchema`, as returned by
+  /// [#resolveDimensionColumns]. The names in `rightSchema` itself can be aliases.
   @VisibleForTesting
   static KeyPlan compileKeyPlan(JoinNode node, String tableName, @Nullable List<String> primaryKeyColumns,
-      DataSchema rightSchema, int leftColumnSize) {
+      DataSchema rightSchema, String[] dimensionColumns, int leftColumnSize) {
     Preconditions.checkState(CollectionUtils.isNotEmpty(primaryKeyColumns),
         "Failed to find primary key columns for dimension table: %s", tableName);
-    String[] rightColumns = rightSchema.getColumnNames();
+    Preconditions.checkState(dimensionColumns.length == rightSchema.size(),
+        "Lookup join on dimension table: %s resolved %s dimension columns for a right input of %s columns", tableName,
+        dimensionColumns.length, rightSchema.size());
     int keySize = primaryKeyColumns.size();
     int[] sources = new int[keySize];
     Arrays.fill(sources, KEY_SOURCE_UNBOUND);
@@ -175,7 +213,7 @@ public class LookupJoinOperator extends MultiStageOperator {
     List<Integer> rightKeys = node.getRightKeys();
     int numEquiKeys = leftKeys.size();
     for (int i = 0; i < numEquiKeys; i++) {
-      String rightColumn = rightColumns[rightKeys.get(i)];
+      String rightColumn = dimensionColumns[rightKeys.get(i)];
       int keyPosition = primaryKeyColumns.indexOf(rightColumn);
       Preconditions.checkState(keyPosition >= 0,
           "Lookup join on dimension table: %s has a join key on column: %s, which is not a primary key column. "
@@ -189,11 +227,11 @@ public class LookupJoinOperator extends MultiStageOperator {
     // Pass 2: bind the remaining key positions from constant equality conditions.
     boolean neverMatches = false;
     for (RexExpression nonEquiCondition : node.getNonEquiConditions()) {
-      int rightColumnId = getConstantEqualityColumnId(nonEquiCondition, leftColumnSize, rightColumns.length);
+      int rightColumnId = getConstantEqualityColumnId(nonEquiCondition, leftColumnSize, dimensionColumns.length);
       if (rightColumnId < 0) {
         continue;
       }
-      int keyPosition = primaryKeyColumns.indexOf(rightColumns[rightColumnId]);
+      int keyPosition = primaryKeyColumns.indexOf(dimensionColumns[rightColumnId]);
       if (keyPosition < 0 || sources[keyPosition] != KEY_SOURCE_UNBOUND) {
         continue;
       }
@@ -202,7 +240,7 @@ public class LookupJoinOperator extends MultiStageOperator {
       Object value = literal.getValue();
       if (value != null) {
         checkConstantType(literal, rightSchema.getColumnDataType(rightColumnId), tableName,
-            rightColumns[rightColumnId]);
+            dimensionColumns[rightColumnId]);
       }
       constants[keyPosition] = value;
       neverMatches |= value == null;
@@ -367,7 +405,7 @@ public class LookupJoinOperator extends MultiStageOperator {
     ArrayList<Object[]> rows = new ArrayList<>(container.size());
 
     for (Object[] leftRow : container) {
-      Object[] rightRow = _neverMatches ? null : _rightTable.lookupValues(getKey(leftRow), _rightColumns);
+      Object[] rightRow = _neverMatches ? null : _rightTable.lookupValues(getKey(leftRow), _dimensionColumns);
       if (rightRow != null) {
         List<Object> resultRow = JoinedRowView.of(leftRow, rightRow, _resultColumnSize, _leftColumnSize);
         if (_nonEquiEvaluators.isEmpty() || _nonEquiEvaluators.stream()
