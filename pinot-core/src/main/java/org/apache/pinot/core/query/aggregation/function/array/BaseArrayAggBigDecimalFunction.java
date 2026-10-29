@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.aggregation.function.array;
 
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectCollection;
 import java.math.BigDecimal;
 import java.util.Map;
@@ -33,7 +32,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public abstract class BaseArrayAggBigDecimalFunction<I extends ObjectCollection<BigDecimal>>
-    extends BaseArrayAggFunction<I, ObjectArrayList<BigDecimal>> {
+    extends BaseArrayAggFunction<I, BigDecimal[]> {
   public BaseArrayAggBigDecimalFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression, DataType.BIG_DECIMAL, nullHandlingEnabled);
   }
@@ -141,13 +140,10 @@ public abstract class BaseArrayAggBigDecimalFunction<I extends ObjectCollection<
   }
 
   @Override
-  public ObjectArrayList<BigDecimal> extractFinalResult(I bigDecimals) {
+  public BigDecimal[] extractFinalResult(I bigDecimals) {
     if (bigDecimals == null) {
-      return new ObjectArrayList<>();
+      return new BigDecimal[0];
     }
-    if (bigDecimals instanceof ObjectArrayList) {
-      return (ObjectArrayList<BigDecimal>) bigDecimals;
-    }
-    return new ObjectArrayList<>(bigDecimals);
+    return bigDecimals.toArray(new BigDecimal[0]);
   }
 }

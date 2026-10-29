@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.aggregation.function.funnel;
 
-import it.unimi.dsi.fastutil.longs.LongArrayList;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -176,7 +175,7 @@ public class FunnelNullHandlingTest {
 
   /// `funnelCount(steps(step0, step1), correlateby(userId))`, built through the same factory
   /// AggregationFunctionFactory uses.
-  private static AggregationFunction<?, LongArrayList> funnelCount(boolean nullHandlingEnabled) {
+  private static AggregationFunction<?, long[]> funnelCount(boolean nullHandlingEnabled) {
     List<ExpressionContext> arguments = List.of(
         ExpressionContext.forFunction(
             new FunctionContext(FunctionContext.Type.TRANSFORM, "steps", List.of(STEP_0, STEP_1))),
@@ -213,21 +212,20 @@ public class FunnelNullHandlingTest {
     int[] step0 = {1, 1};
     int[] step1 = {0, 0};
 
-    AggregationFunction<?, LongArrayList> enabled = funnelCount(true);
+    AggregationFunction<?, long[]> enabled = funnelCount(true);
     AggregationResultHolder holder = enabled.createAggregationResultHolder();
     enabled.aggregate(2, holder, funnelCountBlock(RoaringBitmap.bitmapOf(1), userDictIds, step0, step1));
-    assertEquals(extractCounts(enabled, holder), List.of(1L, 0L));
+    assertEquals(extractCounts(enabled, holder), new long[]{1L, 0L});
 
-    AggregationFunction<?, LongArrayList> disabled = funnelCount(false);
+    AggregationFunction<?, long[]> disabled = funnelCount(false);
     AggregationResultHolder disabledHolder = disabled.createAggregationResultHolder();
     disabled.aggregate(2, disabledHolder, funnelCountBlock(RoaringBitmap.bitmapOf(1), userDictIds, step0, step1));
-    assertEquals(extractCounts(disabled, disabledHolder), List.of(2L, 0L));
+    assertEquals(extractCounts(disabled, disabledHolder), new long[]{2L, 0L});
   }
 
   @SuppressWarnings("unchecked")
-  private static List<Long> extractCounts(AggregationFunction<?, LongArrayList> function,
-      AggregationResultHolder holder) {
-    AggregationFunction<Object, LongArrayList> typed = (AggregationFunction<Object, LongArrayList>) function;
+  private static long[] extractCounts(AggregationFunction<?, long[]> function, AggregationResultHolder holder) {
+    AggregationFunction<Object, long[]> typed = (AggregationFunction<Object, long[]>) function;
     return typed.extractFinalResult(typed.extractAggregationResult(holder));
   }
 }
