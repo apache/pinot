@@ -75,8 +75,8 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
       LOGGER.info("Starting task: {} with configs: {}", taskType, Obfuscator.DEFAULT.toJsonString(configs));
     }
 
-    TableConfig tableConfig = getTableConfig(tableNameWithType);
     Schema schema = getSchema(tableNameWithType);
+    TableConfig tableConfig = getTableConfig(tableNameWithType);
 
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
@@ -146,8 +146,8 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
     ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, false);
     try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
       recordReader.init(segment);
-      SegmentGeneratorConfig config = getSegmentGeneratorConfig(workingDir, tableConfig, segmentMetadata, segmentName,
-          getSchema(tableNameWithType));
+      SegmentGeneratorConfig config =
+          getSegmentGeneratorConfig(workingDir, tableConfig, segmentMetadata, segmentName, schema);
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
       driver.init(config, recordReader);
       driver.build();

@@ -495,10 +495,24 @@ public class ZKMetadataProvider {
   @Nullable
   public static ImmutablePair<TableConfig, Integer> getTableConfigWithVersion(
       ZkHelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType) {
+    return getTableConfigWithVersion(propertyStore, tableNameWithType, true, true);
+  }
+
+  /// @param replaceVariables Whether to replace environment variables and system properties with their actual values
+  /// @param applyDecorator Whether to apply the registered [TableConfigDecoratorRegistry] decorator
+  /// @return a pair of table config and current version from znRecord, null if table config does not exist.
+  ///
+  /// Pass {@code replaceVariables=false, applyDecorator=false} to read the config exactly as stored — needed when the
+  /// config will be transformed and written back (e.g. config migration), so that resolved env vars / decorations are
+  /// not accidentally persisted.
+  @Nullable
+  public static ImmutablePair<TableConfig, Integer> getTableConfigWithVersion(
+      ZkHelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType, boolean replaceVariables,
+      boolean applyDecorator) {
     Stat tableConfigStat = new Stat();
     TableConfig tableConfig = toTableConfig(
         propertyStore.get(constructPropertyStorePathForResourceConfig(tableNameWithType), tableConfigStat,
-            AccessOption.PERSISTENT));
+            AccessOption.PERSISTENT), replaceVariables, applyDecorator);
     if (tableConfig == null) {
       return null;
     }
@@ -587,7 +601,7 @@ public class ZKMetadataProvider {
       TableConfig tableConfig = TableConfigSerDeUtils.fromZNRecord(znRecord);
       TableConfig processedTableConfig = replaceVariables
           ? ConfigUtils.applyConfigWithEnvVariablesAndSystemProperties(tableConfig) : tableConfig;
-      return applyDecorator ? TableConfigDecoratorRegistry.applyDecorator(processedTableConfig) : tableConfig;
+      return applyDecorator ? TableConfigDecoratorRegistry.applyDecorator(processedTableConfig) : processedTableConfig;
     } catch (Exception e) {
       LOGGER.error("Caught exception while creating table config from ZNRecord: {}", znRecord.getId(), e);
       return null;
@@ -597,6 +611,33 @@ public class ZKMetadataProvider {
   public static void setSchema(ZkHelixPropertyStore<ZNRecord> propertyStore, Schema schema) {
     propertyStore.set(constructPropertyStorePathForSchema(schema.getSchemaName()), SchemaSerDeUtils.toZNRecord(schema),
         AccessOption.PERSISTENT);
+  }
+
+  /// Updates an existing schema only if its stored version still matches. A nonnegative version prevents recreating
+  /// a schema deleted after the migration read.
+  public static boolean setSchema(ZkHelixPropertyStore<ZNRecord> propertyStore, Schema schema, int expectedVersion) {
+    Preconditions.checkArgument(expectedVersion >= 0, "Expected schema version must be nonnegative");
+    try {
+      return propertyStore.set(constructPropertyStorePathForSchema(schema.getSchemaName()),
+          SchemaSerDeUtils.toZNRecord(schema), expectedVersion, AccessOption.PERSISTENT);
+    } catch (ZkBadVersionException e) {
+      return false;
+    }
+  }
+
+  /// Reads the stored schema together with its ZK version, without changing its representation.
+  @Nullable
+  public static ImmutablePair<Schema, Integer> getSchemaWithVersion(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      String schemaName) {
+    try {
+      Stat stat = new Stat();
+      ZNRecord record =
+          propertyStore.get(constructPropertyStorePathForSchema(schemaName), stat, AccessOption.PERSISTENT);
+      return record != null ? ImmutablePair.of(SchemaSerDeUtils.fromZNRecord(record), stat.getVersion()) : null;
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while getting schema: {}", schemaName, e);
+      return null;
+    }
   }
 
   @Nullable
