@@ -46,6 +46,12 @@ import org.apache.pinot.segment.spi.index.reader.TextScoreStats;
 /// `AggregationPlanNode`); the filter does not restrict them, only segment pruning does. The function must be the
 /// only aggregation of its query and does not support GROUP BY.
 ///
+/// Because no filter is applied, filters Pinot adds on its own are not applied either: on a hybrid table the
+/// time-boundary split is ignored, so documents present on both the offline and realtime side count twice, and on an
+/// upsert table replaced rows still count toward document count, document frequency and average length. Like
+/// Elasticsearch's index statistics, which also include deleted documents until merged, the statistics are an
+/// approximation of the live corpus; they only rescale scores, so rankings are affected only slightly.
+///
 /// Intermediate and final results are the JSON string; [#merge] sums the counters.
 public class TextScoreStatsAggregationFunction extends BaseSingleInputAggregationFunction<String, String> {
   private static final String EMPTY_STATS = new TextScoreStats().toJson();

@@ -100,7 +100,9 @@ public class AggregationPlanNode implements PlanNode {
 
   /// `TEXT_SCORE_STATS` reads corpus statistics straight from the text index, without scanning documents. The
   /// statistics describe the whole segment (the filter is not applied, like Elasticsearch's DFS phase), so the query is
-  /// answered by the non-scan operator. Returns `null` when the query has no `TEXT_SCORE_STATS`.
+  /// answered by the non-scan operator. That includes filters Pinot adds itself, such as the hybrid-table time
+  /// boundary and upsert valid-doc filtering (see `TextScoreStatsAggregationFunction`). Returns `null` when the query
+  /// has no `TEXT_SCORE_STATS`.
   ///
   /// @throws IllegalArgumentException if `TEXT_SCORE_STATS` is mixed with other aggregation functions
   @Nullable
