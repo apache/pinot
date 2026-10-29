@@ -42,22 +42,31 @@ public final class VectorDistanceUtils {
 
   public static float computeDistance(float[] left, float[] right,
       VectorIndexConfig.VectorDistanceFunction distanceFunction) {
-    float distance;
+    return (float) computeDoubleDistance(left, right, distanceFunction);
+  }
+
+  /// Returns the exact distance between the vectors under the given distance function, in double precision: cosine
+  /// distance for COSINE, Euclidean distance for EUCLIDEAN/L2 and the negated dot product for
+  /// INNER_PRODUCT/DOT_PRODUCT.
+  /// An undefined distance (NaN) is returned as positive infinity, so it sorts last.
+  public static double computeDoubleDistance(float[] left, float[] right,
+      VectorIndexConfig.VectorDistanceFunction distanceFunction) {
+    double distance;
     switch (distanceFunction) {
       case EUCLIDEAN:
       case L2:
-        distance = (float) VectorFunctions.euclideanDistance(left, right);
+        distance = VectorFunctions.euclideanDistance(left, right);
         break;
       case COSINE:
-        distance = (float) VectorFunctions.cosineDistance(left, right, 1.0d);
+        distance = VectorFunctions.cosineDistance(left, right, 1.0d);
         break;
       case INNER_PRODUCT:
       case DOT_PRODUCT:
-        distance = (float) -VectorFunctions.dotProduct(left, right);
+        distance = -VectorFunctions.dotProduct(left, right);
         break;
       default:
         throw new IllegalArgumentException("Unsupported vector distance function: " + distanceFunction);
     }
-    return Float.isNaN(distance) ? Float.POSITIVE_INFINITY : distance;
+    return Double.isNaN(distance) ? Double.POSITIVE_INFINITY : distance;
   }
 }

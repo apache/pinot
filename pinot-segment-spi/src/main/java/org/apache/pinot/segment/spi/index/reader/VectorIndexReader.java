@@ -33,12 +33,17 @@ public interface VectorIndexReader extends IndexReader {
   /// @return bitmap of top k closest vectors
   ImmutableRoaringBitmap getDocIds(float[] vector, int topK);
 
-  /// Returns the distance of each of the top k closest vectors from the given vector, computed by the index, keyed by
-  /// doc id. Distances use the column's configured distance function and match the corresponding distance function
-  /// (e.g. `cosineDistance`). Returns `null` when the index cannot provide distances.
+  /// Searches like [#getDocIds(float[], int)] and returns the same top k documents, keyed by doc id, with the distance
+  /// the index computed for each. The search keeps no state: every call searches the index again.
   ///
-  /// The returned map may also hold documents beyond the top k (e.g. from an earlier filtered search with the same
-  /// vector); callers must compute the distance of a document missing from the map themselves.
+  /// Distances follow the column's configured vector distance function, in the units Pinot uses for exact rerank and
+  /// distance thresholds:
+  /// - `COSINE`: `1 - cosine similarity`
+  /// - `EUCLIDEAN` / `L2`: Euclidean distance
+  /// - `INNER_PRODUCT` / `DOT_PRODUCT`: the negated dot product
+  ///
+  /// Returns `null` when the index cannot return distances in those units for this column; callers then compute the
+  /// distances from the forward index.
   @Nullable
   default Int2FloatMap getDocDistances(float[] vector, int topK) {
     return null;

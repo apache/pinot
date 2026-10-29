@@ -18,11 +18,14 @@
  */
 package org.apache.pinot.core.operator.filter;
 
+import it.unimi.dsi.fastutil.ints.Int2FloatMap;
+import it.unimi.dsi.fastutil.ints.Int2FloatOpenHashMap;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.predicate.VectorSimilarityPredicate;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.reader.EfSearchAware;
+import org.apache.pinot.segment.spi.index.reader.FilterAwareVectorIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.index.reader.NprobeAware;
@@ -34,6 +37,8 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -628,5 +633,94 @@ public class VectorSimilarityFilterOperatorTest {
       VectorIndexConfig.VectorDistanceFunction distanceFunction) {
     return new VectorIndexConfig(false, backendType, 2, 1, distanceFunction,
         Map.of("nlist", "4", "pqM", "2", "pqNbits", "8", "trainSampleSize", "16"));
+  }
+
+  /// When VECTOR_DISTANCE requested the distances of this search, the operator asks the index for them, matches the
+  /// documents they cover and hands them over through the query's [VectorSearchDistances].
+  @Test
+  public void testHandsOverDistancesWhenRequested() {
+    float[] queryVector = {1.0f, 2.0f, 3.0f};
+    VectorIndexReader reader = mock(VectorIndexReader.class);
+    Int2FloatMap distances = distances(1, 3, 5);
+    when(reader.getDocDistances(queryVector, 3)).thenReturn(distances);
+    VectorSearchDistances searchDistances = new VectorSearchDistances();
+    VectorSearchDistances.Request request = searchDistances.request(reader, queryVector.clone());
+
+    VectorSimilarityFilterOperator operator = newOperator(reader, queryVector, null);
+    operator.setSearchDistances(searchDistances);
+
+    Assert.assertEquals(operator.getBitmaps().reduce().toArray(), new int[]{1, 3, 5});
+    Assert.assertSame(request.getDistances(), distances);
+    verify(reader, never()).getDocIds(any(float[].class), anyInt());
+  }
+
+  /// Without a request, a search collects only doc ids, so queries that do not project VECTOR_DISTANCE pay nothing.
+  @Test
+  public void testDoesNotAskForDistancesWithoutRequest() {
+    float[] queryVector = {1.0f, 2.0f, 3.0f};
+    VectorIndexReader reader = mock(VectorIndexReader.class);
+    when(reader.getDocIds(queryVector, 3)).thenReturn(MutableRoaringBitmap.bitmapOf(1, 3, 5));
+    VectorSearchDistances searchDistances = new VectorSearchDistances();
+    searchDistances.request(reader, new float[]{9.0f, 9.0f, 9.0f});
+
+    VectorSimilarityFilterOperator operator = newOperator(reader, queryVector, null);
+    operator.setSearchDistances(searchDistances);
+
+    Assert.assertEquals(operator.getBitmaps().reduce().toArray(), new int[]{1, 3, 5});
+    verify(reader, never()).getDocDistances(any(float[].class), anyInt());
+  }
+
+  /// An index that returns no distances still answers the filter through `getDocIds`.
+  @Test
+  public void testFallsBackToDocIdsWhenIndexReturnsNoDistances() {
+    float[] queryVector = {1.0f, 2.0f, 3.0f};
+    VectorIndexReader reader = mock(VectorIndexReader.class);
+    when(reader.getDocDistances(queryVector, 3)).thenReturn(null);
+    when(reader.getDocIds(queryVector, 3)).thenReturn(MutableRoaringBitmap.bitmapOf(1, 3, 5));
+    VectorSearchDistances searchDistances = new VectorSearchDistances();
+    VectorSearchDistances.Request request = searchDistances.request(reader, queryVector);
+
+    VectorSimilarityFilterOperator operator = newOperator(reader, queryVector, null);
+    operator.setSearchDistances(searchDistances);
+
+    Assert.assertEquals(operator.getBitmaps().reduce().toArray(), new int[]{1, 3, 5});
+    Assert.assertNull(request.getDistances());
+  }
+
+  /// A filtered search hands over the distances of the filtered search.
+  @Test
+  public void testHandsOverDistancesOfFilteredSearch() {
+    float[] queryVector = {1.0f, 2.0f, 3.0f};
+    MutableRoaringBitmap requiredDocIds = MutableRoaringBitmap.bitmapOf(2, 4, 6, 8);
+    FilterAwareVectorIndexReader reader = mock(FilterAwareVectorIndexReader.class);
+    when(reader.supportsPreFilter()).thenReturn(true);
+    Int2FloatMap distances = distances(4, 8);
+    when(reader.getDocDistances(any(float[].class), anyInt(), any(ImmutableRoaringBitmap.class)))
+        .thenReturn(distances);
+    VectorSearchDistances searchDistances = new VectorSearchDistances();
+    VectorSearchDistances.Request request = searchDistances.request(reader, queryVector);
+
+    VectorSimilarityFilterOperator operator = newOperator(reader, queryVector, requiredDocIds);
+    operator.setSearchDistances(searchDistances);
+
+    Assert.assertEquals(operator.getBitmaps().reduce().toArray(), new int[]{4, 8});
+    Assert.assertSame(request.getDistances(), distances);
+    verify(reader, never()).getDocIds(any(float[].class), anyInt(), any(ImmutableRoaringBitmap.class));
+  }
+
+  private static VectorSimilarityFilterOperator newOperator(VectorIndexReader reader, float[] queryVector,
+      MutableRoaringBitmap requiredDocIds) {
+    VectorSimilarityPredicate predicate =
+        new VectorSimilarityPredicate(ExpressionContext.forIdentifier("embedding"), queryVector, 3);
+    return new VectorSimilarityFilterOperator(reader, predicate, 100, VectorSearchParams.DEFAULT, null, null, false,
+        requiredDocIds);
+  }
+
+  private static Int2FloatMap distances(int... docIds) {
+    Int2FloatOpenHashMap distances = new Int2FloatOpenHashMap();
+    for (int docId : docIds) {
+      distances.put(docId, docId / 10f);
+    }
+    return distances;
   }
 }

@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.segment.spi.index.reader;
 
+import it.unimi.dsi.fastutil.ints.Int2FloatMap;
+import javax.annotation.Nullable;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
@@ -44,6 +46,16 @@ public interface FilterAwareVectorIndexReader extends VectorIndexReader {
   /// @throws NullPointerException if preFilterBitmap is null. Implementations must reject null rather than
   ///         silently searching unfiltered, which would return documents outside the caller's filter.
   ImmutableRoaringBitmap getDocIds(float[] vector, int topK, ImmutableRoaringBitmap preFilterBitmap);
+
+  /// Searches like [#getDocIds(float[], int, ImmutableRoaringBitmap)] and returns the same top-K documents with their
+  /// distances, as described in [#getDocDistances(float[], int)].
+  ///
+  /// @return distances keyed by doc id, or `null` when the index cannot return distances for this column
+  /// @throws NullPointerException if preFilterBitmap is null
+  @Nullable
+  default Int2FloatMap getDocDistances(float[] vector, int topK, ImmutableRoaringBitmap preFilterBitmap) {
+    return null;
+  }
 
   /// Returns true if this reader supports efficient pre-filter search.
   /// Some implementations may support the interface but only for certain
