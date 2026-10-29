@@ -219,11 +219,11 @@ public class VectorTest extends CustomDataQueryClusterIntegrationTest {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     int topK = 5;
     String queryVector = "ARRAY[1.1" + StringUtils.repeat(", 0.3", VECTOR_DIM_SIZE - 1) + "]";
-    String query = "SELECT %s(%s, %s%s) AS dist FROM %s WHERE vectorSimilarity(%s, %s, %d) ORDER BY dist ASC LIMIT %d";
-    JsonNode expected = postQuery(String.format(query, "cosineDistance", VECTOR_1, queryVector, "", getTableName(),
+    String query = "SELECT %s(%s, %s) AS dist FROM %s WHERE vectorSimilarity(%s, %s, %d) ORDER BY dist ASC LIMIT %d";
+    JsonNode expected = postQuery(String.format(query, "cosineDistance", VECTOR_1, queryVector, getTableName(),
         VECTOR_1, queryVector, topK * 10, topK));
-    JsonNode actual = postQuery(String.format(query, "vectorDistance", VECTOR_1, queryVector, ", " + topK * 10,
-        getTableName(), VECTOR_1, queryVector, topK * 10, topK));
+    JsonNode actual = postQuery(String.format(query, "vectorDistance", VECTOR_1, queryVector, getTableName(),
+        VECTOR_1, queryVector, topK * 10, topK));
     assertTrue(actual.get("exceptions").isEmpty(), actual.toString());
     JsonNode expectedRows = expected.get("resultTable").get("rows");
     JsonNode actualRows = actual.get("resultTable").get("rows");

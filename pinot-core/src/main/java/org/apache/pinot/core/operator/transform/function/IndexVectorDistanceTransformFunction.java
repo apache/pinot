@@ -33,7 +33,7 @@ import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig.VectorDistan
 import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
 
 
-/// Implements `VECTOR_DISTANCE(column, ARRAY[...], k)`: the distance of each document from the query vector under the
+/// Implements `VECTOR_DISTANCE(column, ARRAY[...])`: the distance of each document from the query vector under the
 /// column's configured vector distance function, i.e. the distance `VECTOR_SIMILARITY` ranks by and
 /// `vectorDistanceThreshold` applies to:
 /// - `COSINE`: `1 - cosine similarity`, as `cosineDistance(column, ARRAY[...])`
@@ -42,9 +42,9 @@ import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
 ///
 /// A column without a vector index config uses EUCLIDEAN, like `VECTOR_SIMILARITY`.
 ///
-/// Paired with `VECTOR_SIMILARITY(column, ARRAY[...], k)` on the same column and vector, it takes the distances from
-/// the index search the filter runs (up to the index's single-precision arithmetic) instead of reading the vectors of
-/// the matched documents from the forward index. The distances are handed over through the query's
+/// Paired with `VECTOR_SIMILARITY(column, ARRAY[...], k)` on the same column and vector, whatever its `k`, it takes the
+/// distances from the index search the filter runs (up to the index's single-precision arithmetic) instead of reading
+/// the vectors of the matched documents from the forward index. The distances are handed over through the query's
 /// [VectorSearchDistances], so nothing outlives the query. When the index returns no distances (e.g. it does not
 /// support the column's distance function) or misses a document, the distances are computed from the forward index.
 ///
@@ -68,9 +68,9 @@ public class IndexVectorDistanceTransformFunction extends BaseTransformFunction 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
     super.init(arguments, columnContextMap);
-    if (arguments.size() != 3) {
+    if (arguments.size() != 2) {
       throw new IllegalArgumentException(
-          "Expected 3 arguments for VECTOR_DISTANCE: VECTOR_DISTANCE(column, ARRAY[...], topK)");
+          "Expected 2 arguments for VECTOR_DISTANCE: VECTOR_DISTANCE(column, ARRAY[...])");
     }
     _columnTransformFunction = arguments.get(0);
     if (!(_columnTransformFunction instanceof IdentifierTransformFunction)
@@ -88,16 +88,6 @@ public class IndexVectorDistanceTransformFunction extends BaseTransformFunction 
       throw new IllegalArgumentException("The second argument of VECTOR_DISTANCE must be an array literal");
     }
     _queryVector = toFloatArray((ArrayLiteralTransformFunction) vectorArgument);
-
-    TransformFunction topKArgument = arguments.get(2);
-    if (!(topKArgument instanceof LiteralTransformFunction)) {
-      throw new IllegalArgumentException("The third argument of VECTOR_DISTANCE must be an integer literal");
-    }
-    // `k` mirrors the paired VECTOR_SIMILARITY; the distances come from that filter's search, whatever its `k`.
-    int topK = ((LiteralTransformFunction) topKArgument).getIntLiteral();
-    if (topK <= 0) {
-      throw new IllegalArgumentException("The third argument of VECTOR_DISTANCE must be positive, got: " + topK);
-    }
   }
 
   @Override
