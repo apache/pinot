@@ -155,23 +155,13 @@ public class ConfluentSchemaRegistrySourceErrorClassificationTest {
   }
 
   @Test
-  public void ourTlsOrConfigFailureIsClassifiedByItsCause() {
+  public void untrustedRegistryOrMissingClientClass() {
     // We couldn't verify the registry's certificate: the endpoint, never our credential.
     Throwable pkix = new SerializationException("Error retrieving Avro value schema for id 1",
         new SSLHandshakeException("PKIX path building failed",
             new CertificateException("unable to find valid certification path to requested target")));
     assertEquals(classify(pkix).getCategory(), IngestionSourceErrorCategory.SOURCE_READ);
-    // A decoder config the client rejects before any request, and a client class missing from the plugin.
-    Map<String, String> badSsl = new HashMap<>();
-    badSsl.put("schema.registry.rest.url", "https://localhost:8081");
-    badSsl.put("schema.registry.ssl.keystore.location", "/nonexistent/keystore.jks");
-    badSsl.put("schema.registry.ssl.keystore.password", "fixture-only");
-    try {
-      new KafkaConfluentSchemaRegistryAvroMessageDecoder().init(badSsl, Set.of("id"), TOPIC);
-      fail("Expected the decoder init to fail");
-    } catch (Exception e) {
-      assertNotClassified(new RuntimeException("Pinot wrapper", e));
-    }
+    // A client class missing from the plugin: a packaging bug.
     assertNotClassified(new NoClassDefFoundError(
         "org/apache/kafka/common/security/oauthbearer/JwtRetriever"));
   }

@@ -35,8 +35,7 @@ public enum IngestionSourceErrorSubReason {
   AUTHORIZATION,
   /// The source refused to say whether the object exists ("does not exist or not authorized"). Check both.
   MISSING_OR_DENIED,
-  /// Authentication or authorization failed with no finer reason, such as STS refusing an AssumeRole request it
-  /// finds invalid.
+  /// Authentication or authorization failed with no finer reason.
   UNSPECIFIED;
 
   /// The lower-case name used in log lines.
