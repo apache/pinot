@@ -64,16 +64,15 @@ public class LuceneTextIndexReader implements TextIndexReader {
   private final IndexReader _indexReader;
   private final Directory _indexDirectory;
   private final IndexSearcher _indexSearcher;
-  /// Number of documents in the Pinot segment. A Lucene index holding more than this means a corrupted or
-  /// partially converted segment; see [#getNumMatchingDocs].
+  /// Number of documents in the Pinot segment, or dictionary entries for a dictionary-based index.
+  /// A per-row Lucene index holding more than this means a corrupted or partially converted segment.
   private final int _numDocs;
   private final String _column;
   private final DocIdTranslator _docIdTranslator;
   private final Analyzer _analyzer;
-  // When true, this index was built over the column dictionary (one Lucene doc per distinct value, Lucene docId ==
-  // dictId). Derived from the persisted segment properties, NOT the live table config, so a table holding a mix of
-  // dictionary-based and per-row text segments reads each correctly. In this mode searches return dictIds via
-  // getDictIds(), and the doc-id translator is a no-op (Lucene docId already equals dictId).
+  // When true, this index was built over the column dictionary (one Lucene document per distinct value).
+  // Derived from the persisted segment properties so a mix of dictionary-based and per-row segments reads correctly.
+  // The doc-id translator maps Lucene document IDs to dictionary IDs in this mode.
   private final boolean _buildOnDictionary;
   private boolean _useANDForMultiTermQueries = false;
   private final String _queryParserClass;
@@ -90,7 +89,6 @@ public class LuceneTextIndexReader implements TextIndexReader {
       _indexDirectory = FSDirectory.open(indexFile.toPath());
       _indexReader = DirectoryReader.open(_indexDirectory);
       _indexSearcher = new IndexSearcher(_indexReader);
-      _numDocs = numDocs;
       if (!config.isEnableQueryCache()) {
         // Disable Lucene query result cache. While it helps a lot with performance for
         // repeated queries, on the downside it can cause heap issues.
@@ -108,13 +106,13 @@ public class LuceneTextIndexReader implements TextIndexReader {
       File propertiesFile = new File(indexFile, V1Constants.Indexes.LUCENE_TEXT_INDEX_PROPERTIES_FILE);
       if (propertiesFile.exists()) {
         config = TextIndexUtils.getUpdatedConfigFromPropertiesFile(propertiesFile, config);
+      } else {
+        config = new TextIndexConfigBuilder(config).withBuildOnDictionary(false).build();
       }
 
       _buildOnDictionary = config.isBuildOnDictionary();
-      // In dictionary mode the Lucene docId equals the dictId (entries are added in dictId order and the index is
-      // force-merged to a single segment), so no docId mapping is needed.
-      _docIdTranslator = _buildOnDictionary ? NoOpDocIdTranslator.INSTANCE
-          : prepareDocIdTranslator(indexDir, _column, numDocs, _indexSearcher, config, indexFile);
+      _numDocs = _buildOnDictionary ? _indexReader.maxDoc() : numDocs;
+      _docIdTranslator = prepareDocIdTranslator(indexDir, _column, _numDocs, _indexSearcher, config, indexFile);
       _analyzer = TextIndexUtils.getAnalyzer(config);
       _queryParserClass = config.getLuceneQueryParserClass();
       _queryParserClassConstructor =
@@ -158,15 +156,12 @@ public class LuceneTextIndexReader implements TextIndexReader {
 
       // Extract properties from buffer
       Properties properties = LuceneTextIndexBufferReader.extractProperties(indexBuffer, column);
-      if (!properties.isEmpty()) {
-        config = updateConfigFromProperties(properties, config);
-      }
+      config = updateConfigFromProperties(properties, config);
 
       // Initialize from components
       _indexDirectory = indexDirectory;
       _indexReader = DirectoryReader.open(_indexDirectory);
       _indexSearcher = new IndexSearcher(_indexReader);
-      _numDocs = numDocs;
 
       if (!config.isEnableQueryCache()) {
         // Disable Lucene query result cache. While it helps a lot with performance for
@@ -182,17 +177,13 @@ public class LuceneTextIndexReader implements TextIndexReader {
         _enablePrefixSuffixMatchingInPhraseQueries = true;
       }
       _buildOnDictionary = config.isBuildOnDictionary();
-      if (_buildOnDictionary) {
-        // In dictionary mode the Lucene docId equals the dictId, so no docId mapping is needed.
-        _docIdTranslator = NoOpDocIdTranslator.INSTANCE;
-      } else {
-        PinotDataBuffer docIdMappingBuffer = LuceneTextIndexBufferReader.extractDocIdMappingBuffer(indexBuffer, column);
-        // Initialize docId translator
-        long startTime = System.currentTimeMillis();
-        _docIdTranslator = createDocIdTranslator(docIdMappingBuffer, config, numDocs);
-        LOGGER.info("Time taken to create docIdTranslator for column {}: {} ms", column,
-            System.currentTimeMillis() - startTime);
-      }
+      _numDocs = _buildOnDictionary ? _indexReader.maxDoc() : numDocs;
+      PinotDataBuffer docIdMappingBuffer = LuceneTextIndexBufferReader.extractDocIdMappingBuffer(indexBuffer, column);
+      // Initialize docId translator
+      long startTime = System.currentTimeMillis();
+      _docIdTranslator = createDocIdTranslator(docIdMappingBuffer, config, _numDocs);
+      LOGGER.info("Time taken to create docIdTranslator for column {}: {} ms", column,
+          System.currentTimeMillis() - startTime);
       // Initialize analyzer and query parser
       _analyzer = TextIndexUtils.getAnalyzer(config);
       _queryParserClass = config.getLuceneQueryParserClass();
@@ -237,7 +228,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
   @Override
   public ImmutableRoaringBitmap getDictIds(String searchQuery) {
     if (_buildOnDictionary) {
-      // In dictionary mode the Lucene docId equals the dictId, so the matching "doc ids" are the matching dict ids.
+      // The translator resolves Lucene document IDs to the original dictionary IDs, including after merges.
       return getDocIds(searchQuery, null, null);
     }
     throw new UnsupportedOperationException(

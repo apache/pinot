@@ -31,6 +31,7 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -43,20 +44,23 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
 /// Verifies that a dictionary-based TEXT index (`buildOnDictionary = true`) returns the same `TEXT_MATCH`
-/// results as the default per-row TEXT index, for both single-value and multi-value STRING columns. The
-/// dictionary-based index returns matching dictIds that are resolved to docIds by the standard dictionary-based
+/// results as the default per-row TEXT index for single-value STRING columns, while multi-value columns retain
+/// the per-row index. The dictionary-based index returns matching dictIds resolved to docIds by dictionary-based
 /// filter operators; this test confirms that resolution is correct end-to-end.
 public class DictionaryBasedTextIndexQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR =
@@ -130,8 +134,16 @@ public class DictionaryBasedTextIndexQueriesTest extends BaseQueriesTest {
         "storeInSegmentFile", Boolean.toString(storeInSegmentFile));
     List<FieldConfig> fieldConfigs = List.of(
         new FieldConfig(SV_COL, EncodingType.DICTIONARY, List.of(IndexType.TEXT), null, props),
-        new FieldConfig(MV_COL, EncodingType.DICTIONARY, List.of(IndexType.TEXT), null, props));
-    return new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setFieldConfigList(fieldConfigs).build();
+        new FieldConfig(MV_COL, EncodingType.DICTIONARY, List.of(IndexType.TEXT), null,
+            Map.of("storeInSegmentFile", Boolean.toString(storeInSegmentFile))));
+    TableConfig config =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setFieldConfigList(fieldConfigs).build();
+    if (buildOnDictionary) {
+      // The text index must retain its dictionary even when these heuristics would otherwise remove it.
+      config.getIndexingConfig().setOptimizeDictionary(true);
+      config.getIndexingConfig().setNoDictionaryCardinalityRatioThreshold(0.001);
+    }
+    return config;
   }
 
   private ImmutableSegment buildAndLoad(String segmentName, boolean buildOnDictionary)
@@ -167,6 +179,7 @@ public class DictionaryBasedTextIndexQueriesTest extends BaseQueriesTest {
         "SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SV_COL + ", 'apple')",
         "SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SV_COL + ", 'cherry')",
         "SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SV_COL + ", 'missing')",
+        "SELECT SUM(TEXT_MATCH(" + SV_COL + ", 'apple')) FROM " + TABLE_NAME,
         "SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + MV_COL + ", 'fruit')",
         "SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + MV_COL + ", 'green')",
         "SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + MV_COL + ", 'red OR blue')"
@@ -176,6 +189,7 @@ public class DictionaryBasedTextIndexQueriesTest extends BaseQueriesTest {
         NUM_ROWS / SV_TOKENS.length,          // 'apple' -> i % 5 == 0
         NUM_ROWS / SV_TOKENS.length,          // 'cherry' -> i % 5 == 2
         0,                                    // not present
+        NUM_ROWS / SV_TOKENS.length,          // transform path also resolves dictIds to the matching rows
         NUM_ROWS,                             // 'fruit' present in every MV row
         countMv(1),                           // 'green' -> i % 3 == 1
         countMv(0) + countMv(2)               // 'red' (i%3==0) OR 'blue' (i%3==2)
@@ -201,22 +215,6 @@ public class DictionaryBasedTextIndexQueriesTest extends BaseQueriesTest {
     }
     dictBased.destroy();
     _indexSegment = null;
-  }
-
-  @Test
-  public void dictionaryBasedIndexIsSmallerForLowCardinality()
-      throws Exception {
-    // The SV column has only 5 distinct values across 1000 rows, so the dictionary-based text index (5 Lucene docs)
-    // must be smaller than the per-row text index (1000 Lucene docs).
-    ImmutableSegment perRow = buildAndLoad("perRowSize", false);
-    long perRowSize = FileUtils.sizeOfDirectory(new File(INDEX_DIR, "perRowSize"));
-    perRow.destroy();
-    ImmutableSegment dictBased = buildAndLoad("dictSize", true);
-    long dictSize = FileUtils.sizeOfDirectory(new File(INDEX_DIR, "dictSize"));
-    dictBased.destroy();
-    _indexSegment = null;
-    assertTrue(dictSize < perRowSize,
-        "Expected dictionary-based segment (" + dictSize + ") < per-row segment (" + perRowSize + ")");
   }
 
   @Test
@@ -254,28 +252,93 @@ public class DictionaryBasedTextIndexQueriesTest extends BaseQueriesTest {
     _indexSegment = null;
   }
 
-  @Test
-  public void buildOnDictionaryRequiresDictionaryEncoding()
+  @DataProvider(name = "storageFormats")
+  public Object[][] storageFormats() {
+    return new Object[][]{{false}, {true}};
+  }
+
+  @Test(dataProvider = "storageFormats")
+  public void reloadRebuildsWhenBuildModeChanges(boolean storeInSegmentFile)
       throws Exception {
-    // A raw (non-dictionary) column with buildOnDictionary=true must fail the build, protecting the docId==dictId
-    // invariant.
+    String segmentName = "modeChange_" + storeInSegmentFile;
+    buildAndLoad(segmentName, false, storeInSegmentFile).destroy();
+    File segmentDir = new File(INDEX_DIR, segmentName);
+    ImmutableSegment dictionaryBased = ImmutableSegmentLoader.load(segmentDir,
+        new IndexLoadingConfig(tableConfig(true, storeInSegmentFile), SCHEMA));
+    _indexSegment = dictionaryBased;
+    _indexSegments = List.of(dictionaryBased);
+    try {
+      assertTrue(dictionaryBased.getDataSource(SV_COL).getTextIndex().isBuildOnDictionary());
+      assertEquals(count("SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SV_COL + ", 'apple')"),
+          NUM_ROWS / SV_TOKENS.length);
+    } finally {
+      dictionaryBased.destroy();
+      _indexSegment = null;
+    }
+
+    TableConfig rawForwardConfig = tableConfig(true, storeInSegmentFile);
+    List<FieldConfig> fields = new ArrayList<>(rawForwardConfig.getFieldConfigList());
+    fields.set(0, new FieldConfig.Builder(fields.get(0)).withEncodingType(EncodingType.RAW).withIndexes(
+        JsonUtils.stringToJsonNode("{\"forward\":{\"encodingType\":\"RAW\"},\"dictionary\":{}}")).build());
+    rawForwardConfig.setFieldConfigList(fields);
+    ImmutableSegment rawForward =
+        ImmutableSegmentLoader.load(segmentDir, new IndexLoadingConfig(rawForwardConfig, SCHEMA));
+    _indexSegment = rawForward;
+    _indexSegments = List.of(rawForward);
+    try {
+      assertFalse(rawForward.getDataSource(SV_COL).getForwardIndex().isDictionaryEncoded());
+      assertEquals(count("SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SV_COL + ", 'apple')"),
+          NUM_ROWS / SV_TOKENS.length);
+      assertEquals(count("SELECT SUM(TEXT_MATCH(" + SV_COL + ", 'apple')) FROM " + TABLE_NAME),
+          NUM_ROWS / SV_TOKENS.length);
+    } finally {
+      rawForward.destroy();
+      _indexSegment = null;
+    }
+
+    // Turning the feature off while removing the dictionary must also replace the old dictId-based text index.
+    TableConfig perRowConfig = tableConfig(false, storeInSegmentFile);
+    perRowConfig.getIndexingConfig().setNoDictionaryColumns(List.of(SV_COL));
+    ImmutableSegment perRow = ImmutableSegmentLoader.load(segmentDir, new IndexLoadingConfig(perRowConfig, SCHEMA));
+    _indexSegment = perRow;
+    _indexSegments = List.of(perRow);
+    try {
+      assertFalse(perRow.getDataSource(SV_COL).getTextIndex().isBuildOnDictionary());
+      assertNull(perRow.getDataSource(SV_COL).getDictionary());
+      assertEquals(count("SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SV_COL + ", 'apple')"),
+          NUM_ROWS / SV_TOKENS.length);
+    } finally {
+      perRow.destroy();
+      _indexSegment = null;
+    }
+  }
+
+  @DataProvider(name = "unsupportedColumns")
+  public Object[][] unsupportedColumns() {
+    return new Object[][]{{SV_COL, EncodingType.RAW}, {MV_COL, EncodingType.DICTIONARY}};
+  }
+
+  @Test(dataProvider = "unsupportedColumns")
+  public void buildOnDictionaryRejectsUnsupportedColumns(String column, EncodingType encodingType)
+      throws Exception {
     Map<String, String> props = Map.of(FieldConfig.TEXT_INDEX_BUILD_ON_DICTIONARY, "true");
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setNoDictionaryColumns(List.of(SV_COL))
-        .setFieldConfigList(List.of(new FieldConfig(SV_COL, EncodingType.RAW, List.of(IndexType.TEXT), null, props)))
+        .setNoDictionaryColumns(encodingType == EncodingType.RAW ? List.of(column) : List.of())
+        .setFieldConfigList(List.of(new FieldConfig(column, encodingType, List.of(IndexType.TEXT), null, props)))
         .build();
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, SCHEMA);
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(TABLE_NAME);
-    config.setSegmentName("raw");
+    config.setSegmentName("unsupported_" + column);
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     try (RecordReader recordReader = new GenericRowRecordReader(createTestData())) {
+      TableConfigUtils.validate(tableConfig, SCHEMA);
       driver.init(config, recordReader);
       driver.build();
-      fail("Expected build to fail for buildOnDictionary on a raw-encoded column");
+      fail("Expected buildOnDictionary to reject column: " + column);
     } catch (Exception e) {
       assertTrue(ExceptionUtils.getStackTrace(e).contains("buildOnDictionary"),
-          "Expected a buildOnDictionary dictionary-required failure, got: " + e);
+          "Expected a buildOnDictionary validation failure, got: " + e);
     }
   }
 
@@ -287,12 +350,17 @@ public class DictionaryBasedTextIndexQueriesTest extends BaseQueriesTest {
     _indexSegments = List.of(dictBased);
     try {
       // TEXT_MATCH options are not supported by the dictionary-based path (getDictIds takes only the query value).
-      getOperator(
-          "SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SV_COL + ", 'apple', 'parser=CLASSIC')");
-      fail("Expected TEXT_MATCH with options to be rejected for a dictionary-based text index");
-    } catch (Exception e) {
-      assertTrue(ExceptionUtils.getStackTrace(e).contains("options are not supported"),
-          "Expected an options-not-supported failure, got: " + e);
+      for (String query : List.of(
+          "SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SV_COL + ", 'apple', 'parser=CLASSIC')",
+          "SELECT SUM(TEXT_MATCH(" + SV_COL + ", 'apple', 'parser=CLASSIC')) FROM " + TABLE_NAME)) {
+        try {
+          getOperator(query);
+          fail("Expected TEXT_MATCH with options to be rejected for a dictionary-based text index");
+        } catch (Exception e) {
+          assertTrue(ExceptionUtils.getStackTrace(e).contains("options are not supported"),
+              "Expected an options-not-supported failure, got: " + e);
+        }
+      }
     } finally {
       dictBased.destroy();
       _indexSegment = null;
@@ -329,10 +397,8 @@ public class DictionaryBasedTextIndexQueriesTest extends BaseQueriesTest {
     ImmutableSegment dictBased = buildAndLoad("dictAll", true);
     _indexSegment = dictBased;
     _indexSegments = List.of(dictBased);
-    // MV distinct values are {fruit, red, green, blue}; OR-ing all of them matches every distinct dictId, so every
-    // row matches.
-    assertEquals(count("SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + MV_COL
-        + ", 'fruit OR red OR green OR blue')"), NUM_ROWS);
+    assertEquals(count("SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SV_COL
+        + ", '" + String.join(" OR ", SV_TOKENS) + "')"), NUM_ROWS);
     dictBased.destroy();
     _indexSegment = null;
   }
@@ -355,10 +421,10 @@ public class DictionaryBasedTextIndexQueriesTest extends BaseQueriesTest {
       }
     }
 
-    // Reload under a table config that turns buildOnDictionary ON. The segment self-describes, so it must still be
-    // read as per-row (the build mode comes from the segment, not the live table config).
+    // Open without preprocessing under a table config that turns buildOnDictionary ON. The existing segment
+    // must still be read as per-row until it is explicitly reloaded and rebuilt.
     ImmutableSegment segment = ImmutableSegmentLoader.load(new File(INDEX_DIR, "preFeature"),
-        new IndexLoadingConfig(tableConfig(true), SCHEMA));
+        new IndexLoadingConfig(tableConfig(true), SCHEMA), false);
     _indexSegment = segment;
     _indexSegments = List.of(segment);
     assertFalse(segment.getDataSource(SV_COL).getTextIndex().isBuildOnDictionary(),

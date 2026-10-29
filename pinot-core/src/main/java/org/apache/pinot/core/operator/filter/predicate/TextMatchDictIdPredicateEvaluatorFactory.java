@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator.filter.predicate;
 import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
@@ -41,6 +42,23 @@ public class TextMatchDictIdPredicateEvaluatorFactory {
   public static BaseDictionaryBasedPredicateEvaluator newDictIdBasedEvaluator(TextMatchPredicate textMatchPredicate,
       TextIndexReader textIndexReader, Dictionary dictionary) {
     return new TextMatchDictIdPredicateEvaluator(textMatchPredicate, textIndexReader, dictionary);
+  }
+
+  /// Adapts dictionary matches to a scan over raw forward values when the column has a standalone dictionary.
+  public static BaseRawValueBasedPredicateEvaluator newRawValueBasedEvaluator(PredicateEvaluator dictionaryEvaluator,
+      Dictionary dictionary) {
+    return new BaseRawValueBasedPredicateEvaluator(dictionaryEvaluator.getPredicate()) {
+      @Override
+      public DataType getDataType() {
+        return DataType.STRING;
+      }
+
+      @Override
+      public boolean applySV(String value) {
+        int dictId = dictionary.indexOf(value);
+        return dictId >= 0 && dictionaryEvaluator.applySV(dictId);
+      }
+    };
   }
 
   private static class TextMatchDictIdPredicateEvaluator extends BaseDictionaryBasedPredicateEvaluator {
