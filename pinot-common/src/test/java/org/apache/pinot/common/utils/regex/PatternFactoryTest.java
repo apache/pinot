@@ -18,28 +18,41 @@
  */
 package org.apache.pinot.common.utils.regex;
 
-import org.testng.Assert;
+import java.lang.reflect.Field;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertTrue;
 
 
 public class PatternFactoryTest {
   @Test
-  public void testNonInitializedPatternFactory() {
-    Pattern pattern = PatternFactory.compile("pattern");
-    Assert.assertTrue(pattern instanceof JavaUtilPattern);
+  public void testNonInitializedPatternFactory()
+      throws ReflectiveOperationException {
+    // Other tests initialize the static factory, so explicitly restore the uninitialized state for this case.
+    Field regexClass = PatternFactory.class.getDeclaredField("_regexClass");
+    regexClass.setAccessible(true);
+    Object previousRegexClass = regexClass.get(null);
+    try {
+      regexClass.set(null, null);
+      Pattern pattern = PatternFactory.compile("pattern");
+      assertTrue(pattern instanceof JavaUtilPattern);
+      assertTrue(pattern.matcher("pattern").matches());
+    } finally {
+      regexClass.set(null, previousRegexClass);
+    }
   }
 
   @Test
   public void testJavaUtilInitializedPatternFactory() {
     PatternFactory.init(RegexClass.JAVA_UTIL.name());
     Pattern pattern = PatternFactory.compile("pattern");
-    Assert.assertTrue(pattern instanceof JavaUtilPattern);
+    assertTrue(pattern instanceof JavaUtilPattern);
   }
 
   @Test
   public void testRe2jInitializedPatternFactory() {
     PatternFactory.init(RegexClass.RE2J.name());
     Pattern pattern = PatternFactory.compile("pattern");
-    Assert.assertTrue(pattern instanceof Re2jPattern);
+    assertTrue(pattern instanceof Re2jPattern);
   }
 }
