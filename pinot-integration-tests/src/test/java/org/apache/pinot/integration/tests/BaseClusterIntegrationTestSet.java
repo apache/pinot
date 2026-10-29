@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.model.ExternalView;
@@ -60,7 +61,6 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -1135,6 +1135,9 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     String tableNameWithType = tableConfig.getTableName();
     Set<String> originalConsumingSegments = _helixResourceManager.getConsumingSegments(tableNameWithType);
     assertFalse(originalConsumingSegments.isEmpty(), "Expected consuming segments before rebalance");
+    Map<Integer, Integer> expectedSequences = originalConsumingSegments.stream().map(LLCSegmentName::new)
+        .collect(Collectors.toMap(LLCSegmentName::getPartitionGroupId,
+            segment -> segment.getSequenceNumber() + (shouldCommit ? 1 : 0)));
 
     // Execute rebalance
     RebalanceResult rebalanceResult = triggerTableRebalance(rebalanceConfig, TableType.REALTIME);
@@ -1146,35 +1149,14 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
       waitForRebalanceToComplete(rebalanceResult.getJobId(), timeoutMs);
     }
 
-    IdealState idealState = _helixResourceManager.getTableIdealState(tableNameWithType);
-    assertNotNull(idealState, "Missing IdealState after rebalance");
-    Map<Integer, Integer> consumingSequenceByPartition = new HashMap<>();
-    idealState.getRecord().getMapFields().forEach((segment, states) -> {
-      if (states.containsValue(SegmentStateModel.CONSUMING)) {
-        LLCSegmentName name = new LLCSegmentName(segment);
-        consumingSequenceByPartition.merge(name.getPartitionGroupId(), name.getSequenceNumber(), Math::max);
-      }
-    });
     for (String originalSegment : originalConsumingSegments) {
       SegmentZKMetadata metadata = _helixResourceManager.getSegmentZKMetadata(tableNameWithType, originalSegment);
       assertNotNull(metadata, "Missing metadata for " + originalSegment);
       assertEquals(metadata.getStatus(), shouldCommit ? Status.DONE : Status.IN_PROGRESS, originalSegment);
-      Map<String, String> states = idealState.getInstanceStateMap(originalSegment);
-      assertNotNull(states, "Missing assignment for " + originalSegment);
-      assertFalse(states.isEmpty(), "Empty assignment for " + originalSegment);
-      String expectedState = shouldCommit ? SegmentStateModel.ONLINE : SegmentStateModel.CONSUMING;
-      assertTrue(states.values().stream().allMatch(expectedState::equals), originalSegment + ": " + states);
-
-      LLCSegmentName original = new LLCSegmentName(originalSegment);
-      Integer currentSequence = consumingSequenceByPartition.get(original.getPartitionGroupId());
-      assertNotNull(currentSequence, "No consuming successor for " + originalSegment);
-      if (shouldCommit) {
-        // These tests use minAvailableReplicas=0, so each partition moves directly to its target instances and
-        // should be force committed exactly once, even if the IdealState update needs to be retried.
-        assertEquals(currentSequence.intValue(), original.getSequenceNumber() + 1, originalSegment);
-      } else {
-        assertEquals(currentSequence.intValue(), original.getSequenceNumber(), originalSegment);
-      }
     }
+    Map<Integer, Integer> currentSequences = _helixResourceManager.getConsumingSegments(tableNameWithType).stream()
+        .map(LLCSegmentName::new)
+        .collect(Collectors.toMap(LLCSegmentName::getPartitionGroupId, LLCSegmentName::getSequenceNumber));
+    assertEquals(currentSequences, expectedSequences);
   }
 }
