@@ -21,6 +21,7 @@ package org.apache.pinot.spi.utils;
 import java.io.File;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -731,12 +732,12 @@ public class CommonConstants {
     public static final String CONFIG_OF_USE_PHYSICAL_OPTIMIZER = "pinot.broker.multistage.use.physical.optimizer";
     public static final boolean DEFAULT_USE_PHYSICAL_OPTIMIZER = false;
 
-    /// Whether the multi-stage planner plans `GROUP BY ARRAY_TO_MV(col)` as an MV aggregate by default. The MV
-    /// aggregate groups each row by every element of the multi-value key in every stage, as the single-stage engine
-    /// does. When false (the default), such a group-by runs only when it is fully pushed down to the leaf stage.
+    /// How the multi-stage planner plans `GROUP BY ARRAY_TO_MV(col)` by default, as one of the [MvAggregateMode]
+    /// values: `auto` (the default), `true` or `false`. The value is case-insensitive. The MV aggregate groups each row
+    /// by every element of the multi-value key in every stage, as the single-stage engine does.
     ///
-    /// A server that predates the MV aggregate cannot run it. Set this to true only when every server runs a version
-    /// with the MV aggregate.
+    /// A server that predates the MV aggregate cannot run it. The `auto` mode is safe during a rolling upgrade: it
+    /// sends the MV aggregate only for queries that fail without it.
     ///
     /// The value can also be set in the cluster config, under the same key. The cluster config wins over the broker
     /// config, and a change applies to the next query without a broker restart. When the key is removed from the
@@ -744,14 +745,42 @@ public class CommonConstants {
     ///
     /// The query option [Request.QueryOptionKey#USE_MV_AGGREGATE] overrides this value for one query.
     ///
-    /// Setting this to false stops only the rewrite into the MV aggregate. These planner changes stay active
-    /// regardless of this value:
+    /// These planner changes stay active regardless of this value:
     /// - The stricter validation of `ARRAY_TO_MV` and its error messages.
     /// - The leaf-stage check that rejects a plain `GROUP BY` on a multi-value column.
-    /// - The classification of the nodes above a lookup join as intermediate stage nodes.
-    /// - The nullability of `ARRAY_TO_MV`: its result is nullable when the array or its component is nullable.
+    /// - The classification of the nodes above a lookup join or an `UNNEST` as intermediate stage nodes.
+    /// - A filter on the result of an aggregate that groups by `ARRAY_TO_MV(expr)` stays above the aggregate.
     public static final String CONFIG_OF_USE_MV_AGGREGATE = "pinot.broker.multistage.use.mv.aggregate";
-    public static final boolean DEFAULT_USE_MV_AGGREGATE = false;
+    public static final String DEFAULT_USE_MV_AGGREGATE = "auto";
+
+    /// The values of [#CONFIG_OF_USE_MV_AGGREGATE] and of the query option [Request.QueryOptionKey#USE_MV_AGGREGATE].
+    public enum MvAggregateMode {
+      /// Always plan `GROUP BY ARRAY_TO_MV(col)` as an MV aggregate.
+      TRUE,
+      /// Never plan the MV aggregate. A `GROUP BY ARRAY_TO_MV(col)` that does not run whole in the leaf stage fails.
+      FALSE,
+      /// Plan the query without the MV aggregate first. If that plan fails the `ARRAY_TO_MV` validation, plan the
+      /// query again with the MV aggregate. A query that plans without the MV aggregate keeps the plan of a broker
+      /// that predates it.
+      AUTO;
+
+      /// Parses `value`, case-insensitive and trimmed.
+      ///
+      /// @throws IllegalArgumentException if the value is not `true`, `false` or `auto`
+      public static MvAggregateMode fromString(String value) {
+        switch (value.trim().toLowerCase(Locale.ROOT)) {
+          case "true":
+            return TRUE;
+          case "false":
+            return FALSE;
+          case "auto":
+            return AUTO;
+          default:
+            throw new IllegalArgumentException("Invalid MV aggregate mode: '" + value + "', must be one of [true, "
+                + "false, auto]");
+        }
+      }
+    }
 
     /// Whether to use lite mode by default.
     /// This value can always be overridden by [Request.QueryOptionKey#USE_LITE_MODE] query option
@@ -1033,10 +1062,9 @@ public class CommonConstants {
         public static final String APPLICATION_NAME = "applicationName";
         public static final String USE_SPOOLS = "useSpools";
         public static final String USE_PHYSICAL_OPTIMIZER = "usePhysicalOptimizer";
-        // When true, the multi-stage planner plans GROUP BY ARRAY_TO_MV(col) as an MV aggregate that groups by every
-        // element of the multi-value key in every stage. When false, it never does. It overrides the broker config
-        // Broker#CONFIG_OF_USE_MV_AGGREGATE. The value is case-insensitive. Other values fail the query with
-        // QUERY_VALIDATION.
+        // How the multi-stage planner plans GROUP BY ARRAY_TO_MV(col): true, false or auto, see
+        // Broker.MvAggregateMode. It overrides the broker config Broker#CONFIG_OF_USE_MV_AGGREGATE. The value is
+        // case-insensitive. Other values fail the query with QUERY_VALIDATION.
         public static final String USE_MV_AGGREGATE = "useMvAggregate";
         // When true, the multi-stage planner prunes input (passthrough) columns - notably the unnested source array -
         // from the UNNEST output when they are not referenced downstream, avoiding copying them into every exploded

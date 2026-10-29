@@ -328,9 +328,9 @@
         ]
       },
       {
-        "description": "Gate off: MV key above a join fails",
+        "description": "Gate off: MV key above a join fails as before the MV aggregate: ARRAY_TO_MV goes below the join, into the leaf stage",
         "sql": "SET useMvAggregate=false; EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(e.mcol1), COUNT(*) FROM e JOIN a ON e.col1 = a.col1 GROUP BY ARRAY_TO_MV(e.mcol1)",
-        "expectedException": ".*ARRAY_TO_MV found in PROJECT in the intermediate stage.*ARRAY_TO_MV is supported only.*"
+        "expectedException": ".*ARRAY_TO_MV found in PROJECT in the leaf stage.*ARRAY_TO_MV is supported only.*"
       },
       {
         "description": "Nested CASE WHEN ARRAY_TO_MV() key above a join fails",

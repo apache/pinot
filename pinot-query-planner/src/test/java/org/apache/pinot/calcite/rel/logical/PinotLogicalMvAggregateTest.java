@@ -81,10 +81,10 @@ public class PinotLogicalMvAggregateTest {
     RelDataType arrKeyType = rowType.getFieldList().get(1).getType();
     assertEquals(arrKeyType.getSqlTypeName(), SqlTypeName.VARCHAR);
     assertFalse(arrKeyType.isNullable());
-    // Nullable BIGINT ARRAY becomes nullable BIGINT
+    // Nullable BIGINT ARRAY becomes BIGINT, with the nullability of the component type, as ARRAY_TO_MV
     RelDataType nullableArrKeyType = rowType.getFieldList().get(2).getType();
     assertEquals(nullableArrKeyType.getSqlTypeName(), SqlTypeName.BIGINT);
-    assertTrue(nullableArrKeyType.isNullable());
+    assertFalse(nullableArrKeyType.isNullable());
     // Aggregate call unchanged
     assertEquals(rowType.getFieldList().get(3).getType().getSqlTypeName(), SqlTypeName.BIGINT);
   }
@@ -100,7 +100,8 @@ public class PinotLogicalMvAggregateTest {
         _typeFactory.createTypeWithNullability(_typeFactory.createArrayType(varchar, -1), true),
         _typeFactory.createArrayType(nullableVarchar, -1),
         _typeFactory.createTypeWithNullability(_typeFactory.createArrayType(nullableVarchar, -1), true));
-    List<Boolean> expectedNullable = List.of(false, true, true, true);
+    // The component type decides, as for ARRAY_TO_MV before the MV aggregate.
+    List<Boolean> expectedNullable = List.of(false, false, true, true);
     RexBuilder rexBuilder = _cluster.getRexBuilder();
     for (int i = 0; i < arrayTypes.size(); i++) {
       RelDataType inputType = _typeFactory.builder().add("arr", arrayTypes.get(i)).build();

@@ -22,6 +22,7 @@ import java.util.List;
 import org.apache.pinot.calcite.sql.fun.ArrayToMvFunctionName;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
@@ -66,7 +67,8 @@ import org.apache.pinot.spi.exception.QueryException;
 ///
 /// "Leaf stage" means below the leaf boundary, the part of a leaf fragment that the single-stage engine runs. In a
 /// fragment with a lookup join, the boundary is the right input of the join: the join and every node above it run
-/// as multi-stage operators and are validated as intermediate-stage nodes.
+/// as multi-stage operators and are validated as intermediate-stage nodes. In a fragment with an `UNNEST`, the
+/// boundary is the input of the `UNNEST` in the same way.
 ///
 /// The visitor is stateless and thread-safe. The context is `true` when the visited node runs in an intermediate
 /// stage and `false` when it runs in the leaf stage. Use [#validate(PlanNode, boolean)] to validate a fragment.
@@ -77,9 +79,20 @@ public class ArrayToMvValidationVisitor implements PlanNodeVisitor<Void, Boolean
   ///
   /// @param scansTables whether the fragment scans a table (a leaf fragment)
   public static void validate(PlanNode fragmentRoot, boolean scansTables) {
-    // In a leaf fragment with a lookup join, the nodes from the root down to the join run above the leaf boundary.
-    boolean isIntermediateStage = !scansTables || containsLookupJoin(fragmentRoot);
+    // In a leaf fragment with a lookup join or an UNNEST, the nodes from the root down to that node run above the leaf
+    // boundary.
+    boolean isIntermediateStage = !scansTables || containsLookupJoin(fragmentRoot) || containsUnnest(fragmentRoot);
     fragmentRoot.visit(INSTANCE, isIntermediateStage);
+  }
+
+  /// Validates every fragment of the plan rooted at `fragment`. It needs no worker assignment: a fragment is a leaf
+  /// fragment when it scans a table.
+  public static void validateFragments(PlanFragment fragment) {
+    PlanNode fragmentRoot = fragment.getFragmentRoot();
+    validate(fragmentRoot, scansTable(fragmentRoot));
+    for (PlanFragment child : fragment.getChildren()) {
+      validateFragments(child);
+    }
   }
 
   private static boolean containsLookupJoin(PlanNode node) {
@@ -92,6 +105,36 @@ public class ArrayToMvValidationVisitor implements PlanNodeVisitor<Void, Boolean
     }
     for (PlanNode input : node.getInputs()) {
       if (containsLookupJoin(input)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static boolean containsUnnest(PlanNode node) {
+    if (node instanceof UnnestNode) {
+      return true;
+    }
+    if (node instanceof MailboxReceiveNode) {
+      return false;
+    }
+    for (PlanNode input : node.getInputs()) {
+      if (containsUnnest(input)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static boolean scansTable(PlanNode node) {
+    if (node instanceof TableScanNode) {
+      return true;
+    }
+    if (node instanceof MailboxReceiveNode) {
+      return false;
+    }
+    for (PlanNode input : node.getInputs()) {
+      if (scansTable(input)) {
         return true;
       }
     }
@@ -253,7 +296,8 @@ public class ArrayToMvValidationVisitor implements PlanNodeVisitor<Void, Boolean
 
   @Override
   public Void visitUnnest(UnnestNode node, Boolean isIntermediateStage) {
-    node.getInputs().forEach(e -> e.visit(this, isIntermediateStage));
+    // In a leaf fragment, the input of the UNNEST is the leaf boundary: the single-stage engine runs it.
+    node.getInputs().forEach(e -> e.visit(this, isIntermediateStage && !scansTable(e)));
     return null;
   }
 
@@ -275,7 +319,15 @@ public class ArrayToMvValidationVisitor implements PlanNodeVisitor<Void, Boolean
   }
 
   private static QueryException error(String context) {
-    return new QueryException(QueryErrorCode.QUERY_PLANNING, context + ". " + SUPPORTED_USES);
+    return new ArrayToMvValidationException(context + ". " + SUPPORTED_USES);
+  }
+
+  /// The [QueryErrorCode#QUERY_PLANNING] error of a plan that uses `ARRAY_TO_MV` where the plan cannot run it. The
+  /// `auto` mode of the MV aggregate plans such a query again with the MV aggregate.
+  public static class ArrayToMvValidationException extends QueryException {
+    ArrayToMvValidationException(String message) {
+      super(QueryErrorCode.QUERY_PLANNING, message);
+    }
   }
 
   private boolean containsArrayToMv(RexExpression expression) {

@@ -44,7 +44,10 @@ import org.apache.calcite.prepare.CalciteCatalogReader;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexExecutor;
+import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.rex.RexShuttle;
 import org.apache.calcite.runtime.CalciteContextException;
 import org.apache.calcite.sql.SqlExplain;
 import org.apache.calcite.sql.SqlExplainFormat;
@@ -66,6 +69,7 @@ import org.apache.pinot.calcite.rel.rules.PinotRuleUtils;
 import org.apache.pinot.calcite.rel.rules.PinotSortExchangeCopyRule;
 import org.apache.pinot.calcite.rex.PinotRexExecutor;
 import org.apache.pinot.calcite.rex.SearchSealer;
+import org.apache.pinot.calcite.sql.fun.ArrayToMvFunctionName;
 import org.apache.pinot.calcite.sql.fun.PinotOperatorTable;
 import org.apache.pinot.calcite.sql2rel.PinotConvertletTable;
 import org.apache.pinot.calcite.sql2rel.PinotRelDecorrelator;
@@ -94,6 +98,7 @@ import org.apache.pinot.query.planner.physical.v2.RelToPRelConverter;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.rules.PinotRuleSet;
 import org.apache.pinot.query.planner.spi.Phase;
+import org.apache.pinot.query.planner.validation.ArrayToMvValidationVisitor;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.validate.BytesCastVisitor;
@@ -101,6 +106,7 @@ import org.apache.pinot.query.validate.RowExpressionValidationVisitor;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.MvAggregateMode;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
@@ -218,7 +224,7 @@ public class QueryEnvironment {
     }
     // Rejects an invalid useMvAggregate value with QUERY_VALIDATION before planning. The planner rule reads it again,
     // and an error thrown there would surface as QUERY_PLANNING.
-    QueryOptionsUtils.isUseMvAggregate(options, _envConfig.defaultUseMvAggregate());
+    QueryOptionsUtils.getMvAggregateMode(options, _envConfig.defaultMvAggregateMode());
     int sortExchangeCopyLimit = QueryOptionsUtils.getSortExchangeCopyThreshold(options,
         _envConfig.defaultSortExchangeCopyLimit());
     boolean usePhysicalOptimizer = QueryOptionsUtils.isUsePhysicalOptimizer(options,
@@ -327,8 +333,10 @@ public class QueryEnvironment {
       } else {
         queryNode = sqlNode;
       }
-      RelRoot relRoot = compileQuery(queryNode, plannerContext);
-      return new CompiledQuery(_envConfig.getDatabase(), sqlQuery, relRoot, plannerContext, sqlNodeAndOptions);
+      RelRoot unoptimizedRelRoot = toRelation(validate(queryNode, plannerContext), plannerContext);
+      RelRoot relRoot = unoptimizedRelRoot.withRel(optimizeAndConvert(unoptimizedRelRoot, plannerContext));
+      return new CompiledQuery(_envConfig.getDatabase(), sqlQuery, relRoot, unoptimizedRelRoot, plannerContext,
+          sqlNodeAndOptions);
     } catch (QueryException e) {
       throw e;
     } catch (Throwable t) {
@@ -418,9 +426,8 @@ public class QueryEnvironment {
   // steps
   // --------------------------------------------------------------------------
 
-  private RelRoot compileQuery(SqlNode sqlNode, PlannerContext plannerContext) {
-    SqlNode validated = validate(sqlNode, plannerContext);
-    RelRoot relation = toRelation(validated, plannerContext);
+  /// Optimizes the converted query and, with the physical optimizer, converts it to the physical plan.
+  private RelNode optimizeAndConvert(RelRoot relation, PlannerContext plannerContext) {
     RelNode optimized = optimize(relation, plannerContext);
     if (plannerContext.isUsePhysicalOptimizer()) {
       Preconditions.checkNotNull(plannerContext.getPhysicalPlannerContext(), "Physical planner context is null");
@@ -428,7 +435,7 @@ public class QueryEnvironment {
           _envConfig.getTableCache()).unwrap();
       PRelNodeTreeValidator.validate((PRelNode) optimized, plannerContext.getPhysicalPlannerContext());
     }
-    return relation.withRel(optimized);
+    return optimized;
   }
 
   /// Query validation is a transformation from SqlNode to SqlNode where each node is validated.
@@ -578,6 +585,30 @@ public class QueryEnvironment {
   // --------------------------------------------------------------------------
   // utils
   // --------------------------------------------------------------------------
+
+  /// Returns whether an expression of `node` or of one of its inputs calls `ARRAY_TO_MV`.
+  private static boolean containsArrayToMv(RelNode node) {
+    boolean[] found = new boolean[1];
+    node.accept(new RexShuttle() {
+      @Override
+      public RexNode visitCall(RexCall call) {
+        if (ArrayToMvFunctionName.matches(call.getOperator().getName())) {
+          found[0] = true;
+          return call;
+        }
+        return super.visitCall(call);
+      }
+    });
+    if (found[0]) {
+      return true;
+    }
+    for (RelNode input : node.getInputs()) {
+      if (containsArrayToMv(input)) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   /// Creates and returns a HepProgram that performs mostly logical transformations.
   /// It performs several phases of rule application over the parsed decorrelated trimmed plan:
@@ -875,15 +906,15 @@ public class QueryEnvironment {
       return CommonConstants.Broker.DEFAULT_USE_PHYSICAL_OPTIMIZER;
     }
 
-    /// Whether to plan `GROUP BY ARRAY_TO_MV(col)` as an MV aggregate by default.
+    /// How to plan `GROUP BY ARRAY_TO_MV(col)` by default, see [MvAggregateMode].
     ///
     /// This is treated as the default value for the broker and it is expected to be obtained from a Pinot
     /// configuration ([CommonConstants.Broker#CONFIG_OF_USE_MV_AGGREGATE]).
     /// This default value can be always overridden at query level by the query option
     /// [CommonConstants.Broker.Request.QueryOptionKey#USE_MV_AGGREGATE].
     @Value.Default
-    default boolean defaultUseMvAggregate() {
-      return CommonConstants.Broker.DEFAULT_USE_MV_AGGREGATE;
+    default MvAggregateMode defaultMvAggregateMode() {
+      return MvAggregateMode.fromString(CommonConstants.Broker.DEFAULT_USE_MV_AGGREGATE);
     }
 
     /// Whether to use lite mode by default.
@@ -1007,16 +1038,20 @@ public class QueryEnvironment {
   public class CompiledQuery implements Closeable {
     private final String _database;
     private final String _textQuery;
-    private final RelRoot _relRoot;
+    // The optimized plan. The MV aggregate fallback replaces it, see #replanWithMvAggregate
+    private RelRoot _relRoot;
+    // The plan before optimization, which the MV aggregate fallback optimizes again
+    private final RelRoot _unoptimizedRelRoot;
     private final PlannerContext _plannerContext;
     private final SqlNodeAndOptions _sqlNodeAndOptions;
     private final Set<String> _tableNames;
 
-    private CompiledQuery(String database, String textQuery, RelRoot relRoot, PlannerContext plannerContext,
-        SqlNodeAndOptions sqlNodeAndOptions) {
+    private CompiledQuery(String database, String textQuery, RelRoot relRoot, RelRoot unoptimizedRelRoot,
+        PlannerContext plannerContext, SqlNodeAndOptions sqlNodeAndOptions) {
       _database = database;
       _textQuery = textQuery;
       _relRoot = relRoot;
+      _unoptimizedRelRoot = unoptimizedRelRoot;
       _plannerContext = plannerContext;
       _sqlNodeAndOptions = sqlNodeAndOptions;
       // Important & tricky: RelToPlanNodeConverter uses thread local. Therefore we need to get the table names here
@@ -1036,6 +1071,55 @@ public class QueryEnvironment {
       return _plannerContext;
     }
 
+    /// Builds the dispatchable plan. In the auto mode of the MV aggregate, a plan that fails the `ARRAY_TO_MV`
+    /// validation is optimized again with the MV aggregate (see [#replanWithMvAggregate]).
+    private DispatchableSubPlan toDispatchableSubPlanWithMvAggregateFallback() {
+      try {
+        return toDispatchableSubPlan(_relRoot, _plannerContext);
+      } catch (QueryException e) {
+        replanWithMvAggregate(e);
+        return toDispatchableSubPlan(_relRoot, _plannerContext);
+      }
+    }
+
+    /// The [MvAggregateMode#AUTO] mode of the MV aggregate: when the plan without the MV aggregate fails the
+    /// `ARRAY_TO_MV` validation, optimizes the unoptimized plan again with the MV aggregate on and replaces
+    /// [#_relRoot]. Rethrows `e` when the fallback does not apply.
+    ///
+    /// Only a query that fails without the MV aggregate changes. A query that passes the validation keeps the plan of
+    /// a broker that predates the MV aggregate, so servers that predate it can run it.
+    private void replanWithMvAggregate(QueryException e) {
+      if (!(e instanceof ArrayToMvValidationVisitor.ArrayToMvValidationException) || !canFallBackToMvAggregate()) {
+        throw e;
+      }
+      _plannerContext.enableMvAggregateFallback();
+      _relRoot = _unoptimizedRelRoot.withRel(optimizeAndConvert(_unoptimizedRelRoot, _plannerContext));
+    }
+
+    /// Whether [#replanWithMvAggregate] can plan this query again with the MV aggregate. The physical optimizer does
+    /// not support the MV aggregate.
+    private boolean canFallBackToMvAggregate() {
+      return _plannerContext.getMvAggregateMode() == MvAggregateMode.AUTO && !_plannerContext.isUseMvAggregate()
+          && !_plannerContext.isUsePhysicalOptimizer();
+    }
+
+    /// The [MvAggregateMode#AUTO] mode for `EXPLAIN PLAN WITHOUT IMPLEMENTATION`, which builds no dispatchable plan:
+    /// validates the plan fragments without worker assignment, and plans the query again with the MV aggregate when
+    /// they fail the `ARRAY_TO_MV` validation. So the explained plan is the plan that the query runs.
+    private void applyMvAggregateFallbackWithoutImplementation() {
+      if (!canFallBackToMvAggregate() || !containsArrayToMv(_relRoot.rel)) {
+        return;
+      }
+      Map<String, String> options = _plannerContext.getOptions();
+      SubPlan plan = PinotLogicalQueryPlanner.makePlan(_relRoot, null, useSpools(options),
+          _envConfig.defaultHashFunction(), pruneUnnestColumns(options));
+      try {
+        ArrayToMvValidationVisitor.validateFragments(plan.getSubPlanRoot());
+      } catch (ArrayToMvValidationVisitor.ArrayToMvValidationException e) {
+        replanWithMvAggregate(e);
+      }
+    }
+
     /// Explain the query plan.
     /// The original query must be an EXPLAIN query and way it will be explained depends on the options of the EXPLAIN
     /// query and the [QueryEnvironment.Config] used to create the [QueryEnvironment] that compiled this query.
@@ -1050,23 +1134,24 @@ public class QueryEnvironment {
         SqlExplainFormat format = _plannerContext.getSqlExplainFormat();
         if (explain instanceof SqlPhysicalExplain) {
           // get the physical plan for query.
-          DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlan(_relRoot, _plannerContext);
+          DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlanWithMvAggregateFallback();
           return getQueryPlannerResult(_plannerContext, dispatchableSubPlan,
               PhysicalExplainPlanVisitor.explain(dispatchableSubPlan), dispatchableSubPlan.getTableNames());
         } else {
           // get the logical plan for query.
           SqlExplainLevel level =
               explain.getDetailLevel() == null ? SqlExplainLevel.DIGEST_ATTRIBUTES : explain.getDetailLevel();
-          Set<String> tableNames = RelToPlanNodeConverter.getTableNamesFromRelRoot(_relRoot.rel);
           if (!explain.withImplementation()) {
             // The query explicitly asked to skip implementation planning, so render the logical plan as-is.
+            applyMvAggregateFallbackWithoutImplementation();
+            Set<String> tableNames = RelToPlanNodeConverter.getTableNamesFromRelRoot(_relRoot.rel);
             return getQueryPlannerResult(_plannerContext, null, PlannerUtils.explainPlan(_relRoot.rel, format, level),
                 tableNames);
           } else if (onServerExplainer == null) {
             // Build the dispatchable subplan even though only the logical plan is rendered: some planning errors are
             // raised while converting the plan or assigning workers (e.g. a `tableOptions` partition hint that
             // disagrees with the table's actual partitioning), and EXPLAIN must fail wherever execution would.
-            DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlan(_relRoot, _plannerContext);
+            DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlanWithMvAggregateFallback();
             return getQueryPlannerResult(_plannerContext, dispatchableSubPlan,
                 PlannerUtils.explainPlan(_relRoot.rel, format, level), dispatchableSubPlan.getTableNames());
           } else {
@@ -1077,8 +1162,14 @@ public class QueryEnvironment {
             TransformationTracker.ByIdentity.Builder<PlanNode, RelNode> nodeTracker =
                 new TransformationTracker.ByIdentity.Builder<>();
             // Transform RelNodes into DispatchableSubPlan
-            DispatchableSubPlan dispatchableSubPlan =
-                toDispatchableSubPlan(_relRoot, _plannerContext, nodeTracker);
+            DispatchableSubPlan dispatchableSubPlan;
+            try {
+              dispatchableSubPlan = toDispatchableSubPlan(_relRoot, _plannerContext, nodeTracker);
+            } catch (QueryException e) {
+              replanWithMvAggregate(e);
+              nodeTracker = new TransformationTracker.ByIdentity.Builder<>();
+              dispatchableSubPlan = toDispatchableSubPlan(_relRoot, _plannerContext, nodeTracker);
+            }
 
             AskingServerStageExplainer serversExplainer = new AskingServerStageExplainer(
                 onServerExplainer, explainPlanVerbose, RelBuilder.create(_config));
@@ -1103,7 +1194,7 @@ public class QueryEnvironment {
         // TODO: current code only assume one SubPlan per query, but we should support multiple SubPlans per query.
         // Each SubPlan should be able to run independently from Broker then set the results into the dependent
         // SubPlan for further processing.
-        DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlan(_relRoot, _plannerContext);
+        DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlanWithMvAggregateFallback();
         return getQueryPlannerResult(_plannerContext, dispatchableSubPlan, null, dispatchableSubPlan.getTableNames());
       } catch (QueryException e) {
         throw e;

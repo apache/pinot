@@ -27,7 +27,6 @@ import java.util.Map;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.type.RelDataType;
-import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.sql.SqlBinaryOperator;
 import org.apache.calcite.sql.SqlFunction;
@@ -143,18 +142,20 @@ public class PinotOperatorTable implements SqlOperatorTable {
   /// still pushed below joins.
   public static final PinotSqlFunction ARRAY_TO_MV =
       new PinotSqlFunction(ArrayToMvFunctionName.NAME,
-          opBinding -> arrayToMvReturnType(opBinding.getTypeFactory(), opBinding.getOperandType(0)),
+          opBinding -> arrayToMvReturnType(opBinding.getOperandType(0)),
           OperandTypes.ARRAY, false);
 
-  /// The type of `ARRAY_TO_MV(array)`: the component type of `arrayType`, nullable when the array or its component
-  /// is nullable. The MV aggregate gives its MV keys the same type, so that it can replace a plain aggregate over
-  /// `ARRAY_TO_MV(array)` without changing the row type.
-  public static RelDataType arrayToMvReturnType(RelDataTypeFactory typeFactory, RelDataType arrayType) {
+  /// The type of `ARRAY_TO_MV(array)`: the component type of `arrayType`. The MV aggregate gives its MV keys the same
+  /// type, so that it can replace a plain aggregate over `ARRAY_TO_MV(array)` without changing the row type.
+  ///
+  /// The type does not depend on the MV aggregate mode, because the `auto` mode optimizes the already converted plan
+  /// again with the MV aggregate. A null multi-value row still goes into the null group at runtime, as in the
+  /// single-stage engine.
+  public static RelDataType arrayToMvReturnType(RelDataType arrayType) {
     RelDataType componentType = arrayType.getComponentType();
     Preconditions.checkArgument(componentType != null, "ARRAY_TO_MV requires an array, got: %s",
         arrayType.getFullTypeString());
-    return typeFactory.createTypeWithNullability(componentType,
-        arrayType.isNullable() || componentType.isNullable());
+    return componentType;
   }
 
   /// This list includes the supported standard [SqlOperator]s defined in [SqlStdOperatorTable].

@@ -137,7 +137,7 @@ public class PinotLogicalMvAggregate extends Aggregate {
             "MV key at group position " + mvKeyIndex + " must be an array, got: " + arrayType.getFullTypeString());
       }
       // Same type as ARRAY_TO_MV(array), so the MV aggregate keeps the row type of the aggregate it replaces.
-      types.set(mvKeyIndex, PinotOperatorTable.arrayToMvReturnType(typeFactory, arrayType));
+      types.set(mvKeyIndex, PinotOperatorTable.arrayToMvReturnType(arrayType));
     }
     return typeFactory.createStructType(types, names);
   }

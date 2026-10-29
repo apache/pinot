@@ -362,9 +362,7 @@ public class QueryEnvironmentTestBase {
         .database(CommonConstants.DEFAULT_DATABASE)
         .tableCache(tableCache)
         .workerManager(new WorkerManager("Broker_localhost", "localhost", reducerPort, routingManager))
-        .isNullHandlingEnabled(true)
-        // The plan and runtime tests cover the MV aggregate, which the broker disables by default.
-        .defaultUseMvAggregate(true);
+        .isNullHandlingEnabled(true);
     return new QueryEnvironment(configCustomizer.apply(config).build());
   }
 

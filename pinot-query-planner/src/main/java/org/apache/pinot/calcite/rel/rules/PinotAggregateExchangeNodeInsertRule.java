@@ -65,9 +65,7 @@ import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalMvAggregate;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
 import org.apache.pinot.common.function.sql.PinotSqlAggFunction;
-import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.query.QueryEnvironment;
-import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -245,7 +243,7 @@ public class PinotAggregateExchangeNodeInsertRule {
     List<Integer> mvKeys = List.of();
     if (hasGroupBy && aggRel.getGroupType() == Aggregate.Group.SIMPLE) {
       mvKeys = ArrayToMvGroupKeys.detect(aggRel);
-      if (!mvKeys.isEmpty() && !isMvAggregateEnabled(call)) {
+      if (!mvKeys.isEmpty() && !PinotRuleUtils.isMvAggregateEnabled(call)) {
         mvKeys = List.of();
       }
     }
@@ -354,22 +352,6 @@ public class PinotAggregateExchangeNodeInsertRule {
     PinotLogicalExchange exchange = PinotLogicalExchange.create(leafAggRel,
         RelDistributions.hash(ImmutableIntList.range(0, aggRel.getGroupCount())));
     return convertAggFromIntermediateInput(aggRel, exchange, AggType.FINAL, leafReturnFinalResult, collations, limit);
-  }
-
-  /// Whether `GROUP BY ARRAY_TO_MV(col)` is planned as an MV aggregate. The query option `useMvAggregate` decides when
-  /// the query sets it. Otherwise [QueryEnvironment.Config#defaultUseMvAggregate()] decides.
-  private static boolean isMvAggregateEnabled(RelOptRuleCall call) {
-    Context genericContext = call.getPlanner().getContext();
-    if (genericContext == null) {
-      return true;
-    }
-    PlannerContext plannerContext = genericContext.unwrap(PlannerContext.class);
-    if (plannerContext != null) {
-      return QueryOptionsUtils.isUseMvAggregate(plannerContext.getOptions(),
-          plannerContext.getEnvConfig().defaultUseMvAggregate());
-    }
-    QueryEnvironment.Config envConfig = genericContext.unwrap(QueryEnvironment.Config.class);
-    return envConfig == null || envConfig.defaultUseMvAggregate();
   }
 
   // TODO: Currently it only handles one WITHIN GROUP collation across all AggregateCalls.

@@ -1326,14 +1326,15 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
         .doesNotContain("PinotLogicalMvAggregate");
   }
 
-  /// The broker config `pinot.broker.multistage.use.mv.aggregate` is off by default. Setting it in the cluster config
-  /// turns the MV aggregate on for the next queries without a broker restart, and removing it turns it off again.
+  /// The broker config `pinot.broker.multistage.use.mv.aggregate` is `auto` by default, which keeps the plain plan of a
+  /// leaf-only aggregate. Setting `true` in the cluster config turns the MV aggregate on for the next queries without
+  /// a broker restart, and removing it restores `auto`.
   @Test
   public void testMvAggregateClusterConfigAppliesWithoutRestart()
       throws Exception {
     String query = "EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(RandomAirports), COUNT(*) FROM mytable "
         + "GROUP BY ARRAY_TO_MV(RandomAirports)";
-    waitForPlan(query, false, "The broker plans the MV aggregate by default");
+    waitForPlan(query, false, "The broker plans the MV aggregate for a leaf-only aggregate by default");
     try {
       updateClusterConfig(Map.of(CommonConstants.Broker.CONFIG_OF_USE_MV_AGGREGATE, "true"));
       waitForPlan(query, true, "The broker does not plan the MV aggregate after the cluster config change");
@@ -1377,6 +1378,11 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     List<List<String>> expectedRows = sortedRows(unnest.get("resultTable").get("rows"));
     assertFalse(expectedRows.isEmpty());
     assertEquals(sortedRows(mvAggregate.get("resultTable").get("rows")), expectedRows);
+    // The default mode, auto, plans the MV aggregate because the query fails without it.
+    Assertions.assertThat(explainPlan("EXPLAIN PLAN FOR " + query)).contains("PinotLogicalMvAggregate");
+    JsonNode auto = postQuery(query);
+    assertNoError(auto);
+    assertEquals(sortedRows(auto.get("resultTable").get("rows")), expectedRows);
   }
 
   /// Above a hash join and above a lookup join with the dimension table, the MV aggregate gives the same rows as the

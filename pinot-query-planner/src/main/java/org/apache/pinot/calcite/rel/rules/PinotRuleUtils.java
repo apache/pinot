@@ -24,7 +24,9 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import javax.annotation.Nullable;
+import org.apache.calcite.plan.Context;
 import org.apache.calcite.plan.Contexts;
+import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.plan.hep.HepRelVertex;
 import org.apache.calcite.rel.RelNode;
@@ -55,6 +57,9 @@ import org.apache.calcite.util.Util;
 import org.apache.pinot.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.pinot.calcite.sql.fun.PinotOperatorTable;
 import org.apache.pinot.common.function.sql.PinotSqlFunction;
+import org.apache.pinot.query.QueryEnvironment;
+import org.apache.pinot.query.context.PlannerContext;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.MvAggregateMode;
 
 
 public class PinotRuleUtils {
@@ -184,6 +189,23 @@ public class PinotRuleUtils {
       Util.swallow(e, null);
       return false;
     }
+  }
+
+  /// Whether `GROUP BY ARRAY_TO_MV(col)` is planned as an MV aggregate in this planner run, see
+  /// [PlannerContext#isUseMvAggregate()]. Without a planner context, it is planned only when
+  /// [QueryEnvironment.Config#defaultMvAggregateMode()] is [MvAggregateMode#TRUE]. Without any context, it is not
+  /// planned, so that the gate fails closed.
+  public static boolean isMvAggregateEnabled(RelOptRuleCall call) {
+    Context genericContext = call.getPlanner().getContext();
+    if (genericContext == null) {
+      return false;
+    }
+    PlannerContext plannerContext = genericContext.unwrap(PlannerContext.class);
+    if (plannerContext != null) {
+      return plannerContext.isUseMvAggregate();
+    }
+    QueryEnvironment.Config envConfig = genericContext.unwrap(QueryEnvironment.Config.class);
+    return envConfig != null && envConfig.defaultMvAggregateMode() == MvAggregateMode.TRUE;
   }
 
   public static class WindowUtils {
