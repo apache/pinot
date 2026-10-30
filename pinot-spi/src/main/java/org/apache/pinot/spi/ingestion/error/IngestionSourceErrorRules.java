@@ -480,7 +480,8 @@ final class IngestionSourceErrorRules {
     return null;
   }
 
-  /// An OAuth 2.0 token endpoint's `error` (RFC 6749 section 5.2), falling back to its status.
+  /// An OAuth 2.0 token endpoint's `error` (RFC 6749 section 5.2), falling back to its status. An error no row names
+  /// is still the endpoint refusing the token request, unless its status says it couldn't serve it.
   @Nullable
   private static IngestionSourceErrorVerdict oauth(@Nullable String error, int status) {
     if (error != null) {
@@ -491,9 +492,10 @@ final class IngestionSourceErrorRules {
       if (OAUTH_AUTHORIZATION.contains(normalized)) {
         return auth(IngestionSourceErrorSubReason.AUTHORIZATION, normalized, TARGET_IDP);
       }
-      if (OAUTH_UNAVAILABLE.contains(normalized)) {
+      if (OAUTH_UNAVAILABLE.contains(normalized) || isUnavailable(status)) {
         return sourceRead(normalized, TARGET_IDP);
       }
+      return auth(IngestionSourceErrorSubReason.UNSPECIFIED, normalized, TARGET_IDP);
     }
     return httpStatus(status, TARGET_IDP);
   }
@@ -597,7 +599,6 @@ final class IngestionSourceErrorRules {
     if (message.contains(PULSAR_OAUTH_TOKEN)) {
       Matcher error = PULSAR_OAUTH_ERROR.matcher(message);
       if (error.find()) {
-        // An error we don't recognise decides nothing: it could be a refusal.
         return oauth(error.group(1), 0);
       }
       Matcher status = PULSAR_OAUTH_STATUS.matcher(message);

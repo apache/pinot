@@ -178,12 +178,17 @@ public class KafkaSourceErrorClassificationTest {
         IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_IDP).getCode(), "invalid_request");
     assertEquals(assertAuth(underPinot(constructOAuthConsumer(401, "{\"error\":\"invalid_request\"}")),
         IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_IDP).getCode(), "invalid_request");
+    // An error no row names is still a refusal.
+    assertEquals(assertAuth(underPinot(constructOAuthConsumer(400, "{\"error\":\"invalid_dpop_proof\"}")),
+        IngestionSourceErrorSubReason.UNSPECIFIED, TARGET_IDP).getCode(), "invalid_dpop_proof");
   }
 
   @Test
   public void oauthTokenEndpointThatFailedIsSourceReadInTheRealClient()
       throws Exception {
     assertSourceRead(underPinot(constructOAuthConsumer(503, "unavailable")), TARGET_IDP);
+    // Whatever error the body names, a 5xx failed.
+    assertSourceRead(underPinot(constructOAuthConsumer(503, "{\"error\":\"backend_error\"}")), TARGET_IDP);
     int closedPort;
     try (ServerSocket socket = new ServerSocket(0)) {
       closedPort = socket.getLocalPort();
