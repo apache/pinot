@@ -24,12 +24,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.OffsetAndTimestamp;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.errors.TimeoutException;
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
 import org.apache.pinot.spi.stream.LongMsgOffset;
@@ -54,10 +56,31 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertSame;
+import static org.testng.Assert.expectThrows;
 
 
 public class KafkaStreamMetadataProviderTest {
   private static final ThreadLocal<Consumer<Bytes, Bytes>> MOCK_CONSUMER = new ThreadLocal<>();
+
+  @Test
+  public void testFetchLatestStreamOffsetPreservesTimeoutCause()
+      throws Exception {
+    String topic = "asset";
+    Consumer<Bytes, Bytes> consumer = mockConsumer(topic, 2);
+    List<TopicPartition> partitions = List.of(new TopicPartition(topic, 1));
+    TimeoutException timeout = new TimeoutException("end offsets unavailable");
+    when(consumer.endOffsets(partitions, Duration.ofMillis(25))).thenThrow(timeout);
+    MOCK_CONSUMER.set(consumer);
+    try (KafkaStreamMetadataProvider provider = new MockKafkaStreamMetadataProvider("client", getStreamConfig(topic))) {
+      TransientConsumerException exception = expectThrows(TransientConsumerException.class,
+          () -> provider.fetchLatestStreamOffset(Set.of(1), 25));
+      assertSame(exception.getCause(), timeout);
+      verify(consumer).endOffsets(partitions, Duration.ofMillis(25));
+    } finally {
+      MOCK_CONSUMER.remove();
+    }
+  }
 
   @Test
   public void testComputePartitionGroupMetadataRecoversMissingLowPartitionId()

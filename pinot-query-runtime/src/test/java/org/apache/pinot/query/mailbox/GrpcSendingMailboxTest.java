@@ -43,6 +43,7 @@ import java.util.stream.Collectors;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockEquals;
 import org.apache.pinot.common.datablock.DataBlockUtils;
+import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.proto.Mailbox.MailboxContent;
 import org.apache.pinot.common.proto.Mailbox.MailboxStatus;
@@ -50,6 +51,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.datablock.DataBlockBuilder;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
+import org.apache.pinot.query.mailbox.channel.ChannelUtils;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
@@ -70,9 +72,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
@@ -133,6 +137,48 @@ public class GrpcSendingMailboxTest {
       verify(call).halfClose();
     } finally {
       mailbox.close();
+    }
+  }
+
+  @Test
+  @SuppressWarnings("unchecked") // The mocked gRPC listener class token erases its response type parameter.
+  public void earlyTerminationDropsDataButStillSendsEos()
+      throws Exception {
+    ChannelManager manager = mock(ChannelManager.class);
+    ManagedChannel channel = mock(ManagedChannel.class);
+    ClientCall<MailboxContent, MailboxStatus> call = mock(ClientCall.class);
+    when(manager.getChannel("localhost", 8000)).thenReturn(channel);
+    when(channel.<MailboxContent, MailboxStatus>newCall(any(), any())).thenReturn(call);
+    GrpcSendingMailbox mailbox = new GrpcSendingMailbox("early-termination-before-eos", manager, "localhost", 8000,
+        Long.MAX_VALUE, new StatMap<>(MailboxSendOperator.StatKey.class), 4 * 1024 * 1024, false);
+    DataSchema schema = new DataSchema(new String[]{"value"}, new ColumnDataType[]{ColumnDataType.STRING});
+    try (QueryThreadContext ignored = QueryThreadContext.openForMseTest()) {
+      try {
+        mailbox.send(new RowHeapDataBlock(List.<Object[]>of(new Object[]{"first"}), schema));
+        ArgumentCaptor<ClientCall.Listener<MailboxStatus>> listener =
+            ArgumentCaptor.forClass(ClientCall.Listener.class);
+        verify(call).start(listener.capture(), any());
+        listener.getValue().onMessage(MailboxStatus.newBuilder()
+            .putMetadata(ChannelUtils.MAILBOX_METADATA_REQUEST_EARLY_TERMINATE, "true").build());
+        assertTrue(mailbox.isEarlyTerminated());
+        assertFalse(mailbox.isTerminated());
+
+        mailbox.send(new RowHeapDataBlock(List.<Object[]>of(new Object[]{"discarded"}), schema));
+        mailbox.send(SuccessMseBlock.INSTANCE, List.of());
+
+        ArgumentCaptor<MailboxContent> contents = ArgumentCaptor.forClass(MailboxContent.class);
+        verify(call, times(2)).sendMessage(contents.capture());
+        DataBlock first = DataBlockUtils.deserialize(
+            List.of(contents.getAllValues().getFirst().getPayload().asReadOnlyByteBuffer()));
+        assertEquals(first.getString(0, 0), "first");
+        MetadataBlock eos = (MetadataBlock) DataBlockUtils.deserialize(
+            List.of(contents.getAllValues().getLast().getPayload().asReadOnlyByteBuffer()));
+        assertEquals(eos.getType(), MetadataBlock.MetadataBlockType.EOS);
+        assertTrue(mailbox.isTerminated());
+        verify(call).halfClose();
+      } finally {
+        mailbox.close();
+      }
     }
   }
 
