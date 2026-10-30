@@ -48,6 +48,7 @@ import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexContext;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -154,14 +155,31 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
       File segmentDir = segmentReader.toSegmentDirectory().getPath().toFile();
       TextIndexConfig indexConfig = fieldIndexConfigs.getConfig(StandardIndexes.text());
       if (indexConfig.isStoreInSegmentFile()) {
-        PinotDataBuffer textIndexBuffer = null;
-        try {
-          textIndexBuffer = segmentReader.getIndexFor(metadata.getColumnName(), StandardIndexes.text());
-        } catch (IOException e) {
-          throw new RuntimeException(e);
+        // Legacy-directory-first: if the on-disk text index is still the Lucene directory (a V3
+        // segment TextIndexHandler has not migrated yet — its combined-format conversion is
+        // v3-gated — or any V1/V2 segment backed by FilePerIndexDirectory), read it directly and
+        // skip the consolidated probe entirely. FilePerIndexDirectory resolves getIndexFor to that
+        // directory and fails to map it (not a regular file), which would kill the segment load
+        // before any fallback could run. This keeps storeInSegmentFile=true rolling-upgrade-safe
+        // for existing text segments.
+        // Probe only when the segment directory is a local directory: under a remote/tiered segment
+        // directory (e.g. tiered storage on S3) getPath() is not a local filesystem path, there can
+        // be no legacy directory on disk, and findTextIndexIndexFile -> findFormatFile would reject
+        // the path outright (IllegalArgumentException) before getIndexFor could read the valid
+        // consolidated columns.psf entry.
+        File legacyTextIndex = segmentDir.isDirectory()
+            ? SegmentDirectoryPaths.findTextIndexIndexFile(segmentDir, metadata.getColumnName())
+            : null;
+        if (legacyTextIndex == null || !legacyTextIndex.isDirectory()) {
+          PinotDataBuffer textIndexBuffer;
+          try {
+            textIndexBuffer = segmentReader.getIndexFor(metadata.getColumnName(), StandardIndexes.text());
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+          return new LuceneTextIndexReader(metadata.getColumnName(), textIndexBuffer, metadata.getTotalDocs(),
+              indexConfig);
         }
-        return new LuceneTextIndexReader(metadata.getColumnName(), textIndexBuffer, metadata.getTotalDocs(),
-            indexConfig);
       }
       return new LuceneTextIndexReader(metadata.getColumnName(), segmentDir, metadata.getTotalDocs(), indexConfig);
     }
