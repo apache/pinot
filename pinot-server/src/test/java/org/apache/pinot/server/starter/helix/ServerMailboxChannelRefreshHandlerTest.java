@@ -36,6 +36,7 @@ import org.testng.annotations.Test;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -203,6 +204,43 @@ public class ServerMailboxChannelRefreshHandlerTest {
     when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
         .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, false));
     _handler.onInstanceConfigChange(List.of(), createCallbackContextForInstance(OTHER_SERVER_ID));
+    verify(_mailboxService).refreshChannel(OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT);
+  }
+
+  @Test
+  public void testMinionMembershipChangesDoNotReadServerConfigs() {
+    String minionId = "Minion_minionhost_8000";
+    when(_helixAdmin.getInstancesInCluster(CLUSTER_NAME))
+        .thenReturn(List.of(SELF_INSTANCE_ID, OTHER_SERVER_ID),
+            List.of(minionId, OTHER_SERVER_ID, SELF_INSTANCE_ID), List.of(SELF_INSTANCE_ID, OTHER_SERVER_ID));
+    when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
+        .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, true));
+    _handler.onInstanceConfigChange(List.of(), createInitContext());
+
+    _handler.onInstanceConfigChange(List.of(), createChildChangeContext());
+    _handler.onInstanceConfigChange(List.of(), createChildChangeContext());
+    verify(_helixAdmin, times(1)).getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID);
+    verify(_mailboxService, never()).refreshChannel(any(), anyInt());
+
+    when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
+        .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, false));
+    _handler.onInstanceConfigChange(List.of(), createCallbackContextForInstance(OTHER_SERVER_ID));
+    verify(_mailboxService).refreshChannel(OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT);
+  }
+
+  @Test
+  public void testServerMembershipChangesStillScanConfigs() {
+    when(_helixAdmin.getInstancesInCluster(CLUSTER_NAME))
+        .thenReturn(List.of(SELF_INSTANCE_ID), List.of(SELF_INSTANCE_ID, OTHER_SERVER_ID));
+    when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
+        .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, true));
+    _handler.onInstanceConfigChange(List.of(), createInitContext());
+    _handler.onInstanceConfigChange(List.of(), createChildChangeContext());
+    verify(_helixAdmin).getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID);
+
+    when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
+        .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, false));
+    _handler.onInstanceConfigChange(List.of(), createInitContext());
     verify(_mailboxService).refreshChannel(OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT);
   }
 

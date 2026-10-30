@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.server.starter.helix;
 
+import com.google.common.collect.Sets;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -68,6 +69,9 @@ public class ServerMailboxChannelRefreshHandler implements InstanceConfigChangeL
   private final String _selfInstanceId;
   private final MailboxService _mailboxService;
 
+  // Participant names from the last successful scan, used to identify changes unrelated to servers.
+  private Set<String> _instances = Set.of();
+
   // Tracks servers that have IS_SHUTDOWN_IN_PROGRESS=true. When a server transitions
   // from being in this set to having IS_SHUTDOWN_IN_PROGRESS=false, we refresh its channel.
   private final Set<String> _shuttingDownServers = new HashSet<>();
@@ -90,10 +94,10 @@ public class ServerMailboxChannelRefreshHandler implements InstanceConfigChangeL
 
     // INIT: first callback when the listener is registered (full cluster snapshot).
     // isChildChange: an instance ZK node was added or removed under /CONFIGS/PARTICIPANT.
-    // Both require a full scan to rebuild _shuttingDownServers from the current cluster state.
+    // INIT always scans; child changes scan only if they could affect servers.
     NotificationContext.Type type = context.getType();
     if (type == NotificationContext.Type.INIT || context.getIsChildChange()) {
-      handleFullScan();
+      handleFullScan(type == NotificationContext.Type.INIT);
     } else if (type == NotificationContext.Type.CALLBACK) {
       // An existing instance's config changed (e.g. IS_SHUTDOWN_IN_PROGRESS toggled).
       // pathChanged is the ZK path of the specific instance that changed.
@@ -103,16 +107,25 @@ public class ServerMailboxChannelRefreshHandler implements InstanceConfigChangeL
     }
   }
 
-  /// Full cluster scan: used on INIT (first callback) and when instances are added/removed.
+  /// Scans on INIT and child changes, skipping membership changes confined to non-server instances.
   ///
   /// It records the new address of every server before it retires any old one. Otherwise, when one server left an
   /// address and a server read later in the scan took it over, the scan would shut down the channel the second server
   /// uses.
-  private void handleFullScan() {
+  private void handleFullScan(boolean initialize) {
+    Set<String> instances = new HashSet<>(_helixAdmin.getInstancesInCluster(_clusterName));
+    Set<String> changedInstances = Sets.symmetricDifference(_instances, instances);
+    // An unchanged snapshot is ambiguous (e.g. a server was recreated with the same name), so still scan it.
+    if (!initialize && !changedInstances.isEmpty()
+        && changedInstances.stream().noneMatch(InstanceTypeUtils::isServer)) {
+      _instances = instances;
+      return;
+    }
+    boolean allConfigsRead = true;
     Set<String> currentShuttingDown = new HashSet<>();
     Set<String> currentServers = new HashSet<>();
     Map<String, Pair<String, Integer>> previousAddresses = new HashMap<>();
-    for (String instance : _helixAdmin.getInstancesInCluster(_clusterName)) {
+    for (String instance : instances) {
       if (!InstanceTypeUtils.isServer(instance) || instance.equals(_selfInstanceId)) {
         continue;
       }
@@ -120,6 +133,7 @@ public class ServerMailboxChannelRefreshHandler implements InstanceConfigChangeL
       currentServers.add(instance);
       InstanceConfig config = getInstanceConfig(instance);
       if (config == null) {
+        allConfigsRead = false;
         continue;
       }
       Pair<String, Integer> previousAddress = recordMailboxAddress(instance, config);
@@ -145,6 +159,8 @@ public class ServerMailboxChannelRefreshHandler implements InstanceConfigChangeL
     }
     _shuttingDownServers.clear();
     _shuttingDownServers.addAll(currentShuttingDown);
+    // A failed read must not suppress a retry on the next child change.
+    _instances = allConfigsRead ? instances : Set.of();
   }
 
   /// Handles a single instance config change by reading only the changed instance's config
