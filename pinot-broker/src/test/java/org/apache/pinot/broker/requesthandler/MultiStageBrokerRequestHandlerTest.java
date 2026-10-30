@@ -19,6 +19,7 @@
 package org.apache.pinot.broker.requesthandler;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -76,6 +77,7 @@ import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.util.TestUtils;
 import org.mockito.ArgumentCaptor;
 import org.mockito.MockedConstruction;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -83,11 +85,14 @@ import org.testng.annotations.Test;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.same;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
@@ -95,6 +100,7 @@ import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 
 public class MultiStageBrokerRequestHandlerTest extends QueryEnvironmentTestBase {
@@ -432,6 +438,75 @@ public class MultiStageBrokerRequestHandlerTest extends QueryEnvironmentTestBase
     } else {
       assertNull(fingerprint);
       assertNull(workerQueryHash);
+    }
+  }
+
+  @Test
+  public void testDispatchFailureReturnsExecutionErrorAndReleasesQueryResources()
+      throws Exception {
+    MockRoutingManagerFactory factory = new MockRoutingManagerFactory(10_001, 10_002);
+    TABLE_SCHEMAS.forEach((table, schema) -> factory.registerTable(schema, table));
+    SERVER1_SEGMENTS.forEach(
+        (table, segments) -> segments.forEach(segment -> factory.registerSegment(10_001, table, segment)));
+    SERVER2_SEGMENTS.forEach(
+        (table, segments) -> segments.forEach(segment -> factory.registerSegment(10_002, table, segment)));
+    RoutingManager routingManager = factory.buildRoutingManager(null);
+    WorkerManager workerManager = new WorkerManager("Broker_localhost", "localhost", 10_003, routingManager);
+    PinotConfiguration config = new PinotConfiguration();
+    config.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, "localhost");
+    config.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, Integer.toString(NetUtils.findOpenPort()));
+    config.setProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION, true);
+    BrokerQueryEventListenerFactory.init(config);
+    BrokerMetrics metrics = BrokerMetrics.noop();
+    QueryQuotaManager quotaManager = mock(QueryQuotaManager.class);
+    when(quotaManager.acquire(anyString())).thenReturn(true);
+    when(quotaManager.acquireDatabase(any())).thenReturn(true);
+    when(quotaManager.acquireApplication(anyString())).thenReturn(true);
+    MultiStageQueryThrottler throttler = new MultiStageQueryThrottler(config);
+
+    // Plan the real query against the existing routing/schema fixture. Only the dispatch I/O boundary fails.
+    try (MockedStatic<BrokerMetrics> brokerMetrics = mockStatic(BrokerMetrics.class, CALLS_REAL_METHODS);
+        MockedConstruction<QueryDispatcher> dispatchers = mockConstruction(QueryDispatcher.class)) {
+      brokerMetrics.when(BrokerMetrics::get).thenReturn(metrics);
+      MultiStageBrokerRequestHandler handler = new MultiStageBrokerRequestHandler(config, "testBrokerId",
+          new BrokerRequestIdGenerator(), routingManager, new AllowAllAccessControlFactory(), quotaManager,
+          factory.buildTableCache(), throttler, mock(FailureDetector.class),
+          ThreadAccountantUtils.getNoOpAccountant(), null, workerManager, workerManager);
+      QueryDispatcher dispatcher = dispatchers.constructed().get(0);
+      IllegalStateException failure = new IllegalStateException("dispatch failed", new IOException("connection reset"));
+      StackTraceElement[] frames = {
+          new StackTraceElement("example.Dispatcher", "submit", "Dispatcher.java", 10),
+          new StackTraceElement("example.Dispatcher", "dispatch", "Dispatcher.java", 11),
+          new StackTraceElement("example.Channel", "send", "Channel.java", 12),
+          new StackTraceElement("example.Channel", "write", "Channel.java", 13)
+      };
+      failure.setStackTrace(frames);
+      failure.getCause().setStackTrace(frames);
+      try (RequestScope requestContext = Tracing.getTracer().createRequestScope()) {
+        requestContext.setRequestArrivalTimeMillis(System.currentTimeMillis());
+        doAnswer(invocation -> {
+          assertTrue(throttler.currentQueryServerThreads() > 0, "Dispatch must hold the query's thread reservation");
+          assertTrue(handler.getRunningQueries().containsKey(requestContext.getRequestId()));
+          throw failure;
+        }).when(dispatcher).submitAndReduce(same(requestContext), any(), anyLong(), any(), any());
+
+        String sql = "SET timeoutMs = 60000; SELECT COUNT(*) FROM a";
+        BrokerResponse response =
+            handler.handleRequest(JsonUtils.newObjectNode().put("sql", sql), null, null, requestContext, null);
+
+        assertEquals(response.getExceptionsSize(), 1);
+        assertEquals(response.getExceptions().get(0).getErrorCode(), QueryErrorCode.QUERY_EXECUTION.getId());
+        String message = response.getExceptions().get(0).getMessage();
+        assertTrue(message.contains("dispatch failed"), message);
+        assertTrue(message.contains("connection reset"), message);
+        assertEquals(requestContext.getErrorCode(), QueryErrorCode.QUERY_EXECUTION.getId());
+        assertEquals(throttler.currentQueryServerThreads(), 0, "Failed dispatch must release its reservation");
+        assertEquals(handler.getRunningQueries(), Map.of(), "Failed dispatch must unregister the running query");
+        verify(dispatcher).submitAndReduce(same(requestContext), any(), anyLong(), any(), any());
+      } finally {
+        handler.shutDown();
+      }
+      verify(dispatcher).shutdown();
     }
   }
 

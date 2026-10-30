@@ -34,6 +34,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
@@ -185,6 +186,48 @@ public class OffHeapSetTest {
         offHeapSet.merge(offHeapSet2);
       }
       verify(offHeapSet, onHeapSet);
+    }
+  }
+
+  /// A zero-only donor must merge, deduplicate, and survive serialization through both public iterator forms.
+  @Test
+  public void testOffHeap128BitZeroDonorMergeAndReusableIteratorRoundTrip() {
+    Set<OffHeap128BitSet.Value> expected = Set.of(new OffHeap128BitSet.Value(0, 0),
+        new OffHeap128BitSet.Value(HashCommon.mix(7L), HashCommon.mix(11L)));
+    try (OffHeap128BitSet donor = new OffHeap128BitSet(INITIAL_EXPECTED_VALUES);
+        OffHeap128BitSet values = new OffHeap128BitSet(INITIAL_EXPECTED_VALUES)) {
+      donor.add(0, 0);
+      donor.add(0, 0);
+      assertEquals(donor.size(), 1, "Adding zero twice must retain a single distinct value");
+      values.add(7, 11);
+      values.merge(donor);
+      values.merge(donor);
+      verify(values, expected);
+      assertEquals(donor.size(), 1, "Merging must not consume the donor");
+
+      OffHeap128BitSet.Value buffer = new OffHeap128BitSet.Value(123, 456);
+      Iterator<Void> reusable = values.iterator(buffer);
+      Set<OffHeap128BitSet.Value> reusedValues = new HashSet<>();
+      for (int i = 0; i < expected.size(); i++) {
+        assertTrue(reusable.hasNext());
+        reusable.next();
+        // Copy the mutable buffer so a later next() cannot corrupt the membership assertion.
+        reusedValues.add(new OffHeap128BitSet.Value(buffer.getHigh(), buffer.getLow()));
+      }
+      assertFalse(reusable.hasNext());
+      assertEquals(reusedValues, expected, "The reusable buffer must represent zero and the nonzero value exactly");
+
+      Iterator<OffHeap128BitSet.Value> allocating = values.iterator();
+      Set<OffHeap128BitSet.Value> allocatedValues = new HashSet<>();
+      for (int i = 0; i < expected.size(); i++) {
+        assertTrue(allocating.hasNext());
+        allocatedValues.add(allocating.next());
+      }
+      assertFalse(allocating.hasNext());
+      assertEquals(allocatedValues, expected, "Iteration order is not part of the set contract");
+      try (OffHeap128BitSet restored = OffHeap128BitSet.deserialize(ByteBuffer.wrap(values.serialize()))) {
+        verify(restored, expected);
+      }
     }
   }
 
