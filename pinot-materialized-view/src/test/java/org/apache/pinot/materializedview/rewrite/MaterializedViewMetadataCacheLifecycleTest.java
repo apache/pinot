@@ -32,6 +32,7 @@ import org.apache.helix.zookeeper.zkclient.IZkDataListener;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.materializedview.metadata.MaterializedViewDefinitionMetadata;
 import org.apache.pinot.materializedview.metadata.MaterializedViewRuntimeMetadata;
+import org.mockito.ArgumentCaptor;
 import org.mockito.invocation.InvocationOnMock;
 import org.testng.annotations.Test;
 
@@ -42,8 +43,10 @@ import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
@@ -133,6 +136,44 @@ public class MaterializedViewMetadataCacheLifecycleTest {
         cache.getMaterializedViewEntriesForBaseTable("orders");
     assertNotNull(restored, "MV-table cycle must also restore the cache entry");
     assertTrue(restored.stream().anyMatch(e -> e.getMaterializedViewTableNameWithType().equals(MV_OFFLINE)));
+  }
+
+  @Test
+  public void testRuntimeChildChangeRefreshesKnownViewWithoutWatchingOrphan()
+      throws Exception {
+    @SuppressWarnings("unchecked")
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
+    Map<String, ZNRecord> store = new ConcurrentHashMap<>();
+    store.put(DEF_PATH, buildDefinition().toZNRecord());
+    store.put(RUNTIME_PATH, buildRuntime().toZNRecord());
+    String orphanView = "mv_orphan_OFFLINE";
+    String orphanRuntimePath = RUNTIME_PARENT + "/" + orphanView;
+    store.put(orphanRuntimePath,
+        new MaterializedViewRuntimeMetadata(orphanView, 10L, Map.of()).toZNRecord());
+    stubPropertyStore(propertyStore, store);
+
+    MaterializedViewMetadataCache cache = new MaterializedViewMetadataCache(propertyStore);
+    try {
+      ArgumentCaptor<IZkChildListener> listener = ArgumentCaptor.forClass(IZkChildListener.class);
+      verify(propertyStore).subscribeChildChanges(eq(RUNTIME_PARENT), listener.capture());
+      long refreshedWatermark = 1_700_000_086_400L;
+      store.put(RUNTIME_PATH,
+          new MaterializedViewRuntimeMetadata(MV_OFFLINE, refreshedWatermark, Map.of()).toZNRecord());
+      listener.getValue().handleChildChange(RUNTIME_PARENT, List.of(MV_OFFLINE, orphanView));
+
+      List<MaterializedViewMetadataCache.MaterializedViewCacheEntry> entries =
+          cache.getMaterializedViewEntriesForBaseTable("orders");
+      assertNotNull(entries);
+      assertEquals(entries.size(), 1);
+      assertEquals(entries.get(0).getMaterializedViewTableNameWithType(), MV_OFFLINE);
+      assertEquals(entries.get(0).getWatermarkMs(), refreshedWatermark,
+          "Runtime children with a definition must refresh their live rewrite entry");
+      assertEquals(cache.size(), 1, "An orphan runtime must not create a queryable view");
+      verify(propertyStore, never()).subscribeDataChanges(eq(orphanRuntimePath), any(IZkDataListener.class));
+    } finally {
+      cache.close();
+    }
+    verify(propertyStore).unsubscribeDataChanges(eq(RUNTIME_PATH), any(IZkDataListener.class));
   }
 
   private static void stubPropertyStore(ZkHelixPropertyStore<ZNRecord> propertyStore, Map<String, ZNRecord> store) {

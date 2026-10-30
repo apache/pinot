@@ -1858,4 +1858,32 @@ public class RetentionManagerTest {
     when(resourceManager.getPropertyStore().get(anyString(), any(Stat.class), eq(AccessOption.PERSISTENT)))
         .thenReturn(lineage.toZNRecord());
   }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  public void testEmptyRealtimeTableRetentionDoesNotSubmitDeletion() {
+    TableConfig config = createRealtimeTableConfig1(1);
+    String table = config.getTableName();
+    PinotHelixResourceManager resources = mock(PinotHelixResourceManager.class);
+    HelixAdmin admin = mock(HelixAdmin.class);
+    ZkHelixPropertyStore<ZNRecord> store = mock(ZkHelixPropertyStore.class);
+    when(resources.getTableConfig(table)).thenReturn(config);
+    when(resources.getSegmentsZKMetadata(table)).thenReturn(List.of());
+    when(resources.getLastLLCCompletedSegments(table)).thenReturn(Set.of());
+    when(resources.getHelixAdmin()).thenReturn(admin);
+    when(resources.getHelixClusterName()).thenReturn("empty-retention");
+    when(admin.getResourceIdealState("empty-retention", table)).thenReturn(new IdealState(table));
+    when(resources.getPropertyStore()).thenReturn(store);
+    when(resources.getLineageUpdaterLock(table)).thenReturn(new Object());
+    ControllerConf conf = new ControllerConf();
+    conf.setUntrackedSegmentDeletionEnabled(false);
+    RetentionManager manager = createRetentionManager(resources, mock(LeadControllerManager.class), conf,
+        mock(ControllerMetrics.class), mock(BrokerServiceHelper.class));
+
+    manager.processTable(table);
+
+    verify(resources).getSegmentsZKMetadata(table);
+    verify(resources, never()).deleteSegments(anyString(), anyList());
+    verify(resources, never()).deleteSegmentsForLineageCleanup(anyString(), anyList());
+  }
 }

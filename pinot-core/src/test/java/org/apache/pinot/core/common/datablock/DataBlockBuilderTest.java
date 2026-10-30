@@ -41,10 +41,30 @@ import org.testng.annotations.Test;
 import static org.mockito.Mockito.mock;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 @SuppressWarnings("rawtypes")
 public class DataBlockBuilderTest {
+
+  @Test
+  public void testInterruptedRowBuildPreservesInterruptStatus() {
+    boolean previouslyInterrupted = Thread.interrupted();
+    try {
+      Thread.currentThread().interrupt();
+      DataSchema schema = new DataSchema(new String[] {"value"}, new ColumnDataType[] {ColumnDataType.INT});
+      RuntimeException exception = expectThrows(RuntimeException.class,
+          () -> DataBlockBuilder.buildFromRows(List.<Object[]>of(new Object[] {7}), schema));
+      assertEquals(exception.getMessage(), "Thread interrupted while processing rows. Rows processed so far: 0");
+      assertTrue(Thread.currentThread().isInterrupted());
+    } finally {
+      Thread.interrupted();
+      if (previouslyInterrupted) {
+        Thread.currentThread().interrupt();
+      }
+    }
+  }
 
   @DataProvider(name = "columnDataTypes")
   ColumnDataType[] columnDataTypes() {

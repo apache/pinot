@@ -941,4 +941,27 @@ public class BrokerRoutingManagerTest {
     // Don't set IS_SHUTDOWN_IN_PROGRESS or QUERIES_DISABLED (they default to false)
     return record;
   }
+
+  @Test
+  public void testExternalViewRemovedDuringAssignmentRefreshPreservesThePreviousRouting()
+      throws Exception {
+    InstanceSelector selector = mock(InstanceSelector.class);
+    putRoutingEntry(TEST_TABLE, createRoutingEntry(TEST_TABLE, null, null, Map.of(), selector, false));
+    IdealState idealState = createIdealState(true);
+    stubSegmentAssignmentChange(idealState);
+    // Stats were read while the table existed; deletion races the subsequent payload read.
+    when(_zkDataAccessor.get(eq("/EXTERNALVIEW/" + TEST_TABLE), any(), eq(AccessOption.PERSISTENT)))
+        .thenReturn(null);
+
+    _routingManager.processClusterChange(ChangeType.EXTERNAL_VIEW);
+
+    verify(selector, never()).onAssignmentChange(any(), any(), any());
+    verify(_brokerMetrics, never()).addMeteredTableValue(TEST_TABLE, BrokerMeter.ROUTING_TABLE_UPDATE_SUCCESS, 1L);
+    verify(_brokerMetrics, never()).addMeteredTableValue(TEST_TABLE, BrokerMeter.ROUTING_TABLE_UPDATE_FAILURE, 1L);
+    // Recovering the ExternalView on the next event must still refresh this unchanged-version entry.
+    stubSegmentAssignmentChange(idealState);
+    _routingManager.processClusterChange(ChangeType.EXTERNAL_VIEW);
+    verify(selector).onAssignmentChange(any(), any(), any());
+    verify(_brokerMetrics).addMeteredTableValue(TEST_TABLE, BrokerMeter.ROUTING_TABLE_UPDATE_SUCCESS, 1L);
+  }
 }

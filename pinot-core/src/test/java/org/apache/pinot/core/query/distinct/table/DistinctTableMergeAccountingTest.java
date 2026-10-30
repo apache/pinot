@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
@@ -44,6 +45,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.assertTrue;
 
 
 /// Verifies that [DistinctTable#mergeDistinctTable] reports resource usage to the query accountant *while* the
@@ -66,6 +68,41 @@ public class DistinctTableMergeAccountingTest {
 
   /// Limit used by the two limited branches. High enough that the merge never satisfies the limit and returns early.
   private static final int LIMIT = NUM_VALUES + 1;
+
+  @Test
+  public void testFloatDataTableRoundTripWithoutNullHandling()
+      throws Exception {
+    DataSchema schema = singleColumnSchema(ColumnDataType.FLOAT);
+    FloatDistinctTable source = new FloatDistinctTable(schema, 10, false, null);
+    source.addUnbounded(2.5f);
+    source.addUnbounded(1.25f);
+    source.addUnbounded(2.5f);
+    FloatDistinctTable restored = new FloatDistinctTable(schema, 10, false, null, source.toDataTable());
+    List<Float> values = new ArrayList<>();
+    for (Object[] row : restored.getRows()) {
+      values.add((Float) row[0]);
+    }
+    values.sort(Float::compare);
+    assertEquals(values, List.of(1.25f, 2.5f));
+    assertEquals(restored.size(), 2);
+  }
+
+  @Test
+  public void testStringMergeStopsAtTheRequestedLimit() {
+    DataSchema schema = singleColumnSchema(ColumnDataType.STRING);
+    StringDistinctTable source = new StringDistinctTable(schema, Integer.MAX_VALUE, false, null);
+    source.addUnbounded("first");
+    source.addUnbounded("second");
+    source.addUnbounded("third");
+    StringDistinctTable destination = new StringDistinctTable(schema, 1, false, null);
+    try (QueryThreadContext ignored = QueryThreadContext.open(QueryExecutionContext.forSseTest(),
+        new TrackingAccountant())) {
+      destination.mergeDistinctTable(source);
+    }
+    assertEquals(destination.size(), 1);
+    assertTrue(destination.isSatisfied());
+    assertTrue(Set.of("first", "second", "third").contains(destination.getRows().get(0)[0]));
+  }
 
   /// Builds a populated merge source plus the (empty) destination it is merged into.
   @FunctionalInterface

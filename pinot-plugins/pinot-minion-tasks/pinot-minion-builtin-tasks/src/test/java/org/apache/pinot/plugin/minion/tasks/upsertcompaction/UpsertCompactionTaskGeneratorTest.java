@@ -22,6 +22,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -326,6 +327,35 @@ public class UpsertCompactionTaskGeneratorTest {
     // Check segmentCreationTimeMillis is deserialized correctly
     assertEquals(validDocIdsMetadataInfo.get("testTable__0").get(0).getSegmentCreationTimeMillis(), 1234567890L);
     assertEquals(validDocIdsMetadataInfo.get("testTable__1").get(0).getSegmentCreationTimeMillis(), 9876543210L);
+  }
+
+  @Test
+  public void testCompactionPriorityUsesInvalidCountAndPreservesTies() {
+    Map<String, SegmentZKMetadata> completedSegments = new LinkedHashMap<>();
+    Map<String, List<ValidDocIdsMetadataInfo>> replicas = new LinkedHashMap<>();
+    List<String> segmentNames = List.of("low", "highFirst", "highSecond", "middle");
+    long[] invalidDocCounts = {10L, 70L, 70L, 30L};
+    for (int i = 0; i < segmentNames.size(); i++) {
+      String segmentName = segmentNames.get(i);
+      SegmentZKMetadata segment = new SegmentZKMetadata(segmentName);
+      segment.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
+      segment.setTotalDocs(100L);
+      segment.setCrc(1000L + i);
+      completedSegments.put(segmentName, segment);
+      replicas.put(segmentName, List.of(new ValidDocIdsMetadataInfo(segmentName,
+          100L - invalidDocCounts[i], invalidDocCounts[i], 100L, String.valueOf(segment.getCrc()), null,
+          ValidDocIdsType.SNAPSHOT, 1000L, 1000L, "server1", ServiceStatus.Status.GOOD)));
+    }
+
+    UpsertCompactionTaskGenerator.SegmentSelectionResult result =
+        UpsertCompactionTaskGenerator.processValidDocIdsMetadata(getCompactionConfigs("1", "1"), completedSegments,
+            replicas, Map.of(), MinionConstants.ValidDocIdsConsensusMode.UNSAFE);
+
+    assertEquals(result.getSegmentsForCompaction(), List.of(completedSegments.get("highFirst"),
+        completedSegments.get("highSecond"), completedSegments.get("middle"), completedSegments.get("low")),
+        "Prioritize the most reclaimable records while retaining input order for equal priorities");
+    assertTrue(result.getSegmentsForDeletion().isEmpty());
+    assertEquals(new ArrayList<>(replicas.keySet()), segmentNames, "Selection must not reorder the input metadata");
   }
 
   @Test
