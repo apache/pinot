@@ -786,7 +786,10 @@ public class CommonConstants {
         "pinot.broker.enable.single.pool.segments.metric";
     public static final boolean DEFAULT_ENABLE_SINGLE_POOL_SEGMENTS_METRIC = false;
 
-    // Config for whether the broker may route to an unhealthy server when no healthy replica is available for a segment
+    /// Whether the broker may route to an unhealthy server when no healthy replica is available for a segment.
+    /// Precedence is cluster config, then broker config, then the default (false). The cluster value overrides the
+    /// broker value at listener registration during startup and on subsequent updates, ensuring a consistent cluster
+    /// policy. Removing the cluster setting restores the broker value (or the default if unset).
     public static final String CONFIG_OF_ENABLE_FAIL_OPEN = "pinot.broker.enable.fail.open";
     public static final boolean DEFAULT_ENABLE_FAIL_OPEN = false;
 

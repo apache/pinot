@@ -238,9 +238,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         Broker.DEFAULT_ENABLE_FAIL_OPEN);
     ServiceStartableUtils.applyClusterConfig(_brokerConf, _zkServers, _clusterName, ServiceRole.BROKER);
     applyCustomConfigs(brokerConf);
-    boolean startupFailOpenEnabled = brokerConf.getProperty(Broker.CONFIG_OF_ENABLE_FAIL_OPEN,
-        Broker.DEFAULT_ENABLE_FAIL_OPEN);
-    _failOpenPolicy = new FailOpenPolicy(brokerConfiguredFailOpenEnabled, startupFailOpenEnabled);
+    _failOpenPolicy = new FailOpenPolicy(brokerConfiguredFailOpenEnabled);
     TableSamplerFactory.init(_brokerConf.subset(CommonConstants.Broker.TABLE_SAMPLER_CONFIG_PREFIX));
     BrokerContext.getInstance().setQueryOperatorFactoryProvider(createQueryOperatorFactoryProvider(_brokerConf));
 

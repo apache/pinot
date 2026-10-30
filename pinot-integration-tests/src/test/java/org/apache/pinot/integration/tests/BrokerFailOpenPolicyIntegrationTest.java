@@ -32,10 +32,8 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Verifies fail-open cluster overrides through a running broker and its Helix listener.
- * This test owns one embedded cluster and is not thread-safe.
- */
+/// Verifies fail-open cluster overrides through a running broker and its Helix listener.
+/// This test owns one embedded cluster and is not thread-safe.
 public class BrokerFailOpenPolicyIntegrationTest extends BaseClusterIntegrationTest {
   private static final String CONFIG_KEY = Broker.CONFIG_OF_ENABLE_FAIL_OPEN;
 
@@ -89,7 +87,7 @@ public class BrokerFailOpenPolicyIntegrationTest extends BaseClusterIntegrationT
         "Fail-open policy did not update to: " + expected);
   }
 
-  /** Exposes the effective policy state without adding a production accessor. */
+  /// Exposes the effective policy state without adding a production accessor.
   private static class TestBrokerStarter extends HelixBrokerStarter {
     boolean isFailOpenEnabled() {
       return _failOpenPolicy.isEnabled();
