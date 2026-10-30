@@ -1487,7 +1487,7 @@ public class TableConfigUtilsTest {
     assertEquals(migrated.getProperties().get(FieldConfig.IS_SEGMENT_PARTITIONED_COLUMN_KEY), "true");
     assertFalse(migrated.getProperties().containsKey(FieldConfig.RAW_INDEX_WRITER_VERSION));
     assertTrue(message.getProperties().containsKey(FieldConfig.RAW_INDEX_WRITER_VERSION));
-    assertEquals(table.getFieldConfigList().get(3).getIndexes(), originalFields.get(3).getIndexes());
+    assertEquals((Object) table.getFieldConfigList().get(3).getIndexes(), originalFields.get(3).getIndexes());
     assertEquals(table.getFieldConfigList().get(4), originalFields.get(4));
     assertFalse(migrated.getIndexes().get("forward").has("targetDocsPerChunk"));
     String normalized = table.toJsonString();

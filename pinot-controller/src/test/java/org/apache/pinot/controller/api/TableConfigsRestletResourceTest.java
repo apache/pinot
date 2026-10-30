@@ -684,12 +684,13 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
       assertNotNull(forward);
       JsonNode original = fieldConfig.toJsonNode();
       assertEquals(forward.path("encodingType").asText(), original.path("encodingType").asText("DICTIONARY"));
-      assertEquals(forward.get("compressionCodec"), original.get("compressionCodec"));
+      assertEquals((Object) forward.get("compressionCodec"), original.get("compressionCodec"));
       if (original.has("properties")) {
         assertEquals(forward.path("rawIndexWriterVersion").asInt(), 4);
         ObjectNode remainingProperties = (ObjectNode) original.get("properties").deepCopy();
         remainingProperties.remove(FieldConfig.RAW_INDEX_WRITER_VERSION);
-        assertEquals(migrated.toJsonNode().get("properties"), remainingProperties);
+        // Compare JSON structure; TestNG's Iterable overload depends on property iteration order.
+        assertEquals((Object) migrated.toJsonNode().get("properties"), remainingProperties);
       }
     } finally {
       adminClient.getTableClient().deleteTableConfigs(tableName, null);
