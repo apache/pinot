@@ -295,12 +295,18 @@ public abstract class SharedHybridClusterIntegrationTestSuite extends BaseCluste
 
   final HybridScenarioLease newScenario(String tableName, String topicName)
       throws Throwable {
+    return newScenario(tableName, topicName, TableType.REALTIME);
+  }
+
+  final HybridScenarioLease newScenario(String tableName, String topicName, TableType firstTableToDrop)
+      throws Throwable {
     enforceScenarioCleanupBarrier();
     File scenarioDir = new File(_tempDir, tableName);
     File segmentDir = new File(scenarioDir, "segmentDir");
     File tarDir = new File(scenarioDir, "tarDir");
     TestUtils.ensureDirectoriesExistAndEmpty(scenarioDir, segmentDir, tarDir);
-    HybridScenarioLease lease = new HybridScenarioLease(tableName, topicName, scenarioDir, segmentDir, tarDir);
+    HybridScenarioLease lease =
+        new HybridScenarioLease(tableName, topicName, scenarioDir, segmentDir, tarDir, firstTableToDrop);
     _scenarioLeases.add(lease);
     return lease;
   }
@@ -756,8 +762,9 @@ public abstract class SharedHybridClusterIntegrationTestSuite extends BaseCluste
   }
 
   private Throwable cleanUpScenario(HybridScenarioLease lease, Throwable cleanupFailure) {
-    cleanupFailure = cleanUpTable(lease, TableType.REALTIME, cleanupFailure);
-    cleanupFailure = cleanUpTable(lease, TableType.OFFLINE, cleanupFailure);
+    cleanupFailure = cleanUpTable(lease, lease._firstTableToDrop, cleanupFailure);
+    TableType secondTableToDrop = lease._firstTableToDrop == TableType.OFFLINE ? TableType.REALTIME : TableType.OFFLINE;
+    cleanupFailure = cleanUpTable(lease, secondTableToDrop, cleanupFailure);
 
     boolean tablesRemoved = !lease._offlineTableCreated && !lease._realtimeTableCreated;
     if (tablesRemoved && lease._routingTableMayExist) {
@@ -1014,6 +1021,7 @@ public abstract class SharedHybridClusterIntegrationTestSuite extends BaseCluste
     final File _scenarioDir;
     final File _segmentDir;
     final File _tarDir;
+    final TableType _firstTableToDrop;
     boolean _schemaCreated;
     boolean _offlineTableCreated;
     boolean _realtimeTableCreated;
@@ -1024,12 +1032,14 @@ public abstract class SharedHybridClusterIntegrationTestSuite extends BaseCluste
     long _offlineInputCount;
     long _realtimeInputCount;
 
-    private HybridScenarioLease(String tableName, String topicName, File scenarioDir, File segmentDir, File tarDir) {
+    private HybridScenarioLease(String tableName, String topicName, File scenarioDir, File segmentDir, File tarDir,
+        TableType firstTableToDrop) {
       _tableName = tableName;
       _topicName = topicName;
       _scenarioDir = scenarioDir;
       _segmentDir = segmentDir;
       _tarDir = tarDir;
+      _firstTableToDrop = firstTableToDrop;
     }
   }
 }
