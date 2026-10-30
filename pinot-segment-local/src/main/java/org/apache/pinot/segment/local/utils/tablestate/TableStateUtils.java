@@ -29,6 +29,7 @@ import org.apache.helix.model.CurrentState;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.LiveInstance;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -88,8 +89,8 @@ public class TableStateUtils {
   }
 
   /// Checks the current assignment before a consumer starts. Earlier ONLINE segments of the same partition must be
-  /// loaded. Non-LLC ONLINE segments are conservatively included because they may hold base rows for the partition.
-  /// The consumer itself and its successors are excluded so that they do not wait for their own completion.
+  /// loaded, as must uploaded segments from that partition. Segments whose partition cannot be inferred from their
+  /// name are conservatively included. The consumer and its successors are excluded to avoid waiting on themselves.
   ///
   /// @param isLocallyReady identifies segments whose metadata is already ready locally despite a pending ONLINE
   ///                      transition, such as a predecessor that finished consumption and released its permit
@@ -115,9 +116,16 @@ public class TableStateUtils {
       }
       String segmentName = entry.getKey();
       LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
-      if (llcSegmentName != null && (llcSegmentName.getPartitionGroupId() != consumer.getPartitionGroupId()
-          || llcSegmentName.getSequenceNumber() >= consumer.getSequenceNumber())) {
-        continue;
+      if (llcSegmentName != null) {
+        if (llcSegmentName.getPartitionGroupId() != consumer.getPartitionGroupId()
+            || llcSegmentName.getSequenceNumber() >= consumer.getSequenceNumber()) {
+          continue;
+        }
+      } else {
+        Integer partitionId = SegmentUtils.getPartitionIdFromSegmentName(segmentName);
+        if (partitionId != null && partitionId != consumer.getPartitionGroupId()) {
+          continue;
+        }
       }
       if (!isLocallyReady.test(segmentName)) {
         requiredSegments.add(segmentName);

@@ -26,6 +26,8 @@ import org.apache.helix.model.CurrentState;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.LiveInstance;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.UploadedRealtimeSegmentName;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING;
@@ -113,13 +115,39 @@ public class TableStateUtilsTest {
   }
 
   @Test
-  public void testRequiresUploadedSegments() {
+  public void testRequiresSegmentsWithUnknownPartition() {
     Assignment fixture = new Assignment();
-    String uploadedSegment = "uploadedSegment";
+    String uploadedSegment = "customSegmentName";
     fixture.assign(uploadedSegment, ONLINE);
-    assertFalse(fixture.isReady(), "A non-LLC segment may hold base rows for this partition");
+    assertFalse(fixture.isReady(), "A segment with an unknown partition may hold base rows for this consumer");
     fixture._currentState.setState(uploadedSegment, ONLINE);
     assertTrue(fixture.isReady());
+  }
+
+  @DataProvider
+  public Object[][] uploadedSegmentStates() {
+    return new Object[][]{{null}, {OFFLINE}, {ERROR}, {ONLINE}};
+  }
+
+  @Test(dataProvider = "uploadedSegmentStates")
+  public void testUploadedSegmentsAreScopedToConsumerPartition(String state) {
+    Assignment fixture = new Assignment();
+    String samePartition = new UploadedRealtimeSegmentName(TABLE, 1, 0, "uploaded", "base").getSegmentName();
+    String otherPartition = new UploadedRealtimeSegmentName(TABLE, 2, 0, "uploaded", "base").getSegmentName();
+    fixture.assign(otherPartition, ONLINE);
+    if (state != null) {
+      fixture._currentState.setState(otherPartition, state);
+    }
+    assertTrue(fixture.isReady(), "An uploaded segment in another partition must not hold up this consumer");
+
+    fixture.assign(samePartition, ONLINE);
+    if (state != null) {
+      fixture._currentState.setState(samePartition, state);
+    }
+    assertEquals(fixture.isReady(), ONLINE.equals(state),
+        "An uploaded segment in this partition must still finish loading");
+    fixture._currentState.setState(samePartition, ONLINE);
+    assertTrue(fixture.isReady(), "Readiness must depend only on the required partition's uploaded segment");
   }
 
   @Test
