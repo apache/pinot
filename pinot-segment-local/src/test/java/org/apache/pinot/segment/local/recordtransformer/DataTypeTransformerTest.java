@@ -451,4 +451,14 @@ public class DataTypeTransformerTest {
     assertEquals(DataTypeTransformerUtils.transformValue(COLUMN, new Object[]{new BigDecimal("0.0"), 1},
         PinotDataType.BOOLEAN_ARRAY), new Integer[]{0, 1});
   }
+
+  /// Mixed-type MV arrays from JSON (e.g. [1.5, 2] decodes to BigDecimal + Integer) must convert to STRING
+  /// per element: no ClassCastException, and BigDecimal elements keep plain (non-exponent) form.
+  @Test
+  public void testTransformMixedTypeArrayToString() {
+    assertEquals(DataTypeTransformerUtils.transformValue(COLUMN, new Object[]{new BigDecimal("1.5"), 2},
+        PinotDataType.STRING_ARRAY), new String[]{"1.5", "2"});
+    assertEquals(DataTypeTransformerUtils.transformValue(COLUMN, new Object[]{2, new BigDecimal("1E+7")},
+        PinotDataType.STRING_ARRAY), new String[]{"2", "10000000"});
+  }
 }

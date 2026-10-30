@@ -1732,7 +1732,18 @@ public enum PinotDataType {
       String[] stringArray = new String[length];
       PinotDataType singleValueType = getSingleValueType();
       for (int i = 0; i < length; i++) {
-        stringArray[i] = singleValueType.toString(valueArray[i]);
+        Object element = valueArray[i];
+        try {
+          // The source type is inferred from the first element, so mixed-type arrays (e.g. JSON [1.5, 2])
+          // can hold elements of other types. A BigDecimal element must still use toPlainString(): the
+          // other types' permissive value.toString() would silently keep exponent form ("1E+7") without
+          // throwing ClassCastException.
+          stringArray[i] = element instanceof BigDecimal
+              ? anyToString(element)
+              : singleValueType.toString(element);
+        } catch (ClassCastException e) {
+          stringArray[i] = anyToString(element);
+        }
       }
       return stringArray;
     }
@@ -2021,6 +2032,10 @@ public enum PinotDataType {
 
   private static double anyToDouble(Object val) {
     return getSingleValueType(val).toDouble(val);
+  }
+
+  private static String anyToString(Object val) {
+    return getSingleValueType(val).toString(val);
   }
 
   /// Returns the [PinotDataType] for the given [FieldSpec] for data ingestion purpose. Returns object array

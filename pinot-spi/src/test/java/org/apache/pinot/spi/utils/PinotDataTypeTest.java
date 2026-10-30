@@ -127,6 +127,22 @@ public class PinotDataTypeTest {
     }
   }
 
+  /// The MV source type is inferred from the first element only, so a mixed-type array such as JSON
+  /// [1.5, 2] (BigDecimal, Integer) must convert each element by its own type instead of casting every
+  /// element to the first element's type.
+  @Test
+  public void testToStringArrayWithMixedTypes() {
+    // First element BigDecimal: casting the Integer element to BigDecimal used to throw ClassCastException.
+    assertEquals(STRING_ARRAY.convert(new Object[]{new BigDecimal("1.5"), 2}, BIG_DECIMAL_ARRAY),
+        new String[]{"1.5", "2"});
+    // First element Integer: the BigDecimal element must still use toPlainString(), not the exponent form
+    // produced by the permissive value.toString() of the inferred source type.
+    assertEquals(STRING_ARRAY.convert(new Object[]{2, new BigDecimal("1E+7")}, INT_ARRAY),
+        new String[]{"2", "10000000"});
+    assertEquals(STRING_ARRAY.convert(new Object[]{new BigDecimal("1E+7"), new BigDecimal("0.0")},
+        BIG_DECIMAL_ARRAY), new String[]{"10000000", "0.0"});
+  }
+
   @DataProvider
   public Object[][] numberFormatConversionErrors() {
     return new Object[][] {
