@@ -32,6 +32,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
@@ -69,6 +70,7 @@ import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
+import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.zookeeper.data.Stat;
@@ -563,22 +565,28 @@ public class RetentionManagerTest {
   }
 
   @DataProvider(name = "hybridTableRetentionStrategyOverrides")
-  public Boolean[][] hybridTableRetentionStrategyOverrides() {
-    // tableLevel (null falls back to clusterLevel), clusterLevel, expectHybridPath
-    return new Boolean[][]{
+  public Object[][] hybridTableRetentionStrategyOverrides() {
+    // tableLevel (null means omitted; null and DEFAULT fall back to clusterLevel), clusterLevel, expectHybridPath
+    return new Object[][]{
         {null, false, false},
         {null, true, true},
-        {true, false, true},
-        {false, true, false},
+        {Enablement.DEFAULT, false, false},
+        {Enablement.DEFAULT, true, true},
+        {Enablement.ENABLE, false, true},
+        {Enablement.ENABLE, true, true},
+        {Enablement.DISABLE, false, false},
+        {Enablement.DISABLE, true, false},
     };
   }
 
   @Test(dataProvider = "hybridTableRetentionStrategyOverrides")
-  public void testTableLevelHybridRetentionStrategyOverridesClusterConfig(Boolean tableLevel, boolean clusterLevel,
-      boolean expectHybridPath) {
+  public void testTableLevelHybridRetentionStrategyOverridesClusterConfig(@Nullable Enablement tableLevel,
+      boolean clusterLevel, boolean expectHybridPath) {
     int replicaCount = 1;
     TableConfig realtimeTableConfig = createRealtimeTableConfig1(replicaCount);
-    realtimeTableConfig.getValidationConfig().setHybridTableRetentionStrategy(tableLevel);
+    if (tableLevel != null) {
+      realtimeTableConfig.getValidationConfig().setHybridTableRetentionStrategy(tableLevel);
+    }
 
     PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
     when(resourceManager.getHelixAdmin()).thenReturn(mock(HelixAdmin.class));

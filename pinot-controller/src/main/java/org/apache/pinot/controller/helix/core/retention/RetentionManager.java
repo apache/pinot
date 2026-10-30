@@ -69,6 +69,7 @@ import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.DataSizeUtils;
+import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
@@ -355,9 +356,9 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
 
     // Scan all segment ZK metadata and purge segments if necessary
     if (TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
-      if (validationConfig.getHybridTableRetentionStrategy() != null) {
+      if (validationConfig.getHybridTableRetentionStrategy() != Enablement.DEFAULT) {
         LOGGER.warn(
-            "enableHybridTableRetentionStrategy is only applicable to realtime tables, "
+            "hybridTableRetentionStrategy is only applicable to realtime tables, "
             + "ignoring it for offline table: {}", tableNameWithType);
       }
       manageRetentionForOfflineTable(tableNameWithType, retentionStrategy, untrackedSegmentsDeletionBatchSize,
