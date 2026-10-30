@@ -527,21 +527,31 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       if (!tableAuthorizationResult.hasAccess()) {
         throwTableAccessError(tableAuthorizationResult);
       }
-      if (_enableRowColumnLevelAuth) {
-        AccessControl accessControl = _accessControlFactory.create();
-        for (String tableName : tables) {
-          accessControl.getRowColFilters(requesterIdentity, tableName).getRLSFilters()
-              .ifPresent(rowFilters -> {
-                rlsFiltersApplied.set(true);
-                String combinedFilters =
-                    rowFilters.stream().map(filter -> "( " + filter + " )").collect(Collectors.joining(" AND "));
-                String key = RlsUtils.buildRlsFilterKey(tableName);
-                compiledQuery.getOptions().put(key, combinedFilters);
-                _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.RLS_FILTERS_APPLIED, 1);
-              });
-        }
+      if (_enableRowColumnLevelAuth && applyRlsFilters(requesterIdentity, tables, compiledQuery.getOptions())) {
+        rlsFiltersApplied.set(true);
       }
     }
+  }
+
+  /// Returns `true` if an RLS filter was added for at least one table.
+  @VisibleForTesting
+  boolean applyRlsFilters(@Nullable RequesterIdentity requesterIdentity, Set<String> tables,
+      Map<String, String> queryOptions) {
+    AccessControl accessControl = _accessControlFactory.create();
+    boolean applied = false;
+    for (String tableName : tables) {
+      List<String> rowFilters = accessControl.getRowColFilters(requesterIdentity, tableName).getRLSFilters()
+          .orElse(null);
+      if (rowFilters == null || rowFilters.isEmpty()) {
+        continue;
+      }
+      String combinedFilters =
+          rowFilters.stream().map(filter -> "( " + filter + " )").collect(Collectors.joining(" AND "));
+      queryOptions.put(RlsUtils.buildRlsFilterKey(tableName), combinedFilters);
+      _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.RLS_FILTERS_APPLIED, 1);
+      applied = true;
+    }
+    return applied;
   }
 
   private ImmutableQueryEnvironment.Config getQueryEnvConf(HttpHeaders httpHeaders, Map<String, String> queryOptions,
