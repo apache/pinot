@@ -18,10 +18,6 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
-import it.unimi.dsi.fastutil.ints.IntArrayList;
-import it.unimi.dsi.fastutil.longs.LongArrayList;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -212,13 +208,13 @@ public class AggregationFunctionNullContractTest {
     assertEquals(create("FUNNELCOMPLETECOUNT", steps, true).extractFinalResult(null), 0);
     assertEquals(create("FUNNELSTEPDURATIONSTATS",
             "(column, '1000', 2, column2 = 'a', column2 = 'b', 'durationFunctions=count')", true)
-        .extractFinalResult(null), new DoubleArrayList());
-    assertEquals(create("FUNNELMATCHSTEP", steps, true).extractFinalResult(null), new IntArrayList(new int[]{0, 0}));
+        .extractFinalResult(null), new double[0]);
+    assertEquals(create("FUNNELMATCHSTEP", steps, true).extractFinalResult(null), new int[]{0, 0});
     assertEquals(create("FUNNELEVENTSFUNCTIONEVAL",
             "(column, '1000', 2, column2 = 'a', column2 = 'b', 2, column, column2)", true)
-        .extractFinalResult(null), new ObjectArrayList<String>());
+        .extractFinalResult(null), new String[0]);
     assertEquals(create("FUNNELCOUNT", "(STEPS(column2 = 'a', column2 = 'b'), CORRELATE_BY(column))", true)
-        .extractFinalResult(null), new LongArrayList(new long[]{0L, 0L}));
+        .extractFinalResult(null), new long[]{0L, 0L});
   }
 
   /// The functions that return SQL `NULL` when nothing was aggregated.

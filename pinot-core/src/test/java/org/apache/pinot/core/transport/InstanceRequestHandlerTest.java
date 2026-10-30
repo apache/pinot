@@ -98,7 +98,7 @@ public class InstanceRequestHandlerTest {
     DataTable dataTable = DataTableFactory.getDataTable(replyBytes);
     assertEquals(dataTable.getMetadata().get(DataTable.MetadataKey.REQUEST_ID.getName()), Long.toString(requestId),
         "The broker matches the reply to its ping by request id");
-    verify(queryScheduler, never()).submit(any());
+    verify(queryScheduler, never()).submitResponse(any());
     channel.finishAndReleaseAll();
   }
 
@@ -117,12 +117,12 @@ public class InstanceRequestHandlerTest {
     assertEquals(queryRequest.getRequestId(), -42L);
 
     QueryScheduler queryScheduler = mock(QueryScheduler.class);
-    when(queryScheduler.submit(any())).thenReturn(SettableFuture.create());
+    when(queryScheduler.submitResponse(any())).thenReturn(SettableFuture.create());
     EmbeddedChannel channel = new EmbeddedChannel(
         new InstanceRequestHandler("server01", new PinotConfiguration(), queryScheduler, mock(AccessControl.class),
             ThreadAccountantUtils.getNoOpAccountant()));
     channel.writeInbound(Unpooled.wrappedBuffer(serialize(asSeenByOldServer)));
-    verify(queryScheduler).submit(any());
+    verify(queryScheduler).submitResponse(any());
     channel.finishAndReleaseAll();
   }
 

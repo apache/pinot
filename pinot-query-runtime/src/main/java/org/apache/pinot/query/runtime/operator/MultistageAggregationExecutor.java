@@ -182,8 +182,7 @@ public class MultistageAggregationExecutor {
       Object[] finalResults = AggregateOperator.getIntermediateResults(aggFunction, block);
       for (Object finalResult : finalResults) {
         _mergeResultHolder[i] =
-            AggregationFunctionUtils.mergeFinalResult(aggFunction, (Comparable) _mergeResultHolder[i],
-                (Comparable) finalResult);
+            AggregationFunctionUtils.mergeFinalResult(aggFunction, _mergeResultHolder[i], finalResult);
       }
     }
   }

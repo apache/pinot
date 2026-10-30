@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.aggregation.function.array;
 
-import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongCollection;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongSet;
@@ -33,7 +32,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public abstract class BaseArrayAggLongFunction<I extends LongCollection>
-    extends BaseArrayAggFunction<I, LongArrayList> {
+    extends BaseArrayAggFunction<I, long[]> {
   public BaseArrayAggLongFunction(ExpressionContext expression, DataType dataType,
       boolean nullHandlingEnabled) {
     super(expression, dataType, nullHandlingEnabled);
@@ -144,10 +143,10 @@ public abstract class BaseArrayAggLongFunction<I extends LongCollection>
   }
 
   @Override
-  public LongArrayList extractFinalResult(I longs) {
+  public long[] extractFinalResult(I longs) {
     if (longs == null) {
-      return new LongArrayList();
+      return new long[0];
     }
-    return new LongArrayList(longs);
+    return longs.toLongArray();
   }
 }

@@ -37,6 +37,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 /// Always applied:
 /// - FIRST_WITH_TIME(dataColumn, timeColumn) -> FIRST_WITH_TIME(dataColumn, timeColumn, 'dataType')
 /// - LAST_WITH_TIME(dataColumn, timeColumn) -> LAST_WITH_TIME(dataColumn, timeColumn, 'dataType')
+/// - ARRAY_AGG(column[, isDistinct]) -> ARRAY_AGG(column, 'dataType'[, isDistinct])
 /// - MODE(stringColumn[, 'MIN'|'MAX']) -> MODE(stringColumn, 'MIN'|'MAX', 'STRING')
 ///
 /// Applied only when enabled through the `inferAnyValueType` query option:
@@ -112,6 +113,10 @@ public class AggregateFunctionRewriteOptimizer implements StatementOptimizer {
       }
       return;
     }
+    if (normalizedName.equals(AggregationFunctionType.ARRAYAGG.name()) && isArrayAggWithoutDataType(function)) {
+      addArrayAggDataTypeArgument(function, normalizedName, fieldSpec);
+      return;
+    }
     if (normalizedName.equals(AggregationFunctionType.MODE.name()) && function.getOperandsSize() <= 2) {
       addModeDataTypeArgument(function, fieldSpec);
       return;
@@ -173,6 +178,45 @@ public class AggregateFunctionRewriteOptimizer implements StatementOptimizer {
       function.addToOperands(RequestUtils.getLiteralExpression("MIN"));
     }
     function.addToOperands(RequestUtils.getLiteralExpression(dataType));
+  }
+
+  /// Matches ARRAY_AGG(column) and ARRAY_AGG(column, isDistinct); a string second argument is the explicit data type.
+  private static boolean isArrayAggWithoutDataType(Function function) {
+    int numOperands = function.getOperandsSize();
+    if (numOperands == 1) {
+      return true;
+    }
+    if (numOperands == 2) {
+      Expression secondOperand = function.getOperands().get(1);
+      return secondOperand.isSetLiteral() && secondOperand.getLiteral().isSetBoolValue();
+    }
+    return false;
+  }
+
+  /// Inserts the column's logical type, the element type for a multi-value column, as the second argument. The
+  /// supported types match `PinotAggregateTypeArgumentRewriteRule` in the multi-stage engine.
+  private static void addArrayAggDataTypeArgument(Function function, String functionName, FieldSpec fieldSpec) {
+    switch (fieldSpec.getDataType()) {
+      case BOOLEAN:
+      case INT:
+      case LONG:
+      case TIMESTAMP:
+      case FLOAT:
+      case DOUBLE:
+      case BIG_DECIMAL:
+      case STRING:
+      case BYTES:
+      case UUID:
+        function.getOperands().add(1, RequestUtils.getLiteralExpression(fieldSpec.getDataType().name()));
+        return;
+      case JSON:
+        // Same as the multi-stage engine, which types a JSON column as VARCHAR.
+        function.getOperands().add(1, RequestUtils.getLiteralExpression(FieldSpec.DataType.STRING.name()));
+        return;
+      default:
+        throw new BadQueryRequestException(
+            String.format("Unsupported data type for %s(expression): %s", functionName, fieldSpec.getDataType()));
+    }
   }
 
   private static void rewriteToTypedVariant(Function function, String functionName, FieldSpec.DataType operandType) {

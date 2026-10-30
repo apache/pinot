@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.aggregation.function.funnel;
 
 import com.google.common.base.Preconditions;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -176,7 +177,7 @@ public class FunnelCountAggregationFunctionFactory implements Supplier<Aggregati
       if (dictIdsWrapper == null) {
         return Collections.nCopies(_numSteps, 0L);
       }
-      return bitmapMergeStrategy.extractFinalResult(Arrays.asList(dictIdsWrapper._stepsBitmaps));
+      return LongArrayList.wrap(bitmapMergeStrategy.extractFinalResult(Arrays.asList(dictIdsWrapper._stepsBitmaps)));
     };
   }
 
@@ -186,7 +187,7 @@ public class FunnelCountAggregationFunctionFactory implements Supplier<Aggregati
       if (sketches == null) {
         return Collections.nCopies(_numSteps, 0L);
       }
-      return thetaSketchMergeStrategy.extractFinalResult(Arrays.asList(sketches));
+      return LongArrayList.wrap(thetaSketchMergeStrategy.extractFinalResult(Arrays.asList(sketches)));
     };
   }
 

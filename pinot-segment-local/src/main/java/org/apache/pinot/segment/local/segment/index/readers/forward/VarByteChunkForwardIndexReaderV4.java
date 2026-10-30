@@ -427,13 +427,14 @@ public class VarByteChunkForwardIndexReaderV4
     protected byte[] processChunkAndReadFirstValue(int docId, long offset, long limit)
         throws IOException {
       _decompressedBuffer.clear();
-      ByteBuffer compressed = _chunks.toDirectByteBuffer(offset, (int) (limit - offset));
-      if (_regularChunk) {
-        decompressChunk(compressed);
-        return readSmallUncompressedValue(docId);
-      }
-      // huge value, no benefit from buffering, return the whole thing
-      return readHugeCompressedValue(compressed, _chunkDecompressor.decompressedLength(compressed));
+      return _chunks.readWithByteBuffer(offset, (int) (limit - offset), compressed -> {
+        if (_regularChunk) {
+          decompressChunk(compressed);
+          return readSmallUncompressedValue(docId);
+        }
+        // huge value, no benefit from buffering, return the whole thing
+        return readHugeCompressedValue(compressed, _chunkDecompressor.decompressedLength(compressed));
+      });
     }
 
     /// Decompresses a regular chunk and reads the number of docs. Subclasses (e.g. V6) can override

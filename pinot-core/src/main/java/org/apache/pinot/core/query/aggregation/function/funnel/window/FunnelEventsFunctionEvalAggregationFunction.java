@@ -19,7 +19,6 @@
 package org.apache.pinot.core.query.aggregation.function.funnel.window;
 
 import com.google.common.base.Preconditions;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
@@ -56,7 +55,7 @@ import org.apache.pinot.spi.query.QueryThreadContext;
 /// known limitation: the value is read positionally and a null row yields the column default, so a null extra field
 /// renders as `0` or the empty string rather than as NULL.
 public class FunnelEventsFunctionEvalAggregationFunction
-    extends BaseAggregationFunction<PriorityQueue<FunnelStepEventWithExtraFields>, ObjectArrayList<String>> {
+    extends BaseAggregationFunction<PriorityQueue<FunnelStepEventWithExtraFields>, String[]> {
   private final static int INTERMEDIATE_RESULT_SERDE_VERSION = 0;
 
   protected final ExpressionContext _timestampExpression;
@@ -483,13 +482,11 @@ public class FunnelEventsFunctionEvalAggregationFunction
   }
 
   @Override
-  public ObjectArrayList<String> extractFinalResult(
-      @Nullable PriorityQueue<FunnelStepEventWithExtraFields> stepEvents) {
-    ObjectArrayList<String> finalResults = new ObjectArrayList<>();
-    List<List<Object[]>> matchedFunnelEventsExtraFields = new ArrayList<>(_numExtraFields);
+  public String[] extractFinalResult(@Nullable PriorityQueue<FunnelStepEventWithExtraFields> stepEvents) {
     if (stepEvents == null || stepEvents.isEmpty()) {
-      return finalResults;
+      return new String[0];
     }
+    List<List<Object[]>> matchedFunnelEventsExtraFields = new ArrayList<>(_numExtraFields);
     stepEvents = new PriorityQueue<>(stepEvents);
     ArrayDeque<FunnelStepEventWithExtraFields> slidingWindow = new ArrayDeque<>();
     while (!stepEvents.isEmpty()) {
@@ -546,24 +543,28 @@ public class FunnelEventsFunctionEvalAggregationFunction
       }
     }
 
-    evalFunctionOnMatchedFunnelEvents(matchedFunnelEventsExtraFields, finalResults);
-    return finalResults;
+    return evalFunctionOnMatchedFunnelEvents(matchedFunnelEventsExtraFields);
   }
 
-  private void evalFunctionOnMatchedFunnelEvents(List<List<Object[]>> matchedFunnelEventsExtraFields,
-      ObjectArrayList<String> finalResults) {
+  private String[] evalFunctionOnMatchedFunnelEvents(List<List<Object[]>> matchedFunnelEventsExtraFields) {
     StringBuilder arrayAssignments = new StringBuilder(Integer.toString(matchedFunnelEventsExtraFields.size()));
+    int numResults = 1;
     for (List<Object[]> funnelEventsExtraField : matchedFunnelEventsExtraFields) {
-      arrayAssignments.append(", ").append(funnelEventsExtraField.size() * _numExtraFields);
+      int numExtraFieldValues = funnelEventsExtraField.size() * _numExtraFields;
+      arrayAssignments.append(", ").append(numExtraFieldValues);
+      numResults += numExtraFieldValues;
     }
-    finalResults.add(arrayAssignments.toString());
+    String[] finalResults = new String[numResults];
+    finalResults[0] = arrayAssignments.toString();
+    int index = 1;
     for (List<Object[]> matchedFunnelEventsExtraField : matchedFunnelEventsExtraFields) {
       for (Object[] extraFields : matchedFunnelEventsExtraField) {
         for (Object extraField : extraFields) {
-          finalResults.add(extraField.toString());
+          finalResults[index++] = extraField.toString();
         }
       }
     }
+    return finalResults;
   }
 
   private List<Object[]> extractFunnelEventsExtraFields(ArrayDeque<FunnelStepEventWithExtraFields> slidingWindow) {
@@ -583,10 +584,36 @@ public class FunnelEventsFunctionEvalAggregationFunction
     return results;
   }
 
+  /// Merges the final results of two partitions of the events. A final result is a header `"N, s1, ..., sN"`, which
+  /// counts the matched funnels and the values of each, followed by those values, so the merged result has one header
+  /// for the funnels of both. It is a new array, so merging the final results of k servers one at a time copies
+  /// O(k * total) values.
   @Override
-  public ObjectArrayList<String> mergeFinalResult(ObjectArrayList<String> finalResult1,
-      ObjectArrayList<String> finalResult2) {
-    finalResult1.addAll(finalResult2);
-    return finalResult1;
+  public String[] mergeFinalResult(String[] finalResult1, String[] finalResult2) {
+    // A final result without events has no header
+    if (finalResult1.length == 0) {
+      return finalResult2;
+    }
+    if (finalResult2.length == 0) {
+      return finalResult1;
+    }
+    String header1 = finalResult1[0];
+    String header2 = finalResult2[0];
+    int countsStart1 = getCountsStart(header1);
+    int countsStart2 = getCountsStart(header2);
+    int numFunnels = Integer.parseInt(header1, 0, countsStart1, 10) + Integer.parseInt(header2, 0, countsStart2, 10);
+    int numValues1 = finalResult1.length - 1;
+    int numValues2 = finalResult2.length - 1;
+    String[] mergedResult = new String[1 + numValues1 + numValues2];
+    mergedResult[0] = numFunnels + header1.substring(countsStart1) + header2.substring(countsStart2);
+    System.arraycopy(finalResult1, 1, mergedResult, 1, numValues1);
+    System.arraycopy(finalResult2, 1, mergedResult, 1 + numValues1, numValues2);
+    return mergedResult;
+  }
+
+  /// Returns the index of the `", "` before the value counts of a header, or its length when it has none.
+  private static int getCountsStart(String header) {
+    int commaIndex = header.indexOf(',');
+    return commaIndex >= 0 ? commaIndex : header.length();
   }
 }
