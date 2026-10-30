@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.recordtransformer;
 
 import com.fasterxml.jackson.core.StreamReadConstraints;
 import com.fasterxml.jackson.databind.JsonNode;
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -35,6 +36,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.PinotDataType;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
@@ -434,5 +436,19 @@ public class DataTypeTransformerTest {
     disabledDedupUppercaseRow.putValue(uuidCol, uppercaseUuid);
     disabledDedupUppercaseRow.putValue(nonPkUuidCol, canonicalUuid);
     disabledDedupTransformer.transform(disabledDedupUppercaseRow); // must not throw
+  }
+
+  /// JSON floats are decoded as BigDecimal. A decoded 0.0 must become boolean false (internal 0) through
+  /// schema conversion, not true: BigDecimal.equals() is scale-sensitive, so 0.0 does not equal ZERO.
+  @Test
+  public void testTransformBigDecimalToBoolean() {
+    assertEquals(DataTypeTransformerUtils.transformValue(COLUMN, new BigDecimal("0.0"), PinotDataType.BOOLEAN), 0);
+    assertEquals(DataTypeTransformerUtils.transformValue(COLUMN, new BigDecimal("-0.0"), PinotDataType.BOOLEAN), 0);
+    assertEquals(DataTypeTransformerUtils.transformValue(COLUMN, new BigDecimal("0E+3"), PinotDataType.BOOLEAN), 0);
+    assertEquals(DataTypeTransformerUtils.transformValue(COLUMN, new BigDecimal("1.5"), PinotDataType.BOOLEAN), 1);
+
+    // Mixed-type MV array (e.g. JSON [0.0, 1]): source type comes from the first element only.
+    assertEquals(DataTypeTransformerUtils.transformValue(COLUMN, new Object[]{new BigDecimal("0.0"), 1},
+        PinotDataType.BOOLEAN_ARRAY), new Integer[]{0, 1});
   }
 }

@@ -205,6 +205,27 @@ public class PinotDataTypeTest {
     assertEquals(BOOLEAN.convert("false", JSON), false);
   }
 
+  /// JSON floats are decoded as BigDecimal, whose equals() is scale-sensitive: BigDecimal("0.0") must still
+  /// convert to boolean false, like numeric zero of every other type.
+  @Test
+  public void testBigDecimalToBoolean() {
+    assertEquals(BOOLEAN.convert(new BigDecimal("0.0"), BIG_DECIMAL), false);
+    assertEquals(BOOLEAN.convert(new BigDecimal("-0.0"), BIG_DECIMAL), false);
+    assertEquals(BOOLEAN.convert(new BigDecimal("0.00"), BIG_DECIMAL), false);
+    assertEquals(BOOLEAN.convert(new BigDecimal("0E+3"), BIG_DECIMAL), false);
+    assertEquals(BOOLEAN.convert(new BigDecimal("0.1"), BIG_DECIMAL), true);
+    assertEquals(BOOLEAN.convert(new BigDecimal("-1"), BIG_DECIMAL), true);
+    // Non-zero even though doubleValue() would underflow to 0.0
+    assertEquals(BOOLEAN.convert(new BigDecimal("1E-400"), BIG_DECIMAL), true);
+
+    // Mixed-type MV array: the source type is inferred from the first element, so the Integer element is
+    // converted through BIG_DECIMAL as well and must not throw ClassCastException.
+    assertEquals(BOOLEAN_ARRAY.convert(new Object[]{new BigDecimal("0.0"), 1}, BIG_DECIMAL_ARRAY),
+        new Boolean[]{false, true});
+    assertEquals(PRIMITIVE_BOOLEAN_ARRAY.convert(new Object[]{new BigDecimal("0.0"), 1}, BIG_DECIMAL_ARRAY),
+        new boolean[]{false, true});
+  }
+
   @Test
   public void testCharacter() {
     assertEquals(STRING.convert('a', CHARACTER), "a");

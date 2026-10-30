@@ -544,7 +544,12 @@ public enum PinotDataType {
 
     @Override
     public boolean toBoolean(Object value) {
-      return !value.equals(BigDecimal.ZERO);
+      // BigDecimal.equals() is scale-sensitive (0.0 does not equal ZERO), so test the numerical value.
+      // A mixed-type MV array can dispatch a non-BigDecimal element here when the source type is inferred
+      // from the first element; fall back to the element's own type instead of casting to BigDecimal.
+      return value instanceof BigDecimal
+          ? ((BigDecimal) value).signum() != 0
+          : getSingleValueType(value).toBoolean(value);
     }
 
     @Override
