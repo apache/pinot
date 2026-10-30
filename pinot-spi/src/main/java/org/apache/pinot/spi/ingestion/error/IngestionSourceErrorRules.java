@@ -423,10 +423,10 @@ final class IngestionSourceErrorRules {
   private static final String LOGIN_EXCEPTION = "javax.security.auth.login.LoginException";
   // kafka-clients' token retriever, stringified into the LoginException: "The response code 401 and error response
   // {"invalid_client" - "..."} was encountered ..." for a refusal, "The unexpected response code 503 ..." (4.x) for a
-  // failure.
+  // failure. A body with no OAuth error field passes through as it came, e.g. a gateway's {"message":"..."}.
   private static final Pattern OAUTH_RESPONSE_CODE = Pattern.compile("The (?:unexpected )?response code (\\d{3})");
   private static final Pattern OAUTH_ERROR =
-      Pattern.compile("(?:\"error\"\\s*:\\s*\"|error response \\{\")([a-z_]{1,64})\"");
+      Pattern.compile("error response \\{\"([^\"]{1,64})\" -|\"error\"\\s*:\\s*\"([^\"]{1,64})\"");
   // The 3.x token retriever's text when the endpoint failed or never answered.
   private static final String OAUTH_TOKEN_UNAVAILABLE = "An internal error occurred while retrieving token";
   // 4.x dumps the retriever's stack trace into the message instead: a network failure names its class there.
@@ -452,7 +452,8 @@ final class IngestionSourceErrorRules {
     Matcher responseCode = OAUTH_RESPONSE_CODE.matcher(message);
     if (responseCode.find()) {
       Matcher error = OAUTH_ERROR.matcher(message);
-      return oauth(error.find() ? error.group(1) : null, Integer.parseInt(responseCode.group(1)));
+      String oauthError = error.find() ? (error.group(1) != null ? error.group(1) : error.group(2)) : null;
+      return oauth(oauthError, Integer.parseInt(responseCode.group(1)));
     }
     if (message.contains(OAUTH_TOKEN_UNAVAILABLE)) {
       // The token endpoint failed or never answered; the client drops which.
@@ -480,20 +481,21 @@ final class IngestionSourceErrorRules {
     return null;
   }
 
-  /// An OAuth 2.0 token endpoint's `error` (RFC 6749 section 5.2), falling back to its status. An error no row names
-  /// is still the endpoint refusing the token request, unless its status says it couldn't serve it.
+  /// An OAuth 2.0 token endpoint's `error` (RFC 6749 section 5.2), falling back to its status. A status that says the
+  /// endpoint couldn't serve the request, or that there is no such endpoint (404), decides first; any other error,
+  /// named or not, is the endpoint refusing the request.
   @Nullable
   private static IngestionSourceErrorVerdict oauth(@Nullable String error, int status) {
     if (error != null) {
       String normalized = error.toLowerCase(Locale.ROOT);
+      if (status == 404 || isUnavailable(status) || OAUTH_UNAVAILABLE.contains(normalized)) {
+        return sourceRead(normalized, TARGET_IDP);
+      }
       if (OAUTH_AUTHENTICATION.contains(normalized)) {
         return auth(IngestionSourceErrorSubReason.AUTHENTICATION, normalized, TARGET_IDP);
       }
       if (OAUTH_AUTHORIZATION.contains(normalized)) {
         return auth(IngestionSourceErrorSubReason.AUTHORIZATION, normalized, TARGET_IDP);
-      }
-      if (OAUTH_UNAVAILABLE.contains(normalized) || isUnavailable(status)) {
-        return sourceRead(normalized, TARGET_IDP);
       }
       return auth(IngestionSourceErrorSubReason.UNSPECIFIED, normalized, TARGET_IDP);
     }
@@ -539,10 +541,11 @@ final class IngestionSourceErrorRules {
   // The client couldn't build its authentication data
   private static final Set<String> PULSAR_AUTHENTICATION_SETUP = Set.of("UnsupportedAuthenticationException",
       "GettingAuthenticationDataException");
-  // The OAuth2 plugin's token errors: "Unable to obtain an access token: <description> (<error>)", or for a status
-  // other than 400 or 401, "Unable to obtain an access token: Failed to perform HTTP request. res: <status>".
+  // The OAuth2 plugin's token errors: "Unable to obtain an access token: <description> (<error>)" for a 400 or 401,
+  // with "(null)" for a body without an error field, or for any other status "Unable to obtain an access token: Failed
+  // to perform HTTP request. res: <status>".
   private static final String PULSAR_OAUTH_TOKEN = "Unable to obtain an access token";
-  private static final Pattern PULSAR_OAUTH_ERROR = Pattern.compile("\\(([a-z_]{1,64})\\)\\s*$");
+  private static final Pattern PULSAR_OAUTH_ERROR = Pattern.compile("\\(([A-Za-z0-9_.-]{1,64})\\)\\s*$");
   private static final Pattern PULSAR_OAUTH_STATUS = Pattern.compile("res: (\\d{3})\\s*$");
 
   /// Pulsar's class is its code: the broker's error maps one to one onto a nested subclass. Every subclass of the
@@ -599,7 +602,10 @@ final class IngestionSourceErrorRules {
     if (message.contains(PULSAR_OAUTH_TOKEN)) {
       Matcher error = PULSAR_OAUTH_ERROR.matcher(message);
       if (error.find()) {
-        return oauth(error.group(1), 0);
+        // A 400 or 401: the endpoint refused the token request, whatever its error says
+        String oauthError = error.group(1);
+        return "null".equals(oauthError) ? auth(IngestionSourceErrorSubReason.UNSPECIFIED, code, TARGET_IDP)
+            : oauth(oauthError, 0);
       }
       Matcher status = PULSAR_OAUTH_STATUS.matcher(message);
       if (status.find()) {

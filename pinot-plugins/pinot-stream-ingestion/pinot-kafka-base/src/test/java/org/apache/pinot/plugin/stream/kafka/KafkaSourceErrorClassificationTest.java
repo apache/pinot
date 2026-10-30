@@ -189,6 +189,12 @@ public class KafkaSourceErrorClassificationTest {
     assertSourceRead(underPinot(constructOAuthConsumer(503, "unavailable")), TARGET_IDP);
     // Whatever error the body names, a 5xx failed.
     assertSourceRead(underPinot(constructOAuthConsumer(503, "{\"error\":\"backend_error\"}")), TARGET_IDP);
+    assertSourceRead(underPinot(constructOAuthConsumer(503, "{\"error\":\"invalid_client\"}")), TARGET_IDP);
+    // A mistyped token URL: a gateway's 404 carries no OAuth error, Spring Boot's names one
+    assertEquals(assertSourceRead(underPinot(constructOAuthConsumer(404,
+        "{\"message\":\"no Route matched with those values\"}")), TARGET_IDP).getCode(), "404");
+    assertSourceRead(underPinot(constructOAuthConsumer(404,
+        "{\"status\":404,\"error\":\"Not Found\",\"path\":\"/oauth/tokn\"}")), TARGET_IDP);
     int closedPort;
     try (ServerSocket socket = new ServerSocket(0)) {
       closedPort = socket.getLocalPort();
