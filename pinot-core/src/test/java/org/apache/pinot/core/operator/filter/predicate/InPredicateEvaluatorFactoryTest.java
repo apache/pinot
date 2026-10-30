@@ -25,19 +25,39 @@ import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import java.math.BigDecimal;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Set;
 import java.util.SortedSet;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.predicate.InPredicate;
 import org.apache.pinot.core.operator.filter.predicate.InPredicateEvaluatorFactory.InRawPredicateEvaluator;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+
 
 public class InPredicateEvaluatorFactoryTest {
+
+  @Test
+  public void testDoubleVectorEvaluationCompactsOnlyTheSelectedPrefix() {
+    InRawPredicateEvaluator evaluator = InPredicateEvaluatorFactory.newRawValueBasedEvaluator(
+        new InPredicate(ExpressionContext.forIdentifier("value"), List.of("1.5", "-2.25")), DataType.DOUBLE);
+    int[] docIds = {7, 3, 12, 5};
+    double[] values = {1.5, 4.0, -2.25, 1.5};
+
+    assertEquals(evaluator.applySV(0, docIds, values), 0);
+    assertEquals(docIds, new int[] {7, 3, 12, 5});
+    int matches = evaluator.applySV(3, docIds, values);
+    assertEquals(matches, 2);
+    assertEquals(Arrays.copyOf(docIds, matches), new int[] {7, 12});
+    assertEquals(values, new double[] {1.5, 4.0, -2.25, 1.5});
+  }
 
   InRawPredicateEvaluator.Visitor<Integer> createValueSizeVisitor() {
     return new InRawPredicateEvaluator.Visitor<>() {

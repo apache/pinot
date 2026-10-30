@@ -24,6 +24,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.SyntheticBlockValSets;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -31,6 +32,8 @@ import org.mockito.Mockito;
 import org.roaringbitmap.RoaringBitmap;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertSame;
@@ -42,8 +45,46 @@ import static org.testng.Assert.assertSame;
 /// cardinality; repair converts back to array containers at up to 4096), so both promoted and non-promoted
 /// accumulator states are verified against an eagerly unioned reference.
 public class DistinctCountBitmapLazyUnionTest {
+  @Test
+  public void testIntGroupBySkipsNullRowsAcrossNonNullRanges() {
+    DistinctCountBitmapAggregationFunction function = new DistinctCountBitmapAggregationFunction(EXPRESSION, true);
+    BlockValSet block = SyntheticBlockValSets.Int.create(RoaringBitmap.bitmapOf(1, 3),
+        new int[]{11, 99, 22, 99, 11});
+    GroupByResultHolder groups = function.createGroupByResultHolder(2, 2);
+    function.aggregateGroupBySV(5, new int[]{0, 0, 1, 1, 1}, groups, Map.of(EXPRESSION, block));
+    assertEquals(function.extractGroupByResult(groups, 0), RoaringBitmap.bitmapOf(11));
+    assertEquals(function.extractGroupByResult(groups, 1), RoaringBitmap.bitmapOf(11, 22));
+    assertEquals(function.extractFinalResult(function.extractGroupByResult(groups, 1)).intValue(), 2);
+  }
+
   private static final ExpressionContext EXPRESSION = ExpressionContext.forIdentifier("bitmapCol");
   private static final Random RANDOM = new Random(42);
+
+  @Test
+  public void testDoubleAggregationSkipsNullsAcrossNonNullRanges() {
+    DistinctCountBitmapAggregationFunction function = new DistinctCountBitmapAggregationFunction(EXPRESSION, true);
+    AggregationResultHolder holder = function.createAggregationResultHolder();
+    BlockValSet block = mock(BlockValSet.class);
+    when(block.getValueType()).thenReturn(DataType.DOUBLE);
+    when(block.isSingleValue()).thenReturn(true);
+    when(block.getDoubleValuesSV()).thenReturn(new double[] {1.5, 2.5, 1.5, -3.5});
+    when(block.getNullBitmap()).thenReturn(RoaringBitmap.bitmapOf(1));
+
+    function.aggregate(4, holder, Map.of(EXPRESSION, block));
+    RoaringBitmap expected = RoaringBitmap.bitmapOf(Double.hashCode(1.5), Double.hashCode(-3.5));
+    assertEquals(function.extractAggregationResult(holder), expected);
+
+    when(block.getDoubleValuesSV()).thenReturn(new double[] {-3.5, 9.75});
+    when(block.getNullBitmap()).thenReturn(RoaringBitmap.bitmapOf(0));
+    function.aggregate(2, holder, Map.of(EXPRESSION, block));
+    expected.add(Double.hashCode(9.75));
+    assertEquals(function.extractAggregationResult(holder), expected);
+
+    when(block.getNullBitmap()).thenReturn(RoaringBitmap.bitmapOf(0, 1));
+    function.aggregate(2, holder, Map.of(EXPRESSION, block));
+    assertEquals(function.extractAggregationResult(holder), expected);
+    assertEquals(function.extractFinalResult(expected).longValue(), 3L);
+  }
 
   private static byte[][] serializedBitmaps(int numBitmaps, int valuesPerBitmap, int maxValue) {
     byte[][] serialized = new byte[numBitmaps][];

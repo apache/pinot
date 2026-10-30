@@ -443,8 +443,11 @@ public abstract class SharedHybridClusterIntegrationTestSuite extends BaseCluste
 
   private void pushRealtimeRecords(HybridScenarioLease lease, List<File> realtimeAvroFiles)
       throws Exception {
-    ClusterIntegrationTestUtils.pushAvroIntoKafka(realtimeAvroFiles, getKafkaBrokerList(), lease._topicName,
-        getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn(), false);
+    try (BatchedKafkaDataProducer producer =
+        new BatchedKafkaDataProducer(getKafkaBrokerList(), getMaxNumKafkaMessagesPerBatch())) {
+      ClusterIntegrationTestUtils.pushAvroIntoKafka(realtimeAvroFiles, lease._topicName,
+          getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn(), false, producer);
+    }
   }
 
   private static long countRecords(List<File> avroFiles)

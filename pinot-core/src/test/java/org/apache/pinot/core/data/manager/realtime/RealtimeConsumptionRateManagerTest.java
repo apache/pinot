@@ -30,6 +30,7 @@ import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
+import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
@@ -121,6 +122,23 @@ public class RealtimeConsumptionRateManagerTest {
     // topic E: partition level rate limit takes precedence over topic level rate limit
     rateLimiter = CONSUMPTION_RATE_MANAGER.createRateLimiter(STREAM_CONFIG_E, TABLE_NAME);
     assertEquals(((PartitionRateLimiter) rateLimiter).getRate(), 4.0, DELTA);
+  }
+
+  @Test
+  public void testServerLimiterAcceptsAnEmptyMessageBatch() {
+    ServerRateLimiter limiter =
+        new ServerRateLimiter(1_000_000, mock(ServerMetrics.class), MessageCountThrottlingStrategy.INSTANCE);
+    limiter.getMetricEmitter().close();
+    MessageBatch<?> batch = mock(MessageBatch.class);
+    when(batch.getMessageCount()).thenReturn(0);
+    try {
+      limiter.throttle(batch);
+      assertEquals(limiter.getMetricEmitter().getMessageCount().sum(), 0L);
+      assertEquals(limiter.getRate(), 1_000_000.0);
+      verify(batch).getMessageCount();
+    } finally {
+      limiter.close();
+    }
   }
 
   @Test

@@ -33,6 +33,7 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.mockito.MockedStatic;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -229,5 +230,29 @@ public class DiskUtilizationCheckerTest {
     Assert.assertNotNull(diskUsageInfo2);
     Assert.assertEquals(diskUsageInfo2.getTotalSpaceBytes(), 2000L);
     Assert.assertEquals(diskUsageInfo2.getUsedSpaceBytes(), 1500L);
+  }
+
+  @Test
+  public void testAllInvalidResponsesDoNotReplaceLastSuccessfulSnapshot() {
+    BiMap<String, String> endpoints = HashBiMap.create();
+    endpoints.put("http://null", "null-server");
+    endpoints.put("http://missing-id", "missing-id-server");
+    endpoints.put("http://malformed", "malformed-server");
+    CompletionServiceHelper.CompletionServiceResponse response =
+        new CompletionServiceHelper.CompletionServiceResponse();
+    response._httpResponses = Map.of("http://null" + DiskUtilizationChecker.DISK_UTILIZATION_API_PATH, "null",
+        "http://missing-id" + DiskUtilizationChecker.DISK_UTILIZATION_API_PATH, "{}",
+        "http://malformed" + DiskUtilizationChecker.DISK_UTILIZATION_API_PATH, "not-json");
+    CompletionServiceHelper helper = mock(CompletionServiceHelper.class);
+    when(helper.doMultiGetRequest(anyList(), anyString(), anyBoolean(), anyMap(), anyInt(), anyString()))
+        .thenReturn(response);
+    // Observe the publishing boundary without changing the JVM-wide snapshot used by other tests.
+    try (MockedStatic<ResourceUtilizationInfo> snapshots = mockStatic(ResourceUtilizationInfo.class)) {
+      _diskUtilizationChecker.computeResourceUtilization(endpoints, helper);
+      snapshots.verify(() -> ResourceUtilizationInfo.setDiskUsageInfo(anyMap()), never());
+      verify(helper).doMultiGetRequest(anyList(), eq("no-op"), eq(false),
+          eq(Map.of("diskUtilizationPath", DISK_UTILIZATION_PATH)), eq(5000),
+          eq("get disk utilization info from servers"));
+    }
   }
 }

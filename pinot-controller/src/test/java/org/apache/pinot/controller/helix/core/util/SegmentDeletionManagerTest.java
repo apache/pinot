@@ -66,7 +66,10 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertTrue;
 
 
 public class SegmentDeletionManagerTest {
@@ -742,6 +745,27 @@ public class SegmentDeletionManagerTest {
         }
         return uri.getPath().endsWith(SegmentDeletionManager.DELETED_SEGMENTS);
       }
+    }
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  public void testMissingIdealStatePreservesSegmentsWhenExternalViewStillExists() {
+    String table = "deleting_OFFLINE";
+    HelixAdmin admin = mock(HelixAdmin.class);
+    when(admin.getResourceExternalView(CLUSTER_NAME, table)).thenReturn(new ExternalView(table));
+    when(admin.getResourceIdealState(CLUSTER_NAME, table)).thenReturn(null);
+    ZkHelixPropertyStore<ZNRecord> store = mock(ZkHelixPropertyStore.class);
+    FakeDeletionManager manager = new FakeDeletionManager(admin, store);
+    try {
+      manager.deleteSegmentsFromPropertyStoreAndLocal(table, List.of("segment"));
+      assertTrue(manager._segmentsRemovedFromStore.isEmpty());
+      assertTrue(manager._segmentsToRetry.isEmpty());
+      verifyNoInteractions(store);
+      verify(admin).getResourceExternalView(CLUSTER_NAME, table);
+      verify(admin).getResourceIdealState(CLUSTER_NAME, table);
+    } finally {
+      manager.stop();
     }
   }
 }

@@ -23,6 +23,7 @@ import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.Uninterruptibles;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelOutboundHandlerAdapter;
@@ -41,6 +42,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
@@ -73,7 +75,11 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.core.transport.QueryServerTestUtils.startAndGetPort;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
 
@@ -159,6 +165,59 @@ public class QueryRoutingTest {
         new ServerRoutingStatsManager(new PinotConfiguration(properties), mock(BrokerMetrics.class));
     statsManager.init();
     return new QueryRouter("testBroker", null, null, statsManager, ThreadAccountantUtils.getNoOpAccountant());
+  }
+
+  @Test
+  public void testPingReturnsFailureWhenTheChannelRejectsTheWrite() {
+    initializeTestFixtures(12345);
+    QueryRouter queryRouter = newIsolatedQueryRouter();
+    Channel channel = mock(Channel.class);
+    when(channel.isActive()).thenReturn(true);
+    doAnswer(invocation -> {
+      ReferenceCountUtil.release(invocation.getArgument(0));
+      throw new RejectedExecutionException("Channel event loop has stopped");
+    }).when(channel).writeAndFlush(any());
+    ServerChannels.ServerChannel offline =
+        queryRouter.getServerChannels().getOrCreateServerChannel(_offlineServerRoutingInstance);
+    offline._openedByQuery = true;
+    offline.setChannel(channel);
+    try {
+      assertFalse(queryRouter.ping(_serverInstance, 5_000L));
+      verify(channel).writeAndFlush(any());
+    } finally {
+      queryRouter.shutDown();
+    }
+  }
+
+  @Test
+  public void testPingPreservesInterruptionWhileWaitingForAResponse() {
+    initializeTestFixtures(12345);
+    QueryRouter queryRouter = newIsolatedQueryRouter();
+    EmbeddedChannel channel = new EmbeddedChannel(new ChannelOutboundHandlerAdapter() {
+      @Override
+      public void write(ChannelHandlerContext context, Object message, ChannelPromise promise) {
+        ReferenceCountUtil.release(message);
+        promise.setSuccess();
+        Thread.currentThread().interrupt();
+      }
+    });
+    ServerChannels.ServerChannel offline =
+        queryRouter.getServerChannels().getOrCreateServerChannel(_offlineServerRoutingInstance);
+    offline._openedByQuery = true;
+    offline.setChannel(channel);
+    boolean previouslyInterrupted = Thread.interrupted();
+    try {
+      assertFalse(queryRouter.ping(_serverInstance, 5_000L));
+      assertTrue(Thread.currentThread().isInterrupted());
+      assertTrue(channel.isOpen());
+    } finally {
+      Thread.interrupted();
+      channel.finishAndReleaseAll();
+      queryRouter.shutDown();
+      if (previouslyInterrupted) {
+        Thread.currentThread().interrupt();
+      }
+    }
   }
 
   @Test

@@ -19,6 +19,7 @@
 
 package org.apache.pinot.core.query.aggregation.function;
 
+import it.unimi.dsi.fastutil.floats.Float2LongOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2LongOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
@@ -43,6 +44,33 @@ import static org.testng.Assert.assertThrows;
 
 
 public class ModeAggregationFunctionTest extends AbstractAggregationFunctionTest {
+
+  @Test
+  public void testNumericModesResolveTiesAndReplaceAnEarlierMode() {
+    long[] longValues = {-2, 0, 4};
+    float[] floatValues = {-2.5f, 0, 4.5f};
+    String[] reducers = {"MIN", "MAX", "AVG"};
+    double[] longTieResults = {-2, 4, 2.0 / 3};
+    double[] floatTieResults = {-2.5, 4.5, 2.0 / 3};
+    for (int reducer = 0; reducer < reducers.length; reducer++) {
+      ModeAggregationFunction function = new ModeAggregationFunction(List.of(
+          ExpressionContext.forIdentifier("value"), ExpressionContext.forLiteral(DataType.STRING, reducers[reducer])),
+          false);
+      for (int mode = 0; mode <= longValues.length; mode++) {
+        Long2LongOpenHashMap longs = new Long2LongOpenHashMap();
+        Float2LongOpenHashMap floats = new Float2LongOpenHashMap();
+        for (int i = 0; i < longValues.length; i++) {
+          long frequency = i == mode ? 2 : 1;
+          longs.put(longValues[i], frequency);
+          floats.put(floatValues[i], frequency);
+        }
+        assertEquals(function.extractFinalResult(longs),
+            mode < longValues.length ? longValues[mode] : longTieResults[reducer]);
+        assertEquals(function.extractFinalResult(floats),
+            mode < floatValues.length ? floatValues[mode] : floatTieResults[reducer]);
+      }
+    }
+  }
 
   @DataProvider(name = "scenarios")
   Object[] scenarios() {

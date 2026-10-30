@@ -41,6 +41,7 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -57,6 +58,9 @@ import org.testng.annotations.Test;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertSame;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 @SuppressWarnings({"rawtypes", "unchecked"})
@@ -305,6 +309,25 @@ public class MutableSegmentImplTest {
         freshSegment.destroy();
       }
     }
+  }
+
+  @Test
+  public void testDataSourceUsesReadSchemaForAnAddedColumn() {
+    Schema readSchema = new Schema.SchemaBuilder().setSchemaName("evolvedSchema")
+        .addSingleValueDimension("lateColumn", DataType.INT, 17).build();
+    String storedColumn = _schema.getPhysicalColumnNames().iterator().next();
+    assertSame(_mutableSegmentImpl.getDataSource(storedColumn, readSchema).getForwardIndex(),
+        _mutableSegmentImpl.getDataSource(storedColumn).getForwardIndex());
+
+    DataSource addedColumn = _mutableSegmentImpl.getDataSource("lateColumn", readSchema);
+    assertEquals(addedColumn.getDataSourceMetadata().getNumDocs(), _mutableSegmentImpl.getNumDocsIndexed());
+    assertEquals(addedColumn.getDataSourceMetadata().getDataType(), DataType.INT);
+    assertEquals(addedColumn.getDictionary().getIntValue(0), 17);
+
+    IllegalStateException error = expectThrows(IllegalStateException.class,
+        () -> _mutableSegmentImpl.getDataSource("unknownColumn", readSchema));
+    assertTrue(error.getMessage().contains("unknownColumn"));
+    assertTrue(error.getMessage().contains("evolvedSchema"));
   }
 
   @AfterClass

@@ -463,6 +463,53 @@ public class MaterializedViewConsistencyManagerTest {
         .set(eq(runtimePathB), any(ZNRecord.class), anyInt(), eq(AccessOption.PERSISTENT));
   }
 
+  @Test
+  public void testSweepSkipsDisappearedRuntimeAndRepairsAfterItReturns()
+      throws Exception {
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
+    String runtimePath = ZKMetadataProvider.constructPropertyStorePathForMaterializedViewRuntime(MV_TABLE);
+    String baseTableOffline = TableNameBuilder.OFFLINE.tableNameWithType(BASE_TABLE);
+    String segmentsParentPath = ZKMetadataProvider.constructPropertyStorePathForResource(baseTableOffline);
+    MaterializedViewRuntimeMetadata runtime = new MaterializedViewRuntimeMetadata(
+        MV_TABLE, 2 * BUCKET_MS, Map.of(0L, validEmptyInfo(), BUCKET_MS, validInfo()));
+    when(propertyStore.get(eq(runtimePath), any(Stat.class), eq(AccessOption.PERSISTENT)))
+        .thenReturn(null, runtime.toZNRecord());
+    when(propertyStore.set(eq(runtimePath), any(ZNRecord.class), eq(0), eq(AccessOption.PERSISTENT)))
+        .thenReturn(true);
+    TableTaskConfig taskConfig = new TableTaskConfig(Map.of(CommonConstants.MaterializedViewTask.TASK_TYPE,
+        Map.of(CommonConstants.MaterializedViewTask.BUCKET_TIME_PERIOD_KEY, "1d")));
+    TableConfig mvConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(MV_TABLE).setIsMaterializedView(true).setTaskConfig(taskConfig).build();
+    when(propertyStore.get(eq(ZKMetadataProvider.constructPropertyStorePathForResourceConfig(MV_TABLE)), any(),
+        eq(AccessOption.PERSISTENT))).thenReturn(TableConfigSerDeUtils.toZNRecord(mvConfig));
+    TableConfig baseConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(BASE_TABLE).build();
+    when(propertyStore.get(eq(ZKMetadataProvider.constructPropertyStorePathForResourceConfig(baseTableOffline)), any(),
+        eq(AccessOption.PERSISTENT))).thenReturn(TableConfigSerDeUtils.toZNRecord(baseConfig));
+    when(propertyStore.getChildren(eq(segmentsParentPath), any(), eq(AccessOption.PERSISTENT), anyInt(), anyInt()))
+        .thenReturn(List.of(segment("backfill", 0L, BUCKET_MS - 1, 11L).toZNRecord()));
+
+    MaterializedViewConsistencyManager manager = new MaterializedViewConsistencyManager();
+    try {
+      manager.init(propertyStore);
+      manager.onMaterializedViewTableCreated(MV_TABLE, List.of(BASE_TABLE));
+      manager.sweepStrandedEmptyPartitions();
+      verify(propertyStore).get(eq(runtimePath), any(Stat.class), eq(AccessOption.PERSISTENT));
+      verify(propertyStore, never()).getChildren(eq(segmentsParentPath), any(), eq(AccessOption.PERSISTENT),
+          anyInt(), anyInt());
+      verify(propertyStore, never()).set(eq(runtimePath), any(ZNRecord.class), anyInt(), eq(AccessOption.PERSISTENT));
+
+      manager.sweepStrandedEmptyPartitions();
+      ArgumentCaptor<ZNRecord> recordCaptor = ArgumentCaptor.forClass(ZNRecord.class);
+      verify(propertyStore).set(eq(runtimePath), recordCaptor.capture(), eq(0), eq(AccessOption.PERSISTENT));
+      MaterializedViewRuntimeMetadata updated = MaterializedViewRuntimeMetadata.fromZNRecord(recordCaptor.getValue());
+      assertEquals(updated.getPartitions().get(0L).getState(), PartitionState.STALE,
+          "A temporarily absent runtime must not prevent repair on the next sweep");
+      assertEquals(updated.getPartitions().get(BUCKET_MS).getState(), PartitionState.VALID);
+    } finally {
+      manager.stop();
+    }
+  }
+
   private static PartitionInfo validInfo() {
     return PartitionInfo.forTesting(PartitionState.VALID, new PartitionFingerprint(1, 1234L), 10L);
   }

@@ -25,8 +25,18 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.expectThrows;
+
 
 public class TlsUtilsTest {
+  @Test
+  public void buildServerContextRequiresKeyStore() {
+    IllegalArgumentException exception =
+        expectThrows(IllegalArgumentException.class, () -> TlsUtils.buildServerContext(new TlsConfig()));
+    assertEquals(exception.getMessage(), "Must provide key store path for secured server");
+  }
+
   @Test
   public void installDefaultSSLSocketFactoryWhenNoKeyOrTrustStore() {
     TlsUtils.installDefaultSSLSocketFactory(null, null, null, null, null, null);

@@ -116,7 +116,7 @@ public class TarCompressionUtilsTest {
 
   @Test(dataProvider = "lz4Implementations")
   public void testLz4ArchiveRoundTrip(String compressorName)
-      throws IOException {
+      throws IOException, CompressorException {
     int contentSize = compressorName.equals(CompressorStreamFactory.LZ4_FRAMED) ? 32 * 1024 : 5 * 1024 * 1024;
     byte[] content = new byte[contentSize];
     new Random(0).nextBytes(content);
@@ -130,7 +130,22 @@ public class TarCompressionUtilsTest {
           TarCompressionUtils.TAR_LZ4_FILE_EXTENSION), LZ4_FAST);
       File defaultArchive = new File(TAR_DIR, "default" + TarCompressionUtils.TAR_LZ4_FILE_EXTENSION);
       TarCompressionUtils.createCompressedTarFile(inputFile, defaultArchive);
-      assertEquals(Files.readAllBytes(TarCompressionUtils.untar(defaultArchive, UNTAR_DIR).get(0).toPath()), content);
+      // Reading the input can update its access time in the STAR tar header. Compare encoders using the same tar
+      // payload so the assertion still verifies the default is LZ4_FAST without depending on file metadata timing.
+      byte[] defaultArchiveBytes = Files.readAllBytes(defaultArchive.toPath());
+      try (InputStream input = COMPRESSOR_STREAM_FACTORY.createCompressorInputStream(
+          new ByteArrayInputStream(defaultArchiveBytes));
+          ByteArrayOutputStream expectedArchive = new ByteArrayOutputStream();
+          CompressorOutputStream<?> output =
+              COMPRESSOR_STREAM_FACTORY.createCompressorOutputStream(LZ4_FAST, expectedArchive)) {
+        IOUtils.copy(input, output);
+        output.finish();
+        assertEquals(defaultArchiveBytes, expectedArchive.toByteArray());
+      }
+      File defaultOutputDir = new File(UNTAR_DIR, "default");
+      List<File> defaultExtractedFiles = TarCompressionUtils.untar(defaultArchive, defaultOutputDir);
+      assertEquals(defaultExtractedFiles, List.of(new File(defaultOutputDir, inputFile.getName())));
+      assertEquals(Files.readAllBytes(defaultExtractedFiles.get(0).toPath()), content);
     }
 
     List<File> extractedFiles = TarCompressionUtils.untar(archive, UNTAR_DIR);

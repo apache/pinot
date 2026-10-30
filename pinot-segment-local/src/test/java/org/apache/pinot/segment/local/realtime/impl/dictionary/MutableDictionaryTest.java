@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.realtime.impl.dictionary;
 
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -32,6 +33,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.spi.index.mutable.MutableDictionary;
@@ -41,6 +43,9 @@ import org.apache.pinot.spi.utils.ByteArray;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 /// Tests for functionality and concurrent read/write against mutable dictionaries.
@@ -205,6 +210,137 @@ public class MutableDictionaryTest implements PinotBuffersAfterClassCheckRule {
 
     Assert.assertEquals(dictionary.getDictIdsInRange(expectedMin.toString(), expectedMax.toString(), true, true).size(),
         dictionary.length());
+  }
+
+  @Test
+  public void testFloatDictionaryRangesAtSignedZeroAndUnboundedEdges()
+      throws Exception {
+    try (MutableDictionary dictionary = new FloatOnHeapMutableDictionary()) {
+      assertFloatingPointRangeEndpoints(dictionary, new Object[]{
+          Float.NEGATIVE_INFINITY, -3.75f, -0.0f, 0.0f, 3.75f, Float.POSITIVE_INFINITY, Float.NaN
+      });
+    }
+  }
+
+  @Test
+  public void testDoubleDictionaryRangesAtSignedZeroAndUnboundedEdges()
+      throws Exception {
+    try (MutableDictionary dictionary = new DoubleOnHeapMutableDictionary()) {
+      assertFloatingPointRangeEndpoints(dictionary, new Object[]{
+          Double.NEGATIVE_INFINITY, -3.75d, -0.0d, 0.0d, 3.75d, Double.POSITIVE_INFINITY, Double.NaN
+      });
+    }
+  }
+
+  @Test
+  public void testDoubleOffHeapDictionaryRangeEndpoints()
+      throws Exception {
+    try (MutableDictionary dictionary = new DoubleOffHeapMutableDictionary(8, 16, _memoryManager, "doubleRanges")) {
+      assertFloatingPointRangeEndpoints(dictionary, new Object[]{
+          Double.NEGATIVE_INFINITY, -3.75d, -0.0d, 0.0d, 3.75d, Double.POSITIVE_INFINITY, Double.NaN
+      });
+    }
+  }
+
+  @Test
+  public void testLongDictionaryRangeEndpoints()
+      throws Exception {
+    try (MutableDictionary dictionary = new LongOnHeapMutableDictionary()) {
+      assertTrue(dictionary.getDictIdsInRange("-1", "1", true, true).isEmpty());
+      assertEquals(dictionary.index(new Object[]{Long.MIN_VALUE, -1L, 0L, 1L, Long.MAX_VALUE}),
+          new int[]{0, 1, 2, 3, 4});
+      assertEquals(dictionary.getDictIdsInRange(RangePredicate.UNBOUNDED, "0", true, true),
+          new IntOpenHashSet(new int[]{0, 1, 2}));
+      assertEquals(dictionary.getDictIdsInRange(RangePredicate.UNBOUNDED, "0", true, false),
+          new IntOpenHashSet(new int[]{0, 1}));
+      assertEquals(dictionary.getDictIdsInRange("0", RangePredicate.UNBOUNDED, true, true),
+          new IntOpenHashSet(new int[]{2, 3, 4}));
+      assertEquals(dictionary.getDictIdsInRange("0", RangePredicate.UNBOUNDED, false, true),
+          new IntOpenHashSet(new int[]{3, 4}));
+      assertEquals(dictionary.getDictIdsInRange("-1", "1", true, true),
+          new IntOpenHashSet(new int[]{1, 2, 3}));
+      assertEquals(dictionary.getDictIdsInRange("-1", "1", true, false),
+          new IntOpenHashSet(new int[]{1, 2}));
+      assertEquals(dictionary.getDictIdsInRange("-1", "1", false, true),
+          new IntOpenHashSet(new int[]{2, 3}));
+      assertEquals(dictionary.getDictIdsInRange("-1", "1", false, false), new IntOpenHashSet(new int[]{2}));
+      assertEquals(dictionary.getLongValue(0), Long.MIN_VALUE);
+      assertEquals(dictionary.getLongValue(4), Long.MAX_VALUE);
+    }
+  }
+
+  @Test
+  public void testLongOffHeapDictionaryRangeEndpoints()
+      throws Exception {
+    try (MutableDictionary dictionary = new LongOffHeapMutableDictionary(8, 16, _memoryManager, "offHeapLongRanges")) {
+      assertTrue(dictionary.getDictIdsInRange("-1", "1", true, true).isEmpty());
+      assertEquals(dictionary.index(new Object[]{Long.MIN_VALUE, -1L, 0L, 1L, Long.MAX_VALUE}),
+          new int[]{0, 1, 2, 3, 4});
+      assertEquals(dictionary.getDictIdsInRange(RangePredicate.UNBOUNDED, "0", true, true),
+          new IntOpenHashSet(new int[]{0, 1, 2}));
+      assertEquals(dictionary.getDictIdsInRange(RangePredicate.UNBOUNDED, "0", true, false),
+          new IntOpenHashSet(new int[]{0, 1}));
+      assertEquals(dictionary.getDictIdsInRange("0", RangePredicate.UNBOUNDED, true, true),
+          new IntOpenHashSet(new int[]{2, 3, 4}));
+      assertEquals(dictionary.getDictIdsInRange("0", RangePredicate.UNBOUNDED, false, true),
+          new IntOpenHashSet(new int[]{3, 4}));
+      assertEquals(dictionary.getDictIdsInRange("-1", "1", true, true),
+          new IntOpenHashSet(new int[]{1, 2, 3}));
+      assertEquals(dictionary.getDictIdsInRange("-1", "1", true, false),
+          new IntOpenHashSet(new int[]{1, 2}));
+      assertEquals(dictionary.getDictIdsInRange("-1", "1", false, true),
+          new IntOpenHashSet(new int[]{2, 3}));
+      assertEquals(dictionary.getDictIdsInRange("-1", "1", false, false), new IntOpenHashSet(new int[]{2}));
+      assertEquals(dictionary.getLongValue(0), Long.MIN_VALUE);
+      assertEquals(dictionary.getLongValue(4), Long.MAX_VALUE);
+    }
+  }
+
+  @Test
+  public void testPrimitiveDoubleLookupDistinguishesSignedZero()
+      throws Exception {
+    try (DoubleOnHeapMutableDictionary dictionary = new DoubleOnHeapMutableDictionary()) {
+      assertEquals(dictionary.index(new Object[]{-0.0d, 0.0d, Double.NaN, 3.75d}), new int[]{0, 1, 2, 3});
+      assertEquals(dictionary.indexOf(-0.0d), 0);
+      assertEquals(dictionary.indexOf(0.0d), 1);
+      assertEquals(dictionary.indexOf(Double.NaN), 2);
+      assertEquals(dictionary.indexOf(3.75d), 3);
+      assertEquals(dictionary.indexOf(-2.0d), MutableDictionary.NULL_VALUE_INDEX);
+      assertEquals(dictionary.length(), 4, "Looking up a missing value must not add a dictionary entry");
+    }
+  }
+
+  private static void assertFloatingPointRangeEndpoints(MutableDictionary dictionary, Object[] values) {
+    assertTrue(dictionary.getDictIdsInRange("-1", "1", true, true).isEmpty());
+    assertEquals(dictionary.index(values), new int[]{0, 1, 2, 3, 4, 5, 6});
+    assertEquals(dictionary.index(values[6]), 6, "Repeated NaN must reuse its dictionary entry");
+    assertEquals(dictionary.length(), 7);
+    assertEquals(dictionary.indexOf("-0.0"), 2);
+    assertEquals(dictionary.indexOf("0.0"), 3);
+
+    // Numeric range predicates treat signed zeros equally, while dictionary lookups retain their distinct IDs.
+    assertEquals(dictionary.getDictIdsInRange("0.0", "0.0", true, true),
+        new IntOpenHashSet(new int[]{2, 3}));
+    assertEquals(dictionary.getDictIdsInRange("0.0", "0.0", false, false), new IntOpenHashSet());
+    // NaN is excluded from every ordered comparison, and infinite endpoints remain queryable.
+    assertEquals(dictionary.getDictIdsInRange(RangePredicate.UNBOUNDED, "0.0", true, true),
+        new IntOpenHashSet(new int[]{0, 1, 2, 3}));
+    assertEquals(dictionary.getDictIdsInRange(RangePredicate.UNBOUNDED, "0.0", true, false),
+        new IntOpenHashSet(new int[]{0, 1}));
+    assertEquals(dictionary.getDictIdsInRange("0.0", RangePredicate.UNBOUNDED, true, true),
+        new IntOpenHashSet(new int[]{2, 3, 4, 5}));
+    assertEquals(dictionary.getDictIdsInRange("0.0", RangePredicate.UNBOUNDED, false, true),
+        new IntOpenHashSet(new int[]{4, 5}));
+    assertEquals(dictionary.getDictIdsInRange("-3.75", "3.75", true, true),
+        new IntOpenHashSet(new int[]{1, 2, 3, 4}));
+    assertEquals(dictionary.getDictIdsInRange("-3.75", "3.75", true, false),
+        new IntOpenHashSet(new int[]{1, 2, 3}));
+    assertEquals(dictionary.getDictIdsInRange("-3.75", "3.75", false, true),
+        new IntOpenHashSet(new int[]{2, 3, 4}));
+    assertEquals(dictionary.getDictIdsInRange("-3.75", "3.75", false, false),
+        new IntOpenHashSet(new int[]{2, 3}));
+    assertEquals(dictionary.getLongValue(1), -3L);
+    assertEquals(dictionary.getLongValue(4), 3L);
   }
 
   private MutableDictionary makeOffHeapDictionary(int estCardinality, int maxOverflowSize,

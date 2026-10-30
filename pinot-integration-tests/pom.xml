@@ -133,6 +133,9 @@
                 <include>org/apache/pinot/integration/tests/F*Test.java</include>
                 <include>org/apache/pinot/integration/tests/G*Test.java</include>
                 <include>org/apache/pinot/integration/tests/H*Test.java</include>
+                <!-- Balance whole-class runtimes across the four CI lanes without splitting shared suites. -->
+                <include>org/apache/pinot/integration/tests/QueryKillingIntegrationTest.java</include>
+                <include>org/apache/pinot/integration/tests/RealtimeToOfflineSegmentsMinionClusterIntegrationTest.java</include>
                 <include>org/apache/pinot/integration/tests/udf/*Test.java</include>
                 <!--
                   Never selected by any lane before, and each fails for a pre-existing reason unrelated to the
@@ -222,6 +225,7 @@
                 <include>org/apache/pinot/integration/tests/M*Test.java</include>
                 <include>org/apache/pinot/integration/tests/N*Test.java</include>
                 <include>org/apache/pinot/integration/tests/GrpcBrokerClusterIntegrationTest.java</include>
+                <include>org/apache/pinot/integration/tests/PauselessRealtimeIngestionIntegrationTest.java</include>
                 <include>org/apache/pinot/integration/tests/TenantRebalanceIntegrationTest.java</include>
                 <include>org/apache/pinot/integration/tests/legacy/*Test.java</include>
               </includes>
@@ -230,6 +234,7 @@
                 <exclude>org/apache/pinot/integration/tests/KafkaConfluentSchemaRegistryAvroMessageDecoderRealtimeClusterIntegrationTest.java</exclude>
                 <exclude>org/apache/pinot/integration/tests/KafkaConsumingSegmentToBeMovedSummaryIntegrationTest.java</exclude>
                 <exclude>org/apache/pinot/integration/tests/LLCRealtimeClusterIntegrationTest.java</exclude>
+                <exclude>org/apache/pinot/integration/tests/NullHandlingIntegrationTest.java</exclude>
               </excludes>
             </configuration>
             <executions>
@@ -300,9 +305,12 @@
               </includes>
               <excludes>
                 <exclude>org/apache/pinot/integration/tests/OfflineClusterIntegrationTest.java</exclude>
+                <exclude>org/apache/pinot/integration/tests/PauselessRealtimeIngestionIntegrationTest.java</exclude>
                 <exclude>org/apache/pinot/integration/tests/PinotLLCRealtimeSegmentManagerIntegrationTest.java</exclude>
+                <exclude>org/apache/pinot/integration/tests/QueryKillingIntegrationTest.java</exclude>
                 <exclude>org/apache/pinot/integration/tests/QueryThreadContextIntegrationTest.java</exclude>
                 <exclude>org/apache/pinot/integration/tests/RealtimeConsumptionRateLimiterClusterIntegrationTest.java</exclude>
+                <exclude>org/apache/pinot/integration/tests/RealtimeToOfflineSegmentsMinionClusterIntegrationTest.java</exclude>
               </excludes>
             </configuration>
             <executions>
@@ -352,6 +360,7 @@
                 <include>org/apache/pinot/integration/tests/X*Test.java</include>
                 <include>org/apache/pinot/integration/tests/Y*Test.java</include>
                 <include>org/apache/pinot/integration/tests/Z*Test.java</include>
+                <include>org/apache/pinot/integration/tests/NullHandlingIntegrationTest.java</include>
                 <include>org/apache/pinot/integration/tests/OfflineClusterIntegrationTest.java</include>
                 <include>org/apache/pinot/integration/tests/RealtimeConsumptionRateLimiterClusterIntegrationTest.java</include>
                 <include>org/apache/pinot/integration/tests/tpch/*Test.java</include>
