@@ -578,7 +578,7 @@ public class RetentionManagerTest {
       boolean expectHybridPath) {
     int replicaCount = 1;
     TableConfig realtimeTableConfig = createRealtimeTableConfig1(replicaCount);
-    realtimeTableConfig.getValidationConfig().setEnableHybridTableRetentionStrategy(tableLevel);
+    realtimeTableConfig.getValidationConfig().setHybridTableRetentionStrategy(tableLevel);
 
     PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
     when(resourceManager.getHelixAdmin()).thenReturn(mock(HelixAdmin.class));

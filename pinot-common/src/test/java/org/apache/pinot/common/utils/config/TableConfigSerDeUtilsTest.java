@@ -376,6 +376,34 @@ public class TableConfigSerDeUtilsTest {
       assertEquals(tunerConfigToCompare.getName(), name);
       assertEquals(tunerConfigToCompare.getTunerProperties(), props);
     }
+    {
+      // With hybrid table retention strategy
+      for (Boolean enableHybridTableRetentionStrategy : new Boolean[]{true, false}) {
+        TableConfig tableConfig = tableConfigBuilder.build();
+        tableConfig.getValidationConfig().setHybridTableRetentionStrategy(enableHybridTableRetentionStrategy);
+
+        // Serialize then de-serialize
+        TableConfig tableConfigToCompare = JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class);
+        assertEquals(tableConfigToCompare, tableConfig);
+        assertEquals(tableConfigToCompare.getValidationConfig().getHybridTableRetentionStrategy(),
+            enableHybridTableRetentionStrategy);
+
+        tableConfigToCompare = TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfig));
+        assertEquals(tableConfigToCompare, tableConfig);
+        assertEquals(tableConfigToCompare.getValidationConfig().getHybridTableRetentionStrategy(),
+            enableHybridTableRetentionStrategy);
+      }
+
+      // Unset by default
+      TableConfig tableConfig = tableConfigBuilder.build();
+      assertNull(tableConfig.getValidationConfig().getHybridTableRetentionStrategy());
+      ObjectNode validationConfigJson = (ObjectNode) tableConfig.toJsonNode().get(TableConfig.VALIDATION_CONFIG_KEY);
+      assertFalse(validationConfigJson.has("enableHybridTableRetentionStrategy"));
+
+      // Configs without this field deserialize to null
+      TableConfig tableConfigToCompare = JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class);
+      assertNull(tableConfigToCompare.getValidationConfig().getHybridTableRetentionStrategy());
+    }
   }
 
   private void checkSegmentsValidationAndRetentionConfig(TableConfig tableConfig) {
