@@ -31,7 +31,21 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
+    <!-- Follow the normal fork count locally; CI can tune Core independently of the other modules. -->
+    <unit.test.core.fork.count>${unit.test.fork.count}</unit.test.core.fork.count>
   </properties>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <forkCount>${unit.test.core.fork.count}</forkCount>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
 
   <dependencies>
     <dependency>

@@ -53,7 +53,10 @@ netstat -i
 #     remains overridable as an escape hatch if a new flake appears, but is intentionally not a
 #     standing default so real failures are never masked.
 UNIT_TEST_FORK_COUNT="${UNIT_TEST_FORK_COUNT:-3}"
-# 2500m/fork: 3 forks * 2500m + the 2g Maven JVM (~9.5g) stays well under the runner's 16g.
+# Core spends most of set #1 starting and running isolated test JVMs. Use the fourth runner CPU while
+# retaining reuseForks=false, all test selectors, and the three-fork default in the other modules.
+UNIT_TEST_CORE_FORK_COUNT="${UNIT_TEST_CORE_FORK_COUNT:-4}"
+# 2500m/fork: Core's 4 forks plus the 2g Maven JVM use about 12g of heap on the 16g runner.
 UNIT_TEST_FORK_HEAP="${UNIT_TEST_FORK_HEAP:-2500m}"
 UNIT_TEST_RERUN_COUNT="${UNIT_TEST_RERUN_COUNT:-0}"
 # Coverage adds ~30% to the test phase (JaCoCo agent per fork + aggregate report). Keep it on by
@@ -63,7 +66,9 @@ RUN_CODECOVERAGE="${RUN_CODECOVERAGE:-true}"
 # Fork-scope the JaCoCo exec file (jacoco-<forkNumber>.exec) so parallel forks don't append to
 # one shared jacoco.exec and corrupt coverage. Only the unit lane sets this; other lanes keep
 # the default empty suffix (target/jacoco.exec).
-FORK_OPTS="-Dunit.test.fork.count=${UNIT_TEST_FORK_COUNT} -Dunit.test.fork.heap=${UNIT_TEST_FORK_HEAP} -Dunit.test.rerun.count=${UNIT_TEST_RERUN_COUNT} -Djacoco.exec.suffix=-\${surefire.forkNumber}"
+FORK_OPTS="-Dunit.test.fork.count=${UNIT_TEST_FORK_COUNT} -Dunit.test.core.fork.count=${UNIT_TEST_CORE_FORK_COUNT}"
+FORK_OPTS="${FORK_OPTS} -Dunit.test.fork.heap=${UNIT_TEST_FORK_HEAP} -Dunit.test.rerun.count=${UNIT_TEST_RERUN_COUNT}"
+FORK_OPTS="${FORK_OPTS} -Djacoco.exec.suffix=-\${surefire.forkNumber}"
 if [ "$RUN_CODECOVERAGE" == "true" ]; then
   COVERAGE_PROFILE=",codecoverage"
 else
