@@ -36,6 +36,7 @@ import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.Table;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
@@ -54,6 +55,7 @@ import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.query.routing.VirtualServerAddress;
+import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
@@ -361,6 +363,45 @@ public class LeafOperatorTest {
     }
 
     operator.close();
+  }
+
+  @Test
+  public void shouldCancelHybridSiblingWhenOneRequestReturnsError()
+      throws Exception {
+    ServerQueryRequest failedRequest = mockQueryRequest(true);
+    ServerQueryRequest siblingRequest = mockQueryRequest(true);
+    CountDownLatch siblingStarted = new CountDownLatch(1);
+    CountDownLatch siblingInterrupted = new CountDownLatch(1);
+    CountDownLatch releaseSibling = new CountDownLatch(1);
+    InstanceResponseBlock error = new InstanceResponseBlock();
+    error.addException(QueryErrorCode.QUERY_EXECUTION, "hybrid request failed");
+    QueryExecutor queryExecutor = mock(QueryExecutor.class);
+    when(queryExecutor.execute(any(), any(), any())).thenAnswer(invocation -> {
+      if (invocation.getArgument(0) == failedRequest) {
+        assertTrue(siblingStarted.await(10, TimeUnit.SECONDS), "The sibling request must already be executing");
+        return error;
+      }
+      siblingStarted.countDown();
+      try {
+        assertTrue(releaseSibling.await(10, TimeUnit.SECONDS), "The failed request must cancel its waiting sibling");
+      } catch (InterruptedException e) {
+        siblingInterrupted.countDown();
+        Thread.currentThread().interrupt();
+      }
+      return new InstanceResponseBlock(new MetadataResultsBlock());
+    });
+    DataSchema schema = new DataSchema(new String[]{"value"}, new ColumnDataType[]{ColumnDataType.INT});
+    try (LeafOperator operator = new LeafOperator(OperatorTestUtil.getTracingContext(),
+        List.of(failedRequest, siblingRequest), schema, queryExecutor, _executorService)) {
+      MseBlock block = operator.nextBlock();
+      assertTrue(block.isError());
+      assertEquals(((ErrorMseBlock) block).getErrorMessages(),
+          Map.of(QueryErrorCode.QUERY_EXECUTION, "hybrid request failed"));
+      assertTrue(siblingInterrupted.await(10, TimeUnit.SECONDS),
+          "The error must release and cancel the hybrid sibling");
+    } finally {
+      releaseSibling.countDown();
+    }
   }
 
   @Test

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import java.math.BigDecimal;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -41,6 +42,29 @@ public abstract class BinaryOperatorTransformFunctionTest extends BaseTransformF
   abstract boolean getExpectedValue(int compareResult);
 
   abstract String getFunctionName();
+
+  @Test
+  public void testFloatingPointComparisonWithExactAndRoundedDecimalLiterals() {
+    for (String literal : new String[] {"1.5", "9007199254740993", "-9007199254740993"}) {
+      BigDecimal decimal = new BigDecimal(literal);
+      ExpressionContext expression = RequestContextUtils.getExpression(
+          String.format("%s(%s, '%s')", getFunctionName(), FLOAT_SV_COLUMN, literal));
+      TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+      boolean[] expectedValues = new boolean[NUM_ROWS];
+      for (int i = 0; i < NUM_ROWS; i++) {
+        expectedValues[i] = getExpectedValue(BigDecimal.valueOf(_floatSVValues[i]).compareTo(decimal));
+      }
+      testTransformFunction(transformFunction, expectedValues);
+
+      expression = RequestContextUtils.getExpression(
+          String.format("%s(%s, '%s')", getFunctionName(), DOUBLE_SV_COLUMN, literal));
+      transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+      for (int i = 0; i < NUM_ROWS; i++) {
+        expectedValues[i] = getExpectedValue(BigDecimal.valueOf(_doubleSVValues[i]).compareTo(decimal));
+      }
+      testTransformFunction(transformFunction, expectedValues);
+    }
+  }
 
   /// For columns with dictionary, BinaryOperatorTransformFunction will automatically use the internal
   /// predicateEvaluator for expression evaluation.

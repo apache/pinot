@@ -19,6 +19,10 @@
 package org.apache.pinot.query.mailbox;
 
 import com.google.protobuf.ByteString;
+import io.grpc.ClientCall;
+import io.grpc.ManagedChannel;
+import io.grpc.Metadata;
+import io.grpc.Status;
 import io.grpc.stub.ClientCallStreamObserver;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -41,7 +45,9 @@ import org.apache.pinot.common.datablock.DataBlockEquals;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.proto.Mailbox.MailboxContent;
+import org.apache.pinot.common.proto.Mailbox.MailboxStatus;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.datablock.DataBlockBuilder;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
@@ -60,13 +66,75 @@ import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
 public class GrpcSendingMailboxTest {
+
+  @Test
+  @SuppressWarnings("unchecked") // The gRPC observer class token cannot retain its MailboxContent parameter.
+  public void sendDataDoesNotWaitForReadyWhenBackpressureIsDisabled()
+      throws Exception {
+    ClientCallStreamObserver<MailboxContent> observer = mock(ClientCallStreamObserver.class);
+    GrpcSendingMailbox mailbox = new GrpcSendingMailbox("disabled-backpressure", mock(ChannelManager.class),
+        "localhost", 0, Long.MAX_VALUE, new StatMap<>(MailboxSendOperator.StatKey.class), 4 * 1024 * 1024, false) {
+      @Override
+      ClientCallStreamObserver<MailboxContent> getContentObserver() {
+        return observer;
+      }
+    };
+    DataSchema schema = new DataSchema(new String[]{"value"}, new ColumnDataType[]{ColumnDataType.STRING});
+    try (QueryThreadContext ignored = QueryThreadContext.openForMseTest()) {
+      try {
+        mailbox.send(new RowHeapDataBlock(List.<Object[]>of(new Object[]{"sent while not ready"}), schema));
+        ArgumentCaptor<MailboxContent> content = ArgumentCaptor.forClass(MailboxContent.class);
+        verify(observer).onNext(content.capture());
+        verify(observer, never()).isReady();
+        DataBlock decoded = DataBlockUtils.deserialize(
+            List.of(content.getValue().getPayload().asReadOnlyByteBuffer()));
+        assertEquals(decoded.getNumberOfRows(), 1);
+        assertEquals(decoded.getString(0, 0), "sent while not ready");
+      } finally {
+        mailbox.close();
+      }
+    }
+    verify(observer).onCompleted();
+  }
+
+  @Test
+  @SuppressWarnings("unchecked") // The mocked gRPC ClientCall class token erases request/response type parameters.
+  public void eosDoesNotSendPayloadWhenTheStreamFinishesDuringOpening()
+      throws Exception {
+    ChannelManager manager = mock(ChannelManager.class);
+    ManagedChannel channel = mock(ManagedChannel.class);
+    ClientCall<MailboxContent, MailboxStatus> call = mock(ClientCall.class);
+    when(manager.getChannel("localhost", 8000)).thenReturn(channel);
+    when(channel.<MailboxContent, MailboxStatus>newCall(any(), any())).thenReturn(call);
+    doAnswer(invocation -> {
+      ClientCall.Listener<MailboxStatus> listener = invocation.getArgument(0);
+      // A peer may finish the stream before the first outbound message is produced.
+      listener.onClose(Status.OK, new Metadata());
+      return null;
+    }).when(call).start(any(), any());
+    GrpcSendingMailbox mailbox = new GrpcSendingMailbox("finished-before-eos", manager, "localhost", 8000,
+        Long.MAX_VALUE, new StatMap<>(MailboxSendOperator.StatKey.class), 4 * 1024 * 1024, true);
+    try {
+      mailbox.send(SuccessMseBlock.INSTANCE, List.of());
+      assertTrue(mailbox.isTerminated());
+      verify(call).start(any(), any());
+      verify(call, never()).sendMessage(any());
+      verify(call).halfClose();
+    } finally {
+      mailbox.close();
+    }
+  }
 
   @Test(dataProvider = "cancellationErrors")
   @SuppressWarnings("unchecked")

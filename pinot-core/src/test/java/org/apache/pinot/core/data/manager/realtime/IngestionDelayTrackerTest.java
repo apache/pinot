@@ -22,6 +22,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -31,6 +32,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
 import org.apache.commons.lang3.tuple.Pair;
@@ -47,9 +49,15 @@ import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
+import org.mockito.MockedStatic;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
@@ -155,6 +163,43 @@ public class IngestionDelayTrackerTest {
 
   private IngestionDelayTracker createTracker() {
     return new MockIngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME, REALTIME_TABLE_DATA_MANAGER);
+  }
+
+  @Test
+  public void testCaughtUpPartitionIsRetainedUntilVerificationTimeout() {
+    var tableConfigAndSchema = REALTIME_TABLE_DATA_MANAGER.getCachedTableConfigAndSchema();
+    RealtimeTableDataManager tableManager = mock(RealtimeTableDataManager.class);
+    when(tableManager.getCachedTableConfigAndSchema()).thenReturn(tableConfigAndSchema);
+    when(tableManager.getHostedPartitionsGroupIds()).thenReturn(Set.of(1));
+    ScheduledExecutorService scheduler = mock(ScheduledExecutorService.class);
+    try (MockedStatic<Executors> executors = mockStatic(Executors.class, CALLS_REAL_METHODS)) {
+      executors.when(() -> Executors.newSingleThreadScheduledExecutor(any(ThreadFactory.class))).thenReturn(scheduler);
+      MockIngestionDelayTracker tracker =
+          new MockIngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME, tableManager, 60_000, 60_000, () -> true);
+      try {
+        Clock start = Clock.fixed(Instant.ofEpochMilli(1_000_000), ZoneOffset.UTC);
+        tracker.setClock(start);
+        String segment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, 123).getSegmentName();
+        tracker.updatePartitionIdToLatestOffset(Map.of(0, new LongMsgOffset(100)));
+        tracker.updateMetrics(segment, 0, start.millis() - 25, start.millis() - 25, null);
+        assertEquals(tracker.getPartitionIngestionOffsetLag(0), 0L);
+        assertEquals(tracker.getPartitionIngestionConsumingOffset(0), 0L);
+
+        tracker.markPartitionForVerification(segment);
+        tracker.setClock(Clock.offset(start, Duration.ofMinutes(10)));
+        tracker.timeoutInactivePartitions();
+        verify(tableManager, never()).getHostedPartitionsGroupIds();
+        assertEquals(tracker.getPartitionIngestionTimeMs(0), start.millis() - 25);
+
+        tracker.setClock(Clock.offset(start, Duration.ofMinutes(10).plusMillis(1)));
+        tracker.timeoutInactivePartitions();
+        verify(tableManager).getHostedPartitionsGroupIds();
+        assertNull(tracker.getPartitionIngestionDelayMs(0));
+        assertEquals(tracker.getPartitionIngestionConsumingOffset(0), 0L);
+      } finally {
+        tracker.shutdown();
+      }
+    }
   }
 
   @Test

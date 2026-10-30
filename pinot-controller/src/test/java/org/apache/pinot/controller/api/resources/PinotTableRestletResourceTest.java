@@ -20,15 +20,19 @@ package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.InputStream;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.helix.task.TaskState;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.WatermarkInductionResult;
+import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableConfigValidator;
 import org.apache.pinot.spi.config.table.TableConfigValidatorRegistry;
+import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -41,6 +45,9 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.mockito.Mockito;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
@@ -146,5 +153,25 @@ public class PinotTableRestletResourceTest {
     } finally {
       TableConfigValidatorRegistry.unregister(rejecting);
     }
+  }
+
+  @Test
+  public void testInProgressTaskWithoutRunningWorkersDoesNotBlockTableCleanup()
+      throws Exception {
+    String table = "cleanup_OFFLINE";
+    String taskType = "CleanupTask";
+    String task = "Task_CleanupTask_pending";
+    TableConfig config = new TableConfigBuilder(TableType.OFFLINE).setTableName("cleanup").build();
+    config.setTaskConfig(new TableTaskConfig(Map.of(taskType, new HashMap<>())));
+    PinotHelixResourceManager resources = mock(PinotHelixResourceManager.class);
+    PinotHelixTaskResourceManager tasks = mock(PinotHelixTaskResourceManager.class);
+    when(resources.getTableConfig(table)).thenReturn(config);
+    when(tasks.getTaskStatesByTable(taskType, table)).thenReturn(Map.of(task, TaskState.IN_PROGRESS));
+    when(tasks.getTaskCount(task)).thenReturn(new PinotHelixTaskResourceManager.TaskCount());
+
+    PinotTableRestletResource.tableTasksCleanup(table, false, resources, tasks);
+
+    verify(tasks).deleteTask(task, true);
+    verify(tasks).getTaskCount(task);
   }
 }

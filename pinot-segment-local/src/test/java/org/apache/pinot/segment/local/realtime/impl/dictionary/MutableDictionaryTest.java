@@ -232,6 +232,43 @@ public class MutableDictionaryTest implements PinotBuffersAfterClassCheckRule {
     }
   }
 
+  @Test
+  public void testDoubleOffHeapDictionaryRangeEndpoints()
+      throws Exception {
+    try (MutableDictionary dictionary = new DoubleOffHeapMutableDictionary(8, 16, _memoryManager, "doubleRanges")) {
+      assertFloatingPointRangeEndpoints(dictionary, new Object[]{
+          Double.NEGATIVE_INFINITY, -3.75d, -0.0d, 0.0d, 3.75d, Double.POSITIVE_INFINITY, Double.NaN
+      });
+    }
+  }
+
+  @Test
+  public void testLongDictionaryRangeEndpoints()
+      throws Exception {
+    try (MutableDictionary dictionary = new LongOnHeapMutableDictionary()) {
+      assertTrue(dictionary.getDictIdsInRange("-1", "1", true, true).isEmpty());
+      assertEquals(dictionary.index(new Object[]{Long.MIN_VALUE, -1L, 0L, 1L, Long.MAX_VALUE}),
+          new int[]{0, 1, 2, 3, 4});
+      assertEquals(dictionary.getDictIdsInRange(RangePredicate.UNBOUNDED, "0", true, true),
+          new IntOpenHashSet(new int[]{0, 1, 2}));
+      assertEquals(dictionary.getDictIdsInRange(RangePredicate.UNBOUNDED, "0", true, false),
+          new IntOpenHashSet(new int[]{0, 1}));
+      assertEquals(dictionary.getDictIdsInRange("0", RangePredicate.UNBOUNDED, true, true),
+          new IntOpenHashSet(new int[]{2, 3, 4}));
+      assertEquals(dictionary.getDictIdsInRange("0", RangePredicate.UNBOUNDED, false, true),
+          new IntOpenHashSet(new int[]{3, 4}));
+      assertEquals(dictionary.getDictIdsInRange("-1", "1", true, true),
+          new IntOpenHashSet(new int[]{1, 2, 3}));
+      assertEquals(dictionary.getDictIdsInRange("-1", "1", true, false),
+          new IntOpenHashSet(new int[]{1, 2}));
+      assertEquals(dictionary.getDictIdsInRange("-1", "1", false, true),
+          new IntOpenHashSet(new int[]{2, 3}));
+      assertEquals(dictionary.getDictIdsInRange("-1", "1", false, false), new IntOpenHashSet(new int[]{2}));
+      assertEquals(dictionary.getLongValue(0), Long.MIN_VALUE);
+      assertEquals(dictionary.getLongValue(4), Long.MAX_VALUE);
+    }
+  }
+
   private static void assertFloatingPointRangeEndpoints(MutableDictionary dictionary, Object[] values) {
     assertTrue(dictionary.getDictIdsInRange("-1", "1", true, true).isEmpty());
     assertEquals(dictionary.index(values), new int[]{0, 1, 2, 3, 4, 5, 6});

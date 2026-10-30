@@ -103,6 +103,7 @@ import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.PermanentConsumerException;
 import org.apache.pinot.spi.stream.RetriableDecodeException;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
+import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamMessage;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
@@ -2001,6 +2002,58 @@ public class RealtimeSegmentDataManagerTest {
     Field field = RealtimeSegmentDataManager.class.getDeclaredField("_hasMessagesFetched");
     field.setAccessible(true);
     field.set(segmentDataManager, hasMessagesFetched);
+  }
+
+  @Test
+  public void testNullLocalBuildDoesNotReplaceTheConsumingSegment()
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager manager = createFakeSegmentManager()) {
+      manager._useRealBuildAndReplace = true;
+      manager._failSegmentBuild = true;
+      assertFalse(manager.buildSegmentAndReplace(null));
+      assertTrue(manager._buildSegmentCalled);
+      verify(manager.getTableDataManager(), never()).replaceConsumingSegment(anyString(), any());
+      manager._failSegmentBuild = false;
+      assertTrue(manager.buildSegmentAndReplace(null));
+      verify(manager.getTableDataManager()).replaceConsumingSegment(eq(SEGMENT_NAME_STR), any(SegmentZKMetadata.class));
+    }
+  }
+
+  @Test
+  public void testIdleEmptyBatchCheckpointsAndRecreatesTheConsumer()
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager manager = createFakeSegmentManager()) {
+      manager._stubConsumeLoop = false;
+      manager._state.set(manager, RealtimeSegmentDataManager.State.INITIAL_CONSUMING);
+      IdleTimer idleTimer = mock(IdleTimer.class);
+      when(idleTimer.getTimeSinceStreamLastCreatedOrConsumedMs()).thenReturn(TimeUnit.MINUTES.toMillis(4));
+      MessageBatch<?> empty = mock(MessageBatch.class);
+      PartitionGroupConsumer original = mock(PartitionGroupConsumer.class);
+      PartitionGroupConsumer replacement = mock(PartitionGroupConsumer.class);
+      when(original.fetchMessages(any(), anyInt())).thenReturn(empty);
+      StreamPartitionMsgOffset offset = manager.getCurrentOffset();
+      when(original.checkpoint(any())).thenAnswer(invocation -> {
+        manager._shouldStop.set(manager, true);
+        return invocation.getArgument(0);
+      });
+      StreamConsumerFactory factory = mock(StreamConsumerFactory.class);
+      when(factory.createPartitionGroupConsumer(anyString(), any(), any())).thenReturn(replacement);
+      Map<String, Object> replacements = Map.of("_idleTimer", idleTimer, "_partitionGroupConsumer", original,
+          "_streamConsumerFactory", factory);
+      for (Map.Entry<String, Object> entry : replacements.entrySet()) {
+        Field field = RealtimeSegmentDataManager.class.getDeclaredField(entry.getKey());
+        field.setAccessible(true);
+        field.set(manager, entry.getValue());
+      }
+
+      assertTrue(manager.consumeLoop());
+      assertEquals(manager.getCurrentOffset(), offset);
+      assertEquals(manager.getSegment().getNumDocsIndexed(), 0);
+      verify(original).checkpoint(offset);
+      verify(original).close();
+      verify(replacement).start(offset);
+      verify(idleTimer).markStreamCreated();
+    }
   }
 
   // If commit fails, make sure that we do not re-build the segment when we try to commit again.
