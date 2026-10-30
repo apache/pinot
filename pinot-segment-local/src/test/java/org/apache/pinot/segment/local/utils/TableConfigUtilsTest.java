@@ -34,6 +34,10 @@ import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.segment.local.utils.TableConfigUtils.ValidationType;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.Constants;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
+import org.apache.pinot.segment.spi.index.IndexService;
+import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
@@ -1438,6 +1442,68 @@ public class TableConfigUtilsTest {
   }
 
   @Test
+  // Legacy fixtures verify automatic migration without changing effective index settings.
+  @SuppressWarnings("removal")
+  public void testMigrateLegacyFieldConfigs()
+      throws IOException {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("message", DataType.STRING)
+        .addSingleValueDimension("geometry", DataType.BYTES)
+        .addMultiValueDimension("vector", DataType.FLOAT)
+        .addSingleValueDimension("partial", DataType.STRING)
+        .addSingleValueDimension("untouched", DataType.INT).build();
+    FieldConfig message = new FieldConfig.Builder("message").withEncodingType(FieldConfig.EncodingType.DICTIONARY)
+        .withCompressionCodec(CompressionCodec.SNAPPY).withIndexTypes(List.of(FieldConfig.IndexType.TEXT))
+        .withProperties(Map.of(FieldConfig.RAW_INDEX_WRITER_VERSION, "4",
+            FieldConfig.DERIVE_NUM_DOCS_PER_CHUNK_RAW_INDEX_KEY, "true",
+            FieldConfig.IS_SEGMENT_PARTITIONED_COLUMN_KEY, "true", "futureProperty", "keep",
+            FieldConfig.TEXT_INDEX_ENABLE_QUERY_CACHE, "true")).build();
+    List<FieldConfig> originalFields = List.of(message,
+        new FieldConfig.Builder("geometry").withIndexTypes(List.of(FieldConfig.IndexType.H3))
+            .withProperties(Map.of("resolutions", "5")).build(),
+        new FieldConfig.Builder("vector").withEncodingType(FieldConfig.EncodingType.RAW)
+            .withIndexTypes(List.of(FieldConfig.IndexType.VECTOR))
+            .withProperties(Map.of("vectorDimension", "3", "vectorDistanceFunction", "COSINE")).build(),
+        new FieldConfig.Builder("partial").withEncodingType(FieldConfig.EncodingType.DICTIONARY)
+            .withIndexes(JsonUtils.stringToJsonNode("{\"forward\":{\"encodingType\":\"RAW\","
+                + "\"configs\":{\"future\":\"keep\"},\"futureProperty\":42}}"))
+            .withProperties(Map.of(FieldConfig.RAW_INDEX_WRITER_VERSION, "2")).build(),
+        new FieldConfig.Builder("untouched").build());
+    TableConfig table = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setNoDictionaryColumns(List.of("message")).setFieldConfigList(originalFields).build();
+    Map<String, FieldIndexConfigs> before = FieldIndexConfigsUtil.createIndexConfigsByColName(table, schema);
+    TableConfigUtils.validate(table, schema, null, null, true);
+    Map<String, FieldIndexConfigs> after = FieldIndexConfigsUtil.createIndexConfigsByColName(table, schema);
+    for (String column : schema.getColumnNames()) {
+      for (IndexType<?, ?, ?> index : IndexService.getInstance().getAllIndexes()) {
+        assertEquals(after.get(column).getConfig(index), before.get(column).getConfig(index), column + "/" + index);
+      }
+    }
+    FieldConfig migrated = table.getFieldConfigList().get(0);
+    assertFalse(migrated.hasFieldLevelEncodingType());
+    assertFalse(migrated.hasFieldLevelCompressionCodec());
+    assertEquals(migrated.getIndexTypes(), List.of());
+    assertEquals(migrated.getProperties().get("futureProperty"), "keep");
+    assertEquals(migrated.getProperties().get(FieldConfig.IS_SEGMENT_PARTITIONED_COLUMN_KEY), "true");
+    assertFalse(migrated.getProperties().containsKey(FieldConfig.RAW_INDEX_WRITER_VERSION));
+    assertTrue(message.getProperties().containsKey(FieldConfig.RAW_INDEX_WRITER_VERSION));
+    assertEquals(table.getFieldConfigList().get(3).getIndexes(), originalFields.get(3).getIndexes());
+    assertEquals(table.getFieldConfigList().get(4), originalFields.get(4));
+    assertFalse(migrated.getIndexes().get("forward").has("targetDocsPerChunk"));
+    String normalized = table.toJsonString();
+    TableConfigUtils.validate(table, schema, null, null, true);
+    assertEquals(table.toJsonString(), normalized);
+
+    FieldConfig disabled = new FieldConfig.Builder("untouched").withEncodingType(FieldConfig.EncodingType.RAW)
+        .withProperties(Map.of(FieldConfig.FORWARD_INDEX_DISABLED, "true",
+            FieldConfig.RAW_INDEX_WRITER_VERSION, "ignored-invalid-value")).build();
+    table.setFieldConfigList(List.of(disabled));
+    TableConfigUtils.validate(table, schema, null, null, true);
+    assertEquals(table.getFieldConfigList(), List.of(disabled));
+    assertTrue(StandardIndexes.forward().getConfig(table, schema).get("untouched").isDisabled());
+  }
+
+  @Test
   // Exercise legacy settings intentionally to verify compatibility.
   @SuppressWarnings({"deprecation", "removal"})
   public void testValidateFieldConfig() {
@@ -1478,7 +1544,7 @@ public class TableConfigUtilsTest {
             JsonUtils.newObjectNode().put("encodingType", "DICTIONARY")))
         .build();
     tableConfig.setFieldConfigList(List.of(tiered));
-    TableConfigUtils.validate(tableConfig, schema);
+    TableConfigUtils.validate(tableConfig, schema, null, null, true);
     assertEquals(tableConfig.getFieldConfigList().get(0), tiered);
     assertEquals(StandardIndexes.forward().getConfig(
         TableConfigUtils.overwriteTableConfigForTier(tableConfig, "cold"), schema).get("myCol2").getEncodingType(),

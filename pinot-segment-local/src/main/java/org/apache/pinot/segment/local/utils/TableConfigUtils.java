@@ -26,6 +26,7 @@ import com.google.common.collect.Iterables;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -52,6 +53,7 @@ import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregatorFactory;
 import org.apache.pinot.segment.local.recordtransformer.SchemaConformingTransformer;
+import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
@@ -196,6 +198,120 @@ public final class TableConfigUtils {
       throw new IllegalStateException(
           "tierOverwrites.consuming produces an invalid table config: " + e.getMessage(), e);
     }
+  }
+
+  /// Optionally migrates legacy field settings after validation. Enable only after every reader supports the
+  /// canonical index configs; older readers may reject the migrated representation.
+  public static void validate(TableConfig tableConfig, Schema schema, @Nullable EnumSet<ValidationType> skipTypes,
+      @Nullable TableConfig existingTableConfig, boolean migrateLegacyFields) {
+    validate(tableConfig, schema, skipTypes, existingTableConfig);
+    if (!migrateLegacyFields || ValidationType.ALL.isSkipped(skipTypes)) {
+      return;
+    }
+    TableConfig migrated = new TableConfig(tableConfig);
+    if (migrateLegacyFieldConfigs(migrated, schema)) {
+      // Publish the new field list only after the converted config passes the same validations.
+      validate(migrated, schema, skipTypes, existingTableConfig);
+      tableConfig.setFieldConfigList(migrated.getFieldConfigList());
+    }
+  }
+
+  // Legacy access is intentional while converting persisted configs to their canonical representation.
+  @SuppressWarnings("removal")
+  private static boolean migrateLegacyFieldConfigs(TableConfig tableConfig, Schema schema) {
+    List<FieldConfig> fields = tableConfig.getFieldConfigList();
+    if (CollectionUtils.isEmpty(fields)) {
+      return false;
+    }
+    JsonNode indexingTiers = tableConfig.getIndexingConfig().getTierOverwrites();
+    boolean hasTierOverwrites = indexingTiers != null && !indexingTiers.isEmpty();
+    for (FieldConfig field : fields) {
+      hasTierOverwrites |= !field.getTierOverwrites().isEmpty();
+    }
+    if (hasTierOverwrites) {
+      // Rewriting the base can shadow inherited scalar overrides. Keep those configs editable and unchanged.
+      LOGGER.warn("Retaining legacy field settings for table: {} because it has tier overrides",
+          tableConfig.getTableName());
+      return false;
+    }
+    Map<FieldConfig.IndexType, IndexType<?, ?, ?>> propertyIndexes = Map.of(
+        FieldConfig.IndexType.TEXT, StandardIndexes.text(), FieldConfig.IndexType.H3, StandardIndexes.h3(),
+        FieldConfig.IndexType.VECTOR, StandardIndexes.vector());
+    Map<String, FieldIndexConfigs> configs = FieldIndexConfigsUtil.createIndexConfigsByColName(tableConfig, schema);
+    List<FieldConfig> migrated = new ArrayList<>(fields.size());
+    for (FieldConfig field : fields) {
+      Map<String, String> properties = field.getProperties() == null
+          ? new HashMap<>() : new HashMap<>(field.getProperties());
+      boolean legacyForward = field.hasFieldLevelEncodingType() || field.hasFieldLevelCompressionCodec()
+          || properties.containsKey(FieldConfig.FORWARD_INDEX_DISABLED)
+          || properties.containsKey(FieldConfig.RAW_INDEX_WRITER_VERSION)
+          || properties.containsKey(FieldConfig.DERIVE_NUM_DOCS_PER_CHUNK_RAW_INDEX_KEY);
+      boolean legacyPropertyIndex = false;
+      for (FieldConfig.IndexType index : field.getIndexTypes()) {
+        legacyPropertyIndex |= propertyIndexes.containsKey(index);
+      }
+      // The legacy disabled path deliberately ignores other forward settings, including invalid latent values.
+      if (Boolean.parseBoolean(properties.get(FieldConfig.FORWARD_INDEX_DISABLED))
+          || (!legacyForward && !legacyPropertyIndex)) {
+        migrated.add(field);
+        continue;
+      }
+      ObjectNode indexes = field.getIndexes().isObject()
+          ? (ObjectNode) field.getIndexes().deepCopy() : JsonUtils.newObjectNode();
+      if (legacyForward) {
+        JsonNode originalForward = indexes.get("forward");
+        ObjectNode forward = originalForward != null && originalForward.isObject()
+            ? (ObjectNode) originalForward : JsonUtils.newObjectNode();
+        // Keep unknown JSON and copy explicit settings only, without pinning service-specific defaults.
+        boolean explicitEncoding = forward.hasNonNull(ForwardIndexType.ENCODING_TYPE_CONFIG_KEY);
+        FieldConfig.EncodingType encoding = ForwardIndexType.getForwardEncodingType(field);
+        IndexingConfig indexing = tableConfig.getIndexingConfig();
+        if (!explicitEncoding && ((indexing.getNoDictionaryColumns() != null
+            && indexing.getNoDictionaryColumns().contains(field.getName()))
+            || (indexing.getNoDictionaryConfig() != null
+            && indexing.getNoDictionaryConfig().containsKey(field.getName())))) {
+          encoding = FieldConfig.EncodingType.RAW;
+        }
+        forward.put(ForwardIndexType.ENCODING_TYPE_CONFIG_KEY, encoding.name());
+        if (field.hasFieldLevelCompressionCodec()) {
+          forward.put("compressionCodec", field.getCompressionCodec().name());
+        }
+        String disabled = properties.remove(FieldConfig.FORWARD_INDEX_DISABLED);
+        if (disabled != null && (Boolean.parseBoolean(disabled) || originalForward == null)) {
+          forward.put("disabled", Boolean.parseBoolean(disabled));
+        }
+        // These properties were ignored by the deserializer when a modern forward block was already present.
+        // Retain them in that case because sorted-column segment creation can still consume them.
+        if (originalForward == null) {
+          String writer = properties.remove(FieldConfig.RAW_INDEX_WRITER_VERSION);
+          if (writer != null) {
+            forward.put("rawIndexWriterVersion", Integer.parseInt(writer));
+          }
+          String derive = properties.remove(FieldConfig.DERIVE_NUM_DOCS_PER_CHUNK_RAW_INDEX_KEY);
+          if (derive != null) {
+            forward.put("deriveNumDocsPerChunk", Boolean.parseBoolean(derive));
+          }
+        }
+        indexes.set("forward", forward);
+      }
+      List<FieldConfig.IndexType> indexTypes = new ArrayList<>(field.getIndexTypes());
+      for (Map.Entry<FieldConfig.IndexType, IndexType<?, ?, ?>> entry : propertyIndexes.entrySet()) {
+        if (indexTypes.contains(entry.getKey())) {
+          IndexType<?, ?, ?> index = entry.getValue();
+          indexes.set(index.getPrettyName(), configs.get(field.getName()).getConfig(index).toJsonNode());
+        }
+      }
+      indexTypes.removeAll(propertyIndexes.keySet());
+      // Unknown/plugin and non-index properties have no general replacement and must remain available.
+      migrated.add(new FieldConfig.Builder(field).withIndexes(indexes).withIndexTypes(indexTypes)
+          .withEncodingType(null).withCompressionCodec(null)
+          .withProperties(properties.isEmpty() ? null : properties).build());
+    }
+    if (migrated.equals(fields)) {
+      return false;
+    }
+    tableConfig.setFieldConfigList(migrated);
+    return true;
   }
 
   private static void validateEffectiveTableConfig(TableConfig tableConfig, Schema schema,

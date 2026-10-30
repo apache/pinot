@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.client.admin.PinotAdminClient;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.TableConfigs;
@@ -56,6 +57,8 @@ import org.testng.annotations.Test;
 import org.testng.collections.Lists;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.fail;
 
 
@@ -620,20 +623,40 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
   @SuppressWarnings("removal")
   public void testUpdateAcceptsStoredLegacyFieldLevelConfigOptions()
       throws Exception {
-    assertUpdateAcceptsStoredLegacyFieldConfig("testUpdateLegacyDefaultEncodingType",
-        JsonUtils.stringToObject("{\"name\":\"dimA\",\"encodingType\":\"DICTIONARY\"}", FieldConfig.class));
-    assertUpdateAcceptsStoredLegacyFieldConfig("testUpdateLegacyRawEncodingAndCompression",
-        new FieldConfig.Builder("dimA")
-            .withEncodingType(EncodingType.RAW)
-            .withCompressionCodec(CompressionCodec.SNAPPY)
-            .build());
-    assertUpdateAcceptsStoredLegacyFieldConfig("testUpdateLegacyProperties",
-        new FieldConfig.Builder("dimA")
-            .withProperties(Map.of(FieldConfig.RAW_INDEX_WRITER_VERSION, "4"))
-            .build());
+    assertFalse(new ControllerConf().isAutoMigrateLegacyFieldConfigsEnabled());
+    ControllerConf controllerConf = DEFAULT_INSTANCE.getControllerConfig();
+    String migrationKey = ControllerConf.AUTO_MIGRATE_LEGACY_FIELD_CONFIGS_ENABLED;
+    boolean hadMigrationConfig = controllerConf.containsKey(migrationKey);
+    Object originalMigrationConfig = controllerConf.getProperty(migrationKey);
+    try {
+      for (boolean migrateLegacyFields : List.of(false, true)) {
+        controllerConf.setProperty(migrationKey, migrateLegacyFields);
+        String suffix = migrateLegacyFields ? "Migrated" : "Legacy";
+        assertUpdateAcceptsStoredLegacyFieldConfig("testUpdateDefaultEncodingType" + suffix,
+            JsonUtils.stringToObject("{\"name\":\"dimA\",\"encodingType\":\"DICTIONARY\"}", FieldConfig.class),
+            migrateLegacyFields);
+        assertUpdateAcceptsStoredLegacyFieldConfig("testUpdateRawEncodingAndCompression" + suffix,
+            new FieldConfig.Builder("dimA")
+                .withEncodingType(EncodingType.RAW)
+                .withCompressionCodec(CompressionCodec.SNAPPY)
+                .build(), migrateLegacyFields);
+        assertUpdateAcceptsStoredLegacyFieldConfig("testUpdateProperties" + suffix,
+            new FieldConfig.Builder("dimA")
+                .withProperties(Map.of(FieldConfig.RAW_INDEX_WRITER_VERSION, "4",
+                    FieldConfig.IS_SEGMENT_PARTITIONED_COLUMN_KEY, "true", "futureProperty", "keep"))
+                .build(), migrateLegacyFields);
+      }
+    } finally {
+      if (hadMigrationConfig) {
+        controllerConf.setProperty(migrationKey, originalMigrationConfig);
+      } else {
+        controllerConf.clearProperty(migrationKey);
+      }
+    }
   }
 
-  private void assertUpdateAcceptsStoredLegacyFieldConfig(String tableName, FieldConfig fieldConfig)
+  private void assertUpdateAcceptsStoredLegacyFieldConfig(String tableName, FieldConfig fieldConfig,
+      boolean migrateLegacyFields)
       throws Exception {
     PinotAdminClient adminClient = getOrCreateAdminClient();
     TableConfig offlineTableConfig = createOfflineTableConfig(tableName);
@@ -650,7 +673,24 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
 
       TableConfig stored = adminClient.getTableClient().getTableConfigsObject(tableName).getOffline();
       assertEquals(stored.getDescription(), "Updated legacy config");
-      assertEquals(stored.getFieldConfigList(), List.of(fieldConfig));
+      if (!migrateLegacyFields) {
+        assertEquals(stored.getFieldConfigList(), List.of(fieldConfig));
+        return;
+      }
+      FieldConfig migrated = stored.getFieldConfigList().get(0);
+      assertFalse(migrated.hasFieldLevelEncodingType());
+      assertFalse(migrated.hasFieldLevelCompressionCodec());
+      JsonNode forward = migrated.getIndexes().get("forward");
+      assertNotNull(forward);
+      JsonNode original = fieldConfig.toJsonNode();
+      assertEquals(forward.path("encodingType").asText(), original.path("encodingType").asText("DICTIONARY"));
+      assertEquals(forward.get("compressionCodec"), original.get("compressionCodec"));
+      if (original.has("properties")) {
+        assertEquals(forward.path("rawIndexWriterVersion").asInt(), 4);
+        ObjectNode remainingProperties = (ObjectNode) original.get("properties").deepCopy();
+        remainingProperties.remove(FieldConfig.RAW_INDEX_WRITER_VERSION);
+        assertEquals(migrated.toJsonNode().get("properties"), remainingProperties);
+      }
     } finally {
       adminClient.getTableClient().deleteTableConfigs(tableName, null);
     }

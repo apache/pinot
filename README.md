@@ -157,6 +157,22 @@ nodes during rolling upgrades and rollback. Use the new shape after all nodes su
 into the relevant `indexes.<indexName>` block. Legacy `properties` also contains settings used outside index configs,
 so it must not be cleared wholesale.
 
+To automatically migrate submitted configs, set this controller property after every component that reads or builds
+segments supports the new format:
+
+```properties
+controller.table.config.auto.migrate.legacy.fields.enabled=true
+```
+
+The default is `false` for rolling-upgrade compatibility. With it enabled, create/update and validation requests convert
+legacy encoding, compression, and supported forward properties into `indexes.forward`; text, H3, and vector settings
+move into their index blocks. Validation returns the converted config for inspection; an update saves it. Existing
+stored configs migrate when submitted again, without a cluster-wide rewrite. Unknown and non-index properties remain
+available. Configs with tier overrides and fields disabled through legacy forward properties retain their original
+representation to preserve inheritance and ignored settings. Skipping all validation also skips migration. Save the
+original configs before enabling migration: disabling the flag does not undo saved conversions, and rollback to an
+older reader requires restoring compatible configs first.
+
 Use this shape for new table configs:
 
 ```json
