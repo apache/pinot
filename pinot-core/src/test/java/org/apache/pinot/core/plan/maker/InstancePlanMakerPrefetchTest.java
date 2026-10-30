@@ -133,7 +133,7 @@ public class InstancePlanMakerPrefetchTest {
     verifyNoFetch(local);
   }
 
-  /// Streaming selection has its own start/stop and per-block fetch lifecycle; only the remote segment gets it.
+  /// Streaming selection has its own start/stop and per-segment fetch lifecycle; only the remote segment gets it.
   @Test
   public void testStreamingSelectionRunsFetchLifecycleOnlyForPlannedSegments()
       throws Exception {
@@ -236,7 +236,8 @@ public class InstancePlanMakerPrefetchTest {
     for (IndexSegment segment : segments) {
       segmentContexts.add(new SegmentContext(segment));
     }
-    List<Long> streamedValues = Collections.synchronizedList(new ArrayList<>());
+    // The streamer is invoked on the response thread, not by the combine workers
+    List<Long> streamedValues = new ArrayList<>();
     ResultsBlockStreamer streamer = block -> {
       for (Object[] row : ((SelectionResultsBlock) block).getRows()) {
         streamedValues.add(((Number) row[0]).longValue());
@@ -247,9 +248,8 @@ public class InstancePlanMakerPrefetchTest {
           .makeStreamingInstancePlan(segmentContexts, queryContext, _executorService, streamer).execute();
       assertTrue(responseBlock.getExceptions().isEmpty(), "Query failed: " + responseBlock.getExceptions());
     }
-    List<Long> sortedValues = new ArrayList<>(streamedValues);
-    Collections.sort(sortedValues);
-    return sortedValues;
+    Collections.sort(streamedValues);
+    return streamedValues;
   }
 
   /// The plan maker takes the registered planner at construction.
