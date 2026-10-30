@@ -269,6 +269,47 @@ public class MutableDictionaryTest implements PinotBuffersAfterClassCheckRule {
     }
   }
 
+  @Test
+  public void testLongOffHeapDictionaryRangeEndpoints()
+      throws Exception {
+    try (MutableDictionary dictionary = new LongOffHeapMutableDictionary(8, 16, _memoryManager, "offHeapLongRanges")) {
+      assertTrue(dictionary.getDictIdsInRange("-1", "1", true, true).isEmpty());
+      assertEquals(dictionary.index(new Object[]{Long.MIN_VALUE, -1L, 0L, 1L, Long.MAX_VALUE}),
+          new int[]{0, 1, 2, 3, 4});
+      assertEquals(dictionary.getDictIdsInRange(RangePredicate.UNBOUNDED, "0", true, true),
+          new IntOpenHashSet(new int[]{0, 1, 2}));
+      assertEquals(dictionary.getDictIdsInRange(RangePredicate.UNBOUNDED, "0", true, false),
+          new IntOpenHashSet(new int[]{0, 1}));
+      assertEquals(dictionary.getDictIdsInRange("0", RangePredicate.UNBOUNDED, true, true),
+          new IntOpenHashSet(new int[]{2, 3, 4}));
+      assertEquals(dictionary.getDictIdsInRange("0", RangePredicate.UNBOUNDED, false, true),
+          new IntOpenHashSet(new int[]{3, 4}));
+      assertEquals(dictionary.getDictIdsInRange("-1", "1", true, true),
+          new IntOpenHashSet(new int[]{1, 2, 3}));
+      assertEquals(dictionary.getDictIdsInRange("-1", "1", true, false),
+          new IntOpenHashSet(new int[]{1, 2}));
+      assertEquals(dictionary.getDictIdsInRange("-1", "1", false, true),
+          new IntOpenHashSet(new int[]{2, 3}));
+      assertEquals(dictionary.getDictIdsInRange("-1", "1", false, false), new IntOpenHashSet(new int[]{2}));
+      assertEquals(dictionary.getLongValue(0), Long.MIN_VALUE);
+      assertEquals(dictionary.getLongValue(4), Long.MAX_VALUE);
+    }
+  }
+
+  @Test
+  public void testPrimitiveDoubleLookupDistinguishesSignedZero()
+      throws Exception {
+    try (DoubleOnHeapMutableDictionary dictionary = new DoubleOnHeapMutableDictionary()) {
+      assertEquals(dictionary.index(new Object[]{-0.0d, 0.0d, Double.NaN, 3.75d}), new int[]{0, 1, 2, 3});
+      assertEquals(dictionary.indexOf(-0.0d), 0);
+      assertEquals(dictionary.indexOf(0.0d), 1);
+      assertEquals(dictionary.indexOf(Double.NaN), 2);
+      assertEquals(dictionary.indexOf(3.75d), 3);
+      assertEquals(dictionary.indexOf(-2.0d), MutableDictionary.NULL_VALUE_INDEX);
+      assertEquals(dictionary.length(), 4, "Looking up a missing value must not add a dictionary entry");
+    }
+  }
+
   private static void assertFloatingPointRangeEndpoints(MutableDictionary dictionary, Object[] values) {
     assertTrue(dictionary.getDictIdsInRange("-1", "1", true, true).isEmpty());
     assertEquals(dictionary.index(values), new int[]{0, 1, 2, 3, 4, 5, 6});

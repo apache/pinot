@@ -37,6 +37,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metrics.ServerGauge;
+import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -44,6 +45,9 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.stream.LongMsgOffset;
+import org.apache.pinot.spi.stream.StreamConsumerFactory;
+import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
+import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -53,10 +57,14 @@ import org.mockito.MockedStatic;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anySet;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -66,6 +74,44 @@ import static org.testng.Assert.fail;
 
 
 public class IngestionDelayTrackerTest {
+  @Test
+  public void testLatestOffsetFetchFailureKeepsTheLastOffsetAndRecovers()
+      throws Exception {
+    ServerMetrics metrics = mock(ServerMetrics.class);
+    RealtimeTableDataManager tableManager = mock(RealtimeTableDataManager.class);
+    TableConfig table = new TableConfigBuilder(TableType.REALTIME).setTableName("offsetRecovery")
+        .setStreamConfigs(getStreamConfigs()).build();
+    when(tableManager.getCachedTableConfigAndSchema()).thenReturn(Pair.of(table, null));
+    when(tableManager.getTableName()).thenReturn(table.getTableName());
+    StreamConsumerFactory factory = mock(StreamConsumerFactory.class);
+    StreamMetadataProvider provider = mock(StreamMetadataProvider.class);
+    when(factory.createStreamMetadataProvider(anyString())).thenReturn(provider);
+    when(provider.supportsOffsetLag()).thenReturn(true);
+    when(provider.fetchLatestStreamOffset(anySet(), anyLong()))
+        .thenReturn(Map.of(0, new LongMsgOffset(100)))
+        .thenThrow(new IllegalStateException("temporary upstream failure"))
+        .thenReturn(Map.of(0, new LongMsgOffset(200)));
+    try (MockedStatic<StreamConsumerFactoryProvider> factories = mockStatic(StreamConsumerFactoryProvider.class)) {
+      factories.when(() -> StreamConsumerFactoryProvider.create(any())).thenReturn(factory);
+      IngestionDelayTracker tracker = new IngestionDelayTracker(metrics, table.getTableName(), tableManager,
+          TimeUnit.DAYS.toMillis(1), TimeUnit.DAYS.toMillis(1), () -> false);
+      try {
+        tracker.updateLatestStreamOffset(Set.of(0));
+        assertEquals(tracker.getLatestPartitionOffset(0), 100L);
+        tracker.updateLatestStreamOffset(Set.of(0));
+        assertEquals(tracker.getLatestPartitionOffset(0), 100L);
+        verify(metrics).addMeteredTableValue(table.getTableName(),
+            ServerMeter.INGESTION_DELAY_LATEST_OFFSET_FETCH_ERRORS, 1);
+        tracker.updateLatestStreamOffset(Set.of(0));
+        assertEquals(tracker.getLatestPartitionOffset(0), 200L);
+        verify(provider, times(3)).fetchLatestStreamOffset(anySet(), anyLong());
+      } finally {
+        tracker.shutdown();
+      }
+      verify(provider).close();
+    }
+  }
+
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(RAW_TABLE_NAME);
   private static final int METRICS_CLEANUP_TICK_INTERVAL_MS = 100;
