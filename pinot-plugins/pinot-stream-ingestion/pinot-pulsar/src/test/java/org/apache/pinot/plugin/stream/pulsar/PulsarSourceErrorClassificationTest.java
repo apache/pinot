@@ -99,6 +99,9 @@ public class PulsarSourceErrorClassificationTest {
         TARGET_IDP).getCode(), "unauthorized");
     assertAuth(new PulsarClientException.AuthenticationException("Unable to obtain an access token: null (null)"),
         IngestionSourceErrorSubReason.UNSPECIFIED, TARGET_IDP);
+    assertEquals(assertAuth(new PulsarClientException.AuthenticationException(
+            "Unable to obtain an access token: null (vendor:denied)"), IngestionSourceErrorSubReason.UNSPECIFIED,
+        TARGET_IDP).getCode(), "vendor:denied");
   }
 
   @Test

@@ -426,7 +426,9 @@ final class IngestionSourceErrorRules {
   // failure. A body with no OAuth error field passes through as it came, e.g. a gateway's {"message":"..."}.
   private static final Pattern OAUTH_RESPONSE_CODE = Pattern.compile("The (?:unexpected )?response code (\\d{3})");
   private static final Pattern OAUTH_ERROR =
-      Pattern.compile("error response \\{\"([^\"]{1,64})\" -|\"error\"\\s*:\\s*\"([^\"]{1,64})\"");
+      Pattern.compile("error response \\{\"([^\"]+)\" -|\"error\"\\s*:\\s*\"([^\"]+)\"");
+  // Bounds the error an endpoint sent, as the logged code; RFC 6749 sets no limit
+  private static final int MAX_OAUTH_ERROR_CODE_LENGTH = 64;
   // The 3.x token retriever's text when the endpoint failed or never answered.
   private static final String OAUTH_TOKEN_UNAVAILABLE = "An internal error occurred while retrieving token";
   // 4.x dumps the retriever's stack trace into the message instead: a network failure names its class there.
@@ -482,22 +484,27 @@ final class IngestionSourceErrorRules {
   }
 
   /// An OAuth 2.0 token endpoint's `error` (RFC 6749 section 5.2), falling back to its status. A status that says the
-  /// endpoint couldn't serve the request, or that there is no such endpoint (404), decides first; any other error,
-  /// named or not, is the endpoint refusing the request.
+  /// endpoint couldn't serve the request, or that there is no such endpoint (404), decides first, then a named error.
+  /// An error no row names is the endpoint refusing the request at 400, the status RFC 6749 gives an error answer
+  /// (status 0: the client reports only a 400 or 401); at any other status, the status decides.
   @Nullable
   private static IngestionSourceErrorVerdict oauth(@Nullable String error, int status) {
     if (error != null) {
       String normalized = error.toLowerCase(Locale.ROOT);
+      String code = normalized.length() > MAX_OAUTH_ERROR_CODE_LENGTH
+          ? normalized.substring(0, MAX_OAUTH_ERROR_CODE_LENGTH) : normalized;
       if (status == 404 || isUnavailable(status) || OAUTH_UNAVAILABLE.contains(normalized)) {
-        return sourceRead(normalized, TARGET_IDP);
+        return sourceRead(code, TARGET_IDP);
       }
       if (OAUTH_AUTHENTICATION.contains(normalized)) {
-        return auth(IngestionSourceErrorSubReason.AUTHENTICATION, normalized, TARGET_IDP);
+        return auth(IngestionSourceErrorSubReason.AUTHENTICATION, code, TARGET_IDP);
       }
       if (OAUTH_AUTHORIZATION.contains(normalized)) {
-        return auth(IngestionSourceErrorSubReason.AUTHORIZATION, normalized, TARGET_IDP);
+        return auth(IngestionSourceErrorSubReason.AUTHORIZATION, code, TARGET_IDP);
       }
-      return auth(IngestionSourceErrorSubReason.UNSPECIFIED, normalized, TARGET_IDP);
+      if (status == 0 || status == 400) {
+        return auth(IngestionSourceErrorSubReason.UNSPECIFIED, code, TARGET_IDP);
+      }
     }
     return httpStatus(status, TARGET_IDP);
   }
@@ -545,7 +552,8 @@ final class IngestionSourceErrorRules {
   // with "(null)" for a body without an error field, or for any other status "Unable to obtain an access token: Failed
   // to perform HTTP request. res: <status>".
   private static final String PULSAR_OAUTH_TOKEN = "Unable to obtain an access token";
-  private static final Pattern PULSAR_OAUTH_ERROR = Pattern.compile("\\(([A-Za-z0-9_.-]{1,64})\\)\\s*$");
+  // Anything but a space, so a JDK message ending in a parenthesis, e.g. "(Connection refused)", is not read
+  private static final Pattern PULSAR_OAUTH_ERROR = Pattern.compile("\\(([^()\\s]+)\\)\\s*$");
   private static final Pattern PULSAR_OAUTH_STATUS = Pattern.compile("res: (\\d{3})\\s*$");
 
   /// Pulsar's class is its code: the broker's error maps one to one onto a nested subclass. Every subclass of the
