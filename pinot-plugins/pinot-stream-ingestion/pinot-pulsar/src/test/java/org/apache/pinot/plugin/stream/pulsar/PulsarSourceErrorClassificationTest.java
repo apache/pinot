@@ -102,6 +102,13 @@ public class PulsarSourceErrorClassificationTest {
     assertEquals(assertAuth(new PulsarClientException.AuthenticationException(
             "Unable to obtain an access token: null (vendor:denied)"), IngestionSourceErrorSubReason.UNSPECIFIED,
         TARGET_IDP).getCode(), "vendor:denied");
+    assertEquals(assertAuth(new PulsarClientException.AuthenticationException(
+            "Unable to obtain an access token: null (Bad credentials)"), IngestionSourceErrorSubReason.UNSPECIFIED,
+        TARGET_IDP).getCode(), "bad_credentials");
+    // A transport failure in the same text ends in an address, not a refusal's parenthesis
+    assertSourceRead(new PulsarClientException.AuthenticationException("Unable to obtain an access token: "
+        + "java.util.concurrent.ExecutionException: io.netty.channel.AbstractChannel$AnnotatedConnectException: "
+        + "Connection refused: localhost/127.0.0.1:1"), TARGET_IDP);
   }
 
   @Test

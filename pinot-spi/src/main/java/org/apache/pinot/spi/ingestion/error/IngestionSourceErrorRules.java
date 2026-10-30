@@ -552,8 +552,8 @@ final class IngestionSourceErrorRules {
   // with "(null)" for a body without an error field, or for any other status "Unable to obtain an access token: Failed
   // to perform HTTP request. res: <status>".
   private static final String PULSAR_OAUTH_TOKEN = "Unable to obtain an access token";
-  // Anything but a space, so a JDK message ending in a parenthesis, e.g. "(Connection refused)", is not read
-  private static final Pattern PULSAR_OAUTH_ERROR = Pattern.compile("\\(([^()\\s]+)\\)\\s*$");
+  // Only the token client's refusal ends in a parenthesis; a transport failure ends in an address or a timeout
+  private static final Pattern PULSAR_OAUTH_ERROR = Pattern.compile("\\(([^()]+)\\)\\s*$");
   private static final Pattern PULSAR_OAUTH_STATUS = Pattern.compile("res: (\\d{3})\\s*$");
 
   /// Pulsar's class is its code: the broker's error maps one to one onto a nested subclass. Every subclass of the
