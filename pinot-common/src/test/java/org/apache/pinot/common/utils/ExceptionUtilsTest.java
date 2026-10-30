@@ -19,6 +19,8 @@
 package org.apache.pinot.common.utils;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.testng.annotations.Test;
 
@@ -121,6 +123,65 @@ public class ExceptionUtilsTest {
     second.initCause(first);
 
     assertEquals(append("top", first), "top -> first -> second");
+  }
+
+  @Test
+  public void testStackTraceFormatsCausesAndHandlesMissingExceptions() {
+    IOException inner = new IOException("inner");
+    inner.setStackTrace(new StackTraceElement[]{
+        new StackTraceElement("example.Reader", "read", "Reader.java", 20)
+    });
+    IllegalStateException outer = new IllegalStateException("outer", inner);
+    outer.setStackTrace(new StackTraceElement[]{
+        new StackTraceElement("example.Worker", "dispatch", "Worker.java", 10)
+    });
+    String expected = "outer\nexample.Worker.dispatch(Worker.java:10)\n"
+        + "inner\nexample.Reader.read(Reader.java:20)\n";
+
+    assertEquals(ExceptionUtils.getStackTrace(outer), expected);
+    assertEquals(ExceptionUtils.getStackTrace(outer, 10), expected);
+    assertEquals(ExceptionUtils.getStackTrace(outer, 10, 1024), expected);
+    assertEquals(ExceptionUtils.getStackTrace(null), "");
+  }
+
+  @Test
+  public void testStackTraceTruncationKeepsCompleteFramesAndOmitsLaterCauses() {
+    IllegalStateException outer = withFourFrames("outer", withFourFrames("inner", null));
+    String firstFrame = "outer\nexample.Worker.step0(Worker.java:10)\n";
+
+    // Truncation happens after a complete frame, preserving a usable failure location.
+    assertEquals(ExceptionUtils.getStackTrace(outer, 0), firstFrame);
+    assertEquals(ExceptionUtils.getStackTrace(outer, Integer.MAX_VALUE, 1), firstFrame);
+  }
+
+  @Test
+  public void testConsolidatedTracesIncludeCausesAndBoundLongChains() {
+    String onlyTrace = "only\nexample.Worker.step0(Worker.java:10)\n"
+        + "example.Worker.step1(Worker.java:11)\nexample.Worker.step2(Worker.java:12)\n"
+        + "example.Worker.step3(Worker.java:13)\n";
+    assertEquals(ExceptionUtils.consolidateExceptionTraces(withFourFrames("only", null)), onlyTrace);
+    assertEquals(ExceptionUtils.consolidateExceptionTraces(null), "");
+
+    Throwable failure = null;
+    for (int cause = 11; cause >= 0; cause--) {
+      failure = withFourFrames("cause" + cause, failure);
+    }
+    String trace = ExceptionUtils.consolidateExceptionTraces(failure);
+    assertEquals(trace.lines().filter(line -> line.startsWith("cause")).collect(Collectors.toList()),
+        List.of("cause0", "cause1", "cause2", "cause3", "cause4", "cause5", "cause6", "cause7", "cause8",
+            "cause9"));
+    assertEquals(trace.lines().count(), 50L);
+  }
+
+  private static IllegalStateException withFourFrames(String message, Throwable cause) {
+    IllegalStateException exception = new IllegalStateException(message, cause);
+    exception.setStackTrace(new StackTraceElement[]{
+        new StackTraceElement("example.Worker", "step0", "Worker.java", 10),
+        new StackTraceElement("example.Worker", "step1", "Worker.java", 11),
+        new StackTraceElement("example.Worker", "step2", "Worker.java", 12),
+        new StackTraceElement("example.Worker", "step3", "Worker.java", 13)
+    });
+    return exception;
   }
 
   private static String append(String message, Throwable cause) {
