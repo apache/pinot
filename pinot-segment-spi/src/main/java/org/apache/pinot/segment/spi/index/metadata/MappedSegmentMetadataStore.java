@@ -164,7 +164,38 @@ final class MappedSegmentMetadataStore implements Closeable {
     _segmentConfigLength = segmentConfigLength;
   }
 
+  static SegmentMetadataImpl.EagerSnapshot captureEagerSnapshot(File indexDir)
+      throws IOException, ConfigurationException {
+    File source = SegmentDirectoryPaths.findMetadataFile(indexDir);
+    if (source == null) {
+      throw new IOException("Missing metadata.properties in " + indexDir);
+    }
+    byte[] propertiesBytes = Files.readAllBytes(source.toPath());
+    File indexMap = findIndexMap(indexDir);
+    byte[] indexMapBytes = indexMap != null ? Files.readAllBytes(indexMap.toPath()) : null;
+    IndexService indexService = IndexService.getInstance();
+    Fingerprint propertiesFingerprint = Fingerprint.of(propertiesBytes);
+    Fingerprint indexMapFingerprint = indexMapFingerprint(indexMapBytes, indexService);
+    PropertiesConfiguration config =
+        CommonsConfigurationUtils.fromInputStream(new ByteArrayInputStream(propertiesBytes));
+    PropertiesConfiguration mapConfig = indexMapBytes != null
+        ? CommonsConfigurationUtils.fromInputStream(new ByteArrayInputStream(indexMapBytes)) : null;
+    SegmentMetadataImpl metadata = new SegmentMetadataImpl(indexDir, config, mapConfig, indexService);
+    // The parsed objects came from the captured bytes. Do not use them for a rebuild if the registry changed while
+    // parsing; open() independently checks that both canonical files still match before using this snapshot.
+    boolean reusable = indexService == IndexService.getInstance()
+        && indexMapFingerprint.sameAs(indexMapFingerprint(indexMapBytes, indexService));
+    return new SegmentMetadataImpl.EagerSnapshot(metadata, reusable ? config : null, propertiesFingerprint._length,
+        propertiesFingerprint._crc, indexMapFingerprint._length, indexMapFingerprint._crc, indexService, reusable);
+  }
+
   static MappedSegmentMetadataStore open(File indexDir, ReadMode readMode)
+      throws IOException, ConfigurationException {
+    return open(indexDir, readMode, null);
+  }
+
+  static MappedSegmentMetadataStore open(File indexDir, ReadMode readMode,
+      @Nullable SegmentMetadataImpl.EagerSnapshot eagerSnapshot)
       throws IOException, ConfigurationException {
     File source = SegmentDirectoryPaths.findMetadataFile(indexDir);
     if (source == null) {
@@ -179,7 +210,8 @@ final class MappedSegmentMetadataStore implements Closeable {
       // The validated heap copy is transient; the store retains only the buffer and shared column layout.
       byte[] bytes = readValid(sidecar, propertiesFingerprint, indexMapFingerprint);
       if (bytes == null) {
-        writeAtomically(sidecar, build(indexDir, propertiesFingerprint, indexMapFingerprint, indexService));
+        writeAtomically(sidecar,
+            build(indexDir, propertiesFingerprint, indexMapFingerprint, indexService, eagerSnapshot));
         rebuilt = true;
         bytes = readValid(sidecar, propertiesFingerprint, indexMapFingerprint);
         if (bytes == null) {
@@ -220,7 +252,8 @@ final class MappedSegmentMetadataStore implements Closeable {
         if (!rebuilt) {
           // A checksum-valid older sidecar can still contain FieldSpec JSON this reader cannot parse. Rebuild it
           // once from canonical metadata instead of falling back to eager on every load.
-          writeAtomically(sidecar, build(indexDir, propertiesFingerprint, indexMapFingerprint, indexService));
+          writeAtomically(sidecar,
+              build(indexDir, propertiesFingerprint, indexMapFingerprint, indexService, eagerSnapshot));
           rebuilt = true;
           continue;
         }
@@ -369,10 +402,16 @@ final class MappedSegmentMetadataStore implements Closeable {
   }
 
   private static byte[] build(File indexDir, Fingerprint propertiesFingerprint, Fingerprint indexMapFingerprint,
-      IndexService indexService)
+      IndexService indexService, @Nullable SegmentMetadataImpl.EagerSnapshot eagerSnapshot)
       throws IOException, ConfigurationException {
-    PropertiesConfiguration config = SegmentMetadataUtils.getPropertiesConfiguration(indexDir);
-    SegmentMetadataImpl source = new SegmentMetadataImpl(indexDir, config);
+    boolean reuse = eagerSnapshot != null && eagerSnapshot._reusable && eagerSnapshot._indexService == indexService
+        && eagerSnapshot._propertiesLength == propertiesFingerprint._length
+        && eagerSnapshot._propertiesCrc == propertiesFingerprint._crc
+        && eagerSnapshot._indexMapLength == indexMapFingerprint._length
+        && eagerSnapshot._indexMapCrc == indexMapFingerprint._crc;
+    PropertiesConfiguration config = reuse ? eagerSnapshot._configuration
+        : SegmentMetadataUtils.getPropertiesConfiguration(indexDir);
+    SegmentMetadataImpl source = reuse ? eagerSnapshot._metadata : new SegmentMetadataImpl(indexDir, config);
     List<String> columns = new ArrayList<>(source.getColumnMetadataMap().keySet());
     columns.sort(Comparator.naturalOrder());
     if ((long) columns.size() * RECORD_SIZE + HEADER_SIZE > Integer.MAX_VALUE) {
@@ -564,7 +603,13 @@ final class MappedSegmentMetadataStore implements Closeable {
 
   private static Fingerprint indexMapFingerprint(File indexDir, IndexService indexService)
       throws IOException {
-    Fingerprint file = Fingerprint.of(findIndexMap(indexDir));
+    File indexMap = findIndexMap(indexDir);
+    return indexMapFingerprint(indexMap != null ? Files.readAllBytes(indexMap.toPath()) : null, indexService);
+  }
+
+  private static Fingerprint indexMapFingerprint(@Nullable byte[] indexMapBytes, IndexService indexService)
+      throws IOException {
+    Fingerprint file = Fingerprint.of(indexMapBytes);
     // A newly registered index can turn a previously unknown index_map entry into an available size.
     ByteArrayOutputStream bytes = new ByteArrayOutputStream();
     try (DataOutputStream output = new DataOutputStream(bytes)) {
@@ -866,8 +911,11 @@ final class MappedSegmentMetadataStore implements Closeable {
       if (file == null || !file.isFile()) {
         return new Fingerprint(-1, 0);
       }
-      byte[] bytes = Files.readAllBytes(file.toPath());
-      return new Fingerprint(bytes.length, crc(bytes, 0, bytes.length));
+      return of(Files.readAllBytes(file.toPath()));
+    }
+
+    static Fingerprint of(@Nullable byte[] bytes) {
+      return bytes == null ? new Fingerprint(-1, 0) : new Fingerprint(bytes.length, crc(bytes, 0, bytes.length));
     }
   }
 

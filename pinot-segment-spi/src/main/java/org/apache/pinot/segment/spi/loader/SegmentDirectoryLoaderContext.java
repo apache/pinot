@@ -36,10 +36,12 @@ public class SegmentDirectoryLoaderContext {
   private final String _segmentTier;
   private final Map<String, Map<String, String>> _instanceTierConfigs;
   private final Map<String, String> _segmentCustomConfigs;
+  private final boolean _mappedMetadataEnabled;
 
   private SegmentDirectoryLoaderContext(ReadMode readMode, TableConfig tableConfig, Schema schema, String instanceId,
       String tableDataDir, String segmentName, long segmentCrc, String segmentTier,
-      Map<String, Map<String, String>> instanceTierConfigs, Map<String, String> segmentCustomConfigs) {
+      Map<String, Map<String, String>> instanceTierConfigs, Map<String, String> segmentCustomConfigs,
+      boolean mappedMetadataEnabled) {
     _readMode = readMode;
     _tableConfig = tableConfig;
     _schema = schema;
@@ -50,6 +52,7 @@ public class SegmentDirectoryLoaderContext {
     _segmentTier = segmentTier;
     _instanceTierConfigs = instanceTierConfigs;
     _segmentCustomConfigs = segmentCustomConfigs;
+    _mappedMetadataEnabled = mappedMetadataEnabled;
   }
 
   public ReadMode getReadMode() {
@@ -91,6 +94,16 @@ public class SegmentDirectoryLoaderContext {
 
   public Map<String, String> getSegmentCustomConfigs() {
     return _segmentCustomConfigs;
+  }
+
+  public boolean isMappedMetadataEnabled() {
+    return _mappedMetadataEnabled;
+  }
+
+  /// Marks only the final serving load for eager metadata reuse, after any preprocessing has finished.
+  public SegmentDirectoryLoaderContext withMappedMetadataEnabled() {
+    return new SegmentDirectoryLoaderContext(_readMode, _tableConfig, _schema, _instanceId, _tableDataDir, _segmentName,
+        _segmentCrc, _segmentTier, _instanceTierConfigs, _segmentCustomConfigs, true);
   }
 
   public static class Builder {
@@ -157,7 +170,7 @@ public class SegmentDirectoryLoaderContext {
 
     public SegmentDirectoryLoaderContext build() {
       return new SegmentDirectoryLoaderContext(_readMode, _tableConfig, _schema, _instanceId, _tableDataDir,
-          _segmentName, _segmentCrc, _segmentTier, _instanceTierConfigs, _segmentCustomConfigs);
+          _segmentName, _segmentCrc, _segmentTier, _instanceTierConfigs, _segmentCustomConfigs, false);
     }
   }
 }

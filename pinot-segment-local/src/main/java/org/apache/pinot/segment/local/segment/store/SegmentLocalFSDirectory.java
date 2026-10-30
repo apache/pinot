@@ -64,6 +64,8 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
   private final SegmentDirectoryLoaderContext _segmentDirectoryLoaderContext;
   private final SegmentLock _segmentLock = new SegmentLock();
   private SegmentMetadataImpl _segmentMetadata;
+  @Nullable
+  private SegmentMetadataImpl.EagerSnapshot _eagerSnapshot;
   private ColumnIndexDirectory _columnIndexDirectory;
   private StarTreeIndexReader _starTreeIndexReader;
   private String _tier;
@@ -104,6 +106,13 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
       LOGGER.error("Failed to load segment, error: ", e);
       throw new RuntimeException(e);
     }
+  }
+
+  /// Retains the final loader's canonical metadata snapshot only until the mapped serving view is opened.
+  public SegmentLocalFSDirectory(File indexDir, SegmentMetadataImpl.EagerSnapshot eagerSnapshot, ReadMode readMode,
+      @Nullable SegmentDirectoryLoaderContext segmentDirectoryLoaderContext) {
+    this(indexDir, eagerSnapshot.getMetadata(), readMode, segmentDirectoryLoaderContext);
+    _eagerSnapshot = eagerSnapshot;
   }
 
   @Override
@@ -148,6 +157,7 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
   @Override
   public void reloadMetadata()
       throws Exception {
+    _eagerSnapshot = null;
     SegmentMetadataImpl metadata = new SegmentMetadataImpl(_indexDir);
     _columnIndexDirectory.setSegmentMetadata(metadata);
     SegmentMetadataImpl previous = _segmentMetadata;
@@ -161,9 +171,11 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
     if (_segmentMetadata.isMapped()) {
       return;
     }
+    SegmentMetadataImpl.EagerSnapshot eagerSnapshot = _eagerSnapshot;
+    _eagerSnapshot = null;
     SegmentMetadataImpl metadata;
     try {
-      metadata = SegmentMetadataImpl.loadMapped(_indexDir, _readMode);
+      metadata = SegmentMetadataImpl.loadMapped(_indexDir, _readMode, eagerSnapshot);
     } catch (IOException | ConfigurationException | RuntimeException e) {
       LOGGER.warn("Failed to load mapped metadata for segment: {}. Using eager metadata.", _indexDir, e);
       return;
@@ -328,6 +340,7 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
         }
       }
     } finally {
+      _eagerSnapshot = null;
       if (_segmentMetadata != null) {
         _segmentMetadata.close();
       }

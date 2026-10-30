@@ -48,6 +48,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationD
 import org.apache.pinot.segment.local.segment.index.converter.SegmentV1V2ToV3FormatConverter;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -492,6 +493,65 @@ public class SegmentMetadataImplTest {
       FileUtils.deleteQuietly(staging);
     }
     assertEquals(PinotDataBuffer.getMmapBufferCount(), mappings);
+  }
+
+  @Test
+  public void testMappedMetadataIgnoresStaleEagerSnapshot()
+      throws Exception {
+    File properties = SegmentDirectoryPaths.findMetadataFile(_segmentDirectory);
+    Files.writeString(properties.toPath(), "\ncustom.snapshotReuse = abc\n", StandardCharsets.UTF_8,
+        StandardOpenOption.APPEND);
+    SegmentMetadataImpl.EagerSnapshot snapshot = SegmentMetadataImpl.loadEagerSnapshot(_segmentDirectory);
+    assertEquals(snapshot.getMetadata().getCustomMap().get("snapshotReuse"), "abc");
+    String oldProperties = Files.readString(properties.toPath());
+    Files.writeString(properties.toPath(), oldProperties.replace("custom.snapshotReuse = abc",
+        "custom.snapshotReuse = xyz"));
+    assertEquals(Files.size(properties.toPath()), oldProperties.getBytes(StandardCharsets.UTF_8).length);
+
+    try (SegmentMetadataImpl mapped = SegmentMetadataImpl.loadMapped(_segmentDirectory, ReadMode.mmap, snapshot)) {
+      assertEquals(mapped.getCustomMap().get("snapshotReuse"), "xyz");
+    }
+  }
+
+  @Test
+  public void testMappedMetadataIgnoresStaleIndexMapSnapshot()
+      throws Exception {
+    new SegmentV1V2ToV3FormatConverter().convert(_segmentDirectory);
+    File indexMap = new File(new File(_segmentDirectory, "v3"), V1Constants.INDEX_MAP_FILE_NAME);
+    PropertiesConfiguration indexConfig = CommonsConfigurationUtils.fromFile(indexMap);
+    String sizeKey = CommonsConfigurationUtils.getKeys(indexConfig).stream()
+        .filter(key -> ColumnIndexUtils.MAP_KEY_NAME_SIZE.equals(
+            ColumnIndexUtils.parseIndexMapKeys(key, _segmentDirectory.getPath())[2])).findFirst().orElseThrow();
+    String[] parsedKey = ColumnIndexUtils.parseIndexMapKeys(sizeKey, _segmentDirectory.getPath());
+    indexConfig.setProperty(sizeKey, 111);
+    CommonsConfigurationUtils.saveToFile(indexConfig, indexMap);
+    SegmentMetadataImpl.EagerSnapshot snapshot = SegmentMetadataImpl.loadEagerSnapshot(_segmentDirectory);
+    assertEquals(snapshot.getMetadata().getColumnMetadataFor(parsedKey[0]).getIndexSizeFor(
+        IndexService.getInstance().get(parsedKey[1])), 111L);
+    long oldSize = Files.size(indexMap.toPath());
+    indexConfig.setProperty(sizeKey, 222);
+    CommonsConfigurationUtils.saveToFile(indexConfig, indexMap);
+    assertEquals(Files.size(indexMap.toPath()), oldSize);
+
+    try (SegmentMetadataImpl mapped = SegmentMetadataImpl.loadMapped(_segmentDirectory, ReadMode.mmap, snapshot)) {
+      assertEquals(mapped.getColumnMetadataFor(parsedKey[0]).getIndexSizeFor(
+          IndexService.getInstance().get(parsedKey[1])), 222L);
+    }
+  }
+
+  @Test
+  public void testReloadMetadataDropsEagerSnapshot()
+      throws Exception {
+    File properties = SegmentDirectoryPaths.findMetadataFile(_segmentDirectory);
+    SegmentMetadataImpl.EagerSnapshot snapshot = SegmentMetadataImpl.loadEagerSnapshot(_segmentDirectory);
+    try (SegmentLocalFSDirectory directory = new SegmentLocalFSDirectory(_segmentDirectory, snapshot, ReadMode.mmap,
+        null)) {
+      Files.writeString(properties.toPath(), "\ncustom.reloadedSnapshot = yes\n", StandardCharsets.UTF_8,
+          StandardOpenOption.APPEND);
+      directory.reloadMetadata();
+      directory.loadMappedMetadata();
+      assertEquals(directory.getSegmentMetadata().getCustomMap().get("reloadedSnapshot"), "yes");
+    }
   }
 
   @Test

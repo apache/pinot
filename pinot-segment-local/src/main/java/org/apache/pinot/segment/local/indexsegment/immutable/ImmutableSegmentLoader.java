@@ -163,7 +163,9 @@ public class ImmutableSegmentLoader {
     }
     SegmentDirectoryLoader segmentLoader =
         SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getSegmentDirectoryLoader());
-    SegmentDirectory segmentDirectory = segmentLoader.load(indexDir.toURI(), segmentLoaderContext);
+    SegmentDirectory segmentDirectory = segmentLoader.load(indexDir.toURI(),
+        indexLoadingConfig.isMappedSegmentMetadataEnabled()
+            ? segmentLoaderContext.withMappedMetadataEnabled() : segmentLoaderContext);
     try {
       return load(segmentDirectory, indexLoadingConfig);
     } catch (Exception e) {

@@ -152,15 +152,57 @@ public class SegmentMetadataImpl implements SegmentMetadata, Closeable {
 
   SegmentMetadataImpl(File indexDir, PropertiesConfiguration segmentMetadataPropertiesConfiguration)
       throws IOException, ConfigurationException {
+    this(indexDir, segmentMetadataPropertiesConfiguration, null, null);
+  }
+
+  SegmentMetadataImpl(File indexDir, PropertiesConfiguration segmentMetadataPropertiesConfiguration,
+      @Nullable PropertiesConfiguration indexMapConfiguration, @Nullable IndexService indexService)
+      throws IOException, ConfigurationException {
     _indexDir = indexDir;
     _columnMetadataMap = new TreeMap<>();
     _schema = new Schema();
-    init(segmentMetadataPropertiesConfiguration);
+    init(segmentMetadataPropertiesConfiguration, indexMapConfiguration, indexService);
     setTimeInfo(segmentMetadataPropertiesConfiguration);
 
     File creationMetaFile = SegmentDirectoryPaths.findCreationMetaFile(indexDir);
     if (creationMetaFile != null) {
       loadCreationMeta(creationMetaFile);
+    }
+  }
+
+  /// Captures the canonical metadata bytes and their parsed eager view for a final local serving load. The snapshot
+  /// is short-lived and is reused for sidecar generation only while the source fingerprints still match.
+  public static EagerSnapshot loadEagerSnapshot(File indexDir)
+      throws IOException, ConfigurationException {
+    return MappedSegmentMetadataStore.captureEagerSnapshot(indexDir);
+  }
+
+  /// A transient eager view and the exact source bytes from which it was parsed.
+  public static final class EagerSnapshot {
+    final SegmentMetadataImpl _metadata;
+    @Nullable
+    final PropertiesConfiguration _configuration;
+    final long _propertiesLength;
+    final int _propertiesCrc;
+    final long _indexMapLength;
+    final int _indexMapCrc;
+    final IndexService _indexService;
+    final boolean _reusable;
+
+    EagerSnapshot(SegmentMetadataImpl metadata, @Nullable PropertiesConfiguration configuration, long propertiesLength,
+        int propertiesCrc, long indexMapLength, int indexMapCrc, IndexService indexService, boolean reusable) {
+      _metadata = metadata;
+      _configuration = configuration;
+      _propertiesLength = propertiesLength;
+      _propertiesCrc = propertiesCrc;
+      _indexMapLength = indexMapLength;
+      _indexMapCrc = indexMapCrc;
+      _indexService = indexService;
+      _reusable = reusable;
+    }
+
+    public SegmentMetadataImpl getMetadata() {
+      return _metadata;
     }
   }
 
@@ -202,7 +244,13 @@ public class SegmentMetadataImpl implements SegmentMetadata, Closeable {
   /// Uses a direct buffer for `heap` mode and a file mapping for `mmap` mode.
   public static SegmentMetadataImpl loadMapped(File indexDir, ReadMode readMode)
       throws IOException, ConfigurationException {
-    return new SegmentMetadataImpl(indexDir, readMode);
+    return loadMapped(indexDir, readMode, null);
+  }
+
+  /// Uses a matching eager snapshot when a sidecar rebuild is needed, otherwise reads canonical metadata afresh.
+  public static SegmentMetadataImpl loadMapped(File indexDir, ReadMode readMode, @Nullable EagerSnapshot eagerSnapshot)
+      throws IOException, ConfigurationException {
+    return new SegmentMetadataImpl(indexDir, readMode, eagerSnapshot);
   }
 
   /// Identifies the local mapped metadata sidecar and its incomplete temporary files.
@@ -215,12 +263,12 @@ public class SegmentMetadataImpl implements SegmentMetadata, Closeable {
     return MappedSegmentMetadataStore.isTempFileName(fileName);
   }
 
-  private SegmentMetadataImpl(File indexDir, ReadMode readMode)
+  private SegmentMetadataImpl(File indexDir, ReadMode readMode, @Nullable EagerSnapshot eagerSnapshot)
       throws IOException, ConfigurationException {
     _indexDir = indexDir;
     _columnMetadataMap = null;
     _schema = null;
-    MappedSegmentMetadataStore store = MappedSegmentMetadataStore.open(indexDir, readMode);
+    MappedSegmentMetadataStore store = MappedSegmentMetadataStore.open(indexDir, readMode, eagerSnapshot);
     try {
       PropertiesConfiguration segmentConfig = store.segmentConfiguration();
       initSegmentFields(segmentConfig);
@@ -340,6 +388,12 @@ public class SegmentMetadataImpl implements SegmentMetadata, Closeable {
 
   private void init(PropertiesConfiguration segmentMetadata)
       throws ConfigurationException {
+    init(segmentMetadata, null, null);
+  }
+
+  private void init(PropertiesConfiguration segmentMetadata, @Nullable PropertiesConfiguration indexMapConfiguration,
+      @Nullable IndexService snapshotIndexService)
+      throws ConfigurationException {
     initSegmentFields(segmentMetadata);
 
     // NOTE: here we only add physical columns as virtual columns should not be loaded from metadata file
@@ -367,9 +421,13 @@ public class SegmentMetadataImpl implements SegmentMetadata, Closeable {
       // Index sizes are available only from a local v3 index_map; stream-loaded metadata has no index directory.
       if (_segmentVersion == SegmentVersion.v3 && _indexDir != null) {
         File indexMapFile = new File(_indexDir, "v3" + File.separator + V1Constants.INDEX_MAP_FILE_NAME);
-        if (indexMapFile.exists()) {
-          IndexService indexService = IndexService.getInstance();
-          PropertiesConfiguration mapConfig = CommonsConfigurationUtils.fromFile(indexMapFile);
+        PropertiesConfiguration mapConfig = indexMapConfiguration;
+        IndexService indexService = snapshotIndexService;
+        if (indexService == null && indexMapFile.exists()) {
+          indexService = IndexService.getInstance();
+          mapConfig = CommonsConfigurationUtils.fromFile(indexMapFile);
+        }
+        if (mapConfig != null) {
           for (String key : CommonsConfigurationUtils.getKeys(mapConfig)) {
             try {
               String[] parsedKeys = ColumnIndexUtils.parseIndexMapKeys(key, _indexDir.getPath());
