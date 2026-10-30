@@ -90,10 +90,15 @@ public class PulsarSourceErrorClassificationTest {
     assertAuth(new PulsarClientException.AuthenticationException(
             "Unable to obtain an access token: Missing parameter (invalid_request)"),
         IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_IDP);
-    // An error no row names is still the endpoint refusing the token request.
+    // An error no row names is still the endpoint refusing the token request, as is a 400 or 401 without one.
     assertEquals(assertAuth(new PulsarClientException.AuthenticationException(
             "Unable to obtain an access token: Something new (novel_error)"), IngestionSourceErrorSubReason.UNSPECIFIED,
         TARGET_IDP).getCode(), "novel_error");
+    assertEquals(assertAuth(new PulsarClientException.AuthenticationException(
+            "Unable to obtain an access token: Unauthorized (Unauthorized)"), IngestionSourceErrorSubReason.UNSPECIFIED,
+        TARGET_IDP).getCode(), "unauthorized");
+    assertAuth(new PulsarClientException.AuthenticationException("Unable to obtain an access token: null (null)"),
+        IngestionSourceErrorSubReason.UNSPECIFIED, TARGET_IDP);
   }
 
   @Test
