@@ -33,6 +33,15 @@ public interface ThreadAccountant {
   /// Samples the resource usage of the current thread.
   void sampleUsage();
 
+  /// Captures accounting and pause observation for the current query thread while it executes outside Java. The
+  /// returned sampler may be used by a control thread; the query thread must close it before clearing its context.
+  /// Returns null when this accountant cannot preserve its sampling and pause policies without Java checkpoints.
+  /// Callers must then retain Java checkpoints or reject external execution; null is not a no-op accountant.
+  @Nullable
+  default ExternalExecutionSampler captureExternalExecutionSampler() {
+    return null;
+  }
+
   /// Clears the previous registered [QueryThreadContext] from the current thread.
   void clear();
 
