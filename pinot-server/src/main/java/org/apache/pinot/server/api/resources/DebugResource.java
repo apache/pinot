@@ -240,7 +240,8 @@ public class DebugResource {
               realtimeSegmentDataManager.getLastConsumedTimestamp(),
               currentOffsets,
               new SegmentConsumerInfo.PartitionOffsetInfo(currentOffsets,
-                  upstreamLatest, recordsLagMap, availabilityLagMsMap));
+                  upstreamLatest, recordsLagMap, availabilityLagMsMap),
+              realtimeSegmentDataManager.getDecoderClassName());
     }
     return segmentConsumerInfo;
   }

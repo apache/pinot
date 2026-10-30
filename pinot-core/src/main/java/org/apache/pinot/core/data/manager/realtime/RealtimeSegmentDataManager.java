@@ -1503,6 +1503,15 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
+  /// @return the FQCN of the [StreamMessageDecoder] actually instantiated on this consumer (the source of truth for
+  ///         what is decoding this segment), or `null` if decoder init has not completed.
+  @Nullable
+  public String getDecoderClassName() {
+    StreamDataDecoder decoder = _streamDataDecoder;
+    StreamMessageDecoder valueDecoder = decoder == null ? null : decoder.getValueDecoder();
+    return valueDecoder == null ? null : valueDecoder.getClass().getName();
+  }
+
   /// Cleans up the metrics that reflects the state of the realtime segment.
   /// This step is essential as the instance may not be the target location for some of the partitions.
   /// E.g. if the number of partitions increases, or a host swap is needed, the target location for some partitions

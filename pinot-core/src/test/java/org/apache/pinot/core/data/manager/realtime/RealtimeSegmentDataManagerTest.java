@@ -279,6 +279,15 @@ public class RealtimeSegmentDataManagerTest {
         _partitionGroupIdToConsumerCoordinatorMap, serverMetrics, timeSupplier);
   }
 
+  @Test
+  public void testGetDecoderClassName()
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      // Reports the actual instantiated decoder wrapped by StreamDataDecoderImpl, resolved via the SPI accessor.
+      assertEquals(segmentDataManager.getDecoderClassName(), FakeStreamMessageDecoder.class.getName());
+    }
+  }
+
   @BeforeClass
   public void setUp() {
     ServerMetrics.register(mock(ServerMetrics.class));
