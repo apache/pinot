@@ -74,7 +74,6 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.zookeeper.data.Stat;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
-import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.helix.core.retention.RetentionManager.DEFAULT_UNTRACKED_SEGMENTS_DELETION_BATCH_SIZE;
@@ -514,49 +513,6 @@ public class RetentionManagerTest {
 
     // verify
     verify(mockPinotHelixResourceManager, times(1)).deleteSegments(eq(realtimeTableName), anyList());
-  }
-
-  @DataProvider(name = "hybridTableRetentionStrategyOverrides")
-  public Boolean[][] hybridTableRetentionStrategyOverrides() {
-    // tableLevel (null falls back to clusterLevel), clusterLevel, expectHybridPath
-    return new Boolean[][]{
-        {null, false, false},
-        {null, true, true},
-        {true, false, true},
-        {false, true, false},
-    };
-  }
-
-  @Test(dataProvider = "hybridTableRetentionStrategyOverrides")
-  public void testTableLevelHybridRetentionStrategyOverridesClusterConfig(Boolean tableLevel, boolean clusterLevel,
-      boolean expectHybridPath) {
-    final int replicaCount = 1;
-    TableConfig realtimeTableConfig = createRealtimeTableConfig1(replicaCount);
-    realtimeTableConfig.getValidationConfig().setEnableHybridTableRetentionStrategy(tableLevel);
-
-    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
-    when(resourceManager.getHelixAdmin()).thenReturn(mock(HelixAdmin.class));
-    setupSizeRetentionOfflineCounterpart(resourceManager);
-
-    ControllerConf conf = new ControllerConf();
-    conf.setProperty(ControllerConf.ENABLE_HYBRID_TABLE_RETENTION_STRATEGY, clusterLevel);
-
-    RetentionManager retentionManager = spy(createSizeRetentionManager(realtimeTableConfig, List.of(), resourceManager,
-        mock(ControllerMetrics.class), conf, mock(BrokerServiceHelper.class)));
-
-    // Only the retention strategy selection is under test, so stub out both branches
-    doNothing().when(retentionManager).manageRetentionForHybridTable(any(), any());
-    doNothing().when(retentionManager).manageRetentionForRealtimeTable(any(), any(), anyInt(), any());
-
-    retentionManager.processTable(REALTIME_TABLE_NAME);
-
-    if (expectHybridPath) {
-      verify(retentionManager).manageRetentionForHybridTable(any(), any());
-      verify(retentionManager, never()).manageRetentionForRealtimeTable(any(), any(), anyInt(), any());
-    } else {
-      verify(retentionManager, never()).manageRetentionForHybridTable(any(), any());
-      verify(retentionManager).manageRetentionForRealtimeTable(any(), any(), anyInt(), any());
-    }
   }
 
   private TableConfig createOfflineTableConfig() {

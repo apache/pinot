@@ -28,7 +28,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -355,22 +354,13 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
 
     // Scan all segment ZK metadata and purge segments if necessary
     if (TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
-      if (validationConfig.getEnableHybridTableRetentionStrategy() != null) {
-        LOGGER.warn(
-            "enableHybridTableRetentionStrategy is only applicable to realtime tables,"
-            + "ignoring it for offline table: {}",
-            tableNameWithType);
-      }
       manageRetentionForOfflineTable(tableNameWithType, retentionStrategy, untrackedSegmentsDeletionBatchSize,
           untrackedSegmentsRetentionStrategy);
     } else {
       String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
       TableConfig offlineTableConfig = _pinotHelixResourceManager.getOfflineTableConfig(rawTableName);
       // hybrid table check should be performed before the realtime table check.
-      boolean hybridTableRetentionStrategyEnabled =
-          Objects.requireNonNullElse(validationConfig.getEnableHybridTableRetentionStrategy(),
-              _isHybridTableRetentionStrategyEnabled);
-      if (hybridTableRetentionStrategyEnabled && offlineTableConfig != null) {
+      if (_isHybridTableRetentionStrategyEnabled && offlineTableConfig != null) {
         // TODO: handle the orphan segment deletion for hybrid table
         manageRetentionForHybridTable(tableConfig, offlineTableConfig);
       } else {
@@ -402,8 +392,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     }
   }
 
-  @VisibleForTesting
-  void manageRetentionForRealtimeTable(String realtimeTableName, RetentionStrategy retentionStrategy,
+  private void manageRetentionForRealtimeTable(String realtimeTableName, RetentionStrategy retentionStrategy,
       int untrackedSegmentsDeletionBatchSize, RetentionStrategy untrackedSegmentsRetentionStrategy) {
     List<SegmentZKMetadata> segmentZKMetadataList = _pinotHelixResourceManager.getSegmentsZKMetadata(realtimeTableName);
 
