@@ -189,11 +189,13 @@ public class RealtimeTableReadinessTest {
 
   @DataProvider
   public Object[][] readinessReads() {
-    return new Object[][]{{"idealState"}, {"liveInstance"}, {"currentState"}};
+    PropertyKey.Builder keys = new PropertyKey.Builder("test-cluster");
+    return new Object[][]{{keys.idealStates(TABLE)}, {keys.liveInstance(SERVER)},
+        {keys.currentState(SERVER, "test-session", TABLE)}};
   }
 
   @Test(dataProvider = "readinessReads")
-  public void testReadinessRetriesTransientZooKeeperFailure(String read) throws Exception {
+  public void testReadinessRetriesTransientZooKeeperFailure(PropertyKey key) throws Exception {
     try (Fixture table = new Fixture(UpsertConfig.Mode.PARTIAL)) {
       LLCSegmentName base = name(0, 1);
       LLCSegmentName consumer = name(0, 2);
@@ -201,16 +203,9 @@ public class RealtimeTableReadinessTest {
       table._currentState.setState(base.getSegmentName(), ONLINE);
       table.assign(consumer, CONSUMING);
       HelixDataAccessor accessor = table.getHelixManager().getHelixDataAccessor();
-      PropertyKey.Builder keys = accessor.keyBuilder();
-      PropertyKey key = switch (read) {
-        case "idealState" -> keys.idealStates(TABLE);
-        case "liveInstance" -> keys.liveInstance(SERVER);
-        case "currentState" -> keys.currentState(SERVER, "test-session", TABLE);
-        default -> throw new IllegalArgumentException(read);
-      };
       HelixProperty recovered = accessor.getProperty(key);
-      when(accessor.<HelixProperty>getProperty(key)).thenThrow(new ZkTimeoutException("Transient " + read + " failure"))
-          .thenReturn(recovered);
+      when(accessor.<HelixProperty>getProperty(key))
+          .thenThrow(new ZkTimeoutException("Transient " + key.getPath() + " failure")).thenReturn(recovered);
 
       BooleanSupplier ready = table.createReadyToConsumeDataSupplier(consumer);
       assertFalse(ready.getAsBoolean(), "A transient read failure must hold consumption without terminating it");
