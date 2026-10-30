@@ -18,6 +18,11 @@
 # under the License.
 #
 
+case "${RUN_TEST_SET:-}" in
+  1|2|3) ;;
+  *) echo "Unsupported RUN_TEST_SET value: ${RUN_TEST_SET:-unset}" >&2; exit 1 ;;
+esac
+
 # Java version
 java -version
 
@@ -26,7 +31,7 @@ ifconfig
 netstat -i
 
 # Unit Tests
-#   - Both test sets run `mvn test` (no install, no -am), so only the listed modules are tested.
+#   - All three workers run `mvn test` (no install, no -am), so only the listed modules are tested.
 #     .pinot_tests_build.sh has already built and installed their required reactor dependencies.
 #   - The preceding clean install built the same sources with the same JDK/compiler settings.
 #     Use Maven's source/class timestamp check on this second invocation: the default incremental
@@ -53,10 +58,7 @@ netstat -i
 #     remains overridable as an escape hatch if a new flake appears, but is intentionally not a
 #     standing default so real failures are never masked.
 UNIT_TEST_FORK_COUNT="${UNIT_TEST_FORK_COUNT:-3}"
-# Core spends most of set #1 starting and running isolated test JVMs. Use the fourth runner CPU while
-# retaining reuseForks=false, all test selectors, and the three-fork default in the other modules.
-UNIT_TEST_CORE_FORK_COUNT="${UNIT_TEST_CORE_FORK_COUNT:-4}"
-# 2500m/fork: Core's 4 forks plus the 2g Maven JVM use about 12g of heap on the 16g runner.
+# 2500m/fork: 3 forks * 2500m + the 2g Maven JVM (~9.5g) stays well under the runner's 16g.
 UNIT_TEST_FORK_HEAP="${UNIT_TEST_FORK_HEAP:-2500m}"
 UNIT_TEST_RERUN_COUNT="${UNIT_TEST_RERUN_COUNT:-0}"
 # Coverage adds ~30% to the test phase (JaCoCo agent per fork + aggregate report). Keep it on by
@@ -66,24 +68,21 @@ RUN_CODECOVERAGE="${RUN_CODECOVERAGE:-true}"
 # Fork-scope the JaCoCo exec file (jacoco-<forkNumber>.exec) so parallel forks don't append to
 # one shared jacoco.exec and corrupt coverage. Only the unit lane sets this; other lanes keep
 # the default empty suffix (target/jacoco.exec).
-FORK_OPTS="-Dunit.test.fork.count=${UNIT_TEST_FORK_COUNT} -Dunit.test.core.fork.count=${UNIT_TEST_CORE_FORK_COUNT}"
-FORK_OPTS="${FORK_OPTS} -Dunit.test.fork.heap=${UNIT_TEST_FORK_HEAP} -Dunit.test.rerun.count=${UNIT_TEST_RERUN_COUNT}"
-FORK_OPTS="${FORK_OPTS} -Djacoco.exec.suffix=-\${surefire.forkNumber}"
+FORK_OPTS="-Dunit.test.fork.count=${UNIT_TEST_FORK_COUNT} -Dunit.test.fork.heap=${UNIT_TEST_FORK_HEAP} -Dunit.test.rerun.count=${UNIT_TEST_RERUN_COUNT} -Djacoco.exec.suffix=-\${surefire.forkNumber}"
 if [ "$RUN_CODECOVERAGE" == "true" ]; then
   COVERAGE_PROFILE=",codecoverage"
 else
   COVERAGE_PROFILE=""
 fi
 if [ "$RUN_TEST_SET" == "1" ]; then
-  # pinot-segment-local's tests run in set #2 to balance pinot-core's longer test time in this
-  # shard against set #2's longer build. It remains built in set #1 as a pinot-core dependency.
+  # Core tests run in worker #3. Core and segment-local are still built here because the query
+  # modules depend on their installed production/test artifacts; segment-local tests remain in set #2.
   # No -am on this command, so only the listed modules test.
   mvn test ${FORK_OPTS} -Dmaven.compiler.useIncrementalCompilation=false \
       -pl 'pinot-spi' \
       -pl 'pinot-segment-spi' \
       -pl 'pinot-common' \
       -pl ':pinot-yammer' \
-      -pl 'pinot-core' \
       -pl 'pinot-query-planner' \
       -pl 'pinot-query-runtime' \
       -P github-actions,no-integration-tests${COVERAGE_PROFILE} || exit 1
@@ -97,6 +96,12 @@ if [ "$RUN_TEST_SET" == "2" ]; then
     -pl '!pinot-query-planner' \
     -pl '!pinot-query-runtime' \
     -pl '!:pinot-yammer' \
+    -P github-actions,no-integration-tests${COVERAGE_PROFILE} || exit 1
+fi
+
+if [ "$RUN_TEST_SET" == "3" ]; then
+  mvn test ${FORK_OPTS} -Dmaven.compiler.useIncrementalCompilation=false \
+    -pl 'pinot-core' \
     -P github-actions,no-integration-tests${COVERAGE_PROFILE} || exit 1
 fi
 

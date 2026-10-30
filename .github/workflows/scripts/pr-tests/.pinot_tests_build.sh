@@ -18,6 +18,13 @@
 # under the License.
 #
 
+if [ "${RUN_INTEGRATION_TESTS:-}" == false ]; then
+  case "${RUN_TEST_SET:-}" in
+    1|2|3) ;;
+    *) echo "Unsupported RUN_TEST_SET value: ${RUN_TEST_SET:-unset}" >&2; exit 1 ;;
+  esac
+fi
+
 # Java version
 java -version
 
@@ -36,8 +43,8 @@ if [ "$RUN_INTEGRATION_TESTS" != false ]; then
     -pl 'pinot-bom,pinot-integration-tests' || exit 1
 else
   # Unit Tests
-  #   - TEST_SET#1 runs install and test together so the module list must ensure no additional modules were tested
-  #     due to the -am flag (include dependency modules)
+  # Every worker installs its required dependencies with tests skipped. The subsequent test
+  # command selects only its assigned modules without -am, so dependency tests are not repeated.
   if [ "$RUN_TEST_SET" == "1" ]; then
     mvn clean install \
       -DskipTests -Dcheckstyle.skip -Dspotless.skip -Denforcer.skip -Dlicense.skip -Dmaven.plugin.appassembler.skip=true \
@@ -60,5 +67,12 @@ else
       -pl '!pinot-integration-tests' \
       -pl '!pinot-perf' \
       -pl '!pinot-distribution' || exit 1
+  fi
+  if [ "$RUN_TEST_SET" == "3" ]; then
+    mvn clean install \
+      -DskipTests -Dcheckstyle.skip -Dspotless.skip -Denforcer.skip -Dlicense.skip -Dmaven.plugin.appassembler.skip=true \
+      -am -B -T 16 -ntp \
+      -P github-actions \
+      -pl 'pinot-bom,pinot-core' || exit 1
   fi
 fi
