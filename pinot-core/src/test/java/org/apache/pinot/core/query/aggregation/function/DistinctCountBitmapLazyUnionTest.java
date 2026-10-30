@@ -31,6 +31,8 @@ import org.mockito.Mockito;
 import org.roaringbitmap.RoaringBitmap;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertSame;
@@ -44,6 +46,32 @@ import static org.testng.Assert.assertSame;
 public class DistinctCountBitmapLazyUnionTest {
   private static final ExpressionContext EXPRESSION = ExpressionContext.forIdentifier("bitmapCol");
   private static final Random RANDOM = new Random(42);
+
+  @Test
+  public void testDoubleAggregationSkipsNullsAcrossNonNullRanges() {
+    DistinctCountBitmapAggregationFunction function = new DistinctCountBitmapAggregationFunction(EXPRESSION, true);
+    AggregationResultHolder holder = function.createAggregationResultHolder();
+    BlockValSet block = mock(BlockValSet.class);
+    when(block.getValueType()).thenReturn(DataType.DOUBLE);
+    when(block.isSingleValue()).thenReturn(true);
+    when(block.getDoubleValuesSV()).thenReturn(new double[] {1.5, 2.5, 1.5, -3.5});
+    when(block.getNullBitmap()).thenReturn(RoaringBitmap.bitmapOf(1));
+
+    function.aggregate(4, holder, Map.of(EXPRESSION, block));
+    RoaringBitmap expected = RoaringBitmap.bitmapOf(Double.hashCode(1.5), Double.hashCode(-3.5));
+    assertEquals(function.extractAggregationResult(holder), expected);
+
+    when(block.getDoubleValuesSV()).thenReturn(new double[] {-3.5, 9.75});
+    when(block.getNullBitmap()).thenReturn(RoaringBitmap.bitmapOf(0));
+    function.aggregate(2, holder, Map.of(EXPRESSION, block));
+    expected.add(Double.hashCode(9.75));
+    assertEquals(function.extractAggregationResult(holder), expected);
+
+    when(block.getNullBitmap()).thenReturn(RoaringBitmap.bitmapOf(0, 1));
+    function.aggregate(2, holder, Map.of(EXPRESSION, block));
+    assertEquals(function.extractAggregationResult(holder), expected);
+    assertEquals(function.extractFinalResult(expected).longValue(), 3L);
+  }
 
   private static byte[][] serializedBitmaps(int numBitmaps, int valuesPerBitmap, int maxValue) {
     byte[][] serialized = new byte[numBitmaps][];

@@ -51,6 +51,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.pinot.common.datatable.DataTable;
@@ -87,6 +88,7 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.core.transport.QueryServerTestUtils.startAndGetPort;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -213,6 +215,59 @@ public class QueryRoutingTest {
     DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
     dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
     return dataTable.toBytes();
+  }
+
+  @Test
+  public void testPingReturnsFailureWhenTheChannelRejectsTheWrite() {
+    initializeTestFixtures(12345);
+    QueryRouter queryRouter = newIsolatedQueryRouter();
+    Channel channel = mock(Channel.class);
+    when(channel.isActive()).thenReturn(true);
+    doAnswer(invocation -> {
+      ReferenceCountUtil.release(invocation.getArgument(0));
+      throw new RejectedExecutionException("Channel event loop has stopped");
+    }).when(channel).writeAndFlush(any());
+    ServerChannels.ServerChannel offline =
+        queryRouter.getServerChannels().getOrCreateServerChannel(_offlineServerRoutingInstance);
+    offline._openedByQuery = true;
+    offline.setChannel(channel);
+    try {
+      assertFalse(queryRouter.ping(_serverInstance, 5_000L));
+      verify(channel).writeAndFlush(any());
+    } finally {
+      queryRouter.shutDown();
+    }
+  }
+
+  @Test
+  public void testPingPreservesInterruptionWhileWaitingForAResponse() {
+    initializeTestFixtures(12345);
+    QueryRouter queryRouter = newIsolatedQueryRouter();
+    EmbeddedChannel channel = new EmbeddedChannel(new ChannelOutboundHandlerAdapter() {
+      @Override
+      public void write(ChannelHandlerContext context, Object message, ChannelPromise promise) {
+        ReferenceCountUtil.release(message);
+        promise.setSuccess();
+        Thread.currentThread().interrupt();
+      }
+    });
+    ServerChannels.ServerChannel offline =
+        queryRouter.getServerChannels().getOrCreateServerChannel(_offlineServerRoutingInstance);
+    offline._openedByQuery = true;
+    offline.setChannel(channel);
+    boolean previouslyInterrupted = Thread.interrupted();
+    try {
+      assertFalse(queryRouter.ping(_serverInstance, 5_000L));
+      assertTrue(Thread.currentThread().isInterrupted());
+      assertTrue(channel.isOpen());
+    } finally {
+      Thread.interrupted();
+      channel.finishAndReleaseAll();
+      queryRouter.shutDown();
+      if (previouslyInterrupted) {
+        Thread.currentThread().interrupt();
+      }
+    }
   }
 
   @Test

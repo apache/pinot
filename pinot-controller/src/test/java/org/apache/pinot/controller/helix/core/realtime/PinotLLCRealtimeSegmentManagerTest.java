@@ -124,6 +124,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.apache.zookeeper.data.Stat;
 import org.joda.time.Interval;
+import org.mockito.MockedConstruction;
 import org.mockito.MockedStatic;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -3792,6 +3793,51 @@ public class PinotLLCRealtimeSegmentManagerTest {
           break;
       }
       return segmentZKMetadata;
+    }
+  }
+
+  @DataProvider(name = "idealStateFetchFailure")
+  public Object[][] idealStateFetchFailure() {
+    return new Object[][]{{false}, {true}};
+  }
+
+  @Test(dataProvider = "idealStateFetchFailure")
+  public void testIdealStateFetchFailureIsMeteredAndCanRecover(boolean backendFailure) {
+    String table = "recovering_REALTIME";
+    PinotHelixResourceManager resources = mock(PinotHelixResourceManager.class);
+    HelixManager helix = mock(HelixManager.class);
+    HelixDataAccessor accessor = mock(HelixDataAccessor.class);
+    PropertyKey.Builder builder = mock(PropertyKey.Builder.class);
+    PropertyKey key = mock(PropertyKey.class);
+    ControllerMetrics metrics = mock(ControllerMetrics.class);
+    when(resources.getHelixZkManager()).thenReturn(helix);
+    when(resources.getHelixAdmin()).thenReturn(mock(HelixAdmin.class));
+    when(helix.getHelixDataAccessor()).thenReturn(accessor);
+    when(accessor.keyBuilder()).thenReturn(builder);
+    when(builder.idealStates(table)).thenReturn(key);
+    IllegalStateException unavailable = new IllegalStateException("ZooKeeper unavailable");
+    if (backendFailure) {
+      when(accessor.getProperty(key)).thenThrow(unavailable);
+    }
+    try (MockedConstruction<FileUploadDownloadClient> clients = mockConstruction(FileUploadDownloadClient.class)) {
+      PinotLLCRealtimeSegmentManager manager =
+          new PinotLLCRealtimeSegmentManager(resources, new ControllerConf(), metrics);
+      try {
+        assertEquals(clients.constructed().size(), 1);
+        IllegalStateException failure = expectThrows(IllegalStateException.class, () -> manager.getIdealState(table));
+        if (backendFailure) {
+          assertSame(failure, unavailable);
+        } else {
+          assertTrue(failure.getMessage().contains("Failed to find IdealState for table: " + table));
+        }
+        verify(metrics).addMeteredTableValue(table, ControllerMeter.LLC_ZOOKEEPER_FETCH_FAILURES, 1L);
+        IdealState recovered = new IdealState(table);
+        doReturn(recovered).when(accessor).getProperty(key);
+        assertSame(manager.getIdealState(table), recovered);
+        verify(metrics, times(1)).addMeteredTableValue(table, ControllerMeter.LLC_ZOOKEEPER_FETCH_FAILURES, 1L);
+      } finally {
+        manager.stop();
+      }
     }
   }
 }
