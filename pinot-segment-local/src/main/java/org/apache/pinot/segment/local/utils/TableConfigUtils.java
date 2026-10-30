@@ -150,7 +150,7 @@ public final class TableConfigUtils {
       RoutingConfig.MULTI_STAGE_REPLICA_GROUP_SELECTOR_TYPE
   );
 
-  private static boolean _disableGroovy;
+  private static volatile boolean _disableGroovy;
 
   private static boolean _enforcePoolBasedAssignment;
 
