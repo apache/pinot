@@ -158,7 +158,8 @@ public class PlanNodeDeserializer {
     Plan.MailboxMergeReceiveNode merge = protoNode.getMailboxMergeReceiveNode();
     return new MailboxMergeReceiveNode(protoNode.getStageId(), extractDataSchema(protoNode), merge.getSenderStageId(),
         convertExchangeType(merge.getExchangeType()), convertDistributionType(merge.getDistributionType()),
-        merge.getKeysList(), convertCollations(merge.getCollationsList()), null);
+        merge.getKeysList(), convertCollations(merge.getCollationsList()), merge.hasFetch() ? merge.getFetch() : -1,
+        merge.hasOffset() ? merge.getOffset() : -1, null);
   }
 
   private static MailboxReceiveNode deserializeMailboxReceiveNode(Plan.PlanNode protoNode) {

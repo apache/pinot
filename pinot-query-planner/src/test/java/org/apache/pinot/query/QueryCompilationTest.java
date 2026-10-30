@@ -1363,11 +1363,19 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   public void testPartitionedWindowUnderFinalOrderBy() {
     String query = "SET stageParallelism=2; SELECT col1, ROW_NUMBER() OVER (PARTITION BY col1 ORDER BY col3) AS rn "
         + "FROM a ORDER BY rn";
-    Map<SortNode, DispatchablePlanFragment> sortStages = findSortOverReceiveStages(_queryEnvironment.planQuery(query));
-    assertEquals(sortStages.size(), 2, "Expected the window Sort and the final Sort");
-    for (Map.Entry<SortNode, DispatchablePlanFragment> entry : sortStages.entrySet()) {
-      int expectedNumWorkers = isOverPartitionedReceive(entry.getKey()) ? 4 : 1;
-      assertEquals(entry.getValue().getWorkerMetadataList().size(), expectedNumWorkers);
+    QueryEnvironment environment = getQueryEnvironment(3, 1, 2, TABLE_SCHEMAS, SERVER1_SEGMENTS,
+        SERVER2_SEGMENTS, PARTITIONED_SEGMENTS_MAP, true);
+    for (boolean enabled : List.of(false, true)) {
+      try (CompiledQuery compiled = environment.compile("SET windowKWayMerge=" + enabled
+          + "; SET streamingSortedMailboxReceive=" + enabled + "; " + query)) {
+        Map<SortNode, DispatchablePlanFragment> sortStages =
+            findSortOverReceiveStages(compiled.planQuery(0).getQueryPlan());
+        assertEquals(sortStages.size(), 2, "Expected the window Sort and the final Sort");
+        for (Map.Entry<SortNode, DispatchablePlanFragment> entry : sortStages.entrySet()) {
+          int expectedNumWorkers = isOverPartitionedReceive(entry.getKey()) ? 4 : 1;
+          assertEquals(entry.getValue().getWorkerMetadataList().size(), expectedNumWorkers);
+        }
+      }
     }
   }
 
@@ -1568,6 +1576,57 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
       assertEquals(((SortNode) window.getInputs().get(0)).getFetch(), Integer.MAX_VALUE,
           "Compatibility fallback must retain the complete window input on older servers");
       assertFalse(window.getInputs().get(0).getInputs().get(0) instanceof MailboxMergeReceiveNode);
+    }
+  }
+
+  @DataProvider
+  public Object[][] orderedLeafCases() {
+    return new Object[][]{
+        {"SELECT col1 FROM a ORDER BY col1 LIMIT 10 OFFSET 5", true, true, true},
+        {"SELECT col1 FROM c WHERE col3 > 0 ORDER BY col1 LIMIT 10 OFFSET 5", true, true, true},
+        {"SELECT col1 FROM d ORDER BY col1 LIMIT 10 OFFSET 5", true, true, false},
+        {"SELECT col1 FROM d_OFFLINE ORDER BY col1 LIMIT 10 OFFSET 5", true, true, true},
+        {"SELECT col1 FROM a ORDER BY col1 LIMIT 10 OFFSET 5", false, true, false},
+        {"SELECT col1 FROM a ORDER BY col1 LIMIT 10 OFFSET 5", true, false, false},
+        {"SELECT col1, COUNT(*) FROM a GROUP BY col1 ORDER BY col1 LIMIT 10 OFFSET 5", true, true, false}
+    };
+  }
+
+  @Test(dataProvider = "orderedLeafCases")
+  @SuppressWarnings("deprecation") // Verify the legacy send flag stays false for an explicit ordered input.
+  public void testOrderedLeafMergeIsEstablishedLogically(String query, boolean capability, boolean enabled,
+      boolean expected) {
+    QueryEnvironment environment = getQueryEnvironment(3, 1, 2, TABLE_SCHEMAS, SERVER1_SEGMENTS,
+        SERVER2_SEGMENTS, PARTITIONED_SEGMENTS_MAP, capability);
+    DispatchableSubPlan plan;
+    try (CompiledQuery compiled = environment.compile(
+        "SET stageParallelism=2; SET streamingSortedMailboxReceive=" + enabled + "; " + query)) {
+      plan = compiled.planQuery(0).getQueryPlan();
+    }
+    MailboxMergeReceiveNode merge = null;
+    for (DispatchablePlanFragment fragment : plan.getQueryStages()) {
+      MailboxMergeReceiveNode candidate = findNodeOfType(fragment.getPlanFragment().getFragmentRoot(),
+          MailboxMergeReceiveNode.class);
+      if (candidate != null) {
+        merge = candidate;
+        assertEquals(fragment.getWorkerMetadataList().size(), 1,
+            "The bounded merge replaces the final sort and must keep its singleton worker");
+        break;
+      }
+    }
+    assertEquals(merge != null, expected, query);
+    if (merge != null) {
+      assertEquals(merge.getFetch(), 10);
+      assertEquals(merge.getOffset(), 5);
+      MailboxSendNode sender = (MailboxSendNode) plan.getQueryStageMap().get(merge.getSenderStageId())
+          .getPlanFragment().getFragmentRoot();
+      assertFalse(sender.isSort());
+      assertTrue(sender.getInputs().get(0) instanceof SortNode);
+      SortNode senderSort = (SortNode) sender.getInputs().get(0);
+      assertEquals(senderSort.getCollations(), merge.getCollations());
+      assertEquals(senderSort.getFetch(), 15);
+      assertTrue(senderSort.isSingleRunRequired());
+      assertTrue(senderSort.getOffset() <= 0);
     }
   }
 

@@ -23,6 +23,7 @@ import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelFieldCollation.Direction;
 import org.apache.calcite.rel.RelFieldCollation.NullDirection;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.routing.VirtualServerAddress;
@@ -537,6 +538,21 @@ public class SortOperatorTest {
   // Streaming. The result is handed back in bounded blocks rather than one block holding everything, so that a large
   // result is neither serialized nor materialized in one piece.
   // --------------------------------------------------------------------------------------------------------------
+
+  @Test
+  public void shouldStreamOnlyWhenProducerMatchesRequestedCollation() {
+    DataSchema schema = new DataSchema(new String[]{"sort"}, new ColumnDataType[]{INT});
+    List<RelFieldCollation> asc = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
+    when(_input.isSortedOn(asc)).thenReturn(true);
+    SortOperator operator = getOperator(schema, asc, 2, 1);
+    assertTrue(operator instanceof LimitSortOperator);
+    assertTrue(operator.isSortedOn(asc));
+    assertFalse(operator.isSortedOn(List.of()));
+    assertTrue(getOperator(schema, List.of(new RelFieldCollation(0, Direction.DESCENDING, NullDirection.LAST)), 2, 1)
+        instanceof TopNSortOperator);
+    assertTrue(getOperator(schema, List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.FIRST)), 2, 1)
+        instanceof TopNSortOperator);
+  }
 
   /// A sorted input must not be buffered at all: the consumer sees rows from the first input block before the input
   /// has reached EOS. This is what makes SORT_LIMIT the only implementation that does not break the pipeline.
