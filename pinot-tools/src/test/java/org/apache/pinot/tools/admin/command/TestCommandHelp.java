@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.tools.admin.command;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -25,11 +27,38 @@ import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.admin.PinotAdministrator;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+import picocli.CommandLine;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class TestCommandHelp {
+  /// A help-only invocation has never started services, but its registered shutdown hook still
+  /// calls cleanup. Exercise that lifecycle before JVM shutdown and ensure help remains usable.
+  @Test
+  public void testHelpOnlyCommandsCanBeCleanedUpAndReused() {
+    List<AbstractBaseAdminCommand> commands = List.of(
+        new StartServiceManagerCommand(), new MoveReplicaGroup(), new OfflineSegmentIntervalCheckerCommand());
+    for (AbstractBaseAdminCommand command : commands) {
+      StringWriter output = new StringWriter();
+      CommandLine commandLine = new CommandLine(command).setOut(new PrintWriter(output, true));
+      try {
+        assertEquals(commandLine.execute("--help"), 0);
+        String originalHelp = output.toString();
+        assertTrue(originalHelp.contains("Usage: " + commandLine.getCommandName()));
+        command.cleanup();
+        command.cleanup();
+        output.getBuffer().setLength(0);
+        assertEquals(commandLine.execute("--help"), 0);
+        assertEquals(output.toString(), originalHelp,
+            "Cleanup of an unstarted command must leave its help/configuration intact");
+      } finally {
+        command.cleanup();
+      }
+    }
+  }
+
   @DataProvider(name = "subCommands")
   Object[][] subCommands() {
     PinotAdministrator administrator = new PinotAdministrator();

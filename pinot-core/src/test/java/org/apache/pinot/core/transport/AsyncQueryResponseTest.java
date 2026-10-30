@@ -26,11 +26,13 @@ import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class AsyncQueryResponseTest {
@@ -43,6 +45,29 @@ public class AsyncQueryResponseTest {
       boolean skipUnavailableServers) {
     return new AsyncQueryResponse(mock(QueryRouter.class), 1L, servers, System.currentTimeMillis(), timeoutMs,
         mock(ServerRoutingStatsManager.class), skipUnavailableServers);
+  }
+
+  @Test
+  public void testInterruptedWaitStillRecordsTimeoutsAndDeregistersQuery() {
+    QueryRouter queryRouter = mock(QueryRouter.class);
+    ServerRoutingStatsManager routingStats = mock(ServerRoutingStatsManager.class);
+    AsyncQueryResponse response = new AsyncQueryResponse(queryRouter, 7L, Set.of(SERVER_1, SERVER_2),
+        System.currentTimeMillis(), 10_000L, routingStats, false);
+    boolean previouslyInterrupted = Thread.interrupted();
+    try {
+      Thread.currentThread().interrupt();
+      expectThrows(InterruptedException.class, response::getFinalResponses);
+      assertFalse(Thread.currentThread().isInterrupted());
+      assertEquals(response.getStatus(), QueryResponse.Status.IN_PROGRESS);
+      verify(routingStats).recordStatsUponResponseArrival(7L, SERVER_1.getInstanceId(), 10_000L);
+      verify(routingStats).recordStatsUponResponseArrival(7L, SERVER_2.getInstanceId(), 10_000L);
+      verify(queryRouter).markQueryDone(7L);
+    } finally {
+      Thread.interrupted();
+      if (previouslyInterrupted) {
+        Thread.currentThread().interrupt();
+      }
+    }
   }
 
   @Test
