@@ -18,10 +18,16 @@
  */
 package org.apache.pinot.common.evaluator;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.function.FunctionEvaluator;
 
 
@@ -40,10 +46,8 @@ public class FunctionEvaluatorFactory {
   /// 2. For TIME column, if conversion is needed, [TimeSpecFunctionEvaluator] for backward compatible handling
   /// of time spec. This
   /// is needed until we migrate to [org.apache.pinot.spi.data.DateTimeFieldSpec]
-  /// 3. For columns ending with \_\_KEYS or \_\_VALUES (used for interpreting Map column in Avro), create default
-  ///    groovy
-  /// functions for
-  /// handing the Map
+  /// 3. For columns ending with \_\_KEYS or \_\_VALUES (used for interpreting Map columns in Avro), extract
+  /// keys or values in key order without compiling Groovy
   /// 4. Return null, if none of the above
   @Nullable
   public static FunctionEvaluator getExpressionEvaluator(FieldSpec fieldSpec) {
@@ -84,14 +88,12 @@ public class FunctionEvaluatorFactory {
 
       // for backward compatible handling of Map type (currently only in Avro)
       String sourceMapName = columnName.substring(0, columnName.length() - MAP_KEY_COLUMN_SUFFIX.length());
-      String defaultMapKeysTransformExpression = getDefaultMapKeysTransformExpression(sourceMapName);
-      functionEvaluator = getExpressionEvaluator(defaultMapKeysTransformExpression);
+      functionEvaluator = new MapFunctionEvaluator(sourceMapName, true);
     } else if (columnName.endsWith(MAP_VALUE_COLUMN_SUFFIX)) {
       // for backward compatible handling of Map type in avro (currently only in Avro)
       String sourceMapName =
           columnName.substring(0, columnName.length() - MAP_VALUE_COLUMN_SUFFIX.length());
-      String defaultMapValuesTransformExpression = getDefaultMapValuesTransformExpression(sourceMapName);
-      functionEvaluator = getExpressionEvaluator(defaultMapValuesTransformExpression);
+      functionEvaluator = new MapFunctionEvaluator(sourceMapName, false);
     }
     return functionEvaluator;
   }
@@ -109,11 +111,40 @@ public class FunctionEvaluatorFactory {
     return transformExpression.startsWith(GroovyFunctionEvaluator.getGroovyExpressionPrefix());
   }
 
-  private static String getDefaultMapKeysTransformExpression(String mapColumnName) {
-    return String.format("Groovy({%s.sort()*.key}, %s)", mapColumnName, mapColumnName);
-  }
+  /// Extracts legacy Avro map keys or values in key order. Immutable and safe to share between threads.
+  private static class MapFunctionEvaluator implements FunctionEvaluator {
+    private final String _mapColumnName;
+    private final boolean _extractKeys;
 
-  private static String getDefaultMapValuesTransformExpression(String mapColumnName) {
-    return String.format("Groovy({%s.sort()*.value}, %s)", mapColumnName, mapColumnName);
+    MapFunctionEvaluator(String mapColumnName, boolean extractKeys) {
+      _mapColumnName = mapColumnName;
+      _extractKeys = extractKeys;
+    }
+
+    @Override
+    public List<String> getArguments() {
+      return List.of(_mapColumnName);
+    }
+
+    @Override
+    public Object evaluate(GenericRow genericRow) {
+      return evaluateMap(genericRow.getValue(_mapColumnName));
+    }
+
+    @Override
+    public Object evaluate(Object[] values) {
+      return evaluateMap(values[0]);
+    }
+
+    @Nullable
+    private List<?> evaluateMap(@Nullable Object value) {
+      if (value == null) {
+        return null;
+      }
+      Map<?, ?> map = (Map<?, ?>) value;
+      // Groovy's sort() preserves the comparator of an existing SortedMap.
+      Map<?, ?> sortedMap = map instanceof SortedMap<?, ?> ? map : new TreeMap<>(map);
+      return new ArrayList<>(_extractKeys ? sortedMap.keySet() : sortedMap.values());
+    }
   }
 }
