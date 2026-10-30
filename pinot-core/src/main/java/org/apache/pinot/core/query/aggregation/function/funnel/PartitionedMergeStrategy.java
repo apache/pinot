@@ -31,21 +31,29 @@ class PartitionedMergeStrategy implements MergeStrategy<List<Long>> {
 
   @Override
   public List<Long> merge(List<Long> a, List<Long> b) {
-    LongArrayList result = toLongArrayList(a);
-    long[] elements = result.elements();
+    long[] result = toLongArray(a);
     for (int i = 0; i < _numSteps; i++) {
-      elements[i] += b.get(i);
+      result[i] += b.get(i);
     }
-    return result;
+    return LongArrayList.wrap(result);
   }
 
   @Override
-  public LongArrayList extractFinalResult(List<Long> intermediateResult) {
-    return toLongArrayList(intermediateResult);
+  public long[] extractFinalResult(List<Long> intermediateResult) {
+    return toLongArray(intermediateResult);
   }
 
-  private LongArrayList toLongArrayList(List<Long> longList) {
-    return longList instanceof LongArrayList ? ((LongArrayList) longList).clone() : new LongArrayList(longList);
+  /// Returns a copy of the step counts, which can be modified without modifying the given list.
+  private static long[] toLongArray(List<Long> stepCounts) {
+    if (stepCounts instanceof LongArrayList) {
+      return ((LongArrayList) stepCounts).toLongArray();
+    }
+    int numSteps = stepCounts.size();
+    long[] result = new long[numSteps];
+    for (int i = 0; i < numSteps; i++) {
+      result[i] = stepCounts.get(i);
+    }
+    return result;
   }
 
   @Override

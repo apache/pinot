@@ -312,7 +312,7 @@
     <google.re2j.version>1.8</google.re2j.version>
     <google.cloud.opentelemetry.version>0.36.0</google.cloud.opentelemetry.version>
     <opentelemetry.gcp.resources.version>1.61.0-alpha</opentelemetry.gcp.resources.version>
-    <google.errorprone.version>2.50.0</google.errorprone.version>
+    <google.errorprone.version>2.51.0</google.errorprone.version>
     <google.j2objc.version>3.1</google.j2objc.version>
 
     <!-- Configuration for Scala -->
@@ -337,7 +337,7 @@
     <wildfly.version>2.0.1</wildfly.version>
     <jettison.version>1.5.7</jettison.version>
     <nimbus-jose-jwt.version>10.10</nimbus-jose-jwt.version>
-    <dnsjava.version>3.6.5</dnsjava.version>
+    <dnsjava.version>3.7.0</dnsjava.version>
     <eclipse.jetty.version>9.4.58.v20250814</eclipse.jetty.version>
     <woodstox.version>7.3.0</woodstox.version>
     <curator.version>5.9.0</curator.version>
@@ -2220,7 +2220,7 @@
         <plugin>
           <groupId>org.jacoco</groupId>
           <artifactId>jacoco-maven-plugin</artifactId>
-          <version>0.8.15</version>
+          <version>0.8.16</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>

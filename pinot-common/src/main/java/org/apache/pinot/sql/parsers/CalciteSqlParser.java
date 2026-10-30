@@ -1308,6 +1308,17 @@ public class CalciteSqlParser {
         operands.add(toExpression(childNode));
       }
     }
+    if (functionKind == SqlKind.ARRAY_AGG && functionNode.getFunctionQuantifier() != null
+        && "DISTINCT".equals(functionNode.getFunctionQuantifier().toString())) {
+      Expression distinct = RequestUtils.getLiteralExpression(true);
+      int lastIndex = operands.size() - 1;
+      if ((operands.size() == 2 || operands.size() == 3) && operands.get(lastIndex).isSetLiteral()
+          && operands.get(lastIndex).getLiteral().isSetBoolValue()) {
+        operands.set(lastIndex, distinct);
+      } else if (operands.size() == 1 || operands.size() == 2) {
+        operands.add(distinct);
+      }
+    }
     ParserUtils.validateFunction(canonicalName, operands);
     Expression functionExpression = RequestUtils.getFunctionExpression(canonicalName, operands);
     if (negated) {

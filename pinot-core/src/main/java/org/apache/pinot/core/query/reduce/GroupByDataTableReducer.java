@@ -18,11 +18,6 @@
  */
 package org.apache.pinot.core.query.reduce;
 
-import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
-import it.unimi.dsi.fastutil.floats.FloatArrayList;
-import it.unimi.dsi.fastutil.ints.IntArrayList;
-import it.unimi.dsi.fastutil.longs.LongArrayList;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.io.IOException;
 import java.sql.Timestamp;
 import java.util.ArrayList;
@@ -340,25 +335,25 @@ public class GroupByDataTableReducer implements DataTableReducer {
                       values[colId] = dataTable.getBytes(rowId, colId);
                       break;
                     case INT_ARRAY:
-                      values[colId] = IntArrayList.wrap(dataTable.getIntArray(rowId, colId));
+                      values[colId] = dataTable.getIntArray(rowId, colId);
                       break;
                     case LONG_ARRAY:
-                      values[colId] = LongArrayList.wrap(dataTable.getLongArray(rowId, colId));
+                      values[colId] = dataTable.getLongArray(rowId, colId);
                       break;
                     case FLOAT_ARRAY:
-                      values[colId] = FloatArrayList.wrap(dataTable.getFloatArray(rowId, colId));
+                      values[colId] = dataTable.getFloatArray(rowId, colId);
                       break;
                     case DOUBLE_ARRAY:
-                      values[colId] = DoubleArrayList.wrap(dataTable.getDoubleArray(rowId, colId));
+                      values[colId] = dataTable.getDoubleArray(rowId, colId);
                       break;
                     case BIG_DECIMAL_ARRAY:
-                      values[colId] = ObjectArrayList.wrap(dataTable.getBigDecimalArray(rowId, colId));
+                      values[colId] = dataTable.getBigDecimalArray(rowId, colId);
                       break;
                     case STRING_ARRAY:
-                      values[colId] = ObjectArrayList.wrap(dataTable.getStringArray(rowId, colId));
+                      values[colId] = dataTable.getStringArray(rowId, colId);
                       break;
                     case BYTES_ARRAY:
-                      values[colId] = ObjectArrayList.wrap(dataTable.getBytesArray(rowId, colId));
+                      values[colId] = dataTable.getBytesArray(rowId, colId);
                       break;
                     case OBJECT:
                       CustomObject customObject = dataTable.getCustomObject(rowId, colId);

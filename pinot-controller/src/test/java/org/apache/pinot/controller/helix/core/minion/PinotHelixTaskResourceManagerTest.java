@@ -29,6 +29,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.helix.HelixException;
 import org.apache.helix.task.JobConfig;
 import org.apache.helix.task.JobContext;
 import org.apache.helix.task.JobDag;
@@ -49,6 +50,7 @@ import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.utils.CommonConstants.TABLE_NAME;
@@ -58,7 +60,9 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
@@ -1276,6 +1280,56 @@ public class PinotHelixTaskResourceManagerTest {
         spyMgr.getTaskCounts(taskType, null, null);
     assertEquals(allTasks.size(), 1);
     assertTrue(allTasks.containsKey(taskName1));
+  }
+
+  @DataProvider
+  public Object[][] forceDelete() {
+    return new Object[][]{{true}, {false}};
+  }
+
+  @Test(dataProvider = "forceDelete")
+  public void testDeleteTaskRetriesWhenHelixFailsToRemoveJob(boolean forceDelete) {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+
+    // Helix reports a ZooKeeper NotEmpty failure while removing the job context as a cause-less HelixException
+    doThrow(new HelixException("Failed to delete job: TaskQueue_TestTask_Task_TestTask_a"))
+        .doNothing()
+        .when(taskDriver).deleteJob("TaskQueue_TestTask", "Task_TestTask_a", forceDelete);
+
+    mgr.deleteTask("Task_TestTask_a", forceDelete);
+
+    verify(taskDriver, times(2)).deleteJob("TaskQueue_TestTask", "Task_TestTask_a", forceDelete);
+  }
+
+  @Test(dataProvider = "forceDelete")
+  public void testDeleteTaskThrowsAfterMaxAttempts(boolean forceDelete) {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+
+    HelixException failure = new HelixException("Failed to delete job: TaskQueue_TestTask_Task_TestTask_a");
+    doThrow(failure).when(taskDriver).deleteJob("TaskQueue_TestTask", "Task_TestTask_a", forceDelete);
+
+    HelixException thrown = expectThrows(HelixException.class, () -> mgr.deleteTask("Task_TestTask_a", forceDelete));
+    assertSame(thrown, failure);
+    verify(taskDriver, times(PinotHelixTaskResourceManager.DELETE_JOB_MAX_ATTEMPTS))
+        .deleteJob("TaskQueue_TestTask", "Task_TestTask_a", forceDelete);
+  }
+
+  @Test
+  public void testDeleteTaskDoesNotRetryNonHelixFailure() {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+
+    // Helix rejects a non-forced delete from a running queue with IllegalStateException; retrying cannot help
+    doThrow(new IllegalStateException("Queue TaskQueue_TestTask is still running!"))
+        .when(taskDriver).deleteJob("TaskQueue_TestTask", "Task_TestTask_a", false);
+
+    expectThrows(IllegalStateException.class, () -> mgr.deleteTask("Task_TestTask_a", false));
+    verify(taskDriver).deleteJob("TaskQueue_TestTask", "Task_TestTask_a", false);
   }
 
   // ==================== Tests for task queue bounding ====================

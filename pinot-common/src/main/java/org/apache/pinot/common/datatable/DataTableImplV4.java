@@ -26,6 +26,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -34,6 +35,7 @@ import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
+import org.apache.pinot.segment.spi.memory.CompoundDataBuffer;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
 import org.apache.pinot.spi.accounting.ThreadResourceSnapshot;
@@ -433,43 +435,44 @@ public class DataTableImplV4 implements DataTable {
     return _errCodeToExceptionMap;
   }
 
-  /// Serializes the table into one array of the exact final size, so the fixed and variable size sections are copied
-  /// once and no buffer grows by doubling.
+  /// Serializes the table into one array of the exact final size. Prefer [#toDataBuffer()], which does not copy the
+  /// fixed and variable size sections.
   @Override
   public byte[] toBytes()
       throws IOException {
-    ThreadResourceSnapshot resourceSnapshot = new ThreadResourceSnapshot();
+    DataBuffer dataBuffer = toDataBuffer();
+    byte[] bytes = new byte[Math.toIntExact(dataBuffer.size())];
+    dataBuffer.copyTo(0, bytes);
+    return bytes;
+  }
 
-    // Add table serialization time and memory metadata when the corresponding measurement is enabled.
-    // When CPU time/memory usage is not collectable, we omit these values from the metadata.
-    // The entries are reserved before the array is sized and filled in after the sections are copied. Both are LONG
-    // keys, whose encoded length does not depend on the value, so the metadata length does not change.
-    boolean measureCpuTime = ThreadResourceUsageProvider.isThreadCpuTimeMeasurementEnabled();
-    boolean measureAllocatedBytes = ThreadResourceUsageProvider.isThreadMemoryMeasurementEnabled();
-    if (measureCpuTime) {
-      _metadata.put(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName(), "0");
-    }
-    if (measureAllocatedBytes) {
-      _metadata.put(MetadataKey.RESPONSE_SER_MEM_ALLOCATED_BYTES.getName(), "0");
-    }
+  /// Serializes the table without copying the fixed and variable size sections. The header, the small sections and
+  /// the metadata are new arrays, and the two data sections are the buffers of this table. On a table built in this
+  /// process, they are the builder's pages, so no buffer is larger than one page plus these small arrays.
+  @Override
+  public DataBuffer toDataBuffer()
+      throws IOException {
+    ThreadResourceSnapshot resourceSnapshot = new ThreadResourceSnapshot();
 
     byte[] exceptionsBytes = serializeExceptions();
     byte[] dictionaryBytes = _stringDictionary != null ? serializeStringDictionary() : null;
     byte[] dataSchemaBytes = _dataSchema != null ? _dataSchema.toBytes() : null;
-    int metadataLength = serializeMetadata().length;
-    long totalLength = HEADER_SIZE + exceptionsBytes.length + lengthOf(dictionaryBytes) + lengthOf(dataSchemaBytes)
-        + sizeOf(_fixedSizeData) + sizeOf(_variableSizeData) + Integer.BYTES + metadataLength;
-    if (totalLength > Integer.MAX_VALUE) {
-      throw new IllegalStateException("Serialized data table size " + totalLength + " exceeds the 2 GB limit");
+    // The header stores every section offset as an int.
+    long sectionsLength = HEADER_SIZE + exceptionsBytes.length + lengthOf(dictionaryBytes) + lengthOf(dataSchemaBytes)
+        + sizeOf(_fixedSizeData) + sizeOf(_variableSizeData);
+    if (sectionsLength > Integer.MAX_VALUE) {
+      throw new IllegalStateException("Serialized data table size " + sectionsLength + " exceeds the 2 GB limit");
     }
-    byte[] bytes = new byte[(int) totalLength];
-    ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-    writeLeadingSections(byteBuffer, exceptionsBytes, dictionaryBytes, dataSchemaBytes);
+    ByteBuffer leadingSections = ByteBuffer.allocate(
+        HEADER_SIZE + exceptionsBytes.length + lengthOf(dictionaryBytes) + lengthOf(dataSchemaBytes));
+    writeLeadingSections(leadingSections, exceptionsBytes, dictionaryBytes, dataSchemaBytes);
 
-    if (measureCpuTime) {
+    // Add table serialization time and memory metadata when the corresponding measurement is enabled.
+    // When CPU time/memory usage is not collectable, we omit these values from the metadata.
+    if (ThreadResourceUsageProvider.isThreadCpuTimeMeasurementEnabled()) {
       _metadata.put(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName(), String.valueOf(resourceSnapshot.getCpuTimeNs()));
     }
-    if (measureAllocatedBytes) {
+    if (ThreadResourceUsageProvider.isThreadMemoryMeasurementEnabled()) {
       _metadata.put(MetadataKey.RESPONSE_SER_MEM_ALLOCATED_BYTES.getName(),
           String.valueOf(resourceSnapshot.getAllocatedBytes()));
     }
@@ -478,14 +481,25 @@ public class DataTableImplV4 implements DataTable {
     // NOTE: We ignore metadata serialization time in "responseSerializationCpuTimeNs" as it's negligible while
     // considering it will bring a lot code complexity.
     byte[] metadataBytes = serializeMetadata();
-    if (metadataBytes.length != metadataLength) {
-      throw new IllegalStateException(
-          "Metadata length changed during serialization from " + metadataLength + " to " + metadataBytes.length);
+    // Readers parse the whole table as one buffer, so the total must fit in an int as well.
+    long totalLength = sectionsLength + Integer.BYTES + metadataBytes.length;
+    if (totalLength > Integer.MAX_VALUE) {
+      throw new IllegalStateException("Serialized data table size " + totalLength + " exceeds the 2 GB limit");
     }
-    byteBuffer.putInt(metadataBytes.length);
-    byteBuffer.put(metadataBytes);
-    assert !byteBuffer.hasRemaining();
-    return bytes;
+    ByteBuffer metadata = ByteBuffer.allocate(Integer.BYTES + metadataBytes.length);
+    metadata.putInt(metadataBytes.length);
+    metadata.put(metadataBytes);
+
+    CompoundDataBuffer.Builder builder = new CompoundDataBuffer.Builder(ByteOrder.BIG_ENDIAN, false);
+    builder.addBuffer(leadingSections.flip());
+    if (_fixedSizeData != null) {
+      builder.addBuffer(_fixedSizeData);
+    }
+    if (_variableSizeData != null) {
+      builder.addBuffer(_variableSizeData);
+    }
+    builder.addBuffer(metadata.flip());
+    return builder.build();
   }
 
   private static int lengthOf(@Nullable byte[] bytes) {
@@ -496,6 +510,8 @@ public class DataTableImplV4 implements DataTable {
     return dataBuffer != null ? dataBuffer.size() : 0;
   }
 
+  /// Writes the header and the exceptions, dictionary and data schema sections. The fixed and variable size sections
+  /// follow them in the serialized table.
   private void writeLeadingSections(ByteBuffer byteBuffer, byte[] exceptionsBytes, @Nullable byte[] dictionaryBytes,
       @Nullable byte[] dataSchemaBytes) {
     int fixedSizeDataLength = (int) sizeOf(_fixedSizeData);
@@ -537,15 +553,6 @@ public class DataTableImplV4 implements DataTable {
     }
     if (dataSchemaBytes != null) {
       byteBuffer.put(dataSchemaBytes);
-    }
-    copySection(_fixedSizeData, byteBuffer, fixedSizeDataLength);
-    copySection(_variableSizeData, byteBuffer, variableSizeDataLength);
-  }
-
-  private static void copySection(@Nullable DataBuffer section, ByteBuffer byteBuffer, int length) {
-    if (length > 0) {
-      section.copyTo(0, byteBuffer.array(), byteBuffer.position(), length);
-      byteBuffer.position(byteBuffer.position() + length);
     }
   }
 

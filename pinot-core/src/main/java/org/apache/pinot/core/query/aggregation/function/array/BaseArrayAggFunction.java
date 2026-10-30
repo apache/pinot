@@ -33,7 +33,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-public abstract class BaseArrayAggFunction<I, F extends Comparable> extends BaseSingleInputAggregationFunction<I, F> {
+public abstract class BaseArrayAggFunction<I, F> extends BaseSingleInputAggregationFunction<I, F> {
 
   private final DataSchema.ColumnDataType _resultColumnType;
 

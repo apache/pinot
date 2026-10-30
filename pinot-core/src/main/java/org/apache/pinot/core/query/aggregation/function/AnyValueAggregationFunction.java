@@ -65,7 +65,7 @@ import org.apache.pinot.spi.utils.ByteArray;
 /// FROM Orders
 /// GROUP BY CustomerID
 /// ```
-public class AnyValueAggregationFunction extends BaseSingleInputAggregationFunction<Object, Comparable<?>> {
+public class AnyValueAggregationFunction extends BaseSingleInputAggregationFunction<Object, Object> {
   private static final DataType[] DATA_TYPE_VALUES = DataType.values();
   // Data type argument, or null when the result type is determined at runtime from the input blocks
   @Nullable
@@ -163,8 +163,8 @@ public class AnyValueAggregationFunction extends BaseSingleInputAggregationFunct
   }
 
   @Override
-  public Comparable<?> extractFinalResult(@Nullable Object intermediateResult) {
-    return (Comparable<?>) intermediateResult;
+  public Object extractFinalResult(@Nullable Object intermediateResult) {
+    return intermediateResult;
   }
 
   @Override

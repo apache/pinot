@@ -23,13 +23,14 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
 
 
 /// Query specific scheduling context
 public class SchedulerQueryContext {
 
   private final ServerQueryRequest _queryRequest;
-  private final SettableFuture<byte[]> _resultFuture;
+  private final SettableFuture<DataBuffer> _resultFuture;
   private SchedulerGroup _schedulerGroup;
 
   public SchedulerQueryContext(ServerQueryRequest queryRequest) {
@@ -42,11 +43,11 @@ public class SchedulerQueryContext {
     return _queryRequest;
   }
 
-  public SettableFuture<byte[]> getResultFuture() {
+  public SettableFuture<DataBuffer> getResultFuture() {
     return _resultFuture;
   }
 
-  public void setResultFuture(ListenableFuture<byte[]> f) {
+  public void setResultFuture(ListenableFuture<DataBuffer> f) {
     _resultFuture.setFuture(f);
   }
 
