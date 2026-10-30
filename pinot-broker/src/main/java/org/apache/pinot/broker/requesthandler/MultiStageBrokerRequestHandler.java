@@ -661,8 +661,12 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   }
 
   /// Extension hook for preparing a stage right before the broker sends it to its workers, to run the query or to
-  /// explain it on the servers. Subclasses can add entries to the custom properties of the stage
-  /// ([DispatchablePlanFragment#getCustomProperties()]), which its workers get in their stage metadata.
+  /// explain it on the servers. To run the query, the broker calls it for every stage, including stage 0 (the broker
+  /// reduce). To explain the query on the servers, it calls it only for the leaf stages that have segments.
+  ///
+  /// Subclasses can add entries to the custom properties of the stage
+  /// ([DispatchablePlanFragment#getCustomProperties()]), which its workers get in their stage metadata. They must not
+  /// replace the existing entries, such as the table name and the time boundary that servers use for leaf stages.
   protected void prepareStageForDispatch(DispatchablePlanFragment stage, Map<String, String> queryOptions) {
   }
 

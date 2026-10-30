@@ -59,6 +59,7 @@ import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.QueryFingerprint;
 import org.apache.pinot.spi.trace.RequestContext;
@@ -198,21 +199,27 @@ public class MultiStageBrokerRequestHandlerTest extends QueryEnvironmentTestBase
           return super.getEstimatedNumQueryThreads(dispatchableSubPlan);
         }
       };
-      String query = "SELECT col1, COUNT(*) FROM a GROUP BY col1";
+      try {
+        String query = "SELECT col1, COUNT(*) FROM a GROUP BY col1";
 
-      // The mocked throttler stops the query before it runs
-      handler.handleRequest(query);
-      Map<Integer, DispatchablePlanFragment> stages = throttledPlan.get().getQueryStageMap();
-      assertEquals(stages.size(), 3);
-      stages.forEach((stageId, stage) -> assertEquals(stage.getCustomProperties().get("testKey"), "stage" + stageId));
+        // The mocked throttler stops the query before it runs
+        BrokerResponse response = handler.handleRequest(query);
+        assertEquals(response.getExceptions().get(0).getErrorCode(), QueryErrorCode.EXECUTION_TIMEOUT.getId());
+        Map<Integer, DispatchablePlanFragment> stages = throttledPlan.get().getQueryStageMap();
+        assertEquals(stages.size(), 3);
+        stages.forEach(
+            (stageId, stage) -> assertEquals(stage.getCustomProperties().get("testKey"), "stage" + stageId));
 
-      handler.handleRequest("SET " + QueryOptionKey.EXPLAIN_ASKING_SERVERS + " = true; EXPLAIN PLAN FOR " + query);
-      ArgumentCaptor<DispatchablePlanFragment> explainedStages =
-          ArgumentCaptor.forClass(DispatchablePlanFragment.class);
-      verify(dispatchers.constructed().get(0), atLeastOnce())
-          .explain(any(), explainedStages.capture(), anyLong(), any());
-      for (DispatchablePlanFragment stage : explainedStages.getAllValues()) {
-        assertEquals(stage.getCustomProperties().get("testKey"), "stage" + stage.getPlanFragment().getFragmentId());
+        handler.handleRequest("SET " + QueryOptionKey.EXPLAIN_ASKING_SERVERS + " = true; EXPLAIN PLAN FOR " + query);
+        ArgumentCaptor<DispatchablePlanFragment> explainedStages =
+            ArgumentCaptor.forClass(DispatchablePlanFragment.class);
+        verify(dispatchers.constructed().get(0), atLeastOnce())
+            .explain(any(), explainedStages.capture(), anyLong(), any());
+        for (DispatchablePlanFragment stage : explainedStages.getAllValues()) {
+          assertEquals(stage.getCustomProperties().get("testKey"), "stage" + stage.getPlanFragment().getFragmentId());
+        }
+      } finally {
+        handler.shutDown();
       }
     }
   }
