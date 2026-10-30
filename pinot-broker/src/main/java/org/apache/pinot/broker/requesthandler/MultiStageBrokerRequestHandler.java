@@ -660,6 +660,12 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       RequestContext requestContext, HttpHeaders httpHeaders) {
   }
 
+  /// Extension hook for preparing a stage right before the broker sends it to its workers, to run the query or to
+  /// explain it on the servers. Subclasses can add entries to the custom properties of the stage
+  /// ([DispatchablePlanFragment#getCustomProperties()]), which its workers get in their stage metadata.
+  protected void prepareStageForDispatch(DispatchablePlanFragment stage, Map<String, String> queryOptions) {
+  }
+
   /// Estimates the total number of server query threads the given plan will consume; used to acquire permits from the
   /// multi-stage query throttler before dispatch. Subclasses can override to accurately
   /// estimate the real per-server work.
@@ -900,6 +906,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       String errorMessage = String.format("Request %d: %s exceeds query quota.", requestId,
           _queryLogger.redactQuery(query.getTextQuery(), requestContext.getQueryFingerprint()));
       return new BrokerResponseNative(QueryErrorCode.TOO_MANY_REQUESTS, errorMessage);
+    }
+
+    for (DispatchablePlanFragment stage : dispatchableSubPlan.getQueryStageMap().values()) {
+      prepareStageForDispatch(stage, query.getOptions());
     }
 
     // Short-circuit: if all leaf stages are empty (all segments pruned or table has no data),
@@ -1151,6 +1161,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private Collection<PlanNode> requestPhysicalPlan(DispatchablePlanFragment fragment,
       RequestContext requestContext, long queryTimeoutMs, Map<String, String> queryOptions) {
     List<PlanNode> stagePlans;
+    prepareStageForDispatch(fragment, queryOptions);
     try {
       stagePlans = _queryDispatcher.explain(requestContext, fragment, queryTimeoutMs, queryOptions);
     } catch (Exception e) {

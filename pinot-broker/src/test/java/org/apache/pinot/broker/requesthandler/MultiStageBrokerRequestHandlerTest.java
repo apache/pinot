@@ -37,6 +37,7 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.core.routing.MockRoutingManagerFactory;
 import org.apache.pinot.core.routing.MultiClusterRoutingContext;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.transport.ServerInstance;
@@ -72,13 +73,16 @@ import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.util.TestUtils;
+import org.mockito.ArgumentCaptor;
 import org.mockito.MockedConstruction;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
@@ -151,6 +155,66 @@ public class MultiStageBrokerRequestHandlerTest extends QueryEnvironmentTestBase
     }
     Assert.assertNotNull(capturedResponse.get(),
         "onQueryCompletion hook must be called with the BrokerResponse from handleRequest for MSE");
+  }
+
+  /// The broker calls [MultiStageBrokerRequestHandler#prepareStageForDispatch] for each stage before it sends the stage
+  /// to its workers, both to run the query and to explain it on the servers.
+  @Test
+  public void testPrepareStageForDispatchHook()
+      throws Exception {
+    int port1 = NetUtils.findOpenPort();
+    int port2 = NetUtils.findOpenPort();
+    MockRoutingManagerFactory factory = new MockRoutingManagerFactory(port1, port2);
+    TABLE_SCHEMAS.forEach((tableName, schema) -> factory.registerTable(schema, tableName));
+    SERVER1_SEGMENTS.forEach(
+        (tableName, segments) -> segments.forEach(segment -> factory.registerSegment(port1, tableName, segment)));
+    SERVER2_SEGMENTS.forEach(
+        (tableName, segments) -> segments.forEach(segment -> factory.registerSegment(port2, tableName, segment)));
+    RoutingManager routingManager = factory.buildRoutingManager(null);
+    WorkerManager workerManager =
+        new WorkerManager("Broker_localhost", "localhost", NetUtils.findOpenPort(), routingManager);
+    PinotConfiguration config = new PinotConfiguration();
+    config.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, "localhost");
+    config.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, Integer.toString(NetUtils.findOpenPort()));
+    BrokerQueryEventListenerFactory.init(config);
+    QueryQuotaManager queryQuotaManager = mock(QueryQuotaManager.class);
+    when(queryQuotaManager.acquire(anyString())).thenReturn(true);
+    when(queryQuotaManager.acquireDatabase(anyString())).thenReturn(true);
+    when(queryQuotaManager.acquireApplication(anyString())).thenReturn(true);
+    AtomicReference<DispatchableSubPlan> throttledPlan = new AtomicReference<>();
+    try (MockedConstruction<QueryDispatcher> dispatchers = mockConstruction(QueryDispatcher.class)) {
+      MultiStageBrokerRequestHandler handler = new MultiStageBrokerRequestHandler(config, "testBrokerId",
+          new BrokerRequestIdGenerator(), routingManager, new AllowAllAccessControlFactory(), queryQuotaManager,
+          factory.buildTableCache(), mock(MultiStageQueryThrottler.class), mock(FailureDetector.class),
+          ThreadAccountantUtils.getNoOpAccountant(), null, workerManager, workerManager) {
+        @Override
+        protected void prepareStageForDispatch(DispatchablePlanFragment stage, Map<String, String> queryOptions) {
+          stage.getCustomProperties().put("testKey", "stage" + stage.getPlanFragment().getFragmentId());
+        }
+
+        @Override
+        protected int getEstimatedNumQueryThreads(DispatchableSubPlan dispatchableSubPlan) {
+          throttledPlan.set(dispatchableSubPlan);
+          return super.getEstimatedNumQueryThreads(dispatchableSubPlan);
+        }
+      };
+      String query = "SELECT col1, COUNT(*) FROM a GROUP BY col1";
+
+      // The mocked throttler stops the query before it runs
+      handler.handleRequest(query);
+      Map<Integer, DispatchablePlanFragment> stages = throttledPlan.get().getQueryStageMap();
+      assertEquals(stages.size(), 3);
+      stages.forEach((stageId, stage) -> assertEquals(stage.getCustomProperties().get("testKey"), "stage" + stageId));
+
+      handler.handleRequest("SET " + QueryOptionKey.EXPLAIN_ASKING_SERVERS + " = true; EXPLAIN PLAN FOR " + query);
+      ArgumentCaptor<DispatchablePlanFragment> explainedStages =
+          ArgumentCaptor.forClass(DispatchablePlanFragment.class);
+      verify(dispatchers.constructed().get(0), atLeastOnce())
+          .explain(any(), explainedStages.capture(), anyLong(), any());
+      for (DispatchablePlanFragment stage : explainedStages.getAllValues()) {
+        assertEquals(stage.getCustomProperties().get("testKey"), "stage" + stage.getPlanFragment().getFragmentId());
+      }
+    }
   }
 
   @Test
