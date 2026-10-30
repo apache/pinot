@@ -73,4 +73,10 @@ public class AvgValueIntegerTupleSketchAggregationFunction
     double estimate = retainedTotal / result.getRetainedEntries();
     return Math.round(estimate);
   }
+
+  /// Averages cannot be merged.
+  @Override
+  public Comparable mergeFinalResult(Comparable finalResult1, Comparable finalResult2) {
+    throw new UnsupportedOperationException("Cannot merge final results for function: " + getType());
+  }
 }

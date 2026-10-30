@@ -182,10 +182,11 @@ public class FunnelCountAggregationFunction<A, I> implements AggregationFunction
 
   @Override
   public long[] mergeFinalResult(long[] finalResult1, long[] finalResult2) {
+    long[] mergedResult = finalResult1.clone();
     for (int i = 0; i < _numSteps; i++) {
-      finalResult1[i] += finalResult2[i];
+      mergedResult[i] += finalResult2[i];
     }
-    return finalResult1;
+    return mergedResult;
   }
 
   @Override

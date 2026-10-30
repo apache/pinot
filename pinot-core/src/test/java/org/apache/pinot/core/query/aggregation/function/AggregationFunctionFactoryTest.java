@@ -202,6 +202,12 @@ public class AggregationFunctionFactoryTest {
     assertEquals(aggregationFunction.getType(), AggregationFunctionType.DISTINCTCOUNTRAWHLLPLUS);
     assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
+    function = getFunction("DiStInCtCoUnTrAwUlL");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, false);
+    assertTrue(aggregationFunction instanceof DistinctCountRawULLAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.DISTINCTCOUNTRAWULL);
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
+
     function = getFunction("FaStHlL");
     aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, false);
     assertTrue(aggregationFunction instanceof FastHLLAggregationFunction);

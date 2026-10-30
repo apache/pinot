@@ -26,6 +26,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.datasketches.tuple.TupleSketch;
+import org.apache.datasketches.tuple.TupleUnion;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.datasketches.tuple.aninteger.IntegerSummaryDeserializer;
 import org.apache.datasketches.tuple.aninteger.IntegerSummarySetOperations;
@@ -277,6 +278,16 @@ public class IntegerTupleSketchAggregationFunction
     accumulator.setSetOperations(_setOps);
     accumulator.setThreshold(_accumulatorThreshold);
     return Base64.getEncoder().encodeToString(accumulator.getResult().toByteArray());
+  }
+
+  /// Merges two final results, which are serialized sketches in string form, into the string form of the merged
+  /// sketch.
+  @Override
+  public Comparable mergeFinalResult(Comparable finalResult1, Comparable finalResult2) {
+    TupleUnion<IntegerSummary> union = new TupleUnion<>(_nominalEntries, _setOps);
+    union.union(deserializeSketch(Base64.getDecoder().decode((String) finalResult1)));
+    union.union(deserializeSketch(Base64.getDecoder().decode((String) finalResult2)));
+    return Base64.getEncoder().encodeToString(union.getResult().toByteArray());
   }
 
   @Override

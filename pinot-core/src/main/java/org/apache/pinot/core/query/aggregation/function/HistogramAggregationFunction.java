@@ -259,6 +259,15 @@ public class HistogramAggregationFunction extends BaseSingleInputAggregationFunc
   }
 
   @Override
+  public double[] mergeFinalResult(double[] finalResult1, double[] finalResult2) {
+    double[] mergedResult = finalResult1.clone();
+    for (int i = 0; i < mergedResult.length; i++) {
+      mergedResult[i] += finalResult2[i];
+    }
+    return mergedResult;
+  }
+
+  @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
