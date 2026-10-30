@@ -552,9 +552,13 @@ final class IngestionSourceErrorRules {
   // with "(null)" for a body without an error field, or for any other status "Unable to obtain an access token: Failed
   // to perform HTTP request. res: <status>".
   private static final String PULSAR_OAUTH_TOKEN = "Unable to obtain an access token";
-  // Only the token client's refusal ends in a parenthesis; a transport failure ends in an address or a timeout. The
-  // error is what follows the last " (", so a description or an error may hold parentheses of its own.
+  // The token client's refusal ends in a parenthesis, and the error is what follows the last " (", so a description
+  // or an error may hold parentheses of its own.
   private static final Pattern PULSAR_OAUTH_ERROR = Pattern.compile(".* \\((.+)\\)\\s*$", Pattern.DOTALL);
+  // The token client's own failures can end in a parenthesis too: a transport failure arrives wrapped in its HTTP
+  // client's ExecutionException, and a 200 answer it can't read with Jackson's reference chain into TokenResult
+  private static final Pattern PULSAR_NOT_A_REFUSAL = Pattern.compile(PULSAR_OAUTH_TOKEN
+      + ": java\\.util\\.concurrent\\.ExecutionException: |\\(through reference chain: [\\w.$]*TokenResult\\[");
   private static final Pattern PULSAR_OAUTH_STATUS = Pattern.compile("res: (\\d{3})\\s*$");
 
   /// Pulsar's class is its code: the broker's error maps one to one onto a nested subclass. Every subclass of the
@@ -610,7 +614,7 @@ final class IngestionSourceErrorRules {
     }
     if (message.contains(PULSAR_OAUTH_TOKEN)) {
       Matcher error = PULSAR_OAUTH_ERROR.matcher(message);
-      if (error.find()) {
+      if (error.find() && !PULSAR_NOT_A_REFUSAL.matcher(message).find()) {
         // A 400 or 401: the endpoint refused the token request, whatever its error says
         String oauthError = error.group(1);
         return "null".equals(oauthError) ? auth(IngestionSourceErrorSubReason.UNSPECIFIED, code, TARGET_IDP)

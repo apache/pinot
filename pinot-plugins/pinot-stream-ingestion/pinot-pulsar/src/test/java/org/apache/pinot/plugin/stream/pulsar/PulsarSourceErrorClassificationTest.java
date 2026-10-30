@@ -110,10 +110,20 @@ public class PulsarSourceErrorClassificationTest {
     assertEquals(assertAuth(new PulsarClientException.AuthenticationException(
             "Unable to obtain an access token: Denied (see docs) (invalid_grant)"),
         IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_IDP).getCode(), "invalid_grant");
-    // A transport failure in the same text ends in an address, not a refusal's parenthesis
+    // A refusal whose description names a Java class is still a refusal
+    assertAuth(new PulsarClientException.AuthenticationException("Unable to obtain an access token: "
+        + "java.lang.SecurityException: Invalid client credentials (invalid_client)"),
+        IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_IDP);
+    // A transport or parsing failure in the same text is not a refusal, even when it ends in a parenthesis
     assertSourceRead(new PulsarClientException.AuthenticationException("Unable to obtain an access token: "
         + "java.util.concurrent.ExecutionException: io.netty.channel.AbstractChannel$AnnotatedConnectException: "
         + "Connection refused: localhost/127.0.0.1:1"), TARGET_IDP);
+    assertSourceRead(new PulsarClientException.AuthenticationException("Unable to obtain an access token: "
+        + "java.util.concurrent.ExecutionException: java.net.ConnectException: No appropriate protocol (protocol is "
+        + "disabled or cipher suites are inappropriate)"), TARGET_IDP);
+    assertSourceRead(new PulsarClientException.AuthenticationException("Unable to obtain an access token: Cannot "
+        + "deserialize value of type `int` from String \"never\": not a valid `int` value (through reference chain: "
+        + "org.apache.pulsar.client.impl.auth.oauth2.protocol.TokenResult[\"expires_in\"])"), TARGET_IDP);
   }
 
   @Test
