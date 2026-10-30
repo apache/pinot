@@ -20,6 +20,8 @@ package org.apache.pinot.segment.local.segment.creator;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.nio.channels.FileChannel;
 import java.util.HashSet;
 import java.util.Random;
 import java.util.Set;
@@ -32,12 +34,24 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.mockito.MockedConstruction;
 import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockConstruction;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertSame;
+import static org.testng.Assert.expectThrows;
 
 
 public class BitmapInvertedIndexCreatorTest implements PinotBuffersAfterMethodCheckRule {
@@ -145,6 +159,46 @@ public class BitmapInvertedIndexCreatorTest implements PinotBuffersAfterMethodCh
     // Validate on-heap inverted index, and check whether two file are the same
     validate(ON_HEAP_INVERTED_INDEX, postingLists);
     Assert.assertTrue(FileUtils.contentEquals(ON_HEAP_INVERTED_INDEX, OFF_HEAP_INVERTED_INDEX));
+  }
+
+  @Test
+  public void testOffHeapSealClosesTheChannelWhenMappingFails()
+      throws IOException {
+    assertOffHeapSealFailure(false);
+  }
+
+  @Test
+  public void testOffHeapSealPreservesMappingFailureWhenChannelCloseAlsoFails()
+      throws IOException {
+    assertOffHeapSealFailure(true);
+  }
+
+  private void assertOffHeapSealFailure(boolean failClose)
+      throws IOException {
+    IOException mappingFailure = new IOException("Cannot map the inverted-index output");
+    IOException closeFailure = new IOException("Cannot close the inverted-index output");
+    FileChannel channel = mock(FileChannel.class);
+    when(channel.map(any(), anyLong(), anyLong())).thenThrow(mappingFailure);
+    if (failClose) {
+      doThrow(closeFailure).when(channel).close();
+    }
+
+    try (OffHeapBitmapInvertedIndexCreator creator = new OffHeapBitmapInvertedIndexCreator(OFF_HEAP_INDEX_DIR,
+        new DimensionFieldSpec(COLUMN_NAME, DataType.INT, true), 2, 2, 0);
+        MockedConstruction<RandomAccessFile> openedFiles = mockConstruction(RandomAccessFile.class,
+            (file, context) -> when(file.getChannel()).thenReturn(channel))) {
+      creator.add(0);
+      creator.add(1);
+
+      IOException failure = expectThrows(IOException.class, creator::seal);
+      assertSame(failure, mappingFailure);
+      assertEquals(failure.getSuppressed().length, failClose ? 1 : 0);
+      if (failClose) {
+        assertSame(failure.getSuppressed()[0], closeFailure);
+      }
+      assertEquals(openedFiles.constructed().size(), 1);
+      verify(channel).close();
+    }
   }
 
   private void validate(File invertedIndex, Set<Integer>[] postingLists)

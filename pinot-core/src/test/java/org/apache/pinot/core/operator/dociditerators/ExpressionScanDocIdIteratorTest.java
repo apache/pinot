@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -47,6 +48,7 @@ import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUt
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -63,6 +65,10 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertSame;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 
 /// Tests for [ExpressionScanDocIdIterator], in particular that the matching docIds it emits are attributed to the
@@ -75,6 +81,93 @@ import static org.testng.Assert.assertEquals;
 /// buffer instead of the docIds carried by the projection block being processed, all blocks except the last one in a
 /// look-ahead window get their matches attributed to the last block's docIds, silently returning wrong results.
 public class ExpressionScanDocIdIteratorTest {
+  @Test
+  public void testProjectionReadFailureClosesResourcesBeforePropagating() {
+    IllegalStateException readFailure = new IllegalStateException("projection read failed");
+    AtomicBoolean closed = new AtomicBoolean();
+    ProjectionOperatorUtils.setImplementation((dataSources, docIds, context) ->
+        new ProjectionOperator(dataSources, docIds, context) {
+          @Override
+          protected ProjectionBlock getNextBlock() {
+            throw readFailure;
+          }
+
+          @Override
+          public void close() {
+            super.close();
+            closed.set(true);
+          }
+        });
+    try {
+      QueryContext query = QueryContextConverterUtils.getQueryContext(
+          "SELECT COUNT(*) FROM testTable WHERE MOD(intColumn, 7) = 0");
+      ExpressionFilterOperator filter =
+          new ExpressionFilterOperator(_segment, query, query.getFilter().getPredicate(), NUM_DOCS);
+      ScanBasedDocIdIterator iterator = (ScanBasedDocIdIterator) filter.nextBlock().getBlockDocIdSet().iterator();
+      assertFalse(closed.get());
+      try {
+        iterator.next();
+        fail("Expected the projection failure");
+      } catch (IllegalStateException failure) {
+        assertSame(failure, readFailure);
+        assertEquals(failure.getSuppressed().length, 0);
+        assertTrue(closed.get());
+      }
+    } finally {
+      ProjectionOperatorUtils.setImplementation(new ProjectionOperatorUtils.DefaultImplementation());
+    }
+  }
+
+  @Test
+  public void testProjectionReadFailureRetainsTheSuppressedCloseFailure() {
+    IllegalStateException readFailure = new IllegalStateException("projection read failed");
+    IllegalStateException closeFailure = new IllegalStateException("projection close failed");
+    ProjectionOperatorUtils.setImplementation((dataSources, docIds, context) ->
+        new ProjectionOperator(dataSources, docIds, context) {
+          @Override
+          protected ProjectionBlock getNextBlock() {
+            throw readFailure;
+          }
+
+          @Override
+          public void close() {
+            super.close();
+            throw closeFailure;
+          }
+        });
+    try {
+      QueryContext query = QueryContextConverterUtils.getQueryContext(
+          "SELECT COUNT(*) FROM testTable WHERE MOD(intColumn, 7) = 0");
+      ExpressionFilterOperator filter =
+          new ExpressionFilterOperator(_segment, query, query.getFilter().getPredicate(), NUM_DOCS);
+      ScanBasedDocIdIterator iterator = (ScanBasedDocIdIterator) filter.nextBlock().getBlockDocIdSet().iterator();
+      try {
+        iterator.next();
+        fail("Expected the projection failure");
+      } catch (IllegalStateException failure) {
+        assertSame(failure, readFailure);
+        assertEquals(failure.getSuppressed(), new Throwable[]{closeFailure});
+      }
+    } finally {
+      ProjectionOperatorUtils.setImplementation(new ProjectionOperatorUtils.DefaultImplementation());
+    }
+  }
+
+  @Test
+  public void testAdvanceSearchesTheCurrentBlockThenSkipsAndExhaustsBlocks() {
+    QueryContext query = QueryContextConverterUtils.getQueryContext(
+        "SELECT COUNT(*) FROM testTable WHERE MOD(intColumn, 7) = 0");
+    ExpressionFilterOperator filter =
+        new ExpressionFilterOperator(_segment, query, query.getFilter().getPredicate(), NUM_DOCS);
+    ScanBasedDocIdIterator iterator = (ScanBasedDocIdIterator) filter.nextBlock().getBlockDocIdSet().iterator();
+    assertEquals(iterator.next(), 0);
+    assertEquals(iterator.advance(8), 14);
+    assertEquals(iterator.advance(9997), 10003);
+    assertEquals(iterator.advance(30001), 30002);
+    assertEquals(iterator.advance(NUM_DOCS - 1), Constants.EOF);
+    assertEquals(iterator.next(), Constants.EOF);
+  }
+
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "ExpressionScanDocIdIteratorTest");
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testSegment";
