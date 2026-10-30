@@ -102,6 +102,8 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 // TODO Re-write this test using the stream abstraction
@@ -835,9 +837,12 @@ public class RealtimeSegmentDataManagerTest {
       Assert.assertTrue(semaphore.tryAcquire());
       segmentDataManager.getConsumerSemaphoreAcquired().set(true);
 
+      assertFalse(segmentDataManager.hasReleasedConsumerSemaphore());
       // With ALLOW_DURING_BUILD_ONLY / ALLOW_ALWAYS, buildSegmentInternal() and downloadSegmentAndReplace() let the
       // next consuming segment start early by closing the consumer and releasing the semaphore together.
       segmentDataManager.closeStreamConsumerAndReleaseSemaphore();
+      assertTrue(segmentDataManager.hasReleasedConsumerSemaphore(),
+          "A stopped predecessor must allow readiness while its segment is still being sealed");
       Assert.assertTrue(segmentDataManager.isStreamConsumerClosed());
       Assert.assertEquals(semaphore.availablePermits(), 1,
           "Consumer semaphore must be released for parallel consumption");

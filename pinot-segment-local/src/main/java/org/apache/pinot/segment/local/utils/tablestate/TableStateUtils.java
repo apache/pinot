@@ -21,12 +21,14 @@ package org.apache.pinot.segment.local.utils.tablestate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.model.CurrentState;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.LiveInstance;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -82,12 +84,56 @@ public class TableStateUtils {
   public static boolean isAllSegmentsLoaded(HelixManager helixManager, String tableNameWithType) {
     List<String> onlineSegments =
         getSegmentsInGivenStateForThisInstance(helixManager, tableNameWithType, SegmentStateModel.ONLINE);
+    return areSegmentsLoaded(helixManager, tableNameWithType, onlineSegments);
+  }
+
+  /// Checks the current assignment before a consumer starts. Earlier ONLINE segments of the same partition must be
+  /// loaded. Non-LLC ONLINE segments are conservatively included because they may hold base rows for the partition.
+  /// The consumer itself and its successors are excluded so that they do not wait for their own completion.
+  ///
+  /// @param isLocallyReady identifies segments whose metadata is already ready locally despite a pending ONLINE
+  ///                      transition, such as a predecessor that finished consumption and released its permit
+  public static boolean isReadyToConsume(HelixManager helixManager, String tableNameWithType, LLCSegmentName consumer,
+      Predicate<String> isLocallyReady) {
+    HelixDataAccessor dataAccessor = helixManager.getHelixDataAccessor();
+    IdealState idealState = dataAccessor.getProperty(dataAccessor.keyBuilder().idealStates(tableNameWithType));
+    if (idealState == null) {
+      LOGGER.warn("Failed to find ideal state for table: {}", tableNameWithType);
+      return false;
+    }
+    String instanceName = helixManager.getInstanceName();
+    Map<String, String> consumerAssignment = idealState.getInstanceStateMap(consumer.getSegmentName());
+    String consumerState = consumerAssignment != null ? consumerAssignment.get(instanceName) : null;
+    if (!SegmentStateModel.CONSUMING.equals(consumerState) && !SegmentStateModel.ONLINE.equals(consumerState)) {
+      return false;
+    }
+
+    List<String> requiredSegments = new ArrayList<>();
+    for (Map.Entry<String, Map<String, String>> entry : idealState.getRecord().getMapFields().entrySet()) {
+      if (!SegmentStateModel.ONLINE.equals(entry.getValue().get(instanceName))) {
+        continue;
+      }
+      String segmentName = entry.getKey();
+      LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
+      if (llcSegmentName != null && (llcSegmentName.getPartitionGroupId() != consumer.getPartitionGroupId()
+          || llcSegmentName.getSequenceNumber() >= consumer.getSequenceNumber())) {
+        continue;
+      }
+      if (!isLocallyReady.test(segmentName)) {
+        requiredSegments.add(segmentName);
+      }
+    }
+    return areSegmentsLoaded(helixManager, tableNameWithType, requiredSegments);
+  }
+
+  private static boolean areSegmentsLoaded(HelixManager helixManager, String tableNameWithType,
+      List<String> onlineSegments) {
     if (onlineSegments.isEmpty()) {
-      LOGGER.info("No ONLINE segment found for table: {}", tableNameWithType);
+      LOGGER.info("No required ONLINE segment found for table: {}", tableNameWithType);
       return true;
     }
 
-    // Check if ideal state and current state matches for all segments assigned to the current instance
+    // Check current state for the required ONLINE segments assigned to this instance.
     HelixDataAccessor dataAccessor = helixManager.getHelixDataAccessor();
     PropertyKey.Builder keyBuilder = dataAccessor.keyBuilder();
     String instanceName = helixManager.getInstanceName();
@@ -119,7 +165,7 @@ public class TableStateUtils {
       }
     }
     if (unloadedSegments.isEmpty()) {
-      LOGGER.info("All segments loaded for table: {}", tableNameWithType);
+      LOGGER.info("All required segments loaded for table: {}", tableNameWithType);
       return true;
     } else {
       int numUnloadedSegments = unloadedSegments.size();
