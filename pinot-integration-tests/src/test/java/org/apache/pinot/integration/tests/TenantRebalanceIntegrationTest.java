@@ -24,6 +24,7 @@ import org.apache.pinot.common.restlet.resources.TenantRebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceConfig;
 import org.apache.pinot.integration.tests.SharedHybridClusterIntegrationTestSuite.HybridScenarioLease;
 import org.apache.pinot.integration.tests.SharedHybridClusterIntegrationTestSuite.SharedHybridSuiteLease;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -50,7 +51,8 @@ public class TenantRebalanceIntegrationTest {
     try {
       _suiteLease = SharedHybridClusterIntegrationTestSuite.acquireSharedSuite();
       _owner = _suiteLease.getOwner();
-      _scenario = _owner.newScenario(TABLE_NAME, TOPIC_NAME);
+      // Preserve the original fixture's offline-first teardown to exercise both hybrid table removal orders.
+      _scenario = _owner.newScenario(TABLE_NAME, TOPIC_NAME, TableType.OFFLINE);
       _owner.setUpStandardScenario(_scenario, null, SharedHybridClusterIntegrationTestSuite.DEFAULT_HYBRID_COUNT);
     } catch (Throwable t) {
       try {
