@@ -32,9 +32,7 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
-import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
-import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TagOverrideConfig;
@@ -57,6 +55,7 @@ import org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPol
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.AssignmentStrategy;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -145,24 +144,26 @@ public class TableConfigSerDeUtilsTest {
       checkTenantConfigWithTagOverride(tableConfigToCompare);
     }
     {
-      // With SegmentAssignmentStrategyConfig
-      ReplicaGroupStrategyConfig replicaGroupStrategyConfig = new ReplicaGroupStrategyConfig("memberId", 5);
-      TableConfig tableConfig = tableConfigBuilder.setSegmentAssignmentConfigMap(
-              Map.of(InstancePartitionsType.OFFLINE.toString(),
-                  new SegmentAssignmentConfig("ReplicaGroupSegmentAssignmentStrategy")))
-          .setReplicaGroupStrategyConfig(replicaGroupStrategyConfig)
+      // With partitioned instance assignment config and segment assignment config
+      InstanceAssignmentConfig instanceAssignmentConfig =
+          new InstanceAssignmentConfig(new InstanceTagPoolConfig("tenant_OFFLINE", false, 0, null), null,
+              new InstanceReplicaGroupPartitionConfig(true, 0, 2, 0, 4, 1, false, null), null, false);
+      TableConfig tableConfig = tableConfigBuilder
+          .setInstanceAssignmentConfigMap(Map.of(InstancePartitionsType.OFFLINE.toString(), instanceAssignmentConfig))
+          .setSegmentAssignmentConfigMap(Map.of(InstancePartitionsType.OFFLINE.toString(),
+              new SegmentAssignmentConfig(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY, "memberId")))
           .build();
 
-      checkSegmentAssignmentStrategyConfig(tableConfig);
+      checkSegmentAssignmentConfig(tableConfig);
 
       // Serialize then de-serialize
       TableConfig tableConfigToCompare = JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class);
       assertEquals(tableConfigToCompare, tableConfig);
-      checkSegmentAssignmentStrategyConfig(tableConfigToCompare);
+      checkSegmentAssignmentConfig(tableConfigToCompare);
 
       tableConfigToCompare = TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfig));
       assertEquals(tableConfigToCompare, tableConfig);
-      checkSegmentAssignmentStrategyConfig(tableConfigToCompare);
+      checkSegmentAssignmentConfig(tableConfigToCompare);
     }
     {
       // With completion config
@@ -441,18 +442,27 @@ public class TableConfigSerDeUtilsTest {
     assertNull(tenantConfig.getTagOverrideConfig().getRealtimeCompleted());
   }
 
-  private void checkSegmentAssignmentStrategyConfig(TableConfig tableConfig) {
-    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
+  private void checkSegmentAssignmentConfig(TableConfig tableConfig) {
+    Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = tableConfig.getInstanceAssignmentConfigMap();
+    assertNotNull(instanceAssignmentConfigMap);
+    InstanceAssignmentConfig instanceAssignmentConfig =
+        instanceAssignmentConfigMap.get(InstancePartitionsType.OFFLINE.toString());
+    assertNotNull(instanceAssignmentConfig);
+    InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig =
+        instanceAssignmentConfig.getReplicaGroupPartitionConfig();
+    assertTrue(replicaGroupPartitionConfig.isReplicaGroupBased());
+    assertEquals(replicaGroupPartitionConfig.getNumReplicaGroups(), 2);
+    assertEquals(replicaGroupPartitionConfig.getNumPartitions(), 4);
+    assertEquals(replicaGroupPartitionConfig.getNumInstancesPerPartition(), 1);
+
     Map<String, SegmentAssignmentConfig> segmentAssignmentConfigMap = tableConfig.getSegmentAssignmentConfigMap();
     assertNotNull(segmentAssignmentConfigMap);
     SegmentAssignmentConfig segmentAssignmentConfig =
         segmentAssignmentConfigMap.get(InstancePartitionsType.OFFLINE.toString());
     assertNotNull(segmentAssignmentConfig);
-    assertEquals(segmentAssignmentConfig.getAssignmentStrategy(), "ReplicaGroupSegmentAssignmentStrategy");
-    ReplicaGroupStrategyConfig replicaGroupStrategyConfig = validationConfig.getReplicaGroupStrategyConfig();
-    assertNotNull(replicaGroupStrategyConfig);
-    assertEquals(replicaGroupStrategyConfig.getPartitionColumn(), "memberId");
-    assertEquals(replicaGroupStrategyConfig.getNumInstancesPerPartition(), 5);
+    assertEquals(segmentAssignmentConfig.getAssignmentStrategy(),
+        AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY);
+    assertEquals(segmentAssignmentConfig.getPartitionColumn(), "memberId");
   }
 
   private void checkCompletionConfig(TableConfig tableConfig) {

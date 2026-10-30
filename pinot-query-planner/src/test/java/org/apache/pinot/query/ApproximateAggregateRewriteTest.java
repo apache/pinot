@@ -18,14 +18,17 @@
  */
 package org.apache.pinot.query;
 
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.routing.MockRoutingManagerFactory;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
@@ -108,6 +111,74 @@ public class ApproximateAggregateRewriteTest extends QueryEnvironmentTestBase {
     assertTrue(subquery.contains("threshold=23"), subquery);
   }
 
+  /// The parameters are appended to the project beneath the aggregate, so the literals already in it, here the data
+  /// type argument of FIRST_WITH_TIME, are still inlined when ProjectMerge is skipped.
+  @Test
+  public void testKeepsOtherLiteralsInlinedWithoutProjectMerge() {
+    for (boolean usePhysicalOptimizer : List.of(false, true)) {
+      QueryEnvironment env = newQueryEnvironment(true, "threshold=17", "threshold=23", usePhysicalOptimizer);
+      for (String input : List.of("a", "(SELECT * FROM a UNION ALL SELECT * FROM b UNION ALL SELECT * FROM c)")) {
+        String query = "SET skipPlannerRules='ProjectMerge'; EXPLAIN PLAN FOR SELECT col2, "
+            + "FIRST_WITH_TIME(col3, ts), DISTINCTCOUNT(col1) FROM " + input + " GROUP BY col2";
+        String plan = env.compile(query, CalciteSqlParser.compileToSqlNodeAndOptions(query))
+            .explain(RANDOM_REQUEST_ID_GEN.nextLong(), null).getExplainPlan();
+        String leafAggregate = plan.lines().filter(line -> line.contains("aggType=[LEAF]")).findFirst().orElse("");
+        for (String literal : List.of("_UTF-8'INT'", "_UTF-8'threshold=17'")) {
+          assertTrue(leafAggregate.contains(literal), "Expected " + literal + " in the leaf aggregate of:\n" + plan);
+        }
+      }
+    }
+  }
+
+  @Test
+  public void testApproximateParamsKeepBranchSpecificUnionColumns() {
+    QueryEnvironment env = newQueryEnvironment(true, "threshold=17", "threshold=23");
+    String query = "EXPLAIN PLAN FOR SELECT DISTINCTCOUNT(x), COVARPOP(x, y) FROM "
+        + "(SELECT col3 x, 1.0 y FROM a UNION ALL SELECT col3, CAST(col7 AS DOUBLE) FROM b)";
+    String plan = env.compile(query, CalciteSqlParser.compileToSqlNodeAndOptions(query))
+        .explain(RANDOM_REQUEST_ID_GEN.nextLong(), null).getExplainPlan();
+    String leaf = plan.lines().filter(line -> line.contains("aggType=[LEAF]")).findFirst().orElse("");
+    assertTrue(leaf.contains("_UTF-8'threshold=17'"), plan);
+    assertFalse(leaf.contains("1.0"), plan);
+  }
+
+  /// `AggregateCaseToFilterRule` turns `COUNT(DISTINCT CASE WHEN c THEN x END)` into `COUNT(DISTINCT x) FILTER (WHERE
+  /// c)`, so the rows that fail `c` add nothing to the count. It only matches a single-argument call, so the rewrite
+  /// has to run after it: with the parameters appended first, the CASE stays and its NULL counts as one more value.
+  @Test
+  public void testKeepsCaseToFilterConversion() {
+    QueryEnvironment exactEnv = newQueryEnvironment(false, "", "");
+    QueryEnvironment approximateEnv = newQueryEnvironment(true, "", "");
+    QueryEnvironment approximateWithParamsEnv = newQueryEnvironment(true, "threshold=17", "");
+    QueryEnvironment physicalOptimizerEnv = newQueryEnvironment(true, "threshold=17", "", true);
+    for (String query : List.of(
+        "SELECT COUNT(DISTINCT CASE WHEN col3 > 0 THEN col1 ELSE NULL END) FROM a",
+        "SELECT col2, COUNT(DISTINCT CASE WHEN col3 > 0 THEN col1 ELSE NULL END) FROM a GROUP BY col2",
+        "SELECT DISTINCTCOUNT(CASE WHEN col3 > 0 THEN col1 ELSE NULL END) FROM a",
+        "SELECT col2, DISTINCTCOUNT(CASE WHEN col3 > 0 THEN col1 END) FROM a GROUP BY col2",
+        // An explicit FILTER is combined with the CASE condition, and must survive the rewrite too.
+        "SELECT COUNT(DISTINCT CASE WHEN col3 > 0 THEN col1 END) FILTER (WHERE col2 = 'x') FROM a")) {
+      String exact = explain(exactEnv, query);
+      assertFilteredWithoutCase(exact);
+
+      // Without parameters the only difference from the exact plan is the function name.
+      String approximate = explain(approximateEnv, query);
+      assertRewritten(approximate, "distinctcountsmarthll");
+      assertEquals(approximate.replace("DISTINCTCOUNTSMARTHLL", "DISTINCTCOUNT"), exact);
+
+      // This is the case that kept the CASE, because the parameter makes it a two-argument call.
+      String approximateWithParams = explain(approximateWithParamsEnv, query);
+      assertRewritten(approximateWithParams, "distinctcountsmarthll");
+      assertTrue(approximateWithParams.contains("threshold=17"), approximateWithParams);
+      assertFilteredWithoutCase(approximateWithParams);
+
+      String physicalOptimizer = explain(physicalOptimizerEnv, query);
+      assertRewritten(physicalOptimizer, "distinctcountsmarthll");
+      assertTrue(physicalOptimizer.contains("threshold=17"), physicalOptimizer);
+      assertFilteredWithoutCase(physicalOptimizer);
+    }
+  }
+
   /// The physical optimizer splits aggregates in its own rule, which also keys the leaf-to-final intermediate format
   /// off the function name, so the rewrite has to hold on that path too.
   @Test
@@ -128,6 +199,11 @@ public class ApproximateAggregateRewriteTest extends QueryEnvironmentTestBase {
 
   private static void assertNotRewritten(String plan) {
     assertFalse(plan.toLowerCase().contains("smart"), "Unexpected rewrite in:\n" + plan);
+  }
+
+  private static void assertFilteredWithoutCase(String plan) {
+    assertTrue(plan.contains(") FILTER $"), "Expected a filtered aggregate in:\n" + plan);
+    assertFalse(plan.contains("CASE"), "Expected the CASE to be converted to a filter in:\n" + plan);
   }
 
   private static String explain(QueryEnvironment env, String query) {

@@ -18,14 +18,10 @@
  */
 package org.apache.pinot.core.query.aggregation.function.funnel;
 
-import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
 import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
-import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
-import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -76,24 +72,24 @@ public class FunnelFinalResultTest {
         {new FunnelMaxStepAggregationFunction(arguments, true), events(0), events(1), 1, 2},
         {new FunnelCompleteCountAggregationFunction(arguments, true), events(0), events(1), 0, 1},
         {new FunnelMatchStepAggregationFunction(arguments, true), events(0), events(1),
-            IntArrayList.wrap(new int[]{1, 0}), IntArrayList.wrap(new int[]{1, 1})},
+            new int[]{1, 0}, new int[]{1, 1}},
         {new FunnelStepDurationStatsAggregationFunction(durationArguments, true), events(0), events(1),
-            DoubleArrayList.wrap(new double[]{1, 0}), DoubleArrayList.wrap(new double[]{1, 1})},
+            new double[]{1, 0}, new double[]{1, 1}},
         {new FunnelEventsFunctionEvalAggregationFunction(eventsArguments, true), eventsWithExtraFields(0),
-            eventsWithExtraFields(1), new ObjectArrayList<>(List.of("0")), new ObjectArrayList<>(List.of("1, 0"))},
+            eventsWithExtraFields(1), new String[]{"0"}, new String[]{"1, 0"}},
         {new FunnelCountAggregationFunctionFactory(countArguments, true).get(),
             List.of(RoaringBitmap.bitmapOf(1), RoaringBitmap.bitmapOf(2)),
             List.of(RoaringBitmap.bitmapOf(2), RoaringBitmap.bitmapOf(1)),
-            LongArrayList.wrap(new long[]{1, 0}), LongArrayList.wrap(new long[]{2, 2})},
+            new long[]{1, 0}, new long[]{2, 2}},
         {new FunnelCountAggregationFunctionFactory(setArguments, true).get(),
             List.of(new HashSet<>(List.of(1)), new HashSet<>(List.of(2))),
             List.of(new HashSet<>(List.of(2)), new HashSet<>(List.of(1))),
-            LongArrayList.wrap(new long[]{1, 0}), LongArrayList.wrap(new long[]{2, 2})}
+            new long[]{1, 0}, new long[]{2, 2}}
     };
   }
 
   @Test(dataProvider = "funnels")
-  public <I, F extends Comparable<?>> void testFinalExtractionPreservesIntermediateResult(
+  public <I, F> void testFinalExtractionPreservesIntermediateResult(
       AggregationFunction<I, F> function,
       I intermediateResult, I otherIntermediateResult, F expectedPartialResult, F expectedMergedResult) {
     assertEquals(function.extractFinalResult(intermediateResult), expectedPartialResult);
@@ -103,17 +99,31 @@ public class FunnelFinalResultTest {
   }
 
   @Test
+  public void testFunnelEventsFunctionEvalFinalResultMerge() {
+    FunnelEventsFunctionEvalAggregationFunction function = new FunnelEventsFunctionEvalAggregationFunction(List.of(
+        ExpressionContext.forIdentifier("ts"), ExpressionContext.forLiteral(Literal.longValue(1000)),
+        ExpressionContext.forLiteral(Literal.intValue(2)), ExpressionContext.forIdentifier("step0"),
+        ExpressionContext.forIdentifier("step1"), ExpressionContext.forLiteral(Literal.intValue(0))), true);
+    String[] twoFunnels = {"2, 1, 2", "a", "b", "c"};
+    String[] oneFunnel = {"1, 2", "d", "e"};
+    assertEquals(function.mergeFinalResult(twoFunnels, oneFunnel),
+        new String[]{"3, 1, 2, 2", "a", "b", "c", "d", "e"});
+    assertEquals(function.mergeFinalResult(oneFunnel, new String[]{"0"}), oneFunnel);
+    assertEquals(function.mergeFinalResult(new String[0], oneFunnel), oneFunnel);
+  }
+
+  @Test
   public void testBitmapFinalExtractionAvoidsUnnecessaryCopies() {
     RoaringBitmap firstStep = mock(RoaringBitmap.class);
     when(firstStep.getCardinality()).thenReturn(1_000_000);
     when(firstStep.clone()).thenThrow(new AssertionError("First-step population must not be copied"));
     assertEquals(new BitmapMergeStrategy(1).extractFinalResult(List.of(firstStep)),
-        LongArrayList.wrap(new long[]{1_000_000}));
+        new long[]{1_000_000});
     assertEquals(new BitmapMergeStrategy(3).extractFinalResult(
         List.of(firstStep, new RoaringBitmap(), RoaringBitmap.bitmapOf(2))),
-        LongArrayList.wrap(new long[]{1_000_000, 0, 0}));
+        new long[]{1_000_000, 0, 0});
     assertEquals(new BitmapMergeStrategy(2).extractFinalResult(List.of(new RoaringBitmap(), firstStep)),
-        LongArrayList.wrap(new long[]{0, 0}));
+        new long[]{0, 0});
     verify(firstStep, never()).clone();
   }
 
@@ -125,7 +135,7 @@ public class FunnelFinalResultTest {
         RoaringBitmap.bitmapOf(3, 4), RoaringBitmap.bitmapOf(5, 6), laterStep);
     int[][] originalSteps = steps.subList(0, 4).stream().map(RoaringBitmap::toArray).toArray(int[][]::new);
     BitmapMergeStrategy strategy = new BitmapMergeStrategy(5);
-    LongArrayList expectedCounts = LongArrayList.wrap(new long[]{3, 2, 1, 0, 0});
+    long[] expectedCounts = {3, 2, 1, 0, 0};
     assertEquals(strategy.extractFinalResult(steps), expectedCounts);
     assertEquals(strategy.extractFinalResult(steps), expectedCounts);
     for (int i = 0; i < originalSteps.length; i++) {
@@ -141,11 +151,11 @@ public class FunnelFinalResultTest {
     when(firstStep.contains(2)).thenReturn(true);
     when(firstStep.iterator()).thenThrow(new AssertionError("Large first-step population must not be traversed"));
     assertEquals(new SetMergeStrategy(1).extractFinalResult(List.of(firstStep)),
-        LongArrayList.wrap(new long[]{1_000_000}));
+        new long[]{1_000_000});
     assertEquals(new SetMergeStrategy(3).extractFinalResult(List.of(firstStep, Set.of(), Set.of(2))),
-        LongArrayList.wrap(new long[]{1_000_000, 0, 0}));
+        new long[]{1_000_000, 0, 0});
     assertEquals(new SetMergeStrategy(3).extractFinalResult(List.of(firstStep, Set.of(2, 3), Set.of(2, 4, 5))),
-        LongArrayList.wrap(new long[]{1_000_000, 1, 1}));
+        new long[]{1_000_000, 1, 1});
     verify(firstStep, never()).iterator();
     verify(firstStep, never()).toArray();
   }
@@ -175,8 +185,8 @@ public class FunnelFinalResultTest {
   public void testSetFinalExtractionPreservesStepPopulations(List<Set> steps, long[] expectedCounts) {
     Object[][] originalSteps = steps.stream().map(Set::toArray).toArray(Object[][]::new);
     SetMergeStrategy strategy = new SetMergeStrategy(3);
-    assertEquals(strategy.extractFinalResult(steps), LongArrayList.wrap(expectedCounts));
-    assertEquals(strategy.extractFinalResult(steps), LongArrayList.wrap(expectedCounts));
+    assertEquals(strategy.extractFinalResult(steps), expectedCounts);
+    assertEquals(strategy.extractFinalResult(steps), expectedCounts);
     for (int i = 0; i < steps.size(); i++) {
       assertEquals(steps.get(i).toArray(), originalSteps[i]);
     }

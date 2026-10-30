@@ -24,7 +24,17 @@ def expected = [
     "simple-assembly/commons-lang3-${commonslang3_version}.jar"
 ] as Set
 
-def entries = new File(basedir,'target/simple-assembly-0.0.1-SNAPSHOT-plugin.zip').with {
+def zip = new File(basedir, 'target/simple-assembly-0.0.1-SNAPSHOT-plugin.zip')
+if (!zip.isFile()) {
+  // The invoker runs this script even when the IT build itself failed, and the exception thrown here then replaces
+  // the invoker's own "build exited with code N" message in the console. Include the end of the IT build log so that
+  // the console shows the real error instead of just a missing-file exception.
+  def buildLog = new File(basedir, 'build.log')
+  def logTail = buildLog.isFile() ? buildLog.readLines().takeRight(100).join('\n') : '(no build.log found)'
+  throw new AssertionError("${zip} was not produced; end of ${buildLog}:\n${logTail}" as String)
+}
+
+def entries = zip.with {
   f ->
     def archive = new ZipFile(f)
     def result = archive.entries().findAll{ !it.directory }.collect { it.name } as Set

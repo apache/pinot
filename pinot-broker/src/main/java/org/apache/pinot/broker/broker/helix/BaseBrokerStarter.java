@@ -231,6 +231,14 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     // Remove all white-spaces from the list of zkServers (if any).
     _zkServers = brokerConf.getProperty(Helix.CONFIG_OF_ZOOKEEPER_SERVER).replaceAll("\\s+", "");
     _clusterName = brokerConf.getProperty(Helix.CONFIG_OF_CLUSTER_NAME);
+    // Keep the component fallback separate from cluster values: the live listeners apply the cluster override and
+    // must restore this value when that override is removed, including when it was already present at startup.
+    _brokerConf.setProperty(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_FINGERPRINTING,
+        _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_FINGERPRINTING,
+            Broker.DEFAULT_BROKER_ENABLE_QUERY_FINGERPRINTING));
+    _brokerConf.setProperty(Broker.CONFIG_OF_BROKER_QUERY_INFER_ANY_VALUE_TYPE,
+        _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_QUERY_INFER_ANY_VALUE_TYPE,
+            Broker.DEFAULT_BROKER_QUERY_INFER_ANY_VALUE_TYPE));
     ServiceStartableUtils.applyClusterConfig(_brokerConf, _zkServers, _clusterName, ServiceRole.BROKER);
     applyCustomConfigs(brokerConf);
     TableSamplerFactory.init(_brokerConf.subset(CommonConstants.Broker.TABLE_SAMPLER_CONFIG_PREFIX));
@@ -585,8 +593,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
               _threadAccountant, multiClusterRoutingContext, workerManager, multiClusterWorkerManager,
               _serverRoutingStatsManager);
       MultiStageBrokerRequestHandler finalHandler = multiStageBrokerRequestHandler;
-      _routingManager.setServerReenableCallback(
-          serverInstance -> finalHandler.getQueryDispatcher().resetClientConnectionBackoff(serverInstance));
+      _routingManager.setServerEnabledCallback(
+          serverInstance -> finalHandler.getQueryDispatcher().onServerEnabled(serverInstance));
       // Lets an operator turn the proto segment list encoding on and off through cluster config, without a restart.
       _clusterConfigChangeHandler.registerClusterConfigChangeListener(
           multiStageBrokerRequestHandler.getQueryDispatcher());
@@ -656,15 +664,22 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _brokerRequestHandler =
         new BrokerRequestHandlerDelegate(singleStageBrokerRequestHandler, multiStageBrokerRequestHandler,
             timeSeriesRequestHandler, _responseStore);
-    // Lets the approximate-function rewrite defaults be changed from the cluster config without a broker restart.
+    // Lets the approximate-function rewrite and inferAnyValueType defaults be changed from the cluster config without a
+    // broker restart.
     // Registering here is a no-op in itself, because the cluster config handler is not wired to Helix yet, so the
     // snapshot it hands the listener is empty. The real values arrive from that handler's first Helix callback,
     // which is set up below and still runs before the broker starts serving traffic.
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(
         singleStageBrokerRequestHandler.getApproximateFunctionOverrideProvider());
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(singleStageBrokerRequestHandler);
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(
+        singleStageBrokerRequestHandler.getInferAnyValueTypeProvider());
     if (multiStageBrokerRequestHandler != null) {
       _clusterConfigChangeHandler.registerClusterConfigChangeListener(
           multiStageBrokerRequestHandler.getApproximateFunctionOverrideProvider());
+      _clusterConfigChangeHandler.registerClusterConfigChangeListener(multiStageBrokerRequestHandler);
+      _clusterConfigChangeHandler.registerClusterConfigChangeListener(
+          multiStageBrokerRequestHandler.getInferAnyValueTypeProvider());
     }
     _brokerRequestHandler.start();
 

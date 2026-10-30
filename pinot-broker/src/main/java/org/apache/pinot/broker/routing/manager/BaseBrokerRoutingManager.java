@@ -145,7 +145,7 @@ public abstract class BaseBrokerRoutingManager
   private final long _newSegmentExpirationMs;
   private final ExecutorService _executorService;
   @Nullable
-  private Consumer<ServerInstance> _serverReenableCallback;
+  private Consumer<ServerInstance> _serverEnabledCallback;
 
   // Providers of extra per-table segment ZK metadata fetch listeners, registered alongside the built-in segment
   // pruners on every table's routing entry. Each provider is invoked once per table (with the table name with type)
@@ -235,10 +235,11 @@ public abstract class BaseBrokerRoutingManager
     return _partitionPruningPreparationThreshold;
   }
 
-  /// Sets a callback to be invoked when a server is re-enabled after being excluded.
-  /// This is useful for resetting gRPC channel state to avoid exponential backoff delays.
-  public void setServerReenableCallback(Consumer<ServerInstance> callback) {
-    _serverReenableCallback = callback;
+  /// Sets a callback to be invoked when a server becomes routable: when it starts, and when it is enabled again after
+  /// it was disabled (for example while it restarted) or excluded. This is useful for resetting gRPC channel state to
+  /// avoid exponential backoff delays and connections to a stale address.
+  public void setServerEnabledCallback(Consumer<ServerInstance> callback) {
+    _serverEnabledCallback = callback;
   }
 
   /// Registers a provider of an extra [SegmentZkMetadataFetchListener] that is attached to every table's routing
@@ -466,12 +467,12 @@ public abstract class BaseBrokerRoutingManager
             // NOTE: Remove new enabled server from excluded servers because the server is likely being restarted
             if (_excludedServers.remove(instanceId)) {
               LOGGER.info("Got excluded server: {} re-enabled, including it into the routing", instanceId);
-              // We clear any GRPC channel reconnection backoff in this callback when a server is re-enabled. Otherwise,
-              // MSE queries to this server may fail fast until the next backoff retry succeeds.
-              if (_serverReenableCallback != null) {
-                LOGGER.info("Calling server re-enable callback for server: {}", instanceId);
-                _serverReenableCallback.accept(serverInstance);
-              }
+            }
+            // The server likely restarted, possibly at a new address. The callback refreshes the GRPC channel to it:
+            // it clears any reconnection backoff, without which MSE queries to this server may fail fast until the
+            // next backoff retry succeeds, and it makes the channel resolve the hostname again.
+            if (_serverEnabledCallback != null) {
+              _serverEnabledCallback.accept(serverInstance);
             }
           }
         }
@@ -486,21 +487,14 @@ public abstract class BaseBrokerRoutingManager
       }
     }
 
-    // Calculate the routable servers and the changed routable servers
+    // Calculate the routable servers and the changed servers
+    // NOTE: All new enabled servers are routable because they are removed from the excluded servers above. All new
+    //       disabled servers are counted as changed, even excluded ones whose routing does not change, so that the
+    //       early termination below cannot skip removing them from _enabledServerInstanceMap.
     List<String> changedServers = new ArrayList<>(newEnabledServers.size() + newDisabledServers.size());
-    if (_excludedServers.isEmpty()) {
-      changedServers.addAll(newEnabledServers);
-      changedServers.addAll(newDisabledServers);
-    } else {
-      enabledServers.removeAll(_excludedServers);
-      // NOTE: All new enabled servers are routable
-      changedServers.addAll(newEnabledServers);
-      for (String newDisabledServer : newDisabledServers) {
-        if (_excludedServers.contains(newDisabledServer)) {
-          changedServers.add(newDisabledServer);
-        }
-      }
-    }
+    changedServers.addAll(newEnabledServers);
+    changedServers.addAll(newDisabledServers);
+    enabledServers.removeAll(_excludedServers);
     _routableServerInstanceMap = buildRoutableServerInstanceMap(enabledServers);
     long calculateChangedServersEndTimeMs = System.currentTimeMillis();
 

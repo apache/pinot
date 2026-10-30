@@ -25,7 +25,6 @@ import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
-import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -34,6 +33,7 @@ import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
+import org.apache.pinot.spi.config.table.assignment.SegmentAssignmentConfig;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
@@ -127,10 +127,11 @@ public class SegmentValidationUtilsTest {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(RAW_TABLE_NAME)
         .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
-        .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(PARTITION_COLUMN, 1))
         .setSegmentPartitionConfig(new SegmentPartitionConfig(Map.of(PARTITION_COLUMN,
             new ColumnPartitionConfig("Murmur", NUM_PARTITIONS), "otherPartitionColumn",
             new ColumnPartitionConfig("Modulo", NUM_PARTITIONS))))
+        .setSegmentAssignmentConfigMap(Map.of(InstancePartitionsType.OFFLINE.name(),
+            new SegmentAssignmentConfig(null, PARTITION_COLUMN)))
         .build();
 
     SegmentValidationUtils.validateUpsertSegmentPartitionMetadata(mockSegmentMetadata(Set.of(1)), tableConfig);
@@ -140,7 +141,8 @@ public class SegmentValidationUtilsTest {
     return new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(RAW_TABLE_NAME)
         .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
-        .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(PARTITION_COLUMN, 1))
+        .setSegmentAssignmentConfigMap(Map.of(InstancePartitionsType.OFFLINE.name(),
+            new SegmentAssignmentConfig(null, PARTITION_COLUMN)))
         .build();
   }
 

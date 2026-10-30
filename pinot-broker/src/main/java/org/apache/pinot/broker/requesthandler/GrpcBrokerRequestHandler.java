@@ -208,9 +208,11 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
   private FailureDetector.ServerState retryUnhealthyServer(String instanceId) {
     LOGGER.info("Checking gRPC connection to unhealthy server: {}", instanceId);
     ServerInstance serverInstance = _routingManager.getEnabledServerInstanceMap().get(instanceId);
+    // Not an enabled server of the routing manager, for example a disabled server or a server of a remote cluster.
+    // Leave it to the other retriers.
     if (serverInstance == null) {
       LOGGER.info("Failed to find enabled server: {} in routing manager, skipping the retry", instanceId);
-      return FailureDetector.ServerState.UNHEALTHY;
+      return FailureDetector.ServerState.UNKNOWN;
     }
 
     String hostnamePort = String.format("%s_%d", serverInstance.getHostname(), serverInstance.getGrpcPort());

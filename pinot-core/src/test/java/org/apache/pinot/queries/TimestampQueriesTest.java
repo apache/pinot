@@ -24,30 +24,46 @@ import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
+import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.TimestampConfig;
+import org.apache.pinot.spi.config.table.TimestampIndexGranularity;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 /// Queries test for TIMESTAMP data type.
@@ -66,6 +82,7 @@ public class TimestampQueriesTest extends BaseQueriesTest {
       new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
 
   private IndexSegment _indexSegment;
+  private IndexSegment _timestampIndexedSegment;
   private List<IndexSegment> _indexSegments;
 
   @Override
@@ -115,6 +132,58 @@ public class TimestampQueriesTest extends BaseQueriesTest {
     ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.mmap);
     _indexSegment = immutableSegment;
     _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
+
+    TableConfig indexedConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setFieldConfigList(List.of(new FieldConfig.Builder(TIMESTAMP_COLUMN).withTimestampConfig(
+            new TimestampConfig(List.of(TimestampIndexGranularity.DAY))).build())).build();
+    Schema indexedSchema = new Schema.SchemaBuilder()
+        .addDateTime(TIMESTAMP_COLUMN, DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
+    SegmentGeneratorConfig indexedGenerator = new SegmentGeneratorConfig(indexedConfig, indexedSchema);
+    indexedGenerator.setSegmentName(SEGMENT_NAME + "_indexed");
+    indexedGenerator.setOutDir(INDEX_DIR.getPath());
+    List<GenericRow> indexedRecords = new ArrayList<>(NUM_RECORDS);
+    for (int i = 0; i < NUM_RECORDS; i++) {
+      GenericRow indexedRecord = new GenericRow();
+      indexedRecord.putValue(TIMESTAMP_COLUMN, BASE_TIMESTAMP + i);
+      indexedRecords.add(indexedRecord);
+    }
+    SegmentIndexCreationDriverImpl indexedDriver = new SegmentIndexCreationDriverImpl();
+    indexedDriver.init(indexedGenerator, new GenericRowRecordReader(indexedRecords));
+    indexedDriver.build();
+    _timestampIndexedSegment =
+        ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME + "_indexed"), ReadMode.mmap);
+  }
+
+  @DataProvider
+  public Object[][] timestampIndexSegmentOrders() {
+    return new Object[][]{{false, false}, {true, false}, {false, true}, {true, true}};
+  }
+
+  @Test(dataProvider = "timestampIndexSegmentOrders")
+  public void testTimestampAggregationWithPrefetch(boolean reversed, boolean allIndexed)
+      throws Exception {
+    String expression = "DATETRUNC('DAY', " + TIMESTAMP_COLUMN + ", 'MILLISECONDS')";
+    String derived = "$" + TIMESTAMP_COLUMN + "$DAY";
+    assertTrue(_timestampIndexedSegment.getColumnNames().contains(derived));
+    PinotQuery query = CalciteSqlParser.compileToPinotQuery(
+        "SELECT DISTINCTCOUNT(" + expression + "), COUNT(*) FROM " + RAW_TABLE_NAME);
+    query.setExpressionOverrideHints(Map.of(CalciteSqlParser.compileToExpression(expression),
+        RequestUtils.getIdentifierExpression(derived)));
+    QueryContext context = QueryContextConverterUtils.getQueryContext(query);
+    context.setEnablePrefetch(true);
+    context.setServerReturnFinalResult(true);
+    context.setEndTimeMs(System.currentTimeMillis() + 30_000);
+    IndexSegment second = allIndexed ? _timestampIndexedSegment : _indexSegment;
+    List<SegmentContext> segments = reversed
+        ? List.of(new SegmentContext(second), new SegmentContext(_timestampIndexedSegment))
+        : List.of(new SegmentContext(_timestampIndexedSegment), new SegmentContext(second));
+    try (QueryThreadContext ignored = QueryThreadContext.openForSseTest()) {
+      InstanceResponseBlock result =
+          new InstancePlanMakerImplV2().makeInstancePlan(segments, context, EXECUTOR_SERVICE).execute();
+      assertEquals(((Number) result.getRows().get(0)[0]).longValue(), 1L);
+      assertEquals(((Number) result.getRows().get(0)[1]).longValue(), 2L * NUM_RECORDS);
+    }
+    assertEquals(context.getColumns(), allIndexed ? Set.of(derived) : Set.of(TIMESTAMP_COLUMN));
   }
 
   @Test
@@ -238,6 +307,7 @@ public class TimestampQueriesTest extends BaseQueriesTest {
   public void tearDown()
       throws IOException {
     _indexSegment.destroy();
+    _timestampIndexedSegment.destroy();
     FileUtils.deleteDirectory(INDEX_DIR);
   }
 }

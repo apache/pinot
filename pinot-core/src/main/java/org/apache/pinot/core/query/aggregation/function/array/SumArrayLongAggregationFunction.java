@@ -24,6 +24,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.utils.ArrayListUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
@@ -36,7 +37,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
 public class SumArrayLongAggregationFunction
-    extends BaseSingleInputAggregationFunction<LongArrayList, LongArrayList> {
+    extends BaseSingleInputAggregationFunction<LongArrayList, long[]> {
 
   public SumArrayLongAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
     super(verifySingleArgument(arguments, "SUM_ARRAY"), nullHandlingEnabled);
@@ -173,7 +174,7 @@ public class SumArrayLongAggregationFunction
 
   @Nullable
   @Override
-  public LongArrayList extractFinalResult(@Nullable LongArrayList result) {
-    return result;
+  public long[] extractFinalResult(@Nullable LongArrayList result) {
+    return result != null ? ArrayListUtils.toLongArray(result) : null;
   }
 }

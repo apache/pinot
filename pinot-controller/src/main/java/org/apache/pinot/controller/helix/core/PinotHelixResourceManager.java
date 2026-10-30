@@ -51,6 +51,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -91,9 +92,12 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.helix.zookeeper.impl.client.ZkClient;
+import org.apache.helix.zookeeper.zkclient.exception.ZkException;
+import org.apache.helix.zookeeper.zkclient.exception.ZkNoNodeException;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
+import org.apache.pinot.common.assignment.PartitionAssignmentUtils;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.config.provider.ZkTableCache;
@@ -211,6 +215,8 @@ import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.apache.pinot.spi.utils.retry.RetryPolicy;
+import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.Op;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -221,6 +227,7 @@ public class PinotHelixResourceManager {
   private static final long CACHE_ENTRY_EXPIRE_TIME_HOURS = 6L;
   private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 2.0f);
   private static final int DEFAULT_SEGMENT_LINEAGE_UPDATE_NUM_RETRY = 5;
+  private static final int MAX_SEGMENT_ZK_METADATA_REMOVAL_ATTEMPTS = 5;
   public static final String APPEND = "APPEND";
   private static final int DEFAULT_LINEAGE_UPDATER_LOCKERS_SIZE = 500;
   private static final String API_REQUEST_ID_PREFIX = "api-";
@@ -624,29 +631,34 @@ public class PinotHelixResourceManager {
 
     InstanceConfigValidatorRegistry.validate(newInstance);
 
-    // Asymmetric preservation of the operational `queriesDisabled` flag managed by
-    // PUT /instances/{name}/state?state=QUERIES_DISABLE|QUERIES_ENABLE (see #setQueriesDisabled):
-    //   - body=true  -> set true (legacy path; explicit operator intent in this request).
-    //   - body=false -> if live==true, preserve true (the clobber case: a generic update to
-    //                   host/tags/ports must NOT silently re-route queries to a server an
-    //                   operator has explicitly removed from routing).
-    //   - body=false + live!=true -> leave as is (no-op / cleared).
-    boolean liveQueriesDisabled =
-        Boolean.parseBoolean(instanceConfig.getRecord().getSimpleField(CommonConstants.Helix.QUERIES_DISABLED));
-
     List<String> newTags = newInstance.getTags();
     List<String> oldTags = instanceConfig.getTags();
-    InstanceUtils.updateHelixInstanceConfig(instanceConfig, newInstance);
-    // If the live record had queriesDisabled=true but the request body defaulted it to false,
-    // restore the operational flag so it survives a request-body-driven update.
-    if (liveQueriesDisabled && !newInstance.isQueriesDisabled()) {
-      instanceConfig.getRecord().setSimpleField(CommonConstants.Helix.QUERIES_DISABLED, Boolean.TRUE.toString());
+    // Apply request-owned fields to the latest Helix record. A participant can update its
+    // own fields (for example pinotVersion and capabilities) after the read above but before
+    // this write. A full-record setProperty would overwrite those newer values; updateProperty
+    // runs this updater against the current record and preserves fields not changed here.
+    AtomicBoolean preservedQueriesDisabled = new AtomicBoolean();
+    boolean updated = _helixDataAccessor.updateProperty(_keyBuilder.instanceConfig(instanceId), record -> {
+      InstanceConfig currentConfig = new InstanceConfig(record);
+      boolean liveQueriesDisabled =
+          Boolean.parseBoolean(record.getSimpleField(CommonConstants.Helix.QUERIES_DISABLED));
+      InstanceUtils.updateHelixInstanceConfig(currentConfig, newInstance);
+      // Preserve the operator-controlled flag when the request body supplies its default false.
+      // An explicit true in the request remains supported for the legacy update path.
+      boolean shouldPreserveQueriesDisabled = liveQueriesDisabled && !newInstance.isQueriesDisabled();
+      if (shouldPreserveQueriesDisabled) {
+        currentConfig.getRecord().setSimpleField(CommonConstants.Helix.QUERIES_DISABLED, Boolean.TRUE.toString());
+      }
+      preservedQueriesDisabled.set(shouldPreserveQueriesDisabled);
+      return currentConfig.getRecord();
+    }, instanceConfig);
+    if (!updated) {
+      throw new RuntimeException("Failed to update instance config for instance: " + instanceId);
+    }
+    if (preservedQueriesDisabled.get()) {
       LOGGER.warn("Ignoring request body's queriesDisabled=false for instance: {} because the live config has "
               + "queriesDisabled=true; use PUT /instances/{}/state?state=QUERIES_ENABLE to clear the flag.", instanceId,
           instanceId);
-    }
-    if (!_helixDataAccessor.setProperty(_keyBuilder.instanceConfig(instanceId), instanceConfig)) {
-      throw new RuntimeException("Failed to set instance config for instance: " + instanceId);
     }
 
     // Update broker resource if necessary
@@ -1521,6 +1533,10 @@ public class PinotHelixResourceManager {
           }
         }
       }
+      // The instances of the partition assignment are in use although they might host no segment
+      if (CollectionUtils.containsAny(taggedInstances, PartitionAssignmentUtils.getAllInstances(tableIdealState))) {
+        return false;
+      }
     }
     return true;
   }
@@ -2278,6 +2294,90 @@ public class PinotHelixResourceManager {
     }
   }
 
+  /// Removes the ZK metadata of the given segments that are IN_PROGRESS and not in the IdealState of the table, i.e.
+  /// new consuming segments that were not added to the IdealState, and returns the segments whose ZK metadata was
+  /// removed.
+  ///
+  /// The removal is submitted in one ZK `multi()` transaction with version-checked deletes of the segment ZK metadata
+  /// read here, and a version-checked write of the unchanged IdealState:
+  /// - An IdealState update that read the IdealState before the transaction fails its version check. An updater that
+  ///   reads the segment ZK metadata again when it retries, like the one of RealtimeSegmentValidationManager, then no
+  ///   longer finds the removed segments.
+  /// - If the IdealState, or the ZK metadata of one of the segments, is updated after it was read here, the transaction
+  ///   fails and is retried.
+  ///
+  /// The data versions cannot tell a segment ZK metadata deleted and recreated with the same name since it was read,
+  /// e.g. by an upload under the same name, from the one that was read. As the IdealState is outside the property
+  /// store, the transaction uses the multi-write ZkClient directly instead of [ZkMultiWriteBuilder].
+  public Set<String> removeInProgressSegmentsZKMetadataNotInIdealState(String tableNameWithType,
+      Collection<String> segmentNames) {
+    return removeInProgressSegmentsZKMetadataNotInIdealState(tableNameWithType, segmentNames, () -> {
+    });
+  }
+
+  /// @param afterRead Runs after reading the IdealState and the segment ZK metadata, before removing it
+  @VisibleForTesting
+  Set<String> removeInProgressSegmentsZKMetadataNotInIdealState(String tableNameWithType,
+      Collection<String> segmentNames, Runnable afterRead) {
+    ZkClient zkClient = getOrBuildMultiWriteZkClient();
+    String idealStatePath = PropertyPathBuilder.idealState(_helixClusterName, tableNameWithType);
+    String propertyStoreRoot = PropertyPathBuilder.propertyStore(_helixClusterName);
+    for (int attempt = 1; ; attempt++) {
+      Stat idealStateStat = new Stat();
+      ZNRecord idealState;
+      try {
+        idealState = zkClient.readData(idealStatePath, idealStateStat);
+      } catch (ZkNoNodeException e) {
+        idealState = null;
+      }
+      if (idealState == null) {
+        // The table was deleted
+        return Set.of();
+      }
+      List<Op> segmentDeletes = new ArrayList<>();
+      Set<String> segmentsToRemove = new HashSet<>();
+      for (String segmentName : segmentNames) {
+        if (idealState.getMapFields().containsKey(segmentName)) {
+          continue;
+        }
+        String segmentPath =
+            propertyStoreRoot + ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, segmentName);
+        Stat segmentStat = new Stat();
+        ZNRecord segmentRecord;
+        try {
+          segmentRecord = zkClient.readData(segmentPath, segmentStat);
+        } catch (ZkNoNodeException e) {
+          continue;
+        }
+        if (new SegmentZKMetadata(segmentRecord).getStatus() == CommonConstants.Segment.Realtime.Status.IN_PROGRESS) {
+          segmentDeletes.add(Op.delete(segmentPath, segmentStat.getVersion()));
+          segmentsToRemove.add(segmentName);
+        }
+      }
+      if (segmentsToRemove.isEmpty()) {
+        return segmentsToRemove;
+      }
+      afterRead.run();
+      List<Op> ops = new ArrayList<>(segmentDeletes.size() + 1);
+      ops.add(Op.setData(idealStatePath, zkClient.serialize(idealState, idealStatePath), idealStateStat.getVersion()));
+      ops.addAll(segmentDeletes);
+      try {
+        zkClient.multi(ops);
+        return segmentsToRemove;
+      } catch (ZkException e) {
+        // As in ZkMultiWriteBuilder#execute(), the ZkClient wraps the KeeperException of an atomic rollback. A version
+        // mismatch or a missing node means that the IdealState or a segment ZK metadata changed concurrently.
+        boolean concurrentChange = e.getCause() instanceof KeeperException.BadVersionException
+            || e.getCause() instanceof KeeperException.NoNodeException;
+        if (!concurrentChange || attempt == MAX_SEGMENT_ZK_METADATA_REMOVAL_ATTEMPTS) {
+          throw e;
+        }
+        LOGGER.info("Retrying to remove segment ZK metadata for segments: {} of table: {} after a concurrent change",
+            segmentsToRemove, tableNameWithType);
+      }
+    }
+  }
+
   public boolean createZKNode(String path, ZNRecord record, int accessOption, long ttl) {
     return _helixDataAccessor.getBaseDataAccessor().create(path, record, accessOption, ttl);
   }
@@ -2949,8 +3049,7 @@ public class PinotHelixResourceManager {
         instancePartitionsMap = fetchOrComputeInstancePartitions(tableNameWithType, tableConfig);
       }
 
-      SegmentAssignment segmentAssignment =
-          SegmentAssignmentFactory.getSegmentAssignment(_helixZkManager, tableConfig, _controllerMetrics);
+      SegmentAssignment segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(_helixZkManager, tableConfig);
       HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, idealState -> {
         assert idealState != null;
         Map<String, Map<String, String>> currentAssignment = idealState.getRecord().getMapFields();
@@ -2959,7 +3058,7 @@ public class PinotHelixResourceManager {
               tableNameWithType);
         } else {
           List<String> assignedInstances =
-              segmentAssignment.assignSegment(segmentName, currentAssignment, instancePartitionsMap);
+              segmentAssignment.assignSegment(segmentName, idealState, instancePartitionsMap);
           LOGGER.info("Assigning segment: {} to instances: {} for table: {}", segmentName, assignedInstances,
               tableNameWithType);
           currentAssignment.put(segmentName,
@@ -3019,8 +3118,7 @@ public class PinotHelixResourceManager {
         tierToInstancePartitionsMap = null;
       }
 
-      SegmentAssignment segmentAssignment =
-          SegmentAssignmentFactory.getSegmentAssignment(_helixZkManager, tableConfig, _controllerMetrics);
+      SegmentAssignment segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(_helixZkManager, tableConfig);
       long segmentAssignmentStartMs = System.currentTimeMillis();
       HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, idealState -> {
         assert idealState != null;
@@ -3039,7 +3137,7 @@ public class PinotHelixResourceManager {
               instancePartitionsMap = tierToInstancePartitionsMap.get(segmentZKMetadata.getTier());
             }
             List<String> assignedInstances =
-                segmentAssignment.assignSegment(segmentName, currentAssignment, instancePartitionsMap);
+                segmentAssignment.assignSegment(segmentName, idealState, instancePartitionsMap);
             LOGGER.info("Assigning segment: {} to instances: {} for table: {}", segmentName, assignedInstances,
                 tableNameWithType);
             currentAssignment.put(segmentName,
@@ -4161,15 +4259,24 @@ public class PinotHelixResourceManager {
     if (!InstanceTypeUtils.isMinion(instanceName)) {
       getAllResources().forEach(resource -> {
         IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, resource);
-        for (String partition : idealState.getPartitionSet()) {
-          if (idealState.getInstanceSet(partition).contains(instanceName)) {
-            response.putIssue(OperationValidationResponse.ErrorCode.CONTAINS_RESOURCE, instanceName, resource);
-            break;
-          }
+        if (isInstanceInIdealState(idealState, instanceName)) {
+          response.putIssue(OperationValidationResponse.ErrorCode.CONTAINS_RESOURCE, instanceName, resource);
         }
       });
     }
     return response.setSafe(response.getIssues().isEmpty());
+  }
+
+  /// Returns whether the given instance is in the given IdealState: it is assigned a partition (a segment of a table),
+  /// or it is in the partition assignment of a table (see [PartitionAssignmentUtils]), whose new segments are assigned
+  /// to the instances of their partition.
+  private static boolean isInstanceInIdealState(IdealState idealState, String instanceName) {
+    for (String partition : idealState.getPartitionSet()) {
+      if (idealState.getInstanceSet(partition).contains(instanceName)) {
+        return true;
+      }
+    }
+    return PartitionAssignmentUtils.getAllInstances(idealState).contains(instanceName);
   }
 
   /// Restores previous tags for a drained minion instance if applicable.

@@ -126,9 +126,11 @@ public class TarCompressionUtilsTest {
     File archive = new File(TAR_DIR, "data" + TarCompressionUtils.TAR_LZ4_FILE_EXTENSION);
     TarCompressionUtils.createCompressedTarFile(inputFile, archive, compressorName);
     if (compressorName.equals(LZ4_FAST)) {
+      assertEquals(TarCompressionUtils.COMPRESSOR_NAME_BY_FILE_EXTENSIONS.get(
+          TarCompressionUtils.TAR_LZ4_FILE_EXTENSION), LZ4_FAST);
       File defaultArchive = new File(TAR_DIR, "default" + TarCompressionUtils.TAR_LZ4_FILE_EXTENSION);
       TarCompressionUtils.createCompressedTarFile(inputFile, defaultArchive);
-      assertEquals(Files.readAllBytes(defaultArchive.toPath()), Files.readAllBytes(archive.toPath()));
+      assertEquals(Files.readAllBytes(TarCompressionUtils.untar(defaultArchive, UNTAR_DIR).get(0).toPath()), content);
     }
 
     List<File> extractedFiles = TarCompressionUtils.untar(archive, UNTAR_DIR);

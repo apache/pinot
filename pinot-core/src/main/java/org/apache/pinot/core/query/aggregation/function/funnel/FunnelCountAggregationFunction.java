@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.aggregation.function.funnel;
 
-import it.unimi.dsi.fastutil.longs.LongArrayList;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -66,7 +65,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 ///
 /// @see FunnelCountAggregationFunctionFactory
 /// @see FunnelCountSortedAggregationFunction
-public class FunnelCountAggregationFunction<A, I> implements AggregationFunction<I, LongArrayList> {
+public class FunnelCountAggregationFunction<A, I> implements AggregationFunction<I, long[]> {
   private final List<ExpressionContext> _expressions;
   private final List<ExpressionContext> _stepExpressions;
   private final List<ExpressionContext> _correlateByExpressions;
@@ -174,19 +173,17 @@ public class FunnelCountAggregationFunction<A, I> implements AggregationFunction
   }
 
   @Override
-  public LongArrayList extractFinalResult(@Nullable I intermediateResult) {
+  public long[] extractFinalResult(@Nullable I intermediateResult) {
     if (intermediateResult == null) {
-      return LongArrayList.wrap(new long[_numSteps]);
+      return new long[_numSteps];
     }
     return _mergeStrategy.extractFinalResult(intermediateResult);
   }
 
   @Override
-  public LongArrayList mergeFinalResult(LongArrayList finalResult1, LongArrayList finalResult2) {
-    long[] elements1 = finalResult1.elements();
-    long[] elements2 = finalResult2.elements();
+  public long[] mergeFinalResult(long[] finalResult1, long[] finalResult2) {
     for (int i = 0; i < _numSteps; i++) {
-      elements1[i] += elements2[i];
+      finalResult1[i] += finalResult2[i];
     }
     return finalResult1;
   }

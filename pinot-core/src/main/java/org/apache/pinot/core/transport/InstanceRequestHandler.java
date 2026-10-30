@@ -30,7 +30,10 @@ import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.ssl.SslHandshakeCompletionEvent;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CancellationException;
@@ -48,6 +51,7 @@ import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -133,6 +137,10 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
       _serverMetrics.addMeteredGlobalValue(ServerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS, 1);
       return;
     }
+    if (instanceRequest.isPing()) {
+      sendPingResponse(ctx, instanceRequest.getRequestId());
+      return;
+    }
     ServerQueryRequest queryRequest;
     try {
       queryRequest = new ServerQueryRequest(instanceRequest, _serverMetrics, queryArrivalTimeMs);
@@ -160,13 +168,28 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     }
   }
 
+  /// Answers a broker's ping with an empty data table carrying its request id, which is all the broker waits for.
+  ///
+  /// The reply is written straight from this event loop and never goes through the query scheduler. The broker pings a
+  /// server after a query to it timed out, to ask whether the server is alive at all; a server that is merely busy must
+  /// still answer promptly, so the reply cannot wait behind queued queries.
+  private void sendPingResponse(ChannelHandlerContext ctx, long requestId) {
+    try {
+      DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
+      dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
+      ctx.writeAndFlush(Unpooled.wrappedBuffer(dataTable.toBytes()));
+    } catch (Exception e) {
+      LOGGER.warn("Failed to answer ping request: {}", requestId, e);
+    }
+  }
+
   /// Submit query for execution and register callback for execution results.
   /// If query cancellation is enabled, the query future is tracked as well.
   @VisibleForTesting
   void submitQuery(ServerQueryRequest queryRequest, ChannelHandlerContext ctx, long queryArrivalTimeMs) {
     QueryExecutionContext executionContext = queryRequest.toExecutionContext(_instanceName);
     try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, _threadAccountant)) {
-      ListenableFuture<byte[]> future = _queryScheduler.submit(queryRequest);
+      ListenableFuture<DataBuffer> future = _queryScheduler.submitResponse(queryRequest);
       if (_executionContexts != null) {
         String queryId = queryRequest.getQueryId();
         // Track the running query for cancellation.
@@ -180,11 +203,11 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     }
   }
 
-  private FutureCallback<byte[]> createCallback(ServerQueryRequest queryRequest, ChannelHandlerContext ctx,
+  private FutureCallback<DataBuffer> createCallback(ServerQueryRequest queryRequest, ChannelHandlerContext ctx,
       long queryArrivalTimeMs) {
     return new FutureCallback<>() {
       @Override
-      public void onSuccess(@Nullable byte[] responseBytes) {
+      public void onSuccess(@Nullable DataBuffer response) {
         if (_executionContexts != null) {
           String queryId = queryRequest.getQueryId();
           if (LOGGER.isDebugEnabled()) {
@@ -194,9 +217,9 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
         }
         long requestId = queryRequest.getRequestId();
         String tableNameWithType = queryRequest.getTableNameWithType();
-        if (responseBytes != null) {
-          // responseBytes contains either query results or exception.
-          sendResponse(ctx, requestId, tableNameWithType, queryArrivalTimeMs, responseBytes);
+        if (response != null) {
+          // response contains either query results or exception.
+          sendResponse(ctx, requestId, tableNameWithType, queryArrivalTimeMs, response);
         } else {
           // Send exception response.
           sendErrorResponse(ctx, requestId, tableNameWithType, queryArrivalTimeMs,
@@ -296,8 +319,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
         dataTable.addException(QueryErrorCode.QUERY_EXECUTION.getId(),
             "Query execution error on: " + _instanceName + " " + e.getMessage());
       }
-      byte[] serializedDataTable = dataTable.toBytes();
-      sendResponse(ctx, requestId, tableNameWithType, queryArrivalTimeMs, serializedDataTable);
+      sendResponse(ctx, requestId, tableNameWithType, queryArrivalTimeMs, dataTable.toDataBuffer());
     } catch (Exception exception) {
       LOGGER.error("Exception while sending query processing error to Broker.", exception);
     } finally {
@@ -310,16 +332,21 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
   }
 
   /// Send a response (either query results or exception) back to broker as response to the query request.
+  ///
+  /// The response buffers are wrapped in one composite Netty buffer without copying them.
   private void sendResponse(ChannelHandlerContext ctx, long requestId, String tableNameWithType,
-      long queryArrivalTimeMs, byte[] serializedDataTable) {
+      long queryArrivalTimeMs, DataBuffer response) {
     long sendResponseStartTimeMs = System.currentTimeMillis();
     int queryProcessingTimeMs = (int) (sendResponseStartTimeMs - queryArrivalTimeMs);
-    ctx.writeAndFlush(Unpooled.wrappedBuffer(serializedDataTable)).addListener(f -> {
+    long responseSizeBytes = response.size();
+    List<ByteBuffer> responseBuffers = new ArrayList<>();
+    response.appendAsByteBuffers(responseBuffers);
+    ctx.writeAndFlush(Unpooled.wrappedBuffer(responseBuffers.toArray(new ByteBuffer[0]))).addListener(f -> {
       if (f.isSuccess()) {
         long sendResponseEndTimeMs = System.currentTimeMillis();
         int sendResponseLatencyMs = (int) (sendResponseEndTimeMs - sendResponseStartTimeMs);
         _serverMetrics.addMeteredGlobalValue(ServerMeter.NETTY_CONNECTION_RESPONSES_SENT, 1);
-        _serverMetrics.addMeteredGlobalValue(ServerMeter.NETTY_CONNECTION_BYTES_SENT, serializedDataTable.length);
+        _serverMetrics.addMeteredGlobalValue(ServerMeter.NETTY_CONNECTION_BYTES_SENT, responseSizeBytes);
         _serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.NETTY_CONNECTION_SEND_RESPONSE_LATENCY,
             sendResponseLatencyMs, TimeUnit.MILLISECONDS);
 
@@ -329,9 +356,9 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
               "Slow query ({}): request handler processing time: {}, send response latency: {}, total time to handle "
                   + "request: {}", requestId, queryProcessingTimeMs, sendResponseLatencyMs, totalQueryTimeMs);
         }
-        if (serializedDataTable.length > LARGE_RESPONSE_SIZE_THRESHOLD_BYTES) {
+        if (responseSizeBytes > LARGE_RESPONSE_SIZE_THRESHOLD_BYTES) {
           LOGGER.warn("Large query ({}): response size in bytes: {}, table name {}", requestId,
-              serializedDataTable.length, tableNameWithType);
+              responseSizeBytes, tableNameWithType);
           _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.LARGE_QUERY_RESPONSES_SENT, 1);
         }
       } else {

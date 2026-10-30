@@ -28,13 +28,13 @@ import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
+import org.apache.pinot.spi.annotations.FunctionVolatility;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.UuidUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNotSame;
 import static org.testng.Assert.assertNull;
@@ -207,8 +207,9 @@ public class IdSetFunctionsTest {
     FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo("inidset", 2);
     assertNotNull(functionInfo);
     assertEquals(functionInfo.getMethod().getDeclaringClass(), IdSetFunctions.class);
-    // Kept out of compile-time evaluation, which passes literals as types the lookup cannot use
-    assertFalse(functionInfo.isDeterministic());
+    // Eligible for compile-time evaluation and ingestion transforms
+    assertTrue(functionInfo.isDeterministic());
+    assertEquals(functionInfo.getVolatility(), FunctionVolatility.IMMUTABLE);
     // The parameters are nullable, so the invoker passes null arguments through instead of returning null
     FunctionInvoker functionInvoker = new FunctionInvoker(functionInfo);
     assertEquals(functionInvoker.invoke(new Object[]{1, null}), Boolean.FALSE);

@@ -136,12 +136,12 @@ public class AggregateOperator extends MultiStageOperator {
 
     // Initialize the appropriate executor.
     AggregateNode.AggType aggType = node.getAggType();
-    // TODO: Allow leaf return final result for non-group-by queries
     boolean leafReturnFinalResult = node.isLeafReturnFinalResult();
     _isGroupBy = !groupKeys.isEmpty();
     if (!_isGroupBy) {
       _aggregationExecutor =
-          new MultistageAggregationExecutor(_aggFunctions, filterArgIds, maxFilterArgId, aggType, _resultSchema);
+          new MultistageAggregationExecutor(_aggFunctions, filterArgIds, maxFilterArgId, aggType, leafReturnFinalResult,
+              _resultSchema);
       _groupByExecutor = null;
     } else {
       _groupByExecutor =
@@ -272,8 +272,8 @@ public class AggregateOperator extends MultiStageOperator {
           }
         }
         if (_groupByExecutor.getNumGroups() >= _groupByExecutor.getNumGroupsWarningLimit()) {
-          LOGGER.warn("numGroups reached warning limit: {} (actual: {})",
-              _groupByExecutor.getNumGroupsWarningLimit(), _groupByExecutor.getNumGroups());
+          LOGGER.warn("numGroups reached warning limit: {} (actual: {})", _groupByExecutor.getNumGroupsWarningLimit(),
+              _groupByExecutor.getNumGroups());
           _statMap.merge(StatKey.NUM_GROUPS_WARNING_LIMIT_REACHED, true);
         }
         return dataBlock;

@@ -58,6 +58,64 @@
           [12, "d", null, null],
           [null, null, 3, "x"]
         ]
+      },
+      {
+        "description": "FULL OUTER JOIN with only non-equi condition, random left and broadcast right: one worker receives every row",
+        "sql": "SELECT /*+ joinOptions(left_distribution_type = 'random', right_distribution_type = 'broadcast') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} FULL OUTER JOIN {tbl2} ON {tbl1}.num < {tbl2}.num",
+        "outputs": [
+          [5, "a", 7, "y"],
+          [5, "a", 10, "z"],
+          [5, "a", 11, "w"],
+          [6, "b", 7, "y"],
+          [6, "b", 10, "z"],
+          [6, "b", 11, "w"],
+          [8, "c", 10, "z"],
+          [8, "c", 11, "w"],
+          [12, "d", null, null],
+          [null, null, 3, "x"]
+        ],
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "FULL OUTER JOIN with only non-equi condition, random left and random right: one worker receives every row",
+        "sql": "SELECT /*+ joinOptions(left_distribution_type = 'random', right_distribution_type = 'random') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} FULL OUTER JOIN {tbl2} ON {tbl1}.num < {tbl2}.num",
+        "outputs": [
+          [5, "a", 7, "y"],
+          [5, "a", 10, "z"],
+          [5, "a", 11, "w"],
+          [6, "b", 7, "y"],
+          [6, "b", 10, "z"],
+          [6, "b", 11, "w"],
+          [8, "c", 10, "z"],
+          [8, "c", 11, "w"],
+          [12, "d", null, null],
+          [null, null, 3, "x"]
+        ],
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "FULL OUTER JOIN with only non-equi condition, broadcast left and broadcast right: one worker receives every row",
+        "sql": "SELECT /*+ joinOptions(left_distribution_type = 'broadcast', right_distribution_type = 'broadcast') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} FULL OUTER JOIN {tbl2} ON {tbl1}.num < {tbl2}.num",
+        "outputs": [
+          [5, "a", 7, "y"],
+          [5, "a", 10, "z"],
+          [5, "a", 11, "w"],
+          [6, "b", 7, "y"],
+          [6, "b", 10, "z"],
+          [6, "b", 11, "w"],
+          [8, "c", 10, "z"],
+          [8, "c", 11, "w"],
+          [12, "d", null, null],
+          [null, null, 3, "x"]
+        ],
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "FULL OUTER JOIN with only non-equi condition cannot take a local side on its single worker",
+        "sql": "SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'local') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} FULL OUTER JOIN {tbl2} ON {tbl1}.num < {tbl2}.num",
+        "outputs": [],
+        "expectedException": ".*FULL join without equi keys runs on a single worker.*",
+        "ignoreV2Optimizer": true
       }
     ]
   }

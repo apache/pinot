@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.aggregation.function.funnel;
 
-import it.unimi.dsi.fastutil.longs.LongArrayList;
 import java.util.List;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -39,7 +38,7 @@ class BitmapMergeStrategy implements MergeStrategy<List<RoaringBitmap>> {
   }
 
   @Override
-  public LongArrayList extractFinalResult(List<RoaringBitmap> stepsBitmaps) {
+  public long[] extractFinalResult(List<RoaringBitmap> stepsBitmaps) {
     long[] result = new long[_numSteps];
     RoaringBitmap intersection = stepsBitmaps.get(0);
     result[0] = intersection.getCardinality();
@@ -55,6 +54,6 @@ class BitmapMergeStrategy implements MergeStrategy<List<RoaringBitmap>> {
       }
       result[i] = intersection.getCardinality();
     }
-    return LongArrayList.wrap(result);
+    return result;
   }
 }

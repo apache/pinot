@@ -323,7 +323,9 @@ public class GcsPinotFS extends BasePinotFS {
     checkState(!dstFile.isDirectory(), "File '%s' must not be a directory", dstFile);
     FileUtils.forceMkdir(dstFile.getParentFile());
     Blob blob = getBlob(new GcsUri(srcUri));
-    checkState(existsBlob(blob), "File '%s' does not exists", srcUri);
+    if (!existsBlob(blob)) {
+      throw new FileNotFoundException("File '" + srcUri + "' does not exist");
+    }
     blob.downloadTo(dstFile.toPath());
   }
 

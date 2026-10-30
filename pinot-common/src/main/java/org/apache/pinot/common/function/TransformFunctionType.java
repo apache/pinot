@@ -177,8 +177,7 @@ public enum TransformFunctionType {
       ReturnTypes.cascade(opBinding -> positionalComponentType(opBinding, 2), SqlTypeTransforms.FORCE_NULLABLE),
       OperandTypes.family(List.of(SqlTypeFamily.ARRAY, SqlTypeFamily.ANY, SqlTypeFamily.ARRAY))),
   // Nullable: both the transform and the scalar function return NULL for a NULL value, unless the IdSet is empty. The
-  // multi-stage planner also uses this operator for the inIdSet scalar function. This operator is deterministic and
-  // the scalar function's is not, so this one lets the planner push IN_ID_SET below joins (see IdSetFunctions).
+  // multi-stage planner also uses this operator for the inIdSet scalar function (see IdSetFunctions).
   IN_ID_SET("inIdSet", ReturnTypes.BOOLEAN_NULLABLE, OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER)),
   // Reads another table: a DELETE predicate rejects it, see DeleteStatement#CROSS_TABLE_FUNCTIONS, which lists the
   // functions by hand and must gain any new function that reads another table
@@ -305,6 +304,12 @@ public enum TransformFunctionType {
 
   public SqlOperandTypeChecker getOperandTypeChecker() {
     return _operandTypeChecker;
+  }
+
+  /// Returns whether the canonicalized function name belongs to the `jsonExtractScalar` family.
+  public static boolean isJsonExtractScalar(String canonicalName) {
+    return canonicalName.equals("jsonextractscalar") || canonicalName.equals("jsonextractscalarfast")
+        || canonicalName.equals("jsonextractscalarfirstmatch") || canonicalName.equals("jsonextractscalarfory");
   }
 
   /// Returns the optional explicit returning type specification.

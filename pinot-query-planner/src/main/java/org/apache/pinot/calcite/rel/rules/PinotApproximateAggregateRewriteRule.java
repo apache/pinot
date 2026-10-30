@@ -29,7 +29,6 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.logical.LogicalAggregate;
-import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlAggFunction;
@@ -55,6 +54,11 @@ import org.apache.pinot.spi.utils.CommonConstants.Broker.PlannerRuleNames;
 /// It must run before [PinotAggregateExchangeNodeInsertRule], which derives the leaf-to-final intermediate result
 /// format from the function name, hence `Phase.BASIC` rather than that rule's `POST_LOGICAL`. That is also why the
 /// runtime is not a valid place to do this rewrite.
+///
+/// It must also run after `AggregateCaseToFilterRule`, which only matches a single-argument call. With the parameter
+/// argument appended first, `COUNT(DISTINCT CASE WHEN c THEN x END)` keeps its CASE and counts the NULL as a value,
+/// instead of becoming `COUNT(DISTINCT x) FILTER (WHERE c)`. The rewrite keeps the call's filter, so a converted CASE
+/// carries over.
 public class PinotApproximateAggregateRewriteRule extends RelOptRule {
   public static final PinotApproximateAggregateRewriteRule INSTANCE =
       new PinotApproximateAggregateRewriteRule(PinotRuleUtils.PINOT_REL_FACTORY);
@@ -92,32 +96,26 @@ public class PinotApproximateAggregateRewriteRule extends RelOptRule {
     String percentileParams = hasPercentile ? envConfig.approximateFunctionPercentileParams() : "";
 
     // The parameters must be input fields, because an aggregate call holds field indices rather than inline literals,
-    // so they are projected underneath the aggregate. With no parameters configured the plan keeps the shape it had
-    // before, with no extra project.
+    // so they are projected underneath the aggregate. They go after the input fields, so the argument and filter
+    // indices of every call stay valid. With no parameters configured the plan keeps the shape it had before, with no
+    // extra project.
     //
-    // Invariant: this project has to stay directly beneath the aggregate. Both PinotAggregateExchangeNodeInsertRule
-    // and AggregatePushdownRule inline the literal only through findImmediateProjects(input), so anything that puts a
-    // node between them would leave the leaf with a column reference where the function expects a parameter string.
-    // Nothing in the later phases does: AggregateProjectMergeRule needs an all-input-ref project and the literals
-    // block it, and ProjectMergeRule collapses into a single project that stays adjacent.
+    // Keep literal arguments in the immediate project visible to the aggregate split rules.
     RelNode newInput = input;
     int distinctCountParamsIndex = -1;
     int percentileParamsIndex = -1;
     if (!distinctCountParams.isEmpty() || !percentileParams.isEmpty()) {
       RexBuilder rexBuilder = aggRel.getCluster().getRexBuilder();
-      List<RexNode> projects = new ArrayList<>(numInputFields + 2);
-      for (int i = 0; i < numInputFields; i++) {
-        projects.add(rexBuilder.makeInputRef(input, i));
-      }
+      List<RexNode> literals = new ArrayList<>(2);
       if (!distinctCountParams.isEmpty()) {
-        distinctCountParamsIndex = projects.size();
-        projects.add(rexBuilder.makeLiteral(distinctCountParams));
+        distinctCountParamsIndex = numInputFields + literals.size();
+        literals.add(rexBuilder.makeLiteral(distinctCountParams));
       }
       if (!percentileParams.isEmpty()) {
-        percentileParamsIndex = projects.size();
-        projects.add(rexBuilder.makeLiteral(percentileParams));
+        percentileParamsIndex = numInputFields + literals.size();
+        literals.add(rexBuilder.makeLiteral(percentileParams));
       }
-      newInput = LogicalProject.create(input, List.of(), projects, (List<String>) null);
+      newInput = PinotRuleUtils.appendAggregateLiterals(input, literals);
     }
 
     List<AggregateCall> rewrittenAggCalls = new ArrayList<>(aggRel.getAggCallList().size());

@@ -124,10 +124,9 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 ///   is not actually per-query everywhere.
 ///
 /// @param <IntermediateResult> Intermediate result generated from segment
-/// @param <FinalResult> Final result used in broker response
+/// @param <FinalResult> Final result, in the stored form of [#getFinalResultColumnType()], see [#extractFinalResult]
 @ThreadSafe
-@SuppressWarnings("rawtypes")
-public interface AggregationFunction<IntermediateResult, FinalResult extends Comparable> {
+public interface AggregationFunction<IntermediateResult, FinalResult> {
 
   /// Returns the type of the aggregation function.
   AggregationFunctionType getType();
@@ -291,9 +290,25 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
   /// This column data type is used for constructing the result table
   ColumnDataType getFinalResultColumnType();
 
+  // TODO: Make final results behave the same in SSE and MSE, and before and after transport. Each change below alters
+  //   the types on the wire or in MSE plans, so it needs a rollout gate for mixed-version clusters.
+  //   - Raw sketch functions order their STRING final results by the sketch estimate where the object is compared (SSE
+  //     group trim and reduce of intermediate results, MSE group trim), but by the serialized sketch after transport
+  //     (SSE reduce of final results, MSE sort). Return a custom object that keeps the estimate order everywhere.
+  //   - SUMPRECISION returns a STRING final result in SSE but BIG_DECIMAL in MSE, so SSE orders it as a string after
+  //     transport and cannot merge the final results of several servers. Return BIG_DECIMAL in SSE as well.
+  //   - OBJECT final results have no serialization of their own: an aggregation cannot return them from servers, and a
+  //     group-by serializes them as intermediate results.
   /// Extracts the final result used in the broker response from the given intermediate result.
   /// When final results are extracted for group-by sorting, preserve the intermediate information needed for
   /// subsequent merging and final extraction.
+  ///
+  /// The final result is the value a column of [#getFinalResultColumnType()] stores, e.g. `int[]` for `INT_ARRAY` and
+  /// `int` for `BOOLEAN`, so it can be transported, sorted and merged without conversion. Sorting compares it in the
+  /// order of the column type, see [org.apache.pinot.spi.utils.StoredValueComparator]. A `STRING` final result may
+  /// instead be an object that is stored as its [Object#toString()] and orders by its own [Comparable] implementation,
+  /// e.g. the serialized sketch of a raw sketch function, which orders by the estimate of the sketch. An `OBJECT` final
+  /// result is a custom object, which must implement [Comparable] to be sorted.
   ///
   /// A `null` intermediate result means nothing was aggregated, and this method decides what that means for this
   /// particular aggregation. It is the only place where that per-function answer is expressed, so it must never
@@ -309,7 +324,7 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
 
   /// Merges two final results, neither of which is `null`. This can be used to optimized certain functions (e.g.
   /// DISTINCT_COUNT) when data is partitioned on each server, where we may directly request servers to return final
-  /// result and merge them on broker.
+  /// result and merge them on broker. The result may be `finalResult1` itself, modified in place.
   ///
   /// Call [AggregationFunctionUtils#mergeFinalResult] instead of calling this directly, on the same terms as [#merge].
   default FinalResult mergeFinalResult(FinalResult finalResult1, FinalResult finalResult2) {

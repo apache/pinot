@@ -22,13 +22,21 @@ import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.zip.GZIPOutputStream;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationTaskRunner;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReader;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
@@ -36,6 +44,8 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.Schema.SchemaBuilder;
+import org.apache.pinot.spi.data.readers.RecordReaderConfig;
+import org.apache.pinot.spi.data.readers.RecordReaderUtils;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.batch.spec.ExecutionFrameworkSpec;
@@ -46,13 +56,133 @@ import org.apache.pinot.spi.ingestion.batch.spec.SegmentNameGeneratorSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.TableSpec;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 import static org.testng.Assert.fail;
 
 public class SegmentGenerationJobRunnerTest {
+
+  @DataProvider
+  public Object[][] localInputOwnershipCases() {
+    return new Object[][]{{false}, {true}};
+  }
+
+  @Test(dataProvider = "localInputOwnershipCases")
+  public void testLocalInputIsBorrowedAndPreserved(boolean failGeneration)
+      throws Exception {
+    File testDir = makeTestDir();
+    try {
+      File inputDir = new File(testDir, "input");
+      FileUtils.forceMkdir(inputDir);
+      File inputFile = new File(inputDir, "input with spaces.csv");
+      FileUtils.writeLines(inputFile, List.of("col1,col2", "value1,1", failGeneration ? "value2,invalid" : "value2,2"));
+      byte[] originalBytes = Files.readAllBytes(inputFile.toPath());
+      File outputDir = new File(testDir, "output");
+      SegmentGenerationJobSpec spec = makeJobSpec(inputDir, outputDir, makeSchemaFile(testDir, "mySchema"),
+          makeTableConfigFile(testDir, "mySchema"));
+      spec.setPinotFSSpecs(List.of());
+      SegmentGenerationJobRunner runner = new SegmentGenerationJobRunner(spec);
+      TrackingLocalPinotFS fileSystem = new TrackingLocalPinotFS();
+      Field inputDirFS = SegmentGenerationJobRunner.class.getDeclaredField("_inputDirFS");
+      inputDirFS.setAccessible(true);
+      inputDirFS.set(runner, fileSystem);
+      if (failGeneration) {
+        RuntimeException failure = expectThrows(RuntimeException.class, runner::run);
+        assertTrue(failure.getMessage().contains("Failed to generate Pinot segment"));
+      } else {
+        runner.run();
+        File unpacked = new File(testDir, "unpacked");
+        TarCompressionUtils.untar(new File(outputDir, "myTable_OFFLINE_0.tar.gz"), unpacked);
+        assertEquals(new SegmentMetadataImpl(new File(unpacked, "myTable_OFFLINE_0")).getTotalDocs(), 2);
+      }
+      assertTrue(fileSystem._copiedInputs.isEmpty(), "Local inputs must be borrowed without copying");
+      assertEquals(Files.readAllBytes(inputFile.toPath()), originalBytes);
+    } finally {
+      FileUtils.deleteDirectory(testDir);
+    }
+  }
+
+  @DataProvider
+  public Object[][] compressedInputOwnershipCases() {
+    return new Object[][]{{false, false}, {true, true}};
+  }
+
+  @Test(dataProvider = "compressedInputOwnershipCases")
+  public void testCompressedLocalInputPreservesSourceAndSibling(boolean gzipSuffix, boolean failGeneration)
+      throws Exception {
+    File testDir = makeTestDir();
+    try {
+      File inputDir = new File(testDir, "input");
+      FileUtils.forceMkdir(inputDir);
+      String inputName = gzipSuffix ? "input.csv.gz" : "compressed-input";
+      File inputFile = new File(inputDir, inputName);
+      File sibling = new File(inputDir, gzipSuffix ? "input.csv" : "compressed-input.csv");
+      byte[] sentinel = "preserve the existing source sibling".getBytes(StandardCharsets.UTF_8);
+      Files.write(sibling.toPath(), sentinel);
+      String csv = "col1,col2\nvalue1,1\nvalue2," + (failGeneration ? "invalid" : "2") + "\n";
+      try (GZIPOutputStream compressed = new GZIPOutputStream(Files.newOutputStream(inputFile.toPath()))) {
+        compressed.write(csv.getBytes(StandardCharsets.UTF_8));
+      }
+      byte[] originalBytes = Files.readAllBytes(inputFile.toPath());
+      File outputDir = new File(testDir, "output");
+      SegmentGenerationJobSpec spec = makeJobSpec(inputDir, outputDir, makeSchemaFile(testDir, "mySchema"),
+          makeTableConfigFile(testDir, "mySchema"));
+      spec.setIncludeFileNamePattern("glob:**/" + inputName);
+      spec.getRecordReaderSpec().setClassName(UnpackingCSVRecordReader.class.getName());
+      SegmentGenerationJobRunner runner = new SegmentGenerationJobRunner(spec);
+      if (failGeneration) {
+        expectThrows(RuntimeException.class, runner::run);
+      } else {
+        runner.run();
+        assertTrue(new File(outputDir, "myTable_OFFLINE_0.tar.gz").isFile());
+      }
+      assertEquals(Files.readAllBytes(inputFile.toPath()), originalBytes);
+      assertEquals(Files.readAllBytes(sibling.toPath()), sentinel, "Existing source siblings must not be overwritten");
+    } finally {
+      FileUtils.deleteDirectory(testDir);
+    }
+  }
+
+  @DataProvider(name = "segmentArchiveCodecs")
+  public Object[][] segmentArchiveCodecs() {
+    return new Object[][]{{"gzip", ".tar.gz"}, {"zstd", ".tar.zst"}};
+  }
+
+  @Test(dataProvider = "segmentArchiveCodecs")
+  public void testSegmentGenerationArchiveCodecs(String codec, String extension)
+      throws Exception {
+    File testDir = makeTestDir();
+    try {
+      File inputDir = new File(testDir, "input");
+      FileUtils.forceMkdir(inputDir);
+      FileUtils.writeLines(new File(inputDir, "input.csv"), List.of("col1,col2", "value1,1", "value2,2"));
+      File outputDir = new File(testDir, "output");
+      SegmentGenerationJobSpec spec = makeJobSpec(inputDir, outputDir, makeSchemaFile(testDir, "mySchema"),
+          makeTableConfigFile(testDir, "mySchema"));
+      spec.setSegmentTarCompressionCodec(codec);
+      new SegmentGenerationJobRunner(spec).run();
+
+      File archive = new File(outputDir, "myTable_OFFLINE_0" + extension);
+      assertTrue(archive.isFile());
+      File unpacked = new File(testDir, "unpacked");
+      TarCompressionUtils.untar(archive, unpacked);
+      assertEquals(new SegmentMetadataImpl(new File(unpacked, "myTable_OFFLINE_0")).getTotalDocs(), 2);
+    } finally {
+      FileUtils.deleteDirectory(testDir);
+    }
+  }
+
+  @Test
+  public void testSegmentGenerationRejectsUnsupportedArchiveCodec() {
+    SegmentGenerationJobSpec spec = new SegmentGenerationJobSpec();
+    assertEquals(spec.getSegmentTarCompressionCodec(), "gzip");
+    assertThrows(IllegalArgumentException.class, () -> spec.setSegmentTarCompressionCodec("bzip2"));
+  }
 
   @Test
   public void testSegmentGeneration() throws Exception {
@@ -224,6 +354,27 @@ public class SegmentGenerationJobRunnerTest {
       // first file we process, and "input2.csv" (the bad file) will be the second one.
       assertEquals(segments.length, 1);
       assertTrue(segments[0].getName().endsWith("input1.tar.gz"));
+    }
+  }
+
+  /// Exercises the same sibling-writing unpacker as the Parquet and ORC readers without another plugin dependency.
+  public static class UnpackingCSVRecordReader extends CSVRecordReader {
+    @Override
+    public void init(File dataFile, @Nullable Set<String> fieldsToRead, @Nullable RecordReaderConfig config)
+        throws IOException {
+      super.init(RecordReaderUtils.unpackIfRequired(dataFile, "csv"), fieldsToRead, config);
+    }
+  }
+
+  /// Records copies to verify that plain local inputs are borrowed.
+  private static class TrackingLocalPinotFS extends LocalPinotFS {
+    private final List<File> _copiedInputs = new ArrayList<>();
+
+    @Override
+    public void copyToLocalFile(URI source, File destination)
+        throws Exception {
+      _copiedInputs.add(destination);
+      super.copyToLocalFile(source, destination);
     }
   }
 

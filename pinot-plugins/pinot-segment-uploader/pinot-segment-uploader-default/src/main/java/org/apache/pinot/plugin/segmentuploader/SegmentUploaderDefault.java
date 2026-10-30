@@ -99,7 +99,7 @@ public class SegmentUploaderDefault implements SegmentUploader {
     String[] filePaths = outputPinotFS.listFiles(segmentDir, true);
     for (String filePath : filePaths) {
       URI uri = URI.create(filePath);
-      if (!outputPinotFS.isDirectory(uri) && filePath.endsWith(Constants.TAR_GZ_FILE_EXT)) {
+      if (!outputPinotFS.isDirectory(uri) && Constants.isSegmentTarFile(filePath)) {
         segmentTarURIs.add(uri);
       }
     }
