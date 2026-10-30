@@ -23,6 +23,8 @@ import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.spi.utils.Pairs.IntPair;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 
 /// The `SortedDocIdIterator` is the iterator for SortedDocIdSet to iterate over a list of matching document id
 /// ranges from a sorted column.
@@ -58,6 +60,30 @@ public final class SortedDocIdIterator implements BlockDocIdIterator {
     } else {
       return Constants.EOF;
     }
+  }
+
+  @Override
+  public int nextBatch(int[] output, int maxDocs) {
+    checkArgument(maxDocs > 0 && maxDocs <= output.length);
+    int size = 0;
+    while (size < maxDocs) {
+      IntPair currentRange = _docIdRanges.get(_currentRangeId);
+      if (_nextDocId > currentRange.getRight()) {
+        if (_currentRangeId == _numRanges - 1) {
+          break;
+        }
+        currentRange = _docIdRanges.get(++_currentRangeId);
+        _nextDocId = currentRange.getLeft();
+      }
+      int nextDocId = _nextDocId;
+      int numDocs = Math.min(maxDocs - size, currentRange.getRight() - nextDocId + 1);
+      for (int i = 0; i < numDocs; i++) {
+        output[size + i] = nextDocId + i;
+      }
+      size += numDocs;
+      _nextDocId += numDocs;
+    }
+    return size;
   }
 
   @Override
