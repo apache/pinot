@@ -43,12 +43,19 @@ public class TableReplicaHealth {
   private final int _minPercentOfReplicas;
   private final int _numSegmentsAtMinPercentOfReplicas;
   private final int _numUnavailableSegments;
+  private final int _numNewFailOpenEligibleSegments;
 
   public TableReplicaHealth(int minPercentOfReplicas, int numSegmentsAtMinPercentOfReplicas,
       int numUnavailableSegments) {
+    this(minPercentOfReplicas, numSegmentsAtMinPercentOfReplicas, numUnavailableSegments, 0);
+  }
+
+  public TableReplicaHealth(int minPercentOfReplicas, int numSegmentsAtMinPercentOfReplicas,
+      int numUnavailableSegments, int numNewFailOpenEligibleSegments) {
     _minPercentOfReplicas = minPercentOfReplicas;
     _numSegmentsAtMinPercentOfReplicas = numSegmentsAtMinPercentOfReplicas;
     _numUnavailableSegments = numUnavailableSegments;
+    _numNewFailOpenEligibleSegments = numNewFailOpenEligibleSegments;
   }
 
   /// Returns the worst measured segment's replica percentage, or [#FULLY_REPLICATED_PERCENT] if there are
@@ -70,6 +77,13 @@ public class TableReplicaHealth {
   /// the data is already gone rather than merely degraded.
   public int getNumUnavailableSegments() {
     return _numUnavailableSegments;
+  }
+
+  /// Returns how many segments became fail-open eligible (unavailable, but with candidates that are all excluded)
+  /// in the refresh that produced this snapshot, i.e. were not already in that state before it. Unlike the values
+  /// above this is a delta, so it must be reported once per snapshot.
+  public int getNumNewFailOpenEligibleSegments() {
+    return _numNewFailOpenEligibleSegments;
   }
 
   /// Returns whether a segment's replication is high enough to measure at all.

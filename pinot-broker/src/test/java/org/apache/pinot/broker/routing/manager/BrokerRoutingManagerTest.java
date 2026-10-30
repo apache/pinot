@@ -771,6 +771,32 @@ public class BrokerRoutingManagerTest {
   }
 
   @Test
+  public void testFailOpenEligibleSegmentsMeterReportedOnceFromTableSelector()
+      throws Exception {
+    // A sampler's selector shares the table name and sees the same transition for every segment it samples, so
+    // emitting from it would count that transition once more per sampler. Only the table's own selector reports.
+    enableTestServer();
+    InstanceSelector samplerInstanceSelector = mock(InstanceSelector.class);
+    when(samplerInstanceSelector.getReplicaHealth()).thenReturn(new TableReplicaHealth(0, 1, 1, 1));
+    InstanceSelector instanceSelector = mock(InstanceSelector.class);
+    when(instanceSelector.getReplicaHealth()).thenReturn(new TableReplicaHealth(0, 1, 1, 1));
+    putRoutingEntry(TEST_TABLE,
+        createRoutingEntry(TEST_TABLE, null, null, Map.of("sampler", createSamplerInfo(samplerInstanceSelector)),
+            instanceSelector, false));
+
+    _routingManager.excludeServerFromRouting(SERVER_INSTANCE_ID);
+
+    verify(_brokerMetrics).addMeteredTableValue(TEST_TABLE, BrokerMeter.FAIL_OPEN_ELIGIBLE_SEGMENTS, 1L);
+    verify(samplerInstanceSelector, never()).getReplicaHealth();
+
+    // The meter is a delta, so reporting the same snapshot again (as after a refresh that threw before reaching
+    // the selector) must not count it twice
+    _routingManager.includeServerToRouting(SERVER_INSTANCE_ID);
+
+    verify(_brokerMetrics).addMeteredTableValue(TEST_TABLE, BrokerMeter.FAIL_OPEN_ELIGIBLE_SEGMENTS, 1L);
+  }
+
+  @Test
   public void testSelectorThatDoesNotMeasureReplicaHealthDropsTheGauges()
       throws Exception {
     // A custom instance selector that does not extend BaseInstanceSelector returns null replica health. Its
