@@ -30,7 +30,10 @@ import java.util.Properties;
 import javax.annotation.Nullable;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.IndexFormatTooOldException;
 import org.apache.lucene.index.IndexReader;
+import org.apache.lucene.index.SegmentInfos;
+import org.apache.lucene.index.StandardDirectoryReader;
 import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.queryparser.classic.QueryParserBase;
 import org.apache.lucene.search.Collector;
@@ -78,12 +81,24 @@ public class LuceneTextIndexReader implements TextIndexReader {
   /// parsed query only when these are equal. Computed once; immutable, with structural equality.
   private final ParseConfig _parseConfig;
 
+  /// Retains support for immutable Lucene 8 text indexes through Lucene's backward codecs.
+  /// The default reader only accepts indexes created with the current or previous major version.
+  static DirectoryReader openIndexReader(Directory directory)
+      throws IOException {
+    try {
+      return DirectoryReader.open(directory);
+    } catch (IndexFormatTooOldException e) {
+      // This lower-level reader accepts the Lucene 8 commit rejected by the default version check.
+      return StandardDirectoryReader.open(directory, SegmentInfos.readLatestCommit(directory, 8), null, null);
+    }
+  }
+
   public LuceneTextIndexReader(String column, File indexDir, int numDocs, TextIndexConfig config) {
     _column = column;
     try {
       File indexFile = getTextIndexFile(indexDir);
       _indexDirectory = FSDirectory.open(indexFile.toPath());
-      _indexReader = DirectoryReader.open(_indexDirectory);
+      _indexReader = openIndexReader(_indexDirectory);
       _indexSearcher = new IndexSearcher(_indexReader);
       _numDocs = numDocs;
       if (!config.isEnableQueryCache()) {
@@ -155,7 +170,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
 
       // Initialize from components
       _indexDirectory = indexDirectory;
-      _indexReader = DirectoryReader.open(_indexDirectory);
+      _indexReader = openIndexReader(_indexDirectory);
       _indexSearcher = new IndexSearcher(_indexReader);
       _numDocs = numDocs;
 

@@ -32,6 +32,7 @@ import org.apache.lucene.document.Field;
 import org.apache.lucene.document.NumericDocValuesField;
 import org.apache.lucene.document.StoredField;
 import org.apache.lucene.document.TextField;
+import org.apache.lucene.index.ConcurrentMergeScheduler;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
@@ -139,6 +140,10 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
       indexWriterConfig.setRAMBufferSizeMB(config.getLuceneMaxBufferSizeMB());
       indexWriterConfig.setCommitOnClose(commit);
       indexWriterConfig.setUseCompoundFile(config.isLuceneUseCompoundFile());
+      // Preserve merge I/O throttling, which Lucene 10 disables by default.
+      ConcurrentMergeScheduler mergeScheduler = new ConcurrentMergeScheduler();
+      mergeScheduler.enableAutoIOThrottle();
+      indexWriterConfig.setMergeScheduler(mergeScheduler);
 
       // Also, for the realtime segment, we set the OpenMode to CREATE to ensure that any existing artifacts
       // will be overwritten. This is necessary because the realtime segment can be created multiple times
