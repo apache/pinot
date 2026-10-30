@@ -19,7 +19,6 @@
 package org.apache.pinot.spi.config.table;
 
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 import org.apache.pinot.spi.utils.TimeUtils;
 
@@ -32,7 +31,6 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   private String _deletedSegmentsRetentionPeriod;
   private String _replacedSegmentsRetentionPeriod;
   private String _lineageEntryCleanupRetentionPeriod;
-  private Boolean _enableHybridTableRetentionStrategy;
   @Deprecated
   private String _segmentPushFrequency; // DO NOT REMOVE, this is used in internal segment generation management
   @Deprecated
@@ -184,15 +182,6 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
 
   public void setLineageEntryCleanupRetentionPeriod(String lineageEntryCleanupRetentionPeriod) {
     _lineageEntryCleanupRetentionPeriod = lineageEntryCleanupRetentionPeriod;
-  }
-
-  @Nullable
-  public Boolean getEnableHybridTableRetentionStrategy() {
-    return _enableHybridTableRetentionStrategy;
-  }
-
-  public void setEnableHybridTableRetentionStrategy(Boolean enableHybridTableRetentionStrategy) {
-    _enableHybridTableRetentionStrategy = enableHybridTableRetentionStrategy;
   }
 
   /// @deprecated Use `segmentIngestionFrequency` from
