@@ -21,6 +21,7 @@ package org.apache.pinot.plugin.minion.tasks.upsertcompaction;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.util.Map;
+import javax.ws.rs.NotFoundException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -166,6 +167,11 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
 
   /// Check C with a short bounded retry so transient server reload races (segment uploaded while a replica is still
   /// rebuilding upsert metadata) do not fail the task on the first attempt. Does not re-download the segment.
+  /// Only transient failures are retried: CRC mismatch / server-not-GOOD while a replica reloads surface as
+  /// [IllegalStateException] (or, in UNSAFE mode, as a skipped server yielding `null`). A missing snapshot
+  /// ([NotFoundException]) is not transient within this task - snapshots are written only when the next
+  /// consuming segment starts, which can be unboundedly later - so it fails fast and the periodic task
+  /// generator reschedules the segment in a later cycle.
   @VisibleForTesting
   RoaringBitmap fetchValidDocIdsWithRetry(PinotTaskConfig pinotTaskConfig, String tableNameWithType, String segmentName,
       String validDocIdsTypeStr, long expectedSegmentCrc, long expectedDataCrc, String consensusMode)
@@ -190,6 +196,15 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
             "No validDocIds found from all servers. They either failed to download or did not match crc from"
                 + " segment copy obtained from deepstore / servers. Expected crc: " + expectedSegmentCrc);
         LOGGER.warn("validDocIds unavailable for segment: {} on attempt {}/{}", segmentName, attempt, maxAttempts);
+      } catch (NotFoundException e) {
+        // No snapshot yet (e.g. latest segment): retrying here cannot create it, so fail fast instead of
+        // burning the remaining attempts. The task is rescheduled by the periodic generator.
+        String message = "No validDocIds snapshot found for segment: " + segmentName
+            + ". Snapshots are written only when the next consuming segment starts, so retrying within this"
+            + " task cannot create it; failing fast for reschedule in a later task cycle: " + e.getMessage();
+        LOGGER.error(message);
+        _minionMetrics.addMeteredTableValue(tableNameWithType, MinionMeter.VALID_DOC_IDS_UNAVAILABLE, 1L);
+        throw new IllegalStateException(message, e);
       } catch (IllegalStateException e) {
         lastFailure = e;
         LOGGER.warn("validDocIds fetch failed for segment: {} on attempt {}/{}: {}", segmentName, attempt, maxAttempts,

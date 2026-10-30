@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import javax.ws.rs.NotFoundException;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
@@ -261,6 +262,43 @@ public class UpsertCompactionTaskExecutorTest {
       } catch (InterruptedException e) {
         throw new RuntimeException(e);
       }
+      verify(_minionMetrics).addMeteredTableValue(REALTIME_TABLE_NAME, MinionMeter.VALID_DOC_IDS_UNAVAILABLE, 1L);
+    }
+  }
+
+  /// A missing snapshot (404) cannot appear within the in-task retry window: snapshots are written only
+  /// when the next consuming segment starts. The fetch must fail fast after a single attempt with an
+  /// explicit message and the unavailable meter; the periodic task generator reschedules it next cycle.
+  @Test
+  public void testFetchValidDocIdsNotFoundFailsFastWithoutRetry() {
+    TestableExecutor executor = newExecutor();
+    executor._validDocIdsFetchMaxAttempts = 3;
+    executor._validDocIdsFetchRetryDelayMs = 0L;
+
+    AtomicInteger calls = new AtomicInteger();
+    try (MockedStatic<MinionTaskUtils> mocked = Mockito.mockStatic(MinionTaskUtils.class, Mockito.CALLS_REAL_METHODS)) {
+      mocked.when(
+              () -> MinionTaskUtils.getValidDocIdFromServerMatchingCrc(anyString(), anyString(), anyString(), any(),
+                  anyLong(), anyLong(), anyString()))
+          .thenAnswer(inv -> {
+            calls.getAndIncrement();
+            throw new NotFoundException(
+                "Unable to retrieve validDocIds bitmap for segment: " + SEGMENT_NAME + " from endpoint: x");
+          });
+
+      try {
+        executor.fetchValidDocIdsWithRetry(createTaskConfig(false), REALTIME_TABLE_NAME, SEGMENT_NAME, "SNAPSHOT",
+            EXPECTED_CRC, DATA_CRC, "EQUAL");
+        Assert.fail("expected IllegalStateException");
+      } catch (IllegalStateException e) {
+        Assert.assertTrue(e.getMessage().contains("No validDocIds snapshot"),
+            "unexpected message: " + e.getMessage());
+        Assert.assertTrue(e.getMessage().contains(SEGMENT_NAME), "unexpected message: " + e.getMessage());
+        Assert.assertTrue(e.getCause() instanceof NotFoundException);
+      } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+      }
+      Assert.assertEquals(calls.get(), 1);
       verify(_minionMetrics).addMeteredTableValue(REALTIME_TABLE_NAME, MinionMeter.VALID_DOC_IDS_UNAVAILABLE, 1L);
     }
   }
