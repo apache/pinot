@@ -38,6 +38,21 @@ import static org.testng.Assert.assertTrue;
 /// NotEqualsTransformFunctionTest, GreaterThanOrEqualTransformFunctionTest, GreaterThanTransformFunctionTest,
 /// LessThanOrEqualTransformFunctionTest, LessThanTransformFunctionTest
 public abstract class BinaryOperatorTransformFunctionTest extends BaseTransformFunctionTest {
+  @Test
+  public void testLongComparisonsBeyondBothRepresentableBounds() {
+    for (String literal : new String[]{"9223372036854775808", "-9223372036854775809"}) {
+      BigDecimal decimal = new BigDecimal(literal);
+      ExpressionContext expression = RequestContextUtils.getExpression(
+          String.format("%s(%s, '%s')", getFunctionName(), LONG_SV_COLUMN, literal));
+      TransformFunction function = TransformFunctionFactory.get(expression, _dataSourceMap);
+      boolean[] expected = new boolean[NUM_ROWS];
+      for (int i = 0; i < NUM_ROWS; i++) {
+        expected[i] = getExpectedValue(BigDecimal.valueOf(_longSVValues[i]).compareTo(decimal));
+      }
+      testTransformFunction(function, expected);
+    }
+  }
+
 
   abstract boolean getExpectedValue(int compareResult);
 

@@ -112,6 +112,38 @@ import static org.testng.Assert.assertTrue;
 
 // TODO Re-write this test using the stream abstraction
 public class RealtimeSegmentDataManagerTest {
+  @Test
+  public void testReadinessGateRechecksUnlessTheConsumerHasBeenStopped()
+      throws Exception {
+    for (boolean stopped : new boolean[]{false, true}) {
+      TableConfig table = createTableConfig();
+      RealtimeTableDataManager tableManager = createTableDataManager(table);
+      ConsumerCoordinator coordinator = mock(ConsumerCoordinator.class);
+      AtomicInteger readinessChecks = new AtomicInteger();
+      // The initial check waits; the next poll observes readiness. A stopped consumer must skip that second check.
+      BooleanSupplier ready = () -> readinessChecks.incrementAndGet() > 1;
+      doThrow(new ConsumerCoordinator.ShouldNotConsumeException("segment no longer needs consumption"))
+          .when(coordinator).acquire(SEGMENT_NAME);
+      RealtimeSegmentDataManager manager = new RealtimeSegmentDataManager(createZkMetadata(), table, tableManager,
+          new File(TEMP_DIR, "readiness").getAbsolutePath(),
+          new IndexLoadingConfig(FakeRealtimeSegmentDataManager.makeInstanceDataManagerConfig(), table),
+          Fixtures.createSchema(), SEGMENT_NAME, coordinator, mock(ServerMetrics.class), null, null, ready);
+      try {
+        if (stopped) {
+          manager.stop();
+        }
+        manager.new PartitionConsumer().run();
+        assertEquals(readinessChecks.get(), stopped ? 1 : 2);
+        verify(coordinator).acquire(SEGMENT_NAME);
+        verify(coordinator, never()).register(any());
+        assertEquals(manager.getCurrentOffset().compareTo(START_OFFSET), 0);
+        assertEquals(manager.getSegment().getNumDocsIndexed(), 0);
+      } finally {
+        manager.destroy();
+      }
+    }
+  }
+
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "RealtimeSegmentDataManagerTest");
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(RAW_TABLE_NAME);

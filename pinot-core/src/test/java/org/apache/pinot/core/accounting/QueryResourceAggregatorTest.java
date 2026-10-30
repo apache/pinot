@@ -20,9 +20,13 @@ package org.apache.pinot.core.accounting;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.log4j.Level;
+import org.apache.log4j.LogManager;
+import org.apache.log4j.Logger;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Accounting;
+import org.apache.pinot.spi.utils.ResourceUsageUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -31,6 +35,48 @@ import static org.testng.Assert.assertTrue;
 
 
 public class QueryResourceAggregatorTest {
+  @Test
+  public void testAlarmingHeapUsesCpuTimeKillingWhenEnabled() {
+    PinotConfiguration config = new PinotConfiguration();
+    config.setProperty(Accounting.Keys.ALARMING_LEVEL_HEAP_USAGE_RATIO, 0f);
+    config.setProperty(Accounting.Keys.CRITICAL_LEVEL_HEAP_USAGE_RATIO, 1.1f);
+    config.setProperty(Accounting.Keys.PANIC_LEVEL_HEAP_USAGE_RATIO, 1.1f);
+    config.setProperty(Accounting.Keys.CPU_TIME_BASED_KILLING_ENABLED, true);
+    QueryMonitorConfig monitor = new QueryMonitorConfig(config, ResourceUsageUtils.getMaxHeapSize());
+    QueryResourceAggregator aggregator =
+        new QueryResourceAggregator("alarming-cpu-test", InstanceType.SERVER, true, true,
+            new AtomicReference<>(monitor));
+    aggregator.preAggregate(List.of());
+    assertEquals(aggregator.getTriggeringLevel(), QueryResourceAggregator.TriggeringLevel.CPUTimeBasedKilling);
+    assertEquals(aggregator.getAggregationSleepTimeMs(), monitor.getAlarmingSleepTime());
+    assertFalse(aggregator.isPauseActive());
+  }
+
+  @Test
+  public void testAlarmingHeapUsesVerboseTrackingOnlyWhileDebugLoggingIsEnabled() {
+    PinotConfiguration config = new PinotConfiguration();
+    config.setProperty(Accounting.Keys.ALARMING_LEVEL_HEAP_USAGE_RATIO, 0f);
+    config.setProperty(Accounting.Keys.CRITICAL_LEVEL_HEAP_USAGE_RATIO, 1.1f);
+    config.setProperty(Accounting.Keys.PANIC_LEVEL_HEAP_USAGE_RATIO, 1.1f);
+    config.setProperty(Accounting.Keys.CPU_TIME_BASED_KILLING_ENABLED, false);
+    QueryMonitorConfig monitor = new QueryMonitorConfig(config, ResourceUsageUtils.getMaxHeapSize());
+    QueryResourceAggregator aggregator =
+        new QueryResourceAggregator("alarming-test", InstanceType.SERVER, false, true, new AtomicReference<>(monitor));
+    Logger logger = LogManager.getLogger(QueryResourceAggregator.class);
+    Level original = logger.getLevel();
+    try {
+      logger.setLevel(Level.DEBUG);
+      aggregator.preAggregate(List.of());
+      assertEquals(aggregator.getTriggeringLevel(), QueryResourceAggregator.TriggeringLevel.HeapMemoryAlarmingVerbose);
+      logger.setLevel(Level.INFO);
+      aggregator.preAggregate(List.of());
+      assertEquals(aggregator.getTriggeringLevel(), QueryResourceAggregator.TriggeringLevel.Normal);
+      assertEquals(aggregator.getPreviousTriggeringLevel(),
+          QueryResourceAggregator.TriggeringLevel.HeapMemoryAlarmingVerbose);
+    } finally {
+      logger.setLevel(original);
+    }
+  }
 
   // Use 0 for critical ratio to guarantee heap always exceeds the threshold in tests, regardless of JVM
   // configuration. Use a very high panic ratio (1.1) to prevent hitting panic level.

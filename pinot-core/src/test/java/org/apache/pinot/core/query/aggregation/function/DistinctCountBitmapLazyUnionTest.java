@@ -24,6 +24,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.SyntheticBlockValSets;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -44,6 +45,18 @@ import static org.testng.Assert.assertSame;
 /// cardinality; repair converts back to array containers at up to 4096), so both promoted and non-promoted
 /// accumulator states are verified against an eagerly unioned reference.
 public class DistinctCountBitmapLazyUnionTest {
+  @Test
+  public void testIntGroupBySkipsNullRowsAcrossNonNullRanges() {
+    DistinctCountBitmapAggregationFunction function = new DistinctCountBitmapAggregationFunction(EXPRESSION, true);
+    BlockValSet block = SyntheticBlockValSets.Int.create(RoaringBitmap.bitmapOf(1, 3),
+        new int[]{11, 99, 22, 99, 11});
+    GroupByResultHolder groups = function.createGroupByResultHolder(2, 2);
+    function.aggregateGroupBySV(5, new int[]{0, 0, 1, 1, 1}, groups, Map.of(EXPRESSION, block));
+    assertEquals(function.extractGroupByResult(groups, 0), RoaringBitmap.bitmapOf(11));
+    assertEquals(function.extractGroupByResult(groups, 1), RoaringBitmap.bitmapOf(11, 22));
+    assertEquals(function.extractFinalResult(function.extractGroupByResult(groups, 1)).intValue(), 2);
+  }
+
   private static final ExpressionContext EXPRESSION = ExpressionContext.forIdentifier("bitmapCol");
   private static final Random RANDOM = new Random(42);
 
