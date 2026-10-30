@@ -178,9 +178,25 @@ public class KafkaSourceErrorClassificationTest {
         IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_IDP).getCode(), "invalid_request");
     assertEquals(assertAuth(underPinot(constructOAuthConsumer(401, "{\"error\":\"invalid_request\"}")),
         IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_IDP).getCode(), "invalid_request");
-    // An error no row names is still a refusal.
+    // An error no row names is still a refusal at 400, whatever its characters or length; the code stays bounded.
     assertEquals(assertAuth(underPinot(constructOAuthConsumer(400, "{\"error\":\"invalid_dpop_proof\"}")),
         IngestionSourceErrorSubReason.UNSPECIFIED, TARGET_IDP).getCode(), "invalid_dpop_proof");
+    assertEquals(assertAuth(underPinot(constructOAuthConsumer(400, "{\"error\":\"vendor:denied\"}")),
+        IngestionSourceErrorSubReason.UNSPECIFIED, TARGET_IDP).getCode(), "vendor:denied");
+    String longError = "a".repeat(65);
+    assertEquals(assertAuth(underPinot(constructOAuthConsumer(400, "{\"error\":\"" + longError + "\"}")),
+        IngestionSourceErrorSubReason.UNSPECIFIED, TARGET_IDP).getCode(), longError.substring(0, 64));
+    // At 401 or 403 the status decides, with its sub-reason
+    assertAuth(underPinot(constructOAuthConsumer(401, "{\"error\":\"invalid_dpop_proof\"}")),
+        IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_IDP);
+  }
+
+  @Test
+  public void oauthTokenUrlThatIsNotATokenEndpointDecidesByStatus()
+      throws Exception {
+    // A token URL pointed at a GET-only endpoint: Spring Boot names its reason phrase as the error
+    assertNotClassified(underPinot(constructOAuthConsumer(405,
+        "{\"status\":405,\"error\":\"Method Not Allowed\",\"path\":\"/oauth2/v1/keys\"}")));
   }
 
   @Test
