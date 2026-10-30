@@ -421,6 +421,49 @@ public class PinotHelixTaskResourceManagerTest {
     // Waiting time should be approximately 600000 ms (10 minutes)
     long waitingTime = waitingTimes.get("taskId1");
     assertTrue(waitingTime >= 595000 && waitingTime <= 605000);
+
+    // The job last made progress when taskId0 started, 3 minutes ago, not when the job started
+    long queueStallTime = taskStatusSummary.getQueueStallTimeMs();
+    assertTrue(queueStallTime >= 175000 && queueStallTime <= 185000);
+  }
+
+  @Test
+  public void testGetTableTaskStatusSummaryQueueStallTime() {
+    String taskName = "Task_TestTask_QueueStall";
+    String helixJobName = PinotHelixTaskResourceManager.getHelixJobName(taskName);
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    JobConfig jobConfig = mock(JobConfig.class);
+    when(taskDriver.getJobConfig(anyString())).thenReturn(jobConfig);
+    Map<String, TaskConfig> taskConfigMap = new HashMap<>();
+    taskConfigMap.put("taskId0", new TaskConfig("", new HashMap<>(Map.of("tableName", "table1_OFFLINE"))));
+    taskConfigMap.put("taskId1", new TaskConfig("", new HashMap<>(Map.of("tableName", "table2_OFFLINE"))));
+    taskConfigMap.put("taskId2", new TaskConfig("", new HashMap<>(Map.of("tableName", "table1_OFFLINE"))));
+    when(jobConfig.getTaskConfigMap()).thenReturn(taskConfigMap);
+    JobContext jobContext = mock(JobContext.class);
+    when(taskDriver.getJobContext(helixJobName)).thenReturn(jobContext);
+    // taskId0 (table1) started 5h ago and finished 1 minute ago; taskId1 (table2) started 2h ago and is running;
+    // taskId2 (table1) is still waiting
+    when(jobContext.getTaskIdPartitionMap()).thenReturn(Map.of("taskId0", 0, "taskId1", 1));
+    long now = System.currentTimeMillis();
+    when(jobContext.getPartitionState(0)).thenReturn(TaskPartitionState.COMPLETED);
+    when(jobContext.getPartitionStartTime(0)).thenReturn(now - 18_000_000L);
+    when(jobContext.getPartitionFinishTime(0)).thenReturn(now - 60_000L);
+    when(jobContext.getPartitionState(1)).thenReturn(TaskPartitionState.RUNNING);
+    when(jobContext.getPartitionStartTime(1)).thenReturn(now - 7_200_000L);
+    when(jobContext.getStartTime()).thenReturn(now - 21_600_000L);
+
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+    Map<String, TaskStatusSummary> tableTaskStatusSummary = mgr.getTableTaskStatusSummary(taskName);
+
+    // The job is 6h old, so the waiting subtask reports 6h of waiting, but a subtask finished a minute ago
+    TaskStatusSummary table1Summary = tableTaskStatusSummary.get("table1_OFFLINE");
+    long waitingTime = table1Summary.getSubtaskWaitingTimes().get("taskId2");
+    assertTrue(waitingTime >= 21_595_000L && waitingTime <= 21_605_000L);
+    long queueStallTime = table1Summary.getQueueStallTimeMs();
+    assertTrue(queueStallTime >= 55_000L && queueStallTime <= 65_000L);
+    // table2 has nothing waiting, so it has no stall
+    assertEquals(tableTaskStatusSummary.get("table2_OFFLINE").getQueueStallTimeMs(), 0L);
   }
 
   @Test
