@@ -75,13 +75,14 @@ else
   COVERAGE_PROFILE=""
 fi
 if [ "$RUN_TEST_SET" == "1" ]; then
-  # Core tests run in worker #3. Core and segment-local are still built here because the query
-  # modules depend on their installed production/test artifacts; segment-local tests remain in set #2.
+  # Core tests run in worker #3. Run segment-local here to balance the remaining unit workers.
+  # Core is still built here because the query modules depend on its installed artifacts.
   # No -am on this command, so only the listed modules test.
   mvn test ${FORK_OPTS} -Dmaven.compiler.useIncrementalCompilation=false \
       -pl 'pinot-spi' \
       -pl 'pinot-segment-spi' \
       -pl 'pinot-common' \
+      -pl 'pinot-segment-local' \
       -pl ':pinot-yammer' \
       -pl 'pinot-query-planner' \
       -pl 'pinot-query-runtime' \
@@ -92,6 +93,7 @@ if [ "$RUN_TEST_SET" == "2" ]; then
     -pl '!pinot-spi' \
     -pl '!pinot-segment-spi' \
     -pl '!pinot-common' \
+    -pl '!pinot-segment-local' \
     -pl '!pinot-core' \
     -pl '!pinot-query-planner' \
     -pl '!pinot-query-runtime' \
