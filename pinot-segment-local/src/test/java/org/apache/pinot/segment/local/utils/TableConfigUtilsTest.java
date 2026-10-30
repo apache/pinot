@@ -42,6 +42,8 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.QuotaConfig;
+import org.apache.pinot.spi.config.table.QuotaEnforcementMode;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
@@ -283,6 +285,31 @@ public class TableConfigUtilsTest {
         .build();
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIsDimTable(true).build();
     TableConfigUtils.validate(tableConfig, schema);
+  }
+
+  @Test
+  public void ensureStorageQuotaConstraintsKeepsEnforcementModesOfDimensionTable() {
+    // No storage quota: the default is filled in, the QPS quota and both enforcement modes are kept
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIsDimTable(true)
+        .setQuotaConfig(new QuotaConfig(null, "5", QuotaEnforcementMode.DISABLED, QuotaEnforcementMode.SHADOW))
+        .build();
+    TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, "200M");
+    QuotaConfig quotaConfig = tableConfig.getQuotaConfig();
+    assertNotNull(quotaConfig);
+    assertEquals(quotaConfig.getStorage(), "200M");
+    assertEquals(quotaConfig.getMaxQPS(), 5.0);
+    assertEquals(quotaConfig.getStorageQuotaEnforcementMode(), QuotaEnforcementMode.DISABLED);
+    assertEquals(quotaConfig.getQueryQuotaEnforcementMode(), QuotaEnforcementMode.SHADOW);
+
+    // Storage quota already set: the quota config is left untouched
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIsDimTable(true)
+        .setQuotaConfig(new QuotaConfig("100M", "5", QuotaEnforcementMode.SHADOW, QuotaEnforcementMode.SHADOW)).build();
+    TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, "200M");
+    quotaConfig = tableConfig.getQuotaConfig();
+    assertNotNull(quotaConfig);
+    assertEquals(quotaConfig.getStorage(), "100M");
+    assertEquals(quotaConfig.getStorageQuotaEnforcementMode(), QuotaEnforcementMode.SHADOW);
+    assertEquals(quotaConfig.getQueryQuotaEnforcementMode(), QuotaEnforcementMode.SHADOW);
   }
 
   @Test

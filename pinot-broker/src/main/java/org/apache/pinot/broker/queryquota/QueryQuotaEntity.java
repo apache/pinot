@@ -19,6 +19,7 @@
 package org.apache.pinot.broker.queryquota;
 
 import com.google.common.util.concurrent.RateLimiter;
+import org.apache.pinot.spi.config.table.QuotaEnforcementMode;
 
 
 public class QueryQuotaEntity {
@@ -29,6 +30,7 @@ public class QueryQuotaEntity {
   private int _numOnlineBrokers;
   private double _overallRate;
   private int _tableConfigStatVersion;
+  private volatile QuotaEnforcementMode _enforcementMode = QuotaEnforcementMode.ENFORCED;
 
   public QueryQuotaEntity(RateLimiter rateLimiter, HitCounter qpsTracker, MaxHitRateTracker maxQpsTracker,
       int numOnlineBrokers, double overallRate, int tableConfigStatVersion) {
@@ -78,5 +80,13 @@ public class QueryQuotaEntity {
 
   public void setTableConfigStatVersion(int tableConfigStatVersion) {
     _tableConfigStatVersion = tableConfigStatVersion;
+  }
+
+  public QuotaEnforcementMode getEnforcementMode() {
+    return _enforcementMode;
+  }
+
+  public void setEnforcementMode(QuotaEnforcementMode enforcementMode) {
+    _enforcementMode = enforcementMode;
   }
 }
