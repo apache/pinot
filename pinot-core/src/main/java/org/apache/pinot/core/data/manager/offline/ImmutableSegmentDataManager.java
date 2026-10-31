@@ -26,6 +26,7 @@ import org.apache.pinot.segment.spi.ImmutableSegment;
 public class ImmutableSegmentDataManager extends SegmentDataManager {
 
   private final ImmutableSegment _immutableSegment;
+  private volatile boolean _metadataReady;
 
   public ImmutableSegmentDataManager(ImmutableSegment immutableSegment) {
     _immutableSegment = immutableSegment;
@@ -39,6 +40,18 @@ public class ImmutableSegmentDataManager extends SegmentDataManager {
   @Override
   public ImmutableSegment getSegment() {
     return _immutableSegment;
+  }
+
+  /// Marks this segment's partition metadata as initialized after a successful add, preload, or replacement.
+  public void markMetadataReady() {
+    _metadataReady = true;
+  }
+
+  /// Returns whether this instance has finished initializing its partition metadata. Registration alone is not enough:
+  /// a new upsert segment is published before its metadata finishes loading. Callers must look up the currently
+  /// registered manager because this flag does not carry over to a replacement instance.
+  public boolean isMetadataReady() {
+    return _metadataReady;
   }
 
   @Override

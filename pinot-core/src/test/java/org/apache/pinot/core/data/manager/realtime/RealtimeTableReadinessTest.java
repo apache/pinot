@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
 import org.apache.commons.io.FileUtils;
@@ -40,6 +41,8 @@ import org.apache.helix.zookeeper.zkclient.exception.ZkTimeoutException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
+import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
@@ -49,6 +52,7 @@ import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
@@ -71,9 +75,12 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -132,7 +139,7 @@ public class RealtimeTableReadinessTest {
       LLCSegmentName n1 = name(0, 1);
       LLCSegmentName n2 = name(0, 2);
       table.assign(n1, ONLINE);
-      table._currentState.setState(n1.getSegmentName(), ONLINE);
+      table.publishState(n1.getSegmentName(), ONLINE);
       table.assign(n2, CONSUMING);
       assertTrue(table.createReadyToConsumeDataSupplier(n2).getAsBoolean());
 
@@ -141,7 +148,7 @@ public class RealtimeTableReadinessTest {
       table.assign(n3, CONSUMING);
       BooleanSupplier ready = table.createReadyToConsumeDataSupplier(n3);
       assertFalse(ready.getAsBoolean(), "Earlier readiness must not cover a newly assigned historical segment");
-      table._currentState.setState(n2.getSegmentName(), ONLINE);
+      table.publishState(n2.getSegmentName(), ONLINE);
       assertTrue(ready.getAsBoolean());
     }
   }
@@ -161,7 +168,7 @@ public class RealtimeTableReadinessTest {
       assertFalse(ready.getAsBoolean());
       when(predecessor.hasReleasedConsumerSemaphore()).thenReturn(true);
       assertFalse(ready.getAsBoolean(), "Pauseless release only makes its own segment ready");
-      table._currentState.setState(n1.getSegmentName(), ONLINE);
+      table.publishState(n1.getSegmentName(), ONLINE);
       assertTrue(ready.getAsBoolean(), "A released predecessor need not finish building before rollover");
       when(predecessor.hasReleasedConsumerSemaphore()).thenReturn(false);
       assertFalse(ready.getAsBoolean(), "A locally present but still-consuming predecessor is not ready");
@@ -180,10 +187,107 @@ public class RealtimeTableReadinessTest {
       table.assign(base, ONLINE);
       table._serverReady.set(true);
       assertFalse(ready.getAsBoolean(), "History assigned while the server was waiting must still be checked");
-      table._currentState.setState(base.getSegmentName(), ONLINE);
+      table.publishState(base.getSegmentName(), ONLINE);
       assertTrue(ready.getAsBoolean());
       table._serverReady.set(false);
       assertFalse(ready.getAsBoolean());
+    }
+  }
+
+  @Test
+  public void testWaitingConsumersShareSnapshotReads() throws Exception {
+    try (Fixture table = new Fixture(UpsertConfig.Mode.PARTIAL)) {
+      List<BooleanSupplier> consumers = new ArrayList<>();
+      for (int partition = 0; partition < 64; partition++) {
+        table.assign(name(partition, 0), ONLINE);
+        LLCSegmentName consumer = name(partition, 1);
+        table.assign(consumer, CONSUMING);
+        consumers.add(table.createReadyToConsumeDataSupplier(consumer));
+      }
+      HelixDataAccessor accessor = table.getHelixManager().getHelixDataAccessor();
+      clearInvocations(accessor);
+      for (int check = 0; check < 3; check++) {
+        consumers.forEach(ready -> assertFalse(ready.getAsBoolean()));
+      }
+      table.verifySnapshotReads(1);
+      table.advancePollInterval();
+      consumers.forEach(ready -> assertFalse(ready.getAsBoolean()));
+      table.verifySnapshotReads(2);
+    }
+  }
+
+  @Test
+  public void testCachedSuccessRechecksNewHistory() throws Exception {
+    try (Fixture table = new Fixture(UpsertConfig.Mode.PARTIAL)) {
+      LLCSegmentName consumer = name(0, 2);
+      table.assign(consumer, CONSUMING);
+      BooleanSupplier ready = table.createReadyToConsumeDataSupplier(consumer);
+      assertTrue(ready.getAsBoolean());
+      // Change the backing record without expiring the snapshot. A cached success cannot miss new history.
+      LLCSegmentName base = name(0, 1);
+      table._assignment.setInstanceStateMap(base.getSegmentName(), Map.of(SERVER, ONLINE));
+      assertFalse(ready.getAsBoolean());
+      table._currentState.setState(base.getSegmentName(), ONLINE);
+      assertTrue(ready.getAsBoolean());
+    }
+  }
+
+  @Test
+  public void testNewConsumerRefreshesOlderSnapshot() throws Exception {
+    try (Fixture table = new Fixture(UpsertConfig.Mode.PARTIAL)) {
+      LLCSegmentName first = name(0, 0);
+      table.assign(first, CONSUMING);
+      assertTrue(table.createReadyToConsumeDataSupplier(first).getAsBoolean());
+      LLCSegmentName next = name(0, 1);
+      table._assignment.setInstanceStateMap(first.getSegmentName(), Map.of(SERVER, ONLINE));
+      table._assignment.setInstanceStateMap(next.getSegmentName(), Map.of(SERVER, CONSUMING));
+      table._currentState.setState(first.getSegmentName(), ONLINE);
+      table._nowNs++;
+      assertTrue(table.createReadyToConsumeDataSupplier(next).getAsBoolean(),
+          "A new consumer must not wait for a cached snapshot that predates its assignment");
+      table.verifySnapshotReads(2);
+    }
+  }
+
+  @Test
+  public void testLocalMetadataCompletionClearsCachedRejection() throws Exception {
+    try (Fixture table = new Fixture(UpsertConfig.Mode.PARTIAL)) {
+      LLCSegmentName base = name(0, 1);
+      LLCSegmentName consumer = name(0, 2);
+      table.assign(base, ONLINE);
+      table.assign(consumer, CONSUMING);
+      table._currentState.setState(base.getSegmentName(), CONSUMING);
+      ImmutableSegmentDataManager manager = new ImmutableSegmentDataManager(mock(ImmutableSegment.class));
+      table.registerLocal(base, manager);
+      BooleanSupplier ready = table.createReadyToConsumeDataSupplier(consumer);
+      assertFalse(ready.getAsBoolean(), "Publication before upsert metadata initialization is not sufficient");
+      manager.markMetadataReady();
+      assertTrue(ready.getAsBoolean(), "Local completion must clear rejection before Helix publishes ONLINE");
+      table.registerLocal(base, new ImmutableSegmentDataManager(mock(ImmutableSegment.class)));
+      assertFalse(ready.getAsBoolean(), "Replacing a ready manager must not preserve readiness by segment name");
+      table.registerLocal(base, manager);
+      assertTrue(ready.getAsBoolean());
+      table.removeLocal(base);
+      assertFalse(ready.getAsBoolean(), "Removing the ready manager must remove its local readiness evidence");
+    }
+  }
+
+  @Test
+  public void testReadyImmutablePredecessorDoesNotHideOlderHistory() throws Exception {
+    try (Fixture table = new Fixture(UpsertConfig.Mode.PARTIAL)) {
+      LLCSegmentName base = name(0, 0);
+      LLCSegmentName predecessor = name(0, 1);
+      LLCSegmentName consumer = name(0, 2);
+      table.assign(base, ONLINE);
+      table.assign(predecessor, ONLINE);
+      table.assign(consumer, CONSUMING);
+      ImmutableSegmentDataManager manager = new ImmutableSegmentDataManager(mock(ImmutableSegment.class));
+      manager.markMetadataReady();
+      table.registerLocal(predecessor, manager);
+      BooleanSupplier ready = table.createReadyToConsumeDataSupplier(consumer);
+      assertFalse(ready.getAsBoolean());
+      table.publishState(base.getSegmentName(), ONLINE);
+      assertTrue(ready.getAsBoolean());
     }
   }
 
@@ -200,7 +304,7 @@ public class RealtimeTableReadinessTest {
       LLCSegmentName base = name(0, 1);
       LLCSegmentName consumer = name(0, 2);
       table.assign(base, ONLINE);
-      table._currentState.setState(base.getSegmentName(), ONLINE);
+      table.publishState(base.getSegmentName(), ONLINE);
       table.assign(consumer, CONSUMING);
       HelixDataAccessor accessor = table.getHelixManager().getHelixDataAccessor();
       HelixProperty recovered = accessor.getProperty(key);
@@ -223,7 +327,7 @@ public class RealtimeTableReadinessTest {
       BooleanSupplier ready = table.createReadyToConsumeDataSupplier(consumer);
       assertTrue(table.isDedupEnabled());
       assertFalse(ready.getAsBoolean());
-      table._currentState.setState(base.getSegmentName(), ONLINE);
+      table.publishState(base.getSegmentName(), ONLINE);
       assertTrue(ready.getAsBoolean());
     }
   }
@@ -269,6 +373,7 @@ public class RealtimeTableReadinessTest {
     private final CurrentState _currentState = new CurrentState(TABLE);
     private final AtomicBoolean _serverReady;
     private final List<IndexSegment> _segments = new ArrayList<>();
+    private long _nowNs = TimeUnit.SECONDS.toNanos(1);
 
     Fixture(UpsertConfig.Mode mode) throws Exception {
       this(mode, false);
@@ -319,12 +424,39 @@ public class RealtimeTableReadinessTest {
       }
     }
 
-    void assign(LLCSegmentName segment, String state) {
-      _assignment.setInstanceStateMap(segment.getSegmentName(), Map.of(SERVER, state));
+    @Override
+    long readinessCheckTimeNs() {
+      return _nowNs;
     }
 
-    void registerLocal(LLCSegmentName name, RealtimeSegmentDataManager segment) {
+    void advancePollInterval() {
+      _nowNs += TimeUnit.MILLISECONDS.toNanos(READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS);
+    }
+
+    void assign(LLCSegmentName segment, String state) {
+      _assignment.setInstanceStateMap(segment.getSegmentName(), Map.of(SERVER, state));
+      advancePollInterval();
+    }
+
+    void publishState(String segment, String state) {
+      _currentState.setState(segment, state);
+      advancePollInterval();
+    }
+
+    void verifySnapshotReads(int count) {
+      HelixDataAccessor accessor = _helixManager.getHelixDataAccessor();
+      PropertyKey.Builder keys = accessor.keyBuilder();
+      verify(accessor, times(count)).getProperty(keys.idealStates(TABLE));
+      verify(accessor, times(count)).getProperty(keys.liveInstance(SERVER));
+      verify(accessor, times(count)).getProperty(keys.currentState(SERVER, "test-session", TABLE));
+    }
+
+    void registerLocal(LLCSegmentName name, SegmentDataManager segment) {
       _segmentDataManagerMap.put(name.getSegmentName(), segment);
+    }
+
+    void removeLocal(LLCSegmentName name) {
+      _segmentDataManagerMap.remove(name.getSegmentName());
     }
 
     void load(LLCSegmentName name, GenericRow row) throws Exception {
@@ -341,7 +473,7 @@ public class RealtimeTableReadinessTest {
           new File(output, name.getSegmentName()), ReadMode.mmap);
       _segments.add(segment);
       _tableUpsertMetadataManager.getOrCreatePartitionManager(name.getPartitionGroupId()).addSegment(segment);
-      _currentState.setState(name.getSegmentName(), ONLINE);
+      publishState(name.getSegmentName(), ONLINE);
     }
 
     void consume(LLCSegmentName name, GenericRow row) throws Exception {

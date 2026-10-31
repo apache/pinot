@@ -799,7 +799,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       long catchUpTimeMillis = 0L;
       _startTimeMs = now();
       try {
-        if (!_consumerCoordinator.waitUntilReadyToConsume(_isReadyToConsumeData, () -> _shouldStop)) {
+        if (!_consumerCoordinator.waitUntilReadyToConsume(_llcSegmentName.getPartitionGroupId(),
+            _isReadyToConsumeData, () -> _shouldStop)) {
           return;
         }
 

@@ -60,6 +60,8 @@ public class ConsumerCoordinator {
   private final Semaphore _semaphore = new Semaphore(1);
   private final Object _readinessMonitor = new Object();
   private volatile long _releaseVersion;
+  // Guarded by _readinessMonitor, including publication of the corresponding partition gauge.
+  private long _readinessWaiters;
   private final Lock _lock = new ReentrantLock();
   private final Condition _condition = _lock.newCondition();
   private final AtomicBoolean _firstTransitionProcessed = new AtomicBoolean(false);
@@ -123,20 +125,41 @@ public class ConsumerCoordinator {
   /// Helix assignment and state changes still use the periodic check. Readiness can perform ZooKeeper reads, so it
   /// must run outside the monitor. The version prevents losing a release between the readiness check and the wait.
   /// @return whether readiness passed, or false if consumption was stopped
-  boolean waitUntilReadyToConsume(BooleanSupplier isReadyToConsume, BooleanSupplier shouldStop)
+  boolean waitUntilReadyToConsume(int partitionGroupId, BooleanSupplier isReadyToConsume, BooleanSupplier shouldStop)
       throws InterruptedException {
-    while (!shouldStop.getAsBoolean()) {
-      long releaseVersion = _releaseVersion;
-      if (isReadyToConsume.getAsBoolean()) {
-        return !shouldStop.getAsBoolean();
+    boolean counted = false;
+    try {
+      while (!shouldStop.getAsBoolean()) {
+        long releaseVersion = _releaseVersion;
+        if (isReadyToConsume.getAsBoolean()) {
+          return !shouldStop.getAsBoolean();
+        }
+        synchronized (_readinessMonitor) {
+          if (!counted) {
+            counted = true;
+            updateReadinessWaiters(partitionGroupId, 1);
+          }
+          if (releaseVersion == _releaseVersion && !shouldStop.getAsBoolean()) {
+            _readinessMonitor.wait(RealtimeTableDataManager.READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS);
+          }
+        }
       }
-      synchronized (_readinessMonitor) {
-        if (releaseVersion == _releaseVersion && !shouldStop.getAsBoolean()) {
-          _readinessMonitor.wait(RealtimeTableDataManager.READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS);
+      return false;
+    } finally {
+      if (counted) {
+        synchronized (_readinessMonitor) {
+          updateReadinessWaiters(partitionGroupId, -1);
         }
       }
     }
-    return false;
+  }
+
+  /// Called under _readinessMonitor so concurrent arrivals and exits cannot publish gauge values out of order.
+  private void updateReadinessWaiters(int partitionGroupId, int delta) {
+    _readinessWaiters += delta;
+    long waiters = _readinessWaiters;
+    _serverMetrics.setOrUpdatePartitionGauge(_realtimeTableDataManager.getTableName(), partitionGroupId,
+        ServerGauge.CONSUMERS_WAITING_FOR_READINESS, () -> waiters);
   }
 
   public void release() {

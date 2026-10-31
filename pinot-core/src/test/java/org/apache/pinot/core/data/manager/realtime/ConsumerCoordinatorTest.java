@@ -19,21 +19,44 @@
 package org.apache.pinot.core.data.manager.realtime;
 
 import com.google.common.cache.CacheBuilder;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ServerGauge;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.util.TestUtils;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.testng.Assert;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 // TODO: Replace the sleep in this test to condition wait
@@ -445,6 +468,132 @@ public class ConsumerCoordinatorTest {
     Assert.assertNotNull(consumerCoordinator.getUnsealedRelease());
     consumerCoordinator.clearUnsealedRelease(getSegmentName(101));
     Assert.assertNull(consumerCoordinator.getUnsealedRelease());
+  }
+
+  @Test(timeOut = 10_000)
+  public void testReadinessGaugeCountsOverlappingWaiters() throws Exception {
+    try (ReadinessFixture fixture = new ReadinessFixture()) {
+      AtomicBoolean firstReady = new AtomicBoolean();
+      AtomicBoolean secondReady = new AtomicBoolean();
+      ReadinessWaiter first = fixture.start(firstReady::get, () -> false);
+      fixture.assertGauge(1);
+      ReadinessWaiter second = fixture.start(secondReady::get, () -> false);
+      fixture.assertGauge(2);
+
+      firstReady.set(true);
+      fixture.signalRelease();
+      assertTrue(first.result().get(2, TimeUnit.SECONDS));
+      fixture.assertGauge(1);
+      assertFalse(second.result().isDone(), "One ready consumer must not clear the other consumer's wait");
+
+      secondReady.set(true);
+      fixture.signalRelease();
+      assertTrue(second.result().get(2, TimeUnit.SECONDS));
+      fixture.assertGauge(0);
+      assertTrue(fixture._gaugeUpdates.isEmpty(), "Repeated false checks must not count the same waiter again");
+    }
+  }
+
+  @DataProvider
+  public Object[][] readinessExits() {
+    return new Object[][]{{"stop"}, {"interrupt"}, {"failure"}};
+  }
+
+  @Test(dataProvider = "readinessExits", timeOut = 10_000)
+  public void testReadinessGaugeClearedOnUnsuccessfulExit(String exit) throws Exception {
+    try (ReadinessFixture fixture = new ReadinessFixture()) {
+      AtomicBoolean stopped = new AtomicBoolean();
+      AtomicBoolean failed = new AtomicBoolean();
+      ReadinessWaiter waiter = fixture.start(() -> {
+        if (failed.get()) {
+          throw new IllegalStateException("Readiness failed");
+        }
+        return false;
+      }, stopped::get);
+      fixture.assertGauge(1);
+      if (exit.equals("stop")) {
+        stopped.set(true);
+        fixture.signalRelease();
+        assertFalse(waiter.result().get(2, TimeUnit.SECONDS));
+      } else {
+        if (exit.equals("interrupt")) {
+          waiter.thread().interrupt();
+        } else {
+          failed.set(true);
+          fixture.signalRelease();
+        }
+        ExecutionException exception =
+            expectThrows(ExecutionException.class, () -> waiter.result().get(2, TimeUnit.SECONDS));
+        assertEquals(exception.getCause().getClass(),
+            exit.equals("interrupt") ? InterruptedException.class : IllegalStateException.class);
+      }
+      fixture.assertGauge(0);
+    }
+  }
+
+  @Test
+  public void testReadinessGaugeDoesNotCountConsumersThatNeverWait() throws Exception {
+    try (ReadinessFixture fixture = new ReadinessFixture()) {
+      assertTrue(fixture._coordinator.waitUntilReadyToConsume(1, () -> true, () -> false));
+      assertFalse(fixture._coordinator.waitUntilReadyToConsume(1, () -> false, () -> true));
+      expectThrows(IllegalStateException.class, () -> fixture._coordinator.waitUntilReadyToConsume(1, () -> {
+        throw new IllegalStateException("Initial readiness failed");
+      }, () -> false));
+      assertTrue(fixture._gaugeUpdates.isEmpty(), "Only a false readiness result should create a counted waiter");
+    }
+  }
+
+  /// Pairs the worker with its outcome so failures on the consumer thread are observed by the test thread.
+  private record ReadinessWaiter(FutureTask<Boolean> result, Thread thread) {
+  }
+
+  /// Owns a partition coordinator and its workers. The test thread owns the worker list; metric updates cross a queue.
+  private static class ReadinessFixture implements AutoCloseable {
+    private final BlockingQueue<Long> _gaugeUpdates = new LinkedBlockingQueue<>();
+    private final List<Thread> _threads = new ArrayList<>();
+    private final ConsumerCoordinator _coordinator;
+
+    ReadinessFixture() {
+      ServerMetrics metrics = mock(ServerMetrics.class);
+      doAnswer(invocation -> {
+        Supplier<Long> value = invocation.getArgument(3);
+        _gaugeUpdates.add(value.get());
+        return null;
+      }).when(metrics).setOrUpdatePartitionGauge(eq("tableTest_REALTIME"), eq(1),
+          eq(ServerGauge.CONSUMERS_WAITING_FOR_READINESS), any());
+      RealtimeTableDataManager table = mock(RealtimeTableDataManager.class);
+      when(table.getTableName()).thenReturn("tableTest_REALTIME");
+      try (MockedStatic<ServerMetrics> factory = mockStatic(ServerMetrics.class)) {
+        factory.when(ServerMetrics::get).thenReturn(metrics);
+        _coordinator = new ConsumerCoordinator(false, table);
+      }
+    }
+
+    ReadinessWaiter start(BooleanSupplier ready, BooleanSupplier stopped) {
+      FutureTask<Boolean> result = new FutureTask<>(() -> _coordinator.waitUntilReadyToConsume(1, ready, stopped));
+      Thread thread = new Thread(result, "readiness-metric");
+      _threads.add(thread);
+      thread.start();
+      return new ReadinessWaiter(result, thread);
+    }
+
+    void assertGauge(long count) throws InterruptedException {
+      assertEquals(_gaugeUpdates.poll(2, TimeUnit.SECONDS), Long.valueOf(count));
+    }
+
+    void signalRelease() {
+      assertTrue(_coordinator.getSemaphore().tryAcquire());
+      _coordinator.release();
+    }
+
+    @Override
+    public void close() throws InterruptedException {
+      for (Thread thread : _threads) {
+        thread.interrupt();
+        thread.join(2000);
+        assertFalse(thread.isAlive(), "Readiness worker did not terminate");
+      }
+    }
   }
 
   @Test

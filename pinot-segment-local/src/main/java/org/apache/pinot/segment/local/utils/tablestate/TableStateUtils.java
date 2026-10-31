@@ -19,6 +19,8 @@
 package org.apache.pinot.segment.local.utils.tablestate;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Predicate;
@@ -115,23 +117,89 @@ public class TableStateUtils {
         continue;
       }
       String segmentName = entry.getKey();
-      LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
-      if (llcSegmentName != null) {
-        if (llcSegmentName.getPartitionGroupId() != consumer.getPartitionGroupId()
-            || llcSegmentName.getSequenceNumber() >= consumer.getSequenceNumber()) {
-          continue;
-        }
-      } else {
-        Integer partitionId = SegmentUtils.getPartitionIdFromSegmentName(segmentName);
-        if (partitionId != null && partitionId != consumer.getPartitionGroupId()) {
-          continue;
-        }
-      }
-      if (!isLocallyReady.test(segmentName)) {
+      if (isRequiredHistory(segmentName, consumer) && !isLocallyReady.test(segmentName)) {
         requiredSegments.add(segmentName);
       }
     }
     return areSegmentsLoaded(helixManager, tableNameWithType, requiredSegments);
+  }
+
+  /// Reads the table assignment and this live instance's current state once for evaluation by multiple consumers.
+  /// The records are copied so subsequent Helix updates cannot mutate the returned snapshot. A cached snapshot must
+  /// only reject readiness; callers must perform a fresh check before authorizing consumption from a cached result.
+  public static ReadinessSnapshot getReadinessSnapshot(HelixManager helixManager, String tableNameWithType) {
+    HelixDataAccessor dataAccessor = helixManager.getHelixDataAccessor();
+    IdealState idealState = dataAccessor.getProperty(dataAccessor.keyBuilder().idealStates(tableNameWithType));
+    if (idealState == null) {
+      LOGGER.warn("Failed to find ideal state for table: {}", tableNameWithType);
+      return new ReadinessSnapshot(Map.of(), Map.of());
+    }
+    String instanceName = helixManager.getInstanceName();
+    Map<String, String> idealStates = new HashMap<>();
+    for (Map.Entry<String, Map<String, String>> entry : idealState.getRecord().getMapFields().entrySet()) {
+      String state = entry.getValue().get(instanceName);
+      if (state != null) {
+        idealStates.put(entry.getKey(), state);
+      }
+    }
+    return new ReadinessSnapshot(idealStates, getCurrentStates(helixManager, tableNameWithType));
+  }
+
+  /// An immutable view of this instance's assignment and current state, safe to share between consumer threads.
+  /// Evaluation performs no ZooKeeper reads and reevaluates the supplied local-readiness predicate for each required
+  /// segment. The predicate must itself be safe for its caller's threads; its results are never retained here.
+  public static final class ReadinessSnapshot {
+    private final Map<String, String> _idealStates;
+    private final Map<String, String> _currentStates;
+
+    private ReadinessSnapshot(Map<String, String> idealStates, Map<String, String> currentStates) {
+      _idealStates = Collections.unmodifiableMap(new HashMap<>(idealStates));
+      _currentStates = Collections.unmodifiableMap(new HashMap<>(currentStates));
+    }
+
+    public boolean isReadyToConsume(LLCSegmentName consumer, Predicate<String> isLocallyReady) {
+      return isReadyToConsume(consumer, isLocallyReady, false);
+    }
+
+    /// Optionally logs the first unavailable history segment. Enable logging for a freshly fetched snapshot, keeping
+    /// repeated rejection checks against a cached snapshot quiet.
+    public boolean isReadyToConsume(LLCSegmentName consumer, Predicate<String> isLocallyReady,
+        boolean logUnavailableSegments) {
+      String consumerState = _idealStates.get(consumer.getSegmentName());
+      if (!SegmentStateModel.CONSUMING.equals(consumerState) && !SegmentStateModel.ONLINE.equals(consumerState)) {
+        return false;
+      }
+      for (Map.Entry<String, String> entry : _idealStates.entrySet()) {
+        String segmentName = entry.getKey();
+        if (SegmentStateModel.ONLINE.equals(entry.getValue()) && isRequiredHistory(segmentName, consumer)
+            && !isLocallyReady.test(segmentName)) {
+          String actualState = _currentStates.get(segmentName);
+          if (!SegmentStateModel.ONLINE.equals(actualState)) {
+            if (logUnavailableSegments) {
+              if (SegmentStateModel.ERROR.equals(actualState)) {
+                LOGGER.error("Consumer: {} is waiting for history segment: {} in ERROR state, expected: {}",
+                    consumer.getSegmentName(), segmentName, SegmentStateModel.ONLINE);
+              } else {
+                LOGGER.info("Consumer: {} is waiting for history segment: {} in state: {}, expected: {}",
+                    consumer.getSegmentName(), segmentName, actualState, SegmentStateModel.ONLINE);
+              }
+            }
+            return false;
+          }
+        }
+      }
+      return true;
+    }
+  }
+
+  private static boolean isRequiredHistory(String segmentName, LLCSegmentName consumer) {
+    LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
+    if (llcSegmentName != null) {
+      return llcSegmentName.getPartitionGroupId() == consumer.getPartitionGroupId()
+          && llcSegmentName.getSequenceNumber() < consumer.getSequenceNumber();
+    }
+    Integer partitionId = SegmentUtils.getPartitionIdFromSegmentName(segmentName);
+    return partitionId == null || partitionId == consumer.getPartitionGroupId();
   }
 
   private static boolean areSegmentsLoaded(HelixManager helixManager, String tableNameWithType,
@@ -141,25 +209,8 @@ public class TableStateUtils {
       return true;
     }
 
-    // Check current state for the required ONLINE segments assigned to this instance.
-    HelixDataAccessor dataAccessor = helixManager.getHelixDataAccessor();
-    PropertyKey.Builder keyBuilder = dataAccessor.keyBuilder();
-    String instanceName = helixManager.getInstanceName();
-    LiveInstance liveInstance = dataAccessor.getProperty(keyBuilder.liveInstance(instanceName));
-    if (liveInstance == null) {
-      LOGGER.warn("Failed to find live instance for instance: {}", instanceName);
-      return false;
-    }
-    String sessionId = liveInstance.getEphemeralOwner();
-    CurrentState currentState =
-        dataAccessor.getProperty(keyBuilder.currentState(instanceName, sessionId, tableNameWithType));
-    if (currentState == null) {
-      LOGGER.warn("Failed to find current state for instance: {}, sessionId: {}, table: {}", instanceName, sessionId,
-          tableNameWithType);
-      return false;
-    }
+    Map<String, String> currentStateMap = getCurrentStates(helixManager, tableNameWithType);
     List<String> unloadedSegments = new ArrayList<>();
-    Map<String, String> currentStateMap = currentState.getPartitionStateMap();
     for (String segmentName : onlineSegments) {
       String actualState = currentStateMap.get(segmentName);
       if (!SegmentStateModel.ONLINE.equals(actualState)) {
@@ -186,5 +237,25 @@ public class TableStateUtils {
       }
       return false;
     }
+  }
+
+  private static Map<String, String> getCurrentStates(HelixManager helixManager, String tableNameWithType) {
+    HelixDataAccessor dataAccessor = helixManager.getHelixDataAccessor();
+    PropertyKey.Builder keyBuilder = dataAccessor.keyBuilder();
+    String instanceName = helixManager.getInstanceName();
+    LiveInstance liveInstance = dataAccessor.getProperty(keyBuilder.liveInstance(instanceName));
+    if (liveInstance == null) {
+      LOGGER.warn("Failed to find live instance for instance: {}", instanceName);
+      return Map.of();
+    }
+    String sessionId = liveInstance.getEphemeralOwner();
+    CurrentState currentState =
+        dataAccessor.getProperty(keyBuilder.currentState(instanceName, sessionId, tableNameWithType));
+    if (currentState == null) {
+      LOGGER.warn("Failed to find current state for instance: {}, sessionId: {}, table: {}", instanceName, sessionId,
+          tableNameWithType);
+      return Map.of();
+    }
+    return currentState.getPartitionStateMap();
   }
 }
