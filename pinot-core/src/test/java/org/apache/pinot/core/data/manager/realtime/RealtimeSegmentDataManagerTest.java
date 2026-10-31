@@ -793,7 +793,7 @@ public class RealtimeSegmentDataManagerTest {
       Assert.assertTrue(segmentDataManager._downloadAndReplaceCalled);
       Assert.assertTrue(segmentDataManager._buildAndReplaceCalled);
       verify(buildFailureServerMetrics, never())
-          .addMeteredTableValue(REALTIME_TABLE_NAME, ServerMeter.SEGMENT_REPLACED_DUE_TO_CRC_MISMATCH, 1);
+          .addMeteredTableValue(anyString(), eq(ServerMeter.SEGMENT_BUILD_WITH_CRC_MISMATCH), eq(1L));
     }
   }
 
@@ -908,7 +908,7 @@ public class RealtimeSegmentDataManagerTest {
       assertTrue(segmentDataManager._buildAndReplaceCalled);
       assertTrue(segmentDataManager._downloadAndReplaceCalled);
       verify(crcMismatchServerMetrics)
-          .addMeteredTableValue(REALTIME_TABLE_NAME, ServerMeter.SEGMENT_REPLACED_DUE_TO_CRC_MISMATCH, 1);
+          .addMeteredTableValue(anyString(), eq(ServerMeter.SEGMENT_BUILD_WITH_CRC_MISMATCH), eq(1L));
     }
 
     // Non-upsert + committed CRC set + local CRC mismatch -> discard local build, download the committed segment.
@@ -929,7 +929,7 @@ public class RealtimeSegmentDataManagerTest {
       Assert.assertTrue(segmentDataManager._buildAndReplaceCalled);
       Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
       verify(matchingUpsertServerMetrics, never())
-          .addMeteredTableValue(REALTIME_TABLE_NAME, ServerMeter.SEGMENT_REPLACED_DUE_TO_CRC_MISMATCH, 1);
+          .addMeteredTableValue(anyString(), eq(ServerMeter.SEGMENT_BUILD_WITH_CRC_MISMATCH), eq(1L));
       verify(segmentDataManager._tableDataManager)
           .replaceConsumingSegment(eq(SEGMENT_NAME_STR), same(committedMetadata));
     }
@@ -944,7 +944,7 @@ public class RealtimeSegmentDataManagerTest {
       Assert.assertTrue(segmentDataManager._buildAndReplaceCalled);
       Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
       verify(matchingNonUpsertServerMetrics, never())
-          .addMeteredTableValue(REALTIME_TABLE_NAME, ServerMeter.SEGMENT_REPLACED_DUE_TO_CRC_MISMATCH, 1);
+          .addMeteredTableValue(anyString(), eq(ServerMeter.SEGMENT_BUILD_WITH_CRC_MISMATCH), eq(1L));
       verify(segmentDataManager._tableDataManager)
           .replaceConsumingSegment(eq(SEGMENT_NAME_STR), same(committedMetadata));
     }
@@ -959,7 +959,7 @@ public class RealtimeSegmentDataManagerTest {
       Assert.assertTrue(segmentDataManager._buildAndReplaceCalled);
       Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
       verify(unsetCrcServerMetrics, never())
-          .addMeteredTableValue(REALTIME_TABLE_NAME, ServerMeter.SEGMENT_REPLACED_DUE_TO_CRC_MISMATCH, 1);
+          .addMeteredTableValue(anyString(), eq(ServerMeter.SEGMENT_BUILD_WITH_CRC_MISMATCH), eq(1L));
       verify(segmentDataManager._tableDataManager)
           .replaceConsumingSegment(eq(SEGMENT_NAME_STR), argThat(m -> m != committedMetadata));
     }
@@ -975,14 +975,14 @@ public class RealtimeSegmentDataManagerTest {
       Assert.assertTrue(segmentDataManager._buildAndReplaceCalled);
       Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
       verify(pauselessServerMetrics, never())
-          .addMeteredTableValue(REALTIME_TABLE_NAME, ServerMeter.SEGMENT_REPLACED_DUE_TO_CRC_MISMATCH, 1);
+          .addMeteredTableValue(anyString(), eq(ServerMeter.SEGMENT_BUILD_WITH_CRC_MISMATCH), eq(1L));
       verify(segmentDataManager._tableDataManager)
           .replaceConsumingSegment(eq(SEGMENT_NAME_STR), argThat(m -> m != committedMetadata));
     }
   }
 
   @Test
-  public void testCrcReplacementMetricForCatchup()
+  public void testCrcBuildMismatchMetricForCatchup()
       throws Exception {
     long finalOffsetValue = START_OFFSET_VALUE + 600;
     LongMsgOffset finalOffset = new LongMsgOffset(finalOffsetValue);
@@ -1002,12 +1002,12 @@ public class RealtimeSegmentDataManagerTest {
       assertTrue(segmentDataManager._buildAndReplaceCalled);
       assertTrue(segmentDataManager._downloadAndReplaceCalled);
       verify(serverMetrics)
-          .addMeteredTableValue(REALTIME_TABLE_NAME, ServerMeter.SEGMENT_REPLACED_DUE_TO_CRC_MISMATCH, 1);
+          .addMeteredTableValue(anyString(), eq(ServerMeter.SEGMENT_BUILD_WITH_CRC_MISMATCH), eq(1L));
     }
   }
 
   @Test
-  public void testCrcReplacementMetricNotEmittedForCatchupBuildFailure()
+  public void testCrcBuildMismatchMetricNotEmittedForCatchupBuildFailure()
       throws Exception {
     long finalOffsetValue = START_OFFSET_VALUE + 600;
     SegmentZKMetadata metadata = crcMetadata(finalOffsetValue, 12345L);
@@ -1025,12 +1025,12 @@ public class RealtimeSegmentDataManagerTest {
       assertTrue(segmentDataManager._buildAndReplaceCalled);
       assertTrue(segmentDataManager._downloadAndReplaceCalled);
       verify(serverMetrics, never())
-          .addMeteredTableValue(REALTIME_TABLE_NAME, ServerMeter.SEGMENT_REPLACED_DUE_TO_CRC_MISMATCH, 1);
+          .addMeteredTableValue(anyString(), eq(ServerMeter.SEGMENT_BUILD_WITH_CRC_MISMATCH), eq(1L));
     }
   }
 
   @Test
-  public void testCrcReplacementMetricNotEmittedForCrcReadError()
+  public void testCrcBuildMismatchMetricNotEmittedForCrcReadError()
       throws Exception {
     long finalOffsetValue = START_OFFSET_VALUE + 600;
     ServerMetrics serverMetrics = mock(ServerMetrics.class);
@@ -1043,12 +1043,12 @@ public class RealtimeSegmentDataManagerTest {
       assertTrue(segmentDataManager._buildAndReplaceCalled);
       assertTrue(segmentDataManager._downloadAndReplaceCalled);
       verify(serverMetrics, never())
-          .addMeteredTableValue(REALTIME_TABLE_NAME, ServerMeter.SEGMENT_REPLACED_DUE_TO_CRC_MISMATCH, 1);
+          .addMeteredTableValue(anyString(), eq(ServerMeter.SEGMENT_BUILD_WITH_CRC_MISMATCH), eq(1L));
     }
   }
 
   @Test
-  public void testCrcReplacementMetricNotEmittedWhenMatchedOffsetDownloadFails()
+  public void testCrcBuildMismatchMetricEmittedWhenMatchedOffsetDownloadFails()
       throws Exception {
     long finalOffsetValue = START_OFFSET_VALUE + 600;
     ServerMetrics serverMetrics = mock(ServerMetrics.class);
@@ -1059,13 +1059,14 @@ public class RealtimeSegmentDataManagerTest {
       assertThrows(IOException.class, () ->
           runGoOnlineForCrcGuard(segmentDataManager, crcMetadata(finalOffsetValue, 12345L), false, finalOffsetValue));
 
-      verify(serverMetrics, never())
-          .addMeteredTableValue(REALTIME_TABLE_NAME, ServerMeter.SEGMENT_REPLACED_DUE_TO_CRC_MISMATCH, 1);
+      // Confirmed mismatch is counted even when the download fallback fails.
+      verify(serverMetrics)
+          .addMeteredTableValue(anyString(), eq(ServerMeter.SEGMENT_BUILD_WITH_CRC_MISMATCH), eq(1L));
     }
   }
 
   @Test
-  public void testCrcReplacementMetricNotEmittedWhenCatchupDownloadFails()
+  public void testCrcBuildMismatchMetricEmittedWhenCatchupDownloadFails()
       throws Exception {
     long finalOffsetValue = START_OFFSET_VALUE + 600;
     SegmentZKMetadata metadata = crcMetadata(finalOffsetValue, 12345L);
@@ -1082,8 +1083,9 @@ public class RealtimeSegmentDataManagerTest {
 
       assertThrows(IOException.class, () -> segmentDataManager.goOnlineFromConsuming(metadata));
 
-      verify(serverMetrics, never())
-          .addMeteredTableValue(REALTIME_TABLE_NAME, ServerMeter.SEGMENT_REPLACED_DUE_TO_CRC_MISMATCH, 1);
+      // Confirmed mismatch is counted even when the download fallback fails.
+      verify(serverMetrics)
+          .addMeteredTableValue(anyString(), eq(ServerMeter.SEGMENT_BUILD_WITH_CRC_MISMATCH), eq(1L));
     }
   }
 
@@ -1986,14 +1988,14 @@ public class RealtimeSegmentDataManagerTest {
     }
 
     @Override
-    protected BuildSegmentResult buildSegmentAndReplace(SegmentZKMetadata committedSegmentZKMetadata)
+    protected boolean buildSegmentAndReplace(SegmentZKMetadata committedSegmentZKMetadata)
         throws Exception {
       terminateLoopIfNecessary();
       _buildAndReplaceCalled = true;
       if (_useRealBuildAndReplace) {
         return super.buildSegmentAndReplace(committedSegmentZKMetadata);
       }
-      return _failSegmentBuildAndReplace ? BuildSegmentResult.FAILURE : BuildSegmentResult.SUCCESS;
+      return !_failSegmentBuildAndReplace;
     }
 
     @Override

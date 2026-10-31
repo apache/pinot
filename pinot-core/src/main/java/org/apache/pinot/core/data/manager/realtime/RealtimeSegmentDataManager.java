@@ -179,18 +179,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
-  /// Outcome of building the consuming segment locally and swapping it in.
-  /// Download of the committed segment is a separate fallback the caller performs when the outcome is not SUCCESS.
-  protected enum BuildSegmentResult {
-    /// Local build completed and the consuming segment was replaced with the local copy.
-    SUCCESS,
-    /// Local build failed, or the local CRC could not be read. Caller should download the committed segment.
-    FAILURE,
-    /// Local build completed, but the CRC does not match ZK. Caller should download the committed segment
-    /// instead of swapping in the divergent local copy.
-    CRC_MISMATCH
-  }
-
   @VisibleForTesting
   public class SegmentBuildDescriptor {
     final File _segmentTarFile;
@@ -1416,7 +1404,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   protected boolean buildSegmentAndReplace()
       throws Exception {
-    return buildSegmentAndReplace(null) == BuildSegmentResult.SUCCESS;
+    return buildSegmentAndReplace(null);
   }
 
   /// Builds the segment from the in-memory rows and replaces the CONSUMING segment with the local copy.
@@ -1427,18 +1415,21 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   /// caller downloads the committed segment. Skipped for pauseless tables and segments whose CRC is not yet set (the
   /// COMMITTING window), so we never download a not-yet-uploaded segment (see PR #17885).
   ///
+  /// Confirmed CRC mismatches are counted via {@link ServerMeter#SEGMENT_BUILD_WITH_CRC_MISMATCH} regardless of
+  /// whether the caller's download fallback succeeds. Build failures and CRC-read errors are not counted.
+  ///
   /// @param committedSegmentZKMetadata committed ZK metadata carrying the CRC, or `null` to skip the check
-  /// @return result indicating success, build failure, or rejection caused by a confirmed CRC mismatch
-  protected BuildSegmentResult buildSegmentAndReplace(@Nullable SegmentZKMetadata committedSegmentZKMetadata)
+  /// @return `true` if the consuming segment was replaced with the local copy; `false` if the caller should download
+  protected boolean buildSegmentAndReplace(@Nullable SegmentZKMetadata committedSegmentZKMetadata)
       throws Exception {
     SegmentBuildDescriptor descriptor;
     try {
       descriptor = buildSegmentInternal(false);
     } catch (Exception e) {
-      return BuildSegmentResult.FAILURE;
+      return false;
     }
     if (descriptor == null) {
-      return BuildSegmentResult.FAILURE;
+      return false;
     }
     boolean crcCheckEnabled = committedSegmentZKMetadata != null && committedSegmentZKMetadata.getCrc() >= 0
         && !PauselessConsumptionUtils.isPauselessEnabled(_tableConfig);
@@ -1447,18 +1438,19 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         if (!isLocalSegmentCrcMatchingZk(committedSegmentZKMetadata)) {
           _segmentLogger.warn("Locally-built segment: {} CRC does not match committed CRC: {} in zk. "
               + "Skipping local build to replace", _segmentNameStr, committedSegmentZKMetadata.getCrc());
-          return BuildSegmentResult.CRC_MISMATCH;
+          _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_BUILD_WITH_CRC_MISMATCH, 1);
+          return false;
         }
       } catch (Exception e) {
         _segmentLogger.warn("Failed to read CRC of locally-built segment: {}; treating as a build failure to download "
             + "the committed segment", _segmentNameStr, e);
-        return BuildSegmentResult.FAILURE;
+        return false;
       }
     }
     // On a CRC match use the committed metadata; otherwise the construction-time metadata.
     _realtimeTableDataManager.replaceConsumingSegment(_segmentNameStr,
         crcCheckEnabled ? committedSegmentZKMetadata : _segmentZKMetadata);
-    return BuildSegmentResult.SUCCESS;
+    return true;
   }
 
   /// Whether the just-built local segment's CRC matches the committed CRC in ZK.
@@ -1732,15 +1724,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           } else if (_currentOffset.compareTo(endOffset) == 0) {
             _segmentLogger.info("Current offset {} matches offset in zk {}. Replacing segment", _currentOffset,
                 endOffset);
-            BuildSegmentResult buildSegmentResult = buildSegmentAndReplace(segmentZKMetadata);
-            if (buildSegmentResult != BuildSegmentResult.SUCCESS) {
+            if (!buildSegmentAndReplace(segmentZKMetadata)) {
               _segmentLogger.warn("Failed to build the segment: {} and replace. Downloading to replace",
                   _segmentNameStr);
               downloadSegmentAndReplace(segmentZKMetadata);
-              if (buildSegmentResult == BuildSegmentResult.CRC_MISMATCH) {
-                _serverMetrics.addMeteredTableValue(_tableNameWithType,
-                    ServerMeter.SEGMENT_REPLACED_DUE_TO_CRC_MISMATCH, 1);
-              }
             }
           } else {
             boolean success = false;
@@ -1759,15 +1746,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             if (success) {
               _segmentLogger.info("Caught up to offset {}", _currentOffset);
               // After catching up the offset matches zk; apply the same CRC guard as the matched-offset case.
-              BuildSegmentResult buildSegmentResult = buildSegmentAndReplace(segmentZKMetadata);
-              if (buildSegmentResult != BuildSegmentResult.SUCCESS) {
+              if (!buildSegmentAndReplace(segmentZKMetadata)) {
                 _segmentLogger.warn("Failed to build the segment: {} after catchup. Downloading to replace",
                     _segmentNameStr);
                 downloadSegmentAndReplace(segmentZKMetadata);
-                if (buildSegmentResult == BuildSegmentResult.CRC_MISMATCH) {
-                  _serverMetrics.addMeteredTableValue(_tableNameWithType,
-                      ServerMeter.SEGMENT_REPLACED_DUE_TO_CRC_MISMATCH, 1);
-                }
               }
             } else {
               _segmentLogger
