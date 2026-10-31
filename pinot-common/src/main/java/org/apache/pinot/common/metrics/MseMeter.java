@@ -44,7 +44,9 @@ public enum MseMeter implements AbstractMetrics.Meter {
   WINDOW_TIMES_MAX_ROWS_REACHED("times", true, ServerMeter.WINDOW_TIMES_MAX_ROWS_REACHED),
   IN_MEMORY_MESSAGES("messages", true, ServerMeter.MULTI_STAGE_IN_MEMORY_MESSAGES),
   RAW_MESSAGES("messages", true, ServerMeter.MULTI_STAGE_RAW_MESSAGES),
-  RAW_BYTES("bytes", true, ServerMeter.MULTI_STAGE_RAW_BYTES);
+  RAW_BYTES("bytes", true, ServerMeter.MULTI_STAGE_RAW_BYTES),
+  MISROUTED_REQUESTS_REJECTED("requests", true, ServerMeter.MULTI_STAGE_MISROUTED_REQUESTS_REJECTED),
+  MISROUTED_REQUESTS_REJECTED_BY_PEER("requests", true, ServerMeter.MULTI_STAGE_MISROUTED_REQUESTS_REJECTED_BY_PEER);
 
   private final String _meterName;
   private final String _unit;
