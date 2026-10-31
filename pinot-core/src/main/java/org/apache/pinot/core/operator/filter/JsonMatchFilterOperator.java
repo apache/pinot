@@ -124,10 +124,14 @@ public class JsonMatchFilterOperator extends BaseFilterOperator {
     // getMatchingDocIds may return a read-only bitmap backed by the index's (possibly memory-mapped) storage. This
     // operator only iterates it (BitmapDocIdSet / BitmapCollection / getCardinality) within the segment's acquired
     // lifetime and never mutates it, so a borrowed posting list can be consumed directly without a copy.
+    ImmutableRoaringBitmap docIds;
     if (_predicate != null) {
-      return _jsonIndex.getMatchingDocIds(_predicate.getValue(), _predicate.getCountPredicate());
+      docIds = _jsonIndex.getMatchingDocIds(_predicate.getValue(), _predicate.getCountPredicate());
     } else {
-      return _jsonIndex.getMatchingDocIds(_filterContext);
+      docIds = _jsonIndex.getMatchingDocIds(_filterContext);
     }
+    // On a consuming segment, the JSON index can hold documents ingested after numDocs was read at planning time, which
+    // the count and the bitmaps must leave out. The bitmap is only copied when it holds such documents.
+    return FilterOperatorUtils.limitToNumDocs(docIds, _numDocs);
   }
 }

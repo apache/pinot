@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator.filter;
 import com.google.common.base.CaseFormat;
 import com.google.common.base.Preconditions;
 import com.uber.h3core.LengthUnit;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -124,16 +125,8 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
         HashSet<Long> partialMatchH3Ids = new HashSet<>(getPossibleMatchH3Ids(_upperBound));
         partialMatchH3Ids.removeAll(fullMatchH3Ids);
 
-        MutableRoaringBitmap fullMatchDocIds = new MutableRoaringBitmap();
-        for (long fullMatchH3Id : fullMatchH3Ids) {
-          fullMatchDocIds.or(_h3IndexReader.getDocIds(fullMatchH3Id));
-        }
-
-        MutableRoaringBitmap partialMatchDocIds = new MutableRoaringBitmap();
-        for (long partialMatchH3Id : partialMatchH3Ids) {
-          partialMatchDocIds.or(_h3IndexReader.getDocIds(partialMatchH3Id));
-        }
-
+        MutableRoaringBitmap fullMatchDocIds = getDocIds(fullMatchH3Ids);
+        MutableRoaringBitmap partialMatchDocIds = getDocIds(partialMatchH3Ids);
         return getFilterBlock(fullMatchDocIds, partialMatchDocIds);
       }
 
@@ -144,10 +137,7 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
         Set<Long> possibleNotMatchH3Ids = new HashSet<>(getPossibleMatchH3Ids(_lowerBound));
 
         // Flip the result of possible not match doc ids to get the full match doc ids
-        MutableRoaringBitmap fullMatchDocIds = new MutableRoaringBitmap();
-        for (long partialMatchH3Id : possibleNotMatchH3Ids) {
-          fullMatchDocIds.or(_h3IndexReader.getDocIds(partialMatchH3Id));
-        }
+        MutableRoaringBitmap fullMatchDocIds = getDocIds(possibleNotMatchH3Ids);
         fullMatchDocIds.flip(0L, _numDocs);
         // The flip turns non-matching docs into full matches, but null geometries have no posting and must not be
         // reported as matches when query null handling is enabled, so exclude them.
@@ -158,10 +148,7 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
 
         // Remove the always not match H3 ids from possible not match H3 ids to get the partial match H3 ids
         possibleNotMatchH3Ids.removeAll(alwaysNotMatchH3Ids);
-        MutableRoaringBitmap partialMatchDocIds = new MutableRoaringBitmap();
-        for (long partialMatchH3Id : possibleNotMatchH3Ids) {
-          partialMatchDocIds.or(_h3IndexReader.getDocIds(partialMatchH3Id));
-        }
+        MutableRoaringBitmap partialMatchDocIds = getDocIds(possibleNotMatchH3Ids);
 
         return getFilterBlock(fullMatchDocIds, partialMatchDocIds);
       }
@@ -181,20 +168,14 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
       } else {
         fullMatchH3Ids = Set.of();
       }
-      MutableRoaringBitmap fullMatchDocIds = new MutableRoaringBitmap();
-      for (long fullMatchH3Id : fullMatchH3Ids) {
-        fullMatchDocIds.or(_h3IndexReader.getDocIds(fullMatchH3Id));
-      }
+      MutableRoaringBitmap fullMatchDocIds = getDocIds(fullMatchH3Ids);
 
       // Remove the always match H3 ids for the lower bound (always not match H3 ids) and the full match H3 ids from the
       // possible match H3 ids for the upper bound to get the partial match H3 ids
       Set<Long> partialMatchH3Ids = new HashSet<>(upperPossibleMatchH3Ids);
       partialMatchH3Ids.removeAll(lowerAlwaysMatchH3Ids);
       partialMatchH3Ids.removeAll(fullMatchH3Ids);
-      MutableRoaringBitmap partialMatchDocIds = new MutableRoaringBitmap();
-      for (long partialMatchH3Id : partialMatchH3Ids) {
-        partialMatchDocIds.or(_h3IndexReader.getDocIds(partialMatchH3Id));
-      }
+      MutableRoaringBitmap partialMatchDocIds = getDocIds(partialMatchH3Ids);
 
       return getFilterBlock(fullMatchDocIds, partialMatchDocIds);
     } catch (Exception e) {
@@ -236,6 +217,18 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
   private List<Long> getH3Ids(int numRings) {
     Preconditions.checkState(numRings <= 100, "Expect numRings <= 100, got: %s", numRings);
     return H3Utils.H3_CORE.gridDisk(_h3Id, numRings);
+  }
+
+  /// Returns the documents indexed under any of the given H3 ids, limited to `[0, numDocs)`. On a consuming segment,
+  /// the H3 index keeps indexing while the query runs, so it can hold documents ingested after numDocs was read at
+  /// planning time. These must be left out: the flip for the lower bound would turn them into matches.
+  private MutableRoaringBitmap getDocIds(Collection<Long> h3Ids) {
+    MutableRoaringBitmap docIds = new MutableRoaringBitmap();
+    for (long h3Id : h3Ids) {
+      docIds.or(_h3IndexReader.getDocIds(h3Id));
+    }
+    docIds.remove(_numDocs, 0x100000000L);
+    return docIds;
   }
 
   /// Returns the filter block document IDs based on the given full match doc ids and the partial match doc ids.
