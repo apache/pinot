@@ -290,6 +290,8 @@ public class AggregationFunctionFactory {
             return new DistinctAvgAggregationFunction(arguments, nullHandlingEnabled);
           case IDSET:
             return new IdSetAggregationFunction(arguments, nullHandlingEnabled);
+          case TEXTSCORESTATS:
+            return new TextScoreStatsAggregationFunction(arguments, nullHandlingEnabled);
           case COUNTMV:
             return new CountMVAggregationFunction(arguments, nullHandlingEnabled);
           case MINMV:
