@@ -22,6 +22,7 @@ import com.dynatrace.hash4j.distinctcount.UltraLogLog;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -32,6 +33,7 @@ import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.core.query.aggregation.groupby.offheap.OffHeapUltraLogLogGroupByResultHolder;
 import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.Constants;
@@ -53,6 +55,10 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
         numExpressions);
     if (arguments.size() == 2) {
       _p = arguments.get(1).getLiteral().getIntValue();
+      // hash4j's UltraLogLog.create(p) bound; validate at plan time so the off-heap holder (which sizes direct
+      // memory as 1 << p without calling create) can never see an out-of-range p
+      Preconditions.checkArgument(_p >= 3 && _p <= 26,
+          "Invalid p for DistinctCountULL: %s, must be in [3, 26]", _p);
     } else {
       _p = CommonConstants.Helix.DEFAULT_ULTRALOGLOG_P;
     }
@@ -75,6 +81,11 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
   @Override
   public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity) {
     return new ObjectGroupByResultHolder(initialCapacity, maxCapacity);
+  }
+
+  @Override
+  public GroupByResultHolder createOffHeapGroupByResultHolder(int initialCapacity, int maxCapacity) {
+    return new OffHeapUltraLogLogGroupByResultHolder(_p, initialCapacity, maxCapacity);
   }
 
   @Override
@@ -331,8 +342,7 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
         int[] intValues = blockValSet.getIntValuesSV();
         forEachNotNull(length, blockValSet, (from, to) -> {
           for (int i = from; i < to; i++) {
-            UltraLogLogUtils.hashObject(intValues[i])
-                .ifPresent(getULL(groupByResultHolder, groupKeyArray[i])::add);
+            addHash(groupByResultHolder, groupKeyArray[i], UltraLogLogUtils.hashObject(intValues[i]));
           }
         });
         break;
@@ -340,8 +350,7 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
         long[] longValues = blockValSet.getLongValuesSV();
         forEachNotNull(length, blockValSet, (from, to) -> {
           for (int i = from; i < to; i++) {
-            UltraLogLogUtils.hashObject(longValues[i])
-                .ifPresent(getULL(groupByResultHolder, groupKeyArray[i])::add);
+            addHash(groupByResultHolder, groupKeyArray[i], UltraLogLogUtils.hashObject(longValues[i]));
           }
         });
         break;
@@ -349,8 +358,7 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
         float[] floatValues = blockValSet.getFloatValuesSV();
         forEachNotNull(length, blockValSet, (from, to) -> {
           for (int i = from; i < to; i++) {
-            UltraLogLogUtils.hashObject(floatValues[i])
-                .ifPresent(getULL(groupByResultHolder, groupKeyArray[i])::add);
+            addHash(groupByResultHolder, groupKeyArray[i], UltraLogLogUtils.hashObject(floatValues[i]));
           }
         });
         break;
@@ -358,8 +366,7 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
         double[] doubleValues = blockValSet.getDoubleValuesSV();
         forEachNotNull(length, blockValSet, (from, to) -> {
           for (int i = from; i < to; i++) {
-            UltraLogLogUtils.hashObject(doubleValues[i])
-                .ifPresent(getULL(groupByResultHolder, groupKeyArray[i])::add);
+            addHash(groupByResultHolder, groupKeyArray[i], UltraLogLogUtils.hashObject(doubleValues[i]));
           }
         });
         break;
@@ -367,8 +374,7 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
         String[] stringValues = blockValSet.getStringValuesSV();
         forEachNotNull(length, blockValSet, (from, to) -> {
           for (int i = from; i < to; i++) {
-            UltraLogLogUtils.hashObject(stringValues[i])
-                .ifPresent(getULL(groupByResultHolder, groupKeyArray[i])::add);
+            addHash(groupByResultHolder, groupKeyArray[i], UltraLogLogUtils.hashObject(stringValues[i]));
           }
         });
         break;
@@ -376,8 +382,7 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
         forEachNotNull(length, blockValSet, (from, to) -> {
           for (int i = from; i < to; i++) {
-            UltraLogLogUtils.hashObject(bytesValues[i])
-                .ifPresent(getULL(groupByResultHolder, groupKeyArray[i])::add);
+            addHash(groupByResultHolder, groupKeyArray[i], UltraLogLogUtils.hashObject(bytesValues[i]));
           }
         });
         break;
@@ -407,9 +412,10 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
         int[][] intValues = blockValSet.getIntValuesMV();
         forEachNotNull(length, blockValSet, (from, to) -> {
           for (int i = from; i < to; i++) {
-            UltraLogLog ull = getULL(groupByResultHolder, groupKeyArray[i]);
+            int groupKey = groupKeyArray[i];
+            touchULL(groupByResultHolder, groupKey);
             for (int value : intValues[i]) {
-              UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+              addHash(groupByResultHolder, groupKey, UltraLogLogUtils.hashObject(value));
             }
           }
         });
@@ -418,9 +424,10 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
         long[][] longValues = blockValSet.getLongValuesMV();
         forEachNotNull(length, blockValSet, (from, to) -> {
           for (int i = from; i < to; i++) {
-            UltraLogLog ull = getULL(groupByResultHolder, groupKeyArray[i]);
+            int groupKey = groupKeyArray[i];
+            touchULL(groupByResultHolder, groupKey);
             for (long value : longValues[i]) {
-              UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+              addHash(groupByResultHolder, groupKey, UltraLogLogUtils.hashObject(value));
             }
           }
         });
@@ -429,9 +436,10 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
         float[][] floatValues = blockValSet.getFloatValuesMV();
         forEachNotNull(length, blockValSet, (from, to) -> {
           for (int i = from; i < to; i++) {
-            UltraLogLog ull = getULL(groupByResultHolder, groupKeyArray[i]);
+            int groupKey = groupKeyArray[i];
+            touchULL(groupByResultHolder, groupKey);
             for (float value : floatValues[i]) {
-              UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+              addHash(groupByResultHolder, groupKey, UltraLogLogUtils.hashObject(value));
             }
           }
         });
@@ -440,9 +448,10 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
         double[][] doubleValues = blockValSet.getDoubleValuesMV();
         forEachNotNull(length, blockValSet, (from, to) -> {
           for (int i = from; i < to; i++) {
-            UltraLogLog ull = getULL(groupByResultHolder, groupKeyArray[i]);
+            int groupKey = groupKeyArray[i];
+            touchULL(groupByResultHolder, groupKey);
             for (double value : doubleValues[i]) {
-              UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+              addHash(groupByResultHolder, groupKey, UltraLogLogUtils.hashObject(value));
             }
           }
         });
@@ -451,9 +460,10 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
         String[][] stringValues = blockValSet.getStringValuesMV();
         forEachNotNull(length, blockValSet, (from, to) -> {
           for (int i = from; i < to; i++) {
-            UltraLogLog ull = getULL(groupByResultHolder, groupKeyArray[i]);
+            int groupKey = groupKeyArray[i];
+            touchULL(groupByResultHolder, groupKey);
             for (String value : stringValues[i]) {
-              UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+              addHash(groupByResultHolder, groupKey, UltraLogLogUtils.hashObject(value));
             }
           }
         });
@@ -462,9 +472,10 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
         byte[][][] bytesValues = blockValSet.getBytesValuesMV();
         forEachNotNull(length, blockValSet, (from, to) -> {
           for (int i = from; i < to; i++) {
-            UltraLogLog ull = getULL(groupByResultHolder, groupKeyArray[i]);
+            int groupKey = groupKeyArray[i];
+            touchULL(groupByResultHolder, groupKey);
             for (byte[] value : bytesValues[i]) {
-              UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+              addHash(groupByResultHolder, groupKey, UltraLogLogUtils.hashObject(value));
             }
           }
         });
@@ -608,9 +619,9 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
           for (int i = from; i < to; i++) {
             int[] intRow = intValues[i];
             for (int groupKey : groupKeysArray[i]) {
-              UltraLogLog ull = getULL(groupByResultHolder, groupKey);
+              touchULL(groupByResultHolder, groupKey);
               for (int value : intRow) {
-                UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+                addHash(groupByResultHolder, groupKey, UltraLogLogUtils.hashObject(value));
               }
             }
           }
@@ -622,9 +633,9 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
           for (int i = from; i < to; i++) {
             long[] longRow = longValues[i];
             for (int groupKey : groupKeysArray[i]) {
-              UltraLogLog ull = getULL(groupByResultHolder, groupKey);
+              touchULL(groupByResultHolder, groupKey);
               for (long value : longRow) {
-                UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+                addHash(groupByResultHolder, groupKey, UltraLogLogUtils.hashObject(value));
               }
             }
           }
@@ -636,9 +647,9 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
           for (int i = from; i < to; i++) {
             float[] floatRow = floatValues[i];
             for (int groupKey : groupKeysArray[i]) {
-              UltraLogLog ull = getULL(groupByResultHolder, groupKey);
+              touchULL(groupByResultHolder, groupKey);
               for (float value : floatRow) {
-                UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+                addHash(groupByResultHolder, groupKey, UltraLogLogUtils.hashObject(value));
               }
             }
           }
@@ -650,9 +661,9 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
           for (int i = from; i < to; i++) {
             double[] doubleRow = doubleValues[i];
             for (int groupKey : groupKeysArray[i]) {
-              UltraLogLog ull = getULL(groupByResultHolder, groupKey);
+              touchULL(groupByResultHolder, groupKey);
               for (double value : doubleRow) {
-                UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+                addHash(groupByResultHolder, groupKey, UltraLogLogUtils.hashObject(value));
               }
             }
           }
@@ -664,9 +675,9 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
           for (int i = from; i < to; i++) {
             String[] stringRow = stringValues[i];
             for (int groupKey : groupKeysArray[i]) {
-              UltraLogLog ull = getULL(groupByResultHolder, groupKey);
+              touchULL(groupByResultHolder, groupKey);
               for (String value : stringRow) {
-                UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+                addHash(groupByResultHolder, groupKey, UltraLogLogUtils.hashObject(value));
               }
             }
           }
@@ -678,9 +689,9 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
           for (int i = from; i < to; i++) {
             byte[][] bytesRow = bytesValues[i];
             for (int groupKey : groupKeysArray[i]) {
-              UltraLogLog ull = getULL(groupByResultHolder, groupKey);
+              touchULL(groupByResultHolder, groupKey);
               for (byte[] value : bytesRow) {
-                UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+                addHash(groupByResultHolder, groupKey, UltraLogLogUtils.hashObject(value));
               }
             }
           }
@@ -811,7 +822,7 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
     return dictIdsWrapper._dictIdBitmap;
   }
 
-  /// Returns the HyperLogLogPlus for the given group key or creates a new one if it does not exist.
+  /// Returns the UltraLogLog for the given group key or creates a new one if it does not exist.
   protected UltraLogLog getULL(GroupByResultHolder groupByResultHolder, int groupKey) {
     UltraLogLog ull = groupByResultHolder.getResult(groupKey);
     if (ull == null) {
@@ -819,6 +830,35 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
       groupByResultHolder.setValueForKey(groupKey, ull);
     }
     return ull;
+  }
+
+  /// Ensures the per-group ULL state exists (off-heap slot or on-heap object). Mirrors the on-heap path's eager
+  /// state creation so untouched-vs-empty groups never diverge between the two modes.
+  protected void touchULL(GroupByResultHolder groupByResultHolder, int groupKey) {
+    if (groupByResultHolder instanceof OffHeapUltraLogLogGroupByResultHolder) {
+      ((OffHeapUltraLogLogGroupByResultHolder) groupByResultHolder).touch(groupKey);
+    } else {
+      getULL(groupByResultHolder, groupKey);
+    }
+  }
+
+  /// Adds the hashed value (when present) into the per-group ULL state, routing register updates straight into
+  /// direct memory when the query runs with off-heap group-by state.
+  protected void addHash(GroupByResultHolder groupByResultHolder, int groupKey, Optional<Long> hashValue) {
+    if (groupByResultHolder instanceof OffHeapUltraLogLogGroupByResultHolder) {
+      OffHeapUltraLogLogGroupByResultHolder offHeapHolder =
+          (OffHeapUltraLogLogGroupByResultHolder) groupByResultHolder;
+      if (hashValue.isPresent()) {
+        // add() creates the slot on first touch, so no separate touch is needed on this (hot) branch
+        offHeapHolder.add(groupKey, hashValue.get());
+      } else {
+        // State creation still matches the on-heap branch, where getULL runs before the presence check
+        offHeapHolder.touch(groupKey);
+      }
+    } else {
+      UltraLogLog ull = getULL(groupByResultHolder, groupKey);
+      hashValue.ifPresent(ull::add);
+    }
   }
 
   /// Helper method to set dictionary id for the given group keys into the result holder.
@@ -831,9 +871,9 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
 
   /// Helper method to set value for the given group keys into the result holder.
   private void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, Object value) {
+    Optional<Long> hashValue = UltraLogLogUtils.hashObject(value);
     for (int groupKey : groupKeys) {
-      UltraLogLogUtils.hashObject(value)
-          .ifPresent(getULL(groupByResultHolder, groupKey)::add);
+      addHash(groupByResultHolder, groupKey, hashValue);
     }
   }
 
