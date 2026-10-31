@@ -20,11 +20,13 @@ package org.apache.pinot.sql.parsers.parser;
 
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
@@ -32,6 +34,18 @@ import static org.testng.Assert.assertTrue;
 
 /// Tests for the TableNameExtractor class.
 public class TableNameExtractorTest {
+  /// The MATCH_RECOGNIZE clause shared by the row pattern recognition cases. Its pattern variables (STRT, DOWN, UP),
+  /// columns (symbol, ts, price) and measure aliases (startPrice, bottomPrice) are identifiers that must never be
+  /// reported as table names.
+  private static final String MATCH_RECOGNIZE_CLAUSE = "MATCH_RECOGNIZE ("
+      + "PARTITION BY symbol ORDER BY ts "
+      + "MEASURES FIRST(STRT.price) AS startPrice, LAST(DOWN.price) AS bottomPrice "
+      + "ONE ROW PER MATCH "
+      + "AFTER MATCH SKIP PAST LAST ROW "
+      + "PATTERN (STRT DOWN+ UP+) "
+      + "DEFINE DOWN AS DOWN.price < PREV(DOWN.price), UP AS UP.price > PREV(UP.price))";
+  private static final List<String> MATCH_RECOGNIZE_NON_TABLE_NAMES =
+      List.of("STRT", "DOWN", "UP", "symbol", "ts", "price", "startPrice", "bottomPrice", "mr", "s");
 
   @Test
   public void testResolveTableNameWithSingleQuery() {
@@ -281,6 +295,49 @@ public class TableNameExtractorTest {
     assertEquals(tableNames.length, 2, "Should resolve two tables");
     assertTrue(Arrays.asList(tableNames).contains("users"), "Should contain users table");
     assertTrue(Arrays.asList(tableNames).contains("orders"), "Should contain orders table from QUALIFY subquery");
+  }
+
+  @DataProvider(name = "matchRecognizeQueries")
+  public Object[][] matchRecognizeQueriesDataProvider() {
+    return new Object[][]{
+        {
+            "Plain table input",
+            "SELECT * FROM trades " + MATCH_RECOGNIZE_CLAUSE,
+            new String[]{"trades"}
+        },
+        {
+            "Aliased MATCH_RECOGNIZE",
+            "SELECT mr.startPrice FROM trades " + MATCH_RECOGNIZE_CLAUSE + " AS mr",
+            new String[]{"trades"}
+        },
+        {
+            "Subquery input",
+            "SELECT * FROM (SELECT symbol, ts, price FROM trades WHERE price > 0) " + MATCH_RECOGNIZE_CLAUSE,
+            new String[]{"trades"}
+        },
+        {
+            "Joined with another table",
+            "SELECT mr.startPrice, s.name FROM trades " + MATCH_RECOGNIZE_CLAUSE + " AS mr "
+                + "JOIN symbols s ON mr.symbol = s.symbol",
+            new String[]{"trades", "symbols"}
+        }
+    };
+  }
+
+  /// MATCH_RECOGNIZE is a FROM-clause item whose only table reference is its input; the identifiers in its
+  /// PARTITION BY, ORDER BY, MEASURES, PATTERN and DEFINE clauses are columns and pattern variables.
+  @Test(dataProvider = "matchRecognizeQueries")
+  public void testResolveTableNameWithMatchRecognize(String testName, String sqlQuery, String[] expectedTableNames) {
+    String[] tableNames = TableNameExtractor.resolveTableName(sqlQuery);
+
+    assertNotNull(tableNames, "Table names should not be null for: " + testName);
+    Set<String> actualTableNames = new HashSet<>(Arrays.asList(tableNames));
+    assertEquals(actualTableNames, new HashSet<>(Arrays.asList(expectedTableNames)),
+        "Should extract the MATCH_RECOGNIZE input tables for: " + testName + ", got: " + actualTableNames);
+    for (String name : MATCH_RECOGNIZE_NON_TABLE_NAMES) {
+      assertFalse(actualTableNames.contains(name),
+          "Pattern variable, column or alias '" + name + "' should not be a table name for: " + testName);
+    }
   }
 
   @Test(expectedExceptions = RuntimeException.class)
