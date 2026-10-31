@@ -31,4 +31,17 @@ public interface SegmentUploader {
   /// Uploads the given segmentFile to the deep-store. Returns the URI where the segment is uploaded. The upload will
   /// wait for the specified timeout.
   URI uploadSegment(File segmentFile, LLCSegmentName segmentName, int timeoutInMillis);
+
+  /// Returns true if [#uploadMetadataTar] actually uploads; callers skip building the tar otherwise.
+  default boolean isMetadataTarUploadSupported() {
+    return false;
+  }
+
+  /// Best-effort upload of the segment metadata tar (metadata.properties + creation.meta) to a tmp name next to the
+  /// segment in the segment store, waiting at most timeoutInMillis. The controller moves it to
+  /// `<segment>.metadata.tar.gz` at commit end. Returns the URI it was uploaded to, or null if unsupported or on
+  /// failure.
+  default URI uploadMetadataTar(File metadataTarFile, LLCSegmentName segmentName, int timeoutInMillis) {
+    return null;
+  }
 }

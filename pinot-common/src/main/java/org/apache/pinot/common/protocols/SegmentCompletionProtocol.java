@@ -124,6 +124,7 @@ public class SegmentCompletionProtocol {
   public static final String MSG_TYPE_BUILD_DETERMINISTIC_FAILURE = "segmentBuildDeterministicFailure";
 
   public static final String PARAM_SEGMENT_LOCATION = "location";
+  public static final String PARAM_METADATA_TAR_LOCATION = "metadataTarLocation";
   public static final String PARAM_SEGMENT_NAME = "name";
   public static final String PARAM_STREAM_PARTITION_MSG_OFFSET = "streamPartitionMsgOffset";
   public static final String PARAM_INSTANCE_ID = "instance";
@@ -283,6 +284,9 @@ public class SegmentCompletionProtocol {
       if (_params.getSegmentLocation() != null) {
         params.put(PARAM_SEGMENT_LOCATION, _params.getSegmentLocation());
       }
+      if (_params.getMetadataTarLocation() != null) {
+        params.put(PARAM_METADATA_TAR_LOCATION, _params.getMetadataTarLocation());
+      }
       if (_params.getStreamPartitionMsgOffset() != null) {
         params.put(PARAM_STREAM_PARTITION_MSG_OFFSET, _params.getStreamPartitionMsgOffset());
       }
@@ -301,6 +305,7 @@ public class SegmentCompletionProtocol {
       private long _waitTimeMillis;
       private int _extraTimeSec;
       private String _segmentLocation;
+      private String _metadataTarLocation;
       private long _memoryUsedBytes;
       private long _segmentSizeBytes;
       private String _streamPartitionMsgOffset;
@@ -313,6 +318,7 @@ public class SegmentCompletionProtocol {
         _waitTimeMillis = WAIT_TIME_MILLIS_DEFAULT;
         _extraTimeSec = -1;
         _segmentLocation = null;
+        _metadataTarLocation = null;
         _memoryUsedBytes = MEMORY_USED_BYTES_DEFAULT;
         _segmentSizeBytes = SEGMENT_SIZE_BYTES_DEFAULT;
         _streamPartitionMsgOffset = null;
@@ -328,6 +334,7 @@ public class SegmentCompletionProtocol {
         _waitTimeMillis = params.getWaitTimeMillis();
         _extraTimeSec = params.getExtraTimeSec();
         _segmentLocation = params.getSegmentLocation();
+        _metadataTarLocation = params.getMetadataTarLocation();
         _memoryUsedBytes = params.getMemoryUsedBytes();
         _segmentSizeBytes = params.getSegmentSizeBytes();
         _streamPartitionMsgOffset = params.getStreamPartitionMsgOffset();
@@ -396,6 +403,11 @@ public class SegmentCompletionProtocol {
         return this;
       }
 
+      public Params withMetadataTarLocation(String metadataTarLocation) {
+        _metadataTarLocation = metadataTarLocation;
+        return this;
+      }
+
       public Params withMemoryUsedBytes(long memoryUsedBytes) {
         _memoryUsedBytes = memoryUsedBytes;
         return this;
@@ -449,6 +461,10 @@ public class SegmentCompletionProtocol {
         return _segmentLocation;
       }
 
+      public String getMetadataTarLocation() {
+        return _metadataTarLocation;
+      }
+
       public long getMemoryUsedBytes() {
         return _memoryUsedBytes;
       }
@@ -471,6 +487,7 @@ public class SegmentCompletionProtocol {
             + ",WaitTimeMillis: " + _waitTimeMillis
             + ",ExtraTimeSec: " + _extraTimeSec
             + ",SegmentLocation: " + _segmentLocation
+            + ",MetadataTarLocation: " + _metadataTarLocation
             + ",MemoryUsedBytes: " + _memoryUsedBytes
             + ",SegmentSizeBytes: " + _segmentSizeBytes
             + ",StreamPartitionMsgOffset: " + _streamPartitionMsgOffset;

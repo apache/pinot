@@ -53,6 +53,7 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import org.apache.pinot.controller.helix.core.SegmentDeletionManager;
+import org.apache.pinot.controller.helix.core.retention.strategy.RetentionStrategy;
 import org.apache.pinot.controller.util.BrokerServiceHelper;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
@@ -65,6 +66,7 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -74,6 +76,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.zookeeper.data.Stat;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.helix.core.retention.RetentionManager.DEFAULT_UNTRACKED_SEGMENTS_DELETION_BATCH_SIZE;
@@ -1857,5 +1860,38 @@ public class RetentionManagerTest {
         new LineageEntry(List.of(source), List.of(destination), state, timestamp));
     when(resourceManager.getPropertyStore().get(anyString(), any(Stat.class), eq(AccessOption.PERSISTENT)))
         .thenReturn(lineage.toZNRecord());
+  }
+
+  @DataProvider
+  public Object[][] tableNamesWithType() {
+    return new Object[][]{{OFFLINE_TABLE_NAME}, {REALTIME_TABLE_NAME}};
+  }
+
+  @Test(dataProvider = "tableNamesWithType")
+  public void testUntrackedScanKeepsSidecarOfTrackedSegment(String tableNameWithType)
+      throws Exception {
+    long thirtyDaysAgo = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(30);
+    for (String fileName : List.of("tracked", "tracked" + Constants.METADATA_TAR_GZ_FILE_EXT,
+        "orphan" + Constants.METADATA_TAR_GZ_FILE_EXT)) {
+      File file = new File(_tableDir, fileName);
+      createFileWithContent(file, fileName);
+      setFileModificationTime(file, thirtyDaysAgo);
+    }
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    when(resourceManager.getDataDir()).thenReturn(_tempDir.toString());
+    RetentionStrategy purgeAll = mock(RetentionStrategy.class);
+    when(purgeAll.isPurgeable(anyString(), anyString(), anyLong())).thenReturn(true);
+    ControllerConf conf = new ControllerConf();
+    RetentionManager retentionManager = createRetentionManager(resourceManager, mock(LeadControllerManager.class),
+        conf, new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry()),
+        new BrokerServiceHelper(resourceManager, conf, null, null));
+
+    List<String> toDelete =
+        retentionManager.findUntrackedSegmentsToDeleteFromDeepstore(tableNameWithType, purgeAll, Set.of("tracked"),
+            purgeAll);
+
+    // The aged sidecar of the tracked segment survives; the orphan is still cleaned up (resolved by the deletion path
+    // through its .tar.gz fallback).
+    assertEquals(toDelete, List.of("orphan.metadata"));
   }
 }

@@ -65,6 +65,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.filesystem.FileMetadata;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.DataSizeUtils;
@@ -630,6 +631,15 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
 
       String segmentName = extractSegmentName(fileMetadata.getFilePath());
       if (Strings.isEmpty(segmentName) || segmentsToExclude.contains(segmentName)) {
+        continue;
+      }
+
+      // A metadata sidecar (<segment>.metadata.tar.gz) belongs to its segment: keep it while that segment is tracked.
+      // An orphaned one is cleaned up like any other untracked file.
+      String filePath = fileMetadata.getFilePath();
+      if (filePath.endsWith(Constants.METADATA_TAR_GZ_FILE_EXT) && segmentsToExclude.contains(
+          StringUtils.removeEnd(filePath.substring(filePath.lastIndexOf('/') + 1),
+              Constants.METADATA_TAR_GZ_FILE_EXT))) {
         continue;
       }
 
