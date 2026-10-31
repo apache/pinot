@@ -26,16 +26,21 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.helix.AccessOption;
+import org.apache.helix.BaseDataAccessor;
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.api.listeners.BatchMode;
 import org.apache.helix.api.listeners.InstanceConfigChangeListener;
 import org.apache.helix.api.listeners.PreFetch;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
+import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,8 +74,11 @@ public class ServerMailboxChannelRefreshHandler implements InstanceConfigChangeL
   private final String _selfInstanceId;
   private final MailboxService _mailboxService;
 
-  // Participant names from the last successful scan, used to identify changes unrelated to servers.
+  // A coherent participant snapshot, invalidated whenever a membership or instance config read fails.
   private Set<String> _instances = Set.of();
+  private long _instancesParentCzxid;
+  private int _instancesParentCversion;
+  private boolean _instancesSnapshotValid;
 
   // Tracks servers that have IS_SHUTDOWN_IN_PROGRESS=true. When a server transitions
   // from being in this set to having IS_SHUTDOWN_IN_PROGRESS=false, we refresh its channel.
@@ -97,7 +105,7 @@ public class ServerMailboxChannelRefreshHandler implements InstanceConfigChangeL
     // INIT always scans; child changes scan only if they could affect servers.
     NotificationContext.Type type = context.getType();
     if (type == NotificationContext.Type.INIT || context.getIsChildChange()) {
-      handleFullScan(type == NotificationContext.Type.INIT);
+      handleFullScan(context);
     } else if (type == NotificationContext.Type.CALLBACK) {
       // An existing instance's config changed (e.g. IS_SHUTDOWN_IN_PROGRESS toggled).
       // pathChanged is the ZK path of the specific instance that changed.
@@ -112,13 +120,39 @@ public class ServerMailboxChannelRefreshHandler implements InstanceConfigChangeL
   /// It records the new address of every server before it retires any old one. Otherwise, when one server left an
   /// address and a server read later in the scan took it over, the scan would shut down the channel the second server
   /// uses.
-  private void handleFullScan(boolean initialize) {
-    Set<String> instances = new HashSet<>(_helixAdmin.getInstancesInCluster(_clusterName));
+  private void handleFullScan(NotificationContext context) {
+    boolean previousSnapshotValid = _instancesSnapshotValid;
+    _instancesSnapshotValid = false;
+    HelixDataAccessor dataAccessor = context.getManager().getHelixDataAccessor();
+    BaseDataAccessor<ZNRecord> baseDataAccessor = dataAccessor.getBaseDataAccessor();
+    String parentPath = dataAccessor.keyBuilder().instanceConfigs().getPath();
+    Set<String> instances;
+    Stat before;
+    Stat after;
+    try {
+      // Helix has no atomic child-names/Stat read. A changing parent makes this snapshot unsafe to cache.
+      before = baseDataAccessor.getStat(parentPath, AccessOption.PERSISTENT);
+      instances = new HashSet<>(baseDataAccessor.getChildNames(parentPath, AccessOption.PERSISTENT));
+      after = baseDataAccessor.getStat(parentPath, AccessOption.PERSISTENT);
+    } catch (Exception e) {
+      LOGGER.warn("Failed to read participant membership version, scanning server configs", e);
+      before = null;
+      after = null;
+      instances = new HashSet<>(_helixAdmin.getInstancesInCluster(_clusterName));
+    }
+    boolean stableSnapshot = before != null && after != null && before.getCzxid() == after.getCzxid()
+        && before.getCversion() == after.getCversion() && before.getPzxid() == after.getPzxid();
     Set<String> changedInstances = Sets.symmetricDifference(_instances, instances);
-    // An unchanged snapshot is ambiguous (e.g. a server was recreated with the same name), so still scan it.
-    if (!initialize && !changedInstances.isEmpty()
+    // cversion counts all child creates/deletes, including same-name server recreation hidden by the net diff.
+    // Long subtraction conservatively rejects counter wrap/reset; czxid identifies parent recreation.
+    if (context.getType() != NotificationContext.Type.INIT && previousSnapshotValid && stableSnapshot
+        && after.getCzxid() == _instancesParentCzxid
+        && (long) after.getCversion() - _instancesParentCversion == changedInstances.size()
+        && !changedInstances.isEmpty()
         && changedInstances.stream().noneMatch(InstanceTypeUtils::isServer)) {
       _instances = instances;
+      _instancesParentCversion = after.getCversion();
+      _instancesSnapshotValid = true;
       return;
     }
     boolean allConfigsRead = true;
@@ -134,6 +168,9 @@ public class ServerMailboxChannelRefreshHandler implements InstanceConfigChangeL
       InstanceConfig config = getInstanceConfig(instance);
       if (config == null) {
         allConfigsRead = false;
+        if (_shuttingDownServers.contains(instance)) {
+          currentShuttingDown.add(instance);
+        }
         continue;
       }
       Pair<String, Integer> previousAddress = recordMailboxAddress(instance, config);
@@ -159,8 +196,12 @@ public class ServerMailboxChannelRefreshHandler implements InstanceConfigChangeL
     }
     _shuttingDownServers.clear();
     _shuttingDownServers.addAll(currentShuttingDown);
-    // A failed read must not suppress a retry on the next child change.
-    _instances = allConfigsRead ? instances : Set.of();
+    _instances = instances;
+    if (allConfigsRead && stableSnapshot) {
+      _instancesParentCzxid = after.getCzxid();
+      _instancesParentCversion = after.getCversion();
+      _instancesSnapshotValid = true;
+    }
   }
 
   /// Handles a single instance config change by reading only the changed instance's config
@@ -184,11 +225,15 @@ public class ServerMailboxChannelRefreshHandler implements InstanceConfigChangeL
   @Nullable
   private InstanceConfig getInstanceConfig(String instance) {
     try {
-      return _helixAdmin.getInstanceConfig(_clusterName, instance);
+      InstanceConfig config = _helixAdmin.getInstanceConfig(_clusterName, instance);
+      if (config != null) {
+        return config;
+      }
     } catch (Exception e) {
       LOGGER.warn("Failed to get instance config for: {}, skipping", instance, e);
-      return null;
     }
+    _instancesSnapshotValid = false;
+    return null;
   }
 
   private static boolean isShutdownInProgress(InstanceConfig config) {
