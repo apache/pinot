@@ -799,11 +799,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       long catchUpTimeMillis = 0L;
       _startTimeMs = now();
       try {
-        if (!_isReadyToConsumeData.getAsBoolean()) {
-          do {
-            //noinspection BusyWait
-            Thread.sleep(RealtimeTableDataManager.READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS);
-          } while (!_shouldStop && !_isReadyToConsumeData.getAsBoolean());
+        if (!_consumerCoordinator.waitUntilReadyToConsume(_isReadyToConsumeData, () -> _shouldStop)) {
+          return;
         }
 
         // Acquire semaphore before consuming data
