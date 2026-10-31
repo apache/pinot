@@ -296,4 +296,19 @@ public class ControllerConfTest {
     Assert.assertEquals(conf.getSegmentReplaceExternalViewCheckIntervalMs(), 500L);
     Assert.assertEquals(conf.getSegmentReplaceMaxRetryAttempts(), 2);
   }
+
+  @Test
+  public void testSegmentUploadRejectOutOfRetentionDefault() {
+    ControllerConf conf = new ControllerConf();
+    Assert.assertFalse(conf.isSegmentUploadRejectOutOfRetentionEnabled());
+  }
+
+  @Test
+  public void testSegmentUploadRejectOutOfRetentionOverride() {
+    ControllerConf conf = new ControllerConf();
+    conf.setSegmentUploadRejectOutOfRetentionEnabled(true);
+    Assert.assertTrue(conf.isSegmentUploadRejectOutOfRetentionEnabled());
+    conf.setSegmentUploadRejectOutOfRetentionEnabled(false);
+    Assert.assertFalse(conf.isSegmentUploadRejectOutOfRetentionEnabled());
+  }
 }

@@ -22,10 +22,16 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hc.core5.http.HttpStatus;
+import org.apache.pinot.common.exception.HttpErrorStatusException;
+import org.apache.pinot.common.metrics.ControllerMeter;
+import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.plugin.ingestion.batch.common.BaseSegmentPushJobRunner;
 import org.apache.pinot.plugin.ingestion.batch.standalone.SegmentMetadataPushJobRunner;
 import org.apache.pinot.plugin.ingestion.batch.standalone.SegmentTarPushJobRunner;
@@ -39,6 +45,7 @@ import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.PushJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.TableSpec;
+import org.apache.pinot.spi.metrics.PinotMeter;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -91,6 +98,13 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
       throws IOException {
     _tableNameSuffix = RandomStringUtils.secure().nextAlphabetic(12);
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+  }
+
+  @Override
+  protected void overrideControllerConf(Map<String, Object> properties) {
+    super.overrideControllerConf(properties);
+    // Applies to every test in this class: any APPEND table configured with a retention window is checked on upload.
+    properties.put(ControllerConf.SEGMENT_UPLOAD_REJECT_OUT_OF_RETENTION_ENABLED, true);
   }
 
   @BeforeClass
@@ -388,6 +402,67 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     Assert.assertTrue(segmentLineageResponse.contains("\"segmentsFrom\":[\"" + firstSegmentName + "\"]"));
     // SegmentsTo should contain uploaded segment.
     Assert.assertTrue(segmentLineageResponse.contains("\"segmentsTo\":[\"" + secondSegmentName + "\"]"));
+  }
+
+  @Test
+  public void testUploadRejectedWhenSegmentOutOfRetention()
+      throws Exception {
+    // The test data ends in 2014, so it is far outside a 7-day retention window.
+    File segmentTarFile = createTableAndBuildSegment("7");
+    long rejectedBefore = getOutOfRetentionRejectedCount();
+
+    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
+      HttpErrorStatusException exception = Assert.expectThrows(HttpErrorStatusException.class,
+          () -> fileUploadDownloadClient.uploadSegment(URI.create(getOrCreateAdminClient().getSegmentUploadUrl()),
+              segmentTarFile.getName(), segmentTarFile, getTableName(), TableType.OFFLINE));
+      Assert.assertEquals(exception.getStatusCode(), HttpStatus.SC_FORBIDDEN);
+      Assert.assertTrue(exception.getMessage().contains("outside the retention window"), exception.getMessage());
+    }
+
+    Assert.assertEquals(getSegmentsList().size(), 0);
+    Assert.assertFalse(new File(_controllerConfig.getDataDir(), getTableName()).exists());
+    Assert.assertEquals(getOutOfRetentionRejectedCount(), rejectedBefore + 1);
+  }
+
+  @Test
+  public void testUploadAcceptedWhenSegmentWithinRetention()
+      throws Exception {
+    File segmentTarFile = createTableAndBuildSegment("36500");
+    long rejectedBefore = getOutOfRetentionRejectedCount();
+
+    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
+      Assert.assertEquals(
+          fileUploadDownloadClient.uploadSegment(URI.create(getOrCreateAdminClient().getSegmentUploadUrl()),
+              segmentTarFile.getName(), segmentTarFile, getTableName(), TableType.OFFLINE).getStatusCode(),
+          HttpStatus.SC_OK);
+    }
+
+    Assert.assertEquals(getSegmentsList().size(), 1);
+    Assert.assertEquals(getOutOfRetentionRejectedCount(), rejectedBefore);
+  }
+
+  private File createTableAndBuildSegment(String retentionDays)
+      throws Exception {
+    Schema schema = createSchema();
+    addSchema(schema);
+    TableConfig offlineTableConfig = createOfflineTableConfig();
+    offlineTableConfig.getValidationConfig().setRetentionTimeUnit("DAYS");
+    offlineTableConfig.getValidationConfig().setRetentionTimeValue(retentionDays);
+    waitForEVToDisappear(offlineTableConfig.getTableName());
+    addTableConfig(offlineTableConfig);
+
+    ClusterIntegrationTestUtils.buildSegmentFromAvro(getAllAvroFiles().get(0), offlineTableConfig, schema,
+        "_retention", _segmentDir, _tarDir);
+    File[] tarFiles = _tarDir.listFiles();
+    Assert.assertNotNull(tarFiles);
+    Assert.assertEquals(tarFiles.length, 1);
+    return tarFiles[0];
+  }
+
+  private long getOutOfRetentionRejectedCount() {
+    PinotMeter meter = _controllerStarter.getControllerMetrics()
+        .getMeteredValue(ControllerMeter.OUT_OF_RETENTION_SEGMENT_UPLOAD_REJECTED);
+    return meter != null ? meter.count() : 0L;
   }
 
   protected TableConfig createOfflineTableConfigWithConsistentPush() {

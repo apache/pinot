@@ -102,7 +102,9 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   // Number of segment-delete requests rejected because the targets participate in a live segment lineage entry.
   LINEAGE_BLOCKED_DELETE_COUNT("LineageBlockedDeleteCount", false),
   // Storage quota breach detected for a table whose enforcement mode is ENFORCED or SHADOW (not DISABLED)
-  STORAGE_QUOTA_EXCEEDED("StorageQuotaExceeded", false);
+  STORAGE_QUOTA_EXCEEDED("StorageQuotaExceeded", false),
+  // Segment uploads rejected for being outside the table retention window.
+  OUT_OF_RETENTION_SEGMENT_UPLOAD_REJECTED("OutOfRetentionSegmentUploadRejected", true);
 
   private final String _brokerMeterName;
   private final String _unit;

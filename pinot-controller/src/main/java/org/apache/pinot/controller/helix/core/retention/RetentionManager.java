@@ -45,6 +45,7 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.utils.RetentionUtils;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.ControllerConf;
@@ -332,11 +333,10 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     String tableNameWithType = tableConfig.getTableName();
     LOGGER.info("Start managing retention for table: {}", tableNameWithType);
 
-    // For offline tables, ensure that the segmentPushType is APPEND.
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
-    String segmentPushType = IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig);
-    if (tableConfig.getTableType() == TableType.OFFLINE && !"APPEND".equalsIgnoreCase(segmentPushType)) {
-      LOGGER.info("Segment push type is not APPEND for table: {}, skip managing retention", tableNameWithType);
+    if (!RetentionUtils.shouldManageTimeBasedDataRetention(tableConfig)) {
+      LOGGER.info("Skipping time-based retention for table: {} (offline tables require APPEND batch ingestion)",
+          tableNameWithType);
       return;
     }
     int untrackedSegmentsDeletionBatchSize =
