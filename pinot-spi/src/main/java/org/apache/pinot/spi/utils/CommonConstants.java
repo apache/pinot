@@ -849,6 +849,17 @@ public class CommonConstants {
 
       public static class QueryOptionKey {
         public static final String TIMEOUT_MS = "timeoutMs";
+        /// Broker-internal: the epoch time in milliseconds at which the broker stops waiting for this request, i.e.
+        /// the time it set [#TIMEOUT_MS] plus the remaining time it will wait (for a hybrid table the longer of the
+        /// two table types' remaining times). Set on every single-stage server request; a user-supplied value is
+        /// overwritten. A request that reaches the server's Netty query transport (`InstanceRequestHandler`) after
+        /// this time plus the server's clock-skew allowance
+        /// ([CommonConstants.Server#CONFIG_OF_REQUEST_DEADLINE_CLOCK_SKEW_MS]) is answered with a timeout error
+        /// instead of being executed: a request can sit for minutes in the socket buffers of a stalled
+        /// broker-to-server connection, and once the connection recovers the server would otherwise run it with a
+        /// full timeout budget measured from its arrival, long after the broker gave up on it. Absent or non-positive
+        /// means no such check, which is what an old broker gets. The gRPC and multi-stage paths do not check it.
+        public static final String REQUEST_DEADLINE_MS = "requestDeadlineMs";
         /// Per-query override of [CommonConstants.Broker#USE_APPROXIMATE_FUNCTION], outranking both the table config
         /// and the cluster or broker default. `false` forces exact results, `true` opts one expensive query in.
         public static final String USE_APPROXIMATE_FUNCTION = "useApproximateFunction";
@@ -1770,6 +1781,21 @@ public class CommonConstants {
     public static final String DEFAULT_SERVER_QUERY_REGEX_CLASS = "JAVA_UTIL";
     public static final String CONFIG_OF_ENABLE_QUERY_CANCELLATION = "pinot.server.enable.query.cancellation";
     public static final boolean DEFAULT_ENABLE_QUERY_CANCELLATION = true;
+    /// Allowance for clock skew between a broker and this server when judging whether a request arrived after the
+    /// broker's deadline for it ([Broker.Request.QueryOptionKey#REQUEST_DEADLINE_MS]). Such a request is answered
+    /// with a timeout error instead of being executed, but only when it arrives more than this many milliseconds
+    /// after the deadline. The broker stamps the deadline a few statements before it starts its own wait for the
+    /// servers, and network or channel-lock delays come after that wait has started, so with synchronized clocks a
+    /// request is rejected only once the broker has stopped waiting for it for longer than this allowance; neither a
+    /// slow hop nor a short `timeoutMs` changes that, since the query's timeout is not part of the comparison. The one
+    /// exposure is a server clock running ahead of the broker's by more than this allowance: it rejects requests that
+    /// arrive within the excess of their deadline, i.e. every request of a query whose remaining timeout is shorter
+    /// than the excess. A server clock behind the broker's only makes the check more lenient. Rejections show up as
+    /// `QuerySchedulingTimeoutError` responses carrying the arrival time and the deadline, and in the
+    /// `QUERIES_EXPIRED_ON_ARRIVAL` meter. A negative value disables the check.
+    public static final String CONFIG_OF_REQUEST_DEADLINE_CLOCK_SKEW_MS =
+        "pinot.server.request.deadline.clock.skew.ms";
+    public static final long DEFAULT_REQUEST_DEADLINE_CLOCK_SKEW_MS = 1_000L;
     public static final String CONFIG_OF_NETTY_SERVER_ENABLED = "pinot.server.netty.enabled";
     public static final boolean DEFAULT_NETTY_SERVER_ENABLED = true;
     public static final String CONFIG_OF_ENABLE_GRPC_SERVER = "pinot.server.grpc.enable";

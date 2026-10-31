@@ -881,6 +881,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       errorMsgs.add(new QueryProcessingException(QueryErrorCode.BROKER_TIMEOUT, errorMessage));
       return BrokerResponseNative.fromBrokerErrors(errorMsgs);
     }
+    setRequestDeadline(remainingTimeMs, offlineBrokerRequest, realtimeBrokerRequest, null);
 
     // Set the maximum serialized response size per server, and ask server to directly return final response when only
     // one server is queried
@@ -957,6 +958,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       }
       routeProvider.calculateRoutes(routeInfo, selectedRoutingManager, offlineBrokerRequest,
           realtimeBrokerRequest, requestId);
+      /// The broker waits the full `remainingTimeMs` again from the fallback dispatch below, so the deadline stamped
+      /// before the split attempt would be early by however long that attempt took; stamp it again.
+      setRequestDeadline(remainingTimeMs, offlineBrokerRequest, realtimeBrokerRequest, null);
       /// After the fallback recomputes the route, refresh the execution-server and
       /// pruned-segment locals captured pre-split.  Without this, the cancel hook (`QueryServers`
       /// built below) would track the pre-split server set — a cancel during fallback would
@@ -2391,6 +2395,30 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     return remainingTimeMs;
   }
 
+  /// Records an approximate end of this broker's remaining wait budget (now plus the remaining time, for a hybrid
+  /// table the longer of the two table types' remaining times) into every dispatched request's query options, see
+  /// [QueryOptionKey#REQUEST_DEADLINE_MS]. The absolute deadline lets a server tell a request that sat in a stalled
+  /// connection from a live one, instead of granting it a fresh timeout budget from its arrival. Always overwritten:
+  /// it is this broker's deadline, whatever the user set.
+  ///
+  /// `AsyncQueryResponse` measures the remaining time from its own start in `QueryRouter#submitQuery`, after this
+  /// runs. The server applies a clock-skew allowance; dispatch delays or clock differences beyond that allowance
+  /// can still cause a request to be rejected before the broker's actual wait ends.
+  private static void setRequestDeadline(long remainingTimeMs, @Nullable BrokerRequest offlineBrokerRequest,
+      @Nullable BrokerRequest realtimeBrokerRequest, @Nullable BrokerRequest materializedViewBrokerRequest) {
+    String requestDeadlineMs = Long.toString(System.currentTimeMillis() + remainingTimeMs);
+    if (offlineBrokerRequest != null) {
+      offlineBrokerRequest.getPinotQuery().putToQueryOptions(QueryOptionKey.REQUEST_DEADLINE_MS, requestDeadlineMs);
+    }
+    if (realtimeBrokerRequest != null) {
+      realtimeBrokerRequest.getPinotQuery().putToQueryOptions(QueryOptionKey.REQUEST_DEADLINE_MS, requestDeadlineMs);
+    }
+    if (materializedViewBrokerRequest != null) {
+      materializedViewBrokerRequest.getPinotQuery()
+          .putToQueryOptions(QueryOptionKey.REQUEST_DEADLINE_MS, requestDeadlineMs);
+    }
+  }
+
   /// Sets a query option indicating the maximum response size that can be sent from a server to the broker. This size
   /// is measured for the serialized response.
   ///
@@ -2698,6 +2726,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       reduceQueryOptions.remove(QueryOptionKey.SERVER_RETURN_FINAL_RESULT_KEY_UNPARTITIONED);
     }
 
+    setRequestDeadline(timeoutMs, baseOfflineBrokerRequest, baseRealtimeBrokerRequest, viewBrokerRequest);
     long materializedViewRequestId = _requestIdGenerator.get();
     if (isQueryCancellationEnabled()) {
       /// Track the union of base + MV server sets against the user's `requestId`.  Cancel will
