@@ -72,6 +72,23 @@ public class EmptyColumnMetadata extends EmptyColumnShape implements ColumnMetad
     return false;
   }
 
+  @Nullable
+  @Override
+  public String getTransformFunction() {
+    return null;
+  }
+
+  @Override
+  public int getTransformFunctionProvenanceVersion() {
+    return UNAVAILABLE;
+  }
+
+  @Nullable
+  @Override
+  public String getTransformFunctionFingerprint() {
+    return null;
+  }
+
   @Override
   public int getNumIndexes() {
     return 0;

@@ -259,6 +259,23 @@ public final class MappedColumnMetadata implements ColumnMetadata {
     return _store.flag(_ordinal, MappedSegmentMetadataStore.AUTO_GENERATED);
   }
 
+  @Nullable
+  @Override
+  public String getTransformFunction() {
+    return _store.string(_ordinal, MappedSegmentMetadataStore.TRANSFORM_FUNCTION);
+  }
+
+  @Override
+  public int getTransformFunctionProvenanceVersion() {
+    return _store.getInt(_ordinal, MappedSegmentMetadataStore.TRANSFORM_PROVENANCE_VERSION);
+  }
+
+  @Nullable
+  @Override
+  public String getTransformFunctionFingerprint() {
+    return _store.string(_ordinal, MappedSegmentMetadataStore.TRANSFORM_FINGERPRINT);
+  }
+
   @Override
   public boolean isMaterializedChild() {
     return getParentColumn() != null;

@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.segment.local.segment.index.loader.defaultcolumn;
 
+import java.util.Set;
+
+
 public interface DefaultColumnHandler {
 
   /// Update the auto-generated default columns.
@@ -32,4 +35,10 @@ public interface DefaultColumnHandler {
   /// for the segment, according to the current table schema.
   /// @return true if there is a need to update.
   boolean needUpdateDefaultColumns();
+
+  /// Columns whose pending update will regenerate values with a changed transform expression. Indexes built over
+  /// their values must be invalidated before the update runs.
+  default Set<String> getColumnsWithPendingTransformValueChanges() {
+    return Set.of();
+  }
 }
