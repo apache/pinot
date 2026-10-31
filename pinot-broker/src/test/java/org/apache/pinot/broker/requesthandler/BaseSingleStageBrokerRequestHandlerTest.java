@@ -1886,13 +1886,14 @@ public class BaseSingleStageBrokerRequestHandlerTest {
   /// Pins the fix for the reviewer-flagged regression: `EXPLAIN PLAN FOR <query>` against a
   @DataProvider
   public Object[][] materializedViewSplitQueries() {
-    return new Object[][]{{true, null}, {false, null}, {false, "1"}};
+    return new Object[][]{{true, null, false}, {false, null, false}, {false, "1", false}, {false, null, true}};
   }
 
-  /// EXPLAIN skips split execution; a real hybrid split stamps the final base + MV requests.
+  /// EXPLAIN skips split execution; a real hybrid split stamps the final base + MV requests. A split that fails falls
+  /// back to the standard dispatch, which waits its full budget again, so the fallback requests are stamped afresh.
   @Test(dataProvider = "materializedViewSplitQueries")
   public void testMaterializedViewSplitDispatchesFreshDeadlineAndSkipsExplain(boolean explain,
-      @Nullable String suppliedDeadline)
+      @Nullable String suppliedDeadline, boolean failSplit)
       throws Exception {
     String baseOfflineTable = "baseTable_OFFLINE";
     String baseRealtimeTable = "baseTable_REALTIME";
@@ -1975,6 +1976,9 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     BrokerQueryEventListenerFactory.init(config);
 
     AtomicReference<BrokerRequest> capturedServerBrokerRequest = new AtomicReference<>();
+    AtomicReference<TableRouteInfo> capturedFallbackRoute = new AtomicReference<>();
+    AtomicReference<Long> capturedFallbackTimeoutMs = new AtomicReference<>();
+    AtomicReference<Long> splitFailedAtMs = new AtomicReference<>();
     AtomicReference<TableRouteInfo> capturedBaseRoute = new AtomicReference<>();
     AtomicReference<TableRouteInfo> capturedViewRoute = new AtomicReference<>();
     AtomicReference<Long> capturedTimeoutMs = new AtomicReference<>();
@@ -1996,6 +2000,8 @@ public class BaseSingleStageBrokerRequestHandlerTest {
               TableRouteInfo route, long timeoutMs, ServerStats serverStats,
               RequestContext requestContext) {
             capturedServerBrokerRequest.set(serverBrokerRequest);
+            capturedFallbackRoute.set(route);
+            capturedFallbackTimeoutMs.set(timeoutMs);
             return BrokerResponseNative.empty();
           }
 
@@ -2003,9 +2009,16 @@ public class BaseSingleStageBrokerRequestHandlerTest {
           protected BrokerResponseNative processMaterializedViewSplitBrokerRequest(long requestId,
               long materializedViewRequestId, BrokerRequest originalBrokerRequest, TableRouteInfo baseRoute,
               TableRouteInfo materializedViewRoute, long timeoutMs, ServerStats serverStats,
-              RequestContext requestContext) {
+              RequestContext requestContext)
+              throws Exception {
             if (explain) {
               fail("processMaterializedViewSplitBrokerRequest must not run for EXPLAIN queries");
+            }
+            if (failSplit) {
+              // A split attempt that takes a while and then fails, e.g. a materialized-view server erroring out
+              Thread.sleep(20);
+              splitFailedAtMs.set(System.currentTimeMillis());
+              throw new IllegalStateException("split failed");
             }
             capturedBaseRoute.set(baseRoute);
             capturedViewRoute.set(materializedViewRoute);
@@ -2022,6 +2035,25 @@ public class BaseSingleStageBrokerRequestHandlerTest {
       assertNotNull(serverBrokerRequest, "EXPLAIN must fall through to standard explain handling");
       assertEquals(serverBrokerRequest.getPinotQuery().getDataSource().getTableName(), baseOfflineTable);
       assertNull(capturedBaseRoute.get(), "EXPLAIN must not dispatch a split request");
+      return;
+    }
+    if (failSplit) {
+      TableRouteInfo fallbackRoute = capturedFallbackRoute.get();
+      assertNotNull(fallbackRoute, "a failed split must fall back to the standard dispatch");
+      Map<String, String> fallbackOfflineOptions =
+          fallbackRoute.getOfflineBrokerRequest().getPinotQuery().getQueryOptions();
+      Map<String, String> fallbackRealtimeOptions =
+          fallbackRoute.getRealtimeBrokerRequest().getPinotQuery().getQueryOptions();
+      String fallbackDeadline = fallbackOfflineOptions.get(QueryOptionKey.REQUEST_DEADLINE_MS);
+      assertNotNull(fallbackDeadline, "the fallback base request needs a broker deadline");
+      assertEquals(fallbackRealtimeOptions.get(QueryOptionKey.REQUEST_DEADLINE_MS), fallbackDeadline);
+      // Stamped after the split failed, from the budget the fallback dispatch waits again, not before the attempt
+      long fallbackDeadlineMs = Long.parseLong(fallbackDeadline);
+      long fallbackTimeoutMs = capturedFallbackTimeoutMs.get();
+      assertTrue(fallbackDeadlineMs >= splitFailedAtMs.get() + fallbackTimeoutMs
+              && fallbackDeadlineMs <= afterMs + fallbackTimeoutMs,
+          String.format("fallback deadline %d not within [%d, %d]", fallbackDeadlineMs,
+              splitFailedAtMs.get() + fallbackTimeoutMs, afterMs + fallbackTimeoutMs));
       return;
     }
 

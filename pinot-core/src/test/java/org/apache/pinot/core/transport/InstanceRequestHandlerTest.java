@@ -305,6 +305,20 @@ public class InstanceRequestHandlerTest {
     assertEquals(submitted.size(), 3);
   }
 
+  /// A huge deadline, which only an old broker forwarding a user's value can send, is far in the future rather than
+  /// overflowing into a rejection: the check subtracts the deadline from the arrival time instead of adding the
+  /// allowance to the deadline.
+  @Test
+  public void testHugeDeadlineIsExecuted()
+      throws Exception {
+    List<ServerQueryRequest> submitted = new ArrayList<>();
+    InstanceRequestHandler handler = createHandler(new PinotConfiguration(), submitted);
+
+    assertTrue(handle(handler, 1L, () -> Long.toString(Long.MAX_VALUE)).getExceptions().isEmpty());
+    assertTrue(handle(handler, 2L, () -> Long.toString(Long.MAX_VALUE - 1)).getExceptions().isEmpty());
+    assertEquals(submitted.size(), 2);
+  }
+
   /// A value that is not a number (only an old broker forwards user input unchanged) is answered with the parse error
   /// under the request's own id, so the broker does not wait for the query to time out, and is not scheduled.
   @Test
