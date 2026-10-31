@@ -202,13 +202,13 @@ public class PredownloadZKClient implements AutoCloseable {
     for (PredownloadSegmentInfo predownloadSegmentInfo : predownloadSegmentInfoList) {
       String tableNameWithType = predownloadSegmentInfo.getTableNameWithType();
       tableInfoMap.computeIfAbsent(tableNameWithType, name -> {
+        Schema schema = ZKMetadataProvider.getTableSchema(propertyStore, tableNameWithType);
         TableConfig tableConfig = ZKMetadataProvider.getTableConfig(propertyStore, tableNameWithType);
         if (tableConfig == null) {
           LOGGER.warn("Cannot predownload segment {} because not able to get its table config from ZK",
               predownloadSegmentInfo.getSegmentName());
           return null;
         }
-        Schema schema = ZKMetadataProvider.getTableSchema(propertyStore, tableNameWithType);
         return new PredownloadTableInfo(name, tableConfig, schema, instanceDataManagerConfig);
       });
       SegmentZKMetadata segmentZKMetadata = ZKMetadataProvider.getSegmentZKMetadata(propertyStore, tableNameWithType,

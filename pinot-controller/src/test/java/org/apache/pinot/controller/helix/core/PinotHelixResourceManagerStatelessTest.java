@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.BiMap;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -32,16 +33,20 @@ import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.PropertyPathBuilder;
 import org.apache.helix.controller.dataproviders.ResourceControllerDataProvider;
 import org.apache.helix.controller.rebalancer.strategy.CrushEdRebalanceStrategy;
+import org.apache.helix.manager.zk.ZkBaseDataAccessor;
 import org.apache.helix.model.ClusterConfig;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.MasterSlaveSMD;
+import org.apache.helix.store.zk.AutoFallbackPropertyStore;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.zkclient.exception.ZkBadVersionException;
 import org.apache.pinot.common.assignment.PartitionAssignmentUtils;
@@ -57,9 +62,12 @@ import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.config.InstanceUtils;
+import org.apache.pinot.common.utils.config.SchemaSerDeUtils;
+import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
+import org.apache.pinot.common.utils.helix.ZkMultiWriteBuilder;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.api.resources.InstanceInfo;
@@ -79,11 +87,13 @@ import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.LongMsgOffset;
@@ -95,6 +105,7 @@ import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Segment;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -107,11 +118,16 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
@@ -1178,6 +1194,321 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
 
       assertEquals(resourceManager.getSchema(rawTableName), schema);
       verify(resourceManager).sendTableConfigSchemaRefreshMessage(offlineTableName);
+    } finally {
+      _helixResourceManager.deleteOfflineTable(rawTableName);
+      deleteSchema(rawTableName);
+    }
+  }
+
+  @Test
+  public void testVersionedSchemaUpdatePreservesConcurrentEditsAndDeletes()
+      throws Exception {
+    String schemaName = "versionedSchemaUpdate";
+    addDummySchema(schemaName);
+    try {
+      var propertyStore = _helixResourceManager.getPropertyStore();
+      var original = ZKMetadataProvider.getSchemaWithVersion(propertyStore, schemaName);
+      assertNotNull(original);
+      Schema migrated = createDummySchema(schemaName);
+      migrated.addField(new DimensionFieldSpec("migrated", DataType.STRING, true));
+      PinotHelixResourceManager resourceManager = spy(_helixResourceManager);
+      String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(schemaName);
+      doReturn(List.of(tableNameWithType)).when(resourceManager).getExistingTableNamesWithType(schemaName, null);
+      doNothing().when(resourceManager).sendTableConfigSchemaRefreshMessage(tableNameWithType);
+      assertTrue(resourceManager.updateSchema(migrated, original.getRight()));
+      verify(resourceManager).sendTableConfigSchemaRefreshMessage(tableNameWithType);
+      var updated = ZKMetadataProvider.getSchemaWithVersion(propertyStore, schemaName);
+      assertNotNull(updated);
+      assertEquals(updated.getLeft(), migrated);
+      assertEquals(updated.getRight().intValue(), original.getRight() + 1);
+
+      Schema stale = createDummySchema(schemaName);
+      stale.addField(new DimensionFieldSpec("stale", DataType.STRING, true));
+      assertFalse(resourceManager.updateSchema(stale, original.getRight()));
+      assertEquals(_helixResourceManager.getSchema(schemaName), migrated);
+      assertFalse(ZKMetadataProvider.setSchema(propertyStore, stale, original.getRight()));
+      assertEquals(_helixResourceManager.getSchema(schemaName), migrated);
+
+      assertTrue(_helixResourceManager.deleteSchema(schemaName));
+      assertFalse(ZKMetadataProvider.setSchema(propertyStore, migrated, updated.getRight()));
+      assertFalse(resourceManager.updateSchema(migrated, updated.getRight()));
+      assertNull(ZKMetadataProvider.getSchemaWithVersion(propertyStore, schemaName));
+      verify(resourceManager).sendTableConfigSchemaRefreshMessage(tableNameWithType);
+    } finally {
+      if (ZKMetadataProvider.isSchemaExists(_helixResourceManager.getPropertyStore(), schemaName)) {
+        deleteSchema(schemaName);
+      }
+    }
+  }
+
+  @Test
+  public void testFailedVersionedSchemaWriteDoesNotRefresh()
+      throws Exception {
+    String schemaName = "failedSchemaMigration";
+    Schema original = createDummySchema(schemaName);
+    Schema migrated = createDummySchema(schemaName);
+    migrated.addField(new DimensionFieldSpec("migrated", DataType.STRING, true));
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock();
+    doAnswer(invocation -> {
+      invocation.<Stat>getArgument(1).setVersion(3);
+      return SchemaSerDeUtils.toZNRecord(original);
+    }).when(propertyStore).get(anyString(), any(Stat.class), eq(AccessOption.PERSISTENT));
+    when(propertyStore.set(anyString(), any(ZNRecord.class), eq(3), eq(AccessOption.PERSISTENT))).thenReturn(false);
+    PinotHelixResourceManager resourceManager = spy(_helixResourceManager);
+    Field propertyStoreField = PinotHelixResourceManager.class.getDeclaredField("_propertyStore");
+    propertyStoreField.setAccessible(true);
+    propertyStoreField.set(resourceManager, propertyStore);
+
+    assertFalse(resourceManager.updateSchema(migrated, 3));
+    verify(propertyStore).set(anyString(), any(ZNRecord.class), eq(3), eq(AccessOption.PERSISTENT));
+    verify(propertyStore, never()).exists(anyString(), anyInt());
+    verify(resourceManager, never()).sendTableConfigSchemaRefreshMessage(anyString());
+  }
+
+  @Test
+  @SuppressWarnings("deprecation") // Reproduce a stored schema transform before moving it into the table config.
+  public void testCoordinatedSchemaMigrationChecksTableVersionsAtomically()
+      throws Exception {
+    String schemaName = "coordinatedSchemaMigration";
+    String tableName = TableNameBuilder.OFFLINE.tableNameWithType(schemaName);
+    addDummySchema(schemaName);
+    TableConfig originalTable = new TableConfigBuilder(TableType.OFFLINE).setTableName(schemaName)
+        .setBrokerTenant(BROKER_TENANT_NAME).setServerTenant(SERVER_TENANT_NAME).build();
+    waitForEVToDisappear(tableName);
+    _helixResourceManager.addTable(originalTable);
+    var propertyStore = _helixResourceManager.getPropertyStore();
+    String tablePath = ZKMetadataProvider.constructPropertyStorePathForResourceConfig(tableName);
+    try {
+      Schema original = createDummySchema(schemaName);
+      original.getFieldSpecFor("dimA").setTransformFunction("lower(sourceDimA)");
+      ZKMetadataProvider.setSchema(propertyStore, original);
+      var schemaAndVersion = ZKMetadataProvider.getSchemaWithVersion(propertyStore, schemaName);
+      assertNotNull(schemaAndVersion);
+      Schema migrated = createDummySchema(schemaName);
+      TableConfig migratedTable = new TableConfig(originalTable);
+      IngestionConfig ingestion = new IngestionConfig();
+      ingestion.setTransformConfigs(List.of(new TransformConfig("dimA", "lower(sourceDimA)")));
+      migratedTable.setIngestionConfig(ingestion);
+      PinotHelixResourceManager resourceManager = spy(_helixResourceManager);
+      doNothing().when(resourceManager).sendTableConfigRefreshMessage(tableName);
+      doNothing().when(resourceManager).sendTableConfigSchemaRefreshMessage(tableName);
+
+      for (boolean delete : List.of(false, true)) {
+        assertTrue(ZKMetadataProvider.setTableConfig(propertyStore, originalTable, -1));
+        var tableAndVersion = ZKMetadataProvider.getTableConfigWithVersion(propertyStore, tableName, false, false);
+        assertNotNull(tableAndVersion);
+        doAnswer(invocation -> {
+          ZkMultiWriteBuilder transaction = spy(_helixResourceManager.multiWriteZK());
+          doAnswer(execute -> {
+            if (delete) {
+              assertTrue(propertyStore.remove(tablePath, AccessOption.PERSISTENT));
+            } else {
+              assertTrue(ZKMetadataProvider.setTableConfig(propertyStore, originalTable, -1));
+            }
+            return execute.callRealMethod();
+          }).when(transaction).execute();
+          return transaction;
+        }).when(resourceManager).multiWriteZK();
+
+        assertFalse(resourceManager.updateSchemaAndTableConfigs(migrated, schemaAndVersion.getRight(),
+            Map.of(tableName, Pair.of(migratedTable, tableAndVersion.getRight()))));
+        assertEquals(ZKMetadataProvider.getSchemaWithVersion(propertyStore, schemaName), schemaAndVersion);
+        assertEquals(ZKMetadataProvider.getTableConfig(propertyStore, tableName, false, false),
+            delete ? null : originalTable);
+      }
+      assertTrue(ZKMetadataProvider.setTableConfig(propertyStore, originalTable, -1));
+      var tableAndVersion = ZKMetadataProvider.getTableConfigWithVersion(propertyStore, tableName, false, false);
+      assertNotNull(tableAndVersion);
+      TableConfig counterpart = new TableConfigBuilder(TableType.REALTIME).setTableName(schemaName).build();
+      String counterpartPath =
+          ZKMetadataProvider.constructPropertyStorePathForResourceConfig(counterpart.getTableName());
+      doAnswer(invocation -> {
+        ZkMultiWriteBuilder transaction = spy(_helixResourceManager.multiWriteZK());
+        doAnswer(execute -> {
+          _helixResourceManager.createTableConfigWithSchemaVersion(counterpart);
+          return execute.callRealMethod();
+        }).when(transaction).execute();
+        return transaction;
+      }).when(resourceManager).multiWriteZK();
+      try {
+        assertFalse(resourceManager.updateSchemaAndTableConfigs(migrated, schemaAndVersion.getRight(),
+            Map.of(tableName, Pair.of(migratedTable, tableAndVersion.getRight()))));
+        assertEquals(ZKMetadataProvider.getSchemaWithVersion(propertyStore, schemaName).getLeft(), original);
+        assertEquals(ZKMetadataProvider.getTableConfigWithVersion(propertyStore, tableName, false, false),
+            tableAndVersion);
+      } finally {
+        assertTrue(propertyStore.remove(counterpartPath, AccessOption.PERSISTENT));
+      }
+      verify(resourceManager, never()).sendTableConfigRefreshMessage(anyString());
+      verify(resourceManager, never()).sendTableConfigSchemaRefreshMessage(anyString());
+      schemaAndVersion = ZKMetadataProvider.getSchemaWithVersion(propertyStore, schemaName);
+      assertNotNull(schemaAndVersion);
+      doAnswer(invocation -> _helixResourceManager.multiWriteZK()).when(resourceManager).multiWriteZK();
+      assertTrue(resourceManager.updateSchemaAndTableConfigs(migrated, schemaAndVersion.getRight(),
+          Map.of(tableName, Pair.of(migratedTable, tableAndVersion.getRight()))));
+      var updatedTable = ZKMetadataProvider.getTableConfigWithVersion(propertyStore, tableName, false, false);
+      assertNotNull(updatedTable);
+      assertEquals(updatedTable.getRight().intValue(), tableAndVersion.getRight() + 1);
+      assertEquals(updatedTable.getLeft().getIngestionConfig().getTransformConfigs(), ingestion.getTransformConfigs());
+      assertNull(_helixResourceManager.getSchema(schemaName).getFieldSpecFor("dimA").getTransformFunction());
+
+      Schema extended = createDummySchema(schemaName);
+      extended.addField(new DimensionFieldSpec("extra", DataType.STRING, true));
+      assertTrue(resourceManager.updateSchemaAndTableConfigs(extended, schemaAndVersion.getRight() + 1,
+          Map.of(tableName, updatedTable)));
+      assertEquals(ZKMetadataProvider.getTableConfigWithVersion(propertyStore, tableName, false, false).getRight(),
+          updatedTable.getRight());
+      verify(resourceManager).sendTableConfigRefreshMessage(tableName);
+      verify(resourceManager, times(2)).sendTableConfigSchemaRefreshMessage(tableName);
+    } finally {
+      _helixResourceManager.deleteOfflineTable(schemaName);
+      deleteSchema(schemaName);
+    }
+  }
+
+  @Test
+  public void testTableCreationPromotesFallbackSchemaWithoutLosingStoredFields()
+      throws Exception {
+    String schemaName = "fallbackSchemaCreation";
+    String schemaPath = ZKMetadataProvider.constructPropertyStorePathForSchema(schemaName);
+    String clusterRoot = "/" + _helixResourceManager.getHelixClusterName();
+    String currentSchemaPath =
+        PropertyPathBuilder.propertyStore(_helixResourceManager.getHelixClusterName()) + schemaPath;
+    String legacySchemaPath = clusterRoot + "/HELIX_PROPERTYSTORE" + schemaPath;
+    var accessor = _helixResourceManager.getHelixZkManager().getHelixDataAccessor().getBaseDataAccessor();
+    ZNRecord stored = SchemaSerDeUtils.toZNRecord(createDummySchema(schemaName));
+    ObjectNode schemaJson = (ObjectNode) JsonUtils.stringToJsonNode(stored.getSimpleField("schemaJSON"));
+    schemaJson.put("futureSchemaSetting", "preserve");
+    stored.setSimpleField("schemaJSON", schemaJson.toString());
+    stored.setMapField("futureRecordSetting", Map.of("key", "preserve"));
+    TableConfig table = new TableConfigBuilder(TableType.OFFLINE).setTableName(schemaName).build();
+    String tablePath = PropertyPathBuilder.propertyStore(_helixResourceManager.getHelixClusterName())
+        + ZKMetadataProvider.constructPropertyStorePathForResourceConfig(table.getTableName());
+    assertFalse(accessor.exists(currentSchemaPath, AccessOption.PERSISTENT));
+    assertTrue(accessor.create(legacySchemaPath, stored, AccessOption.PERSISTENT));
+    try {
+      AutoFallbackPropertyStore<ZNRecord> propertyStore = new AutoFallbackPropertyStore<>(
+          (ZkBaseDataAccessor<ZNRecord>) accessor,
+          PropertyPathBuilder.propertyStore(_helixResourceManager.getHelixClusterName()),
+          clusterRoot + "/HELIX_PROPERTYSTORE");
+      PinotHelixResourceManager resourceManager = spy(_helixResourceManager);
+      Field propertyStoreField = PinotHelixResourceManager.class.getDeclaredField("_propertyStore");
+      propertyStoreField.setAccessible(true);
+      propertyStoreField.set(resourceManager, propertyStore);
+      doAnswer(invocation -> _helixResourceManager.multiWriteZK()).when(resourceManager).multiWriteZK();
+      assertNotNull(resourceManager.getSchema(schemaName));
+      resourceManager.createTableConfigWithSchemaVersion(table);
+      ZNRecord promoted = accessor.get(currentSchemaPath, null, AccessOption.PERSISTENT);
+      assertNotNull(promoted);
+      assertEquals(promoted.getSimpleFields(), stored.getSimpleFields());
+      assertEquals(promoted.getMapFields(), stored.getMapFields());
+      assertNotNull(accessor.get(tablePath, null, AccessOption.PERSISTENT));
+    } finally {
+      accessor.remove(tablePath, AccessOption.PERSISTENT);
+      accessor.remove(currentSchemaPath, AccessOption.PERSISTENT);
+      accessor.remove(legacySchemaPath, AccessOption.PERSISTENT);
+    }
+  }
+
+  @Test
+  public void testTableConfigMigrationPreservesRawTemplates()
+      throws Exception {
+    String rawTableName = "rawTableConfigMigration";
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
+    addDummySchema(rawTableName);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName)
+        .setBrokerTenant(BROKER_TENANT_NAME).setServerTenant(SERVER_TENANT_NAME).build();
+    waitForEVToDisappear(offlineTableName);
+    _helixResourceManager.addTable(tableConfig);
+    String previousTenant = System.getProperty("MIGRATION_SERVER_TENANT");
+    System.setProperty("MIGRATION_SERVER_TENANT", SERVER_TENANT_NAME);
+    try {
+      var configAndVersion = ZKMetadataProvider.getTableConfigWithVersion(
+          _helixResourceManager.getPropertyStore(), offlineTableName, false, false);
+      assertNotNull(configAndVersion);
+      TableConfig rawConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName)
+          .setBrokerTenant(BROKER_TENANT_NAME).setServerTenant("${MIGRATION_SERVER_TENANT}").build();
+      PinotHelixResourceManager resourceManager = spy(_helixResourceManager);
+      doNothing().when(resourceManager).sendTableConfigRefreshMessage(offlineTableName);
+      doNothing().when(resourceManager).sendTableConfigSchemaRefreshMessage(offlineTableName);
+      resourceManager.setExistingTableConfig(rawConfig, tableConfig, configAndVersion.getRight(), false);
+
+      TableConfig stored = ZKMetadataProvider.getTableConfig(
+          _helixResourceManager.getPropertyStore(), offlineTableName, false, false);
+      assertNotNull(stored);
+      assertEquals(stored.getTenantConfig().getServer(), "${MIGRATION_SERVER_TENANT}");
+      verify(resourceManager).sendTableConfigRefreshMessage(offlineTableName);
+      verify(resourceManager).sendTableConfigSchemaRefreshMessage(offlineTableName);
+    } finally {
+      _helixResourceManager.deleteOfflineTable(rawTableName);
+      deleteSchema(rawTableName);
+      if (previousTenant == null) {
+        System.clearProperty("MIGRATION_SERVER_TENANT");
+      } else {
+        System.setProperty("MIGRATION_SERVER_TENANT", previousTenant);
+      }
+    }
+  }
+
+  @Test
+  public void testAutomaticMigrationRejectsUnknownStoredFields()
+      throws Exception {
+    String rawTableName = "unknownMigrationFields";
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
+    addDummySchema(rawTableName);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName)
+        .setBrokerTenant(BROKER_TENANT_NAME).setServerTenant(SERVER_TENANT_NAME).build();
+    waitForEVToDisappear(offlineTableName);
+    _helixResourceManager.addTable(tableConfig);
+    var propertyStore = _helixResourceManager.getPropertyStore();
+    String schemaPath = ZKMetadataProvider.constructPropertyStorePathForSchema(rawTableName);
+    String tablePath = ZKMetadataProvider.constructPropertyStorePathForResourceConfig(offlineTableName);
+    PinotHelixResourceManager resourceManager = spy(_helixResourceManager);
+    doNothing().when(resourceManager).sendTableConfigRefreshMessage(offlineTableName);
+    doNothing().when(resourceManager).sendTableConfigSchemaRefreshMessage(offlineTableName);
+    try {
+      Schema original = createDummySchema(rawTableName);
+      Schema migrated = createDummySchema(rawTableName);
+      migrated.addField(new DimensionFieldSpec("migrated", DataType.STRING, true));
+      for (int i = 0; i < 3; i++) {
+        ZNRecord storedSchema = SchemaSerDeUtils.toZNRecord(original);
+        ObjectNode schemaJson = (ObjectNode) JsonUtils.stringToJsonNode(storedSchema.getSimpleField("schemaJSON"));
+        ObjectNode field = (ObjectNode) schemaJson.get("dimensionFieldSpecs").get(0);
+        if (i == 0) {
+          field.putObject("futureOptions");
+        } else if (i == 1) {
+          field.putArray("futureOptions");
+        } else {
+          storedSchema.setSimpleField("futureSetting", "retained");
+          storedSchema.setMapField("futureMap", Map.of());
+          storedSchema.setListField("futureList", List.of());
+        }
+        storedSchema.setSimpleField("schemaJSON", schemaJson.toString());
+        assertTrue(propertyStore.set(schemaPath, storedSchema, AccessOption.PERSISTENT));
+        Stat stat = new Stat();
+        propertyStore.get(schemaPath, stat, AccessOption.PERSISTENT);
+        assertFalse(resourceManager.updateSchema(migrated, stat.getVersion()));
+        assertEquals(propertyStore.get(schemaPath, null, AccessOption.PERSISTENT), storedSchema);
+
+        ZNRecord storedTable = TableConfigSerDeUtils.toZNRecord(tableConfig);
+        ObjectNode indexing =
+            (ObjectNode) JsonUtils.stringToJsonNode(storedTable.getSimpleField(TableConfig.INDEXING_CONFIG_KEY));
+        if (i == 0) {
+          indexing.putObject("futureOptions");
+        } else if (i == 1) {
+          indexing.putArray("futureOptions");
+        } else {
+          storedTable.setListField("futureList", List.of());
+        }
+        storedTable.setSimpleField(TableConfig.INDEXING_CONFIG_KEY, indexing.toString());
+        assertTrue(propertyStore.set(tablePath, storedTable, AccessOption.PERSISTENT));
+        propertyStore.get(tablePath, stat, AccessOption.PERSISTENT);
+        assertThrows(IllegalStateException.class,
+            () -> resourceManager.setExistingTableConfig(tableConfig, tableConfig, stat.getVersion(), false));
+        assertEquals(propertyStore.get(tablePath, null, AccessOption.PERSISTENT), storedTable);
+      }
+      verify(resourceManager, never()).sendTableConfigRefreshMessage(offlineTableName);
+      verify(resourceManager, never()).sendTableConfigSchemaRefreshMessage(offlineTableName);
     } finally {
       _helixResourceManager.deleteOfflineTable(rawTableName);
       deleteSchema(rawTableName);

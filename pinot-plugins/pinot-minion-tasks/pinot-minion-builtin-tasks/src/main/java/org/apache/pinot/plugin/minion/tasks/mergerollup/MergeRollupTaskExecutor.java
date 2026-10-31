@@ -66,8 +66,8 @@ public class MergeRollupTaskExecutor extends BaseMultipleSegmentsConversionExecu
     long startMillis = System.currentTimeMillis();
 
     String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
-    TableConfig tableConfig = getTableConfig(tableNameWithType);
     Schema schema = getSchema(tableNameWithType);
+    TableConfig tableConfig = getTableConfig(tableNameWithType);
 
     Set<String> dimensionsToErase = MergeRollupTaskUtils.getDimensionsToErase(configs);
     List<RecordTransformer> customRecordTransformers = new ArrayList<>();

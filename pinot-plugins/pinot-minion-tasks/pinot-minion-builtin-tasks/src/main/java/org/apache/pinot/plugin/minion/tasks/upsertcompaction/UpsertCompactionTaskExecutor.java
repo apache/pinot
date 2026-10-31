@@ -58,6 +58,7 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     long startMillis = System.currentTimeMillis();
 
     String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
+    Schema schema = getSchema(tableNameWithType);
     TableConfig tableConfig = getTableConfig(tableNameWithType);
 
     String validDocIdsTypeStr = MinionTaskUtils.getValidDocIdsType(tableConfig.getUpsertConfig(), configs,
@@ -109,8 +110,8 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     int totalDocsAfterCompaction;
     try (CompactedPinotSegmentRecordReader compactedRecordReader = new CompactedPinotSegmentRecordReader(validDocIds)) {
       compactedRecordReader.init(indexDir, null, null);
-      SegmentGeneratorConfig config = getSegmentGeneratorConfig(workingDir, tableConfig, segmentMetadata, segmentName,
-          getSchema(tableNameWithType));
+      SegmentGeneratorConfig config =
+          getSegmentGeneratorConfig(workingDir, tableConfig, segmentMetadata, segmentName, schema);
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
       driver.init(config, compactedRecordReader);
       driver.build();

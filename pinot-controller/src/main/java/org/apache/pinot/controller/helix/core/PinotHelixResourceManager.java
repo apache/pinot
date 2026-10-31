@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.helix.core;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.CacheBuilder;
@@ -141,6 +142,8 @@ import org.apache.pinot.common.utils.LogicalTableConfigUtils;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.config.AccessControlUserConfigUtils;
 import org.apache.pinot.common.utils.config.InstanceUtils;
+import org.apache.pinot.common.utils.config.SchemaSerDeUtils;
+import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
@@ -177,13 +180,16 @@ import org.apache.pinot.materializedview.metadata.MaterializedViewDefinitionMeta
 import org.apache.pinot.materializedview.metadata.MaterializedViewDefinitionMetadataBuilder;
 import org.apache.pinot.materializedview.metadata.MaterializedViewDefinitionMetadataUtils;
 import org.apache.pinot.materializedview.metadata.MaterializedViewRuntimeMetadataUtils;
+import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.auth.AuthProvider;
+import org.apache.pinot.spi.config.ConfigUtils;
 import org.apache.pinot.spi.config.DatabaseConfig;
 import org.apache.pinot.spi.config.instance.Instance;
 import org.apache.pinot.spi.config.instance.InstanceConfigValidatorRegistry;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableConfigValidatorRegistry;
 import org.apache.pinot.spi.config.table.TableStatsHumanReadable;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TagOverrideConfig;
@@ -211,6 +217,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateM
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.TableConfigDecoratorRegistry;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
@@ -1760,6 +1767,99 @@ public class PinotHelixResourceManager {
     }
   }
 
+  /// Updates an existing schema with optimistic concurrency and refreshes its servers only after a successful write.
+  /// Returns false for an unchanged schema, a stale version, a deleted schema, or a rejected persistence operation.
+  public boolean updateSchema(Schema schema, int expectedVersion)
+      throws SchemaBackwardIncompatibleException {
+    Schema oldSchema = getSchemaForVersionedUpdate(schema.getSchemaName(), expectedVersion);
+    if (oldSchema == null) {
+      return false;
+    }
+    schema.validate();
+    if (!updateSchema(schema, oldSchema, false, expectedVersion)) {
+      return false;
+    }
+    refreshTablesUsingSchema(schema.getSchemaName());
+    return true;
+  }
+
+  /// Atomically updates affected table configs before removing their shared schema's legacy transforms.
+  /// Every table version is checked, including tables whose existing overrides require no config change.
+  /// Stale/deleted records leave all definitions unchanged, and refreshes are sent only after the transaction succeeds.
+  public boolean updateSchemaAndTableConfigs(Schema schema, int expectedSchemaVersion,
+      Map<String, Pair<TableConfig, Integer>> tableConfigs)
+      throws SchemaBackwardIncompatibleException, TableConfigBackwardIncompatibleException, TableNotFoundException,
+      IOException, KeeperException {
+    Schema oldSchema = getSchemaForVersionedUpdate(schema.getSchemaName(), expectedSchemaVersion);
+    if (oldSchema == null || !validateSchemaUpdate(schema, oldSchema, false)) {
+      return false;
+    }
+    ZkMultiWriteBuilder transaction = multiWriteZK();
+    List<TableConfig> effectiveConfigs = new ArrayList<>(tableConfigs.size());
+    List<TableConfig> changedConfigs = new ArrayList<>(tableConfigs.size());
+    for (Map.Entry<String, Pair<TableConfig, Integer>> entry : tableConfigs.entrySet()) {
+      String tableName = entry.getKey();
+      TableConfig rawConfig = entry.getValue().getLeft();
+      int expectedVersion = entry.getValue().getRight();
+      Preconditions.checkArgument(expectedVersion >= 0 && tableName.equals(rawConfig.getTableName())
+              && schema.getSchemaName().equals(TableNameBuilder.extractRawTableName(tableName)),
+          "Expected a versioned physical table using schema: %s", schema.getSchemaName());
+      Pair<TableConfig, Integer> original =
+          ZKMetadataProvider.getTableConfigWithVersion(_propertyStore, tableName, false, false);
+      if (original == null || original.getRight() != expectedVersion) {
+        return false;
+      }
+      TableConfig effective = TableConfigDecoratorRegistry.applyDecorator(
+          ConfigUtils.applyConfigWithEnvVariablesAndSystemProperties(rawConfig));
+      TableConfig existingEffective = TableConfigDecoratorRegistry.applyDecorator(
+          ConfigUtils.applyConfigWithEnvVariablesAndSystemProperties(original.getLeft()));
+      TableConfigUtils.validate(effective, schema, null, existingEffective);
+      TableConfigValidatorRegistry.validate(effective, schema);
+      validateExistingTableConfig(rawConfig, effective, expectedVersion, false, true);
+      effectiveConfigs.add(effective);
+      String path = ZKMetadataProvider.constructPropertyStorePathForResourceConfig(tableName);
+      transaction.check(path, expectedVersion);
+      if (!JsonUtils.objectToJsonNode(rawConfig).equals(JsonUtils.objectToJsonNode(original.getLeft()))) {
+        transaction.set(path, TableConfigSerDeUtils.toZNRecord(rawConfig), expectedVersion);
+        changedConfigs.add(effective);
+      }
+    }
+    SchemaUtils.validate(schema, effectiveConfigs, false, oldSchema);
+    if (!new HashSet<>(getExistingTableNamesWithType(schema.getSchemaName(), null)).equals(tableConfigs.keySet())) {
+      return false;
+    }
+    transaction.set(ZKMetadataProvider.constructPropertyStorePathForSchema(schema.getSchemaName()),
+        SchemaSerDeUtils.toZNRecord(schema), expectedSchemaVersion);
+    try {
+      transaction.execute();
+    } catch (KeeperException.BadVersionException | KeeperException.NoNodeException e) {
+      return false;
+    }
+    for (TableConfig config : changedConfigs) {
+      refreshExistingTableConfig(config);
+    }
+    refreshTablesUsingSchema(schema.getSchemaName());
+    return true;
+  }
+
+  @Nullable
+  private Schema getSchemaForVersionedUpdate(String schemaName, int expectedVersion) {
+    Preconditions.checkArgument(expectedVersion >= 0, "Expected schema version must be nonnegative");
+    Pair<Schema, Integer> schemaAndVersion =
+        ZKMetadataProvider.getSchemaWithVersion(_propertyStore, schemaName);
+    if (schemaAndVersion == null || schemaAndVersion.getRight() != expectedVersion) {
+      return null;
+    }
+    Stat stat = new Stat();
+    ZNRecord stored = _propertyStore.get(ZKMetadataProvider.constructPropertyStorePathForSchema(schemaName),
+        stat, AccessOption.PERSISTENT);
+    if (stored == null || stat.getVersion() != expectedVersion
+        || !preservesStoredRecord(stored, SchemaSerDeUtils.toZNRecord(schemaAndVersion.getLeft()))) {
+      return null;
+    }
+    return schemaAndVersion.getLeft();
+  }
+
   /// Reloads all segments of the tables using the given schema. Logical table schemas are skipped because no
   /// segments are backed by them.
   private void reloadTablesUsingSchema(String schemaName)
@@ -1798,11 +1898,31 @@ public class PinotHelixResourceManager {
   /// backward-compatible with the existing schema.
   private void updateSchema(Schema schema, Schema oldSchema, boolean forceTableSchemaUpdate)
       throws SchemaBackwardIncompatibleException {
+    updateSchema(schema, oldSchema, forceTableSchemaUpdate, null);
+  }
+
+  private boolean updateSchema(Schema schema, Schema oldSchema, boolean forceTableSchemaUpdate,
+      @Nullable Integer expectedVersion)
+      throws SchemaBackwardIncompatibleException {
+    if (!validateSchemaUpdate(schema, oldSchema, forceTableSchemaUpdate)) {
+      return false;
+    }
+    if (expectedVersion == null) {
+      ZKMetadataProvider.setSchema(_propertyStore, schema);
+    } else if (!ZKMetadataProvider.setSchema(_propertyStore, schema, expectedVersion)) {
+      return false;
+    }
+    LOGGER.info("Updated schema: {}", schema.getSchemaName());
+    return true;
+  }
+
+  private boolean validateSchemaUpdate(Schema schema, Schema oldSchema, boolean forceTableSchemaUpdate)
+      throws SchemaBackwardIncompatibleException {
     String schemaName = schema.getSchemaName();
     schema.updateBooleanFieldsIfNeeded(oldSchema);
     if (schema.equals(oldSchema)) {
       LOGGER.info("New schema: {} is the same as the existing schema, not updating it", schemaName);
-      return;
+      return false;
     }
 
     boolean isBackwardCompatible = schema.isBackwardCompatibleWith(oldSchema);
@@ -1875,8 +1995,7 @@ public class PinotHelixResourceManager {
         throw new SchemaBackwardIncompatibleException(errorMsg.toString());
       }
     }
-    ZKMetadataProvider.setSchema(_propertyStore, schema);
-    LOGGER.info("Updated schema: {}", schemaName);
+    return true;
   }
 
   /// Deletes the given schema. Returns `true` when schema exists, `false` when schema does not exist.
@@ -2044,18 +2163,12 @@ public class PinotHelixResourceManager {
     IdealState idealState =
         PinotTableIdealStateBuilder.buildEmptyIdealStateFor(tableNameWithType, tableConfig.getReplication());
     TableType tableType = tableConfig.getTableType();
-    // Ensure that table is not created if schema is not present
-    if (ZKMetadataProvider.getSchema(_propertyStore, rawTableName) == null) {
-      throw new InvalidTableConfigException("No schema defined for table: " + tableNameWithType);
-    }
     Preconditions.checkState(tableType == TableType.OFFLINE || tableType == TableType.REALTIME,
         "Invalid table type: %s", tableType);
 
     // Add table config
     LOGGER.info("Adding table {}: Creating table config in the property store", tableNameWithType);
-    if (!ZKMetadataProvider.createTableConfig(_propertyStore, tableConfig)) {
-      throw new RuntimeException("Failed to create table config for table: " + tableNameWithType);
-    }
+    createTableConfigWithSchemaVersion(tableConfig);
 
     try {
       // Read table config from ZK to ensure we get consistent view across all APIs (e.g. environment variables applied,
@@ -2101,6 +2214,51 @@ public class PinotHelixResourceManager {
     persistMaterializedViewDefinitionMetadataBestEffort(tableConfig);
     notifyMaterializedViewConsistencyManagerForTableCreate(tableConfig);
     LOGGER.info("Adding table {}: Successfully added table", tableNameWithType);
+  }
+
+  /// Fences schema cleanup against new physical tables by changing the schema data version in the same transaction.
+  /// The exact stored record is retained, including fields unknown to this controller.
+  @VisibleForTesting
+  void createTableConfigWithSchemaVersion(TableConfig tableConfig)
+      throws IOException {
+    String tableName = tableConfig.getTableName();
+    String schemaPath = ZKMetadataProvider.constructPropertyStorePathForSchema(
+        TableNameBuilder.extractRawTableName(tableName));
+    String tablePath = ZKMetadataProvider.constructPropertyStorePathForResourceConfig(tableName);
+    String tableParent = tablePath.substring(0, tablePath.lastIndexOf('/'));
+    for (int attempt = 0; attempt < 3; attempt++) {
+      Stat stat = new Stat();
+      ZNRecord schemaRecord = _propertyStore.get(schemaPath, stat, AccessOption.PERSISTENT);
+      if (schemaRecord == null) {
+        throw new InvalidTableConfigException("No schema defined for table: " + tableName);
+      }
+      if (!_propertyStore.exists(tableParent, AccessOption.PERSISTENT)) {
+        _propertyStore.create(tableParent, new ZNRecord("TABLE"), AccessOption.PERSISTENT);
+      }
+      try {
+        multiWriteZK().set(schemaPath, schemaRecord, stat.getVersion())
+            .create(tablePath, TableConfigSerDeUtils.toZNRecord(tableConfig)).execute();
+        return;
+      } catch (KeeperException.BadVersionException e) {
+        if (attempt == 2) {
+          throw new IOException("Schema changed while creating table: " + tableName + "; retry the request", e);
+        }
+      } catch (KeeperException.NodeExistsException e) {
+        throw new TableAlreadyExistsException("Table config for " + tableName + " already exists");
+      } catch (KeeperException.NoNodeException e) {
+        if (!_propertyStore.exists(schemaPath, AccessOption.PERSISTENT)) {
+          throw new InvalidTableConfigException("No schema defined for table: " + tableName);
+        }
+        // AutoFallbackPropertyStore can read a schema that exists only in HELIX_PROPERTYSTORE. An identity update
+        // promotes its exact raw record to PROPERTYSTORE before retrying the version-fenced transaction.
+        if (!_propertyStore.update(schemaPath, existing -> existing, AccessOption.PERSISTENT)) {
+          throw new IOException("Failed to promote schema while creating table: " + tableName, e);
+        }
+      } catch (KeeperException e) {
+        throw new IOException("Failed to create table config for table: " + tableName, e);
+      }
+    }
+    throw new IOException("Schema changed while creating table: " + tableName + "; retry the request");
   }
 
   /// Adds a logical table.
@@ -2612,7 +2770,51 @@ public class PinotHelixResourceManager {
   /// @throws TableConfigBackwardIncompatibleException if config changes are backward incompatible and force is false
   public void setExistingTableConfig(TableConfig tableConfig, int expectedVersion, boolean force)
       throws TableConfigBackwardIncompatibleException {
+    setExistingTableConfig(tableConfig, tableConfig, expectedVersion, force, false);
+  }
+
+  /// Persists the raw config while using a separately resolved config for validation and runtime side effects.
+  /// This keeps environment-variable templates in storage without passing them to instance assignment.
+  public void setExistingTableConfig(TableConfig rawTableConfig, TableConfig tableConfig, int expectedVersion,
+      boolean force)
+      throws TableConfigBackwardIncompatibleException {
+    Preconditions.checkArgument(expectedVersion >= 0, "Expected table config version must be nonnegative");
+    setExistingTableConfig(rawTableConfig, tableConfig, expectedVersion, force, true);
+  }
+
+  private void setExistingTableConfig(TableConfig rawTableConfig, TableConfig tableConfig, int expectedVersion,
+      boolean force, boolean checkRoundTrip)
+      throws TableConfigBackwardIncompatibleException {
+    validateExistingTableConfig(rawTableConfig, tableConfig, expectedVersion, force, checkRoundTrip);
+    if (!ZKMetadataProvider.setTableConfig(_propertyStore, rawTableConfig, expectedVersion)) {
+      throw new RuntimeException(
+          "Failed to update table config in Zookeeper for table: " + tableConfig.getTableName() + " with"
+              + " expected version: " + expectedVersion);
+    }
+    refreshExistingTableConfig(tableConfig);
+    sendTableConfigSchemaRefreshMessage(tableConfig.getTableName());
+  }
+
+  private void validateExistingTableConfig(TableConfig rawTableConfig, TableConfig tableConfig, int expectedVersion,
+      boolean force, boolean checkRoundTrip)
+      throws TableConfigBackwardIncompatibleException {
+    Preconditions.checkArgument(rawTableConfig.getTableName().equals(tableConfig.getTableName()),
+        "Stored and effective table config names must match");
     String tableNameWithType = tableConfig.getTableName();
+    if (checkRoundTrip) {
+      Stat stat = new Stat();
+      String path = ZKMetadataProvider.constructPropertyStorePathForResourceConfig(tableNameWithType);
+      ZNRecord stored = _propertyStore.get(path, stat, AccessOption.PERSISTENT);
+      Preconditions.checkState(stored != null && stat.getVersion() == expectedVersion,
+          "Stored table config changed before migration: %s", tableNameWithType);
+      try {
+        Preconditions.checkState(preservesStoredRecord(stored,
+                TableConfigSerDeUtils.toZNRecord(TableConfigSerDeUtils.fromZNRecord(stored))),
+            "Automatic migration would lose stored table config fields: %s", tableNameWithType);
+      } catch (IOException e) {
+        throw new IllegalStateException("Failed to check stored table config: " + tableNameWithType, e);
+      }
+    }
     TableConfig existingTableConfig = getTableConfig(tableNameWithType);
     if (existingTableConfig != null) {
       List<String> violations = TableConfigUtils.validateBackwardCompatibility(tableConfig, existingTableConfig);
@@ -2630,13 +2832,10 @@ public class PinotHelixResourceManager {
         }
       }
     }
+  }
 
-    if (!ZKMetadataProvider.setTableConfig(_propertyStore, tableConfig, expectedVersion)) {
-      throw new RuntimeException(
-          "Failed to update table config in Zookeeper for table: " + tableNameWithType + " with" + " expected version: "
-              + expectedVersion);
-    }
-
+  private void refreshExistingTableConfig(TableConfig tableConfig) {
+    String tableNameWithType = tableConfig.getTableName();
     // Update IdealState replication
     IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
     Preconditions.checkArgument(idealState != null,
@@ -2657,7 +2856,59 @@ public class PinotHelixResourceManager {
 
     // Refresh brokers and servers so in-memory table config caches observe the update.
     sendTableConfigRefreshMessage(tableNameWithType);
-    sendTableConfigSchemaRefreshMessage(tableNameWithType);
+  }
+
+  /// Automatic migration must not discard fields understood by another version or a plugin. Added defaults are
+  /// harmless, but every stored value (including empty containers and extra ZNRecord fields) must survive parsing.
+  private static boolean preservesStoredRecord(ZNRecord stored, ZNRecord roundTripped) {
+    return Objects.equals(stored.getId(), roundTripped.getId())
+        && Arrays.equals(stored.getRawPayload(), roundTripped.getRawPayload())
+        && preservesStoredJson(JsonUtils.objectToJsonNode(stored.getSimpleFields()),
+            JsonUtils.objectToJsonNode(roundTripped.getSimpleFields()))
+        && preservesStoredJson(JsonUtils.objectToJsonNode(stored.getMapFields()),
+            JsonUtils.objectToJsonNode(roundTripped.getMapFields()))
+        && preservesStoredJson(JsonUtils.objectToJsonNode(stored.getListFields()),
+            JsonUtils.objectToJsonNode(roundTripped.getListFields()));
+  }
+
+  private static boolean preservesStoredJson(JsonNode stored, @Nullable JsonNode roundTripped) {
+    if (stored.equals(roundTripped)) {
+      return true;
+    }
+    if (roundTripped == null) {
+      return false;
+    }
+    if (stored.isObject()) {
+      if (!roundTripped.isObject()) {
+        return false;
+      }
+      for (Map.Entry<String, JsonNode> field : stored.properties()) {
+        if (!preservesStoredJson(field.getValue(), roundTripped.get(field.getKey()))) {
+          return false;
+        }
+      }
+      return true;
+    }
+    if (stored.isArray()) {
+      if (!roundTripped.isArray() || stored.size() != roundTripped.size()) {
+        return false;
+      }
+      for (int i = 0; i < stored.size(); i++) {
+        if (!preservesStoredJson(stored.get(i), roundTripped.get(i))) {
+          return false;
+        }
+      }
+      return true;
+    }
+    if (stored.isTextual() && roundTripped.isTextual()) {
+      try {
+        return preservesStoredJson(JsonUtils.stringToJsonNode(stored.textValue()),
+            JsonUtils.stringToJsonNode(roundTripped.textValue()));
+      } catch (IOException e) {
+        return false;
+      }
+    }
+    return false;
   }
 
   public void deleteUser(String username) {
