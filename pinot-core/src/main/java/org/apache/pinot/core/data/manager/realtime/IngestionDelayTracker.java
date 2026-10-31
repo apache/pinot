@@ -124,12 +124,18 @@ public class IngestionDelayTracker {
   private static final int IGNORED_SEGMENT_CACHE_TIME_MINUTES = 10;
   // Timeout after 5 seconds while fetching the latest stream offset.
   private static final long LATEST_STREAM_OFFSET_FETCH_TIMEOUT_MS = TimeUnit.SECONDS.toMillis(5);
+  // Consecutive failed refreshes after which the tracker records a stream as unreadable: six, as the consume loop gives
+  // up on its sixth failed fetch, though refreshes are a tracking interval apart (about three minutes in all)
+  private static final int MAX_CONSECUTIVE_STREAM_FAILURES = 6;
 
   private final ServerMetrics _serverMetrics;
   private final String _tableNameWithType;
   private final String _metricName;
   private final RealtimeTableDataManager _realTimeTableDataManager;
   private final BooleanSupplier _isServerReadyToServeQueries;
+  private final IngestionSourceErrorRecorder _sourceErrors;
+  // Consecutive failures to create a stream's metadata provider or fetch its latest offsets, by stream config index
+  private final Map<Integer, Integer> _consecutiveStreamFailures = new ConcurrentHashMap<>();
   private final Cache<String, Boolean> _segmentsToIgnore =
       CacheBuilder.newBuilder().expireAfterAccess(IGNORED_SEGMENT_CACHE_TIME_MINUTES, TimeUnit.MINUTES).build();
   // Map to describe the partitions for which the metrics are being reported.
@@ -157,6 +163,7 @@ public class IngestionDelayTracker {
   // 2. All threads which can removes metrics - Consumer thread, Helix Thread, Server API Thread, etc.
   protected ConcurrentHashMap<Integer, StreamMetadataProvider> _streamConfigIndexToStreamMetadataProvider =
       new ConcurrentHashMap<>();
+  private final Map<Integer, String> _streamConfigIndexToTopic = new ConcurrentHashMap<>();
 
   public IngestionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
       RealtimeTableDataManager realtimeTableDataManager)
@@ -174,6 +181,10 @@ public class IngestionDelayTracker {
     _metricName = tableNameWithType;
     _realTimeTableDataManager = realtimeTableDataManager;
     _isServerReadyToServeQueries = isServerReadyToServeQueries;
+    // The table data manager owns the recorder; one that has none (a test double) gets a local one
+    IngestionSourceErrorRecorder sourceErrors = realtimeTableDataManager.getIngestionSourceErrorRecorder();
+    _sourceErrors =
+        sourceErrors != null ? sourceErrors : new IngestionSourceErrorRecorder(serverMetrics, tableNameWithType);
 
     _metricsRemovalScheduler = Executors.newSingleThreadScheduledExecutor(getThreadFactory(
         "IngestionDelayMetricsRemovalThread-" + TableNameBuilder.extractRawTableName(tableNameWithType)));
@@ -181,7 +192,7 @@ public class IngestionDelayTracker {
     _metricsRemovalScheduler.scheduleWithFixedDelay(this::timeoutInactivePartitions,
         INITIAL_SCHEDULED_EXECUTOR_THREAD_DELAY_MS, metricsRemovalIntervalMs, TimeUnit.MILLISECONDS);
 
-    createOrUpdateStreamMetadataProvider();
+    createOrUpdateStreamMetadataProvider(null);
 
     _ingestionDelayTrackingScheduler = Executors.newSingleThreadScheduledExecutor(
         getThreadFactory("IngestionDelayTrackingThread-" + TableNameBuilder.extractRawTableName(tableNameWithType)));
@@ -190,7 +201,10 @@ public class IngestionDelayTracker {
         INITIAL_SCHEDULED_EXECUTOR_THREAD_DELAY_MS, metricsTrackingIntervalMs, TimeUnit.MILLISECONDS);
   }
 
-  private void createOrUpdateStreamMetadataProvider() {
+  /// @param streamIndexToStreamPartitionIds the partitions being tracked, against which a failure to create a provider
+  ///                                        is recorded; null when there are none yet
+  private void createOrUpdateStreamMetadataProvider(
+      @Nullable Map<Integer, Set<Integer>> streamIndexToStreamPartitionIds) {
     List<StreamConfig> streamConfigs =
         IngestionConfigUtils.getStreamConfigs(_realTimeTableDataManager.getCachedTableConfigAndSchema().getLeft());
 
@@ -208,11 +222,18 @@ public class IngestionDelayTracker {
         streamMetadataProvider = streamConsumerFactory.createStreamMetadataProvider(clientId);
       } catch (Exception e) {
         LOGGER.error("Failed to create stream metadata provider for streamConfig: {}", streamConfig, e);
+        if (streamConfig != null && streamIndexToStreamPartitionIds != null
+            && streamIndexToStreamPartitionIds.containsKey(streamConfigIndex)) {
+          recordStreamFailure(streamConfigIndex, streamConfig.getTopicName(),
+              streamIndexToStreamPartitionIds.get(streamConfigIndex), e);
+        }
         continue;
       }
+      _consecutiveStreamFailures.remove(streamConfigIndex);
 
       assert streamMetadataProvider != null;
       _streamConfigIndexToStreamMetadataProvider.put(streamConfigIndex, streamMetadataProvider);
+      _streamConfigIndexToTopic.put(streamConfigIndex, streamConfig.getTopicName());
 
       if ((streamMetadataProvider.supportsOffsetLag()) && (_partitionIdToLatestOffset == null)) {
         _partitionIdToLatestOffset = new ConcurrentHashMap<>();
@@ -270,7 +291,7 @@ public class IngestionDelayTracker {
     if (streamIndexToStreamPartitionIds.size() > _streamConfigIndexToStreamMetadataProvider.size()) {
       // There might be a new stream config added or need to retry creation of streamMetadataProvider for a stream
       // which might have failed before.
-      createOrUpdateStreamMetadataProvider();
+      createOrUpdateStreamMetadataProvider(streamIndexToStreamPartitionIds);
     }
 
     for (Map.Entry<Integer, StreamMetadataProvider> entry : _streamConfigIndexToStreamMetadataProvider.entrySet()) {
@@ -279,6 +300,7 @@ public class IngestionDelayTracker {
 
       if (!streamIndexToStreamPartitionIds.containsKey(streamIndex)) {
         // Server is not hosting any partitions of this stream.
+        _consecutiveStreamFailures.remove(streamIndex);
         continue;
       }
 
@@ -299,13 +321,29 @@ public class IngestionDelayTracker {
           } else {
             _partitionIdToLatestOffset.putAll(streamPartitionIdToLatestOffset);
           }
+          _consecutiveStreamFailures.remove(streamIndex);
         } catch (Exception e) {
           _serverMetrics.addMeteredTableValue(_realTimeTableDataManager.getTableName(),
               ServerMeter.INGESTION_DELAY_LATEST_OFFSET_FETCH_ERRORS, 1);
           LOGGER.error("Failed to update latest stream offsets for partitions: {}", streamPartitionIds, e);
+          // For Kafka this is the only server path where a missing topic or an unreachable broker throws: the consumer
+          // just returns empty fetches.
+          recordStreamFailure(streamIndex, _streamConfigIndexToTopic.get(streamIndex), streamPartitionIds, e);
         }
       }
     }
+  }
+
+  /// Records a failure to reach the stream of `streamIndex` against the tracked partitions it serves: a refusal at
+  /// once, an unreadable stream only after [#MAX_CONSECUTIVE_STREAM_FAILURES] in a row.
+  private void recordStreamFailure(int streamIndex, String topic, Set<Integer> streamPartitionIds, Exception failure) {
+    int consecutiveFailures = _consecutiveStreamFailures.merge(streamIndex, 1, Integer::sum);
+    List<Integer> partitionIds = new ArrayList<>(streamPartitionIds.size());
+    for (int streamPartitionId : streamPartitionIds) {
+      partitionIds.add(IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(streamPartitionId, streamIndex));
+    }
+    _sourceErrors.record("latest_offset_fetch", failure, consecutiveFailures >= MAX_CONSECUTIVE_STREAM_FAILURES,
+        topic, partitionIds);
   }
 
   private ThreadFactory getThreadFactory(String threadName) {

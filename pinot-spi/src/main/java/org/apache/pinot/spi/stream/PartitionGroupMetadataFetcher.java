@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
+import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorReporter;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -151,6 +152,9 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
         // continue — the caller emits a metric and healthy topics proceed normally.
         LOGGER.warn("Permanent failure fetching StreamMetadata for topic {}, skipping in multi-topic fetch",
             topicName, e);
+        // Skipped so that the healthy topics proceed: report it to the calling site, which records it now, whatever
+        // the remaining topics do
+        IngestionSourceErrorReporter.report(e);
       } catch (Exception e) {
         LOGGER.warn("Could not get StreamMetadata for topic {}", topicName, e);
         _exception = e;

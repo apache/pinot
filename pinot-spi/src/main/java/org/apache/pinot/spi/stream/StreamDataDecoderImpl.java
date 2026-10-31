@@ -20,6 +20,7 @@ package org.apache.pinot.spi.stream;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -35,9 +36,13 @@ public class StreamDataDecoderImpl implements StreamDataDecoder {
   public static final String HEADER_KEY_PREFIX = "__header$";
   public static final String METADATA_KEY_PREFIX = "__metadata$";
   public static final String RECORD_SERIALIZED_VALUE_SIZE_KEY = METADATA_KEY_PREFIX + "recordSerializedValueSize";
+  // A decoder that fails every row, e.g. on a schema registry that refuses us, must not log every row
+  private static final long DECODE_ERROR_LOG_INTERVAL_MS = TimeUnit.MINUTES.toMillis(1);
 
   private final StreamMessageDecoder _valueDecoder;
   private final boolean _isKeyBytesType;
+  private long _lastDecodeErrorLogMs;
+  private long _decodeErrorsSinceLastLog;
   private final GenericRow _reuse = new GenericRow();
 
   /// @return Whether the given key is one of the special types of keys (\_\_key, \_\_header$, etc.)
@@ -90,8 +95,19 @@ public class StreamDataDecoderImpl implements StreamDataDecoder {
             new RuntimeException("Encountered unknown exception when decoding a Stream message"));
       }
     } catch (Exception e) {
-      LOGGER.error("Failed to decode StreamMessage", e);
+      logDecodeError(e);
       return new StreamDataDecoderResult(null, e);
+    }
+  }
+
+  private void logDecodeError(Exception e) {
+    _decodeErrorsSinceLastLog++;
+    long nowMs = System.currentTimeMillis();
+    if (nowMs - _lastDecodeErrorLogMs >= DECODE_ERROR_LOG_INTERVAL_MS) {
+      LOGGER.error("Failed to decode StreamMessage ({} failures since the last such line)", _decodeErrorsSinceLastLog,
+          e);
+      _lastDecodeErrorLogMs = nowMs;
+      _decodeErrorsSinceLastLog = 0;
     }
   }
 }
