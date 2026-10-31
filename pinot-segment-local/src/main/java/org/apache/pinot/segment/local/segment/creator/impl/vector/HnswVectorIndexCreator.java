@@ -70,19 +70,22 @@ public class HnswVectorIndexCreator implements VectorIndexCreator {
 
   /// With `buildThreads` > 1 (at most [VectorIndexConfigValidator#MAX_HNSW_BUILD_THREADS]), vectors are buffered and
   /// indexed from that many threads on seal: each thread fills its own Lucene segment, so the graphs build in
-  /// parallel. With the default `forceMerge=true` they are then merged into one graph using the same number of merge
-  /// workers. With `forceMerge=false` the graphs are kept as separate Lucene segments and searched together: the
+  /// parallel. With the default `forceMerge=true` they are then merged into one graph on a single thread, so the result
+  /// is the same on every build. `concurrentMerge=true` merges with `buildThreads` workers instead: faster, but the
+  /// merged graph then depends on thread timing, so replicas that each build the index can return different top-K
+  /// results for the same query, and recall can shift slightly. With `forceMerge=false` the graphs are kept as separate Lucene segments and searched together: the
   /// build is faster, but each query searches every graph, so query latency is higher (2-3x in one benchmark with 4
   /// threads). The number of graphs is at least `buildThreads`, and more when a thread's vectors exceed
   /// `maxBufferSizeMB` and Lucene flushes it more than once.
   private final int _buildThreads;
   private final boolean _forceMerge;
+  private final boolean _concurrentMerge;
   private final VectorIndexConfig _vectorIndexConfig;
   /// Above this many vectors the buffered ones are indexed on the calling thread and buffering stops, so large
   /// segments keep the single-writer path. Defaults to as many vectors as fit in 64 MB, at most 50,000. While
   /// buffering, the build holds the vectors on heap plus up to one `maxBufferSizeMB` per thread.
   private final int _parallelBuildMaxDocs;
-  /// Runs the graph merge workers on seal, when building in parallel with `forceMerge=true`
+  /// Runs the graph merge workers on seal, when building in parallel with `forceMerge=true` and `concurrentMerge=true`
   @Nullable
   private final ExecutorService _mergeExecutor;
   @Nullable
@@ -101,12 +104,13 @@ public class HnswVectorIndexCreator implements VectorIndexCreator {
     _buildThreads = Math.min(VectorIndexConfigValidator.MAX_HNSW_BUILD_THREADS,
         Math.max(1, Integer.parseInt(properties.getOrDefault("buildThreads", "1"))));
     _forceMerge = Boolean.parseBoolean(properties.getOrDefault("forceMerge", "true"));
+    _concurrentMerge = Boolean.parseBoolean(properties.getOrDefault("concurrentMerge", "false"));
     String parallelBuildMaxDocs = properties.get("parallelBuildMaxDocs");
     _parallelBuildMaxDocs = parallelBuildMaxDocs != null ? Integer.parseInt(parallelBuildMaxDocs)
         : (int) Math.max(1, Math.min(DEFAULT_PARALLEL_BUILD_MAX_DOCS,
             DEFAULT_PARALLEL_BUILD_MAX_BYTES / ((long) Float.BYTES * _vectorDimension)));
     _bufferedVectors = _buildThreads > 1 ? new ArrayList<>() : null;
-    _mergeExecutor = _buildThreads > 1 && _forceMerge ? Executors.newFixedThreadPool(_buildThreads) : null;
+    _mergeExecutor = _buildThreads > 1 && _forceMerge && _concurrentMerge ? Executors.newFixedThreadPool(_buildThreads) : null;
     _vectorIndexConfig = vectorIndexConfig;
     // Segment generation is always in V1 and later we convert (as part of post creation processing) to V3 if
     // segmentVersion is set to V3 in SegmentGeneratorConfig.
@@ -236,8 +240,8 @@ public class HnswVectorIndexCreator implements VectorIndexCreator {
   @Override
   public void seal() {
     try {
-      LOGGER.info("Sealing HNSW index for column: {} (buildThreads: {}, forceMerge: {})", _vectorColumn,
-          _buildThreads, _forceMerge);
+      LOGGER.info("Sealing HNSW index for column: {} (buildThreads: {}, forceMerge: {}, concurrentMerge: {})",
+          _vectorColumn, _buildThreads, _forceMerge, _concurrentMerge);
       if (_bufferedVectors != null) {
         addBufferedInParallel();
       }

@@ -184,14 +184,19 @@ public class HnswVectorIndexCreatorTest {
 
   @DataProvider
   public Object[][] parallelBuilds() {
-    // buildThreads, forceMerge, parallelBuildMaxDocs: the last case outgrows the buffer and falls back to one writer
-    return new Object[][]{{1, true, 50_000}, {4, true, 50_000}, {4, false, 50_000}, {3, true, 100}};
+    // buildThreads, forceMerge, concurrentMerge, parallelBuildMaxDocs: the last case outgrows the buffer and falls back
+    // to one writer
+    return new Object[][]{
+        {1, true, false, 50_000}, {4, true, false, 50_000}, {4, true, true, 50_000}, {4, false, false, 50_000},
+        {3, true, false, 100}
+    };
   }
 
   /// Every build mode, including the default single writer, must index each row under its own doc id: searching for a
   /// stored vector finds that row.
   @Test(dataProvider = "parallelBuilds")
-  public void testParallelBuildKeepsDocIds(int buildThreads, boolean forceMerge, int parallelBuildMaxDocs)
+  public void testParallelBuildKeepsDocIds(int buildThreads, boolean forceMerge, boolean concurrentMerge,
+      int parallelBuildMaxDocs)
       throws IOException {
     File indexDir = new File(INDEX_DIR, "parallel");
     FileUtils.forceMkdir(indexDir);
@@ -200,6 +205,7 @@ public class HnswVectorIndexCreatorTest {
     properties.put("vectorDimension", "8");
     properties.put("buildThreads", String.valueOf(buildThreads));
     properties.put("forceMerge", String.valueOf(forceMerge));
+    properties.put("concurrentMerge", String.valueOf(concurrentMerge));
     properties.put("parallelBuildMaxDocs", String.valueOf(parallelBuildMaxDocs));
     VectorIndexConfig config = new VectorIndexConfig(properties);
     int numDocs = 1000;

@@ -105,6 +105,7 @@ public class VectorIndexConfigValidatorTest {
     properties.put("mode", "BEST_SPEED");
     properties.put("buildThreads", "4");
     properties.put("forceMerge", "FALSE");
+    properties.put("concurrentMerge", "true");
     properties.put("parallelBuildMaxDocs", "20000");
 
     VectorIndexConfig config = new VectorIndexConfig(properties);
@@ -118,7 +119,8 @@ public class VectorIndexConfigValidatorTest {
         {"buildThreads", "0", ".*buildThreads must be a positive integer.*"},
         {"buildThreads", "2000", ".*buildThreads must be <= 32.*"},
         {"parallelBuildMaxDocs", "-1", ".*parallelBuildMaxDocs must be a positive integer.*"},
-        {"forceMerge", "yes", ".*forceMerge must be true or false.*"}
+        {"forceMerge", "yes", ".*forceMerge must be true or false.*"},
+        {"concurrentMerge", "1", ".*concurrentMerge must be true or false.*"}
     };
   }
 
