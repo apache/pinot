@@ -25,6 +25,7 @@ import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlJoin;
 import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.SqlMatchRecognize;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlNodeList;
 import org.apache.calcite.sql.SqlOrderBy;
@@ -96,6 +97,8 @@ public class TableNameExtractor {
       visitSelect((SqlSelect) node);
     } else if (node instanceof SqlJoin) {
       visitJoin((SqlJoin) node);
+    } else if (node instanceof SqlMatchRecognize) {
+      visitMatchRecognize((SqlMatchRecognize) node);
     } else if (node instanceof SqlBasicCall) {
       visitBasicCall((SqlBasicCall) node);
     } else if (node instanceof SqlIdentifier) {
@@ -199,6 +202,17 @@ public class TableNameExtractor {
       extractTableNames(join.getCondition());
     }
     // Restore original context
+    _inFromClause = wasInFromClause;
+  }
+
+  /// Visits a `MATCH_RECOGNIZE` FROM-clause item. [SqlMatchRecognize] is a plain `SqlCall`, not a [SqlBasicCall], so it
+  /// needs its own branch. Only its input (a table or a subquery) can reference a table. PARTITION BY, ORDER BY,
+  /// MEASURES, PATTERN and DEFINE hold columns and pattern variables, so they are not walked: in FROM-clause mode their
+  /// identifiers would be recorded as table names.
+  private void visitMatchRecognize(SqlMatchRecognize matchRecognize) {
+    boolean wasInFromClause = _inFromClause;
+    _inFromClause = true;
+    extractTableNames(matchRecognize.getTableRef());
     _inFromClause = wasInFromClause;
   }
 
