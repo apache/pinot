@@ -43,6 +43,9 @@ public class DataTableHandler extends SimpleChannelInboundHandler<ByteBuf> {
   private final ThreadAccountant _threadAccountant;
   private final ServerRoutingInstance _serverRoutingInstance;
   private final BrokerMetrics _brokerMetrics = BrokerMetrics.get();
+  // Set before the broker closes this channel on purpose after a restart: queries still in flight fail as usual,
+  // but the server is not reported for the close
+  private volatile boolean _closedByBroker;
 
   public DataTableHandler(QueryRouter queryRouter, ThreadAccountant threadAccountant,
       ServerRoutingInstance serverRoutingInstance) {
@@ -58,13 +61,26 @@ public class DataTableHandler extends SimpleChannelInboundHandler<ByteBuf> {
         _serverRoutingInstance.getShortName());
   }
 
+  /// See [#_closedByBroker]. Called by `ServerChannels` right before it closes the channel.
+  void markClosedByBroker() {
+    _closedByBroker = true;
+  }
+
   @Override
   public void channelInactive(ChannelHandlerContext ctx) {
-    LOGGER.error("Channel for server: {} is now inactive, marking server unavailable", _serverRoutingInstance);
+    boolean closedByBroker = _closedByBroker;
+    if (closedByBroker) {
+      LOGGER.info("Channel for server: {} closed by the broker is now inactive, failing the queries still in flight "
+          + "on it", _serverRoutingInstance);
+    } else {
+      LOGGER.error("Channel for server: {} is now inactive, marking server unavailable", _serverRoutingInstance);
+    }
     _brokerMetrics.addMeteredValue(BrokerMeter.NETTY_CONNECTION_CHANNEL_INACTIVE, 1,
         _serverRoutingInstance.getShortName());
-    _queryRouter.markServerUnavailable(_serverRoutingInstance,
-        new RuntimeException(String.format("Channel for server: %s is inactive", _serverRoutingInstance)));
+    // Scoped to this channel: a channel the broker replaced must not take down the queries on its successor
+    _queryRouter.markServerUnavailable(_serverRoutingInstance, ctx.channel(),
+        new RuntimeException(String.format("Channel for server: %s is inactive", _serverRoutingInstance)),
+        !closedByBroker);
   }
 
   @Override

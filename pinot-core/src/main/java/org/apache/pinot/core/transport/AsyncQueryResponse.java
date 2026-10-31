@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.transport;
 
+import io.netty.channel.Channel;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -42,6 +43,7 @@ public class AsyncQueryResponse implements QueryResponse {
   private final AtomicInteger _numServersResponded = new AtomicInteger();
   private final ConcurrentHashMap<ServerRoutingInstance, ServerResponse> _responseMap;
   private final CountDownLatch _countDownLatch;
+  private final long _startTimeMs;
   private final long _maxEndTimeMs;
   private final long _timeoutMs;
   private final ServerRoutingStatsManager _serverRoutingStatsManager;
@@ -71,6 +73,7 @@ public class AsyncQueryResponse implements QueryResponse {
     }
     _countDownLatch = new CountDownLatch(numServersQueried);
     _timeoutMs = timeoutMs;
+    _startTimeMs = startTimeMs;
     _maxEndTimeMs = startTimeMs + timeoutMs;
   }
 
@@ -94,7 +97,9 @@ public class AsyncQueryResponse implements QueryResponse {
       throws InterruptedException {
     try {
       boolean finish = _countDownLatch.await(_maxEndTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
-      _status.compareAndSet(Status.IN_PROGRESS, finish ? Status.COMPLETED : Status.TIMED_OUT);
+      if (_status.compareAndSet(Status.IN_PROGRESS, finish ? Status.COMPLETED : Status.TIMED_OUT) && !finish) {
+        recordUnansweredServers();
+      }
       return _responseMap;
     } finally {
       // Update ServerRoutingStats for query completion. This is done here to ensure that the stats are updated for
@@ -113,6 +118,20 @@ public class AsyncQueryResponse implements QueryResponse {
       }
 
       _queryRouter.markQueryDone(_requestId);
+    }
+  }
+
+  /// On a timeout, hands every server the request reached but that never answered to the transport, with the time
+  /// and the channel the request was written to; the transport judges after a grace period whether the server has gone
+  /// silent on that channel (see [ServerChannels#recordUnansweredQuery]).
+  private void recordUnansweredServers() {
+    for (Map.Entry<ServerRoutingInstance, ServerResponse> entry : _responseMap.entrySet()) {
+      ServerResponse response = entry.getValue();
+      int submitDelayMs = response.getSubmitDelayMs();
+      // Only servers the request was actually submitted to can be blamed for not answering it
+      if (response.getDataTable() == null && submitDelayMs >= 0) {
+        _queryRouter.recordServerTimeout(entry.getKey(), _startTimeMs + submitDelayMs, response.getChannel());
+      }
     }
   }
 
@@ -179,6 +198,13 @@ public class AsyncQueryResponse implements QueryResponse {
     _responseMap.get(serverRoutingInstance).markRequestSubmitted();
   }
 
+  /// Records the channel the request to the server is about to be written to, before the write, so that from then
+  /// on only that channel going down affects the query (see
+  /// [#markServerUnavailable(ServerRoutingInstance, Channel, Exception, boolean)]).
+  void markRequestChannel(ServerRoutingInstance serverRoutingInstance, Channel channel) {
+    _responseMap.get(serverRoutingInstance).setChannel(channel);
+  }
+
   void markRequestSent(ServerRoutingInstance serverRoutingInstance, int requestSentLatencyMs) {
     _responseMap.get(serverRoutingInstance).markRequestSent(requestSentLatencyMs);
   }
@@ -193,8 +219,14 @@ public class AsyncQueryResponse implements QueryResponse {
   }
 
   void markQueryFailed(ServerRoutingInstance serverRoutingInstance, Exception exception) {
+    failQuery(serverRoutingInstance, exception, true);
+  }
+
+  private void failQuery(ServerRoutingInstance serverRoutingInstance, Exception exception, boolean reportServer) {
     _status.set(Status.FAILED);
-    _failedServer = serverRoutingInstance;
+    if (reportServer) {
+      _failedServer = serverRoutingInstance;
+    }
     _countedDownServers.add(serverRoutingInstance);
     _exception = exception;
     int count = (int) _countDownLatch.getCount();
@@ -208,7 +240,17 @@ public class AsyncQueryResponse implements QueryResponse {
   /// NOTE: the server might not have been hit by this query. Only acts if the query was sent to the server and the
   /// server has not responded yet.
   boolean markServerUnavailable(ServerRoutingInstance serverRoutingInstance, Exception exception) {
-    if (!shouldActOnServerDown(serverRoutingInstance)) {
+    return markServerUnavailable(serverRoutingInstance, null, exception, true);
+  }
+
+  /// As [#markServerUnavailable(ServerRoutingInstance, Exception)], restricted to the query written to `channel`
+  /// when one is given: a late close of a channel the broker already replaced must not fail the queries running on
+  /// its successor. `reportServer` is `false` when the broker itself closed the channel after a restart: the query
+  /// still fails or is skipped, but the close is not evidence against
+  /// the server, so it is not recorded for the failure detector.
+  boolean markServerUnavailable(ServerRoutingInstance serverRoutingInstance, @Nullable Channel channel,
+      Exception exception, boolean reportServer) {
+    if (!shouldActOnServerDown(serverRoutingInstance, channel, reportServer)) {
       return false;
     }
     if (_skipUnavailableServers) {
@@ -216,13 +258,15 @@ public class AsyncQueryResponse implements QueryResponse {
       // routing, but do NOT set the query-global exception/status (no BROKER_REQUEST_SEND error, query stays
       // COMPLETED)
       if (_countedDownServers.add(serverRoutingInstance)) {
-        _failedServer = serverRoutingInstance;
+        if (reportServer) {
+          _failedServer = serverRoutingInstance;
+        }
         _countDownLatch.countDown();
         return true;
       }
       return false;
     }
-    markQueryFailed(serverRoutingInstance, exception);
+    failQuery(serverRoutingInstance, exception, reportServer);
     return false;
   }
 
@@ -237,8 +281,27 @@ public class AsyncQueryResponse implements QueryResponse {
   /// Returns `true` if a server-down event should be acted on: the server was queried by this response and has not
   /// responded yet
   private boolean shouldActOnServerDown(ServerRoutingInstance serverRoutingInstance) {
+    return shouldActOnServerDown(serverRoutingInstance, null, true);
+  }
+
+  /// As above, and when `channel` is given the request must have been written to that channel. A request whose
+  /// channel is not known yet (it is about to be written, possibly to a channel that is still being connected) is
+  /// still taken down by a genuine failure of the server, as before, but never by a close the broker itself made:
+  /// that close only concerns the queries demonstrably written to the closed channel.
+  private boolean shouldActOnServerDown(ServerRoutingInstance serverRoutingInstance, @Nullable Channel channel,
+      boolean reportServer) {
     ServerResponse serverResponse = _responseMap.get(serverRoutingInstance);
-    return serverResponse != null && serverResponse.getDataTable() == null;
+    if (serverResponse == null || serverResponse.getDataTable() != null) {
+      return false;
+    }
+    if (channel == null) {
+      return true;
+    }
+    Channel requestChannel = serverResponse.getChannel();
+    if (requestChannel == null) {
+      return reportServer;
+    }
+    return requestChannel == channel;
   }
 
   /// Releases the latch slot for a server that was skipped at request-submission time (the send failed and the

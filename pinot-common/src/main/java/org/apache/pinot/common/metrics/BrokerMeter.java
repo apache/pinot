@@ -232,6 +232,19 @@ public class BrokerMeter implements AbstractMetrics.Meter {
       "NETTY_CONNECTION_CHANNEL_ACTIVE", "nettyConnection", false);
   public static final BrokerMeter NETTY_CONNECTION_CHANNEL_INACTIVE = create(
       "NETTY_CONNECTION_CHANNEL_INACTIVE", "nettyConnection", false);
+  // Requests rejected because the channel's outbound queue was above its high watermark, i.e. the send window to the
+  // server is closed (see NettyConfig.WRITE_BUFFER_HIGH_WATER_MARK_BYTES). Each one is a query failed fast instead of
+  // being queued in direct memory behind a stalled socket.
+  public static final BrokerMeter NETTY_CONNECTION_UNWRITABLE_REJECTIONS = create(
+      "NETTY_CONNECTION_UNWRITABLE_REJECTIONS", "nettyConnection", true);
+  // Connections closed after pending writes made no positive socket byte progress for NettyConfig.WRITE_TIMEOUT_MS.
+  // Progressing requests can take longer overall; a stalled or half-open socket can still report isActive().
+  public static final BrokerMeter NETTY_CONNECTION_WRITE_TIMEOUTS = create(
+      "NETTY_CONNECTION_WRITE_TIMEOUTS", "nettyConnection", true);
+  // Cached channels closed and dropped because the routing manager re-enabled their server, which usually means the
+  // server was restarted and the cached channel points at the old process.
+  public static final BrokerMeter NETTY_CONNECTION_CHANNEL_EVICTIONS = create(
+      "NETTY_CONNECTION_CHANNEL_EVICTIONS", "nettyConnection", true);
 
   public static final BrokerMeter PROACTIVE_CLUSTER_CHANGE_CHECK = create(
       "PROACTIVE_CLUSTER_CHANGE_CHECK", "proactiveClusterChangeCheck", true);
