@@ -98,12 +98,22 @@ public final class TableConfigValidationUtils {
       @Nullable EnumSet<ValidationType> skipTypes, PinotHelixResourceManager resourceManager,
       ControllerConf controllerConf, @Nullable PinotTaskManager taskManager,
       @Nullable TableConfig existingTableConfig) {
+    validateTableConfig(tableConfig, schema, skipTypes, resourceManager, controllerConf, taskManager,
+        existingTableConfig, true);
+  }
+
+  static void validateTableConfig(TableConfig tableConfig, Schema schema,
+      @Nullable EnumSet<ValidationType> skipTypes, PinotHelixResourceManager resourceManager,
+      ControllerConf controllerConf, @Nullable PinotTaskManager taskManager,
+      @Nullable TableConfig existingTableConfig, boolean checkStoredHybridConfig) {
     validateEnvironmentVariables(tableConfig);
     TableConfigUtils.validate(tableConfig, schema, skipTypes, existingTableConfig);
     TableConfigUtils.validateTableName(tableConfig);
     TableConfigUtils.ensureMinReplicas(tableConfig, controllerConf.getDefaultTableMinReplicas());
     TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, controllerConf.getDimTableMaxSize());
-    checkHybridTableConfig(resourceManager, tableConfig);
+    if (checkStoredHybridConfig) {
+      checkHybridTableConfig(resourceManager, tableConfig);
+    }
     TaskConfigUtils.validateTaskConfigs(tableConfig, schema, taskManager, skipTypes);
     if (!ValidationType.INSTANCE_ASSIGNMENT.isSkipped(skipTypes)) {
       validateInstanceAssignment(resourceManager, tableConfig);

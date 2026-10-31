@@ -391,7 +391,7 @@ public final class PropertyExtractor {
     for (String value : list) {
       if (value != null && value.contains(",")) {
         throw new IllegalArgumentException("SHOW CREATE TABLE cannot emit property '" + key
-            + "' as comma-separated DDL because value '" + value + "' contains a comma; "
+            + "' as comma-separated DDL because one of its values contains a comma; "
             + "replaying the emitted DDL would split it into multiple values. Use the JSON "
             + "table config API for this table until the DDL grammar supports escaped CSV values.");
       }
