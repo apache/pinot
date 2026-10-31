@@ -838,6 +838,18 @@ public class CommonConstants {
     /// Calcite itself stops treating an IN list as a scalar predicate.
     public static final int DEFAULT_SEALED_IN_LIST_THRESHOLD = 20;
 
+    /// Whether the multi-stage engine resolves a simple name in `GROUP BY` to a `SELECT` alias before a column of the
+    /// same name. Calcite 1.42 (CALCITE-7052) resolves the column first, as MySQL and PostgreSQL do. Before that, Pinot
+    /// resolved the alias first. Enable this to keep the old behavior for queries such as
+    /// `SELECT CASE WHEN c = 'a' THEN 'x' ELSE c END AS c, COUNT(*) FROM t GROUP BY c`.
+    ///
+    /// This value can always be overridden by the [Request.QueryOptionKey#PREFER_SELECT_ALIAS_IN_GROUP_BY] query
+    /// option. Planning outside the broker's multi-stage request handler (for example for the controller `/sql`
+    /// endpoint) does not read this broker config and uses the default. The query option works everywhere.
+    public static final String CONFIG_OF_PREFER_SELECT_ALIAS_IN_GROUP_BY =
+        "pinot.broker.multistage.prefer.select.alias.in.group.by";
+    public static final boolean DEFAULT_PREFER_SELECT_ALIAS_IN_GROUP_BY = false;
+
     public static class Request {
       public static final String SQL = "sql";
       public static final String SQL_V1 = "sqlV1";
@@ -1235,6 +1247,9 @@ public class CommonConstants {
 
         /// Option to customize the value of [Broker#CONFIG_OF_SEALED_IN_LIST_THRESHOLD]
         public static final String SEALED_IN_LIST_THRESHOLD = "sealedInListThreshold";
+
+        /// Option to customize the value of [Broker#CONFIG_OF_PREFER_SELECT_ALIAS_IN_GROUP_BY]
+        public static final String PREFER_SELECT_ALIAS_IN_GROUP_BY = "preferSelectAliasInGroupBy";
 
         // Vector search query options
 

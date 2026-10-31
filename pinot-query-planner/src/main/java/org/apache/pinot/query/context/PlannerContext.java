@@ -69,7 +69,8 @@ public class PlannerContext implements AutoCloseable, Context {
       HepProgram optProgram, HepProgram traitProgram, Map<String, String> options, QueryEnvironment.Config envConfig,
       SqlExplainFormat sqlExplainFormat, @Nullable PhysicalPlannerContext physicalPlannerContext) {
     _planner = new PlannerImpl(config);
-    _validator = new Validator(config.getOperatorTable(), catalogReader, typeFactory);
+    _validator = new Validator(config.getOperatorTable(), catalogReader, typeFactory,
+        QueryOptionsUtils.isPreferSelectAliasInGroupBy(options, envConfig.defaultPreferSelectAliasInGroupBy()));
     _options = options;
     _envConfig = envConfig;
     _relOptPlanner = new LogicalPlanner(optProgram, this, config.getTraitDefs());
