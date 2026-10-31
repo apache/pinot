@@ -256,6 +256,7 @@ public class TransformFunctionFactory {
 
     // Vector functions
     typeToImplementation.put(TransformFunctionType.COSINE_DISTANCE, CosineDistanceTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.VECTOR_DISTANCE, IndexVectorDistanceTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.INNER_PRODUCT, InnerProductTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.L1_DISTANCE, L1DistanceTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.L2_DISTANCE, L2DistanceTransformFunction.class);

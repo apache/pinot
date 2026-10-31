@@ -19,6 +19,8 @@
 package org.apache.pinot.segment.local.segment.index.readers.vector;
 
 import com.google.common.base.Preconditions;
+import it.unimi.dsi.fastutil.ints.Int2FloatMap;
+import it.unimi.dsi.fastutil.ints.Int2FloatOpenHashMap;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
@@ -64,11 +66,16 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
   private final ThreadLocal<Integer> _efSearchOverride = new ThreadLocal<>();
   private final ThreadLocal<Boolean> _useRelativeDistanceOverride = new ThreadLocal<>();
   private final ThreadLocal<Boolean> _useBoundedQueueOverride = new ThreadLocal<>();
+  /// Lucene returns cosine similarity scores, which convert exactly to `1 - cosine similarity`; other functions use
+  /// scaled scores, so distances are only returned for COSINE.
+  private final boolean _returnsDistances;
 
   /// File-backed constructor: opens a [FSDirectory] from the Lucene HNSW index directory
   /// found under `indexDir`.
   public HnswVectorIndexReader(String column, File indexDir, int numDocs, VectorIndexConfig config) {
     _column = column;
+    _returnsDistances = config != null
+        && config.getVectorDistanceFunction() == VectorIndexConfig.VectorDistanceFunction.COSINE;
     try {
       File indexFile = getVectorIndexFile(indexDir);
       _indexDirectory = FSDirectory.open(indexFile.toPath());
@@ -98,6 +105,8 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
   /// @param config      vector index configuration
   public HnswVectorIndexReader(String column, PinotDataBuffer indexBuffer, int numDocs, VectorIndexConfig config) {
     _column = column;
+    _returnsDistances = config != null
+        && config.getVectorDistanceFunction() == VectorIndexConfig.VectorDistanceFunction.COSINE;
     try {
       _indexDirectory = HnswVectorIndexBufferReader.createLuceneDirectory(indexBuffer, column);
       _indexReader = DirectoryReader.open(_indexDirectory);
@@ -256,6 +265,46 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
       docIds.add(_docIdTranslator.getPinotDocId(scoreDoc.doc));
     }
     return docIds;
+  }
+
+  @Nullable
+  @Override
+  public Int2FloatMap getDocDistances(float[] vector, int topK) {
+    if (!_returnsDistances) {
+      return null;
+    }
+    try {
+      return toDistances(search(vector, topK, null));
+    } catch (IOException e) {
+      throw new RuntimeException("Caught exception while searching the HNSW index for column: " + _column, e);
+    }
+  }
+
+  @Nullable
+  @Override
+  public Int2FloatMap getDocDistances(float[] vector, int topK, ImmutableRoaringBitmap preFilterBitmap) {
+    Preconditions.checkNotNull(preFilterBitmap, "Pre-filter bitmap must not be null for filtered vector search");
+    if (!_returnsDistances) {
+      return null;
+    }
+    if (preFilterBitmap.isEmpty()) {
+      return new Int2FloatOpenHashMap();
+    }
+    try {
+      return toDistances(search(vector, topK, new RoaringBitmapFilterQuery(preFilterBitmap, _docIdTranslator)));
+    } catch (IOException e) {
+      throw new RuntimeException(
+          "Caught exception while searching the HNSW index with pre-filter for column: " + _column, e);
+    }
+  }
+
+  /// Converts Lucene COSINE scores (`(1 + cos) / 2`) to cosine distances (`1 - cos`), keyed by Pinot doc id.
+  private Int2FloatMap toDistances(TopDocs topDocs) {
+    Int2FloatOpenHashMap distances = new Int2FloatOpenHashMap(topDocs.scoreDocs.length);
+    for (ScoreDoc scoreDoc : topDocs.scoreDocs) {
+      distances.put(_docIdTranslator.getPinotDocId(scoreDoc.doc), 2 - 2 * scoreDoc.score);
+    }
+    return distances;
   }
 
   /// Lucene docIDs are not same as pinot docIDs. The internal implementation

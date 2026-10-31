@@ -211,6 +211,28 @@ public class VectorTest extends CustomDataQueryClusterIntegrationTest {
     }
   }
 
+  /// VECTOR_DISTANCE paired with VECTOR_SIMILARITY on a COSINE index returns the cosine distances, in the same order as
+  /// cosineDistance, on both query engines.
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testVectorDistance(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    int topK = 5;
+    String queryVector = "ARRAY[1.1" + StringUtils.repeat(", 0.3", VECTOR_DIM_SIZE - 1) + "]";
+    String query = "SELECT %s(%s, %s) AS dist FROM %s WHERE vectorSimilarity(%s, %s, %d) ORDER BY dist ASC LIMIT %d";
+    JsonNode expected = postQuery(String.format(query, "cosineDistance", VECTOR_1, queryVector, getTableName(),
+        VECTOR_1, queryVector, topK * 10, topK));
+    JsonNode actual = postQuery(String.format(query, "vectorDistance", VECTOR_1, queryVector, getTableName(),
+        VECTOR_1, queryVector, topK * 10, topK));
+    assertTrue(actual.get("exceptions").isEmpty(), actual.toString());
+    JsonNode expectedRows = expected.get("resultTable").get("rows");
+    JsonNode actualRows = actual.get("resultTable").get("rows");
+    assertEquals(actualRows.size(), topK);
+    for (int i = 0; i < topK; i++) {
+      assertEquals(actualRows.get(i).get(0).asDouble(), expectedRows.get(i).get(0).asDouble(), 1e-5);
+    }
+  }
+
   /// Tests filtered ANN: VECTOR_SIMILARITY combined with a metadata filter.
   /// All returned rows must match the filter predicate and be ordered by distance.
   @Test(dataProvider = "useBothQueryEngines")
