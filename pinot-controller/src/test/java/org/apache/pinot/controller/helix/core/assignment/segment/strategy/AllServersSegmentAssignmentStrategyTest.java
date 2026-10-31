@@ -27,6 +27,7 @@ import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixProperty;
 import org.apache.helix.PropertyKey;
+import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.assignment.InstancePartitions;
@@ -42,7 +43,6 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.apache.helix.model.InstanceConfig.InstanceConfigProperty.TAG_LIST;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -60,9 +60,6 @@ public class AllServersSegmentAssignmentStrategyTest {
   private static final String REALTIME_SERVER_TAG = "DefaultTenant_REALTIME";
   private static final String BROKER_TAG = "DefaultTenant_Broker";
   private static final String SEGMENT_NAME = "segment1";
-
-  private SegmentAssignment _segmentAssignment;
-  private HelixManager _helixManager;
   private static final String INSTANCE_PARTITIONS_NAME =
       InstancePartitionsType.OFFLINE.getInstancePartitionsName(RAW_TABLE_NAME);
   private static final String COMPLETED_INSTANCE_NAME_PREFIX = "completedInstance_";
@@ -71,7 +68,9 @@ public class AllServersSegmentAssignmentStrategyTest {
   private static final List<String> COMPLETED_INSTANCES =
       SegmentAssignmentTestUtils.getNameList(COMPLETED_INSTANCE_NAME_PREFIX, NUM_INSTANCES);
 
-  private Map<InstancePartitionsType, InstancePartitions> _instancePartitionsMap = new HashMap<>();
+  private final Map<InstancePartitionsType, InstancePartitions> _instancePartitionsMap = new HashMap<>();
+  private HelixManager _helixManager;
+  private SegmentAssignment _segmentAssignment;
 
   @BeforeClass
   public void setup() {
@@ -86,7 +85,7 @@ public class AllServersSegmentAssignmentStrategyTest {
 
     _instancePartitionsMap.put(InstancePartitionsType.OFFLINE, instancePartitions);
     _instancePartitionsMap.put(InstancePartitionsType.COMPLETED, completedInstancePartitions);
-    _segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig, null);
+    _segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig);
   }
 
   @Test
@@ -99,7 +98,8 @@ public class AllServersSegmentAssignmentStrategyTest {
     List<HelixProperty> instanceConfigList = new ArrayList<>();
     for (String instance : INSTANCES) {
       ZNRecord znRecord = new ZNRecord(instance);
-      znRecord.setListField(TAG_LIST.name(), List.of(OFFLINE_SERVER_TAG, REALTIME_SERVER_TAG));
+      znRecord.setListField(InstanceConfig.InstanceConfigProperty.TAG_LIST.name(),
+          List.of(OFFLINE_SERVER_TAG, REALTIME_SERVER_TAG));
       instanceConfigList.add(new InstanceConfig(znRecord));
     }
     HelixDataAccessor dataAccessor = mock(HelixDataAccessor.class);
@@ -108,23 +108,25 @@ public class AllServersSegmentAssignmentStrategyTest {
     when(dataAccessor.getChildValues(builder.instanceConfigs(), true)).thenReturn(instanceConfigList);
     when(_helixManager.getHelixDataAccessor()).thenReturn(dataAccessor);
 
-    List<String> instances = _segmentAssignment.assignSegment(SEGMENT_NAME, new TreeMap(), _instancePartitionsMap);
+    List<String> instances = _segmentAssignment.assignSegment(SEGMENT_NAME, new IdealState(RAW_TABLE_NAME),
+        _instancePartitionsMap);
     assertEquals(instances.size(), NUM_INSTANCES);
     assertEqualsNoOrder(instances.toArray(), INSTANCES.toArray());
 
     // Remove one instance and rebalance table
-    Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
-    Map<String, String> segment1Assginment = new TreeMap<>();
-    instances.stream().forEach(instance -> segment1Assginment.put(instance, "ONLINE"));
-    currentAssignment.put(SEGMENT_NAME, segment1Assginment);
+    IdealState idealState = new IdealState(RAW_TABLE_NAME);
+    Map<String, Map<String, String>> currentAssignment = idealState.getRecord().getMapFields();
+    Map<String, String> segment1Assignment = new TreeMap<>();
+    instances.forEach(instance -> segment1Assignment.put(instance, "ONLINE"));
+    currentAssignment.put(SEGMENT_NAME, segment1Assignment);
     ZNRecord znRecord = new ZNRecord(instanceConfigList.get(0).getId());
-    znRecord.setListField(TAG_LIST.name(), List.of(BROKER_TAG));
+    znRecord.setListField(InstanceConfig.InstanceConfigProperty.TAG_LIST.name(), List.of(BROKER_TAG));
     InstanceConfig newInstanceConfig = new InstanceConfig(znRecord);
     instanceConfigList.set(0, newInstanceConfig);
     when(dataAccessor.getChildValues(builder.instanceConfigs(), true)).thenReturn(instanceConfigList);
 
-    Map<String, Map<String, String>> newAssignment =
-        _segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, null, null, new RebalanceConfig());
+    Map<String, Map<String, String>> newAssignment = _segmentAssignment.rebalanceTable(idealState,
+        _instancePartitionsMap, null, null, new RebalanceConfig()).getSegmentAssignment();
     assertEquals(newAssignment.get(SEGMENT_NAME).size(), NUM_INSTANCES - 1);
   }
 
@@ -133,7 +135,7 @@ public class AllServersSegmentAssignmentStrategyTest {
     List<HelixProperty> instanceConfigList = new ArrayList<>();
     for (String instance : INSTANCES) {
       ZNRecord znRecord = new ZNRecord(instance);
-      znRecord.setListField(TAG_LIST.name(), List.of(REALTIME_SERVER_TAG));
+      znRecord.setListField(InstanceConfig.InstanceConfigProperty.TAG_LIST.name(), List.of(REALTIME_SERVER_TAG));
       instanceConfigList.add(new InstanceConfig(znRecord));
     }
     HelixDataAccessor dataAccessor = mock(HelixDataAccessor.class);
@@ -142,7 +144,8 @@ public class AllServersSegmentAssignmentStrategyTest {
     when(dataAccessor.getChildValues(builder.instanceConfigs(), true)).thenReturn(instanceConfigList);
     when(_helixManager.getHelixDataAccessor()).thenReturn(dataAccessor);
 
-    List<String> instances = _segmentAssignment.assignSegment(SEGMENT_NAME, new TreeMap(), _instancePartitionsMap);
+    List<String> instances = _segmentAssignment.assignSegment(SEGMENT_NAME, new IdealState(RAW_TABLE_NAME),
+        _instancePartitionsMap);
     assertEquals(instances.size(), NUM_INSTANCES);
     assertEqualsNoOrder(instances.toArray(), INSTANCES.toArray());
   }

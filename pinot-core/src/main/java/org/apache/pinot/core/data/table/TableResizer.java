@@ -45,6 +45,7 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.postaggregation.PostAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.StoredValueComparator;
 
 
 /// Helper class for trimming and sorting records in the IndexedTable, based on the order by information
@@ -104,16 +105,23 @@ public class TableResizer {
     _orderByValueExtractors = new OrderByValueExtractor[_numOrderByExpressions];
     Comparator[] comparators = new Comparator[_numOrderByExpressions];
     int[] nullComparisonResults = new int[_numOrderByExpressions];
-    for (int i = 0; i < _numOrderByExpressions; i++) {
-      OrderByExpressionContext orderByExpression = orderByExpressions.get(i);
-      _orderByValueExtractors[i] = getOrderByValueExtractor(orderByExpression.getExpression());
-      comparators[i] = orderByExpression.isAsc() ? Comparator.naturalOrder() : Comparator.reverseOrder();
-      nullComparisonResults[i] = orderByExpression.isNullsLast() ? -1 : 1;
-    }
     /// Grouping-set queries produce genuine null group-key values for rolled-up columns regardless of the
     /// user's null-handling option, so ORDER BY over a grouping column must use the null-safe comparator.
-    boolean nullHandlingEnabled = queryContext.requiresNullAwareKeyEvaluation();
-    if (nullHandlingEnabled) {
+    boolean nullAwareComparison = queryContext.requiresNullAwareKeyEvaluation();
+    for (int i = 0; i < _numOrderByExpressions; i++) {
+      OrderByExpressionContext orderByExpression = orderByExpressions.get(i);
+      ExpressionContext expression = orderByExpression.getExpression();
+      _orderByValueExtractors[i] = getOrderByValueExtractor(expression);
+      comparators[i] =
+          orderByExpression.isAsc() ? StoredValueComparator.INSTANCE : StoredValueComparator.INSTANCE.reversed();
+      nullComparisonResults[i] = orderByExpression.isNullsLast() ? -1 : 1;
+      // Aggregation results can be null with null handling disabled too, e.g. MINSTRING over an empty group.
+      if (expression.getType() != ExpressionContext.Type.LITERAL && !_groupByExpressionIndexMap.containsKey(
+          expression)) {
+        nullAwareComparison = true;
+      }
+    }
+    if (nullAwareComparison) {
       _intermediateRecordComparator = (o1, o2) -> {
         for (int i = 0; i < _numOrderByExpressions; i++) {
           Object v1 = o1._values[i];
@@ -190,7 +198,7 @@ public class TableResizer {
 
   /// Constructs an IntermediateRecord by extracting the order-by values from the record.
   private IntermediateRecord getIntermediateRecord(Key key, Record record) {
-    Comparable[] orderByValues = new Comparable[_numOrderByExpressions];
+    Object[] orderByValues = new Object[_numOrderByExpressions];
     for (int i = 0; i < _numOrderByExpressions; i++) {
       orderByValues[i] = _orderByValueExtractors[i].extract(record);
     }
@@ -481,7 +489,7 @@ public class TableResizer {
     ColumnDataType getValueType();
 
     /// Extracts the value from the given Record.
-    Comparable extract(Record record);
+    Object extract(Record record);
   }
 
   /// Extractor for a literal.
@@ -517,8 +525,8 @@ public class TableResizer {
     }
 
     @Override
-    public Comparable extract(Record record) {
-      return (Comparable) record.getValues()[_index];
+    public Object extract(Record record) {
+      return record.getValues()[_index];
     }
   }
 
@@ -540,7 +548,7 @@ public class TableResizer {
     }
 
     @Override
-    public Comparable extract(Record record) {
+    public Object extract(Record record) {
       return _aggregationFunction.extractFinalResult(record.getValues()[_index]);
     }
   }
@@ -578,7 +586,7 @@ public class TableResizer {
     }
 
     @Override
-    public Comparable extract(Record record) {
+    public Object extract(Record record) {
       if (_discriminatorIndex < 0 || _valuesByOrdinal == null) {
         return 0;
       }
@@ -615,17 +623,13 @@ public class TableResizer {
     }
 
     @Override
-    public Comparable extract(Record record) {
+    public Object extract(Record record) {
       int numArguments = _arguments.length;
       for (int i = 0; i < numArguments; i++) {
         _arguments[i] = _argumentExtractors[i].extract(record);
       }
       Object result = _postAggregationFunction.invoke(_arguments);
-      if (_postAggregationFunction.getResultType() == ColumnDataType.BYTES) {
-        return new ByteArray((byte[]) result);
-      } else {
-        return (Comparable) result;
-      }
+      return _postAggregationFunction.getResultType() == ColumnDataType.BYTES ? new ByteArray((byte[]) result) : result;
     }
   }
 }

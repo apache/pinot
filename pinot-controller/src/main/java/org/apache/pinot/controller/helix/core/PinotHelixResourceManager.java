@@ -51,6 +51,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -96,6 +97,7 @@ import org.apache.helix.zookeeper.zkclient.exception.ZkNoNodeException;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
+import org.apache.pinot.common.assignment.PartitionAssignmentUtils;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.config.provider.ZkTableCache;
@@ -629,29 +631,34 @@ public class PinotHelixResourceManager {
 
     InstanceConfigValidatorRegistry.validate(newInstance);
 
-    // Asymmetric preservation of the operational `queriesDisabled` flag managed by
-    // PUT /instances/{name}/state?state=QUERIES_DISABLE|QUERIES_ENABLE (see #setQueriesDisabled):
-    //   - body=true  -> set true (legacy path; explicit operator intent in this request).
-    //   - body=false -> if live==true, preserve true (the clobber case: a generic update to
-    //                   host/tags/ports must NOT silently re-route queries to a server an
-    //                   operator has explicitly removed from routing).
-    //   - body=false + live!=true -> leave as is (no-op / cleared).
-    boolean liveQueriesDisabled =
-        Boolean.parseBoolean(instanceConfig.getRecord().getSimpleField(CommonConstants.Helix.QUERIES_DISABLED));
-
     List<String> newTags = newInstance.getTags();
     List<String> oldTags = instanceConfig.getTags();
-    InstanceUtils.updateHelixInstanceConfig(instanceConfig, newInstance);
-    // If the live record had queriesDisabled=true but the request body defaulted it to false,
-    // restore the operational flag so it survives a request-body-driven update.
-    if (liveQueriesDisabled && !newInstance.isQueriesDisabled()) {
-      instanceConfig.getRecord().setSimpleField(CommonConstants.Helix.QUERIES_DISABLED, Boolean.TRUE.toString());
+    // Apply request-owned fields to the latest Helix record. A participant can update its
+    // own fields (for example pinotVersion and capabilities) after the read above but before
+    // this write. A full-record setProperty would overwrite those newer values; updateProperty
+    // runs this updater against the current record and preserves fields not changed here.
+    AtomicBoolean preservedQueriesDisabled = new AtomicBoolean();
+    boolean updated = _helixDataAccessor.updateProperty(_keyBuilder.instanceConfig(instanceId), record -> {
+      InstanceConfig currentConfig = new InstanceConfig(record);
+      boolean liveQueriesDisabled =
+          Boolean.parseBoolean(record.getSimpleField(CommonConstants.Helix.QUERIES_DISABLED));
+      InstanceUtils.updateHelixInstanceConfig(currentConfig, newInstance);
+      // Preserve the operator-controlled flag when the request body supplies its default false.
+      // An explicit true in the request remains supported for the legacy update path.
+      boolean shouldPreserveQueriesDisabled = liveQueriesDisabled && !newInstance.isQueriesDisabled();
+      if (shouldPreserveQueriesDisabled) {
+        currentConfig.getRecord().setSimpleField(CommonConstants.Helix.QUERIES_DISABLED, Boolean.TRUE.toString());
+      }
+      preservedQueriesDisabled.set(shouldPreserveQueriesDisabled);
+      return currentConfig.getRecord();
+    }, instanceConfig);
+    if (!updated) {
+      throw new RuntimeException("Failed to update instance config for instance: " + instanceId);
+    }
+    if (preservedQueriesDisabled.get()) {
       LOGGER.warn("Ignoring request body's queriesDisabled=false for instance: {} because the live config has "
               + "queriesDisabled=true; use PUT /instances/{}/state?state=QUERIES_ENABLE to clear the flag.", instanceId,
           instanceId);
-    }
-    if (!_helixDataAccessor.setProperty(_keyBuilder.instanceConfig(instanceId), instanceConfig)) {
-      throw new RuntimeException("Failed to set instance config for instance: " + instanceId);
     }
 
     // Update broker resource if necessary
@@ -1525,6 +1532,10 @@ public class PinotHelixResourceManager {
             return false;
           }
         }
+      }
+      // The instances of the partition assignment are in use although they might host no segment
+      if (CollectionUtils.containsAny(taggedInstances, PartitionAssignmentUtils.getAllInstances(tableIdealState))) {
+        return false;
       }
     }
     return true;
@@ -3038,8 +3049,7 @@ public class PinotHelixResourceManager {
         instancePartitionsMap = fetchOrComputeInstancePartitions(tableNameWithType, tableConfig);
       }
 
-      SegmentAssignment segmentAssignment =
-          SegmentAssignmentFactory.getSegmentAssignment(_helixZkManager, tableConfig, _controllerMetrics);
+      SegmentAssignment segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(_helixZkManager, tableConfig);
       HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, idealState -> {
         assert idealState != null;
         Map<String, Map<String, String>> currentAssignment = idealState.getRecord().getMapFields();
@@ -3048,7 +3058,7 @@ public class PinotHelixResourceManager {
               tableNameWithType);
         } else {
           List<String> assignedInstances =
-              segmentAssignment.assignSegment(segmentName, currentAssignment, instancePartitionsMap);
+              segmentAssignment.assignSegment(segmentName, idealState, instancePartitionsMap);
           LOGGER.info("Assigning segment: {} to instances: {} for table: {}", segmentName, assignedInstances,
               tableNameWithType);
           currentAssignment.put(segmentName,
@@ -3108,8 +3118,7 @@ public class PinotHelixResourceManager {
         tierToInstancePartitionsMap = null;
       }
 
-      SegmentAssignment segmentAssignment =
-          SegmentAssignmentFactory.getSegmentAssignment(_helixZkManager, tableConfig, _controllerMetrics);
+      SegmentAssignment segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(_helixZkManager, tableConfig);
       long segmentAssignmentStartMs = System.currentTimeMillis();
       HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, idealState -> {
         assert idealState != null;
@@ -3128,7 +3137,7 @@ public class PinotHelixResourceManager {
               instancePartitionsMap = tierToInstancePartitionsMap.get(segmentZKMetadata.getTier());
             }
             List<String> assignedInstances =
-                segmentAssignment.assignSegment(segmentName, currentAssignment, instancePartitionsMap);
+                segmentAssignment.assignSegment(segmentName, idealState, instancePartitionsMap);
             LOGGER.info("Assigning segment: {} to instances: {} for table: {}", segmentName, assignedInstances,
                 tableNameWithType);
             currentAssignment.put(segmentName,
@@ -4250,15 +4259,24 @@ public class PinotHelixResourceManager {
     if (!InstanceTypeUtils.isMinion(instanceName)) {
       getAllResources().forEach(resource -> {
         IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, resource);
-        for (String partition : idealState.getPartitionSet()) {
-          if (idealState.getInstanceSet(partition).contains(instanceName)) {
-            response.putIssue(OperationValidationResponse.ErrorCode.CONTAINS_RESOURCE, instanceName, resource);
-            break;
-          }
+        if (isInstanceInIdealState(idealState, instanceName)) {
+          response.putIssue(OperationValidationResponse.ErrorCode.CONTAINS_RESOURCE, instanceName, resource);
         }
       });
     }
     return response.setSafe(response.getIssues().isEmpty());
+  }
+
+  /// Returns whether the given instance is in the given IdealState: it is assigned a partition (a segment of a table),
+  /// or it is in the partition assignment of a table (see [PartitionAssignmentUtils]), whose new segments are assigned
+  /// to the instances of their partition.
+  private static boolean isInstanceInIdealState(IdealState idealState, String instanceName) {
+    for (String partition : idealState.getPartitionSet()) {
+      if (idealState.getInstanceSet(partition).contains(instanceName)) {
+        return true;
+      }
+    }
+    return PartitionAssignmentUtils.getAllInstances(idealState).contains(instanceName);
   }
 
   /// Restores previous tags for a drained minion instance if applicable.

@@ -18,11 +18,13 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.lang.foreign.MemorySegment;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.datasketches.theta.ThetaSketch;
+import org.apache.datasketches.theta.ThetaUnion;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.segment.local.customobject.ThetaSketchAccumulator;
@@ -66,5 +68,20 @@ public class DistinctCountRawThetaSketchAggregationFunction extends DistinctCoun
 
     ThetaSketch sketch = evaluatePostAggregationExpression(mergedSketches);
     return Base64.getEncoder().encodeToString(sketch.toByteArray());
+  }
+
+  /// Merges two final results, which are serialized sketches in string form, into the string form of their union.
+  /// Final results are only merged across partitions of the aggregated values, so the union of the sketches that the
+  /// post-aggregation expression returns for each partition is the sketch it returns for all of them.
+  @Override
+  public String mergeFinalResult(Comparable finalResult1, Comparable finalResult2) {
+    ThetaUnion union = _setOperationBuilder.buildUnion();
+    union.union(deserializeFinalResult(finalResult1));
+    union.union(deserializeFinalResult(finalResult2));
+    return Base64.getEncoder().encodeToString(union.getResult().toByteArray());
+  }
+
+  private static ThetaSketch deserializeFinalResult(Comparable finalResult) {
+    return ThetaSketch.wrap(MemorySegment.ofArray(Base64.getDecoder().decode((String) finalResult)));
   }
 }

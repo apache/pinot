@@ -23,6 +23,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -36,6 +37,11 @@ import org.apache.pinot.spi.utils.CommonConstants;
 /// Always applied:
 /// - FIRST_WITH_TIME(dataColumn, timeColumn) -> FIRST_WITH_TIME(dataColumn, timeColumn, 'dataType')
 /// - LAST_WITH_TIME(dataColumn, timeColumn) -> LAST_WITH_TIME(dataColumn, timeColumn, 'dataType')
+/// - ARRAY_AGG(column[, isDistinct]) -> ARRAY_AGG(column, 'dataType'[, isDistinct])
+/// - MODE(stringColumn[, 'MIN'|'MAX']) -> MODE(stringColumn, 'MIN'|'MAX', 'STRING')
+///
+/// Applied only when enabled through the `inferAnyValueType` query option:
+/// - ANY_VALUE(column) -> ANY_VALUE(column, 'dataType')
 ///
 /// Applied only when enabled through the `autoRewriteAggregationType` query option:
 /// - MIN(stringType) -> MINSTRING
@@ -56,22 +62,25 @@ public class AggregateFunctionRewriteOptimizer implements StatementOptimizer {
 
     boolean rewriteToTypedVariants = pinotQuery.getQueryOptions() != null && Boolean.parseBoolean(
         pinotQuery.getQueryOptions().get(CommonConstants.Broker.Request.QueryOptionKey.AUTO_REWRITE_AGGREGATION_TYPE));
-    rewrite(pinotQuery.getSelectList(), schema, rewriteToTypedVariants);
-    rewrite(pinotQuery.getGroupByList(), schema, rewriteToTypedVariants);
-    rewrite(pinotQuery.getOrderByList(), schema, rewriteToTypedVariants);
-    rewrite(pinotQuery.getFilterExpression(), schema, rewriteToTypedVariants);
-    rewrite(pinotQuery.getHavingExpression(), schema, rewriteToTypedVariants);
+    boolean inferAnyValueType = QueryOptionsUtils.isInferAnyValueType(pinotQuery.getQueryOptions());
+    rewrite(pinotQuery.getSelectList(), schema, rewriteToTypedVariants, inferAnyValueType);
+    rewrite(pinotQuery.getGroupByList(), schema, rewriteToTypedVariants, inferAnyValueType);
+    rewrite(pinotQuery.getOrderByList(), schema, rewriteToTypedVariants, inferAnyValueType);
+    rewrite(pinotQuery.getFilterExpression(), schema, rewriteToTypedVariants, inferAnyValueType);
+    rewrite(pinotQuery.getHavingExpression(), schema, rewriteToTypedVariants, inferAnyValueType);
   }
 
-  private static void rewrite(@Nullable List<Expression> expressions, Schema schema, boolean rewriteToTypedVariants) {
+  private static void rewrite(@Nullable List<Expression> expressions, Schema schema, boolean rewriteToTypedVariants,
+      boolean inferAnyValueType) {
     if (expressions != null) {
       for (Expression expression : expressions) {
-        rewrite(expression, schema, rewriteToTypedVariants);
+        rewrite(expression, schema, rewriteToTypedVariants, inferAnyValueType);
       }
     }
   }
 
-  private static void rewrite(@Nullable Expression expression, Schema schema, boolean rewriteToTypedVariants) {
+  private static void rewrite(@Nullable Expression expression, Schema schema, boolean rewriteToTypedVariants,
+      boolean inferAnyValueType) {
     if (expression == null || !expression.isSetFunctionCall()) {
       return;
     }
@@ -79,7 +88,7 @@ public class AggregateFunctionRewriteOptimizer implements StatementOptimizer {
     Function function = expression.getFunctionCall();
     String functionName = function.getOperator();
     if (!AggregationFunctionType.isAggregationFunction(functionName)) {
-      rewrite(function.getOperands(), schema, rewriteToTypedVariants);
+      rewrite(function.getOperands(), schema, rewriteToTypedVariants, inferAnyValueType);
       return;
     }
 
@@ -95,7 +104,21 @@ public class AggregateFunctionRewriteOptimizer implements StatementOptimizer {
     String normalizedName = AggregationFunctionType.getNormalizedAggregationFunctionName(functionName);
     if ((normalizedName.equals(AggregationFunctionType.FIRSTWITHTIME.name())
         || normalizedName.equals(AggregationFunctionType.LASTWITHTIME.name())) && function.getOperandsSize() == 2) {
-      addDataTypeArgument(function, normalizedName, fieldSpec);
+      addDataTypeArgument(function, normalizedName + "(dataColumn, timeColumn)", fieldSpec);
+      return;
+    }
+    if (normalizedName.equals(AggregationFunctionType.ANYVALUE.name()) && function.getOperandsSize() == 1) {
+      if (inferAnyValueType) {
+        addDataTypeArgument(function, normalizedName + "(expr)", fieldSpec);
+      }
+      return;
+    }
+    if (normalizedName.equals(AggregationFunctionType.ARRAYAGG.name()) && isArrayAggWithoutDataType(function)) {
+      addArrayAggDataTypeArgument(function, normalizedName, fieldSpec);
+      return;
+    }
+    if (normalizedName.equals(AggregationFunctionType.MODE.name()) && function.getOperandsSize() <= 2) {
+      addModeDataTypeArgument(function, fieldSpec);
       return;
     }
     if (rewriteToTypedVariants) {
@@ -107,7 +130,7 @@ public class AggregateFunctionRewriteOptimizer implements StatementOptimizer {
 
   /// Appends the data column's logical type. The supported types match `PinotAggregateTypeArgumentRewriteRule` in the
   /// multi-stage engine.
-  private static void addDataTypeArgument(Function function, String functionName, FieldSpec fieldSpec) {
+  private static void addDataTypeArgument(Function function, String call, FieldSpec fieldSpec) {
     if (fieldSpec.isSingleValueField()) {
       switch (fieldSpec.getDataType()) {
         case INT:
@@ -130,8 +153,70 @@ public class AggregateFunctionRewriteOptimizer implements StatementOptimizer {
           break;
       }
     }
-    throw new BadQueryRequestException(String.format("Unsupported data type for %s(dataColumn, timeColumn): %s%s",
-        functionName, fieldSpec.isSingleValueField() ? "" : "multi-value ", fieldSpec.getDataType()));
+    throw new BadQueryRequestException(String.format("Unsupported data type for %s: %s%s", call,
+        fieldSpec.isSingleValueField() ? "" : "multi-value ", fieldSpec.getDataType()));
+  }
+
+  /// Appends the default tie reducer when missing, then STRING for a STRING or JSON column.
+  private static void addModeDataTypeArgument(Function function, FieldSpec fieldSpec) {
+    if (!fieldSpec.isSingleValueField()) {
+      return;
+    }
+    String dataType;
+    switch (fieldSpec.getDataType()) {
+      case STRING:
+        dataType = fieldSpec.getDataType().name();
+        break;
+      case JSON:
+        // Same as the multi-stage engine, which types a JSON column as VARCHAR.
+        dataType = FieldSpec.DataType.STRING.name();
+        break;
+      default:
+        return;
+    }
+    if (function.getOperandsSize() == 1) {
+      function.addToOperands(RequestUtils.getLiteralExpression("MIN"));
+    }
+    function.addToOperands(RequestUtils.getLiteralExpression(dataType));
+  }
+
+  /// Matches ARRAY_AGG(column) and ARRAY_AGG(column, isDistinct); a string second argument is the explicit data type.
+  private static boolean isArrayAggWithoutDataType(Function function) {
+    int numOperands = function.getOperandsSize();
+    if (numOperands == 1) {
+      return true;
+    }
+    if (numOperands == 2) {
+      Expression secondOperand = function.getOperands().get(1);
+      return secondOperand.isSetLiteral() && secondOperand.getLiteral().isSetBoolValue();
+    }
+    return false;
+  }
+
+  /// Inserts the column's logical type, the element type for a multi-value column, as the second argument. The
+  /// supported types match `PinotAggregateTypeArgumentRewriteRule` in the multi-stage engine.
+  private static void addArrayAggDataTypeArgument(Function function, String functionName, FieldSpec fieldSpec) {
+    switch (fieldSpec.getDataType()) {
+      case BOOLEAN:
+      case INT:
+      case LONG:
+      case TIMESTAMP:
+      case FLOAT:
+      case DOUBLE:
+      case BIG_DECIMAL:
+      case STRING:
+      case BYTES:
+      case UUID:
+        function.getOperands().add(1, RequestUtils.getLiteralExpression(fieldSpec.getDataType().name()));
+        return;
+      case JSON:
+        // Same as the multi-stage engine, which types a JSON column as VARCHAR.
+        function.getOperands().add(1, RequestUtils.getLiteralExpression(FieldSpec.DataType.STRING.name()));
+        return;
+      default:
+        throw new BadQueryRequestException(
+            String.format("Unsupported data type for %s(expression): %s", functionName, fieldSpec.getDataType()));
+    }
   }
 
   private static void rewriteToTypedVariant(Function function, String functionName, FieldSpec.DataType operandType) {

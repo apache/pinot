@@ -49,7 +49,6 @@ import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
-import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextMetadata;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
@@ -285,7 +284,7 @@ public class SegmentPreProcessor implements AutoCloseable {
       if (_schema.hasColumn(column) || !configsByCol.containsKey(column)) {
         continue;
       }
-      if (!(entry.getValue() instanceof ColumnMetadataImpl columnMetadata) || !columnMetadata.isMaterializedChild()) {
+      if (!entry.getValue().isMaterializedChild()) {
         continue;
       }
       if (augmented == null) {
@@ -295,7 +294,7 @@ public class SegmentPreProcessor implements AutoCloseable {
           augmented.addField(fieldSpec);
         }
       }
-      augmented.addField(columnMetadata.getFieldSpec());
+      augmented.addField(entry.getValue().getFieldSpec());
     }
     return augmented == null ? _schema : augmented;
   }

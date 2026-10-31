@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function.array;
 
+import java.lang.reflect.Array;
 import java.nio.ByteBuffer;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -33,7 +34,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-public abstract class BaseArrayAggFunction<I, F extends Comparable> extends BaseSingleInputAggregationFunction<I, F> {
+public abstract class BaseArrayAggFunction<I, F> extends BaseSingleInputAggregationFunction<I, F> {
 
   private final DataSchema.ColumnDataType _resultColumnType;
 
@@ -99,5 +100,24 @@ public abstract class BaseArrayAggFunction<I, F extends Comparable> extends Base
   @Override
   public I extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     return groupByResultHolder.getResult(groupKey);
+  }
+
+  /// Merges two final results by concatenating them. Final results are only merged across partitions of the
+  /// aggregated values, so the values of the distinct variants do not overlap.
+  @Override
+  public F mergeFinalResult(F finalResult1, F finalResult2) {
+    int length1 = Array.getLength(finalResult1);
+    if (length1 == 0) {
+      return finalResult2;
+    }
+    int length2 = Array.getLength(finalResult2);
+    if (length2 == 0) {
+      return finalResult1;
+    }
+    //noinspection unchecked
+    F mergedResult = (F) Array.newInstance(finalResult1.getClass().getComponentType(), length1 + length2);
+    System.arraycopy(finalResult1, 0, mergedResult, 0, length1);
+    System.arraycopy(finalResult2, 0, mergedResult, length1, length2);
+    return mergedResult;
   }
 }

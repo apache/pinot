@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -534,8 +535,22 @@ public class TablesResourceTest extends BaseResourceTest {
       throws IOException, ConfigurationException {
     String segmentPath = "/segments/" + tableNameWithType + "/" + segment.getSegmentName();
 
+    File segmentDir = new File(_tableDataManagerMap.get(tableNameWithType).getTableDataDir(), segment.getSegmentName());
+    // The fixture loads without an instance config; create the local serving sidecar to test its tar exclusion.
+    try (SegmentMetadataImpl mappedMetadata = SegmentMetadataImpl.loadMapped(segmentDir)) {
+      assertTrue(mappedMetadata.isMapped());
+    }
+    assertTrue(new File(segmentDir, "segment_metadata.bin").isFile());
+    File temporarySidecar = new File(segmentDir, ".segment_metadata.test.tmp");
+    Files.writeString(temporarySidecar.toPath(), "in progress");
+
     // Download the segment and save to a temp local file.
-    Response response = _webTarget.path(segmentPath).request().get(Response.class);
+    Response response;
+    try {
+      response = _webTarget.path(segmentPath).request().get(Response.class);
+    } finally {
+      Files.deleteIfExists(temporarySidecar.toPath());
+    }
     assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
     File segmentFile = response.readEntity(File.class);
 
@@ -549,6 +564,11 @@ public class TablesResourceTest extends BaseResourceTest {
     // Extract creation.meta
     TarCompressionUtils.untarOneFile(segmentFile, V1Constants.SEGMENT_CREATION_META,
         new File(tempMetadataDir, V1Constants.SEGMENT_CREATION_META));
+
+    assertThrows(IOException.class, () -> TarCompressionUtils.untarOneFile(segmentFile, "segment_metadata.bin",
+        new File(tempMetadataDir, "sidecar")));
+    assertThrows(IOException.class, () -> TarCompressionUtils.untarOneFile(segmentFile, temporarySidecar.getName(),
+        new File(tempMetadataDir, "temporary-sidecar")));
 
     // Load segment metadata
     SegmentMetadataImpl metadata = new SegmentMetadataImpl(tempMetadataDir);

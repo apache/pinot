@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.core.query.optimizer.statement;
 
+import java.util.Map;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
@@ -46,9 +48,14 @@ public class AggregateFunctionRewriteOptimizerTest {
       .addSingleValueDimension("bytesCol", DataType.BYTES)
       .addSingleValueDimension("uuidCol", DataType.UUID)
       .addMultiValueDimension("mvCol", DataType.INT)
+      .addMultiValueDimension("mvStringCol", DataType.STRING)
       .addSingleValueDimension("timeCol", DataType.LONG)
+      .addComplex("mapCol", DataType.MAP, Map.of(
+          "key", new DimensionFieldSpec("key", DataType.STRING, true),
+          "value", new DimensionFieldSpec("value", DataType.INT, true)))
       .build();
   private static final String AUTO_REWRITE = "SET autoRewriteAggregationType=true; ";
+  private static final String INFER_ANY_VALUE_TYPE = "SET inferAnyValueType=true; ";
 
   @DataProvider
   public Object[][] dataTypes() {
@@ -86,6 +93,45 @@ public class AggregateFunctionRewriteOptimizerTest {
         + "FROM testTable");
   }
 
+  @DataProvider
+  public Object[][] arrayAggDataTypes() {
+    return new Object[][]{
+        {"intCol", "INT"}, {"longCol", "LONG"}, {"floatCol", "FLOAT"}, {"doubleCol", "DOUBLE"},
+        {"bigDecimalCol", "BIG_DECIMAL"}, {"stringCol", "STRING"}, {"jsonCol", "STRING"}, {"boolCol", "BOOLEAN"},
+        {"timestampCol", "TIMESTAMP"}, {"bytesCol", "BYTES"}, {"uuidCol", "UUID"}, {"mvCol", "INT"}
+    };
+  }
+
+  @Test(dataProvider = "arrayAggDataTypes")
+  public void testArrayAggInfersDataType(String column, String dataType) {
+    assertRewrite("SELECT ARRAY_AGG(" + column + "), arrayAgg(" + column + ", true) FROM testTable",
+        "SELECT ARRAY_AGG(" + column + ", '" + dataType + "'), arrayAgg(" + column + ", '" + dataType + "', true) "
+            + "FROM testTable");
+  }
+
+  @Test
+  public void testArrayAggDistinctKeyword() {
+    for (String arguments : new String[]{"intCol", "intCol, false", "intCol, 'INT'", "intCol, 'INT', true",
+        "intCol, 'INT', false"}) {
+      assertRewrite("SELECT ARRAY_AGG(DISTINCT " + arguments + ") FROM testTable",
+          "SELECT ARRAY_AGG(intCol, 'INT', true) FROM testTable");
+    }
+  }
+
+  @Test
+  public void testArrayAggRejectsUnsupportedColumn() {
+    PinotQuery query = CalciteSqlParser.compileToPinotQuery("SELECT ARRAY_AGG(mapCol) FROM testTable");
+    BadQueryRequestException exception = expectThrows(BadQueryRequestException.class,
+        () -> new AggregateFunctionRewriteOptimizer().optimize(query, SCHEMA));
+    assertEquals(exception.getMessage(), "Unsupported data type for ARRAYAGG(expression): MAP");
+  }
+
+  @Test
+  public void testArrayAggKeepsExplicitFormsAndColumnsWithoutSchemaType() {
+    assertUnchanged("SELECT ARRAY_AGG(intCol, 'LONG'), ARRAY_AGG(intCol, 'LONG', true), ARRAY_AGG(intCol, 1), "
+        + "ARRAY_AGG(missingCol), ARRAY_AGG(trim(stringCol), true) FROM testTable");
+  }
+
   @Test
   public void testRewritesNestedAggregationsConsistently() {
     // Aliases, transforms, FILTER, HAVING and ORDER BY wrap the aggregation in another function.
@@ -99,6 +145,77 @@ public class AggregateFunctionRewriteOptimizerTest {
             + "FIRST_WITH_TIME(doubleCol, timeCol, 'DOUBLE') FILTER (WHERE boolCol) "
             + "FROM testTable GROUP BY intCol HAVING FIRST_WITH_TIME(longCol, timeCol, 'LONG') > 1 "
             + "ORDER BY LAST_WITH_TIME(timestampCol, timeCol, 'TIMESTAMP')");
+  }
+
+  @Test(dataProvider = "dataTypes")
+  public void testAnyValueInfersDataType(String column, String dataType) {
+    for (String function : new String[]{"ANY_VALUE", "anyValue"}) {
+      assertRewrite(INFER_ANY_VALUE_TYPE + "SELECT " + function + "(" + column + ") FROM testTable",
+          INFER_ANY_VALUE_TYPE + "SELECT " + function + "(" + column + ", '" + dataType + "') FROM testTable");
+    }
+  }
+
+  @Test
+  public void testAnyValueRejectsMultiValueColumn() {
+    PinotQuery query =
+        CalciteSqlParser.compileToPinotQuery(INFER_ANY_VALUE_TYPE + "SELECT ANY_VALUE(mvCol) FROM testTable");
+    BadQueryRequestException exception = expectThrows(BadQueryRequestException.class,
+        () -> new AggregateFunctionRewriteOptimizer().optimize(query, SCHEMA));
+    assertEquals(exception.getMessage(), "Unsupported data type for ANYVALUE(expr): multi-value INT");
+    assertUnchanged("SELECT ANY_VALUE(mvCol) FROM testTable");
+  }
+
+  @Test
+  public void testAnyValueKeepsArgumentsWithoutSchemaType() {
+    for (String column : new String[]{"missingCol", "trim(stringCol)"}) {
+      assertUnchanged(INFER_ANY_VALUE_TYPE + "SELECT ANY_VALUE(" + column + ") FROM testTable");
+    }
+    assertUnchanged(INFER_ANY_VALUE_TYPE + "SELECT ANY_VALUE(intCol, 'LONG') FROM testTable");
+  }
+
+  @Test
+  public void testRewritesNestedAnyValueConsistently() {
+    assertRewrite(INFER_ANY_VALUE_TYPE + "SELECT intCol, ANY_VALUE(stringCol) AS v1, ANY_VALUE(doubleCol) FILTER "
+            + "(WHERE boolCol) FROM testTable GROUP BY intCol HAVING ANY_VALUE(longCol) > 1 "
+            + "ORDER BY ANY_VALUE(timestampCol)",
+        INFER_ANY_VALUE_TYPE + "SELECT intCol, ANY_VALUE(stringCol, 'STRING') AS v1, ANY_VALUE(doubleCol, 'DOUBLE') "
+            + "FILTER (WHERE boolCol) FROM testTable GROUP BY intCol HAVING ANY_VALUE(longCol, 'LONG') > 1 "
+            + "ORDER BY ANY_VALUE(timestampCol, 'TIMESTAMP')");
+  }
+
+  @Test
+  public void testAnyValueDataTypeRequiresQueryOption() {
+    String query = "SELECT ANY_VALUE(intCol), FIRST_WITH_TIME(intCol, timeCol) FROM testTable";
+    String expectedQuery = "SELECT ANY_VALUE(intCol, 'INT'), FIRST_WITH_TIME(intCol, timeCol, 'INT') FROM testTable";
+    assertRewrite(INFER_ANY_VALUE_TYPE + query, INFER_ANY_VALUE_TYPE + expectedQuery);
+    // The option only applies to ANY_VALUE.
+    String unchangedAnyValue = "SELECT ANY_VALUE(intCol), FIRST_WITH_TIME(intCol, timeCol, 'INT') FROM testTable";
+    assertRewrite(query, unchangedAnyValue);
+    assertRewrite("SET inferAnyValueType=false; " + query, "SET inferAnyValueType=false; " + unchangedAnyValue);
+  }
+
+  @Test
+  public void testModeInfersNonNumericDataType() {
+    assertRewrite("SELECT MODE(stringCol), MODE(jsonCol), MODE(boolCol, 'MAX'), MODE(timestampCol, 'AVG') "
+            + "FROM testTable",
+        "SELECT MODE(stringCol, 'MIN', 'STRING'), MODE(jsonCol, 'MIN', 'STRING'), MODE(boolCol, 'MAX'), "
+            + "MODE(timestampCol, 'AVG') FROM testTable");
+    assertRewrite("SELECT intCol, MODE(stringCol) FILTER (WHERE boolCol) AS m FROM testTable GROUP BY intCol "
+            + "HAVING MODE(boolCol) = true ORDER BY MODE(timestampCol, 'MAX')",
+        "SELECT intCol, MODE(stringCol, 'MIN', 'STRING') FILTER (WHERE boolCol) AS m FROM testTable GROUP BY intCol "
+            + "HAVING MODE(boolCol) = true ORDER BY MODE(timestampCol, 'MAX')");
+  }
+
+  @Test
+  public void testModeKeepsOtherInputs() {
+    // Numeric, BOOLEAN and TIMESTAMP MODE keep their DOUBLE results
+    assertUnchanged("SELECT MODE(intCol), MODE(longCol, 'AVG'), MODE(floatCol, 'MAX'), MODE(doubleCol) FROM testTable");
+    for (String column : new String[]{
+        "boolCol", "timestampCol", "bytesCol", "uuidCol", "mvStringCol", "missingCol", "trim(stringCol)"
+    }) {
+      assertUnchanged("SELECT MODE(" + column + ") FROM testTable");
+    }
+    assertUnchanged("SELECT MODE(stringCol, 'MAX', 'STRING') FROM testTable");
   }
 
   @Test

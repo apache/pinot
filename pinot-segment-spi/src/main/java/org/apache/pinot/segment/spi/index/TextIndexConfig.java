@@ -78,11 +78,11 @@ public class TextIndexConfig extends IndexConfig {
   private final boolean _storeInSegmentFile;
 
   public enum DocIdTranslatorMode {
-    // build and keep mapping
+    /// Keep load-time and reused-mutable mappings. Fresh immutable indexes still drop verified identity mappings.
     Default,
-    // build mapping and check if it can be dropped
+    /// Drop verified identity mappings, including when reusing mutable indexes.
     TryOptimize,
-    // mapping is not necessary, use lucene ids
+    /// Use Lucene document IDs without constructing or verifying a mapping.
     Skip;
 
     static DocIdTranslatorMode of(String mode) {

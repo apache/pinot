@@ -23,6 +23,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -72,6 +74,8 @@ import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
+import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
@@ -92,6 +96,7 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.apache.pinot.util.TestUtils;
+import org.mockito.MockedStatic;
 import org.slf4j.Logger;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
@@ -103,11 +108,13 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
@@ -371,6 +378,54 @@ public class BaseTableDataManagerTest {
       fail();
     } catch (Exception e) {
       // As expected, segment reloading fails due to missing the local segment dir.
+    }
+  }
+
+  @Test
+  public void testMappedMetadataOnExistingSegmentLoadAndDirectoryReuseReload()
+      throws Exception {
+    File indexDir = createSegment(SegmentVersion.v3, 5);
+    SegmentZKMetadata zkMetadata = new SegmentZKMetadata(SEGMENT_NAME);
+    zkMetadata.setCrc(getCRC(indexDir));
+    InstanceDataManagerConfig instanceConfig = createDefaultInstanceDataManagerConfig();
+    when(instanceConfig.getConfig()).thenReturn(new PinotConfiguration(
+        Map.of(IndexLoadingConfig.MAPPED_SEGMENT_METADATA_ENABLED, true)));
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(instanceConfig, DEFAULT_TABLE_CONFIG, SCHEMA);
+    BaseTableDataManager tableDataManager = spy(createTableManager(instanceConfig));
+    seedZKMetadata(tableDataManager, SEGMENT_NAME, zkMetadata);
+    doReturn(indexLoadingConfig).when(tableDataManager).fetchIndexLoadingConfig();
+    SegmentDirectoryLoader defaultLoader = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader();
+    AtomicInteger markedLoads = new AtomicInteger();
+    SegmentDirectoryLoader checkingLoader = (uri, context) -> {
+      assertTrue(context.isMappedMetadataEnabled());
+      markedLoads.incrementAndGet();
+      return defaultLoader.load(uri, context);
+    };
+    try (MockedStatic<SegmentDirectoryLoaderRegistry> registry =
+        mockStatic(SegmentDirectoryLoaderRegistry.class, CALLS_REAL_METHODS)) {
+      registry.when(() -> SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(
+          SegmentDirectoryLoaderRegistry.DEFAULT_SEGMENT_DIRECTORY_LOADER_NAME))
+          .thenReturn(checkingLoader);
+
+      File sidecar = new File(indexDir, "segment_metadata.bin");
+      assertFalse(sidecar.exists());
+      tableDataManager.addNewOnlineSegment(zkMetadata, indexLoadingConfig);
+      assertTrue(((SegmentMetadataImpl) tableDataManager.getSegmentDataManager(SEGMENT_NAME).getSegment()
+          .getSegmentMetadata()).isMapped());
+      assertTrue(sidecar.exists());
+      int startupLoads = markedLoads.get();
+      assertTrue(startupLoads > 0);
+
+      File properties = SegmentDirectoryPaths.findMetadataFile(indexDir);
+      Files.writeString(properties.toPath(), "\ncustom.serverReload = fresh\n", StandardCharsets.UTF_8,
+          StandardOpenOption.APPEND);
+      tableDataManager.reloadSegment(SEGMENT_NAME, false, null);
+      verify(tableDataManager, never()).createBackup(indexDir);
+      SegmentMetadataImpl reloaded = (SegmentMetadataImpl) tableDataManager.getSegmentDataManager(SEGMENT_NAME)
+          .getSegment().getSegmentMetadata();
+      assertTrue(reloaded.isMapped());
+      assertEquals(reloaded.getCustomMap().get("serverReload"), "fresh");
+      assertEquals(markedLoads.get(), startupLoads + 1);
     }
   }
 

@@ -51,6 +51,9 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.broker.routing.instanceselector.SegmentStatesTestUtils.createSegmentStates;
+import static org.apache.pinot.broker.routing.instanceselector.SelectionResultTestUtils.getOptionalSegmentToInstanceMap;
+import static org.apache.pinot.broker.routing.instanceselector.SelectionResultTestUtils.getSegmentToInstanceMap;
 import static org.apache.pinot.spi.config.table.RoutingConfig.REPLICA_GROUP_INSTANCE_SELECTOR_TYPE;
 import static org.apache.pinot.spi.config.table.RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE;
 import static org.apache.pinot.spi.utils.CommonConstants.Broker.FALLBACK_POOL_ID;
@@ -62,11 +65,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 /// Tests for [ReplicaGroupInstanceSelector] and [StrictReplicaGroupInstanceSelector], including adaptive server
@@ -192,7 +191,7 @@ public class ReplicaGroupSelectorTest {
     expectedReplicaGroupInstanceSelectorResult.put(segments.get(10), instance0);
     expectedReplicaGroupInstanceSelectorResult.put(segments.get(11), instance1);
     InstanceSelector.SelectionResult selectionResult = replicaGroupInstanceSelector.select(brokerRequest, segments, 0);
-    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedReplicaGroupInstanceSelectorResult);
+    assertEquals(getSegmentToInstanceMap(selectionResult), expectedReplicaGroupInstanceSelectorResult);
     assertTrue(selectionResult.getUnavailableSegments().isEmpty());
   }
 
@@ -262,8 +261,44 @@ public class ReplicaGroupSelectorTest {
     expectedReplicaGroupInstanceSelectorResult.put(segments.get(10), instance1);
     expectedReplicaGroupInstanceSelectorResult.put(segments.get(11), instance2);
     InstanceSelector.SelectionResult selectionResult = replicaGroupInstanceSelector.select(brokerRequest, segments, 0);
-    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedReplicaGroupInstanceSelectorResult);
+    assertEquals(getSegmentToInstanceMap(selectionResult), expectedReplicaGroupInstanceSelectorResult);
     assertTrue(selectionResult.getUnavailableSegments().isEmpty());
+  }
+
+  @Test
+  public void testReplicaGroupInstanceSelectorFixedReplicaRotationAtMaxTableNameHash() {
+    // The raw table name hashes to Integer.MAX_VALUE, the largest hash before the cap
+    when(_tableConfig.getTableName()).thenReturn("aBIAa9p_OFFLINE");
+    List<Pair<String, String>> instanceStates =
+        List.of(Pair.of("instance0", ONLINE), Pair.of("instance1", ONLINE), Pair.of("instance2", ONLINE));
+    Map<String, List<Pair<String, String>>> assignment = Map.of(
+        "segment0", instanceStates,
+        "segment1", instanceStates,
+        "segment2", instanceStates,
+        "segment3", instanceStates
+    );
+    ReplicaGroupInstanceSelector selector = new ReplicaGroupInstanceSelector();
+    selector.init(_tableConfig, mock(ZkHelixPropertyStore.class), mock(BrokerMetrics.class), null, Clock.systemUTC(),
+        INSTANCE_SELECTOR_CONFIG, Set.of("instance0", "instance1", "instance2"), EMPTY_SERVER_MAP,
+        createIdealState(assignment), createExternalView(assignment), assignment.keySet());
+    BrokerRequest brokerRequest = mock(BrokerRequest.class);
+    PinotQuery pinotQuery = mock(PinotQuery.class);
+    when(brokerRequest.getPinotQuery()).thenReturn(pinotQuery);
+    when(pinotQuery.getQueryOptions()).thenReturn(Map.of(
+        CommonConstants.Broker.Request.QueryOptionKey.USE_FIXED_REPLICA, "true",
+        CommonConstants.Broker.Request.QueryOptionKey.NUM_REPLICA_GROUPS_TO_QUERY, "2"
+    ));
+
+    // As with the hash before the cap, the segments alternate between the candidates Integer.MAX_VALUE % 3 = 1 and
+    // (Integer.MAX_VALUE + 1) % 3 = 2, the sum taken without int overflow
+    InstanceSelector.SelectionResult selectionResult =
+        selector.select(brokerRequest, List.of("segment0", "segment1", "segment2", "segment3"), 0);
+    assertEquals(getSegmentToInstanceMap(selectionResult), Map.of(
+        "segment0", "instance1",
+        "segment1", "instance2",
+        "segment2", "instance1",
+        "segment3", "instance2"
+    ));
   }
 
   @Test
@@ -324,13 +359,13 @@ public class ReplicaGroupSelectorTest {
       expectedReplicaGroupInstanceSelectorResult.put(segment, instance0);
     }
     InstanceSelector.SelectionResult selectionResult = replicaGroupInstanceSelector.select(brokerRequest, segments, 0);
-    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedReplicaGroupInstanceSelectorResult);
+    assertEquals(getSegmentToInstanceMap(selectionResult), expectedReplicaGroupInstanceSelectorResult);
 
     for (String segment : segments) {
       expectedReplicaGroupInstanceSelectorResult.put(segment, instance1);
     }
     selectionResult = replicaGroupInstanceSelector.select(brokerRequest, segments, 1);
-    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedReplicaGroupInstanceSelectorResult);
+    assertEquals(getSegmentToInstanceMap(selectionResult), expectedReplicaGroupInstanceSelectorResult);
   }
 
   // --- Adaptive server selection tests ---
@@ -369,7 +404,7 @@ public class ReplicaGroupSelectorTest {
     candidatesMap.put(AR_SEGMENT2, Arrays.asList(
         new SegmentInstanceCandidate(AR_P0_RG0_SERVER_E, true, 0, 0),
         new SegmentInstanceCandidate(AR_P1_RG1_SERVER_D, true, 1, 1)));
-    return new SegmentStates(candidatesMap, new HashSet<>(AR_SEGMENTS), null);
+    return createSegmentStates(candidatesMap, Set.of());
   }
 
   private ReplicaGroupInstanceSelector buildArSelector(String selectorType, HybridSelector hybridSelector) {
@@ -424,17 +459,39 @@ public class ReplicaGroupSelectorTest {
     assertNotNull(instanceSelector._priorityPoolInstanceSelector);
 
     when(hybridSelector.fetchServerRankingsWithScores(any())).thenReturn(AR_SERVER_RANKS);
-    InstanceSelector.InstanceMapping result =
-        instanceSelector.select(AR_SEGMENTS, 0, buildArSegmentStates(), null);
+    InstanceSelector.SelectionResult result = instanceSelector.select(AR_SEGMENTS, 0, buildArSegmentStates(), null);
 
     // AR prefers the better-ranked server when all candidates are ranked:
     // segment0: B (rank 3) over A (rank 4)
     // segment1: D (rank 1) over C (rank 2)
     // segment2: E unranked → AR falls back to round-robin → index 0 = E
-    assertEquals(result.segmentToInstanceMap(), Map.of(
+    assertEquals(getSegmentToInstanceMap(result), Map.of(
         AR_SEGMENT0, AR_P1_RG1_SERVER_B,
         AR_SEGMENT1, AR_P1_RG1_SERVER_D,
         AR_SEGMENT2, AR_P0_RG0_SERVER_E));
+  }
+
+  @Test
+  public void testReplicaGroupAdaptiveSupportsFixedReplicaQueryOption() {
+    HybridSelector hybridSelector = mock(HybridSelector.class);
+    ReplicaGroupInstanceSelector instanceSelector =
+        buildArSelector(REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, hybridSelector);
+    when(hybridSelector.fetchServerRankingsWithScores(any())).thenReturn(AR_SERVER_RANKS);
+
+    // Fixed replica routing selects the candidate index derived from the raw table name, 0 for "testTable", for every
+    // request, without ranking the servers.
+    Map<String, String> queryOptions = Map.of(CommonConstants.Broker.Request.QueryOptionKey.USE_FIXED_REPLICA, "true");
+    SegmentStates segmentStates = buildArSegmentStates();
+    Map<String, String> expectedSegmentToInstanceMap = Map.of(
+        AR_SEGMENT0, AR_P0_RG0_SERVER_A,
+        AR_SEGMENT1, AR_P0_RG0_SERVER_C,
+        AR_SEGMENT2, AR_P0_RG0_SERVER_E
+    );
+    InstanceSelector.SelectionResult result = instanceSelector.select(AR_SEGMENTS, 0, segmentStates, queryOptions);
+    assertEquals(getSegmentToInstanceMap(result), expectedSegmentToInstanceMap);
+    result = instanceSelector.select(AR_SEGMENTS, 1, segmentStates, queryOptions);
+    assertEquals(getSegmentToInstanceMap(result), expectedSegmentToInstanceMap);
+    verify(hybridSelector, never()).fetchServerRankingsWithScores(any());
   }
 
   @Test
@@ -451,17 +508,17 @@ public class ReplicaGroupSelectorTest {
     assertNull(instanceSelector._adaptiveServerSelector);
     assertNull(instanceSelector._priorityPoolInstanceSelector);
 
-    BaseInstanceSelector.InstanceMapping result =
+    InstanceSelector.SelectionResult result =
         instanceSelector.select(STRICT_SEGMENTS, 0, buildStrictReplicaGroupSegmentStates(), null);
 
     verify(hybridSelector, never()).fetchServerRankingsWithScores(any());
-    assertEquals(result.segmentToInstanceMap(), Map.of(
+    assertEquals(getSegmentToInstanceMap(result), Map.of(
         STRICT_SEGMENT0, STRICT_RG0_SERVER_A,
         STRICT_SEGMENT1, STRICT_RG0_SERVER_A,
         STRICT_SEGMENT2, STRICT_RG0_SERVER_B));
 
     result = instanceSelector.select(STRICT_SEGMENTS, 1, buildStrictReplicaGroupSegmentStates(), null);
-    assertEquals(result.segmentToInstanceMap(), Map.of(
+    assertEquals(getSegmentToInstanceMap(result), Map.of(
         STRICT_SEGMENT0, STRICT_RG1_SERVER_C,
         STRICT_SEGMENT1, STRICT_RG1_SERVER_C,
         STRICT_SEGMENT2, STRICT_RG1_SERVER_D));
@@ -488,11 +545,11 @@ public class ReplicaGroupSelectorTest {
 
     assertNull(instanceSelector._adaptiveServerSelector);
     assertNull(instanceSelector._priorityPoolInstanceSelector);
-    InstanceSelector.InstanceMapping result =
+    InstanceSelector.SelectionResult result =
         instanceSelector.select(STRICT_SEGMENTS, 0, buildStrictReplicaGroupSegmentStates(), null);
     verify(hybridSelector, never()).fetchServerRankingsWithScores(any());
-    assertEquals(result.segmentToInstanceMap().get(STRICT_SEGMENT0),
-        result.segmentToInstanceMap().get(STRICT_SEGMENT1));
+    Map<String, String> segmentToInstanceMap = getSegmentToInstanceMap(result);
+    assertEquals(segmentToInstanceMap.get(STRICT_SEGMENT0), segmentToInstanceMap.get(STRICT_SEGMENT1));
   }
 
   @Test
@@ -503,11 +560,11 @@ public class ReplicaGroupSelectorTest {
 
     assertNull(instanceSelector._adaptiveServerSelector);
     assertNull(instanceSelector._priorityPoolInstanceSelector);
-    InstanceSelector.InstanceMapping result =
+    InstanceSelector.SelectionResult result =
         instanceSelector.select(STRICT_SEGMENTS, 0, buildStrictReplicaGroupSegmentStates(), null);
     verify(hybridSelector, never()).fetchServerRankingsWithScores(any());
-    assertEquals(result.segmentToInstanceMap().get(STRICT_SEGMENT0),
-        result.segmentToInstanceMap().get(STRICT_SEGMENT1));
+    Map<String, String> segmentToInstanceMap = getSegmentToInstanceMap(result);
+    assertEquals(segmentToInstanceMap.get(STRICT_SEGMENT0), segmentToInstanceMap.get(STRICT_SEGMENT1));
   }
 
   // --- Strict replica group adaptive routing tests ---
@@ -555,7 +612,7 @@ public class ReplicaGroupSelectorTest {
     candidatesMap.put(STRICT_SEGMENT2,
         buildStrictReplicaGroupCandidates(STRICT_RG0_SERVER_B, STRICT_RG1_SERVER_D, replicaGroup0Pool,
             replicaGroup1Pool));
-    return new SegmentStates(candidatesMap, new HashSet<>(STRICT_SEGMENTS), null);
+    return createSegmentStates(candidatesMap, Set.of());
   }
 
   private StrictReplicaGroupInstanceSelector buildStrictReplicaGroupArSelector(HybridSelector hybridSelector) {
@@ -634,12 +691,12 @@ public class ReplicaGroupSelectorTest {
         new ImmutablePair<>(STRICT_RG0_SERVER_B, 4.0)   // rank 3 (worst)
     ));
 
-    InstanceSelector.InstanceMapping result =
+    InstanceSelector.SelectionResult result =
         instanceSelector.select(STRICT_SEGMENTS, 0, buildStrictReplicaGroupSegmentStates(), null);
 
     // Each partition independently prefers its healthier replica. Segments 0 and 1 share a candidate list, so they
     // make the same choice.
-    assertEquals(result.segmentToInstanceMap(), Map.of(
+    assertEquals(getSegmentToInstanceMap(result), Map.of(
         STRICT_SEGMENT0, STRICT_RG1_SERVER_C,
         STRICT_SEGMENT1, STRICT_RG1_SERVER_C,
         STRICT_SEGMENT2, STRICT_RG1_SERVER_D));
@@ -660,10 +717,10 @@ public class ReplicaGroupSelectorTest {
         new ImmutablePair<>(STRICT_RG1_SERVER_D, 4.0)
     ));
 
-    InstanceSelector.InstanceMapping result =
+    InstanceSelector.SelectionResult result =
         instanceSelector.select(STRICT_SEGMENTS, 0, buildStrictReplicaGroupSegmentStates(), null);
 
-    assertEquals(result.segmentToInstanceMap(), Map.of(
+    assertEquals(getSegmentToInstanceMap(result), Map.of(
         STRICT_SEGMENT0, STRICT_RG0_SERVER_A,
         STRICT_SEGMENT1, STRICT_RG0_SERVER_A,
         STRICT_SEGMENT2, STRICT_RG0_SERVER_B));
@@ -683,11 +740,11 @@ public class ReplicaGroupSelectorTest {
 
     Map<String, String> queryOptions = Map.of(
         CommonConstants.Broker.Request.QueryOptionKey.ORDERED_PREFERRED_POOLS, "0");
-    InstanceSelector.InstanceMapping result = instanceSelector.select(STRICT_SEGMENTS, 0,
+    InstanceSelector.SelectionResult result = instanceSelector.select(STRICT_SEGMENTS, 0,
         buildStrictReplicaGroupSegmentStates(0, 1), queryOptions);
 
     // Preferred pools are the primary selection criterion, even when another pool is healthier.
-    assertEquals(result.segmentToInstanceMap(), Map.of(
+    assertEquals(getSegmentToInstanceMap(result), Map.of(
         STRICT_SEGMENT0, STRICT_RG0_SERVER_A,
         STRICT_SEGMENT1, STRICT_RG0_SERVER_A,
         STRICT_SEGMENT2, STRICT_RG0_SERVER_B));
@@ -720,15 +777,14 @@ public class ReplicaGroupSelectorTest {
         new SegmentInstanceCandidate(STRICT_RG0_SERVER_B, true, 0, 0),
         new SegmentInstanceCandidate(STRICT_RG1_SERVER_D, true, 0, 1),
         new SegmentInstanceCandidate(nonPreferredServerF, true, 1, 2)));
-    SegmentStates segmentStates = new SegmentStates(candidatesMap, new HashSet<>(STRICT_SEGMENTS), null);
+    SegmentStates segmentStates = createSegmentStates(candidatesMap, Set.of());
 
     Map<String, String> queryOptions = Map.of(
         CommonConstants.Broker.Request.QueryOptionKey.ORDERED_PREFERRED_POOLS, "0");
-    InstanceSelector.InstanceMapping result = instanceSelector.select(STRICT_SEGMENTS, 1, segmentStates,
-        queryOptions);
+    InstanceSelector.SelectionResult result = instanceSelector.select(STRICT_SEGMENTS, 1, segmentStates, queryOptions);
 
     // The healthiest candidate within pool 0 wins, while the healthier candidates in pool 1 are ignored.
-    assertEquals(result.segmentToInstanceMap(), Map.of(
+    assertEquals(getSegmentToInstanceMap(result), Map.of(
         STRICT_SEGMENT0, STRICT_RG1_SERVER_C,
         STRICT_SEGMENT1, STRICT_RG1_SERVER_C,
         STRICT_SEGMENT2, STRICT_RG1_SERVER_D));
@@ -743,16 +799,16 @@ public class ReplicaGroupSelectorTest {
     when(hybridSelector.fetchServerRankingsWithScores(any())).thenReturn(List.of());
 
     // requestId=0 picks candidate index 0.
-    InstanceSelector.InstanceMapping result =
+    InstanceSelector.SelectionResult result =
         instanceSelector.select(STRICT_SEGMENTS, 0, buildStrictReplicaGroupSegmentStates(), null);
-    assertEquals(result.segmentToInstanceMap(), Map.of(
+    assertEquals(getSegmentToInstanceMap(result), Map.of(
         STRICT_SEGMENT0, STRICT_RG0_SERVER_A,
         STRICT_SEGMENT1, STRICT_RG0_SERVER_A,
         STRICT_SEGMENT2, STRICT_RG0_SERVER_B));
 
     // requestId=1 picks candidate index 1.
     result = instanceSelector.select(STRICT_SEGMENTS, 1, buildStrictReplicaGroupSegmentStates(), null);
-    assertEquals(result.segmentToInstanceMap(), Map.of(
+    assertEquals(getSegmentToInstanceMap(result), Map.of(
         STRICT_SEGMENT0, STRICT_RG1_SERVER_C,
         STRICT_SEGMENT1, STRICT_RG1_SERVER_C,
         STRICT_SEGMENT2, STRICT_RG1_SERVER_D));
@@ -765,11 +821,11 @@ public class ReplicaGroupSelectorTest {
 
     Map<String, String> queryOptions = Map.of(
         CommonConstants.Broker.Request.QueryOptionKey.USE_FIXED_REPLICA, "true");
-    InstanceSelector.InstanceMapping result =
+    InstanceSelector.SelectionResult result =
         instanceSelector.select(STRICT_SEGMENTS, 0, buildStrictReplicaGroupSegmentStates(), queryOptions);
     verify(hybridSelector, never()).fetchServerRankingsWithScores(any());
-    assertEquals(result.segmentToInstanceMap().get(STRICT_SEGMENT0),
-        result.segmentToInstanceMap().get(STRICT_SEGMENT1));
+    Map<String, String> segmentToInstanceMap = getSegmentToInstanceMap(result);
+    assertEquals(segmentToInstanceMap.get(STRICT_SEGMENT0), segmentToInstanceMap.get(STRICT_SEGMENT1));
   }
 
   @Test
@@ -779,11 +835,11 @@ public class ReplicaGroupSelectorTest {
 
     Map<String, String> queryOptions = Map.of(
         CommonConstants.Broker.Request.QueryOptionKey.NUM_REPLICA_GROUPS_TO_QUERY, "2");
-    InstanceSelector.InstanceMapping result =
+    InstanceSelector.SelectionResult result =
         instanceSelector.select(STRICT_SEGMENTS, 0, buildStrictReplicaGroupSegmentStates(), queryOptions);
 
     verify(hybridSelector, never()).fetchServerRankingsWithScores(any());
-    assertEquals(result.segmentToInstanceMap(), Map.of(
+    assertEquals(getSegmentToInstanceMap(result), Map.of(
         STRICT_SEGMENT0, STRICT_RG0_SERVER_A,
         STRICT_SEGMENT1, STRICT_RG1_SERVER_C,
         STRICT_SEGMENT2, STRICT_RG0_SERVER_B));
@@ -801,10 +857,10 @@ public class ReplicaGroupSelectorTest {
         new ImmutablePair<>(STRICT_RG1_SERVER_D, 4.0)
     ));
 
-    InstanceSelector.InstanceMapping result =
+    InstanceSelector.SelectionResult result =
         instanceSelector.select(STRICT_SEGMENTS, 42, buildStrictReplicaGroupSegmentStates(), null);
 
-    assertEquals(result.segmentToInstanceMap(), Map.of(
+    assertEquals(getSegmentToInstanceMap(result), Map.of(
         STRICT_SEGMENT0, STRICT_RG1_SERVER_C,
         STRICT_SEGMENT1, STRICT_RG1_SERVER_C,
         STRICT_SEGMENT2, STRICT_RG0_SERVER_B));
@@ -867,7 +923,7 @@ public class ReplicaGroupSelectorTest {
 
     InstanceSelector.SelectionResult result = instanceSelector.select(brokerRequest, segments, 0);
 
-    assertEquals(result.getSegmentToInstanceMap(), Map.of(
+    assertEquals(getSegmentToInstanceMap(result), Map.of(
         partition0Segment0, partition0Replica1,
         partition0Segment1, partition0Replica1,
         partition1Segment0, partition1Replica0,
@@ -913,7 +969,7 @@ public class ReplicaGroupSelectorTest {
     when(pinotQuery.getQueryOptions()).thenReturn(null);
 
     InstanceSelector.SelectionResult result = instanceSelector.select(brokerRequest, segments, 0);
-    assertEquals(result.getSegmentToInstanceMap(), Map.of(seg0, serverA));
+    assertEquals(getSegmentToInstanceMap(result), Map.of(seg0, serverA));
     // seg1 has null candidates (not yet in the selector's state) → must NOT appear as unavailable
     assertTrue(result.getUnavailableSegments().isEmpty());
   }
@@ -934,14 +990,13 @@ public class ReplicaGroupSelectorTest {
         new SegmentInstanceCandidate(STRICT_RG0_SERVER_A, true, FALLBACK_POOL_ID, 0)));
     candidatesMap.put(newSegment, List.of(
         new SegmentInstanceCandidate(STRICT_RG1_SERVER_D, false, FALLBACK_POOL_ID, 1)));
-    SegmentStates segmentStates = new SegmentStates(candidatesMap,
-        Set.of(STRICT_RG0_SERVER_A, STRICT_RG1_SERVER_D), Set.of());
+    SegmentStates segmentStates = createSegmentStates(candidatesMap, Set.of());
 
-    InstanceSelector.InstanceMapping result =
+    InstanceSelector.SelectionResult result =
         instanceSelector.select(List.of(STRICT_SEGMENT0, newSegment), 0, segmentStates, Map.of());
 
-    assertEquals(result.segmentToInstanceMap(), Map.of(STRICT_SEGMENT0, STRICT_RG0_SERVER_A));
-    assertEquals(result.optionalSegmentToInstanceMap(), Map.of(newSegment, STRICT_RG1_SERVER_D));
+    assertEquals(getSegmentToInstanceMap(result), Map.of(STRICT_SEGMENT0, STRICT_RG0_SERVER_A));
+    assertEquals(getOptionalSegmentToInstanceMap(result), Map.of(newSegment, STRICT_RG1_SERVER_D));
   }
 
   @Test
@@ -1010,14 +1065,13 @@ public class ReplicaGroupSelectorTest {
     candidatesMap.put(segExtra, Arrays.asList(
         new SegmentInstanceCandidate(STRICT_RG1_SERVER_D, true, FALLBACK_POOL_ID, 0),
         new SegmentInstanceCandidate(rg1ServerE, true, 99, 1)));
-    SegmentStates segmentStates = new SegmentStates(candidatesMap, allSegments, null);
+    SegmentStates segmentStates = createSegmentStates(candidatesMap, Set.of());
 
-    InstanceSelector.InstanceMapping result =
-        instanceSelector.select(STRICT_SEGMENTS, 0, segmentStates, null);
+    InstanceSelector.SelectionResult result = instanceSelector.select(STRICT_SEGMENTS, 0, segmentStates, null);
 
     // Each query partition picks its healthiest candidate; server_e is not considered because it hosts no query
     // segments.
-    assertEquals(result.segmentToInstanceMap(), Map.of(
+    assertEquals(getSegmentToInstanceMap(result), Map.of(
         STRICT_SEGMENT0, STRICT_RG1_SERVER_C,
         STRICT_SEGMENT1, STRICT_RG1_SERVER_C,
         STRICT_SEGMENT2, STRICT_RG1_SERVER_D));
@@ -1049,13 +1103,13 @@ public class ReplicaGroupSelectorTest {
         new SegmentInstanceCandidate(STRICT_RG0_SERVER_B, true, FALLBACK_POOL_ID, 0),
         new SegmentInstanceCandidate(STRICT_RG1_SERVER_D, true, FALLBACK_POOL_ID, 1),
         new SegmentInstanceCandidate(replicaGroup2ServerF, true, FALLBACK_POOL_ID, 2)));
-    SegmentStates segmentStates = new SegmentStates(candidatesMap, new HashSet<>(STRICT_SEGMENTS), null);
+    SegmentStates segmentStates = createSegmentStates(candidatesMap, Set.of());
 
-    InstanceSelector.InstanceMapping result =
+    InstanceSelector.SelectionResult result =
         instanceSelector.select(STRICT_SEGMENTS, Integer.MIN_VALUE, segmentStates, null);
 
-    // floorMod(Integer.MIN_VALUE, 3) is 1; the previous '%' indexing returned -2 and threw.
-    assertEquals(result.segmentToInstanceMap(), Map.of(
+    // floorMod(Integer.MIN_VALUE, 3) is 1.
+    assertEquals(getSegmentToInstanceMap(result), Map.of(
         STRICT_SEGMENT0, STRICT_RG1_SERVER_C,
         STRICT_SEGMENT1, STRICT_RG1_SERVER_C,
         STRICT_SEGMENT2, STRICT_RG1_SERVER_D));

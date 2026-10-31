@@ -143,7 +143,7 @@ public class MultipleTreesBuilderCloseTest {
     );
 
     // Load the segment to get metadata
-    File segmentDir = INDEX_DIR.listFiles()[0];
+    File segmentDir = INDEX_DIR.listFiles(File::isDirectory)[0];
     ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDir, ReadMode.mmap);
     try {
       return StarTreeBuilderUtils.generateBuilderConfigs(
@@ -168,7 +168,7 @@ public class MultipleTreesBuilderCloseTest {
     );
 
     // Load the segment to get metadata
-    File segmentDir = INDEX_DIR.listFiles()[0];
+    File segmentDir = INDEX_DIR.listFiles(File::isDirectory)[0];
     ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDir, ReadMode.mmap);
     try {
       return StarTreeBuilderUtils.generateBuilderConfigs(

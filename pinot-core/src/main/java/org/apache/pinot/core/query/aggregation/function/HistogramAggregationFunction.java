@@ -26,6 +26,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.utils.ArrayListUtils;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
@@ -42,7 +43,7 @@ import org.apache.pinot.spi.utils.ArrayCopyUtils;
 /// usage example:
 /// `Histogram(columnName, ARRAY\[0,1,10,100\])` to specify bins \[0,1), \[1,10), \[10,1000\] or
 /// `Histogram(columnName, 0, 1000, 10)` to specify 10 equal-length bins \[0,100), \[100,200), ..., \[900,1000\]
-public class HistogramAggregationFunction extends BaseSingleInputAggregationFunction<DoubleArrayList, DoubleArrayList> {
+public class HistogramAggregationFunction extends BaseSingleInputAggregationFunction<DoubleArrayList, double[]> {
 
   private static final String ARRAY_CONSTRUCTOR = "arrayvalueconstructor";
   private static final int INVALID_BIN = -1;
@@ -248,13 +249,22 @@ public class HistogramAggregationFunction extends BaseSingleInputAggregationFunc
 
   @Nullable
   @Override
-  public DoubleArrayList extractFinalResult(@Nullable DoubleArrayList doubleArrayList) {
+  public double[] extractFinalResult(@Nullable DoubleArrayList doubleArrayList) {
     if (doubleArrayList == null) {
       // A null intermediate result means nothing was aggregated. With null handling enabled the histogram of nothing
       // is NULL; with it disabled it is the all-zero histogram, which is the answer this mode has always given.
-      return _nullHandlingEnabled ? null : DoubleVectorOpUtils.createAndInitialize(getNumBins());
+      return _nullHandlingEnabled ? null : new double[getNumBins()];
     }
-    return doubleArrayList;
+    return ArrayListUtils.toDoubleArray(doubleArrayList);
+  }
+
+  @Override
+  public double[] mergeFinalResult(double[] finalResult1, double[] finalResult2) {
+    double[] mergedResult = finalResult1.clone();
+    for (int i = 0; i < mergedResult.length; i++) {
+      mergedResult[i] += finalResult2[i];
+    }
+    return mergedResult;
   }
 
   @Override

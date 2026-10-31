@@ -64,6 +64,8 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
   private final SegmentDirectoryLoaderContext _segmentDirectoryLoaderContext;
   private final SegmentLock _segmentLock = new SegmentLock();
   private SegmentMetadataImpl _segmentMetadata;
+  @Nullable
+  private SegmentMetadataImpl.EagerSnapshot _eagerSnapshot;
   private ColumnIndexDirectory _columnIndexDirectory;
   private StarTreeIndexReader _starTreeIndexReader;
   private String _tier;
@@ -106,6 +108,13 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
     }
   }
 
+  /// Retains the final loader's canonical metadata snapshot only until the mapped serving view is opened.
+  public SegmentLocalFSDirectory(File indexDir, SegmentMetadataImpl.EagerSnapshot eagerSnapshot, ReadMode readMode,
+      @Nullable SegmentDirectoryLoaderContext segmentDirectoryLoaderContext) {
+    this(indexDir, eagerSnapshot.getMetadata(), readMode, segmentDirectoryLoaderContext);
+    _eagerSnapshot = eagerSnapshot;
+  }
+
   @Override
   public URI getIndexDir() {
     return _indexDir.toURI();
@@ -121,7 +130,9 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
       src = new File(parentDir, _indexDir.getName() + CommonConstants.Segment.SEGMENT_BACKUP_DIR_SUFFIX);
     }
     if (src.exists() && !src.equals(dest)) {
-      FileUtils.copyDirectory(src, dest);
+      File sourceDir = src;
+      FileUtils.copyDirectory(src, dest, file -> !file.isFile() || !file.getParentFile().equals(sourceDir)
+          || !SegmentMetadataImpl.isMappedMetadataTemporaryFileName(file.getName()));
     }
   }
 
@@ -141,11 +152,38 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
     return _segmentMetadata;
   }
 
+  /// Called only during preprocessing, before the segment is queryable; replacing and closing metadata is not
+  /// synchronized with serving readers.
   @Override
   public void reloadMetadata()
       throws Exception {
-    _segmentMetadata = new SegmentMetadataImpl(_indexDir);
-    _columnIndexDirectory.setSegmentMetadata(_segmentMetadata);
+    _eagerSnapshot = null;
+    SegmentMetadataImpl metadata = new SegmentMetadataImpl(_indexDir);
+    _columnIndexDirectory.setSegmentMetadata(metadata);
+    SegmentMetadataImpl previous = _segmentMetadata;
+    _segmentMetadata = metadata;
+    previous.close();
+  }
+
+  /// Replaces mutable metadata with the mapped representation after preprocessing and before the segment is queryable.
+  public void loadMappedMetadata()
+      throws IOException {
+    if (_segmentMetadata.isMapped()) {
+      return;
+    }
+    SegmentMetadataImpl.EagerSnapshot eagerSnapshot = _eagerSnapshot;
+    _eagerSnapshot = null;
+    SegmentMetadataImpl metadata;
+    try {
+      metadata = SegmentMetadataImpl.loadMapped(_indexDir, _readMode, eagerSnapshot);
+    } catch (IOException | ConfigurationException | RuntimeException e) {
+      LOGGER.warn("Failed to load mapped metadata for segment: {}. Using eager metadata.", _indexDir, e);
+      return;
+    }
+    _columnIndexDirectory.setSegmentMetadata(metadata);
+    SegmentMetadataImpl previous = _segmentMetadata;
+    _segmentMetadata = metadata;
+    previous.close();
   }
 
   private File getSegmentPath(File segmentDirectory, SegmentVersion segmentVersion) {
@@ -286,15 +324,25 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
   @Override
   public void close()
       throws IOException {
-    _segmentLock.close();
-    synchronized (this) {
-      if (_columnIndexDirectory != null) {
-        _columnIndexDirectory.close();
-        _columnIndexDirectory = null;
+    try {
+      try {
+        _segmentLock.close();
+      } finally {
+        synchronized (this) {
+          if (_columnIndexDirectory != null) {
+            _columnIndexDirectory.close();
+            _columnIndexDirectory = null;
+          }
+          if (_starTreeIndexReader != null) {
+            _starTreeIndexReader.close();
+            _starTreeIndexReader = null;
+          }
+        }
       }
-      if (_starTreeIndexReader != null) {
-        _starTreeIndexReader.close();
-        _starTreeIndexReader = null;
+    } finally {
+      _eagerSnapshot = null;
+      if (_segmentMetadata != null) {
+        _segmentMetadata.close();
       }
     }
   }

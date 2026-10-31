@@ -155,7 +155,6 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final ExecutorService _queryCompileExecutor;
   private final Set<String> _defaultDisabledPlannerRules;
   protected final long _extraPassiveTimeoutMs;
-  protected final boolean _enableQueryFingerprinting;
   private final boolean _streamStatsDefault;
   @Nullable
   protected final String _defaultStreamingGroupByFlushThreshold;
@@ -245,16 +244,6 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
             Math.max(1, Runtime.getRuntime().availableProcessors() / 2),
             new NamedThreadFactory("multi-stage-query-compile-executor")));
     _defaultDisabledPlannerRules = getDefaultDisabledPlannerRules(_config);
-    boolean fingerprintingConfigured = _config.getProperty(
-        CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_QUERY_FINGERPRINTING,
-        CommonConstants.Broker.DEFAULT_BROKER_ENABLE_QUERY_FINGERPRINTING);
-    boolean redactionNeedsFingerprinting =
-        _queryLogger.getSqlRedactionMode() == QueryLogger.SqlRedactionMode.LITERAL_VALUES;
-    if (redactionNeedsFingerprinting && !fingerprintingConfigured) {
-      LOGGER.warn("SQL redaction mode 'literal_values' requires query fingerprinting. "
-          + "Enabling query fingerprinting automatically.");
-    }
-    _enableQueryFingerprinting = fingerprintingConfigured || redactionNeedsFingerprinting;
     int streamingGroupByFlushThreshold = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_MSE_STREAMING_GROUP_BY_FLUSH_THRESHOLD,
         CommonConstants.Broker.DEFAULT_MSE_STREAMING_GROUP_BY_FLUSH_THRESHOLD);
@@ -503,13 +492,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private QueryEnvironment.CompiledQuery compileQuery(long requestId, String query, SqlNodeAndOptions sqlNodeAndOptions,
       RequestContext requestContext, HttpHeaders httpHeaders, Timer queryTimer) {
     // Add queryHash to query options so it gets passed to multi-stage workers
-    if (_enableQueryFingerprinting) {
-      QueryFingerprint queryFingerprint = requestContext.getQueryFingerprint();
-      if (queryFingerprint != null) {
-        sqlNodeAndOptions.getOptions().put(
-            CommonConstants.Broker.Request.QueryOptionKey.QUERY_HASH,
-            queryFingerprint.getQueryHash());
-      }
+    QueryFingerprint queryFingerprint = requestContext.getQueryFingerprint();
+    if (queryFingerprint != null) {
+      sqlNodeAndOptions.getOptions().put(CommonConstants.Broker.Request.QueryOptionKey.QUERY_HASH,
+          queryFingerprint.getQueryHash());
     }
 
     Map<String, String> queryOptions = sqlNodeAndOptions.getOptions();
@@ -672,6 +658,16 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   /// [QueryEnvironment.CompiledQuery#getTableNames()] without re-parsing SQL.
   protected void prepareCompiledQueryForPlanning(QueryEnvironment.CompiledQuery compiledQuery, long requestId,
       RequestContext requestContext, HttpHeaders httpHeaders) {
+  }
+
+  /// Extension hook for preparing a stage right before the broker sends it to its workers, to run the query or to
+  /// explain it on the servers. To run the query, the broker calls it for every stage, including stage 0 (the broker
+  /// reduce). To explain the query on the servers, it calls it only for the leaf stages that have segments.
+  ///
+  /// Subclasses can add entries to the custom properties of the stage
+  /// ([DispatchablePlanFragment#getCustomProperties()]), which its workers get in their stage metadata. They must not
+  /// replace the existing entries, such as the table name and the time boundary that servers use for leaf stages.
+  protected void prepareStageForDispatch(DispatchablePlanFragment stage, Map<String, String> queryOptions) {
   }
 
   /// Estimates the total number of server query threads the given plan will consume; used to acquire permits from the
@@ -914,6 +910,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       String errorMessage = String.format("Request %d: %s exceeds query quota.", requestId,
           _queryLogger.redactQuery(query.getTextQuery(), requestContext.getQueryFingerprint()));
       return new BrokerResponseNative(QueryErrorCode.TOO_MANY_REQUESTS, errorMessage);
+    }
+
+    for (DispatchablePlanFragment stage : dispatchableSubPlan.getQueryStageMap().values()) {
+      prepareStageForDispatch(stage, query.getOptions());
     }
 
     // Short-circuit: if all leaf stages are empty (all segments pruned or table has no data),
@@ -1165,6 +1165,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private Collection<PlanNode> requestPhysicalPlan(DispatchablePlanFragment fragment,
       RequestContext requestContext, long queryTimeoutMs, Map<String, String> queryOptions) {
     List<PlanNode> stagePlans;
+    prepareStageForDispatch(fragment, queryOptions);
     try {
       stagePlans = _queryDispatcher.explain(requestContext, fragment, queryTimeoutMs, queryOptions);
     } catch (Exception e) {
@@ -1276,13 +1277,27 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   /// Check if a server that was previously detected as unhealthy is now healthy.
   public FailureDetector.ServerState retryUnhealthyServer(String instanceId) {
     LOGGER.info("Checking gRPC connection to unhealthy server: {}", instanceId);
-    ServerInstance serverInstance = _routingManager.getEnabledServerInstanceMap().get(instanceId);
-    if (serverInstance == null) {
-      LOGGER.info("Failed to find enabled server: {} in routing manager, skipping the retry", instanceId);
-      return FailureDetector.ServerState.UNHEALTHY;
+    ServerInstance serverInstance = getEnabledServerInstance(instanceId);
+    if (serverInstance != null) {
+      return _queryDispatcher.checkConnectivityToInstance(serverInstance);
     }
+    // Queries are also dispatched to workers that no routing manager knows, for example workers that a custom worker
+    // manager picks. Check them at the address that a query was last dispatched to.
+    return _queryDispatcher.checkConnectivityToInstance(instanceId);
+  }
 
-    return _queryDispatcher.checkConnectivityToInstance(serverInstance);
+  /// Returns the enabled server with the given instance id: a server of this cluster, or with multi-cluster routing, a
+  /// server of a remote cluster.
+  @Nullable
+  private ServerInstance getEnabledServerInstance(String instanceId) {
+    ServerInstance serverInstance = _routingManager.getEnabledServerInstanceMap().get(instanceId);
+    if (serverInstance == null && _multiClusterRoutingContext != null) {
+      RoutingManager multiClusterRoutingManager = _multiClusterRoutingContext.getMultiClusterRoutingManager();
+      if (multiClusterRoutingManager != null) {
+        serverInstance = multiClusterRoutingManager.getEnabledServerInstanceMap().get(instanceId);
+      }
+    }
+    return serverInstance;
   }
 
   public static boolean isYellowError(QueryException e) {

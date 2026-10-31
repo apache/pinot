@@ -42,6 +42,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
+import org.apache.helix.HelixException;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.task.JobConfig;
@@ -90,6 +91,10 @@ public class PinotHelixTaskResourceManager {
 
   private static final EnumSet<TaskState> TERMINAL_STATES =
       EnumSet.of(TaskState.COMPLETED, TaskState.FAILED, TaskState.TIMED_OUT, TaskState.ABORTED);
+
+  @VisibleForTesting
+  static final int DELETE_JOB_MAX_ATTEMPTS = 3;
+  private static final long DELETE_JOB_BACKOFF_MS = 1000L;
 
   private final TaskDriver _taskDriver;
   private final PinotHelixResourceManager _helixResourceManager;
@@ -319,10 +324,16 @@ public class PinotHelixTaskResourceManager {
   /// Delete a single task from the task queue. The task queue should be
   /// stopped before deleting the task, otherwise it fails with exception.
   ///
+  /// A delete that fails with [HelixException] is retried a few times with a growing backoff. The Helix task pipeline
+  /// can still be writing the job context right after the queue is stopped or the task is scheduled. Removing the
+  /// context ZNode then fails with ZooKeeper `NotEmpty`, which Helix reports as a [HelixException] without the cause.
+  /// Each step of a delete skips ZNodes that are already gone, so a retry resumes where the failed attempt stopped.
+  /// Each attempt holds this manager's lock, but the backoff between attempts does not.
+  ///
   /// @param taskName the task to delete from the queue.
   /// @param forceDelete as said in helix comment, if set true, all job's related zk nodes will
   ///                    be clean up from zookeeper even if its workflow information can not be found.
-  public synchronized void deleteTask(String taskName, boolean forceDelete) {
+  public void deleteTask(String taskName, boolean forceDelete) {
     String taskType = getTaskType(taskName);
     String helixJobQueueName = getHelixJobQueueName(taskType);
     if (forceDelete) {
@@ -330,7 +341,28 @@ public class PinotHelixTaskResourceManager {
     } else {
       LOGGER.info("Deleting task: {} from queue: {} of task type: {}", taskName, helixJobQueueName, taskType);
     }
-    _taskDriver.deleteJob(helixJobQueueName, taskName, forceDelete);
+    for (int attempt = 1; ; attempt++) {
+      try {
+        synchronized (this) {
+          _taskDriver.deleteJob(helixJobQueueName, taskName, forceDelete);
+        }
+        return;
+      } catch (HelixException e) {
+        if (attempt >= DELETE_JOB_MAX_ATTEMPTS) {
+          throw e;
+        }
+        long backoffMs = DELETE_JOB_BACKOFF_MS * attempt;
+        LOGGER.warn("Attempt {} to delete task: {} from queue: {} failed, retrying in {}ms", attempt, taskName,
+            helixJobQueueName, backoffMs, e);
+        try {
+          Thread.sleep(backoffMs);
+        } catch (InterruptedException ie) {
+          Thread.currentThread().interrupt();
+          e.addSuppressed(ie);
+          throw e;
+        }
+      }
+    }
   }
 
   /// Get all task queues.

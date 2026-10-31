@@ -63,6 +63,7 @@ import org.apache.pinot.segment.local.segment.index.forward.CompressionStatsMeta
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.InvertedIndexAndDictionaryBasedForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
+import org.apache.pinot.segment.local.segment.index.readers.NullValueVectorReaderImpl;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.utils.ClusterConfigForTable;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -671,15 +672,23 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     int numArguments = argumentSources.size();
     List<ValueReader> valueReaders = new ArrayList<>(numArguments);
     List<IntFunction<Object>> argumentValues = new ArrayList<>(numArguments);
-    for (DerivedColumnArgument argumentSource : argumentSources) {
-      Object[] values = argumentSource.getValues();
-      if (values != null) {
-        argumentValues.add(docId -> values[docId]);
-      } else {
-        ValueReader valueReader = new ValueReader(argumentSource.getColumnMetadata());
-        valueReaders.add(valueReader);
-        argumentValues.add(valueReader::getValue);
+    try {
+      for (DerivedColumnArgument argumentSource : argumentSources) {
+        Object[] values = argumentSource.getValues();
+        if (values != null) {
+          argumentValues.add(docId -> values[docId]);
+        } else {
+          ValueReader valueReader = new ValueReader(argumentSource.getColumnMetadata());
+          valueReaders.add(valueReader);
+          argumentValues.add(valueReader::getValue);
+        }
       }
+    } catch (IOException | IndexReaderConstraintException | RuntimeException e) {
+      // The finally below only runs once the readers are built, so close the ones opened before the failure here
+      for (ValueReader valueReader : valueReaders) {
+        valueReader.close();
+      }
+      throw e;
     }
 
     FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
@@ -1721,17 +1730,35 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           .add(StandardIndexes.forward(), ForwardIndexConfig.getDefault(columnMetadata.getForwardIndexEncoding()))
           .build();
       _forwardIndexReader = readerFactory.createIndexReader(_segmentWriter, fieldIndexConfigs, columnMetadata);
-      if (columnMetadata.hasDictionary()) {
-        _dictionary = DictionaryIndexType.read(_segmentWriter, columnMetadata);
-      } else {
-        _dictionary = null;
+      Dictionary dictionary = null;
+      try {
+        if (columnMetadata.hasDictionary()) {
+          dictionary = DictionaryIndexType.read(_segmentWriter, columnMetadata);
+        }
+        // A null source value is stored as the column's default value. Read the null vector too, so the function sees
+        // null for those docs, as it does at ingestion, instead of deriving a non-null value from the placeholder.
+        String column = columnMetadata.getColumnName();
+        NullValueVectorReaderImpl nullValueVectorReader = null;
+        if (_segmentWriter.hasIndexFor(column, StandardIndexes.nullValueVector())) {
+          nullValueVectorReader =
+              new NullValueVectorReaderImpl(_segmentWriter.getIndexFor(column, StandardIndexes.nullValueVector()));
+        }
+        _columnReader = new PinotSegmentColumnReader(column, _forwardIndexReader, dictionary, nullValueVectorReader,
+            columnMetadata.getMaxNumberOfMultiValues());
+      } catch (IOException | RuntimeException e) {
+        // The caller never gets this reader to close, so release what was opened before the failure
+        if (dictionary != null) {
+          dictionary.close();
+        }
+        _forwardIndexReader.close();
+        throw e;
       }
-      _columnReader = new PinotSegmentColumnReader(columnMetadata.getColumnName(), _forwardIndexReader, _dictionary,
-          null, columnMetadata.getMaxNumberOfMultiValues());
+      _dictionary = dictionary;
     }
 
+    @Nullable
     Object getValue(int docId) {
-      return _columnReader.getValue(docId);
+      return _columnReader.isNull(docId) ? null : _columnReader.getValue(docId);
     }
 
     @Override

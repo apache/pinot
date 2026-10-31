@@ -27,8 +27,7 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 
 
 /// Base implementation of [AggregationFunction] with single input expression.
-public abstract class BaseSingleInputAggregationFunction<I, F extends Comparable>
-    extends BaseAggregationFunction<I, F> {
+public abstract class BaseSingleInputAggregationFunction<I, F> extends BaseAggregationFunction<I, F> {
   protected final ExpressionContext _expression;
 
   /// Constructor for the class.
