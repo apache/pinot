@@ -44,9 +44,11 @@ import org.apache.calcite.sql.type.SqlTypeUtil;
 
 
 /// Reduces string literal casts using bounded, reusable Calcite executables. Each source/target type pair is compiled
-/// with an input reference instead of a literal, so different values share Calcite's conversion code. Other expressions
-/// use the fallback executor. Cached functions are immutable; input values and results stay local to each call, making
-/// this executor thread-safe without sharing RexExecutable's mutable data context.
+/// with an input reference instead of a literal, so different values share Calcite's conversion code. Casts of exact
+/// numeric literals to DOUBLE, FLOAT or REAL are rounded directly, and `ARRAY[...]` constructors of literals are kept
+/// as they are, so a query vector needs no generated code. Other expressions use the fallback executor. Cached
+/// functions are immutable; input values and results stay local to each call, making this executor thread-safe
+/// without sharing RexExecutable's mutable data context.
 public final class PinotRexExecutor implements RexExecutor {
   public static final PinotRexExecutor INSTANCE = new PinotRexExecutor(RexUtil.EXECUTOR);
 
@@ -87,8 +89,9 @@ public final class PinotRexExecutor implements RexExecutor {
         if (isNumericToApproximateCast(expression)) {
           // CAST(<numeric literal> AS DOUBLE/FLOAT/REAL), e.g. every element of a query vector: round the value the
           // way the cast would, without generating code
-          literals.add(rexBuilder.makeApproxLiteral(new BigDecimal(approximateValue((RexCall) expression)),
-              expression.getType()));
+          // Like the string path, keep a nullable target's type with a cast
+          literals.add(rexBuilder.makeLiteral(new BigDecimal(approximateValue((RexCall) expression)),
+              expression.getType(), true));
           continue;
         }
         RexLiteral operand = (RexLiteral) ((RexCall) expression).getOperands().get(0);
@@ -120,8 +123,10 @@ public final class PinotRexExecutor implements RexExecutor {
     });
   }
 
-  /// Returns whether the expression casts a non-null numeric literal to an approximate type (DOUBLE, FLOAT, REAL) and
-  /// the result is finite. Overflow to infinity is left to the fallback, which decides how to represent it.
+  /// Returns whether the expression casts a non-null exact numeric literal (integer or DECIMAL) to an approximate type
+  /// (DOUBLE, FLOAT, REAL) and the result is finite. Overflow to infinity is left to the fallback, which decides how to
+  /// represent it. Approximate sources are left to the fallback too: reading them as a BigDecimal rounds to 16 digits,
+  /// and NaN or infinity cannot be read that way at all.
   @VisibleForTesting
   static boolean isNumericToApproximateCast(RexNode expression) {
     if (!(expression instanceof RexCall)) {
@@ -134,7 +139,7 @@ public final class PinotRexExecutor implements RexExecutor {
     }
     RexNode operand = call.getOperands().get(0);
     return operand instanceof RexLiteral && !((RexLiteral) operand).isNull()
-        && SqlTypeUtil.isNumeric(operand.getType()) && Double.isFinite(approximateValue(call));
+        && SqlTypeUtil.isExactNumeric(operand.getType()) && Double.isFinite(approximateValue(call));
   }
 
   /// The value of `CAST(<numeric literal> AS <approximate type>)`: REAL rounds to single precision, while FLOAT and

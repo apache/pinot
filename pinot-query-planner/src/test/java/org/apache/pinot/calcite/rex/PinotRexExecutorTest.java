@@ -304,9 +304,36 @@ public class PinotRexExecutorTest {
     List<RexNode> actual = reduce(new PinotRexExecutor(fallback), builder, input);
     assertEquals(actual, expected);
     assertEquals(actual.get(0).getType(), expected.get(0).getType());
-    // Only a cast that overflows to infinity is left to the fallback
+    // Approximate sources, and casts that overflow to infinity, are left to the fallback
     double converted = targetType == SqlTypeName.REAL ? Float.parseFloat(value) : Double.parseDouble(value);
-    assertEquals(fallback._calls.get(), Double.isFinite(converted) ? 0 : 1);
+    assertEquals(fallback._calls.get(), value.contains("E") || !Double.isFinite(converted) ? 1 : 0);
+  }
+
+  @Test
+  public void testApproximateSourceCastsUseFallback() {
+    LiteralRexBuilder builder = new LiteralRexBuilder();
+    RelDataType doubleType = builder.getTypeFactory().createSqlType(SqlTypeName.DOUBLE);
+    // 17 significant digits: rounding to a 16-digit BigDecimal would fold this to 0.3
+    RexNode literal = builder.makeApproxLiteral(new BigDecimal("0.30000000000000004"));
+    RexNode expression = builder.makeAbstractCast(doubleType, literal, false);
+    List<RexNode> input = List.of(expression);
+    CountingFallback fallback = new CountingFallback(CALCITE_EXECUTOR);
+    List<RexNode> actual = reduce(new PinotRexExecutor(fallback), builder, input);
+    assertEquals(fallback._calls.get(), 1);
+    assertEquals(actual, reduce(CALCITE_EXECUTOR, builder, input));
+  }
+
+  @Test
+  public void testNumericToApproximateCastKeepsNullableTargetType() {
+    LiteralRexBuilder builder = new LiteralRexBuilder();
+    RelDataType nullableDouble = builder.getTypeFactory().createTypeWithNullability(
+        builder.getTypeFactory().createSqlType(SqlTypeName.DOUBLE), true);
+    RexNode expression = builder.makeAbstractCast(nullableDouble, builder.makeExactLiteral(new BigDecimal("0.5")),
+        false);
+    List<RexNode> input = List.of(expression);
+    List<RexNode> actual = reduce(new PinotRexExecutor(FAILING_FALLBACK), builder, input);
+    assertEquals(actual.get(0).getType(), expression.getType());
+    assertEquals(actual, reduce(CALCITE_EXECUTOR, builder, input));
   }
 
   @Test
