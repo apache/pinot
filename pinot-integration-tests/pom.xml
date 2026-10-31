@@ -358,10 +358,31 @@
                 <include>org/apache/pinot/server/realtime/**</include>
               </includes>
               <excludes>
+                <exclude>org/apache/pinot/integration/tests/SegmentUploadIntegrationTest.java</exclude>
+                <exclude>org/apache/pinot/integration/tests/SegmentWriterUploaderIntegrationTest.java</exclude>
                 <exclude>org/apache/pinot/integration/tests/SpoolIntegrationTest.java</exclude>
                 <exclude>org/apache/pinot/integration/tests/TenantRebalanceIntegrationTest.java</exclude>
               </excludes>
             </configuration>
+            <executions>
+              <execution>
+                <id>shared-offline-upload-integration-test-suite</id>
+                <phase>test</phase>
+                <goals>
+                  <goal>test</goal>
+                </goals>
+                <configuration>
+                  <skipTests>${pinot.integration.test.skip.named.suites}</skipTests>
+                  <reportNameSuffix>shared-offline-upload</reportNameSuffix>
+                  <excludes combine.self="override">
+                    <exclude>none</exclude>
+                  </excludes>
+                  <includes combine.self="override">
+                    <include>org/apache/pinot/integration/tests/suites/SharedOfflineUploadSuite.java</include>
+                  </includes>
+                </configuration>
+              </execution>
+            </executions>
           </plugin>
         </plugins>
       </build>
