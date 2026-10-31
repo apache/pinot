@@ -75,10 +75,15 @@ public class ServerMailboxChannelRefreshHandler implements InstanceConfigChangeL
   private final MailboxService _mailboxService;
 
   // A coherent participant snapshot, invalidated whenever a membership or instance config read fails.
-  private Set<String> _instances = Set.of();
-  private long _instancesParentCzxid;
-  private int _instancesParentCversion;
-  private boolean _instancesSnapshotValid;
+  @Nullable
+  private MembershipSnapshot _membershipSnapshot;
+
+  /// Immutable participant names and parent version from a coherent membership read.
+  private record MembershipSnapshot(Set<String> instances, long parentCzxid, int parentCversion) {
+    private MembershipSnapshot {
+      instances = Set.copyOf(instances);
+    }
+  }
 
   // Tracks servers that have IS_SHUTDOWN_IN_PROGRESS=true. When a server transitions
   // from being in this set to having IS_SHUTDOWN_IN_PROGRESS=false, we refresh its channel.
@@ -105,7 +110,7 @@ public class ServerMailboxChannelRefreshHandler implements InstanceConfigChangeL
     // INIT always scans; child changes scan only if they could affect servers.
     NotificationContext.Type type = context.getType();
     if (type == NotificationContext.Type.INIT || context.getIsChildChange()) {
-      handleFullScan(context);
+      handleMembershipChange(context);
     } else if (type == NotificationContext.Type.CALLBACK) {
       // An existing instance's config changed (e.g. IS_SHUTDOWN_IN_PROGRESS toggled).
       // pathChanged is the ZK path of the specific instance that changed.
@@ -116,13 +121,9 @@ public class ServerMailboxChannelRefreshHandler implements InstanceConfigChangeL
   }
 
   /// Scans on INIT and child changes, skipping membership changes confined to non-server instances.
-  ///
-  /// It records the new address of every server before it retires any old one. Otherwise, when one server left an
-  /// address and a server read later in the scan took it over, the scan would shut down the channel the second server
-  /// uses.
-  private void handleFullScan(NotificationContext context) {
-    boolean previousSnapshotValid = _instancesSnapshotValid;
-    _instancesSnapshotValid = false;
+  private void handleMembershipChange(NotificationContext context) {
+    MembershipSnapshot previousSnapshot = _membershipSnapshot;
+    _membershipSnapshot = null;
     HelixDataAccessor dataAccessor = context.getManager().getHelixDataAccessor();
     BaseDataAccessor<ZNRecord> baseDataAccessor = dataAccessor.getBaseDataAccessor();
     String parentPath = dataAccessor.keyBuilder().instanceConfigs().getPath();
@@ -142,19 +143,29 @@ public class ServerMailboxChannelRefreshHandler implements InstanceConfigChangeL
     }
     boolean stableSnapshot = before != null && after != null && before.getCzxid() == after.getCzxid()
         && before.getCversion() == after.getCversion() && before.getPzxid() == after.getPzxid();
-    Set<String> changedInstances = Sets.symmetricDifference(_instances, instances);
-    // cversion counts all child creates/deletes, including same-name server recreation hidden by the net diff.
-    // Long subtraction conservatively rejects counter wrap/reset; czxid identifies parent recreation.
-    if (context.getType() != NotificationContext.Type.INIT && previousSnapshotValid && stableSnapshot
-        && after.getCzxid() == _instancesParentCzxid
-        && (long) after.getCversion() - _instancesParentCversion == changedInstances.size()
-        && !changedInstances.isEmpty()
-        && changedInstances.stream().noneMatch(InstanceTypeUtils::isServer)) {
-      _instances = instances;
-      _instancesParentCversion = after.getCversion();
-      _instancesSnapshotValid = true;
-      return;
+    if (context.getType() != NotificationContext.Type.INIT && previousSnapshot != null && stableSnapshot) {
+      Set<String> changedInstances = Sets.symmetricDifference(previousSnapshot.instances(), instances);
+      // cversion counts all child creates/deletes, including same-name server recreation hidden by the net diff.
+      // Long subtraction conservatively rejects counter wrap/reset; czxid identifies parent recreation.
+      if (after.getCzxid() == previousSnapshot.parentCzxid()
+          && (long) after.getCversion() - previousSnapshot.parentCversion() == changedInstances.size()
+          && !changedInstances.isEmpty()
+          && changedInstances.stream().noneMatch(InstanceTypeUtils::isServer)) {
+        _membershipSnapshot = new MembershipSnapshot(instances, after.getCzxid(), after.getCversion());
+        return;
+      }
     }
+    if (scanServerConfigs(instances) && stableSnapshot) {
+      _membershipSnapshot = new MembershipSnapshot(instances, after.getCzxid(), after.getCversion());
+    }
+  }
+
+  /// Reconciles server configs, returning whether every config was read successfully.
+  ///
+  /// It records the new address of every server before it retires any old one. Otherwise, when one server left an
+  /// address and a server read later in the scan took it over, the scan would shut down the channel the second server
+  /// uses.
+  private boolean scanServerConfigs(Set<String> instances) {
     boolean allConfigsRead = true;
     Set<String> currentShuttingDown = new HashSet<>();
     Set<String> currentServers = new HashSet<>();
@@ -196,12 +207,7 @@ public class ServerMailboxChannelRefreshHandler implements InstanceConfigChangeL
     }
     _shuttingDownServers.clear();
     _shuttingDownServers.addAll(currentShuttingDown);
-    _instances = instances;
-    if (allConfigsRead && stableSnapshot) {
-      _instancesParentCzxid = after.getCzxid();
-      _instancesParentCversion = after.getCversion();
-      _instancesSnapshotValid = true;
-    }
+    return allConfigsRead;
   }
 
   /// Handles a single instance config change by reading only the changed instance's config
@@ -232,7 +238,7 @@ public class ServerMailboxChannelRefreshHandler implements InstanceConfigChangeL
     } catch (Exception e) {
       LOGGER.warn("Failed to get instance config for: {}, skipping", instance, e);
     }
-    _instancesSnapshotValid = false;
+    _membershipSnapshot = null;
     return null;
   }
 

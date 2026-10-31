@@ -246,11 +246,11 @@ public class ServerMailboxChannelRefreshHandlerTest {
 
   @Test
   public void testServerMembershipChangesStillScanConfigs() {
-    stubParticipantSnapshot(List.of(SELF_INSTANCE_ID));
+    stubParticipantSnapshot(List.of(SELF_INSTANCE_ID), 10, 1);
     when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
         .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, true));
     _handler.onInstanceConfigChange(List.of(), createInitContext());
-    stubParticipantSnapshot(List.of(SELF_INSTANCE_ID, OTHER_SERVER_ID));
+    stubParticipantSnapshot(List.of(SELF_INSTANCE_ID, OTHER_SERVER_ID), 11, 1);
     _handler.onInstanceConfigChange(List.of(), createChildChangeContext());
     verify(_helixAdmin).getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID);
 
@@ -397,12 +397,12 @@ public class ServerMailboxChannelRefreshHandlerTest {
 
   @Test
   public void testRetiresChannelOfServerThatLeftTheCluster() {
-    stubParticipantSnapshot(List.of(SELF_INSTANCE_ID, OTHER_SERVER_ID));
+    stubParticipantSnapshot(List.of(SELF_INSTANCE_ID, OTHER_SERVER_ID), 10, 1);
     when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
         .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, false));
     _handler.onInstanceConfigChange(List.of(), createInitContext());
 
-    stubParticipantSnapshot(List.of(SELF_INSTANCE_ID));
+    stubParticipantSnapshot(List.of(SELF_INSTANCE_ID), 11, 1);
     _handler.onInstanceConfigChange(List.of(), createChildChangeContext());
     verify(_mailboxService).retireChannel(OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT);
   }
