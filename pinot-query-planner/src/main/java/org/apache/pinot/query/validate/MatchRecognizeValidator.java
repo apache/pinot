@@ -145,7 +145,7 @@ public class MatchRecognizeValidator extends SqlBasicVisitor<Void> {
     validateMeasures(match);
     isolateRowSourceAlias(match, definedVariables);
     applyStandardAfterMatchDefault(match);
-    warnOnUndefinedPatternVariables(match, definedVariables);
+    logUndefinedPatternVariables(match, definedVariables);
   }
 
   /// Canonicalizes every unquoted pattern variable to upper case while retaining quoted identifiers verbatim.
@@ -561,16 +561,19 @@ public class MatchRecognizeValidator extends SqlBasicVisitor<Void> {
     return call;
   }
 
-  /// Warns about pattern variables that appear in `PATTERN` but are never `DEFINE`d. SQL:2016 says such a variable
-  /// matches every row (its condition defaults to `TRUE`), so this is legal, but it is far more often a typo.
-  private void warnOnUndefinedPatternVariables(SqlMatchRecognize match, Set<String> definedVariables) {
+  /// Logs, at debug level, the pattern variables that appear in `PATTERN` but are never `DEFINE`d. SQL:2016 says such
+  /// a variable matches every row (its condition defaults to `TRUE`). The standard idiom `PATTERN (STRT DOWN+ UP+)`
+  /// leaves `STRT` undefined on purpose, so this is not worth a broker warning the query author never sees.
+  private void logUndefinedPatternVariables(SqlMatchRecognize match, Set<String> definedVariables) {
+    if (!LOGGER.isDebugEnabled()) {
+      return;
+    }
     Set<String> undefinedVariables = new LinkedHashSet<>();
     collectPatternVariables(match.getPattern(), undefinedVariables);
     undefinedVariables.removeAll(definedVariables);
     if (!undefinedVariables.isEmpty()) {
-      LOGGER.warn("MATCH_RECOGNIZE pattern variable(s) {} are used in PATTERN but never DEFINEd. Per SQL:2016 they "
-          + "match every row (their condition defaults to TRUE), which is usually an unintended typo. Query pattern: "
-          + "{}", undefinedVariables, match.getPattern());
+      LOGGER.debug("MATCH_RECOGNIZE pattern variable(s) {} are used in PATTERN without a DEFINE entry, so per SQL:2016 "
+          + "they match every row. Query pattern: {}", undefinedVariables, match.getPattern());
     }
   }
 
