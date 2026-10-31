@@ -67,6 +67,9 @@ import org.slf4j.LoggerFactory;
 ///     namespaces inside MATCH_RECOGNIZE, but Calcite reuses the row source alias as the alpha of the universal row
 ///     pattern variable. [#isolateRowSourceAlias] gives a colliding input an internal alias before Calcite validation,
 ///     so explicit pattern references and unqualified universal references remain distinguishable.
+///  6. **`PREV` in `DEFINE` must be anchored before Calcite validation.** Calcite rewrites `PREV(x, n)` into the
+///     logical `LAST(x, n)` unless `x` is qualified by the variable being defined, which silently changes the rows an
+///     unqualified or cross-variable `PREV` reads. See [#anchorAtLastRow].
 ///
 /// Everything this class rejects is deferred, not permanently unsupported; each message names the construct so the
 /// user can rewrite the query.
@@ -469,12 +472,13 @@ public class MatchRecognizeValidator extends SqlBasicVisitor<Void> {
     }
   }
 
-  /// Normalizes processing modes and rejects aggregate calls inside `DEFINE`.
+  /// Normalizes processing modes, anchors `PREV` operands, and rejects aggregate calls inside `DEFINE`.
   ///
   /// SQL:2016 `DEFINE` always evaluates while the matcher is building a candidate match, so `RUNNING` is legal but
   /// redundant and `FINAL` is illegal. Calcite 1.42 rejects both modifiers before relational conversion; stripping
   /// `RUNNING` here preserves its standard semantics while allowing the query through Calcite. Aggregates are also
   /// legal in SQL:2016 `DEFINE` (over the rows matched so far), but Pinot does not implement their running state yet.
+  /// See [#anchorAtLastRow] for the `PREV` rewrite.
   private void validateDefinitions(SqlNodeList patternDefList) {
     for (SqlNode definition : patternDefList) {
       SqlNode condition = patternDefinitionCondition(definition);
@@ -506,6 +510,52 @@ public class MatchRecognizeValidator extends SqlBasicVisitor<Void> {
       SqlNode operand = operands.get(i);
       if (operand != null) {
         call.setOperand(i, normalizeDefinition(operand, definition));
+      }
+    }
+    if (call.getKind() == SqlKind.PREV) {
+      SqlIdentifier variable = patternDefinitionVariable(definition);
+      String definedVariable = variable != null && variable.isSimple() ? variable.getSimple() : null;
+      call.setOperand(0, anchorAtLastRow(call.operand(0), definedVariable));
+    }
+    return call;
+  }
+
+  /// Rewrites every column in the operand of a `DEFINE` `PREV` call that is not qualified by `definedVariable` into
+  /// `LAST(column, 0)`, so `PREV(x, n)` reaches Calcite as `PREV(LAST(x, 0), n)`.
+  ///
+  /// SQL:2016 defines `PREV(x, n)` as the row n rows physically before the row `LAST(x, 0)` designates: the current
+  /// row for an unqualified (universal) column, and the last row mapped to `A` for `A.x`. Calcite qualifies an
+  /// unqualified column with the row source alias, and `SqlValidatorImpl.NavigationReplacer` then rewrites
+  /// `PREV(x, n)` into `LAST(x, n)` whenever `x` is not qualified by the variable being defined. `LAST(x, n)` is
+  /// logical navigation within the match so far, which is NULL whenever that row precedes the match start, e.g. in
+  /// every single-row match. The replacer only rewrites a bare identifier operand, so the anchored form passes through
+  /// unchanged, and the runtime compiles it into the same physical step from the anchored row.
+  ///
+  /// Every identifier is anchored, not only a bare operand, because Calcite's `NavigationExpander` distributes `PREV`
+  /// over its operand: `PREV(price * 2)` becomes `PREV(price) * PREV(2)`. Columns qualified by the defined variable are
+  /// already kept physical by Calcite, and columns inside `FIRST` / `LAST` are already anchored, so both stay as they
+  /// are.
+  private static SqlNode anchorAtLastRow(SqlNode node, @Nullable String definedVariable) {
+    if (node instanceof SqlIdentifier) {
+      SqlIdentifier identifier = (SqlIdentifier) node;
+      if (!identifier.isSimple() && identifier.names.get(0).equals(definedVariable)) {
+        return identifier;
+      }
+      SqlParserPos pos = identifier.getParserPosition();
+      return SqlStdOperatorTable.LAST.createCall(pos, identifier, SqlLiteral.createExactNumeric("0", pos));
+    }
+    if (!(node instanceof SqlCall)) {
+      return node;
+    }
+    SqlCall call = (SqlCall) node;
+    if (call.getKind() == SqlKind.FIRST || call.getKind() == SqlKind.LAST) {
+      return call;
+    }
+    List<SqlNode> operands = call.getOperandList();
+    for (int i = 0; i < operands.size(); i++) {
+      SqlNode operand = operands.get(i);
+      if (operand != null) {
+        call.setOperand(i, anchorAtLastRow(operand, definedVariable));
       }
     }
     return call;

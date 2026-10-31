@@ -233,11 +233,6 @@ public class MatchRecognizeValidatorTest extends QueryEnvironmentTestBase {
             "SELECT * FROM a MATCH_RECOGNIZE (ORDER BY ts MEASURES MATCH_NUMBER() AS mno PATTERN (PERMUTE A) "
                 + "DEFINE PERMUTE AS PERMUTE.col3 > 0, A AS A.col3 > 0)"
         },
-        // Cross-symbol references and PREV / NEXT with an explicit offset in DEFINE.
-        new Object[]{
-            "SELECT * FROM a MATCH_RECOGNIZE (ORDER BY ts MEASURES MATCH_NUMBER() AS mno PATTERN (A B+) "
-                + "DEFINE A AS A.col3 > 0, B AS B.col3 > PREV(A.col3, 3) AND B.col3 < NEXT(A.col3, 2))"
-        },
         // A measure alias that differs from a PARTITION BY column only in case is a distinct column, because
         // Calcite's RelDataTypeFactory.Builder#nameExists is case-sensitive. Rejecting it would break a query that
         // works today.
@@ -257,6 +252,37 @@ public class MatchRecognizeValidatorTest extends QueryEnvironmentTestBase {
                 + "MEASURES LAST(col3) AS universal_s, LAST(\"a\".col3) AS pattern_s "
                 + "PATTERN (\"a\" B+) DEFINE \"a\" AS \"a\".col3 > 0, B AS B.col3 > 0)"
         }
+    };
+    //@formatter:on
+  }
+
+  /// Calcite's validator rewrites `PREV(x, n)` into the logical `LAST(x, n)` whenever `x` is not qualified by the
+  /// variable being defined, which is NULL whenever that row precedes the match start. Such a column must reach Calcite
+  /// anchored at its variable's last row, `PREV(LAST(x, 0), n)`, which is the SQL:2016 meaning of `PREV(x, n)`.
+  @Test(dataProvider = "prevNavigationDefinitions")
+  public void testPrevOfAnotherVariableIsAnchoredAtItsLastRow(String definition, String expectedRewrite) {
+    SqlMatchRecognize match = validate("SELECT * FROM a MATCH_RECOGNIZE (ORDER BY ts MEASURES MATCH_NUMBER() AS mno "
+        + "PATTERN (A B+) DEFINE A AS A.col3 > 0, B AS " + definition + ")");
+    SqlNode condition = ((SqlCall) match.getPatternDefList().get(1)).operand(0);
+    assertEquals(condition.toString().replace('\n', ' '), expectedRewrite);
+  }
+
+  @DataProvider(name = "prevNavigationDefinitions")
+  public Object[][] prevNavigationDefinitions() {
+    //@formatter:off
+    return new Object[][]{
+        // Cross-variable references with an explicit offset. NEXT is not rewritten by Calcite and stays as written.
+        new Object[]{
+            "B.col3 > PREV(A.col3, 3) AND B.col3 < NEXT(A.col3, 2)",
+            "`B`.`col3` > PREV(LAST(`A`.`col3`, 0), 3) AND `B`.`col3` < NEXT(`A`.`col3`, 2)"
+        },
+        // An unqualified column belongs to the universal row pattern variable, never to the defined one.
+        new Object[]{"PREV(col3) < col3", "PREV(LAST(`col3`, 0), 1) < `col3`"},
+        // Calcite distributes PREV over the operand expression, so every column inside it is anchored separately.
+        new Object[]{"PREV(col3 * 2) > 0", "PREV(LAST(`col3`, 0) * 2, 1) > 0"},
+        // Already physical relative to the defined variable, or already anchored explicitly: left untouched.
+        new Object[]{"B.col3 > PREV(B.col3)", "`B`.`col3` > PREV(`B`.`col3`, 1)"},
+        new Object[]{"PREV(LAST(A.col3, 1), 2) > 0", "PREV(LAST(`A`.`col3`, 1), 2) > 0"}
     };
     //@formatter:on
   }
