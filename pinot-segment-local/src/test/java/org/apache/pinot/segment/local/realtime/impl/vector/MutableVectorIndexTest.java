@@ -43,6 +43,8 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertTrue;
+
 
 public class MutableVectorIndexTest {
   private static final String COLUMN_NAME = "embedding";
@@ -52,6 +54,16 @@ public class MutableVectorIndexTest {
   @BeforeClass
   public void setUpSearcherPool() {
     RealtimeLuceneTextIndexSearcherPool.init(SEARCHER_POOL_SIZE);
+  }
+
+  @Test
+  public void testUsesDefaultTuningWhenPropertiesAreOmitted() {
+    VectorIndexConfig config = new VectorIndexConfig(false, "HNSW", 5, 1,
+        VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN, null);
+    try (MutableVectorIndex index =
+        new MutableVectorIndex("mutableVectorIndexDefaultsTest_" + System.nanoTime(), COLUMN_NAME, config)) {
+      assertTrue(index.supportsPreFilter());
+    }
   }
 
   @Test

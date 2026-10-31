@@ -22,7 +22,6 @@ import java.io.File;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -67,12 +66,17 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 
 
 public class DictionariesTest implements PinotBuffersAfterMethodCheckRule {
@@ -546,17 +550,24 @@ public class DictionariesTest implements PinotBuffersAfterMethodCheckRule {
     }
   }
 
-  @Test
-  public void clpStatsCollectorTest() {
+  @DataProvider
+  public Object[][] clpStatsCollectorConfigs() {
+    return new Object[][]{{false, false}, {false, true}, {true, false}, {true, true}};
+  }
+
+  @Test(dataProvider = "clpStatsCollectorConfigs")
+  public void clpStatsCollectorTest(boolean canonicalConfig, boolean fieldSpecConstructor) {
     Schema schema = new Schema();
     schema.addField(new DimensionFieldSpec("column1", DataType.STRING, true));
-    List<FieldConfig> fieldConfigList = new ArrayList<>();
-    fieldConfigList.add(new FieldConfig("column1", FieldConfig.EncodingType.RAW, Collections.EMPTY_LIST,
-        FieldConfig.CompressionCodec.CLP, Collections.EMPTY_MAP));
-    _tableConfig.setFieldConfigList(fieldConfigList);
-    StatsCollectorConfig statsCollectorConfig = new StatsCollectorConfig(_tableConfig, schema, null);
-    StringColumnPreIndexStatsCollector statsCollector =
-        new StringColumnPreIndexStatsCollector("column1", statsCollectorConfig);
+    FieldConfig fieldConfig = canonicalConfig
+        ? new FieldConfig.Builder("column1").withIndexes(JsonUtils.newObjectNode().set("forward",
+            JsonUtils.newObjectNode().put("encodingType", "RAW").put("compressionCodec", "CLP"))).build()
+        : new FieldConfig("column1", FieldConfig.EncodingType.RAW, List.of(),
+            FieldConfig.CompressionCodec.CLP, Map.of());
+    _tableConfig.setFieldConfigList(List.of(fieldConfig));
+    StringColumnPreIndexStatsCollector statsCollector = fieldSpecConstructor
+        ? new StringColumnPreIndexStatsCollector(schema.getFieldSpecFor("column1"), fieldConfig, null)
+        : new StringColumnPreIndexStatsCollector("column1", new StatsCollectorConfig(_tableConfig, schema, null));
 
     List<String> logLines = new ArrayList<>();
     logLines.add(
@@ -571,9 +582,9 @@ public class DictionariesTest implements PinotBuffersAfterMethodCheckRule {
     }
     statsCollector.seal();
 
-    Assert.assertNotNull(statsCollector.getCLPStats());
+    assertNotNull(statsCollector.getCLPStats());
 
     // Same log line format
-    Assert.assertEquals(statsCollector.getCLPStats().getSortedLogTypeValues().length, 1);
+    assertEquals(statsCollector.getCLPStats().getSortedLogTypeValues().length, 1);
   }
 }

@@ -26,6 +26,7 @@ import com.google.common.collect.Iterables;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -52,11 +53,13 @@ import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregatorFactory;
 import org.apache.pinot.segment.local.recordtransformer.SchemaConformingTransformer;
+import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
+import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -66,7 +69,6 @@ import org.apache.pinot.spi.annotations.FunctionVolatility;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
-import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
@@ -196,6 +198,120 @@ public final class TableConfigUtils {
       throw new IllegalStateException(
           "tierOverwrites.consuming produces an invalid table config: " + e.getMessage(), e);
     }
+  }
+
+  /// Optionally migrates legacy field settings after validation. Enable only after every reader supports the
+  /// canonical index configs; older readers may reject the migrated representation.
+  public static void validate(TableConfig tableConfig, Schema schema, @Nullable EnumSet<ValidationType> skipTypes,
+      @Nullable TableConfig existingTableConfig, boolean migrateLegacyFields) {
+    validate(tableConfig, schema, skipTypes, existingTableConfig);
+    if (!migrateLegacyFields || ValidationType.ALL.isSkipped(skipTypes)) {
+      return;
+    }
+    TableConfig migrated = new TableConfig(tableConfig);
+    if (migrateLegacyFieldConfigs(migrated, schema)) {
+      // Publish the new field list only after the converted config passes the same validations.
+      validate(migrated, schema, skipTypes, existingTableConfig);
+      tableConfig.setFieldConfigList(migrated.getFieldConfigList());
+    }
+  }
+
+  // Legacy access is intentional while converting persisted configs to their canonical representation.
+  @SuppressWarnings("removal")
+  private static boolean migrateLegacyFieldConfigs(TableConfig tableConfig, Schema schema) {
+    List<FieldConfig> fields = tableConfig.getFieldConfigList();
+    if (CollectionUtils.isEmpty(fields)) {
+      return false;
+    }
+    JsonNode indexingTiers = tableConfig.getIndexingConfig().getTierOverwrites();
+    boolean hasTierOverwrites = indexingTiers != null && !indexingTiers.isEmpty();
+    for (FieldConfig field : fields) {
+      hasTierOverwrites |= !field.getTierOverwrites().isEmpty();
+    }
+    if (hasTierOverwrites) {
+      // Rewriting the base can shadow inherited scalar overrides. Keep those configs editable and unchanged.
+      LOGGER.warn("Retaining legacy field settings for table: {} because it has tier overrides",
+          tableConfig.getTableName());
+      return false;
+    }
+    Map<FieldConfig.IndexType, IndexType<?, ?, ?>> propertyIndexes = Map.of(
+        FieldConfig.IndexType.TEXT, StandardIndexes.text(), FieldConfig.IndexType.H3, StandardIndexes.h3(),
+        FieldConfig.IndexType.VECTOR, StandardIndexes.vector());
+    Map<String, FieldIndexConfigs> configs = FieldIndexConfigsUtil.createIndexConfigsByColName(tableConfig, schema);
+    List<FieldConfig> migrated = new ArrayList<>(fields.size());
+    for (FieldConfig field : fields) {
+      Map<String, String> properties = field.getProperties() == null
+          ? new HashMap<>() : new HashMap<>(field.getProperties());
+      boolean legacyForward = field.hasFieldLevelEncodingType() || field.hasFieldLevelCompressionCodec()
+          || properties.containsKey(FieldConfig.FORWARD_INDEX_DISABLED)
+          || properties.containsKey(FieldConfig.RAW_INDEX_WRITER_VERSION)
+          || properties.containsKey(FieldConfig.DERIVE_NUM_DOCS_PER_CHUNK_RAW_INDEX_KEY);
+      boolean legacyPropertyIndex = false;
+      for (FieldConfig.IndexType index : field.getIndexTypes()) {
+        legacyPropertyIndex |= propertyIndexes.containsKey(index);
+      }
+      // The legacy disabled path deliberately ignores other forward settings, including invalid latent values.
+      if (Boolean.parseBoolean(properties.get(FieldConfig.FORWARD_INDEX_DISABLED))
+          || (!legacyForward && !legacyPropertyIndex)) {
+        migrated.add(field);
+        continue;
+      }
+      ObjectNode indexes = field.getIndexes().isObject()
+          ? (ObjectNode) field.getIndexes().deepCopy() : JsonUtils.newObjectNode();
+      if (legacyForward) {
+        JsonNode originalForward = indexes.get("forward");
+        ObjectNode forward = originalForward != null && originalForward.isObject()
+            ? (ObjectNode) originalForward : JsonUtils.newObjectNode();
+        // Keep unknown JSON and copy explicit settings only, without pinning service-specific defaults.
+        boolean explicitEncoding = forward.hasNonNull(ForwardIndexType.ENCODING_TYPE_CONFIG_KEY);
+        FieldConfig.EncodingType encoding = ForwardIndexType.getForwardEncodingType(field);
+        IndexingConfig indexing = tableConfig.getIndexingConfig();
+        if (!explicitEncoding && ((indexing.getNoDictionaryColumns() != null
+            && indexing.getNoDictionaryColumns().contains(field.getName()))
+            || (indexing.getNoDictionaryConfig() != null
+            && indexing.getNoDictionaryConfig().containsKey(field.getName())))) {
+          encoding = FieldConfig.EncodingType.RAW;
+        }
+        forward.put(ForwardIndexType.ENCODING_TYPE_CONFIG_KEY, encoding.name());
+        if (field.hasFieldLevelCompressionCodec()) {
+          forward.put("compressionCodec", field.getCompressionCodec().name());
+        }
+        String disabled = properties.remove(FieldConfig.FORWARD_INDEX_DISABLED);
+        if (disabled != null && (Boolean.parseBoolean(disabled) || originalForward == null)) {
+          forward.put("disabled", Boolean.parseBoolean(disabled));
+        }
+        // These properties were ignored by the deserializer when a modern forward block was already present.
+        // Retain them in that case because sorted-column segment creation can still consume them.
+        if (originalForward == null) {
+          String writer = properties.remove(FieldConfig.RAW_INDEX_WRITER_VERSION);
+          if (writer != null) {
+            forward.put("rawIndexWriterVersion", Integer.parseInt(writer));
+          }
+          String derive = properties.remove(FieldConfig.DERIVE_NUM_DOCS_PER_CHUNK_RAW_INDEX_KEY);
+          if (derive != null) {
+            forward.put("deriveNumDocsPerChunk", Boolean.parseBoolean(derive));
+          }
+        }
+        indexes.set("forward", forward);
+      }
+      List<FieldConfig.IndexType> indexTypes = new ArrayList<>(field.getIndexTypes());
+      for (Map.Entry<FieldConfig.IndexType, IndexType<?, ?, ?>> entry : propertyIndexes.entrySet()) {
+        if (indexTypes.contains(entry.getKey())) {
+          IndexType<?, ?, ?> index = entry.getValue();
+          indexes.set(index.getPrettyName(), configs.get(field.getName()).getConfig(index).toJsonNode());
+        }
+      }
+      indexTypes.removeAll(propertyIndexes.keySet());
+      // Unknown/plugin and non-index properties have no general replacement and must remain available.
+      migrated.add(new FieldConfig.Builder(field).withIndexes(indexes).withIndexTypes(indexTypes)
+          .withEncodingType(null).withCompressionCodec(null)
+          .withProperties(properties.isEmpty() ? null : properties).build());
+    }
+    if (migrated.equals(fields)) {
+      return false;
+    }
+    tableConfig.setFieldConfigList(migrated);
+    return true;
   }
 
   private static void validateEffectiveTableConfig(TableConfig tableConfig, Schema schema,
@@ -2047,11 +2163,7 @@ public final class TableConfigUtils {
         String column = fieldConfig.getName();
         Preconditions.checkState(seenColumns.add(column), "Duplicate FieldConfig for column: %s", column);
         Preconditions.checkState(schema.hasColumn(column), "Failed to find column: %s in schema", column);
-
-        // Validate DELTA / DELTADELTA compression codecs compatibility
-        validateGorillaCompressionCodecIfPresent(fieldConfig, schema.getFieldSpecFor(column));
       }
-      validateIndexingConfigAndFieldConfigListCompatibility(indexingConfig, fieldConfigs);
     }
 
     Map<String, FieldIndexConfigs> indexConfigsMap;
@@ -2066,6 +2178,7 @@ public final class TableConfigUtils {
       FieldSpec fieldSpec = schema.getFieldSpecFor(column);
       Preconditions.checkState(fieldSpec != null, "Failed to find column: %s in schema", column);
       FieldIndexConfigs indexConfigs = entry.getValue();
+      validateGorillaCompressionCodecIfPresent(indexConfigs.getConfig(StandardIndexes.forward()), fieldSpec, column);
       for (IndexType<?, ?, ?> indexType : allIndexes) {
         indexType.validate(indexConfigs, fieldSpec, tableConfig);
       }
@@ -2193,29 +2306,6 @@ public final class TableConfigUtils {
         for (String key : multiColTextIndex.getPerColumnProperties().get(column).keySet()) {
           Preconditions.checkState(MultiColumnTextMetadata.isValidPerColumnProperty(key),
               "Multi-column text index doesn't allow: %s as property for column: %s", key, column);
-        }
-      }
-    }
-  }
-
-  /// Validates compatibility across [IndexingConfig] and [FieldConfig]s, ensures that:
-  /// - Columns with DICTIONARY encoding type in [FieldConfig]s are not defined as no-dictionary in [IndexingConfig]
-  private static void validateIndexingConfigAndFieldConfigListCompatibility(IndexingConfig indexingConfig,
-      List<FieldConfig> fieldConfigs) {
-    Set<String> noDictionaryColumnsFromIndexingConfig = new HashSet<>();
-    if (indexingConfig.getNoDictionaryColumns() != null) {
-      noDictionaryColumnsFromIndexingConfig.addAll(indexingConfig.getNoDictionaryColumns());
-    }
-    if (indexingConfig.getNoDictionaryConfig() != null) {
-      noDictionaryColumnsFromIndexingConfig.addAll(indexingConfig.getNoDictionaryConfig().keySet());
-    }
-    if (!noDictionaryColumnsFromIndexingConfig.isEmpty()) {
-      for (FieldConfig fieldConfig : fieldConfigs) {
-        String column = fieldConfig.getName();
-        EncodingType encodingType = fieldConfig.getEncodingType();
-        if (encodingType == EncodingType.DICTIONARY) {
-          Preconditions.checkState(!noDictionaryColumnsFromIndexingConfig.contains(column),
-              "FieldConfig encoding type is different from indexingConfig for column: %s", column);
         }
       }
     }
@@ -2566,26 +2656,36 @@ public final class TableConfigUtils {
     return UPSERT_DEDUP_ALLOWED_ROUTING_STRATEGIES.stream().anyMatch(x -> x.equalsIgnoreCase(instanceSelectorType));
   }
 
-  /// Helper method to extract TableConfig in updated syntax from current TableConfig.
+  /// Helper method to extract [TableConfig] in updated syntax from current [TableConfig].
   ///
-  /// - Moves all index configs to FieldConfig.indexes
-  /// - Clean up index related configs from IndexingConfig and FieldConfig.IndexTypes
+  /// - Moves all index configs to `FieldConfig.indexes`
+  /// - Cleans up index related configs from [IndexingConfig] and deprecated field-level [FieldConfig] fields
   public static TableConfig createTableConfigFromOldFormat(TableConfig tableConfig, Schema schema) {
     TableConfig clone = new TableConfig(tableConfig);
     for (IndexType<?, ?, ?> indexType : IndexService.getInstance().getAllIndexes()) {
       // get all the index data in new format
       indexType.convertToNewFormat(clone, schema);
     }
-    // cleanup the indexTypes field from all FieldConfig items
+    // Clean up deprecated field-level config from all FieldConfig items.
     if (clone.getFieldConfigList() != null) {
       List<FieldConfig> cleanFieldConfigList = new ArrayList<>();
       for (FieldConfig fieldConfig : clone.getFieldConfigList()) {
-        cleanFieldConfigList.add(
-            new FieldConfig.Builder(fieldConfig).withIndexTypes(null).withProperties(null).build());
+        cleanFieldConfigList.add(clearDeprecatedFieldConfigOptions(fieldConfig));
       }
       clone.setFieldConfigList(cleanFieldConfigList);
     }
     return clone;
+  }
+
+  // Legacy setters are required to clear converted fields.
+  @SuppressWarnings({"deprecation", "removal"})
+  private static FieldConfig clearDeprecatedFieldConfigOptions(FieldConfig fieldConfig) {
+    return new FieldConfig.Builder(fieldConfig)
+        .withEncodingType(null)
+        .withIndexTypes(null)
+        .withCompressionCodec(null)
+        .withProperties(null)
+        .build();
   }
 
   public static boolean isCommitTimeCompactionEnabled(TableConfig tableConfig) {
@@ -2911,20 +3011,23 @@ public final class TableConfigUtils {
     return relevantTenants.contains(tenantName);
   }
 
-  private static void validateGorillaCompressionCodecIfPresent(FieldConfig fieldConfig, FieldSpec fieldSpec) {
-    if (fieldConfig.getCompressionCodec() == null) {
+  private static void validateGorillaCompressionCodecIfPresent(ForwardIndexConfig forwardIndexConfig,
+      FieldSpec fieldSpec, String column) {
+    FieldConfig.CompressionCodec compressionCodec =
+        forwardIndexConfig != null ? forwardIndexConfig.getCompressionCodec() : null;
+    if (compressionCodec == null) {
       return;
     }
-    switch (fieldConfig.getCompressionCodec()) {
+    switch (compressionCodec) {
       case DELTA:
       case DELTADELTA:
         Preconditions.checkState(fieldSpec.isSingleValueField(),
             "Compression codec %s can only be used on single-value columns, found multi-value column: %s",
-            fieldConfig.getCompressionCodec(), fieldConfig.getName());
+            compressionCodec, column);
         DataType storedType = fieldSpec.getDataType().getStoredType();
         Preconditions.checkState(storedType == DataType.INT || storedType == DataType.LONG,
             "Compression codec %s can only be used on INT/LONG data types, found %s for column: %s",
-            fieldConfig.getCompressionCodec(), storedType, fieldConfig.getName());
+            compressionCodec, storedType, column);
         break;
       default:
         // no-op for other codecs

@@ -176,6 +176,8 @@ public class TextIndexConfigTest {
       throws JsonProcessingException {
     // Create config, serialize to JSON, deserialize back - should work
     final String originalConfStr = "{\n"
+        + "        \"rawValue\": \"placeholder\",\n"
+        + "        \"queryCache\": true,\n"
         + "        \"luceneAnalyzerClassArgs\": \"arg1,arg2\",\n"
         + "        \"luceneAnalyzerClassArgTypes\": \"java.lang.String,java.lang.Integer\"\n"
         + "}";
@@ -183,14 +185,27 @@ public class TextIndexConfigTest {
 
     // Serialize to JSON (getters return List<String>, so it becomes JSON arrays)
     final String serialized = JsonUtils.objectToString(originalConfig);
+    assertTrue(serialized.contains("\"rawValue\":\"placeholder\""));
+    assertTrue(serialized.contains("\"queryCache\":true"));
 
     // Deserialize back - this was the failing case before the fix
     final TextIndexConfig deserializedConfig = JsonUtils.stringToObject(serialized, TextIndexConfig.class);
 
+    assertEquals(deserializedConfig.getRawValueForTextIndex(), "placeholder");
+    assertTrue(deserializedConfig.isEnableQueryCache());
     assertEquals(deserializedConfig.getLuceneAnalyzerClassArgs(), originalConfig.getLuceneAnalyzerClassArgs(),
         "Round-trip failed for luceneAnalyzerClassArgs");
     assertEquals(deserializedConfig.getLuceneAnalyzerClassArgTypes(), originalConfig.getLuceneAnalyzerClassArgTypes(),
         "Round-trip failed for luceneAnalyzerClassArgTypes");
+  }
+
+  @Test
+  public void testLegacySerializedPropertyNames()
+      throws JsonProcessingException {
+    TextIndexConfig config = JsonUtils.stringToObject(
+        "{\"rawValueForTextIndex\":\"placeholder\",\"enableQueryCache\":true}", TextIndexConfig.class);
+    assertEquals(config.getRawValueForTextIndex(), "placeholder");
+    assertTrue(config.isEnableQueryCache());
   }
 
   @Test

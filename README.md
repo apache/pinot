@@ -147,6 +147,53 @@ For faster builds it is recommended to use `./mvnw verify -Ppinot-fastdev`, whic
 
 More detailed instructions can be found at [Quick Demo](https://docs.pinot.apache.org/basics/getting-started/quick-start) section in the documentation.
 
+### Forward Index Encoding In Table Configs
+
+Set per-column forward index settings inside `fieldConfigList[].indexes.forward`. The older field-level
+`fieldConfigList[].encodingType`, `fieldConfigList[].compressionCodec`, and `fieldConfigList[].properties` forms are
+deprecated but remain accepted on table create/update. Existing configs, including `DICTIONARY` values added by older
+serializers, can still be read, edited, and submitted without manual migration. Legacy fields are retained for older
+nodes during rolling upgrades and rollback. Use the new shape after all nodes support it; move index-specific settings
+into the relevant `indexes.<indexName>` block. Legacy `properties` also contains settings used outside index configs,
+so it must not be cleared wholesale.
+
+To automatically migrate submitted configs, set this controller property after every component that reads or builds
+segments supports the new format:
+
+```properties
+controller.table.config.auto.migrate.legacy.fields.enabled=true
+```
+
+The default is `false` for rolling-upgrade compatibility. With it enabled, create/update and validation requests convert
+legacy encoding, compression, and supported forward properties into `indexes.forward`; text, H3, and vector settings
+move into their index blocks. Validation returns the converted config for inspection; an update saves it. Existing
+stored configs migrate when submitted again, without a cluster-wide rewrite. Unknown and non-index properties remain
+available. Configs with tier overrides and fields disabled through legacy forward properties retain their original
+representation to preserve inheritance and ignored settings. Skipping all validation also skips migration. Save the
+original configs before enabling migration: disabling the flag does not undo saved conversions, and rollback to an
+older reader requires restoring compatible configs first.
+
+Use this shape for new table configs:
+
+```json
+{
+  "fieldConfigList": [
+    {
+      "name": "message",
+      "indexes": {
+        "forward": {
+          "encodingType": "RAW",
+          "compressionCodec": "ZSTANDARD",
+          "rawIndexWriterVersion": 4
+        },
+        "text": {
+        }
+      }
+    }
+  ]
+}
+```
+
 ### macOS Build Requirements
 
 If you're building Pinot on macOS and encounter issues with the gRPC Java plugin during the build process, you may need to configure the protobuf Maven plugin to use a specific executable path. This is a known issue on macOS ARM (Apple Silicon) systems.

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.creator.impl.stats;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Utf8;
 import com.yscope.clp.compressorfrontend.BuiltInVariableHandlingRuleVersions;
@@ -31,6 +32,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
@@ -47,7 +49,7 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
 
   public StringColumnPreIndexStatsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
     super(column, statsCollectorConfig);
-    if (_fieldConfig != null && _fieldConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLP) {
+    if (getCompressionCodec(_fieldConfig) == CompressionCodec.CLP) {
       _clpStatsCollector = new CLPStatsCollector();
     }
   }
@@ -55,9 +57,23 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
   public StringColumnPreIndexStatsCollector(FieldSpec fieldSpec, @Nullable FieldConfig fieldConfig,
       @Nullable PartitionFunction partitionFunction) {
     super(fieldSpec, fieldConfig, partitionFunction);
-    if (_fieldConfig != null && _fieldConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLP) {
+    if (getCompressionCodec(_fieldConfig) == CompressionCodec.CLP) {
       _clpStatsCollector = new CLPStatsCollector();
     }
+  }
+
+  // Legacy codec access is required when reading configs that have not been migrated.
+  @Nullable
+  @SuppressWarnings("removal")
+  private static CompressionCodec getCompressionCodec(@Nullable FieldConfig fieldConfig) {
+    if (fieldConfig == null) {
+      return null;
+    }
+    JsonNode forward = fieldConfig.getIndexes().get("forward");
+    JsonNode codec = forward != null ? forward.get("compressionCodec") : null;
+    return codec != null && !codec.isNull()
+        ? CompressionCodec.valueOf(codec.asText())
+        : fieldConfig.getCompressionCodec();
   }
 
   @Override
