@@ -142,6 +142,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   // Object to track ingestion delay for all partitions
   private IngestionDelayTracker _ingestionDelayTracker;
+  private IngestionSourceErrorRecorder _ingestionSourceErrorRecorder;
 
   private TableDedupMetadataManager _tableDedupMetadataManager;
   private BooleanSupplier _isTableReadyToConsumeData;
@@ -173,6 +174,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   @Override
   protected void doInit() {
     _leaseExtender = SegmentBuildTimeLeaseExtender.getOrCreate(_instanceId, _serverMetrics, _tableNameWithType);
+    _ingestionSourceErrorRecorder = new IngestionSourceErrorRecorder(_serverMetrics, _tableNameWithType);
     // Tracks ingestion delay of all partitions being served for this table
     _ingestionDelayTracker = new IngestionDelayTracker(_serverMetrics, _tableNameWithType, this);
     File statsFile = new File(_tableDataDir, STATS_FILE_NAME);
@@ -295,6 +297,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   @Override
   protected void doShutdown() {
+    // Stop recording source failures first: consumer threads can outlive the shutdown.
+    _ingestionSourceErrorRecorder.close();
     // Make sure we do metric cleanup when we shut down the table.
     // Do this first, so we do not show ingestion lag during shutdown.
     _ingestionDelayTracker.shutdown();
@@ -323,6 +327,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     if (_leaseExtender != null) {
       _leaseExtender.shutDown();
     }
+  }
+
+  /// Records the stream source failures this table's consumers and its ingestion delay tracker see.
+  public IngestionSourceErrorRecorder getIngestionSourceErrorRecorder() {
+    return _ingestionSourceErrorRecorder;
   }
 
   /// Updates the ingestion metrics for the given partition.

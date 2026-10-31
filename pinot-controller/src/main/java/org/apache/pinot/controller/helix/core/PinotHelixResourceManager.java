@@ -2729,6 +2729,11 @@ public class PinotHelixResourceManager {
 
     // Remove COMMITTING segment list
     if (tableType == TableType.REALTIME) {
+      // A table whose stream refused its creation was never led by this controller, so SegmentStatusChecker won't
+      // remove the source failure gauges its setup recorded
+      if (_controllerMetrics != null) {
+        PinotTableIdealStateBuilder.removeSourceFailureGauges(tableNameWithType, _controllerMetrics);
+      }
       if (ZKMetadataProvider.removePauselessDebugMetadata(_propertyStore, tableNameWithType)) {
         LOGGER.info("Deleting table {}: Removed pauseless debug metadata", tableNameWithType);
       } else {

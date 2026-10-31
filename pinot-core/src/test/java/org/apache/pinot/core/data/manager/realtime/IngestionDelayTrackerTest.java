@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.data.manager.realtime;
 
+import java.net.ConnectException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -41,7 +42,12 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
+import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorClassifier;
+import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorRule;
+import org.apache.pinot.spi.ingestion.error.RefusedBySourceException;
+import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.stream.LongMsgOffset;
+import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -49,9 +55,14 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anySet;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
@@ -502,6 +513,54 @@ public class IngestionDelayTrackerTest {
           IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(0, 1)))).getOffset(), Integer.MAX_VALUE);
     } finally {
       ingestionDelayTracker.shutdown();
+    }
+  }
+
+  @Test
+  public void testOffsetFetchSourceFailuresAreRecorded()
+      throws Exception {
+    ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+    String readGauge = ServerGauge.INGESTION_SOURCE_READ_FAILURE_TIME_SECONDS.getGaugeName() + "."
+        + REALTIME_TABLE_NAME + ".0";
+    String authGauge = ServerGauge.INGESTION_SOURCE_AUTH_FAILURE_TIME_SECONDS.getGaugeName() + "."
+        + REALTIME_TABLE_NAME + ".0";
+    IngestionSourceErrorRule refusal = RefusedBySourceException.RULE;
+    IngestionSourceErrorClassifier.registerRule(refusal);
+    // Not ready to serve queries, so the tracker's own schedule never refreshes concurrently with the test
+    MockIngestionDelayTracker tracker =
+        new MockIngestionDelayTracker(serverMetrics, REALTIME_TABLE_NAME, REALTIME_TABLE_DATA_MANAGER, 1000, 1000,
+            () -> false);
+    try {
+      StreamMetadataProvider provider = mock(StreamMetadataProvider.class);
+      when(provider.supportsOffsetLag()).thenReturn(true);
+      tracker._streamConfigIndexToStreamMetadataProvider.put(0, provider);
+      Set<Integer> partitionsHosted = Set.of(0);
+      RuntimeException unreachable = new RuntimeException(new ConnectException("Connection refused"));
+
+      // An unreachable stream is recorded only after six refreshes in a row fail; a success starts the count over.
+      doThrow(unreachable).when(provider).fetchLatestStreamOffset(anySet(), anyLong());
+      for (int i = 0; i < 5; i++) {
+        tracker.updateLatestStreamOffset(partitionsHosted);
+      }
+      doReturn(Map.of(0, new LongMsgOffset(10))).when(provider).fetchLatestStreamOffset(anySet(), anyLong());
+      tracker.updateLatestStreamOffset(partitionsHosted);
+      doThrow(unreachable).when(provider).fetchLatestStreamOffset(anySet(), anyLong());
+      for (int i = 0; i < 5; i++) {
+        tracker.updateLatestStreamOffset(partitionsHosted);
+      }
+      assertNull(serverMetrics.getGaugeValue(readGauge));
+      tracker.updateLatestStreamOffset(partitionsHosted);
+      assertNotNull(serverMetrics.getGaugeValue(readGauge));
+
+      // A refusal is recorded at once.
+      assertNull(serverMetrics.getGaugeValue(authGauge));
+      doThrow(new RefusedBySourceException()).when(provider)
+          .fetchLatestStreamOffset(anySet(), anyLong());
+      tracker.updateLatestStreamOffset(partitionsHosted);
+      assertNotNull(serverMetrics.getGaugeValue(authGauge));
+    } finally {
+      tracker.shutdown();
+      IngestionSourceErrorClassifier.unregisterRule(refusal);
     }
   }
 
