@@ -134,13 +134,28 @@ public class SelectionPlanNode implements PlanNode {
   /// but ORDER BY sorted_col1 DESC, sorted_col2 ASC and ORDER BY sorted_col1 ASC, sorted_col2 DESC will return 1 while
   /// ORDER BY not_sorted, sorted_col1 will return 0 because the first column is not sorted.
   ///
-  /// It doesn't make sense to add literal expressions in an order by expression, but if they are included, they are
-  /// considered sorted and its ASC/DESC is ignored.
+  /// Literal and function expressions cannot establish a sorted prefix because they are not backed by any data source
+  /// column, so ORDER BY <literal>, ... or ORDER BY <function>, ... returns 0 even if followed by sorted identifiers.
+  /// Once a sorted identifier has established the prefix, trailing literals are effectively constant and do not disrupt
+  /// ordering, so they extend the prefix (e.g. ORDER BY sorted_col, 'x' returns 2).
   ///
   /// @return the max number that guarantees that from the first expression to the returned number, the index is already
   /// sorted.
   private int getSortedColumnsPrefix(List<OrderByExpressionContext> orderByExpressions, boolean isNullHandlingEnabled) {
-    boolean asc = orderByExpressions.get(0).isAsc();
+    // LITERAL and FUNCTION expressions cannot establish a sorted prefix: they are not backed by a data source column,
+    // so the segment's natural sort order cannot be relied on for them.  Only IDENTIFIER expressions can start the
+    // prefix.  Once established, trailing LITERAL expressions extend the prefix because their constant value does not
+    // disrupt ordering, but trailing FUNCTION expressions still terminate it (we don't know whether the function is
+    // monotonic over the sorted column).
+    OrderByExpressionContext firstExpr = orderByExpressions.get(0);
+    switch (firstExpr.getExpression().getType()) {
+      case LITERAL:
+      case FUNCTION:
+        return 0;
+      default:
+        // fall through
+    }
+    boolean asc = firstExpr.isAsc();
     for (int i = 0; i < orderByExpressions.size(); i++) {
       if (!isSorted(orderByExpressions.get(i), asc, isNullHandlingEnabled)) {
         return i;
@@ -153,6 +168,10 @@ public class SelectionPlanNode implements PlanNode {
   private boolean isSorted(OrderByExpressionContext orderByExpression, boolean asc, boolean isNullHandlingEnabled) {
     switch (orderByExpression.getExpression().getType()) {
       case LITERAL: {
+        // LITERAL expressions are effectively constant — their value does not change across rows, so they cannot
+        // disrupt an established sort order once a sorted identifier has led the prefix.  A lone LITERAL (or one
+        // appearing before any sorted identifier) is rejected by getSortedColumnsPrefix returning 0, so returning true
+        // here is safe and preserves trailing-literal optimization without triggering the crash from issue #19701.
         return true;
       }
       case IDENTIFIER: {
