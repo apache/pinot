@@ -100,7 +100,7 @@ public class SegmentDirectoryLoaderContext {
     return _mappedMetadataEnabled;
   }
 
-  /// Marks only the final serving load for eager metadata reuse, after any preprocessing has finished.
+  /// Requests a guarded eager snapshot for a local directory that may become the mapped serving view.
   public SegmentDirectoryLoaderContext withMappedMetadataEnabled() {
     return new SegmentDirectoryLoaderContext(_readMode, _tableConfig, _schema, _instanceId, _tableDataDir, _segmentName,
         _segmentCrc, _segmentTier, _instanceTierConfigs, _segmentCustomConfigs, true);

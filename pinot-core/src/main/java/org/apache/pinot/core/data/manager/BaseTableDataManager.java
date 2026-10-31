@@ -2196,7 +2196,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
         SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getSegmentDirectoryLoader());
     File indexDir =
         getSegmentDataDir(segmentName, indexLoadingConfig.getSegmentTier(), indexLoadingConfig.getTableConfig());
-    return segmentDirectoryLoader.load(indexDir.toURI(), loaderContext);
+    return segmentDirectoryLoader.load(indexDir.toURI(), indexLoadingConfig.isMappedSegmentMetadataEnabled()
+        ? loaderContext.withMappedMetadataEnabled() : loaderContext);
   }
 
   // CRC check can be performed on both segment CRC and data CRC (if available) based on the ZK property value of
