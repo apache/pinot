@@ -22,6 +22,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.function.UnaryOperator;
 import javax.annotation.Nullable;
 import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.sql.SqlCall;
@@ -213,6 +214,9 @@ public class MatchRecognizeValidator extends SqlBasicVisitor<Void> {
     if (node instanceof SqlIdentifier) {
       SqlIdentifier identifier = (SqlIdentifier) node;
       return identifier.names.size() > 1 ? normalizeIdentifierComponent(identifier, 0) : identifier;
+    }
+    if (node instanceof SqlNodeList) {
+      return rewriteElements((SqlNodeList) node, this::normalizePatternReferences);
     }
     if (!(node instanceof SqlCall)) {
       return node;
@@ -489,6 +493,9 @@ public class MatchRecognizeValidator extends SqlBasicVisitor<Void> {
   }
 
   private SqlNode normalizeDefinition(SqlNode node, SqlNode definition) {
+    if (node instanceof SqlNodeList) {
+      return rewriteElements((SqlNodeList) node, element -> normalizeDefinition(element, definition));
+    }
     if (!(node instanceof SqlCall)) {
       return node;
     }
@@ -544,6 +551,9 @@ public class MatchRecognizeValidator extends SqlBasicVisitor<Void> {
       SqlParserPos pos = identifier.getParserPosition();
       return SqlStdOperatorTable.LAST.createCall(pos, identifier, SqlLiteral.createExactNumeric("0", pos));
     }
+    if (node instanceof SqlNodeList) {
+      return rewriteElements((SqlNodeList) node, element -> anchorAtLastRow(element, definedVariable));
+    }
     if (!(node instanceof SqlCall)) {
       return node;
     }
@@ -559,6 +569,19 @@ public class MatchRecognizeValidator extends SqlBasicVisitor<Void> {
       }
     }
     return call;
+  }
+
+  /// Rewrites every element of `list` in place. `CASE` keeps its WHEN and THEN branches, and `IN` its value list, in a
+  /// [SqlNodeList] operand rather than in call operands, so an expression rewrite that only followed call operands
+  /// would silently skip those branches.
+  private static SqlNodeList rewriteElements(SqlNodeList list, UnaryOperator<SqlNode> rewriter) {
+    for (int i = 0; i < list.size(); i++) {
+      SqlNode element = list.get(i);
+      if (element != null) {
+        list.set(i, rewriter.apply(element));
+      }
+    }
+    return list;
   }
 
   /// Logs, at debug level, the pattern variables that appear in `PATTERN` but are never `DEFINE`d. SQL:2016 says such
