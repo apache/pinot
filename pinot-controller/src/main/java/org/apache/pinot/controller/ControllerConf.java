@@ -372,6 +372,13 @@ public class ControllerConf extends PinotConfiguration {
   public static final String SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS = "controller.segment.upload.timeoutInMillis";
   /// If true, the controller may reject single-segment uploads with HTTP 403 when segment data end is past the table
   /// data retention window (see {@link org.apache.pinot.controller.api.upload.SegmentValidationUtils}).
+  ///
+  /// This also applies to minion task uploads that push through `POST /segments`: always for Purge, UpsertCompaction
+  /// and RefreshSegment, and for RealtimeToOffline, MergeRollup and UpsertCompactMerge unless `batchSegmentUpload` is
+  /// on.
+  /// A rejected RealtimeToOffline upload does not advance its watermark, so the task retries the same window until the
+  /// source segments age out (indefinitely with the hybrid retention strategy, since the time boundary cannot advance).
+  /// Review task schedules and buffer periods against table retention before enabling.
   public static final String SEGMENT_UPLOAD_REJECT_OUT_OF_RETENTION_ENABLED =
       "controller.segment.upload.rejectOutOfRetention.enabled";
   public static final String REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS =

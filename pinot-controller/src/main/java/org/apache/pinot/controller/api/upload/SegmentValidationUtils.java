@@ -110,9 +110,12 @@ public class SegmentValidationUtils {
 
   /// When `controller.segment.upload.rejectOutOfRetention.enabled` is true on the controller, rejects the upload if
   /// the segment's data end time (from segment file metadata) is past the table's `retentionTimeValue` /
-  /// `retentionTimeUnit` window, using the same boundary as the controller retention manager. **Index creation time is
-  /// not** used as a fallback here: it can reflect upstream segment timestamps (for example upsert compaction) and is a
-  /// poor proxy for the data window at upload time.
+  /// `retentionTimeUnit` window. This matches the retention manager's time-based boundary. It does not model the
+  /// hybrid retention strategy (`controller.enable.hybrid.table.retention.strategy`), under which the REALTIME side of
+  /// a hybrid table is purged by the offline time boundary instead of the retention window. The two boundaries are
+  /// independent there, so this check can be either stricter or looser than what the retention manager purges.
+  /// **Index creation time is not** used as a fallback here: it can reflect upstream segment timestamps (for example
+  /// upsert compaction) and is a poor proxy for the data window at upload time.
   ///
   /// Rejection uses HTTP 403 so callers that enable the controller flag can treat the response as a hard failure.
   /// Clients that do not enable the flag see no behavior change.
@@ -120,6 +123,11 @@ public class SegmentValidationUtils {
   /// Controller wiring: {@link org.apache.pinot.controller.api.resources.PinotSegmentUploadDownloadRestletResource}
   /// invokes this for single-segment upload only. METADATA batch upload (`POST /segments/batchUpload`) and
   /// reingested-segment upload do not call it.
+  ///
+  /// Minion task uploads are not exempt. Purge, UpsertCompaction and RefreshSegment always push through this
+  /// single-segment endpoint. RealtimeToOffline, MergeRollup and UpsertCompactMerge do too unless `batchSegmentUpload`
+  /// is enabled for the task. A rejected RealtimeToOffline upload does not advance the task watermark, so the same
+  /// window is retried on every run until the source segments age out.
   ///
   /// For tables where the retention manager does not apply time-based retention to completed segments (offline tables
   /// whose batch ingestion type is not `APPEND`), this method returns without evaluating retention.
