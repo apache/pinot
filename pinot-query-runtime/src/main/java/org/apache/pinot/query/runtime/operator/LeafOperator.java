@@ -728,9 +728,8 @@ public class LeafOperator extends MultiStageOperator implements ExplainableOpera
   }
 
   private RowHeapDataBlock composeDirectMseBlock(BaseResultsBlock block) {
-    List<Object[]> resultRows = block.getRows();
     DataSchema inputDataSchema = block.getDataSchema();
-    assert resultRows != null && inputDataSchema != null;
+    assert inputDataSchema != null;
     ColumnDataType[] inputStoredTypes = inputDataSchema.getStoredColumnDataTypes();
     ColumnDataType[] outputStoredTypes = _dataSchema.getStoredColumnDataTypes();
     QueryContext queryContext = _requests.get(0).getQueryContext();
@@ -746,6 +745,12 @@ public class LeafOperator extends MultiStageOperator implements ExplainableOpera
         colIdsToConvert[numColumnsToConvert++] = colId;
       }
     }
+    if (numColumnsToConvert == 0 && block instanceof GroupByResultsBlock groupByBlock
+        && groupByBlock.getTable() != null) {
+      return new RowHeapDataBlock(groupByBlock.getTable(), _dataSchema, queryContext.getAggregationFunctions());
+    }
+    List<Object[]> resultRows = block.getRows();
+    assert resultRows != null;
     if (numColumnsToConvert > 0) {
       for (Object[] row : resultRows) {
         for (int i = 0; i < numColumnsToConvert; i++) {
