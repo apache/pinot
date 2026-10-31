@@ -57,6 +57,7 @@ import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.calcite.rel.logical.PinotLogicalMatch;
 import org.apache.pinot.calcite.rel.rules.ImmutablePinotSortExchangeCopyRule;
 import org.apache.pinot.calcite.rel.rules.PinotAggregateTypeArgumentRewriteRule;
 import org.apache.pinot.calcite.rel.rules.PinotImplicitTableHintRule;
@@ -97,6 +98,7 @@ import org.apache.pinot.query.planner.spi.Phase;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.validate.BytesCastVisitor;
+import org.apache.pinot.query.validate.MatchRecognizeValidator;
 import org.apache.pinot.query.validate.RowExpressionValidationVisitor;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
@@ -443,6 +445,19 @@ public class QueryEnvironment {
   /// in case it was legal to apply an automatic cast for these types!).
   private SqlNode validate(SqlNode sqlNode, PlannerContext plannerContext) {
     try {
+      // MATCH_RECOGNIZE checks and rewrites must run on the raw SqlNode tree: the omitted-vs-explicit AFTER MATCH
+      // distinction is lost during conversion to RelNode, and some unsupported constructs fail inside
+      // SqlToRelConverter with an assertion instead of a usable message. See MatchRecognizeValidator.
+      MatchRecognizeValidator matchRecognizeValidator = new MatchRecognizeValidator();
+      sqlNode.accept(matchRecognizeValidator);
+      if (matchRecognizeValidator.hasMatchRecognize() && plannerContext.isUsePhysicalOptimizer()) {
+        PhysicalPlannerContext physicalPlannerContext = plannerContext.getPhysicalPlannerContext();
+        boolean useLiteMode = physicalPlannerContext != null && physicalPlannerContext.isUseLiteMode();
+        throw new MatchRecognizeValidator.UnsupportedMatchRecognizeException(
+            "MATCH_RECOGNIZE is not supported by the multi-stage physical optimizer"
+                + (useLiteMode ? " in lite mode" : "")
+                + ". Retry with the query option 'usePhysicalOptimizer=false'.");
+      }
       SqlNode validated = plannerContext.getValidator().validate(sqlNode);
       if (!validated.getKind().belongsTo(SqlKind.QUERY)) {
         throw new IllegalArgumentException("Unsupported SQL query, failed to validate query:\n" + sqlNode);
@@ -491,7 +506,10 @@ public class QueryEnvironment {
       } catch (Throwable e) {
         throw new RuntimeException("Failed to convert query to relational expression:\n" + sqlNode, e);
       }
-      RelNode rootNode = relRoot.rel;
+      // Calcite keeps the MATCH_RECOGNIZE partition keys only as a bit set. Their source order can be recovered from
+      // the field names only here: field trimming drops projects that only rename, so later a MATCH_RECOGNIZE input
+      // can carry the table's column names instead of the aliases that PARTITION BY refers to.
+      RelNode rootNode = PinotLogicalMatch.pinPartitionKeyOrder(relRoot.rel);
       try {
         // NOTE: DO NOT use converter.decorrelate(sqlNode, rootNode) because the converted type check can fail. This is
         //       probably a bug in Calcite.
