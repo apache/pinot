@@ -958,6 +958,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       }
       routeProvider.calculateRoutes(routeInfo, selectedRoutingManager, offlineBrokerRequest,
           realtimeBrokerRequest, requestId);
+      /// The broker waits the full `remainingTimeMs` again from the fallback dispatch below, so the deadline stamped
+      /// before the split attempt would be early by however long that attempt took; stamp it again.
+      setRequestDeadline(remainingTimeMs, offlineBrokerRequest, realtimeBrokerRequest, null);
       /// After the fallback recomputes the route, refresh the execution-server and
       /// pruned-segment locals captured pre-split.  Without this, the cancel hook (`QueryServers`
       /// built below) would track the pre-split server set — a cancel during fallback would

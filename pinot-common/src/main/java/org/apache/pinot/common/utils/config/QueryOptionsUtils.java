@@ -314,6 +314,7 @@ public class QueryOptionsUtils {
     String requestDeadlineMsString = queryOptions.get(QueryOptionKey.REQUEST_DEADLINE_MS);
     Long requestDeadlineMs =
         checkedParseLong(QueryOptionKey.REQUEST_DEADLINE_MS, requestDeadlineMsString, Long.MIN_VALUE);
+    // Non-positive is deliberately the same as absent: never a real epoch deadline, so the request runs as before.
     return requestDeadlineMs != null && requestDeadlineMs > 0 ? requestDeadlineMs : null;
   }
 
