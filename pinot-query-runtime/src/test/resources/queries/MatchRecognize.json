@@ -89,5 +89,36 @@
         "ignoreLiteMode": true
       }
     ]
+  },
+  "match_recognize_partition_order": {
+    "tables": {
+      "trades": {
+        "schema": [
+          {"name": "sym", "type": "STRING"},
+          {"name": "venue", "type": "STRING"},
+          {"name": "seq", "type": "LONG"},
+          {"name": "price", "type": "INT"}
+        ],
+        "inputs": [
+          ["AAPL", "NYSE", 1, 10],
+          ["AAPL", "NYSE", 2, 11],
+          ["AAPL", "BATS", 3, 12],
+          ["MSFT", "NYSE", 4, 13]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "The subquery swaps the names of sym and venue but keeps the table's column order (price, seq, sym, venue), so field trimming drops the renaming projection and leaves the MATCH_RECOGNIZE input with the table's names. Output column sym must carry the venue values and venue the sym values; resolving the PARTITION BY order against the trimmed input names would swap them back without any error.",
+        "sql": "SELECT * FROM (SELECT price, seq, sym AS venue, venue AS sym FROM {trades} WHERE price > 0) AS s MATCH_RECOGNIZE (PARTITION BY sym, venue ORDER BY seq MEASURES COUNT(*) AS cnt ONE ROW PER MATCH PATTERN (A+) DEFINE A AS A.price > 0) AS mr",
+        "outputs": [
+          ["NYSE", "AAPL", 2],
+          ["BATS", "AAPL", 1],
+          ["NYSE", "MSFT", 1]
+        ],
+        "ignoreV2Optimizer": true,
+        "ignoreLiteMode": true
+      }
+    ]
   }
 }
