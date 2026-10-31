@@ -436,7 +436,7 @@ public class ObjectSerDeUtils {
     }
   };
 
-  // The list deserializers below read short lists one value at a time and longer ones in bulk; see
+  // The list and array deserializers below read short lists one value at a time and longer ones in bulk; see
   // PrimitiveArrayOutput.MIN_BULK_VALUES for the cutoff.
 
   /// Checks that `byteBuffer` holds `numValues` values of `width` bytes, before the array for them is allocated. Throws
@@ -447,6 +447,36 @@ public class ObjectSerDeUtils {
     }
     if (numValues > byteBuffer.remaining() / width) {
       throw new BufferUnderflowException();
+    }
+  }
+
+  /// Writes the number of values, then the first `numValues` of `values`, in big-endian order.
+  private static void serializeLongs(long[] values, int numValues, ByteBuffer destination) {
+    checkSerializationBuffer(destination, Math.addExact(Integer.BYTES, Math.multiplyExact(numValues, Long.BYTES)));
+    ByteOrder originalOrder = destination.order();
+    destination.order(ByteOrder.BIG_ENDIAN);
+    try {
+      destination.putInt(numValues);
+      for (int i = 0; i < numValues; i++) {
+        destination.putLong(values[i]);
+      }
+    } finally {
+      destination.order(originalOrder);
+    }
+  }
+
+  /// Writes the number of values, then the first `numValues` of `values`, in big-endian order.
+  private static void serializeDoubles(double[] values, int numValues, ByteBuffer destination) {
+    checkSerializationBuffer(destination, Math.addExact(Integer.BYTES, Math.multiplyExact(numValues, Double.BYTES)));
+    ByteOrder originalOrder = destination.order();
+    destination.order(ByteOrder.BIG_ENDIAN);
+    try {
+      destination.putInt(numValues);
+      for (int i = 0; i < numValues; i++) {
+        destination.putLong(Double.doubleToRawLongBits(values[i]));
+      }
+    } finally {
+      destination.order(originalOrder);
     }
   }
 
@@ -501,6 +531,47 @@ public class ObjectSerDeUtils {
     }
   };
 
+  /// Serializes a `long[]` in the format of [#LONG_ARRAY_LIST_SER_DE]. It has no [ObjectType] of its own: a payload is
+  /// sent as [ObjectType#LongArrayList].
+  public static final ObjectSerDe<long[]> LONG_ARRAY_SER_DE = new ObjectSerDe<long[]>() {
+
+    @Override
+    public int getSerializedSize(long[] longArray) {
+      return Math.addExact(Integer.BYTES, Math.multiplyExact(longArray.length, Long.BYTES));
+    }
+
+    @Override
+    public byte[] serialize(long[] longArray) {
+      return ObjectSerDe.super.serialize(longArray);
+    }
+
+    @Override
+    public void serialize(long[] longArray, ByteBuffer destination) {
+      serializeLongs(longArray, longArray.length, destination);
+    }
+
+    @Override
+    public long[] deserialize(byte[] bytes) {
+      return deserialize(ByteBuffer.wrap(bytes));
+    }
+
+    @Override
+    public long[] deserialize(ByteBuffer byteBuffer) {
+      int numValues = byteBuffer.getInt();
+      checkRemaining(byteBuffer, numValues, Long.BYTES);
+      long[] values = new long[numValues];
+      if (numValues < PrimitiveArrayOutput.MIN_BULK_VALUES) {
+        for (int i = 0; i < numValues; i++) {
+          values[i] = byteBuffer.getLong();
+        }
+      } else {
+        byteBuffer.asLongBuffer().get(values);
+        byteBuffer.position(byteBuffer.position() + numValues * Long.BYTES);
+      }
+      return values;
+    }
+  };
+
   public static final ObjectSerDe<LongArrayList> LONG_ARRAY_LIST_SER_DE = new ObjectSerDe<LongArrayList>() {
 
     @Override
@@ -515,19 +586,7 @@ public class ObjectSerDeUtils {
 
     @Override
     public void serialize(LongArrayList longArrayList, ByteBuffer destination) {
-      checkSerializationBuffer(destination, getSerializedSize(longArrayList));
-      ByteOrder originalOrder = destination.order();
-      destination.order(ByteOrder.BIG_ENDIAN);
-      try {
-        int size = longArrayList.size();
-        destination.putInt(size);
-        long[] values = longArrayList.elements();
-        for (int i = 0; i < size; i++) {
-          destination.putLong(values[i]);
-        }
-      } finally {
-        destination.order(originalOrder);
-      }
+      serializeLongs(longArrayList.elements(), longArrayList.size(), destination);
     }
 
     @Override
@@ -537,18 +596,7 @@ public class ObjectSerDeUtils {
 
     @Override
     public LongArrayList deserialize(ByteBuffer byteBuffer) {
-      int numValues = byteBuffer.getInt();
-      checkRemaining(byteBuffer, numValues, Long.BYTES);
-      long[] values = new long[numValues];
-      if (numValues < PrimitiveArrayOutput.MIN_BULK_VALUES) {
-        for (int i = 0; i < numValues; i++) {
-          values[i] = byteBuffer.getLong();
-        }
-      } else {
-        byteBuffer.asLongBuffer().get(values);
-        byteBuffer.position(byteBuffer.position() + numValues * Long.BYTES);
-      }
-      return LongArrayList.wrap(values);
+      return LongArrayList.wrap(LONG_ARRAY_SER_DE.deserialize(byteBuffer));
     }
   };
 
@@ -603,6 +651,47 @@ public class ObjectSerDeUtils {
     }
   };
 
+  /// Serializes a `double[]` in the format of [#DOUBLE_ARRAY_LIST_SER_DE]. It has no [ObjectType] of its own: a payload
+  /// is sent as [ObjectType#DoubleArrayList].
+  public static final ObjectSerDe<double[]> DOUBLE_ARRAY_SER_DE = new ObjectSerDe<double[]>() {
+
+    @Override
+    public int getSerializedSize(double[] doubleArray) {
+      return Math.addExact(Integer.BYTES, Math.multiplyExact(doubleArray.length, Double.BYTES));
+    }
+
+    @Override
+    public byte[] serialize(double[] doubleArray) {
+      return ObjectSerDe.super.serialize(doubleArray);
+    }
+
+    @Override
+    public void serialize(double[] doubleArray, ByteBuffer destination) {
+      serializeDoubles(doubleArray, doubleArray.length, destination);
+    }
+
+    @Override
+    public double[] deserialize(byte[] bytes) {
+      return deserialize(ByteBuffer.wrap(bytes));
+    }
+
+    @Override
+    public double[] deserialize(ByteBuffer byteBuffer) {
+      int numValues = byteBuffer.getInt();
+      checkRemaining(byteBuffer, numValues, Double.BYTES);
+      double[] values = new double[numValues];
+      if (numValues < PrimitiveArrayOutput.MIN_BULK_VALUES) {
+        for (int i = 0; i < numValues; i++) {
+          values[i] = byteBuffer.getDouble();
+        }
+      } else {
+        byteBuffer.asDoubleBuffer().get(values);
+        byteBuffer.position(byteBuffer.position() + numValues * Double.BYTES);
+      }
+      return values;
+    }
+  };
+
   public static final ObjectSerDe<DoubleArrayList> DOUBLE_ARRAY_LIST_SER_DE = new ObjectSerDe<DoubleArrayList>() {
 
     @Override
@@ -617,19 +706,7 @@ public class ObjectSerDeUtils {
 
     @Override
     public void serialize(DoubleArrayList doubleArrayList, ByteBuffer destination) {
-      checkSerializationBuffer(destination, getSerializedSize(doubleArrayList));
-      ByteOrder originalOrder = destination.order();
-      destination.order(ByteOrder.BIG_ENDIAN);
-      try {
-        int size = doubleArrayList.size();
-        destination.putInt(size);
-        double[] values = doubleArrayList.elements();
-        for (int i = 0; i < size; i++) {
-          destination.putLong(Double.doubleToRawLongBits(values[i]));
-        }
-      } finally {
-        destination.order(originalOrder);
-      }
+      serializeDoubles(doubleArrayList.elements(), doubleArrayList.size(), destination);
     }
 
     @Override
@@ -639,18 +716,7 @@ public class ObjectSerDeUtils {
 
     @Override
     public DoubleArrayList deserialize(ByteBuffer byteBuffer) {
-      int numValues = byteBuffer.getInt();
-      checkRemaining(byteBuffer, numValues, Double.BYTES);
-      double[] values = new double[numValues];
-      if (numValues < PrimitiveArrayOutput.MIN_BULK_VALUES) {
-        for (int i = 0; i < numValues; i++) {
-          values[i] = byteBuffer.getDouble();
-        }
-      } else {
-        byteBuffer.asDoubleBuffer().get(values);
-        byteBuffer.position(byteBuffer.position() + numValues * Double.BYTES);
-      }
-      return DoubleArrayList.wrap(values);
+      return DoubleArrayList.wrap(DOUBLE_ARRAY_SER_DE.deserialize(byteBuffer));
     }
   };
 
