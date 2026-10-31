@@ -19,6 +19,7 @@
 package org.apache.pinot.core.data.function;
 
 import com.google.common.collect.Lists;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.common.evaluator.InbuiltFunctionEvaluator;
@@ -176,6 +177,19 @@ public class ObjectFunctionsTest {
     nullIf4.putValue("value1", 1);
     nullIf4.putValue("value2", null);
     inputs.add(new Object[]{"NULLIF(value1, value2)", Lists.newArrayList("value1", "value2"), nullIf4, 1});
+
+    // Numbers of different types with the same value are not distinct (equals() would keep value1).
+    GenericRow nullIfCrossType = new GenericRow();
+    nullIfCrossType.putValue("value1", 1);
+    nullIfCrossType.putValue("value2", 1L);
+    inputs.add(new Object[]{"NULLIF(value1, value2)", Lists.newArrayList("value1", "value2"), nullIfCrossType, null});
+
+    // JSON floats decode as BigDecimal: 1.50 (BigDecimal, scale 2) must match 1.5 (Double).
+    GenericRow nullIfBigDecimal = new GenericRow();
+    nullIfBigDecimal.putValue("value1", new BigDecimal("1.50"));
+    nullIfBigDecimal.putValue("value2", 1.5);
+    inputs.add(
+        new Object[]{"NULLIF(value1, value2)", Lists.newArrayList("value1", "value2"), nullIfBigDecimal, null});
 
     return inputs.toArray(new Object[0][]);
   }

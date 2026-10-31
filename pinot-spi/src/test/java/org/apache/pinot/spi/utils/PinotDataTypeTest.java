@@ -127,6 +127,22 @@ public class PinotDataTypeTest {
     }
   }
 
+  /// The MV source type is inferred from the first element only, so a mixed-type array such as JSON
+  /// [1.5, 2] (BigDecimal, Integer) must convert each element by its own type instead of casting every
+  /// element to the first element's type.
+  @Test
+  public void testToStringArrayWithMixedTypes() {
+    // First element BigDecimal: casting the Integer element to BigDecimal used to throw ClassCastException.
+    assertEquals(STRING_ARRAY.convert(new Object[]{new BigDecimal("1.5"), 2}, BIG_DECIMAL_ARRAY),
+        new String[]{"1.5", "2"});
+    // First element Integer: the BigDecimal element must still use toPlainString(), not the exponent form
+    // produced by the permissive value.toString() of the inferred source type.
+    assertEquals(STRING_ARRAY.convert(new Object[]{2, new BigDecimal("1E+7")}, INT_ARRAY),
+        new String[]{"2", "10000000"});
+    assertEquals(STRING_ARRAY.convert(new Object[]{new BigDecimal("1E+7"), new BigDecimal("0.0")},
+        BIG_DECIMAL_ARRAY), new String[]{"10000000", "0.0"});
+  }
+
   @DataProvider
   public Object[][] numberFormatConversionErrors() {
     return new Object[][] {
@@ -203,6 +219,27 @@ public class PinotDataTypeTest {
 
     assertEquals(BOOLEAN.convert("true", JSON), true);
     assertEquals(BOOLEAN.convert("false", JSON), false);
+  }
+
+  /// JSON floats are decoded as BigDecimal, whose equals() is scale-sensitive: BigDecimal("0.0") must still
+  /// convert to boolean false, like numeric zero of every other type.
+  @Test
+  public void testBigDecimalToBoolean() {
+    assertEquals(BOOLEAN.convert(new BigDecimal("0.0"), BIG_DECIMAL), false);
+    assertEquals(BOOLEAN.convert(new BigDecimal("-0.0"), BIG_DECIMAL), false);
+    assertEquals(BOOLEAN.convert(new BigDecimal("0.00"), BIG_DECIMAL), false);
+    assertEquals(BOOLEAN.convert(new BigDecimal("0E+3"), BIG_DECIMAL), false);
+    assertEquals(BOOLEAN.convert(new BigDecimal("0.1"), BIG_DECIMAL), true);
+    assertEquals(BOOLEAN.convert(new BigDecimal("-1"), BIG_DECIMAL), true);
+    // Non-zero even though doubleValue() would underflow to 0.0
+    assertEquals(BOOLEAN.convert(new BigDecimal("1E-400"), BIG_DECIMAL), true);
+
+    // Mixed-type MV array: the source type is inferred from the first element, so the Integer element is
+    // converted through BIG_DECIMAL as well and must not throw ClassCastException.
+    assertEquals(BOOLEAN_ARRAY.convert(new Object[]{new BigDecimal("0.0"), 1}, BIG_DECIMAL_ARRAY),
+        new Boolean[]{false, true});
+    assertEquals(PRIMITIVE_BOOLEAN_ARRAY.convert(new Object[]{new BigDecimal("0.0"), 1}, BIG_DECIMAL_ARRAY),
+        new boolean[]{false, true});
   }
 
   @Test

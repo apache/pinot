@@ -22,11 +22,12 @@ import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /// Parses UTF-8 text JSON, the historical [org.apache.pinot.plugin.inputformat.json.JSONMessageDecoder]
-/// behavior. Uses the same Jackson map/value materialization contract as the binary JSON parsers.
+/// format. Floating literals are `BigDecimal` so high-precision decimals survive ingestion; this is
+/// always on because it is the correct behavior for decimal text, not an opt-in.
 class TextJsonPayloadParser extends JacksonPayloadParser {
 
   TextJsonPayloadParser() {
-    super(JsonUtils.DEFAULT_READER);
+    super(JsonUtils.READER_WITH_BIG_DECIMAL);
   }
 
   @Override

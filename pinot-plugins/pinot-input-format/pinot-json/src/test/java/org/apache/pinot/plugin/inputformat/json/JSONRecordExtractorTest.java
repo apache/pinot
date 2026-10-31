@@ -75,6 +75,13 @@ public class JSONRecordExtractorTest {
   }
 
   @Test
+  public void testBigDecimalPreserved() {
+    BigDecimal value = new BigDecimal("12345678901234567890.12345678901234567890");
+    Object result = extract(value);
+    assertEquals(result, value);
+  }
+
+  @Test
   public void testStringPreserved() {
     Object result = extract("hello");
     assertEquals(result, "hello");
