@@ -54,10 +54,12 @@ public record DocIdsSnapshot(MutableRoaringBitmap docIds, @Nullable Metadata met
     VALID_DOC_IDS, QUERYABLE_DOC_IDS
   }
 
-  // Ignore unknown fields so an older server still reads diagnostics written by a newer one.
+  // Ignore unknown fields so an older server still reads diagnostics written by a newer one. upsertTieTimeMs is the
+  // segment time upsert broke comparison ties with when the bitmap was captured, and is null in older files.
   @JsonIgnoreProperties(ignoreUnknown = true)
   public record Metadata(long docIdsCrc, DocIdsType docIdsType, long snapshotCapturedAtMs,
-                         @Nullable String snapshotConsumingSegmentName, @Nullable String snapshotConsumedUpToOffset) {
+                         @Nullable String snapshotConsumingSegmentName, @Nullable String snapshotConsumedUpToOffset,
+                         @Nullable Long upsertTieTimeMs) {
     public Map<String, Object> toResponse(long nowMs) {
       Map<String, Object> response = new HashMap<>();
       response.put("docIdsCrc", docIdsCrc);
@@ -71,6 +73,9 @@ public record DocIdsSnapshot(MutableRoaringBitmap docIds, @Nullable Metadata met
         response.put("snapshotConsumingSegmentName", snapshotConsumingSegmentName);
         response.put("snapshotConsumedUpToOffset", snapshotConsumedUpToOffset);
       }
+      if (upsertTieTimeMs != null) {
+        response.put("upsertTieTimeMs", upsertTieTimeMs);
+      }
       return response;
     }
   }
@@ -78,7 +83,7 @@ public record DocIdsSnapshot(MutableRoaringBitmap docIds, @Nullable Metadata met
   /// Builds the diagnostics for a bitmap read by [ThreadSafeMutableRoaringBitmap#getBytesAndCardinality()], which
   /// also took the capture time under the bitmap's lock. Hashes the detached bytes outside that lock.
   public static Metadata metadata(ThreadSafeMutableRoaringBitmap.CardinalityAndBytes docIds, DocIdsType docIdsType,
-      @Nullable Trigger trigger) {
+      @Nullable Trigger trigger, long upsertTieTimeMs) {
     ImmutableRoaringBitmap captured = new ImmutableRoaringBitmap(ByteBuffer.wrap(docIds.getBytes()));
     CRC32 crc = new CRC32();
     IntIterator iterator = captured.getIntIterator();
@@ -91,7 +96,8 @@ public record DocIdsSnapshot(MutableRoaringBitmap docIds, @Nullable Metadata met
       crc.update(docId);
     }
     return new Metadata(crc.getValue(), docIdsType, docIds.getCapturedAtMs(),
-        trigger != null ? trigger.consumingSegmentName() : null, trigger != null ? trigger.consumedUpToOffset() : null);
+        trigger != null ? trigger.consumingSegmentName() : null, trigger != null ? trigger.consumedUpToOffset() : null,
+        upsertTieTimeMs);
   }
 
   /// Writes the bitmap and then its diagnostics trailer, without copying the bitmap bytes. Writes only the bitmap, as

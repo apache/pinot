@@ -105,6 +105,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -1378,6 +1379,81 @@ public class BaseTableDataManagerTest {
 
     assertTrue(dataDir.exists());
     assertEquals(new SegmentMetadataImpl(dataDir).getTotalDocs(), 5);
+  }
+
+  @Test
+  public void testRefreshSegmentMetadataReloadsUpsertSegmentWhenTieTimeChanged()
+      throws Exception {
+    // This is an OFFLINE table, where upsert breaks comparison ties on the push time
+    ImmutableSegmentDataManager segmentDataManager =
+        createImmutableSegmentDataManager(SEGMENT_NAME, mockUpsertSegmentMetadata(1024L, 1000L, 1000L));
+    BaseTableDataManager tableDataManager =
+        createTableManagerForMetadataRefresh(segmentDataManager, mockZKMetadata(1024L, 1000L, 2000L), true);
+    tableDataManager.refreshSegmentMetadata(SEGMENT_NAME);
+    verify(tableDataManager).reloadSegment(eq(segmentDataManager), any(IndexLoadingConfig.class), eq(false));
+
+    // Without a push time in ZK, upsert falls back to the creation time
+    segmentDataManager =
+        createImmutableSegmentDataManager(SEGMENT_NAME, mockUpsertSegmentMetadata(1024L, 1000L, Long.MIN_VALUE));
+    tableDataManager =
+        createTableManagerForMetadataRefresh(segmentDataManager, mockZKMetadata(1024L, 2000L, Long.MIN_VALUE), true);
+    tableDataManager.refreshSegmentMetadata(SEGMENT_NAME);
+    verify(tableDataManager).reloadSegment(eq(segmentDataManager), any(IndexLoadingConfig.class), eq(false));
+  }
+
+  @Test
+  public void testRefreshSegmentMetadataSkipsReloadWhenTieTimeUnchanged()
+      throws Exception {
+    // The creation time changed, but upsert on an OFFLINE table breaks ties on the push time, which did not
+    BaseTableDataManager tableDataManager = createTableManagerForMetadataRefresh(
+        createImmutableSegmentDataManager(SEGMENT_NAME, mockUpsertSegmentMetadata(1024L, 1000L, 1000L)),
+        mockZKMetadata(1024L, 2000L, 1000L), true);
+    tableDataManager.refreshSegmentMetadata(SEGMENT_NAME);
+    verify(tableDataManager, never()).reloadSegment(any(SegmentDataManager.class), any(), anyBoolean());
+
+    // The data changed as well, which the segment refresh message handles
+    tableDataManager = createTableManagerForMetadataRefresh(
+        createImmutableSegmentDataManager(SEGMENT_NAME, mockUpsertSegmentMetadata(1024L, 1000L, 1000L)),
+        mockZKMetadata(2048L, 1000L, 2000L), true);
+    tableDataManager.refreshSegmentMetadata(SEGMENT_NAME);
+    verify(tableDataManager, never()).reloadSegment(any(SegmentDataManager.class), any(), anyBoolean());
+
+    // Without upsert, servers don't use these times after loading the segment
+    tableDataManager = createTableManagerForMetadataRefresh(
+        createImmutableSegmentDataManager(SEGMENT_NAME, mockUpsertSegmentMetadata(1024L, 1000L, 1000L)),
+        mockZKMetadata(1024L, 1000L, 2000L), false);
+    tableDataManager.refreshSegmentMetadata(SEGMENT_NAME);
+    verify(tableDataManager, never()).fetchZKMetadata(SEGMENT_NAME);
+    verify(tableDataManager, never()).reloadSegment(any(SegmentDataManager.class), any(), anyBoolean());
+  }
+
+  private BaseTableDataManager createTableManagerForMetadataRefresh(ImmutableSegmentDataManager segmentDataManager,
+      SegmentZKMetadata zkMetadata, boolean upsertEnabled)
+      throws Exception {
+    BaseTableDataManager tableDataManager = spy(createTableManager());
+    doReturn(upsertEnabled).when(tableDataManager).isUpsertEnabled();
+    tableDataManager.registerSegment(SEGMENT_NAME, segmentDataManager);
+    seedZKMetadata(tableDataManager, SEGMENT_NAME, zkMetadata);
+    doAnswer(invocation -> new IndexLoadingConfig()).when(tableDataManager).fetchIndexLoadingConfig();
+    doNothing().when(tableDataManager).reloadSegment(any(SegmentDataManager.class), any(), anyBoolean());
+    return tableDataManager;
+  }
+
+  private static SegmentMetadataImpl mockUpsertSegmentMetadata(long crc, long zkCreationTime, long zkPushTime) {
+    SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
+    when(segmentMetadata.getCrc()).thenReturn(crc);
+    when(segmentMetadata.getZkCreationTime()).thenReturn(zkCreationTime);
+    when(segmentMetadata.getZkPushTime()).thenReturn(zkPushTime);
+    return segmentMetadata;
+  }
+
+  private static SegmentZKMetadata mockZKMetadata(long crc, long creationTime, long pushTime) {
+    SegmentZKMetadata zkMetadata = mock(SegmentZKMetadata.class);
+    when(zkMetadata.getSegmentName()).thenReturn(SEGMENT_NAME);
+    when(zkMetadata.getCrc()).thenReturn(crc);
+    when(zkMetadata.getCreationTime()).thenReturn(creationTime);
+    when(zkMetadata.getPushTime()).thenReturn(pushTime);
+    return zkMetadata;
   }
 
   @Test

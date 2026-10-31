@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.messages.SegmentMetadataRefreshMessage;
 import org.apache.pinot.common.messages.TableDeletionMessage;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -184,5 +185,20 @@ public class SegmentMessageHandlerFactoryTest {
     runDeletion(instanceDataManager, mock(ServerMetrics.class));
 
     verify(instanceDataManager, times(1)).deleteTable(eq(TABLE), anyLong());
+  }
+
+  @Test
+  public void testSegmentMetadataRefreshMessageRefreshesSegmentMetadata()
+      throws Exception {
+    InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
+    SegmentMetadataRefreshMessage message = new SegmentMetadataRefreshMessage(TABLE, "seg");
+    // Helix sets the resource and partition names when it sends the message
+    message.setResourceName(TABLE);
+    message.setPartitionName("seg");
+
+    new SegmentMessageHandlerFactory(instanceDataManager, mock(ServerMetrics.class)).createHandler(message, null)
+        .handleMessage();
+
+    verify(instanceDataManager).refreshSegmentMetadata(TABLE, "seg");
   }
 }

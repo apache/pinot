@@ -88,6 +88,11 @@ public interface InstanceDataManager {
   void replaceSegment(String tableNameWithType, String segmentName)
       throws Exception;
 
+  /// Applies a change to the segment ZK metadata that came without a data (CRC) change, keeping the local segment.
+  /// This method is triggered by a custom message (NOT state transition).
+  void refreshSegmentMetadata(String tableNameWithType, String segmentName)
+      throws Exception;
+
   /// Offloads a segment from table but not dropping its data from server.
   /// This method is triggered by state transition to OFFLINE state.
   void offloadSegment(String tableNameWithType, String segmentName)

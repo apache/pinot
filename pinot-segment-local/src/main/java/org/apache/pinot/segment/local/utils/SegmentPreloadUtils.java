@@ -30,6 +30,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.function.BiPredicate;
 import javax.annotation.Nullable;
+import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
@@ -38,6 +39,7 @@ import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.upsert.DocIdsSnapshot;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -134,13 +136,31 @@ public class SegmentPreloadUtils {
   public static boolean hasValidDocIdsSnapshot(TableDataManager tableDataManager, TableConfig tableConfig,
       String segmentName, String segmentTier) {
     try {
-      File indexDir = tableDataManager.getSegmentDataDir(segmentName, segmentTier, tableConfig);
-      File snapshotFile =
-          new File(SegmentDirectoryPaths.findSegmentDirectory(indexDir), V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
-      return snapshotFile.exists();
+      return getValidDocIdsSnapshotFile(tableDataManager, tableConfig, segmentName, segmentTier).exists();
     } catch (Exception e) {
       return false;
     }
+  }
+
+  /// Returns the metadata written with the validDocIds snapshot, or null when the snapshot or its metadata is missing
+  /// or unreadable.
+  @Nullable
+  public static DocIdsSnapshot.Metadata getValidDocIdsSnapshotMetadata(TableDataManager tableDataManager,
+      TableConfig tableConfig, String segmentName, String segmentTier) {
+    try {
+      File snapshotFile = getValidDocIdsSnapshotFile(tableDataManager, tableConfig, segmentName, segmentTier);
+      return DocIdsSnapshot.fromBytes(FileUtils.readFileToByteArray(snapshotFile)).metadata();
+    } catch (Exception e) {
+      LOGGER.warn("Failed to read validDocIds snapshot metadata of segment: {} in table: {}", segmentName,
+          tableDataManager.getTableName(), e);
+      return null;
+    }
+  }
+
+  private static File getValidDocIdsSnapshotFile(TableDataManager tableDataManager, TableConfig tableConfig,
+      String segmentName, String segmentTier) {
+    File indexDir = tableDataManager.getSegmentDataDir(segmentName, segmentTier, tableConfig);
+    return new File(SegmentDirectoryPaths.findSegmentDirectory(indexDir), V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
   }
 
   private static boolean isSegmentOnlineOnRequestedInstance(String segmentName, String instanceId,

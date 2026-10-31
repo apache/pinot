@@ -423,6 +423,19 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
+  public void refreshSegmentMetadata(String tableNameWithType, String segmentName)
+      throws Exception {
+    LOGGER.info("Refreshing metadata of segment: {} in table: {}", segmentName, tableNameWithType);
+    TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
+    if (tableDataManager != null) {
+      tableDataManager.refreshSegmentMetadata(segmentName);
+    } else {
+      LOGGER.warn("Failed to find data manager for table: {}, skipping refreshing metadata of segment: {}",
+          tableNameWithType, segmentName);
+    }
+  }
+
+  @Override
   public void offloadSegment(String tableNameWithType, String segmentName)
       throws Exception {
     LOGGER.info("Offloading segment: {} from table: {}", segmentName, tableNameWithType);

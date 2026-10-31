@@ -33,6 +33,7 @@ import org.apache.pinot.common.utils.FileUploadDownloadClient.FileUploadType;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.URIUtils;
+import org.apache.pinot.common.utils.UploadedRealtimeSegmentName;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.ControllerTest;
@@ -43,6 +44,7 @@ import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -55,7 +57,13 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
@@ -80,6 +88,13 @@ public class ZKOperatorTest {
           .setTimeColumnName(TIME_COLUMN)
           .setStreamConfigs(getStreamConfigs())
           .setNumReplicas(1)
+          .build();
+  private static final TableConfig REALTIME_UPSERT_TABLE_CONFIG =
+      new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
+          .setTimeColumnName(TIME_COLUMN)
+          .setStreamConfigs(getStreamConfigs())
+          .setNumReplicas(1)
+          .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
           .build();
   private static final Schema SCHEMA = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
       .addDateTime(TIME_COLUMN, DataType.TIMESTAMP, "1:MILLISECONDS:TIMESTAMP", "1:MILLISECONDS")
@@ -392,6 +407,83 @@ public class ZKOperatorTest {
     assertEquals(segmentZKMetadata.getStatus(), Status.UPLOADED);
     assertEquals(segmentZKMetadata.getStartOffset(), "1234");
     assertEquals(segmentZKMetadata.getEndOffset(), "2345");
+  }
+
+  @Test
+  public void testSameCrcRefreshSendsSegmentMetadataRefreshForUpsertTable()
+      throws Exception {
+    PinotHelixResourceManager resourceManager = spy(_resourceManager);
+    ZKOperator zkOperator = new ZKOperator(resourceManager, mock(ControllerConf.class), mock(ControllerMetrics.class));
+    // Upsert tables need a partition id for an uploaded segment, so use the uploaded real-time segment name format.
+    String segmentName = new UploadedRealtimeSegmentName(RAW_TABLE_NAME, 2, 1717027200000L, "uploaded", "0")
+        .getSegmentName();
+
+    SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
+    when(segmentMetadata.getName()).thenReturn(segmentName);
+    when(segmentMetadata.getCrc()).thenReturn(12345L);
+    when(segmentMetadata.getDataCrc()).thenReturn(432L);
+    when(segmentMetadata.getIndexCreationTime()).thenReturn(123L);
+    zkOperator.completeSegmentOperations(REALTIME_UPSERT_TABLE_CONFIG, segmentMetadata, FileUploadType.SEGMENT, null,
+        null, "downloadUrl", "downloadUrl", null, 10, true, true, mock(HttpHeaders.class));
+
+    SegmentZKMetadata segmentZKMetadata = _resourceManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentName);
+    assertNotNull(segmentZKMetadata);
+    assertEquals(segmentZKMetadata.getCreationTime(), 123L);
+    verify(resourceManager, never()).sendSegmentMetadataRefreshMessage(anyString(), anyString());
+
+    // Refresh with the same CRC but a different creation time. The push counts as a new push, so creation time, refresh
+    // time and download URL should change, and servers should be told to pick up the new creation time.
+    when(segmentMetadata.getIndexCreationTime()).thenReturn(456L);
+    zkOperator.completeSegmentOperations(REALTIME_UPSERT_TABLE_CONFIG, segmentMetadata, FileUploadType.SEGMENT, null,
+        null, "otherDownloadUrl", "otherDownloadUrl", null, 10, true, true, mock(HttpHeaders.class));
+
+    segmentZKMetadata = _resourceManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentName);
+    assertNotNull(segmentZKMetadata);
+    assertEquals(segmentZKMetadata.getCrc(), 12345L);
+    assertEquals(segmentZKMetadata.getCreationTime(), 456L);
+    assertTrue(segmentZKMetadata.getRefreshTime() > 0);
+    assertEquals(segmentZKMetadata.getDownloadUrl(), "otherDownloadUrl");
+    verify(resourceManager).sendSegmentMetadataRefreshMessage(REALTIME_TABLE_NAME, segmentName);
+    verify(resourceManager, never()).sendSegmentRefreshMessage(anyString(), anyString(), anyBoolean(), anyBoolean());
+
+    // Refresh with a different CRC. Servers replace the segment, so they only get the segment refresh.
+    when(segmentMetadata.getCrc()).thenReturn(23456L);
+    when(segmentMetadata.getIndexCreationTime()).thenReturn(789L);
+    zkOperator.completeSegmentOperations(REALTIME_UPSERT_TABLE_CONFIG, segmentMetadata, FileUploadType.SEGMENT, null,
+        null, "otherDownloadUrl", "otherDownloadUrl", null, 10, true, true, mock(HttpHeaders.class));
+
+    segmentZKMetadata = _resourceManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentName);
+    assertNotNull(segmentZKMetadata);
+    assertEquals(segmentZKMetadata.getCrc(), 23456L);
+    assertEquals(segmentZKMetadata.getCreationTime(), 789L);
+    verify(resourceManager).sendSegmentRefreshMessage(REALTIME_TABLE_NAME, segmentName, true, true);
+    verify(resourceManager, times(1)).sendSegmentMetadataRefreshMessage(anyString(), anyString());
+  }
+
+  @Test
+  public void testSameCrcRefreshSkipsSegmentMetadataRefreshForNonUpsertTable()
+      throws Exception {
+    PinotHelixResourceManager resourceManager = spy(_resourceManager);
+    ZKOperator zkOperator = new ZKOperator(resourceManager, mock(ControllerConf.class), mock(ControllerMetrics.class));
+    String segmentName = "sameCrcSegment";
+
+    SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
+    when(segmentMetadata.getName()).thenReturn(segmentName);
+    when(segmentMetadata.getCrc()).thenReturn(12345L);
+    when(segmentMetadata.getDataCrc()).thenReturn(432L);
+    when(segmentMetadata.getIndexCreationTime()).thenReturn(123L);
+    zkOperator.completeSegmentOperations(OFFLINE_TABLE_CONFIG, segmentMetadata, FileUploadType.SEGMENT, null, null,
+        "downloadUrl", "downloadUrl", null, 10, true, true, mock(HttpHeaders.class));
+
+    // Servers of a table without upsert don't read the creation time after loading a segment, so they get no message
+    when(segmentMetadata.getIndexCreationTime()).thenReturn(456L);
+    zkOperator.completeSegmentOperations(OFFLINE_TABLE_CONFIG, segmentMetadata, FileUploadType.SEGMENT, null, null,
+        "downloadUrl", "downloadUrl", null, 10, true, true, mock(HttpHeaders.class));
+
+    SegmentZKMetadata segmentZKMetadata = _resourceManager.getSegmentZKMetadata(OFFLINE_TABLE_NAME, segmentName);
+    assertNotNull(segmentZKMetadata);
+    assertEquals(segmentZKMetadata.getCreationTime(), 456L);
+    verify(resourceManager, never()).sendSegmentMetadataRefreshMessage(anyString(), anyString());
   }
 
   @AfterClass

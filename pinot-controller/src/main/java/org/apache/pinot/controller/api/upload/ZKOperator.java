@@ -338,6 +338,11 @@ public class ZKOperator {
               String.format("Failed to update ZK metadata for segment: %s, table: %s, expected version: %d",
                   segmentName, tableNameWithType, expectedVersion));
         }
+        // Upsert servers copy the creation (or push) time when they load a segment and use it to break comparison
+        // ties, so tell them to pick up the new one. Other tables don't read these times on servers.
+        if (tableConfig.isUpsertEnabled()) {
+          _pinotHelixResourceManager.sendSegmentMetadataRefreshMessage(tableNameWithType, segmentName);
+        }
       } else {
         // New segment is different with the existing one, update ZK metadata and refresh the segment
         LOGGER.info(

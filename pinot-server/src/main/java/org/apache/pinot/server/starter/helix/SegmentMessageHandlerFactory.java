@@ -34,6 +34,7 @@ import org.apache.helix.model.Message;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.messages.ForceCommitMessage;
 import org.apache.pinot.common.messages.IngestionMetricsRemoveMessage;
+import org.apache.pinot.common.messages.SegmentMetadataRefreshMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
 import org.apache.pinot.common.messages.TableConfigSchemaRefreshMessage;
@@ -77,6 +78,8 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
     switch (msgSubType) {
       case SegmentRefreshMessage.REFRESH_SEGMENT_MSG_SUB_TYPE:
         return new SegmentRefreshMessageHandler(new SegmentRefreshMessage(message), _metrics, context);
+      case SegmentMetadataRefreshMessage.REFRESH_SEGMENT_METADATA_MSG_SUB_TYPE:
+        return new SegmentMetadataRefreshMessageHandler(new SegmentMetadataRefreshMessage(message), _metrics, context);
       case SegmentReloadMessage.RELOAD_SEGMENT_MSG_SUB_TYPE:
         return new SegmentReloadMessageHandler(new SegmentReloadMessage(message), _metrics, context);
       case TableDeletionMessage.DELETE_TABLE_MSG_SUB_TYPE:
@@ -118,6 +121,27 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
       try {
         // The number of retry times depends on the retry count in Constants.
         _instanceDataManager.replaceSegment(_tableNameWithType, _segmentName);
+        result.setSuccess(true);
+      } catch (Exception e) {
+        _metrics.addMeteredTableValue(_tableNameWithType, ServerMeter.REFRESH_FAILURES, 1);
+        Utils.rethrowException(e);
+      }
+      return result;
+    }
+  }
+
+  private class SegmentMetadataRefreshMessageHandler extends DefaultMessageHandler {
+    SegmentMetadataRefreshMessageHandler(SegmentMetadataRefreshMessage metadataRefreshMessage, ServerMetrics metrics,
+        NotificationContext context) {
+      super(metadataRefreshMessage, metrics, context);
+    }
+
+    @Override
+    public HelixTaskResult handleMessage() {
+      HelixTaskResult result = new HelixTaskResult();
+      _logger.info("Handling message: {}", _message);
+      try {
+        _instanceDataManager.refreshSegmentMetadata(_tableNameWithType, _segmentName);
         result.setSuccess(true);
       } catch (Exception e) {
         _metrics.addMeteredTableValue(_tableNameWithType, ServerMeter.REFRESH_FAILURES, 1);
