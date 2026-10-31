@@ -20,8 +20,10 @@ package org.apache.pinot.query.runtime.operator.utils;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
@@ -306,17 +308,33 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
   /// block and then call [#calculateStats()] to get the stats once the stream finishes.
   public static class OfMseBlock extends BlockingMultiStreamConsumer<ReceivingMailbox.MseBlockWithStats> {
 
+    /// How many senders a timeout message names at most.
+    private static final int MAX_SENDERS_IN_TIMEOUT_MESSAGE = 5;
+
     private final int _stageId;
     @Nullable
     private MultiStageQueryStats _stats;
     private final int _senderStageId;
+    private final int _numSenders;
+    /// Describes the sender of each mailbox, by mailbox id, for timeout messages. Only called on timeout.
+    private final Supplier<Map<Object, String>> _senderDescriptions;
 
     public OfMseBlock(OpChainExecutionContext context,
         List<? extends AsyncStream<ReceivingMailbox.MseBlockWithStats>> asyncProducers, int senderStageId) {
+      this(context, asyncProducers, senderStageId, Map::of);
+    }
+
+    /// @param senderDescriptions describes the sender of each mailbox (such as its worker and address), by mailbox id,
+    ///                           to name the senders a timeout waited for. Only called on timeout.
+    public OfMseBlock(OpChainExecutionContext context,
+        List<? extends AsyncStream<ReceivingMailbox.MseBlockWithStats>> asyncProducers, int senderStageId,
+        Supplier<Map<Object, String>> senderDescriptions) {
       super(context.getId(), context.getPassiveDeadlineMs(), asyncProducers);
       _stageId = context.getStageId();
       _stats = MultiStageQueryStats.emptyStats(context.getStageId());
       _senderStageId = senderStageId;
+      _numSenders = asyncProducers.size();
+      _senderDescriptions = senderDescriptions;
     }
 
     @Override
@@ -359,7 +377,8 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
       if (terminateException != null) {
         return onException(terminateException.getErrorCode(), terminateException.getMessage());
       }
-      String errMsg = "Timed out on stage " + _stageId + " waiting for data from child stage " + _senderStageId;
+      String errMsg = "Timed out on stage " + _stageId + " waiting for data from child stage " + _senderStageId
+          + describeMissingSenders();
       // We log this case as debug because:
       // - The opchain will already log a stackless message once the opchain fail
       // - The trace is not useful (the log message is good enough to find where we failed)
@@ -367,6 +386,32 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
       //   will make it more difficult to find the real error in the log.
       LOGGER.debug(errMsg);
       return onException(QueryErrorCode.EXECUTION_TIMEOUT, errMsg);
+    }
+
+    /// Names the senders whose end of stream has not arrived, so that a timeout caused by one lost stream (for example
+    /// one sent to the wrong server) points to the sender and its address rather than to the whole child stage.
+    private String describeMissingSenders() {
+      int numMissing = _mailboxes.size();
+      if (numMissing == 0) {
+        return "";
+      }
+      StringBuilder message = new StringBuilder(" (no end of stream from ").append(numMissing).append(" of ")
+          .append(_numSenders).append(" senders");
+      Map<Object, String> senderDescriptions = _senderDescriptions.get();
+      int numNamed = 0;
+      for (AsyncStream<ReceivingMailbox.MseBlockWithStats> mailbox : _mailboxes) {
+        String description = senderDescriptions.get(mailbox.getId());
+        if (description == null) {
+          continue;
+        }
+        if (numNamed == MAX_SENDERS_IN_TIMEOUT_MESSAGE) {
+          message.append(", ...");
+          break;
+        }
+        message.append(numNamed == 0 ? ": " : ", ").append(description);
+        numNamed++;
+      }
+      return message.append(')').toString();
     }
 
     @Override
