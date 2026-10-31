@@ -26,7 +26,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.commons.io.FileUtils;
 import org.apache.pinot.plugin.inputformat.avro.AvroRecordReader;
 import org.apache.pinot.plugin.segmentuploader.SegmentUploaderDefault;
 import org.apache.pinot.plugin.segmentwriter.filebased.FileBasedSegmentWriter;
@@ -44,13 +43,12 @@ import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
-import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
 /// Tests creating segments via the [SegmentWriter] implementations
-public class SegmentWriterUploaderIntegrationTest extends BaseClusterIntegrationTest {
+public class SegmentWriterUploaderIntegrationTest extends SharedOfflineUploadIntegrationTestSuite {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentWriterUploaderIntegrationTest.class);
 
@@ -62,12 +60,6 @@ public class SegmentWriterUploaderIntegrationTest extends BaseClusterIntegration
   public void setUp()
       throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
-
-    // Start the Pinot cluster
-    startZk();
-    startController();
-    startBroker();
-    startServer();
 
     // Create and upload the schema
     _schema = createSchema();
@@ -199,16 +191,5 @@ public class SegmentWriterUploaderIntegrationTest extends BaseClusterIntegration
         }
       }
     }, 100L, 120_000L, "Failed to load get num segments");
-  }
-
-  @AfterClass
-  public void tearDown()
-      throws Exception {
-    stopServer();
-    stopBroker();
-    stopController();
-    stopZk();
-
-    FileUtils.deleteDirectory(_tempDir);
   }
 }
