@@ -64,10 +64,10 @@ import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlMatchRecognize;
 import org.apache.calcite.sql.type.SqlTypeName;
-import org.apache.calcite.util.ImmutableBitSet;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalAggregate;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
+import org.apache.pinot.calcite.rel.logical.PinotLogicalMatch;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalTableScan;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
@@ -824,53 +824,19 @@ public final class RelToPlanNodeConverter {
 
   /// The input column indexes of the `PARTITION BY` keys, in `PARTITION BY` **source** order.
   ///
-  /// [Match#getPartitionKeys()] is an [ImmutableBitSet], so `asList()` always returns the keys in
-  /// ascending index order and the order the user wrote them in is gone. The output row type built by
-  /// `SqlValidatorImpl.validateMatchRecognize` does keep it: its leading fields are the partition columns in
-  /// source order, named after the last component of each `PARTITION BY` identifier. `MatchOperator` fills
-  /// the output row positionally, so the two have to agree - otherwise
-  /// `PARTITION BY <later column>, <earlier column>` reports each partition column's value under the other one's
-  /// name, or fails with a `ClassCastException` when the two types differ.
-  ///
-  /// The number of leading partition fields is derived from the measure count rather than from
-  /// `partitionKeys.cardinality()`, because `PARTITION BY col, col` contributes two output fields but only
-  /// one bit. The names are resolved against the partition key set only, case-sensitively first, because the schema may
-  /// be case-insensitive and the row type carries the identifier as it was written rather than as it was resolved.
+  /// `MatchOperator` emits the partition columns positionally in this order, so it has to agree with the output row
+  /// type. [Match#getPartitionKeys()] is an `ImmutableBitSet` and has lost the order; [PinotLogicalMatch] recovered it
+  /// right after `SqlToRelConverter`, while the input field names still matched the `PARTITION BY` names.
   private static List<Integer> partitionKeysInSourceOrder(Match node) {
-    ImmutableBitSet partitionKeys = node.getPartitionKeys();
-    List<String> outputFieldNames = node.getRowType().getFieldNames();
-    int numPartitionFields = outputFieldNames.size() - node.getMeasures().size();
-    if (numPartitionFields <= 1) {
-      // Nothing to reorder, and no name to resolve: keep the cheap and always correct path.
-      return partitionKeys.asList();
+    if (node instanceof PinotLogicalMatch) {
+      return ((PinotLogicalMatch) node).getPartitionKeysInSourceOrder();
     }
-    List<String> inputFieldNames = node.getInput().getRowType().getFieldNames();
-    List<Integer> ordered = new ArrayList<>(numPartitionFields);
-    for (int i = 0; i < numPartitionFields; i++) {
-      ordered.add(resolvePartitionKey(outputFieldNames.get(i), partitionKeys, inputFieldNames));
-    }
-    // A future Calcite change to how the Match row type is built must fail loudly rather than silently misalign rows.
-    Preconditions.checkState(ImmutableBitSet.of(ordered).equals(partitionKeys),
-        "MATCH_RECOGNIZE partition keys %s recovered from the output row type %s do not match Calcite's %s", ordered,
-        outputFieldNames, partitionKeys);
-    return ordered;
-  }
-
-  private static int resolvePartitionKey(String name, ImmutableBitSet partitionKeys, List<String> inputFieldNames) {
-    int caseInsensitiveMatch = -1;
-    for (int index : partitionKeys) {
-      String inputFieldName = inputFieldNames.get(index);
-      if (inputFieldName.equals(name)) {
-        return index;
-      }
-      if (inputFieldName.equalsIgnoreCase(name)) {
-        caseInsensitiveMatch = index;
-      }
-    }
-    Preconditions.checkState(caseInsensitiveMatch >= 0,
-        "MATCH_RECOGNIZE partition column '%s' does not resolve to any of the partition key columns %s of %s", name,
-        partitionKeys, inputFieldNames);
-    return caseInsensitiveMatch;
+    // Any other Match only knows its keys as a set, which is the source order only for a single partition column.
+    int numPartitionFields = node.getRowType().getFieldCount() - node.getMeasures().size();
+    Preconditions.checkState(numPartitionFields <= 1,
+        "MATCH_RECOGNIZE with %s PARTITION BY columns must be planned as a PinotLogicalMatch to keep their order, "
+            + "got: %s", numPartitionFields, node);
+    return node.getPartitionKeys().asList();
   }
 
   /// Registers every pattern variable of `pattern` in `symbolOrdinals`, in order of first appearance.

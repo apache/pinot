@@ -39,7 +39,6 @@ import org.apache.calcite.rel.core.SetOp;
 import org.apache.calcite.rel.core.Uncollect;
 import org.apache.calcite.rel.core.Window;
 import org.apache.calcite.rel.logical.LogicalIntersect;
-import org.apache.calcite.rel.logical.LogicalMatch;
 import org.apache.calcite.rel.logical.LogicalMinus;
 import org.apache.calcite.rel.logical.LogicalSort;
 import org.apache.calcite.rel.logical.LogicalUnion;
@@ -62,6 +61,7 @@ import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.util.ImmutableBitSet;
+import org.apache.pinot.calcite.rel.logical.PinotLogicalMatch;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.core.operator.ExplainAttributeBuilder;
@@ -441,7 +441,7 @@ public final class PlanNodeToRelConverter {
       return null;
     }
 
-    private LogicalMatch toLogicalMatch(MatchNode node, RelNode input) {
+    private PinotLogicalMatch toLogicalMatch(MatchNode node, RelNode input) {
       List<PatternSymbol> symbols = node.getPatternSymbols();
       Map<String, RexNode> patternDefinitions = new LinkedHashMap<>();
       Map<String, RexNode> measures = new LinkedHashMap<>();
@@ -463,13 +463,14 @@ public final class PlanNodeToRelConverter {
       }
 
       // MatchNode carries the `^` / `$` anchors as tree nodes; Calcite carries them as booleans on the rel.
+      // The partition keys stay in source order, which a plain LogicalMatch would sort into a bit set.
       RowPattern pattern = node.getPattern();
       RelDataType rowType = node.getDataSchema().toRelDataType(_builder.getTypeFactory());
-      return LogicalMatch.create(input, rowType, toPatternRexNode(stripAnchors(pattern), symbols),
+      return PinotLogicalMatch.create(input, rowType, toPatternRexNode(stripAnchors(pattern), symbols),
           hasAnchor(pattern, RowPattern.Kind.ANCHOR_START), hasAnchor(pattern, RowPattern.Kind.ANCHOR_END),
           patternDefinitions, measures, toAfterRexNode(node, symbols), Map.of(),
-          node.getRowsPerMatchMode() == MatchNode.RowsPerMatchMode.ALL_ROWS_PER_MATCH,
-          ImmutableBitSet.of(node.getPartitionKeys()), RelCollations.of(node.getCollations()), null);
+          node.getRowsPerMatchMode() == MatchNode.RowsPerMatchMode.ALL_ROWS_PER_MATCH, node.getPartitionKeys(),
+          RelCollations.of(node.getCollations()), null);
     }
 
     private static boolean hasAnchor(RowPattern pattern, RowPattern.Kind anchor) {

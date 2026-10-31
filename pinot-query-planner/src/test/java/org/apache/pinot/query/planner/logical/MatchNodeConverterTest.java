@@ -34,6 +34,7 @@ import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalAggregate;
+import org.apache.pinot.calcite.rel.logical.PinotLogicalMatch;
 import org.apache.pinot.calcite.sql.fun.PinotOperatorTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -43,11 +44,14 @@ import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
+import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MatchNode;
 import org.apache.pinot.query.planner.plannode.PatternSymbol;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
+import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.RowPattern;
+import org.apache.pinot.query.planner.plannode.TableScanNode;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.PinotSqlType;
@@ -384,6 +388,32 @@ public class MatchNodeConverterTest extends QueryEnvironmentTestBase {
     assertEquals(match.getPartitionKeys(), List.of(2, 0));
   }
 
+  /// Field trimming turns a project that only renames into a virtual rename, so the Match input ends up with the
+  /// table's column names instead of the subquery's aliases. The partition order must not depend on those names.
+  @Test
+  public void testPartitionKeyOrderSurvivesARenamingSubqueryInput() {
+    MatchNode match = planMatch("SELECT * FROM (SELECT col1 AS k1, col2 AS k2, col3 AS v, ts AS t FROM a "
+        + "WHERE col3 > 0) AS s MATCH_RECOGNIZE (PARTITION BY k1, k2 ORDER BY t MEASURES COUNT(*) AS cnt "
+        + "PATTERN (A B+) DEFINE B AS B.v > PREV(B.v))");
+    assertEquals(match.getPartitionKeys(), List.of(0, 1));
+    assertEquals(match.getDataSchema().getColumnNames(), new String[]{"k1", "k2", "cnt"});
+    assertEquals(partitionKeySourceColumns(match), List.of("col1", "col2"));
+  }
+
+  /// The subquery swaps the names of `col1` and `col2`, and field trimming leaves the Match input with the table's
+  /// names. Output column `col1` must carry the values of table column `col2` and vice versa; matching the output names
+  /// against the trimmed input names would put each column's values under the other one's name without any error.
+  @Test
+  public void testPartitionKeyOrderSurvivesPermutedSubqueryAliases() {
+    MatchNode match = planMatch("SELECT * FROM (SELECT col1 AS col2, col2 AS col1, col3, ts FROM a "
+        + "WHERE col3 > 0) AS s MATCH_RECOGNIZE (PARTITION BY col1, col2 ORDER BY ts MEASURES COUNT(*) AS cnt "
+        + "PATTERN (A B+) DEFINE B AS B.col3 > PREV(B.col3))");
+    assertEquals(match.getDataSchema().getColumnNames(), new String[]{"col1", "col2", "cnt"});
+    assertEquals(partitionKeySourceColumns(match), List.of("col2", "col1"),
+        "Output columns [col1, col2] must be filled from table columns [col2, col1]");
+    assertEquals(match.getPartitionKeys(), List.of(1, 0));
+  }
+
   @Test
   public void testMultiValuePartitionKeyIsRejectedDuringPlanning() {
     RuntimeException e = expectThrows(RuntimeException.class, () -> planMatch(
@@ -526,8 +556,64 @@ public class MatchNodeConverterTest extends QueryEnvironmentTestBase {
     assertEquals(logicalMatch.getOrderKeys().getFieldCollations(), List.of(new RelFieldCollation(1)));
   }
 
+  /// A [MatchNode]'s partition keys are in source order, which Calcite's bit set would lose on the way back.
+  @Test
+  public void testMatchNodeKeepsPartitionKeyOrderWhenConvertedBack() {
+    DataSchema inputSchema = new DataSchema(new String[]{"col1", "col2", "col3"},
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.INT});
+    DataSchema outputSchema = new DataSchema(new String[]{"col2", "col1", "ev"},
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.INT});
+    PlanNode input = new ExplainedNode(0, inputSchema, null, List.of(), "Input", Map.of());
+    List<PatternSymbol> symbols =
+        List.of(new PatternSymbol("A", new RexExpression.Literal(ColumnDataType.BOOLEAN, true)));
+    List<MatchNode.Measure> measures =
+        List.of(new MatchNode.Measure("ev", new RexExpression.PatternFieldRef(2, 0, "A")));
+    MatchNode match = new MatchNode(0, outputSchema, PlanNode.NodeHint.EMPTY, List.of(input), symbols,
+        new RowPattern.Symbol(0), measures, List.of(1, 0), List.of(new RelFieldCollation(2)),
+        MatchNode.AfterMatchSkipMode.PAST_LAST_ROW, MatchNode.NO_SKIP_TO_SYMBOL,
+        MatchNode.RowsPerMatchMode.ONE_ROW_PER_MATCH);
+
+    RelBuilder relBuilder = RelBuilder.create(Frameworks.newConfigBuilder()
+        .operatorTable(PinotOperatorTable.instance(true))
+        .defaultSchema(CalciteSchema.createRootSchema(false).plus())
+        .build());
+    Match logicalMatch = findMatch(PlanNodeToRelConverter.convert(relBuilder, match));
+
+    assertTrue(logicalMatch instanceof PinotLogicalMatch, "Expected a PinotLogicalMatch, got: " + logicalMatch);
+    assertEquals(((PinotLogicalMatch) logicalMatch).getPartitionKeysInSourceOrder(), List.of(1, 0));
+    assertEquals(logicalMatch.getPartitionKeys().asList(), List.of(0, 1));
+    // Two matches that differ only in the partition order must not share a digest.
+    assertTrue(RelOptUtil.toString(logicalMatch).contains("partitionOrder=[[1, 0]]"),
+        RelOptUtil.toString(logicalMatch));
+  }
+
   private static List<String> symbolNames(MatchNode match) {
     return match.getPatternSymbols().stream().map(PatternSymbol::getName).collect(Collectors.toList());
+  }
+
+  /// The table column that feeds each `PARTITION BY` key of `match`, in `PARTITION BY` order. `MatchOperator` emits
+  /// the partition key values in this order as the leading output columns.
+  private static List<String> partitionKeySourceColumns(MatchNode match) {
+    return match.getPartitionKeys().stream().map(key -> sourceColumn(match.getInputs().get(0), key))
+        .collect(Collectors.toList());
+  }
+
+  /// Follows input column `index` of `node` down to the table column it reads, across stage boundaries.
+  private static String sourceColumn(PlanNode node, int index) {
+    if (node instanceof TableScanNode) {
+      return ((TableScanNode) node).getColumns().get(index);
+    }
+    if (node instanceof MailboxReceiveNode) {
+      return sourceColumn(((MailboxReceiveNode) node).getSender(), index);
+    }
+    if (node instanceof ProjectNode) {
+      RexExpression project = ((ProjectNode) node).getProjects().get(index);
+      assertTrue(project instanceof RexExpression.InputRef, "Expected a column reference, got: " + project);
+      return sourceColumn(node.getInputs().get(0), ((RexExpression.InputRef) project).getIndex());
+    }
+    // Filters, sorts and mailbox senders pass their input columns through unchanged.
+    assertEquals(node.getInputs().size(), 1, "Unexpected node on the path to the table scan: " + node);
+    return sourceColumn(node.getInputs().get(0), index);
   }
 
   /// Renders a MATCH_RECOGNIZE expression as `FUNCTION(operand, ...)`, a literal as its value, and a pattern field
