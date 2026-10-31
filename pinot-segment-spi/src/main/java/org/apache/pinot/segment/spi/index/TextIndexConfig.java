@@ -42,6 +42,7 @@ public class TextIndexConfig extends IndexConfig {
   private static final DocIdTranslatorMode LUCENE_TRANSLATOR_MODE = null;
   private static final boolean LUCENE_INDEX_DEFAULT_CASE_SENSITIVE_INDEX = false;
   private static final boolean LUCENE_INDEX_DEFAULT_STORE_IN_SEGMENT_FILE = false;
+  private static final boolean LUCENE_INDEX_DEFAULT_BUILD_ON_DICTIONARY = false;
 
   // keep in sync with constructor!
   private static final List<String> PROPERTY_NAMES = List.of(
@@ -49,13 +50,14 @@ public class TextIndexConfig extends IndexConfig {
       "luceneUseCompoundFile", "luceneMaxBufferSizeMB", "luceneAnalyzerClass", "luceneAnalyzerClassArgs",
       "luceneAnalyzerClassArgTypes", "luceneQueryParserClass", "enablePrefixSuffixMatchingInPhraseQueries",
       "reuseMutableIndex", "luceneNRTCachingDirectoryMaxBufferSizeMB", "useLogByteSizeMergePolicy",
-      "docIdTranslatorMode", "caseSensitive", "storeInSegmentFile"
+      "docIdTranslatorMode", "caseSensitive", "storeInSegmentFile", "buildOnDictionary"
   );
 
   public static final TextIndexConfig DISABLED =
       new TextIndexConfig(true, null, false, false, List.of(), List.of(), false,
           LUCENE_INDEX_DEFAULT_MAX_BUFFER_SIZE_MB, null, null, null, null, false, false, 0, false, null,
-          LUCENE_INDEX_DEFAULT_CASE_SENSITIVE_INDEX, LUCENE_INDEX_DEFAULT_STORE_IN_SEGMENT_FILE);
+          LUCENE_INDEX_DEFAULT_CASE_SENSITIVE_INDEX, LUCENE_INDEX_DEFAULT_STORE_IN_SEGMENT_FILE,
+          LUCENE_INDEX_DEFAULT_BUILD_ON_DICTIONARY);
 
   @Nullable
   private final Object _rawValueForTextIndex;
@@ -76,6 +78,7 @@ public class TextIndexConfig extends IndexConfig {
   private final DocIdTranslatorMode _docIdTranslatorMode;
   private final boolean _caseSensitive;
   private final boolean _storeInSegmentFile;
+  private final boolean _buildOnDictionary;
 
   public enum DocIdTranslatorMode {
     /// Keep load-time and reused-mutable mappings. Fresh immutable indexes still drop verified identity mappings.
@@ -111,7 +114,8 @@ public class TextIndexConfig extends IndexConfig {
         luceneAnalyzerClassArgs, luceneAnalyzerClassArgTypes, luceneQueryParserClass,
         enablePrefixSuffixMatchingInPhraseQueries, reuseMutableIndex,
         luceneNRTCachingDirectoryMaxBufferSizeMB, useLogByteSizeMergePolicy, docIdTranslatorMode,
-        LUCENE_INDEX_DEFAULT_CASE_SENSITIVE_INDEX, LUCENE_INDEX_DEFAULT_STORE_IN_SEGMENT_FILE);
+        LUCENE_INDEX_DEFAULT_CASE_SENSITIVE_INDEX, LUCENE_INDEX_DEFAULT_STORE_IN_SEGMENT_FILE,
+        LUCENE_INDEX_DEFAULT_BUILD_ON_DICTIONARY);
   }
 
   /// @deprecated Use the new constructor with storeInSegmentFile parameter instead.
@@ -134,7 +138,24 @@ public class TextIndexConfig extends IndexConfig {
          enablePrefixSuffixPhraseMatching != null ? enablePrefixSuffixPhraseMatching : false,
          false, 0, false, docIdTranslatorMode,
          enablePrefixSuffixMatchingKey != null ? enablePrefixSuffixMatchingKey : false,
-         storeInSegmentFile != null ? storeInSegmentFile : false);
+         storeInSegmentFile != null ? storeInSegmentFile : false,
+         LUCENE_INDEX_DEFAULT_BUILD_ON_DICTIONARY);
+  }
+
+  /// Retained for binary compatibility (pre-`buildOnDictionary`). Delegates to the canonical constructor with
+  /// `buildOnDictionary` defaulted to false.
+  public TextIndexConfig(Boolean disabled, @Nullable Object rawValueForTextIndex, boolean enableQueryCache,
+      boolean useANDForMultiTermQueries, List<String> stopWordsInclude, List<String> stopWordsExclude,
+      Boolean luceneUseCompoundFile, Integer luceneMaxBufferSizeMB, String luceneAnalyzerClass,
+      Object luceneAnalyzerClassArgs, Object luceneAnalyzerClassArgTypes, String luceneQueryParserClass,
+      Boolean enablePrefixSuffixMatchingInPhraseQueries, Boolean reuseMutableIndex,
+      Integer luceneNRTCachingDirectoryMaxBufferSizeMB, Boolean useLogByteSizeMergePolicy,
+      DocIdTranslatorMode docIdTranslatorMode, Boolean caseSensitive, Boolean storeInSegmentFile) {
+    this(disabled, rawValueForTextIndex, enableQueryCache, useANDForMultiTermQueries, stopWordsInclude,
+        stopWordsExclude, luceneUseCompoundFile, luceneMaxBufferSizeMB, luceneAnalyzerClass, luceneAnalyzerClassArgs,
+        luceneAnalyzerClassArgTypes, luceneQueryParserClass, enablePrefixSuffixMatchingInPhraseQueries,
+        reuseMutableIndex, luceneNRTCachingDirectoryMaxBufferSizeMB, useLogByteSizeMergePolicy, docIdTranslatorMode,
+        caseSensitive, storeInSegmentFile, LUCENE_INDEX_DEFAULT_BUILD_ON_DICTIONARY);
   }
 
   @JsonCreator
@@ -156,7 +177,8 @@ public class TextIndexConfig extends IndexConfig {
       @JsonProperty("useLogByteSizeMergePolicy") Boolean useLogByteSizeMergePolicy,
       @JsonProperty("docIdTranslatorMode") DocIdTranslatorMode docIdTranslatorMode,
       @JsonProperty("caseSensitive") Boolean caseSensitive,
-      @JsonProperty("storeInSegmentFile") Boolean storeInSegmentFile) {
+      @JsonProperty("storeInSegmentFile") Boolean storeInSegmentFile,
+      @JsonProperty("buildOnDictionary") Boolean buildOnDictionary) {
     super(disabled);
     _rawValueForTextIndex = rawValueForTextIndex;
     _enableQueryCache = enableQueryCache;
@@ -191,6 +213,7 @@ public class TextIndexConfig extends IndexConfig {
     _docIdTranslatorMode = docIdTranslatorMode == null ? LUCENE_TRANSLATOR_MODE : docIdTranslatorMode;
     _caseSensitive = caseSensitive == null ? LUCENE_INDEX_DEFAULT_CASE_SENSITIVE_INDEX : caseSensitive;
     _storeInSegmentFile = storeInSegmentFile == null ? LUCENE_INDEX_DEFAULT_STORE_IN_SEGMENT_FILE : storeInSegmentFile;
+    _buildOnDictionary = buildOnDictionary == null ? LUCENE_INDEX_DEFAULT_BUILD_ON_DICTIONARY : buildOnDictionary;
   }
 
   /// Parses the input value to a List of Strings.
@@ -316,6 +339,17 @@ public class TextIndexConfig extends IndexConfig {
     return _storeInSegmentFile;
   }
 
+  /// Whether the Lucene text index is built over the column's dictionary (one document per distinct value)
+  /// instead of one document per row. Lucene document ids are translated to dictionary ids. `TEXT_MATCH` returns
+  /// matching dictIds that are resolved to docIds through the dictionary-based filter operators. Requires a
+  /// dictionary-encoded single-value STRING column and is only applied to immutable segments. Defaults to false.
+  /// Enable only after all servers support dictionary-based text indexes. Before downgrading to an older server,
+  /// disable this option and rebuild every dictionary-based text index: older readers interpret dictionary ids as
+  /// document ids and can silently return incorrect matches.
+  public boolean isBuildOnDictionary() {
+    return _buildOnDictionary;
+  }
+
   public static abstract class AbstractBuilder {
     @Nullable
     protected Object _rawValueForTextIndex;
@@ -338,6 +372,7 @@ public class TextIndexConfig extends IndexConfig {
     protected DocIdTranslatorMode _docIdTranslatorMode = LUCENE_TRANSLATOR_MODE;
     protected boolean _caseSensitive = LUCENE_INDEX_DEFAULT_CASE_SENSITIVE_INDEX;
     protected boolean _storeInSegmentFile = LUCENE_INDEX_DEFAULT_STORE_IN_SEGMENT_FILE;
+    protected boolean _buildOnDictionary = LUCENE_INDEX_DEFAULT_BUILD_ON_DICTIONARY;
 
     public AbstractBuilder() {
     }
@@ -362,6 +397,7 @@ public class TextIndexConfig extends IndexConfig {
       _docIdTranslatorMode = other._docIdTranslatorMode;
       _caseSensitive = other._caseSensitive;
       _storeInSegmentFile = other._storeInSegmentFile;
+      _buildOnDictionary = other._buildOnDictionary;
     }
 
     public TextIndexConfig build() {
@@ -371,7 +407,7 @@ public class TextIndexConfig extends IndexConfig {
           CsvParser.serialize(_luceneAnalyzerClassArgTypes, true, false),
           _luceneQueryParserClass, _enablePrefixSuffixMatchingInPhraseQueries, _reuseMutableIndex,
           _luceneNRTCachingDirectoryMaxBufferSizeMB, _useLogByteSizeMergePolicy, _docIdTranslatorMode, _caseSensitive,
-          _storeInSegmentFile);
+          _storeInSegmentFile, _buildOnDictionary);
     }
 
     public abstract AbstractBuilder withProperties(@Nullable Map<String, String> textIndexProperties);
@@ -471,6 +507,11 @@ public class TextIndexConfig extends IndexConfig {
       _storeInSegmentFile = storeInSegmentFile;
       return this;
     }
+
+    public AbstractBuilder withBuildOnDictionary(boolean buildOnDictionary) {
+      _buildOnDictionary = buildOnDictionary;
+      return this;
+    }
   }
 
   @Override
@@ -501,7 +542,8 @@ public class TextIndexConfig extends IndexConfig {
         && Objects.equals(_luceneAnalyzerClassArgs, that._luceneAnalyzerClassArgs)
         && Objects.equals(_luceneAnalyzerClassArgTypes, that._luceneAnalyzerClassArgTypes)
         && Objects.equals(_luceneQueryParserClass, that._luceneQueryParserClass)
-        && _caseSensitive == that._caseSensitive && _storeInSegmentFile == that._storeInSegmentFile;
+        && _caseSensitive == that._caseSensitive && _storeInSegmentFile == that._storeInSegmentFile
+        && _buildOnDictionary == that._buildOnDictionary;
   }
 
   @Override
@@ -511,7 +553,7 @@ public class TextIndexConfig extends IndexConfig {
         _luceneMaxBufferSizeMB, _luceneAnalyzerClass, _luceneAnalyzerClassArgs, _luceneAnalyzerClassArgTypes,
         _luceneQueryParserClass, _enablePrefixSuffixMatchingInPhraseQueries, _reuseMutableIndex,
         _luceneNRTCachingDirectoryMaxBufferSizeMB, _useLogByteSizeMergePolicy, _docIdTranslatorMode, _caseSensitive,
-        _storeInSegmentFile);
+        _storeInSegmentFile, _buildOnDictionary);
   }
 
   public static boolean isProperty(String prop) {

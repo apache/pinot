@@ -46,6 +46,7 @@ import org.apache.pinot.core.operator.filter.H3IndexFilterOperator;
 import org.apache.pinot.core.operator.filter.JsonMatchFilterOperator;
 import org.apache.pinot.core.operator.filter.MapFilterOperator;
 import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
+import org.apache.pinot.core.operator.filter.ScanBasedFilterOperator;
 import org.apache.pinot.core.operator.filter.TextMatchFilterOperator;
 import org.apache.pinot.core.operator.filter.VectorDistanceUtils;
 import org.apache.pinot.core.operator.filter.VectorRadiusFilterOperator;
@@ -55,6 +56,7 @@ import org.apache.pinot.core.operator.filter.VectorSearchStrategy;
 import org.apache.pinot.core.operator.filter.VectorSimilarityFilterOperator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
+import org.apache.pinot.core.operator.filter.predicate.TextMatchDictIdPredicateEvaluatorFactory;
 import org.apache.pinot.core.operator.transform.function.ItemTransformFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -305,6 +307,26 @@ public class FilterPlanNode implements PlanNode {
 
               Preconditions.checkState(textIndexReader != null,
                   "Cannot apply TEXT_MATCH on column: %s without text index", column);
+
+              if (textIndexReader.isBuildOnDictionary()) {
+                // Dictionary-based text index: search returns matching dictIds, resolved to docIds by the standard
+                // dictionary-based filter operators (inverted index / scan), exactly like FST/REGEXP_LIKE.
+                TextMatchPredicate textMatchPredicate = (TextMatchPredicate) predicate;
+                Preconditions.checkState(textMatchPredicate.getOptions() == null,
+                    "TEXT_MATCH options are not supported for a dictionary-based text index on column: %s", column);
+                predicateEvaluator = TextMatchDictIdPredicateEvaluatorFactory.newDictIdBasedEvaluator(
+                    textMatchPredicate, textIndexReader, dataSource.getDictionary());
+                BaseFilterOperator filterOperator =
+                    FilterOperatorUtils.getLeafFilterOperator(_queryContext, predicateEvaluator, dataSource, numDocs);
+                if (filterOperator instanceof ScanBasedFilterOperator && dataSource.getForwardIndex() != null
+                    && !dataSource.getForwardIndex().isDictionaryEncoded()) {
+                  predicateEvaluator = TextMatchDictIdPredicateEvaluatorFactory.newRawValueBasedEvaluator(
+                      predicateEvaluator, dataSource.getDictionary());
+                  filterOperator = new ScanBasedFilterOperator(_queryContext, predicateEvaluator, dataSource, numDocs);
+                }
+                _predicateEvaluators.add(Pair.of(predicate, predicateEvaluator));
+                return filterOperator;
+              }
 
               if (textIndexReader.isMultiColumn()) {
                 return new TextMatchFilterOperator(column, textIndexReader, (TextMatchPredicate) predicate, numDocs,

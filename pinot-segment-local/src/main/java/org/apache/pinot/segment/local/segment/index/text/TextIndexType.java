@@ -32,6 +32,7 @@ import org.apache.pinot.segment.local.segment.index.loader.invertedindex.TextInd
 import org.apache.pinot.segment.local.segment.index.readers.text.LuceneTextIndexReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.AbstractIndexType;
 import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
@@ -51,6 +52,7 @@ import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -84,8 +86,14 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
   public void validate(FieldIndexConfigs indexConfigs, FieldSpec fieldSpec, TableConfig tableConfig) {
     TextIndexConfig textIndexConfig = indexConfigs.getConfig(StandardIndexes.text());
     if (textIndexConfig.isEnabled()) {
-      Preconditions.checkState(fieldSpec.getDataType().getStoredType() == FieldSpec.DataType.STRING,
+      Preconditions.checkState(fieldSpec.getDataType().getStoredType() == DataType.STRING,
           "Cannot create TEXT index on column: %s of stored type other than STRING", fieldSpec.getName());
+      if (textIndexConfig.isBuildOnDictionary()) {
+        Preconditions.checkState(fieldSpec.isSingleValueField(),
+            "buildOnDictionary TEXT index requires a single-value column: %s", fieldSpec.getName());
+        Preconditions.checkState(indexConfigs.getConfig(StandardIndexes.dictionary()).isEnabled(),
+            "buildOnDictionary TEXT index requires a dictionary-encoded column: %s", fieldSpec.getName());
+      }
     }
   }
 
@@ -103,8 +111,29 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
   @Override
   public TextIndexCreator createIndexCreator(IndexCreationContext context, TextIndexConfig indexConfig)
       throws IOException {
-    Preconditions.checkState(context.getFieldSpec().getDataType().getStoredType() == FieldSpec.DataType.STRING,
+    Preconditions.checkState(context.getFieldSpec().getDataType().getStoredType() == DataType.STRING,
         "Text index is currently only supported on STRING type columns");
+    if (indexConfig.isBuildOnDictionary()) {
+      Preconditions.checkState(context.getFieldSpec().isSingleValueField(),
+          "buildOnDictionary TEXT index requires a single-value column: %s", context.getFieldSpec().getName());
+      Preconditions.checkState(context.hasDictionary(),
+          "buildOnDictionary TEXT index requires a dictionary-encoded column: %s", context.getFieldSpec().getName());
+      LuceneTextIndexCreator creator = new LuceneTextIndexCreator(context, indexConfig);
+      // Columnar segment-creation / realtime-conversion path: build one Lucene document per distinct dictionary value
+      // (the stored id is the dictId). On the reload path ColumnStatistics is null and TextIndexHandler feeds the
+      // dictionary values via add(String) instead.
+      ColumnStatistics columnStatistics = context.getColumnStatistics();
+      if (columnStatistics != null) {
+        Object uniqueValues = columnStatistics.getUniqueValuesSet();
+        Preconditions.checkState(uniqueValues instanceof String[],
+            "Expected String[] dictionary values for dictionary-based TEXT index on column: %s",
+            context.getFieldSpec().getName());
+        for (String value : (String[]) uniqueValues) {
+          creator.add(value);
+        }
+      }
+      return creator;
+    }
     return new LuceneTextIndexCreator(context, indexConfig);
   }
 
@@ -121,14 +150,12 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
 
   @Override
   public boolean requiresDictionary(FieldSpec fieldSpec, TextIndexConfig indexConfig) {
-    // Lucene text index is built directly from raw text values.
-    return false;
+    return indexConfig.isBuildOnDictionary();
   }
 
   @Override
   public boolean shouldInvalidateOnDictionaryChange(FieldSpec fieldSpec, TextIndexConfig indexConfig) {
-    // Lucene text index payload is derived from raw text values, independent of dictionary representation.
-    return false;
+    return indexConfig.isBuildOnDictionary();
   }
 
   @Override
@@ -147,7 +174,7 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
     public TextIndexReader createIndexReader(SegmentDirectory.Reader segmentReader, FieldIndexConfigs fieldIndexConfigs,
         ColumnMetadata metadata)
         throws IndexReaderConstraintException {
-      if (metadata.getDataType() != FieldSpec.DataType.STRING) {
+      if (metadata.getDataType() != DataType.STRING) {
         throw new IndexReaderConstraintException(metadata.getColumnName(), StandardIndexes.text(),
             "Text index is currently only supported on STRING type columns");
       }
