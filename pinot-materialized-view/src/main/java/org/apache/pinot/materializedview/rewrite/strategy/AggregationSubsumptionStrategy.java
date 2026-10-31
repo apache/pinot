@@ -157,7 +157,7 @@ public class AggregationSubsumptionStrategy extends AbstractSubsumptionStrategy 
       }
       AggregationEquivalence rule =
           AggregationEquivalenceRegistry.findRule(userFuncName, materializedViewFunc.getOperator());
-      if (rule != null) {
+      if (rule != null && rule.operandsCompatible(userOperands, materializedViewFunc.getOperands())) {
         return new Object[]{materializedViewEntry.getValue(), rule};
       }
     }
