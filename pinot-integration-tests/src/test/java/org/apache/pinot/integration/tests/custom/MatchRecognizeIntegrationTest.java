@@ -74,28 +74,36 @@ public class MatchRecognizeIntegrationTest extends CustomDataQueryClusterIntegra
   private static final String V_SHAPE_DEFINE =
       " DEFINE DOWN AS DOWN.priceCol < PREV(DOWN.priceCol), UP AS UP.priceCol > PREV(UP.priceCol)";
 
+  /// Matches of [#canonicalVShapeQuery(String)] with [#V_SHAPE_DEFINE]. STRT consumes one row, so the second AAPL V
+  /// (seq 5..7) is unreachable: the first match ends at seq 5 and SKIP PAST LAST ROW resumes at seq 6, leaving no row
+  /// for STRT before the fall at seq 6.
+  private static final Object[][] CANONICAL_V_SHAPE_MATCHES = {
+      {"AAPL", 1, 1, 3, 5, 5},
+      {"AMZN", 1, 1, 4, 5, 5},
+      {"MSFT", 1, 1, 2, 3, 3}
+  };
+
+  /// Matches of `neighbourQuery("PREV(A.priceCol) < A.priceCol")`: rows whose predecessor within the partition is
+  /// cheaper. seqCol = 1 is absent for every symbol.
+  private static final Object[][] ROWS_ABOVE_PREDECESSOR = {
+      {"AAPL", 4, 9}, {"AAPL", 5, 12}, {"AAPL", 7, 11},
+      {"AMZN", 5, 25},
+      {"MSFT", 3, 8},
+      {"NFLX", 2, 2}, {"NFLX", 3, 3}, {"NFLX", 4, 4}, {"NFLX", 5, 5}, {"NFLX", 6, 6}, {"NFLX", 7, 7},
+      {"NFLX", 8, 8}
+  };
+
+  /// Matches of `neighbourQuery("PREV(A.priceCol) IS NULL")`: exactly the first row of every partition.
+  private static final Object[][] FIRST_ROW_OF_EACH_PARTITION = {
+      {"AAPL", 1, 10}, {"AMZN", 1, 20}, {"GOOG", 1, 4}, {"MSFT", 1, 5}, {"NFLX", 1, 1}
+  };
+
   /// The canonical vendor-documentation V-shape query: a start row, a strictly falling run, then a strictly rising run.
   @Test(dataProvider = "useV2QueryEngine")
   public void testCanonicalVShape(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    String query = "SELECT * FROM " + getTableName() + " MATCH_RECOGNIZE ("
-        + " PARTITION BY symbolCol"
-        + " ORDER BY seqCol"
-        + " MEASURES MATCH_NUMBER() AS mno, STRT.seqCol AS start_seq, LAST(DOWN.seqCol) AS bottom_seq,"
-        + " LAST(UP.seqCol) AS end_seq, LAST(DOWN.priceCol) AS bottom_price"
-        + " ONE ROW PER MATCH"
-        + " AFTER MATCH SKIP PAST LAST ROW"
-        + " PATTERN (STRT DOWN+ UP+)"
-        + V_SHAPE_DEFINE
-        + ") AS mr ORDER BY symbolCol, start_seq";
-    // STRT consumes one row, so the second AAPL V (seq 5..7) is unreachable: the first match ends at seq 5 and
-    // SKIP PAST LAST ROW resumes at seq 6, leaving no row for STRT before the fall at seq 6.
-    assertMatchRows(query, new Object[][]{
-        {"AAPL", 1, 1, 3, 5, 5},
-        {"AMZN", 1, 1, 4, 5, 5},
-        {"MSFT", 1, 1, 2, 3, 3}
-    });
+    assertMatchRows(canonicalVShapeQuery(V_SHAPE_DEFINE), CANONICAL_V_SHAPE_MATCHES);
   }
 
   /// THE critical default. SQL:2016, Trino, Snowflake and Oracle all default an omitted AFTER MATCH clause to
@@ -442,14 +450,7 @@ public class MatchRecognizeIntegrationTest extends CustomDataQueryClusterIntegra
   public void testPrevAndNextAreBoundedByPartition(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    // Rows whose predecessor within the partition is cheaper. seqCol = 1 is absent for every symbol.
-    assertMatchRows(neighbourQuery("PREV(A.priceCol) < A.priceCol"), new Object[][]{
-        {"AAPL", 4, 9}, {"AAPL", 5, 12}, {"AAPL", 7, 11},
-        {"AMZN", 5, 25},
-        {"MSFT", 3, 8},
-        {"NFLX", 2, 2}, {"NFLX", 3, 3}, {"NFLX", 4, 4}, {"NFLX", 5, 5}, {"NFLX", 6, 6}, {"NFLX", 7, 7},
-        {"NFLX", 8, 8}
-    });
+    assertMatchRows(neighbourQuery("PREV(A.priceCol) < A.priceCol"), ROWS_ABOVE_PREDECESSOR);
     // Rows whose successor within the partition is dearer. The last row of AAPL (7), AMZN (5), GOOG (3), MSFT (3)
     // and NFLX (8) is absent from every one of them.
     assertMatchRows(neighbourQuery("NEXT(A.priceCol) > A.priceCol"), new Object[][]{
@@ -461,11 +462,58 @@ public class MatchRecognizeIntegrationTest extends CustomDataQueryClusterIntegra
     });
 
     // And directly: the NULL is observable, and it happens exactly once per partition on each side.
-    assertMatchRows(neighbourQuery("PREV(A.priceCol) IS NULL"), new Object[][]{
-        {"AAPL", 1, 10}, {"AMZN", 1, 20}, {"GOOG", 1, 4}, {"MSFT", 1, 5}, {"NFLX", 1, 1}
-    });
+    assertMatchRows(neighbourQuery("PREV(A.priceCol) IS NULL"), FIRST_ROW_OF_EACH_PARTITION);
     assertMatchRows(neighbourQuery("NEXT(A.priceCol) IS NULL"), new Object[][]{
         {"AAPL", 7, 11}, {"AMZN", 5, 25}, {"GOOG", 3, 4}, {"MSFT", 3, 8}, {"NFLX", 8, 8}
+    });
+  }
+
+  /// An unqualified column in DEFINE belongs to the universal row pattern variable, so `PREV(priceCol)` is the row
+  /// physically before the current one, exactly like `PREV(A.priceCol)` while `A` is being defined.
+  ///
+  /// Calcite rewrites `PREV(x, n)` into the logical navigation `LAST(x, n)` whenever `x` is not qualified by the
+  /// variable being defined, and it qualifies an unqualified column with the row source alias first. `LAST(x, 1)` is
+  /// the row before the current one *within the match so far*, which does not exist in a single-row match, so the
+  /// unqualified forms below would otherwise match no row and every row respectively.
+  @Test(dataProvider = "useV2QueryEngine")
+  public void testUnqualifiedPrevIsPhysicalNavigation(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    assertMatchRows(neighbourQuery("PREV(priceCol) < priceCol"), ROWS_ABOVE_PREDECESSOR);
+    assertMatchRows(neighbourQuery("PREV(priceCol) IS NULL"), FIRST_ROW_OF_EACH_PARTITION);
+
+    // Regression guard: in the V shape a matched row always precedes every DOWN / UP row, so the logical and the
+    // physical previous row coincide there and the unqualified form must keep returning the qualified matches.
+    assertMatchRows(canonicalVShapeQuery(
+        " DEFINE DOWN AS priceCol < PREV(priceCol), UP AS priceCol > PREV(priceCol)"), CANONICAL_V_SHAPE_MATCHES);
+  }
+
+  /// `PREV(A.priceCol)` inside the definition of another variable `B` is the row physically before the last row mapped
+  /// to `A` (SQL:2016 `PREV(LAST(A.priceCol, 0), 1)`), not the row before it in the match. `A` is left undefined, so it
+  /// matches any row, and each match is the pair `(A, B)` with `price[B] > price[row before A]`. A match therefore
+  /// never starts on the first row of a partition. Hand-computed from [#PRICES], with A and B as seqCol values:
+  /// - AAPL: A=2 B=3 (5 > 10) fails; A=3 B=4 (9 > 8); after SKIP PAST LAST ROW, A=5 B=6 (7 > 9) and A=6 B=7
+  ///   (11 > 12) fail.
+  /// - AMZN: A=2 B=3 (10 > 20) and A=3 B=4 (5 > 15) fail; A=4 B=5 (25 > 10).
+  /// - GOOG: flat, never strictly greater.
+  /// - MSFT: A=2 B=3 (8 > 5).
+  /// - NFLX: strictly increasing, so every pair from A=2 matches: (2, 3), (4, 5), (6, 7).
+  @Test(dataProvider = "useV2QueryEngine")
+  public void testPrevOfAnotherVariableNavigatesFromItsLastRow(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = "SELECT * FROM " + getTableName() + " MATCH_RECOGNIZE ("
+        + " PARTITION BY symbolCol ORDER BY seqCol"
+        + " MEASURES LAST(A.seqCol) AS a_seq, LAST(B.seqCol) AS b_seq, LAST(B.priceCol) AS b_price"
+        + " ONE ROW PER MATCH AFTER MATCH SKIP PAST LAST ROW"
+        + " PATTERN (A B)"
+        + " DEFINE B AS B.priceCol > PREV(A.priceCol)"
+        + ") AS mr ORDER BY symbolCol, a_seq";
+    assertMatchRows(query, new Object[][]{
+        {"AAPL", 3, 4, 9},
+        {"AMZN", 4, 5, 25},
+        {"MSFT", 2, 3, 8},
+        {"NFLX", 2, 3, 3}, {"NFLX", 4, 5, 5}, {"NFLX", 6, 7, 7}
     });
   }
 
@@ -712,6 +760,19 @@ public class MatchRecognizeIntegrationTest extends CustomDataQueryClusterIntegra
         + " PATTERN (" + pattern + ")"
         + " DEFINE A AS A.priceCol > 0"
         + ") AS mr ORDER BY symbolCol";
+  }
+
+  private String canonicalVShapeQuery(String define) {
+    return "SELECT * FROM " + getTableName() + " MATCH_RECOGNIZE ("
+        + " PARTITION BY symbolCol"
+        + " ORDER BY seqCol"
+        + " MEASURES MATCH_NUMBER() AS mno, STRT.seqCol AS start_seq, LAST(DOWN.seqCol) AS bottom_seq,"
+        + " LAST(UP.seqCol) AS end_seq, LAST(DOWN.priceCol) AS bottom_price"
+        + " ONE ROW PER MATCH"
+        + " AFTER MATCH SKIP PAST LAST ROW"
+        + " PATTERN (STRT DOWN+ UP+)"
+        + define
+        + ") AS mr ORDER BY symbolCol, start_seq";
   }
 
   private String vShapeQuery(String afterMatch) {
