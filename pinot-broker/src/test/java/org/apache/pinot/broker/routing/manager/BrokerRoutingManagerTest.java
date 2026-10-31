@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.broker.routing.manager;
 
-import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import java.lang.reflect.Constructor;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -167,7 +167,6 @@ public class BrokerRoutingManagerTest {
     ZNRecordSerializer serializer = new ZNRecordSerializer();
     ZNRecord assignments = new ZNRecord(TEST_TABLE);
     assignments.setMapField("required", Map.of(SERVER_INSTANCE_ID, "ONLINE"));
-    assignments.setMapField("optional", Map.of(SERVER_INSTANCE_ID, "ONLINE"));
     byte[] serializedAssignments = serializer.serialize(assignments);
     InstanceSelector instanceSelector = mock(InstanceSelector.class);
     putRoutingEntry(TEST_TABLE,
@@ -176,13 +175,10 @@ public class BrokerRoutingManagerTest {
     for (int grpcPort : List.of(9000, 9001)) {
       ZNRecord decodedAssignments = (ZNRecord) serializer.deserialize(serializedAssignments);
       String requiredInstanceId = decodedAssignments.getMapField("required").keySet().iterator().next();
-      String optionalInstanceId = decodedAssignments.getMapField("optional").keySet().iterator().next();
       // Exercise IDs from real assignment-map decoding, including the parser's JVM interning behavior.
       assertSame(requiredInstanceId, SERVER_INSTANCE_ID);
-      assertSame(optionalInstanceId, requiredInstanceId);
       when(instanceSelector.select(any(), any(), anyLong())).thenReturn(new InstanceSelector.SelectionResult(
-          new InstanceSelector.InstanceMapping(Map.of("required", requiredInstanceId),
-              Map.of("optional", optionalInstanceId)), List.of(), 0));
+          Map.of(requiredInstanceId, segmentsToQuery(List.of("required"), List.of("optional"))), List.of(), 0));
 
       ZNRecord config = createEnabledServerZNRecord(SERVER_INSTANCE_ID);
       config.setIntField(Helix.Instance.GRPC_PORT_KEY, grpcPort);
@@ -217,7 +213,7 @@ public class BrokerRoutingManagerTest {
   }
 
   @Test
-  public void testGroupingPreservesOptionalServerAndMissingServerBehavior()
+  public void testRoutingTableSkipsOptionalOnlyServersAndMetersMissingServers()
       throws Exception {
     String optionalOnlyInstanceId = "Server_optional_8000";
     ServerInstance requiredServer =
@@ -226,14 +222,15 @@ public class BrokerRoutingManagerTest {
         new ServerInstance(new InstanceConfig(createEnabledServerZNRecord(optionalOnlyInstanceId)));
     _routingManager.getEnabledServerInstanceMap().put(SERVER_INSTANCE_ID, requiredServer);
     _routingManager.getEnabledServerInstanceMap().put(optionalOnlyInstanceId, optionalOnlyServer);
-    Map<String, String> required = new Object2ObjectOpenHashMap<>(Map.of(
-        "required0", SERVER_INSTANCE_ID, "required1", SERVER_INSTANCE_ID,
-        "missingRequired0", "Server_missing_8000", "missingRequired1", "Server_missing_8000"));
-    Map<String, String> optional = Map.of("optional", SERVER_INSTANCE_ID,
-        "optionalOnly", optionalOnlyInstanceId, "missingOptional", "Server_missing_optional_8000");
+    Map<String, SegmentsToQuery> instanceToSegmentsMap = Map.of(
+        SERVER_INSTANCE_ID, segmentsToQuery(List.of("required0", "required1"), List.of("optional")),
+        optionalOnlyInstanceId, segmentsToQuery(List.of(), List.of("optionalOnly")),
+        "Server_missing_8000", segmentsToQuery(List.of("missingRequired0", "missingRequired1"), List.of()),
+        "Server_missing_optional_8000", segmentsToQuery(List.of(), List.of("missingOptional"))
+    );
     InstanceSelector instanceSelector = mock(InstanceSelector.class);
-    when(instanceSelector.select(any(), any(), anyLong())).thenReturn(new InstanceSelector.SelectionResult(
-        new InstanceSelector.InstanceMapping(required, optional), List.of(), 0));
+    when(instanceSelector.select(any(), any(), anyLong())).thenReturn(
+        new InstanceSelector.SelectionResult(instanceToSegmentsMap, List.of(), 0));
     putRoutingEntry(TEST_TABLE, createRoutingEntry(TEST_TABLE,
         selectorOf("required0", "required1", "missingRequired0", "missingRequired1", "optional", "optionalOnly",
             "missingOptional"), List.of(), instanceSelector));
@@ -241,11 +238,10 @@ public class BrokerRoutingManagerTest {
 
     RoutingTable routingTable = _routingManager.getRoutingTable(brokerRequest(TEST_TABLE), 0);
 
-    Map<ServerInstance, SegmentsToQuery> grouped = routingTable.getServerInstanceToSegmentsMap();
-    assertEquals(grouped.keySet(), Set.of(requiredServer));
-    assertEquals(new HashSet<>(grouped.get(requiredServer).getSegments()), Set.of("required0", "required1"));
-    assertEquals(grouped.get(requiredServer).getSegments().size(), 2);
-    assertEquals(grouped.get(requiredServer).getOptionalSegments(), List.of("optional"));
+    Map<ServerInstance, SegmentsToQuery> serverSegments = routingTable.getServerInstanceToSegmentsMap();
+    assertEquals(serverSegments.keySet(), Set.of(requiredServer));
+    assertEquals(serverSegments.get(requiredServer).getSegments(), List.of("required0", "required1"));
+    assertEquals(serverSegments.get(requiredServer).getOptionalSegments(), List.of("optional"));
     assertTrue(routingTable.getUnavailableSegments().isEmpty());
     // Missing required segments are metered; missing optional segments and optional-only servers are skipped.
     ArgumentCaptor<Long> increments = ArgumentCaptor.forClass(Long.class);
@@ -489,6 +485,11 @@ public class BrokerRoutingManagerTest {
     SegmentSelector segmentSelector = mock(SegmentSelector.class);
     when(segmentSelector.select(any())).thenReturn(Set.of(segments));
     return segmentSelector;
+  }
+
+  /// Returns the segments to query on one instance, backed by mutable lists as an instance selector returns them.
+  private static SegmentsToQuery segmentsToQuery(List<String> segments, List<String> optionalSegments) {
+    return new SegmentsToQuery(new ArrayList<>(segments), new ArrayList<>(optionalSegments));
   }
 
   /// Mirrors [org.apache.pinot.broker.routing.segmentpruner.EmptySegmentPruner]: a fresh set when it prunes

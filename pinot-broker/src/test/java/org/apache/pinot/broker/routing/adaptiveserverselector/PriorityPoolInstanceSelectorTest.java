@@ -27,8 +27,12 @@ import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.assertTrue;
+
 
 public class PriorityPoolInstanceSelectorTest {
 
@@ -44,21 +48,9 @@ public class PriorityPoolInstanceSelectorTest {
   }
 
   @Test
-  public void testSelectWithEmptyCandidates() {
-    SegmentInstanceCandidate result = _selector.select(_context, List.of());
-    assertNull(result);
-  }
-
-  @Test
-  public void testSelectWithNullCandidates() {
-    SegmentInstanceCandidate result = _selector.select(_context, null);
-    assertNull(result);
-  }
-
-  @Test
   public void testSelectWithNoPreferredGroups() {
     // Setup
-    List<SegmentInstanceCandidate> candidates = Arrays.asList(
+    List<SegmentInstanceCandidate> candidates = List.of(
         createCandidate("server1", 1),
         createCandidate("server2", 2),
         createCandidate("server3", 3)
@@ -67,70 +59,119 @@ public class PriorityPoolInstanceSelectorTest {
     when(_adaptiveServerSelector.select(any())).thenReturn("server2");
 
     // Execute
-    SegmentInstanceCandidate result = _selector.select(_context, candidates);
+    int index = _selector.forQuery(_context).select(candidates);
 
     // Verify
-    assertNotNull(result);
-    assertEquals(result.getInstance(), "server2");
+    verify(_adaptiveServerSelector).select(List.of("server1", "server2", "server3"));
+    assertEquals(index, 1);
   }
 
   @Test
   public void testSelectWithPreferredGroupHasServers() {
     // Setup - Example 1 from Javadoc
-    List<SegmentInstanceCandidate> candidates = Arrays.asList(
+    List<SegmentInstanceCandidate> candidates = List.of(
         createCandidate("server1", 1),
         createCandidate("server2", 2),
         createCandidate("server3", 1)
     );
-    when(_context.getOrderedPreferredPools()).thenReturn(Arrays.asList(2, 1));
+    when(_context.getOrderedPreferredPools()).thenReturn(List.of(2, 1));
     when(_adaptiveServerSelector.select(any())).thenReturn("server2");
 
     // Execute
-    SegmentInstanceCandidate result = _selector.select(_context, candidates);
+    int index = _selector.forQuery(_context).select(candidates);
 
     // Verify
-    assertNotNull(result);
-    assertEquals(result.getInstance(), "server2");
-    assertEquals(result.getPool(), 2);
+    verify(_adaptiveServerSelector).select(List.of("server2"));
+    assertEquals(index, 1);
   }
 
   @Test
   public void testSelectWithFallbackToSecondPreferredGroup() {
     // Setup - Example 2 from Javadoc
-    List<SegmentInstanceCandidate> candidates = Arrays.asList(
+    List<SegmentInstanceCandidate> candidates = List.of(
         createCandidate("server1", 1),
         createCandidate("server3", 1),
         createCandidate("server4", 3)
     );
-    when(_context.getOrderedPreferredPools()).thenReturn(Arrays.asList(2, 1));
+    when(_context.getOrderedPreferredPools()).thenReturn(List.of(2, 1));
     when(_adaptiveServerSelector.select(any())).thenReturn("server1");
 
     // Execute
-    SegmentInstanceCandidate result = _selector.select(_context, candidates);
+    int index = _selector.forQuery(_context).select(candidates);
 
     // Verify
-    assertNotNull(result);
-    assertEquals(result.getInstance(), "server1");
-    assertEquals(result.getPool(), 1);
+    verify(_adaptiveServerSelector).select(List.of("server1", "server3"));
+    assertEquals(index, 0);
   }
 
   @Test
   public void testSelectWithFallbackToNonPreferredGroup() {
     // Setup - Example 3 from Javadoc
-    List<SegmentInstanceCandidate> candidates = Arrays.asList(
+    List<SegmentInstanceCandidate> candidates = List.of(
         createCandidate("server4", -1),
         createCandidate("server5", -1)
     );
-    when(_context.getOrderedPreferredPools()).thenReturn(Arrays.asList(2, 1));
+    when(_context.getOrderedPreferredPools()).thenReturn(List.of(2, 1));
     when(_adaptiveServerSelector.select(any())).thenReturn("server4");
 
     // Execute
-    SegmentInstanceCandidate result = _selector.select(_context, candidates);
+    int index = _selector.forQuery(_context).select(candidates);
 
     // Verify
-    assertNotNull(result);
-    assertEquals(result.getInstance(), "server4");
-    assertEquals(result.getPool(), -1);
+    verify(_adaptiveServerSelector).select(List.of("server4", "server5"));
+    assertEquals(index, 0);
+  }
+
+  @Test
+  public void testSelectWithRepeatedPreferredPool() {
+    // Setup - Pool 1 is listed twice and keeps the priority of its first position
+    List<SegmentInstanceCandidate> candidates = List.of(
+        createCandidate("server1", 1),
+        createCandidate("server2", 2),
+        createCandidate("server3", 1)
+    );
+    when(_context.getOrderedPreferredPools()).thenReturn(List.of(1, 2, 1));
+    when(_adaptiveServerSelector.select(any())).thenReturn("server3");
+
+    // Execute
+    int index = _selector.forQuery(_context).select(candidates);
+
+    // Verify
+    verify(_adaptiveServerSelector).select(List.of("server1", "server3"));
+    assertEquals(index, 2);
+  }
+
+  @Test
+  public void testSelectWithMaxValuePreferredPool() {
+    // Setup - The servers not in a preferred pool share the priority of preferred pool `Integer.MAX_VALUE`
+    List<SegmentInstanceCandidate> candidates = List.of(
+        createCandidate("server1", 1),
+        createCandidate("server2", Integer.MAX_VALUE),
+        createCandidate("server3", 3)
+    );
+    when(_context.getOrderedPreferredPools()).thenReturn(List.of(Integer.MAX_VALUE, 1));
+    when(_adaptiveServerSelector.select(any())).thenReturn("server3");
+
+    // Execute
+    int index = _selector.forQuery(_context).select(candidates);
+
+    // Verify
+    verify(_adaptiveServerSelector).select(List.of("server2", "server3"));
+    assertEquals(index, 2);
+  }
+
+  @Test
+  public void testSelectWithNoCandidateSelected() {
+    // Setup
+    List<SegmentInstanceCandidate> candidates = List.of(
+        createCandidate("server1", 1),
+        createCandidate("server2", 2)
+    );
+    when(_context.getOrderedPreferredPools()).thenReturn(List.of());
+    when(_adaptiveServerSelector.select(any())).thenReturn(null);
+
+    // Execute and verify
+    assertThrows(IllegalStateException.class, () -> _selector.forQuery(_context).select(candidates));
   }
 
   @Test
