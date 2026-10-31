@@ -19,6 +19,9 @@
 package org.apache.pinot.controller.helix.core;
 
 import com.google.common.collect.BiMap;
+import java.lang.management.LockInfo;
+import java.lang.management.ManagementFactory;
+import java.lang.management.ThreadInfo;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -1545,16 +1548,28 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
       Future<String> startB;
       // Hold the lineage lock so run B passes the existence check (A is still 'IN_PROGRESS') and then blocks on the
       // lock. 'synchronized' is reentrant, so this thread can still end run A while holding it.
-      synchronized (_helixResourceManager.getLineageUpdaterLock(OFFLINE_TABLE_NAME)) {
+      Object lineageLock = _helixResourceManager.getLineageUpdaterLock(OFFLINE_TABLE_NAME);
+      int lineageLockIdentity = System.identityHashCode(lineageLock);
+      synchronized (lineageLock) {
         AtomicReference<Thread> threadB = new AtomicReference<>();
         startB = executor.submit(() -> {
           threadB.set(Thread.currentThread());
           return _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom, List.of("b0"), true,
               null);
         });
-        TestUtils.waitForCondition(
-            aVoid -> threadB.get() != null && threadB.get().getState() == Thread.State.BLOCKED, 10_000L,
-            "Run B did not reach the lineage lock");
+        // Wait until B is blocked on this lineage lock, not merely Thread.State.BLOCKED (which can be another monitor).
+        TestUtils.waitForCondition(aVoid -> {
+          Thread thread = threadB.get();
+          if (thread == null) {
+            return false;
+          }
+          ThreadInfo threadInfo = ManagementFactory.getThreadMXBean().getThreadInfo(thread.threadId());
+          if (threadInfo == null || threadInfo.getThreadState() != Thread.State.BLOCKED) {
+            return false;
+          }
+          LockInfo lockInfo = threadInfo.getLockInfo();
+          return lockInfo != null && lockInfo.getIdentityHashCode() == lineageLockIdentity;
+        }, 10_000L, "Run B did not reach the lineage lock");
         _helixResourceManager.endReplaceSegments(OFFLINE_TABLE_NAME, lineageEntryIdA, null);
       }
 
@@ -1579,10 +1594,20 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     assertEquals(segmentLineage.getLineageEntryIds(), Set.of(lineageEntryIdA));
     assertEquals(segmentLineage.getLineageEntry(lineageEntryIdA).getState(), LineageEntryState.COMPLETED);
 
-    // A partially overlapping retry is rejected too, while a disjoint one is still accepted
-    assertThrows(RuntimeException.class,
-        () -> _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, Arrays.asList("s1", "s2"),
-            List.of("b1"), true, null));
+    // Partial overlap is rejected by the pre-lock existence check (s1 already replaced), not the new in-lock branch
+    try {
+      _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, Arrays.asList("s1", "s2"), List.of("b1"), true,
+          null);
+      fail("Expected startReplaceSegments to reject partially overlapping segmentsFrom");
+    } catch (RuntimeException e) {
+      Throwable failure = e;
+      while (failure.getCause() != null) {
+        failure = failure.getCause();
+      }
+      assertTrue(failure instanceof IllegalStateException);
+      assertTrue(failure.getMessage().contains("does not exist"), failure.getMessage());
+    }
+    // A disjoint start is still accepted
     String lineageEntryIdC =
         _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, List.of("s2"), List.of("c0"), true, null);
     segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
