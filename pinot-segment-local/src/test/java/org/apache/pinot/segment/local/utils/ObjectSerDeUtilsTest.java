@@ -171,6 +171,17 @@ public class ObjectSerDeUtilsTest {
         {DoubleArrayList.wrap(new double[]{Double.longBitsToDouble(0x7ff0123456789abcL), -0.0d,
             Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY, 99}, 4), ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE,
             HexFormat.of().parseHex("000000047ff0123456789abc80000000000000007ff0000000000000fff0000000000000")},
+        {new long[0], ObjectSerDeUtils.LONG_ARRAY_SER_DE, HexFormat.of().parseHex("00000000")},
+        {new long[]{Long.MIN_VALUE, Long.MAX_VALUE, 0}, ObjectSerDeUtils.LONG_ARRAY_SER_DE,
+            HexFormat.of().parseHex("0000000380000000000000007fffffffffffffff0000000000000000")},
+        {largeLongList.toLongArray(), ObjectSerDeUtils.LONG_ARRAY_SER_DE,
+            ObjectSerDeUtils.LONG_ARRAY_LIST_SER_DE.serialize(largeLongList)},
+        {new double[0], ObjectSerDeUtils.DOUBLE_ARRAY_SER_DE, HexFormat.of().parseHex("00000000")},
+        {new double[]{Double.longBitsToDouble(0x7ff0123456789abcL), -0.0d, Double.POSITIVE_INFINITY,
+            Double.NEGATIVE_INFINITY}, ObjectSerDeUtils.DOUBLE_ARRAY_SER_DE,
+            HexFormat.of().parseHex("000000047ff0123456789abc80000000000000007ff0000000000000fff0000000000000")},
+        {largeDoubleList.toDoubleArray(), ObjectSerDeUtils.DOUBLE_ARRAY_SER_DE,
+            ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE.serialize(largeDoubleList)},
         {new HyperLogLog(4), ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE,
             HexFormat.of().parseHex("000000040000000c" + "000000000000000000000000")},
         {hyperLogLog, ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE, hyperLogLog.getBytes()},
@@ -328,6 +339,16 @@ public class ObjectSerDeUtilsTest {
       }
       return bits;
     }
+    if (value instanceof long[] values) {
+      return values.clone();
+    }
+    if (value instanceof double[] values) {
+      long[] bits = new long[values.length];
+      for (int i = 0; i < values.length; i++) {
+        bits[i] = Double.doubleToRawLongBits(values[i]);
+      }
+      return bits;
+    }
     if (value instanceof HyperLogLog hyperLogLog) {
       return hyperLogLog.getBytes();
     }
@@ -359,6 +380,17 @@ public class ObjectSerDeUtilsTest {
       DoubleArrayList actual = ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE.deserialize(bytes);
 
       assertEquals(actual, expected, ERROR_MESSAGE);
+    }
+  }
+
+  @Test
+  public void testDoubleArray() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      double[] expected = RANDOM.doubles(RANDOM.nextInt(100)).toArray();
+      byte[] bytes = ObjectSerDeUtils.DOUBLE_ARRAY_SER_DE.serialize(expected);
+      assertEquals(bytes, ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE.serialize(DoubleArrayList.wrap(expected)),
+          ERROR_MESSAGE);
+      assertEquals(ObjectSerDeUtils.DOUBLE_ARRAY_SER_DE.deserialize(bytes), expected, ERROR_MESSAGE);
     }
   }
 
@@ -610,6 +642,17 @@ public class ObjectSerDeUtilsTest {
       byte[] bytes = ObjectSerDeUtils.LONG_ARRAY_LIST_SER_DE.serialize(expected);
       LongArrayList actual = ObjectSerDeUtils.LONG_ARRAY_LIST_SER_DE.deserialize(bytes);
       assertEquals(actual, expected, ERROR_MESSAGE);
+    }
+  }
+
+  @Test
+  public void testLongArray() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      long[] expected = RANDOM.longs(RANDOM.nextInt(100)).toArray();
+      byte[] bytes = ObjectSerDeUtils.LONG_ARRAY_SER_DE.serialize(expected);
+      assertEquals(bytes, ObjectSerDeUtils.LONG_ARRAY_LIST_SER_DE.serialize(LongArrayList.wrap(expected)),
+          ERROR_MESSAGE);
+      assertEquals(ObjectSerDeUtils.LONG_ARRAY_SER_DE.deserialize(bytes), expected, ERROR_MESSAGE);
     }
   }
 
