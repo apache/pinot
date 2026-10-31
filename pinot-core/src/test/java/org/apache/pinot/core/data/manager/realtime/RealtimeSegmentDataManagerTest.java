@@ -425,6 +425,57 @@ public class RealtimeSegmentDataManagerTest {
   }
 
   @DataProvider
+  public Object[][] protocolCatchupOnlineEscape() {
+    return new Object[][]{{true}, {false}};
+  }
+
+  /// A committer can stop on an offset the stream only reaches by skipping (one past a commit marker). A follower in
+  /// protocol CATCHING_UP to that offset keeps polling without advancing, but it is not stuck: the ONLINE transition
+  /// that follows the commit runs the CONSUMING_TO_ONLINE catch-up, which adopts the position. The local segment is
+  /// then reused only on a matching committed CRC, otherwise downloaded.
+  @Test(dataProvider = "protocolCatchupOnlineEscape")
+  public void testProtocolCatchupToSkippedOffsetEscapesThroughOnlineTransition(boolean crcMatches)
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segmentDataManager =
+        createFakeSegmentManager(true, new TimeSupplier(), null, null, null)) {
+      long target = START_OFFSET_VALUE + 1;
+      segmentDataManager._stubConsumeLoop = false;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.CATCHING_UP);
+      segmentDataManager.setFinalOffset(target);
+      // The commit marker at START_OFFSET_VALUE is skipped: every poll reports the target and delivers nothing
+      ScriptedPartitionGroupConsumer catchup = new ScriptedPartitionGroupConsumer(segmentDataManager,
+          emptyBatch(target), emptyBatch(target), emptyBatch(target));
+      segmentDataManager.setPartitionGroupConsumer(catchup);
+
+      segmentDataManager.consumeLoop();
+
+      assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(), START_OFFSET_VALUE,
+          "protocol catch-up does not adopt the skipped position");
+      assertEquals(catchup._requestedOffsets, List.of(START_OFFSET_VALUE, START_OFFSET_VALUE, START_OFFSET_VALUE));
+
+      ScriptedPartitionGroupConsumer online =
+          new ScriptedPartitionGroupConsumer(segmentDataManager, emptyBatch(target), emptyBatch(target));
+      segmentDataManager.setPartitionGroupConsumer(online);
+      segmentDataManager._useRealBuildAndReplace = true;
+      segmentDataManager._localSegmentCrcMatchesZk = crcMatches;
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
+      segmentDataManager._stopWaitTimeMs = 0;
+      SegmentZKMetadata committed = crcMetadata(target, 12345L);
+
+      segmentDataManager.goOnlineFromConsuming(committed);
+
+      assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(), target);
+      assertEquals(online._requestedOffsets, List.of(START_OFFSET_VALUE), "one poll reaches the target");
+      assertEquals(segmentDataManager._downloadAndReplaceCalled, !crcMatches);
+      if (crcMatches) {
+        verify(segmentDataManager._tableDataManager).replaceConsumingSegment(eq(SEGMENT_NAME_STR), same(committed));
+      } else {
+        verify(segmentDataManager._tableDataManager, never()).replaceConsumingSegment(anyString(), any());
+      }
+    }
+  }
+
+  @DataProvider
   public Object[][] recordOvershootDataLoss() {
     return new Object[][]{{false}, {true}};
   }

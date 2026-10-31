@@ -639,6 +639,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   /// batch. ONLINE catch-up can cap the position at the committed final offset, because any local reuse is guarded
   /// by the committed CRC. A reported loss is not capped; ordinary overshoot recovery still applies.
   ///
+  /// A follower in protocol CATCHING_UP to a final offset the stream only reaches by skipping (a committer that
+  /// adopted the position past a commit marker) therefore cannot reach it by consuming. It keeps polling without
+  /// advancing, one idle sleep per empty batch, until the ONLINE transition that follows the commit. That transition
+  /// is the intended way out: its CONSUMING_TO_ONLINE catch-up adopts the position, and the local segment is reused
+  /// only on a matching committed CRC, otherwise downloaded.
+  ///
   /// @return `true` if `_currentOffset` was advanced
   private boolean adoptNextBatchOffsetOfEmptyBatch(MessageBatch messageBatch) {
     if (_state == State.CATCHING_UP) {
@@ -674,6 +680,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
     _segmentLogger.info("Next message ends at {}, past the final offset {}. Settling on the final offset from {}",
         nextOffset, _finalOffset, _currentOffset);
+    // The message is not indexed. That is only safe because of this flag: buildSegmentAndReplace() then reuses the
+    // local segment only on a matching committed CRC and downloads it otherwise, so a message the committer did index
+    // (one straddling the final offset, offset < final < next, included) cannot leave a divergent copy.
     _hasUnverifiedOffsetAdvance = true;
     _currentOffset = _finalOffset;
     return true;
