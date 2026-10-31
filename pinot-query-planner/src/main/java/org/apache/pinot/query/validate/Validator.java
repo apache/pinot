@@ -19,6 +19,7 @@
 package org.apache.pinot.query.validate;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -62,6 +63,10 @@ public class Validator extends SqlValidatorImpl {
         }
       };
 
+  /// MATCH_RECOGNIZE operators that can evaluate to SQL NULL even when all their operands are NOT NULL.
+  private static final Set<SqlKind> MATCH_RECOGNIZE_NULLABLE_KINDS = EnumSet.of(SqlKind.CLASSIFIER, SqlKind.FIRST,
+      SqlKind.LAST, SqlKind.PREV, SqlKind.NEXT, SqlKind.FINAL, SqlKind.RUNNING);
+
   public Validator(SqlOperatorTable opTab, SqlValidatorCatalogReader catalogReader, RelDataTypeFactory typeFactory) {
     super(opTab, catalogReader, typeFactory,
         Config.DEFAULT.withConformance(PINOT_CONFORMANCE)
@@ -69,13 +74,21 @@ public class Validator extends SqlValidatorImpl {
             .withTypeCoercionFactory(PinotTypeCoercion::new));
   }
 
-  /// Calcite 1.42 declares `CLASSIFIER()` as a non-null VARCHAR, but an empty match has no classified row and must
-  /// return SQL NULL. Correct the type at the validator boundary so the MATCH_RECOGNIZE output schema is nullable and
-  /// Calcite cannot simplify an outer `COUNT(classifier_measure)` to `COUNT(*)`.
+  /// Calcite 1.42 types the MATCH_RECOGNIZE operators as if they always had a row to read: `CLASSIFIER()` is a
+  /// non-null VARCHAR, and `FIRST`, `LAST`, `PREV`, `NEXT`, `FINAL` and `RUNNING` are nullable only when an operand is.
+  /// Pinot columns are NOT NULL unless column-based null handling is enabled, yet these return SQL NULL when the
+  /// referenced variable matched no row (for example `B` in `PATTERN (A B?)`, or an empty match), or when a physical
+  /// offset falls outside the partition. Every measure is validated as `FINAL(...)` or `RUNNING(...)`, which also
+  /// covers a bare `B.col3` measure and an aggregate such as `SUM(B.col3)` over a variable that matched no row.
+  ///
+  /// Correct the types at the validator boundary so the MATCH_RECOGNIZE output schema is nullable. Otherwise Calcite
+  /// folds `measure IS NULL` to FALSE and `measure IS NOT NULL` to TRUE, and simplifies `COUNT(measure)` to
+  /// `COUNT(*)`, all without an error. The cost is that measures that are never null, such as `MATCH_NUMBER()`, are
+  /// typed nullable too, which only gives up those optimizations.
   @Override
   public RelDataType deriveType(SqlValidatorScope scope, SqlNode expression) {
     RelDataType type = super.deriveType(scope, expression);
-    if (expression.getKind() == SqlKind.CLASSIFIER && !type.isNullable()) {
+    if (MATCH_RECOGNIZE_NULLABLE_KINDS.contains(expression.getKind()) && !type.isNullable()) {
       type = getTypeFactory().createTypeWithNullability(type, true);
       setValidatedNodeType(expression, type);
     }
