@@ -73,9 +73,9 @@ public class HnswVectorIndexCreator implements VectorIndexCreator {
   /// parallel. With the default `forceMerge=true` they are then merged into one graph on a single thread, so the result
   /// is the same on every build. `concurrentMerge=true` merges with `buildThreads` workers instead: faster, but the
   /// merged graph then depends on thread timing, so replicas that each build the index can return different top-K
-  /// results for the same query, and recall can shift slightly. With `forceMerge=false` the graphs are kept as separate Lucene segments and searched together: the
-  /// build is faster, but each query searches every graph, so query latency is higher (2-3x in one benchmark with 4
-  /// threads). The number of graphs is at least `buildThreads`, and more when a thread's vectors exceed
+  /// results for the same query, and recall can shift slightly. With `forceMerge=false` the graphs are kept as separate
+  /// Lucene segments and searched together: the build is faster, but each query searches every graph, so query latency
+  /// is higher (2-3x in one benchmark with 4 threads). The number of graphs is at least `buildThreads`, and more when a thread's vectors exceed
   /// `maxBufferSizeMB` and Lucene flushes it more than once.
   private final int _buildThreads;
   private final boolean _forceMerge;
@@ -110,7 +110,8 @@ public class HnswVectorIndexCreator implements VectorIndexCreator {
         : (int) Math.max(1, Math.min(DEFAULT_PARALLEL_BUILD_MAX_DOCS,
             DEFAULT_PARALLEL_BUILD_MAX_BYTES / ((long) Float.BYTES * _vectorDimension)));
     _bufferedVectors = _buildThreads > 1 ? new ArrayList<>() : null;
-    _mergeExecutor = _buildThreads > 1 && _forceMerge && _concurrentMerge ? Executors.newFixedThreadPool(_buildThreads) : null;
+    _mergeExecutor =
+        _buildThreads > 1 && _forceMerge && _concurrentMerge ? Executors.newFixedThreadPool(_buildThreads) : null;
     _vectorIndexConfig = vectorIndexConfig;
     // Segment generation is always in V1 and later we convert (as part of post creation processing) to V3 if
     // segmentVersion is set to V3 in SegmentGeneratorConfig.
