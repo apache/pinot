@@ -322,6 +322,17 @@ public class ObjectSerDeUtilsTest {
   }
 
   @Test
+  public void testDoubleArray() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      double[] expected = RANDOM.doubles(RANDOM.nextInt(100)).toArray();
+      byte[] bytes = ObjectSerDeUtils.DOUBLE_ARRAY_SER_DE.serialize(expected);
+      assertEquals(bytes, ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE.serialize(DoubleArrayList.wrap(expected)),
+          ERROR_MESSAGE);
+      assertEquals(ObjectSerDeUtils.DOUBLE_ARRAY_SER_DE.deserialize(bytes), expected, ERROR_MESSAGE);
+    }
+  }
+
+  @Test
   public void testAvgPair() {
     for (int i = 0; i < NUM_ITERATIONS; i++) {
       AvgPair expected = new AvgPair(RANDOM.nextDouble(), RANDOM.nextLong());
@@ -743,6 +754,17 @@ public class ObjectSerDeUtilsTest {
       byte[] bytes = ObjectSerDeUtils.serialize(expected);
       LongArrayList actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.LongArrayList);
       assertEquals(actual, expected, ERROR_MESSAGE);
+    }
+  }
+
+  @Test
+  public void testLongArray() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      long[] expected = RANDOM.longs(RANDOM.nextInt(100)).toArray();
+      byte[] bytes = ObjectSerDeUtils.LONG_ARRAY_SER_DE.serialize(expected);
+      assertEquals(bytes, ObjectSerDeUtils.LONG_ARRAY_LIST_SER_DE.serialize(LongArrayList.wrap(expected)),
+          ERROR_MESSAGE);
+      assertEquals(ObjectSerDeUtils.LONG_ARRAY_SER_DE.deserialize(bytes), expected, ERROR_MESSAGE);
     }
   }
 

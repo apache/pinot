@@ -19,14 +19,12 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import com.google.common.base.Preconditions;
-import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.utils.ArrayListUtils;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
@@ -34,7 +32,6 @@ import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
-import org.apache.pinot.core.query.aggregation.utils.DoubleVectorOpUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
 
@@ -43,7 +40,7 @@ import org.apache.pinot.spi.utils.ArrayCopyUtils;
 /// usage example:
 /// `Histogram(columnName, ARRAY\[0,1,10,100\])` to specify bins \[0,1), \[1,10), \[10,1000\] or
 /// `Histogram(columnName, 0, 1000, 10)` to specify 10 equal-length bins \[0,100), \[100,200), ..., \[900,1000\]
-public class HistogramAggregationFunction extends BaseSingleInputAggregationFunction<DoubleArrayList, double[]> {
+public class HistogramAggregationFunction extends BaseSingleInputAggregationFunction<double[], double[]> {
 
   private static final String ARRAY_CONSTRUCTOR = "arrayvalueconstructor";
   private static final int INVALID_BIN = -1;
@@ -203,26 +200,28 @@ public class HistogramAggregationFunction extends BaseSingleInputAggregationFunc
 
   @Nullable
   @Override
-  public DoubleArrayList extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
-    DoubleArrayList histogram = aggregationResultHolder.getResult();
+  public double[] extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
+    double[] histogram = aggregationResultHolder.getResult();
     if (histogram != null) {
       return histogram;
     }
     // With the option disabled an untouched holder still renders the empty accumulator, which is the
     // intermediate this mode has always emitted; with it enabled the null is the signal that nothing was
     // aggregated.
-    return _nullHandlingEnabled ? null : DoubleVectorOpUtils.createAndInitialize(getNumBins());
+    return _nullHandlingEnabled ? null : new double[getNumBins()];
   }
 
   @Nullable
   @Override
-  public DoubleArrayList extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
+  public double[] extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     return groupByResultHolder.getResult(groupKey);
   }
 
   @Override
-  public DoubleArrayList merge(DoubleArrayList intermediateResult1, DoubleArrayList intermediateResult2) {
-    DoubleVectorOpUtils.vectorAdd(intermediateResult1, intermediateResult2);
+  public double[] merge(double[] intermediateResult1, double[] intermediateResult2) {
+    for (int i = 0; i < intermediateResult1.length; i++) {
+      intermediateResult1[i] += intermediateResult2[i];
+    }
     return intermediateResult1;
   }
 
@@ -232,14 +231,14 @@ public class HistogramAggregationFunction extends BaseSingleInputAggregationFunc
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(DoubleArrayList doubles) {
+  public SerializedIntermediateResult serializeIntermediateResult(double[] histogram) {
     return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.DoubleArrayList.getValue(),
-        ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE.serialize(doubles));
+        ObjectSerDeUtils.DOUBLE_ARRAY_SER_DE.serialize(histogram));
   }
 
   @Override
-  public DoubleArrayList deserializeIntermediateResult(CustomObject customObject) {
-    return ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE.deserialize(customObject.getBuffer());
+  public double[] deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.DOUBLE_ARRAY_SER_DE.deserialize(customObject.getBuffer());
   }
 
   @Override
@@ -249,22 +248,18 @@ public class HistogramAggregationFunction extends BaseSingleInputAggregationFunc
 
   @Nullable
   @Override
-  public double[] extractFinalResult(@Nullable DoubleArrayList doubleArrayList) {
-    if (doubleArrayList == null) {
+  public double[] extractFinalResult(@Nullable double[] histogram) {
+    if (histogram == null) {
       // A null intermediate result means nothing was aggregated. With null handling enabled the histogram of nothing
       // is NULL; with it disabled it is the all-zero histogram, which is the answer this mode has always given.
       return _nullHandlingEnabled ? null : new double[getNumBins()];
     }
-    return ArrayListUtils.toDoubleArray(doubleArrayList);
+    return histogram;
   }
 
   @Override
   public double[] mergeFinalResult(double[] finalResult1, double[] finalResult2) {
-    double[] mergedResult = finalResult1.clone();
-    for (int i = 0; i < mergedResult.length; i++) {
-      mergedResult[i] += finalResult2[i];
-    }
-    return mergedResult;
+    return merge(finalResult1.clone(), finalResult2);
   }
 
   @Override
@@ -279,7 +274,8 @@ public class HistogramAggregationFunction extends BaseSingleInputAggregationFunc
   }
 
   private void aggregateSV(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet) {
-    double[] histogram = new double[getNumBins()];
+    double[] aggregatedHistogram = aggregationResultHolder.getResult();
+    double[] histogram = aggregatedHistogram != null ? aggregatedHistogram : new double[getNumBins()];
     int numRows;
     switch (blockValSet.getValueType().getStoredType()) {
       case INT: {
@@ -336,16 +332,17 @@ public class HistogramAggregationFunction extends BaseSingleInputAggregationFunc
         throw new IllegalStateException("Cannot compute histogram for non-numeric type: "
             + blockValSet.getValueType());
     }
-    // The histogram is published only when a row reached it, so a block with no non-null row leaves the holder
-    // untouched and extractFinalResult sees the null that means nothing was aggregated. It is published once rather
-    // than per range, because the buffer accumulates across ranges and adding it again would recount earlier rows.
-    if (numRows > 0) {
-      setAggregationResult(aggregationResultHolder, histogram);
+    // Rows are counted into the aggregated histogram when there is one. A new histogram is published only when a row
+    // reached it, so a block with no non-null row leaves the holder untouched and extractFinalResult sees the null
+    // that means nothing was aggregated.
+    if (aggregatedHistogram == null && numRows > 0) {
+      aggregationResultHolder.setValue(histogram);
     }
   }
 
   private void aggregateMV(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet) {
-    double[] histogram = new double[getNumBins()];
+    double[] aggregatedHistogram = aggregationResultHolder.getResult();
+    double[] histogram = aggregatedHistogram != null ? aggregatedHistogram : new double[getNumBins()];
     int numRows;
     switch (blockValSet.getValueType().getStoredType()) {
       case INT: {
@@ -412,8 +409,8 @@ public class HistogramAggregationFunction extends BaseSingleInputAggregationFunc
         throw new IllegalStateException("Cannot compute histogram for non-numeric type: "
             + blockValSet.getValueType());
     }
-    if (numRows > 0) {
-      setAggregationResult(aggregationResultHolder, histogram);
+    if (aggregatedHistogram == null && numRows > 0) {
+      aggregationResultHolder.setValue(histogram);
     }
   }
 
@@ -707,22 +704,13 @@ public class HistogramAggregationFunction extends BaseSingleInputAggregationFunc
 
   protected void setGroupByResult(int groupKey, GroupByResultHolder groupByResultHolder, double val) {
     int binID = getBinId(val);
-    DoubleArrayList byResultHolderResult = groupByResultHolder.getResult(groupKey);
-    if (byResultHolderResult == null) {
-      byResultHolderResult = DoubleVectorOpUtils.createAndInitialize(getNumBins());
-      groupByResultHolder.setValueForKey(groupKey, byResultHolderResult);
+    double[] histogram = groupByResultHolder.getResult(groupKey);
+    if (histogram == null) {
+      histogram = new double[getNumBins()];
+      groupByResultHolder.setValueForKey(groupKey, histogram);
     }
     if (binID != INVALID_BIN) {
-      DoubleVectorOpUtils.incrementElementByOne(byResultHolderResult, binID);
-    }
-  }
-
-  protected void setAggregationResult(AggregationResultHolder aggregationResultHolder, double[] histogram) {
-    DoubleArrayList aggregatedHistogram = aggregationResultHolder.getResult();
-    if (aggregatedHistogram == null) {
-      aggregationResultHolder.setValue(DoubleVectorOpUtils.createAndInitialize(histogram));
-    } else {
-      DoubleVectorOpUtils.vectorAdd(aggregatedHistogram, histogram);
+      histogram[binID]++;
     }
   }
 }
