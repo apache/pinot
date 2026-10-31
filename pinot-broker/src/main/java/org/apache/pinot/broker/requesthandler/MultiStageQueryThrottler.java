@@ -27,9 +27,11 @@ import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixConstants;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.HelixConfigScope;
+import org.apache.helix.model.IdealState;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.pinot.broker.broker.helix.ClusterChangeHandler;
 import org.apache.pinot.common.concurrency.AdjustableSemaphore;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.query.QueryThreadExceedStrategy;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -93,9 +95,7 @@ public class MultiStageQueryThrottler implements ClusterChangeHandler {
     _maxServerQueryThreads = calculateMaxServerQueryThreads();
 
     List<String> clusterInstances = _helixAdmin.getInstancesInCluster(_helixManager.getClusterName());
-    _numBrokers = Math.max(1, (int) clusterInstances.stream()
-        .filter(instance -> instance.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE))
-        .count());
+    _numBrokers = countBrokers();
     _numServers = Math.max(1, (int) clusterInstances.stream()
         .filter(instance -> instance.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE))
         .count());
@@ -116,9 +116,6 @@ public class MultiStageQueryThrottler implements ClusterChangeHandler {
   /// @param unit the time unit of the timeout argument
   ///
   /// @throws InterruptedException if the current thread is interrupted
-  /// @throws RuntimeException if the query can never be dispatched due to the number of estimated query server threads
-  /// being greater than the maximum number of server query threads calculated on the basis of
-  /// _CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS \* numServers / numBrokers_
   public boolean tryAcquire(int numQueryThreads, long timeout, TimeUnit unit)
       throws InterruptedException {
     if (_maxServerQueryThreads <= 0) {
@@ -126,21 +123,12 @@ public class MultiStageQueryThrottler implements ClusterChangeHandler {
       return true;
     }
 
-    if (numQueryThreads > _semaphore.getTotalPermits() && _exceedStrategy != QueryThreadExceedStrategy.LOG) {
-      throw new RuntimeException(
-          String.format("Can't dispatch query because the estimated number of server threads for this query is too "
-              + "large for the configured value of '%s' or '%s'. estimatedThreads=%d configuredLimit=%d",
-                  CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS,
-                  CommonConstants.Broker.CONFIG_OF_MSE_MAX_SERVER_QUERY_THREADS,
-                  numQueryThreads, _semaphore.getTotalPermits()));
-    }
-
     if (_exceedStrategy == QueryThreadExceedStrategy.LOG) {
-      boolean wouldThrottle = _currentQueryServerThreads.get() + numQueryThreads > _maxServerQueryThreads;
+      boolean wouldThrottle = _currentQueryServerThreads.get() + numQueryThreads > _semaphore.getTotalPermits();
       if (wouldThrottle) {
         LOGGER.warn(
             "Exceed strategy LOG: Query would have been throttled. estimatedThreads: {} availableThreads: {}",
-            numQueryThreads, _maxServerQueryThreads - _currentQueryServerThreads.get());
+            numQueryThreads, _semaphore.getTotalPermits() - _currentQueryServerThreads.get());
       }
       _currentQueryServerThreads.addAndGet(numQueryThreads);
       return true;
@@ -172,10 +160,12 @@ public class MultiStageQueryThrottler implements ClusterChangeHandler {
         "MultiStageQuerySemaphore can only handle EXTERNAL_VIEW and CLUSTER_CONFIG changes");
 
     if (changeType == HelixConstants.ChangeType.EXTERNAL_VIEW) {
+      if (_maxServerQueryThreads <= 0) {
+        // Limiting is disabled, and enabling it requires a restart
+        return;
+      }
       List<String> clusterInstances = _helixAdmin.getInstancesInCluster(_helixManager.getClusterName());
-      int numBrokers = Math.max(1, (int) clusterInstances.stream()
-          .filter(instance -> instance.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE))
-          .count());
+      int numBrokers = countBrokers();
       int numServers = Math.max(1, (int) clusterInstances.stream()
           .filter(instance -> instance.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE))
           .count());
@@ -183,10 +173,7 @@ public class MultiStageQueryThrottler implements ClusterChangeHandler {
       if (numBrokers != _numBrokers || numServers != _numServers) {
         _numBrokers = numBrokers;
         _numServers = numServers;
-        if (_maxServerQueryThreads > 0) {
-          int semaphoreLimit = calculateSemaphoreLimit();
-          _semaphore.setPermits(semaphoreLimit);
-        }
+        _semaphore.setPermits(calculateSemaphoreLimit());
       }
     } else {
       int newMaxServerQueryThreads = calculateMaxServerQueryThreads();
@@ -216,6 +203,11 @@ public class MultiStageQueryThrottler implements ClusterChangeHandler {
     return _currentQueryServerThreads.get();
   }
 
+  /// Most query server threads a single query can acquire, or [Integer#MAX_VALUE] if limiting is disabled.
+  int getMaxPermits() {
+    return _maxServerQueryThreads > 0 ? _semaphore.getTotalPermits() : Integer.MAX_VALUE;
+  }
+
   @VisibleForTesting
   int availablePermits() {
     return _semaphore.availablePermits();
@@ -230,6 +222,13 @@ public class MultiStageQueryThrottler implements ClusterChangeHandler {
         List.of(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS))
         .getOrDefault(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS,
             CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS));
+  }
+
+  /// Counts the brokers that serve a table. A broker that serves no table gets no queries, so it gets no share of the
+  /// server threads.
+  private int countBrokers() {
+    IdealState brokerResource = HelixHelper.getBrokerIdealStates(_helixAdmin, _helixManager.getClusterName());
+    return brokerResource != null ? Math.max(1, HelixHelper.getAllInstancesForResource(brokerResource).size()) : 1;
   }
 
   private int calculateSemaphoreLimit() {
