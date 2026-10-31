@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.upsert;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.MapMaker;
 import com.google.common.util.concurrent.AtomicDouble;
 import java.io.File;
 import java.io.IOException;
@@ -32,6 +33,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -107,13 +109,20 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   // Basically, it's possible that some segments in the table partition are not tracked here, as their upsert metadata
   // is not managed by the manager currently.
   protected final Set<IndexSegment> _trackedSegments = ConcurrentHashMap.newKeySet();
-  // Track all the immutable segments where changes took place since last snapshot was taken.
-  // Note: the set can be updated by multiple Helix task threads and the consuming thread concurrently. To not miss
-  // segments updated while a snapshot is being taken, the snapshot flow removes the exact segments it has persisted
-  // instead of clearing the set, and it retains only the tracked segments at the end of each snapshot round to avoid
-  // keeping stale segment object references around.
+  // Track all the immutable segments where changes took place since last snapshot was taken, along with their maximum
+  // comparison values. The value must remain readable if a segment is destroyed while the snapshot pass is capping
+  // the TTL watermark. Helix task threads and the consuming thread can update the map concurrently, so the snapshot
+  // flow removes only the exact segments it persisted and retains tracked segments at the end of each round.
   // Skip mutableSegments as only immutable segments are for taking snapshots.
-  protected final Set<ImmutableSegmentImpl> _updatedSegmentsSinceLastSnapshot = ConcurrentHashMap.newKeySet();
+  private final ConcurrentHashMap<ImmutableSegmentImpl, Double> _updatedSegmentMaxComparisonValues =
+      new ConcurrentHashMap<>();
+  // Keep the protected Set field for extensions compiled against the previous API. Both views share one backing map.
+  protected final Set<ImmutableSegmentImpl> _updatedSegmentsSinceLastSnapshot =
+      _updatedSegmentMaxComparisonValues.keySet(TTL_WATERMARK_NOT_SET);
+  // Keep the comparison maximum readable while an old segment is still referenced by a concurrent update or
+  // snapshot pass, even after its mapped metadata is closed. Weak keys release replaced segments after those passes.
+  private final ConcurrentMap<ImmutableSegmentImpl, Double> _segmentMaxComparisonValues =
+      new MapMaker().weakKeys().makeMap();
   // Track all the immutable segments that have their validDocIds snapshot file persisted on disk. The snapshot flow
   // persists the snapshots of these segments before creating snapshot files for the other segments, and uses this
   // set to classify the segments without checking the segment directory or acquiring the segmentLock. The
@@ -341,7 +350,12 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   protected double getMaxComparisonValue(IndexSegment segment) {
-    return ((Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0))
+    if (segment instanceof ImmutableSegmentImpl immutableSegment) {
+      return _segmentMaxComparisonValues.computeIfAbsent(immutableSegment,
+          key -> ((Number) key.getSegmentMetadata().getColumnMetadataFor(_comparisonColumns.get(0))
+              .getMaxValue()).doubleValue());
+    }
+    return ((Number) segment.getSegmentMetadata().getColumnMetadataFor(_comparisonColumns.get(0))
         .getMaxValue()).doubleValue();
   }
 
@@ -476,6 +490,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     MutableRoaringBitmap validDocIds = segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
     Preconditions.checkState(validDocIds != null,
         "Snapshot of validDocIds is required to preload segment: %s, table: %s", segmentName, _tableNameWithType);
+    // Cache the maximum even when the snapshot has no valid docs: preloadSegment() still tracks this segment for
+    // snapshots, and another thread may destroy it while an updated marker is being read.
+    double maxComparisonValue = isTTLEnabled() ? getMaxComparisonValue(segment) : TTL_WATERMARK_NOT_SET;
     if (validDocIds.isEmpty()) {
       _logger.info("Skip preloading segment: {} without valid doc, current primary key count: {}",
           segment.getSegmentName(), getNumPrimaryKeys());
@@ -485,7 +502,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       return;
     }
     // Bump watermark after rows are added; see doAddSegment.
-    double maxComparisonValue = isTTLEnabled() ? getMaxComparisonValue(segment) : TTL_WATERMARK_NOT_SET;
     if (isTTLEnabled() && canSkipSegmentOutOfTTL(maxComparisonValue)
         && skipPreloadSegmentOutOfTTL(segment, validDocIds)) {
       updateLargestSeenComparisonValue(maxComparisonValue);
@@ -1001,6 +1017,10 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     TreeMap<String, Long> segmentVersions = new TreeMap<>();
     for (IndexSegment segment : _trackedSegments) {
       if (segment instanceof ImmutableSegmentImpl) {
+        if (!_trackedSegments.contains(segment)) {
+          consistent = false;
+          continue;
+        }
         SegmentMetadata segmentMetadata = segment.getSegmentMetadata();
         long dataCrc = segmentMetadata.getDataCrc();
         segmentVersions.put(segment.getSegmentName(), dataCrc >= 0 ? dataCrc : segmentMetadata.getCrc());
@@ -1198,17 +1218,31 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   /// the persisted watermark to keep such segments within TTL, and get them added with the regular flow after restart.
   /// The watermark in memory is not changed, and primary keys are still expired against it, so a segment that keeps
   /// missing its snapshot doesn't keep the expired primary keys in memory.
-  private double getWatermarkToPersist() {
+  @VisibleForTesting
+  double getWatermarkToPersist() {
     double watermark = _largestSeenComparisonValue.get();
     if (_metadataTTL <= 0) {
       return watermark;
     }
     double cappedWatermark = watermark;
-    // Unlike taking the snapshots above, reading the max comparison value doesn't need the segmentLock or the check
-    // against _trackedSegments: it comes from the segment metadata, which can still be read after the segment is
-    // destroyed, and a segment removed in the meantime can only cap the watermark lower than needed.
-    for (ImmutableSegmentImpl segment : _updatedSegmentsSinceLastSnapshot) {
-      double maxComparisonValue = getMaxComparisonValue(segment);
+    // An updated segment observed while being untracked can later return with a stale snapshot. Use the maximum
+    // captured when it was marked updated, because its mapped metadata may have closed during this pass.
+    for (Map.Entry<ImmutableSegmentImpl, Double> entry : _updatedSegmentMaxComparisonValues.entrySet()) {
+      double maxComparisonValue = entry.getValue();
+      if (maxComparisonValue == TTL_WATERMARK_NOT_SET) {
+        // The marker may be visible before markSegmentUpdated() reads the maximum. Read it under the segment lock
+        // while the segment is still available; otherwise do not trust a stale snapshot.
+        ImmutableSegmentImpl segment = entry.getKey();
+        if (!segment.tryAcquireReadLock()) {
+          cappedWatermark = TTL_WATERMARK_NOT_SET;
+          break;
+        }
+        try {
+          maxComparisonValue = getMaxComparisonValue(segment);
+        } finally {
+          segment.releaseReadLock();
+        }
+      }
       double maxWatermark = maxComparisonValue + _metadataTTL;
       // Make sure the segment is not out of TTL as checked by isOutOfMetadataTTL(), regardless of rounding
       while (maxComparisonValue < maxWatermark - _metadataTTL) {
@@ -1410,7 +1444,23 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
 
   protected void trackUpdatedSegmentsSinceLastSnapshot(IndexSegment segment) {
     if (_enableSnapshot && segment instanceof ImmutableSegmentImpl immutableSegment) {
-      _updatedSegmentsSinceLastSnapshot.add(immutableSegment);
+      markSegmentUpdated(immutableSegment);
+    }
+  }
+
+  private void markSegmentUpdated(ImmutableSegmentImpl segment) {
+    // Every loaded TTL segment had its maximum cached before its rows were processed. Publish that value with the
+    // marker so a snapshot never has to read metadata from a segment destroyed during this update.
+    Double cachedMax = _metadataTTL > 0 ? _segmentMaxComparisonValues.get(segment) : null;
+    if (_updatedSegmentMaxComparisonValues.putIfAbsent(segment,
+        cachedMax != null ? cachedMax : TTL_WATERMARK_NOT_SET) != null
+        || _metadataTTL <= 0 || cachedMax != null || !segment.tryAcquireReadLock()) {
+      return;
+    }
+    try {
+      _updatedSegmentMaxComparisonValues.replace(segment, TTL_WATERMARK_NOT_SET, getMaxComparisonValue(segment));
+    } finally {
+      segment.releaseReadLock();
     }
   }
 
@@ -1428,7 +1478,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     if (hasValidDocIdsSnapshotFile(segment)) {
       _segmentsWithSnapshot.add(segment);
     }
-    _updatedSegmentsSinceLastSnapshot.add(segment);
+    markSegmentUpdated(segment);
   }
 
   /// Removes the segment from all the tracking sets. The segment is removed eagerly instead of waiting for the next
