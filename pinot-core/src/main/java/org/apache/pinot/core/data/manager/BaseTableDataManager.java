@@ -411,6 +411,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.SEGMENT_COUNT, 1L);
 
     ImmutableSegmentDataManager newSegmentManager = new ImmutableSegmentDataManager(immutableSegment);
+    newSegmentManager.markMetadataReady();
     SegmentDataManager oldSegmentManager = registerSegment(segmentName, newSegmentManager);
     if (oldSegmentManager == null) {
       _logger.info("Added new immutable segment: {}", segmentName);
@@ -1037,6 +1038,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       // Register segment after it is preloaded and has initialized its validDocIds. The order of preloading and
       // registering segment doesn't matter much as preloading happens before the table partition is ready for queries.
       partitionUpsertMetadataManager.preloadSegment(immutableSegment);
+      newSegmentManager.markMetadataReady();
       registerSegment(segmentName, newSegmentManager, partitionUpsertMetadataManager);
       _logger.info("Preloaded immutable segment: {} with upsert enabled", segmentName);
       return;
@@ -1050,6 +1052,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       registerSegment(segmentName, newSegmentManager, partitionUpsertMetadataManager);
       partitionUpsertMetadataManager.trackNewlyAddedSegment(segmentName);
       partitionUpsertMetadataManager.addSegment(immutableSegment);
+      newSegmentManager.markMetadataReady();
       _logger.info("Added new immutable segment: {} with upsert enabled", segmentName);
     } else {
       replaceUpsertSegment(segmentName, oldSegmentManager, newSegmentManager, partitionUpsertMetadataManager);
@@ -1065,6 +1068,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       // When replacing a segment, register the new segment *after* replaceSegment() finishes filling its validDocIds
       // bitmap. Otherwise queries lose access to valid docs in the old segment before the new bitmap is ready.
       partitionUpsertMetadataManager.replaceSegment(immutableSegment, oldSegment);
+      newSegmentManager.markMetadataReady();
       registerSegment(segmentName, newSegmentManager, partitionUpsertMetadataManager);
     } else {
       // For consistency modes, keep both old and new segments visible to queries during replacement so that queries
@@ -1074,6 +1078,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       SegmentDataManager duoSegmentDataManager = new DuoSegmentDataManager(newSegmentManager, oldSegmentManager);
       registerSegment(segmentName, duoSegmentDataManager, partitionUpsertMetadataManager);
       partitionUpsertMetadataManager.replaceSegment(immutableSegment, oldSegment);
+      newSegmentManager.markMetadataReady();
       registerSegment(segmentName, newSegmentManager, partitionUpsertMetadataManager);
     }
     _logger.info("Replaced {} segment: {} with upsert enabled and consistency mode: {}",

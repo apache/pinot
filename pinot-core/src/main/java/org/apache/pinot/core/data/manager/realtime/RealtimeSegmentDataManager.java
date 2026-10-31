@@ -263,6 +263,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   // modify the permit. This boolean make sure the semaphore gets released only once when the partition group stops
   // consuming.
   private final AtomicBoolean _consumerSemaphoreAcquired = new AtomicBoolean(false);
+  // Published only when parallel consumption is allowed and the stopped consumer's rows remain in metadata.
+  private volatile boolean _hasReleasedConsumerSemaphore;
   private final ServerMetrics _serverMetrics;
   private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
   private final PartitionDedupMetadataManager _partitionDedupMetadataManager;
@@ -797,11 +799,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       long catchUpTimeMillis = 0L;
       _startTimeMs = now();
       try {
-        if (!_isReadyToConsumeData.getAsBoolean()) {
-          do {
-            //noinspection BusyWait
-            Thread.sleep(RealtimeTableDataManager.READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS);
-          } while (!_shouldStop && !_isReadyToConsumeData.getAsBoolean());
+        if (!_consumerCoordinator.waitUntilReadyToConsume(_llcSegmentName.getPartitionGroupId(),
+            _isReadyToConsumeData, () -> _shouldStop)) {
+          return;
         }
 
         // Acquire semaphore before consuming data
@@ -1474,8 +1474,14 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     if (_consumerSemaphoreAcquired.compareAndSet(true, false)) {
       _segmentLogger.info("Releasing consumer semaphore before the segment is sealed, stopped at offset: {}",
           _currentOffset);
+      _hasReleasedConsumerSemaphore = true;
       _consumerCoordinator.releaseUnsealed(_segmentNameStr, _currentOffset);
     }
+  }
+
+  /// Whether this stopped consumer has allowed its successor to consume while its segment is still being sealed.
+  boolean hasReleasedConsumerSemaphore() {
+    return _hasReleasedConsumerSemaphore;
   }
 
   private void closePartitionGroupConsumer() {

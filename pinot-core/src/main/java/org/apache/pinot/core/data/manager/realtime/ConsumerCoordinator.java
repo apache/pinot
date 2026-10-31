@@ -28,6 +28,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.BooleanSupplier;
 import javax.annotation.Nullable;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -57,6 +58,10 @@ public class ConsumerCoordinator {
   // released by a different thread than the one that acquired it. There is no out-of-box Lock implementation that
   // allows releasing the lock from a different thread.
   private final Semaphore _semaphore = new Semaphore(1);
+  private final Object _readinessMonitor = new Object();
+  private volatile long _releaseVersion;
+  // Guarded by _readinessMonitor, including publication of the corresponding partition gauge.
+  private long _readinessWaiters;
   private final Lock _lock = new ReentrantLock();
   private final Condition _condition = _lock.newCondition();
   private final AtomicBoolean _firstTransitionProcessed = new AtomicBoolean(false);
@@ -116,14 +121,65 @@ public class ConsumerCoordinator {
     }
   }
 
+  /// Waits for required history before acquiring the consumer permit. Local permit releases wake all waiters;
+  /// Helix assignment and state changes still use the periodic check. Readiness can perform ZooKeeper reads, so it
+  /// must run outside the monitor. The version prevents losing a release between the readiness check and the wait.
+  /// @return whether readiness passed, or false if consumption was stopped
+  boolean waitUntilReadyToConsume(int partitionGroupId, BooleanSupplier isReadyToConsume, BooleanSupplier shouldStop)
+      throws InterruptedException {
+    boolean counted = false;
+    try {
+      while (!shouldStop.getAsBoolean()) {
+        long releaseVersion = _releaseVersion;
+        if (isReadyToConsume.getAsBoolean()) {
+          return !shouldStop.getAsBoolean();
+        }
+        synchronized (_readinessMonitor) {
+          if (!counted) {
+            counted = true;
+            updateReadinessWaiters(partitionGroupId, 1);
+          }
+          if (releaseVersion == _releaseVersion && !shouldStop.getAsBoolean()) {
+            _readinessMonitor.wait(RealtimeTableDataManager.READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS);
+          }
+        }
+      }
+      return false;
+    } finally {
+      if (counted) {
+        synchronized (_readinessMonitor) {
+          updateReadinessWaiters(partitionGroupId, -1);
+        }
+      }
+    }
+  }
+
+  /// Called under _readinessMonitor so concurrent arrivals and exits cannot publish gauge values out of order.
+  private void updateReadinessWaiters(int partitionGroupId, int delta) {
+    _readinessWaiters += delta;
+    long waiters = _readinessWaiters;
+    if (waiters == 0) {
+      // Remove the idle gauge before this partition or table is discarded. A later waiter recreates it.
+      _serverMetrics.removePartitionGauge(_realtimeTableDataManager.getTableName(), partitionGroupId,
+          ServerGauge.CONSUMERS_WAITING_FOR_READINESS);
+    } else {
+      _serverMetrics.setOrUpdatePartitionGauge(_realtimeTableDataManager.getTableName(), partitionGroupId,
+          ServerGauge.CONSUMERS_WAITING_FOR_READINESS, () -> waiters);
+    }
+  }
+
   public void release() {
     _semaphore.release();
+    synchronized (_readinessMonitor) {
+      _releaseVersion++;
+      _readinessMonitor.notifyAll();
+    }
   }
 
   /// Releases the semaphore while the segment is still mutable, recording the offset it stopped at (exclusive).
   public void releaseUnsealed(String segmentName, StreamPartitionMsgOffset stoppedAtOffset) {
     _unsealedRelease.set(new UnsealedRelease(segmentName, stoppedAtOffset));
-    _semaphore.release();
+    release();
   }
 
   /// Clears the unsealed release recorded by the given segment, once that segment is offloaded.

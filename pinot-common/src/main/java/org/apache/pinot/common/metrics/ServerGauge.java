@@ -160,6 +160,8 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
       "Time in ms from status checker registration until realtime consumption catchup first reports GOOD"),
   CONSUMER_LOCK_WAIT_TIME_MS("milliseconds", false,
       "Indicates the time consumer spends while waiting on the consumer lock."),
+  CONSUMERS_WAITING_FOR_READINESS("consumers", false,
+      "Number of consumers waiting for server readiness or required historical segments before acquiring a permit."),
 
   // commit-time compaction gauge metrics
   COMMIT_TIME_COMPACTION_RATIO_PERCENT("percentage", false, "Percentage of rows removed during commit-time compaction"),

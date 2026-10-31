@@ -46,6 +46,7 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.helix.zookeeper.zkclient.exception.ZkException;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
@@ -54,6 +55,7 @@ import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.core.data.manager.BaseTableDataManager;
+import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
@@ -68,6 +70,7 @@ import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManagerFactory;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.segment.local.utils.tablestate.TableStateUtils;
+import org.apache.pinot.segment.local.utils.tablestate.TableStateUtils.ReadinessSnapshot;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.config.table.IndexingConfig;
@@ -136,6 +139,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   protected Cache<String, StreamMetadataProvider> _streamMetadataProviderCache;
 
+  // Share rejection checks across waiting consumers. Both fields are guarded by _readinessSnapshotLock.
+  private final Object _readinessSnapshotLock = new Object();
+  private ReadinessSnapshot _readinessSnapshot;
+  private long _readinessSnapshotTimeNs;
+
   private final BooleanSupplier _isServerReadyToConsumeData;
   private final BooleanSupplier _isServerReadyToServeQueries;
   private final ServerIngestionOomProtectionManager.ServerThrottleState _serverIngestionOomProtectionThrottleState;
@@ -144,7 +152,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private IngestionDelayTracker _ingestionDelayTracker;
 
   private TableDedupMetadataManager _tableDedupMetadataManager;
-  private BooleanSupplier _isTableReadyToConsumeData;
   private ServerIngestionOomProtectionManager _serverIngestionOomProtectionManager;
   private boolean _enforceConsumptionInOrder = false;
 
@@ -235,41 +242,66 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     _enforceConsumptionInOrder = isEnforceConsumptionInOrder();
     _streamMetadataProviderCache = getStreamMetadataProviderCache();
 
-    // For dedup and partial-upsert, need to wait for all segments loaded before starting consuming data
-    BooleanSupplier readyForDedupOrPartialUpsert;
-    if (isDedupEnabled() || isPartialUpsertEnabled()) {
-      readyForDedupOrPartialUpsert = new BooleanSupplier() {
-        volatile boolean _allSegmentsLoaded;
-        long _lastCheckTimeMs;
-
-        @Override
-        public boolean getAsBoolean() {
-          if (_allSegmentsLoaded) {
-            return true;
-          } else {
-            synchronized (this) {
-              if (_allSegmentsLoaded) {
-                return true;
-              }
-              long currentTimeMs = System.currentTimeMillis();
-              if (currentTimeMs - _lastCheckTimeMs <= READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS) {
-                return false;
-              }
-              _lastCheckTimeMs = currentTimeMs;
-              _allSegmentsLoaded = TableStateUtils.isAllSegmentsLoaded(_helixManager, _tableNameWithType);
-              return _allSegmentsLoaded;
-            }
-          }
-        }
-      };
-    } else {
-      readyForDedupOrPartialUpsert = () -> true;
-    }
-    _isTableReadyToConsumeData = () -> readyForDedupOrPartialUpsert.getAsBoolean()
-        && _isServerReadyToConsumeData.getAsBoolean();
     _serverIngestionOomProtectionManager = new ServerIngestionOomProtectionManager(
         () -> getCachedTableConfigAndSchema().getLeft(), () -> isUpsertEnabled() || isDedupEnabled(),
         _serverIngestionOomProtectionThrottleState);
+  }
+
+  /// Checks the assigned history again for each consumer, including partitions added after table initialization.
+  /// The consumer thread polls this supplier before acquiring its permit, so segment loading is never blocked by it.
+  @VisibleForTesting
+  BooleanSupplier createReadyToConsumeDataSupplier(LLCSegmentName llcSegmentName) {
+    if (!isDedupEnabled() && !isPartialUpsertEnabled()) {
+      return _isServerReadyToConsumeData;
+    }
+    long consumerCreationTimeNs = readinessCheckTimeNs();
+    return () -> {
+      if (!_isServerReadyToConsumeData.getAsBoolean()) {
+        return false;
+      }
+      try {
+        return isReadyToConsume(llcSegmentName, consumerCreationTimeNs);
+      } catch (ZkException e) {
+        _logger.warn("Failed to check readiness for segment: {}, will retry", llcSegmentName, e);
+        return false;
+      }
+    };
+  }
+
+  private boolean isReadyToConsume(LLCSegmentName consumer, long consumerCreationTimeNs) {
+    ReadinessSnapshot snapshot;
+    synchronized (_readinessSnapshotLock) {
+      long nowNs = readinessCheckTimeNs();
+      if (_readinessSnapshot == null || _readinessSnapshotTimeNs - consumerCreationTimeNs < 0
+          || nowNs - _readinessSnapshotTimeNs
+          >= TimeUnit.MILLISECONDS.toNanos(READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS)) {
+        // A new consumer must see its own assignment. Record the read's start time, not its completion time.
+        snapshot = TableStateUtils.getReadinessSnapshot(_helixManager, _tableNameWithType);
+        _readinessSnapshot = snapshot;
+        _readinessSnapshotTimeNs = nowNs;
+        return snapshot.isReadyToConsume(consumer, this::isSegmentMetadataReady, true);
+      }
+      snapshot = _readinessSnapshot;
+    }
+    // Local completion can clear a cached rejection immediately, without waiting for the next ZooKeeper poll.
+    // A cached success must never authorize consumption: newly assigned history could be absent from the snapshot.
+    return snapshot.isReadyToConsume(consumer, this::isSegmentMetadataReady)
+        && TableStateUtils.isReadyToConsume(_helixManager, _tableNameWithType, consumer, this::isSegmentMetadataReady);
+  }
+
+  private boolean isSegmentMetadataReady(String segmentName) {
+    SegmentDataManager manager = _segmentDataManagerMap.get(segmentName);
+    // Pauseless release publishes completed mutable metadata; ordinary rollover publishes a ready immutable manager
+    // before releasing the permit. Mere immutable presence is insufficient because initial upsert loading registers
+    // the manager before its metadata is populated. Always inspect the currently registered manager.
+    return manager instanceof RealtimeSegmentDataManager
+        && ((RealtimeSegmentDataManager) manager).hasReleasedConsumerSemaphore()
+        || manager instanceof ImmutableSegmentDataManager && ((ImmutableSegmentDataManager) manager).isMetadataReady();
+  }
+
+  @VisibleForTesting
+  long readinessCheckTimeNs() {
+    return System.nanoTime();
   }
 
   @VisibleForTesting
@@ -620,7 +652,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     RealtimeSegmentDataManager realtimeSegmentDataManager =
         createRealtimeSegmentDataManager(zkMetadata, tableConfig, indexLoadingConfig, schema, llcSegmentName,
             consumerCoordinator, partitionUpsertMetadataManager, partitionDedupMetadataManager,
-            _isTableReadyToConsumeData);
+            createReadyToConsumeDataSupplier(llcSegmentName));
     // A segment can finish construction after table shutdown has drained the registered segments. Publish and start
     // it together so shutdown either owns its cleanup or rejects it before any consumer is started.
     // Query threads never take this monitor: they read the segment map lock-free and only take per-segment reference

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.data.manager.realtime;
 
+import com.google.common.cache.CacheBuilder;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
@@ -25,10 +26,12 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -38,12 +41,18 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
+import org.apache.helix.PropertyKey;
+import org.apache.helix.model.CurrentState;
+import org.apache.helix.model.IdealState;
+import org.apache.helix.model.LiveInstance;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.provider.DefaultTableDataManagerProvider;
 import org.apache.pinot.core.data.manager.provider.TableDataManagerProvider;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
@@ -58,13 +67,16 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationD
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
+import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.UpsertContext;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
@@ -79,13 +91,17 @@ import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.util.TestUtils;
 import org.mockito.InOrder;
+import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING;
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -102,6 +118,8 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 // TODO Re-write this test using the stream abstraction
@@ -826,6 +844,227 @@ public class RealtimeSegmentDataManagerTest {
     }
   }
 
+  @Test(timeOut = 20_000)
+  public void testLocalReleaseBetweenReadinessCheckAndWaitStartsSuccessor() throws Exception {
+    assertStartupAfterLocalRelease(true, false);
+  }
+
+  @Test(timeOut = 20_000)
+  public void testLocalReleaseWakesWaitingSuccessor() throws Exception {
+    assertStartupAfterLocalRelease(false, false);
+  }
+
+  @Test(timeOut = 20_000)
+  public void testLocalReleaseDoesNotBypassMissingHistory() throws Exception {
+    assertStartupAfterLocalRelease(false, true);
+  }
+
+  @DataProvider
+  public Object[][] ordinaryRolloverHistory() {
+    return new Object[][]{{false}, {true}};
+  }
+
+  @Test(dataProvider = "ordinaryRolloverHistory", timeOut = 20_000)
+  public void testOrdinaryRolloverWakesSuccessorBeforeCurrentStatePublication(boolean missingHistory) throws Exception {
+    Map<Integer, ConsumerCoordinator> coordinators = new HashMap<>();
+    TableConfig config = createTableConfigWithStreamIngestion(false, ParallelSegmentConsumptionPolicy.DISALLOW_ALWAYS);
+    LLCSegmentName predecessorName =
+        new LLCSegmentName(RAW_TABLE_NAME, PARTITION_GROUP_ID, SEQUENCE_ID - 1, SEG_TIME_MS);
+    RolloverReadinessTableDataManager table =
+        new RolloverReadinessTableDataManager(predecessorName, SEGMENT_NAME, missingHistory);
+    ImmutableSegment immutable = mock(ImmutableSegment.class);
+    when(immutable.getSegmentName()).thenReturn(predecessorName.getSegmentName());
+    ImmutableSegmentDataManager replacement = new ImmutableSegmentDataManager(immutable);
+    BooleanSupplier ready = table.createReadyToConsumeDataSupplier(SEGMENT_NAME);
+    CountDownLatch firstCheck = new CountDownLatch(1);
+    CountDownLatch checkedReplacement = new CountDownLatch(1);
+    BooleanSupplier observedReady = () -> {
+      boolean result = ready.getAsBoolean();
+      firstCheck.countDown();
+      if (replacement.isMetadataReady()) {
+        checkedReplacement.countDown();
+      }
+      return result;
+    };
+    try (FakeRealtimeSegmentDataManager predecessor =
+        createStartupSegmentManager(SEQUENCE_ID - 1, coordinators, () -> true, config);
+        FakeRealtimeSegmentDataManager successor =
+            createStartupSegmentManager(SEQUENCE_ID, coordinators, observedReady, config)) {
+      table.registerSegment(predecessorName.getSegmentName(), predecessor);
+      ConsumerCoordinator coordinator = coordinators.get(PARTITION_GROUP_ID);
+      assertTrue(coordinator.getSemaphore().tryAcquire());
+      predecessor.getConsumerSemaphoreAcquired().set(true);
+      successor._consumeOffsets.add(new LongMsgOffset(START_OFFSET_VALUE + 1));
+      Thread consumerThread = new Thread(successor.createPartitionConsumer(), "ordinary-rollover-readiness");
+      try {
+        consumerThread.start();
+        assertTrue(firstCheck.await(10, TimeUnit.SECONDS), "Successor never checked readiness");
+        awaitStartupWait(consumerThread);
+
+        // Real Base replacement marks and publishes the immutable manager before real predecessor offload releases
+        // the permit. Helix deliberately continues to report CONSUMING throughout the handoff.
+        table.replacePredecessor(predecessor, replacement);
+        assertTrue(replacement.isMetadataReady());
+        assertFalse(predecessor.hasReleasedConsumerSemaphore(), "Ordinary offload must not use pauseless readiness");
+        assertEquals(table._currentState.getState(predecessorName.getSegmentName()), CONSUMING);
+        if (missingHistory) {
+          assertTrue(checkedReplacement.await(2, TimeUnit.SECONDS), "Offload did not wake the readiness check");
+          awaitStartupWait(consumerThread);
+          assertEquals(successor._consumeLoopStarted.getCount(), 1L,
+              "A ready immutable predecessor must not hide missing older history");
+          assertFalse(successor.getConsumerSemaphoreAcquired().get());
+          assertEquals(coordinator.getSemaphore().availablePermits(), 1);
+        } else {
+          assertTrue(successor._consumeLoopStarted.await(2, TimeUnit.SECONDS),
+              "Ordinary rollover must start before the five-second readiness poll or CurrentState publication");
+          consumerThread.join(2000);
+          assertFalse(consumerThread.isAlive(), "The one-record consumer did not finish");
+          assertFalse(successor._postConsumeStoppedCalled, "Startup must not enter the consumer error path");
+        }
+      } finally {
+        successor.stop();
+        consumerThread.interrupt();
+        consumerThread.join(10_000);
+        assertFalse(consumerThread.isAlive(), "Consumer must terminate before its segment is destroyed");
+      }
+    }
+  }
+
+  private void assertStartupAfterLocalRelease(boolean releaseBeforeWait, boolean missingHistory) throws Exception {
+    Map<Integer, ConsumerCoordinator> coordinators = new HashMap<>();
+    CountDownLatch firstCheck = new CountDownLatch(1);
+    CountDownLatch finishFirstCheck = new CountDownLatch(releaseBeforeWait ? 1 : 0);
+    CountDownLatch recheckedAfterRelease = new CountDownLatch(1);
+    try (FakeRealtimeSegmentDataManager predecessor =
+        createStartupSegmentManager(SEQUENCE_ID - 1, coordinators, () -> true)) {
+      ConsumerCoordinator coordinator = coordinators.get(PARTITION_GROUP_ID);
+      assertTrue(coordinator.getSemaphore().tryAcquire());
+      predecessor.getConsumerSemaphoreAcquired().set(true);
+      BooleanSupplier ready = () -> {
+        boolean released = predecessor.hasReleasedConsumerSemaphore();
+        if (released) {
+          recheckedAfterRelease.countDown();
+        }
+        boolean result = released && !missingHistory;
+        firstCheck.countDown();
+        try {
+          assertTrue(finishFirstCheck.await(10, TimeUnit.SECONDS), "First readiness check was not released");
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          throw new AssertionError(e);
+        }
+        return result;
+      };
+      try (FakeRealtimeSegmentDataManager successor = createStartupSegmentManager(SEQUENCE_ID, coordinators, ready)) {
+        successor._consumeOffsets.add(new LongMsgOffset(START_OFFSET_VALUE + 1));
+        Thread consumerThread = new Thread(successor.createPartitionConsumer(), "successor-readiness");
+        try {
+          consumerThread.start();
+          assertTrue(firstCheck.await(10, TimeUnit.SECONDS), "Successor never checked readiness");
+          if (!releaseBeforeWait) {
+            awaitStartupWait(consumerThread);
+          }
+          // Keep the first false result until the release has completed, forcing the check-to-wait race.
+          predecessor.closeStreamConsumerAndReleaseSemaphore();
+          finishFirstCheck.countDown();
+          if (missingHistory) {
+            assertTrue(recheckedAfterRelease.await(2, TimeUnit.SECONDS), "Release did not wake the readiness check");
+            awaitStartupWait(consumerThread);
+            assertEquals(successor._consumeLoopStarted.getCount(), 1L,
+                "A local release must not bypass another missing historical segment");
+            assertFalse(successor.getConsumerSemaphoreAcquired().get());
+            assertEquals(coordinator.getSemaphore().availablePermits(), 1);
+          } else {
+            assertTrue(successor._consumeLoopStarted.await(2, TimeUnit.SECONDS),
+                "Local release must start the successor without waiting for the five-second readiness poll");
+            consumerThread.join(2000);
+            assertFalse(consumerThread.isAlive(), "The one-record consumer did not finish");
+            assertFalse(successor._postConsumeStoppedCalled, "Startup must not enter the consumer error path");
+          }
+        } finally {
+          finishFirstCheck.countDown();
+          successor.stop();
+          consumerThread.interrupt();
+          consumerThread.join(10_000);
+          assertFalse(consumerThread.isAlive(), "Consumer must terminate before its segment is destroyed");
+          if (missingHistory) {
+            assertFalse(successor.getConsumerSemaphoreAcquired().get(), "A stopped waiter must not acquire the permit");
+            assertEquals(coordinator.getSemaphore().availablePermits(), 1);
+          }
+        }
+      }
+    }
+  }
+
+  private static void awaitStartupWait(Thread consumerThread) {
+    TestUtils.waitForCondition(ignored -> consumerThread.getState() == Thread.State.WAITING
+        || consumerThread.getState() == Thread.State.TIMED_WAITING, 10, 2000,
+        "Successor did not enter its startup wait");
+  }
+
+  private FakeRealtimeSegmentDataManager createStartupSegmentManager(int sequence,
+      Map<Integer, ConsumerCoordinator> coordinators, BooleanSupplier ready) throws Exception {
+    return createStartupSegmentManager(sequence, coordinators, ready, createTableConfig());
+  }
+
+  private FakeRealtimeSegmentDataManager createStartupSegmentManager(int sequence,
+      Map<Integer, ConsumerCoordinator> coordinators, BooleanSupplier ready, TableConfig tableConfig) throws Exception {
+    RealtimeTableDataManager tableDataManager = createTableDataManager(tableConfig);
+    coordinators.computeIfAbsent(PARTITION_GROUP_ID, ignored -> new ConsumerCoordinator(false, tableDataManager));
+    LLCSegmentName name = new LLCSegmentName(RAW_TABLE_NAME, PARTITION_GROUP_ID, sequence, SEG_TIME_MS);
+    SegmentZKMetadata metadata = new SegmentZKMetadata(name.getSegmentName());
+    metadata.setStartOffset(START_OFFSET.toString());
+    metadata.setCreationTime(System.currentTimeMillis());
+    metadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
+    return new FakeRealtimeSegmentDataManager(metadata, tableConfig, tableDataManager,
+        new File(TEMP_DIR, REALTIME_TABLE_NAME).getAbsolutePath(), Fixtures.createSchema(), name, coordinators,
+        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), new TimeSupplier(), ready);
+  }
+
+  /// Supplies real readiness and replacement lifecycle code with fixed Helix records. Only the segment map changes
+  /// concurrently, through the production registration path; the assignment and CurrentState stay unchanged.
+  private static class RolloverReadinessTableDataManager extends RealtimeTableDataManager {
+    private final CurrentState _currentState = new CurrentState(REALTIME_TABLE_NAME);
+    private final PartitionUpsertMetadataManager _partition = mock(PartitionUpsertMetadataManager.class);
+
+    RolloverReadinessTableDataManager(LLCSegmentName predecessor, LLCSegmentName consumer, boolean missingHistory) {
+      super(null);
+      String instance = "server-1";
+      _tableNameWithType = REALTIME_TABLE_NAME;
+      _logger = LoggerFactory.getLogger(RolloverReadinessTableDataManager.class);
+      _recentlyDeletedSegments = CacheBuilder.newBuilder().build();
+      _tableUpsertMetadataManager = mock(TableUpsertMetadataManager.class);
+      UpsertContext context = mock(UpsertContext.class);
+      when(context.getUpsertMode()).thenReturn(UpsertConfig.Mode.PARTIAL);
+      when(context.getConsistencyMode()).thenReturn(UpsertConfig.ConsistencyMode.NONE);
+      when(_tableUpsertMetadataManager.getContext()).thenReturn(context);
+      IdealState assignment = new IdealState(REALTIME_TABLE_NAME);
+      assignment.setInstanceStateMap(predecessor.getSegmentName(), Map.of(instance, ONLINE));
+      assignment.setInstanceStateMap(consumer.getSegmentName(), Map.of(instance, CONSUMING));
+      _currentState.setState(predecessor.getSegmentName(), CONSUMING);
+      if (missingHistory) {
+        LLCSegmentName older = new LLCSegmentName(RAW_TABLE_NAME, PARTITION_GROUP_ID, SEQUENCE_ID - 2, SEG_TIME_MS);
+        assignment.setInstanceStateMap(older.getSegmentName(), Map.of(instance, ONLINE));
+      }
+      _helixManager = mock(HelixManager.class);
+      HelixDataAccessor accessor = mock(HelixDataAccessor.class);
+      PropertyKey.Builder keys = new PropertyKey.Builder("test-cluster");
+      LiveInstance liveInstance = mock(LiveInstance.class);
+      when(_helixManager.getInstanceName()).thenReturn(instance);
+      when(_helixManager.getHelixDataAccessor()).thenReturn(accessor);
+      when(accessor.keyBuilder()).thenReturn(keys);
+      when(accessor.getProperty(keys.idealStates(REALTIME_TABLE_NAME))).thenReturn(assignment);
+      when(accessor.getProperty(keys.liveInstance(instance))).thenReturn(liveInstance);
+      when(liveInstance.getEphemeralOwner()).thenReturn("test-session");
+      when(accessor.getProperty(keys.currentState(instance, "test-session", REALTIME_TABLE_NAME)))
+          .thenReturn(_currentState);
+    }
+
+    void replacePredecessor(RealtimeSegmentDataManager predecessor, ImmutableSegmentDataManager replacement) {
+      replaceUpsertSegment(predecessor.getSegmentName(), predecessor, replacement, _partition);
+    }
+  }
+
   @Test
   public void testOffloadAfterParallelConsumptionReleaseDoesNotReleaseSemaphoreTwice()
       throws Exception {
@@ -835,9 +1074,12 @@ public class RealtimeSegmentDataManagerTest {
       Assert.assertTrue(semaphore.tryAcquire());
       segmentDataManager.getConsumerSemaphoreAcquired().set(true);
 
+      assertFalse(segmentDataManager.hasReleasedConsumerSemaphore());
       // With ALLOW_DURING_BUILD_ONLY / ALLOW_ALWAYS, buildSegmentInternal() and downloadSegmentAndReplace() let the
       // next consuming segment start early by closing the consumer and releasing the semaphore together.
       segmentDataManager.closeStreamConsumerAndReleaseSemaphore();
+      assertTrue(segmentDataManager.hasReleasedConsumerSemaphore(),
+          "A stopped predecessor must allow readiness while its segment is still being sealed");
       Assert.assertTrue(segmentDataManager.isStreamConsumerClosed());
       Assert.assertEquals(semaphore.availablePermits(), 1,
           "Consumer semaphore must be released for parallel consumption");
@@ -1699,6 +1941,7 @@ public class RealtimeSegmentDataManagerTest {
         SegmentCompletionProtocol.ControllerResponseStatus.PROCESSED;
     public Map<Integer, ConsumerCoordinator> _consumerCoordinatorMap;
     public boolean _stubConsumeLoop = true;
+    private final CountDownLatch _consumeLoopStarted = new CountDownLatch(1);
     public RealtimeTableDataManager _tableDataManager;
     private TimeSupplier _timeSupplier;
     private boolean _indexCapacityThresholdBreached;
@@ -1718,10 +1961,18 @@ public class RealtimeSegmentDataManagerTest {
         LLCSegmentName llcSegmentName, Map<Integer, ConsumerCoordinator> consumerCoordinatorMap,
         ServerMetrics serverMetrics, TimeSupplier timeSupplier)
         throws Exception {
+      this(segmentZKMetadata, tableConfig, realtimeTableDataManager, resourceDataDir, schema, llcSegmentName,
+          consumerCoordinatorMap, serverMetrics, timeSupplier, () -> true);
+    }
+
+    FakeRealtimeSegmentDataManager(SegmentZKMetadata segmentZKMetadata, TableConfig tableConfig,
+        RealtimeTableDataManager realtimeTableDataManager, String resourceDataDir, Schema schema,
+        LLCSegmentName llcSegmentName, Map<Integer, ConsumerCoordinator> consumerCoordinatorMap,
+        ServerMetrics serverMetrics, TimeSupplier timeSupplier, BooleanSupplier ready)
+        throws Exception {
       super(segmentZKMetadata, tableConfig, realtimeTableDataManager, resourceDataDir,
           new IndexLoadingConfig(makeInstanceDataManagerConfig(), tableConfig), schema, llcSegmentName,
-          consumerCoordinatorMap.get(llcSegmentName.getPartitionGroupId()), serverMetrics, null, null,
-          () -> true);
+          consumerCoordinatorMap.get(llcSegmentName.getPartitionGroupId()), serverMetrics, null, null, ready);
       _tableDataManager = realtimeTableDataManager;
       _state = RealtimeSegmentDataManager.class.getDeclaredField("_state");
       _state.setAccessible(true);
@@ -1815,6 +2066,7 @@ public class RealtimeSegmentDataManagerTest {
     @Override
     protected boolean consumeLoop()
         throws Exception {
+      _consumeLoopStarted.countDown();
       if (_stubConsumeLoop) {
         if (_throwExceptionFromConsume) {
           throw new PermanentConsumerException(new Throwable("Offset out of range"));
