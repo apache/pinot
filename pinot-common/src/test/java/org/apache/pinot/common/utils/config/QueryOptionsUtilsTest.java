@@ -25,6 +25,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.MvAggregateMode;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -444,5 +447,25 @@ public class QueryOptionsUtilsTest {
     IllegalArgumentException e = expectThrows(IllegalArgumentException.class,
         () -> QueryOptionsUtils.getSealedInListThreshold(queryOptions, 20));
     assertTrue(e.getMessage().contains(SEALED_IN_LIST_THRESHOLD), e.getMessage());
+  }
+
+  @Test
+  public void testGetMvAggregateMode() {
+    // Without the option, the broker config decides.
+    assertEquals(QueryOptionsUtils.getMvAggregateMode(Map.of(), MvAggregateMode.AUTO), MvAggregateMode.AUTO);
+    assertEquals(QueryOptionsUtils.getMvAggregateMode(Map.of(), MvAggregateMode.FALSE), MvAggregateMode.FALSE);
+    assertEquals(QueryOptionsUtils.getMvAggregateMode(Map.of(USE_MV_AGGREGATE, "true"), MvAggregateMode.FALSE),
+        MvAggregateMode.TRUE);
+    assertEquals(QueryOptionsUtils.getMvAggregateMode(Map.of(USE_MV_AGGREGATE, " FALSE "), MvAggregateMode.TRUE),
+        MvAggregateMode.FALSE);
+    assertEquals(QueryOptionsUtils.getMvAggregateMode(Map.of(USE_MV_AGGREGATE, "Auto"), MvAggregateMode.FALSE),
+        MvAggregateMode.AUTO);
+    for (String invalid : List.of("yes", "1", "")) {
+      QueryException e = expectThrows(QueryException.class,
+          () -> QueryOptionsUtils.getMvAggregateMode(Map.of(USE_MV_AGGREGATE, invalid), MvAggregateMode.AUTO));
+      assertEquals(e.getErrorCode(), QueryErrorCode.QUERY_VALIDATION);
+      assertTrue(e.getMessage().contains(USE_MV_AGGREGATE), e.getMessage());
+      assertTrue(e.getMessage().contains("[true, false, auto]"), e.getMessage());
+    }
   }
 }

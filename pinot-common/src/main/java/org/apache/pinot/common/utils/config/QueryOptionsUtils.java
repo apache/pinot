@@ -36,6 +36,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.MvAggregateMode;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.WindowOverFlowMode;
@@ -809,6 +810,23 @@ public class QueryOptionsUtils {
   public static boolean isUsePhysicalOptimizer(Map<String, String> queryOptions, boolean defaultValue) {
     String option = queryOptions.get(QueryOptionKey.USE_PHYSICAL_OPTIMIZER);
     return option != null ? Boolean.parseBoolean(option) : defaultValue;
+  }
+
+  /// Reads the `useMvAggregate` query option: `true`, `false` or `auto`, case-insensitive. Returns `defaultValue`, the
+  /// broker config, when the query does not set it. See [QueryOptionKey#USE_MV_AGGREGATE].
+  ///
+  /// @throws org.apache.pinot.spi.exception.QueryException with [QueryErrorCode#QUERY_VALIDATION] for any other value
+  public static MvAggregateMode getMvAggregateMode(Map<String, String> queryOptions, MvAggregateMode defaultValue) {
+    String option = queryOptions.get(QueryOptionKey.USE_MV_AGGREGATE);
+    if (option == null) {
+      return defaultValue;
+    }
+    try {
+      return MvAggregateMode.fromString(option);
+    } catch (IllegalArgumentException e) {
+      throw QueryErrorCode.QUERY_VALIDATION.asException("Invalid value '" + option + "' for query option '"
+          + QueryOptionKey.USE_MV_AGGREGATE + "', must be one of [true, false, auto]");
+    }
   }
 
   /// Reads the `streamStats` query option that opts a single query into the `SubmitWithStream`

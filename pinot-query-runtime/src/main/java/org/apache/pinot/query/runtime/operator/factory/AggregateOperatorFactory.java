@@ -19,9 +19,11 @@
 package org.apache.pinot.query.runtime.operator.factory;
 
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.MvAggregateNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
+import org.apache.pinot.query.runtime.operator.MvAggregateOperator;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 
 
@@ -41,6 +43,13 @@ public interface AggregateOperatorFactory {
   /// two agree as usual.
   MultiStageOperator createAggregateOperator(OpChainExecutionContext context, MultiStageOperator inputOperator,
       PlanNode inputPlanNode, AggregateNode aggregateNode);
+
+  /// Creates the operator of an MV aggregate: a group by where some keys are multi-value, see [MvAggregateNode].
+  /// The default implementation returns the built-in [MvAggregateOperator].
+  default MultiStageOperator createMvAggregateOperator(OpChainExecutionContext context,
+      MultiStageOperator inputOperator, PlanNode inputPlanNode, MvAggregateNode mvAggregateNode) {
+    return new MvAggregateOperator(context, inputOperator, mvAggregateNode);
+  }
 
   MultiStageOperator createWindowAggregateOperator(OpChainExecutionContext context, MultiStageOperator inputOperator,
       PlanNode inputPlanNode, WindowNode windowNode);

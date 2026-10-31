@@ -35,6 +35,7 @@ import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.MvAggregateNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
@@ -432,6 +433,20 @@ public class PlanNodeToOpChain {
         PlanNode input = node.getInputs().get(0);
         child = visit(input, context);
         return new UnnestOperator(context, child, input.getDataSchema(), node);
+      } catch (Exception e) {
+        return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage(), child);
+      }
+    }
+
+    @Override
+    public MultiStageOperator visitMvAggregate(MvAggregateNode node, OpChainExecutionContext context) {
+      MultiStageOperator child = null;
+      try {
+        PlanNode input = node.getInputs().get(0);
+        child = visit(input, context);
+        AggregateOperatorFactory aggregateOperatorFactory =
+            context.getQueryOperatorFactoryProvider().getAggregateOperatorFactory();
+        return aggregateOperatorFactory.createMvAggregateOperator(context, child, input, node);
       } catch (Exception e) {
         return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage(), child);
       }

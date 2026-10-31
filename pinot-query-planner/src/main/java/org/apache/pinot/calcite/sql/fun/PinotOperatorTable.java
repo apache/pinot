@@ -141,8 +141,22 @@ public class PinotOperatorTable implements SqlOperatorTable {
   /// [org.apache.pinot.calcite.rel.rules.PinotRuleUtils#isRelocatable] ignores this flag, so ARRAY_TO_MV filters are
   /// still pushed below joins.
   public static final PinotSqlFunction ARRAY_TO_MV =
-      new PinotSqlFunction("ARRAY_TO_MV", opBinding -> opBinding.getOperandType(0).getComponentType(),
+      new PinotSqlFunction(ArrayToMvFunctionName.NAME,
+          opBinding -> arrayToMvReturnType(opBinding.getOperandType(0)),
           OperandTypes.ARRAY, false);
+
+  /// The type of `ARRAY_TO_MV(array)`: the component type of `arrayType`. The MV aggregate gives its MV keys the same
+  /// type, so that it can replace a plain aggregate over `ARRAY_TO_MV(array)` without changing the row type.
+  ///
+  /// The type does not depend on the MV aggregate mode, because the `auto` mode optimizes the already converted plan
+  /// again with the MV aggregate. A null multi-value row still goes into the null group at runtime, as in the
+  /// single-stage engine.
+  public static RelDataType arrayToMvReturnType(RelDataType arrayType) {
+    RelDataType componentType = arrayType.getComponentType();
+    Preconditions.checkArgument(componentType != null, "ARRAY_TO_MV requires an array, got: %s",
+        arrayType.getFullTypeString());
+    return componentType;
+  }
 
   /// This list includes the supported standard [SqlOperator]s defined in [SqlStdOperatorTable].
   /// NOTE: The operator order follows the same order as defined in [SqlStdOperatorTable] for easier search.

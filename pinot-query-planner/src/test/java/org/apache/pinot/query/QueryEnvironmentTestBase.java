@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.function.UnaryOperator;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -47,7 +48,7 @@ public class QueryEnvironmentTestBase {
   protected static final Random RANDOM_REQUEST_ID_GEN = new Random();
   public static final Map<String, List<String>> SERVER1_SEGMENTS =
       Map.of("a_REALTIME", List.of("a1", "a2"), "b_REALTIME", List.of("b1"), "c_OFFLINE",
-          List.of("c1"), "d_OFFLINE", List.of("d1"), "e_OFFLINE", List.of("e1"));
+          List.of("c1"), "d_OFFLINE", List.of("d1"), "e_OFFLINE", List.of("e1"), "f_OFFLINE", List.of("f1"));
   public static final Map<String, List<String>> SERVER2_SEGMENTS =
       Map.of("a_REALTIME", List.of("a3"), "c_OFFLINE", List.of("c2", "c3"),
           "d_REALTIME", List.of("d2"), "d_OFFLINE", List.of("d3"), "e_REALTIME",
@@ -79,6 +80,11 @@ public class QueryEnvironmentTestBase {
     TABLE_SCHEMAS.put("e", getSchemaBuilder("e")
         .addMultiValueDimension("mcol1", FieldSpec.DataType.STRING)
         .addMultiValueDimension("mcol2", FieldSpec.DataType.LONG)
+        .build());
+    // Column-based null handling: every column, including the multi-value one, is nullable.
+    TABLE_SCHEMAS.put("f_OFFLINE", getSchemaBuilder("f")
+        .addMultiValueDimension("mcol1", FieldSpec.DataType.STRING)
+        .setEnableColumnBasedNullHandling(true)
         .build());
   }
 
@@ -304,6 +310,16 @@ public class QueryEnvironmentTestBase {
   public static QueryEnvironment getQueryEnvironment(int reducerPort, int port1, int port2,
       Map<String, Schema> schemaMap, Map<String, List<String>> segmentMap1, Map<String, List<String>> segmentMap2,
       @Nullable Map<String, Pair<String, List<List<String>>>> partitionedSegmentsMap) {
+    return getQueryEnvironment(reducerPort, port1, port2, schemaMap, segmentMap1, segmentMap2, partitionedSegmentsMap,
+        UnaryOperator.identity());
+  }
+
+  /// Same as [#getQueryEnvironment(int, int, int, Map, Map, Map, Map)], with `configCustomizer` applied to the planner
+  /// config, for example to change a broker default.
+  public static QueryEnvironment getQueryEnvironment(int reducerPort, int port1, int port2,
+      Map<String, Schema> schemaMap, Map<String, List<String>> segmentMap1, Map<String, List<String>> segmentMap2,
+      @Nullable Map<String, Pair<String, List<List<String>>>> partitionedSegmentsMap,
+      UnaryOperator<ImmutableQueryEnvironment.Config.Builder> configCustomizer) {
     MockRoutingManagerFactory factory = new MockRoutingManagerFactory(port1, port2);
     for (Map.Entry<String, Schema> entry : schemaMap.entrySet()) {
       factory.registerTable(entry.getValue(), entry.getKey());
@@ -341,8 +357,13 @@ public class QueryEnvironmentTestBase {
     }
     RoutingManager routingManager = factory.buildRoutingManager(partitionInfoMap);
     TableCache tableCache = factory.buildTableCache();
-    return new QueryEnvironment(CommonConstants.DEFAULT_DATABASE, tableCache,
-        new WorkerManager("Broker_localhost", "localhost", reducerPort, routingManager));
+    ImmutableQueryEnvironment.Config.Builder config = QueryEnvironment.configBuilder()
+        .requestId(-1L)
+        .database(CommonConstants.DEFAULT_DATABASE)
+        .tableCache(tableCache)
+        .workerManager(new WorkerManager("Broker_localhost", "localhost", reducerPort, routingManager))
+        .isNullHandlingEnabled(true);
+    return new QueryEnvironment(configCustomizer.apply(config).build());
   }
 
   /// JSON test case definition for query planner test cases. Tables and schemas will come from those already defined

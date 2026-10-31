@@ -67,6 +67,8 @@ public interface PlanNodeVisitor<T, C> {
 
   T visitUnnest(UnnestNode node, C context);
 
+  T visitMvAggregate(MvAggregateNode node, C context);
+
   /// A depth-first visitor that visits all children of a node before visiting the node itself.
   ///
   /// The default implementation for each plan node type does nothing but visiting its inputs
@@ -236,6 +238,13 @@ public interface PlanNodeVisitor<T, C> {
 
     @Override
     public T visitUnnest(UnnestNode node, C context) {
+      preChildren(node, context);
+      visitChildren(node, context);
+      return postChildren(node, context);
+    }
+
+    @Override
+    public T visitMvAggregate(MvAggregateNode node, C context) {
       preChildren(node, context);
       visitChildren(node, context);
       return postChildren(node, context);
