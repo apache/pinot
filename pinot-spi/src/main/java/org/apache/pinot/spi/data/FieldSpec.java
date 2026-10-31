@@ -47,6 +47,7 @@ import org.apache.pinot.spi.utils.EqualityUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.TimestampUtils;
 import org.apache.pinot.spi.utils.UuidUtils;
+import org.apache.pinot.spi.utils.VariantEnvelope;
 
 
 /// The `FieldSpec` class contains all specs related to any field (column) in [Schema].
@@ -525,6 +526,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
               return DEFAULT_DIMENSION_NULL_VALUE_OF_JSON;
             case BYTES:
               return DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES;
+            case VARIANT:
+              return DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES;
             case UUID:
               // The nil UUID is the default null sentinel. Tables that ingest nil UUID as a real value should enable
               // column-based null handling to distinguish it from null rows.
@@ -654,7 +657,11 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   protected void appendDefaultNullValue(ObjectNode jsonNode) {
     assert _defaultNullValue != null;
     String key = "defaultNullValue";
-    if (!_defaultNullValue.equals(getDefaultNullValue(getFieldType(), _dataType, null))) {
+    Object typeDefaultNullValue = getDefaultNullValue(getFieldType(), _dataType, null);
+    boolean usesTypeDefault = _dataType == DataType.VARIANT
+        ? Arrays.equals((byte[]) _defaultNullValue, (byte[]) typeDefaultNullValue)
+        : _defaultNullValue.equals(typeDefaultNullValue);
+    if (!usesTypeDefault) {
       switch (_dataType) {
         case INT:
           jsonNode.put(key, (Integer) _defaultNullValue);
@@ -682,6 +689,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
           jsonNode.put(key, (String) _defaultNullValue);
           break;
         case BYTES:
+        case VARIANT:
           jsonNode.put(key, BytesUtils.toHexString((byte[]) _defaultNullValue));
           break;
         case UUID:
@@ -720,7 +728,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
         && Objects.equals(_maxLength, that._maxLength)
         && Objects.equals(_maxLengthExceedStrategy, that._maxLengthExceedStrategy)
         && _allowTrailingZeros == that._allowTrailingZeros
-        && _dataType.equals(_defaultNullValue, that._defaultNullValue)
+        && defaultNullValuesEqual(that)
         && Objects.equals(_transformFunction, that._transformFunction)
         && Objects.equals(_virtualColumnProvider, that._virtualColumnProvider)
         && Objects.equals(_description, that._description)
@@ -733,8 +741,22 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   @Override
   public int hashCode() {
     return Objects.hash(_name, _dataType, _singleValueField, _notNull, _maxLength, _maxLengthExceedStrategy,
-        _allowTrailingZeros, _dataType.hashCode(_defaultNullValue), _transformFunction, _virtualColumnProvider,
+        _allowTrailingZeros, defaultNullValueHashCode(), _transformFunction, _virtualColumnProvider,
         _description, _tags, _fieldId, _aliases, _metadata);
+  }
+
+  private boolean defaultNullValuesEqual(FieldSpec that) {
+    // VARIANT deliberately rejects semantic value equality. FieldSpec equality only compares schema configuration,
+    // where the reserved byte-array null sentinel is structural metadata rather than a queryable Variant value.
+    return _dataType == DataType.VARIANT
+        ? Arrays.equals((byte[]) _defaultNullValue, (byte[]) that._defaultNullValue)
+        : _dataType.equals(_defaultNullValue, that._defaultNullValue);
+  }
+
+  private int defaultNullValueHashCode() {
+    // Keep this paired with defaultNullValuesEqual() without enabling semantic hashing for VARIANT values.
+    return _dataType == DataType.VARIANT ? Arrays.hashCode((byte[]) _defaultNullValue)
+        : _dataType.hashCode(_defaultNullValue);
   }
 
   /// The `FieldType` enum is used to demonstrate the real world business logic for a column.
@@ -764,13 +786,13 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   /// - `BOOLEAN` → [Integer] (`0` or `1`)
   /// - `TIMESTAMP` → [Long] (epoch millis)
   /// - `STRING` / `JSON` → [String]
-  /// - `BYTES` → `byte[]`
+  /// - `BYTES` / `VARIANT` → `byte[]`
   /// - `UUID` → `byte[]` (fixed 16-byte big-endian form)
   /// - `MAP` / `OPEN_STRUCT` → [Map]
   /// - `LIST` → [List]
   ///
-  /// `convertInternal` is the exception: it returns the internal storage form, which for `BYTES` and `UUID` is
-  /// [ByteArray] rather than `byte[]`.
+  /// `convertInternal` is the exception: it returns the internal storage form, which for `BYTES`, `VARIANT`, and
+  /// `UUID` is [ByteArray] rather than `byte[]`.
   @SuppressWarnings("rawtypes")
   public enum DataType {
     // LIST is for complex lists which is different from multi-value column of primitives
@@ -791,7 +813,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     MAP(false),
     OPEN_STRUCT(false),
     LIST(false),
-    UNKNOWN(false);
+    UNKNOWN(false),
+    // VARIANT is a logical type stored as variable-width BYTES in a Pinot-owned PVAR envelope.
+    VARIANT(BYTES, false);
 
     private final DataType _storedType;
     private final int _size;
@@ -857,7 +881,53 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
       return _storedType == UNKNOWN;
     }
 
-    /// Converts the given string value to the data type. Returns byte\[\] for BYTES and UUID.
+    /// Returns whether generic operators may apply equality to raw values of this logical type.
+    public boolean supportsEquality() {
+      return this != VARIANT;
+    }
+
+    /// Returns whether generic operators may hash raw values of this logical type.
+    public boolean supportsHashing() {
+      return this != VARIANT;
+    }
+
+    /// Returns whether physical stored ordering is also a valid ordering for raw values of this logical type.
+    public boolean supportsOrdering() {
+      switch (this) {
+        case STRUCT:
+        case MAP:
+        case OPEN_STRUCT:
+        case LIST:
+        case UNKNOWN:
+        case VARIANT:
+          return false;
+        default:
+          return true;
+      }
+    }
+
+    /// Returns whether segment metadata may derive logical minimum and maximum values from this type.
+    public boolean supportsMinMax() {
+      return supportsOrdering();
+    }
+
+    /// Returns whether generic aggregation functions may consume raw values of this logical type.
+    ///
+    /// Value-independent functions such as non-distinct `COUNT` do not consume the value and can still be
+    /// used when this returns `false`.
+    public boolean supportsDirectAggregation() {
+      return this != VARIANT;
+    }
+
+    /// Returns whether generic pattern predicates may consume raw values of this logical type.
+    ///
+    /// This expresses logical-type restrictions only. Predicate type checking separately ensures that the stored
+    /// value is usable as text.
+    public boolean supportsPatternMatching() {
+      return this != VARIANT;
+    }
+
+    /// Converts the given string value to the data type. Returns byte\[\] for BYTES, VARIANT and UUID.
     public Object convert(String value) {
       try {
         switch (this) {
@@ -880,6 +950,12 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
             return value;
           case BYTES:
             return BytesUtils.toBytes(value);
+          case VARIANT:
+            byte[] envelope = BytesUtils.toBytes(value);
+            if (envelope.length != 0) {
+              VariantEnvelope.decode(envelope);
+            }
+            return envelope;
           case UUID:
             return UuidUtils.toBytes(value);
           case MAP:
@@ -896,10 +972,16 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     }
 
     public boolean equals(Object value1, Object value2) {
+      if (this == VARIANT) {
+        throw new UnsupportedOperationException(this + " does not support equality");
+      }
       return this == BYTES || this == UUID ? Arrays.equals((byte[]) value1, (byte[]) value2) : value1.equals(value2);
     }
 
     public int hashCode(Object value) {
+      if (this == VARIANT) {
+        throw new UnsupportedOperationException(this + " does not support hashing");
+      }
       return this == BYTES || this == UUID ? Arrays.hashCode((byte[]) value) : value.hashCode();
     }
 
@@ -909,6 +991,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     /// return -1 if value1 is less than value2
     /// return 1 if value1 is greater than value2
     public int compare(Object value1, Object value2) {
+      if (this == VARIANT) {
+        throw new UnsupportedOperationException(this + " does not support ordering");
+      }
       switch (this) {
         case INT:
         case BOOLEAN:
@@ -942,7 +1027,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
       if (this == BIG_DECIMAL) {
         return ((BigDecimal) value).toPlainString();
       }
-      if (this == BYTES) {
+      if (this == BYTES || this == VARIANT) {
         return BytesUtils.toHexString((byte[]) value);
       }
       if (this == UUID) {
@@ -958,7 +1043,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
       return value.toString();
     }
 
-    /// Converts the given string value to the data type. Returns ByteArray for BYTES and UUID.
+    /// Converts the given string value to the data type. Returns ByteArray for BYTES, VARIANT and UUID.
     public Comparable convertInternal(String value) {
       try {
         switch (this) {
@@ -981,6 +1066,12 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
             return value;
           case BYTES:
             return BytesUtils.toByteArray(value);
+          case VARIANT:
+            byte[] envelope = BytesUtils.toBytes(value);
+            if (envelope.length != 0) {
+              VariantEnvelope.decode(envelope);
+            }
+            return new ByteArray(envelope);
           case UUID:
             return new ByteArray(UuidUtils.toBytes(value));
           case MAP:
