@@ -223,7 +223,7 @@ public class MatchRecognizeValidatorTest extends QueryEnvironmentTestBase {
             "SELECT * FROM a MATCH_RECOGNIZE (ORDER BY ts DESC MEASURES MATCH_NUMBER() AS mno PATTERN (A) "
                 + "DEFINE A AS A.col3 > 0)"
         },
-        // A pattern variable used but not DEFINEd only warns; SQL:2016 says its condition defaults to TRUE.
+        // A pattern variable used but not DEFINEd is legal; SQL:2016 says its condition defaults to TRUE.
         new Object[]{
             "SELECT * FROM a MATCH_RECOGNIZE (ORDER BY ts MEASURES MATCH_NUMBER() AS mno PATTERN (A B+ TYPO) "
                 + "DEFINE A AS A.col3 > 0, B AS B.col3 > 0)"
