@@ -71,8 +71,8 @@ public class DataTableHandler extends SimpleChannelInboundHandler<ByteBuf> {
   protected void channelRead0(ChannelHandlerContext ctx, ByteBuf msg) {
     int responseSize = msg.readableBytes();
     _brokerMetrics.addMeteredGlobalValue(BrokerMeter.NETTY_CONNECTION_BYTES_RECEIVED, responseSize);
+    long deserializationStartTimeMs = System.currentTimeMillis();
     try {
-      long deserializationStartTimeMs = System.currentTimeMillis();
       ThreadResourceSnapshot resourceSnapshot = new ThreadResourceSnapshot();
       DataTable dataTable = DataTableFactory.getDataTable(msg.nioBuffer());
       _queryRouter.receiveDataTable(_serverRoutingInstance, dataTable, responseSize,
@@ -97,6 +97,15 @@ public class DataTableHandler extends SimpleChannelInboundHandler<ByteBuf> {
       LOGGER.error("Caught exception while deserializing data table of size: {} from server: {}", responseSize,
           _serverRoutingInstance, e);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.DATA_TABLE_DESERIALIZATION_EXCEPTIONS, 1);
+      // A deserialization parse failure on malformed/corrupted response bytes may leave framing desynchronized or
+      // indicate a protocol mismatch, so closing the channel is necessary to reset the connection and prevent
+      // subsequent queries on this pooled connection from reading corrupted frames.
+      try {
+        _queryRouter.markServerDeserializationError(_serverRoutingInstance, e, responseSize,
+            (int) (System.currentTimeMillis() - deserializationStartTimeMs));
+      } finally {
+        ctx.close();
+      }
     }
   }
 
@@ -108,8 +117,8 @@ public class DataTableHandler extends SimpleChannelInboundHandler<ByteBuf> {
      * No ctx.fireExceptionCaught() — this is the last handler in the pipeline.
      * Firing would only reach Netty's TailContext which logs a redundant warning.
      * Direct memory OOM from the upstream frame decoder is caught by DirectOOMHandler
-     * before it reaches here. Any OOM that arrives here is heap OOM from channelRead0()
-     * deserialization, which does not corrupt the channel's byte stream.
+     * before it reaches here. This handles unhandled throwables like heap OOM where the upstream
+     * frame length was already consumed and framing remains intact, unlike parse failures in channelRead0.
      */
   }
 }

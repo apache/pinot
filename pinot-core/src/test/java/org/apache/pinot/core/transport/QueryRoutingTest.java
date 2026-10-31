@@ -282,18 +282,17 @@ public class QueryRoutingTest {
     assertEquals(response.size(), 1);
     assertTrue(response.containsKey(_offlineServerRoutingInstance));
     ServerResponse serverResponse = response.get(_offlineServerRoutingInstance);
-    assertNull(serverResponse.getDataTable());
+    assertNotNull(serverResponse.getDataTable());
+    assertTrue(serverResponse.getDataTable().getExceptions()
+        .containsKey(QueryErrorCode.DESERIALIZATION_ERROR.getId()));
     assertEquals(serverResponse.getResponseDelayMs(), -1);
     assertEquals(serverResponse.getResponseSize(), 0);
-    assertEquals(serverResponse.getDeserializationTimeMs(), 0);
-    // Query should time out
-    assertTrue(System.currentTimeMillis() - startTimeMs >= 1000);
-    // A request left unanswered until the deadline produces a timeout and nothing else: the send succeeded and the
-    // channel was never torn down, so no failed server is reported. This is why the broker's failure detector cannot
-    // rely on getFailedServer() alone -- see FailureDetector#notifyServerNotResponded.
-    assertEquals(asyncQueryResponse.getStatus(), QueryResponse.Status.TIMED_OUT);
+    assertTrue(serverResponse.getDeserializationTimeMs() >= 0);
+    assertEquals(asyncQueryResponse.getStatus(), QueryResponse.Status.COMPLETED);
     assertNull(asyncQueryResponse.getException());
-    assertNull(asyncQueryResponse.getFailedServer());
+    assertEquals(asyncQueryResponse.getFailedServer(), _offlineServerRoutingInstance);
+    // Query should return immediately without waiting for timeout
+    assertTrue(System.currentTimeMillis() - startTimeMs < 1000);
     _requestCount += 2;
     waitForStatsUpdate(_requestCount);
     assertEquals(_serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverId).intValue(), 0);
@@ -767,6 +766,69 @@ public class QueryRoutingTest {
           + elapsed);
     } finally {
       unavailableServer.shutDown();
+      queryRouter.shutDown();
+    }
+  }
+
+  @Test
+  public void testMultiServerPartialResultsOnDeserializationError()
+      throws Exception {
+    long requestId = 123;
+    DataSchema dataSchema =
+        new DataSchema(new String[]{"column1"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING});
+    DataTableBuilder builder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
+    builder.startRow();
+    builder.setColumn(0, "value1");
+    builder.finishRow();
+    DataTable dataTableSuccess = builder.build();
+    dataTableSuccess.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
+    byte[] successResponseBytes = dataTableSuccess.toBytes();
+
+    long timeoutMs = 10_000L;
+    QueryServer healthyServer = getQueryServer(0, successResponseBytes, 0);
+    int healthyPort = startAndGetPort(healthyServer);
+    QueryServer invalidServer = getQueryServer(0, new byte[0], 0);
+    int invalidPort = startAndGetPort(invalidServer);
+
+    QueryRouter queryRouter = newIsolatedQueryRouter();
+    try {
+      ServerInstance healthyInstance = new ServerInstance("localhost", healthyPort);
+      ServerInstance invalidInstance = new ServerInstance("localhost", invalidPort);
+      ServerRoutingInstance healthyRoutingInstance =
+          healthyInstance.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY);
+      ServerRoutingInstance invalidRoutingInstance =
+          invalidInstance.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY);
+      Map<ServerInstance, SegmentsToQuery> routingTable =
+          Map.of(healthyInstance, new SegmentsToQuery(List.of(), List.of()),
+              invalidInstance, new SegmentsToQuery(List.of(), List.of()));
+
+      BrokerRequest brokerRequest =
+          CalciteSqlCompiler.compileToBrokerRequest("SET skipUnavailableServers=true; SELECT * FROM testTable");
+      long startTime = System.currentTimeMillis();
+      AsyncQueryResponse asyncQueryResponse =
+          queryRouter.submitQuery(requestId, "testTable", brokerRequest, routingTable, null, null, timeoutMs);
+      Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
+      long elapsed = System.currentTimeMillis() - startTime;
+
+      assertEquals(response.size(), 2);
+      assertTrue(response.containsKey(healthyRoutingInstance));
+      assertTrue(response.containsKey(invalidRoutingInstance));
+
+      ServerResponse healthyResponse = response.get(healthyRoutingInstance);
+      assertNotNull(healthyResponse.getDataTable());
+      assertEquals(healthyResponse.getDataTable().getNumberOfRows(), 1);
+      assertEquals(healthyResponse.getDataTable().getString(0, 0), "value1");
+
+      ServerResponse invalidResponse = response.get(invalidRoutingInstance);
+      assertNotNull(invalidResponse.getDataTable());
+      assertTrue(invalidResponse.getDataTable().getExceptions()
+          .containsKey(QueryErrorCode.DESERIALIZATION_ERROR.getId()));
+
+      assertEquals(asyncQueryResponse.getFailedServer(), invalidRoutingInstance);
+      assertTrue(elapsed < timeoutMs, "Expected immediate completion before timeout, elapsed=" + elapsed);
+    } finally {
+      healthyServer.shutDown();
+      invalidServer.shutDown();
       queryRouter.shutDown();
     }
   }

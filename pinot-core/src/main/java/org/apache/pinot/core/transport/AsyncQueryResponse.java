@@ -29,6 +29,7 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 
@@ -181,6 +182,26 @@ public class AsyncQueryResponse implements QueryResponse {
 
   void markRequestSent(ServerRoutingInstance serverRoutingInstance, int requestSentLatencyMs) {
     _responseMap.get(serverRoutingInstance).markRequestSent(requestSentLatencyMs);
+  }
+
+  // Issue #18866: Handle server DataTable deserialization errors without waiting for query timeout
+  void receiveDeserializationError(ServerRoutingInstance serverRoutingInstance, Exception exception,
+      int responseSize, int deserializationTimeMs) {
+    if (!shouldActOnServerDown(serverRoutingInstance)) {
+      return;
+    }
+    if (!_countedDownServers.add(serverRoutingInstance)) {
+      return;
+    }
+    _failedServer = serverRoutingInstance;
+    DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
+    dataTable.getMetadata().put(DataTable.MetadataKey.REQUEST_ID.getName(), Long.toString(_requestId));
+    dataTable.addException(QueryErrorCode.DESERIALIZATION_ERROR.getId(),
+        exception.getMessage() != null ? exception.getMessage() : exception.toString());
+    ServerResponse response = _responseMap.get(serverRoutingInstance);
+    response.receiveDeserializationError(dataTable, responseSize, deserializationTimeMs);
+    _numServersResponded.getAndIncrement();
+    _countDownLatch.countDown();
   }
 
   void receiveDataTable(ServerRoutingInstance serverRoutingInstance, DataTable dataTable, int responseSize,
