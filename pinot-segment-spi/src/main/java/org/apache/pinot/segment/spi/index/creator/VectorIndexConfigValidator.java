@@ -44,7 +44,7 @@ public final class VectorIndexConfigValidator {
       Arrays.asList("maxCon", "beamWidth", "maxDimensions", "maxBufferSizeMB",
           "useCompoundFile", "mode", "commit", "commitIntervalMs", "commitDocs",
           "refreshMinIntervalMs", "refreshWaitTimeoutMs", VectorIndexConfig.MMAP_GRAPH_ON_MERGE, "buildThreads",
-          "forceMerge", "parallelBuildMaxDocs")));
+          "forceMerge", "concurrentMerge", "parallelBuildMaxDocs")));
 
   /// Upper bound for the HNSW `buildThreads` property: each thread opens its own Lucene IndexWriter and directory
   /// during segment build, so an unbounded value can exhaust threads and file handles.
@@ -274,6 +274,7 @@ public final class VectorIndexConfigValidator {
     }
     validatePositiveIntProperty(properties, "parallelBuildMaxDocs", "HNSW parallelBuildMaxDocs");
     validateBooleanProperty(properties, "forceMerge", "HNSW forceMerge");
+    validateBooleanProperty(properties, "concurrentMerge", "HNSW concurrentMerge");
     // Rejected here rather than only in MutableVectorIndex: the constructor guard runs when a consuming segment is
     // created on the server, which would stop ingestion for the partition instead of failing the table config.
     validateLongProperty(properties, "refreshMinIntervalMs", "HNSW refreshMinIntervalMs", 0L);
