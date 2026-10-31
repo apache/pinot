@@ -28,7 +28,9 @@ import org.apache.calcite.jdbc.CalciteSchema;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.core.Filter;
 import org.apache.calcite.rel.core.Match;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalAggregate;
@@ -64,6 +66,10 @@ import static org.testng.Assert.expectThrows;
 /// Tests the two MATCH_RECOGNIZE rel conversions: [RelToPlanNodeConverter] lowering Calcite's `LogicalMatch` into a
 /// [MatchNode], and [PlanNodeToRelConverter] rebuilding a `LogicalMatch` from it.
 public class MatchNodeConverterTest extends QueryEnvironmentTestBase {
+  /// `B?` can match no row, and then every navigation over `B` is null although `B.col3` is NOT NULL in table `a`. A
+  /// bare `B.col3` measure is validated as `FINAL(B.col3)`, so `b` covers `LAST` and `b2` covers `FINAL` alone.
+  private static final String OPTIONAL_VARIABLE_MATCH_QUERY = "SELECT b, b2 FROM a MATCH_RECOGNIZE (PARTITION BY col1 "
+      + "ORDER BY ts MEASURES LAST(B.col3) AS b, B.col3 AS b2 PATTERN (A B?) DEFINE A AS A.col3 > 0, B AS B.col3 > 0)";
 
   @Test(dataProvider = "patternQueries")
   public void testPatternIsLowered(String patternClause, String expectedPattern) {
@@ -286,6 +292,43 @@ public class MatchNodeConverterTest extends QueryEnvironmentTestBase {
       assertEquals(aggregate.getAggCallList().get(0).rexList.size()
               + aggregate.getAggCallList().get(0).getArgList().size(), 1,
           "COUNT(CLASSIFIER()) must not be simplified to COUNT(*) in:\n" + plan);
+    }
+  }
+
+  @Test
+  public void testNavigationMeasuresOverAnOptionalVariableAreNullable() {
+    try (var compiled = _queryEnvironment.compile(OPTIONAL_VARIABLE_MATCH_QUERY)) {
+      Match match = findMatch(compiled.getRelNode());
+      assertNotNull(match, "Expected a match node");
+      assertTrue(match.getRowType().getField("b", true, false).getType().isNullable(),
+          "LAST(B.col3) must be nullable because it is null when B matched no row");
+      assertTrue(match.getRowType().getField("b2", true, false).getType().isNullable(),
+          "B.col3 must be nullable because it is null when B matched no row");
+    }
+  }
+
+  @Test
+  public void testCountOverNavigationMeasureKeepsItsOperand() {
+    try (var compiled = _queryEnvironment.compile(
+        "SELECT COUNT(b) FROM (" + OPTIONAL_VARIABLE_MATCH_QUERY + ") matches")) {
+      String plan = RelOptUtil.toString(compiled.getRelNode());
+      PinotLogicalAggregate aggregate = findLeafAggregate(compiled.getRelNode());
+      assertNotNull(aggregate, "Expected a leaf aggregate in:\n" + plan);
+      assertEquals(aggregate.getAggCallList().size(), 1);
+      assertEquals(aggregate.getAggCallList().get(0).rexList.size()
+              + aggregate.getAggCallList().get(0).getArgList().size(), 1,
+          "COUNT(LAST(B.col3)) must not be simplified to COUNT(*) in:\n" + plan);
+    }
+  }
+
+  @Test
+  public void testIsNullOverNavigationMeasureIsNotFolded() {
+    try (var compiled = _queryEnvironment.compile(
+        "SELECT b FROM (" + OPTIONAL_VARIABLE_MATCH_QUERY + ") matches WHERE b IS NULL")) {
+      String plan = RelOptUtil.toString(compiled.getRelNode());
+      Filter filter = findFilterAboveMatch(compiled.getRelNode());
+      assertNotNull(filter, "b IS NULL must stay a filter above the match, not fold to empty values, in:\n" + plan);
+      assertEquals(filter.getCondition().getKind(), SqlKind.IS_NULL, "Unexpected filter condition in:\n" + plan);
     }
   }
 
@@ -533,6 +576,20 @@ public class MatchNodeConverterTest extends QueryEnvironmentTestBase {
       Match match = findMatch(input);
       if (match != null) {
         return match;
+      }
+    }
+    return null;
+  }
+
+  @Nullable
+  private static Filter findFilterAboveMatch(RelNode rel) {
+    if (rel instanceof Filter && findMatch(((Filter) rel).getInput()) != null) {
+      return (Filter) rel;
+    }
+    for (RelNode input : rel.getInputs()) {
+      Filter filter = findFilterAboveMatch(input);
+      if (filter != null) {
+        return filter;
       }
     }
     return null;
