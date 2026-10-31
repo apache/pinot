@@ -26,6 +26,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.codecs.lucene912.Lucene912Codec;
@@ -324,6 +325,13 @@ public class VectorIndexUtils {
   }
 
   public static IndexWriterConfig getIndexWriterConfig(VectorIndexConfig vectorIndexConfig) {
+    return getIndexWriterConfig(vectorIndexConfig, 1, null);
+  }
+
+  /// Same as [#getIndexWriterConfig(VectorIndexConfig)], but merges HNSW graphs with `numMergeWorkers` threads from
+  /// `mergeExec` (see [HnswVectorsFormat]).
+  public static IndexWriterConfig getIndexWriterConfig(VectorIndexConfig vectorIndexConfig, int numMergeWorkers,
+      @Nullable ExecutorService mergeExec) {
     IndexWriterConfig indexWriterConfig = new IndexWriterConfig();
 
     double maxBufferSizeMB = Double.parseDouble(vectorIndexConfig.getProperties()
@@ -344,7 +352,7 @@ public class VectorIndexUtils {
         .getOrDefault("maxDimensions", String.valueOf(HnswVectorsFormat.DEFAULT_MAX_DIMENSIONS)));
 
     HnswVectorsFormat knnVectorsFormat =
-        new HnswVectorsFormat(maxCon, beamWidth, maxDimensions);
+        new HnswVectorsFormat(maxCon, beamWidth, maxDimensions, numMergeWorkers, mergeExec);
 
     Lucene912Codec.Mode mode = Lucene912Codec.Mode.valueOf(vectorIndexConfig.getProperties()
         .getOrDefault("mode", Lucene912Codec.Mode.BEST_SPEED.name()));
