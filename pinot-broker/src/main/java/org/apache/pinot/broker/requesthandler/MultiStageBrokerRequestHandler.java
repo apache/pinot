@@ -87,6 +87,7 @@ import org.apache.pinot.query.ImmutableQueryEnvironment;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.explain.AskingServerStageExplainer;
+import org.apache.pinot.query.planner.logical.SpoolMode;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -160,6 +161,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   protected final String _defaultStreamingGroupByFlushThreshold;
   @Nullable
   protected final String _defaultStreamingDistinctFlushThreshold;
+  /// Parsed once so that an invalid [CommonConstants.Broker#CONFIG_OF_SPOOLS] fails the broker start, not every query.
+  private final SpoolMode _defaultSpoolMode;
 
   protected final PinotMeter _stagesStartedMeter = BrokerMeter.MSE_STAGES_STARTED.getGlobalMeter();
   protected final PinotMeter _stagesFinishedMeter = BrokerMeter.MSE_STAGES_COMPLETED.getGlobalMeter();
@@ -256,6 +259,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         CommonConstants.Broker.DEFAULT_MSE_STREAMING_DISTINCT_FLUSH_THRESHOLD);
     _defaultStreamingDistinctFlushThreshold =
         streamingDistinctFlushThreshold > 0 ? Integer.toString(streamingDistinctFlushThreshold) : null;
+    _defaultSpoolMode = SpoolMode.fromString(_config.getProperty(CommonConstants.Broker.CONFIG_OF_SPOOLS,
+        CommonConstants.Broker.DEFAULT_SPOOLS_MODE));
   }
 
   /// Returns the planner rules disabled by default: the comma-separated list in
@@ -549,8 +554,6 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     String database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptions, httpHeaders);
     boolean inferPartitionHint = _config.getProperty(CommonConstants.Broker.CONFIG_OF_INFER_PARTITION_HINT,
         CommonConstants.Broker.DEFAULT_INFER_PARTITION_HINT);
-    boolean defaultUseSpool = _config.getProperty(CommonConstants.Broker.CONFIG_OF_SPOOLS,
-        CommonConstants.Broker.DEFAULT_OF_SPOOLS);
     boolean defaultUseLeafServerForIntermediateStage = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_USE_LEAF_SERVER_FOR_INTERMEDIATE_STAGE,
         CommonConstants.Broker.DEFAULT_USE_LEAF_SERVER_FOR_INTERMEDIATE_STAGE);
@@ -615,7 +618,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .isCaseSensitive(caseSensitive)
         .isNullHandlingEnabled(QueryOptionsUtils.isNullHandlingEnabled(queryOptions))
         .defaultInferPartitionHint(inferPartitionHint)
-        .defaultUseSpools(defaultUseSpool)
+        .defaultSpoolMode(_defaultSpoolMode)
         .defaultUnnestColumnPruning(defaultUnnestColumnPruning)
         .defaultUseLeafServerForIntermediateStage(defaultUseLeafServerForIntermediateStage)
         .defaultEnableGroupTrim(defaultEnableGroupTrim)
