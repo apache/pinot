@@ -195,6 +195,32 @@ public class MatchNodeConverterTest extends QueryEnvironmentTestBase {
     assertEquals(refs.get(0).getSymbolOrdinal(), RexExpression.PatternFieldRef.UNIVERSAL_SYMBOL_ORDINAL);
   }
 
+  /// `PREV` of a column that is not qualified by the variable being defined must reach the plan as physical navigation
+  /// from that variable's last row, `PREV(LAST(x, 0), n)`. Calcite's validator would otherwise turn it into the logical
+  /// `LAST(x, n)`, the n-th row before the current one within the match, which is NULL in every single-row match.
+  /// `*` renders the universal row pattern variable and the number after the dot is the input column (col3 = 2).
+  @Test(dataProvider = "prevDefinitionQueries")
+  public void testPrevOfAnotherVariableStaysPhysicalNavigation(String definition, String expectedDefinition) {
+    MatchNode match = planMatch("SELECT * FROM a MATCH_RECOGNIZE (ORDER BY ts MEASURES MATCH_NUMBER() AS mno "
+        + "PATTERN (A B) DEFINE A AS A.col3 > 0, B AS " + definition + ")");
+    assertEquals(symbolNames(match), List.of("A", "B"));
+    assertEquals(render(match.getPatternSymbols().get(1).getDefinition()), expectedDefinition);
+  }
+
+  @DataProvider(name = "prevDefinitionQueries")
+  public Object[][] prevDefinitionQueries() {
+    //@formatter:off
+    return new Object[][]{
+        // Unqualified: the universal row pattern variable, whose last row in DEFINE is the current row.
+        new Object[]{"PREV(col3) < col3", "LESS_THAN(PREV(LAST(*.2, 0), 1), LAST(*.2, 0))"},
+        // Cross-variable: the row physically before the last row mapped to A.
+        new Object[]{"B.col3 > PREV(A.col3)", "GREATER_THAN(PREV(B.2, 0), PREV(LAST(A.2, 0), 1))"},
+        // Qualified by the defined variable: Calcite already keeps this physical, so it is not rewritten.
+        new Object[]{"B.col3 > PREV(B.col3)", "GREATER_THAN(PREV(B.2, 0), PREV(B.2, 1))"}
+    };
+    //@formatter:on
+  }
+
   @Test(dataProvider = "afterMatchQueries")
   public void testAfterMatchSkipMode(String afterClause, MatchNode.AfterMatchSkipMode expectedMode,
       int expectedOrdinal) {
@@ -459,6 +485,26 @@ public class MatchNodeConverterTest extends QueryEnvironmentTestBase {
 
   private static List<String> symbolNames(MatchNode match) {
     return match.getPatternSymbols().stream().map(PatternSymbol::getName).collect(Collectors.toList());
+  }
+
+  /// Renders a MATCH_RECOGNIZE expression as `FUNCTION(operand, ...)`, a literal as its value, and a pattern field
+  /// reference as `variable.column`, with `*` for the universal row pattern variable.
+  private static String render(@Nullable RexExpression expression) {
+    if (expression instanceof RexExpression.PatternFieldRef) {
+      RexExpression.PatternFieldRef ref = (RexExpression.PatternFieldRef) expression;
+      String variable = ref.getSymbolOrdinal() == RexExpression.PatternFieldRef.UNIVERSAL_SYMBOL_ORDINAL ? "*"
+          : ref.getAlpha();
+      return variable + "." + ref.getIndex();
+    }
+    if (expression instanceof RexExpression.Literal) {
+      return String.valueOf(((RexExpression.Literal) expression).getValue());
+    }
+    if (expression instanceof RexExpression.FunctionCall) {
+      RexExpression.FunctionCall call = (RexExpression.FunctionCall) expression;
+      return call.getFunctionOperands().stream().map(MatchNodeConverterTest::render)
+          .collect(Collectors.joining(", ", call.getFunctionName() + "(", ")"));
+    }
+    return String.valueOf(expression);
   }
 
   private static List<RexExpression.PatternFieldRef> collectPatternFieldRefs(@Nullable RexExpression expression) {
