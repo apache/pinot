@@ -69,8 +69,7 @@ public class DropwizardMetricsRegistry implements PinotMetricsRegistry {
 
   @Override
   public PinotTimer newTimer(PinotMetricName name, TimeUnit durationUnit, TimeUnit rateUnit) {
-    Timer timer = _metricRegistry.timer(name.getMetricName().toString(),
-        () -> new Timer(new SlidingTimeWindowArrayReservoir(15, TimeUnit.MINUTES)));
+    Timer timer = _metricRegistry.timer(name.getMetricName().toString());
     return new DropwizardTimer(timer);
   }
 

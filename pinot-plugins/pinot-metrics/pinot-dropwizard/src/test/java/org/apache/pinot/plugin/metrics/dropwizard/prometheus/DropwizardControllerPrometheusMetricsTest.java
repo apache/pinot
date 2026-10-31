@@ -19,17 +19,11 @@
 
 package org.apache.pinot.plugin.metrics.dropwizard.prometheus;
 
-import org.apache.pinot.common.metrics.ControllerGauge;
-import org.apache.pinot.common.metrics.ControllerMeter;
-import org.apache.pinot.common.metrics.ControllerTimer;
 import org.apache.pinot.common.metrics.prometheus.ControllerPrometheusMetricsTest;
 import org.apache.pinot.plugin.metrics.dropwizard.DropwizardMetricsFactory;
 import org.apache.pinot.spi.annotations.metrics.PinotMetricsFactory;
-import org.testng.annotations.Test;
 
 
-/// Disabling tests as Pinot currently uses Yammer and these tests fail for [DropwizardMetricsFactory]
-@Test(enabled = false) // enabled=false on class level doesn't seem to work in intellij
 public class DropwizardControllerPrometheusMetricsTest extends ControllerPrometheusMetricsTest {
 
   @Override
@@ -39,22 +33,6 @@ public class DropwizardControllerPrometheusMetricsTest extends ControllerPrometh
 
   @Override
   protected String getConfigFile() {
-    //todo: return the correct dir once this test is enabled
-    return null;
-  }
-
-  @Test(dataProvider = "controllerTimers", enabled = false)
-  public void timerTest(ControllerTimer controllerTimer) {
-    super.timerTest(controllerTimer);
-  }
-
-  @Test(dataProvider = "controllerMeters", enabled = false)
-  public void meterTest(ControllerMeter meter) {
-    super.meterTest(meter);
-  }
-
-  @Test(dataProvider = "controllerGauges", enabled = false)
-  public void gaugeTest(ControllerGauge controllerGauge) {
-    super.gaugeTest(controllerGauge);
+    return "../../../docker/images/pinot/etc/jmx_prometheus_javaagent/configs-dropwizard/controller.yml";
   }
 }

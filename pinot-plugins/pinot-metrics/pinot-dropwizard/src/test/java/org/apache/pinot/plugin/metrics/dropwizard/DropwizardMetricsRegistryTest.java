@@ -18,9 +18,14 @@
  */
 package org.apache.pinot.plugin.metrics.dropwizard;
 
+import com.codahale.metrics.Timer;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.metrics.PinotGauge;
-import org.testng.Assert;
+import org.apache.pinot.spi.metrics.PinotTimer;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class DropwizardMetricsRegistryTest {
@@ -30,8 +35,23 @@ public class DropwizardMetricsRegistryTest {
     DropwizardSettableGauge<Long> dropwizardSettableGauge = new DropwizardSettableGauge<>(1L);
     DropwizardGauge<Long> dropwizardGauge = new DropwizardGauge<>(dropwizardSettableGauge);
     PinotGauge<Long> pinotGauge = dropwizardMetricsRegistry.newGauge(new DropwizardMetricName("test"), dropwizardGauge);
-    Assert.assertEquals(pinotGauge.value(), Long.valueOf(1L));
+    assertEquals(pinotGauge.value(), Long.valueOf(1L));
     pinotGauge = dropwizardMetricsRegistry.newGauge(new DropwizardMetricName("test"), null);
-    Assert.assertEquals(pinotGauge.value(), Long.valueOf(1L));
+    assertEquals(pinotGauge.value(), Long.valueOf(1L));
+  }
+
+  @Test
+  public void testTimerReservoirIsBounded() {
+    DropwizardMetricsRegistry registry = new DropwizardMetricsRegistry();
+    PinotTimer timer = registry.newTimer(new DropwizardMetricName("timer"), TimeUnit.MILLISECONDS, TimeUnit.SECONDS);
+    int updates = 10_000;
+    for (int i = 0; i < updates; i++) {
+      timer.update(1, TimeUnit.MILLISECONDS);
+    }
+
+    assertEquals(timer.count(), (long) updates);
+    int retainedSamples = ((Timer) timer.getTimer()).getSnapshot().size();
+    assertTrue(retainedSamples > 0 && retainedSamples <= 1028,
+        "Timer retained " + retainedSamples + " samples after " + updates + " updates");
   }
 }
