@@ -286,19 +286,30 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
   }
 
   private class IngestionMetricsRemoveMessageHandler extends DefaultMessageHandler {
+    private final boolean _endOfPartitionGroup;
 
     IngestionMetricsRemoveMessageHandler(IngestionMetricsRemoveMessage message, ServerMetrics metrics,
         NotificationContext context) {
       super(message, metrics, context);
+      _endOfPartitionGroup = message.isEndOfPartitionGroup();
     }
 
     @Override
     public HelixTaskResult handleMessage() {
-      _logger.info("Handling ingestion metrics remove message for table: {}, segment: {}", _tableNameWithType,
-          _segmentName);
+      _logger.info("Handling ingestion metrics remove message for table: {}, segment: {}, end of partition group: {}",
+          _tableNameWithType, _segmentName, _endOfPartitionGroup);
       TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(_tableNameWithType);
       if (tableDataManager instanceof RealtimeTableDataManager) {
-        ((RealtimeTableDataManager) tableDataManager).removeIngestionMetrics(_segmentName);
+        RealtimeTableDataManager realtimeTableDataManager = (RealtimeTableDataManager) tableDataManager;
+        realtimeTableDataManager.removeIngestionMetrics(_segmentName);
+        if (_endOfPartitionGroup) {
+          try {
+            realtimeTableDataManager.removePartitionConsumingGauge(_segmentName);
+          } catch (Exception e) {
+            _logger.warn("Failed to remove consuming gauge for table: {}, segment: {}", _tableNameWithType,
+                _segmentName, e);
+          }
+        }
       }
       HelixTaskResult helixTaskResult = new HelixTaskResult();
       helixTaskResult.setSuccess(true);
