@@ -75,8 +75,8 @@ public class HnswVectorIndexCreator implements VectorIndexCreator {
   /// merged graph then depends on thread timing, so replicas that each build the index can return different top-K
   /// results for the same query, and recall can shift slightly. With `forceMerge=false` the graphs are kept as separate
   /// Lucene segments and searched together: the build is faster, but each query searches every graph, so query latency
-  /// is higher (2-3x in one benchmark with 4 threads). The number of graphs is at least `buildThreads`, and more when a thread's vectors exceed
-  /// `maxBufferSizeMB` and Lucene flushes it more than once.
+  /// is higher (2-3x in one benchmark with 4 threads). The number of graphs is at least `buildThreads`, and more when a
+  /// thread's vectors exceed `maxBufferSizeMB` and Lucene flushes it more than once.
   private final int _buildThreads;
   private final boolean _forceMerge;
   private final boolean _concurrentMerge;
