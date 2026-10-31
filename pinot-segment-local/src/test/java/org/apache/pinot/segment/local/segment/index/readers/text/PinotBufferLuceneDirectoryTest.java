@@ -94,7 +94,11 @@ public class PinotBufferLuceneDirectoryTest {
           try (IndexInput input = source.openInput(file.getName(), IOContext.READONCE)) {
             input.readBytes(bytes, 0, bytes.length);
           }
-          buffer.readFrom(file.getOffset(), bytes);
+          // Byte by byte, not readFrom: readFrom writes through toDirectByteBuffer, the method openInput reads
+          // through, so a wrong offset there would shift the write and the read alike and go unnoticed
+          for (int i = 0; i < bytes.length; i++) {
+            buffer.putByte(file.getOffset() + i, bytes[i]);
+          }
         }
 
         PinotBufferLuceneDirectory directory = new PinotBufferLuceneDirectory(buffer, fileMap, "text");
