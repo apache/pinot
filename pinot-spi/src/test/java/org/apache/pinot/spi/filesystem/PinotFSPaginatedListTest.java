@@ -35,7 +35,7 @@ import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 
 
-/// Tests for the 4-arg listFilesWithMetadata: default method guard clause and NoClosePinotFS delegation.
+/// Tests for the 4-arg listFilesWithMetadata (default method guard clause) and NoClosePinotFS delegation.
 public class PinotFSPaginatedListTest {
 
   private static final URI TEST_URI = URI.create("s3://bucket/data/");
@@ -106,6 +106,21 @@ public class PinotFSPaginatedListTest {
 
     assertEquals(result, expected);
     verify(mockDelegate).listFilesWithMetadata(TEST_URI, true, filter, 5);
+  }
+
+  /// PinotFSFactory hands out NoClosePinotFS, so without forwarding a sorted store would look unsorted.
+  @Test
+  public void testNoClosePinotFSDelegatesListingAfter() throws IOException {
+    final PinotFS mockDelegate = mock(PinotFS.class);
+    final List<FileMetadata> expected = Arrays.asList(
+        new FileMetadata.Builder().setFilePath("s3://bucket/data/d=2/f.parquet").setIsDirectory(false).build());
+    when(mockDelegate.supportsListingAfter()).thenReturn(true);
+    when(mockDelegate.listFilesWithMetadataAfter(TEST_URI, "s3://bucket/data/d=1/~", 7)).thenReturn(expected);
+
+    final NoClosePinotFS noCloseFS = new NoClosePinotFS(mockDelegate);
+
+    assertEquals(noCloseFS.supportsListingAfter(), true);
+    assertEquals(noCloseFS.listFilesWithMetadataAfter(TEST_URI, "s3://bucket/data/d=1/~", 7), expected);
   }
 
   @SuppressWarnings("unchecked")
