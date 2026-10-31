@@ -341,6 +341,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   // Rate limiting for reportDataLoss(). Only touched from the consumer thread.
   private long _lastDataLossReportTimeMs = -1;
   private int _dataLossBatchesSinceLastReport = 0;
+  // Where the most recent batch with loss was detected while the rate limit suppressed its report; null when every
+  // batch with loss has been reported.
+  @Nullable
+  private String _unreportedDataLossLocation;
   private SegmentCompletionProtocol.ReasonCode _stopReasonCode = null;
   private final Semaphore _segBuildSemaphore;
   private final boolean _isOffHeap;
@@ -1173,28 +1177,46 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   /// The [ServerGauge#STREAM_DATA_LOSS] gauge is set for every batch that reports loss. The ERROR log line and the
   /// segment error entry are emitted at most once per [#DATA_LOSS_REPORT_INTERVAL_MS] per segment, carrying the
   /// number of affected batches since the previous report, so a stream that keeps reporting loss on every poll
-  /// does not flood the log or churn the segment error cache.
+  /// does not flood the log or churn the segment error cache. A batch with loss whose report was suppressed is
+  /// reported by the first batch processed after the interval has elapsed, even when that batch and every one before
+  /// it is healthy, so a loss event that the stream recovers from within the interval still reaches the log and the
+  /// segment error cache. This method runs for every fetched batch, including empty ones, so the deferred report
+  /// follows the end of the interval within one fetch.
   ///
   /// @param messageBatch Message batch to validate
   @VisibleForTesting
   void reportDataLoss(MessageBatch messageBatch) {
     if (!messageBatch.hasDataLoss()) {
+      if (_unreportedDataLossLocation != null) {
+        long now = now();
+        if (now - _lastDataLossReportTimeMs >= DATA_LOSS_REPORT_INTERVAL_MS) {
+          logDataLoss(now, _unreportedDataLossLocation);
+        }
+      }
       return;
     }
     _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.STREAM_DATA_LOSS, 1L);
     _dataLossBatchesSinceLastReport++;
+    String location = "startOffset: " + _currentOffset + " batchFirstOffset: " + messageBatch.getFirstMessageOffset();
     long now = now();
     if (_lastDataLossReportTimeMs >= 0 && now - _lastDataLossReportTimeMs < DATA_LOSS_REPORT_INTERVAL_MS) {
+      _unreportedDataLossLocation = location;
       return;
     }
+    logDataLoss(now, location);
+  }
+
+  /// Emits the data-loss ERROR line and segment error entry for the most recent batch with loss, detected at the given
+  /// location, and restarts the rate-limit interval.
+  private void logDataLoss(long now, String location) {
     String message = "Message loss detected in stream partition: " + _partitionGroupId + " for table: "
-        + _tableNameWithType + " startOffset: " + _currentOffset + " batchFirstOffset: "
-        + messageBatch.getFirstMessageOffset() + " (batches with loss since last report: "
+        + _tableNameWithType + " " + location + " (batches with loss since last report: "
         + _dataLossBatchesSinceLastReport + ")";
     _segmentLogger.error(message);
     _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now, message, null));
     _lastDataLossReportTimeMs = now;
     _dataLossBatchesSinceLastReport = 0;
+    _unreportedDataLossLocation = null;
   }
 
   public StreamPartitionMsgOffset getCurrentOffset() {
