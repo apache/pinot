@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
+import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
@@ -188,6 +189,29 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     _groupByTrimThreshold = groupByTrimThreshold;
   }
 
+  /// Adds one plan node per segment to `planNodes`. With prefetch enabled, a segment for which the [FetchPlanner]
+  /// plans a [FetchContext] gets a plan node that acquires and releases its buffers around execution, and is added to
+  /// `fetchSegmentContexts` with its context added to `fetchContexts` at the same position. A segment for which the
+  /// planner returns null (it needs no fetch) gets the plain plan node, as without prefetch. The fetch lists are only
+  /// written with prefetch enabled, so they can be immutable empty lists otherwise.
+  private void addSegmentPlanNodes(List<SegmentContext> segmentContexts, QueryContext queryContext,
+      Function<SegmentContext, PlanNode> segmentPlanNodeMaker, List<PlanNode> planNodes,
+      List<SegmentContext> fetchSegmentContexts, List<FetchContext> fetchContexts) {
+    boolean enablePrefetch = queryContext.isEnablePrefetch();
+    for (SegmentContext segmentContext : segmentContexts) {
+      FetchContext fetchContext =
+          enablePrefetch ? _fetchPlanner.planFetchForProcessing(segmentContext.getIndexSegment(), queryContext) : null;
+      if (fetchContext != null) {
+        fetchSegmentContexts.add(segmentContext);
+        fetchContexts.add(fetchContext);
+        planNodes.add(new AcquireReleaseColumnsSegmentPlanNode(segmentPlanNodeMaker.apply(segmentContext),
+            segmentContext, fetchContext));
+      } else {
+        planNodes.add(segmentPlanNodeMaker.apply(segmentContext));
+      }
+    }
+  }
+
   @Override
   public Plan makeInstancePlan(List<SegmentContext> segmentContexts, QueryContext queryContext,
       ExecutorService executorService) {
@@ -197,27 +221,15 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
 
     int numSegments = segmentContexts.size();
     List<PlanNode> planNodes = new ArrayList<>(numSegments);
-    List<FetchContext> fetchContexts;
-    if (queryContext.isEnablePrefetch()) {
-      fetchContexts = new ArrayList<>(numSegments);
-      for (SegmentContext segmentContext : segmentContexts) {
-        FetchContext fetchContext =
-            _fetchPlanner.planFetchForProcessing(segmentContext.getIndexSegment(), queryContext);
-        fetchContexts.add(fetchContext);
-        planNodes.add(
-            new AcquireReleaseColumnsSegmentPlanNode(makeSegmentPlanNode(segmentContext, queryContext), segmentContext,
-                fetchContext));
-      }
-    } else {
-      fetchContexts = List.of();
-      for (SegmentContext segmentContext : segmentContexts) {
-        planNodes.add(makeSegmentPlanNode(segmentContext, queryContext));
-      }
-    }
+    boolean enablePrefetch = queryContext.isEnablePrefetch();
+    List<SegmentContext> fetchSegmentContexts = enablePrefetch ? new ArrayList<>(numSegments) : List.of();
+    List<FetchContext> fetchContexts = enablePrefetch ? new ArrayList<>(numSegments) : List.of();
+    addSegmentPlanNodes(segmentContexts, queryContext, segmentContext -> makeSegmentPlanNode(segmentContext,
+        queryContext), planNodes, fetchSegmentContexts, fetchContexts);
 
     CombinePlanNode combinePlanNode = createCombinePlanNode(planNodes, queryContext, executorService, null);
     return new GlobalPlanImplV0(
-        new InstanceResponsePlanNode(combinePlanNode, segmentContexts, fetchContexts, queryContext));
+        new InstanceResponsePlanNode(combinePlanNode, fetchSegmentContexts, fetchContexts, queryContext));
   }
 
   /// Resolves [AndRestrictionPushdownMode] for a query.
@@ -403,27 +415,15 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
 
     int numSegments = segmentContexts.size();
     List<PlanNode> planNodes = new ArrayList<>(numSegments);
-    List<FetchContext> fetchContexts;
-    if (queryContext.isEnablePrefetch()) {
-      fetchContexts = new ArrayList<>(numSegments);
-      for (SegmentContext segmentContext : segmentContexts) {
-        FetchContext fetchContext =
-            _fetchPlanner.planFetchForProcessing(segmentContext.getIndexSegment(), queryContext);
-        fetchContexts.add(fetchContext);
-        planNodes.add(
-            new AcquireReleaseColumnsSegmentPlanNode(makeStreamingSegmentPlanNode(segmentContext, queryContext),
-                segmentContext, fetchContext));
-      }
-    } else {
-      fetchContexts = List.of();
-      for (SegmentContext segmentContext : segmentContexts) {
-        planNodes.add(makeStreamingSegmentPlanNode(segmentContext, queryContext));
-      }
-    }
+    boolean enablePrefetch = queryContext.isEnablePrefetch();
+    List<SegmentContext> fetchSegmentContexts = enablePrefetch ? new ArrayList<>(numSegments) : List.of();
+    List<FetchContext> fetchContexts = enablePrefetch ? new ArrayList<>(numSegments) : List.of();
+    addSegmentPlanNodes(segmentContexts, queryContext, segmentContext -> makeStreamingSegmentPlanNode(segmentContext,
+        queryContext), planNodes, fetchSegmentContexts, fetchContexts);
 
     CombinePlanNode combinePlanNode = createCombinePlanNode(planNodes, queryContext, executorService, streamer);
-    return new GlobalPlanImplV0(
-        new StreamingInstanceResponsePlanNode(combinePlanNode, segmentContexts, fetchContexts, queryContext, streamer));
+    return new GlobalPlanImplV0(new StreamingInstanceResponsePlanNode(combinePlanNode, fetchSegmentContexts,
+        fetchContexts, queryContext, streamer));
   }
 
   @Override
