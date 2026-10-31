@@ -414,5 +414,87 @@
         "ignoreLiteMode": true
       }
     ]
+  },
+  "lookup_join_aliased_dimension_columns": {
+    "comment": "The dimension side of a lookup join is a Project over a TableScan. The Project output names can be aliases, so the lookup must read the dimension table by the physical column names that the Project references.",
+    "tables": {
+      "fact_tbl": {
+        "schema": [
+          {"name": "dim_key", "type": "INT"}
+        ],
+        "inputs": [
+          [1],
+          [2],
+          [3]
+        ]
+      },
+      "dim_tbl": {
+        "schema": [
+          {"name": "id", "type": "INT"},
+          {"name": "a", "type": "STRING"},
+          {"name": "b", "type": "STRING"}
+        ],
+        "inputs": [
+          [1, "a1", "b1"],
+          [2, "a2", "b2"]
+        ],
+        "replicated": true,
+        "isDimTable": true,
+        "primaryKeyColumns": ["id"]
+      }
+    },
+    "queries": [
+      {
+        "description": "Aliases that swap two dimension columns",
+        "sql": "SELECT /*+ joinOptions(join_strategy='lookup') */ f.dim_key, d.a, d.b FROM {fact_tbl} f JOIN (SELECT id, a AS b, b AS a FROM {dim_tbl}) d ON f.dim_key = d.id",
+        "outputs": [
+          [1, "b1", "a1"],
+          [2, "b2", "a2"]
+        ],
+        "ignoreLiteMode": true
+      },
+      {
+        "description": "Alias on the primary key column",
+        "sql": "SELECT /*+ joinOptions(join_strategy='lookup') */ f.dim_key, d.a FROM {fact_tbl} f JOIN (SELECT id AS k, a FROM {dim_tbl}) d ON f.dim_key = d.k",
+        "outputs": [
+          [1, "a1"],
+          [2, "a2"]
+        ],
+        "ignoreLiteMode": true
+      },
+      {
+        "description": "Alias on a non-key column",
+        "sql": "SELECT /*+ joinOptions(join_strategy='lookup') */ f.dim_key, d.x FROM {fact_tbl} f LEFT JOIN (SELECT id, a AS x FROM {dim_tbl}) d ON f.dim_key = d.id",
+        "outputs": [
+          [1, "a1"],
+          [2, "a2"],
+          [3, null]
+        ],
+        "ignoreLiteMode": true
+      },
+      {
+        "description": "A filter inside the dimension subquery is rejected, because the lookup cannot apply it",
+        "sql": "SELECT /*+ joinOptions(join_strategy='lookup') */ f.dim_key, d.a FROM {fact_tbl} f JOIN (SELECT id, a FROM {dim_tbl} WHERE b = 'b1') d ON f.dim_key = d.id",
+        "expectedException": ".*(Project over (a )?TableScan|right side deeper than 2 levels).*",
+        "outputs": [],
+        "ignoreLiteMode": true
+      },
+      {
+        "description": "A computed column in the dimension subquery is rejected, because the lookup reads table columns only",
+        "sql": "SELECT /*+ joinOptions(join_strategy='lookup') */ f.dim_key, d.u FROM {fact_tbl} f JOIN (SELECT id, UPPER(a) AS u FROM {dim_tbl}) d ON f.dim_key = d.id",
+        "expectedException": ".*(identifier \\(RexInputRef\\) only Project|must project columns only).*",
+        "outputs": [],
+        "ignoreLiteMode": true
+      },
+      {
+        "description": "A dimension column projected twice",
+        "sql": "SELECT /*+ joinOptions(join_strategy='lookup') */ f.dim_key, d.a, d.a2 FROM {fact_tbl} f JOIN (SELECT id, a, a AS a2 FROM {dim_tbl}) d ON f.dim_key = d.id",
+        "outputs": [
+          [1, "a1", "a1"],
+          [2, "a2", "a2"]
+        ],
+        "ignoreLiteMode": true
+      }
+    ]
   }
 }
