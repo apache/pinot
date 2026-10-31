@@ -25,6 +25,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -846,11 +847,10 @@ public class RealtimeSegmentDataManagerTest {
   }
 
   private void assertStartupAfterLocalRelease(boolean releaseBeforeWait, boolean missingHistory) throws Exception {
-    Map<Integer, ConsumerCoordinator> coordinators = new ConcurrentHashMap<>();
+    Map<Integer, ConsumerCoordinator> coordinators = new HashMap<>();
     CountDownLatch firstCheck = new CountDownLatch(1);
     CountDownLatch finishFirstCheck = new CountDownLatch(releaseBeforeWait ? 1 : 0);
     CountDownLatch recheckedAfterRelease = new CountDownLatch(1);
-    AtomicBoolean first = new AtomicBoolean(true);
     try (FakeRealtimeSegmentDataManager predecessor =
         createStartupSegmentManager(SEQUENCE_ID - 1, coordinators, () -> true)) {
       ConsumerCoordinator coordinator = coordinators.get(PARTITION_GROUP_ID);
@@ -862,14 +862,12 @@ public class RealtimeSegmentDataManagerTest {
           recheckedAfterRelease.countDown();
         }
         boolean result = released && !missingHistory;
-        if (first.compareAndSet(true, false)) {
-          firstCheck.countDown();
-          try {
-            assertTrue(finishFirstCheck.await(10, TimeUnit.SECONDS), "First readiness check was not released");
-          } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new AssertionError(e);
-          }
+        firstCheck.countDown();
+        try {
+          assertTrue(finishFirstCheck.await(10, TimeUnit.SECONDS), "First readiness check was not released");
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          throw new AssertionError(e);
         }
         return result;
       };
