@@ -491,6 +491,15 @@ public class ConsumerCoordinatorTest {
       assertTrue(second.result().get(2, TimeUnit.SECONDS));
       fixture.assertGauge(0);
       assertTrue(fixture._gaugeUpdates.isEmpty(), "Repeated false checks must not count the same waiter again");
+
+      // A subsequent wait recreates the gauge after the last prior waiter removed it.
+      firstReady.set(false);
+      ReadinessWaiter later = fixture.start(firstReady::get, () -> false);
+      fixture.assertGauge(1);
+      firstReady.set(true);
+      fixture.signalRelease();
+      assertTrue(later.result().get(2, TimeUnit.SECONDS));
+      fixture.assertGauge(0);
     }
   }
 
@@ -557,10 +566,16 @@ public class ConsumerCoordinatorTest {
       ServerMetrics metrics = mock(ServerMetrics.class);
       doAnswer(invocation -> {
         Supplier<Long> value = invocation.getArgument(3);
-        _gaugeUpdates.add(value.get());
+        long waiters = value.get();
+        assertTrue(waiters > 0, "An idle readiness gauge must be removed instead of publishing zero");
+        _gaugeUpdates.add(waiters);
         return null;
       }).when(metrics).setOrUpdatePartitionGauge(eq("tableTest_REALTIME"), eq(1),
           eq(ServerGauge.CONSUMERS_WAITING_FOR_READINESS), any());
+      doAnswer(invocation -> {
+        _gaugeUpdates.add(0L);
+        return null;
+      }).when(metrics).removePartitionGauge("tableTest_REALTIME", 1, ServerGauge.CONSUMERS_WAITING_FOR_READINESS);
       RealtimeTableDataManager table = mock(RealtimeTableDataManager.class);
       when(table.getTableName()).thenReturn("tableTest_REALTIME");
       try (MockedStatic<ServerMetrics> factory = mockStatic(ServerMetrics.class)) {

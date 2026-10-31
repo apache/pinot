@@ -158,8 +158,14 @@ public class ConsumerCoordinator {
   private void updateReadinessWaiters(int partitionGroupId, int delta) {
     _readinessWaiters += delta;
     long waiters = _readinessWaiters;
-    _serverMetrics.setOrUpdatePartitionGauge(_realtimeTableDataManager.getTableName(), partitionGroupId,
-        ServerGauge.CONSUMERS_WAITING_FOR_READINESS, () -> waiters);
+    if (waiters == 0) {
+      // Remove the idle gauge before this partition or table is discarded. A later waiter recreates it.
+      _serverMetrics.removePartitionGauge(_realtimeTableDataManager.getTableName(), partitionGroupId,
+          ServerGauge.CONSUMERS_WAITING_FOR_READINESS);
+    } else {
+      _serverMetrics.setOrUpdatePartitionGauge(_realtimeTableDataManager.getTableName(), partitionGroupId,
+          ServerGauge.CONSUMERS_WAITING_FOR_READINESS, () -> waiters);
+    }
   }
 
   public void release() {
