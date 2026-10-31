@@ -607,16 +607,17 @@ public class SegmentMetadataImplTest {
           assertEquals(mapped.getSchema(), eager.getSchema());
         }
       }
-      // An unsupported sidecar version must rebuild from canonical metadata.
+      // An unsupported sidecar version, such as a version 1 file without transform provenance, must rebuild from
+      // canonical metadata.
       byte[] unsupportedVersion = Files.readAllBytes(sidecar.toPath());
       ByteBuffer header = ByteBuffer.wrap(unsupportedVersion).order(ByteOrder.BIG_ENDIAN);
-      header.putInt(4, 2);
+      header.putInt(4, 1);
       header.putInt(40, sidecarCrc(unsupportedVersion));
       Files.write(sidecar.toPath(), unsupportedVersion);
       try (SegmentMetadataImpl mapped = SegmentMetadataImpl.loadMapped(segmentDir)) {
         assertEquals(mapped.getSchema(), eager.getSchema());
       }
-      assertEquals(ByteBuffer.wrap(Files.readAllBytes(sidecar.toPath())).order(ByteOrder.BIG_ENDIAN).getInt(4), 1);
+      assertEquals(ByteBuffer.wrap(Files.readAllBytes(sidecar.toPath())).order(ByteOrder.BIG_ENDIAN).getInt(4), 2);
     } finally {
       FileUtils.deleteQuietly(segmentDir);
     }
