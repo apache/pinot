@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.List;
 import java.util.Map;
@@ -194,9 +195,9 @@ public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
           indexFileChannel);
 
       // Write the doc id mapping to the index file
-      ByteBuffer docIdMappingBuffer =
-          indexFileChannel.map(FileChannel.MapMode.READ_WRITE, indexFileChannel.position(), docIdMappingFileLength)
-              .order(ByteOrder.LITTLE_ENDIAN);
+      MappedByteBuffer docIdMappingBuffer =
+          indexFileChannel.map(FileChannel.MapMode.READ_WRITE, indexFileChannel.position(), docIdMappingFileLength);
+      docIdMappingBuffer.order(ByteOrder.LITTLE_ENDIAN);
       int numDocs = _numFlattenedRecordsList.size();
       for (int i = 0; i < numDocs; i++) {
         int numRecords = _numFlattenedRecordsList.getInt(i);
@@ -204,6 +205,7 @@ public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
           docIdMappingBuffer.putInt(i);
         }
       }
+      org.apache.pinot.common.utils.FileUtils.forceMappedBuffers(docIdMappingBuffer);
       if (CleanerUtil.UNMAP_SUPPORTED) {
         CleanerUtil.BufferCleaner cleaner = CleanerUtil.getCleaner();
         cleaner.freeBuffer(docIdMappingBuffer);

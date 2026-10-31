@@ -458,6 +458,24 @@ public class HttpClient implements AutoCloseable {
   public File downloadUntarFileStreamed(URI uri, int connectionRequestTimeoutMs, int socketTimeoutMs, File dest,
       AuthProvider authProvider, List<Header> httpHeaders, long maxStreamRateInByte)
       throws IOException, HttpErrorStatusException {
+    return downloadUntarFileStreamed(uri, connectionRequestTimeoutMs, socketTimeoutMs, dest, authProvider, httpHeaders,
+        maxStreamRateInByte, false);
+  }
+
+  /// Downloads and un-tars a segment stream, synchronizing each extracted segment file before returning.
+  ///
+  /// This is deliberately separate from [#downloadUntarFileStreamed] because ordinary extraction does not require
+  /// an fsync for every archive entry.
+  public File downloadUntarSegmentStreamed(URI uri, int connectionRequestTimeoutMs, int socketTimeoutMs, File dest,
+      AuthProvider authProvider, List<Header> httpHeaders, long maxStreamRateInByte)
+      throws IOException, HttpErrorStatusException {
+    return downloadUntarFileStreamed(uri, connectionRequestTimeoutMs, socketTimeoutMs, dest, authProvider, httpHeaders,
+        maxStreamRateInByte, true);
+  }
+
+  private File downloadUntarFileStreamed(URI uri, int connectionRequestTimeoutMs, int socketTimeoutMs, File dest,
+      AuthProvider authProvider, List<Header> httpHeaders, long maxStreamRateInByte, boolean syncExtractedFiles)
+      throws IOException, HttpErrorStatusException {
     ClassicHttpRequest request = getDownloadFileRequest(uri, authProvider, httpHeaders);
     File ret;
 
@@ -474,7 +492,8 @@ public class HttpClient implements AutoCloseable {
       }
 
       try (InputStream inputStream = response.getEntity().getContent()) {
-        ret = TarCompressionUtils.untarWithRateLimiter(inputStream, dest, maxStreamRateInByte).get(0);
+        ret = (syncExtractedFiles ? TarCompressionUtils.untarDurably(inputStream, dest, maxStreamRateInByte)
+            : TarCompressionUtils.untarWithRateLimiter(inputStream, dest, maxStreamRateInByte)).get(0);
       }
 
       LOGGER.info("Downloaded from: {} to: {} with rate limiter; Response status code: {}", uri, dest, statusCode);

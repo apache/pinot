@@ -107,6 +107,7 @@ public final class HnswVectorIndexCombined {
       long dataOffset = LuceneCombinedTextIndexConstants.getHeaderSize() + calculateMetadataSize(fileInfoMap);
       writeFileMetadata(outputChannel, fileInfoMap, dataOffset);
       writeFileData(outputChannel, fileInfoMap);
+      outputChannel.force(true);
     }
 
     LOGGER.info("Combined {} HNSW index files into: {} ({} bytes)", fileCount, outputFilePath, totalSize);
