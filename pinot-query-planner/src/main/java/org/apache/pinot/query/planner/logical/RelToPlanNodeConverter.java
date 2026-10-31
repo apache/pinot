@@ -58,6 +58,7 @@ import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexWindowExclusion;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
+import org.apache.pinot.calcite.rel.logical.PinotKWayMergeSortExchange;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalAggregate;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
@@ -577,6 +578,18 @@ public final class RelToPlanNodeConverter {
     List<RelFieldCollation> collations;
     boolean sortOnSender;
     boolean sortOnReceiver;
+    if (node instanceof PinotKWayMergeSortExchange) {
+      PinotKWayMergeSortExchange merge = (PinotKWayMergeSortExchange) node;
+      List<PlanNode> inputs = convertInputs(node.getInputs());
+      Preconditions.checkState(inputs.get(0) instanceof SortNode, "Merge exchange requires an explicit sender sort");
+      SortNode senderSort = ((SortNode) inputs.get(0)).requiringSingleRun();
+      inputs.set(0, senderSort);
+      if (_tracker != null) {
+        _tracker.trackCreation(merge.getInput(), senderSort);
+      }
+      return ExchangeNode.kWayMerge(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), inputs, distributionType,
+          distribution.getKeys(), merge.getCollation().getFieldCollations(), _hashFunction);
+    }
     if (node instanceof PinotLogicalSortExchange) {
       PinotLogicalSortExchange sortExchange = (PinotLogicalSortExchange) node;
       exchangeType = sortExchange.getExchangeType();
@@ -676,8 +689,19 @@ public final class RelToPlanNodeConverter {
     for (RexLiteral constant : node.constants) {
       constants.add(RexExpressionUtils.fromRexLiteral(constant));
     }
+    List<PlanNode> inputs = convertInputs(node.getInputs());
+    if (inputs.get(0) instanceof SortNode && ((SortNode) inputs.get(0)).getFetch() < 0) {
+      // Older servers ignore the single-run hint, so encode the complete receiver input as an explicit fetch.
+      SortNode sort = (SortNode) inputs.get(0);
+      SortNode fullSort = new SortNode(sort.getStageId(), sort.getDataSchema(), sort.getNodeHint(), sort.getInputs(),
+          sort.getCollations(), Integer.MAX_VALUE, sort.getOffset()).requiringSingleRun();
+      inputs.set(0, fullSort);
+      if (_tracker != null) {
+        _tracker.trackCreation(node.getInput(), fullSort);
+      }
+    }
     return new WindowNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.fromRelHints(node.getHints()),
-        convertInputs(node.getInputs()), windowGroup.keys.asList(), windowGroup.orderKeys.getFieldCollations(),
+        inputs, windowGroup.keys.asList(), windowGroup.orderKeys.getFieldCollations(),
         aggCalls, windowFrameType, lowerBound, upperBound, fromRexWindowExclusion(windowGroup.exclude), constants);
   }
 
