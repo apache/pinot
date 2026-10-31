@@ -482,6 +482,14 @@ public class MatchRecognizeIntegrationTest extends CustomDataQueryClusterIntegra
     assertMatchRows(neighbourQuery("PREV(priceCol) < priceCol"), ROWS_ABOVE_PREDECESSOR);
     assertMatchRows(neighbourQuery("PREV(priceCol) IS NULL"), FIRST_ROW_OF_EACH_PARTITION);
 
+    // CASE keeps its WHEN / THEN branches, and IN its values, in a list operand, so PREV there must stay physical too.
+    assertMatchRows(neighbourQuery("CASE WHEN PREV(priceCol) < priceCol THEN TRUE ELSE FALSE END"),
+        ROWS_ABOVE_PREDECESSOR);
+    assertMatchRows(neighbourQuery("CASE WHEN PREV(priceCol) IS NULL THEN TRUE ELSE FALSE END"),
+        FIRST_ROW_OF_EACH_PARTITION);
+    // Only the flat GOOG partition repeats its predecessor's price.
+    assertMatchRows(neighbourQuery("priceCol IN (PREV(priceCol), 0)"), new Object[][]{{"GOOG", 2, 4}, {"GOOG", 3, 4}});
+
     // Regression guard: in the V shape a matched row always precedes every DOWN / UP row, so the logical and the
     // physical previous row coincide there and the unqualified form must keep returning the qualified matches.
     assertMatchRows(canonicalVShapeQuery(
@@ -502,19 +510,15 @@ public class MatchRecognizeIntegrationTest extends CustomDataQueryClusterIntegra
   public void testPrevOfAnotherVariableNavigatesFromItsLastRow(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    String query = "SELECT * FROM " + getTableName() + " MATCH_RECOGNIZE ("
-        + " PARTITION BY symbolCol ORDER BY seqCol"
-        + " MEASURES LAST(A.seqCol) AS a_seq, LAST(B.seqCol) AS b_seq, LAST(B.priceCol) AS b_price"
-        + " ONE ROW PER MATCH AFTER MATCH SKIP PAST LAST ROW"
-        + " PATTERN (A B)"
-        + " DEFINE B AS B.priceCol > PREV(A.priceCol)"
-        + ") AS mr ORDER BY symbolCol, a_seq";
-    assertMatchRows(query, new Object[][]{
+    Object[][] expectedRows = {
         {"AAPL", 3, 4, 9},
         {"AMZN", 4, 5, 25},
         {"MSFT", 2, 3, 8},
         {"NFLX", 2, 3, 3}, {"NFLX", 4, 5, 5}, {"NFLX", 6, 7, 7}
-    });
+    };
+    assertMatchRows(pairQuery("B.priceCol > PREV(A.priceCol)"), expectedRows);
+    // The same definition inside a CASE branch, with lower-case qualifiers that still name the pattern variables.
+    assertMatchRows(pairQuery("CASE WHEN b.priceCol > PREV(a.priceCol) THEN TRUE ELSE FALSE END"), expectedRows);
   }
 
   /// Source NULLs retain SQL semantics when null handling is enabled. With null handling disabled Pinot exposes the
@@ -750,6 +754,16 @@ public class MatchRecognizeIntegrationTest extends CustomDataQueryClusterIntegra
         + " PATTERN (A)"
         + " DEFINE A AS " + definition
         + ") AS mr ORDER BY symbolCol, seq";
+  }
+
+  private String pairQuery(String bDefinition) {
+    return "SELECT * FROM " + getTableName() + " MATCH_RECOGNIZE ("
+        + " PARTITION BY symbolCol ORDER BY seqCol"
+        + " MEASURES LAST(A.seqCol) AS a_seq, LAST(B.seqCol) AS b_seq, LAST(B.priceCol) AS b_price"
+        + " ONE ROW PER MATCH AFTER MATCH SKIP PAST LAST ROW"
+        + " PATTERN (A B)"
+        + " DEFINE B AS " + bDefinition
+        + ") AS mr ORDER BY symbolCol, a_seq";
   }
 
   private String anchoredQuery(String pattern) {

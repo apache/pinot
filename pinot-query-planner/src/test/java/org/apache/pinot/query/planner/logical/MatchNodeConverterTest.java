@@ -178,6 +178,20 @@ public class MatchNodeConverterTest extends QueryEnvironmentTestBase {
     assertEquals(match.getAfterMatchSkipToSymbolOrdinal(), 0);
   }
 
+  /// A CASE keeps its WHEN / THEN branches in a list operand. A lower-case qualifier there must still name the pattern
+  /// variable in MEASURES, not be looked up as a table.
+  @Test
+  public void testUnquotedPatternVariableInsideCaseMeasureIsCaseInsensitive() {
+    MatchNode match = planMatch("SELECT * FROM a AS src MATCH_RECOGNIZE (ORDER BY ts "
+        + "MEASURES CASE WHEN LAST(a.col3) > 0 THEN 1 ELSE 0 END AS flag PATTERN (A) DEFINE A AS A.col3 > 0)");
+
+    List<RexExpression.PatternFieldRef> measureRefs =
+        collectPatternFieldRefs(match.getMeasures().get(0).getExpression());
+    assertEquals(measureRefs.size(), 1);
+    assertEquals(measureRefs.get(0).getAlpha(), "A");
+    assertEquals(measureRefs.get(0).getSymbolOrdinal(), 0);
+  }
+
   @Test
   public void testQuotedPatternVariableNamesRemainCaseSensitive() {
     MatchNode match = planMatch("SELECT * FROM a AS src MATCH_RECOGNIZE (ORDER BY ts "
@@ -226,7 +240,24 @@ public class MatchNodeConverterTest extends QueryEnvironmentTestBase {
         // Cross-variable: the row physically before the last row mapped to A.
         new Object[]{"B.col3 > PREV(A.col3)", "GREATER_THAN(PREV(B.2, 0), PREV(LAST(A.2, 0), 1))"},
         // Qualified by the defined variable: Calcite already keeps this physical, so it is not rewritten.
-        new Object[]{"B.col3 > PREV(B.col3)", "GREATER_THAN(PREV(B.2, 0), PREV(B.2, 1))"}
+        new Object[]{"B.col3 > PREV(B.col3)", "GREATER_THAN(PREV(B.2, 0), PREV(B.2, 1))"},
+        // CASE keeps its WHEN / THEN branches, and IN its values, in a list operand; PREV there is anchored as well.
+        new Object[]{
+            "CASE WHEN PREV(col3) < col3 THEN TRUE ELSE FALSE END",
+            "CASE(LESS_THAN(PREV(LAST(*.2, 0), 1), LAST(*.2, 0)), 1, 0)"
+        },
+        new Object[]{
+            "CASE WHEN B.col3 > PREV(A.col3) THEN TRUE ELSE FALSE END",
+            "CASE(GREATER_THAN(PREV(B.2, 0), PREV(LAST(A.2, 0), 1)), 1, 0)"
+        },
+        new Object[]{
+            "col3 IN (PREV(col3), 0)", "OR(EQUALS(LAST(*.2, 0), PREV(LAST(*.2, 0), 1)), EQUALS(LAST(*.2, 0), 0))"
+        },
+        // A lower-case qualifier inside a CASE branch still names the pattern variable.
+        new Object[]{
+            "CASE WHEN b.col3 > PREV(a.col3) THEN TRUE ELSE FALSE END",
+            "CASE(GREATER_THAN(PREV(B.2, 0), PREV(LAST(A.2, 0), 1)), 1, 0)"
+        }
     };
     //@formatter:on
   }

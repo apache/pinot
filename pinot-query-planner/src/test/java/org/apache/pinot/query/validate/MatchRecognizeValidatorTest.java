@@ -143,6 +143,12 @@ public class MatchRecognizeValidatorTest extends QueryEnvironmentTestBase {
             "Aggregate function 'DISTINCTCOUNT' is not supported yet in the MATCH_RECOGNIZE DEFINE clause"
         },
         new Object[]{
+            // The WHEN / THEN branches of a CASE are a list operand, which the check descends into as well.
+            "SELECT * FROM a MATCH_RECOGNIZE (ORDER BY ts PATTERN (A B+) "
+                + "DEFINE A AS A.col3 > 0, B AS CASE WHEN SUM(B.col3) < 100 THEN TRUE ELSE FALSE END)",
+            "Aggregate function 'SUM' is not supported yet in the MATCH_RECOGNIZE DEFINE clause"
+        },
+        new Object[]{
             "SELECT * FROM a MATCH_RECOGNIZE (ORDER BY ts NULLS FIRST PATTERN (A) DEFINE A AS A.col3 > 0)",
             "NULLS FIRST / NULLS LAST is not supported yet"
         },
@@ -280,6 +286,12 @@ public class MatchRecognizeValidatorTest extends QueryEnvironmentTestBase {
         new Object[]{"PREV(col3) < col3", "PREV(LAST(`col3`, 0), 1) < `col3`"},
         // Calcite distributes PREV over the operand expression, so every column inside it is anchored separately.
         new Object[]{"PREV(col3 * 2) > 0", "PREV(LAST(`col3`, 0) * 2, 1) > 0"},
+        // CASE keeps its WHEN / THEN branches in a list operand, and IN its values; PREV there is anchored as well.
+        new Object[]{
+            "CASE WHEN PREV(col3) < col3 THEN TRUE ELSE FALSE END",
+            "CASE WHEN PREV(LAST(`col3`, 0), 1) < `col3` THEN TRUE ELSE FALSE END"
+        },
+        new Object[]{"col3 IN (PREV(col3), 0)", "`col3` IN (PREV(LAST(`col3`, 0), 1), 0)"},
         // Already physical relative to the defined variable, or already anchored explicitly: left untouched.
         new Object[]{"B.col3 > PREV(B.col3)", "`B`.`col3` > PREV(`B`.`col3`, 1)"},
         new Object[]{"PREV(LAST(A.col3, 1), 2) > 0", "PREV(LAST(`A`.`col3`, 1), 2) > 0"}
@@ -303,6 +315,12 @@ public class MatchRecognizeValidatorTest extends QueryEnvironmentTestBase {
         "SELECT * FROM a MATCH_RECOGNIZE (PARTITION BY col1 ORDER BY ts "
             + "MEASURES RUNNING LAST(A.col3) AS running_v, FINAL LAST(A.col3) AS final_v "
             + "PATTERN (A+) DEFINE A AS RUNNING LAST(A.col3) > 0)")) {
+      assertNotNull(query);
+    }
+    // The WHEN / THEN branches of a CASE are a list operand, which the rewrite descends into as well.
+    try (CompiledQuery query = _queryEnvironment.compile(
+        "SELECT * FROM a MATCH_RECOGNIZE (PARTITION BY col1 ORDER BY ts MEASURES MATCH_NUMBER() AS mno "
+            + "PATTERN (A+) DEFINE A AS CASE WHEN RUNNING LAST(A.col3) > 0 THEN TRUE ELSE FALSE END)")) {
       assertNotNull(query);
     }
   }
