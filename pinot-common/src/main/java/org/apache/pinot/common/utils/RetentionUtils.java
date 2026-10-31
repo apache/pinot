@@ -129,7 +129,7 @@ public class RetentionUtils {
       return OptionalLong.of(TimeUnit.valueOf(retentionTimeUnit.toUpperCase(Locale.ROOT))
           .toMillis(Long.parseLong(retentionTimeValue)));
     } catch (Exception e) {
-      LOGGER.warn("Failed to parse table data retention: unit='{}' value='{}'", retentionTimeUnit, retentionTimeValue,
+      LOGGER.debug("Failed to parse table data retention: unit='{}' value='{}'", retentionTimeUnit, retentionTimeValue,
           e);
       return OptionalLong.empty();
     }
