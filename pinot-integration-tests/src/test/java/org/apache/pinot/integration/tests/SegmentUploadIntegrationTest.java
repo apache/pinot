@@ -31,7 +31,6 @@ import org.apache.hc.core5.http.HttpStatus;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
-import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.plugin.ingestion.batch.common.BaseSegmentPushJobRunner;
 import org.apache.pinot.plugin.ingestion.batch.standalone.SegmentMetadataPushJobRunner;
 import org.apache.pinot.plugin.ingestion.batch.standalone.SegmentTarPushJobRunner;
@@ -50,9 +49,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
-import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -66,7 +63,7 @@ import static org.testng.Assert.expectThrows;
 /// Test for advanced push types.
 /// Currently only tests METADATA push type.
 /// todo: add test for URI push
-public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
+public class SegmentUploadIntegrationTest extends SharedOfflineUploadIntegrationTestSuite {
   private static String _tableNameSuffix;
 
   @Override
@@ -104,25 +101,6 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
       throws IOException {
     _tableNameSuffix = RandomStringUtils.secure().nextAlphabetic(12);
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
-  }
-
-  @Override
-  protected void overrideControllerConf(Map<String, Object> properties) {
-    super.overrideControllerConf(properties);
-    // Applies to every test in this class: any APPEND table configured with a retention window is checked on upload.
-    properties.put(ControllerConf.SEGMENT_UPLOAD_REJECT_OUT_OF_RETENTION, true);
-  }
-
-  @BeforeClass
-  public void setUp()
-      throws Exception {
-    // Start Zk and Kafka
-    startZk();
-
-    // Start the Pinot cluster
-    startController();
-    startBroker();
-    startServer();
   }
 
   @Test
@@ -509,14 +487,5 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
       throws IOException {
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
     dropOfflineTable(offlineTableName);
-  }
-
-  @AfterClass
-  public void tearDown()
-      throws Exception {
-    stopServer();
-    stopBroker();
-    stopController();
-    stopZk();
   }
 }
