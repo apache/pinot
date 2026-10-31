@@ -238,6 +238,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private static final int MSG_COUNT_THRESHOLD_FOR_LOG = 100000;
   private static final int BUILD_TIME_LEASE_SECONDS = 30;
   private static final int MAX_CONSECUTIVE_ERROR_COUNT = 5;
+  // Minimum interval between the data-loss ERROR log line and segment error entry for a segment. The
+  // STREAM_DATA_LOSS gauge is still set for every batch that reports loss; only the diagnostics are throttled.
+  private static final long DATA_LOSS_REPORT_INTERVAL_MS = TimeUnit.MINUTES.toMillis(1);
   // 8 min max timeout for the retry policy
   private static final RetryPolicy CONSUMER_RECREATE_RETRY_POLICY =
       RetryPolicies.exponentialBackoffRetryPolicy(10, 1000L, 2.0f);
@@ -270,6 +273,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private ServerIngestionOomProtectionManager _serverIngestionOomProtectionManager;
   private final MutableSegmentImpl _realtimeSegment;
   private volatile StreamPartitionMsgOffset _currentOffset; // Next offset to be consumed
+  // Segment-level provenance: published before an offset advanced without consuming rows, and never cleared by
+  // another poll or consumer recreation. A non-committer can only reuse this rowset with committed CRC proof.
+  private volatile boolean _hasUnverifiedOffsetAdvance;
   private volatile State _state;
   private volatile int _numRowsConsumed = 0;
   private volatile int _numRowsIndexed = 0; // Can be different from _numRowsConsumed when metrics update is enabled.
@@ -335,6 +341,13 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private long _consumeStartTime = -1;
   private long _lastLogTime = 0;
   private int _lastConsumedCount = 0;
+  // Rate limiting for reportDataLoss(). Only touched from the consumer thread.
+  private long _lastDataLossReportTimeMs = -1;
+  private int _dataLossBatchesSinceLastReport = 0;
+  // Where the most recent batch with loss was detected while the rate limit suppressed its report; null when every
+  // batch with loss has been reported.
+  @Nullable
+  private String _unreportedDataLossLocation;
   private SegmentCompletionProtocol.ReasonCode _stopReasonCode = null;
   private final Semaphore _segBuildSemaphore;
   private final boolean _isOffHeap;
@@ -552,12 +565,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       if (_currentOffset.compareTo(lastUpdatedOffset) != 0) {
         _idleTimer.markEventConsumed();
         // We consumed something. Update the highest stream offset as well as partition-consuming metric.
-        // TODO Issue 5359 Need to find a way to bump metrics without getting actual offset value.
-        if (_currentOffset instanceof LongMsgOffset) {
-          // TODO: only LongMsgOffset supplies long offset value.
-          _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.HIGHEST_STREAM_OFFSET_CONSUMED,
-              ((LongMsgOffset) _currentOffset).getOffset());
-        }
+        updateHighestStreamOffsetConsumedGauge();
         lastUpdatedOffset = _streamPartitionMsgOffsetFactory.create(_currentOffset);
       } else if (endCriteriaReached) {
         // At this point current offset has not moved because processStreamEvents() has exited before processing a
@@ -577,6 +585,13 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         }
         _currentOffset = nextOffset;
         lastUpdatedOffset = _streamPartitionMsgOffsetFactory.create(nextOffset);
+      } else if (adoptNextBatchOffsetOfEmptyBatch(messageBatch)) {
+        // The stream delivered nothing but reported a new position. Count it as stream activity for the idle timer
+        // without treating it as proof that no rows were skipped (it is not a consumed row: ingestion delay and
+        // freshness are left to processStreamEvents, which already treats an empty batch as caught up).
+        _idleTimer.markEventConsumed();
+        updateHighestStreamOffsetConsumedGauge();
+        lastUpdatedOffset = _streamPartitionMsgOffsetFactory.create(_currentOffset);
       } else {
         // We did not consume any rows.
         long timeSinceStreamLastCreatedOrConsumedMs = _idleTimer.getTimeSinceStreamLastCreatedOrConsumedMs();
@@ -602,6 +617,74 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       // name is partly to avoid a more convoluted name and partly in anticipation of making it real-time.
       _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_BYTES_DROPPED, _numBytesDropped);
     }
+    return true;
+  }
+
+  // TODO Issue 5359 Need to find a way to bump metrics without getting actual offset value.
+  private void updateHighestStreamOffsetConsumedGauge() {
+    if (_currentOffset instanceof LongMsgOffset) {
+      // TODO: only LongMsgOffset supplies long offset value.
+      _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.HIGHEST_STREAM_OFFSET_CONSUMED,
+          ((LongMsgOffset) _currentOffset).getOffset());
+    }
+  }
+
+  /// Adopts an empty batch's advanced consumer position for INITIAL consumption or ONLINE catch-up.
+  /// Transaction markers and aborted records can move a stream's position without delivering rows, so adoption
+  /// keeps position and lag current. But a position, including a batch with `hasDataLoss() == false`, does not prove
+  /// the skipped interval contained no rows: validation may be unavailable, or the topic may have been compacted.
+  /// Remember that uncertainty for local-reuse CRC validation even when the new position is below the final offset.
+  ///
+  /// Protocol CATCHING_UP can subsequently become the committer, so it must not synthesize progress from an empty
+  /// batch. ONLINE catch-up can cap the position at the committed final offset, because any local reuse is guarded
+  /// by the committed CRC. A reported loss is not capped; ordinary overshoot recovery still applies.
+  ///
+  /// A follower in protocol CATCHING_UP to a final offset the stream only reaches by skipping (a committer that
+  /// adopted the position past a commit marker) therefore cannot reach it by consuming. It keeps polling without
+  /// advancing, one idle sleep per empty batch, until the ONLINE transition that follows the commit. That transition
+  /// is the intended way out: its CONSUMING_TO_ONLINE catch-up adopts the position, and the local segment is reused
+  /// only on a matching committed CRC, otherwise downloaded.
+  ///
+  /// @return `true` if `_currentOffset` was advanced
+  private boolean adoptNextBatchOffsetOfEmptyBatch(MessageBatch messageBatch) {
+    if (_state == State.CATCHING_UP) {
+      return false;
+    }
+    StreamPartitionMsgOffset nextBatchOffset = messageBatch.getOffsetOfNextBatch();
+    if (nextBatchOffset == null || nextBatchOffset.compareTo(_currentOffset) <= 0) {
+      return false;
+    }
+    if (_state == State.CONSUMING_TO_ONLINE && _finalOffset != null && !messageBatch.hasDataLoss()
+        && nextBatchOffset.compareTo(_finalOffset) > 0) {
+      nextBatchOffset = _finalOffset;
+    }
+    if (_segmentLogger.isDebugEnabled()) {
+      _segmentLogger.debug("Empty batch moved the stream position. Advancing from {} to {}", _currentOffset,
+          nextBatchOffset);
+    }
+    _hasUnverifiedOffsetAdvance = true;
+    _currentOffset = nextBatchOffset;
+    return true;
+  }
+
+  /// ONLINE catch-up can stop before a message ending past the committed final offset. This only establishes
+  /// offset equality, not row equality, so record the unverified advance before publishing the final offset.
+  /// Protocol CATCHING_UP must retain ordinary record advancement and overshoot handling instead of manufacturing
+  /// a target match that could make this replica the committer. Reported loss also retains overshoot recovery.
+  ///
+  /// @return `true` if consumption must stop before the message
+  private boolean reachedFinalOffsetBeforeMessage(MessageBatch messageBatch, StreamPartitionMsgOffset nextOffset) {
+    if (_state != State.CONSUMING_TO_ONLINE || _finalOffset == null || messageBatch.hasDataLoss()
+        || _currentOffset.compareTo(_finalOffset) >= 0 || nextOffset.compareTo(_finalOffset) <= 0) {
+      return false;
+    }
+    _segmentLogger.info("Next message ends at {}, past the final offset {}. Settling on the final offset from {}",
+        nextOffset, _finalOffset, _currentOffset);
+    // The message is not indexed. That is only safe because of this flag: buildSegmentAndReplace() then reuses the
+    // local segment only on a matching committed CRC and downloads it otherwise, so a message the committer did index
+    // (one straddling the final offset, offset < final < next, included) cannot leave a divergent copy.
+    _hasUnverifiedOffsetAdvance = true;
+    _currentOffset = _finalOffset;
     return true;
   }
 
@@ -656,12 +739,16 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         throw new RuntimeException("Realtime segment full");
       }
 
-      // Decode message
       StreamMessage<?> streamMessage = messageBatch.getStreamMessage(index);
-      StreamDataDecoderResult decodedRow = _streamDataDecoder.decode(streamMessage);
       StreamMessageMetadata metadata = streamMessage.getMetadata();
       StreamPartitionMsgOffset offset = metadata.getOffset();
       StreamPartitionMsgOffset nextOffset = metadata.getNextOffset();
+      if (reachedFinalOffsetBeforeMessage(messageBatch, nextOffset)) {
+        prematureExit = true;
+        break;
+      }
+      // Decode message
+      StreamDataDecoderResult decodedRow = _streamDataDecoder.decode(streamMessage);
       int rowSizeInBytes = metadata.getRecordSerializedSize();
       if (decodedRow.getException() != null) {
         String errorMessage = "Stopping consumption due to decode error at offset: " + offset;
@@ -1164,16 +1251,50 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   /// Checks and reports if the consumer is going through data loss.
   ///
+  /// The [ServerGauge#STREAM_DATA_LOSS] gauge is set for every batch that reports loss. The ERROR log line and the
+  /// segment error entry are emitted at most once per [#DATA_LOSS_REPORT_INTERVAL_MS] per segment, carrying the
+  /// number of affected batches since the previous report, so a stream that keeps reporting loss on every poll
+  /// does not flood the log or churn the segment error cache. A batch with loss whose report was suppressed is
+  /// reported by the first batch processed after the interval has elapsed, even when that batch and every one before
+  /// it is healthy, so a loss event that the stream recovers from within the interval still reaches the log and the
+  /// segment error cache. This method runs for every fetched batch, including empty ones, so the deferred report
+  /// follows the end of the interval within one fetch.
+  ///
   /// @param messageBatch Message batch to validate
-  private void reportDataLoss(MessageBatch messageBatch) {
-    if (messageBatch.hasDataLoss()) {
-      _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.STREAM_DATA_LOSS, 1L);
-      String message = "Message loss detected in stream partition: " + _partitionGroupId + " for table: "
-          + _tableNameWithType + " startOffset: " + _currentOffset + " batchFirstOffset: "
-          + messageBatch.getFirstMessageOffset();
-      _segmentLogger.error(message);
-      _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), message, null));
+  @VisibleForTesting
+  void reportDataLoss(MessageBatch messageBatch) {
+    if (!messageBatch.hasDataLoss()) {
+      if (_unreportedDataLossLocation != null) {
+        long now = now();
+        if (now - _lastDataLossReportTimeMs >= DATA_LOSS_REPORT_INTERVAL_MS) {
+          logDataLoss(now, _unreportedDataLossLocation);
+        }
+      }
+      return;
     }
+    _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.STREAM_DATA_LOSS, 1L);
+    _dataLossBatchesSinceLastReport++;
+    String location = "startOffset: " + _currentOffset + " batchFirstOffset: " + messageBatch.getFirstMessageOffset()
+        + " batchNextOffset: " + messageBatch.getOffsetOfNextBatch();
+    long now = now();
+    if (_lastDataLossReportTimeMs >= 0 && now - _lastDataLossReportTimeMs < DATA_LOSS_REPORT_INTERVAL_MS) {
+      _unreportedDataLossLocation = location;
+      return;
+    }
+    logDataLoss(now, location);
+  }
+
+  /// Emits the data-loss ERROR line and segment error entry for the most recent batch with loss, detected at the given
+  /// location, and restarts the rate-limit interval.
+  private void logDataLoss(long now, String location) {
+    String message = "Message loss detected in stream partition: " + _partitionGroupId + " for table: "
+        + _tableNameWithType + " " + location + " (batches with loss since last report: "
+        + _dataLossBatchesSinceLastReport + ")";
+    _segmentLogger.error(message);
+    _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now, message, null));
+    _lastDataLossReportTimeMs = now;
+    _dataLossBatchesSinceLastReport = 0;
+    _unreportedDataLossLocation = null;
   }
 
   public StreamPartitionMsgOffset getCurrentOffset() {
@@ -1412,12 +1533,21 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   /// ordering); swapping in a divergent copy corrupts upsert metadata and leaves replicas inconsistent otherwise. So
   /// when `committedSegmentZKMetadata` carries a CRC, a mismatch discards the local build (returns `false`) and the
   /// caller downloads the committed segment. Skipped for pauseless tables and segments whose CRC is not yet set (the
-  /// COMMITTING window), so we never download a not-yet-uploaded segment (see PR #17885).
+  /// COMMITTING window), so we never download a not-yet-uploaded segment (see PR #17885). After an unverified offset
+  /// advance, those exceptions cannot establish row equality: local reuse requires an enabled, matching committed
+  /// CRC check. Otherwise the caller must use the existing download/recovery path.
   ///
-  /// @param committedSegmentZKMetadata committed ZK metadata carrying the CRC, or `null` to skip the check
+  /// @param committedSegmentZKMetadata committed ZK metadata carrying the CRC, or `null` for legacy unflagged reuse
   /// @return `true` if built and replaced locally; `false` if the build failed or was rejected on a CRC mismatch
   protected boolean buildSegmentAndReplace(@Nullable SegmentZKMetadata committedSegmentZKMetadata)
       throws Exception {
+    boolean crcCheckEnabled = committedSegmentZKMetadata != null && committedSegmentZKMetadata.getCrc() >= 0
+        && !PauselessConsumptionUtils.isPauselessEnabled(_tableConfig);
+    if (_hasUnverifiedOffsetAdvance && !crcCheckEnabled) {
+      _segmentLogger.warn("Segment {} advanced across unverified stream offsets without usable committed CRC proof. "
+          + "Skipping local build to replace", _segmentNameStr);
+      return false;
+    }
     SegmentBuildDescriptor descriptor;
     try {
       descriptor = buildSegmentInternal(false);
@@ -1427,8 +1557,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     if (descriptor == null) {
       return false;
     }
-    boolean crcCheckEnabled = committedSegmentZKMetadata != null && committedSegmentZKMetadata.getCrc() >= 0
-        && !PauselessConsumptionUtils.isPauselessEnabled(_tableConfig);
     if (crcCheckEnabled && !isLocalSegmentCrcMatchingZk(committedSegmentZKMetadata)) {
       _segmentLogger.warn("Locally-built segment: {} CRC does not match committed CRC: {} in zk. "
           + "Skipping local build to replace", _segmentNameStr, committedSegmentZKMetadata.getCrc());
