@@ -585,6 +585,15 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   @Override
+  public boolean isAcceptingRecords() {
+    if (!startOperation()) {
+      return false;
+    }
+    finishOperation();
+    return true;
+  }
+
+  @Override
   public boolean addRecord(MutableSegment segment, RecordInfo recordInfo) {
     _gotFirstConsumingSegment = true;
     if (!startOperation()) {
@@ -606,6 +615,23 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   /// Returns `true` when the record is added to the upsert metadata manager, `false` when the record is
   /// out-of-order thus not added.
   protected abstract boolean doAddRecord(MutableSegment segment, RecordInfo recordInfo);
+
+  @Override
+  public void dropOutOfOrderRecord(MutableSegment segment, RecordInfo recordInfo) {
+    _gotFirstConsumingSegment = true;
+    if (!startOperation()) {
+      _logger.debug("Skip dropping record for segment: {} because metadata manager is already stopped",
+          segment.getSegmentName());
+      return;
+    }
+    try {
+      // The newer comparison value was read by isOutOfOrderRecord() and is not looked up again.
+      handleOutOfOrderEvent(null, recordInfo.getComparisonValue());
+      _trackedSegments.add(segment);
+    } finally {
+      finishOperation();
+    }
+  }
 
   @Override
   public void replaceSegment(ImmutableSegment segment, IndexSegment oldSegment) {
