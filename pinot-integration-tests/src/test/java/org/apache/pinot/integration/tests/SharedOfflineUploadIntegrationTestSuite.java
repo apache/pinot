@@ -18,13 +18,14 @@
  */
 package org.apache.pinot.integration.tests;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.broker.broker.helix.BaseBrokerStarter;
 import org.apache.pinot.client.admin.PinotAdminClient;
+import org.apache.pinot.integration.tests.custom.CustomDataQueryClusterIntegrationTest;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -36,62 +37,97 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.AfterSuite;
 import org.testng.annotations.BeforeClass;
-import org.testng.annotations.BeforeMethod;
-import org.testng.annotations.BeforeSuite;
 
 
-/// Shares one default offline cluster between sequential segment-upload tests.
-/// The owner has independent process state; each class retains its own data directories and configuration hooks.
-/// Direct class selection uses the same suite callbacks to start and close its own cluster.
-/// Parallel classes are rejected.
-public abstract class SharedOfflineUploadIntegrationTestSuite extends BaseClusterIntegrationTest {
+/// Runs segment upload scenarios against the custom suite cluster.
+/// Each class owns its table and schema resources; parallel classes are rejected.
+public abstract class SharedOfflineUploadIntegrationTestSuite extends CustomDataQueryClusterIntegrationTest {
   private static final Set<SharedOfflineUploadIntegrationTestSuite> PARTICIPANTS = new LinkedHashSet<>();
-  private static OfflineUploadClusterOwner _owner;
   private static SharedOfflineUploadIntegrationTestSuite _activeClass;
-  private static Throwable _cleanupFailure;
 
   private final Set<String> _tables = new LinkedHashSet<>();
   private final Set<String> _schemas = new LinkedHashSet<>();
 
-  @BeforeSuite(alwaysRun = true)
-  public final void setUpSharedOfflineUploadSuite()
-      throws Throwable {
-    synchronized (SharedOfflineUploadIntegrationTestSuite.class) {
-      checkCleanupFailure();
-      if (_owner == null) {
-        _owner = new OfflineUploadClusterOwner();
-        try {
-          _owner.startCluster();
-        } catch (Throwable t) {
-          _cleanupFailure = t;
-          Throwable cleanupFailure = _owner.stopCluster(null);
-          if (cleanupFailure != null) {
-            t.addSuppressed(cleanupFailure);
-          }
-          throw t;
-        }
-      }
-    }
-  }
-
   @BeforeClass(alwaysRun = true)
   public final void bindSharedOfflineUploadCluster() {
     synchronized (SharedOfflineUploadIntegrationTestSuite.class) {
-      checkCleanupFailure();
+      assertCustomSuiteHealthy();
       if (_activeClass != null) {
         throw new IllegalStateException("Another offline upload class still owns the shared cluster");
       }
       _activeClass = this;
       PARTICIPANTS.add(this);
       // These inherited fields are read directly by metadata-push tests and external-view helpers.
-      _controllerConfig = owner().getControllerConfig();
-      _helixResourceManager = owner().getHelixResourceManager();
+      _controllerConfig = getSharedControllerStarter().getConfig();
+      _controllerBaseApiUrl = _controllerConfig.generateVipUrl();
+      _helixResourceManager = getSharedHelixResourceManager();
+      initControllerRequestURLBuilder();
     }
   }
 
-  @BeforeMethod(alwaysRun = true)
-  public final void checkSharedOfflineUploadCleanup() {
-    checkCleanupFailure();
+  // These tests create their own empty table at the point required by each scenario.
+  @Override
+  @BeforeClass
+  public void setUp()
+      throws Exception {
+  }
+
+  @Override
+  @AfterClass(alwaysRun = true)
+  public void tearDown()
+      throws IOException {
+  }
+
+  @Override
+  public String getTableName() {
+    return DEFAULT_TABLE_NAME;
+  }
+
+  @Override
+  public Schema createSchema()
+      throws IOException {
+    return createDefaultSchema();
+  }
+
+  @Override
+  public List<File> createAvroFiles()
+      throws Exception {
+    return getAllAvroFiles();
+  }
+
+  @Override
+  public TableConfig createOfflineTableConfig() {
+    return createDefaultOfflineTableConfig();
+  }
+
+  @Override
+  public String getTimeColumnName() {
+    return DEFAULT_TIME_COLUMN_NAME;
+  }
+
+  @Override
+  protected String getSortedColumn() {
+    return getDefaultSortedColumn();
+  }
+
+  @Override
+  protected List<String> getInvertedIndexColumns() {
+    return getDefaultInvertedIndexColumns();
+  }
+
+  @Override
+  protected List<String> getNoDictionaryColumns() {
+    return getDefaultNoDictionaryColumns();
+  }
+
+  @Override
+  protected List<String> getRangeIndexColumns() {
+    return getDefaultRangeIndexColumns();
+  }
+
+  @Override
+  protected List<String> getBloomFilterColumns() {
+    return getDefaultBloomFilterColumns();
   }
 
   @Override
@@ -142,7 +178,7 @@ public abstract class SharedOfflineUploadIntegrationTestSuite extends BaseCluste
   private Throwable cleanUpTables(Throwable failure) {
     for (String table : List.copyOf(_tables)) {
       try {
-        owner().removeTable(table);
+        removeTable(table);
         _tables.remove(table);
       } catch (Throwable t) {
         failure = appendFailure(failure, t);
@@ -157,8 +193,8 @@ public abstract class SharedOfflineUploadIntegrationTestSuite extends BaseCluste
     if (_tables.isEmpty()) {
       for (String schema : List.copyOf(_schemas)) {
         try {
-          if (owner().getHelixResourceManager().getSchema(schema) != null) {
-            owner().deleteSchema(schema);
+          if (getSharedHelixResourceManager().getSchema(schema) != null) {
+            deleteSchema(schema);
           }
           _schemas.remove(schema);
         } catch (Throwable t) {
@@ -178,7 +214,8 @@ public abstract class SharedOfflineUploadIntegrationTestSuite extends BaseCluste
         _pinotConnectionV2 = null;
       });
     }
-    if (_tables.isEmpty() && _schemas.isEmpty()) {
+    if (_tables.isEmpty() && _schemas.isEmpty() && this != _sharedClusterTestSuite) {
+      // The suite owner retains its directory until the Custom suite teardown.
       failure = cleanUp(failure, () -> FileUtils.deleteDirectory(_tempDir));
     }
     return failure;
@@ -187,41 +224,20 @@ public abstract class SharedOfflineUploadIntegrationTestSuite extends BaseCluste
   @AfterSuite(alwaysRun = true)
   public final void tearDownSharedOfflineUploadSuite()
       throws Throwable {
-    synchronized (SharedOfflineUploadIntegrationTestSuite.class) {
-      if (_owner == null) {
-        return;
-      }
-      Throwable failure = null;
-      for (SharedOfflineUploadIntegrationTestSuite participant : PARTICIPANTS) {
-        failure = participant.cleanUpClass(failure);
-      }
-      failure = _owner.stopCluster(failure);
-      _owner = null;
-      _activeClass = null;
-      PARTICIPANTS.clear();
-      if (failure != null) {
-        recordCleanupFailure(failure);
-        throw failure;
-      }
+    Throwable failure = null;
+    for (SharedOfflineUploadIntegrationTestSuite participant : PARTICIPANTS) {
+      failure = participant.cleanUpClass(failure);
+    }
+    PARTICIPANTS.clear();
+    _activeClass = null;
+    if (failure != null) {
+      recordCleanupFailure(failure);
+      throw failure;
     }
   }
 
-  private static OfflineUploadClusterOwner owner() {
-    if (_owner == null) {
-      throw new IllegalStateException("The shared offline upload cluster has not started");
-    }
-    return _owner;
-  }
-
-  private static void checkCleanupFailure() {
-    if (_cleanupFailure != null) {
-      throw new IllegalStateException("The shared offline upload cluster did not clean up successfully",
-          _cleanupFailure);
-    }
-  }
-
-  private static synchronized void recordCleanupFailure(Throwable failure) {
-    _cleanupFailure = appendFailure(_cleanupFailure, failure);
+  private static void recordCleanupFailure(Throwable failure) {
+    recordCustomSuiteCleanupFailure(failure);
   }
 
   private static Throwable appendFailure(Throwable failure, Throwable next) {
@@ -253,105 +269,39 @@ public abstract class SharedOfflineUploadIntegrationTestSuite extends BaseCluste
   @Override
   public final PinotAdminClient getOrCreateAdminClient()
       throws IOException {
-    return owner().getOrCreateAdminClient();
-  }
-
-  @Override
-  public final String getControllerBaseApiUrl() {
-    return owner().getControllerBaseApiUrl();
-  }
-
-  @Override
-  public final String getZkUrl() {
-    return owner().getZkUrl();
-  }
-
-  @Override
-  public final String getHelixClusterName() {
-    return owner().getHelixClusterName();
-  }
-
-  @Override
-  protected final String getBrokerBaseApiUrl() {
-    return owner().getBrokerBaseApiUrl();
-  }
-
-  @Override
-  protected final String getBrokerGrpcEndpoint() {
-    return owner().getBrokerGrpcEndpoint();
-  }
-
-  /// Owns only the default ZK/controller/broker/server processes; no test class owns these resources.
-  private static final class OfflineUploadClusterOwner extends BaseClusterIntegrationTest {
-    private BaseBrokerStarter _allocatedBroker;
-    private BaseServerStarter _allocatedServer;
-
-    private void startCluster()
-        throws Exception {
-      startZk();
-      startController();
-      startBroker();
-      startServer();
+    if (_sharedClusterTestSuite == this) {
+      return super.getOrCreateAdminClient();
     }
+    return _sharedClusterTestSuite.getOrCreateAdminClient();
+  }
 
-    @Override
-    protected BaseBrokerStarter createBrokerStarter() {
-      _allocatedBroker = super.createBrokerStarter();
-      return _allocatedBroker;
+  private void removeTable(String tableNameWithType)
+      throws IOException {
+    List<BaseServerStarter> servers = getSharedServerStarters();
+    if (servers.size() != 2) {
+      throw new IllegalStateException("Expected two custom suite servers while cleaning up an offline table");
     }
-
-    @Override
-    protected BaseServerStarter createServerStarter() {
-      _allocatedServer = super.createServerStarter();
-      return _allocatedServer;
+    if (getSharedHelixResourceManager().getOfflineTableConfig(tableNameWithType) != null) {
+      dropOfflineTable(tableNameWithType);
     }
-
-    private Throwable stopCluster(Throwable failure) {
-      if (_allocatedServer != null) {
-        // startServers registers a starter only after start succeeds; retain partially initialized starters too.
-        if (!_serverStarters.contains(_allocatedServer)) {
-          _serverStarters.add(_allocatedServer);
-        }
-        failure = cleanUp(failure, () -> {
-          stopServer();
-          _allocatedServer = null;
-        });
-      }
-      if (_allocatedBroker != null) {
-        if (!_brokerStarters.contains(_allocatedBroker)) {
-          _brokerStarters.add(_allocatedBroker);
-        }
-        failure = cleanUp(failure, () -> {
-          stopBroker();
-          _allocatedBroker = null;
-        });
-      }
-      if (_controllerStarter != null) {
-        failure = cleanUp(failure, this::stopController);
-      }
-      return cleanUp(failure, this::stopZk);
-    }
-
-    private void removeTable(String tableNameWithType)
-        throws IOException {
-      if (_serverStarters.size() != 1) {
-        throw new IllegalStateException("Expected one server while cleaning up an offline upload table");
-      }
-      if (_helixResourceManager.getOfflineTableConfig(tableNameWithType) != null) {
-        dropOfflineTable(tableNameWithType);
-      }
-      waitForTableDataManagerRemoved(tableNameWithType);
-      waitForEVToDisappear(tableNameWithType);
-      String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-      TestUtils.waitForCondition(ignored -> {
-        try {
-          getDebugInfo("debug/routingTable/" + rawTableName);
+    TestUtils.waitForCondition(ignored -> {
+      for (BaseServerStarter server : servers) {
+        if (server.getServerInstance().getInstanceDataManager().getTableDataManager(tableNameWithType) != null) {
           return false;
-        } catch (Exception e) {
-          String message = e.getMessage();
-          return message != null && message.contains("Got error status code: 404");
         }
-      }, 60_000L, "Routing table still exists after dropping offline upload table " + rawTableName);
-    }
+      }
+      return true;
+    }, 60_000L, "Failed to remove table data manager for table: " + tableNameWithType);
+    waitForEVToDisappear(tableNameWithType);
+    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    TestUtils.waitForCondition(ignored -> {
+      try {
+        getDebugInfo("debug/routingTable/" + rawTableName);
+        return false;
+      } catch (Exception e) {
+        String message = e.getMessage();
+        return message != null && message.contains("Got error status code: 404");
+      }
+    }, 60_000L, "Routing table still exists after dropping offline upload table " + rawTableName);
   }
 }
