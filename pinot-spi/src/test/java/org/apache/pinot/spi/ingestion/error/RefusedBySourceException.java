@@ -23,7 +23,7 @@ package org.apache.pinot.spi.ingestion.error;
 public class RefusedBySourceException extends RuntimeException {
   public static final IngestionSourceErrorRule RULE =
       (node, below, evidence) -> node instanceof RefusedBySourceException
-          ? IngestionSourceErrorVerdict.auth(IngestionSourceErrorSubReason.AUTHORIZATION, "refused", null) : null;
+          ? IngestionSourceErrorVerdict.auth("refused", null) : null;
 
   public RefusedBySourceException() {
     super("refused");

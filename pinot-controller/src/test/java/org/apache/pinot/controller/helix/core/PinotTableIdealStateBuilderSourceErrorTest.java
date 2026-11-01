@@ -36,7 +36,6 @@ import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorClassifier;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorReporter;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorRule;
-import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorSubReason;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorVerdict;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
@@ -73,7 +72,7 @@ import static org.testng.Assert.expectThrows;
 public class PinotTableIdealStateBuilderSourceErrorTest {
   private static final IngestionSourceErrorRule REFUSED_RULE =
       (node, below, evidence) -> node instanceof RefusedException
-          ? IngestionSourceErrorVerdict.auth(IngestionSourceErrorSubReason.AUTHORIZATION, "refused", null) : null;
+          ? IngestionSourceErrorVerdict.auth("refused", null) : null;
 
   /// A source's refusal. A registered rule recognises it, since the built-in rules need SDKs this module doesn't ship.
   private static class RefusedException extends RuntimeException {
