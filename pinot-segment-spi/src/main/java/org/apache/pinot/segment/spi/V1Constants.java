@@ -29,6 +29,14 @@ public class V1Constants {
   public static final String QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME = "queryabledocids.bitmap.snapshot";
   public static final String TTL_WATERMARK_TABLE_PARTITION = "ttl.watermark.partition.";
 
+  public static class DataCrc {
+    // Version 1 covers forward index and dictionary files
+    public static final int VERSION_1 = 1;
+    // Version 2 also covers null vector files, because a null is stored as the default value in the forward index
+    public static final int VERSION_2 = 2;
+    public static final int LATEST_VERSION = VERSION_2;
+  }
+
   public static class Str {
     public static final char DEFAULT_STRING_PAD_CHAR = '\0';
   }

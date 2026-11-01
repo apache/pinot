@@ -1570,6 +1570,12 @@ public class CommonConstants {
     public static final String SEGMENT_FORMAT_VERSION = "segment.format.version";
     public static final String CONFIG_OF_SEGMENT_FORMAT_VERSION =
         INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "." + SEGMENT_FORMAT_VERSION;
+    // Version of the data CRC written into newly built segments. Replicas compare data CRCs at commit, so keep it the
+    // same on all servers. Version 1 covers forward index and dictionary files, version 2 also covers null vectors.
+    public static final String SEGMENT_DATA_CRC_VERSION = "segment.data.crc.version";
+    public static final String CONFIG_OF_SEGMENT_DATA_CRC_VERSION =
+        INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "." + SEGMENT_DATA_CRC_VERSION;
+    public static final int DEFAULT_SEGMENT_DATA_CRC_VERSION = 1;
     public static final String REALTIME_OFFHEAP_ALLOCATION = "realtime.alloc.offheap";
     public static final String CONFIG_OF_REALTIME_OFFHEAP_ALLOCATION =
         INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "." + REALTIME_OFFHEAP_ALLOCATION;

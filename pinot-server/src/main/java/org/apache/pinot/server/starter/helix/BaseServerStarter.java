@@ -103,6 +103,7 @@ import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLucene
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexSearcherPool;
 import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.local.utils.ClusterConfigForTable;
+import org.apache.pinot.segment.local.utils.CrcUtils;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
@@ -213,6 +214,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
     if (null != tarCompressionCodecName) {
       TarCompressionUtils.setDefaultCompressor(tarCompressionCodecName);
     }
+
+    CrcUtils.setDefaultDataCrcVersion(_serverConf.getProperty(Server.CONFIG_OF_SEGMENT_DATA_CRC_VERSION,
+        Server.DEFAULT_SEGMENT_DATA_CRC_VERSION));
 
     setupHelixSystemProperties();
     _listenerConfigs = ListenerConfigUtil.buildServerAdminConfigs(_serverConf);
