@@ -153,7 +153,7 @@ public final class IngestionSourceErrorClassifier {
 
   /// The decision of the registered rules on `node`. When they disagree, [IngestionSourceErrorVerdict#none] beats
   /// [IngestionSourceErrorCategory#AUTH], which beats [IngestionSourceErrorCategory#SOURCE_READ], and remaining ties
-  /// break on sub-reason, code and target, so registration order never matters.
+  /// break on code and target, so registration order never matters.
   @Nullable
   private static IngestionSourceErrorVerdict decideRegistered(Set<IngestionSourceErrorRule> rules, Throwable node,
       List<Throwable> below, @Nullable IngestionSourceErrorEvidence evidence) {
@@ -178,7 +178,6 @@ public final class IngestionSourceErrorClassifier {
 
   private static final Comparator<IngestionSourceErrorVerdict> PRECEDENCE =
       Comparator.comparingInt(IngestionSourceErrorClassifier::rank)
-          .thenComparing(IngestionSourceErrorVerdict::getSubReason, Comparator.nullsLast(Comparator.naturalOrder()))
           .thenComparing(IngestionSourceErrorVerdict::getCode, Comparator.nullsLast(Comparator.naturalOrder()))
           .thenComparing(IngestionSourceErrorVerdict::getTarget, Comparator.nullsLast(Comparator.naturalOrder()));
 

@@ -46,7 +46,6 @@ import org.apache.kafka.common.errors.TimeoutException;
 import org.apache.kafka.common.errors.TopicAuthorizationException;
 import org.apache.kafka.common.errors.UnsupportedSaslMechanismException;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
-import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorSubReason;
 import org.testng.annotations.Test;
 import software.amazon.awssdk.core.exception.SdkClientException;
 
@@ -76,14 +75,14 @@ public class KafkaSourceErrorClassificationTest {
     // A broker rejection carries no cause.
     assertAuth(underPinot(new SaslAuthenticationException(
             "Authentication failed during authentication due to invalid credentials with SASL mechanism PLAIN")),
-        IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_BROKER);
+        TARGET_BROKER);
     assertAuth(new UnsupportedSaslMechanismException("Client SASL mechanism 'PLAIN' not enabled in the server"),
-        IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_BROKER);
+        TARGET_BROKER);
     assertAuth(new IllegalSaslStateException("Unexpected handshake request"),
-        IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_BROKER);
+        TARGET_BROKER);
     // MSK IAM reports a policy denial the same way, whichever identity signed the request.
     assertAuth(underPinot(new SaslAuthenticationException("[uuid]: Access denied")),
-        IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_BROKER);
+        TARGET_BROKER);
   }
 
   @Test
@@ -97,11 +96,11 @@ public class KafkaSourceErrorClassificationTest {
             + "the Kafka Broker.",
         new SaslException("Failed to find AWS IAM Credentials", SdkClientException.create(
             "Unable to load credentials from any of the providers in the chain AwsCredentialsProviderChain")));
-    assertAuth(underPinot(credentialsGone), IngestionSourceErrorSubReason.AUTHENTICATION, null);
+    assertAuth(underPinot(credentialsGone), null);
     // Any client-side failure building the SASL token: authentication failed before the broker judged anything.
     Throwable kerberosClient = new SaslAuthenticationException("An error occurred when evaluating SASL token",
         new SaslException("GSS initiate failed", new IllegalStateException("no valid credentials")));
-    assertAuth(underPinot(kerberosClient), IngestionSourceErrorSubReason.AUTHENTICATION, null);
+    assertAuth(underPinot(kerberosClient), null);
     // A KDC that never answered the service-ticket request: SOURCE_READ, as for any endpoint.
     Throwable kdcTimeout = new SaslAuthenticationException("An error occurred when evaluating SASL token",
         new SaslException("GSS initiate failed", new SocketTimeoutException("Receive timed out")));
@@ -116,7 +115,7 @@ public class KafkaSourceErrorClassificationTest {
   @Test
   public void topicAclDenied() {
     assertAuth(underPinot(new TopicAuthorizationException(Set.of("events"))),
-        IngestionSourceErrorSubReason.AUTHORIZATION, TARGET_BROKER);
+        TARGET_BROKER);
   }
 
   @Test
@@ -128,7 +127,7 @@ public class KafkaSourceErrorClassificationTest {
 
     Throwable brokerRejectedUs = new SslAuthenticationException("SSL handshake failed",
         new SSLHandshakeException("Received fatal alert: bad_certificate"));
-    assertAuth(underPinot(brokerRejectedUs), IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_BROKER);
+    assertAuth(underPinot(brokerRejectedUs), TARGET_BROKER);
 
     Throwable otherHandshakeFailure = new SslAuthenticationException("SSL handshake failed",
         new SSLHandshakeException("Received fatal alert: handshake_failure"));
@@ -165,30 +164,29 @@ public class KafkaSourceErrorClassificationTest {
   public void oauthTokenEndpointRefusesTheClientInTheRealClient()
       throws Exception {
     assertEquals(assertAuth(underPinot(constructOAuthConsumer(401, "{\"error\":\"invalid_client\"}")),
-        IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_IDP).getCode(), "invalid_client");
+        TARGET_IDP).getCode(), "invalid_client");
     // RFC 6749 refusals arrive as 400.
     assertEquals(assertAuth(underPinot(constructOAuthConsumer(400, "{\"error\":\"invalid_grant\"}")),
-        IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_IDP).getCode(), "invalid_grant");
+        TARGET_IDP).getCode(), "invalid_grant");
     assertEquals(assertAuth(underPinot(constructOAuthConsumer(400, "{\"error\":\"unauthorized_client\"}")),
-        IngestionSourceErrorSubReason.AUTHORIZATION, TARGET_IDP).getCode(), "unauthorized_client");
-    assertEquals(assertAuth(underPinot(constructOAuthConsumer(403, "{}")), IngestionSourceErrorSubReason.AUTHORIZATION,
-        TARGET_IDP).getCode(), "403");
+        TARGET_IDP).getCode(), "unauthorized_client");
+    assertEquals(assertAuth(underPinot(constructOAuthConsumer(403, "{}")), TARGET_IDP).getCode(), "403");
     // The endpoint refusing the token request itself, whatever the status.
     assertEquals(assertAuth(underPinot(constructOAuthConsumer(400, "{\"error\":\"invalid_request\"}")),
-        IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_IDP).getCode(), "invalid_request");
+        TARGET_IDP).getCode(), "invalid_request");
     assertEquals(assertAuth(underPinot(constructOAuthConsumer(401, "{\"error\":\"invalid_request\"}")),
-        IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_IDP).getCode(), "invalid_request");
+        TARGET_IDP).getCode(), "invalid_request");
     // An error no row names is still a refusal at 400, whatever its characters or length; the code stays bounded.
     assertEquals(assertAuth(underPinot(constructOAuthConsumer(400, "{\"error\":\"invalid_dpop_proof\"}")),
-        IngestionSourceErrorSubReason.UNSPECIFIED, TARGET_IDP).getCode(), "invalid_dpop_proof");
+        TARGET_IDP).getCode(), "invalid_dpop_proof");
     assertEquals(assertAuth(underPinot(constructOAuthConsumer(400, "{\"error\":\"vendor:denied\"}")),
-        IngestionSourceErrorSubReason.UNSPECIFIED, TARGET_IDP).getCode(), "vendor:denied");
+        TARGET_IDP).getCode(), "vendor:denied");
     String longError = "a".repeat(65);
     assertEquals(assertAuth(underPinot(constructOAuthConsumer(400, "{\"error\":\"" + longError + "\"}")),
-        IngestionSourceErrorSubReason.UNSPECIFIED, TARGET_IDP).getCode(), longError.substring(0, 64));
+        TARGET_IDP).getCode(), longError.substring(0, 64));
     // At 401 or 403 the status decides, with its sub-reason
     assertAuth(underPinot(constructOAuthConsumer(401, "{\"error\":\"invalid_dpop_proof\"}")),
-        IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_IDP);
+        TARGET_IDP);
   }
 
   @Test
@@ -222,16 +220,15 @@ public class KafkaSourceErrorClassificationTest {
   public void kerberosLogin() {
     Throwable rejected = new KafkaException("Failed to construct kafka consumer",
         new KafkaException(new LoginException("Pre-authentication information was invalid (24)")));
-    assertAuth(rejected, IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_IDP);
+    assertAuth(rejected, TARGET_IDP);
     assertAuth(new LoginException("Client not found in Kerberos database (6)"),
-        IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_IDP);
+        TARGET_IDP);
     assertSourceRead(new LoginException("Cannot contact any KDC for realm 'EXAMPLE.COM'"), TARGET_IDP);
     assertSourceRead(new LoginException("Receive timed out"), TARGET_IDP);
     // Our clock, keytab or krb5 setup: the login failed without the KDC rejecting the principal.
-    assertAuth(new LoginException("Unable to obtain password from user"), IngestionSourceErrorSubReason.AUTHENTICATION,
-        null);
-    assertAuth(new LoginException("Clock skew too great (37)"), IngestionSourceErrorSubReason.AUTHENTICATION, null);
-    assertAuth(new LoginException("Cannot locate default realm"), IngestionSourceErrorSubReason.AUTHENTICATION, null);
+    assertAuth(new LoginException("Unable to obtain password from user"), null);
+    assertAuth(new LoginException("Clock skew too great (37)"), null);
+    assertAuth(new LoginException("Cannot locate default realm"), null);
   }
 
   @Test
@@ -243,7 +240,7 @@ public class KafkaSourceErrorClassificationTest {
       Class<?> isolatedClass = isolated.loadClass(TopicAuthorizationException.class.getName());
       assertTrue(isolatedClass != TopicAuthorizationException.class);
       Throwable denied = (Throwable) isolatedClass.getConstructor(String.class).newInstance("denied");
-      assertAuth(underPinot(denied), IngestionSourceErrorSubReason.AUTHORIZATION, TARGET_BROKER);
+      assertAuth(underPinot(denied), TARGET_BROKER);
     }
   }
 

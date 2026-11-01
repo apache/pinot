@@ -30,7 +30,6 @@ import java.net.UnknownHostException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.net.ssl.SSLHandshakeException;
-import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorSubReason;
 import org.testng.annotations.Test;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
@@ -99,21 +98,21 @@ public class KinesisSourceErrorClassificationTest {
   public void permissionDenied() {
     assertAuth(underPinot(AccessDeniedException.builder().awsErrorDetails(details("Kinesis", "AccessDeniedException"))
             .statusCode(400).message("User: arn is not authorized to perform: kinesis:GetRecords on resource: stream")
-            .build()), IngestionSourceErrorSubReason.AUTHORIZATION, null);
+            .build()), null);
     // The denied action names the key that encrypts the stream.
     assertAuth(kinesis("AccessDeniedException", "User: arn is not authorized to perform: kms:Decrypt on resource: "
-        + "key"), IngestionSourceErrorSubReason.AUTHORIZATION, TARGET_KMS);
+        + "key"), TARGET_KMS);
     assertAuth(kinesis("AccessDeniedException", "The ciphertext refers to a customer master key that does not exist, "
             + "does not exist in this region, or you are not allowed to access."),
-        IngestionSourceErrorSubReason.MISSING_OR_DENIED, TARGET_KMS);
+        TARGET_KMS);
   }
 
   @Test
   public void keyThatEncryptsTheStream() {
     assertAuth(KmsAccessDeniedException.builder().awsErrorDetails(details("Kinesis", "KMSAccessDeniedException"))
-        .statusCode(400).message("denied").build(), IngestionSourceErrorSubReason.AUTHORIZATION, TARGET_KMS);
+        .statusCode(400).message("denied").build(), TARGET_KMS);
     assertAuth(KmsOptInRequiredException.builder().awsErrorDetails(details("Kinesis", "KMSOptInRequired"))
-        .statusCode(400).message("opt in").build(), IngestionSourceErrorSubReason.AUTHORIZATION, TARGET_KMS);
+        .statusCode(400).message("opt in").build(), TARGET_KMS);
     assertSourceRead(KmsDisabledException.builder().awsErrorDetails(details("Kinesis", "KMSDisabledException"))
         .statusCode(400).message("disabled").build(), TARGET_KMS);
     assertSourceRead(KmsInvalidStateException.builder()
@@ -128,17 +127,17 @@ public class KinesisSourceErrorClassificationTest {
   @Test
   public void credentialCodesAreAuthWhoeverOwnsTheCredential() {
     assertAuth(underPinot(kinesis("UnrecognizedClientException",
-        "The security token included in the request is invalid.")), IngestionSourceErrorSubReason.AUTHENTICATION, null);
+        "The security token included in the request is invalid.")), null);
     assertAuth(kinesis("InvalidSignatureException",
             "The request signature we calculated does not match the signature you provided."),
-        IngestionSourceErrorSubReason.AUTHENTICATION, null);
+        null);
     assertAuth(kinesis("ExpiredTokenException", "The security token has expired."),
-        IngestionSourceErrorSubReason.AUTHENTICATION, null);
+        null);
     // Our clock, under a signature code or its own: no message decides against AUTH.
     assertAuth(kinesis("InvalidSignatureException",
             "Signature expired: 20260101T000000Z is now earlier than 20260101T000500Z"),
-        IngestionSourceErrorSubReason.AUTHENTICATION, null);
-    assertAuth(kinesis("RequestExpired", "Request has expired."), IngestionSourceErrorSubReason.AUTHENTICATION, null);
+        null);
+    assertAuth(kinesis("RequestExpired", "Request has expired."), null);
   }
 
   @Test
@@ -147,21 +146,21 @@ public class KinesisSourceErrorClassificationTest {
     Throwable trustDenied = sts("AccessDenied", 403,
         "User: arn:aws:sts::000000000000:assumed-role/node/i-0 is not authorized to perform: sts:AssumeRole on "
             + "resource: arn:aws:iam::111111111111:role/table");
-    assertAuth(underPinot(trustDenied), IngestionSourceErrorSubReason.AUTHORIZATION, TARGET_STS);
+    assertAuth(underPinot(trustDenied), TARGET_STS);
     // The base keys are rejected by STS.
     assertAuth(sts("InvalidClientTokenId", 403, "The security token included in the request is invalid."),
-        IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_STS);
+        TARGET_STS);
     assertAuth(RegionDisabledException.builder().awsErrorDetails(details("Sts", "RegionDisabledException"))
         .statusCode(403).message("STS is not activated in this region").build(),
-        IngestionSourceErrorSubReason.AUTHORIZATION, TARGET_STS);
+        TARGET_STS);
     // The process's web identity, reused by the default chain after its first success.
     assertAuth(sts("AccessDenied", 403, "Not authorized to perform sts:AssumeRoleWithWebIdentity"),
-        IngestionSourceErrorSubReason.AUTHORIZATION, TARGET_STS);
+        TARGET_STS);
     assertAuth(sts("InvalidIdentityToken", 400, "No OpenIDConnect provider found in your account for https://oidc"),
-        IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_STS);
+        TARGET_STS);
     // STS refusing the AssumeRole request itself: a role ARN or session duration it won't accept.
     assertAuth(sts("ValidationError", 400, "The requested DurationSeconds exceeds the MaxSessionDuration"),
-        IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_STS);
+        TARGET_STS);
     // The web identity's provider never answered STS.
     assertSourceRead(sts("IDPCommunicationError", 400, "The IdP could not be contacted"), TARGET_STS);
   }
@@ -189,17 +188,16 @@ public class KinesisSourceErrorClassificationTest {
     // S3 answers 403 when it disabled all access to a resource, or to a Requester Pays object for this requester.
     assertAuth(AwsServiceException.builder().awsErrorDetails(details("S3", "AllAccessDisabled")).statusCode(403)
         .message("All access to this Amazon S3 resource has been disabled.").build(),
-        IngestionSourceErrorSubReason.AUTHORIZATION, null);
-    assertAuth(AwsServiceException.builder().awsErrorDetails(details("S3", "InvalidPayer")).statusCode(403)
-        .message("All access to this object has been disabled.").build(), IngestionSourceErrorSubReason.AUTHORIZATION,
         null);
+    assertAuth(AwsServiceException.builder().awsErrorDetails(details("S3", "InvalidPayer")).statusCode(403)
+        .message("All access to this object has been disabled.").build(), null);
   }
 
   @Test
   public void glueCodesKeyOnTheCodeNotTheStatus() {
     // Glue is a JSON-protocol service: denial, missing entity and throttling are all 400.
     assertAuth(AwsServiceException.builder().awsErrorDetails(details("Glue", "AccessDeniedException"))
-        .statusCode(400).message("denied").build(), IngestionSourceErrorSubReason.AUTHORIZATION, null);
+        .statusCode(400).message("denied").build(), null);
     assertSourceRead(AwsServiceException.builder().awsErrorDetails(details("Glue", "EntityNotFoundException"))
         .statusCode(400).message("Schema version is not found.").build(), null);
     assertSourceRead(AwsServiceException.builder().awsErrorDetails(details("Glue", "ThrottlingException"))
@@ -219,12 +217,11 @@ public class KinesisSourceErrorClassificationTest {
     // A credential chain that found no credential.
     assertAuth(underPinot(SdkClientException.create(
             "Unable to load credentials from any of the providers in the chain AwsCredentialsProviderChain")),
-        IngestionSourceErrorSubReason.AUTHENTICATION, null);
+        null);
     // One of its providers, called directly after the chain's first success: IMDS, or the ECS / EKS Pod Identity
     // container endpoint. One whose endpoint never answered, or failed, is SOURCE_READ like any endpoint.
     assertAuth(SdkClientException.create("Failed to load credentials from IMDS.",
-            new IOException("Unable to parse the credentials response")), IngestionSourceErrorSubReason.AUTHENTICATION,
-        null);
+            new IOException("Unable to parse the credentials response")), null);
     assertEquals(assertSourceRead(SdkClientException.create("Failed to load credentials from IMDS.",
         new SocketTimeoutException("Connect timed out")), TARGET_IDP).getCode(), "SocketTimeoutException");
     assertEquals(assertSourceRead(SdkClientException.create("Failed to load credentials from metadata service.",
@@ -244,7 +241,7 @@ public class KinesisSourceErrorClassificationTest {
     // The endpoint answered, rejecting the client certificate we presented
     assertAuth(SdkClientException.create("Unable to execute HTTP request",
         new SSLHandshakeException("Received fatal alert: bad_certificate")),
-        IngestionSourceErrorSubReason.AUTHENTICATION, null);
+        null);
   }
 
   /// A load balancer or proxy that reads each request in full and closes the connection without answering.

@@ -46,37 +46,33 @@ public final class IngestionSourceErrorVerdict {
   @Nullable
   private final IngestionSourceErrorCategory _category;
   @Nullable
-  private final IngestionSourceErrorSubReason _subReason;
-  @Nullable
   private final String _code;
   @Nullable
   private final String _target;
 
-  private IngestionSourceErrorVerdict(@Nullable IngestionSourceErrorCategory category,
-      @Nullable IngestionSourceErrorSubReason subReason, @Nullable String code, @Nullable String target) {
+  private IngestionSourceErrorVerdict(@Nullable IngestionSourceErrorCategory category, @Nullable String code,
+      @Nullable String target) {
     _category = category;
-    _subReason = subReason;
     _code = token(code);
     _target = token(target);
   }
 
   /// Authentication or authorization failed. `target` names the service that answered when it isn't the source
   /// itself, or is null when no service answered (a credential that couldn't be loaded or built).
-  public static IngestionSourceErrorVerdict auth(IngestionSourceErrorSubReason subReason, @Nullable String code,
-      @Nullable String target) {
-    return new IngestionSourceErrorVerdict(IngestionSourceErrorCategory.AUTH, subReason, code, target);
+  public static IngestionSourceErrorVerdict auth(@Nullable String code, @Nullable String target) {
+    return new IngestionSourceErrorVerdict(IngestionSourceErrorCategory.AUTH, code, target);
   }
 
   /// Reading from the source failed otherwise: it couldn't serve the request or rejected it, never answered, or the
   /// client couldn't be set up.
   public static IngestionSourceErrorVerdict sourceRead(@Nullable String code, @Nullable String target) {
-    return new IngestionSourceErrorVerdict(IngestionSourceErrorCategory.SOURCE_READ, null, code, target);
+    return new IngestionSourceErrorVerdict(IngestionSourceErrorCategory.SOURCE_READ, code, target);
   }
 
   /// Not a failure to access the source. It still decides the chain it was found in, so a wrapper above it can't
   /// reinstate a category.
   public static IngestionSourceErrorVerdict none(@Nullable String code) {
-    return new IngestionSourceErrorVerdict(null, null, code, null);
+    return new IngestionSourceErrorVerdict(null, code, null);
   }
 
   /// The category, or null for [#none].
@@ -87,12 +83,6 @@ public final class IngestionSourceErrorVerdict {
 
   public boolean isNone() {
     return _category == null;
-  }
-
-  /// The finer reason behind an [IngestionSourceErrorCategory#AUTH] verdict; null otherwise.
-  @Nullable
-  public IngestionSourceErrorSubReason getSubReason() {
-    return _subReason;
   }
 
   /// The source's own code that decided, e.g. `AccessDeniedException`, `403`, `PERMISSION_DENIED`.
@@ -131,7 +121,7 @@ public final class IngestionSourceErrorVerdict {
   @Override
   public String toString() {
     String category = _category != null ? _category.name() : "none";
-    return category + (_subReason != null ? "/" + _subReason.label() : "") + (_code != null ? " code=" + _code : "")
+    return category + (_code != null ? " code=" + _code : "")
         + (_target != null ? " target=" + _target : "");
   }
 }

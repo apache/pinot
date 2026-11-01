@@ -37,12 +37,10 @@ public final class IngestionSourceErrorAssertions {
         .orElseThrow(() -> new AssertionError("Not classified: " + describe(failure)));
   }
 
-  public static IngestionSourceErrorClassification assertAuth(Throwable failure,
-      IngestionSourceErrorSubReason subReason, @Nullable String target) {
+  public static IngestionSourceErrorClassification assertAuth(Throwable failure, @Nullable String target) {
     IngestionSourceErrorClassification classification = classify(failure);
     String description = describe(failure);
     assertEquals(classification.getCategory(), IngestionSourceErrorCategory.AUTH, description);
-    assertEquals(classification.getSubReason(), subReason, description);
     assertEquals(classification.getTarget(), target, description);
     return classification;
   }

@@ -74,7 +74,7 @@ final class IngestionSourceErrorRules {
       return sourceRead(code, evidence.getTarget());
     }
     if (IngestionSourceErrorEvidence.LOCAL_PRECHECK.equals(code)) {
-      return auth(IngestionSourceErrorSubReason.AUTHENTICATION, code, evidence.getTarget());
+      return auth(code, evidence.getTarget());
     }
     if (IngestionSourceErrorEvidence.UNKNOWN_TOPIC_OR_PARTITION.equals(code)) {
       return sourceRead(code, evidence.getTarget() != null ? evidence.getTarget() : TARGET_BROKER);
@@ -148,12 +148,7 @@ final class IngestionSourceErrorRules {
       return null;
     }
     String name = alert.group(1);
-    if (TLS_CERTIFICATE_REJECTED_ALERTS.contains(name)) {
-      return auth(IngestionSourceErrorSubReason.AUTHENTICATION, name, target);
-    }
-    return TLS_ACCESS_DENIED_ALERT.equals(name)
-        ? auth(IngestionSourceErrorSubReason.AUTHORIZATION, name, target)
-        : null;
+    return TLS_REFUSAL_ALERTS.contains(name) ? auth(name, target) : null;
   }
 
   /// A credential the client couldn't get: authentication failed, unless what lies beneath shows that the endpoint
@@ -176,7 +171,7 @@ final class IngestionSourceErrorRules {
         return sourceRead(String.valueOf(status), TARGET_IDP);
       }
     }
-    return auth(IngestionSourceErrorSubReason.AUTHENTICATION, code, target);
+    return auth(code, target);
   }
 
   /// Whether `throwable` is a network failure: DNS, connect, TLS, a socket error or a timeout.
@@ -202,13 +197,13 @@ final class IngestionSourceErrorRules {
       "software.amazon.awssdk.core.exception.ApiCallTimeoutException",
       "software.amazon.awssdk.core.exception.ApiCallAttemptTimeoutException");
   // Codes that reject a credential, a web identity token, or a request's signature, our clock's skew included.
-  private static final Set<String> AWS_CREDENTIAL_CODES = Set.of("InvalidAccessKeyId", "SignatureDoesNotMatch",
+  private static final Set<String> AWS_AUTH_CODES = Set.of("InvalidAccessKeyId", "SignatureDoesNotMatch",
       "InvalidSignatureException", "ExpiredToken", "ExpiredTokenException", "InvalidToken", "TokenRefreshRequired",
       "InvalidClientTokenId", "IncompleteSignature", "MissingAuthenticationToken", "UnrecognizedClientException",
-      "RequestTimeTooSkewed", "RequestExpired", "RequestInTheFuture", "InvalidIdentityToken", "IDPRejectedClaim");
-  private static final Set<String> AWS_AUTHORIZATION_CODES = Set.of("RegionDisabledException",
-      "GlueEncryptionException", "AccountProblem", "NotSignedUp", "AllAccessDisabled", "InvalidPayer");
-  private static final Set<String> AWS_KMS_AUTHORIZATION_CODES = Set.of("KMSAccessDeniedException",
+      "RequestTimeTooSkewed", "RequestExpired", "RequestInTheFuture", "InvalidIdentityToken", "IDPRejectedClaim",
+      "RegionDisabledException", "GlueEncryptionException", "AccountProblem", "NotSignedUp", "AllAccessDisabled",
+      "InvalidPayer");
+  private static final Set<String> AWS_KMS_AUTH_CODES = Set.of("KMSAccessDeniedException",
       "KMSOptInRequired", "KMSKeyNotAccessibleFault");
   private static final Set<String> AWS_SOURCE_READ_CODES = Set.of("NoSuchKey", "NoSuchBucket", "InvalidObjectState",
       "ObjectNotInActiveTierError", "PermanentRedirect", "AuthorizationHeaderMalformed",
@@ -242,7 +237,7 @@ final class IngestionSourceErrorRules {
     if (code == null || code.isEmpty()) {
       // A response with no body (a HEAD): a deny, a missing object without list permission and our skew look alike.
       if (status == 403) {
-        return auth(IngestionSourceErrorSubReason.MISSING_OR_DENIED, "403", target);
+        return auth("403", target);
       }
       if (status == 404 || status == 400 || status == 429 || (status >= 300 && status < 400) || status >= 500) {
         return sourceRead(String.valueOf(status), target);
@@ -250,19 +245,15 @@ final class IngestionSourceErrorRules {
       return null;
     }
     if (code.equals("AccessDenied") || code.equals("AccessDeniedException")) {
-      if (message.contains("ciphertext refers to a customer master key that does not exist")) {
-        return auth(IngestionSourceErrorSubReason.MISSING_OR_DENIED, code, TARGET_KMS);
-      }
-      return auth(IngestionSourceErrorSubReason.AUTHORIZATION, code, message.contains("kms:") ? TARGET_KMS : target);
+      boolean kms = message.contains("ciphertext refers to a customer master key that does not exist")
+          || message.contains("kms:");
+      return auth(code, kms ? TARGET_KMS : target);
     }
-    if (AWS_AUTHORIZATION_CODES.contains(code)) {
-      return auth(IngestionSourceErrorSubReason.AUTHORIZATION, code, target);
+    if (AWS_AUTH_CODES.contains(code)) {
+      return auth(code, target);
     }
-    if (AWS_KMS_AUTHORIZATION_CODES.contains(code)) {
-      return auth(IngestionSourceErrorSubReason.AUTHORIZATION, code, TARGET_KMS);
-    }
-    if (AWS_CREDENTIAL_CODES.contains(code)) {
-      return auth(IngestionSourceErrorSubReason.AUTHENTICATION, code, target);
+    if (AWS_KMS_AUTH_CODES.contains(code)) {
+      return auth(code, TARGET_KMS);
     }
     if (AWS_KMS_SOURCE_READ_CODES.contains(code)) {
       return sourceRead(code, TARGET_KMS);
@@ -271,7 +262,7 @@ final class IngestionSourceErrorRules {
       return sourceRead(code, target);
     }
     if (AWS_INVALID_REQUEST_CODES.contains(code)) {
-      return sts ? auth(IngestionSourceErrorSubReason.AUTHENTICATION, code, target) : sourceRead(code, target);
+      return sts ? auth(code, target) : sourceRead(code, target);
     }
     return null;
   }
@@ -327,17 +318,16 @@ final class IngestionSourceErrorRules {
       "java.security.cert.CertPathValidatorException", "sun.security.validator.ValidatorException");
   private static final Pattern TLS_ALERT = Pattern.compile("Received fatal alert: ([a-z_]+)");
   // Alerts a peer sends when it rejects the certificate we presented.
-  private static final Set<String> TLS_CERTIFICATE_REJECTED_ALERTS = Set.of("bad_certificate",
-      "unsupported_certificate", "certificate_revoked", "certificate_expired", "certificate_unknown", "unknown_ca",
-      "certificate_required");
-  private static final String TLS_ACCESS_DENIED_ALERT = "access_denied";
+  private static final Set<String> TLS_REFUSAL_ALERTS = Set.of("bad_certificate", "unsupported_certificate",
+      "certificate_revoked", "certificate_expired", "certificate_unknown", "unknown_ca", "certificate_required",
+      "access_denied");
 
   @Nullable
   private static IngestionSourceErrorVerdict kafka(Throwable node, List<Throwable> below) {
     Class<?> clazz = node.getClass();
     String code = clazz.getSimpleName();
     if (hasClass(clazz, KAFKA_AUTHORIZATION)) {
-      return auth(IngestionSourceErrorSubReason.AUTHORIZATION, code, TARGET_BROKER);
+      return auth(code, TARGET_BROKER);
     }
     if (hasClass(clazz, KAFKA_AUTHENTICATION)) {
       return kafkaAuthentication(node, below);
@@ -376,7 +366,7 @@ final class IngestionSourceErrorRules {
         return credentialFailure(code, null, below);
       }
     }
-    return auth(IngestionSourceErrorSubReason.AUTHENTICATION, code, TARGET_BROKER);
+    return auth(code, TARGET_BROKER);
   }
 
   private static IngestionSourceErrorVerdict kafkaTls(String code, List<Throwable> below) {
@@ -436,10 +426,8 @@ final class IngestionSourceErrorRules {
       "java.net.UnknownHostException", "java.net.SocketTimeoutException", "java.net.NoRouteToHostException",
       "java.net.http.HttpTimeoutException", "javax.net.ssl.SSLHandshakeException");
   // invalid_request: the endpoint refused the token request itself.
-  private static final Set<String> OAUTH_AUTHENTICATION = Set.of("invalid_client", "invalid_grant",
-      "unsupported_grant_type", "invalid_request");
-  private static final Set<String> OAUTH_AUTHORIZATION = Set.of("unauthorized_client", "invalid_scope",
-      "access_denied");
+  private static final Set<String> OAUTH_REFUSED = Set.of("invalid_client", "invalid_grant",
+      "unsupported_grant_type", "invalid_request", "unauthorized_client", "invalid_scope", "access_denied");
   private static final Set<String> OAUTH_UNAVAILABLE = Set.of("server_error", "temporarily_unavailable");
   private static final List<String> KERBEROS_UNREACHABLE = List.of("Cannot contact any KDC", "Receive timed out");
   // Our clock, keytab or krb5 setup: the login fails without the KDC rejecting the principal.
@@ -473,12 +461,12 @@ final class IngestionSourceErrorRules {
     }
     for (String local : KERBEROS_LOCAL_FAILURES) {
       if (message.contains(local)) {
-        return auth(IngestionSourceErrorSubReason.AUTHENTICATION, node.getClass().getSimpleName(), null);
+        return auth(node.getClass().getSimpleName(), null);
       }
     }
     Matcher rejected = KERBEROS_REJECTED.matcher(message);
     if (rejected.find()) {
-      return auth(IngestionSourceErrorSubReason.AUTHENTICATION, "krb5_" + rejected.group(1), TARGET_IDP);
+      return auth("krb5_" + rejected.group(1), TARGET_IDP);
     }
     return null;
   }
@@ -496,14 +484,8 @@ final class IngestionSourceErrorRules {
       if (status == 404 || isUnavailable(status) || OAUTH_UNAVAILABLE.contains(normalized)) {
         return sourceRead(code, TARGET_IDP);
       }
-      if (OAUTH_AUTHENTICATION.contains(normalized)) {
-        return auth(IngestionSourceErrorSubReason.AUTHENTICATION, code, TARGET_IDP);
-      }
-      if (OAUTH_AUTHORIZATION.contains(normalized)) {
-        return auth(IngestionSourceErrorSubReason.AUTHORIZATION, code, TARGET_IDP);
-      }
-      if (status == 0 || status == 400) {
-        return auth(IngestionSourceErrorSubReason.UNSPECIFIED, code, TARGET_IDP);
+      if (OAUTH_REFUSED.contains(normalized) || status == 0 || status == 400) {
+        return auth(code, TARGET_IDP);
       }
     }
     return httpStatus(status, TARGET_IDP);
@@ -514,11 +496,8 @@ final class IngestionSourceErrorRules {
   @Nullable
   private static IngestionSourceErrorVerdict httpStatus(int status, String target) {
     String code = String.valueOf(status);
-    if (status == 401) {
-      return auth(IngestionSourceErrorSubReason.AUTHENTICATION, code, target);
-    }
-    if (status == 403) {
-      return auth(IngestionSourceErrorSubReason.AUTHORIZATION, code, target);
+    if (status == 401 || status == 403) {
+      return auth(code, target);
     }
     if (status == 404 || isUnavailable(status)) {
       return sourceRead(code, target);
@@ -579,7 +558,7 @@ final class IngestionSourceErrorRules {
         return pulsarAuthentication(message);
       }
       if (simple.equals("AuthorizationException")) {
-        return auth(IngestionSourceErrorSubReason.AUTHORIZATION, simple, TARGET_BROKER);
+        return auth(simple, TARGET_BROKER);
       }
       if (simple.equals("TooManyRequestsException") && message.contains("Requests number out of config")) {
         // The client's own lookup semaphore: the broker never saw the request.
@@ -607,7 +586,7 @@ final class IngestionSourceErrorRules {
   private static IngestionSourceErrorVerdict pulsarAuthentication(String message) {
     String code = "AuthenticationException";
     if (message.startsWith("Unable to read private key")) {
-      return auth(IngestionSourceErrorSubReason.AUTHENTICATION, code, null);
+      return auth(code, null);
     }
     if (message.contains("Unable to retrieve OAuth 2.0 server metadata")) {
       return sourceRead(code, TARGET_IDP);
@@ -617,8 +596,7 @@ final class IngestionSourceErrorRules {
       if (error.find() && !PULSAR_NOT_A_REFUSAL.matcher(message).find()) {
         // A 400 or 401: the endpoint refused the token request, whatever its error says
         String oauthError = error.group(1);
-        return "null".equals(oauthError) ? auth(IngestionSourceErrorSubReason.UNSPECIFIED, code, TARGET_IDP)
-            : oauth(oauthError, 0);
+        return "null".equals(oauthError) ? auth(code, TARGET_IDP) : oauth(oauthError, 0);
       }
       Matcher status = PULSAR_OAUTH_STATUS.matcher(message);
       if (status.find()) {
@@ -631,7 +609,7 @@ final class IngestionSourceErrorRules {
       return sourceRead(code, TARGET_IDP);
     }
     // The broker rejected the token: it gives one generic message for every reason.
-    return auth(IngestionSourceErrorSubReason.AUTHENTICATION, code, TARGET_BROKER);
+    return auth(code, TARGET_BROKER);
   }
 
   /// The admin client maps both 401 and 403 to `NotAuthorizedException`: only the status tells them apart. The base
@@ -677,12 +655,9 @@ final class IngestionSourceErrorRules {
         // The service's refusal, which carries no cause, or grpc-auth's report of a token refresh that failed
         return credentialFailure(code, null, below);
       case "PERMISSION_DENIED":
-        return auth(IngestionSourceErrorSubReason.AUTHORIZATION, code, null);
+        return auth(code, null);
       case "NOT_FOUND":
-        if (messageOf(node).contains(GOOGLE_MISSING_OR_DENIED)) {
-          return auth(IngestionSourceErrorSubReason.MISSING_OR_DENIED, code, null);
-        }
-        return sourceRead(code, null);
+        return messageOf(node).contains(GOOGLE_MISSING_OR_DENIED) ? auth(code, null) : sourceRead(code, null);
       case "UNAVAILABLE":
         // The transport failed, unless the peer rejected the certificate we presented
         for (Throwable cause : below) {
@@ -719,9 +694,8 @@ final class IngestionSourceErrorRules {
   // ---------------------------------------------------------------------------------------------------------------
   // Shorthands
 
-  private static IngestionSourceErrorVerdict auth(IngestionSourceErrorSubReason subReason, @Nullable String code,
-      @Nullable String target) {
-    return IngestionSourceErrorVerdict.auth(subReason, code, target);
+  private static IngestionSourceErrorVerdict auth(@Nullable String code, @Nullable String target) {
+    return IngestionSourceErrorVerdict.auth(code, target);
   }
 
   private static IngestionSourceErrorVerdict sourceRead(@Nullable String code, @Nullable String target) {

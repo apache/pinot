@@ -47,7 +47,6 @@ import java.util.Date;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.net.ssl.SSLHandshakeException;
-import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorSubReason;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorAssertions.assertAuth;
@@ -163,9 +162,9 @@ public class GoogleCloudSourceErrorClassificationTest {
   @Test
   public void rejectedTokenIsAuth()
       throws Exception {
-    assertAuth(tokenRefreshFailure(KEY_REVOKED), IngestionSourceErrorSubReason.AUTHENTICATION, null);
+    assertAuth(tokenRefreshFailure(KEY_REVOKED), null);
     // Our clock skew is refused the same way: no body decides against AUTH.
-    assertAuth(tokenRefreshFailure(CLOCK_SKEW), IngestionSourceErrorSubReason.AUTHENTICATION, null);
+    assertAuth(tokenRefreshFailure(CLOCK_SKEW), null);
   }
 
   @Test
@@ -186,7 +185,7 @@ public class GoogleCloudSourceErrorClassificationTest {
     assertSourceRead(tokenRefreshFailure(unreachable), null);
     // An impersonated credential whose IAM endpoint failed, or refused.
     assertEquals(assertSourceRead(impersonationFailure(503), TARGET_IDP).getCode(), "503");
-    assertAuth(impersonationFailure(403), IngestionSourceErrorSubReason.AUTHENTICATION, null);
+    assertAuth(impersonationFailure(403), null);
     // grpc-auth reports a metadata server it couldn't find as UNAUTHENTICATED, over the network failure.
     assertSourceRead(Status.UNAUTHENTICATED.withCause(new IOException(
         "ComputeEngineCredentials cannot find the metadata server.", new UnknownHostException(
@@ -205,16 +204,16 @@ public class GoogleCloudSourceErrorClassificationTest {
   @Test
   public void permissionDenied() {
     assertAuth(new RuntimeException("Failed to create a subscription", gax(Status.Code.PERMISSION_DENIED,
-        "User not authorized to perform this action.")), IngestionSourceErrorSubReason.AUTHORIZATION, null);
+        "User not authorized to perform this action.")), null);
     assertAuth(Status.PERMISSION_DENIED.withDescription("Request is prohibited by organization's policy")
-        .asRuntimeException(), IngestionSourceErrorSubReason.AUTHORIZATION, null);
+        .asRuntimeException(), null);
   }
 
   @Test
   public void peerRejectingOurCertificateBeneathUnavailable() {
     // gRPC surfaces a TLS handshake the server refused as UNAVAILABLE with the SSL failure as its cause
     assertAuth(Status.UNAVAILABLE.withCause(new SSLHandshakeException("Received fatal alert: bad_certificate"))
-        .asRuntimeException(), IngestionSourceErrorSubReason.AUTHENTICATION, null);
+        .asRuntimeException(), null);
     assertSourceRead(Status.UNAVAILABLE.withCause(new SSLHandshakeException("Received fatal alert: handshake_failure"))
         .asRuntimeException(), null);
   }
@@ -222,7 +221,7 @@ public class GoogleCloudSourceErrorClassificationTest {
   @Test
   public void missingOrDeniedProject() {
     assertAuth(gax(Status.Code.NOT_FOUND, "Requested project not found or user does not have access to it."),
-        IngestionSourceErrorSubReason.MISSING_OR_DENIED, null);
+        null);
   }
 
   @Test

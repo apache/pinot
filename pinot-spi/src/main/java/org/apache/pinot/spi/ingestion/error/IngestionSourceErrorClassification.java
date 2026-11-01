@@ -41,13 +41,6 @@ public final class IngestionSourceErrorClassification {
     return _verdict.getCategory();
   }
 
-  /// The finer reason behind an [IngestionSourceErrorCategory#AUTH] verdict; null for
-  /// [IngestionSourceErrorCategory#SOURCE_READ].
-  @Nullable
-  public IngestionSourceErrorSubReason getSubReason() {
-    return _verdict.getSubReason();
-  }
-
   /// The source's own code that decided, as a bounded token.
   @Nullable
   public String getCode() {

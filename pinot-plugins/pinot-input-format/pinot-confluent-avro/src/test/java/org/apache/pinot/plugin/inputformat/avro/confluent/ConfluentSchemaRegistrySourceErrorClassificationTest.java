@@ -31,7 +31,6 @@ import javax.net.ssl.SSLHandshakeException;
 import org.apache.kafka.common.errors.SerializationException;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorCategory;
-import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorSubReason;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
@@ -67,7 +66,7 @@ public class ConfluentSchemaRegistrySourceErrorClassificationTest {
   public void registryRejectsTheCredential()
       throws Exception {
     assertAuth(decodeFailure(registryAnswering(401, "{\"error_code\":401,\"message\":\"Unauthorized\"}"),
-        payload(1, new byte[]{2})), IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_SCHEMA_REGISTRY);
+        payload(1, new byte[]{2})), TARGET_SCHEMA_REGISTRY);
   }
 
   @Test
@@ -75,7 +74,7 @@ public class ConfluentSchemaRegistrySourceErrorClassificationTest {
       throws Exception {
     String denied = "{\"error_code\":40301,\"message\":\"User is denied operation on this server.\"}";
     assertAuth(decodeFailure(registryAnswering(403, denied), payload(1, new byte[]{2})),
-        IngestionSourceErrorSubReason.AUTHORIZATION, TARGET_SCHEMA_REGISTRY);
+        TARGET_SCHEMA_REGISTRY);
   }
 
   @Test
@@ -83,7 +82,7 @@ public class ConfluentSchemaRegistrySourceErrorClassificationTest {
       throws Exception {
     // A proxy or firewall answering 403 with an HTML body: the client's error code is 50005, its status stays 403.
     assertAuth(decodeFailure(registryAnswering(403, "<html><body>Forbidden</body></html>"), payload(1, new byte[]{2})),
-        IngestionSourceErrorSubReason.AUTHORIZATION, TARGET_SCHEMA_REGISTRY);
+        TARGET_SCHEMA_REGISTRY);
   }
 
   @Test

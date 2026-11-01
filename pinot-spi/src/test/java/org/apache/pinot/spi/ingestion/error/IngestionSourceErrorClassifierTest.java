@@ -78,7 +78,7 @@ public class IngestionSourceErrorClassifierTest {
 
   private static final IngestionSourceErrorRule TEST_RULES = (node, below, evidence) -> {
     if (IngestionSourceErrorRule.hasClass(node.getClass(), RefusedException.class.getName())) {
-      return IngestionSourceErrorVerdict.auth(IngestionSourceErrorSubReason.AUTHORIZATION, "refused", null);
+      return IngestionSourceErrorVerdict.auth("refused", null);
     }
     if (IngestionSourceErrorRule.hasClass(node.getClass(), MissingException.class.getName())) {
       return IngestionSourceErrorVerdict.sourceRead("missing", null);
@@ -124,7 +124,6 @@ public class IngestionSourceErrorClassifierTest {
     IngestionSourceErrorClassification rejected = IngestionSourceErrorClassifier.classify(new RuntimeException(
         "Error retrieving Avro schema", new SSLHandshakeException("Received fatal alert: bad_certificate"))).get();
     assertEquals(rejected.getCategory(), IngestionSourceErrorCategory.AUTH);
-    assertEquals(rejected.getSubReason(), IngestionSourceErrorSubReason.AUTHENTICATION);
     assertEquals(categoryOf(new RuntimeException(new SSLHandshakeException("Received fatal alert: access_denied"))),
         Optional.of(IngestionSourceErrorCategory.AUTH));
     // Any other handshake failure: the TLS connection to the endpoint failed
@@ -184,7 +183,7 @@ public class IngestionSourceErrorClassifierTest {
     register((node, below, evidence) -> !(node instanceof RefusedException) ? null
         : evidence != null && "cancelled".equals(evidence.getCode())
             ? IngestionSourceErrorVerdict.none("cancelled")
-            : IngestionSourceErrorVerdict.auth(IngestionSourceErrorSubReason.AUTHENTICATION, "refused", null));
+            : IngestionSourceErrorVerdict.auth("refused", null));
     Throwable shared = new RefusedException(null);
     Throwable cancelled = IngestionSourceErrorEvidence.attach(new RuntimeException("first attempt", shared),
         new IngestionSourceErrorEvidence().setEvidence(0, "cancelled"));
@@ -222,10 +221,10 @@ public class IngestionSourceErrorClassifierTest {
     IngestionSourceErrorRule missingIsRead = (node, below, evidence) -> node instanceof FileNotFoundException
         ? IngestionSourceErrorVerdict.sourceRead("FileNotFoundException", null) : null;
     IngestionSourceErrorRule missingIsAuth = (node, below, evidence) -> node instanceof FileNotFoundException
-        ? IngestionSourceErrorVerdict.auth(IngestionSourceErrorSubReason.AUTHORIZATION, "FileNotFoundException", null)
+        ? IngestionSourceErrorVerdict.auth("FileNotFoundException", null)
         : null;
     IngestionSourceErrorRule connectIsAuth = (node, below, evidence) -> node instanceof ConnectException
-        ? IngestionSourceErrorVerdict.auth(IngestionSourceErrorSubReason.UNSPECIFIED, "ConnectException", null) : null;
+        ? IngestionSourceErrorVerdict.auth("ConnectException", null) : null;
     IngestionSourceErrorRule failing = (node, below, evidence) -> {
       throw new IllegalStateException("rule bug");
     };
@@ -253,7 +252,7 @@ public class IngestionSourceErrorClassifierTest {
     IngestionSourceErrorRule readRule = (node, below, evidence) -> node instanceof MissingException
         ? IngestionSourceErrorVerdict.sourceRead("read", null) : null;
     IngestionSourceErrorRule authRule = (node, below, evidence) -> node instanceof MissingException
-        ? IngestionSourceErrorVerdict.auth(IngestionSourceErrorSubReason.UNSPECIFIED, "auth", null) : null;
+        ? IngestionSourceErrorVerdict.auth("auth", null) : null;
     IngestionSourceErrorRule noneRule = (node, below, evidence) -> node instanceof MissingException
         ? IngestionSourceErrorVerdict.none("none") : null;
 
@@ -271,23 +270,22 @@ public class IngestionSourceErrorClassifierTest {
 
   @Test
   public void registrationOrderNeverChangesTheDetailEither() {
-    IngestionSourceErrorRule authenticationRule = (node, below, evidence) -> node instanceof MissingException
-        ? IngestionSourceErrorVerdict.auth(IngestionSourceErrorSubReason.AUTHENTICATION, "b", null) : null;
-    IngestionSourceErrorRule authorizationRule = (node, below, evidence) -> node instanceof MissingException
-        ? IngestionSourceErrorVerdict.auth(IngestionSourceErrorSubReason.AUTHORIZATION, "a", null) : null;
-    register(authenticationRule);
-    register(authorizationRule);
+    IngestionSourceErrorRule ruleB = (node, below, evidence) -> node instanceof MissingException
+        ? IngestionSourceErrorVerdict.auth("b", null) : null;
+    IngestionSourceErrorRule ruleA = (node, below, evidence) -> node instanceof MissingException
+        ? IngestionSourceErrorVerdict.auth("a", null) : null;
+    register(ruleB);
+    register(ruleA);
     String first = IngestionSourceErrorClassifier.classify(new MissingException()).get().toString();
     unregister();
-    register(authorizationRule);
-    register(authenticationRule);
+    register(ruleA);
+    register(ruleB);
     assertEquals(IngestionSourceErrorClassifier.classify(new MissingException()).get().toString(), first);
   }
 
   @Test
   public void registeredRuleNeverOverridesABuiltInDecision() {
-    register((node, below, evidence) -> IngestionSourceErrorVerdict.auth(IngestionSourceErrorSubReason.UNSPECIFIED,
-        "any", null));
+    register((node, below, evidence) -> IngestionSourceErrorVerdict.auth("any", null));
     // A built-in rule decides the interrupt at the root, so the registered rule's verdict on the wrapper above it is
     // never reached.
     assertEquals(categoryOf(new RuntimeException("wrapper", new InterruptedException())), Optional.empty());
