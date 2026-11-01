@@ -63,12 +63,8 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
 
-/// Drives the plugin against a real broker with token authentication and authorization on: what the broker refuses
-/// must reach the Pinot site that called the plugin, as an exception or a report, and classify AUTH. That covers
-/// consumer creation, a lagging reader whose grant is revoked (which used to hang), and the controller's metadata.
 public class PulsarSourceErrorComponentTest {
   private static final DockerImageName PULSAR_IMAGE = DockerImageName.parse("apachepulsar/pulsar:3.2.2");
-  // The image defaults to 6 GiB, which can exhaust the Docker VM when unit tests use multiple forks.
   private static final String PULSAR_MEMORY = "-Xms512m -Xmx1g -XX:MaxDirectMemorySize=1g";
   private static final Duration PULSAR_STARTUP_TIMEOUT = Duration.ofMinutes(10);
   private static final String TABLE_NAME_WITH_TYPE = "tableName_REALTIME";
@@ -80,9 +76,7 @@ public class PulsarSourceErrorComponentTest {
   private static final int FETCH_TIMEOUT_MS = 1000;
 
   private static final String ADMIN_ROLE = "admin";
-  // Consumes the topic, until the lagging-reader test revokes its grant
   private static final String READER_ROLE = "reader";
-  // May look the topic up, but not subscribe
   private static final String PRODUCER_ROLE = "producer";
   private static final String STRANGER_ROLE = "stranger";
 
@@ -104,7 +98,6 @@ public class PulsarSourceErrorComponentTest {
         .withEnv("PULSAR_PREFIX_brokerClientAuthenticationPlugin",
             "org.apache.pulsar.client.impl.auth.AuthenticationToken")
         .withEnv("PULSAR_PREFIX_brokerClientAuthenticationParameters", "token:" + _adminToken)
-        // The default readiness check calls the admin API without a token
         .waitingFor(Wait.forHttp("/admin/v2/clusters").forPort(PulsarContainer.BROKER_HTTP_PORT)
             .withHeader("Authorization", "Bearer " + _adminToken)
             .forResponsePredicate(body -> body.contains("standalone")).withStartupTimeout(PULSAR_STARTUP_TIMEOUT));
@@ -116,8 +109,6 @@ public class PulsarSourceErrorComponentTest {
     }
     try (PulsarClient client = PulsarClient.builder().serviceUrl(_pulsar.getPulsarBrokerUrl())
         .authentication(AuthenticationFactory.token(_adminToken)).build();
-        // Unbatched, so the broker pushes only a receiver queue's worth (1000) and the backlog stays on the broker: a
-        // batched backlog this small would land in the reader's queue whole, and the reader would never lag
         Producer<byte[]> producer = client.newProducer().topic(partition(0)).enableBatching(false).create()) {
       List<CompletableFuture<MessageId>> sends = new ArrayList<>(NUM_MESSAGES);
       for (int i = 0; i < NUM_MESSAGES; i++) {
@@ -145,8 +136,6 @@ public class PulsarSourceErrorComponentTest {
     assertAuth(rejected, TARGET_BROKER);
   }
 
-  /// The broker re-checks a grant only when a reader reconnects, and the client then retries the refused reconnect
-  /// forever. A lagging reader used to wait for it in `readNext()`; now it gives up, and the recreate shows why.
   @Test(timeOut = 120_000)
   public void revokedGrantUnderALaggingReaderSurfacesAtTheRecreate()
       throws Exception {
@@ -156,8 +145,6 @@ public class PulsarSourceErrorComponentTest {
     long gaveUpAtMs;
     try (PartitionGroupConsumer consumer = consumerFactory.createPartitionGroupConsumer(CLIENT_ID,
         consumingStatus(0))) {
-      // A short first fetch learns the last message id and stays far behind it: from now on the reader answers
-      // hasMessageAvailable() from its cache
       MessageBatch<?> batch = consumer.fetchMessages(new MessageIdStreamOffset(MessageId.earliest), 20);
       assertTrue(batch.getMessageCount() < NUM_MESSAGES / 2, "The reader must lag");
       StreamPartitionMsgOffset offset = batch.getOffsetOfNextBatch();
@@ -167,7 +154,6 @@ public class PulsarSourceErrorComponentTest {
         admin.topics().unload(partition(0));
       }
       disconnectedAtMs = System.currentTimeMillis();
-      // Driven the way the consume loop drives it, which has no idle timer here: fetch until the transient exception
       long deadlineMs = disconnectedAtMs + PulsarPartitionLevelConsumer.MAX_DISCONNECTED_MS + 5 * FETCH_TIMEOUT_MS;
       gaveUpAtMs = -1;
       while (gaveUpAtMs < 0) {
@@ -184,19 +170,15 @@ public class PulsarSourceErrorComponentTest {
             && disconnectedMs < PulsarPartitionLevelConsumer.MAX_DISCONNECTED_MS + 5 * FETCH_TIMEOUT_MS,
         "Gave up after " + disconnectedMs + " ms disconnected");
 
-    // The recreate's fresh handshake fails with the broker's refusal
     RuntimeException refused = expectThrows(RuntimeException.class,
         () -> consumerFactory.createPartitionGroupConsumer(CLIENT_ID, consumingStatus(0)));
     assertAuth(refused, TARGET_BROKER);
   }
 
-  /// A lagging reader the broker drops, with its grant intact, reconnects by itself inside the window and reads on: the
-  /// window never fires on an ordinary reconnect.
   @Test(timeOut = 120_000)
   public void droppedLaggingReaderThatReconnectsReadsOn()
       throws Exception {
     try (PulsarAdmin admin = admin()) {
-      // The lagging-reader test may already have revoked it
       admin.namespaces().grantPermissionOnNamespace(NAMESPACE, READER_ROLE, EnumSet.of(AuthAction.consume));
     }
     StreamConsumerFactory consumerFactory = StreamConsumerFactoryProvider.create(streamConfig(token(_signingKey,
@@ -211,8 +193,6 @@ public class PulsarSourceErrorComponentTest {
       try (PulsarAdmin admin = admin()) {
         admin.topics().unload(partition(0));
       }
-      // At most a receiver queue's worth was buffered when the broker dropped the reader, so reading the whole topic
-      // means it reconnected. A fetch throwing here fails the test.
       long deadlineMs = System.currentTimeMillis() + PulsarPartitionLevelConsumer.MAX_DISCONNECTED_MS;
       while (numConsumed < NUM_MESSAGES) {
         assertTrue(System.currentTimeMillis() < deadlineMs, "The reader didn't reconnect: read " + numConsumed);
@@ -223,14 +203,10 @@ public class PulsarSourceErrorComponentTest {
     }
   }
 
-  /// Partition 0 is consuming and partition 1 is new. A refusal keeps the partial result, partition 0 only, as before,
-  /// and is now reported to the controller.
   @Test(timeOut = 120_000)
   public void metadataReportsTheRefusalsItSwallows()
       throws Exception {
-    // No grant: the partition list itself is refused, and reported from its future
     assertRefusalReported(STRANGER_ROLE, ExecutionException.class);
-    // Produce only: the partitions can be listed, but the new one can't be subscribed to
     assertRefusalReported(PRODUCER_ROLE, PulsarClientException.class);
   }
 
@@ -284,7 +260,6 @@ public class PulsarSourceErrorComponentTest {
     return key;
   }
 
-  /// A Pulsar token: a JWT naming the role, signed with HS256 as the broker's token provider checks it.
   private static String token(byte[] key, String role)
       throws Exception {
     Base64.Encoder encoder = Base64.getUrlEncoder().withoutPadding();

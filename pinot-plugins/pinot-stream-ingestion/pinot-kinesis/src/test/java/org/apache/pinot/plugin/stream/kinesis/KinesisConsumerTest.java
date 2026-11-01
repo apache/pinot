@@ -283,7 +283,6 @@ public class KinesisConsumerTest {
 
   @Test
   public void testReportsThrottlingThatExhaustsMoreThanFiveFetchesInARow() {
-    // As the SDK raises it, with Kinesis's error code
     ProvisionedThroughputExceededException throttled = (ProvisionedThroughputExceededException)
         ProvisionedThroughputExceededException.builder().awsErrorDetails(
                 AwsErrorDetails.builder().errorCode("ProvisionedThroughputExceededException").build())
@@ -298,7 +297,6 @@ public class KinesisConsumerTest {
       }
       return GetRecordsResponse.builder().nextShardIterator(PLACEHOLDER).records(List.of()).build();
     });
-    // The count is kept per consumer client id and shard, across recreation
     String clientId = "throttledTable_REALTIME-stream-0";
     TestKinesisConsumer kinesisConsumer =
         new TestKinesisConsumer(_kinesisConfig, kinesisClient, NO_OP_REQUEST_RATE_LIMITER, clientId);
@@ -306,7 +304,6 @@ public class KinesisConsumerTest {
 
     List<Throwable> reported = new ArrayList<>();
     try (IngestionSourceErrorReporter.Scope ignored = IngestionSourceErrorReporter.listen(reported::add)) {
-      // Five exhausted fetches and then one that isn't: the consume loop rides that out, so nothing is reported
       for (int i = 0; i < 5; i++) {
         assertEquals(kinesisConsumer.fetchMessages(startOffset, 2500).getMessageCount(), 0);
       }
@@ -318,7 +315,6 @@ public class KinesisConsumerTest {
       }
       assertTrue(reported.isEmpty(), reported.toString());
 
-      // The sixth in a row is reported, and so is every further one
       assertEquals(kinesisConsumer.fetchMessages(startOffset, 2500).getMessageCount(), 0);
       assertEquals(reported.size(), 1);
       assertSame(reported.get(0), throttled);
@@ -326,13 +322,11 @@ public class KinesisConsumerTest {
       kinesisConsumer.fetchMessages(startOffset, 2500);
       assertEquals(reported.size(), 2);
 
-      // The consume loop recreates a consumer that keeps returning empty batches; the new one carries on the count
       TestKinesisConsumer recreatedConsumer =
           new TestKinesisConsumer(_kinesisConfig, kinesisClient, NO_OP_REQUEST_RATE_LIMITER, clientId);
       recreatedConsumer.fetchMessages(startOffset, 2500);
       assertEquals(reported.size(), 3);
 
-      // Our own request limiter timing out is not the source's failure, nor a sign it recovered
       TestKinesisConsumer limitedConsumer = new TestKinesisConsumer(_kinesisConfig, kinesisClient,
           (streamName, shardId, requestType, rpsLimit, timeoutMs) -> false, clientId);
       for (int i = 0; i < 7; i++) {
@@ -343,7 +337,6 @@ public class KinesisConsumerTest {
       assertEquals(reported.size(), 4);
     }
 
-    // Another table's healthy consumer of the same stream and shard, interleaved, never resets this one's count
     KinesisClient healthyClient = mock(KinesisClient.class);
     when(healthyClient.getShardIterator(any(GetShardIteratorRequest.class))).thenReturn(
         GetShardIteratorResponse.builder().shardIterator(PLACEHOLDER).build());
@@ -396,7 +389,6 @@ public class KinesisConsumerTest {
       throttledThisFetch[0] = true;
       throw rateLimitException();
     });
-    // Our limiter grants a fetch's first GetRecords, and runs out of time for the retry after Kinesis throttled it
     KinesisConsumer.RequestRateLimiter requestRateLimiter = (streamName, shardId, requestType, rpsLimit, timeoutMs) ->
         requestType != KinesisConsumer.RequestType.GET_RECORDS || !throttledThisFetch[0];
     TestKinesisConsumer kinesisConsumer = new TestKinesisConsumer(_kinesisConfig, kinesisClient, requestRateLimiter,
@@ -410,7 +402,6 @@ public class KinesisConsumerTest {
         assertEquals(kinesisConsumer.fetchMessages(startOffset, 2500).getMessageCount(), 0);
       }
     }
-    // Kinesis throttled each of the six, so the sixth is reported
     assertEquals(reported.size(), 1);
   }
 

@@ -56,20 +56,13 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
   private static final int RATE_LIMIT_BACKOFF_JITTER_BOUND_MS = 250;
   private static final RequestRateLimiter SHARED_REQUEST_RATE_LIMITER = new SharedKinesisRequestRateLimiter();
   private static final double RATE_LIMIT_LOG_RATE_PER_MIN = 5.0;
-  // Exhausted throttling returns an empty batch, which the consume loop counts as a successful fetch. Like the consume
-  // loop's own tolerance for fetch errors, this many in a row are tolerated; each further one is reported.
   private static final int MAX_CONSECUTIVE_THROTTLED_FETCHES = 5;
-  // Fetches in a row that throttling exhausted, by consumer and shard. Kept outside the consumer instance: every empty
-  // batch counts toward the consume loop's idle timeout, which recreates the consumer under the same client id. Idle
-  // entries expire: a consumer the consume loop didn't create, such as the controller's end-of-shard check under a
-  // unique client id per call, never fetches under its key again.
   private static final Map<String, Integer> CONSECUTIVE_THROTTLED_FETCHES =
       CacheBuilder.newBuilder().expireAfterAccess(1, TimeUnit.HOURS).<String, Integer>build().asMap();
 
   private final ThrottledLogger _throttledLogger = new ThrottledLogger(LOGGER, RATE_LIMIT_LOG_RATE_PER_MIN);
   private String _nextStartSequenceNumber = null;
   private String _nextShardIterator = null;
-  // Identifies this consumer across recreation, and apart from other tables' consumers of the same stream
   private final String _throttleKeyPrefix;
   private final RequestRateLimiter _requestRateLimiter;
 
@@ -77,7 +70,6 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
     this(config, (String) null);
   }
 
-  /// @param clientId the consume loop's id for this consumer, the same when it recreates it
   public KinesisConsumer(KinesisConfig config, @Nullable String clientId) {
     super(config);
     _requestRateLimiter = SHARED_REQUEST_RATE_LIMITER;
@@ -148,18 +140,14 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
         sleep(backoffMs);
       } catch (KinesisRequestTimeoutException e) {
         if (lastRateLimitException != null) {
-          // Kinesis throttled this fetch before our own limiter ran out of time for the retry
           return throttleExhausted(startOffset, attempts, lastRateLimitException);
         }
-        // Our own request limiter, not the source: nothing to report, and no sign the source recovered either
         logRequestLimiterTimeout(startOffset, e);
         return new KinesisMessageBatch(List.of(), startOffset, false, 0);
       }
     }
   }
 
-  /// Kinesis kept throttling the fetch until its timeout. The empty batch hides the failure from the consume loop, so
-  /// once more than [#MAX_CONSECUTIVE_THROTTLED_FETCHES] fetches in a row end this way, each is reported.
   private KinesisMessageBatch throttleExhausted(KinesisPartitionGroupOffset startOffset, int attempts,
       KinesisRateLimitException rateLimitException) {
     logRateLimitTimeout(startOffset, attempts, rateLimitException);

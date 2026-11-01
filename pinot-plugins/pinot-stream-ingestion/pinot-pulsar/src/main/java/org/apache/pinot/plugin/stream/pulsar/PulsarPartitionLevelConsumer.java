@@ -42,10 +42,6 @@ import org.slf4j.LoggerFactory;
 public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnectionHandler
     implements PartitionGroupConsumer {
   private static final Logger LOGGER = LoggerFactory.getLogger(PulsarPartitionLevelConsumer.class);
-  // A reader disconnected this long is given up on, so that the consume loop recreates it: the client retries the
-  // reconnect forever and only logs why the broker refuses it, while the fresh handshake fails with the refusal. 30 s
-  // is the client's default operation timeout, after which a caught-up reader in the same state already fails with a
-  // timeout. A broker restart or a topic unload reconnects well within it.
   @VisibleForTesting
   static final long MAX_DISCONNECTED_MS = 30_000L;
 
@@ -94,8 +90,6 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
         if (remainingMs <= 0) {
           break;
         }
-        // Bounded by the deadline: a lagging reader answers hasMessageAvailable() from its cache, and once its
-        // connection drops an unbounded read waits forever
         Message<byte[]> message = _reader.readNext((int) remainingMs, TimeUnit.MILLISECONDS);
         if (message == null) {
           break;
@@ -118,8 +112,6 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
     return new PulsarMessageBatch(messages, offsetOfNextBatch, _reader.hasReachedEndOfTopic(), batchSizeInBytes);
   }
 
-  /// Throws a transient exception once the reader has stayed disconnected for [#MAX_DISCONNECTED_MS], so that the
-  /// consume loop recreates it whether or not idle recreation is enabled.
   private void checkConnected(long nowMs) {
     if (_reader.isConnected()) {
       _disconnectedSinceMs = -1;
