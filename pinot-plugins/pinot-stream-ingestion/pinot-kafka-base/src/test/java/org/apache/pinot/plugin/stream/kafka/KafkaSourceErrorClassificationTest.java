@@ -59,20 +59,14 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
-/// Pins the classifier's Kafka broker rules against the kafka-clients version on the test classpath: 3.x here, and
-/// 4.x through the subclass in pinot-kafka-4.0, where the authentication classes moved under
-/// `InvalidConfigurationException` and the OAuth login reports failures differently. Where it is cheap, a fixture is
-/// produced by the real client.
 public class KafkaSourceErrorClassificationTest {
 
-  /// The consume loop sees the broker's exception raw, under Pinot's own wrappers.
   private static Throwable underPinot(Throwable failure) {
     return new RuntimeException("Pinot wrapper", failure);
   }
 
   @Test
   public void brokerRejectsTheCredential() {
-    // A broker rejection carries no cause.
     assertAuth(underPinot(new SaslAuthenticationException(
             "Authentication failed during authentication due to invalid credentials with SASL mechanism PLAIN")),
         TARGET_BROKER);
@@ -80,15 +74,12 @@ public class KafkaSourceErrorClassificationTest {
         TARGET_BROKER);
     assertAuth(new IllegalSaslStateException("Unexpected handshake request"),
         TARGET_BROKER);
-    // MSK IAM reports a policy denial the same way, whichever identity signed the request.
     assertAuth(underPinot(new SaslAuthenticationException("[uuid]: Access denied")),
         TARGET_BROKER);
   }
 
   @Test
   public void clientSideSaslFailureIsAuthWithNoTarget() {
-    // The MSK IAM login module failing to load the process's credentials, as kafka-clients and aws-msk-iam-auth
-    // build it.
     Throwable credentialsGone = new SaslAuthenticationException(
         "An error: (java.security.PrivilegedActionException: javax.security.sasl.SaslException: Failed to find AWS "
             + "IAM Credentials [Caused by software.amazon.awssdk.core.exception.SdkClientException: Unable to load "
@@ -97,11 +88,9 @@ public class KafkaSourceErrorClassificationTest {
         new SaslException("Failed to find AWS IAM Credentials", SdkClientException.create(
             "Unable to load credentials from any of the providers in the chain AwsCredentialsProviderChain")));
     assertAuth(underPinot(credentialsGone), null);
-    // Any client-side failure building the SASL token: authentication failed before the broker judged anything.
     Throwable kerberosClient = new SaslAuthenticationException("An error occurred when evaluating SASL token",
         new SaslException("GSS initiate failed", new IllegalStateException("no valid credentials")));
     assertAuth(underPinot(kerberosClient), null);
-    // A KDC that never answered the service-ticket request: SOURCE_READ, as for any endpoint.
     Throwable kdcTimeout = new SaslAuthenticationException("An error occurred when evaluating SASL token",
         new SaslException("GSS initiate failed", new SocketTimeoutException("Receive timed out")));
     assertSourceRead(underPinot(kdcTimeout), TARGET_IDP);
@@ -150,7 +139,6 @@ public class KafkaSourceErrorClassificationTest {
   public void clientConfigErrorIsSourceRead() {
     assertSourceRead(new KafkaException("Failed to construct kafka consumer",
         new ConfigException("Invalid value FOO for configuration security.protocol")), null);
-    // In 4.x the authentication classes extend this one: it must never decide on its own.
     assertNotClassified(new InvalidConfigurationException("Invalid configuration"));
   }
 
@@ -165,18 +153,15 @@ public class KafkaSourceErrorClassificationTest {
       throws Exception {
     assertEquals(assertAuth(underPinot(constructOAuthConsumer(401, "{\"error\":\"invalid_client\"}")),
         TARGET_IDP).getCode(), "invalid_client");
-    // RFC 6749 refusals arrive as 400.
     assertEquals(assertAuth(underPinot(constructOAuthConsumer(400, "{\"error\":\"invalid_grant\"}")),
         TARGET_IDP).getCode(), "invalid_grant");
     assertEquals(assertAuth(underPinot(constructOAuthConsumer(400, "{\"error\":\"unauthorized_client\"}")),
         TARGET_IDP).getCode(), "unauthorized_client");
     assertEquals(assertAuth(underPinot(constructOAuthConsumer(403, "{}")), TARGET_IDP).getCode(), "403");
-    // The endpoint refusing the token request itself, whatever the status.
     assertEquals(assertAuth(underPinot(constructOAuthConsumer(400, "{\"error\":\"invalid_request\"}")),
         TARGET_IDP).getCode(), "invalid_request");
     assertEquals(assertAuth(underPinot(constructOAuthConsumer(401, "{\"error\":\"invalid_request\"}")),
         TARGET_IDP).getCode(), "invalid_request");
-    // An error no row names is still a refusal at 400, whatever its characters or length; the code stays bounded.
     assertEquals(assertAuth(underPinot(constructOAuthConsumer(400, "{\"error\":\"invalid_dpop_proof\"}")),
         TARGET_IDP).getCode(), "invalid_dpop_proof");
     assertEquals(assertAuth(underPinot(constructOAuthConsumer(400, "{\"error\":\"vendor:denied\"}")),
@@ -184,7 +169,6 @@ public class KafkaSourceErrorClassificationTest {
     String longError = "a".repeat(65);
     assertEquals(assertAuth(underPinot(constructOAuthConsumer(400, "{\"error\":\"" + longError + "\"}")),
         TARGET_IDP).getCode(), longError.substring(0, 64));
-    // At 401 or 403 the status decides, with its sub-reason
     assertAuth(underPinot(constructOAuthConsumer(401, "{\"error\":\"invalid_dpop_proof\"}")),
         TARGET_IDP);
   }
@@ -192,7 +176,6 @@ public class KafkaSourceErrorClassificationTest {
   @Test
   public void oauthTokenUrlThatIsNotATokenEndpointDecidesByStatus()
       throws Exception {
-    // A token URL pointed at a GET-only endpoint: Spring Boot names its reason phrase as the error
     assertNotClassified(underPinot(constructOAuthConsumer(405,
         "{\"status\":405,\"error\":\"Method Not Allowed\",\"path\":\"/oauth2/v1/keys\"}")));
   }
@@ -201,10 +184,8 @@ public class KafkaSourceErrorClassificationTest {
   public void oauthTokenEndpointThatFailedIsSourceReadInTheRealClient()
       throws Exception {
     assertSourceRead(underPinot(constructOAuthConsumer(503, "unavailable")), TARGET_IDP);
-    // Whatever error the body names, a 5xx failed.
     assertSourceRead(underPinot(constructOAuthConsumer(503, "{\"error\":\"backend_error\"}")), TARGET_IDP);
     assertSourceRead(underPinot(constructOAuthConsumer(503, "{\"error\":\"invalid_client\"}")), TARGET_IDP);
-    // A mistyped token URL: a gateway's 404 carries no OAuth error, Spring Boot's names one
     assertEquals(assertSourceRead(underPinot(constructOAuthConsumer(404,
         "{\"message\":\"no Route matched with those values\"}")), TARGET_IDP).getCode(), "404");
     assertSourceRead(underPinot(constructOAuthConsumer(404,
@@ -225,7 +206,6 @@ public class KafkaSourceErrorClassificationTest {
         TARGET_IDP);
     assertSourceRead(new LoginException("Cannot contact any KDC for realm 'EXAMPLE.COM'"), TARGET_IDP);
     assertSourceRead(new LoginException("Receive timed out"), TARGET_IDP);
-    // Our clock, keytab or krb5 setup: the login failed without the KDC rejecting the principal.
     assertAuth(new LoginException("Unable to obtain password from user"), null);
     assertAuth(new LoginException("Clock skew too great (37)"), null);
     assertAuth(new LoginException("Cannot locate default realm"), null);
@@ -234,7 +214,6 @@ public class KafkaSourceErrorClassificationTest {
   @Test
   public void classifiesClassesFromAnotherClassLoader()
       throws Exception {
-    // Plugins load kafka-clients in their own classloader: the classifier must match by name, never by instanceof.
     URL kafkaClients = TopicAuthorizationException.class.getProtectionDomain().getCodeSource().getLocation();
     try (URLClassLoader isolated = new URLClassLoader(new URL[]{kafkaClients}, ClassLoader.getPlatformClassLoader())) {
       Class<?> isolatedClass = isolated.loadClass(TopicAuthorizationException.class.getName());
@@ -260,8 +239,6 @@ public class KafkaSourceErrorClassificationTest {
     }
   }
 
-  /// Builds an OAUTHBEARER consumer whose token endpoint answers `status` with `body`. The login runs in the
-  /// constructor, before any broker connection.
   private static Throwable constructOAuthConsumer(int status, String body)
       throws Exception {
     HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);

@@ -21,9 +21,6 @@ package org.apache.pinot.spi.ingestion.error;
 import javax.annotation.Nullable;
 
 
-/// The result of [IngestionSourceErrorClassifier#classify]: the category, plus bounded detail for a log line. The
-/// detail and [#toString] hold no message text, which carries account ids, principals and endpoints; a caller that
-/// needs more reads the deciding exception itself.
 public final class IngestionSourceErrorClassification {
   private final IngestionSourceErrorVerdict _verdict;
   private final Throwable _exception;
@@ -41,29 +38,24 @@ public final class IngestionSourceErrorClassification {
     return _verdict.getCategory();
   }
 
-  /// The source's own code that decided, as a bounded token.
   @Nullable
   public String getCode() {
     return _verdict.getCode();
   }
 
-  /// The service that answered when it isn't the source itself, e.g. `schema_registry` or `sts`.
   @Nullable
   public String getTarget() {
     return _verdict.getTarget();
   }
 
-  /// The exception that decided.
   public Throwable getException() {
     return _exception;
   }
 
-  /// The class of the exception that decided.
   public String getExceptionClass() {
     return _exception.getClass().getName();
   }
 
-  /// The evidence nearest above the exception that decided, in its own chain, or null.
   @Nullable
   public IngestionSourceErrorEvidence getEvidence() {
     return _evidence;

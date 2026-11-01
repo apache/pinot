@@ -34,10 +34,7 @@ import static org.apache.pinot.spi.ingestion.error.IngestionSourceErrorVerdict.T
 import static org.testng.Assert.assertEquals;
 
 
-/// Pins the classifier's Pulsar rules against the client pinot-pulsar ships. Pulsar's class is its code, so the most
-/// specific subclass decides, wherever it sits in the tree.
 public class PulsarSourceErrorClassificationTest {
-  /// The plugin wraps the client's exception, and the consume loop wraps the plugin's.
   private static Throwable underPinot(Throwable failure) {
     return new RuntimeException("Pinot wrapper", new RuntimeException("Caught exception while creating Pulsar "
         + "reader", failure));
@@ -51,7 +48,6 @@ public class PulsarSourceErrorClassificationTest {
 
   @Test
   public void oauthRefusalBuriedUnderTheV5Bridge() {
-    // Pulsar 5's OAuth bridge puts the base class on top; the specific class beneath it decides.
     Throwable refused = new PulsarClientException.AuthenticationException(
         "Unable to obtain an access token: Client authentication failed (invalid_client)");
     Throwable bridged = new PulsarClientException(new RuntimeException(refused));
@@ -73,7 +69,6 @@ public class PulsarSourceErrorClassificationTest {
 
   @Test
   public void identityProviderStatusDecidesWithoutAnOAuthError() {
-    // The token client reports any status but 200, 400 and 401 by its number alone.
     assertAuth(new PulsarClientException.AuthenticationException(
             "Unable to obtain an access token: Failed to perform HTTP request. res: 403"),
         TARGET_IDP);
@@ -81,14 +76,11 @@ public class PulsarSourceErrorClassificationTest {
 
   @Test
   public void oauthErrorsDecideByTheirMeaning() {
-    // The identity provider refused the grant.
     assertAuth(new PulsarClientException.AuthenticationException(
         "Unable to obtain an access token: Access denied (access_denied)"), TARGET_IDP);
-    // The endpoint refusing the token request itself.
     assertAuth(new PulsarClientException.AuthenticationException(
             "Unable to obtain an access token: Missing parameter (invalid_request)"),
         TARGET_IDP);
-    // An error no row names is still the endpoint refusing the token request, as is a 400 or 401 without one.
     assertEquals(assertAuth(new PulsarClientException.AuthenticationException(
             "Unable to obtain an access token: Something new (novel_error)"), TARGET_IDP).getCode(), "novel_error");
     assertEquals(assertAuth(new PulsarClientException.AuthenticationException(
@@ -104,11 +96,9 @@ public class PulsarSourceErrorClassificationTest {
     assertEquals(assertAuth(new PulsarClientException.AuthenticationException(
             "Unable to obtain an access token: Denied (see docs) (invalid_grant)"),
         TARGET_IDP).getCode(), "invalid_grant");
-    // A refusal whose description names a Java class is still a refusal
     assertAuth(new PulsarClientException.AuthenticationException("Unable to obtain an access token: "
         + "java.lang.SecurityException: Invalid client credentials (invalid_client)"),
         TARGET_IDP);
-    // A transport or parsing failure in the same text is not a refusal, even when it ends in a parenthesis
     assertSourceRead(new PulsarClientException.AuthenticationException("Unable to obtain an access token: "
         + "java.util.concurrent.ExecutionException: io.netty.channel.AbstractChannel$AnnotatedConnectException: "
         + "Connection refused: localhost/127.0.0.1:1"), TARGET_IDP);
@@ -122,22 +112,17 @@ public class PulsarSourceErrorClassificationTest {
 
   @Test
   public void clientSideFailures() {
-    // Authentication failed before the broker judged anything.
     assertAuth(new PulsarClientException.AuthenticationException("Unable to read private key: no such file"),
         null);
     assertAuth(new PulsarClientException.UnsupportedAuthenticationException("bad auth plugin"),
         null);
-    // Its authentication data's endpoint never answered: SOURCE_READ, as for any endpoint.
     assertSourceRead(new PulsarClientException.GettingAuthenticationDataException(
         new ConnectException("Connection refused")), TARGET_IDP);
-    // The client's config: the read failed all the same.
     assertSourceRead(new PulsarClientException.InvalidConfigurationException("bad config"), null);
     assertSourceRead(new PulsarClientException.InvalidServiceURL("Invalid service URL", null), null);
     assertSourceRead(new PulsarClientException.InvalidTopicNameException("bad topic"), null);
-    // The client's own lookup semaphore: the broker never saw the request.
     assertSourceRead(new PulsarClientException.TooManyRequestsException("Requests number out of config: 50000"),
         null);
-    // A client Pinot already closed.
     assertNotClassified(new PulsarClientException.AlreadyClosedException("Client already closed"));
   }
 
@@ -151,7 +136,6 @@ public class PulsarSourceErrorClassificationTest {
   public void brokerCannotServeUs() {
     assertSourceRead(underPinot(new PulsarClientException.TopicDoesNotExistException("Topic not found")),
         TARGET_BROKER);
-    // Subclasses of LookupException read as the lookup failure they are.
     assertSourceRead(new PulsarClientException.ServiceNotReadyException("bundle unloading"), TARGET_BROKER);
     assertSourceRead(new PulsarClientException.TooManyRequestsException("lookup throttled"), TARGET_BROKER);
     assertSourceRead(new PulsarClientException.TimeoutException("could not get the last message id"), TARGET_BROKER);
@@ -161,22 +145,18 @@ public class PulsarSourceErrorClassificationTest {
     assertSourceRead(new PulsarClientException.ConsumerBusyException("Exclusive consumer is already connected"),
         TARGET_BROKER);
     assertSourceRead(new PulsarClientException.NotAllowedException("Subscription type not allowed"), TARGET_BROKER);
-    // A TLS failure surfaces only as a closed connection.
     assertSourceRead(new PulsarClientException("Connection already closed"), TARGET_BROKER);
   }
 
   @Test
   public void baseClassAloneDefersToItsCause() {
-    // The base class with a network cause: the generic network rule decides.
     Throwable connect = new PulsarClientException(new ConnectException("Connection refused"));
     assertEquals(classify(connect).getCategory(), IngestionSourceErrorCategory.SOURCE_READ);
-    // HTTP lookup drops the status: nothing to decide on.
     assertNotClassified(new PulsarClientException("HTTP get request failed: Forbidden"));
   }
 
   @Test
   public void adminStatusTellsAuthenticationFromAuthorization() {
-    // The admin client maps both 401 and 403 to NotAuthorizedException.
     assertAuth(new PulsarAdminException.NotAuthorizedException(null, "Unauthorized", 401),
         TARGET_ADMIN);
     assertAuth(new PulsarAdminException.NotAuthorizedException(null, "Forbidden", 403),
@@ -184,7 +164,6 @@ public class PulsarSourceErrorClassificationTest {
     assertSourceRead(new PulsarAdminException.NotFoundException(null, "Schema not found", 404), TARGET_ADMIN);
     assertSourceRead(new PulsarAdminException.ServerSideErrorException(null, "unavailable", "", 503), TARGET_ADMIN);
     assertSourceRead(new PulsarAdminException(null, "Request Timeout", 408), TARGET_ADMIN);
-    // A client-side failure the admin client wraps with a default status of 500 is not the server's answer.
     assertNotClassified(new PulsarAdminException(new IllegalStateException("Client instance has been closed.")));
   }
 }

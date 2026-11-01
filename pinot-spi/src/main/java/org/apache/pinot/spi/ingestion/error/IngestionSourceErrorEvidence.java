@@ -25,29 +25,13 @@ import java.util.concurrent.ConcurrentMap;
 import javax.annotation.Nullable;
 
 
-/// What a client knew about a failure that its exception does not say: any status or code it is about to discard (a
-/// synthesized "topic does not exist", a cause it drops), and the endpoint it resolved.
-///
-/// [#attach] adds it to the failure as a suppressed exception, so the thrown type never changes and the evidence
-/// travels with every wrapper that keeps the cause. [IngestionSourceErrorClassifier] reads it as evidence for the
-/// failure it is attached to and the causes beneath, and never classifies it as a failure of its own.
-///
-/// It holds only bounded values: a target, a status, a code token, flags, and a resource reduced to scheme, host and
-/// port. It shows up in stack traces and logs, so it must never hold message text, user info or query strings.
 public final class IngestionSourceErrorEvidence extends RuntimeException {
   private static final long serialVersionUID = 1L;
 
-  /// The code for a source that never answered (DNS, connect, TLS, timeout), for a client that drops the cause that
-  /// would show it.
   public static final String UNREACHABLE = "unreachable";
-  /// The code for a credential the client couldn't load, or that its own check rejected, before any request: none was
-  /// found, it can't be parsed, or it has expired.
   public static final String LOCAL_PRECHECK = "local_precheck";
-  /// The code a Kafka client records when it synthesizes "topic does not exist" from a metadata answer that lacks the
-  /// topic: Kafka's own `UNKNOWN_TOPIC_OR_PARTITION` error, which the synthesized exception doesn't carry.
   public static final String UNKNOWN_TOPIC_OR_PARTITION = "UNKNOWN_TOPIC_OR_PARTITION";
 
-  // Throwables built with suppression disabled can't carry evidence; their evidence lives here, keyed by identity.
   private static final ConcurrentMap<Throwable, IngestionSourceErrorEvidence> UNSUPPRESSIBLE =
       new MapMaker().weakKeys().makeMap();
 
@@ -64,12 +48,6 @@ public final class IngestionSourceErrorEvidence extends RuntimeException {
     super(null, null, false, false);
   }
 
-  /// Attaches a copy of `evidence` to `failure` and returns `failure`. A failure that already carries evidence keeps
-  /// it: the innermost client is the closest to the source.
-  ///
-  /// Attach only to an exception created for this failure, such as the plugin's own wrapper. Some clients throw
-  /// shared instances (Kafka's `Errors.X.exception()`), and evidence attached to one would apply to every later
-  /// failure that reuses it.
   public static <T extends Throwable> T attach(T failure, IngestionSourceErrorEvidence evidence) {
     if (of(failure) != null) {
       return failure;
@@ -82,7 +60,6 @@ public final class IngestionSourceErrorEvidence extends RuntimeException {
     return failure;
   }
 
-  /// The evidence attached directly to `failure`, or null. Evidence on its causes is not considered.
   @Nullable
   public static IngestionSourceErrorEvidence of(Throwable failure) {
     for (Throwable suppressed : failure.getSuppressed()) {
@@ -93,14 +70,11 @@ public final class IngestionSourceErrorEvidence extends RuntimeException {
     return UNSUPPRESSIBLE.get(failure);
   }
 
-  /// The evidence of a failure that couldn't carry it as a suppressed exception, or null.
   @Nullable
   static IngestionSourceErrorEvidence ofUnsuppressible(Throwable failure) {
     return UNSUPPRESSIBLE.get(failure);
   }
 
-  /// The service the client was talking to when it isn't the source itself, e.g.
-  /// [IngestionSourceErrorVerdict#TARGET_SCHEMA_REGISTRY].
   @Nullable
   public String getTarget() {
     return _target;
@@ -111,54 +85,40 @@ public final class IngestionSourceErrorEvidence extends RuntimeException {
     return this;
   }
 
-  /// The status the transport saw, or 0 when none was recorded.
   public int getStatus() {
     return _status;
   }
 
-  /// The source's own error code the transport saw, or one of the codes defined here, or null.
   @Nullable
   public String getCode() {
     return _code;
   }
 
-  /// Records evidence the transport is about to discard. Only bounded values belong here, never message text.
   public IngestionSourceErrorEvidence setEvidence(int status, @Nullable String code) {
     _status = status;
     _code = IngestionSourceErrorVerdict.token(code);
     return this;
   }
 
-  /// The endpoint as the client resolved it, reduced to scheme, host and port, or null. The built-in rules don't read
-  /// it; registered rules and log lines can.
   @Nullable
   public String getResource() {
     return _resource;
   }
 
-  /// Records the endpoint the client resolved. User info, path and query, which can carry credentials or
-  /// signatures, are dropped; a value that isn't a URI with a host is recorded as `unknown`.
   public IngestionSourceErrorEvidence setResource(@Nullable String uri) {
     _resource = resourceOf(uri);
     return this;
   }
 
-  /// Whether the failure this evidence is attached to marks a call into the source; see [#setBoundary].
   public boolean isBoundary() {
     return _boundary;
   }
 
-  /// Marks the failure this evidence is attached to as a call into the source. When any exception of a failure carries
-  /// boundary evidence, only the exceptions at or beneath a boundary in their own chain are read as the source's, and a
-  /// suppressed exception counts only through a boundary of its own. A caller whose one operation also reads storage
-  /// that isn't the source, such as Pinot's own deep store, marks each source call this way. A stream client, whose
-  /// whole failure comes from the source, doesn't need to.
   public IngestionSourceErrorEvidence setBoundary(boolean boundary) {
     _boundary = boundary;
     return this;
   }
 
-  /// A copy to attach to one failure: a stack trace prints a throwable it meets twice as a circular reference.
   private IngestionSourceErrorEvidence copy() {
     IngestionSourceErrorEvidence copy = new IngestionSourceErrorEvidence().setTarget(_target)
         .setEvidence(_status, _code).setBoundary(_boundary);

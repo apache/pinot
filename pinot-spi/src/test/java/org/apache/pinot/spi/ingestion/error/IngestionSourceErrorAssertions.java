@@ -26,8 +26,6 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/// Assertions for the fixture tests that pin the classifier's rules against each SDK. A failed assertion prints the
-/// whole exception tree, so a rule can be corrected from it.
 public final class IngestionSourceErrorAssertions {
   private IngestionSourceErrorAssertions() {
   }

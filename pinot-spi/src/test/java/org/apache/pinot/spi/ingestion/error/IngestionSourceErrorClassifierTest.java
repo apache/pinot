@@ -20,9 +20,11 @@ package org.apache.pinot.spi.ingestion.error;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.net.BindException;
 import java.net.ConnectException;
 import java.net.SocketException;
+import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
@@ -49,27 +51,21 @@ import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
 
-/// The classifier's contract, independent of any SDK: how a tree's verdicts combine, how registered rules take part,
-/// and that classification never fails or leaks. The per-SDK rules are pinned by fixture tests in the plugin modules
-/// that ship each SDK.
 public class IngestionSourceErrorClassifierTest {
   private final List<IngestionSourceErrorRule> _registered = new ArrayList<>();
 
-  /// A source exception a registered rule recognises by name.
   private static class RefusedException extends RuntimeException {
     RefusedException(Throwable cause) {
       super("refused", cause);
     }
   }
 
-  /// A source exception meaning the data is missing.
   private static class MissingException extends RuntimeException {
     MissingException() {
       super("missing");
     }
   }
 
-  /// A failure that is not a failure to access the source, e.g. Pinot's own cancellation.
   private static class OurFailureException extends IOException {
     OurFailureException() {
       super("ours");
@@ -120,30 +116,33 @@ public class IngestionSourceErrorClassifierTest {
 
   @Test
   public void peerRejectingOurCertificateIsAuthOverAnyTransport() {
-    // A schema registry, Pulsar or any HTTP source with mutual TLS, as for a Kafka broker
     IngestionSourceErrorClassification rejected = IngestionSourceErrorClassifier.classify(new RuntimeException(
         "Error retrieving Avro schema", new SSLHandshakeException("Received fatal alert: bad_certificate"))).get();
     assertEquals(rejected.getCategory(), IngestionSourceErrorCategory.AUTH);
     assertEquals(categoryOf(new RuntimeException(new SSLHandshakeException("Received fatal alert: access_denied"))),
         Optional.of(IngestionSourceErrorCategory.AUTH));
-    // Any other handshake failure: the TLS connection to the endpoint failed
     assertEquals(categoryOf(new RuntimeException(new SSLHandshakeException("Received fatal alert: handshake_failure"))),
         Optional.of(IngestionSourceErrorCategory.SOURCE_READ));
   }
 
   @Test
   public void anyNetworkFailureIsSourceReadWhoeverOwnsTheEndpoint() {
-    // A metadata endpoint serving the process's own identity, like any other endpoint.
     assertEquals(categoryOf(new RuntimeException(
         new ConnectException("Connect to 169.254.169.254:80 [/169.254.169.254] failed: Connection refused"))),
         Optional.of(IngestionSourceErrorCategory.SOURCE_READ));
-    // Our own exhausted ports or file descriptors stop the read all the same.
     assertEquals(categoryOf(new RuntimeException(new BindException("Cannot assign requested address"))),
         Optional.of(IngestionSourceErrorCategory.SOURCE_READ));
     assertEquals(categoryOf(new RuntimeException(new SocketException("Too many open files"))),
         Optional.of(IngestionSourceErrorCategory.SOURCE_READ));
     assertEquals(categoryOf(new RuntimeException(new SocketException("Connection reset"))),
         Optional.of(IngestionSourceErrorCategory.SOURCE_READ));
+  }
+
+  @Test
+  public void socketTimeoutIsSourceReadThoughItExtendsInterruptedIOException() {
+    assertEquals(categoryOf(new RuntimeException(new SocketTimeoutException("Read timed out"))),
+        Optional.of(IngestionSourceErrorCategory.SOURCE_READ));
+    assertEquals(categoryOf(new RuntimeException(new InterruptedIOException())), Optional.empty());
   }
 
   @Test
@@ -155,9 +154,7 @@ public class IngestionSourceErrorClassifierTest {
   @Test
   public void exclusionBeneathADecidingSourceExceptionWins() {
     register(TEST_RULES);
-    // Our own failure is the root: a source class wrapping it can't reinstate a category.
     assertEquals(categoryOf(new RefusedException(new OurFailureException())), Optional.empty());
-    // A source refusal is the root: our wrapper above it doesn't hide it.
     assertEquals(categoryOf(new RuntimeException(new OurFailureException().initCause(new RefusedException(null)))),
         Optional.of(IngestionSourceErrorCategory.AUTH));
   }
@@ -179,7 +176,6 @@ public class IngestionSourceErrorClassifierTest {
 
   @Test
   public void causeSharedByTwoBranchesIsReadUnderEachBranchsEvidence() {
-    // The evidence above the shared cause decides: one branch's attempt was cancelled, the other's was refused.
     register((node, below, evidence) -> !(node instanceof RefusedException) ? null
         : evidence != null && "cancelled".equals(evidence.getCode())
             ? IngestionSourceErrorVerdict.none("cancelled")
@@ -198,7 +194,6 @@ public class IngestionSourceErrorClassifierTest {
 
   @Test
   public void genericRuleAppliesOnlyWhereNoSourceRuleDecidedTheChain() {
-    // A file missing under a path the caller knows is remote: the transport's word, not a source's answer
     IngestionSourceErrorRule remoteFileMissing = (node, below, evidence) -> node instanceof FileNotFoundException
         ? IngestionSourceErrorVerdict.sourceRead("FileNotFoundException", null) : null;
     IngestionSourceErrorClassifier.registerGenericRule(remoteFileMissing);
@@ -206,7 +201,6 @@ public class IngestionSourceErrorClassifierTest {
       register(TEST_RULES);
       assertEquals(categoryOf(new RuntimeException(new FileNotFoundException("s3://bucket/input"))),
           Optional.of(IngestionSourceErrorCategory.SOURCE_READ));
-      // A source exception above it decides the chain, even a failure that says it isn't a failure to access it
       assertEquals(categoryOf(new RefusedException(new FileNotFoundException("s3://bucket/input"))),
           Optional.of(IngestionSourceErrorCategory.AUTH));
       assertEquals(categoryOf(new OurFailureException().initCause(new FileNotFoundException("s3://bucket/input"))),
@@ -231,13 +225,10 @@ public class IngestionSourceErrorClassifierTest {
     List<IngestionSourceErrorRule> rules = List.of(failing, missingIsRead, missingIsAuth, connectIsAuth);
     rules.forEach(IngestionSourceErrorClassifier::registerGenericRule);
     try {
-      // A failing rule is no decision, and the stronger verdict wins, not the first registered
       assertEquals(categoryOf(new RuntimeException(new FileNotFoundException("s3://bucket/input"))),
           Optional.of(IngestionSourceErrorCategory.AUTH));
-      // The built-in network rules decide an exception first
       assertEquals(categoryOf(new RuntimeException(new ConnectException("refused"))),
           Optional.of(IngestionSourceErrorCategory.SOURCE_READ));
-      // In a tree with a boundary, nothing outside it is read
       Throwable failure = new RuntimeException("task failed");
       failure.addSuppressed(sourceCall(new RuntimeException("source read failed", new IllegalStateException())));
       failure.addSuppressed(new RuntimeException("deep store read failed", new FileNotFoundException("/segments/a")));
@@ -286,8 +277,6 @@ public class IngestionSourceErrorClassifierTest {
   @Test
   public void registeredRuleNeverOverridesABuiltInDecision() {
     register((node, below, evidence) -> IngestionSourceErrorVerdict.auth("any", null));
-    // A built-in rule decides the interrupt at the root, so the registered rule's verdict on the wrapper above it is
-    // never reached.
     assertEquals(categoryOf(new RuntimeException("wrapper", new InterruptedException())), Optional.empty());
   }
 
@@ -308,7 +297,6 @@ public class IngestionSourceErrorClassifierTest {
 
   @Test
   public void classifyNeverThrows() {
-    // Rules read these classes' messages; a getMessage() that throws reads as no message.
     Throwable hostileNetwork = new UnknownHostException() {
       @Override
       public String getMessage() {
@@ -325,7 +313,6 @@ public class IngestionSourceErrorClassifierTest {
     };
     assertEquals(categoryOf(new RuntimeException("wrapper", hostileLogin)), Optional.empty());
 
-    // A rule that smuggles out a checked exception or overflows counts as no decision.
     register((node, below, evidence) -> {
       throw IngestionSourceErrorClassifierTest.<RuntimeException>sneaky(new IOException("checked"));
     });
@@ -333,7 +320,6 @@ public class IngestionSourceErrorClassifierTest {
       throw new StackOverflowError();
     });
     assertEquals(categoryOf(new ConnectException("refused")), Optional.of(IngestionSourceErrorCategory.SOURCE_READ));
-    // A getCause() that throws ends classification, never the caller.
     Throwable hostileCause = new RuntimeException("wrapper") {
       @Override
       public synchronized Throwable getCause() {
@@ -342,7 +328,6 @@ public class IngestionSourceErrorClassifierTest {
     };
     assertEquals(categoryOf(hostileCause), Optional.empty());
 
-    // A cause cycle and a tree that suppresses itself terminate.
     RuntimeException a = new RuntimeException("a");
     RuntimeException b = new RuntimeException("b", a);
     a.initCause(b);
@@ -353,14 +338,12 @@ public class IngestionSourceErrorClassifierTest {
   @Test
   public void classificationFailuresWarnAtMostOnceAMinuteWithoutTheFailuresMessage() {
     String marker = "fixture-secret";
-    // A rule that fails on every node, carrying the node's message in its own, its cause and a suppressed exception
     IngestionSourceErrorRule brokenRule = (node, below, evidence) -> {
       IllegalStateException failure = new IllegalStateException("rule failed on: " + node.getMessage(), node);
       failure.addSuppressed(new RuntimeException(node.getMessage()));
       throw failure;
     };
     register(brokenRule);
-    // As in a fresh process: another test class in this JVM may have logged within the interval
     IngestionSourceErrorClassifier.LAST_FAILURE_LOG_MS.set(0);
     WarnCapture warnings = WarnCapture.attachTo(IngestionSourceErrorClassifier.class.getName());
     try {
@@ -374,7 +357,6 @@ public class IngestionSourceErrorClassifierTest {
       assertTrue(ruleWarning.contains(IllegalStateException.class.getName()), ruleWarning);
       assertFalse(ruleWarning.contains(marker), ruleWarning);
 
-      // Within the minute nothing more is logged; after it, the next failure is
       IngestionSourceErrorClassifier.LAST_FAILURE_LOG_MS.set(System.currentTimeMillis() - 50_000);
       categoryOf(new ConnectException(marker));
       assertEquals(warnings._rendered.size(), 1, warnings._rendered.toString());
@@ -382,7 +364,6 @@ public class IngestionSourceErrorClassifierTest {
       categoryOf(new ConnectException(marker));
       assertEquals(warnings._rendered.size(), 2, warnings._rendered.toString());
 
-      // The walk failing warns too, naming the failure's class only
       IngestionSourceErrorClassifier.LAST_FAILURE_LOG_MS.set(0);
       Throwable hostileCause = new RuntimeException(marker) {
         @Override
@@ -396,7 +377,6 @@ public class IngestionSourceErrorClassifierTest {
       assertTrue(walkWarning.startsWith(
           "Failed to classify an ingestion source failure: " + hostileCause.getClass().getName()), walkWarning);
       assertFalse(walkWarning.contains(marker), walkWarning);
-      // Nor does a null failure escape
       IngestionSourceErrorClassifier.LAST_FAILURE_LOG_MS.set(0);
       assertEquals(IngestionSourceErrorClassifier.classify(null), Optional.empty());
       assertEquals(warnings._rendered.size(), 4, warnings._rendered.toString());
@@ -405,7 +385,6 @@ public class IngestionSourceErrorClassifierTest {
     }
   }
 
-  /// Collects the WARN events of one logger, rendered with any throwable they carry.
   private static final class WarnCapture extends AbstractAppender {
     private static final PatternLayout RENDERING = PatternLayout.newBuilder().withPattern("%m%n%throwable").build();
     final List<String> _rendered = new CopyOnWriteArrayList<>();
@@ -427,8 +406,6 @@ public class IngestionSourceErrorClassifierTest {
     void detach() {
       _logger.removeAppender(this);
       stop();
-      // Attaching registered a LoggerConfig for a logger log4j2.xml doesn't declare: remove it, since test classes
-      // share this JVM
       LoggerContext context = _logger.getContext();
       context.getConfiguration().removeLogger(_logger.getName());
       context.updateLoggers();
@@ -454,7 +431,6 @@ public class IngestionSourceErrorClassifierTest {
     }
     current.addSuppressed(new ConnectException("deepest"));
     AtomicReference<Object> result = new AtomicReference<>();
-    // A small stack, as on a busy consumer thread.
     Thread thread = new Thread(null, () -> {
       try {
         result.set(categoryOf(root));
@@ -484,13 +460,11 @@ public class IngestionSourceErrorClassifierTest {
         new IngestionSourceErrorEvidence().setEvidence(0, IngestionSourceErrorEvidence.LOCAL_PRECHECK));
     assertEquals(categoryOf(badKey), Optional.of(IngestionSourceErrorCategory.AUTH));
 
-    // A code the engine doesn't define decides nothing in the engine: a registered rule, or what lies beneath, does.
     Throwable unknownCode = IngestionSourceErrorEvidence.attach(new IOException("trust store unreadable"),
         new IngestionSourceErrorEvidence().setEvidence(0, "some_plugin_code"));
     assertEquals(categoryOf(new ConnectException().initCause(unknownCode)),
         Optional.of(IngestionSourceErrorCategory.SOURCE_READ));
 
-    // A target alone decides nothing.
     Throwable targetOnly = IngestionSourceErrorEvidence.attach(new IllegalStateException(),
         new IngestionSourceErrorEvidence().setTarget(IngestionSourceErrorVerdict.TARGET_BROKER));
     assertEquals(categoryOf(targetOnly), Optional.empty());
@@ -515,17 +489,14 @@ public class IngestionSourceErrorClassifierTest {
   @Test
   public void boundaryLimitsTheReadToTheSourcesBranches() {
     register(TEST_RULES);
-    // A source read beside a refusal from storage that isn't the source, such as Pinot's own deep store
     Throwable failure = new RuntimeException("task failed");
     failure.addSuppressed(sourceCall(new RuntimeException("source read failed", new MissingException())));
     failure.addSuppressed(new RuntimeException("deep store read failed", new RefusedException(null)));
     assertEquals(categoryOf(failure), Optional.of(IngestionSourceErrorCategory.SOURCE_READ));
 
-    // A failure suppressed onto the source call (closing a stream on our side) doesn't inherit its boundary.
     Throwable sourceFailure = sourceCall(new RuntimeException("source call failed", new IllegalStateException()));
     sourceFailure.addSuppressed(new RuntimeException("close failed", new ConnectException("refused")));
     assertEquals(categoryOf(sourceFailure), Optional.empty());
-    // Without a boundary anywhere, the caller vouches for the whole failure.
     Throwable unmarked = new RuntimeException("source call failed", new IllegalStateException());
     unmarked.addSuppressed(new RuntimeException("close failed", new ConnectException("refused")));
     assertEquals(categoryOf(unmarked), Optional.of(IngestionSourceErrorCategory.SOURCE_READ));
@@ -566,7 +537,6 @@ public class IngestionSourceErrorClassifierTest {
     assertTrue(code.length() <= 64, code);
     assertFalse(code.contains("\n"), code);
     assertEquals(new IngestionSourceErrorEvidence().setResource("broker-1:9092 SASL_SSL").getResource(), "unknown");
-    // One replacement for each character, a supplementary one or a lone surrogate included, and 64 at most.
     assertEquals(IngestionSourceErrorVerdict.token("a😀b\uD83D c"), "a_b__c");
     assertEquals(IngestionSourceErrorVerdict.token("😀".repeat(100_000)), "_".repeat(64));
 

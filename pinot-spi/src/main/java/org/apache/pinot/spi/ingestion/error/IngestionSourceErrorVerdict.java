@@ -21,23 +21,12 @@ package org.apache.pinot.spi.ingestion.error;
 import javax.annotation.Nullable;
 
 
-/// A rule's decision on one throwable: a category, or [#none] when the throwable shows the failure is not a failure to
-/// access the source (Pinot's own cancellation, or a client Pinot closed).
-///
-/// The code and target are bounded tokens, safe for log lines: SDK codes are short identifiers, but a configured
-/// endpoint can answer with anything.
 public final class IngestionSourceErrorVerdict {
-  /// The target for a Kafka broker.
   public static final String TARGET_BROKER = "broker";
-  /// The target for a schema registry a decoder looks schemas up in.
   public static final String TARGET_SCHEMA_REGISTRY = "schema_registry";
-  /// The target for AWS STS, answering for the credential rather than the source.
   public static final String TARGET_STS = "sts";
-  /// The target for AWS KMS, answering for the key that encrypts the source's data.
   public static final String TARGET_KMS = "kms";
-  /// The target for an identity provider: an OAuth token endpoint or a Kerberos KDC.
   public static final String TARGET_IDP = "idp";
-  /// The target for an admin endpoint of the source, e.g. Pulsar's admin API.
   public static final String TARGET_ADMIN = "admin";
 
   private static final String TOKEN_PUNCTUATION = "_.:/-";
@@ -57,25 +46,18 @@ public final class IngestionSourceErrorVerdict {
     _target = token(target);
   }
 
-  /// Authentication or authorization failed. `target` names the service that answered when it isn't the source
-  /// itself, or is null when no service answered (a credential that couldn't be loaded or built).
   public static IngestionSourceErrorVerdict auth(@Nullable String code, @Nullable String target) {
     return new IngestionSourceErrorVerdict(IngestionSourceErrorCategory.AUTH, code, target);
   }
 
-  /// Reading from the source failed otherwise: it couldn't serve the request or rejected it, never answered, or the
-  /// client couldn't be set up.
   public static IngestionSourceErrorVerdict sourceRead(@Nullable String code, @Nullable String target) {
     return new IngestionSourceErrorVerdict(IngestionSourceErrorCategory.SOURCE_READ, code, target);
   }
 
-  /// Not a failure to access the source. It still decides the chain it was found in, so a wrapper above it can't
-  /// reinstate a category.
   public static IngestionSourceErrorVerdict none(@Nullable String code) {
     return new IngestionSourceErrorVerdict(null, code, null);
   }
 
-  /// The category, or null for [#none].
   @Nullable
   public IngestionSourceErrorCategory getCategory() {
     return _category;
@@ -85,20 +67,16 @@ public final class IngestionSourceErrorVerdict {
     return _category == null;
   }
 
-  /// The source's own code that decided, e.g. `AccessDeniedException`, `403`, `PERMISSION_DENIED`.
   @Nullable
   public String getCode() {
     return _code;
   }
 
-  /// The service that answered when it isn't the source itself, e.g. [#TARGET_STS] or [#TARGET_SCHEMA_REGISTRY].
   @Nullable
   public String getTarget() {
     return _target;
   }
 
-  /// `value` with every character outside `[A-Za-z0-9_.:/-]` replaced and its length capped, or null. Reads no further
-  /// than the cap: a configured endpoint can answer with a code of any length.
   @Nullable
   static String token(@Nullable String value) {
     if (value == null) {

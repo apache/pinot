@@ -57,8 +57,6 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 
 
-/// Pins the classifier's gRPC, gax and google-auth rules against the Google Cloud client libraries Pinot ships. A
-/// rejected token is AUTH whoever's key it was, our clock skew included; a token endpoint that failed is SOURCE_READ.
 public class GoogleCloudSourceErrorClassificationTest {
   private static final String CLOCK_SKEW = "{\"error\":\"invalid_grant\",\"error_description\":\"Invalid JWT: "
       + "Token must be a short-lived token (60 minutes) and in a reasonable timeframe. Check your iat and exp values "
@@ -114,7 +112,6 @@ public class GoogleCloudSourceErrorClassificationTest {
         .setContentType("application/json").setContent(body)).build();
   }
 
-  /// What a gRPC call reports when the token refresh behind it fails, as grpc-auth builds it from the failure.
   private static Throwable tokenRefreshFailure(HttpTransport tokenEndpoint)
       throws Exception {
     ServiceAccountCredentials credentials = ServiceAccountCredentials.newBuilder()
@@ -122,14 +119,11 @@ public class GoogleCloudSourceErrorClassificationTest {
         .setPrivateKey(KeyPairGenerator.getInstance("RSA").generateKeyPair().getPrivate())
         .setScopes(List.of("https://www.googleapis.com/auth/pubsub"))
         .setHttpTransportFactory(() -> tokenEndpoint)
-        // google-auth's backoff would only slow the test: retrying doesn't change which failure is reported
         .setDefaultRetriesEnabled(false)
         .build();
     return callFailure(credentials);
   }
 
-  /// What a gRPC call reports when an impersonated credential's IAM token request fails: google-auth wraps the HTTP
-  /// response in a plain IOException, with no GoogleAuthException between.
   private static Throwable impersonationFailure(int status)
       throws Exception {
     GoogleCredentials source =
@@ -163,7 +157,6 @@ public class GoogleCloudSourceErrorClassificationTest {
   public void rejectedTokenIsAuth()
       throws Exception {
     assertAuth(tokenRefreshFailure(KEY_REVOKED), null);
-    // Our clock skew is refused the same way: no body decides against AUTH.
     assertAuth(tokenRefreshFailure(CLOCK_SKEW), null);
   }
 
@@ -183,10 +176,8 @@ public class GoogleCloudSourceErrorClassificationTest {
       }
     };
     assertSourceRead(tokenRefreshFailure(unreachable), null);
-    // An impersonated credential whose IAM endpoint failed, or refused.
     assertEquals(assertSourceRead(impersonationFailure(503), TARGET_IDP).getCode(), "503");
     assertAuth(impersonationFailure(403), null);
-    // grpc-auth reports a metadata server it couldn't find as UNAUTHENTICATED, over the network failure.
     assertSourceRead(Status.UNAUTHENTICATED.withCause(new IOException(
         "ComputeEngineCredentials cannot find the metadata server.", new UnknownHostException(
             "metadata.google.internal"))).asRuntimeException(), TARGET_IDP);
@@ -195,7 +186,6 @@ public class GoogleCloudSourceErrorClassificationTest {
   @Test
   public void tokenEndpointThatFailedIsSourceRead()
       throws Exception {
-    // google-auth won't retry a 502 or 504, so grpc-auth reports it as UNAUTHENTICATED; a 500 or 503 as UNAVAILABLE.
     for (int status : new int[]{502, 504, 500, 503}) {
       assertSourceRead(tokenRefreshFailure(tokenEndpoint(status, "Bad Gateway")), TARGET_IDP);
     }
@@ -211,7 +201,6 @@ public class GoogleCloudSourceErrorClassificationTest {
 
   @Test
   public void peerRejectingOurCertificateBeneathUnavailable() {
-    // gRPC surfaces a TLS handshake the server refused as UNAVAILABLE with the SSL failure as its cause
     assertAuth(Status.UNAVAILABLE.withCause(new SSLHandshakeException("Received fatal alert: bad_certificate"))
         .asRuntimeException(), null);
     assertSourceRead(Status.UNAVAILABLE.withCause(new SSLHandshakeException("Received fatal alert: handshake_failure"))

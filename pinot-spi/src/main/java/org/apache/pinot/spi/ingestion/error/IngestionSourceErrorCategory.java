@@ -18,18 +18,7 @@
  */
 package org.apache.pinot.spi.ingestion.error;
 
-/// What failed when Pinot accessed an ingestion source (a stream, its schema registry, a file system). The category
-/// never depends on whose credential failed or who can fix it, which Pinot can't know.
-///
-/// A failure that is not a failure to access the source has no category at all: Pinot's own cancellation, a client
-/// Pinot closed, content that was read but can't be parsed, or an exception no rule recognises.
 public enum IngestionSourceErrorCategory {
-  /// Authentication or authorization failed: a credential, signature or token was rejected, a permission or an access
-  /// policy denied the request, the source answered "does not exist or not authorized", a credential couldn't be
-  /// loaded, read or built, or an identity service refused the request.
   AUTH,
-  /// Any other failure to read from the source: the data is missing or expired, the source throttled or failed after
-  /// our retries, it rejected a request as invalid, the client couldn't be set up, or an endpoint, an identity
-  /// service's included, never answered.
   SOURCE_READ
 }

@@ -70,9 +70,6 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
 
-/// Pins the classifier's AWS rules (the code table and the message carve-outs) against the exception hierarchy of the
-/// SDK pinot-kinesis ships. AWS answers almost everything with 400 or 403, so the error code decides, never whose
-/// credential it rejected. Each code below is a row of the rule table that the batch classifier shares.
 public class KinesisSourceErrorClassificationTest {
 
   private static AwsErrorDetails details(String service, String code) {
@@ -89,7 +86,6 @@ public class KinesisSourceErrorClassificationTest {
         .message(message).build();
   }
 
-  /// The consume loop sees the SDK's exception raw, under Pinot's own wrappers.
   private static Throwable underPinot(Throwable failure) {
     return new RuntimeException("Pinot wrapper", failure);
   }
@@ -99,7 +95,6 @@ public class KinesisSourceErrorClassificationTest {
     assertAuth(underPinot(AccessDeniedException.builder().awsErrorDetails(details("Kinesis", "AccessDeniedException"))
             .statusCode(400).message("User: arn is not authorized to perform: kinesis:GetRecords on resource: stream")
             .build()), null);
-    // The denied action names the key that encrypts the stream.
     assertAuth(kinesis("AccessDeniedException", "User: arn is not authorized to perform: kms:Decrypt on resource: "
         + "key"), TARGET_KMS);
     assertAuth(kinesis("AccessDeniedException", "The ciphertext refers to a customer master key that does not exist, "
@@ -133,7 +128,6 @@ public class KinesisSourceErrorClassificationTest {
         null);
     assertAuth(kinesis("ExpiredTokenException", "The security token has expired."),
         null);
-    // Our clock, under a signature code or its own: no message decides against AUTH.
     assertAuth(kinesis("InvalidSignatureException",
             "Signature expired: 20260101T000000Z is now earlier than 20260101T000500Z"),
         null);
@@ -142,26 +136,21 @@ public class KinesisSourceErrorClassificationTest {
 
   @Test
   public void assumeRole() {
-    // The table's role refuses us (trust policy, external id): raised raw from the Kinesis call.
     Throwable trustDenied = sts("AccessDenied", 403,
         "User: arn:aws:sts::000000000000:assumed-role/node/i-0 is not authorized to perform: sts:AssumeRole on "
             + "resource: arn:aws:iam::111111111111:role/table");
     assertAuth(underPinot(trustDenied), TARGET_STS);
-    // The base keys are rejected by STS.
     assertAuth(sts("InvalidClientTokenId", 403, "The security token included in the request is invalid."),
         TARGET_STS);
     assertAuth(RegionDisabledException.builder().awsErrorDetails(details("Sts", "RegionDisabledException"))
         .statusCode(403).message("STS is not activated in this region").build(),
         TARGET_STS);
-    // The process's web identity, reused by the default chain after its first success.
     assertAuth(sts("AccessDenied", 403, "Not authorized to perform sts:AssumeRoleWithWebIdentity"),
         TARGET_STS);
     assertAuth(sts("InvalidIdentityToken", 400, "No OpenIDConnect provider found in your account for https://oidc"),
         TARGET_STS);
-    // STS refusing the AssumeRole request itself: a role ARN or session duration it won't accept.
     assertAuth(sts("ValidationError", 400, "The requested DurationSeconds exceeds the MaxSessionDuration"),
         TARGET_STS);
-    // The web identity's provider never answered STS.
     assertSourceRead(sts("IDPCommunicationError", 400, "The IdP could not be contacted"), TARGET_STS);
   }
 
@@ -178,14 +167,12 @@ public class KinesisSourceErrorClassificationTest {
     assertSourceRead(LimitExceededException.builder().awsErrorDetails(details("Kinesis", "LimitExceededException"))
         .statusCode(400).message("Rate exceeded").build(), null);
     assertSourceRead(kinesis("InternalFailure", "internal"), null);
-    // An unmodeled 5xx.
     assertSourceRead(KinesisException.builder().awsErrorDetails(details("Kinesis", "SomethingNew")).statusCode(503)
         .message("unavailable").build(), null);
   }
 
   @Test
   public void accessTheSourceDisabledIsAuthorization() {
-    // S3 answers 403 when it disabled all access to a resource, or to a Requester Pays object for this requester.
     assertAuth(AwsServiceException.builder().awsErrorDetails(details("S3", "AllAccessDisabled")).statusCode(403)
         .message("All access to this Amazon S3 resource has been disabled.").build(),
         null);
@@ -195,7 +182,6 @@ public class KinesisSourceErrorClassificationTest {
 
   @Test
   public void glueCodesKeyOnTheCodeNotTheStatus() {
-    // Glue is a JSON-protocol service: denial, missing entity and throttling are all 400.
     assertAuth(AwsServiceException.builder().awsErrorDetails(details("Glue", "AccessDeniedException"))
         .statusCode(400).message("denied").build(), null);
     assertSourceRead(AwsServiceException.builder().awsErrorDetails(details("Glue", "EntityNotFoundException"))
@@ -214,12 +200,9 @@ public class KinesisSourceErrorClassificationTest {
 
   @Test
   public void clientSideFailures() {
-    // A credential chain that found no credential.
     assertAuth(underPinot(SdkClientException.create(
             "Unable to load credentials from any of the providers in the chain AwsCredentialsProviderChain")),
         null);
-    // One of its providers, called directly after the chain's first success: IMDS, or the ECS / EKS Pod Identity
-    // container endpoint. One whose endpoint never answered, or failed, is SOURCE_READ like any endpoint.
     assertAuth(SdkClientException.create("Failed to load credentials from IMDS.",
             new IOException("Unable to parse the credentials response")), null);
     assertEquals(assertSourceRead(SdkClientException.create("Failed to load credentials from IMDS.",
@@ -229,22 +212,17 @@ public class KinesisSourceErrorClassificationTest {
     assertEquals(assertSourceRead(SdkClientException.create("Failed to load credentials from IMDS.",
         SdkServiceException.builder().statusCode(500).message("Internal Server Error").build()), TARGET_IDP)
         .getCode(), "500");
-    // Any endpoint that never answered, a metadata endpoint included.
     assertSourceRead(SdkClientException.create("Unable to execute HTTP request",
         new ConnectException("Connect to 169.254.169.254:80 [/169.254.169.254] failed: Connection refused")), null);
-    // Our cancellation.
     assertNotClassified(AbortedException.create("Thread was interrupted"));
-    // The endpoint never answered.
     assertSourceRead(underPinot(SdkClientException.create("Unable to execute HTTP request: kinesis.example",
         new UnknownHostException("kinesis.us-east-1.amazonaws.example"))), null);
     assertSourceRead(ApiCallTimeoutException.create(5000), null);
-    // The endpoint answered, rejecting the client certificate we presented
     assertAuth(SdkClientException.create("Unable to execute HTTP request",
         new SSLHandshakeException("Received fatal alert: bad_certificate")),
         null);
   }
 
-  /// A load balancer or proxy that reads each request in full and closes the connection without answering.
   private static ServerSocket droppingEndpoint()
       throws IOException {
     ServerSocket endpoint = new ServerSocket(0, 50, InetAddress.getLoopbackAddress());
@@ -296,8 +274,6 @@ public class KinesisSourceErrorClassificationTest {
   @Test
   public void endpointThatClosesWithoutAnsweringIsSourceRead()
       throws IOException {
-    // The SDK retries, then gives up with the HTTP client's no-response failure as the cause. Kinesis is built on the
-    // Apache 4 client; STS takes the SDK's default, Apache 5.
     try (ServerSocket endpoint = droppingEndpoint();
         KinesisClient kinesis = KinesisClient.builder()
             .endpointOverride(URI.create("http://127.0.0.1:" + endpoint.getLocalPort()))
@@ -323,7 +299,6 @@ public class KinesisSourceErrorClassificationTest {
 
   @Test
   public void retryRecordsAreNotNetworkFailures() {
-    // The SDK attaches one cause-less record per earlier attempt; they must not read as an unreachable endpoint.
     Throwable cancelled = AbortedException.create("Thread was interrupted");
     cancelled.addSuppressed(SdkClientException.create("Request attempt 1 failure: Unable to execute HTTP request"));
     cancelled.addSuppressed(SdkClientException.create("Request attempt 2 failure: Connect timed out"));

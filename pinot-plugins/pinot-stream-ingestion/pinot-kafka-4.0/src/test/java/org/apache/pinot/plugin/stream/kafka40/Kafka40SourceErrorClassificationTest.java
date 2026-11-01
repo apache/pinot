@@ -21,6 +21,5 @@ package org.apache.pinot.plugin.stream.kafka40;
 import org.apache.pinot.plugin.stream.kafka.KafkaSourceErrorClassificationTest;
 
 
-/// Runs the Kafka classification fixtures against kafka-clients 4.x.
 public class Kafka40SourceErrorClassificationTest extends KafkaSourceErrorClassificationTest {
 }

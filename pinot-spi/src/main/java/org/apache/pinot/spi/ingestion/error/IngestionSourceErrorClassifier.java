@@ -36,38 +36,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/// Folds a failure to access an ingestion source into [IngestionSourceErrorCategory#AUTH] or
-/// [IngestionSourceErrorCategory#SOURCE_READ] by what failed: authentication or authorization, or the read. Status
-/// codes and error codes are only evidence, read per source.
-///
-/// The exception tree is split into chains: the failure with its causes, and each suppressed exception with its own
-/// causes. When an exception in the tree carries boundary evidence ([IngestionSourceErrorEvidence#setBoundary]), only
-/// the parts of chains at or beneath a boundary are read; otherwise the caller vouches that the whole failure came
-/// from the source. Within a chain:
-///
-/// 1. walking from the root cause up, the first source-specific rule that decides wins. A rule that says the failure
-///    is not a failure to access the source (Pinot's own cancellation, or a client Pinot closed) therefore decides
-///    only when no source exception sits beneath it, and a wrapper above it can't reinstate a category;
-/// 2. generic rules, which read the transport rather than a source's answer (`java.net` / `javax.net.ssl`, and any
-///    registered with [#registerGenericRule]), apply only when no source rule decided the chain.
-///
-/// Across chains [IngestionSourceErrorCategory#AUTH] beats [IngestionSourceErrorCategory#SOURCE_READ]: a refusal
-/// recorded as a suppressed exception still surfaces.
-///
-/// Built-in rules cover kafka-clients, the Confluent schema-registry client, the AWS SDK v2, the Pulsar client and
-/// admin APIs, gRPC and gax, Kerberos and OAuth logins, and JDK network types. They match classes by name anywhere in
-/// the hierarchy, because SDKs load in plugin classloaders, sometimes in two versions at once. They read codes
-/// reflectively and fail closed. A plugin for another SDK adds rules with [#registerRule].
-///
-/// [#classify] never throws, apart from rethrowing the JVM's own fatal errors (`OutOfMemoryError`, `InternalError`).
-/// Its only side effect is a WARN, at most once a minute, when a rule or the classification itself fails.
 public final class IngestionSourceErrorClassifier {
-  // Bounds the walk over pathological exception graphs; real failures are a few dozen nodes.
   private static final int MAX_NODES = 1_000;
   private static final Logger LOGGER = LoggerFactory.getLogger(IngestionSourceErrorClassifier.class);
-  // Classification runs on every failed fetch or row, so a broken rule fails just as often
   private static final long FAILURE_LOG_INTERVAL_MS = TimeUnit.MINUTES.toMillis(1);
-  // Enough to find the failing code
   private static final int MAX_LOGGED_FRAMES = 10;
   private static final Set<IngestionSourceErrorRule> REGISTERED_RULES = new CopyOnWriteArraySet<>();
   private static final Set<IngestionSourceErrorRule> REGISTERED_GENERIC_RULES = new CopyOnWriteArraySet<>();
@@ -77,7 +49,6 @@ public final class IngestionSourceErrorClassifier {
   private IngestionSourceErrorClassifier() {
   }
 
-  /// Classifies `failure`, or returns empty when it is not a failure to access the source.
   public static Optional<IngestionSourceErrorClassification> classify(Throwable failure) {
     try {
       Walk walk = new Walk();
@@ -88,18 +59,13 @@ public final class IngestionSourceErrorClassifier {
       }
       return Optional.of(new IngestionSourceErrorClassification(decided._verdict, decided._node, decided._evidence));
     } catch (Throwable t) {
-      // Observation only: a classification bug, or a hostile exception, must never change how the failure itself is
-      // handled.
       rethrowIfFatal(t);
-      // The class only: the failure's message is the caller's to log
       String failureClass = failure != null ? failure.getClass().getName() : null;
       warnAtMostOnceAMinute("Failed to classify an ingestion source failure: {}, caught: {}", failureClass, t);
       return Optional.empty();
     }
   }
 
-  /// Logs a failure of classification itself, at most once a minute across all of them. Describing a hostile exception
-  /// can fail in turn, which must not escape either.
   private static void warnAtMostOnceAMinute(String message, String subject, Throwable t) {
     long nowMs = System.currentTimeMillis();
     long lastLoggedMs = LAST_FAILURE_LOG_MS.get();
@@ -112,8 +78,6 @@ public final class IngestionSourceErrorClassifier {
     }
   }
 
-  /// The class and first stack frames of what classification caught, without its message, cause or suppressed
-  /// exceptions: any of them can carry the classified failure, whose message is the caller's to log.
   private static String describe(Throwable t) {
     StringBuilder description = new StringBuilder(t.getClass().getName());
     StackTraceElement[] frames = t.getStackTrace();
@@ -123,15 +87,12 @@ public final class IngestionSourceErrorClassifier {
     return description.toString();
   }
 
-  /// Running out of memory or a broken JVM is not ours to swallow; a stack overflow from a hostile exception is.
   static void rethrowIfFatal(Throwable t) {
     if (t instanceof VirtualMachineError && !(t instanceof StackOverflowError)) {
       throw (VirtualMachineError) t;
     }
   }
 
-  /// Adds rules for an SDK Pinot doesn't ship. Registering the same rule twice has no effect, and the order rules are
-  /// registered in never changes an outcome.
   public static void registerRule(IngestionSourceErrorRule rule) {
     REGISTERED_RULES.add(rule);
   }
@@ -140,9 +101,6 @@ public final class IngestionSourceErrorClassifier {
     REGISTERED_RULES.remove(rule);
   }
 
-  /// Adds generic rules: ones that read the transport rather than a source's answer, such as a file missing under a
-  /// path the caller knows is remote. Like the built-in network rules, they apply to a chain only when no source rule,
-  /// built-in or registered, decided it, and after the built-in network rules on each exception.
   public static void registerGenericRule(IngestionSourceErrorRule rule) {
     REGISTERED_GENERIC_RULES.add(rule);
   }
@@ -151,9 +109,6 @@ public final class IngestionSourceErrorClassifier {
     REGISTERED_GENERIC_RULES.remove(rule);
   }
 
-  /// The decision of the registered rules on `node`. When they disagree, [IngestionSourceErrorVerdict#none] beats
-  /// [IngestionSourceErrorCategory#AUTH], which beats [IngestionSourceErrorCategory#SOURCE_READ], and remaining ties
-  /// break on code and target, so registration order never matters.
   @Nullable
   private static IngestionSourceErrorVerdict decideRegistered(Set<IngestionSourceErrorRule> rules, Throwable node,
       List<Throwable> below, @Nullable IngestionSourceErrorEvidence evidence) {
@@ -163,7 +118,6 @@ public final class IngestionSourceErrorClassifier {
       try {
         verdict = rule.decide(node, below, evidence);
       } catch (Throwable t) {
-        // A rule that throws anything, even a checked exception it smuggles out, counts as no decision.
         rethrowIfFatal(t);
         warnAtMostOnceAMinute("Ingestion source error rule: {} failed, counting it as no decision, caught: {}",
             rule.getClass().getName(), t);
@@ -198,13 +152,10 @@ public final class IngestionSourceErrorClassifier {
     }
   }
 
-  /// One chain of the tree: an exception and its causes, with the evidence each node carries and the evidence nearest
-  /// above it.
   private static final class Chain {
     final List<Throwable> _nodes = new ArrayList<>();
     final List<IngestionSourceErrorEvidence> _direct = new ArrayList<>();
     final List<IngestionSourceErrorEvidence> _nearest = new ArrayList<>();
-    // The first node with a boundary: it and every node beneath it are within the boundary
     int _firstBoundary = -1;
   }
 
@@ -214,8 +165,6 @@ public final class IngestionSourceErrorClassifier {
     int _visited;
     boolean _hasBoundary;
 
-    /// Decides the chain starting at `failure`, then every chain hanging off it as a suppressed exception, depth
-    /// first. A work stack rather than recursion: suppressed exceptions can nest arbitrarily deep.
     void visit(Throwable failure) {
       Deque<Throwable> pending = new ArrayDeque<>();
       pending.push(failure);
@@ -231,8 +180,6 @@ public final class IngestionSourceErrorClassifier {
       }
     }
 
-    /// Records the chain starting at `head` and returns the heads of the chains suppressed along it. Chains may share
-    /// causes, and each reads a shared cause under its own evidence, so only a cycle within the chain ends it early.
     private List<Throwable> visitChain(Throwable head) {
       Chain chain = new Chain();
       List<Throwable> suppressedHeads = new ArrayList<>();
@@ -267,8 +214,6 @@ public final class IngestionSourceErrorClassifier {
       return suppressedHeads;
     }
 
-    /// Decides every chain visited and returns the first AUTH decision, else the first SOURCE_READ one. In a tree with
-    /// a boundary, only the exceptions within one are read.
     @Nullable
     Decision decide() {
       Decision decided = null;
@@ -287,7 +232,6 @@ public final class IngestionSourceErrorClassifier {
 
     @Nullable
     private Decision decide(Chain chain) {
-      // Rules read the nodes beneath theirs but never change them
       List<Throwable> nodes = Collections.unmodifiableList(chain._nodes);
       for (int i = nodes.size() - 1; i >= 0; i--) {
         if (!isEligible(chain, i)) {

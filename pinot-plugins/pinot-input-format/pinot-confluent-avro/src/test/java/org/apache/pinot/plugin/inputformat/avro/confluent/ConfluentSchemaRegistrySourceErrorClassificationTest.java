@@ -43,9 +43,6 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.fail;
 
 
-/// Pins the schema-registry rules through Pinot's real decoder and the shipped registry client, against a local
-/// registry stub. The serde wraps a registry 401/403 in the same Kafka classes a broker uses, so these failures must
-/// name the registry, not the broker.
 public class ConfluentSchemaRegistrySourceErrorClassificationTest {
   private static final String TOPIC = "events";
   private static final String VALID_SCHEMA_RESPONSE =
@@ -80,7 +77,6 @@ public class ConfluentSchemaRegistrySourceErrorClassificationTest {
   @Test
   public void networkPolicyInFrontOfTheRegistryDenies()
       throws Exception {
-    // A proxy or firewall answering 403 with an HTML body: the client's error code is 50005, its status stays 403.
     assertAuth(decodeFailure(registryAnswering(403, "<html><body>Forbidden</body></html>"), payload(1, new byte[]{2})),
         TARGET_SCHEMA_REGISTRY);
   }
@@ -91,7 +87,6 @@ public class ConfluentSchemaRegistrySourceErrorClassificationTest {
     assertSourceRead(decodeFailure(registryAnswering(404, "{\"error_code\":40403,\"message\":\"Schema 1 not found\"}"),
         payload(1, new byte[]{2})), TARGET_SCHEMA_REGISTRY);
     stopRegistry();
-    // A throttled registry: the serde maps 429 to a Kafka class and drops the cause.
     String throttled = "{\"error_code\":42901,\"message\":\"Rate limit exceeded\"}";
     assertSourceRead(decodeFailure(registryAnswering(429, throttled), payload(1, new byte[]{2})),
         TARGET_SCHEMA_REGISTRY);
@@ -99,16 +94,13 @@ public class ConfluentSchemaRegistrySourceErrorClassificationTest {
     assertSourceRead(decodeFailure(registryAnswering(503, "{\"error_code\":50301,\"message\":\"Unavailable\"}"),
         payload(1, new byte[]{2})), TARGET_SCHEMA_REGISTRY);
     stopRegistry();
-    // A Protobuf reference that was never registered.
     String subjectNotFound = "{\"error_code\":40401,\"message\":\"Subject not found\"}";
     assertSourceRead(decodeFailure(registryAnswering(404, subjectNotFound), payload(1, new byte[]{2})),
         TARGET_SCHEMA_REGISTRY);
     stopRegistry();
-    // A URL that isn't a registry at all.
     assertSourceRead(decodeFailure(registryAnswering(404, "<html><body>Not Found</body></html>"),
         payload(1, new byte[]{2})), TARGET_SCHEMA_REGISTRY);
     stopRegistry();
-    // A request the registry rejects.
     assertSourceRead(decodeFailure(registryAnswering(422, "{\"error_code\":42201,\"message\":\"Invalid schema\"}"),
         payload(1, new byte[]{2})), TARGET_SCHEMA_REGISTRY);
   }
@@ -145,22 +137,18 @@ public class ConfluentSchemaRegistrySourceErrorClassificationTest {
   @Test
   public void contentThatWontParseIsNotTheSource()
       throws Exception {
-    // Not registry-framed at all.
     assertNotClassified(decodeFailure(registryAnswering(200, VALID_SCHEMA_RESPONSE), new byte[]{1, 2, 3, 4, 5, 6}));
     stopRegistry();
-    // The schema is served but the bytes don't match it.
     assertNotClassified(decodeFailure(registryAnswering(200, VALID_SCHEMA_RESPONSE),
         payload(1, new byte[]{(byte) 0xff, (byte) 0xff, (byte) 0xff, (byte) 0xff, (byte) 0xff, (byte) 0xff})));
   }
 
   @Test
   public void untrustedRegistryOrMissingClientClass() {
-    // We couldn't verify the registry's certificate: the endpoint, never our credential.
     Throwable pkix = new SerializationException("Error retrieving Avro value schema for id 1",
         new SSLHandshakeException("PKIX path building failed",
             new CertificateException("unable to find valid certification path to requested target")));
     assertEquals(classify(pkix).getCategory(), IngestionSourceErrorCategory.SOURCE_READ);
-    // A client class missing from the plugin: a packaging bug.
     assertNotClassified(new NoClassDefFoundError(
         "org/apache/kafka/common/security/oauthbearer/JwtRetriever"));
   }
@@ -180,7 +168,6 @@ public class ConfluentSchemaRegistrySourceErrorClassificationTest {
     return "http://localhost:" + _registry.getAddress().getPort();
   }
 
-  /// A registry-framed payload: magic byte 0, the schema id, then the Avro body.
   private static byte[] payload(int schemaId, byte[] body) {
     return ByteBuffer.allocate(5 + body.length).put((byte) 0).putInt(schemaId).put(body).array();
   }
