@@ -327,7 +327,7 @@ public class AsyncQueryResponseTest {
     AsyncQueryResponse response = newResponse(Set.of(SERVER_1, SERVER_2), 500L, true);
 
     response.receiveDeserializationError(SERVER_1, new RuntimeException("bad"), 0, 0);
-    response.receiveDataTable(SERVER_1, DataTableBuilderFactory.getEmptyDataTable(), 100, 5);
+    response.receiveDataTable(SERVER_1, mock(DataTable.class), 100, 5);
 
     Map<ServerRoutingInstance, ServerResponse> responses = response.getFinalResponses();
     assertEquals(responses.size(), 2);
@@ -347,7 +347,7 @@ public class AsyncQueryResponseTest {
       throws Exception {
     AsyncQueryResponse response = newResponse(Set.of(SERVER_1, SERVER_2), 500L, true);
 
-    DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
+    DataTable dataTable = mock(DataTable.class);
     response.receiveDataTable(SERVER_1, dataTable, 100, 5);
     response.receiveDeserializationError(SERVER_1, new RuntimeException("bad"), 0, 0);
 
