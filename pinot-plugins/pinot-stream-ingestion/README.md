@@ -37,9 +37,17 @@ to the Kafka 4 implementation. Existing `plugins.include` entries and plugin-qua
 `pinot-kafka-2.0` or `pinot-kafka-3.0` also resolve to `pinot-kafka-4.0`. Custom deployments must package the Kafka 4 plugin;
 the aliases do not retain the Kafka 3 client or its protocol support.
 
+Consumer and Admin client construction translates `auto.include.jmx.reporter` to `metric.reporters`, preserving the
+Kafka 3 behavior: `true` adds the built-in JMX reporter alongside custom reporters when absent; `false` disables only
+automatic inclusion and preserves every explicitly configured reporter, including JMX. Omitting the old flag keeps
+Kafka 4 defaults. The removed `org.apache.kafka.common.security.oauthbearer.secured.OAuthBearerLoginCallbackHandler`
+class name, including its Pinot-shaded form, resolves to the current OAuth login callback. ConfigProvider-backed values
+for these settings are resolved before translation using the existing provider declarations and path restrictions.
+Stored table configs remain unchanged.
+
 Kafka 4 clients require brokers version 2.1 or newer; upgrading the Pinot plugin does not require Kafka 4 brokers or a
 broker-side ZooKeeper-to-KRaft migration. Review [Kafka's client upgrade guide](https://kafka.apache.org/42/getting-started/upgrade/)
-for removed configuration/API support, especially OAuth callback class names and endpoint allowlists. Validate the
+for other removed configuration/API support and OAuth endpoint allowlist requirements. Validate the
 TLS/SASL/OAuth or MSK IAM settings used by each source against the replacement client.
 
 Retain existing factory names during rolling upgrades, and avoid writing Kafka 4 factory names until every component
