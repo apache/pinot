@@ -195,8 +195,11 @@ public class ServerChannels {
         "Channel to server: " + serverRoutingInstance + " kept being evicted while sending a request");
   }
 
-  /// Closes and forgets the cached channel to the given routing instance, if there is one. Returns `true` if a
-  /// channel was evicted.
+  /// Closes and forgets the cached channel to the given routing instance, if there is one. Returns `true` if that
+  /// closed a live connection. An entry whose channel had already closed (the server sent a FIN as it shut down) or
+  /// never connected is dropped all the same but not counted, so that
+  /// [BrokerMeter#NETTY_CONNECTION_CHANNEL_EVICTIONS] reads as connections that were still open, possibly half-open,
+  /// when the broker gave up on them, and a graceful rolling restart does not bump it for every server.
   ///
   /// Called when the routing manager enables a server, which is what a restart looks like through Helix, and when it
   /// sees a server removed from the cluster. The cached channel then belongs to a previous process: if that process
@@ -214,9 +217,16 @@ public class ServerChannels {
     if (serverChannel == null) {
       return false;
     }
-    LOGGER.info("Evicting cached channel to server: {}", serverRoutingInstance);
-    _brokerMetrics.addMeteredGlobalValue(BrokerMeter.NETTY_CONNECTION_CHANNEL_EVICTIONS, 1);
+    // Read before the eviction closes it; a snapshot is enough, as it only decides what is counted
+    Channel channel = serverChannel._channel;
+    boolean wasConnected = channel != null && channel.isActive();
     serverChannel.evict();
+    if (!wasConnected) {
+      LOGGER.debug("Dropped cached entry without a live channel to server: {}", serverRoutingInstance);
+      return false;
+    }
+    LOGGER.info("Evicted live cached channel to server: {}", serverRoutingInstance);
+    _brokerMetrics.addMeteredGlobalValue(BrokerMeter.NETTY_CONNECTION_CHANNEL_EVICTIONS, 1);
     return true;
   }
 
@@ -493,6 +503,13 @@ public class ServerChannels {
       // entry holds by the time the write completes, or a late failure would close a healthy reconnected channel.
       Channel channel = _channel;
       if (!channel.isWritable()) {
+        if (!channel.isActive()) {
+          // A closed channel reports unwritable too, as Netty drops its outbound buffer on close: it went inactive
+          // after the connect above, through a server FIN or an eviction mid-send. That is not a stalled send window,
+          // so it is not counted as an unwritable rejection.
+          throw new IllegalStateException(
+              "Channel to server: " + serverRoutingInstance + " closed before the request could be written");
+        }
         // The outbound queue is above the high watermark, which only happens when the server stopped draining its
         // socket or the path stopped forwarding. Fail the query now rather than queueing yet another request buffer
         // in direct memory behind a closed send window; the write timeout handler closes the channel if the stall

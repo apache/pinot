@@ -1050,18 +1050,20 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
   public void onServerEnabled(ServerInstance serverInstance) {
     int numEvicted = _queryRouter.evictChannels(serverInstance);
     if (numEvicted > 0) {
-      LOGGER.info("Evicted {} cached channel(s) to enabled server: {}, the next query reconnects", numEvicted,
+      LOGGER.info("Evicted {} live cached channel(s) to enabled server: {}, the next query reconnects", numEvicted,
           serverInstance.getInstanceId());
     }
   }
 
-  /// Drops the cached Netty channels to a server removed from the cluster: nothing routes to it any more, and if it
-  /// is ever added back under the same id it is a new process.
+  /// Drops the cached Netty channels to a server removed from the cluster, or to the previous address of a server
+  /// that moved: nothing routes there any more, and if the server is ever added back under the same id, or moves back
+  /// to that address, it is a new process.
   @Override
   public void onServerRemoved(ServerInstance serverInstance) {
     int numEvicted = _queryRouter.evictChannels(serverInstance);
     if (numEvicted > 0) {
-      LOGGER.info("Evicted {} cached channel(s) to removed server: {}", numEvicted, serverInstance.getInstanceId());
+      LOGGER.info("Evicted {} live cached channel(s) to server: {} at {}:{}, which left the cluster or that address",
+          numEvicted, serverInstance.getInstanceId(), serverInstance.getHostname(), serverInstance.getPort());
     }
   }
 

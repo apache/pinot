@@ -94,8 +94,10 @@ public interface BrokerRequestHandler {
   }
 
   /// Called when the routing manager sees a server removed from the cluster altogether (its instance config is
-  /// gone). A handler that caches connections to the server drops them: nothing will be routed to it any more, and
-  /// a server later added back under the same id is a new process. Same contract as [#onServerEnabled].
+  /// gone), and with the instance at the previous address when a server is back under the same id at a different
+  /// address. A handler that caches connections to that instance drops them: nothing will be routed there any more,
+  /// and a server later added back under the same id, or moved back to that address, is a new process. Same contract
+  /// as [#onServerEnabled].
   default void onServerRemoved(ServerInstance serverInstance) {
   }
 

@@ -241,8 +241,9 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   // Progressing requests can take longer overall; a stalled or half-open socket can still report isActive().
   public static final BrokerMeter NETTY_CONNECTION_WRITE_TIMEOUTS = create(
       "NETTY_CONNECTION_WRITE_TIMEOUTS", "nettyConnection", true);
-  // Cached channels closed and dropped because the routing manager re-enabled their server, which usually means the
-  // server was restarted and the cached channel points at the old process.
+  // Live cached channels closed and dropped because the routing manager enabled their server again, which usually
+  // means the server was restarted and the cached channel points at the old process, or because the server left the
+  // cluster or moved to another address. Entries whose channel had already closed are dropped without being counted.
   public static final BrokerMeter NETTY_CONNECTION_CHANNEL_EVICTIONS = create(
       "NETTY_CONNECTION_CHANNEL_EVICTIONS", "nettyConnection", true);
 

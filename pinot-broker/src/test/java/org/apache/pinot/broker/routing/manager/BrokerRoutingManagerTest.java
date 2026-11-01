@@ -409,6 +409,59 @@ public class BrokerRoutingManagerTest {
     verify(_serverRemovedCallback, times(3)).accept(any());
   }
 
+  /// A server back under the same id at a different address has left its previous address for good. Listeners key
+  /// what they cache by address, so the removed callback gets the instance at the previous address: otherwise the
+  /// single-stage channels to it would stay cached forever. Covered while the server stays enabled and across a
+  /// disable and re-enable; a change that keeps the address calls nothing.
+  @Test
+  public void testRemovedCallbackInvokedWithPreviousAddressWhenServerMoves() {
+    _routingManager.addServerEnabledCallback(_serverEnabledCallback);
+    _routingManager.addServerRemovedCallback(_serverRemovedCallback);
+    setInstanceConfigs(createEnabledServerZNRecord(SERVER_INSTANCE_ID));
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    verify(_serverEnabledCallback, times(1)).accept(any());
+
+    // A config change that keeps the address
+    ZNRecord tagged = createEnabledServerZNRecord(SERVER_INSTANCE_ID);
+    tagged.setListField(InstanceConfig.InstanceConfigProperty.TAG_LIST.name(), List.of("DefaultTenant_OFFLINE"));
+    setInstanceConfigs(tagged);
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    verify(_serverRemovedCallback, never()).accept(any());
+
+    // Moves to another host while it stays enabled: not a newly enabled server, but its previous address is gone
+    ZNRecord moved = createEnabledServerZNRecord(SERVER_INSTANCE_ID);
+    moved.setSimpleField(InstanceConfig.InstanceConfigProperty.HELIX_HOST.name(), "otherhost");
+    setInstanceConfigs(moved);
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    ArgumentCaptor<ServerInstance> captor = ArgumentCaptor.forClass(ServerInstance.class);
+    verify(_serverRemovedCallback).accept(captor.capture());
+    assertEquals(captor.getValue().getHostname(), SERVER_HOST);
+    assertEquals(captor.getValue().getPort(), SERVER_PORT);
+    assertEquals(_routingManager.getEnabledServerInstanceMap().get(SERVER_INSTANCE_ID).getHostname(), "otherhost");
+    verify(_serverEnabledCallback, times(1)).accept(any());
+
+    // Disabled, then enabled again at another port: compared with the address it had when it was disabled
+    ZNRecord disabled = createDisabledServerZNRecord(SERVER_INSTANCE_ID);
+    disabled.setSimpleField(InstanceConfig.InstanceConfigProperty.HELIX_HOST.name(), "otherhost");
+    setInstanceConfigs(disabled);
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    verify(_serverRemovedCallback, times(1)).accept(any());
+    ZNRecord reenabled = createEnabledServerZNRecord(SERVER_INSTANCE_ID);
+    reenabled.setSimpleField(InstanceConfig.InstanceConfigProperty.HELIX_HOST.name(), "otherhost");
+    reenabled.setSimpleField(InstanceConfig.InstanceConfigProperty.HELIX_PORT.name(), "8001");
+    setInstanceConfigs(reenabled);
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    verify(_serverRemovedCallback, times(2)).accept(captor.capture());
+    assertEquals(captor.getValue().getHostname(), "otherhost");
+    assertEquals(captor.getValue().getPort(), SERVER_PORT);
+    verify(_serverEnabledCallback, times(2)).accept(any());
+  }
+
+  private void setInstanceConfigs(ZNRecord... instanceConfigs) {
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(List.of(instanceConfigs));
+  }
+
   /// `setServerEnabledCallback` replaces what it set before, and only that, so callbacks registered through
   /// `addServerEnabledCallback` (the single-stage channel eviction) are never dropped by it.
   @Test

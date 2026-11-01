@@ -428,6 +428,7 @@ public class ServerChannelsTest {
       ServerChannels.ServerChannel oldEntry = channels.getOrCreateServerChannel(instance);
       Channel oldChannel = mock(Channel.class);
       when(oldChannel.pipeline()).thenReturn(mock(ChannelPipeline.class));
+      when(oldChannel.isActive()).thenReturn(true);
       when(oldChannel.isWritable()).thenReturn(true);
       ChannelFuture oldWrite = mock(ChannelFuture.class);
       when(oldChannel.writeAndFlush(any())).thenReturn(oldWrite);
@@ -472,6 +473,7 @@ public class ServerChannelsTest {
       ServerRoutingInstance routingInstance = new ServerRoutingInstance("localhost", 12345, TableType.OFFLINE);
       ServerChannels.ServerChannel serverChannel = serverChannels.getOrCreateServerChannel(routingInstance);
       Channel mockChannel = mock(Channel.class);
+      when(mockChannel.isActive()).thenReturn(true);
       when(mockChannel.isWritable()).thenReturn(false);
       when(mockChannel.bytesBeforeWritable()).thenReturn(12_345L);
       serverChannel.setChannel(mockChannel);
@@ -489,6 +491,35 @@ public class ServerChannelsTest {
       verify(mockChannel, never()).close();
       verify(asyncQueryResponse, never()).markRequestSent(any(), anyInt());
       verify(asyncQueryResponse, never()).markServerUnavailable(any(), any(), any(Exception.class), anyBoolean());
+    } finally {
+      serverChannels.shutDown();
+    }
+  }
+
+  /// A channel that closed after the connect also reports unwritable, as Netty drops its outbound buffer on close.
+  /// The request still fails without a write, but as a closed channel: that is not a stalled send window, so it is
+  /// not counted as an unwritable rejection.
+  @Test
+  public void testClosedChannelIsNotCountedAsUnwritable() {
+    ServerChannels serverChannels =
+        new ServerChannels(mock(QueryRouter.class), null, null, ThreadAccountantUtils.getNoOpAccountant());
+    try {
+      ServerRoutingInstance routingInstance = new ServerRoutingInstance("localhost", 12345, TableType.OFFLINE);
+      ServerChannels.ServerChannel serverChannel = serverChannels.getOrCreateServerChannel(routingInstance);
+      EmbeddedChannel closedChannel = new EmbeddedChannel();
+      closedChannel.close();
+      assertFalse(closedChannel.isWritable(), "Netty reports a closed channel as unwritable");
+      serverChannel.setChannel(closedChannel);
+      AsyncQueryResponse asyncQueryResponse = mock(AsyncQueryResponse.class);
+
+      long rejectionsBefore = meterCount(BrokerMeter.NETTY_CONNECTION_UNWRITABLE_REJECTIONS);
+      IllegalStateException e = expectThrows(IllegalStateException.class,
+          () -> serverChannel.sendRequestWithoutLocking("test_table", asyncQueryResponse, routingInstance,
+              new byte[]{1, 2, 3}));
+      assertTrue(e.getMessage().contains("closed"), e.getMessage());
+      assertEquals(meterCount(BrokerMeter.NETTY_CONNECTION_UNWRITABLE_REJECTIONS), rejectionsBefore);
+      assertTrue(closedChannel.outboundMessages().isEmpty());
+      verify(asyncQueryResponse, never()).markRequestSent(any(), anyInt());
     } finally {
       serverChannels.shutDown();
     }
@@ -894,6 +925,39 @@ public class ServerChannelsTest {
       assertTrue(freshEntry._channel.isActive());
       verify(nextResponse, timeout(5_000L)).markRequestSent(eq(instance), anyInt());
       assertTrue(serverChannels.hasChannel(instance));
+    } finally {
+      serverChannels.shutDown();
+    }
+  }
+
+  /// Only an eviction that closes a live connection is counted. An entry whose channel already closed (the server sent
+  /// a FIN as it shut down) or never connected is dropped all the same, so the next request opens a fresh channel, but
+  /// a graceful rolling restart must not look like a wave of stale connections.
+  @Test
+  public void testEvictingEntryWithoutLiveChannelIsNotCounted()
+      throws Exception {
+    ServerChannels serverChannels =
+        new ServerChannels(mock(QueryRouter.class), null, null, ThreadAccountantUtils.getNoOpAccountant());
+    try (StalledServer server = new StalledServer()) {
+      long evictionsBefore = meterCount(BrokerMeter.NETTY_CONNECTION_CHANNEL_EVICTIONS);
+
+      ServerRoutingInstance neverConnected =
+          new ServerRoutingInstance("localhost", server.getPort(), TableType.OFFLINE);
+      ServerChannels.ServerChannel neverConnectedEntry = serverChannels.getOrCreateServerChannel(neverConnected);
+      assertFalse(serverChannels.evictChannel(neverConnected));
+      assertNotSame(serverChannels.getOrCreateServerChannel(neverConnected), neverConnectedEntry,
+          "The entry is dropped even though it is not counted");
+
+      ServerRoutingInstance closed = new ServerRoutingInstance("localhost", server.getPort(), TableType.REALTIME);
+      ServerChannels.ServerChannel closedEntry = serverChannels.getOrCreateServerChannel(closed);
+      serverChannels.connect(closed);
+      Channel closedChannel = closedEntry._channel;
+      closedChannel.close().sync();
+      assertFalse(serverChannels.evictChannel(closed));
+      assertNotSame(serverChannels.getOrCreateServerChannel(closed), closedEntry,
+          "The entry is dropped even though it is not counted");
+
+      assertEquals(meterCount(BrokerMeter.NETTY_CONNECTION_CHANNEL_EVICTIONS), evictionsBefore);
     } finally {
       serverChannels.shutDown();
     }

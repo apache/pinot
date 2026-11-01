@@ -331,11 +331,12 @@ public class QueryRouter {
   }
 
   /// Closes and forgets every cached channel to the given server: both table types, over TLS and plaintext. Returns
-  /// the number of channels evicted.
+  /// the number of live connections closed (see [ServerChannels#evictChannel]).
   ///
   /// Called through `BrokerRequestHandler#onServerEnabled` when the routing manager enables a server, which is how a
   /// restart shows up through Helix, and through `BrokerRequestHandler#onServerRemoved` when a server leaves the
-  /// cluster. See [ServerChannels#evictChannel] for why the cached channel cannot be trusted at that point.
+  /// cluster or moves to another address (with the instance at its previous address). See
+  /// [ServerChannels#evictChannel] for why the cached channel cannot be trusted at that point.
   public int evictChannels(ServerInstance serverInstance) {
     int numEvicted = 0;
     for (TableType tableType : TableType.values()) {
