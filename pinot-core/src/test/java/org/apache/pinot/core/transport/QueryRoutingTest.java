@@ -39,6 +39,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
@@ -109,6 +110,58 @@ public class QueryRoutingTest {
       }
     } finally {
       clearTestFixtures();
+    }
+  }
+
+  @Test
+  public void testMultipleInFlightQueriesOnDeserializationError()
+      throws Exception {
+    SettableFuture<byte[]> responseFuture = SettableFuture.create();
+    CountDownLatch queriesReceivedLatch = new CountDownLatch(2);
+    _queryServer = QueryServerTestUtils.newQueryServer(invocation -> {
+      queriesReceivedLatch.countDown();
+      return responseFuture;
+    });
+    initializeTestFixtures(QueryServerTestUtils.startAndGetPort(_queryServer));
+
+    QueryRouter queryRouter = newIsolatedQueryRouter();
+    try {
+      long timeoutMs = 10_000L;
+      long startTimeMs = System.currentTimeMillis();
+      AsyncQueryResponse response1 =
+          queryRouter.submitQuery(123L, "testTable", BROKER_REQUEST, _routingTable, null, null, timeoutMs);
+      AsyncQueryResponse response2 =
+          queryRouter.submitQuery(124L, "testTable", BROKER_REQUEST, _routingTable, null, null, timeoutMs);
+
+      assertTrue(queriesReceivedLatch.await(5, TimeUnit.SECONDS), "Both queries should have reached the server");
+
+      responseFuture.set(new byte[0]);
+
+      Map<ServerRoutingInstance, ServerResponse> responses1 = response1.getFinalResponses();
+      Map<ServerRoutingInstance, ServerResponse> responses2 = response2.getFinalResponses();
+      long elapsed = System.currentTimeMillis() - startTimeMs;
+
+      assertTrue(elapsed < timeoutMs, "Expected immediate completion before timeout, elapsed=" + elapsed);
+
+      assertEquals(response1.getStatus(), QueryResponse.Status.COMPLETED);
+      assertNull(response1.getException());
+      assertEquals(response1.getFailedServer(), _offlineServerRoutingInstance);
+      ServerResponse serverResponse1 = responses1.get(_offlineServerRoutingInstance);
+      assertNotNull(serverResponse1);
+      assertNotNull(serverResponse1.getDataTable());
+      assertTrue(serverResponse1.getDataTable().getExceptions()
+          .containsKey(QueryErrorCode.DESERIALIZATION_ERROR.getId()));
+
+      assertEquals(response2.getStatus(), QueryResponse.Status.COMPLETED);
+      assertNull(response2.getException());
+      assertEquals(response2.getFailedServer(), _offlineServerRoutingInstance);
+      ServerResponse serverResponse2 = responses2.get(_offlineServerRoutingInstance);
+      assertNotNull(serverResponse2);
+      assertNotNull(serverResponse2.getDataTable());
+      assertTrue(serverResponse2.getDataTable().getExceptions()
+          .containsKey(QueryErrorCode.DESERIALIZATION_ERROR.getId()));
+    } finally {
+      queryRouter.shutDown();
     }
   }
 

@@ -47,8 +47,9 @@ public class AsyncQueryResponse implements QueryResponse {
   private final long _timeoutMs;
   private final ServerRoutingStatsManager _serverRoutingStatsManager;
   private final boolean _skipUnavailableServers;
-  // Servers whose latch slot has already been released via a down-path (skipServerResponse or markServerUnavailable).
-  // A server can be reported down more than once for the same query
+  // Tracks servers whose latch slot has already been released (via receiveDataTable, receiveDeserializationError,
+  // skipServerResponse, or markServerUnavailable) ensuring each server's slot is counted down at most once for this
+  // query.
   private final Set<ServerRoutingInstance> _countedDownServers = ConcurrentHashMap.newKeySet();
 
   private volatile ServerRoutingInstance _failedServer;
@@ -184,7 +185,7 @@ public class AsyncQueryResponse implements QueryResponse {
     _responseMap.get(serverRoutingInstance).markRequestSent(requestSentLatencyMs);
   }
 
-  // Issue #18866: Handle server DataTable deserialization errors without waiting for query timeout
+  // Handle server DataTable deserialization errors without waiting for query timeout
   void receiveDeserializationError(ServerRoutingInstance serverRoutingInstance, Exception exception,
       int responseSize, int deserializationTimeMs) {
     if (!shouldActOnServerDown(serverRoutingInstance)) {
@@ -206,6 +207,9 @@ public class AsyncQueryResponse implements QueryResponse {
 
   void receiveDataTable(ServerRoutingInstance serverRoutingInstance, DataTable dataTable, int responseSize,
       int deserializationTimeMs) {
+    if (!_countedDownServers.add(serverRoutingInstance)) {
+      return;
+    }
     ServerResponse response = _responseMap.get(serverRoutingInstance);
     response.receiveDataTable(dataTable, responseSize, deserializationTimeMs);
 

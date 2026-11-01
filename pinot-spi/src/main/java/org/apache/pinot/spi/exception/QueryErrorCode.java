@@ -57,7 +57,7 @@ public enum QueryErrorCode {
   SERVER_NOT_RESPONDING(427, "ServerNotResponding", Response.Status.SERVICE_UNAVAILABLE),
   TOO_MANY_REQUESTS(429, "TooManyRequests", Response.Status.TOO_MANY_REQUESTS),
   WORKLOAD_BUDGET_EXCEEDED(430, "WorkloadBudgetExceededError", Response.Status.TOO_MANY_REQUESTS),
-  // Issue #18866: Distinguish DataTable deserialization failures from generic internal errors or timeouts
+  // Distinguish DataTable deserialization failures from generic internal errors or timeouts
   DESERIALIZATION_ERROR(435, "DeserializationError", Response.Status.INTERNAL_SERVER_ERROR),
   INTERNAL(450, "InternalError", Response.Status.INTERNAL_SERVER_ERROR),
   MERGE_RESPONSE(500, "MergeResponseError", Response.Status.INTERNAL_SERVER_ERROR),

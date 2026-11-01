@@ -20,6 +20,7 @@ package org.apache.pinot.core.transport;
 
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.exception.QueryCancelledException;
@@ -177,5 +178,42 @@ public class AsyncQueryResponseTest {
     assertEquals(response.getStatus(), QueryResponse.Status.TIMED_OUT);
     assertNull(response.getException());
     assertEquals(response.getFailedServer(), SERVER_1);
+  }
+
+  @Test
+  public void testReceiveDeserializationErrorThenReceiveDataTableIsIdempotent()
+      throws Exception {
+    AsyncQueryResponse response = newResponse(Set.of(SERVER_1, SERVER_2), 500L, true);
+
+    response.receiveDeserializationError(SERVER_1, new RuntimeException("bad"), 0, 0);
+    response.receiveDataTable(SERVER_1, mock(DataTable.class), 100, 5);
+
+    Map<ServerRoutingInstance, ServerResponse> responses = response.getFinalResponses();
+    assertEquals(responses.size(), 2);
+    assertEquals(response.getStatus(), QueryResponse.Status.TIMED_OUT);
+    assertNull(response.getException());
+    assertEquals(response.getFailedServer(), SERVER_1);
+
+    ServerResponse serverResponse = responses.get(SERVER_1);
+    assertNotNull(serverResponse);
+    assertNotNull(serverResponse.getDataTable());
+    assertTrue(serverResponse.getDataTable().getExceptions()
+        .containsKey(QueryErrorCode.DESERIALIZATION_ERROR.getId()));
+  }
+
+  @Test
+  public void testReceiveDataTableThenReceiveDeserializationErrorIsIdempotent()
+      throws Exception {
+    AsyncQueryResponse response = newResponse(Set.of(SERVER_1, SERVER_2), 500L, true);
+
+    DataTable dataTable = mock(DataTable.class);
+    response.receiveDataTable(SERVER_1, dataTable, 100, 5);
+    response.receiveDeserializationError(SERVER_1, new RuntimeException("bad"), 0, 0);
+
+    Map<ServerRoutingInstance, ServerResponse> responses = response.getFinalResponses();
+    assertEquals(responses.size(), 2);
+    assertEquals(response.getStatus(), QueryResponse.Status.TIMED_OUT);
+    assertNull(response.getException());
+    assertEquals(responses.get(SERVER_1).getDataTable(), dataTable);
   }
 }

@@ -72,41 +72,44 @@ public class DataTableHandler extends SimpleChannelInboundHandler<ByteBuf> {
     int responseSize = msg.readableBytes();
     _brokerMetrics.addMeteredGlobalValue(BrokerMeter.NETTY_CONNECTION_BYTES_RECEIVED, responseSize);
     long deserializationStartTimeMs = System.currentTimeMillis();
+    ThreadResourceSnapshot resourceSnapshot = new ThreadResourceSnapshot();
+    DataTable dataTable;
     try {
-      ThreadResourceSnapshot resourceSnapshot = new ThreadResourceSnapshot();
-      DataTable dataTable = DataTableFactory.getDataTable(msg.nioBuffer());
-      _queryRouter.receiveDataTable(_serverRoutingInstance, dataTable, responseSize,
-          (int) (System.currentTimeMillis() - deserializationStartTimeMs));
-      long cpuTimeNs = resourceSnapshot.getCpuTimeNs();
-      long allocatedBytes = resourceSnapshot.getAllocatedBytes();
-      // QUERY scope - keyed by query id
-      Map<String, String> metadata = dataTable.getMetadata();
-      String queryId = metadata.get(DataTable.MetadataKey.QUERY_ID.getName());
-      // NOTE: Fallback to REQUEST_ID for backwards compatibility. When query id is explicitly provided, and is
-      //       different from request id, this resource usage won't be tracked.
-      if (queryId == null) {
-        queryId = metadata.get(DataTable.MetadataKey.REQUEST_ID.getName());
-      }
-      _threadAccountant.updateUntrackedResourceUsage(queryId, cpuTimeNs, allocatedBytes, TrackingScope.QUERY);
-      // WORKLOAD scope - keyed by workload name
-      // Use default workload name if not present
-      String workloadName = metadata.getOrDefault(DataTable.MetadataKey.WORKLOAD_NAME.getName(),
-          CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME);
-      _threadAccountant.updateUntrackedResourceUsage(workloadName, cpuTimeNs, allocatedBytes, TrackingScope.WORKLOAD);
+      dataTable = DataTableFactory.getDataTable(msg.nioBuffer());
     } catch (Exception e) {
       LOGGER.error("Caught exception while deserializing data table of size: {} from server: {}", responseSize,
           _serverRoutingInstance, e);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.DATA_TABLE_DESERIALIZATION_EXCEPTIONS, 1);
-      // A deserialization parse failure on malformed/corrupted response bytes may leave framing desynchronized or
-      // indicate a protocol mismatch, so closing the channel is necessary to reset the connection and prevent
-      // subsequent queries on this pooled connection from reading corrupted frames.
+      // Closing the channel is necessary because broadcasting the deserialization error releases the latch slots of
+      // all in-flight queries on this server channel, preventing future responses on this connection from interfering
+      // with those queries or subsequent requests.
       try {
         _queryRouter.markServerDeserializationError(_serverRoutingInstance, e, responseSize,
             (int) (System.currentTimeMillis() - deserializationStartTimeMs));
       } finally {
         ctx.close();
       }
+      return;
     }
+
+    _queryRouter.receiveDataTable(_serverRoutingInstance, dataTable, responseSize,
+        (int) (System.currentTimeMillis() - deserializationStartTimeMs));
+    long cpuTimeNs = resourceSnapshot.getCpuTimeNs();
+    long allocatedBytes = resourceSnapshot.getAllocatedBytes();
+    // QUERY scope - keyed by query id
+    Map<String, String> metadata = dataTable.getMetadata();
+    String queryId = metadata.get(DataTable.MetadataKey.QUERY_ID.getName());
+    // NOTE: Fallback to REQUEST_ID for backwards compatibility. When query id is explicitly provided, and is
+    //       different from request id, this resource usage won't be tracked.
+    if (queryId == null) {
+      queryId = metadata.get(DataTable.MetadataKey.REQUEST_ID.getName());
+    }
+    _threadAccountant.updateUntrackedResourceUsage(queryId, cpuTimeNs, allocatedBytes, TrackingScope.QUERY);
+    // WORKLOAD scope - keyed by workload name
+    // Use default workload name if not present
+    String workloadName = metadata.getOrDefault(DataTable.MetadataKey.WORKLOAD_NAME.getName(),
+        CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME);
+    _threadAccountant.updateUntrackedResourceUsage(workloadName, cpuTimeNs, allocatedBytes, TrackingScope.WORKLOAD);
   }
 
   @Override
@@ -117,8 +120,8 @@ public class DataTableHandler extends SimpleChannelInboundHandler<ByteBuf> {
      * No ctx.fireExceptionCaught() — this is the last handler in the pipeline.
      * Firing would only reach Netty's TailContext which logs a redundant warning.
      * Direct memory OOM from the upstream frame decoder is caught by DirectOOMHandler
-     * before it reaches here. This handles unhandled throwables like heap OOM where the upstream
-     * frame length was already consumed and framing remains intact, unlike parse failures in channelRead0.
+     * before it reaches here. Any OOM that arrives here is heap OOM from channelRead0()
+     * deserialization, which does not corrupt the channel's byte stream.
      */
   }
 }
