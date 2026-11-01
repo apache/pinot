@@ -92,23 +92,10 @@ import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
-/// End-to-end proof that a real controller and server record the failures of a stream source as timestamp gauges:
-/// AUTH when authentication or authorization fails, SOURCE_READ when reading fails otherwise. The server writes
-/// them per partition, the controller per table.
-///
-/// Every test starts its own embedded Kafka with a SASL/PLAIN listener and the standard authorizer, with a fresh
-/// super-user for setup and a fresh principal for Pinot, so breaking one test's broker or ACLs touches nothing another
-/// test uses. A table created with bad credentials is rejected and deleted, so each case first creates a table that
-/// consumes and then breaks it the way a source does. The credentials are random, fake and used only by this test. The
-/// test never logs them or puts them in an assertion message, though Pinot's own logs may print the stream config.
-///
-/// The server's delay tracker refreshes the latest offsets every 30 seconds and records SOURCE_READ only after 6
-/// failures in a row, so each SOURCE_READ case takes about 3.5 minutes.
 public class IngestionSourceErrorSaslKafkaIntegrationTest extends BaseClusterIntegrationTest {
   private static final String PLAIN_LOGIN_MODULE = "org.apache.kafka.common.security.plain.PlainLoginModule";
   private static final int PARTITION = 0;
   private static final long SERVER_AUTH_TIMEOUT_MS = 60_000L;
-  // 6 offset refreshes 30 s apart, each failing after its 5 s timeout, plus the wait for the first one
   private static final long DELAY_TRACKER_SOURCE_READ_TIMEOUT_MS = TimeUnit.MINUTES.toMillis(6);
   private static final int DELAY_TRACKER_FAILURES_TO_GIVE_UP = 6;
 
@@ -145,8 +132,6 @@ public class IngestionSourceErrorSaslKafkaIntegrationTest extends BaseClusterInt
     FileUtils.deleteDirectory(_tempDir);
   }
 
-  /// Starts a Kafka broker that serves only SASL/PLAIN on its client listener and authorizes every request, with a
-  /// super-user for the test's own setup and a principal for Pinot that starts with no ACLs.
   @BeforeMethod
   public void startSaslKafka() {
     String adminUser = "admin" + randomHex();
@@ -157,18 +142,14 @@ public class IngestionSourceErrorSaslKafkaIntegrationTest extends BaseClusterInt
     _pinotJaasConfig = jaasConfig(_pinotPrincipal, pinotPassword, "");
 
     Properties brokerProps = new Properties();
-    // The embedded cluster names its client listener EXTERNAL and its KRaft listener CONTROLLER
     brokerProps.setProperty("listener.security.protocol.map", "EXTERNAL:SASL_PLAINTEXT,CONTROLLER:PLAINTEXT");
     brokerProps.setProperty("sasl.enabled.mechanisms", "PLAIN");
     brokerProps.setProperty("sasl.mechanism.inter.broker.protocol", "PLAIN");
     brokerProps.setProperty("listener.name.external.plain.sasl.jaas.config", jaasConfig(adminUser, adminPassword,
         " user_" + adminUser + "=\"" + adminPassword + "\" user_" + _pinotPrincipal + "=\"" + pinotPassword + "\""));
     brokerProps.setProperty("authorizer.class.name", "org.apache.kafka.metadata.authorizer.StandardAuthorizer");
-    // ANONYMOUS is the broker itself on the plaintext KRaft listener
     brokerProps.setProperty("super.users", "User:" + adminUser + ";User:ANONYMOUS");
     brokerProps.setProperty("allow.everyone.if.no.acl.found", "false");
-    // As on managed Kafka. With auto-creation on, a missing topic reads as a topic authorization failure to a
-    // principal that may not create it.
     brokerProps.setProperty("auto.create.topics.enable", "false");
     _kafka = new EmbeddedKafkaCluster();
     _kafka.init(brokerProps);
@@ -193,8 +174,6 @@ public class IngestionSourceErrorSaslKafkaIntegrationTest extends BaseClusterInt
     stopKafkaBroker();
   }
 
-  /// Revoking the topic ACL: the server partition's AUTH gauge is set at the first refusal, and the controller table's
-  /// after a forced validation run. The consumer still gives up and stops consuming, as before.
   @Test
   public void testRevokedTopicAclSetsAuth()
       throws Exception {
@@ -220,8 +199,6 @@ public class IngestionSourceErrorSaslKafkaIntegrationTest extends BaseClusterInt
     }
   }
 
-  /// Deleting the topic: the controller's SOURCE_READ gauge is set through the Kafka plugin's evidence on "Topic does
-  /// not exist", and the server's through the delay tracker, since the consumer only sees empty fetches.
   @Test
   public void testDeletedTopicSetsSourceRead()
       throws Exception {
@@ -252,14 +229,6 @@ public class IngestionSourceErrorSaslKafkaIntegrationTest extends BaseClusterInt
     }
   }
 
-  /// Stopping the broker: Kafka's consumer answers with empty fetches, so the server's SOURCE_READ gauge comes from the
-  /// delay tracker. The controller's comes from its metadata fetch timing out.
-  ///
-  /// Each controller fetch attempt against the dead broker waits out its 15 s deadline, then closes Kafka's admin
-  /// client, which waits for its abandoned topic listings to time out: `default.api.timeout.ms`, shortened here from
-  /// 60 s (with `request.timeout.ms`, which it must not undercut). The controller half runs the segment status checker,
-  /// which reaches the metadata fetch once (3 attempts). A forced validation run reaches the same fetch but retries its
-  /// IdealState update 10 times, so it takes 10 times as long.
   @Test
   public void testStoppedBrokerSetsSourceRead()
       throws Exception {
@@ -286,8 +255,6 @@ public class IngestionSourceErrorSaslKafkaIntegrationTest extends BaseClusterInt
     }
   }
 
-  /// The real Confluent Avro decoder against a registry that starts refusing the decoder's credential: the partition's
-  /// AUTH gauge is set while every fetch from Kafka succeeds.
   @Test
   public void testSchemaRegistryRefusalSetsAuthWhileFetchesSucceed()
       throws Exception {
@@ -296,11 +263,9 @@ public class IngestionSourceErrorSaslKafkaIntegrationTest extends BaseClusterInt
     try (RegistryStub registry = new RegistryStub(200, schemaResponse())) {
       createConfluentAvroTable(tableName, registry);
       try {
-        // Working: schema 1 is served, and the client caches it
         produce(tableName, List.of(registryFramed(1, avroEvent(1)), registryFramed(1, avroEvent(2))));
         waitForCount(tableName, 2);
 
-        // The registry now refuses us; rows that need a new schema can no longer be decoded
         registry.answer(403, REGISTRY_DENIED);
         int requestsBeforeRefusal = registry.requests();
         long brokenAtSeconds = nowSeconds();
@@ -315,7 +280,6 @@ public class IngestionSourceErrorSaslKafkaIntegrationTest extends BaseClusterInt
         assertNull(ServerMetrics.get().getGaugeValue(
             serverGaugeName(ServerGauge.INGESTION_SOURCE_READ_FAILURE_TIME_SECONDS, tableNameWithType)));
 
-        // The controller never talks to the registry
         runRealtimeSegmentValidation();
         assertNoControllerGauges(tableNameWithType);
       } finally {
@@ -324,8 +288,6 @@ public class IngestionSourceErrorSaslKafkaIntegrationTest extends BaseClusterInt
     }
   }
 
-  /// The same decoder and a registry that serves the schema, fed rows that won't parse: every bad row is dropped and
-  /// nothing is recorded, since the content is the producer's, not the source's verdict.
   @Test
   public void testUnparsableContentSetsNothing()
       throws Exception {
@@ -335,11 +297,8 @@ public class IngestionSourceErrorSaslKafkaIntegrationTest extends BaseClusterInt
       createConfluentAvroTable(tableName, registry);
       try {
         List<byte[]> payloads = new ArrayList<>();
-        // Not registry-framed
         payloads.add("not avro".getBytes(StandardCharsets.UTF_8));
-        // Registry-framed, but the bytes don't match the schema
         payloads.add(registryFramed(1, new byte[]{(byte) 0xff, (byte) 0xff, (byte) 0xff, (byte) 0xff, (byte) 0xff}));
-        // Valid rows after the bad ones prove the bad ones were consumed
         payloads.add(registryFramed(1, avroEvent(1)));
         payloads.add(registryFramed(1, avroEvent(2)));
         produce(tableName, payloads);
@@ -387,7 +346,6 @@ public class IngestionSourceErrorSaslKafkaIntegrationTest extends BaseClusterInt
       throws Exception {
     _kafkaAdmin.createTopics(List.of(new NewTopic(topic, 1, (short) 1))).all().get(30, TimeUnit.SECONDS);
     _kafkaAdmin.createAcls(pinotAcls(topic)).all().get(30, TimeUnit.SECONDS);
-    // Wait until Pinot's principal can see the topic
     Properties consumerProps = saslClientProps(_pinotJaasConfig);
     consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
     consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
@@ -493,7 +451,6 @@ public class IngestionSourceErrorSaslKafkaIntegrationTest extends BaseClusterInt
     }
   }
 
-  /// The consume loop never threw, and the delay tracker failed enough offset refreshes in a row to give up.
   private static void assertSetByDelayTrackerOnly(String tableNameWithType, String topic) {
     ServerMetrics serverMetrics = ServerMetrics.get();
     assertEquals(serverMetrics.getMeteredTableValue(tableNameWithType + "_" + topic,
@@ -532,7 +489,6 @@ public class IngestionSourceErrorSaslKafkaIntegrationTest extends BaseClusterInt
         controllerGaugeName(ControllerGauge.INGESTION_SOURCE_READ_FAILURE_TIME_SECONDS, tableNameWithType)));
   }
 
-  /// Waits for a timestamp gauge to record a failure at or after `sinceSeconds`.
   private static void waitForGaugeSince(AbstractMetrics<?, ?, ?, ?> metrics, String gaugeName, long sinceSeconds,
       long timeoutMs) {
     TestUtils.waitForCondition(aVoid -> {
@@ -608,12 +564,10 @@ public class IngestionSourceErrorSaslKafkaIntegrationTest extends BaseClusterInt
     return out.toByteArray();
   }
 
-  /// The schema registry wire format: magic byte 0, the schema id, then the Avro body.
   private static byte[] registryFramed(int schemaId, byte[] body) {
     return ByteBuffer.allocate(5 + body.length).put((byte) 0).putInt(schemaId).put(body).array();
   }
 
-  /// A schema registry that answers every request with one status and body, which the test can change.
   private static final class RegistryStub implements AutoCloseable {
     private final HttpServer _server;
     private final AtomicInteger _requests = new AtomicInteger();

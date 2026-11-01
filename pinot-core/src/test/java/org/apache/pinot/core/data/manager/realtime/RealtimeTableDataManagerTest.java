@@ -126,7 +126,6 @@ public class RealtimeTableDataManagerTest {
 
       table.shutDown();
       assertNull(metrics.getGaugeValue(authGauge));
-      // A consumer thread that outlives the shutdown writes nothing back
       recorder.record("fetch", new RefusedBySourceException(), false, "topic", List.of(3));
       assertNull(metrics.getGaugeValue(authGauge));
     } finally {

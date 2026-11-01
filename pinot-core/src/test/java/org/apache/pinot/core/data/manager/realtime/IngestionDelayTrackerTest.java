@@ -526,7 +526,6 @@ public class IngestionDelayTrackerTest {
         + REALTIME_TABLE_NAME + ".0";
     IngestionSourceErrorRule refusal = RefusedBySourceException.RULE;
     IngestionSourceErrorClassifier.registerRule(refusal);
-    // Not ready to serve queries, so the tracker's own schedule never refreshes concurrently with the test
     MockIngestionDelayTracker tracker =
         new MockIngestionDelayTracker(serverMetrics, REALTIME_TABLE_NAME, REALTIME_TABLE_DATA_MANAGER, 1000, 1000,
             () -> false);
@@ -537,7 +536,6 @@ public class IngestionDelayTrackerTest {
       Set<Integer> partitionsHosted = Set.of(0);
       RuntimeException unreachable = new RuntimeException(new ConnectException("Connection refused"));
 
-      // An unreachable stream is recorded only after six refreshes in a row fail; a success starts the count over.
       doThrow(unreachable).when(provider).fetchLatestStreamOffset(anySet(), anyLong());
       for (int i = 0; i < 5; i++) {
         tracker.updateLatestStreamOffset(partitionsHosted);
@@ -552,7 +550,6 @@ public class IngestionDelayTrackerTest {
       tracker.updateLatestStreamOffset(partitionsHosted);
       assertNotNull(serverMetrics.getGaugeValue(readGauge));
 
-      // A refusal is recorded at once.
       assertNull(serverMetrics.getGaugeValue(authGauge));
       doThrow(new RefusedBySourceException()).when(provider)
           .fetchLatestStreamOffset(anySet(), anyLong());

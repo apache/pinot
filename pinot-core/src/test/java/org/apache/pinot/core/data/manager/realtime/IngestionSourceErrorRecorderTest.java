@@ -73,7 +73,6 @@ public class IngestionSourceErrorRecorderTest {
       throws Exception {
     ServerMetrics metrics = spy(new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()));
     String authGauge = ServerGauge.INGESTION_SOURCE_AUTH_FAILURE_TIME_SECONDS.getGaugeName() + "." + TABLE + ".0";
-    // The old table's consumer thread stalls in the middle of its write
     CountDownLatch writing = new CountDownLatch(1);
     CountDownLatch resume = new CountDownLatch(1);
     doAnswer(invocation -> {
@@ -92,7 +91,6 @@ public class IngestionSourceErrorRecorderTest {
     Thread shutdown = new Thread(oldTable::close);
     shutdown.start();
 
-    // The table is deleted and recreated as soon as the old one's shutdown returns
     IngestionSourceErrorRecorder newTable = new IngestionSourceErrorRecorder(metrics, TABLE);
     shutdown.join(1_000);
     boolean newTableRecorded = !shutdown.isAlive();
@@ -108,15 +106,12 @@ public class IngestionSourceErrorRecorderTest {
     assertNotNull(metrics.getGaugeValue(authGauge), "The recreated table's record must survive the old shutdown");
   }
 
-  /// Every consumer thread of every table records through the same process: a failure in recording itself, on many
-  /// threads at once, must never reach the consume loop, and is logged at WARN once per interval for the process.
   @Test(timeOut = 30_000)
   public void concurrentRecordingFailuresNeverEscapeAndWarnOnce()
       throws Exception {
     ServerMetrics metrics = spy(new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()));
     doThrow(new IllegalStateException("metrics registry closed")).when(metrics)
         .setValueOfPartitionGauge(anyString(), anyInt(), any(ServerGauge.class), anyLong());
-    // As in a fresh process: another test class in this JVM may have logged a recording failure within the interval
     IngestionSourceErrorRecorder.LAST_RECORDING_FAILURE_LOG_MS.set(0);
     WarnCapture warnings = WarnCapture.attachTo(IngestionSourceErrorRecorder.class.getName());
     int numThreads = 8;
@@ -141,7 +136,6 @@ public class IngestionSourceErrorRecorderTest {
     assertEquals(warnings.messagesStartingWith("Failed to record an ingestion source failure").size(), 1);
   }
 
-  /// Captures the WARN lines of one logger
   private static final class WarnCapture extends AbstractAppender {
     private final List<String> _messages = new CopyOnWriteArrayList<>();
     private final Logger _logger;
@@ -162,8 +156,6 @@ public class IngestionSourceErrorRecorderTest {
     void detach() {
       _logger.removeAppender(this);
       stop();
-      // Attaching registered a LoggerConfig for a logger log4j2.xml doesn't declare: remove it, since test classes
-      // share this JVM
       LoggerContext context = _logger.getContext();
       context.getConfiguration().removeLogger(_logger.getName());
       context.updateLoggers();

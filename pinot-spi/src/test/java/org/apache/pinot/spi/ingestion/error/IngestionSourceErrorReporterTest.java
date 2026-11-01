@@ -41,13 +41,11 @@ public class IngestionSourceErrorReporterTest {
       try (IngestionSourceErrorReporter.Scope nested = IngestionSourceErrorReporter.listen(inner::add)) {
         IngestionSourceErrorReporter.report(second);
       }
-      // Another thread's report never reaches this site.
       Thread other = new Thread(() -> IngestionSourceErrorReporter.report(new RuntimeException("other thread")));
       other.start();
       other.join();
       IngestionSourceErrorReporter.report(third);
     }
-    // Once the site's call returns, a report goes nowhere.
     IngestionSourceErrorReporter.report(new RuntimeException("after"));
     assertEquals(outer, List.of(first, third));
     assertEquals(inner, List.of(second));

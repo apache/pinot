@@ -436,8 +436,6 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
     }
 
     if (topicMissing) {
-      // The broker's metadata lacks the topic: record that, which the synthesized exception doesn't say, and keep the
-      // last failure seen while retrying.
       RuntimeException topicDoesNotExist = new RuntimeException("Topic does not exist: " + _topic);
       if (lastError != null) {
         topicDoesNotExist.addSuppressed(lastError);
@@ -454,7 +452,6 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
       }
     }
 
-    // Keep the last failure: on its own the message says nothing about the source
     throw new TransientConsumerException(
         new RuntimeException("Failed to fetch partition information for topic: " + _topic, lastError));
   }
@@ -493,7 +490,6 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
     } catch (ExecutionException e) {
       throw new TransientConsumerException(e);
     } catch (java.util.concurrent.TimeoutException e) {
-      // The broker never answered the listing in time; on its own this cause says nothing about the source.
       throw IngestionSourceErrorEvidence.attach(new TransientConsumerException(e),
           KafkaSourceErrorEvidence.BROKER_UNREACHABLE);
     }

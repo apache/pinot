@@ -26,7 +26,6 @@ import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.utils.retry.RetryPolicy;
 
 
-/// Runs the Kafka source error evidence tests against the kafka-clients 4.x plugin and a containerized broker.
 public class Kafka40SourceErrorEvidenceTest extends BaseKafkaSourceErrorEvidenceTest {
   private static final String CLIENT_ID = "clientId";
 

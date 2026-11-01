@@ -297,7 +297,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   @Override
   protected void doShutdown() {
-    // Stop recording source failures first: consumer threads can outlive the shutdown.
     _ingestionSourceErrorRecorder.close();
     // Make sure we do metric cleanup when we shut down the table.
     // Do this first, so we do not show ingestion lag during shutdown.
@@ -329,7 +328,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     }
   }
 
-  /// Records the stream source failures this table's consumers and its ingestion delay tracker see.
   public IngestionSourceErrorRecorder getIngestionSourceErrorRecorder() {
     return _ingestionSourceErrorRecorder;
   }

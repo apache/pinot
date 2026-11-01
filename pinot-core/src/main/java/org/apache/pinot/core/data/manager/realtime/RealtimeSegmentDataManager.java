@@ -321,7 +321,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final TransformPipeline _transformPipeline;
   private PartitionGroupConsumer _partitionGroupConsumer = null;
   private final IngestionSourceErrorRecorder _sourceErrors;
-  // Failures the stream plugin swallows on purpose during a fetch, a checkpoint or consumer creation, and reports
   private final Consumer<Throwable> _reportedFetchErrors;
   private final Consumer<Throwable> _reportedCheckpointErrors;
   private final Consumer<Throwable> _reportedCreateErrors;
@@ -461,7 +460,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private void handleTransientStreamErrors(Exception e)
       throws Exception {
     _consecutiveErrorCount++;
-    // A refusal is recorded on sight: an auth failure interleaved with empty fetches never reaches the give-up below.
     recordSourceError("fetch", e, _consecutiveErrorCount > MAX_CONSECUTIVE_ERROR_COUNT);
     _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);
     _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS,
@@ -674,7 +672,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       StreamPartitionMsgOffset nextOffset = metadata.getNextOffset();
       int rowSizeInBytes = metadata.getRecordSerializedSize();
       if (decodedRow.getException() != null) {
-        // A failed schema-registry lookup drops the row, so every failed row is classified and written at once.
         recordSourceError("decode", decodedRow.getException(), true);
         String errorMessage = "Stopping consumption due to decode error at offset: " + offset;
         if (_stopOnDecodeError) {
@@ -1992,7 +1989,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
     _segmentLogger = LoggerFactory.getLogger(RealtimeSegmentDataManager.class.getName() + "_" + _segmentNameStr);
     _tableStreamName = _tableNameWithType + "_" + streamTopic;
-    // The table data manager owns the recorder; one that has none (a test double) gets a local one
     IngestionSourceErrorRecorder sourceErrors = realtimeTableDataManager.getIngestionSourceErrorRecorder();
     _sourceErrors = sourceErrors != null ? sourceErrors : new IngestionSourceErrorRecorder(serverMetrics,
         _tableNameWithType);
@@ -2074,9 +2070,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         }
       });
     } catch (Exception e) {
-      // Classified by the last attempt's failure, which the retry policy's own exception doesn't carry. It stays out
-      // of the segment error, which the server's debug API serves: a decoder's exception can quote stream config
-      // values.
       Exception lastFailure = lastDecoderInitFailure.get();
       recordSourceError("decoder_init", lastFailure != null ? lastFailure : e, true);
       _realtimeTableDataManager.addSegmentError(_segmentNameStr,
@@ -2313,8 +2306,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
-  /// Checkpoints the stream consumer at the current offset. A source that can't take the checkpoint is a source
-  /// failure Pinot gives up on, and so is one the plugin reports while it checkpoints.
   private StreamPartitionMsgOffset checkpoint() {
     try (IngestionSourceErrorReporter.Scope ignored = IngestionSourceErrorReporter.listen(_reportedCheckpointErrors)) {
       return _partitionGroupConsumer.checkpoint(_currentOffset);
@@ -2325,7 +2316,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   }
 
   private void recordSourceError(String site, Throwable failure, boolean givingUp) {
-    // A failure while consumption is being stopped is usually the stop's own interrupt, not the source's
     if (_shouldStop) {
       return;
     }
@@ -2404,8 +2394,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       decoder.init(fieldsToRead, _streamConfig, _tableConfig, _schema);
       return decoder;
     } catch (Exception e) {
-      // Never put the stream config in the message: its values can hold credentials, and the exception reaches the
-      // segment error and logs.
       throw new RuntimeException("Caught exception while creating StreamMessageDecoder: " + decoderClass, e);
     }
   }

@@ -22,14 +22,10 @@ import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorEvidence;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorVerdict;
 
 
-/// The evidence the Kafka plugins attach to the exceptions they create for a source failure. These are templates:
-/// [IngestionSourceErrorEvidence#attach] copies them onto each failure.
 public final class KafkaSourceErrorEvidence {
-  /// The broker's metadata lacks the topic, which the synthesized "Topic does not exist" doesn't say.
   public static final IngestionSourceErrorEvidence TOPIC_MISSING = new IngestionSourceErrorEvidence()
       .setTarget(IngestionSourceErrorVerdict.TARGET_BROKER)
       .setEvidence(0, IngestionSourceErrorEvidence.UNKNOWN_TOPIC_OR_PARTITION);
-  /// The broker never answered in time.
   public static final IngestionSourceErrorEvidence BROKER_UNREACHABLE = new IngestionSourceErrorEvidence()
       .setTarget(IngestionSourceErrorVerdict.TARGET_BROKER)
       .setEvidence(0, IngestionSourceErrorEvidence.UNREACHABLE);

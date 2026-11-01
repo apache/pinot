@@ -36,7 +36,6 @@ public class StreamDataDecoderImpl implements StreamDataDecoder {
   public static final String HEADER_KEY_PREFIX = "__header$";
   public static final String METADATA_KEY_PREFIX = "__metadata$";
   public static final String RECORD_SERIALIZED_VALUE_SIZE_KEY = METADATA_KEY_PREFIX + "recordSerializedValueSize";
-  // A decoder that fails every row, e.g. on a schema registry that refuses us, must not log every row
   private static final long DECODE_ERROR_LOG_INTERVAL_MS = TimeUnit.MINUTES.toMillis(1);
 
   private final StreamMessageDecoder _valueDecoder;

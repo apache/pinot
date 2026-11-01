@@ -44,19 +44,13 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
 
-/// Pins that a Kafka plugin hands the classifier what it knows about a failure: the real cause behind a consumer it
-/// gave up recreating, the broker's answer behind a synthesized "topic does not exist" or a topic listing that timed
-/// out. Each Kafka module runs it against its own plugin, its kafka-clients version and a real broker.
 public abstract class BaseKafkaSourceErrorEvidenceTest {
   private static final String TOPIC = "events";
 
-  /// The module's partition consumer, built through the constructor that creates its Kafka consumer under a retry
-  /// policy, as the server does when it recreates a consumer.
   protected abstract PartitionGroupConsumer createConsumer(StreamConfig streamConfig, RetryPolicy retryPolicy);
 
   protected abstract StreamMetadataProvider createMetadataProvider(StreamConfig streamConfig);
 
-  /// Starts a single broker and returns its bootstrap servers.
   protected abstract String startBroker()
       throws Exception;
 
@@ -72,7 +66,6 @@ public abstract class BaseKafkaSourceErrorEvidenceTest {
       giveUp = expectThrows(RuntimeException.class,
           () -> createConsumer(streamConfig, RetryPolicies.noDelayRetryPolicy(2)));
     }
-    // Kafka's own messages can quote config values, and the thrown exception reaches the segment error
     assertTrue(giveUp.getCause() instanceof AttemptsExceededException, ExceptionUtils.getStackTrace(giveUp));
     assertNull(giveUp.getCause().getCause(), ExceptionUtils.getStackTrace(giveUp));
     assertEquals(reported.size(), 1);
@@ -97,10 +90,7 @@ public abstract class BaseKafkaSourceErrorEvidenceTest {
   @Test
   public void topicListingTimeoutIsUnreachable()
       throws Exception {
-    // The kernel completes the TCP handshake into the backlog, but nothing ever answers a Kafka request.
     ServerSocket silentBroker = new ServerSocket(0);
-    // Short client timeouts, and the broker gone before the provider closes: otherwise Kafka's admin client can wait
-    // indefinitely in close() for the listing it abandoned.
     StreamConfig streamConfig = streamConfig("localhost:" + silentBroker.getLocalPort(),
         Map.of("request.timeout.ms", "1000", "default.api.timeout.ms", "1000"));
     try (StreamMetadataProvider provider = createMetadataProvider(streamConfig)) {

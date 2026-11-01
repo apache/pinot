@@ -35,28 +35,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/// Records the stream source failures a realtime table's consumers and its ingestion delay tracker see: a timestamp
-/// gauge per partition and category, and a WARN line per write, rate-limited per category.
-///
-/// [IngestionSourceErrorCategory#AUTH] is written at every refusal, whether or not Pinot retries.
-/// [IngestionSourceErrorCategory#SOURCE_READ] is written only once Pinot gives up on the source, so a transient
-/// failure it recovers from writes nothing. The gauges record when a failure last happened: they are never cleared on
-/// success or when a partition stops consuming, only when the table data manager shuts down ([#close]).
-///
-/// Recording never throws, so it never changes consumption. The WARN line carries no exception message, which can
-/// hold principals, ARNs or account ids.
 public class IngestionSourceErrorRecorder {
   private static final Logger LOGGER = LoggerFactory.getLogger(IngestionSourceErrorRecorder.class);
   private static final long LOG_INTERVAL_MS = TimeUnit.MINUTES.toMillis(1);
-  // A failure in recording itself, such as a metrics registry that throws: logged from any consumer thread, at most
-  // once per interval for the process
   @VisibleForTesting
   static final AtomicLong LAST_RECORDING_FAILURE_LOG_MS = new AtomicLong();
 
   private final ServerMetrics _serverMetrics;
   private final String _tableNameWithType;
-  // Guarded by this: gauge writes and close() are serialized, so once close() returns nothing writes or removes a gauge
-  // of this table again, even for a table recreated under the same name
   private final Set<Integer> _partitionsWritten = new HashSet<>();
   private final Map<IngestionSourceErrorCategory, Long> _lastLoggedMs =
       new EnumMap<>(IngestionSourceErrorCategory.class);
@@ -67,11 +53,6 @@ public class IngestionSourceErrorRecorder {
     _tableNameWithType = tableNameWithType;
   }
 
-  /// Classifies a failure from the stream source of `topic` and records it for `partitionIds` if it is the source's
-  /// verdict and due to be written.
-  ///
-  /// @param site where Pinot saw the failure, for the log line
-  /// @param givingUp whether Pinot gives up on the source with this failure, rather than retrying it
   public void record(String site, Throwable failure, boolean givingUp, String topic,
       Collection<Integer> partitionIds) {
     if (partitionIds.isEmpty()) {
@@ -91,7 +72,6 @@ public class IngestionSourceErrorRecorder {
       long nowMs = System.currentTimeMillis();
       boolean logDue;
       synchronized (this) {
-        // A consumer thread can outlive the table's shutdown
         if (_closed) {
           return;
         }
@@ -119,7 +99,6 @@ public class IngestionSourceErrorRecorder {
     }
   }
 
-  /// Stops recording and removes the gauges of every partition written so far. Waits for a write in progress.
   public synchronized void close() {
     _closed = true;
     for (int partitionId : _partitionsWritten) {

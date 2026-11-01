@@ -68,13 +68,11 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
 
-/// The controller records a stream source failure it gives up on while fetching a table's stream metadata.
 public class PinotTableIdealStateBuilderSourceErrorTest {
   private static final IngestionSourceErrorRule REFUSED_RULE =
       (node, below, evidence) -> node instanceof RefusedException
           ? IngestionSourceErrorVerdict.auth("refused", null) : null;
 
-  /// A source's refusal. A registered rule recognises it, since the built-in rules need SDKs this module doesn't ship.
   private static class RefusedException extends RuntimeException {
     RefusedException() {
       super("refused");
@@ -92,7 +90,6 @@ public class PinotTableIdealStateBuilderSourceErrorTest {
 
   @AfterMethod
   public void forgetTablesWithSourceFailures() {
-    // The remembered tables are static: leave none for the next test class in this JVM
     PinotTableIdealStateBuilder.removeSourceFailureGaugesOfDeletedTables(table -> false, _controllerMetrics);
   }
 
@@ -112,7 +109,6 @@ public class PinotTableIdealStateBuilderSourceErrorTest {
     return streamConfig;
   }
 
-  /// Answers each topic's metadata fetch with `answer`.
   private static StreamConsumerFactory factory(Answer<List<PartitionGroupMetadata>> answer)
       throws Exception {
     StreamMetadataProvider provider = mock(StreamMetadataProvider.class);
@@ -189,7 +185,6 @@ public class PinotTableIdealStateBuilderSourceErrorTest {
       throws Exception {
     String deleted = "deletedDuringFetchTable_REALTIME";
     String live = "liveTable_REALTIME";
-    // The deletion removes the table's gauges while its fetch is still running, so the failure lands after it
     StreamConsumerFactory deletedThenRefused = factory(invocation -> {
       PinotTableIdealStateBuilder.removeSourceFailureGauges(deleted, _controllerMetrics);
       throw new RefusedException();
@@ -210,8 +205,6 @@ public class PinotTableIdealStateBuilderSourceErrorTest {
     }
     assertNotNull(gauge(ControllerGauge.INGESTION_SOURCE_AUTH_FAILURE_TIME_SECONDS, deleted));
 
-    // The checker runs on a controller that leads no table, as one whose last table was the deleted one. Only the live
-    // table's config still exists, though it can't be read.
     PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
     when(resourceManager.getAllTables()).thenReturn(List.of(live));
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
@@ -245,7 +238,6 @@ public class PinotTableIdealStateBuilderSourceErrorTest {
     sweep.start();
     assertTrue(sweepFoundTableGone.await(10, TimeUnit.SECONDS));
 
-    // The table is created again and records a failure while the sweep holds its decision that the table is gone
     Thread recreated = new Thread(() -> PinotTableIdealStateBuilder.recordSourceFailure(table, new RefusedException()));
     recreated.start();
     long deadlineMs = System.currentTimeMillis() + 10_000;
@@ -263,7 +255,6 @@ public class PinotTableIdealStateBuilderSourceErrorTest {
   public void failureThePluginSwallowsAndReportsIsRecorded()
       throws Exception {
     String table = "reportedTable_REALTIME";
-    // A plugin that answers a denied metadata call with no partitions, and reports the denial
     StreamConsumerFactory factory = factory(invocation -> {
       IngestionSourceErrorReporter.report(new RefusedException());
       return List.of();

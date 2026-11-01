@@ -120,8 +120,6 @@ public abstract class KafkaPartitionLevelConnectionHandler {
         }
       });
     } catch (AttemptsExceededException | RetriableOperationException e) {
-      // The retry policy gives up without the failures it retried. Report the last one to the site that called, which
-      // classifies it, but keep it out of the thrown exception: Kafka's own messages can quote config values.
       if (lastAttemptFailure.get() != null) {
         IngestionSourceErrorReporter.report(lastAttemptFailure.get());
       }

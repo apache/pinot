@@ -21,20 +21,12 @@ package org.apache.pinot.spi.ingestion.error;
 import java.util.function.Consumer;
 
 
-/// Lets a stream plugin report a source failure it swallows on purpose, such as a metadata call it answers with a
-/// partial result, so that the Pinot site that called the plugin can still classify it.
-///
-/// The site installs a listener around its call into the plugin with [#listen]. [#report] hands the failure to the
-/// listener installed on the calling thread, and does nothing when there is none, so a plugin reports from the thread
-/// Pinot called it on: a failure seen on a client's callback thread is handed back to that thread first. A reported
-/// failure counts as Pinot having given up on the source, so report only what the plugin won't retry itself.
 public final class IngestionSourceErrorReporter {
   private static final ThreadLocal<Consumer<Throwable>> LISTENER = new ThreadLocal<>();
 
   private IngestionSourceErrorReporter() {
   }
 
-  /// Reports a source failure the caller swallows. Never throws, apart from the JVM's own fatal errors.
   public static void report(Throwable failure) {
     Consumer<Throwable> listener = LISTENER.get();
     if (listener != null) {
@@ -46,7 +38,6 @@ public final class IngestionSourceErrorReporter {
     }
   }
 
-  /// Installs `listener` for the calling thread until the returned scope is closed, which restores the previous one.
   public static Scope listen(Consumer<Throwable> listener) {
     Consumer<Throwable> previous = LISTENER.get();
     LISTENER.set(listener);
@@ -59,7 +50,6 @@ public final class IngestionSourceErrorReporter {
     };
   }
 
-  /// A listener installed by [#listen].
   public interface Scope extends AutoCloseable {
     @Override
     void close();

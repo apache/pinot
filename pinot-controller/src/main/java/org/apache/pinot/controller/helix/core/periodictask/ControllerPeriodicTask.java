@@ -82,7 +82,6 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask impleme
     try {
       cleanupOnEveryRun();
     } catch (Exception e) {
-      // A failed cleanup must not stop the task's own work
       LOGGER.error("Caught exception while running cleanup of task: {}", _taskName, e);
       _controllerMetrics.addMeteredTableValue(_taskName, ControllerMeter.CONTROLLER_PERIODIC_TASK_ERROR, 1L);
     }
@@ -170,8 +169,6 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask impleme
   protected void postprocess() {
   }
 
-  /// Can be overridden to perform cleanups on every run of the task, whether or not the current controller leads any
-  /// table. A failure is logged and doesn't stop the run.
   protected void cleanupOnEveryRun() {
   }
 

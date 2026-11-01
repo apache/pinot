@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.spi.ingestion.error;
 
-/// A source's refusal, for tests of the sites that record classifications. [#RULE] recognises it once registered,
-/// since the built-in rules need SDKs those modules don't ship.
 public class RefusedBySourceException extends RuntimeException {
   public static final IngestionSourceErrorRule RULE =
       (node, below, evidence) -> node instanceof RefusedBySourceException

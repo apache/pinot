@@ -53,17 +53,12 @@ public class PinotTableIdealStateBuilder {
   }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotTableIdealStateBuilder.class);
-  // A failure in recording itself, such as a metrics registry that throws: logged from any thread, at most once a
-  // minute for the process
   private static final long RECORDING_FAILURE_LOG_INTERVAL_MS = TimeUnit.MINUTES.toMillis(1);
   private static final AtomicLong LAST_RECORDING_FAILURE_LOG_MS = new AtomicLong();
   private static final RetryPolicy DEFAULT_IDEALSTATE_UPDATE_RETRY_POLICY =
       RetryPolicies.randomDelayRetryPolicy(3, 100L, 200L);
-  // Source failure WARN lines already logged in the last minute, by table and category
   private static final Cache<String, Boolean> RECENT_SOURCE_FAILURE_LOGS =
       CacheBuilder.newBuilder().expireAfterWrite(1, TimeUnit.MINUTES).build();
-  // Tables this controller has written a source failure gauge for, so that one written after its table was deleted
-  // can be found and removed. A table's write and its removal are atomic with each other, through this map.
   private static final Map<String, Boolean> TABLES_WITH_SOURCE_FAILURES = new ConcurrentHashMap<>();
   private static final List<ControllerGauge> SOURCE_FAILURE_GAUGES =
       List.of(ControllerGauge.INGESTION_SOURCE_AUTH_FAILURE_TIME_SECONDS,
@@ -120,8 +115,6 @@ public class PinotTableIdealStateBuilder {
     PartitionGroupMetadataFetcher partitionGroupMetadataFetcher = new PartitionGroupMetadataFetcher(
         streamConfigs, partitionGroupConsumptionStatusList, pausedTopicIndices, forceGetOffsetFromStream);
     String tableNameWithType = streamConfigs.get(0).getTableNameWithType();
-    // Failures swallowed so that the fetch can proceed (a topic skipped as permanently failed, a plugin answering with
-    // a partial result) are reported as they happen
     try (IngestionSourceErrorReporter.Scope ignored = IngestionSourceErrorReporter.listen(
         failure -> recordSourceFailure(tableNameWithType, failure))) {
       DEFAULT_IDEALSTATE_UPDATE_RETRY_POLICY.attempt(partitionGroupMetadataFetcher);
@@ -139,19 +132,15 @@ public class PinotTableIdealStateBuilder {
     }
   }
 
-  /// Removes a table's source failure gauges.
   public static void removeSourceFailureGauges(String tableNameWithType, ControllerMetrics controllerMetrics) {
     for (ControllerGauge gauge : SOURCE_FAILURE_GAUGES) {
       controllerMetrics.removeTableGauge(tableNameWithType, gauge);
     }
   }
 
-  /// Removes the source failure gauges this controller wrote for tables that no longer exist. A metadata fetch still
-  /// running when its table is deleted, on this controller or another, writes its gauge after the deletion removed it.
   public static void removeSourceFailureGaugesOfDeletedTables(Predicate<String> tableExists,
       ControllerMetrics controllerMetrics) {
     for (String tableNameWithType : TABLES_WITH_SOURCE_FAILURES.keySet()) {
-      // Checked and removed atomically with the table's writes, so a table created again meanwhile keeps its gauge
       TABLES_WITH_SOURCE_FAILURES.computeIfPresent(tableNameWithType, (table, remembered) -> {
         if (tableExists.test(table)) {
           return remembered;
@@ -162,11 +151,6 @@ public class PinotTableIdealStateBuilder {
     }
   }
 
-  /// Records a stream source failure the metadata fetch gave up on (it exhausted its retries, a topic was skipped as
-  /// permanently failed, or the plugin reported a failure it swallows): the table's timestamp gauge for its category,
-  /// and a WARN line rate-limited per table and category. The gauges are never cleared on success;
-  /// [org.apache.pinot.controller.helix.SegmentStatusChecker] and table deletion remove them. Never throws, and the
-  /// line carries no exception message.
   @VisibleForTesting
   static void recordSourceFailure(String tableNameWithType, @Nullable Throwable failure) {
     if (failure == null) {

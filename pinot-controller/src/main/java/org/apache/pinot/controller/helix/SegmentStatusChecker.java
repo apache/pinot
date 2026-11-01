@@ -139,7 +139,6 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
 
   @Override
   protected void cleanupOnEveryRun() {
-    // Existence only: a config that exists but fails to read is still a live table
     PinotTableIdealStateBuilder.removeSourceFailureGaugesOfDeletedTables(
         tableNameWithType -> ZKMetadataProvider.isTableConfigExists(_pinotHelixResourceManager.getPropertyStore(),
             tableNameWithType), _controllerMetrics);
