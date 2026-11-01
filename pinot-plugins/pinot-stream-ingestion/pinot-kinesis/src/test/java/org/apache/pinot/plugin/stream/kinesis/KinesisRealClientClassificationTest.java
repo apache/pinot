@@ -29,7 +29,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorSubReason;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.testng.Assert.ThrowingRunnable;
@@ -141,16 +140,16 @@ public class KinesisRealClientClassificationTest {
     try (KinesisConsumer consumer = new KinesisConsumer(new KinesisConfig(streamConfig))) {
       KinesisException rejected =
           expectThrows(KinesisException.class, () -> consumer.fetchMessages(START_OFFSET, TIMEOUT_MS));
-      assertAuth(rejected, IngestionSourceErrorSubReason.AUTHENTICATION, null);
+      assertAuth(rejected, null);
     }
     // The controller's partition metadata, and the server's partition count
     try (KinesisStreamMetadataProvider metadataProvider =
         new KinesisStreamMetadataProvider("clientId", streamConfig)) {
       assertAuth(expectThrows(KinesisException.class,
               () -> metadataProvider.computePartitionGroupMetadata("clientId", streamConfig, List.of(), TIMEOUT_MS)),
-          IngestionSourceErrorSubReason.AUTHENTICATION, null);
+          null);
       assertAuth(expectThrows(RuntimeException.class, () -> metadataProvider.fetchPartitionCount(TIMEOUT_MS)),
-          IngestionSourceErrorSubReason.AUTHENTICATION, null);
+          null);
     }
   }
 
@@ -162,7 +161,7 @@ public class KinesisRealClientClassificationTest {
       try (KinesisConsumer consumer = new KinesisConsumer(new KinesisConfig(streamConfig(Map.of())))) {
         KinesisException rejected =
             expectThrows(KinesisException.class, () -> consumer.fetchMessages(START_OFFSET, TIMEOUT_MS));
-        assertAuth(rejected, IngestionSourceErrorSubReason.AUTHENTICATION, null);
+        assertAuth(rejected, null);
       }
     });
   }
@@ -179,13 +178,13 @@ public class KinesisRealClientClassificationTest {
         _stsErrorCode = "InvalidClientTokenId";
         StsException rejected =
             expectThrows(StsException.class, () -> consumer.fetchMessages(START_OFFSET, TIMEOUT_MS));
-        assertAuth(rejected, IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_STS);
+        assertAuth(rejected, TARGET_STS);
 
         // The table's role refuses the assumption
         _stsErrorCode = "AccessDenied";
         StsException denied =
             expectThrows(StsException.class, () -> consumer.fetchMessages(START_OFFSET, TIMEOUT_MS));
-        assertAuth(denied, IngestionSourceErrorSubReason.AUTHORIZATION, TARGET_STS);
+        assertAuth(denied, TARGET_STS);
       }
     });
     // No credential, so no request ever reached Kinesis

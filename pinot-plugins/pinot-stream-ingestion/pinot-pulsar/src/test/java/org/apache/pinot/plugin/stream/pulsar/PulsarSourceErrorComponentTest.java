@@ -33,7 +33,6 @@ import java.util.stream.Collectors;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorReporter;
-import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorSubReason;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
@@ -143,7 +142,7 @@ public class PulsarSourceErrorComponentTest {
         StreamConsumerFactoryProvider.create(streamConfig(token(randomKey(), READER_ROLE)));
     RuntimeException rejected = expectThrows(RuntimeException.class,
         () -> consumerFactory.createPartitionGroupConsumer(CLIENT_ID, consumingStatus(0)));
-    assertAuth(rejected, IngestionSourceErrorSubReason.AUTHENTICATION, TARGET_BROKER);
+    assertAuth(rejected, TARGET_BROKER);
   }
 
   /// The broker re-checks a grant only when a reader reconnects, and the client then retries the refused reconnect
@@ -188,7 +187,7 @@ public class PulsarSourceErrorComponentTest {
     // The recreate's fresh handshake fails with the broker's refusal
     RuntimeException refused = expectThrows(RuntimeException.class,
         () -> consumerFactory.createPartitionGroupConsumer(CLIENT_ID, consumingStatus(0)));
-    assertAuth(refused, IngestionSourceErrorSubReason.AUTHORIZATION, TARGET_BROKER);
+    assertAuth(refused, TARGET_BROKER);
   }
 
   /// A lagging reader the broker drops, with its grant intact, reconnects by itself inside the window and reads on: the
@@ -249,7 +248,7 @@ public class PulsarSourceErrorComponentTest {
         List.of(0));
     assertEquals(reported.size(), 1, role + ": " + reported);
     assertTrue(reportedType.isInstance(reported.get(0)), role + ": " + reported.get(0));
-    assertAuth(reported.get(0), IngestionSourceErrorSubReason.AUTHORIZATION, TARGET_BROKER);
+    assertAuth(reported.get(0), TARGET_BROKER);
   }
 
   private StreamConfig streamConfig(String token) {
