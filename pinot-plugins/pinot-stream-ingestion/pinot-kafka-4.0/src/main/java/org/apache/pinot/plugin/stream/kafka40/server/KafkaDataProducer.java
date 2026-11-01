@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.stream.kafka30.server;
+package org.apache.pinot.plugin.stream.kafka40.server;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -34,6 +34,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/// Kafka 4 producer adapter for local quickstarts and ingestion fixtures. Not thread-safe.
 public class KafkaDataProducer implements StreamDataProducer {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaDataProducer.class);

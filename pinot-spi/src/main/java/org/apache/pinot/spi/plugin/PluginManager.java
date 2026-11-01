@@ -97,14 +97,15 @@ public class PluginManager {
       put("org.apache.pinot.filesystem.LocalPinotFS", "org.apache.pinot.spi.filesystem.LocalPinotFS");
 
       // StreamConsumerFactory
-      // Old-style class names mapped to current plugin packages
-      // Rename the usage of kafka 2 to kafka 3
+      // Map every historical factory directly to the sole Kafka implementation; aliases are not chained.
       put("org.apache.pinot.core.realtime.impl.kafka2.KafkaConsumerFactory",
-          "org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory");
+          "org.apache.pinot.plugin.stream.kafka40.KafkaConsumerFactory");
       put("org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
-          "org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory");
+          "org.apache.pinot.plugin.stream.kafka40.KafkaConsumerFactory");
       put("org.apache.pinot.core.realtime.impl.kafka3.KafkaConsumerFactory",
-          "org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory");
+          "org.apache.pinot.plugin.stream.kafka40.KafkaConsumerFactory");
+      put("org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory",
+          "org.apache.pinot.plugin.stream.kafka40.KafkaConsumerFactory");
     }
   };
 
@@ -134,6 +135,9 @@ public class PluginManager {
 
   private final ClassWorld _classWorld;
   private final Map<Plugin, PluginClassLoader> _registry;
+  private final Map<String, String> _backwardCompatiblePluginNames = new HashMap<>(Map.of(
+      "pinot-kafka-2.0", "pinot-kafka-4.0",
+      "pinot-kafka-3.0", "pinot-kafka-4.0"));
 
   private String _pluginsDirectories;
   private String _pluginsInclude;
@@ -228,7 +232,8 @@ public class PluginManager {
           FileUtils.listFiles(new File(pluginsDirectory), new String[]{JAR_FILE_EXTENSION}, true);
       List<String> pluginsToLoad = null;
       if (!StringUtils.isEmpty(pluginsInclude)) {
-        pluginsToLoad = Arrays.asList(pluginsInclude.split(";"));
+        pluginsToLoad = Arrays.stream(pluginsInclude.split(";"))
+            .map(this::getBackwardCompatiblePluginName).collect(Collectors.toList());
         LOGGER.info("Potential plugins to load: [{}]", Arrays.toString(pluginsToLoad.toArray()));
       } else {
         LOGGER.info("Please use system property '{}' to customize plugins to load. Loading all plugins: {}",
@@ -386,12 +391,13 @@ public class PluginManager {
     // Backward compatible check.
     String name = loadClassWithBackwardCompatibleCheck(className);
 
-    Plugin plugin = new Plugin(pluginName);
+    String currentPluginName = getBackwardCompatiblePluginName(pluginName);
+    Plugin plugin = new Plugin(currentPluginName);
     if (_registry.containsKey(plugin)) {
       return _registry.get(plugin).loadClass(name, true);
     } else {
       try {
-        return _classWorld.getRealm(pluginName).loadClass(className);
+        return _classWorld.getRealm(currentPluginName).loadClass(name);
       } catch (NoSuchRealmException e) {
         throw new RuntimeException(e);
       }
@@ -457,12 +463,13 @@ public class PluginManager {
     Class<T> loadedClass;
     String name = loadClassWithBackwardCompatibleCheck(className);
 
-    Plugin plugin = new Plugin(pluginName);
+    String currentPluginName = getBackwardCompatiblePluginName(pluginName);
+    Plugin plugin = new Plugin(currentPluginName);
     if (_registry.containsKey(plugin)) {
       PluginClassLoader pluginClassLoader = _registry.get(plugin);
       loadedClass = (Class<T>) pluginClassLoader.loadClass(name, true);
     } else {
-      loadedClass = (Class<T>) Class.forName(name, true, _classWorld.getRealm(pluginName));
+      loadedClass = (Class<T>) Class.forName(name, true, _classWorld.getRealm(currentPluginName));
     }
     Constructor<?> constructor;
     constructor = loadedClass.getConstructor(argTypes);
@@ -523,6 +530,26 @@ public class PluginManager {
     }
     if (recordReaderConfigClass != null) {
       INPUT_FORMAT_TO_RECORD_READER_CONFIG_CLASS_NAME_MAP.put(inputFormat.toLowerCase(), recordReaderConfigClass);
+    }
+  }
+
+  private String getBackwardCompatiblePluginName(String pluginName) {
+    return _backwardCompatiblePluginNames.getOrDefault(pluginName, pluginName);
+  }
+
+  /// Registers a direct alias for a renamed plugin, including `plugins.include` and plugin-qualified class names.
+  /// Call during bootstrap, before creating plugin instances. If eager initialization already skipped the replacement
+  /// because only the old name was included, loads that replacement now. Repeated registration is harmless.
+  public synchronized void registerBackwardCompatiblePluginName(String oldPluginName, String newPluginName) {
+    String previousName = _backwardCompatiblePluginNames.put(oldPluginName, newPluginName);
+    if (newPluginName.equals(previousName) || StringUtils.isEmpty(_pluginsDirectories)
+        || StringUtils.isEmpty(_pluginsInclude) || !Arrays.asList(_pluginsInclude.split(";")).contains(oldPluginName)
+        || _registry.containsKey(new Plugin(newPluginName)) || _classWorld.getClassRealm(newPluginName) != null) {
+      return;
+    }
+    File pluginDirectory = getPluginsToLoad(_pluginsDirectories, oldPluginName).get(newPluginName);
+    if (pluginDirectory != null) {
+      load(newPluginName, pluginDirectory);
     }
   }
 

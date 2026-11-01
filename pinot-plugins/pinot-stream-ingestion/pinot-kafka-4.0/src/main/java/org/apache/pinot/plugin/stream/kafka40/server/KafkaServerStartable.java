@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.stream.kafka30.server;
+package org.apache.pinot.plugin.stream.kafka40.server;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -39,14 +39,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/// Kafka 3.x implementation of [StreamDataServerStartable].
+/// Kafka 4.x implementation of [StreamDataServerStartable].
 ///
 /// This class can either connect to an external broker or start a managed single-node KRaft
 /// container for local quickstart usage. It is not thread-safe.
 public class KafkaServerStartable implements StreamDataServerStartable {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaServerStartable.class);
 
-  private static final String KAFKA_IMAGE = "apache/kafka:3.9.1";
+  private static final String KAFKA_IMAGE = "apache/kafka:4.2.0";
   private static final int KAFKA_STARTUP_TIMEOUT_SECONDS = 60;
 
   private static final int DEFAULT_BROKER_ID = 0;

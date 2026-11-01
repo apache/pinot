@@ -16,20 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.stream.kafka30.server;
+package org.apache.pinot.plugin.stream.kafka40.server;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
-import kafka.testkit.KafkaClusterTestKit;
-import kafka.testkit.TestKitNodes;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.NewPartitions;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.admin.RecordsToDelete;
 import org.apache.kafka.common.TopicPartition;
-import org.apache.kafka.server.common.MetadataVersion;
+import org.apache.kafka.common.test.KafkaClusterTestKit;
+import org.apache.kafka.common.test.TestKitNodes;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,7 +70,6 @@ public class EmbeddedKafkaCluster implements StreamDataServerStartable {
           .setNumBrokerNodes(_brokerCount)
           .setNumControllerNodes(1)
           .setPerServerProperties(Map.of())
-          .setBootstrapMetadataVersion(MetadataVersion.latestProduction())
           .build();
 
       KafkaClusterTestKit.Builder builder = new KafkaClusterTestKit.Builder(nodes)

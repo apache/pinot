@@ -32,6 +32,7 @@ import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import org.apache.kafka.clients.consumer.Consumer;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.producer.KafkaProducer;
@@ -339,6 +340,42 @@ public class KafkaPartitionLevelConsumerTest {
     int partition = 0;
     KafkaPartitionLevelConsumer kafkaSimpleStreamConsumer = createConsumer(clientId, streamConfig, partition);
     kafkaSimpleStreamConsumer.fetchMessages(new LongMsgOffset(12345L), 10000);
+  }
+
+  @Test
+  public void testLegacyFactoriesResumeFromSavedOffset()
+      throws Exception {
+    Map<String, String> config = new HashMap<>(getStreamConfig(TEST_TOPIC_1).getStreamConfigsMap());
+    config.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "100");
+    StreamPartitionMsgOffset savedOffset = new LongMsgOffset(0);
+    long expectedOffset = 0;
+    for (String factoryName : new String[]{null,
+        "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
+        "org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory"}) {
+      if (factoryName == null) {
+        config.remove("stream.kafka.consumer.factory.class.name");
+      } else {
+        config.put("stream.kafka.consumer.factory.class.name", factoryName);
+      }
+      StreamConsumerFactory factory = StreamConsumerFactoryProvider.create(new StreamConfig("table_REALTIME", config));
+      assertEquals(factory.getClass(), KafkaConsumerFactory.class);
+      PartitionGroupConsumptionStatus status =
+          new PartitionGroupConsumptionStatus(0, 0, savedOffset, null, "CONSUMING");
+      try (PartitionGroupConsumer consumer = factory.createPartitionGroupConsumer("legacy-factory-test", status)) {
+        MessageBatch<?> batch = consumer.fetchMessages(savedOffset, 10000);
+        assertTrue(batch.getMessageCount() > 0);
+        assertTrue(batch.getMessageCount() <= 100);
+        assertEquals(batch.getFirstMessageOffset().toString(), savedOffset.toString());
+        for (int i = 0; i < batch.getMessageCount(); i++) {
+          StreamMessage<?> message = batch.getStreamMessage(i);
+          assertEquals(message.getMetadata().getOffset().toString(), Long.toString(expectedOffset));
+          assertEquals(new String((byte[]) message.getValue(), StandardCharsets.UTF_8), "sample_msg_" + expectedOffset);
+          expectedOffset++;
+        }
+        savedOffset = batch.getOffsetOfNextBatch();
+        assertEquals(savedOffset.toString(), Long.toString(expectedOffset));
+      }
+    }
   }
 
   @Test
