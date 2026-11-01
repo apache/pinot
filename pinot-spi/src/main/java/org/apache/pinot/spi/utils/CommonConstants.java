@@ -1546,6 +1546,11 @@ public class CommonConstants {
     public static final String DEFAULT_INSTANCE_BASE_DIR =
         FileUtils.getTempDirectoryPath() + File.separator + "PinotServer";
     public static final String DEFAULT_INSTANCE_DATA_DIR = DEFAULT_INSTANCE_BASE_DIR + File.separator + "index";
+    // Disable automatic creation to require a pre-existing data directory at server startup.
+    public static final String INSTANCE_DATA_DIR_CREATE_IF_MISSING = "dataDir.createIfMissing";
+    public static final String CONFIG_OF_INSTANCE_DATA_DIR_CREATE_IF_MISSING =
+        INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "." + INSTANCE_DATA_DIR_CREATE_IF_MISSING;
+    public static final boolean DEFAULT_INSTANCE_DATA_DIR_CREATE_IF_MISSING = true;
     public static final String CONSUMER_DIR = "consumerDir";
     public static final String CONFIG_OF_CONSUMER_DIR = INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "." + CONSUMER_DIR;
     public static final String INSTANCE_SEGMENT_TAR_DIR = "segmentTarDir";

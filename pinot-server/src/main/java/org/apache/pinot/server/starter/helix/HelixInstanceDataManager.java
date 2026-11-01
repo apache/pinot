@@ -74,6 +74,7 @@ import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.plugin.PluginManager;
+import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.ConsumingSegmentConsistencyModeListener;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -166,7 +167,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         ServerSegmentCompletionProtocolHandler.getSegmentUploadRequestTimeoutMs(), serverMetrics);
 
     File instanceDataDir = new File(_instanceDataManagerConfig.getInstanceDataDir());
-    initInstanceDataDir(instanceDataDir);
+    initInstanceDataDir(instanceDataDir, _instanceDataManagerConfig.shouldCreateInstanceDataDirIfMissing());
 
     File instanceSegmentTarDir = new File(_instanceDataManagerConfig.getInstanceSegmentTarDir());
     initInstanceSegmentTarDir(instanceSegmentTarDir);
@@ -204,8 +205,10 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @VisibleForTesting
-  void initInstanceDataDir(File instanceDataDir) {
+  void initInstanceDataDir(File instanceDataDir, boolean createIfMissing) {
     if (!instanceDataDir.exists()) {
+      Preconditions.checkState(createIfMissing, "Instance data dir does not exist: %s (%s=false)", instanceDataDir,
+          Server.CONFIG_OF_INSTANCE_DATA_DIR_CREATE_IF_MISSING);
       Preconditions.checkState(instanceDataDir.mkdirs(), "Failed to create instance data dir: %s", instanceDataDir);
     } else {
       // Clean up the _tmp (consuming segments) dir and empty table data dir

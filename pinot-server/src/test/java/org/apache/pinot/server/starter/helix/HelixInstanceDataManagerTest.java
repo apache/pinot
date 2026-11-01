@@ -20,8 +20,8 @@ package org.apache.pinot.server.starter.helix;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import org.apache.commons.io.FileUtils;
-import org.mockito.Mockito;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -30,6 +30,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 import static org.testng.Assert.fail;
 
 
@@ -41,11 +42,9 @@ public class HelixInstanceDataManagerTest {
 
   @BeforeClass
   public void setUp() {
-    _helixInstanceDataManager = Mockito.mock(HelixInstanceDataManager.class);
+    _helixInstanceDataManager = new HelixInstanceDataManager();
     _testInstanceDataDir = new File("testInstanceDataDir");
     _testInstanceSegmentTarDir = new File("testInstanceSegmentTarDir");
-    Mockito.doCallRealMethod().when(_helixInstanceDataManager).initInstanceDataDir(_testInstanceDataDir);
-    Mockito.doCallRealMethod().when(_helixInstanceDataManager).initInstanceSegmentTarDir(_testInstanceSegmentTarDir);
   }
 
   @AfterClass
@@ -60,9 +59,28 @@ public class HelixInstanceDataManagerTest {
       FileUtils.deleteQuietly(_testInstanceDataDir);
     }
 
-    _helixInstanceDataManager.initInstanceDataDir(_testInstanceDataDir);
+    _helixInstanceDataManager.initInstanceDataDir(_testInstanceDataDir, true);
 
     assertTrue(_testInstanceDataDir.exists(), "Instance data directory should be created.");
+  }
+
+  @Test
+  public void testInitInstanceDataDirRequiresExistingDirectoryWhenCreationDisabled()
+      throws IOException {
+    File tempDir = Files.createTempDirectory("pinot-data-dir-test").toFile();
+    File dataDir = new File(tempDir, "disk/data");
+    try {
+      IllegalStateException exception = expectThrows(IllegalStateException.class,
+          () -> _helixInstanceDataManager.initInstanceDataDir(dataDir, false));
+      assertTrue(exception.getMessage().contains(dataDir.toString()));
+      assertFalse(dataDir.getParentFile().exists(), "Missing data directory must not be created.");
+
+      assertTrue(dataDir.mkdirs(), "Failed to prepare data directory.");
+      _helixInstanceDataManager.initInstanceDataDir(dataDir, false);
+      assertTrue(dataDir.isDirectory());
+    } finally {
+      FileUtils.deleteDirectory(tempDir);
+    }
   }
 
   @Test
@@ -70,7 +88,7 @@ public class HelixInstanceDataManagerTest {
     File tableDir = new File(_testInstanceDataDir, "tableA_OFFLINE");
     assertTrue(tableDir.mkdirs(), "Failed to create temp directory.");
 
-    _helixInstanceDataManager.initInstanceDataDir(_testInstanceDataDir);
+    _helixInstanceDataManager.initInstanceDataDir(_testInstanceDataDir, true);
 
     assertFalse(tableDir.exists(), "Temporary directory should be deleted.");
   }
@@ -83,7 +101,7 @@ public class HelixInstanceDataManagerTest {
     _testInstanceDataDir.setWritable(false);
 
     try {
-      _helixInstanceDataManager.initInstanceDataDir(_testInstanceDataDir);
+      _helixInstanceDataManager.initInstanceDataDir(_testInstanceDataDir, true);
       fail("Expected IllegalStateException due to non-writable directory.");
     } catch (IllegalStateException e) {
       // Expected exception
