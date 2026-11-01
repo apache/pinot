@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -39,13 +40,14 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
+import org.apache.pinot.broker.broker.helix.BaseBrokerStarter;
 import org.apache.pinot.controller.BaseControllerStarter;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
-import org.apache.pinot.integration.tests.BaseClusterIntegrationTest;
 import org.apache.pinot.integration.tests.ClusterIntegrationTestUtils;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
+import org.apache.pinot.plugin.stream.kafka30.server.EmbeddedKafkaCluster;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -62,7 +64,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeSuite;
 
 
-public abstract class CustomDataQueryClusterIntegrationTest extends BaseClusterIntegrationTest {
+public abstract class CustomDataQueryClusterIntegrationTest extends CustomSuiteHealthCheckedIntegrationTest {
   protected static final Logger LOGGER = LoggerFactory.getLogger(CustomDataQueryClusterIntegrationTest.class);
   private static final int REALTIME_TABLE_CONFIG_RETRY_COUNT = 5;
   private static final long REALTIME_TABLE_CONFIG_RETRY_WAIT_MS = 1_000L;
@@ -70,39 +72,196 @@ public abstract class CustomDataQueryClusterIntegrationTest extends BaseClusterI
   protected static CustomDataQueryClusterIntegrationTest _sharedClusterTestSuite = null;
   protected static final String TIMESTAMP_FIELD_NAME = "ts";
 
+  private final List<BaseBrokerStarter> _allocatedBrokers = new ArrayList<>();
+  private final List<BaseServerStarter> _allocatedServers = new ArrayList<>();
+  private EmbeddedKafkaCluster _allocatedKafka;
+  private boolean _zkAttempted;
+  private boolean _kafkaAttempted;
+  private boolean _controllerAttempted;
+  private boolean _brokerAttempted;
+  private boolean _serverAttempted;
+  private boolean _minionAttempted;
+  private boolean _suiteCleanupAttempted;
+
+  @Override
+  protected EmbeddedKafkaCluster createEmbeddedKafkaCluster() {
+    _allocatedKafka = allocateCustomKafka();
+    return _allocatedKafka;
+  }
+
+  @Override
+  protected BaseBrokerStarter createBrokerStarter() {
+    BaseBrokerStarter starter = allocateCustomBroker();
+    _allocatedBrokers.add(starter);
+    return starter;
+  }
+
+  @Override
+  protected BaseServerStarter createServerStarter() {
+    BaseServerStarter starter = allocateCustomServer();
+    _allocatedServers.add(starter);
+    return starter;
+  }
+
+  protected EmbeddedKafkaCluster allocateCustomKafka() {
+    return super.createEmbeddedKafkaCluster();
+  }
+
+  protected BaseBrokerStarter allocateCustomBroker() {
+    return super.createBrokerStarter();
+  }
+
+  protected BaseServerStarter allocateCustomServer() {
+    return super.createServerStarter();
+  }
+
   @BeforeSuite
   public void setUpSuite()
-      throws Exception {
+      throws Throwable {
     LOGGER.warn("Setting up integration test suite");
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
     _sharedClusterTestSuite = this;
-
-    // Start the Pinot cluster
-    startZk();
-    LOGGER.warn("Start Kafka in the integration test suite");
-    startKafkaWithoutTopic();
-    startController();
-    startBroker();
-    startServer();
-    startMinion();
-    LOGGER.warn("Finished setting up integration test suite");
+    try {
+      _zkAttempted = true;
+      startZk();
+      LOGGER.warn("Start Kafka in the integration test suite");
+      _kafkaAttempted = true;
+      startKafkaWithoutTopic();
+      _controllerAttempted = true;
+      startController();
+      _brokerAttempted = true;
+      startBroker();
+      _serverAttempted = true;
+      startServer();
+      _minionAttempted = true;
+      startMinion();
+      LOGGER.warn("Finished setting up integration test suite");
+    } catch (Throwable failure) {
+      recordCustomSuiteCleanupFailure(failure);
+      cleanUpSuite(failure);
+      throw failure;
+    }
   }
 
-  @AfterSuite
+  @AfterSuite(alwaysRun = true)
   public void tearDownSuite()
-      throws Exception {
+      throws Throwable {
+    CustomDataQueryClusterIntegrationTest owner = _sharedClusterTestSuite;
+    if (owner == null) {
+      return;
+    }
     LOGGER.warn("Tearing down integration test suite");
-    // Shutdown the Pinot cluster
-    stopMinion();
-    stopServer();
-    stopBroker();
-    stopController();
-    // Stop Kafka
-    LOGGER.warn("Stop Kafka in the integration test suite");
-    stopKafka();
-    stopZk();
-    FileUtils.deleteDirectory(_tempDir);
+    Throwable failure = owner.cleanUpSuite(null);
+    _sharedClusterTestSuite = null;
+    if (failure != null) {
+      recordCustomSuiteCleanupFailure(failure);
+      throw failure;
+    }
     LOGGER.warn("Finished tearing down integration test suite");
+  }
+
+  private Throwable cleanUpSuite(Throwable failure) {
+    if (_suiteCleanupAttempted) {
+      return failure;
+    }
+    _suiteCleanupAttempted = true;
+    if (_minionAttempted) {
+      failure = cleanUp(failure, this::cleanUpCustomMinion);
+    }
+    if (_serverAttempted) {
+      failure = cleanUp(failure, this::cleanUpCustomServers);
+    }
+    if (_brokerAttempted) {
+      failure = cleanUp(failure, this::cleanUpCustomBrokers);
+    }
+    if (_controllerAttempted) {
+      failure = cleanUp(failure, this::cleanUpCustomController);
+    }
+    if (_kafkaAttempted) {
+      failure = cleanUp(failure, this::cleanUpCustomKafka);
+    }
+    if (_zkAttempted) {
+      failure = cleanUp(failure, this::stopZk);
+    }
+    return cleanUp(failure, () -> FileUtils.deleteDirectory(_tempDir));
+  }
+
+  protected void cleanUpCustomMinion() {
+    if (_minionStarter != null) {
+      stopMinion();
+    }
+  }
+
+  protected void cleanUpCustomServers()
+      throws Throwable {
+    Throwable failure = null;
+    LinkedHashSet<BaseServerStarter> starters = new LinkedHashSet<>(_serverStarters);
+    starters.addAll(_allocatedServers);
+    for (BaseServerStarter starter : starters) {
+      failure = cleanUp(failure, starter::stop);
+    }
+    if (failure != null) {
+      throw failure;
+    }
+    FileUtils.deleteQuietly(new File(TEMP_SERVER_DIR));
+    _serverStarters.clear();
+    _allocatedServers.clear();
+    _serverGrpcPort = 0;
+    _serverAdminApiPort = 0;
+    _serverNettyPort = 0;
+  }
+
+  protected void cleanUpCustomBrokers()
+      throws Throwable {
+    Throwable failure = null;
+    LinkedHashSet<BaseBrokerStarter> starters = new LinkedHashSet<>(_brokerStarters);
+    starters.addAll(_allocatedBrokers);
+    for (BaseBrokerStarter starter : starters) {
+      failure = cleanUp(failure, starter::stop);
+    }
+    if (failure != null) {
+      throw failure;
+    }
+    _brokerStarters.clear();
+    _allocatedBrokers.clear();
+    _brokerPorts.clear();
+    _brokerBaseApiUrl = null;
+    _brokerGrpcEndpoint = null;
+  }
+
+  protected void cleanUpCustomController() {
+    if (_controllerStarter != null) {
+      stopController();
+    }
+  }
+
+  protected void cleanUpCustomKafka() {
+    if (_kafkaStarters != null) {
+      stopKafka();
+    } else if (_allocatedKafka != null) {
+      // Startup can fail before the shared starter list is populated.
+      _allocatedKafka.stop();
+    }
+    _allocatedKafka = null;
+  }
+
+  private static Throwable cleanUp(Throwable failure, CleanupAction action) {
+    try {
+      action.run();
+    } catch (Throwable next) {
+      if (failure == null) {
+        failure = next;
+      } else if (failure != next) {
+        failure.addSuppressed(next);
+      }
+    }
+    return failure;
+  }
+
+  @FunctionalInterface
+  private interface CleanupAction {
+    void run()
+        throws Throwable;
   }
 
   @BeforeClass
@@ -405,11 +564,42 @@ public abstract class CustomDataQueryClusterIntegrationTest extends BaseClusterI
     return getTableName() + "-kafka";
   }
 
+  /// Original cluster defaults for scenarios that prepare their own offline tables.
+  protected final Schema createDefaultSchema()
+      throws IOException {
+    return super.createSchema();
+  }
+
+  protected final TableConfig createDefaultOfflineTableConfig() {
+    return super.createOfflineTableConfig();
+  }
+
+  protected final String getDefaultSortedColumn() {
+    return super.getSortedColumn();
+  }
+
+  protected final List<String> getDefaultInvertedIndexColumns() {
+    return super.getInvertedIndexColumns();
+  }
+
+  protected final List<String> getDefaultNoDictionaryColumns() {
+    return super.getNoDictionaryColumns();
+  }
+
+  protected final List<String> getDefaultRangeIndexColumns() {
+    return super.getRangeIndexColumns();
+  }
+
+  protected final List<String> getDefaultBloomFilterColumns() {
+    return super.getBloomFilterColumns();
+  }
+
   @Override
   public abstract String getTableName();
 
   @Override
-  public abstract Schema createSchema();
+  public abstract Schema createSchema()
+      throws IOException;
 
   public abstract List<File> createAvroFiles()
       throws Exception;

@@ -48,6 +48,7 @@ import org.testng.annotations.Test;
 
 
 /// Tests creating segments via the [SegmentWriter] implementations
+@Test(suiteName = "CustomClusterIntegrationTest")
 public class SegmentWriterUploaderIntegrationTest extends SharedOfflineUploadIntegrationTestSuite {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentWriterUploaderIntegrationTest.class);
