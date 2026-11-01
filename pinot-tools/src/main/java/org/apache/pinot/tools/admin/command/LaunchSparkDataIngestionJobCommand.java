@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.tools.admin.command;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import java.io.File;
@@ -68,9 +69,7 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
       + "of plugin name separated by : to load at runtime. e.g. pinto-s3:pinot-parquet")
   private List<String> _pluginsToLoad;
 
-  // Kafka plugins need to be excluded as they contain scala dependencies which cause
-  // NoSuchMethodErrors with runtime spark.
-  // It is also fine to exclude Kafka plugins as they are not going to be used in batch ingestion in any case
+  // Kafka plugins are not used in batch ingestion; exclude their dependencies from the Spark classpath.
   @CommandLine.Option(names = {"-pluginsToExclude"}, defaultValue = "pinot-kafka-4.0", required =
       false, arity = "1..*", split = ":", description =
       "List " + "of plugin name separated by : to not load at runtime. e.g. pinto-s3:pinot-parquet")
@@ -267,12 +266,18 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
     }
   }
 
-  private boolean shouldLoadPlugin(String parentDir) {
-    boolean shouldLoadPlugin = _pluginsToLoad == null && !_pluginsToExclude.contains(parentDir)
+  @VisibleForTesting
+  boolean shouldLoadPlugin(String parentDir) {
+    boolean shouldLoadPlugin = _pluginsToLoad == null && !containsPlugin(_pluginsToExclude, parentDir)
         && !parentDir.contains("spark");
-    shouldLoadPlugin = shouldLoadPlugin || (_pluginsToLoad != null && _pluginsToLoad.contains(parentDir));
+    shouldLoadPlugin = shouldLoadPlugin || (_pluginsToLoad != null && containsPlugin(_pluginsToLoad, parentDir));
     shouldLoadPlugin = shouldLoadPlugin || _sparkVersion.getPluginName().contentEquals(parentDir);
     return shouldLoadPlugin;
+  }
+
+  private static boolean containsPlugin(List<String> plugins, String pluginName) {
+    return plugins.contains(pluginName) || (pluginName.equals("pinot-kafka-4.0")
+        && (plugins.contains("pinot-kafka-2.0") || plugins.contains("pinot-kafka-3.0")));
   }
 
   private void addJarFilePath(SparkLauncher sparkLauncher, List<String> extraClassPath, String file) {

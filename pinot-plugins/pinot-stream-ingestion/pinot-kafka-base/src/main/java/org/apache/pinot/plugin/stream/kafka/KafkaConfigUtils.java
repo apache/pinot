@@ -72,18 +72,20 @@ public class KafkaConfigUtils {
   }
 
   private static void normalizeLegacyProperties(Properties properties) {
-    boolean hasLegacyJmxSetting = properties.containsKey(AUTO_INCLUDE_JMX_REPORTER_CONFIG);
+    boolean hasJmxSettings = properties.containsKey(AUTO_INCLUDE_JMX_REPORTER_CONFIG)
+        || properties.containsKey(CommonClientConfigs.METRIC_REPORTER_CLASSES_CONFIG);
     List<String> compatibilityKeys = new ArrayList<>();
     compatibilityKeys.add(SaslConfigs.SASL_LOGIN_CALLBACK_HANDLER_CLASS);
-    if (hasLegacyJmxSetting) {
+    if (hasJmxSettings) {
       compatibilityKeys.add(AUTO_INCLUDE_JMX_REPORTER_CONFIG);
       compatibilityKeys.add(CommonClientConfigs.METRIC_REPORTER_CLASSES_CONFIG);
     }
     resolveCompatibilityReferences(properties, compatibilityKeys);
 
-    if (hasLegacyJmxSetting) {
-      boolean includeJmx = (Boolean) ConfigDef.parseType(AUTO_INCLUDE_JMX_REPORTER_CONFIG,
-          properties.remove(AUTO_INCLUDE_JMX_REPORTER_CONFIG), ConfigDef.Type.BOOLEAN);
+    if (hasJmxSettings) {
+      Object legacyJmxSetting = properties.remove(AUTO_INCLUDE_JMX_REPORTER_CONFIG);
+      boolean includeJmx = legacyJmxSetting == null || (Boolean) ConfigDef.parseType(AUTO_INCLUDE_JMX_REPORTER_CONFIG,
+          legacyJmxSetting, ConfigDef.Type.BOOLEAN);
       Object configuredReporters = properties.getProperty(CommonClientConfigs.METRIC_REPORTER_CLASSES_CONFIG, "");
       List<?> reporterNames = (List<?>) ConfigDef.parseType(CommonClientConfigs.METRIC_REPORTER_CLASSES_CONFIG,
           configuredReporters, ConfigDef.Type.LIST);

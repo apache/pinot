@@ -122,7 +122,10 @@ public class KafkaConfigUtilsTest {
         {"true", subclass, List.of(subclass, jmx)},
         {"false", subclass, List.of(subclass)},
         {null, null, List.of(jmx)},
-        {null, custom, List.of(custom)}
+        {null, "", List.of(jmx)},
+        {null, custom, List.of(custom, jmx)},
+        {null, custom + "," + jmx, List.of(custom, jmx)},
+        {null, subclass, List.of(subclass, jmx)}
     };
   }
 
@@ -162,21 +165,23 @@ public class KafkaConfigUtilsTest {
       throws Exception {
     Path providerFile = Files.createTempFile("kafka-legacy-settings", ".properties");
     try {
-      for (String flag : List.of("true", "false")) {
+      for (String flag : new String[]{"true", "false", null}) {
         Files.writeString(providerFile, "jmx=" + flag + "\nreporters=" + TestMetricsReporter.class.getName()
             + "\ncallback=" + legacyLoginCallback() + "\npassword=test-password\n");
         Properties properties = createClientProperties();
         properties.setProperty(AbstractConfig.CONFIG_PROVIDERS_CONFIG, "file");
         properties.setProperty("config.providers.file.class", FileConfigProvider.class.getName());
         properties.setProperty("config.providers.file.param.allowed.paths", providerFile.getParent().toString());
-        properties.setProperty(LEGACY_JMX_CONFIG, "${file:" + providerFile + ":jmx}");
+        if (flag != null) {
+          properties.setProperty(LEGACY_JMX_CONFIG, "${file:" + providerFile + ":jmx}");
+        }
         properties.setProperty(METRIC_REPORTER_CLASSES_CONFIG, "${file:" + providerFile + ":reporters}");
         properties.setProperty(SaslConfigs.SASL_LOGIN_CALLBACK_HANDLER_CLASS, "${file:" + providerFile + ":callback}");
         String passwordReference = "${file:" + providerFile + ":password}";
         properties.setProperty(SslConfigs.SSL_KEYSTORE_PASSWORD_CONFIG, passwordReference);
-        List<String> reporters = flag.equals("true")
-            ? List.of(TestMetricsReporter.class.getName(), JmxReporter.class.getName())
-            : List.of(TestMetricsReporter.class.getName());
+        List<String> reporters = "false".equals(flag)
+            ? List.of(TestMetricsReporter.class.getName())
+            : List.of(TestMetricsReporter.class.getName(), JmxReporter.class.getName());
         assertKafka4ClientConfigs(properties, reporters, OAuthBearerLoginCallbackHandler.class);
         Properties normalized =
             KafkaConfigUtils.filterAndValidateKafkaProperties(properties, ConsumerConfig.configNames());

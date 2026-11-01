@@ -46,7 +46,6 @@ data:
           "streamType": "kafka",
           "stream.kafka.topic.name": "pullRequestMergedEvents",
           "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",
-          "stream.kafka.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kafka40.KafkaConsumerFactory",
           "stream.kafka.broker.list": "kafka:9092",
           "realtime.segment.flush.threshold.time": "12h",
           "realtime.segment.flush.threshold.size": "100000",

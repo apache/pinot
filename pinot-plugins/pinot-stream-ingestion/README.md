@@ -25,8 +25,9 @@ in the connector's own POM.
 
 ## Kafka 4 migration
 
-`pinot-kafka-4.0` is the only Kafka implementation and the default for tables that omit the consumer factory. New table
-configs can use:
+`pinot-kafka-4.0` is the only Kafka implementation and the default for tables that omit the consumer factory. Leave
+the factory unset in new table configs so each component uses its own default during a rolling upgrade. After every
+component that consumes table configs has the Kafka 4 plugin, configs can explicitly use:
 
 ```json
 "stream.kafka.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kafka40.KafkaConsumerFactory"
@@ -39,19 +40,25 @@ the aliases do not retain the Kafka 3 client or its protocol support.
 
 Consumer and Admin client construction translates `auto.include.jmx.reporter` to `metric.reporters`, preserving the
 Kafka 3 behavior: `true` adds the built-in JMX reporter alongside custom reporters when absent; `false` disables only
-automatic inclusion and preserves every explicitly configured reporter, including JMX. Omitting the old flag keeps
-Kafka 4 defaults. The removed `org.apache.kafka.common.security.oauthbearer.secured.OAuthBearerLoginCallbackHandler`
-class name, including its Pinot-shaded form, resolves to the current OAuth login callback. ConfigProvider-backed values
+automatic inclusion and preserves every explicitly configured reporter, including JMX. Omitting the old flag also
+preserves Kafka 3 automatic JMX inclusion alongside explicitly configured reporters. The removed
+`org.apache.kafka.common.security.oauthbearer.secured.OAuthBearerLoginCallbackHandler` class name, including its
+Pinot-shaded form, resolves to the current OAuth login callback. ConfigProvider-backed values
 for these settings are resolved before translation using the existing provider declarations and path restrictions.
 Stored table configs remain unchanged.
 
 Kafka 4 clients require brokers version 2.1 or newer; upgrading the Pinot plugin does not require Kafka 4 brokers or a
 broker-side ZooKeeper-to-KRaft migration. Review [Kafka's client upgrade guide](https://kafka.apache.org/42/getting-started/upgrade/)
-for other removed configuration/API support and OAuth endpoint allowlist requirements. Validate the
-TLS/SASL/OAuth or MSK IAM settings used by each source against the replacement client.
+for other removed configuration/API support. Kafka 4 defaults
+`org.apache.kafka.sasl.oauthbearer.allowed.urls` to an empty allowlist. Before upgrading OAuth sources, allow their
+trusted token endpoint and any configured JWKS URL with this JVM property; see
+[Kafka system properties](https://kafka.apache.org/42/configuration/system-properties/). The callback class alias does
+not bypass this security requirement. Validate the TLS/SASL/OAuth or MSK IAM settings used by each source against the
+replacement client.
 
-Retain existing factory names during rolling upgrades, and avoid writing Kafka 4 factory names until every component
-that consumes table configs has the Kafka 4 plugin. Validate partition discovery, ingestion from saved offsets, restart
+Retain existing factory names during rolling upgrades. The controller UI and Helm examples leave the factory unset in
+new table configs, so each component uses its own default. Avoid writing explicit Kafka 4 factory names until every
+component that consumes table configs has the Kafka 4 plugin. Validate partition discovery, ingestion from saved offsets, restart
 and replay on representative sources before completing rollout. Before rolling back to an image without the Kafka 4
 plugin, restore legacy factory names in any table configs changed after the upgrade. Existing offsets and stream config
 keys are unchanged.

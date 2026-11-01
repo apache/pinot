@@ -39,6 +39,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
@@ -135,7 +136,7 @@ public class PluginManager {
 
   private final ClassWorld _classWorld;
   private final Map<Plugin, PluginClassLoader> _registry;
-  private final Map<String, String> _backwardCompatiblePluginNames = new HashMap<>(Map.of(
+  private final Map<String, String> _backwardCompatiblePluginNames = new ConcurrentHashMap<>(Map.of(
       "pinot-kafka-2.0", "pinot-kafka-4.0",
       "pinot-kafka-3.0", "pinot-kafka-4.0"));
 
