@@ -262,16 +262,23 @@ public class IngestionSourceErrorClassifierTest {
   @Test
   public void registrationOrderNeverChangesTheDetailEither() {
     IngestionSourceErrorRule ruleB = (node, below, evidence) -> node instanceof MissingException
-        ? IngestionSourceErrorVerdict.auth("b", null) : null;
+        ? IngestionSourceErrorVerdict.auth("b", "idp") : null;
     IngestionSourceErrorRule ruleA = (node, below, evidence) -> node instanceof MissingException
-        ? IngestionSourceErrorVerdict.auth("a", null) : null;
+        ? IngestionSourceErrorVerdict.auth("a", "broker") : null;
     register(ruleB);
     register(ruleA);
-    String first = IngestionSourceErrorClassifier.classify(new MissingException()).get().toString();
+    assertLowestCodeWins();
     unregister();
     register(ruleA);
     register(ruleB);
-    assertEquals(IngestionSourceErrorClassifier.classify(new MissingException()).get().toString(), first);
+    assertLowestCodeWins();
+  }
+
+  private static void assertLowestCodeWins() {
+    IngestionSourceErrorClassification classification =
+        IngestionSourceErrorClassifier.classify(new MissingException()).orElseThrow();
+    assertEquals(classification.getCode(), "a");
+    assertEquals(classification.getTarget(), "broker");
   }
 
   @Test
