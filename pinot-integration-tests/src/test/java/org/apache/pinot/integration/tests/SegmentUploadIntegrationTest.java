@@ -63,6 +63,7 @@ import static org.testng.Assert.expectThrows;
 /// Test for advanced push types.
 /// Currently only tests METADATA push type.
 /// todo: add test for URI push
+@Test(suiteName = "CustomClusterIntegrationTest")
 public class SegmentUploadIntegrationTest extends SharedOfflineUploadIntegrationTestSuite {
   private static String _tableNameSuffix;
 

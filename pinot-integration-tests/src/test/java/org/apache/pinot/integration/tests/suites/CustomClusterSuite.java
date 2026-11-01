@@ -18,8 +18,11 @@
  */
 package org.apache.pinot.integration.tests.suites;
 
+import org.apache.pinot.integration.tests.SegmentUploadIntegrationTest;
+import org.apache.pinot.integration.tests.SegmentWriterUploaderIntegrationTest;
 import org.junit.platform.suite.api.IncludeClassNamePatterns;
 import org.junit.platform.suite.api.IncludeEngines;
+import org.junit.platform.suite.api.SelectClasses;
 import org.junit.platform.suite.api.SelectPackages;
 import org.junit.platform.suite.api.Suite;
 
@@ -29,6 +32,7 @@ import org.junit.platform.suite.api.Suite;
 @Suite
 @IncludeEngines("testng")
 @SelectPackages("org.apache.pinot.integration.tests.custom")
+@SelectClasses({SegmentWriterUploaderIntegrationTest.class, SegmentUploadIntegrationTest.class})
 @IncludeClassNamePatterns(".*")
 public class CustomClusterSuite {
 }
