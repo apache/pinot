@@ -41,6 +41,7 @@ import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTas
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.spi.config.table.DisasterRecoveryMode;
 import org.apache.pinot.spi.config.table.PauseState;
+import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.QuotaEnforcementMode;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.stream.OffsetCriteria;
@@ -64,6 +65,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
   private final ValidationMetrics _validationMetrics;
   private final ControllerMetrics _controllerMetrics;
   private final StorageQuotaChecker _storageQuotaChecker;
+  private final PrimaryKeyQuotaChecker _primaryKeyQuotaChecker;
   private final ResourceUtilizationManager _resourceUtilizationManager;
   private final int _segmentLevelValidationIntervalInSeconds;
   private final boolean _segmentAutoResetOnErrorAtValidation;
@@ -74,7 +76,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
   public RealtimeSegmentValidationManager(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager,
       ValidationMetrics validationMetrics, ControllerMetrics controllerMetrics, StorageQuotaChecker quotaChecker,
-      ResourceUtilizationManager resourceUtilizationManager) {
+      PrimaryKeyQuotaChecker primaryKeyQuotaChecker, ResourceUtilizationManager resourceUtilizationManager) {
     super("RealtimeSegmentValidationManager", config.getRealtimeSegmentValidationFrequencyInSeconds(),
         config.getRealtimeSegmentValidationManagerInitialDelaySeconds(),
         config.getRealtimeSegmentValidationCronExpression(),
@@ -83,6 +85,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     _validationMetrics = validationMetrics;
     _controllerMetrics = controllerMetrics;
     _storageQuotaChecker = quotaChecker;
+    _primaryKeyQuotaChecker = primaryKeyQuotaChecker;
     _resourceUtilizationManager = resourceUtilizationManager;
 
     _segmentLevelValidationIntervalInSeconds = config.getSegmentLevelValidationIntervalInSeconds();
@@ -195,32 +198,79 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     }
     _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.RESOURCE_UTILIZATION_LIMIT_EXCEEDED,
         0L);
-    // Perform storage quota checks.
+    // Perform storage and primary key quota checks. Both pause realtime consumption on breach but share a single
+    // IdealState pause flag, so the logic below is pause-reason-aware: it never resumes a table paused for one reason
+    // just because the other reason is clear, and it resumes only when ALL quota reasons are within limits.
     TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
-    boolean isQuotaExceeded = _storageQuotaChecker.isTableStorageQuotaExceeded(tableConfig);
-    QuotaEnforcementMode enforcementMode = _storageQuotaChecker.getEnforcementMode(tableConfig);
-    if (isQuotaExceeded && enforcementMode == QuotaEnforcementMode.SHADOW) {
+
+    // Only an enforced breach pauses consumption; a breach in SHADOW or DISABLED mode is treated as within quota.
+    boolean isStorageQuotaBreached = _storageQuotaChecker.isTableStorageQuotaExceeded(tableConfig);
+    QuotaEnforcementMode storageMode = _storageQuotaChecker.getEnforcementMode(tableConfig);
+    if (isStorageQuotaBreached && storageMode == QuotaEnforcementMode.SHADOW) {
       // The breach meter is already emitted by StorageQuotaChecker
       LOGGER.warn("Storage quota exceeded for table: {}, but enforcement mode is SHADOW, not pausing consumption",
           tableNameWithType);
     }
-    // Only an enforced breach pauses consumption; a breach in SHADOW or DISABLED mode is treated as within quota
-    boolean shouldPauseForQuota = isQuotaExceeded && enforcementMode == QuotaEnforcementMode.ENFORCED;
-    if (shouldPauseForQuota == isTablePaused) {
-      return !isTablePaused;
+    boolean storageExceeded = isStorageQuotaBreached && storageMode == QuotaEnforcementMode.ENFORCED;
+
+    // Primary key quota: same gating. UNDETERMINED (counts could not be read) is handled below.
+    PrimaryKeyQuotaChecker.Status pkStatus = _primaryKeyQuotaChecker.checkPrimaryKeyQuota(tableConfig);
+    QuotaEnforcementMode pkMode = _primaryKeyQuotaChecker.getEnforcementMode(tableConfig);
+    boolean isPkQuotaBreached = pkStatus == PrimaryKeyQuotaChecker.Status.EXCEEDED;
+    if (isPkQuotaBreached && pkMode == QuotaEnforcementMode.SHADOW) {
+      // The breach meter is already emitted by PrimaryKeyQuotaChecker
+      LOGGER.warn("Primary key quota exceeded for table: {}, but enforcement mode is SHADOW, not pausing consumption",
+          tableNameWithType);
     }
-    // if quota breach and pause flag is not in sync, update the IS
-    if (shouldPauseForQuota) {
-      String storageQuota = tableConfig.getQuotaConfig() != null ? tableConfig.getQuotaConfig().getStorage() : "NA";
-      // as quota is breached pause the consumption right away
-      _llcRealtimeSegmentManager.pauseConsumption(tableNameWithType, PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED,
-          "Storage quota of " + storageQuota + " exceeded.");
-    } else {
-      // as quota limit is being honored, unset the pause state and allow consuming segment recreation.
-      _llcRealtimeSegmentManager.updatePauseStateInIdealState(tableNameWithType, false,
-          PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED, "Table storage within quota limits");
+    boolean pkExceeded = isPkQuotaBreached && pkMode == QuotaEnforcementMode.ENFORCED;
+
+    // By this point the table is either not paused, or paused for a quota reason (ADMINISTRATIVE returned early and
+    // RESOURCE_UTILIZATION was fully resolved above).
+    PauseState.ReasonCode currentReason = isTablePaused ? pauseStatus.getReasonCode() : null;
+    boolean pausedByQuota = currentReason == PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED
+        || currentReason == PauseState.ReasonCode.PRIMARY_KEY_QUOTA_EXCEEDED;
+    // Storage takes precedence over primary key for the single stored pause reason when both are exceeded.
+    PauseState.ReasonCode desiredReason = storageExceeded ? PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED
+        : pkExceeded ? PauseState.ReasonCode.PRIMARY_KEY_QUOTA_EXCEEDED : null;
+
+    if (desiredReason == null) {
+      // No quota is effectively exceeded. Don't resume a PK-paused table when the PK status couldn't be determined.
+      if (currentReason == PauseState.ReasonCode.PRIMARY_KEY_QUOTA_EXCEEDED
+          && pkStatus == PrimaryKeyQuotaChecker.Status.UNDETERMINED) {
+        LOGGER.warn("Primary key quota could not be determined for table: {}, and it is paused, leave it as paused",
+            tableNameWithType);
+        return false;
+      }
+      if (pausedByQuota) {
+        // All quota reasons are within limits --> resume, clearing the reason the table was paused with.
+        _llcRealtimeSegmentManager.updatePauseStateInIdealState(tableNameWithType, false, currentReason,
+            "Table quotas within limits");
+      }
+      // No quota reason is blocking consumption (ADMINISTRATIVE/RESOURCE_UTILIZATION were handled above).
+      return true;
     }
-    return !shouldPauseForQuota;
+
+    // A quota is exceeded --> the table must be paused with desiredReason.
+    if (!isTablePaused) {
+      _llcRealtimeSegmentManager.pauseConsumption(tableNameWithType, desiredReason,
+          quotaExceededComment(desiredReason, tableConfig));
+    } else if (currentReason != desiredReason) {
+      // Already paused by a quota but the active reason changed (e.g. storage now also breached): relabel the pause
+      // state without issuing another force-commit.
+      _llcRealtimeSegmentManager.updatePauseStateInIdealState(tableNameWithType, true, desiredReason,
+          quotaExceededComment(desiredReason, tableConfig));
+    }
+    return false;
+  }
+
+  private static String quotaExceededComment(PauseState.ReasonCode reasonCode, TableConfig tableConfig) {
+    QuotaConfig quotaConfig = tableConfig.getQuotaConfig();
+    if (reasonCode == PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED) {
+      String storageQuota = quotaConfig != null ? quotaConfig.getStorage() : "NA";
+      return "Storage quota of " + storageQuota + " exceeded.";
+    }
+    Object cap = quotaConfig != null ? quotaConfig.getMaxPrimaryKeysPerPartition() : "NA";
+    return "Primary key quota of " + cap + " per partition exceeded.";
   }
 
   private void runSegmentLevelValidation(TableConfig tableConfig) {

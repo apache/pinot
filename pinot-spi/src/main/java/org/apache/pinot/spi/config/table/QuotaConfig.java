@@ -52,17 +52,37 @@ public class QuotaConfig extends BaseJsonConfig {
       + "but queries are not rejected) or ENFORCED. Defaults to ENFORCED")
   private final QuotaEnforcementMode _queryQuotaEnforcementMode;
 
+  // Optional per-partition primary key cap for upsert tables. Null means no limit. Omitted from the serialized form
+  // when null, so configs that do not use it are unchanged and stay readable by binaries that predate this field.
+  @JsonPropertyDescription("Max number of primary keys allowed in any single partition of an upsert table (counted "
+      + "per replica, since each partition's primary key map lives wholly on one server per replica). Null means no "
+      + "limit. Only applicable to upsert-enabled realtime tables")
+  private final Long _maxPrimaryKeysPerPartition;
+
+  @JsonPropertyDescription("How the primary key quota is enforced: DISABLED, SHADOW (breaches are metered and logged "
+      + "but consumption is not paused) or ENFORCED. Defaults to ENFORCED")
+  private final QuotaEnforcementMode _primaryKeyQuotaEnforcementMode;
+
   public QuotaConfig(@Nullable String storage, @Nullable String maxQueriesPerSecond) {
     this(storage, maxQueriesPerSecond, null, null);
+  }
+
+  public QuotaConfig(@Nullable String storage, @Nullable String maxQueriesPerSecond,
+      @Nullable QuotaEnforcementMode storageQuotaEnforcementMode,
+      @Nullable QuotaEnforcementMode queryQuotaEnforcementMode) {
+    this(storage, maxQueriesPerSecond, storageQuotaEnforcementMode, queryQuotaEnforcementMode, null, null);
   }
 
   @JsonCreator
   public QuotaConfig(@JsonProperty("storage") @Nullable String storage,
       @JsonProperty("maxQueriesPerSecond") @Nullable String maxQueriesPerSecond,
       @JsonProperty("storageQuotaEnforcementMode") @Nullable QuotaEnforcementMode storageQuotaEnforcementMode,
-      @JsonProperty("queryQuotaEnforcementMode") @Nullable QuotaEnforcementMode queryQuotaEnforcementMode) {
+      @JsonProperty("queryQuotaEnforcementMode") @Nullable QuotaEnforcementMode queryQuotaEnforcementMode,
+      @JsonProperty("maxPrimaryKeysPerPartition") @Nullable Long maxPrimaryKeysPerPartition,
+      @JsonProperty("primaryKeyQuotaEnforcementMode") @Nullable QuotaEnforcementMode primaryKeyQuotaEnforcementMode) {
     _storageQuotaEnforcementMode = storageQuotaEnforcementMode;
     _queryQuotaEnforcementMode = queryQuotaEnforcementMode;
+    _primaryKeyQuotaEnforcementMode = primaryKeyQuotaEnforcementMode;
     // Validate and standardize the value
     if (storage != null) {
       try {
@@ -88,6 +108,11 @@ public class QuotaConfig extends BaseJsonConfig {
       _maxQPS = INVALID_MAX_QPS;
       _maxQueriesPerSecond = null;
     }
+    if (maxPrimaryKeysPerPartition != null) {
+      Preconditions.checkArgument(maxPrimaryKeysPerPartition > 0,
+          "Invalid 'maxPrimaryKeysPerPartition': %s, must be a positive value", maxPrimaryKeysPerPartition);
+    }
+    _maxPrimaryKeysPerPartition = maxPrimaryKeysPerPartition;
   }
 
   @Nullable
@@ -120,5 +145,17 @@ public class QuotaConfig extends BaseJsonConfig {
   @Nullable
   public QuotaEnforcementMode getQueryQuotaEnforcementMode() {
     return _queryQuotaEnforcementMode;
+  }
+
+  /// Max number of primary keys allowed in any single partition (per replica) of an upsert table. Null means no limit.
+  @Nullable
+  public Long getMaxPrimaryKeysPerPartition() {
+    return _maxPrimaryKeysPerPartition;
+  }
+
+  /// Enforcement mode of the primary key quota for this table. Null means [QuotaEnforcementMode#ENFORCED].
+  @Nullable
+  public QuotaEnforcementMode getPrimaryKeyQuotaEnforcementMode() {
+    return _primaryKeyQuotaEnforcementMode;
   }
 }

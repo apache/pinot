@@ -373,6 +373,7 @@ public class ControllerConf extends PinotConfiguration {
   public static final String REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS =
       "controller.realtime.segment.metadata.commit.numLocks";
   public static final String ENABLE_STORAGE_QUOTA_CHECK = "controller.enable.storage.quota.check";
+  public static final String ENABLE_PRIMARY_KEY_QUOTA_CHECK = "controller.enable.primary.key.quota.check";
   public static final String REBALANCE_DISK_UTILIZATION_THRESHOLD = "controller.rebalance.disk.utilization.threshold";
   public static final String DISK_UTILIZATION_THRESHOLD = "controller.disk.utilization.threshold"; // 0 < threshold < 1
   public static final String DISK_UTILIZATION_CHECK_TIMEOUT_MS = "controller.disk.utilization.check.timeoutMs";
@@ -422,6 +423,7 @@ public class ControllerConf extends PinotConfiguration {
   public static final int DEFAULT_MIN_NUM_CHARS_IN_IS_TO_TURN_ON_COMPRESSION = -1;
   public static final int DEFAULT_REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS = 64;
   public static final boolean DEFAULT_ENABLE_STORAGE_QUOTA_CHECK = true;
+  public static final boolean DEFAULT_ENABLE_PRIMARY_KEY_QUOTA_CHECK = true;
   public static final double DEFAULT_REBALANCE_DISK_UTILIZATION_THRESHOLD = 0.9;
   public static final double DEFAULT_DISK_UTILIZATION_THRESHOLD = 0.95;
   public static final int DEFAULT_DISK_UTILIZATION_CHECK_TIMEOUT_MS = 30_000;
@@ -1264,6 +1266,10 @@ public class ControllerConf extends PinotConfiguration {
 
   public boolean getEnableStorageQuotaCheck() {
     return getProperty(ENABLE_STORAGE_QUOTA_CHECK, DEFAULT_ENABLE_STORAGE_QUOTA_CHECK);
+  }
+
+  public boolean getEnablePrimaryKeyQuotaCheck() {
+    return getProperty(ENABLE_PRIMARY_KEY_QUOTA_CHECK, DEFAULT_ENABLE_PRIMARY_KEY_QUOTA_CHECK);
   }
 
   public String getDiskUtilizationPath() {
