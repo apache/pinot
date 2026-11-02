@@ -28,7 +28,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -384,9 +383,8 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
   /// runtime through cluster config.
   protected boolean shouldEnableHybridTableRetentionStrategy(TableConfig realtimeTableConfig,
       TableConfig offlineTableConfig) {
-    return Objects.requireNonNullElse(
-        realtimeTableConfig.getValidationConfig().getHybridTableRetentionStrategy(),
-        _isHybridTableRetentionStrategyEnabled);
+    return realtimeTableConfig.getValidationConfig().getHybridTableRetentionStrategy()
+        .isEnabled(_isHybridTableRetentionStrategyEnabled);
   }
 
   private void manageRetentionForOfflineTable(String offlineTableName, RetentionStrategy retentionStrategy,
