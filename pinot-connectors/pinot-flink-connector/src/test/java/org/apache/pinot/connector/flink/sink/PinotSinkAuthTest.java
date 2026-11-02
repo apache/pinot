@@ -72,6 +72,13 @@ public class PinotSinkAuthTest {
     assertNull(PinotSink.createAuthProvider(tableConfig));
   }
 
+  @Test
+  public void testCreateAuthProviderWithBlankToken() {
+    TableConfig tableConfig = tableConfigWithBatchConfig(Map.of(BatchConfigProperties.AUTH_TOKEN, "  "));
+
+    assertNull(PinotSink.createAuthProvider(tableConfig));
+  }
+
   private static TableConfig tableConfigWithBatchConfig(Map<String, String> batchConfigMap) {
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setBatchIngestionConfig(new BatchIngestionConfig(List.of(batchConfigMap), "APPEND", "DAILY"));
