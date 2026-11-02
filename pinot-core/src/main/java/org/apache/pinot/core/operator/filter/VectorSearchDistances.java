@@ -26,12 +26,12 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
 
 
-/// Hands the distances computed by a vector index search from [VectorSimilarityFilterOperator] to `VECTOR_DISTANCE`
+/// Hands the distances computed by a vector index search from [VectorSimilarityFilterOperator] to `cosineDistance`
 /// on the same segment, column and query vector, so the projection does not recompute them from the forward index.
 ///
 /// One instance lives in the [QueryContext] of each query, so the distances are released with the query and never
-/// shared across queries. `VECTOR_DISTANCE` requests distances while the query is planned; the filter fills a request
-/// only when one exists, so queries that do not project `VECTOR_DISTANCE` collect nothing.
+/// shared across queries. `cosineDistance` requests distances while the query is planned; the filter fills a request
+/// only when one exists, so queries that do not project it collect nothing.
 public final class VectorSearchDistances {
   private final ConcurrentHashMap<Key, Request> _requests = new ConcurrentHashMap<>();
 

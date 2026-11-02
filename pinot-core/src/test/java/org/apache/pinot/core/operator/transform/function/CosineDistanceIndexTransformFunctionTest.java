@@ -22,10 +22,10 @@ import it.unimi.dsi.fastutil.ints.Int2FloatOpenHashMap;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.function.scalar.VectorFunctions;
-import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.filter.VectorSearchDistances;
+import org.apache.pinot.core.operator.transform.function.VectorTransformFunctions.CosineDistanceTransformFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -46,68 +46,69 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.expectThrows;
 
 
-/// `VECTOR_DISTANCE` returns the distances a `VECTOR_SIMILARITY` search hands over through the query, and otherwise
-/// computes them under the column's configured distance function.
-public class IndexVectorDistanceTransformFunctionTest extends BaseTransformFunctionTest {
+/// `cosineDistance` on a column with a COSINE vector index returns the distances a `VECTOR_SIMILARITY` search hands
+/// over through the query, and otherwise computes them from the forward index.
+public class CosineDistanceIndexTransformFunctionTest extends BaseTransformFunctionTest {
 
-  /// A column without a vector index config ranks by EUCLIDEAN in VECTOR_SIMILARITY, so VECTOR_DISTANCE uses it too.
   @Test
-  public void testComputesEuclideanDistancesWithoutVectorIndexConfig() {
+  public void testComputesDistancesWithoutVectorIndex() {
     float[] query = _vector2Values[0];
-    double[] actual = transform(_dataSourceMap, query, newQueryContext());
+    QueryContext queryContext = newQueryContext();
+    double[] actual = transform(_dataSourceMap, "cosineDistance(vector1, " + toLiteral(query) + ")", queryContext);
     for (int i = 0; i < NUM_ROWS; i++) {
-      assertEquals(actual[i], VectorFunctions.euclideanDistance(_vector1Values[i], query), 1e-9);
+      assertEquals(actual[i], VectorFunctions.cosineDistance(_vector1Values[i], query), 1e-9);
     }
   }
 
-  /// Distances follow the column's configured distance function, as VECTOR_SIMILARITY does.
-  @Test
-  public void testComputesDistancesUnderConfiguredFunction() {
-    float[] query = _vector2Values[0];
-    for (VectorDistanceFunction function : VectorDistanceFunction.values()) {
-      double[] actual = transform(withVectorIndex(null, function), query, newQueryContext());
-      for (int i = 0; i < NUM_ROWS; i++) {
-        double expected;
-        switch (function) {
-          case COSINE:
-            expected = VectorFunctions.cosineDistance(_vector1Values[i], query);
-            break;
-          case EUCLIDEAN:
-          case L2:
-            expected = VectorFunctions.euclideanDistance(_vector1Values[i], query);
-            break;
-          default:
-            expected = -VectorFunctions.dotProduct(_vector1Values[i], query);
-            break;
-        }
-        assertEquals(actual[i], expected, 1e-9, function.name());
-      }
-    }
-  }
-
-  /// Distances handed over by the filter's search are used as they are, without searching the index again.
+  /// Distances handed over by the filter's search are used as they are, without searching the index again, with the
+  /// column on either side and with a default value.
   @Test
   public void testUsesDistancesHandedOverByTheSearch() {
     float[] query = _vector2Values[0];
-    VectorIndexReader reader = mock(VectorIndexReader.class);
-    QueryContext queryContext = newQueryContext();
-    TransformFunction function = create(withVectorIndex(reader, VectorDistanceFunction.COSINE), query, queryContext);
-    VectorSearchDistances.Request request = VectorSearchDistances.of(queryContext).getRequest(reader, query.clone());
-    assertNotNull(request, "VECTOR_DISTANCE must request the distances of the search while it is planned");
-    Int2FloatOpenHashMap served = new Int2FloatOpenHashMap();
-    for (int i = 0; i < NUM_ROWS; i++) {
-      served.put(i, -i);
+    String literal = toLiteral(query);
+    for (String expression : new String[]{
+        "cosineDistance(vector1, " + literal + ")",
+        "cosineDistance(" + literal + ", vector1)",
+        "cosineDistance(vector1, " + literal + ", 0.5)"}) {
+      VectorIndexReader reader = mock(VectorIndexReader.class);
+      QueryContext queryContext = newQueryContext();
+      TransformFunction function =
+          create(withVectorIndex(reader, VectorDistanceFunction.COSINE), expression, queryContext);
+      VectorSearchDistances.Request request = VectorSearchDistances.of(queryContext).getRequest(reader, query.clone());
+      assertNotNull(request, expression + " must request the distances of the search while it is planned");
+      Int2FloatOpenHashMap served = new Int2FloatOpenHashMap();
+      for (int i = 0; i < NUM_ROWS; i++) {
+        served.put(i, -i);
+      }
+      request.setDistances(served);
+      double[] actual = function.transformToDoubleValuesSV(_projectionBlock);
+      for (int i = 0; i < NUM_ROWS; i++) {
+        assertEquals(actual[i], -i, 0.0, expression);
+      }
+      verify(reader, never()).getDocDistances(any(float[].class), anyInt());
+      verify(reader, never()).getDocIds(any(float[].class), anyInt());
     }
-    request.setDistances(served);
-    double[] actual = function.transformToDoubleValuesSV(_projectionBlock);
-    for (int i = 0; i < NUM_ROWS; i++) {
-      assertEquals(actual[i], -i, 0.0);
+  }
+
+  /// Only a COSINE index serves cosine distances: other distance functions request nothing.
+  @Test
+  public void testRequestsNothingFromNonCosineIndex() {
+    float[] query = _vector2Values[0];
+    for (VectorDistanceFunction distanceFunction : VectorDistanceFunction.values()) {
+      if (distanceFunction == VectorDistanceFunction.COSINE) {
+        continue;
+      }
+      VectorIndexReader reader = mock(VectorIndexReader.class);
+      QueryContext queryContext = newQueryContext();
+      double[] actual = transform(withVectorIndex(reader, distanceFunction),
+          "cosineDistance(vector1, " + toLiteral(query) + ")", queryContext);
+      assertNull(VectorSearchDistances.of(queryContext).getRequest(reader, query), distanceFunction.name());
+      for (int i = 0; i < NUM_ROWS; i++) {
+        assertEquals(actual[i], VectorFunctions.cosineDistance(_vector1Values[i], query), 1e-9);
+      }
     }
-    verify(reader, never()).getDocDistances(any(float[].class), anyInt());
-    verify(reader, never()).getDocIds(any(float[].class), anyInt());
   }
 
   /// Without a search to take distances from, they are computed rather than searched for.
@@ -115,7 +116,8 @@ public class IndexVectorDistanceTransformFunctionTest extends BaseTransformFunct
   public void testComputesDistancesWhenNoSearchHandsThemOver() {
     float[] query = _vector2Values[0];
     VectorIndexReader reader = mock(VectorIndexReader.class);
-    double[] actual = transform(withVectorIndex(reader, VectorDistanceFunction.COSINE), query, newQueryContext());
+    double[] actual = transform(withVectorIndex(reader, VectorDistanceFunction.COSINE),
+        "cosineDistance(vector1, " + toLiteral(query) + ")", newQueryContext());
     for (int i = 0; i < NUM_ROWS; i++) {
       assertEquals(actual[i], VectorFunctions.cosineDistance(_vector1Values[i], query), 1e-9);
     }
@@ -128,7 +130,8 @@ public class IndexVectorDistanceTransformFunctionTest extends BaseTransformFunct
     float[] query = _vector2Values[0];
     VectorIndexReader reader = mock(VectorIndexReader.class);
     QueryContext queryContext = newQueryContext();
-    create(withVectorIndex(reader, VectorDistanceFunction.COSINE), query, queryContext);
+    create(withVectorIndex(reader, VectorDistanceFunction.COSINE), "cosineDistance(vector1, " + toLiteral(query) + ")",
+        queryContext);
     assertNull(VectorSearchDistances.of(queryContext).getRequest(reader, _vector2Values[1]));
   }
 
@@ -137,7 +140,8 @@ public class IndexVectorDistanceTransformFunctionTest extends BaseTransformFunct
     float[] query = _vector2Values[0];
     VectorIndexReader reader = mock(VectorIndexReader.class);
     QueryContext queryContext = newQueryContext();
-    TransformFunction function = create(withVectorIndex(reader, VectorDistanceFunction.COSINE), query, queryContext);
+    TransformFunction function = create(withVectorIndex(reader, VectorDistanceFunction.COSINE),
+        "cosineDistance(vector1, " + toLiteral(query) + ")", queryContext);
     Int2FloatOpenHashMap served = new Int2FloatOpenHashMap();
     for (int i = 1; i < NUM_ROWS; i++) {
       served.put(i, -i);
@@ -149,50 +153,34 @@ public class IndexVectorDistanceTransformFunctionTest extends BaseTransformFunct
     }
   }
 
-  /// An integer vector literal (`ARRAY[1, 0, ...]`) is accepted, as VECTOR_SIMILARITY accepts it.
+  /// An integer vector literal (`ARRAY[1, 0, ...]`) requests the search for the same vector VECTOR_SIMILARITY parses.
   @Test
-  public void testAcceptsIntegerVectorLiteral() {
+  public void testIntegerVectorLiteralMatchesTheSearch() {
     StringBuilder literal = new StringBuilder("ARRAY[");
     float[] query = new float[VECTOR_DIM_SIZE];
     for (int i = 0; i < VECTOR_DIM_SIZE; i++) {
-      query[i] = i % 3;
-      literal.append(i == 0 ? "" : ",").append(i % 3);
+      query[i] = i % 3 + 1;
+      literal.append(i == 0 ? "" : ",").append(i % 3 + 1);
     }
-    ExpressionContext expression = RequestContextUtils.getExpression(
-        "vectorDistance(vector1, " + literal.append(']') + ")");
-    double[] actual =
-        TransformFunctionFactory.get(expression, _dataSourceMap).transformToDoubleValuesSV(_projectionBlock);
-    for (int i = 0; i < NUM_ROWS; i++) {
-      assertEquals(actual[i], VectorFunctions.euclideanDistance(_vector1Values[i], query), 1e-9);
-    }
+    VectorIndexReader reader = mock(VectorIndexReader.class);
+    QueryContext queryContext = newQueryContext();
+    create(withVectorIndex(reader, VectorDistanceFunction.COSINE), "cosineDistance(vector1, " + literal + "])",
+        queryContext);
+    assertNotNull(VectorSearchDistances.of(queryContext).getRequest(reader, query));
   }
 
-  @Test
-  public void testRejectsInvalidArguments() {
-    String vector = toLiteral(_vector2Values[0]);
-    for (String expression : new String[]{
-        "vectorDistance(vector1)",
-        "vectorDistance(vector1, " + vector + ", 10)",
-        "vectorDistance(intSV, " + vector + ")",
-        "vectorDistance(vector1, vector2)"}) {
-      expectThrows(Exception.class,
-          () -> TransformFunctionFactory.get(RequestContextUtils.getExpression(expression), _dataSourceMap));
-    }
+  private double[] transform(Map<String, DataSource> dataSourceMap, String expression, QueryContext queryContext) {
+    return create(dataSourceMap, expression, queryContext).transformToDoubleValuesSV(_projectionBlock);
   }
 
-  private double[] transform(Map<String, DataSource> dataSourceMap, float[] query, QueryContext queryContext) {
-    return create(dataSourceMap, query, queryContext).transformToDoubleValuesSV(_projectionBlock);
-  }
-
-  private static TransformFunction create(Map<String, DataSource> dataSourceMap, float[] query,
+  private static TransformFunction create(Map<String, DataSource> dataSourceMap, String expression,
       QueryContext queryContext) {
-    ExpressionContext expression =
-        RequestContextUtils.getExpression("vectorDistance(vector1, " + toLiteral(query) + ")");
     Map<String, ColumnContext> columnContextMap = new HashMap<>();
     dataSourceMap.forEach(
         (column, dataSource) -> columnContextMap.put(column, ColumnContext.fromDataSource(dataSource)));
-    TransformFunction function = TransformFunctionFactory.get(expression, columnContextMap, queryContext);
-    assertTrue(function instanceof IndexVectorDistanceTransformFunction);
+    TransformFunction function =
+        TransformFunctionFactory.get(RequestContextUtils.getExpression(expression), columnContextMap, queryContext);
+    assertTrue(function instanceof CosineDistanceTransformFunction);
     return function;
   }
 

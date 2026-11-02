@@ -635,7 +635,7 @@ public class VectorSimilarityFilterOperatorTest {
         Map.of("nlist", "4", "pqM", "2", "pqNbits", "8", "trainSampleSize", "16"));
   }
 
-  /// When VECTOR_DISTANCE requested the distances of this search, the operator asks the index for them, matches the
+  /// When cosineDistance requested the distances of this search, the operator asks the index for them, matches the
   /// documents they cover and hands them over through the query's [VectorSearchDistances].
   @Test
   public void testHandsOverDistancesWhenRequested() {
@@ -654,7 +654,7 @@ public class VectorSimilarityFilterOperatorTest {
     verify(reader, never()).getDocIds(any(float[].class), anyInt());
   }
 
-  /// Without a request, a search collects only doc ids, so queries that do not project VECTOR_DISTANCE pay nothing.
+  /// Without a request, a search collects only doc ids, so queries that do not project cosineDistance pay nothing.
   @Test
   public void testDoesNotAskForDistancesWithoutRequest() {
     float[] queryVector = {1.0f, 2.0f, 3.0f};

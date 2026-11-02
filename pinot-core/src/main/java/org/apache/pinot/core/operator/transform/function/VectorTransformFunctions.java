@@ -19,18 +19,35 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.base.Preconditions;
+import it.unimi.dsi.fastutil.ints.Int2FloatMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.function.scalar.VectorFunctions;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
+import org.apache.pinot.core.operator.filter.VectorSearchDistances;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
+import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
 
 
 public class VectorTransformFunctions {
+  /// Implements `cosineDistance(left, right[, defaultValue])`.
+  ///
+  /// When one argument is a column with a COSINE vector index and the other an array literal, and the query filters
+  /// with `VECTOR_SIMILARITY` on the same column and vector, the distances of the matched documents are taken from the
+  /// index search the filter runs instead of reading their vectors from the forward index. They are handed over
+  /// through the query's [VectorSearchDistances], so nothing outlives the query. Index distances carry the index's
+  /// single-precision arithmetic (within about 1e-6 of the exact value). When the index returns no distances or misses
+  /// a document, the distances are computed from the forward index.
   public static class CosineDistanceTransformFunction extends VectorDistanceTransformFunction {
     public static final String FUNCTION_NAME = "cosineDistance";
     private Double _defaultValue = null;
+    @Nullable
+    private VectorSearchDistances.Request _distancesRequest;
 
     @Override
     protected void checkArgumentSize(List<TransformFunction> arguments) {
@@ -49,8 +66,88 @@ public class VectorTransformFunctions {
     }
 
     @Override
+    public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap,
+        QueryContext queryContext) {
+      super.init(arguments, columnContextMap, queryContext);
+      if (_leftTransformFunction instanceof IdentifierTransformFunction
+          && _rightTransformFunction instanceof ArrayLiteralTransformFunction) {
+        _distancesRequest = requestIndexDistances((IdentifierTransformFunction) _leftTransformFunction,
+            (ArrayLiteralTransformFunction) _rightTransformFunction, columnContextMap, queryContext);
+      } else if (_rightTransformFunction instanceof IdentifierTransformFunction
+          && _leftTransformFunction instanceof ArrayLiteralTransformFunction) {
+        _distancesRequest = requestIndexDistances((IdentifierTransformFunction) _rightTransformFunction,
+            (ArrayLiteralTransformFunction) _leftTransformFunction, columnContextMap, queryContext);
+      }
+    }
+
+    /// Asks a `VECTOR_SIMILARITY` filter on the column and vector to hand over the distances of its search, when the
+    /// column has a COSINE vector index (whose distances are cosine distances).
+    @Nullable
+    private static VectorSearchDistances.Request requestIndexDistances(IdentifierTransformFunction column,
+        ArrayLiteralTransformFunction vector, Map<String, ColumnContext> columnContextMap, QueryContext queryContext) {
+      ColumnContext columnContext = columnContextMap.get(column.getColumnName());
+      DataSource dataSource = columnContext != null ? columnContext.getDataSource() : null;
+      if (dataSource == null) {
+        return null;
+      }
+      VectorIndexReader vectorIndexReader = dataSource.getVectorIndex();
+      VectorIndexConfig vectorIndexConfig = dataSource.getVectorIndexConfig();
+      if (vectorIndexReader == null || vectorIndexConfig == null
+          || vectorIndexConfig.getVectorDistanceFunction() != VectorIndexConfig.VectorDistanceFunction.COSINE) {
+        return null;
+      }
+      float[] queryVector = toFloatArray(vector);
+      return queryVector != null ? VectorSearchDistances.of(queryContext).request(vectorIndexReader, queryVector)
+          : null;
+    }
+
+    /// Float array literals are rare in SQL (`ARRAY[0.1, ...]` parses as DOUBLE, `ARRAY[1, 0]` as INT); narrow every
+    /// numeric array like VECTOR_SIMILARITY does, so the same vector literal matches the filter's search.
+    @Nullable
+    private static float[] toFloatArray(ArrayLiteralTransformFunction literal) {
+      float[] floats = literal.getFloatArrayLiteral();
+      if (floats != null) {
+        return floats;
+      }
+      double[] doubles = literal.getDoubleArrayLiteral();
+      int[] ints = literal.getIntArrayLiteral();
+      long[] longs = literal.getLongArrayLiteral();
+      int length = doubles != null ? doubles.length : ints != null ? ints.length : longs != null ? longs.length : -1;
+      if (length < 0) {
+        return null;
+      }
+      floats = new float[length];
+      for (int i = 0; i < length; i++) {
+        floats[i] = doubles != null ? (float) doubles[i] : ints != null ? ints[i] : (float) longs[i];
+      }
+      return floats;
+    }
+
+    @Override
     public String getName() {
       return FUNCTION_NAME;
+    }
+
+    @Override
+    public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
+      Int2FloatMap distances = _distancesRequest != null ? _distancesRequest.getDistances() : null;
+      int[] docIds = valueBlock.getDocIds();
+      if (distances != null && docIds != null) {
+        int length = valueBlock.getNumDocs();
+        initDoubleValuesSV(length);
+        boolean allServed = true;
+        for (int i = 0; i < length; i++) {
+          if (!distances.containsKey(docIds[i])) {
+            allServed = false;
+            break;
+          }
+          _doubleValuesSV[i] = distances.get(docIds[i]);
+        }
+        if (allServed) {
+          return _doubleValuesSV;
+        }
+      }
+      return super.transformToDoubleValuesSV(valueBlock);
     }
 
     @Override
