@@ -18,17 +18,13 @@
  */
 package org.apache.pinot.broker.routing.instanceselector;
 
-import com.google.common.annotations.VisibleForTesting;
+import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
 import java.time.Clock;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
-import java.util.SortedMap;
-import java.util.TreeMap;
 import javax.annotation.Nullable;
 import org.apache.helix.AccessOption;
 import org.apache.helix.model.ExternalView;
@@ -42,7 +38,6 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -56,9 +51,14 @@ import org.slf4j.MarkerFactory;
 import static org.apache.pinot.spi.utils.CommonConstants.Broker.FALLBACK_POOL_ID;
 
 
-/// Base implementation of instance selector. Selector maintains a map from segment to enabled ONLINE/CONSUMING server
-/// instances that serves the segment and a set of unavailable segments (no enabled instance or all enabled instances
-/// are in OFFLINE/ERROR state).
+/// Base implementation of instance selector. Selector maintains the enabled ONLINE/CONSUMING server instances that
+/// serve each segment, and the unavailable segments (no enabled instance or all enabled instances are in
+/// OFFLINE/ERROR state).
+///
+/// Segments with the same candidates (disabled instances included), of the same kind (old or new) and with the same
+/// number of expected replicas share one [CandidateGroup], so the per-segment state is reduced to the id of the group
+/// of the segment, plus the creation time of the new segments (see [SegmentGroups]). An instance change only
+/// recomputes per-group state (see [SegmentStates]), and the selection works on the groups.
 ///
 /// Special handling of new segment: It is common for new segment to be partially available or not available at all in
 /// all instances.
@@ -97,13 +97,11 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
   /// `<MarkerFilter marker="ROUTING_NEW_SEGMENTS" onMatch="DENY" onMismatch="NEUTRAL"/>`
   private static final Marker NEW_SEGMENTS_MARKER = MarkerFactory.getMarker("ROUTING_NEW_SEGMENTS");
   // To prevent int overflow, reset the request id once it reaches this value
-  protected static final long MAX_REQUEST_ID = 1_000_000_000;
-  /// Maximum number of distinct (ideal state, external view) instance state map pairs whose candidate lists one
-  /// rebuild shares between segments. Past this bound, the rebuild stops caching new pairs: segments with an already
-  /// cached pair keep sharing its lists, and segments with any other pair get their own lists, as if there was no
-  /// sharing. In a realtime table, all the segments of a stream partition usually have the same pair, so the number of
-  /// distinct pairs is close to the number of partitions, far below this bound.
-  static final int MAX_SHARED_CANDIDATE_LISTS = 4096;
+  static final long MAX_REQUEST_ID = 1_000_000_000;
+  // To prevent int overflow when adding a replica offset, reduce the table name hash for fixed replica routing modulo
+  // this value: the largest int multiple of the least common multiple of 1 to 22, which keeps the selected candidate
+  // for up to 22 candidates, and for most tables with more candidates
+  static final int MAX_TABLE_NAME_HASH = 2_095_133_040;
 
   protected TableConfig _tableConfig;
   protected String _tableNameWithType;
@@ -118,29 +116,11 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
   protected boolean _emitSinglePoolSegmentsMetric;
   protected int _tableNameHashForFixedReplicaRouting;
 
-  // These 3 variables are the cached states to help accelerate the change processing
   protected Set<String> _enabledInstances;
-  // For old segments, all candidates are online
-  // Reduce this map to reduce garbage
-  protected final Map<String, List<SegmentInstanceCandidate>> _oldSegmentCandidatesMap = new HashMap<>();
-  protected Map<String, NewSegmentState> _newSegmentStateMap;
-  /// Number of ONLINE/CONSUMING instances in the ideal state, for old segments that have fewer
-  /// candidates than that. Only used for metrics
-  ///
-  /// Kept sparse deliberately: an absent entry means "as many candidates as the ideal state assigns",
-  /// so a healthy table stores nothing here. Read it through [#getExpectedReplicas].
-  protected final Map<String, Integer> _oldSegmentExpectedReplicasMap = new HashMap<>();
 
   // _segmentStates is needed for instance selection (multi-threaded), so it is made volatile.
   protected volatile SegmentStates _segmentStates;
-  // Published together with _segmentStates and read back by the routing manager to report the table's
-  // gauges. Volatile so that a reader on another thread cannot see it lagging the segment states it was
-  // computed alongside.
-  protected volatile TableReplicaHealth _replicaHealth;
   protected Map<String, ServerInstance> _enabledServerStore;
-  // Only read by the rebuild thread. Not final so that tests can disable or bound the sharing.
-  @VisibleForTesting
-  int _maxSharedCandidateLists = MAX_SHARED_CANDIDATE_LISTS;
 
   @Override
   public void init(TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore,
@@ -160,7 +140,7 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
     // instance
     // Math.abs(Integer.MIN_VALUE) = Integer.MIN_VALUE, so we use & 0x7FFFFFFF to get a positive value
     _tableNameHashForFixedReplicaRouting =
-        TableNameBuilder.extractRawTableName(_tableNameWithType).hashCode() & 0x7FFFFFFF;
+        (TableNameBuilder.extractRawTableName(_tableNameWithType).hashCode() & 0x7FFFFFFF) % MAX_TABLE_NAME_HASH;
 
     _priorityPoolInstanceSelector =
         _adaptiveServerSelector == null ? null : new PriorityPoolInstanceSelector(_adaptiveServerSelector);
@@ -170,56 +150,20 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
     }
     _enabledInstances = enabledInstances;
     _enabledServerStore = enabledServerMap;
-    Map<String, Long> newSegmentCreationTimeMap =
+    Object2LongOpenHashMap<String> newSegmentCreationTimeMap =
         getNewSegmentCreationTimeMapFromZK(idealState, externalView, onlineSegments);
-    updateSegmentMaps(idealState, externalView, onlineSegments, newSegmentCreationTimeMap);
-    refreshSegmentStates();
+    updateSegmentStates(idealState, externalView, onlineSegments, newSegmentCreationTimeMap);
   }
 
   /// Returns how well the table's segments are currently replicated across the instances this selector
   /// can route to. Never null once [#init] has run.
   @Override
   public TableReplicaHealth getReplicaHealth() {
-    return _replicaHealth;
-  }
-
-  /// Returns the number of instances the ideal state assigns to the given old segment in an
-  /// ONLINE/CONSUMING state. See [#_oldSegmentExpectedReplicasMap] for why this is stored sparsely.
-  private int getExpectedReplicas(String segment, int numCandidates) {
-    return Math.max(1, _oldSegmentExpectedReplicasMap.getOrDefault(segment, numCandidates));
-  }
-
-  /// Records an old segment's candidates, along with the ideal-state replica count the replica health needs
-  /// that the candidate list does not preserve. The single entry point for both structures, so that they
-  /// cannot fall out of step.
-  protected void putOldSegment(String segment, List<SegmentInstanceCandidate> candidates,
-      Map<String, String> idealStateInstanceStateMap) {
-    _oldSegmentCandidatesMap.put(segment, candidates);
-    // Stored only when it differs from the candidate count, see _oldSegmentExpectedReplicasMap
-    int numIdealStateReplicas = getNumInstancesOnlineForRouting(idealStateInstanceStateMap);
-    if (numIdealStateReplicas > candidates.size()) {
-      _oldSegmentExpectedReplicasMap.put(segment, numIdealStateReplicas);
-    }
-  }
-
-  /// Returns the number of instances in the given ideal state assignment that are ONLINE/CONSUMING.
-  protected static int getNumInstancesOnlineForRouting(Map<String, String> idealStateInstanceStateMap) {
-    int numOnlineForRouting = 0;
-    for (String state : idealStateInstanceStateMap.values()) {
-      if (isOnlineForRouting(state)) {
-        numOnlineForRouting++;
-      }
-    }
-    return numOnlineForRouting;
-  }
-
-  /// Returns whether the instance state is online for routing purpose (ONLINE/CONSUMING).
-  static boolean isOnlineForRouting(@Nullable String state) {
-    return SegmentStateModel.ONLINE.equals(state) || SegmentStateModel.CONSUMING.equals(state);
+    return _segmentStates.getReplicaHealth();
   }
 
   /// Returns a map from new segment to their creation time based on the ZK metadata.
-  Map<String, Long> getNewSegmentCreationTimeMapFromZK(IdealState idealState, ExternalView externalView,
+  Object2LongOpenHashMap<String> getNewSegmentCreationTimeMapFromZK(IdealState idealState, ExternalView externalView,
       Set<String> onlineSegments) {
     List<String> potentialNewSegments = new ArrayList<>();
     Map<String, Map<String, String>> idealStateAssignment = idealState.getRecord().getMapFields();
@@ -231,7 +175,7 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
       }
     }
 
-    Map<String, Long> newSegmentCreationTimeMap = new HashMap<>();
+    Object2LongOpenHashMap<String> newSegmentCreationTimeMap = new Object2LongOpenHashMap<>();
     long currentTimeMs = _clock.millis();
     String segmentZKMetadataPathPrefix =
         ZKMetadataProvider.constructPropertyStorePathForResource(_tableNameWithType) + "/";
@@ -268,7 +212,7 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
     boolean hasConverged = true;
     // Only track ONLINE/CONSUMING instances within the ideal state
     for (Map.Entry<String, String> entry : idealStateInstanceStateMap.entrySet()) {
-      if (isOnlineForRouting(entry.getValue())) {
+      if (SegmentGroupsBuilder.isOnlineForRouting(entry.getValue())) {
         String externalViewState = externalViewInstanceStateMap.get(entry.getKey());
         if (externalViewState == null || externalViewState.equals(SegmentStateModel.OFFLINE)) {
           hasConverged = false;
@@ -280,275 +224,168 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
     return !hasConverged;
   }
 
-  /// Returns the online instances for routing purpose.
-  static Set<String> getOnlineInstances(Map<String, String> idealStateInstanceStateMap,
-      Map<String, String> externalViewInstanceStateMap) {
-    Set<String> onlineInstances = new HashSet<>();
-    // Only track ONLINE/CONSUMING instances within the ideal state
-    for (Map.Entry<String, String> entry : idealStateInstanceStateMap.entrySet()) {
-      String instance = entry.getKey();
-      // NOTE: DO NOT check if EV matches IS because it is a valid state when EV is CONSUMING while IS is ONLINE
-      if (isOnlineForRouting(entry.getValue()) && isOnlineForRouting(externalViewInstanceStateMap.get(instance))) {
-        onlineInstances.add(instance);
-      }
-    }
-    return onlineInstances;
+  /// Returns whether to compute the candidates with the strict replica-group rules: an instance unavailable for any old
+  /// segment is excluded from the candidates of every segment with the same instances in the ideal state, so that
+  /// these segments are always routed to the same instance.
+  boolean isStrictReplicaGroupRouting() {
+    return false;
   }
 
-  /// Returns a map that iterates the entries of the given map in key order: the map itself when it is a
-  /// [SortedMap] or when its iteration order is already sorted, otherwise a sorted copy.
-  ///
-  /// The instance state maps read from ZooKeeper are insertion-ordered, and are usually written in key order, so
-  /// the linear check avoids the copy in the common case.
-  static Map<String, String> sortByKeyIfNeeded(Map<String, String> map) {
-    if (map instanceof SortedMap) {
-      return map;
-    }
-    String previousKey = null;
-    for (String key : map.keySet()) {
-      if (previousKey != null && previousKey.compareTo(key) > 0) {
-        return new TreeMap<>(map);
-      }
-      previousKey = key;
-    }
-    return map;
-  }
-
-  /// Returns the candidates of an old segment: the instances that are ONLINE/CONSUMING in both the ideal state and
-  /// the external view, in instance order.
-  List<SegmentInstanceCandidate> computeOldSegmentCandidates(Map<String, String> idealStateInstanceStateMap,
-      Map<String, String> externalViewInstanceStateMap) {
-    List<SegmentInstanceCandidate> candidates = new ArrayList<>(idealStateInstanceStateMap.size());
-    int idealStateReplicaId = 0;
-    for (Map.Entry<String, String> entry : sortByKeyIfNeeded(idealStateInstanceStateMap).entrySet()) {
-      String instance = entry.getKey();
-      // NOTE: DO NOT check if EV matches IS because it is a valid state when EV is CONSUMING while IS is ONLINE
-      if (isOnlineForRouting(entry.getValue()) && isOnlineForRouting(externalViewInstanceStateMap.get(instance))) {
-        candidates.add(new SegmentInstanceCandidate(instance, true, getPool(instance), idealStateReplicaId));
-      }
-      idealStateReplicaId++;
-    }
-    return candidates;
-  }
-
-  /// Returns the candidates of a new segment: the instances that are ONLINE/CONSUMING in the ideal state, in instance
-  /// order. A candidate is online when the instance is ONLINE/CONSUMING in the external view.
-  List<SegmentInstanceCandidate> computeNewSegmentCandidates(Map<String, String> idealStateInstanceStateMap,
-      @Nullable Map<String, String> externalViewInstanceStateMap) {
-    List<SegmentInstanceCandidate> candidates = new ArrayList<>(idealStateInstanceStateMap.size());
-    int idealStateReplicaId = 0;
-    for (Map.Entry<String, String> entry : sortByKeyIfNeeded(idealStateInstanceStateMap).entrySet()) {
-      if (isOnlineForRouting(entry.getValue())) {
-        String instance = entry.getKey();
-        boolean online =
-            externalViewInstanceStateMap != null && isOnlineForRouting(externalViewInstanceStateMap.get(instance));
-        candidates.add(new SegmentInstanceCandidate(instance, online, getPool(instance), idealStateReplicaId));
-      }
-      idealStateReplicaId++;
-    }
-    return candidates;
-  }
-
-  /// Updates the segment maps based on the given ideal state, external view, online segments (segments with
-  /// ONLINE/CONSUMING instances in the ideal state and pre-selected by the `SegmentPreSelector`) and new
-  /// segments. After this update:
-  /// - Old segments' online instances should be tracked in _oldSegmentCandidatesMap
-  /// - New segments' state (creation time and candidate instances) should be tracked in _newSegmentStateMap
-  void updateSegmentMaps(IdealState idealState, ExternalView externalView, Set<String> onlineSegments,
-      Map<String, Long> newSegmentCreationTimeMap) {
-    _oldSegmentCandidatesMap.clear();
-    _oldSegmentExpectedReplicasMap.clear();
-    _newSegmentStateMap = new HashMap<>(HashUtil.getHashMapCapacity(newSegmentCreationTimeMap.size()));
-
+  /// Rebuilds the segment groups from the given ideal state, external view, online segments (segments with
+  /// ONLINE/CONSUMING instances in the ideal state and pre-selected by the `SegmentPreSelector`) and new segments,
+  /// then publishes the segment states.
+  private void updateSegmentStates(IdealState idealState, ExternalView externalView, Set<String> onlineSegments,
+      Object2LongOpenHashMap<String> newSegmentCreationTimeMap) {
     Map<String, Map<String, String>> idealStateAssignment = idealState.getRecord().getMapFields();
     Map<String, Map<String, String>> externalViewAssignment = externalView.getRecord().getMapFields();
-    InstanceStateMapsCache instanceStateMapsCache = new InstanceStateMapsCache(_maxSharedCandidateLists);
-    int numSinglePoolSegments = 0;
-    Set<Integer> pools = new HashSet<>();
+    SegmentGroupsBuilder segmentGroupsBuilder =
+        new SegmentGroupsBuilder(_tableNameWithType, newSegmentCreationTimeMap, onlineSegments.size(),
+            isStrictReplicaGroupRouting(), this::getPool);
     for (String segment : onlineSegments) {
       Map<String, String> idealStateInstanceStateMap = idealStateAssignment.get(segment);
-      Long newSegmentCreationTimeMs = newSegmentCreationTimeMap.get(segment);
-      Map<String, String> externalViewInstanceStateMap = externalViewAssignment.get(segment);
-
-      if (newSegmentCreationTimeMs != null) {
-        // New segment
-        _newSegmentStateMap.put(segment, new NewSegmentState(newSegmentCreationTimeMs,
-            computeNewSegmentCandidates(idealStateInstanceStateMap, externalViewInstanceStateMap)));
-      } else if (externalViewInstanceStateMap == null) {
-        // Old segment
-        putOldSegment(segment, List.of(), idealStateInstanceStateMap);
-      } else {
-        // Old segment. Segments with the same instance state maps share the candidate list.
-        InstanceStateMaps instanceStateMaps =
-            instanceStateMapsCache.canonicalize(idealStateInstanceStateMap, externalViewInstanceStateMap);
-        List<SegmentInstanceCandidate> candidates = instanceStateMaps._oldSegmentCandidates;
-        if (candidates == null) {
-          candidates = computeOldSegmentCandidates(idealStateInstanceStateMap, externalViewInstanceStateMap);
-          instanceStateMaps._oldSegmentCandidates = candidates;
-        }
-        putOldSegment(segment, candidates, idealStateInstanceStateMap);
-      }
-      if (_emitSinglePoolSegmentsMetric) {
-        pools.clear();
-        for (String instance : idealStateInstanceStateMap.keySet()) {
-          pools.add(getPool(instance));
-        }
-        if (pools.size() < 2) {
-          numSinglePoolSegments++;
-        }
-      }
+      assert idealStateInstanceStateMap != null;
+      segmentGroupsBuilder.addSegment(segment, idealStateInstanceStateMap, externalViewAssignment.get(segment));
     }
     if (_emitSinglePoolSegmentsMetric) {
-      _brokerMetrics.addMeteredTableValue(_tableNameWithType, BrokerMeter.SINGLE_POOL_SEGMENTS, numSinglePoolSegments);
+      _brokerMetrics.addMeteredTableValue(_tableNameWithType, BrokerMeter.SINGLE_POOL_SEGMENTS,
+          segmentGroupsBuilder.getNumSinglePoolSegments());
     }
-    if (LOGGER.isDebugEnabled()) {
-      LOGGER.debug("Got _newSegmentStateMap: {}, _oldSegmentCandidatesMap: {}", _newSegmentStateMap.keySet(),
-          _oldSegmentCandidatesMap.keySet());
-    }
+    SegmentGroups segmentGroups = segmentGroupsBuilder.build();
+    LOGGER.debug("Got {} candidate groups for {} segments of table: {}", segmentGroups.getNumGroups(),
+        onlineSegments.size(), _tableNameWithType);
+    refreshSegmentStates(segmentGroups);
   }
 
-  /// Refreshes the \_segmentStates based on the in-memory states.
-  /// Note that the whole \_segmentStates has to be updated together to avoid partial state update.
-  void refreshSegmentStates() {
-    Map<String, List<SegmentInstanceCandidate>> instanceCandidatesMap =
-        new HashMap<>(HashUtil.getHashMapCapacity(_oldSegmentCandidatesMap.size() + _newSegmentStateMap.size()));
-    Set<String> servingInstances = new HashSet<>();
-    Set<String> unavailableSegments = new HashSet<>();
+  /// Publishes the segment states of the given segment groups under the enabled instances, along with the replica
+  /// health. Reuses the routing of every group whose candidates did not change enabled state since the published
+  /// segment states, when they are of the same segment groups.
+  ///
+  /// Apart from the DEBUG log of the unavailable segments, the cost depends on the number of groups and instances, not
+  /// on the number of segments.
+  private void refreshSegmentStates(SegmentGroups segmentGroups) {
+    int numSlots = segmentGroups.getNumSlots();
+    boolean[] enabledBySlot = new boolean[numSlots];
+    for (int slot = 0; slot < numSlots; slot++) {
+      enabledBySlot[slot] = _enabledInstances.contains(segmentGroups._slotInstances[slot]);
+    }
+    SegmentStates previousSegmentStates = _segmentStates;
+    boolean[] previousEnabledBySlot =
+        previousSegmentStates != null && previousSegmentStates._segmentGroups == segmentGroups
+            ? previousSegmentStates._enabledBySlot
+            : null;
+
+    int numGroups = segmentGroups.getNumGroups();
+    GroupRouting[] routings = new GroupRouting[numGroups];
     int minPercentOfReplicas = TableReplicaHealth.FULLY_REPLICATED_PERCENT;
     // Segments seen at exactly minPercentOfReplicas so far. Reset whenever a lower percentage displaces the
     // minimum, so that the pair published below always describes the same population.
     int numSegmentsAtMinPercentOfReplicas = 0;
-
-    for (Map.Entry<String, List<SegmentInstanceCandidate>> entry : _oldSegmentCandidatesMap.entrySet()) {
-      String segment = entry.getKey();
-      List<SegmentInstanceCandidate> candidates = entry.getValue();
-      List<SegmentInstanceCandidate> enabledCandidates =
-          getEnabledCandidatesAndAddToServingInstances(candidates, servingInstances);
-      int expectedReplicas = getExpectedReplicas(segment, candidates.size());
-      int servingReplicas = enabledCandidates.size();
+    int numUnavailableSegments = 0;
+    for (int groupId = 0; groupId < numGroups; groupId++) {
+      CandidateGroup group = segmentGroups._groups[groupId];
+      GroupRouting routing =
+          previousEnabledBySlot != null && !hasEnabledStateChange(group, previousEnabledBySlot, enabledBySlot)
+              ? previousSegmentStates._routings[groupId]
+              : group.filterEnabled(enabledBySlot);
+      routings[groupId] = routing;
+      int groupSize = segmentGroups._groupSizes[groupId];
+      int numServingReplicas = routing.getNumCandidates();
+      if (group._new) {
+        if (numServingReplicas == 0) {
+          LOGGER.info("Failed to find servers hosting {} new segments (e.g. {}) for table: {} (all candidate "
+                  + "instances: {} are disabled, but not counting new segments as unavailable)", groupSize,
+              group._sampleSegment, _tableNameWithType, getCandidateInstances(group));
+        }
+        continue;
+      }
+      int expectedReplicas = group._expectedReplicas;
       if (TableReplicaHealth.shouldMeasure(expectedReplicas)) {
-        int percentOfReplicas = TableReplicaHealth.toPercent(servingReplicas, expectedReplicas);
+        int percentOfReplicas = TableReplicaHealth.toPercent(numServingReplicas, expectedReplicas);
         if (percentOfReplicas < minPercentOfReplicas) {
           minPercentOfReplicas = percentOfReplicas;
-          numSegmentsAtMinPercentOfReplicas = 1;
+          numSegmentsAtMinPercentOfReplicas = groupSize;
         } else if (percentOfReplicas == minPercentOfReplicas) {
-          numSegmentsAtMinPercentOfReplicas++;
+          numSegmentsAtMinPercentOfReplicas += groupSize;
         }
       }
-      if (!enabledCandidates.isEmpty()) {
-        instanceCandidatesMap.put(segment, enabledCandidates);
-      } else {
-        List<String> candidateInstances = new ArrayList<>(candidates.size());
-        for (SegmentInstanceCandidate candidate : candidates) {
-          candidateInstances.add(candidate.getInstance());
-        }
-        LOGGER.warn("Failed to find servers hosting old segment: {} for table: {} "
-                + "(all candidate instances: {} are disabled, counting segment as unavailable)", segment,
-            _tableNameWithType, candidateInstances);
-        unavailableSegments.add(segment);
-        _brokerMetrics.addMeteredTableValue(_tableNameWithType, BrokerMeter.NO_SERVING_HOST_FOR_SEGMENT, 1);
+      if (numServingReplicas == 0) {
+        numUnavailableSegments += groupSize;
+        LOGGER.warn("Failed to find servers hosting {} old segments (e.g. {}) for table: {} (all candidate instances: "
+                + "{} are disabled, counting segments as unavailable)", groupSize, group._sampleSegment,
+            _tableNameWithType, getCandidateInstances(group));
+        _brokerMetrics.addMeteredTableValue(_tableNameWithType, BrokerMeter.NO_SERVING_HOST_FOR_SEGMENT, groupSize);
       }
     }
-
-    for (Map.Entry<String, NewSegmentState> entry : _newSegmentStateMap.entrySet()) {
-      String segment = entry.getKey();
-      NewSegmentState newSegmentState = entry.getValue();
-      List<SegmentInstanceCandidate> candidates = newSegmentState.getCandidates();
-      List<SegmentInstanceCandidate> enabledCandidates =
-          getEnabledCandidatesAndAddToServingInstances(candidates, servingInstances);
-      if (!enabledCandidates.isEmpty()) {
-        instanceCandidatesMap.put(segment, enabledCandidates);
-      } else {
-        // Do not count new segment as unavailable
-        List<String> candidateInstances = new ArrayList<>(candidates.size());
-        for (SegmentInstanceCandidate candidate : candidates) {
-          candidateInstances.add(candidate.getInstance());
+    SegmentStates segmentStates = new SegmentStates(segmentGroups, routings, enabledBySlot,
+        new TableReplicaHealth(minPercentOfReplicas, numSegmentsAtMinPercentOfReplicas, numUnavailableSegments));
+    if (numUnavailableSegments > 0 && LOGGER.isDebugEnabled()) {
+      List<String> unavailableSegments = new ArrayList<>(numUnavailableSegments);
+      segmentGroups._segmentToGroupId.object2IntEntrySet().fastForEach(entry -> {
+        if (segmentStates.isUnavailable(entry.getIntValue())) {
+          unavailableSegments.add(entry.getKey());
         }
-        LOGGER.info("Failed to find servers hosting new segment: {} for table: {} "
-                + "(all candidate instances: {} are disabled, but not counting new segment as unavailable)", segment,
-            _tableNameWithType, candidateInstances);
-      }
+      });
+      LOGGER.debug("Got {} unavailable segments: {} for table: {}", numUnavailableSegments, unavailableSegments,
+          _tableNameWithType);
     }
-
-    _segmentStates = new SegmentStates(instanceCandidatesMap, servingInstances, unavailableSegments);
-    _replicaHealth = new TableReplicaHealth(minPercentOfReplicas, numSegmentsAtMinPercentOfReplicas,
-        unavailableSegments.size());
+    _segmentStates = segmentStates;
   }
 
-  /// Returns the enabled candidates, and adds their instances to the serving instances.
-  ///
-  /// When every candidate is enabled, returns the given list itself rather than a copy. That publishes the list to
-  /// the query path, which is safe because candidate lists are never modified once built. It also keeps the lists
-  /// that [#updateSegmentMaps] shares between segments shared in the published [SegmentStates].
-  private List<SegmentInstanceCandidate> getEnabledCandidatesAndAddToServingInstances(
-      List<SegmentInstanceCandidate> candidates, Set<String> servingInstances) {
-    int numCandidates = candidates.size();
-    int numLeadingEnabledCandidates = 0;
-    while (numLeadingEnabledCandidates < numCandidates) {
-      String instance = candidates.get(numLeadingEnabledCandidates).getInstance();
-      if (!_enabledInstances.contains(instance)) {
-        break;
-      }
-      servingInstances.add(instance);
-      numLeadingEnabledCandidates++;
-    }
-    if (numLeadingEnabledCandidates == numCandidates) {
-      return candidates;
-    }
-    List<SegmentInstanceCandidate> enabledCandidates = new ArrayList<>(numCandidates - 1);
-    for (int i = 0; i < numLeadingEnabledCandidates; i++) {
-      enabledCandidates.add(candidates.get(i));
-    }
-    // The candidate at numLeadingEnabledCandidates is disabled
-    for (int i = numLeadingEnabledCandidates + 1; i < numCandidates; i++) {
-      SegmentInstanceCandidate candidate = candidates.get(i);
-      String instance = candidate.getInstance();
-      if (_enabledInstances.contains(instance)) {
-        enabledCandidates.add(candidate);
-        servingInstances.add(instance);
+  private static boolean hasEnabledStateChange(CandidateGroup group, boolean[] previousEnabledBySlot,
+      boolean[] enabledBySlot) {
+    for (int slot : group._routing._slots) {
+      if (previousEnabledBySlot[slot] != enabledBySlot[slot]) {
+        return true;
       }
     }
-    return enabledCandidates;
+    return false;
+  }
+
+  private static List<String> getCandidateInstances(CandidateGroup group) {
+    List<String> candidateInstances = new ArrayList<>(group._routing.getNumCandidates());
+    for (SegmentInstanceCandidate candidate : group._routing.getCandidates()) {
+      candidateInstances.add(candidate.getInstance());
+    }
+    return candidateInstances;
   }
 
   /// {@inheritDoc}
   ///
-  /// Updates the cached enabled instances and re-calculates [#_segmentStates].
+  /// Updates the cached enabled instances and re-calculates [#_segmentStates] for the same segment groups.
   @Override
   public void onInstancesChange(Set<String> enabledInstances, List<String> changedInstances) {
     _enabledInstances = enabledInstances;
-    refreshSegmentStates();
+    refreshSegmentStates(_segmentStates._segmentGroups);
   }
 
   /// {@inheritDoc}
   ///
-  /// Updates the cached maps ([#_oldSegmentCandidatesMap] and [#_newSegmentStateMap], and re-calculates
-  /// [#_segmentStates] based on the cached states.
+  /// Rebuilds the segment groups and re-calculates [#_segmentStates].
   @Override
   public void onAssignmentChange(IdealState idealState, ExternalView externalView, Set<String> onlineSegments) {
-    Map<String, Long> newSegmentCreationTimeMap =
+    Object2LongOpenHashMap<String> newSegmentCreationTimeMap =
         getNewSegmentCreationTimeMapFromExistingStates(idealState, externalView, onlineSegments);
-    updateSegmentMaps(idealState, externalView, onlineSegments, newSegmentCreationTimeMap);
-    refreshSegmentStates();
+    updateSegmentStates(idealState, externalView, onlineSegments, newSegmentCreationTimeMap);
   }
 
   /// Returns a map from new segment to their creation time based on the existing in-memory states.
-  Map<String, Long> getNewSegmentCreationTimeMapFromExistingStates(IdealState idealState, ExternalView externalView,
-      Set<String> onlineSegments) {
-    Map<String, Long> newSegmentCreationTimeMap = new HashMap<>();
+  Object2LongOpenHashMap<String> getNewSegmentCreationTimeMapFromExistingStates(IdealState idealState,
+      ExternalView externalView, Set<String> onlineSegments) {
+    Object2LongOpenHashMap<String> newSegmentCreationTimeMap = new Object2LongOpenHashMap<>();
     long currentTimeMs = _clock.millis();
     Map<String, Map<String, String>> idealStateAssignment = idealState.getRecord().getMapFields();
     Map<String, Map<String, String>> externalViewAssignment = externalView.getRecord().getMapFields();
+    SegmentGroups segmentGroups = _segmentStates._segmentGroups;
     for (String segment : onlineSegments) {
-      NewSegmentState newSegmentState = _newSegmentStateMap.get(segment);
       long creationTimeMs = 0;
-      if (newSegmentState != null) {
+      long previousCreationTimeMs = segmentGroups._newSegmentCreationTimeMap.getLong(segment);
+      if (previousCreationTimeMs > 0) {
         // It was a new segment before, check the creation time and segment state to see if it is still a new segment
-        if (InstanceSelector.isNewSegment(newSegmentState.getCreationTimeMs(), currentTimeMs,
+        if (InstanceSelector.isNewSegment(previousCreationTimeMs, currentTimeMs,
             _newSegmentExpirationTimeInSeconds * 1000)) {
-          creationTimeMs = newSegmentState.getCreationTimeMs();
+          creationTimeMs = previousCreationTimeMs;
         }
-      } else if (!_oldSegmentCandidatesMap.containsKey(segment)) {
+      } else if (segmentGroups._segmentToGroupId.getInt(segment) == SegmentStates.UNKNOWN_SEGMENT) {
         // This is the first time we see this segment, use the current time as the creation time
         creationTimeMs = currentTimeMs;
       }
@@ -567,28 +404,14 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
   }
 
   @Override
-  public SelectionResult select(BrokerRequest brokerRequest, List<String> segments, long requestId) {
+  public SelectionResult select(BrokerRequest brokerRequest, Collection<String> segments, long requestId) {
     Map<String, String> queryOptions =
         (brokerRequest.getPinotQuery() != null && brokerRequest.getPinotQuery().getQueryOptions() != null)
-            ? brokerRequest.getPinotQuery().getQueryOptions() : Map.of();
+            ? brokerRequest.getPinotQuery().getQueryOptions()
+            : Map.of();
     int requestIdInt = (int) (requestId % MAX_REQUEST_ID);
-    // Copy the volatile reference so that the segment-to-instance map and unavailable segments have a consistent view
-    // of the state.
-    SegmentStates segmentStates = _segmentStates;
-    InstanceMapping mapping = select(segments, requestIdInt, segmentStates, queryOptions);
-    Set<String> unavailableSegments = segmentStates.getUnavailableSegments();
-
-    if (unavailableSegments.isEmpty()) {
-      return new SelectionResult(mapping, List.of(), 0);
-    } else {
-      List<String> unavailableSegmentsForRequest = new ArrayList<>();
-      for (String segment : segments) {
-        if (unavailableSegments.contains(segment)) {
-          unavailableSegmentsForRequest.add(segment);
-        }
-      }
-      return new SelectionResult(mapping, unavailableSegmentsForRequest, 0);
-    }
+    // Read the volatile reference once, so that the whole selection has a consistent view of the state
+    return select(segments, requestIdInt, _segmentStates, queryOptions);
   }
 
   @Override
@@ -596,104 +419,41 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
     return _segmentStates.getServingInstances();
   }
 
-  @VisibleForTesting
-  int getPool(String instanceID) {
+  private int getPool(String instanceID) {
     int pool = FALLBACK_POOL_ID;
     ServerInstance server = _enabledServerStore.get(instanceID);
     if (server == null) {
-      LOGGER.warn("Failed to find server {} in the enabledServerManager when update segmentsMap for table {}",
-          instanceID, _tableNameWithType);
+      LOGGER.warn("Failed to find server {} in the enabledServerManager when building the candidate groups for "
+          + "table {}", instanceID, _tableNameWithType);
     } else {
       pool = server.getPool();
     }
     return pool;
   }
 
-  /// Selects the server instances for the given segments based on the request id and segment states. Returns an
-  /// [InstanceSelector.InstanceMapping] containing two maps from segment to selected server instance. The optional map
-  /// covers new segments that are not online yet; instead of simply skipping them at the broker, we can send them to
-  /// servers and let servers decide how to handle them.
-  protected abstract InstanceMapping select(List<String> segments, int requestId, SegmentStates segmentStates,
+  /// Selects, for every segment, the candidate at index `floorMod(baseIndex, numCandidates)`, so that the segments with
+  /// the same number of candidates (e.g. the segments of mirror servers) are selected on the same candidate index.
+  SelectionCollector selectSameCandidateIndex(Collection<String> segments, SegmentStates segmentStates, int baseIndex) {
+    SelectionCollector collector = new SelectionCollector(segmentStates, segments.size(), false);
+    int numCandidates = 0;
+    int candidateIndex = 0;
+    for (String segment : segments) {
+      GroupRouting routing = collector.resolveRouting(segment);
+      if (routing != null) {
+        if (routing.getNumCandidates() != numCandidates) {
+          numCandidates = routing.getNumCandidates();
+          candidateIndex = Math.floorMod(baseIndex, numCandidates);
+        }
+        collector.add(routing, candidateIndex, segment);
+      }
+    }
+    return collector;
+  }
+
+  /// Selects the server instances for the given segments based on the request id and segment states. Returns the
+  /// segments to query on each selected instance, where the optional segments cover new segments that are not online
+  /// yet: instead of simply skipping them at the broker, we can send them to servers and let servers decide how to
+  /// handle them. Also returns the requested segments that are unavailable, in the order of the given segments.
+  protected abstract SelectionResult select(Collection<String> segments, int requestId, SegmentStates segmentStates,
       Map<String, String> queryOptions);
-
-  /// The ideal state and external view instance state maps of a segment, compared by content. Within one rebuild,
-  /// segments with equal maps get the same routing candidates, so the canonical instance (see
-  /// [InstanceStateMapsCache]) caches what is derived from the maps, and the segments share it.
-  ///
-  /// Not thread safe. Only used by the rebuild thread, for the duration of one rebuild.
-  static final class InstanceStateMaps {
-    final Map<String, String> _idealStateInstanceStateMap;
-    @Nullable
-    final Map<String, String> _externalViewInstanceStateMap;
-    private final int _hashCode;
-    // Derived from the maps, computed on first use
-    @Nullable
-    Set<String> _onlineInstances;
-    @Nullable
-    List<SegmentInstanceCandidate> _oldSegmentCandidates;
-    // Used by the strict replica-group selector to collect the unavailable instances once per instance state maps
-    boolean _unavailableInstancesCollected;
-
-    InstanceStateMaps(Map<String, String> idealStateInstanceStateMap,
-        @Nullable Map<String, String> externalViewInstanceStateMap) {
-      _idealStateInstanceStateMap = idealStateInstanceStateMap;
-      _externalViewInstanceStateMap = externalViewInstanceStateMap;
-      _hashCode = 31 * idealStateInstanceStateMap.hashCode() + Objects.hashCode(externalViewInstanceStateMap);
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (this == o) {
-        return true;
-      }
-      if (!(o instanceof InstanceStateMaps)) {
-        return false;
-      }
-      InstanceStateMaps that = (InstanceStateMaps) o;
-      // NOTE: Map.equals() ignores the iteration order, so maps with the same entries in a different order share one
-      //       canonical InstanceStateMaps. This is correct because every candidate list is built in the order of
-      //       sortByKeyIfNeeded(), which does not depend on the iteration order of the maps.
-      return _hashCode == that._hashCode && _idealStateInstanceStateMap.equals(that._idealStateInstanceStateMap)
-          && Objects.equals(_externalViewInstanceStateMap, that._externalViewInstanceStateMap);
-    }
-
-    @Override
-    public int hashCode() {
-      return _hashCode;
-    }
-  }
-
-  /// Returns one canonical [InstanceStateMaps] per distinct pair of instance state maps, so that the segments of one
-  /// rebuild with equal maps share what is derived from them.
-  ///
-  /// The cache keeps at most `maxSize` pairs. Past that bound, it stops caching new pairs: a pair already in the cache
-  /// still returns its canonical [InstanceStateMaps], while any other pair returns a new [InstanceStateMaps] for each
-  /// call, which makes each segment compute its own state, as if there was no sharing.
-  ///
-  /// Not thread safe. Only used by the rebuild thread, for the duration of one rebuild.
-  static final class InstanceStateMapsCache {
-    private final int _maxSize;
-    private final Map<InstanceStateMaps, InstanceStateMaps> _cache = new HashMap<>();
-
-    InstanceStateMapsCache(int maxSize) {
-      _maxSize = maxSize;
-    }
-
-    InstanceStateMaps canonicalize(Map<String, String> idealStateInstanceStateMap,
-        @Nullable Map<String, String> externalViewInstanceStateMap) {
-      InstanceStateMaps instanceStateMaps =
-          new InstanceStateMaps(idealStateInstanceStateMap, externalViewInstanceStateMap);
-      if (_maxSize <= 0) {
-        return instanceStateMaps;
-      }
-      InstanceStateMaps canonical = _cache.get(instanceStateMaps);
-      if (canonical != null) {
-        return canonical;
-      }
-      if (_cache.size() < _maxSize) {
-        _cache.put(instanceStateMaps, instanceStateMaps);
-      }
-      return instanceStateMaps;
-    }
-  }
 }

@@ -26,6 +26,8 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
+import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
@@ -46,6 +48,15 @@ public interface DataTable {
 
   byte[] toBytes()
       throws IOException;
+
+  /// Serializes the table into the same bytes as [#toBytes()], but possibly split into several buffers. An
+  /// implementation can return its sections without copying them, so a large table does not need one large array.
+  ///
+  /// The default implementation wraps [#toBytes()].
+  default DataBuffer toDataBuffer()
+      throws IOException {
+    return PinotByteBuffer.wrap(toBytes());
+  }
 
   Map<String, String> getMetadata();
 

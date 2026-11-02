@@ -67,6 +67,7 @@ import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.LogicalTableConfig;
@@ -527,7 +528,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         return null;
       }
       try {
-        return segmentDataManager.getSegment().getSegmentMetadata();
+        return detachMappedMetadata(segmentDataManager);
       } finally {
         tableDataManager.releaseSegment(segmentDataManager);
       }
@@ -545,7 +546,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       try {
         List<SegmentMetadata> segmentsMetadata = new ArrayList<>(segmentDataManagers.size());
         for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-          segmentsMetadata.add(segmentDataManager.getSegment().getSegmentMetadata());
+          segmentsMetadata.add(detachMappedMetadata(segmentDataManager));
         }
         return segmentsMetadata;
       } finally {
@@ -554,6 +555,14 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         }
       }
     }
+  }
+
+  private static SegmentMetadata detachMappedMetadata(SegmentDataManager segmentDataManager) {
+    SegmentMetadata metadata = segmentDataManager.getSegment().getSegmentMetadata();
+    if (metadata instanceof SegmentMetadataImpl segmentMetadata && segmentMetadata.isMapped()) {
+      return segmentMetadata.detachedCopy();
+    }
+    return metadata;
   }
 
   /// Assemble the path to segment dir directly, when table mgr object is not

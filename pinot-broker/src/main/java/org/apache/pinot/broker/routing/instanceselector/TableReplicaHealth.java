@@ -65,7 +65,7 @@ public class TableReplicaHealth {
   }
 
   /// Returns how many segments cannot be routed anywhere, whatever their replication. Matches
-  /// [SegmentStates#getUnavailableSegments()], i.e. what the query path refuses to serve, so unlike the two
+  /// [SegmentStates#isUnavailable(int)], i.e. what the query path refuses to serve, so unlike the two
   /// above it includes single-replica segments. When [#getMinPercentOfReplicas] is `0`, this is how much of
   /// the data is already gone rather than merely degraded.
   public int getNumUnavailableSegments() {

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.aggregation.function.funnel;
 
-import it.unimi.dsi.fastutil.longs.LongArrayList;
 import javax.annotation.concurrent.ThreadSafe;
 
 
@@ -38,5 +37,5 @@ interface MergeStrategy<I> {
     return true;
   }
 
-  LongArrayList extractFinalResult(I intermediateResult);
+  long[] extractFinalResult(I intermediateResult);
 }

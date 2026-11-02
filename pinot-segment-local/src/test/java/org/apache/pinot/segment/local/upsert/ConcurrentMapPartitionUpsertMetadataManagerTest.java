@@ -1014,6 +1014,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     columnMetadataMap.put(PRIMARY_KEY_COLUMNS.get(0), primaryKeyColumnMetadata);
     columnMetadataMap.put(COMPARISON_COLUMNS.get(0), comparisonColumnMetadata);
     when(segmentMetadata.getColumnMetadataMap()).thenReturn(columnMetadataMap);
+    when(segmentMetadata.getColumnMetadataFor(COMPARISON_COLUMNS.get(0))).thenReturn(comparisonColumnMetadata);
 
     when(segment.getSegmentMetadata()).thenReturn(segmentMetadata);
     return segment;
@@ -1105,6 +1106,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     when(segmentMetadata.getColumnMetadataMap()).thenReturn(new TreeMap() {{
         this.put(comparisonColumns.get(0), columnMetadata);
       }});
+    when(segmentMetadata.getColumnMetadataFor(comparisonColumns.get(0))).thenReturn(columnMetadata);
     doReturn(endTime).when(columnMetadata).getMaxValue();
     if (snapshot != null) {
       when(segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME)).thenReturn(snapshot);
@@ -1948,6 +1950,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
       when(segmentMetadata.getColumnMetadataMap()).thenReturn(new TreeMap() {{
           this.put(COMPARISON_COLUMNS.get(0), columnMetadata);
         }});
+      when(segmentMetadata.getColumnMetadataFor(COMPARISON_COLUMNS.get(0))).thenReturn(columnMetadata);
 
       ImmutableSegmentImpl segment =
           mockImmutableSegmentWithSegmentMetadata(1, new ThreadSafeMutableRoaringBitmap(), null, null, segmentMetadata,

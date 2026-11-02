@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.aggregation.function.array;
 
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.util.Map;
@@ -97,8 +96,8 @@ public class ArrayAggDistinctBytesFunction extends BaseArrayAggBytesFunction<Obj
   }
 
   @Override
-  public ObjectArrayList<ByteArray> extractFinalResult(ObjectSet<ByteArray> intermediateResult) {
-    return intermediateResult == null ? new ObjectArrayList<>() : new ObjectArrayList<>(intermediateResult);
+  public ByteArray[] extractFinalResult(ObjectSet<ByteArray> intermediateResult) {
+    return intermediateResult != null ? intermediateResult.toArray(new ByteArray[0]) : new ByteArray[0];
   }
 
   @Override

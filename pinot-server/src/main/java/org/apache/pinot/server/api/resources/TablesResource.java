@@ -110,6 +110,7 @@ import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager.Snap
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.IndexService;
@@ -265,7 +266,7 @@ public class TablesResource {
 
             // Column stats are scoped to the caller's column filter.
             for (String column : columnSet) {
-              ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataMap().get(column);
+              ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);
               int columnLength = columnMetadata.getLengthOfLongestElement();
               if (columnLength < 0) {
                 // For raw STRING/BYTES/BIG_DECIMAL column, set the columnLength as the length of the max value.
@@ -396,11 +397,18 @@ public class TablesResource {
   static int addColumnContributions(int currentCount, ImmutableSegment segment,
       @Nullable Set<String> columnFilter) {
     int additionalCount = 0;
+    SegmentMetadata segmentMetadata = segment.getSegmentMetadata();
+    Set<String> physicalColumns = segmentMetadata instanceof SegmentMetadataImpl
+        ? segment.getPhysicalColumnNames()
+        : null;
     if (columnFilter == null) {
-      additionalCount = segment.getSegmentMetadata().getColumnMetadataMap().size();
+      additionalCount = physicalColumns != null
+          ? physicalColumns.size()
+          : segmentMetadata.getColumnMetadataMap().size();
     } else {
       for (String column : columnFilter) {
-        if (segment.getSegmentMetadata().getColumnMetadataMap().containsKey(column)) {
+        if (physicalColumns != null ? physicalColumns.contains(column)
+            : segmentMetadata.getColumnMetadataMap().containsKey(column)) {
           additionalCount++;
         }
       }
@@ -611,8 +619,7 @@ public class TablesResource {
           tableNameWithType + "_" + segmentName + "_" + UUID.randomUUID() + TarCompressionUtils.TAR_GZ_FILE_EXTENSION,
           "Invalid table / segment name: %s , %s", tableNameWithType, segmentName);
 
-      TarCompressionUtils.createCompressedTarFile(new File(tableDataManager.getTableDataDir(), segmentName),
-          segmentTarFile);
+      createSegmentTransferTarFile(new File(tableDataManager.getTableDataDir(), segmentName), segmentTarFile);
       Response.ResponseBuilder builder = Response.ok();
       builder.entity((StreamingOutput) output -> {
         try {
@@ -1101,9 +1108,19 @@ public class TablesResource {
     File segmentTarFile = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(segmentTarUploadDir,
         tableNameWithType + "_" + segmentName + "_" + UUID.randomUUID() + TarCompressionUtils.TAR_GZ_FILE_EXTENSION,
         "Invalid table / segment name: %s, %s", tableNameWithType, segmentName);
-    TarCompressionUtils.createCompressedTarFile(new File(tableDataManager.getTableDataDir(), segmentName),
-        segmentTarFile);
+    createSegmentTransferTarFile(new File(tableDataManager.getTableDataDir(), segmentName), segmentTarFile);
     return segmentTarFile;
+  }
+
+  private static void createSegmentTransferTarFile(File segmentDir, File segmentTarFile)
+      throws IOException {
+    TarCompressionUtils.createFilteredCompressedTarFile(segmentDir, segmentTarFile, file -> {
+      if (!segmentDir.equals(file.getParentFile())) {
+        return true;
+      }
+      // Local serving artifacts are rebuilt from metadata.properties on the receiving server.
+      return !SegmentMetadataImpl.isMappedMetadataSidecarFileName(file.getName());
+    });
   }
 
   /// Uploads a segment tar file to the segment store and returns the segment download url.

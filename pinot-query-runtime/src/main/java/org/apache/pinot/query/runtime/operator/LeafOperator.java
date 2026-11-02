@@ -22,7 +22,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -44,9 +43,11 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
+import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock.EarlyTerminationReason;
 import org.apache.pinot.core.operator.blocks.results.ExplainV2ResultBlock;
+import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.MetadataResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.plan.ExplainInfo;
@@ -732,22 +733,44 @@ public class LeafOperator extends MultiStageOperator implements ExplainableOpera
     assert resultRows != null && inputDataSchema != null;
     ColumnDataType[] inputStoredTypes = inputDataSchema.getStoredColumnDataTypes();
     ColumnDataType[] outputStoredTypes = _dataSchema.getStoredColumnDataTypes();
-    if (!Arrays.equals(inputStoredTypes, outputStoredTypes)) {
-      for (Object[] row : resultRows) {
-        convertRow(row, inputStoredTypes, outputStoredTypes);
+    QueryContext queryContext = _requests.get(0).getQueryContext();
+    // Convert the columns whose stored types differ, and the STRING final aggregation results, which can be objects
+    // stored as their strings, e.g. raw sketches
+    int numColumns = outputStoredTypes.length;
+    int firstFinalResultColId = getFirstFinalResultColId(block, queryContext, numColumns);
+    int[] colIdsToConvert = new int[numColumns];
+    int numColumnsToConvert = 0;
+    for (int colId = 0; colId < numColumns; colId++) {
+      if (inputStoredTypes[colId] != outputStoredTypes[colId]
+          || (colId >= firstFinalResultColId && outputStoredTypes[colId] == ColumnDataType.STRING)) {
+        colIdsToConvert[numColumnsToConvert++] = colId;
       }
     }
-    return new RowHeapDataBlock(resultRows, _dataSchema, _requests.get(0).getQueryContext().getAggregationFunctions());
+    if (numColumnsToConvert > 0) {
+      for (Object[] row : resultRows) {
+        for (int i = 0; i < numColumnsToConvert; i++) {
+          int colId = colIdsToConvert[i];
+          Object value = row[colId];
+          if (value != null) {
+            row[colId] = TypeUtils.convert(value, outputStoredTypes[colId]);
+          }
+        }
+      }
+    }
+    return new RowHeapDataBlock(resultRows, _dataSchema, queryContext.getAggregationFunctions());
   }
 
-  public static void convertRow(Object[] row, ColumnDataType[] inputStoredTypes, ColumnDataType[] outputStoredTypes) {
-    int numColumns = row.length;
-    for (int colId = 0; colId < numColumns; colId++) {
-      Object value = row[colId];
-      if (value != null && inputStoredTypes[colId] != outputStoredTypes[colId]) {
-        row[colId] = TypeUtils.convert(value, outputStoredTypes[colId]);
-      }
+  /// Returns the index of the first final aggregation result column of the block, or `numColumns` when the block does
+  /// not hold final aggregation results, which the server returns when the query asks for them.
+  private static int getFirstFinalResultColId(BaseResultsBlock block, QueryContext queryContext, int numColumns) {
+    if (block instanceof AggregationResultsBlock && queryContext.isServerReturnFinalResult()) {
+      return 0;
     }
+    if (block instanceof GroupByResultsBlock && (queryContext.isServerReturnFinalResult()
+        || queryContext.isServerReturnFinalResultKeyUnpartitioned())) {
+      return queryContext.getNumGroupByKeyColumns();
+    }
+    return numColumns;
   }
 
   public enum StatKey implements StatMap.Key {

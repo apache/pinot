@@ -20,6 +20,7 @@ package org.apache.pinot.queries;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
@@ -28,6 +29,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertFalse;
@@ -36,6 +38,8 @@ import static org.testng.Assert.assertTrue;
 
 public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleValueQueriesTest {
   private static final String GROUP_BY = " GROUP BY column9 ORDER BY v1 DESC, v2 DESC LIMIT 1";
+  private static final Map<String, String> SERVER_RETURN_FINAL_RESULT =
+      Map.of(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true");
 
   // Allow 5% quantile error due to the randomness of TDigest merge
   private static final double PERCENTILE_TDIGEST_DELTA = 0.05 * Integer.MAX_VALUE;
@@ -324,6 +328,10 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L, 0L, 120000L, expectedResultTable,
         cardinalityExtractor);
 
+    brokerResponse = getBrokerResponse(query, SERVER_RETURN_FINAL_RESULT);
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L, 0L, 120000L, expectedResultTable,
+        cardinalityExtractor);
+
     brokerResponse = getBrokerResponse(query + FILTER);
     expectedResultTable = new ResultTable(expectedDataSchema, List.<Object[]>of(new Object[]{1886L, 4492L}));
     QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L, 49032L, 120000L, expectedResultTable,
@@ -355,6 +363,10 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
         new DataSchema(new String[]{"v1", "v2"}, new ColumnDataType[]{ColumnDataType.LONG, ColumnDataType.LONG});
     ResultTable expectedResultTable =
         new ResultTable(expectedDataSchema, List.<Object[]>of(new Object[]{6595L, 21822L}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L, 0L, 120000L, expectedResultTable,
+        cardinalityExtractor);
+
+    brokerResponse = getBrokerResponse(query, SERVER_RETURN_FINAL_RESULT);
     QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L, 0L, 120000L, expectedResultTable,
         cardinalityExtractor);
 
@@ -585,6 +597,8 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
             percentile, percentile);
     QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(rawQuery), getBrokerResponse(regularQuery),
         quantileExtractor);
+    QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(rawQuery, SERVER_RETURN_FINAL_RESULT),
+        getBrokerResponse(regularQuery), quantileExtractor);
     QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(rawQuery + FILTER),
         getBrokerResponse(regularQuery + FILTER), quantileExtractor);
     QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(rawQuery + GROUP_BY),
@@ -619,6 +633,8 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
             percentile, percentile);
     QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(rawQuery), getBrokerResponse(regularQuery),
         quantileExtractor, PERCENTILE_TDIGEST_DELTA);
+    QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(rawQuery, SERVER_RETURN_FINAL_RESULT),
+        getBrokerResponse(regularQuery), quantileExtractor, PERCENTILE_TDIGEST_DELTA);
     QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(rawQuery + FILTER),
         getBrokerResponse(regularQuery + FILTER), quantileExtractor, PERCENTILE_TDIGEST_DELTA);
     QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(rawQuery + GROUP_BY),

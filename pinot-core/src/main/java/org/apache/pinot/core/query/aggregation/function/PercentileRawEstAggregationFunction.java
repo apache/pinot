@@ -24,17 +24,19 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.local.customobject.QuantileDigest;
 import org.apache.pinot.segment.local.customobject.SerializedQuantileDigest;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.utils.BytesUtils;
 
 
 /// The `PercentileRawEstAggregationFunction` returns the serialized `QuantileDigest` data structure of the
 /// `PercentileEstAggregationFunction`.
 public class PercentileRawEstAggregationFunction
-    extends BaseSingleInputAggregationFunction<QuantileDigest, SerializedQuantileDigest> {
+    extends BaseSingleInputAggregationFunction<QuantileDigest, Comparable<?>> {
   private final PercentileEstAggregationFunction _percentileEstAggregationFunction;
 
   public PercentileRawEstAggregationFunction(ExpressionContext expressionContext, double percentile,
@@ -145,5 +147,17 @@ public class PercentileRawEstAggregationFunction
               _percentileEstAggregationFunction._percentile);
     }
     return new SerializedQuantileDigest(intermediateResult, _percentileEstAggregationFunction._percentile);
+  }
+
+  /// Merges two final results, which are serialized digests in string form, into the string form of the merged
+  /// digest.
+  @Override
+  public String mergeFinalResult(Comparable<?> finalResult1, Comparable<?> finalResult2) {
+    QuantileDigest merged = merge(deserializeFinalResult(finalResult1), deserializeFinalResult(finalResult2));
+    return new SerializedQuantileDigest(merged, _percentileEstAggregationFunction._percentile).toString();
+  }
+
+  private static QuantileDigest deserializeFinalResult(Comparable<?> finalResult) {
+    return ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(BytesUtils.toBytes((String) finalResult));
   }
 }

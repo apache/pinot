@@ -80,16 +80,17 @@ public class EmptyIndexSegmentTest {
     verify(segmentDirectory, times(1)).onSegmentAdded();
   }
 
-  /// An empty segment loaded without a directory (e.g. the local File path) must treat the lifecycle callbacks as safe
-  /// no-ops.
+  /// An empty segment loaded without a directory (e.g. the local File path) owns its metadata mapping.
   @Test
-  public void testMetadataOnlySegmentHasNoDirectorySideEffects() {
+  public void testMetadataOnlySegmentClosesMetadata()
+      throws Exception {
     SegmentMetadataImpl metadata = mock(SegmentMetadataImpl.class);
     when(metadata.getName()).thenReturn("seg");
     EmptyIndexSegment segment = new EmptyIndexSegment(metadata);
 
-    // No directory: both must be safe no-ops.
+    // No directory: registration is a no-op, while destruction closes metadata.
     segment.onSegmentAdded();
     segment.destroy();
+    verify(metadata).close();
   }
 }

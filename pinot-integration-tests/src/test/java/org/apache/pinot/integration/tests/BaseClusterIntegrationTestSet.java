@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.model.ExternalView;
@@ -40,6 +41,7 @@ import org.apache.pinot.client.ResultSet;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.client.admin.PinotAdminException;
 import org.apache.pinot.client.admin.PinotAdminNotFoundException;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.restlet.resources.PinotTableReloadStatusResponse;
 import org.apache.pinot.common.restlet.resources.RebalanceConfig;
 import org.apache.pinot.common.restlet.resources.RebalanceResult;
@@ -48,7 +50,6 @@ import org.apache.pinot.common.restlet.resources.TableSegmentsReloadCheckRespons
 import org.apache.pinot.common.restlet.resources.TableView;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.config.InstanceUtils;
-import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
 import org.apache.pinot.spi.config.instance.Instance;
@@ -60,6 +61,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.StringUtil;
@@ -1129,19 +1131,16 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     // Set force commit
     rebalanceConfig.setForceCommit(true);
 
+    // Snapshot all consuming segments, including when includeConsuming is false and the rebalance summary has none.
+    String tableNameWithType = tableConfig.getTableName();
+    Set<String> originalConsumingSegments = _helixResourceManager.getConsumingSegments(tableNameWithType);
+    assertFalse(originalConsumingSegments.isEmpty(), "Expected consuming segments before rebalance");
+    Map<Integer, Integer> expectedSequences = originalConsumingSegments.stream().map(LLCSegmentName::new)
+        .collect(Collectors.toMap(LLCSegmentName::getPartitionGroupId,
+            segment -> segment.getSequenceNumber() + (shouldCommit ? 1 : 0)));
+
     // Execute rebalance
     RebalanceResult rebalanceResult = triggerTableRebalance(rebalanceConfig, TableType.REALTIME);
-
-    // Get original consuming segments (if present)
-    Set<String> originalConsumingSegmentsToMove = null;
-    if (rebalanceResult.getRebalanceSummaryResult() != null
-        && rebalanceResult.getRebalanceSummaryResult().getSegmentInfo() != null
-        && rebalanceResult.getRebalanceSummaryResult().getSegmentInfo().getConsumingSegmentToBeMovedSummary() != null) {
-      originalConsumingSegmentsToMove = rebalanceResult.getRebalanceSummaryResult().getSegmentInfo()
-          .getConsumingSegmentToBeMovedSummary()
-          .getConsumingSegmentsToBeMovedWithMostOffsetsToCatchUp()
-          .keySet();
-    }
 
     // Wait for completion based on the flag
     if (waitForEVISConverge) {
@@ -1150,21 +1149,14 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
       waitForRebalanceToComplete(rebalanceResult.getJobId(), timeoutMs);
     }
 
-    // Check if segments were committed (only if there were consuming segments to move)
-    if (originalConsumingSegmentsToMove != null && !originalConsumingSegmentsToMove.isEmpty()) {
-      ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap consumingSegmentInfoResponse =
-          getOrCreateAdminClient().getTableClient().getConsumingSegmentsInfo(getTableName(),
-              ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap.class);
-      LLCSegmentName consumingSegmentNow = new LLCSegmentName(
-          consumingSegmentInfoResponse._segmentToConsumingInfoMap.keySet().stream().sorted().iterator().next());
-      LLCSegmentName consumingSegmentOriginal =
-          new LLCSegmentName(originalConsumingSegmentsToMove.stream().sorted().iterator().next());
-
-      if (shouldCommit) {
-        assertEquals(consumingSegmentNow.getSequenceNumber(), consumingSegmentOriginal.getSequenceNumber() + 1);
-      } else {
-        assertEquals(consumingSegmentNow.getSequenceNumber(), consumingSegmentOriginal.getSequenceNumber());
-      }
+    for (String originalSegment : originalConsumingSegments) {
+      SegmentZKMetadata metadata = _helixResourceManager.getSegmentZKMetadata(tableNameWithType, originalSegment);
+      assertNotNull(metadata, "Missing metadata for " + originalSegment);
+      assertEquals(metadata.getStatus(), shouldCommit ? Status.DONE : Status.IN_PROGRESS, originalSegment);
     }
+    Map<Integer, Integer> currentSequences = _helixResourceManager.getConsumingSegments(tableNameWithType).stream()
+        .map(LLCSegmentName::new)
+        .collect(Collectors.toMap(LLCSegmentName::getPartitionGroupId, LLCSegmentName::getSequenceNumber));
+    assertEquals(currentSequences, expectedSequences);
   }
 }

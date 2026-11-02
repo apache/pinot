@@ -86,7 +86,7 @@ public class AggregationDataTableReducer implements DataTableReducer {
     Object[] finalResults = new Object[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {
       AggregationFunction aggregationFunction = _aggregationFunctions[i];
-      Comparable result = aggregationFunction.extractFinalResult(intermediateResults[i]);
+      Object result = aggregationFunction.extractFinalResult(intermediateResults[i]);
       finalResults[i] = result != null ? aggregationFunction.getFinalResultColumnType().convert(result) : null;
     }
     brokerResponseNative.setResultTable(reduceToResultTable(getPrePostAggregationDataSchema(dataSchema), finalResults));
@@ -182,11 +182,11 @@ public class AggregationDataTableReducer implements DataTableReducer {
   private void reduceWithFinalResult(DataSchema dataSchema, Collection<DataTable> dataTables,
       BrokerResponseNative brokerResponseNative) {
     int numAggregationFunctions = _aggregationFunctions.length;
-    Comparable[] finalResults = new Comparable[numAggregationFunctions];
+    Object[] finalResults = new Object[numAggregationFunctions];
     for (DataTable dataTable : dataTables) {
       for (int i = 0; i < numAggregationFunctions; i++) {
         QueryThreadContext.checkTerminationAndSampleUsage("AggregationDataTableReducer");
-        Comparable finalResultToMerge;
+        Object finalResultToMerge;
         ColumnDataType columnDataType = dataSchema.getColumnDataType(i);
         RoaringBitmap nullBitmap = dataTable.getNullRowIds(i);
         if (nullBitmap != null && nullBitmap.contains(0)) {
@@ -201,7 +201,7 @@ public class AggregationDataTableReducer implements DataTableReducer {
     Object[] convertedFinalResults = new Object[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {
       AggregationFunction aggregationFunction = _aggregationFunctions[i];
-      Comparable result = finalResults[i];
+      Object result = finalResults[i];
       convertedFinalResults[i] = result != null ? aggregationFunction.getFinalResultColumnType().convert(result) : null;
     }
     brokerResponseNative.setResultTable(
