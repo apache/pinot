@@ -60,6 +60,7 @@ import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.config.table.UpsertConfig.ConsistencyMode;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -88,7 +89,7 @@ import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
-/// Tests consumer readiness against real partial-upsert rows. The fixture controls Helix publication synchronously;
+/// Tests consumer readiness with real upsert metadata and rows. The fixture controls Helix publication synchronously;
 /// readiness and indexing use production code, without starting stream-consumer or Helix threads. Each test confines
 /// its fixture and metadata to the invoking thread.
 public class RealtimeTableReadinessTest {
@@ -98,8 +99,10 @@ public class RealtimeTableReadinessTest {
   private static final String KEY = "key";
   private static final String VALUE = "value";
   private static final String TIMESTAMP = "timestamp";
+  private static final String OUT_OF_ORDER = "outOfOrder";
   private static final Schema SCHEMA = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE)
       .addSingleValueDimension(KEY, DataType.STRING).addMetric(VALUE, DataType.LONG)
+      .addSingleValueDimension(OUT_OF_ORDER, DataType.BOOLEAN)
       .addDateTime(TIMESTAMP, DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
       .setPrimaryKeyColumns(List.of(KEY)).build();
 
@@ -326,9 +329,49 @@ public class RealtimeTableReadinessTest {
       table.assign(consumer, CONSUMING);
       BooleanSupplier ready = table.createReadyToConsumeDataSupplier(consumer);
       assertTrue(table.isDedupEnabled());
+      assertTrue(table.requiresHistoryForConsumption());
       assertFalse(ready.getAsBoolean());
       table.publishState(base.getSegmentName(), ONLINE);
       assertTrue(ready.getAsBoolean());
+    }
+  }
+
+  @DataProvider
+  public Object[][] fullUpsertHistoryModes() {
+    return new Object[][]{
+        {true, ConsistencyMode.NONE, false}, {true, ConsistencyMode.NONE, true},
+        {false, ConsistencyMode.NONE, false}, {false, ConsistencyMode.NONE, true},
+        {true, ConsistencyMode.SYNC, false}, {false, ConsistencyMode.SYNC, false},
+        {true, ConsistencyMode.SNAPSHOT, false}, {false, ConsistencyMode.SNAPSHOT, false}
+    };
+  }
+
+  @Test(dataProvider = "fullUpsertHistoryModes")
+  public void testFullUpsertHistoryRequirement(boolean dropOutOfOrder, ConsistencyMode consistencyMode,
+      boolean enforceConsumptionInOrder) throws Exception {
+    UpsertConfig upsert = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsert.setConsistencyMode(consistencyMode);
+    if (dropOutOfOrder) {
+      upsert.setDropOutOfOrderRecord(true);
+    } else {
+      upsert.setOutOfOrderRecordColumn(OUT_OF_ORDER);
+    }
+    try (Fixture table = new Fixture(upsert)) {
+      table.setEnforceConsumptionInOrder(enforceConsumptionInOrder);
+      // Consistent upsert views disable drop/mark options in the effective context, even when configured above.
+      boolean requiresHistory = consistencyMode == ConsistencyMode.NONE;
+      assertEquals(table.requiresHistoryForConsumption(), requiresHistory);
+      LLCSegmentName base = name(0, 1);
+      LLCSegmentName consumer = name(0, 2);
+      table.assign(base, ONLINE);
+      table.assign(consumer, CONSUMING);
+      BooleanSupplier ready = table.createReadyToConsumeDataSupplier(consumer);
+      assertEquals(ready.getAsBoolean(), !requiresHistory,
+          "History-sensitive full upsert must wait regardless of enforceConsumptionInOrder");
+
+      table.publishState(base.getSegmentName(), ONLINE);
+      assertTrue(ready.getAsBoolean());
+      table.verifySnapshotReads(requiresHistory ? 2 : 0);
     }
   }
 
@@ -344,11 +387,13 @@ public class RealtimeTableReadinessTest {
       LLCSegmentName consumer = name(0, 2);
       table.assign(consumer, CONSUMING);
       BooleanSupplier ready = table.createReadyToConsumeDataSupplier(consumer);
+      assertFalse(table.requiresHistoryForConsumption());
       assertTrue(ready.getAsBoolean());
       table._serverReady.set(false);
       assertFalse(ready.getAsBoolean());
       table._serverReady.set(true);
       assertTrue(ready.getAsBoolean());
+      table.verifySnapshotReads(0);
     }
   }
 
@@ -384,13 +429,20 @@ public class RealtimeTableReadinessTest {
     }
 
     Fixture(UpsertConfig.Mode mode, boolean dedup, AtomicBoolean serverReady) throws Exception {
+      this(new UpsertConfig(mode), dedup, serverReady);
+    }
+
+    Fixture(UpsertConfig upsert) throws Exception {
+      this(upsert, false, new AtomicBoolean(true));
+    }
+
+    Fixture(UpsertConfig upsert, boolean dedup, AtomicBoolean serverReady) throws Exception {
       super(null, serverReady::get, () -> true,
           ServerIngestionOomProtectionManager.createServerThrottleState(null, ServerMetrics.get()));
       _serverReady = serverReady;
       _directory = Files.createTempDirectory("consumer-readiness").toFile();
-      UpsertConfig upsert = new UpsertConfig(mode);
       upsert.setComparisonColumns(List.of(TIMESTAMP));
-      if (mode == UpsertConfig.Mode.PARTIAL) {
+      if (upsert.getMode() == UpsertConfig.Mode.PARTIAL) {
         upsert.setPartialUpsertStrategies(Map.of(VALUE, UpsertConfig.Strategy.INCREMENT));
       }
       _config = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE)

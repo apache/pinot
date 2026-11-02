@@ -799,14 +799,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       long catchUpTimeMillis = 0L;
       _startTimeMs = now();
       try {
-        if (!_consumerCoordinator.waitUntilReadyToConsume(_llcSegmentName.getPartitionGroupId(),
-            _isReadyToConsumeData, () -> _shouldStop)) {
-          return;
-        }
-
-        // Acquire semaphore before consuming data
+        // Check admission and acquire the partition permit before consuming data.
         try {
-          _consumerCoordinator.acquire(_llcSegmentName);
+          if (!_consumerCoordinator.acquire(_llcSegmentName, _isReadyToConsumeData, () -> _shouldStop)) {
+            return;
+          }
         } catch (ConsumerCoordinator.ShouldNotConsumeException e) {
           _segmentLogger.info("Skipping consumption because: {}", e.getMessage());
           return;

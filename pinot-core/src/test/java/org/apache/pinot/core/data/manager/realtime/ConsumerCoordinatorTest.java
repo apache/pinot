@@ -24,12 +24,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
@@ -437,7 +439,7 @@ public class ConsumerCoordinatorTest {
     String segmentName = "tableTest_REALTIME__1__101__20250304T0035Z";
     LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
     Assert.assertNotNull(llcSegmentName);
-    consumerCoordinator.acquire(llcSegmentName);
+    assertTrue(consumerCoordinator.acquire(llcSegmentName, () -> true, () -> false));
     Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 0);
     Assert.assertFalse(consumerCoordinator.getSemaphore().hasQueuedThreads());
 
@@ -454,7 +456,7 @@ public class ConsumerCoordinatorTest {
     ConsumerCoordinator consumerCoordinator = new ConsumerCoordinator(false, realtimeTableDataManager);
     LLCSegmentName llcSegmentName = LLCSegmentName.of(getSegmentName(101));
     Assert.assertNotNull(llcSegmentName);
-    consumerCoordinator.acquire(llcSegmentName);
+    assertTrue(consumerCoordinator.acquire(llcSegmentName, () -> true, () -> false));
 
     consumerCoordinator.releaseUnsealed(getSegmentName(101), new LongMsgOffset(250));
     Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 1);
@@ -470,6 +472,72 @@ public class ConsumerCoordinatorTest {
     Assert.assertNull(consumerCoordinator.getUnsealedRelease());
   }
 
+  @DataProvider
+  public Object[][] historyOrderingModes() {
+    return new Object[][]{{false}, {true}};
+  }
+
+  @Test(dataProvider = "historyOrderingModes", timeOut = 10_000)
+  public void testHistoryReadinessReplacesPreviousRegistration(boolean enforceConsumptionInOrder) throws Exception {
+    try (ReadinessFixture fixture = new ReadinessFixture(enforceConsumptionInOrder, true)) {
+      AtomicBoolean historyReady = new AtomicBoolean();
+      ReadinessWaiter waiter = fixture.start(historyReady::get, () -> false);
+      fixture.assertGauge(1);
+      assertFalse(waiter.result().isDone(), "History must be checked even when ordering is disabled");
+      assertEquals(fixture._coordinator.getSemaphore().availablePermits(), 1);
+
+      // Ready metadata is enough: the old registration watermark must not introduce another wait.
+      historyReady.set(true);
+      fixture.signalRelease();
+      fixture.assertAcquiredAndRelease(waiter);
+      fixture.assertGauge(0);
+    }
+  }
+
+  @Test(timeOut = 20_000)
+  public void testReadinessSkipsRepeatedChecksWhilePermitHeld() throws Exception {
+    try (ReadinessFixture fixture = new ReadinessFixture(false, true)) {
+      assertTrue(fixture._coordinator.acquire(getLLCSegment(100), () -> true, () -> false));
+      AtomicBoolean historyReady = new AtomicBoolean();
+      AtomicBoolean observeNextPoll = new AtomicBoolean();
+      AtomicInteger readinessChecks = new AtomicInteger();
+      BlockingQueue<Integer> checks = new LinkedBlockingQueue<>();
+      CountDownLatch nextPoll = new CountDownLatch(1);
+      ReadinessWaiter waiter = fixture.start(() -> {
+        checks.add(readinessChecks.incrementAndGet());
+        return historyReady.get();
+      }, () -> {
+        if (observeNextPoll.get()) {
+          nextPoll.countDown();
+        }
+        return false;
+      });
+      fixture.assertGauge(1);
+      assertEquals(checks.poll(2, TimeUnit.SECONDS), Integer.valueOf(1));
+      awaitReadinessWait(waiter);
+      observeNextPoll.set(true);
+      assertTrue(nextPoll.await(7, TimeUnit.SECONDS), "The periodic readiness wait did not expire");
+      awaitReadinessWait(waiter);
+      assertEquals(readinessChecks.get(), 1, "A held permit makes repeated history reads unnecessary");
+
+      fixture._coordinator.release();
+      assertEquals(checks.poll(2, TimeUnit.SECONDS), Integer.valueOf(2));
+      awaitReadinessWait(waiter);
+      assertFalse(waiter.result().isDone(), "Permit release must still check the complete history");
+      assertEquals(fixture._coordinator.getSemaphore().availablePermits(), 1);
+
+      historyReady.set(true);
+      fixture.signalRelease();
+      fixture.assertAcquiredAndRelease(waiter);
+      fixture.assertGauge(0);
+    }
+  }
+
+  private static void awaitReadinessWait(ReadinessWaiter waiter) {
+    TestUtils.waitForCondition(ignored -> waiter.thread().getState() == Thread.State.TIMED_WAITING, 10, 2000,
+        "Consumer did not enter its readiness wait");
+  }
+
   @Test(timeOut = 10_000)
   public void testReadinessGaugeCountsOverlappingWaiters() throws Exception {
     try (ReadinessFixture fixture = new ReadinessFixture()) {
@@ -482,13 +550,13 @@ public class ConsumerCoordinatorTest {
 
       firstReady.set(true);
       fixture.signalRelease();
-      assertTrue(first.result().get(2, TimeUnit.SECONDS));
+      fixture.assertAcquiredAndRelease(first);
       fixture.assertGauge(1);
       assertFalse(second.result().isDone(), "One ready consumer must not clear the other consumer's wait");
 
       secondReady.set(true);
       fixture.signalRelease();
-      assertTrue(second.result().get(2, TimeUnit.SECONDS));
+      fixture.assertAcquiredAndRelease(second);
       fixture.assertGauge(0);
       assertTrue(fixture._gaugeUpdates.isEmpty(), "Repeated false checks must not count the same waiter again");
 
@@ -498,7 +566,7 @@ public class ConsumerCoordinatorTest {
       fixture.assertGauge(1);
       firstReady.set(true);
       fixture.signalRelease();
-      assertTrue(later.result().get(2, TimeUnit.SECONDS));
+      fixture.assertAcquiredAndRelease(later);
       fixture.assertGauge(0);
     }
   }
@@ -537,15 +605,28 @@ public class ConsumerCoordinatorTest {
             exit.equals("interrupt") ? InterruptedException.class : IllegalStateException.class);
       }
       fixture.assertGauge(0);
+      assertEquals(fixture._coordinator.getSemaphore().availablePermits(), 1,
+          "An unsuccessful admission must not acquire the permit");
     }
   }
 
   @Test
   public void testReadinessGaugeDoesNotCountConsumersThatNeverWait() throws Exception {
     try (ReadinessFixture fixture = new ReadinessFixture()) {
-      assertTrue(fixture._coordinator.waitUntilReadyToConsume(1, () -> true, () -> false));
-      assertFalse(fixture._coordinator.waitUntilReadyToConsume(1, () -> false, () -> true));
-      expectThrows(IllegalStateException.class, () -> fixture._coordinator.waitUntilReadyToConsume(1, () -> {
+      assertTrue(fixture._coordinator.acquire(getLLCSegment(101), () -> true, () -> false));
+      fixture._coordinator.release();
+      assertFalse(fixture._coordinator.acquire(getLLCSegment(101), () -> false, () -> true));
+      AtomicBoolean stopped = new AtomicBoolean();
+      assertFalse(fixture._coordinator.acquire(getLLCSegment(101), () -> {
+        stopped.set(true);
+        return true;
+      }, stopped::get));
+      assertEquals(fixture._coordinator.getSemaphore().availablePermits(), 1);
+      assertFalse(fixture._coordinator.acquire(getLLCSegment(101), () -> true,
+          () -> fixture._coordinator.getSemaphore().availablePermits() == 0));
+      assertEquals(fixture._coordinator.getSemaphore().availablePermits(), 1,
+          "Cancellation immediately after acquisition must return the permit");
+      expectThrows(IllegalStateException.class, () -> fixture._coordinator.acquire(getLLCSegment(101), () -> {
         throw new IllegalStateException("Initial readiness failed");
       }, () -> false));
       assertTrue(fixture._gaugeUpdates.isEmpty(), "Only a false readiness result should create a counted waiter");
@@ -563,6 +644,10 @@ public class ConsumerCoordinatorTest {
     private final ConsumerCoordinator _coordinator;
 
     ReadinessFixture() {
+      this(false, false);
+    }
+
+    ReadinessFixture(boolean enforceConsumptionInOrder, boolean requiresHistory) {
       ServerMetrics metrics = mock(ServerMetrics.class);
       doAnswer(invocation -> {
         Supplier<Long> value = invocation.getArgument(3);
@@ -578,14 +663,16 @@ public class ConsumerCoordinatorTest {
       }).when(metrics).removePartitionGauge("tableTest_REALTIME", 1, ServerGauge.CONSUMERS_WAITING_FOR_READINESS);
       RealtimeTableDataManager table = mock(RealtimeTableDataManager.class);
       when(table.getTableName()).thenReturn("tableTest_REALTIME");
+      when(table.requiresHistoryForConsumption()).thenReturn(requiresHistory);
       try (MockedStatic<ServerMetrics> factory = mockStatic(ServerMetrics.class)) {
         factory.when(ServerMetrics::get).thenReturn(metrics);
-        _coordinator = new ConsumerCoordinator(false, table);
+        _coordinator = new ConsumerCoordinator(enforceConsumptionInOrder, table);
       }
     }
 
     ReadinessWaiter start(BooleanSupplier ready, BooleanSupplier stopped) {
-      FutureTask<Boolean> result = new FutureTask<>(() -> _coordinator.waitUntilReadyToConsume(1, ready, stopped));
+      LLCSegmentName segment = new LLCSegmentName("tableTest_REALTIME__1__101__20250304T0035Z");
+      FutureTask<Boolean> result = new FutureTask<>(() -> _coordinator.acquire(segment, ready, stopped));
       Thread thread = new Thread(result, "readiness-metric");
       _threads.add(thread);
       thread.start();
@@ -594,6 +681,12 @@ public class ConsumerCoordinatorTest {
 
     void assertGauge(long count) throws InterruptedException {
       assertEquals(_gaugeUpdates.poll(2, TimeUnit.SECONDS), Long.valueOf(count));
+    }
+
+    void assertAcquiredAndRelease(ReadinessWaiter waiter) throws Exception {
+      assertTrue(waiter.result().get(2, TimeUnit.SECONDS));
+      assertEquals(_coordinator.getSemaphore().availablePermits(), 0);
+      _coordinator.release();
     }
 
     void signalRelease() {
@@ -673,7 +766,7 @@ public class ConsumerCoordinatorTest {
   private Thread getNewThread(FakeConsumerCoordinator consumerCoordinator, LLCSegmentName llcSegmentName) {
     return new Thread(() -> {
       try {
-        consumerCoordinator.acquire(llcSegmentName);
+        assertTrue(consumerCoordinator.acquire(llcSegmentName, () -> true, () -> false));
       } catch (Exception e) {
         Assert.fail();
       }

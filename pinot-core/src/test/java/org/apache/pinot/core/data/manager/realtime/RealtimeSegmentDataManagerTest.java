@@ -1036,6 +1036,7 @@ public class RealtimeSegmentDataManagerTest {
       _tableUpsertMetadataManager = mock(TableUpsertMetadataManager.class);
       UpsertContext context = mock(UpsertContext.class);
       when(context.getUpsertMode()).thenReturn(UpsertConfig.Mode.PARTIAL);
+      when(context.isTableTypeInconsistentDuringConsumption()).thenReturn(true);
       when(context.getConsistencyMode()).thenReturn(UpsertConfig.ConsistencyMode.NONE);
       when(_tableUpsertMetadataManager.getContext()).thenReturn(context);
       IdealState assignment = new IdealState(REALTIME_TABLE_NAME);

@@ -251,7 +251,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   /// The consumer thread polls this supplier before acquiring its permit, so segment loading is never blocked by it.
   @VisibleForTesting
   BooleanSupplier createReadyToConsumeDataSupplier(LLCSegmentName llcSegmentName) {
-    if (!isDedupEnabled() && !isPartialUpsertEnabled()) {
+    if (!requiresHistoryForConsumption()) {
       return _isServerReadyToConsumeData;
     }
     long consumerCreationTimeNs = readinessCheckTimeNs();
@@ -268,13 +268,19 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     };
   }
 
+  /// Dedup and order-sensitive upsert modes need their assigned history before admitting a consumer.
+  boolean requiresHistoryForConsumption() {
+    return isDedupEnabled() || (_tableUpsertMetadataManager != null
+        && _tableUpsertMetadataManager.getContext().isTableTypeInconsistentDuringConsumption());
+  }
+
   private boolean isReadyToConsume(LLCSegmentName consumer, long consumerCreationTimeNs) {
     ReadinessSnapshot snapshot;
     synchronized (_readinessSnapshotLock) {
       long nowNs = readinessCheckTimeNs();
       if (_readinessSnapshot == null || _readinessSnapshotTimeNs - consumerCreationTimeNs < 0
-          || nowNs - _readinessSnapshotTimeNs
-          >= TimeUnit.MILLISECONDS.toNanos(READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS)) {
+          || nowNs - _readinessSnapshotTimeNs >= TimeUnit.MILLISECONDS.toNanos(
+              READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS)) {
         // A new consumer must see its own assignment. Record the read's start time, not its completion time.
         snapshot = TableStateUtils.getReadinessSnapshot(_helixManager, _tableNameWithType);
         _readinessSnapshot = snapshot;

@@ -44,12 +44,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/// The ConsumerCoordinator coordinates the offline->consuming helix transitions.
+/// Coordinates consumer admission and exclusive consumption for one table partition. History readiness replaces
+/// predecessor registration for tables that require complete history. Other tables retain optional registration
+/// ordering. Consumer and Helix threads share this coordinator; readiness callbacks run outside coordination locks.
 public class ConsumerCoordinator {
   private static final Logger LOGGER = LoggerFactory.getLogger(ConsumerCoordinator.class);
   private static final long WAIT_INTERVAL_MS = TimeUnit.MINUTES.toMillis(3);
 
-  private final boolean _enforceConsumptionInOrder;
+  private final boolean _requirePreviousSegmentRegistration;
   private final RealtimeTableDataManager _realtimeTableDataManager;
   private final boolean _useIdealStateToCalculatePreviousSegment;
   private final ServerMetrics _serverMetrics;
@@ -76,7 +78,8 @@ public class ConsumerCoordinator {
   }
 
   public ConsumerCoordinator(boolean enforceConsumptionInOrder, RealtimeTableDataManager realtimeTableDataManager) {
-    _enforceConsumptionInOrder = enforceConsumptionInOrder;
+    _requirePreviousSegmentRegistration =
+        enforceConsumptionInOrder && !realtimeTableDataManager.requiresHistoryForConsumption();
     _realtimeTableDataManager = realtimeTableDataManager;
     StreamIngestionConfig streamIngestionConfig = realtimeTableDataManager.getStreamIngestionConfig();
     _useIdealStateToCalculatePreviousSegment =
@@ -84,21 +87,16 @@ public class ConsumerCoordinator {
     _serverMetrics = ServerMetrics.get();
   }
 
-  /// Acquires the consumer semaphore for the given LLC segment. When consumption order is enforced, it waits for the
-  /// previous segment to be registered.
-  ///
-  /// TODO: Revisit if we want to handle the following corner case:
-  ///   - Seg 100 (OFFLINE -> CONSUMING pending)
-  ///   - Seg 101 (OFFLINE -> CONSUMING returned because of status change)
-  ///   - Seg 101 (CONSUMING -> ONLINE processed)
-  ///   - Seg 102 (OFFLINE -> CONSUMING started consuming while 100 is not registered)
-  ///   It should be extremely rare because there has to be multiple CONSUMING state transitions pending, which means
-  ///   state transition for Seg 100 has been delayed for at least the consumption time of Seg 101. Since we are not
-  ///   blocking the state transition of OFFLINE -> CONSUMING, the chance of this happening is very low.
-  public void acquire(LLCSegmentName llcSegmentName)
+  /// Waits for server/history readiness, then acquires the consumer permit. Complete history readiness supersedes
+  /// predecessor registration; other tables retain registration ordering when configured.
+  /// @return true if the caller owns the permit and must release it, or false if stopped before admission
+  public boolean acquire(LLCSegmentName llcSegmentName, BooleanSupplier isReadyToConsume, BooleanSupplier shouldStop)
       throws InterruptedException, ShouldNotConsumeException {
+    if (!waitUntilReadyToConsume(llcSegmentName.getPartitionGroupId(), isReadyToConsume, shouldStop)) {
+      return false;
+    }
     String segmentName = llcSegmentName.getSegmentName();
-    if (_enforceConsumptionInOrder) {
+    if (_requirePreviousSegmentRegistration) {
       long startTimeMs = System.currentTimeMillis();
       waitForPreviousSegment(llcSegmentName);
       _serverMetrics.addTimedTableValue(_realtimeTableDataManager.getTableName(), ServerTimer.PREV_SEGMENT_WAIT_TIME_MS,
@@ -107,7 +105,19 @@ public class ConsumerCoordinator {
 
     long startTimeMs = System.currentTimeMillis();
     try {
-      while (!_semaphore.tryAcquire(WAIT_INTERVAL_MS, TimeUnit.MILLISECONDS)) {
+      while (!shouldStop.getAsBoolean()) {
+        if (_semaphore.tryAcquire(WAIT_INTERVAL_MS, TimeUnit.MILLISECONDS)) {
+          // Cancellation may race with release/acquisition. Do not transfer a permit to a stopped consumer.
+          boolean admitted = false;
+          try {
+            admitted = !shouldStop.getAsBoolean();
+            return admitted;
+          } finally {
+            if (!admitted) {
+              release();
+            }
+          }
+        }
         checkSegmentStatus(segmentName);
         long waitTimeMs = System.currentTimeMillis() - startTimeMs;
         LOGGER.warn("Failed to acquire consumer semaphore for segment: {} in: {}ms. Retrying.", segmentName,
@@ -115,6 +125,7 @@ public class ConsumerCoordinator {
         _serverMetrics.setValueOfPartitionGauge(_realtimeTableDataManager.getTableName(),
             llcSegmentName.getPartitionGroupId(), ServerGauge.CONSUMER_LOCK_WAIT_TIME_MS, waitTimeMs);
       }
+      return false;
     } finally {
       _serverMetrics.setValueOfPartitionGauge(_realtimeTableDataManager.getTableName(),
           llcSegmentName.getPartitionGroupId(), ServerGauge.CONSUMER_LOCK_WAIT_TIME_MS, 0);
@@ -125,13 +136,16 @@ public class ConsumerCoordinator {
   /// Helix assignment and state changes still use the periodic check. Readiness can perform ZooKeeper reads, so it
   /// must run outside the monitor. The version prevents losing a release between the readiness check and the wait.
   /// @return whether readiness passed, or false if consumption was stopped
-  boolean waitUntilReadyToConsume(int partitionGroupId, BooleanSupplier isReadyToConsume, BooleanSupplier shouldStop)
+  private boolean waitUntilReadyToConsume(int partitionGroupId, BooleanSupplier isReadyToConsume,
+      BooleanSupplier shouldStop)
       throws InterruptedException {
     boolean counted = false;
     try {
       while (!shouldStop.getAsBoolean()) {
         long releaseVersion = _releaseVersion;
-        if (isReadyToConsume.getAsBoolean()) {
+        // Keep the first check for diagnostics, but avoid polling history while another consumer holds the permit.
+        // A release wakes this loop; permit availability never substitutes for the complete readiness check.
+        if ((!counted || _semaphore.availablePermits() > 0) && isReadyToConsume.getAsBoolean()) {
           return !shouldStop.getAsBoolean();
         }
         synchronized (_readinessMonitor) {
@@ -199,7 +213,7 @@ public class ConsumerCoordinator {
   }
 
   public void register(LLCSegmentName llcSegmentName) {
-    if (!_enforceConsumptionInOrder) {
+    if (!_requirePreviousSegmentRegistration) {
       return;
     }
     _lock.lock();
@@ -222,8 +236,16 @@ public class ConsumerCoordinator {
     }
   }
 
-  /// Waits for the previous segment to be registered to the server. Returns the segment ZK metadata fetched during the
-  /// wait to reduce unnecessary ZK read.
+  /// Waits for the previous segment to be registered to the server. Used only when complete history is not required.
+  ///
+  /// TODO: Legacy registration ordering can miss earlier segments in the following corner case:
+  ///   - Seg 100 (OFFLINE -> CONSUMING pending)
+  ///   - Seg 101 (OFFLINE -> CONSUMING returned because of status change)
+  ///   - Seg 101 (CONSUMING -> ONLINE processed)
+  ///   - Seg 102 (OFFLINE -> CONSUMING started consuming while 100 is not registered)
+  ///   It should be extremely rare because there has to be multiple CONSUMING state transitions pending, which means
+  ///   state transition for Seg 100 has been delayed for at least the consumption time of Seg 101. Since we are not
+  ///   blocking the state transition of OFFLINE -> CONSUMING, the chance of this happening is very low.
   private void waitForPreviousSegment(LLCSegmentName currentSegment)
       throws InterruptedException, ShouldNotConsumeException {
     if (!_firstTransitionProcessed.get() || _useIdealStateToCalculatePreviousSegment) {
@@ -238,8 +260,7 @@ public class ConsumerCoordinator {
     }
   }
 
-  /// Waits for the previous segment with the sequence number to be registered to the server. Returns the segment ZK
-  /// metadata fetched during the wait to reduce unnecessary ZK read..
+  /// Waits for the previous segment with the given sequence number to be registered to the server.
   @VisibleForTesting
   void waitForPreviousSegment(LLCSegmentName currentSegment, int previousSegmentSequenceNumber)
       throws InterruptedException, ShouldNotConsumeException {
