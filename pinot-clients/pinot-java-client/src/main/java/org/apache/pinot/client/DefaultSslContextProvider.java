@@ -22,10 +22,16 @@ import java.util.List;
 import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLParameters;
 import org.asynchttpclient.DefaultAsyncHttpClientConfig;
 
 
 /// Default SSL context provider that uses the JDK/BCJSSE stack and disables OpenSSL.
+///
+/// When an [SSLContext] is supplied, every engine verifies that the broker certificate matches the host the client
+/// dials (HTTPS endpoint identification), so certificates need SANs for broker hostnames or, when brokers register
+/// by IP, their IP addresses. Verification is skipped only when the AsyncHttpClient config disables it, e.g. with the
+/// JVM-wide system property `org.asynchttpclient.disableHttpsEndpointIdentificationAlgorithm=true`.
 public class DefaultSslContextProvider implements SslContextProvider {
 
   @Override
@@ -45,6 +51,14 @@ public class DefaultSslContextProvider implements SslContextProvider {
       builder.setSslEngineFactory((config, peerHost, peerPort) -> {
         SSLEngine engine = sslContext.createSSLEngine(peerHost, peerPort);
         engine.setUseClientMode(true);
+        // A JDK SSLEngine verifies the peer hostname only when an endpoint identification algorithm is set. This
+        // factory replaces AsyncHttpClient's own engine factory, so apply the same check it would, honoring
+        // disableHttpsEndpointIdentificationAlgorithm.
+        if (!config.isDisableHttpsEndpointIdentificationAlgorithm()) {
+          SSLParameters sslParameters = engine.getSSLParameters();
+          sslParameters.setEndpointIdentificationAlgorithm("HTTPS");
+          engine.setSSLParameters(sslParameters);
+        }
         if (enabledProtocols.length > 0) {
           engine.setEnabledProtocols(enabledProtocols);
         }
