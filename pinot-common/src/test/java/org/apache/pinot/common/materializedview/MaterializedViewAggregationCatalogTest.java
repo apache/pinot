@@ -51,7 +51,9 @@ public class MaterializedViewAggregationCatalogTest {
         "COUNT", DataType.LONG,
         "DISTINCTCOUNTRAWHLL", DataType.BYTES,
         "DISTINCTCOUNTRAWHLLPLUS", DataType.BYTES,
-        "DISTINCTCOUNTRAWTHETASKETCH", DataType.BYTES);
+        "DISTINCTCOUNTRAWTHETASKETCH", DataType.BYTES,
+        "DISTINCTCOUNTRAWCPCSKETCH", DataType.BYTES,
+        "DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH", DataType.BYTES);
     assertEquals(MaterializedViewAggregationCatalog.SUPPORTED_AGGREGATIONS, expected);
   }
 
@@ -90,6 +92,11 @@ public class MaterializedViewAggregationCatalogTest {
     assertEquals(MaterializedViewAggregationCatalog.getInferredDataType("DISTINCTCOUNTRAWHLLPLUS"),
         DataType.BYTES);
     assertEquals(MaterializedViewAggregationCatalog.getInferredDataType("DISTINCTCOUNTRAWTHETASKETCH"),
+        DataType.BYTES);
+    assertEquals(MaterializedViewAggregationCatalog.getInferredDataType("DISTINCTCOUNTRAWCPCSKETCH"),
+        DataType.BYTES);
+    assertEquals(
+        MaterializedViewAggregationCatalog.getInferredDataType("DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH"),
         DataType.BYTES);
   }
 
