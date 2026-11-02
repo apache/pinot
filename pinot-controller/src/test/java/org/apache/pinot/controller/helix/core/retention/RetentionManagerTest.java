@@ -566,22 +566,28 @@ public class RetentionManagerTest {
 
   @DataProvider(name = "hybridTableRetentionStrategyOverrides")
   public Object[][] hybridTableRetentionStrategyOverrides() {
-    // tableLevel (null means omitted; null and DEFAULT fall back to clusterLevel), clusterLevel, expectHybridPath
+    // tableLevel (null means omitted; null and DEFAULT fall back to clusterLevel), clusterLevel, hasOfflineTable,
+    // expectHybridPath
     return new Object[][]{
-        {null, false, false},
-        {null, true, true},
-        {Enablement.DEFAULT, false, false},
-        {Enablement.DEFAULT, true, true},
-        {Enablement.ENABLE, false, true},
-        {Enablement.ENABLE, true, true},
-        {Enablement.DISABLE, false, false},
-        {Enablement.DISABLE, true, false},
+        {null, false, true, false},
+        {null, true, true, true},
+        {Enablement.DEFAULT, false, true, false},
+        {Enablement.DEFAULT, true, true, true},
+        {Enablement.ENABLE, false, true, true},
+        {Enablement.ENABLE, true, true, true},
+        {Enablement.DISABLE, false, true, false},
+        {Enablement.DISABLE, true, true, false},
+        // Without an OFFLINE counterpart, realtime retention is used regardless of the table and cluster level configs
+        {null, true, false, false},
+        {Enablement.DEFAULT, true, false, false},
+        {Enablement.ENABLE, false, false, false},
+        {Enablement.ENABLE, true, false, false},
     };
   }
 
   @Test(dataProvider = "hybridTableRetentionStrategyOverrides")
   public void testTableLevelHybridRetentionStrategyOverridesClusterConfig(@Nullable Enablement tableLevel,
-      boolean clusterLevel, boolean expectHybridPath) {
+      boolean clusterLevel, boolean hasOfflineTable, boolean expectHybridPath) {
     int replicaCount = 1;
     TableConfig realtimeTableConfig = createRealtimeTableConfig1(replicaCount);
     if (tableLevel != null) {
@@ -590,7 +596,9 @@ public class RetentionManagerTest {
 
     PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
     when(resourceManager.getHelixAdmin()).thenReturn(mock(HelixAdmin.class));
-    setupSizeRetentionOfflineCounterpart(resourceManager);
+    if (hasOfflineTable) {
+      setupSizeRetentionOfflineCounterpart(resourceManager);
+    }
 
     ControllerConf conf = new ControllerConf();
     conf.setProperty(ControllerConf.ENABLE_HYBRID_TABLE_RETENTION_STRATEGY, clusterLevel);
