@@ -438,7 +438,8 @@ final class IngestionSourceErrorRules {
   private static final Set<String> PULSAR_AUTHENTICATION_SETUP = Set.of("UnsupportedAuthenticationException",
       "GettingAuthenticationDataException");
   private static final String PULSAR_OAUTH_TOKEN = "Unable to obtain an access token";
-  private static final Pattern PULSAR_OAUTH_ERROR = Pattern.compile(".* \\((.+)\\)\\s*$", Pattern.DOTALL);
+  private static final String REGEX_WHITESPACE = " \t\n\u000B\f\r";
+  private static final String REGEX_FINAL_LINE_TERMINATORS = "\u0085\u2028\u2029";
   private static final Pattern PULSAR_NOT_A_REFUSAL = Pattern.compile(PULSAR_OAUTH_TOKEN
       + ": java\\.util\\.concurrent\\.ExecutionException: |\\(through reference chain: [\\w.$]*TokenResult\\[");
   private static final Pattern PULSAR_OAUTH_STATUS = Pattern.compile("res: (\\d{3})\\s*$");
@@ -477,6 +478,22 @@ final class IngestionSourceErrorRules {
     return null;
   }
 
+  @Nullable
+  private static String pulsarOAuthError(String message) {
+    int end = message.length();
+    if (end > 0 && REGEX_FINAL_LINE_TERMINATORS.indexOf(message.charAt(end - 1)) >= 0) {
+      end--;
+    }
+    while (end > 0 && REGEX_WHITESPACE.indexOf(message.charAt(end - 1)) >= 0) {
+      end--;
+    }
+    if (end == 0 || message.charAt(end - 1) != ')') {
+      return null;
+    }
+    int open = message.lastIndexOf(" (", end - 4);
+    return open >= 0 ? message.substring(open + 2, end - 1) : null;
+  }
+
   private static IngestionSourceErrorVerdict pulsarAuthentication(String message) {
     String code = "AuthenticationException";
     if (message.startsWith("Unable to read private key")) {
@@ -486,9 +503,8 @@ final class IngestionSourceErrorRules {
       return sourceRead(code, TARGET_IDP);
     }
     if (message.contains(PULSAR_OAUTH_TOKEN)) {
-      Matcher error = PULSAR_OAUTH_ERROR.matcher(message);
-      if (error.find() && !PULSAR_NOT_A_REFUSAL.matcher(message).find()) {
-        String oauthError = error.group(1);
+      String oauthError = pulsarOAuthError(message);
+      if (oauthError != null && !PULSAR_NOT_A_REFUSAL.matcher(message).find()) {
         return "null".equals(oauthError) ? auth(code, TARGET_IDP) : oauth(oauthError, 0);
       }
       Matcher status = PULSAR_OAUTH_STATUS.matcher(message);

@@ -110,6 +110,12 @@ public class PulsarSourceErrorClassificationTest {
         + "org.apache.pulsar.client.impl.auth.oauth2.protocol.TokenResult[\"expires_in\"])"), TARGET_IDP);
   }
 
+  @Test(timeOut = 10_000)
+  public void aLongTokenErrorIsReadInLinearTime() {
+    assertSourceRead(new PulsarClientException.AuthenticationException(
+        "Unable to obtain an access token: " + " (x".repeat(20_000)), TARGET_IDP);
+  }
+
   @Test
   public void clientSideFailures() {
     assertAuth(new PulsarClientException.AuthenticationException("Unable to read private key: no such file"),
