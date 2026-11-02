@@ -24,7 +24,7 @@ import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.spi.utils.CommonConstants.Server.CONFIG_OF_INSTANCE_DATA_DIR_CREATE_IF_MISSING;
+import static org.apache.pinot.spi.utils.CommonConstants.Server.CONFIG_OF_INSTANCE_DATA_DIR_FAIL_ON_MISSING;
 import static org.apache.pinot.spi.utils.CommonConstants.Server.CONFIG_OF_INSTANCE_ID;
 import static org.apache.pinot.spi.utils.CommonConstants.Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX;
 import static org.apache.pinot.spi.utils.CommonConstants.Server.INSTANCE_ID;
@@ -36,15 +36,15 @@ import static org.testng.Assert.assertTrue;
 public class HelixInstanceDataManagerConfigTest {
 
   @Test
-  public void testInstanceDataDirCreationConfig()
+  public void testInstanceDataDirFailOnMissingConfig()
       throws ConfigurationException {
     PinotConfiguration serverConfig = new PinotConfiguration(Map.of(CONFIG_OF_INSTANCE_ID, "testInstance"));
-    assertTrue(new HelixInstanceDataManagerConfig(serverConfig.subset(INSTANCE_DATA_MANAGER_CONFIG_PREFIX))
-        .shouldCreateInstanceDataDirIfMissing());
-
-    serverConfig.setProperty(CONFIG_OF_INSTANCE_DATA_DIR_CREATE_IF_MISSING, "false");
     assertFalse(new HelixInstanceDataManagerConfig(serverConfig.subset(INSTANCE_DATA_MANAGER_CONFIG_PREFIX))
-        .shouldCreateInstanceDataDirIfMissing());
+        .shouldFailOnMissingInstanceDataDir());
+
+    serverConfig.setProperty(CONFIG_OF_INSTANCE_DATA_DIR_FAIL_ON_MISSING, "true");
+    assertTrue(new HelixInstanceDataManagerConfig(serverConfig.subset(INSTANCE_DATA_MANAGER_CONFIG_PREFIX))
+        .shouldFailOnMissingInstanceDataDir());
   }
 
   @Test

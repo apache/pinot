@@ -166,11 +166,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     _segmentUploader = new PinotFSSegmentUploader(_instanceDataManagerConfig.getSegmentStoreUri(),
         ServerSegmentCompletionProtocolHandler.getSegmentUploadRequestTimeoutMs(), serverMetrics);
 
-    File instanceDataDir = new File(_instanceDataManagerConfig.getInstanceDataDir());
-    initInstanceDataDir(instanceDataDir, _instanceDataManagerConfig.shouldCreateInstanceDataDirIfMissing());
-
-    File instanceSegmentTarDir = new File(_instanceDataManagerConfig.getInstanceSegmentTarDir());
-    initInstanceSegmentTarDir(instanceSegmentTarDir);
+    initInstanceDataDir();
+    initInstanceSegmentTarDir();
 
     // Initialize segment build time lease extender executor
     SegmentBuildTimeLeaseExtender.initExecutor();
@@ -205,10 +202,12 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @VisibleForTesting
-  void initInstanceDataDir(File instanceDataDir, boolean createIfMissing) {
+  void initInstanceDataDir() {
+    File instanceDataDir = new File(_instanceDataManagerConfig.getInstanceDataDir());
     if (!instanceDataDir.exists()) {
-      Preconditions.checkState(createIfMissing, "Instance data dir does not exist: %s (%s=false)", instanceDataDir,
-          Server.CONFIG_OF_INSTANCE_DATA_DIR_CREATE_IF_MISSING);
+      Preconditions.checkState(!_instanceDataManagerConfig.shouldFailOnMissingInstanceDataDir(),
+          "Instance data dir does not exist: %s (%s=true)", instanceDataDir,
+          Server.CONFIG_OF_INSTANCE_DATA_DIR_FAIL_ON_MISSING);
       Preconditions.checkState(instanceDataDir.mkdirs(), "Failed to create instance data dir: %s", instanceDataDir);
     } else {
       // Clean up the _tmp (consuming segments) dir and empty table data dir
@@ -235,7 +234,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @VisibleForTesting
-  void initInstanceSegmentTarDir(File instanceSegmentTarDir) {
+  void initInstanceSegmentTarDir() {
+    File instanceSegmentTarDir = new File(_instanceDataManagerConfig.getInstanceSegmentTarDir());
     if (!instanceSegmentTarDir.exists()) {
       Preconditions.checkState(instanceSegmentTarDir.mkdirs(), "Failed to create instance segment tar dir: %s",
           instanceSegmentTarDir);
