@@ -379,8 +379,8 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
   /// Returns whether the hybrid table retention strategy should be applied to the given REALTIME table. Subclasses can
   /// override this to decide per table.
   ///
-  /// The default returns the value of [ControllerConf#ENABLE_HYBRID_TABLE_RETENTION_STRATEGY], which can be updated at
-  /// runtime through cluster config.
+  /// By default, the table-level `hybridTableRetentionStrategy` takes precedence; when it is `DEFAULT`, the value of
+  /// [ControllerConf#ENABLE_HYBRID_TABLE_RETENTION_STRATEGY] is used.
   protected boolean shouldEnableHybridTableRetentionStrategy(TableConfig realtimeTableConfig,
       TableConfig offlineTableConfig) {
     return realtimeTableConfig.getValidationConfig().getHybridTableRetentionStrategy()

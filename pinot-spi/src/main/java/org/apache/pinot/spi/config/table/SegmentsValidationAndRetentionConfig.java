@@ -193,7 +193,10 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   }
 
   /// Whether to use the hybrid table retention strategy for this table. Only applicable to realtime tables. DEFAULT
-  /// falls back to the controller-level config.
+  /// falls back to the controller-level config `controller.enable.hybrid.table.retention.strategy`.
+  ///
+  /// When enabled and an OFFLINE counterpart exists, realtime segments are retained until the OFFLINE time boundary
+  /// moves past them instead of by `retentionTimeValue`, so data is not dropped before the OFFLINE table covers it.
   // Ignored for serialization so that DEFAULT is omitted, see the field
   @JsonIgnore
   public Enablement getHybridTableRetentionStrategy() {
