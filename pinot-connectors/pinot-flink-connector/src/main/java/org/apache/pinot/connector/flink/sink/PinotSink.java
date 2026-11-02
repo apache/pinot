@@ -31,11 +31,14 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.api.connector.sink2.SinkWriter;
 import org.apache.flink.api.connector.sink2.WriterInitContext;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.connector.flink.common.PinotGenericRowConverter;
 import org.apache.pinot.plugin.segmentuploader.SegmentUploaderDefault;
+import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
@@ -137,6 +140,21 @@ public class PinotSink<T> implements Sink<T> {
     return tableConfig;
   }
 
+  /// Builds an [AuthProvider] from the `authToken` in the table's batch config, or returns null if none is set.
+  @Nullable
+  static AuthProvider createAuthProvider(TableConfig tableConfig) {
+    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+    if (ingestionConfig == null || ingestionConfig.getBatchIngestionConfig() == null) {
+      return null;
+    }
+    List<Map<String, String>> batchConfigMaps = ingestionConfig.getBatchIngestionConfig().getBatchConfigMaps();
+    if (batchConfigMaps == null || batchConfigMaps.isEmpty()) {
+      return null;
+    }
+    String authToken = batchConfigMaps.get(0).get(BatchConfigProperties.AUTH_TOKEN);
+    return StringUtils.isBlank(authToken) ? null : AuthProviderUtils.makeAuthProvider(authToken);
+  }
+
   @Override
   public SinkWriter<T> createWriter(WriterInitContext context)
       throws IOException {
@@ -150,6 +168,7 @@ public class PinotSink<T> implements Sink<T> {
   private final class PinotSinkWriter implements SinkWriter<T> {
     private final SegmentWriter _segmentWriter;
     private final SegmentUploader _segmentUploader;
+    @Nullable private final AuthProvider _authProvider;
     private final ExecutorService _executor;
     private final List<Future<?>> _pendingUploads = new ArrayList<>();
     private long _segmentNumRecord;
@@ -169,7 +188,8 @@ public class PinotSink<T> implements Sink<T> {
         segmentUploader.init(_tableConfig);
         _segmentWriter = segmentWriter;
         _segmentUploader = segmentUploader;
-        LOG.info("Open Pinot sink with the table {}", _tableConfig.toJsonString());
+        _authProvider = createAuthProvider(_tableConfig);
+        LOG.info("Open Pinot sink with the table {}", _tableConfig.getTableName());
       } catch (Exception e) {
         shutdownExecutorNow();
         closeQuietly(segmentWriter);
@@ -252,7 +272,7 @@ public class PinotSink<T> implements Sink<T> {
       LOG.info("Pinot segment writer flushed with {} records to {}", recordsInSegment, segmentURI);
       _pendingUploads.add(_executor.submit(() -> {
         try {
-          _segmentUploader.uploadSegment(segmentURI, null);
+          _segmentUploader.uploadSegment(segmentURI, _authProvider);
         } catch (Exception e) {
           throw new RuntimeException("Failed to upload Pinot segment", e);
         }
