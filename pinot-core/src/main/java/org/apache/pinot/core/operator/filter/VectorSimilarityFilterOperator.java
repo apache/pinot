@@ -397,7 +397,7 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
       // 3. Execute ANN search (with pre-filter if available)
       ImmutableRoaringBitmap preFilter = effectiveAllowedDocIds;
       ImmutableRoaringBitmap annResults;
-      // A projection of VECTOR_DISTANCE on this search asked for its distances: get them along with the doc ids.
+      // A cosineDistance projection on this search asked for its distances: get them along with the doc ids.
       VectorSearchDistances.Request distancesRequest =
           _searchDistances != null ? _searchDistances.getRequest(_vectorIndexReader, queryVector) : null;
       Int2FloatMap distances = null;
