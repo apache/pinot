@@ -19,10 +19,8 @@
 package org.apache.pinot.connector.flink.sink;
 
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeinfo.Types;
@@ -34,12 +32,9 @@ import org.apache.pinot.integration.tests.BaseClusterIntegrationTest;
 import org.apache.pinot.integration.tests.BasicAuthTestUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
-import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -98,8 +93,8 @@ public class PinotSinkAuthIntegrationTest extends BaseClusterIntegrationTest {
             .addSingleValueDimension("c", FieldSpec.DataType.STRING).build();
 
     addSchema(_schema);
-    // The table config stored in the controller never contains the token
-    addTableConfig(createSinkTableConfig(null));
+    // The table config stored in the controller has no batch config and never contains the token
+    addTableConfig(new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build());
   }
 
   @AfterClass
@@ -119,34 +114,23 @@ public class PinotSinkAuthIntegrationTest extends BaseClusterIntegrationTest {
   @Test
   public void testUploadSucceedsWithAuthToken()
       throws Exception {
-    // The token is only set on the in-memory table config passed to the sink
-    runSink(createSinkTableConfig(BasicAuthTestUtils.AUTH_TOKEN));
+    // Make sure the controller actually enforces auth, otherwise the upload below would pass without a token
+    int statusCode = sendGetRequestWithStatusCode(
+        getControllerRequestURLBuilder().forTableGet(RAW_TABLE_NAME), Map.of()).getLeft();
+    assertEquals(statusCode, 401);
+
+    // Same flow as the README: fetch the table config, then pass the token to the sink
+    TableConfig tableConfig =
+        getOrCreateAdminClient().getTableClient().getTableConfigObjectForType(RAW_TABLE_NAME, TableType.OFFLINE);
+    StreamExecutionEnvironment execEnv = StreamExecutionEnvironment.getExecutionEnvironment();
+    execEnv.setParallelism(1);
+    execEnv.fromData(_data, _typeInfo)
+        .sinkTo(new PinotSink<>(new FlinkRowGenericRowConverter(_typeInfo), tableConfig, _schema,
+            getControllerBaseApiUrl(), BasicAuthTestUtils.AUTH_TOKEN));
+    execEnv.execute();
 
     List<String> segments = getOrCreateAdminClient().getSegmentClient()
         .listSegments(OFFLINE_TABLE_NAME, TableType.OFFLINE.toString(), false);
     assertEquals(segments.size(), 1);
-  }
-
-  private void runSink(TableConfig tableConfig)
-      throws Exception {
-    StreamExecutionEnvironment execEnv = StreamExecutionEnvironment.getExecutionEnvironment();
-    execEnv.setParallelism(1);
-    execEnv.fromData(_data, _typeInfo)
-        .sinkTo(new PinotSink<>(new FlinkRowGenericRowConverter(_typeInfo), tableConfig, _schema));
-    execEnv.execute();
-  }
-
-  private TableConfig createSinkTableConfig(@Nullable String authToken) {
-    Map<String, String> batchConfigs = new HashMap<>();
-    batchConfigs.put(BatchConfigProperties.OUTPUT_DIR_URI, _tarDir.getAbsolutePath());
-    batchConfigs.put(BatchConfigProperties.OVERWRITE_OUTPUT, "false");
-    batchConfigs.put(BatchConfigProperties.PUSH_CONTROLLER_URI, getControllerBaseApiUrl());
-    if (authToken != null) {
-      batchConfigs.put(BatchConfigProperties.AUTH_TOKEN, authToken);
-    }
-    IngestionConfig ingestionConfig = new IngestionConfig();
-    ingestionConfig.setBatchIngestionConfig(new BatchIngestionConfig(List.of(batchConfigs), "APPEND", "HOURLY"));
-    return new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setIngestionConfig(ingestionConfig)
-        .build();
   }
 }

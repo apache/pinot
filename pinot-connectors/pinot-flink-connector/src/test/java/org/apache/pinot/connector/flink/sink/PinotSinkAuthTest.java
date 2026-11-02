@@ -30,6 +30,7 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 
@@ -77,6 +78,42 @@ public class PinotSinkAuthTest {
     TableConfig tableConfig = tableConfigWithBatchConfig(Map.of(BatchConfigProperties.AUTH_TOKEN, "  "));
 
     assertNull(PinotSink.createAuthProvider(tableConfig));
+  }
+
+  @Test
+  public void testPrepareTableConfigForSinkAddsAuthTokenWithoutIngestionConfig() {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
+
+    TableConfig result = PinotSink.prepareTableConfigForSink(tableConfig, "http://localhost:9000", AUTH_TOKEN);
+
+    Map<String, String> batchConfigMap =
+        result.getIngestionConfig().getBatchIngestionConfig().getBatchConfigMaps().get(0);
+    assertEquals(batchConfigMap.get(BatchConfigProperties.AUTH_TOKEN), AUTH_TOKEN);
+    assertNotNull(PinotSink.createAuthProvider(result));
+  }
+
+  @Test
+  public void testPrepareTableConfigForSinkMergesAuthTokenIntoExistingBatchConfig() {
+    TableConfig tableConfig = tableConfigWithBatchConfig(Map.of("existing", "value"));
+
+    TableConfig result = PinotSink.prepareTableConfigForSink(tableConfig, "http://localhost:9000", AUTH_TOKEN);
+
+    Map<String, String> batchConfigMap =
+        result.getIngestionConfig().getBatchIngestionConfig().getBatchConfigMaps().get(0);
+    assertEquals(batchConfigMap.get("existing"), "value");
+    assertEquals(batchConfigMap.get(BatchConfigProperties.AUTH_TOKEN), AUTH_TOKEN);
+  }
+
+  @Test
+  public void testPrepareTableConfigForSinkWithoutAuthToken() {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
+
+    TableConfig result = PinotSink.prepareTableConfigForSink(tableConfig, "http://localhost:9000", null);
+
+    Map<String, String> batchConfigMap =
+        result.getIngestionConfig().getBatchIngestionConfig().getBatchConfigMaps().get(0);
+    assertFalse(batchConfigMap.containsKey(BatchConfigProperties.AUTH_TOKEN));
+    assertNull(PinotSink.createAuthProvider(result));
   }
 
   private static TableConfig tableConfigWithBatchConfig(Map<String, String> batchConfigMap) {

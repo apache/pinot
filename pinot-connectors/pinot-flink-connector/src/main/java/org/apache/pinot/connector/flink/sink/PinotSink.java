@@ -86,6 +86,15 @@ public class PinotSink<T> implements Sink<T> {
         DEFAULT_SEGMENT_FLUSH_MAX_NUM_RECORDS, DEFAULT_EXECUTOR_POOL_SIZE);
   }
 
+  /// Same as [#PinotSink(PinotGenericRowConverter, TableConfig, Schema, String)], and also adds `authToken` to the
+  /// batch config so segment uploads authenticate with the controller. The token only lives in the in-memory table
+  /// config; it is never written back to the controller.
+  public PinotSink(PinotGenericRowConverter<T> recordConverter, TableConfig tableConfig, Schema schema,
+      String controllerBaseUrl, @Nullable String authToken) {
+    this(recordConverter, prepareTableConfigForSink(tableConfig, controllerBaseUrl, authToken), schema,
+        DEFAULT_SEGMENT_FLUSH_MAX_NUM_RECORDS, DEFAULT_EXECUTOR_POOL_SIZE);
+  }
+
   public PinotSink(PinotGenericRowConverter<T> recordConverter, TableConfig tableConfig, Schema schema,
       long segmentFlushMaxNumRecords, int executorPoolSize) {
     this(recordConverter, tableConfig, schema, segmentFlushMaxNumRecords, executorPoolSize, null, null);
@@ -105,9 +114,18 @@ public class PinotSink<T> implements Sink<T> {
 
   /// Applies the connector-specific batch-ingestion defaults needed for segment generation and upload.
   static TableConfig prepareTableConfigForSink(TableConfig tableConfig, String controllerBaseUrl) {
+    return prepareTableConfigForSink(tableConfig, controllerBaseUrl, null);
+  }
+
+  /// Same as [#prepareTableConfigForSink(TableConfig, String)], and also adds `authToken` when it is not blank.
+  static TableConfig prepareTableConfigForSink(TableConfig tableConfig, String controllerBaseUrl,
+      @Nullable String authToken) {
     Map<String, String> requiredBatchConfig = new HashMap<>();
     requiredBatchConfig.put(BatchConfigProperties.PUSH_CONTROLLER_URI, controllerBaseUrl);
     requiredBatchConfig.put(BatchConfigProperties.OUTPUT_DIR_URI, DEFAULT_OUTPUT_DIR_URI);
+    if (StringUtils.isNotBlank(authToken)) {
+      requiredBatchConfig.put(BatchConfigProperties.AUTH_TOKEN, authToken);
+    }
 
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
     if (ingestionConfig == null) {
@@ -141,6 +159,9 @@ public class PinotSink<T> implements Sink<T> {
   }
 
   /// Builds an [AuthProvider] from the `authToken` in the table's batch config, or returns null if none is set.
+  ///
+  /// Set the token only on the in-memory [TableConfig] passed to the sink, not on the table config stored in the
+  /// controller: the stored config is kept in ZooKeeper and returned by the table APIs.
   @Nullable
   static AuthProvider createAuthProvider(TableConfig tableConfig) {
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
