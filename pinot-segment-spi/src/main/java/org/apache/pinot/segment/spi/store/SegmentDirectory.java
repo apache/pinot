@@ -101,6 +101,13 @@ public abstract class SegmentDirectory implements Closeable {
   public abstract void reloadMetadata()
       throws Exception;
 
+  /// Switches to mapped segment metadata, for a directory that supports it, after preprocessing and before the segment
+  /// is queryable. The serving load calls this only when mapped segment metadata is enabled. The default keeps the
+  /// current metadata.
+  public void loadMappedMetadata()
+      throws IOException {
+  }
+
   /// Get the path/URL for the directory
   public abstract Path getPath();
 
