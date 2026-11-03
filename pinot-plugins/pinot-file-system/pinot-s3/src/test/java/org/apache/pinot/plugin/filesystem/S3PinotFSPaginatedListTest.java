@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.filesystem;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.time.Instant;
@@ -40,6 +41,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 /// Unit tests for S3PinotFS.listFilesWithMetadata(URI, boolean, Predicate, int)
@@ -76,6 +78,43 @@ public class S3PinotFSPaginatedListTest {
       builder.nextContinuationToken(nextToken);
     }
     return builder.build();
+  }
+
+  @Test
+  public void testListedLastModifiedTimeUsesExactKeyPrefix() throws IOException {
+    URI uri = URI.create("s3a://bucket/data/file%20one.parquet");
+    String key = "data/file one.parquet";
+    Instant lastModified = Instant.parse("2026-11-03T01:00:09.007Z");
+    S3Object object = S3Object.builder().key(key).size(100L).lastModified(lastModified).build();
+    ListObjectsV2Request request = ListObjectsV2Request.builder().bucket("bucket").prefix(key).maxKeys(1).build();
+    when(_mockS3Client.listObjectsV2(request)).thenReturn(page(List.of(object), true, "next"));
+
+    assertEquals(_s3PinotFS.getListedLastModifiedTime(uri), lastModified.toEpochMilli());
+    verify(_mockS3Client).listObjectsV2(request);
+  }
+
+  @Test
+  public void testListedLastModifiedTimeRejectsSimilarKey() {
+    URI uri = URI.create("s3://bucket/data/file.parquet");
+    ListObjectsV2Request request =
+        ListObjectsV2Request.builder().bucket("bucket").prefix("data/file.parquet").maxKeys(1).build();
+    when(_mockS3Client.listObjectsV2(request))
+        .thenReturn(page(List.of(s3obj("data/file.parquet.bak", 100)), true, "next"));
+
+    expectThrows(FileNotFoundException.class, () -> _s3PinotFS.getListedLastModifiedTime(uri));
+    verify(_mockS3Client).listObjectsV2(request);
+  }
+
+  @Test
+  public void testListedLastModifiedTimeRequiresTimestamp() {
+    URI uri = URI.create("s3://bucket/data/file.parquet");
+    ListObjectsV2Request request =
+        ListObjectsV2Request.builder().bucket("bucket").prefix("data/file.parquet").maxKeys(1).build();
+    S3Object object = S3Object.builder().key("data/file.parquet").size(100L).build();
+    when(_mockS3Client.listObjectsV2(request)).thenReturn(page(List.of(object), false, null));
+
+    IOException exception = expectThrows(IOException.class, () -> _s3PinotFS.getListedLastModifiedTime(uri));
+    assertTrue(exception.getMessage().contains("no last-modified time"));
   }
 
   @Test

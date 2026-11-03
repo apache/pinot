@@ -229,6 +229,18 @@ public interface PinotFS extends Closeable, Serializable {
   long lastModified(URI uri)
       throws IOException;
 
+  /// Returns the last-modified time for a single file using the same timestamp source as
+  /// [#listFilesWithMetadata(URI, boolean)].
+  /// Implementations that support a targeted lookup should avoid scanning the parent directory.
+  /// @param uri location of the file
+  /// @return the last-modified time in milliseconds since the epoch
+  /// @throws IOException on I/O failure, including when the file does not exist
+  /// @throws UnsupportedOperationException if the filesystem does not support this lookup
+  default long getListedLastModifiedTime(URI uri)
+      throws IOException {
+    throw new UnsupportedOperationException("Listed last-modified time lookup not supported");
+  }
+
   /// Updates the last modified time of an existing file or directory to be current time. If the file system object
   /// does not exist, creates an empty file.
   /// @param uri location of file or directory

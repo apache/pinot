@@ -22,12 +22,14 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -967,6 +969,25 @@ public class S3PinotFS extends BasePinotFS {
   public long lastModified(URI uri)
       throws IOException {
     return getS3ObjectMetadata(uri).lastModified().toEpochMilli();
+  }
+
+  @Override
+  public long getListedLastModifiedTime(URI uri)
+      throws IOException {
+    String key = sanitizePath(getBase(uri).relativize(uri).getPath());
+    // General-purpose S3 lists keys in lexicographic order. The exact key precedes any longer keys
+    // that share its prefix, so one result is enough.
+    ListObjectsV2Request request =
+        ListObjectsV2Request.builder().bucket(uri.getHost()).prefix(key).maxKeys(1).build();
+    List<S3Object> objects = retryWithS3CredentialRefresh(() -> _s3Client.listObjectsV2(request)).contents();
+    if (objects.isEmpty() || !key.equals(objects.get(0).key())) {
+      throw new FileNotFoundException("No S3 object found for " + uri);
+    }
+    Instant lastModified = objects.get(0).lastModified();
+    if (lastModified == null) {
+      throw new IOException("S3 listing returned no last-modified time for " + uri);
+    }
+    return lastModified.toEpochMilli();
   }
 
   @Override

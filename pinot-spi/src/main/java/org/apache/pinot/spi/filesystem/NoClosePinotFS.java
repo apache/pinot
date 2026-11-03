@@ -137,6 +137,12 @@ public class NoClosePinotFS implements PinotFS {
   }
 
   @Override
+  public long getListedLastModifiedTime(URI uri)
+      throws IOException {
+    return _delegate.getListedLastModifiedTime(uri);
+  }
+
+  @Override
   public boolean touch(URI uri)
       throws IOException {
     return _delegate.touch(uri);
