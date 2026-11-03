@@ -29,6 +29,8 @@ import org.mockito.ArgumentCaptor;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
+import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
 import software.amazon.awssdk.services.s3.model.S3Object;
@@ -245,14 +247,17 @@ public class S3PinotFSPaginatedListTest {
 
   @Test
   public void testFileMetadataAttributes() throws IOException {
-    final Instant mtime = Instant.parse("2026-01-15T10:30:00Z");
+    final Instant headMtime = Instant.parse("2026-01-15T10:30:00Z");
+    final Instant listedMtime = headMtime.plusMillis(7);
     final S3Object obj = S3Object.builder()
         .key("data/file.parquet")
         .size(4096L)
-        .lastModified(mtime)
+        .lastModified(listedMtime)
         .build();
     when(_mockS3Client.listObjectsV2(any(ListObjectsV2Request.class)))
         .thenReturn(page(Arrays.asList(obj), false, null));
+    when(_mockS3Client.headObject(any(HeadObjectRequest.class)))
+        .thenReturn(HeadObjectResponse.builder().lastModified(headMtime).build());
 
     final List<FileMetadata> result = _s3PinotFS.listFilesWithMetadata(
         URI.create("s3://bucket/data/"), true, ACCEPT_ALL, 10);
@@ -261,8 +266,11 @@ public class S3PinotFSPaginatedListTest {
     final FileMetadata fm = result.get(0);
     assertEquals(fm.getFilePath(), "s3://bucket/data/file.parquet");
     assertEquals(fm.getLength(), 4096L);
-    assertEquals(fm.getLastModifiedTime(), mtime.toEpochMilli());
+    assertEquals(fm.getLastModifiedTime(), listedMtime.toEpochMilli());
     assertEquals(fm.isDirectory(), false);
+    final long observedMtime = _s3PinotFS.lastModified(URI.create(fm.getFilePath()));
+    assertEquals(_s3PinotFS.compareLastModifiedTimes(fm.getLastModifiedTime(), observedMtime), 0);
+    assertTrue(_s3PinotFS.compareLastModifiedTimes(fm.getLastModifiedTime(), observedMtime + 1_000) < 0);
   }
 
   @Test

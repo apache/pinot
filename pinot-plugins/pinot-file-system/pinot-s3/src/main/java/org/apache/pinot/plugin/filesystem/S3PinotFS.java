@@ -970,6 +970,12 @@ public class S3PinotFS extends BasePinotFS {
   }
 
   @Override
+  public int compareLastModifiedTimes(long leftTimestampMs, long rightTimestampMs) {
+    // LIST can report milliseconds, while the Last-Modified header from HEAD has whole-second precision.
+    return Long.compare(Math.floorDiv(leftTimestampMs, 1_000L), Math.floorDiv(rightTimestampMs, 1_000L));
+  }
+
+  @Override
   public boolean touch(URI uri)
       throws IOException {
     try {
