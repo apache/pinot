@@ -338,7 +338,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private long _consumeStartTime = -1;
   private long _lastLogTime = 0;
   private int _lastConsumedCount = 0;
-  // Rate limiting for reportDataLoss(). Only touched from the consumer thread.
+  // Rate limiting for reportDataLoss(). Only touched by the thread running consumeLoop(): the consumer thread, or the
+  // state transition thread catching up to the final offset after stop() has joined the consumer thread.
   private long _lastDataLossReportTimeMs = -1;
   private int _dataLossBatchesSinceLastReport = 0;
   // Where the most recent batch with loss was detected while the rate limit suppressed its report; null when every
@@ -491,6 +492,15 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   }
 
   protected boolean consumeLoop()
+      throws Exception {
+    try {
+      return doConsumeLoop();
+    } finally {
+      flushDataLossReport();
+    }
+  }
+
+  private boolean doConsumeLoop()
       throws Exception {
     // At this point, we know that we can potentially move the offset, so the old saved segment file is not valid
     // anymore. Remove the file if it exists.
@@ -1181,7 +1191,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   /// reported by the first batch processed after the interval has elapsed, even when that batch and every one before
   /// it is healthy, so a loss event that the stream recovers from within the interval still reaches the log and the
   /// segment error cache. This method runs for every fetched batch, including empty ones, so the deferred report
-  /// follows the end of the interval within one fetch.
+  /// follows the end of the interval within one fetch. When the consume loop exits before that,
+  /// [#flushDataLossReport] reports it instead.
   ///
   /// @param messageBatch Message batch to validate
   @VisibleForTesting
@@ -1204,6 +1215,17 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       return;
     }
     logDataLoss(now, location);
+  }
+
+  /// Reports the batch with loss whose report the rate limit suppressed, if any. Runs whenever the consume loop exits:
+  /// no further batch comes to trigger the deferred report in [#reportDataLoss] once consumption stops (the segment
+  /// may commit right after), and the [ServerGauge#STREAM_DATA_LOSS] gauge is removed with the segment, so the loss
+  /// would otherwise never reach the log or the segment error cache.
+  @VisibleForTesting
+  void flushDataLossReport() {
+    if (_unreportedDataLossLocation != null) {
+      logDataLoss(now(), _unreportedDataLossLocation);
+    }
   }
 
   /// Emits the data-loss ERROR line and segment error entry for the most recent batch with loss, detected at the given

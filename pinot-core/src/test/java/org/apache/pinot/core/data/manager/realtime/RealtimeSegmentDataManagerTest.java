@@ -341,6 +341,55 @@ public class RealtimeSegmentDataManagerTest {
     }
   }
 
+  /// A loss whose report the rate limit suppressed must not be dropped when consumption stops before the interval
+  /// elapses, e.g. because the segment reaches its end criteria and commits: leaving the consume loop reports it.
+  @Test
+  public void testSuppressedDataLossIsReportedWhenConsumptionStops()
+      throws Exception {
+    TimeSupplier timeSupplier = new TimeSupplier();
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(true, timeSupplier,
+        String.valueOf(FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS), "10m", null)) {
+      RealtimeTableDataManager tableDataManager = segmentDataManager.getTableDataManager();
+      MessageBatch<?> firstLoss = mock(MessageBatch.class);
+      when(firstLoss.hasDataLoss()).thenReturn(true);
+      when(firstLoss.getFirstMessageOffset()).thenReturn(new LongMsgOffset(197));
+      MessageBatch<?> secondLoss = mock(MessageBatch.class);
+      when(secondLoss.hasDataLoss()).thenReturn(true);
+      when(secondLoss.getFirstMessageOffset()).thenReturn(new LongMsgOffset(481));
+      ArgumentCaptor<SegmentErrorInfo> errorCaptor = ArgumentCaptor.forClass(SegmentErrorInfo.class);
+
+      segmentDataManager.reportDataLoss(firstLoss);
+      timeSupplier.add(TimeUnit.SECONDS.toMillis(30));
+      segmentDataManager.reportDataLoss(secondLoss);
+      verify(tableDataManager, times(1)).addSegmentError(eq(SEGMENT_NAME_STR), any(SegmentErrorInfo.class));
+
+      // Consume to the end criteria and commit within the interval: the healthy batches do not report the suppressed
+      // loss, leaving the consume loop does
+      segmentDataManager._stubConsumeLoop = false;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.INITIAL_CONSUMING);
+      RealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
+      LongMsgOffset endOffset =
+          new LongMsgOffset(START_OFFSET_VALUE + FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
+      segmentDataManager._consumeOffsets.add(endOffset);
+      segmentDataManager._responses.add(new SegmentCompletionProtocol.Response(
+          new SegmentCompletionProtocol.Response.Params().withStatus(
+                  SegmentCompletionProtocol.ControllerResponseStatus.COMMIT)
+              .withStreamPartitionMsgOffset(endOffset.toString())));
+      consumer.run();
+
+      Assert.assertEquals(segmentDataManager.getSegment().getNumDocsIndexed(),
+          FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
+      verify(tableDataManager, times(2)).addSegmentError(eq(SEGMENT_NAME_STR), errorCaptor.capture());
+      String message = errorCaptor.getValue().getErrorMessage();
+      Assert.assertTrue(message.contains("batchFirstOffset: 481"), message);
+      Assert.assertTrue(message.contains("batches with loss since last report: 1)"), message);
+
+      // Nothing is left to report afterwards
+      segmentDataManager.flushDataLossReport();
+      verify(tableDataManager, times(2)).addSegmentError(eq(SEGMENT_NAME_STR), any(SegmentErrorInfo.class));
+    }
+  }
+
   private FakeRealtimeSegmentDataManager createFakeSegmentManager(boolean noUpsert, TimeSupplier timeSupplier,
       @Nullable String maxRows, @Nullable String maxDuration, @Nullable TableConfig tableConfig)
       throws Exception {
