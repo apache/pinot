@@ -46,6 +46,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.segment.uploader.SegmentUploader;
 import org.apache.pinot.spi.ingestion.segment.writer.SegmentWriter;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -87,12 +88,15 @@ public class PinotSink<T> implements Sink<T> {
   }
 
   /// Same as [#PinotSink(PinotGenericRowConverter, TableConfig, Schema, String)], and also adds `authToken` to the
-  /// batch config so segment uploads authenticate with the controller. The token only lives in the in-memory table
-  /// config; it is never written back to the controller.
+  /// batch config so segment uploads authenticate with the controller. A non-blank `authToken` overrides any token
+  /// already in the batch config.
+  ///
+  /// The given `tableConfig` is not modified: the sink works on a deep copy, so the token never ends up in the
+  /// caller's table config.
   public PinotSink(PinotGenericRowConverter<T> recordConverter, TableConfig tableConfig, Schema schema,
       String controllerBaseUrl, @Nullable String authToken) {
-    this(recordConverter, prepareTableConfigForSink(tableConfig, controllerBaseUrl, authToken), schema,
-        DEFAULT_SEGMENT_FLUSH_MAX_NUM_RECORDS, DEFAULT_EXECUTOR_POOL_SIZE);
+    this(recordConverter, prepareTableConfigForSink(copyTableConfig(tableConfig), controllerBaseUrl, authToken),
+        schema, DEFAULT_SEGMENT_FLUSH_MAX_NUM_RECORDS, DEFAULT_EXECUTOR_POOL_SIZE);
   }
 
   public PinotSink(PinotGenericRowConverter<T> recordConverter, TableConfig tableConfig, Schema schema,
@@ -110,6 +114,16 @@ public class PinotSink<T> implements Sink<T> {
     _executorPoolSize = executorPoolSize;
     _segmentNamePrefix = segmentNamePrefix;
     _segmentUploadTimeMs = segmentUploadTimeMs;
+  }
+
+  /// Deep-copies the table config through JSON. `new TableConfig(tableConfig)` is not enough because it shares the
+  /// nested ingestion config.
+  private static TableConfig copyTableConfig(TableConfig tableConfig) {
+    try {
+      return JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class);
+    } catch (IOException e) {
+      throw new IllegalStateException("Failed to copy table config for table: " + tableConfig.getTableName(), e);
+    }
   }
 
   /// Applies the connector-specific batch-ingestion defaults needed for segment generation and upload.
@@ -160,8 +174,9 @@ public class PinotSink<T> implements Sink<T> {
 
   /// Builds an [AuthProvider] from the `authToken` in the table's batch config, or returns null if none is set.
   ///
-  /// Set the token only on the in-memory [TableConfig] passed to the sink, not on the table config stored in the
-  /// controller: the stored config is kept in ZooKeeper and returned by the table APIs.
+  /// Prefer passing the token to [#PinotSink(PinotGenericRowConverter, TableConfig, Schema, String, String)]. Never
+  /// store it in the table config saved on the controller: that config is kept in ZooKeeper and returned by the table
+  /// APIs.
   @Nullable
   static AuthProvider createAuthProvider(TableConfig tableConfig) {
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();

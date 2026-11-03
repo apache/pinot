@@ -107,8 +107,10 @@ try (PinotAdminClient client =
 }
 ```
  - The token can be `Basic <base64(user:password)>` or `Bearer <token>`.
- - The sink adds the token to the `authToken` entry of the in-memory table config only. Do not save the token in
-   the table config stored in the controller: that config is kept in ZooKeeper and returned by the table APIs.
+ - The sink adds the token to its own copy of the table config; the `tableConfig` you pass in is not modified. Do not
+   save the token in the table config stored in the controller: that config is kept in ZooKeeper and returned by the
+   table APIs.
+ - Like any credential passed to a Flink job, the token is part of the serialized job graph sent to the task managers.
  - Only static tokens are supported for segment upload.
 
 ## Notes for backfilling upsert table

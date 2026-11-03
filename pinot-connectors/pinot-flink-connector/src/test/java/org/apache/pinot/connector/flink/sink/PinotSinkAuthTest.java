@@ -20,11 +20,17 @@ package org.apache.pinot.connector.flink.sink;
 
 import java.util.List;
 import java.util.Map;
+import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.common.typeinfo.Types;
+import org.apache.flink.api.java.typeutils.RowTypeInfo;
+import org.apache.pinot.connector.flink.common.FlinkRowGenericRowConverter;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
@@ -94,14 +100,47 @@ public class PinotSinkAuthTest {
 
   @Test
   public void testPrepareTableConfigForSinkMergesAuthTokenIntoExistingBatchConfig() {
-    TableConfig tableConfig = tableConfigWithBatchConfig(Map.of("existing", "value"));
+    TableConfig tableConfig =
+        tableConfigWithBatchConfig(Map.of("existing", "value", BatchConfigProperties.AUTH_TOKEN, "Basic b2xkOm9sZA=="));
 
     TableConfig result = PinotSink.prepareTableConfigForSink(tableConfig, "http://localhost:9000", AUTH_TOKEN);
 
     Map<String, String> batchConfigMap =
         result.getIngestionConfig().getBatchIngestionConfig().getBatchConfigMaps().get(0);
     assertEquals(batchConfigMap.get("existing"), "value");
+    // The explicit token overrides the one already in the batch config
     assertEquals(batchConfigMap.get(BatchConfigProperties.AUTH_TOKEN), AUTH_TOKEN);
+  }
+
+  @Test
+  public void testConstructorWithAuthTokenDoesNotModifyCallerTableConfig() {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
+
+    new PinotSink<>(createConverter(), tableConfig, createSchema(), "http://localhost:9000", AUTH_TOKEN);
+
+    assertNull(tableConfig.getIngestionConfig());
+    assertFalse(tableConfig.toJsonString().contains(AUTH_TOKEN));
+  }
+
+  @Test
+  public void testConstructorWithAuthTokenDoesNotModifyCallerBatchConfig() {
+    TableConfig tableConfig = tableConfigWithBatchConfig(Map.of("existing", "value"));
+
+    new PinotSink<>(createConverter(), tableConfig, createSchema(), "http://localhost:9000", AUTH_TOKEN);
+
+    assertEquals(tableConfig.getIngestionConfig().getBatchIngestionConfig().getBatchConfigMaps(),
+        List.of(Map.of("existing", "value")));
+    assertFalse(tableConfig.toJsonString().contains(AUTH_TOKEN));
+  }
+
+  private static FlinkRowGenericRowConverter createConverter() {
+    return new FlinkRowGenericRowConverter(
+        new RowTypeInfo(new TypeInformation[]{Types.INT}, new String[]{"a"}));
+  }
+
+  private static Schema createSchema() {
+    return new Schema.SchemaBuilder().setSchemaName("myTable")
+        .addSingleValueDimension("a", FieldSpec.DataType.INT).build();
   }
 
   @Test
