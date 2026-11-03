@@ -98,13 +98,15 @@ public interface PinotTaskGenerator {
     return CommonConstants.Helix.UNTAGGED_MINION_INSTANCE;
   }
 
-  /// Validates the effective minion instance tag before scheduled task generation.
-  /// The effective tag includes any scheduling request override. The default implementation permits every tag.
+  /// Validates the effective minion instance tag before scheduled or ad-hoc task generation.
+  /// The effective tag includes any request override. The default implementation permits every tag.
   /// Implementations must only validate: scheduling paths may invoke this hook more than once.
   ///
   /// @param tableConfig table whose tasks are being scheduled
-  /// @param minionInstanceTag effective tag, which may be null
-  /// @throws IllegalArgumentException if the tag is incompatible with the table's tasks
+  /// @param minionInstanceTag effective tag, or null if no instance-group tag was selected.
+  ///        The default minion pool has the explicit tag [CommonConstants.Helix#UNTAGGED_MINION_INSTANCE].
+  /// @throws IllegalArgumentException if the tag is incompatible with the table's tasks. The scheduler records a
+  ///         scheduling error and skips the table for this task type. Ad-hoc creation fails before generating tasks.
   default void validateMinionInstanceTag(TableConfig tableConfig, @Nullable String minionInstanceTag) {
   }
 

@@ -94,9 +94,11 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
             TIMEOUT_IN_MS, "Minion tag must be visible before scheduling");
       }
       String taskType = "ValidateTag" + enforceTag + (override == null ? "default" : override.replace("_", ""));
-      Map<String, String> taskConfigs = new HashMap<>(Map.of("minionInstanceTag", dedicatedTag));
+      String otherTaskType = taskType + "Other";
+      Map<String, String> taskConfigs =
+          new HashMap<>(Map.of(PinotTaskManager.MINION_INSTANCE_TAG_CONFIG, dedicatedTag));
       TableConfig table = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
-          .setTaskConfig(new TableTaskConfig(Map.of(taskType, taskConfigs))).build();
+          .setTaskConfig(new TableTaskConfig(Map.of(taskType, taskConfigs, otherTaskType, new HashMap<>()))).build();
       waitForEVToDisappear(table.getTableName());
       getOrCreateAdminClient().getTableClient().createTable(table.toJsonString(), "TASK");
       PinotTaskManager taskManager = _controllerStarter.getTaskManager();
@@ -115,6 +117,11 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
         }
 
         @Override
+        public List<PinotTaskConfig> generateTasks(TableConfig tableConfig, Map<String, String> configs) {
+          return generateTasks(List.of(tableConfig));
+        }
+
+        @Override
         public void validateMinionInstanceTag(TableConfig tableConfig, String effectiveTag) {
           if (!dedicatedTag.equals(effectiveTag)) {
             throw new IllegalArgumentException("Effective minion tag must be " + dedicatedTag);
@@ -123,33 +130,50 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
       } : createFakeTaskGenerator(taskType, 1, 1);
       generator.init(taskManager.getClusterInfoAccessor());
       taskManager.registerTaskGenerator(generator);
-      taskResources.ensureTaskQueueExists(taskType);
+      taskManager.registerTaskGenerator(createFakeTaskGenerator(otherTaskType, 1, 1));
       TaskSchedulingContext context = new TaskSchedulingContext().setTablesToSchedule(Set.of(TABLE_NAME_WITH_TYPE))
-          .setTasksToSchedule(Set.of(taskType)).setMinionInstanceTag(override);
-      RuntimeException failure = null;
-      TaskSchedulingInfo result = null;
-      try {
-        result = taskManager.scheduleTasks(context).get(taskType);
-      } catch (RuntimeException e) {
-        failure = e;
-      }
+          .setMinionInstanceTag(override);
+      Map<String, TaskSchedulingInfo> results = taskManager.scheduleTasks(context);
+      assertEquals(results.get(otherTaskType).getScheduledTaskNames().size(), 1);
+      assertEquals(taskResources.getTaskStates(otherTaskType).size(), 1);
+
+      TaskSchedulingInfo result = results.get(taskType);
       int submitted = taskResources.getTaskStates(taskType).size();
-      LOGGER.info("Effective tag witness: enforced={}, override={}, generated={}, submitted={}", enforceTag,
-          override, generated.get(), submitted);
-      if (enforceTag && override != null && !dedicatedTag.equals(override)) {
+      boolean rejected = enforceTag && override != null && !dedicatedTag.equals(override);
+      assertTrue(result.getGenerationErrors().isEmpty());
+      if (rejected) {
         assertEquals(generated.get(), 0, "Reject an incompatible override before generator side effects");
         assertEquals(submitted, 0, "An incompatible override must not submit a task");
-        assertNotNull(failure);
-        assertTrue(failure.getMessage().contains(TABLE_NAME_WITH_TYPE));
-        assertTrue(failure.getMessage().contains("Effective minion tag must be " + dedicatedTag));
+        assertNull(result.getScheduledTaskNames());
+        assertEquals(result.getSchedulingErrors().size(), 1);
+        String error = result.getSchedulingErrors().get(0);
+        assertTrue(error.contains(TABLE_NAME_WITH_TYPE));
+        assertTrue(error.contains("Effective minion tag must be " + dedicatedTag));
       } else {
-        assertNull(failure);
-        assertNotNull(result);
-        assertTrue(result.getGenerationErrors().isEmpty());
         assertTrue(result.getSchedulingErrors().isEmpty());
         assertEquals(submitted, 1);
         if (enforceTag) {
           assertEquals(generated.get(), 1);
+        }
+      }
+
+      if (enforceTag) {
+        Map<String, String> adhocConfigs = override != null
+            ? new HashMap<>(Map.of(PinotTaskManager.MINION_INSTANCE_TAG_CONFIG, override)) : null;
+        int generatedBeforeAdhoc = generated.get();
+        if (dedicatedTag.equals(override)) {
+          String taskName = taskManager.createTask(taskType, RAW_TABLE_NAME, null, adhocConfigs)
+              .get(TABLE_NAME_WITH_TYPE);
+          assertNotNull(taskName);
+          assertEquals(taskResources.getTaskRuntimeConfig(taskName).get("MinionWorkerGroupTag"), dedicatedTag);
+          assertEquals(generated.get(), generatedBeforeAdhoc + 1);
+          assertEquals(taskResources.getTaskStates(taskType).size(), submitted + 1);
+        } else {
+          IllegalArgumentException error = expectThrows(IllegalArgumentException.class,
+              () -> taskManager.createTask(taskType, RAW_TABLE_NAME, null, adhocConfigs));
+          assertEquals(error.getMessage(), "Effective minion tag must be " + dedicatedTag);
+          assertEquals(generated.get(), generatedBeforeAdhoc);
+          assertEquals(taskResources.getTaskStates(taskType).size(), submitted);
         }
       }
     } finally {
