@@ -2286,10 +2286,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       closePartitionGroupConsumer();
     }
     _segmentLogger.info("Creating new stream consumer for topic partition {} , reason: {}", _clientId, reason);
+    PartitionGroupConsumer consumer = null;
     try {
-      PartitionGroupConsumer consumer =
-          _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus,
-              CONSUMER_RECREATE_RETRY_POLICY);
+      consumer = _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus,
+          CONSUMER_RECREATE_RETRY_POLICY);
       consumer.start(_currentOffset);
       // Offload may have closed a still-null field while create was in flight. Do not close on
       // _shouldStop: stop() is also used for CONSUMING -> ONLINE catchup.
@@ -2302,6 +2302,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         closePartitionGroupConsumer();
       }
     } catch (Exception e) {
+      if (consumer != null) {
+        closeQuietly(consumer);
+      }
       _segmentLogger.error("Faced exception while trying to create stream consumer for topic partition {} reason {}",
           _clientId, reason, e);
       _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.STREAM_CONSUMER_CREATE_EXCEPTIONS, 1L);
@@ -2323,13 +2326,16 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _segmentLogger.info("Recreating stream consumer for topic partition {}, reason: {}", _clientId, reason);
     _currentOffset = _partitionGroupConsumer.get().checkpoint(_currentOffset);
     closePartitionGroupConsumer();
+    PartitionGroupConsumer consumer = null;
     try {
-      PartitionGroupConsumer consumer =
-          _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus,
-              CONSUMER_RECREATE_RETRY_POLICY);
+      consumer = _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus,
+          CONSUMER_RECREATE_RETRY_POLICY);
       consumer.start(_currentOffset);
       _partitionGroupConsumer.set(consumer);
     } catch (Exception e) {
+      if (consumer != null) {
+        closeQuietly(consumer);
+      }
       _segmentLogger.error("Faced exception while trying to recreate stream consumer for topic partition {}", _clientId,
           e);
       _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.STREAM_CONSUMER_CREATE_EXCEPTIONS, 1L);

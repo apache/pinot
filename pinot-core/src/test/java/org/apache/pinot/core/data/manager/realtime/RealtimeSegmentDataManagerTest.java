@@ -82,6 +82,7 @@ import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.LongMsgOffsetFactory;
 import org.apache.pinot.spi.stream.MessageBatch;
+import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PermanentConsumerException;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamDataDecoder;
@@ -117,7 +118,9 @@ import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 // TODO Re-write this test using the stream abstraction
@@ -478,6 +481,47 @@ public class RealtimeSegmentDataManagerTest {
       verify(manager, never()).removeExpiredPrimaryKeys();
       assertEquals(segmentDataManager.getCurrentOffset().toString(), START_OFFSET.toString());
     }
+  }
+
+  @DataProvider
+  public Object[][] startupFailurePaths() {
+    return new Object[][]{{false, false}, {false, true}, {true, false}, {true, true}};
+  }
+
+  @Test(dataProvider = "startupFailurePaths")
+  public void testFailedConsumerStartClosesUnpublishedConsumer(boolean recreate, boolean closeFails)
+      throws Exception {
+    TableConfig tableConfig = Fixtures.createTableConfig(RecordingStreamConsumerFactory.class.getName(),
+        FakeStreamMessageDecoder.class.getName());
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(false, new TimeSupplier(), null,
+        null, tableConfig)) {
+      if (recreate) {
+        invokeConsumerCreation(segmentDataManager, "makeStreamConsumer");
+        assertNotNull(segmentDataManager.getPartitionGroupConsumer());
+      }
+      PartitionGroupConsumer previousConsumer = segmentDataManager.getPartitionGroupConsumer();
+      RuntimeException startFailure = new IllegalStateException("stream consumer start failed");
+      RecordingStreamConsumerFactory.START_FAILURE.set(startFailure);
+      RecordingStreamConsumerFactory.FAIL_CLOSE.set(closeFails);
+
+      InvocationTargetException failure = expectThrows(InvocationTargetException.class,
+          () -> invokeConsumerCreation(segmentDataManager, recreate ? "recreateStreamConsumer" : "makeStreamConsumer"));
+
+      assertSame(failure.getCause(), startFailure);
+      assertSame(segmentDataManager.getPartitionGroupConsumer(), previousConsumer);
+      int expectedClosedConsumers = recreate ? 2 : 1;
+      assertEquals(RecordingStreamConsumerFactory.CLOSE_COUNT.get(), expectedClosedConsumers);
+      assertEquals(RecordingStreamConsumerFactory.FAILED_START_CLOSE_COUNT.get(), 1);
+      segmentDataManager.offload();
+      assertEquals(RecordingStreamConsumerFactory.FAILED_START_CLOSE_COUNT.get(), 1);
+    }
+  }
+
+  private static void invokeConsumerCreation(FakeRealtimeSegmentDataManager segmentDataManager, String methodName)
+      throws Exception {
+    Method method = RealtimeSegmentDataManager.class.getDeclaredMethod(methodName, String.class);
+    method.setAccessible(true);
+    method.invoke(segmentDataManager, "test consumer startup");
   }
 
   @Test
