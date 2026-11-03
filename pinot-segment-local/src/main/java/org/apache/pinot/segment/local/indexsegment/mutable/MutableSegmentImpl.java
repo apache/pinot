@@ -862,7 +862,7 @@ public class MutableSegmentImpl implements MutableSegment {
 
       Object value = row.getValue(entry.getKey());
       if (value == null) {
-        recordIndexingError("DICTIONARY");
+        recordIndexingError(entry.getKey(), "DICTIONARY");
       } else {
         if (indexContainer._fieldSpec.isSingleValueField()) {
           indexContainer._dictId = dictionary.index(value);
@@ -979,7 +979,7 @@ public class MutableSegmentImpl implements MutableSegment {
             mutableIndex.add(value, dictId, docId);
             updateIndexCapacityThresholdBreached(mutableIndex, indexEntry.getKey(), column);
           } catch (Exception e) {
-            recordIndexingError(indexEntry.getKey(), e);
+            recordIndexingError(column, indexEntry.getKey(), e);
           }
         }
 
@@ -1020,7 +1020,7 @@ public class MutableSegmentImpl implements MutableSegment {
             mutableIndex.add(values, dictIds, docId);
             updateIndexCapacityThresholdBreached(mutableIndex, indexEntry.getKey(), column);
           } catch (Exception e) {
-            recordIndexingError(indexEntry.getKey(), e);
+            recordIndexingError(column, indexEntry.getKey(), e);
           }
         }
         indexContainer._valuesInfo.updateMVNumValues(values.length);
@@ -1093,8 +1093,8 @@ public class MutableSegmentImpl implements MutableSegment {
     }
   }
 
-  private void recordIndexingError(IndexType<?, ?, ?> indexType, Exception exception) {
-    _logger.error("failed to index value with {}", indexType, exception);
+  private void recordIndexingError(String columnName, IndexType<?, ?, ?> indexType, Exception exception) {
+    _logger.error("Failed to index value for column: {} with index: {}", columnName, indexType, exception);
     if (_serverMetrics != null) {
       String indexMetricName = indexType.getPrettyName().toUpperCase(Locale.US);
       String metricKeyName = _realtimeTableName + "-" + indexMetricName + "-indexingError";
@@ -1102,8 +1102,8 @@ public class MutableSegmentImpl implements MutableSegment {
     }
   }
 
-  private void recordIndexingError(String indexType) {
-    _logger.error("failed to index value with {}", indexType);
+  private void recordIndexingError(String columnName, String indexType) {
+    _logger.error("Failed to index value for column: {} with index: {}", columnName, indexType);
     if (_serverMetrics != null) {
       String metricKeyName = _realtimeTableName + "-" + indexType + "-indexingError";
       _serverMetrics.addMeteredTableValue(metricKeyName, ServerMeter.INDEXING_FAILURES, 1);

@@ -65,6 +65,7 @@ import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.memory.PinotBufferFactory;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.ColumnIndexUtils;
+import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -89,6 +90,8 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -496,6 +499,50 @@ public class SegmentMetadataImplTest {
   }
 
   @Test
+  public void testMappedMetadataSubclass()
+      throws Exception {
+    new SegmentV1V2ToV3FormatConverter().convert(_segmentDirectory);
+    SegmentMetadataImpl eager = new SegmentMetadataImpl(_segmentDirectory);
+    long mappings = PinotDataBuffer.getMmapBufferCount();
+    try (MetadataOnlySegmentMetadata mapped = new MetadataOnlySegmentMetadata(_segmentDirectory)) {
+      assertTrue(mapped.isMapped());
+      assertNull(mapped.getIndexDir());
+      assertEquals(mapped.getName(), eager.getName());
+      assertEquals(mapped.getTotalDocs(), eager.getTotalDocs());
+      assertEquals(mapped.getPhysicalColumnNames(), eager.getSchema().getPhysicalColumnNames());
+      for (String column : mapped.getPhysicalColumnNames()) {
+        ColumnMetadata actual = mapped.getColumnMetadataFor(column);
+        assertTrue(actual instanceof MappedColumnMetadata, column);
+        assertEquals(((MappedColumnMetadata) actual).getIndexSizeMap(),
+            ((ColumnMetadataImpl) eager.getColumnMetadataFor(column)).getIndexSizeMap(), column);
+      }
+      SegmentMetadataImpl detached = mapped.detachedCopy();
+      assertFalse(detached.isMapped());
+      assertFalse(detached instanceof MetadataOnlySegmentMetadata);
+      assertNull(detached.getIndexDir());
+      assertEquals(detached.getTotalDocs(), eager.getTotalDocs());
+    }
+    assertEquals(PinotDataBuffer.getMmapBufferCount(), mappings);
+  }
+
+  @Test
+  public void testServingLoadSwitchesAnySegmentDirectoryToMappedMetadata()
+      throws Exception {
+    InstanceDataManagerConfig instanceConfig = mock(InstanceDataManagerConfig.class);
+    PinotConfiguration config = new PinotConfiguration();
+    when(instanceConfig.getConfig()).thenReturn(config);
+    for (boolean enabled : new boolean[]{true, false}) {
+      config.setProperty(IndexLoadingConfig.MAPPED_SEGMENT_METADATA_ENABLED, enabled);
+      // Not a SegmentLocalFSDirectory: the switch is part of the SegmentDirectory contract.
+      SegmentDirectory segmentDirectory = mock(SegmentDirectory.class);
+      when(segmentDirectory.getSegmentMetadata()).thenReturn(
+          new SegmentMetadataImpl("testTable", "emptySegment", new Schema(), System.currentTimeMillis()));
+      ImmutableSegmentLoader.load(segmentDirectory, new IndexLoadingConfig(instanceConfig, null, null)).destroy();
+      verify(segmentDirectory, times(enabled ? 1 : 0)).loadMappedMetadata();
+    }
+  }
+
+  @Test
   public void testMappedMetadataIgnoresStaleEagerSnapshot()
       throws Exception {
     File properties = SegmentDirectoryPaths.findMetadataFile(_segmentDirectory);
@@ -880,5 +927,18 @@ public class SegmentMetadataImplTest {
     driver.init(config, new GenericRowRecordReader(rows));
     driver.build();
     return driver.getOutputDirectory();
+  }
+
+  /// Reports no index directory, as metadata staged apart from a segment's index files would.
+  private static final class MetadataOnlySegmentMetadata extends SegmentMetadataImpl {
+    MetadataOnlySegmentMetadata(File metadataDir)
+        throws IOException, ConfigurationException {
+      super(metadataDir, ReadMode.mmap, null);
+    }
+
+    @Override
+    public File getIndexDir() {
+      return null;
+    }
   }
 }
