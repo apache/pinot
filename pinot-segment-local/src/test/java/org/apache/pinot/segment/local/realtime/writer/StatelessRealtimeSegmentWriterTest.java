@@ -25,6 +25,7 @@ import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -38,15 +39,20 @@ import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamMessage;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
+import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.testng.Assert.expectThrows;
 
 
-/// Tests how [StatelessRealtimeSegmentWriter] stops consuming.
+/// Tests how [StatelessRealtimeSegmentWriter] stops consuming and how it handles `index()` failures.
 public class StatelessRealtimeSegmentWriterTest {
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String STREAM_TYPE = "test";
@@ -82,6 +88,43 @@ public class StatelessRealtimeSegmentWriterTest {
       assertThat(writer.isSuccess()).isFalse();
       assertThat(writer.getConsumptionException()).hasMessageStartingWith("Consumption stopped at offset");
     }
+  }
+
+  // A published-then-rethrown index() must not abort stateless consumption (issue #16316).
+  @Test
+  public void testPublishedRepairDoesNotAbort()
+      throws Exception {
+    MutableSegmentImpl segment = mock(MutableSegmentImpl.class);
+    when(segment.getNumDocsIndexed()).thenReturn(0, 1);
+    when(segment.canAddMore()).thenReturn(true);
+    when(segment.canTakeMoreRows()).thenReturn(true);
+    when(segment.index(any(), any())).thenThrow(new RuntimeException("repaired then rethrown"));
+    StatelessRealtimeSegmentWriter.indexTransformedRow(segment, new GenericRow(), mock(StreamMessageMetadata.class));
+  }
+
+  @Test
+  public void testUnpublishedFailureRethrows()
+      throws Exception {
+    MutableSegmentImpl segment = mock(MutableSegmentImpl.class);
+    when(segment.getNumDocsIndexed()).thenReturn(0);
+    when(segment.canAddMore()).thenReturn(true);
+    when(segment.index(any(), any())).thenThrow(new RuntimeException("failed before mutation"));
+    expectThrows(RuntimeException.class,
+        () -> StatelessRealtimeSegmentWriter.indexTransformedRow(segment, new GenericRow(),
+            mock(StreamMessageMetadata.class)));
+  }
+
+  @Test
+  public void testTerminalPublishedRepairRethrows()
+      throws Exception {
+    MutableSegmentImpl segment = mock(MutableSegmentImpl.class);
+    when(segment.getNumDocsIndexed()).thenReturn(0, 1);
+    when(segment.canAddMore()).thenReturn(false);
+    when(segment.canTakeMoreRows()).thenReturn(false);
+    when(segment.index(any(), any())).thenThrow(new RuntimeException("unrecoverable"));
+    expectThrows(RuntimeException.class,
+        () -> StatelessRealtimeSegmentWriter.indexTransformedRow(segment, new GenericRow(),
+            mock(StreamMessageMetadata.class)));
   }
 
   /// Stream that never returns a message and keeps polling when interrupted.

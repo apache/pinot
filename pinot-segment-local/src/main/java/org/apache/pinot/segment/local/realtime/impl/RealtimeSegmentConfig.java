@@ -39,6 +39,7 @@ import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.Schema;
 
 
@@ -72,6 +73,9 @@ public class RealtimeSegmentConfig {
   @Nullable
   private final MultiColumnTextIndexConfig _multiColIndexConfig;
   private final boolean _dropRecordOnPartitionMismatch;
+  /// Mirrors [IngestionConfig#isContinueOnError]. A started row is always finished or the segment is marked
+  /// terminal. This flag only controls whether [#index] rethrows after a successful repair.
+  private final boolean _continueOnError;
 
   // TODO: Clean up this constructor. Most of these things can be extracted from tableConfig.
 
@@ -99,7 +103,8 @@ public class RealtimeSegmentConfig {
       @Nullable PartitionDedupMetadataManager partitionDedupMetadataManager,
       String consumerDir,
       @Nullable MultiColumnTextIndexConfig textIndexConfig,
-      boolean dropRecordOnPartitionMismatch) {
+      boolean dropRecordOnPartitionMismatch,
+      boolean continueOnError) {
     _tableNameWithType = tableNameWithType;
     _segmentName = segmentName;
     _streamName = streamName;
@@ -123,6 +128,7 @@ public class RealtimeSegmentConfig {
     _consumerDir = consumerDir;
     _multiColIndexConfig = textIndexConfig;
     _dropRecordOnPartitionMismatch = dropRecordOnPartitionMismatch;
+    _continueOnError = continueOnError;
   }
 
   public String getTableNameWithType() {
@@ -222,6 +228,19 @@ public class RealtimeSegmentConfig {
     return _dropRecordOnPartitionMismatch;
   }
 
+  /// When true, a recoverable row repair is logged and indexing returns. When false, the repaired row is still
+  /// published and then the original error is rethrown. An unrecoverable repair always marks the segment terminal.
+  public boolean isContinueOnError() {
+    return _continueOnError;
+  }
+
+  /// Reads [IngestionConfig#isContinueOnError] from the table config. Defaults to {@code false} when the
+  /// table or ingestion config is absent, matching the field default on [IngestionConfig].
+  private static boolean continueOnErrorFromTableConfig(@Nullable TableConfig tableConfig) {
+    IngestionConfig ingestionConfig = tableConfig != null ? tableConfig.getIngestionConfig() : null;
+    return ingestionConfig != null && ingestionConfig.isContinueOnError();
+  }
+
   public static class Builder {
     private String _tableNameWithType;
     private String _segmentName;
@@ -248,6 +267,7 @@ public class RealtimeSegmentConfig {
     private String _consumerDir;
     private MultiColumnTextIndexConfig _textIndexConfig;
     private boolean _dropRecordOnPartitionMismatch;
+    private boolean _continueOnError;
 
     public Builder() {
       _indexConfigByCol = new HashMap<>();
@@ -255,11 +275,13 @@ public class RealtimeSegmentConfig {
 
     public Builder(IndexLoadingConfig indexLoadingConfig) {
       this(indexLoadingConfig.getFieldIndexConfigByColName(), indexLoadingConfig.getSortedColumns());
+      _continueOnError = continueOnErrorFromTableConfig(indexLoadingConfig.getTableConfig());
     }
 
     public Builder(TableConfig tableConfig, Schema schema) {
       this(FieldIndexConfigsUtil.createIndexConfigsByColName(tableConfig, schema),
           tableConfig.getIndexingConfig().getSortedColumn());
+      _continueOnError = continueOnErrorFromTableConfig(tableConfig);
     }
 
     public Builder(Map<String, FieldIndexConfigs> indexConfigsByColName, @Nullable List<String> sortedColumns) {
@@ -414,6 +436,11 @@ public class RealtimeSegmentConfig {
       return this;
     }
 
+    public Builder setContinueOnError(boolean continueOnError) {
+      _continueOnError = continueOnError;
+      return this;
+    }
+
     public RealtimeSegmentConfig build() {
       Map<String, FieldIndexConfigs> indexConfigByCol = Maps.newHashMapWithExpectedSize(_indexConfigByCol.size());
       for (Map.Entry<String, FieldIndexConfigs.Builder> entry : _indexConfigByCol.entrySet()) {
@@ -424,7 +451,8 @@ public class RealtimeSegmentConfig {
           _capacity, _avgNumMultiValues, Collections.unmodifiableMap(indexConfigByCol), _segmentZKMetadata, _offHeap,
           _memoryManager, _statsHistory, _partitionColumn, _partitionFunction, _partitionId, _aggregateMetrics,
           _ingestionAggregationConfigs, _defaultNullHandlingEnabled, _partitionUpsertMetadataManager,
-          _partitionDedupMetadataManager, _consumerDir, _textIndexConfig, _dropRecordOnPartitionMismatch);
+          _partitionDedupMetadataManager, _consumerDir, _textIndexConfig, _dropRecordOnPartitionMismatch,
+          _continueOnError);
     }
   }
 }
