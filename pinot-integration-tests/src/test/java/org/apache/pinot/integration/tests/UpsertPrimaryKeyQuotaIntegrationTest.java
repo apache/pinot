@@ -42,16 +42,14 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Integration test for the per-partition primary key quota on upsert tables.
- *
- * <p>The gameScores data set has only 3 distinct primary keys (playerId 100/101/102). With 2 Kafka partitions and a cap
- * of 1 primary key per partition, at least one partition is guaranteed (pigeonhole) to hold 2 keys, so the quota is
- * always breached regardless of the hash distribution. This makes the breach deterministic.
- *
- * <p>SHADOW: the breach meter fires but consumption is not paused. ENFORCED: the table is paused with reason
- * {@link org.apache.pinot.spi.config.table.PauseState.ReasonCode#PRIMARY_KEY_QUOTA_EXCEEDED}.
- */
+/// Integration test for the per-partition primary key quota on upsert tables.
+///
+/// The gameScores data set has only 3 distinct primary keys (playerId 100/101/102). With 2 Kafka partitions and a cap
+/// of 1 primary key per partition, at least one partition is guaranteed (pigeonhole) to hold 2 keys, so the quota is
+/// always breached regardless of the hash distribution. This makes the breach deterministic.
+///
+/// SHADOW: the breach meter fires but consumption is not paused. ENFORCED: the table is paused with reason
+/// [org.apache.pinot.spi.config.table.PauseState.ReasonCode#PRIMARY_KEY_QUOTA_EXCEEDED].
 public class UpsertPrimaryKeyQuotaIntegrationTest extends BaseClusterIntegrationTest {
   private static final String INPUT_DATA_LARGE_TAR_FILE = "gameScores_large_csv.tar.gz";
   private static final String CSV_SCHEMA_HEADER = "playerId,name,game,score,timestampInEpoch,deleted";

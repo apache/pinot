@@ -21,6 +21,7 @@ package org.apache.pinot.controller.validation;
 import com.google.common.collect.HashBiMap;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.ControllerMeter;
@@ -185,7 +186,7 @@ public class PrimaryKeyQuotaCheckerTest {
 
   @Test
   public void testEmptyMapIsUndetermined() {
-    mockServerCounts(Collections.emptyMap());
+    mockServerCounts(Map.of());
     TableConfig tableConfig = upsertTableConfig(100L, QuotaEnforcementMode.ENFORCED);
     PrimaryKeyQuotaChecker checker = newChecker();
     assertEquals(checker.checkPrimaryKeyQuota(tableConfig), PrimaryKeyQuotaChecker.Status.UNDETERMINED);
@@ -200,6 +201,27 @@ public class PrimaryKeyQuotaCheckerTest {
     PrimaryKeyQuotaChecker checker = newChecker();
     assertEquals(checker.checkPrimaryKeyQuota(tableConfig), PrimaryKeyQuotaChecker.Status.UNDETERMINED);
     assertFalse(checker.isTablePrimaryKeyQuotaExceeded(tableConfig));
+  }
+
+  @Test
+  public void testPartialResponseWithoutBreachIsUndetermined() {
+    // Server_1 hosts the table but did not respond; it may hold the partition that is over the cap
+    when(_helix.getServerToSegmentsMap(TABLE_NAME)).thenReturn(Map.of("Server_0", List.of(), "Server_1", List.of()));
+    mockServerCounts(Map.of(0, Map.of("Server_0", 50L)));
+    TableConfig tableConfig = upsertTableConfig(100L, QuotaEnforcementMode.ENFORCED);
+    PrimaryKeyQuotaChecker checker = newChecker();
+    long before = breachCount();
+    assertEquals(checker.checkPrimaryKeyQuota(tableConfig), PrimaryKeyQuotaChecker.Status.UNDETERMINED);
+    assertEquals(breachCount(), before);
+  }
+
+  @Test
+  public void testPartialResponseWithBreachIsExceeded() {
+    // A missing server can only hide a breach, so one seen in a partial response is real
+    when(_helix.getServerToSegmentsMap(TABLE_NAME)).thenReturn(Map.of("Server_0", List.of(), "Server_1", List.of()));
+    mockServerCounts(Map.of(0, Map.of("Server_0", 150L)));
+    TableConfig tableConfig = upsertTableConfig(100L, QuotaEnforcementMode.ENFORCED);
+    assertEquals(newChecker().checkPrimaryKeyQuota(tableConfig), PrimaryKeyQuotaChecker.Status.EXCEEDED);
   }
 
   @Test

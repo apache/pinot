@@ -259,10 +259,8 @@ public class RealtimeSegmentValidationManagerTest {
         eq(PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED), anyString());
   }
 
-  /**
-   * Sets up the common mocks for the primary key quota tests: not resource-utilization or storage limited, with the
-   * given current pause state.
-   */
+  /// Sets up the common mocks for the primary key quota tests: not resource-utilization or storage limited, with the
+  /// given current pause state.
   private TableConfig setupForPkTests(String tableName, boolean isTablePaused, PauseState.ReasonCode reasonCode) {
     PauseStatusDetails pauseStatus = mock(PauseStatusDetails.class);
     TableConfig tableConfig = mock(TableConfig.class);
@@ -310,7 +308,8 @@ public class RealtimeSegmentValidationManagerTest {
     String tableName = "testTable_REALTIME";
     TableConfig tableConfig =
         setupForPkTests(tableName, true, PauseState.ReasonCode.PRIMARY_KEY_QUOTA_EXCEEDED);
-    when(_primaryKeyQuotaChecker.checkPrimaryKeyQuota(tableConfig)).thenReturn(PrimaryKeyQuotaChecker.Status.WITHIN_QUOTA);
+    when(_primaryKeyQuotaChecker.checkPrimaryKeyQuota(tableConfig))
+        .thenReturn(PrimaryKeyQuotaChecker.Status.WITHIN_QUOTA);
     when(_primaryKeyQuotaChecker.getEnforcementMode(tableConfig)).thenReturn(QuotaEnforcementMode.ENFORCED);
 
     boolean result = _realtimeSegmentValidationManager.shouldEnsureConsuming(tableName);
@@ -320,10 +319,8 @@ public class RealtimeSegmentValidationManagerTest {
         eq(PauseState.ReasonCode.PRIMARY_KEY_QUOTA_EXCEEDED), anyString());
   }
 
-  /**
-   * Regression: a table paused for storage quota must NOT be resumed by the primary key check when storage is still
-   * exceeded.
-   */
+  /// Regression: a table paused for storage quota must NOT be resumed by the primary key check when storage is still
+  /// exceeded.
   @Test
   public void testStoragePausedNotResumedByClearPrimaryKey() {
     String tableName = "testTable_REALTIME";
@@ -331,7 +328,8 @@ public class RealtimeSegmentValidationManagerTest {
     // storage still exceeded
     when(_storageQuotaChecker.isTableStorageQuotaExceeded(tableConfig)).thenReturn(true);
     // PK is clear
-    when(_primaryKeyQuotaChecker.checkPrimaryKeyQuota(tableConfig)).thenReturn(PrimaryKeyQuotaChecker.Status.WITHIN_QUOTA);
+    when(_primaryKeyQuotaChecker.checkPrimaryKeyQuota(tableConfig))
+        .thenReturn(PrimaryKeyQuotaChecker.Status.WITHIN_QUOTA);
     when(_primaryKeyQuotaChecker.getEnforcementMode(tableConfig)).thenReturn(QuotaEnforcementMode.ENFORCED);
 
     boolean result = _realtimeSegmentValidationManager.shouldEnsureConsuming(tableName);
@@ -341,10 +339,8 @@ public class RealtimeSegmentValidationManagerTest {
         any(PauseState.ReasonCode.class), anyString());
   }
 
-  /**
-   * Regression for the shared pause-flag bug: a table paused for primary key quota must NOT be resumed by the storage
-   * check when the primary key quota is still exceeded.
-   */
+  /// Regression for the shared pause-flag bug: a table paused for primary key quota must NOT be resumed by the storage
+  /// check when the primary key quota is still exceeded.
   @Test
   public void testPrimaryKeyPausedNotResumedByClearStorage() {
     String tableName = "testTable_REALTIME";
@@ -360,10 +356,8 @@ public class RealtimeSegmentValidationManagerTest {
         any(PauseState.ReasonCode.class), anyString());
   }
 
-  /**
-   * Both quotas exceeded while paused for primary key: the stored reason is relabeled to storage (which takes
-   * precedence) without a second force-commit, and the table is not resumed.
-   */
+  /// Both quotas exceeded while paused for primary key: the stored reason is relabeled to storage (which takes
+  /// precedence) without a second force-commit, and the table is not resumed.
   @Test
   public void testBothExceededRelabelsToStorageWhilePkPaused() {
     String tableName = "testTable_REALTIME";
@@ -381,11 +375,10 @@ public class RealtimeSegmentValidationManagerTest {
         eq(PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED), anyString());
   }
 
-  /**
-   * A table paused for storage quota whose storage has returned to within limits (or whose storage cap was raised) but
-   * whose primary key quota is still exceeded must stay paused, with the stored reason relabeled from storage to primary
-   * key (no resume, no second force-commit). Symmetric counterpart of {@link #testBothExceededRelabelsToStorageWhilePkPaused}.
-   */
+  /// A table paused for storage quota whose storage has returned to within limits (or whose storage cap was raised) but
+  /// whose primary key quota is still exceeded must stay paused, with the stored reason relabeled from storage to
+  /// primary key (no resume, no second force-commit). Symmetric counterpart of
+  /// [#testBothExceededRelabelsToStorageWhilePkPaused].
   @Test
   public void testStorageClearedButPrimaryKeyStillExceededRelabelsToPrimaryKey() {
     String tableName = "testTable_REALTIME";
@@ -408,14 +401,13 @@ public class RealtimeSegmentValidationManagerTest {
         eq(PauseState.ReasonCode.PRIMARY_KEY_QUOTA_EXCEEDED), anyString());
   }
 
-  /**
-   * A PK-paused table whose primary key status cannot be determined (e.g. servers unreachable) is left paused.
-   */
+  /// A PK-paused table whose primary key status cannot be determined (e.g. servers unreachable) is left paused.
   @Test
   public void testPrimaryKeyUndeterminedLeavesPkPausedTablePaused() {
     String tableName = "testTable_REALTIME";
     TableConfig tableConfig = setupForPkTests(tableName, true, PauseState.ReasonCode.PRIMARY_KEY_QUOTA_EXCEEDED);
-    when(_primaryKeyQuotaChecker.checkPrimaryKeyQuota(tableConfig)).thenReturn(PrimaryKeyQuotaChecker.Status.UNDETERMINED);
+    when(_primaryKeyQuotaChecker.checkPrimaryKeyQuota(tableConfig))
+        .thenReturn(PrimaryKeyQuotaChecker.Status.UNDETERMINED);
     when(_primaryKeyQuotaChecker.getEnforcementMode(tableConfig)).thenReturn(QuotaEnforcementMode.ENFORCED);
 
     boolean result = _realtimeSegmentValidationManager.shouldEnsureConsuming(tableName);

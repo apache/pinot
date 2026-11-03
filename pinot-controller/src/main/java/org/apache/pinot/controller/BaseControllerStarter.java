@@ -133,11 +133,11 @@ import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.controller.validation.BrokerResourceValidationManager;
 import org.apache.pinot.controller.validation.DiskUtilizationChecker;
 import org.apache.pinot.controller.validation.OfflineSegmentValidationManager;
+import org.apache.pinot.controller.validation.PrimaryKeyQuotaChecker;
 import org.apache.pinot.controller.validation.RealtimeOffsetAutoResetManager;
 import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
 import org.apache.pinot.controller.validation.ResourceUtilizationChecker;
 import org.apache.pinot.controller.validation.ResourceUtilizationManager;
-import org.apache.pinot.controller.validation.PrimaryKeyQuotaChecker;
 import org.apache.pinot.controller.validation.StorageQuotaChecker;
 import org.apache.pinot.controller.validation.UtilizationChecker;
 import org.apache.pinot.controller.workload.QueryWorkloadManager;
@@ -683,9 +683,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
             _leadControllerManager);
     _storageQuotaChecker = new StorageQuotaChecker(_tableSizeReader, _controllerMetrics, _leadControllerManager,
         _helixResourceManager, _config);
-    _primaryKeyQuotaChecker = new PrimaryKeyQuotaChecker(
-        new ServerSegmentMetadataReader(_executorService, _connectionManager), _helixResourceManager, _controllerMetrics,
-        _config);
+    _primaryKeyQuotaChecker =
+        new PrimaryKeyQuotaChecker(new ServerSegmentMetadataReader(_executorService, _connectionManager),
+            _helixResourceManager, _controllerMetrics, _config);
 
     DiskUtilizationChecker diskUtilizationChecker = new DiskUtilizationChecker(_helixResourceManager, _config);
     if (shouldAddUtilizationChecker(_config.isDiskUtilizationCheckerEnabled())) {
