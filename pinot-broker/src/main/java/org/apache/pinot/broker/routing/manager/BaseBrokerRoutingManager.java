@@ -152,6 +152,7 @@ public abstract class BaseBrokerRoutingManager
   private final long _newSegmentExpirationMs;
   private final ExecutorService _executorService;
   private final List<Consumer<ServerInstance>> _serverEnabledCallbacks = new CopyOnWriteArrayList<>();
+  private final List<Consumer<ServerInstance>> _serverDisabledCallbacks = new CopyOnWriteArrayList<>();
   private final List<Consumer<ServerInstance>> _serverRemovedCallbacks = new CopyOnWriteArrayList<>();
   // The callback installed through setServerEnabledCallback, so that setting it again replaces it rather than piling up
   @Nullable
@@ -263,6 +264,14 @@ public abstract class BaseBrokerRoutingManager
     }
     _serverEnabledCallback = callback;
     _serverEnabledCallbacks.add(callback);
+  }
+
+  /// Registers a callback invoked with the [ServerInstance] of an enabled server that becomes disabled while it stays
+  /// in the cluster: disabled by an operator, its queries disabled, or shutting down, which a server also reports as
+  /// it starts up. It runs once routing no longer selects the server. Same threading rules as
+  /// [#addServerEnabledCallback(Consumer)].
+  public void addServerDisabledCallback(Consumer<ServerInstance> callback) {
+    _serverDisabledCallbacks.add(callback);
   }
 
   /// Registers a callback invoked with the last known [ServerInstance] of a server that has been removed from the
@@ -586,6 +595,7 @@ public abstract class BaseBrokerRoutingManager
       if (presentServers.contains(newDisabledInstance)) {
         // Still in the cluster, just disabled or shutting down: remember it so that a later removal is reported
         _disabledServers.put(newDisabledInstance, serverInstance);
+        invokeCallbacks(_serverDisabledCallbacks, serverInstance, "disabled");
       } else {
         // Went from enabled to removed in one step
         notifyServerRemoved(serverInstance);
@@ -621,26 +631,21 @@ public abstract class BaseBrokerRoutingManager
   }
 
   private void notifyServerEnabled(ServerInstance serverInstance) {
-    for (Consumer<ServerInstance> callback : _serverEnabledCallbacks) {
-      try {
-        callback.accept(serverInstance);
-      } catch (Exception e) {
-        LOGGER.error("Caught exception in server enabled callback for server: {}, ignoring it",
-            serverInstance.getInstanceId(), e);
-      }
-    }
+    invokeCallbacks(_serverEnabledCallbacks, serverInstance, "enabled");
   }
 
   private void notifyServerRemoved(ServerInstance serverInstance) {
     LOGGER.info("Server: {} has been removed from the cluster", serverInstance.getInstanceId());
-    invokeServerRemovedCallbacks(serverInstance);
+    invokeCallbacks(_serverRemovedCallbacks, serverInstance, "removed");
   }
 
   /// A server back under the same id at a different address (hostname, Netty port or Netty TLS port) has left its
   /// previous address for good. Listeners key what they cache by address rather than by id, so they get the removed
   /// callback with the previous instance: otherwise its cached channels would never be dropped, and one gone
   /// half-open would be picked up again if the server ever moved back to that address. Channels at an address that
-  /// did not change are dropped too, which only costs a reconnect.
+  /// did not change are dropped too: a server writes its address into its instance config as it starts up, so a
+  /// changed address means a new process, those channels lead to the previous one like the others, and whatever was
+  /// still in flight on them was sent to it.
   private void notifyIfAddressChanged(@Nullable ServerInstance previousInstance, ServerInstance serverInstance) {
     if (previousInstance == null || (previousInstance.getHostname().equals(serverInstance.getHostname())
         && previousInstance.getPort() == serverInstance.getPort()
@@ -650,15 +655,16 @@ public abstract class BaseBrokerRoutingManager
     LOGGER.info("Server: {} moved from {}:{} (TLS port {}) to {}:{} (TLS port {})", serverInstance.getInstanceId(),
         previousInstance.getHostname(), previousInstance.getPort(), previousInstance.getNettyTlsPort(),
         serverInstance.getHostname(), serverInstance.getPort(), serverInstance.getNettyTlsPort());
-    invokeServerRemovedCallbacks(previousInstance);
+    invokeCallbacks(_serverRemovedCallbacks, previousInstance, "removed");
   }
 
-  private void invokeServerRemovedCallbacks(ServerInstance serverInstance) {
-    for (Consumer<ServerInstance> callback : _serverRemovedCallbacks) {
+  private static void invokeCallbacks(List<Consumer<ServerInstance>> callbacks, ServerInstance serverInstance,
+      String event) {
+    for (Consumer<ServerInstance> callback : callbacks) {
       try {
         callback.accept(serverInstance);
       } catch (Exception e) {
-        LOGGER.error("Caught exception in server removed callback for server: {}, ignoring it",
+        LOGGER.error("Caught exception in server {} callback for server: {}, ignoring it", event,
             serverInstance.getInstanceId(), e);
       }
     }

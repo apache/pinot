@@ -138,7 +138,8 @@ public class RequestWriteTimeoutHandler extends ChannelDuplexHandler {
     LOGGER.error("Request write to server: {} made no progress for {}ms ({} bytes pending, writable: {}), closing the "
         + "channel as the socket is stalled or half-open", _serverRoutingInstance, _timeoutMs, pendingBytes,
         channel.isWritable());
-    BrokerMetrics.get().addMeteredGlobalValue(BrokerMeter.NETTY_CONNECTION_WRITE_TIMEOUTS, 1);
+    BrokerMetrics.get()
+        .addMeteredValue(BrokerMeter.NETTY_CONNECTION_WRITE_TIMEOUTS, 1, _serverRoutingInstance.getShortName());
     ctx.close();
   }
 

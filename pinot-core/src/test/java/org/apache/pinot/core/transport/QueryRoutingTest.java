@@ -83,7 +83,10 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.core.transport.QueryServerTestUtils.startAndGetPort;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
@@ -830,6 +833,74 @@ public class QueryRoutingTest {
           "Expected fresh channels on the server");
     } finally {
       queryRouter.shutDown();
+    }
+  }
+
+  /// A server toggled off and on again, not restarted, keeps the channel that still carries a query and heard from it
+  /// after the disable, so the query can finish. A channel that heard nothing since the disable is evicted, and the
+  /// queries on it fail without the server being reported.
+  @Test
+  public void testEnabledServerKeepsChannelThatCarriesQueriesAndAnsweredSinceDisabled()
+      throws Exception {
+    long heldRequestId = 201;
+    long answeredRequestId = 202;
+    DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
+    dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(answeredRequestId));
+    DataBuffer answer = PinotByteBuffer.wrap(dataTable.toBytes());
+    _queryServer = QueryServerTestUtils.newQueryServer(
+        queryRequest -> queryRequest.getRequestId() == answeredRequestId ? Futures.immediateFuture(answer)
+            : SettableFuture.create());
+    initializeTestFixtures(startAndGetPort(_queryServer));
+    QueryRouter router = newIsolatedQueryRouter();
+    try {
+      AsyncQueryResponse held =
+          router.submitQuery(heldRequestId, "testTable", BROKER_REQUEST, _routingTable, null, null, 10_000L);
+      Channel channel = router.getServerChannels().getOrCreateServerChannel(_offlineServerRoutingInstance)._channel;
+      router.markServerDisabled(_serverInstance);
+      AsyncQueryResponse answered =
+          router.submitQuery(answeredRequestId, "testTable", BROKER_REQUEST, _routingTable, null, null, 10_000L);
+      assertNotNull(answered.getFinalResponses().get(_offlineServerRoutingInstance).getDataTable());
+
+      assertEquals(router.evictChannelsOfEnabledServer(_serverInstance), 0);
+      assertSame(router.getServerChannels().getOrCreateServerChannel(_offlineServerRoutingInstance)._channel,
+          channel);
+      assertTrue(channel.isActive());
+      assertEquals(held.getStatus(), QueryResponse.Status.IN_PROGRESS);
+
+      // Disabled again, and nothing heard since: evicted, and the held query fails without blaming the server
+      router.markServerDisabled(_serverInstance);
+      assertEquals(router.evictChannelsOfEnabledServer(_serverInstance), 1);
+      held.getFinalResponses();
+      assertEquals(held.getStatus(), QueryResponse.Status.FAILED);
+      assertNull(held.getFailedServer());
+      assertFalse(channel.isActive());
+    } finally {
+      router.shutDown();
+    }
+  }
+
+  /// A query rejected because the channel's outbound queue is full fails, or skips the server, without reporting the
+  /// server: that is backpressure, which a healthy server draining a large request causes too.
+  @Test(dataProvider = "skipUnavailable")
+  public void testUnwritableRejectionDoesNotReportServer(boolean skip)
+      throws Exception {
+    initializeTestFixtures(12345);
+    QueryRouter router = newIsolatedQueryRouter();
+    try {
+      Channel unwritableChannel = mock(Channel.class);
+      when(unwritableChannel.isActive()).thenReturn(true);
+      when(unwritableChannel.isWritable()).thenReturn(false);
+      router.getServerChannels().getOrCreateServerChannel(_offlineServerRoutingInstance).setChannel(unwritableChannel);
+      BrokerRequest request = CalciteSqlCompiler.compileToBrokerRequest(
+          "SET skipUnavailableServers=" + skip + "; SELECT * FROM testTable");
+
+      AsyncQueryResponse response = router.submitQuery(301L, "testTable", request, _routingTable, null, null, 10_000L);
+      response.getFinalResponses();
+      assertEquals(response.getStatus(), skip ? QueryResponse.Status.COMPLETED : QueryResponse.Status.FAILED);
+      assertNull(response.getFailedServer());
+      verify(unwritableChannel, never()).writeAndFlush(any());
+    } finally {
+      router.shutDown();
     }
   }
 

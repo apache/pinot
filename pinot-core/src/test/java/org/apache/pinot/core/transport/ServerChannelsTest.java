@@ -51,6 +51,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -64,6 +65,7 @@ import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
+import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.core.util.OsCheck;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
@@ -71,6 +73,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
 import org.mockito.ArgumentCaptor;
 import org.testng.annotations.BeforeClass;
@@ -99,6 +102,8 @@ import static org.testng.Assert.fail;
 
 
 public class ServerChannelsTest {
+  private static final ServerRoutingInstance STALLED_EMBEDDED_INSTANCE =
+      new ServerRoutingInstance("localhost", 12345, TableType.OFFLINE);
 
   @DataProvider
   public Object[][] parameters() {
@@ -222,7 +227,8 @@ public class ServerChannelsTest {
     when(mockFuture.addListener(listenerCaptor.capture())).thenReturn(mockFuture);
 
     AsyncQueryResponse asyncQueryResponse = mock(AsyncQueryResponse.class);
-    serverChannel.sendRequestWithoutLocking("test_table", asyncQueryResponse, routingInstance, new byte[]{1, 2, 3});
+    serverChannel.sendRequestWithoutLocking("test_table", asyncQueryResponse, routingInstance, new byte[]{1, 2, 3},
+        true);
 
     // Simulate write failure
     when(mockFuture.isSuccess()).thenReturn(false);
@@ -268,7 +274,8 @@ public class ServerChannelsTest {
     when(mockFuture.addListener(listenerCaptor.capture())).thenReturn(mockFuture);
 
     AsyncQueryResponse asyncQueryResponse = mock(AsyncQueryResponse.class);
-    serverChannel.sendRequestWithoutLocking("test_table", asyncQueryResponse, routingInstance, new byte[]{1, 2, 3});
+    serverChannel.sendRequestWithoutLocking("test_table", asyncQueryResponse, routingInstance, new byte[]{1, 2, 3},
+        true);
 
     // Simulate write success
     when(mockFuture.isSuccess()).thenReturn(true);
@@ -397,7 +404,7 @@ public class ServerChannelsTest {
       when(mockFuture.addListener(listenerCaptor.capture())).thenReturn(mockFuture);
       serverChannel.setChannel(staleChannel);
       serverChannel.sendRequestWithoutLocking("test_table", mock(AsyncQueryResponse.class), routingInstance,
-          new byte[]{1, 2, 3});
+          new byte[]{1, 2, 3}, true);
 
       // The entry reconnected before the write failure came back
       Channel freshChannel = mock(Channel.class);
@@ -437,7 +444,7 @@ public class ServerChannelsTest {
       oldEntry.setChannel(oldChannel);
       AsyncQueryResponse old = new AsyncQueryResponse(mock(QueryRouter.class), 1L, Set.of(instance),
           System.currentTimeMillis(), 10_000L, mock(ServerRoutingStatsManager.class), false);
-      oldEntry.sendRequestWithoutLocking("testTable", old, instance, new byte[]{1});
+      oldEntry.sendRequestWithoutLocking("testTable", old, instance, new byte[]{1}, true);
       assertTrue(channels.evictChannel(instance));
       ServerChannels.ServerChannel replacement = channels.getOrCreateServerChannel(instance);
       assertNotSame(replacement, oldEntry);
@@ -447,7 +454,7 @@ public class ServerChannelsTest {
       replacement.setChannel(freshChannel);
       AsyncQueryResponse fresh = new AsyncQueryResponse(mock(QueryRouter.class), 2L, Set.of(instance),
           System.currentTimeMillis(), 10_000L, mock(ServerRoutingStatsManager.class), false);
-      replacement.sendRequestWithoutLocking("testTable", fresh, instance, new byte[]{2});
+      replacement.sendRequestWithoutLocking("testTable", fresh, instance, new byte[]{2}, true);
       when(oldWrite.isSuccess()).thenReturn(false);
       when(oldWrite.cause()).thenReturn(new IOException("evicted before write completed"));
       listener.getValue().operationComplete(oldWrite);
@@ -479,13 +486,15 @@ public class ServerChannelsTest {
       serverChannel.setChannel(mockChannel);
       AsyncQueryResponse asyncQueryResponse = mock(AsyncQueryResponse.class);
 
-      long rejectionsBefore = meterCount(BrokerMeter.NETTY_CONNECTION_UNWRITABLE_REJECTIONS);
-      IllegalStateException e = expectThrows(IllegalStateException.class,
+      long rejectionsBefore = meterCount(BrokerMeter.NETTY_CONNECTION_UNWRITABLE_REJECTIONS, routingInstance);
+      // Its own type, so that the query router does not report the server for backpressure
+      ServerChannels.UnwritableChannelException e = expectThrows(ServerChannels.UnwritableChannelException.class,
           () -> serverChannel.sendRequestWithoutLocking("test_table", asyncQueryResponse, routingInstance,
-              new byte[]{1, 2, 3}));
+              new byte[]{1, 2, 3}, true));
       assertTrue(e.getMessage().contains("not writable"), e.getMessage());
       assertTrue(e.getMessage().contains("12345"), e.getMessage());
-      assertEquals(meterCount(BrokerMeter.NETTY_CONNECTION_UNWRITABLE_REJECTIONS), rejectionsBefore + 1);
+      assertEquals(meterCount(BrokerMeter.NETTY_CONNECTION_UNWRITABLE_REJECTIONS, routingInstance),
+          rejectionsBefore + 1);
 
       verify(mockChannel, never()).writeAndFlush(any());
       verify(mockChannel, never()).close();
@@ -493,6 +502,133 @@ public class ServerChannelsTest {
       verify(asyncQueryResponse, never()).markServerUnavailable(any(), any(), any(Exception.class), anyBoolean());
     } finally {
       serverChannels.shutDown();
+    }
+  }
+
+  /// A ping is queued even when the outbound queue is above the high watermark: whether it is answered is what tells a
+  /// server draining a large request from one that stalled, so rejecting it would fail it either way.
+  @SuppressWarnings("unchecked")
+  @Test
+  public void testPingIsQueuedOnUnwritableChannel()
+      throws Exception {
+    ServerChannels serverChannels =
+        new ServerChannels(mock(QueryRouter.class), null, null, ThreadAccountantUtils.getNoOpAccountant());
+    try {
+      ServerRoutingInstance routingInstance = new ServerRoutingInstance("localhost", 12345, TableType.OFFLINE);
+      ServerChannels.ServerChannel serverChannel = serverChannels.getOrCreateServerChannel(routingInstance);
+      Channel mockChannel = mock(Channel.class);
+      ChannelFuture mockFuture = mock(ChannelFuture.class);
+      when(mockChannel.isActive()).thenReturn(true);
+      when(mockChannel.isWritable()).thenReturn(false);
+      when(mockChannel.writeAndFlush(any())).thenReturn(mockFuture);
+      ArgumentCaptor<GenericFutureListener> listenerCaptor = ArgumentCaptor.forClass(GenericFutureListener.class);
+      when(mockFuture.addListener(listenerCaptor.capture())).thenReturn(mockFuture);
+      serverChannel.setChannel(mockChannel);
+      AsyncQueryResponse asyncQueryResponse = mock(AsyncQueryResponse.class);
+
+      long rejectionsBefore = meterCount(BrokerMeter.NETTY_CONNECTION_UNWRITABLE_REJECTIONS, routingInstance);
+      assertSame(serverChannel.sendRequestWithoutLocking("ping_table", asyncQueryResponse, routingInstance,
+          new byte[]{1, 2, 3}, false), mockChannel);
+      verify(mockChannel).writeAndFlush(any());
+      verify(asyncQueryResponse).markRequestChannel(routingInstance, mockChannel);
+      assertEquals(meterCount(BrokerMeter.NETTY_CONNECTION_UNWRITABLE_REJECTIONS, routingInstance), rejectionsBefore);
+      when(mockFuture.isSuccess()).thenReturn(true);
+      listenerCaptor.getValue().operationComplete(mockFuture);
+      verify(asyncQueryResponse).markRequestSent(eq(routingInstance), anyInt());
+    } finally {
+      serverChannels.shutDown();
+    }
+  }
+
+  /// An eviction that lands after the connect closes the channel under the sender. The sender retries on a fresh
+  /// entry, as for the other eviction races, instead of failing the query and reporting the server for a close the
+  /// broker made.
+  @Test
+  public void testEvictionAfterConnectRetriesInsteadOfFailing() {
+    ServerChannels serverChannels =
+        new ServerChannels(mock(QueryRouter.class), null, null, ThreadAccountantUtils.getNoOpAccountant());
+    try {
+      ServerRoutingInstance routingInstance = new ServerRoutingInstance("localhost", 12345, TableType.OFFLINE);
+      ServerChannels.ServerChannel serverChannel = serverChannels.getOrCreateServerChannel(routingInstance);
+      EmbeddedChannel channel = new EmbeddedChannel();
+      serverChannel.setChannel(channel);
+      assertTrue(serverChannels.evictChannel(routingInstance));
+      assertFalse(channel.isActive());
+      AsyncQueryResponse asyncQueryResponse = mock(AsyncQueryResponse.class);
+
+      assertNull(serverChannel.sendRequestWithoutLocking("test_table", asyncQueryResponse, routingInstance,
+          new byte[]{1, 2, 3}, true), "The caller retries on a fresh entry");
+      assertTrue(channel.outboundMessages().isEmpty());
+      verify(asyncQueryResponse, never()).markRequestChannel(any(), any());
+      verify(asyncQueryResponse, never()).markServerUnavailable(any(), any(), any(Exception.class), anyBoolean());
+    } finally {
+      serverChannels.shutDown();
+    }
+  }
+
+  /// When the routing manager enables a server again, a channel is kept only if it received data after the server was
+  /// disabled and still carries queries: the server was toggled, not restarted, and those queries are left to finish.
+  /// A channel that heard nothing since the disable leads to a process that may be gone, one that carries nothing
+  /// costs only a reconnect, and without a disable on record there is nothing to go by.
+  @Test
+  public void testEnabledServerKeepsOnlyChannelHeardFromSinceDisabledThatCarriesQueries() {
+    ServerChannels serverChannels =
+        new ServerChannels(mock(QueryRouter.class), null, null, ThreadAccountantUtils.getNoOpAccountant());
+    try {
+      ServerRoutingInstance routingInstance = new ServerRoutingInstance("localhost", 12345, TableType.OFFLINE);
+      long evictionsBefore = meterCount(BrokerMeter.NETTY_CONNECTION_CHANNEL_EVICTIONS, routingInstance);
+
+      // Heard from since the disable, carries queries: kept, and the disable is cleared
+      ServerChannels.ServerChannel kept = serverChannels.getOrCreateServerChannel(routingInstance);
+      EmbeddedChannel keptChannel = newChannelWithDataTableHandler(routingInstance);
+      kept.setChannel(keptChannel);
+      readFrame(keptChannel);
+      serverChannels.markServerDisabled(routingInstance);
+      readFrame(keptChannel);
+      assertFalse(serverChannels.evictChannelOfEnabledServer(routingInstance, channel -> channel == keptChannel));
+      assertSame(serverChannels.getOrCreateServerChannel(routingInstance), kept);
+      assertTrue(keptChannel.isActive());
+      assertFalse(kept._disabled);
+
+      // Enabled again without another disable: nothing to go by, evicted
+      assertTrue(serverChannels.evictChannelOfEnabledServer(routingInstance, channel -> true));
+      assertFalse(keptChannel.isActive());
+
+      // Nothing received since the disable, although frames came before it: evicted
+      ServerChannels.ServerChannel silent = serverChannels.getOrCreateServerChannel(routingInstance);
+      EmbeddedChannel silentChannel = newChannelWithDataTableHandler(routingInstance);
+      silent.setChannel(silentChannel);
+      readFrame(silentChannel);
+      serverChannels.markServerDisabled(routingInstance);
+      assertTrue(serverChannels.evictChannelOfEnabledServer(routingInstance, channel -> true));
+      assertFalse(silentChannel.isActive());
+
+      // Heard from since the disable, but no query left on it: evicted
+      ServerChannels.ServerChannel idle = serverChannels.getOrCreateServerChannel(routingInstance);
+      EmbeddedChannel idleChannel = newChannelWithDataTableHandler(routingInstance);
+      idle.setChannel(idleChannel);
+      serverChannels.markServerDisabled(routingInstance);
+      readFrame(idleChannel);
+      assertTrue(serverChannels.evictChannelOfEnabledServer(routingInstance, channel -> false));
+      assertFalse(idleChannel.isActive());
+
+      assertEquals(meterCount(BrokerMeter.NETTY_CONNECTION_CHANNEL_EVICTIONS, routingInstance), evictionsBefore + 3);
+    } finally {
+      serverChannels.shutDown();
+    }
+  }
+
+  private static EmbeddedChannel newChannelWithDataTableHandler(ServerRoutingInstance routingInstance) {
+    return new EmbeddedChannel(
+        new DataTableHandler(mock(QueryRouter.class), ThreadAccountantUtils.getNoOpAccountant(), routingInstance));
+  }
+
+  /// Delivers an empty data table to the channel, as a server response would arrive.
+  private static void readFrame(EmbeddedChannel channel) {
+    try {
+      channel.writeInbound(Unpooled.wrappedBuffer(DataTableBuilderFactory.getEmptyDataTable().toBytes()));
+    } catch (IOException e) {
+      throw new RuntimeException(e);
     }
   }
 
@@ -512,12 +648,12 @@ public class ServerChannelsTest {
       serverChannel.setChannel(closedChannel);
       AsyncQueryResponse asyncQueryResponse = mock(AsyncQueryResponse.class);
 
-      long rejectionsBefore = meterCount(BrokerMeter.NETTY_CONNECTION_UNWRITABLE_REJECTIONS);
+      long rejectionsBefore = meterCount(BrokerMeter.NETTY_CONNECTION_UNWRITABLE_REJECTIONS, routingInstance);
       IllegalStateException e = expectThrows(IllegalStateException.class,
           () -> serverChannel.sendRequestWithoutLocking("test_table", asyncQueryResponse, routingInstance,
-              new byte[]{1, 2, 3}));
+              new byte[]{1, 2, 3}, true));
       assertTrue(e.getMessage().contains("closed"), e.getMessage());
-      assertEquals(meterCount(BrokerMeter.NETTY_CONNECTION_UNWRITABLE_REJECTIONS), rejectionsBefore);
+      assertEquals(meterCount(BrokerMeter.NETTY_CONNECTION_UNWRITABLE_REJECTIONS, routingInstance), rejectionsBefore);
       assertTrue(closedChannel.outboundMessages().isEmpty());
       verify(asyncQueryResponse, never()).markRequestSent(any(), anyInt());
     } finally {
@@ -541,7 +677,7 @@ public class ServerChannelsTest {
       ServerChannels.ServerChannel serverChannel = serverChannels.getOrCreateServerChannel(instance);
       server.shrinkSendBuffer(serverChannel);
       AsyncQueryResponse asyncQueryResponse = mock(AsyncQueryResponse.class);
-      long writeTimeoutsBefore = meterCount(BrokerMeter.NETTY_CONNECTION_WRITE_TIMEOUTS);
+      long writeTimeoutsBefore = meterCount(BrokerMeter.NETTY_CONNECTION_WRITE_TIMEOUTS, instance);
 
       long startTimeMs = System.currentTimeMillis();
       serverChannels.sendRequest("testTable", asyncQueryResponse, instance, largeInstanceRequest(4 * 1024 * 1024),
@@ -555,7 +691,7 @@ public class ServerChannelsTest {
           "The write timeout did not close the stalled channel");
       long elapsedMs = System.currentTimeMillis() - startTimeMs;
       assertTrue(elapsedMs >= writeTimeoutMs, "Closed before the write timeout elapsed: " + elapsedMs + "ms");
-      assertEquals(meterCount(BrokerMeter.NETTY_CONNECTION_WRITE_TIMEOUTS), writeTimeoutsBefore + 1);
+      assertEquals(meterCount(BrokerMeter.NETTY_CONNECTION_WRITE_TIMEOUTS, instance), writeTimeoutsBefore + 1);
       // Closing fails the stuck write, which marks the server unavailable for that query instead of letting it
       // wait out its own timeout
       verify(asyncQueryResponse, timeout(5_000L)).markServerUnavailable(eq(instance), eq(channel), any(Exception.class),
@@ -595,7 +731,7 @@ public class ServerChannelsTest {
       ServerRoutingInstance instance = new ServerRoutingInstance("localhost", server.getPort(), TableType.OFFLINE);
       ServerChannels.ServerChannel serverChannel = serverChannels.getOrCreateServerChannel(instance);
       server.shrinkSendBuffer(serverChannel);
-      long writeTimeoutsBefore = meterCount(BrokerMeter.NETTY_CONNECTION_WRITE_TIMEOUTS);
+      long writeTimeoutsBefore = meterCount(BrokerMeter.NETTY_CONNECTION_WRITE_TIMEOUTS, instance);
       AsyncQueryResponse asyncQueryResponse = mock(AsyncQueryResponse.class);
       AsyncQueryResponse queuedResponse = mock(AsyncQueryResponse.class);
 
@@ -616,7 +752,7 @@ public class ServerChannelsTest {
       assertTrue(elapsedMs > writeTimeoutMs, "The write must have outlived the timeout to prove the point: "
           + elapsedMs + "ms");
       assertTrue(channel.isActive(), "A progressing write must not get the channel closed");
-      assertEquals(meterCount(BrokerMeter.NETTY_CONNECTION_WRITE_TIMEOUTS), writeTimeoutsBefore);
+      assertEquals(meterCount(BrokerMeter.NETTY_CONNECTION_WRITE_TIMEOUTS, instance), writeTimeoutsBefore);
       verify(asyncQueryResponse, never()).markServerUnavailable(any(), any(), any(Exception.class), anyBoolean());
     } finally {
       serverChannels.shutDown();
@@ -654,7 +790,7 @@ public class ServerChannelsTest {
       Channel channel = entry._channel;
       AsyncQueryResponse response = new AsyncQueryResponse(mock(QueryRouter.class), 1L, Set.of(instance),
           System.currentTimeMillis(), 60_000L, mock(ServerRoutingStatsManager.class), false);
-      long before = meterCount(BrokerMeter.NETTY_CONNECTION_WRITE_TIMEOUTS);
+      long before = meterCount(BrokerMeter.NETTY_CONNECTION_WRITE_TIMEOUTS, instance);
       long startMs = System.currentTimeMillis();
       channels.sendRequest("testTable", response, instance, largeInstanceRequest(8 * 1024 * 1024), 10_000L);
       if (drain) {
@@ -665,12 +801,12 @@ public class ServerChannelsTest {
         assertTrue(System.currentTimeMillis() - startMs > writeTimeoutMs);
         assertTrue(server._bytesRead.get() > 0);
         assertNull(response.getException());
-        assertEquals(meterCount(BrokerMeter.NETTY_CONNECTION_WRITE_TIMEOUTS), before);
+        assertEquals(meterCount(BrokerMeter.NETTY_CONNECTION_WRITE_TIMEOUTS, instance), before);
       } else {
         TestUtils.waitForCondition(aVoid -> !channel.isActive(), 10L, 10_000L, "A stalled TLS write was not closed");
         TestUtils.waitForCondition(aVoid -> response.getException() != null, 10L, 5_000L,
             "The pending TLS request did not receive its write failure");
-        assertEquals(meterCount(BrokerMeter.NETTY_CONNECTION_WRITE_TIMEOUTS), before + 1);
+        assertEquals(meterCount(BrokerMeter.NETTY_CONNECTION_WRITE_TIMEOUTS, instance), before + 1);
         assertEquals(response.getStatus(), QueryResponse.Status.FAILED);
       }
     } finally {
@@ -738,7 +874,7 @@ public class ServerChannelsTest {
   public void testFlushedRegularAndVoidWritesRemainMonitored(boolean voidPromise)
       throws Exception {
     EmbeddedChannel channel = stalledEmbeddedChannel(150L);
-    long before = meterCount(BrokerMeter.NETTY_CONNECTION_WRITE_TIMEOUTS);
+    long before = meterCount(BrokerMeter.NETTY_CONNECTION_WRITE_TIMEOUTS, STALLED_EMBEDDED_INSTANCE);
     try {
       ByteBuf bytes = Unpooled.buffer(8).writeLong(1L);
       ChannelPromise promise = voidPromise ? channel.voidPromise() : channel.newPromise();
@@ -755,7 +891,7 @@ public class ServerChannelsTest {
         assertFalse(promise.isSuccess());
         assertNotNull(promise.cause());
       }
-      assertEquals(meterCount(BrokerMeter.NETTY_CONNECTION_WRITE_TIMEOUTS), before + 1);
+      assertEquals(meterCount(BrokerMeter.NETTY_CONNECTION_WRITE_TIMEOUTS, STALLED_EMBEDDED_INSTANCE), before + 1);
     } finally {
       channel.finishAndReleaseAll();
     }
@@ -805,7 +941,7 @@ public class ServerChannelsTest {
     EmbeddedChannel channel = stalledEmbeddedChannel(200L);
     List<ByteBuf> bytes = new ArrayList<>();
     List<ChannelPromise> promises = new ArrayList<>();
-    long before = meterCount(BrokerMeter.NETTY_CONNECTION_WRITE_TIMEOUTS);
+    long before = meterCount(BrokerMeter.NETTY_CONNECTION_WRITE_TIMEOUTS, STALLED_EMBEDDED_INSTANCE);
     try {
       for (int i = 0; i < 3; i++) {
         bytes.add(Unpooled.buffer(8).writeLong(i));
@@ -820,7 +956,7 @@ public class ServerChannelsTest {
         assertTrue(promises.get(i).isDone());
         assertFalse(promises.get(i).isSuccess());
       }
-      assertEquals(meterCount(BrokerMeter.NETTY_CONNECTION_WRITE_TIMEOUTS), before + 1);
+      assertEquals(meterCount(BrokerMeter.NETTY_CONNECTION_WRITE_TIMEOUTS, STALLED_EMBEDDED_INSTANCE), before + 1);
     } finally {
       channel.finishAndReleaseAll();
     }
@@ -828,8 +964,7 @@ public class ServerChannelsTest {
 
   /// Use Netty's actual outbound queue and flush/cancellation semantics while deliberately accepting no bytes.
   private static EmbeddedChannel stalledEmbeddedChannel(long timeoutMs) {
-    return new EmbeddedChannel(new RequestWriteTimeoutHandler(
-        new ServerRoutingInstance("localhost", 12345, TableType.OFFLINE), timeoutMs),
+    return new EmbeddedChannel(new RequestWriteTimeoutHandler(STALLED_EMBEDDED_INSTANCE, timeoutMs),
         new ChannelInboundHandlerAdapter() {
           @Override
           public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
@@ -861,7 +996,7 @@ public class ServerChannelsTest {
       ServerRoutingInstance instance = new ServerRoutingInstance("localhost", server.getPort(), TableType.OFFLINE);
       ServerChannels.ServerChannel serverChannel = serverChannels.getOrCreateServerChannel(instance);
       server.shrinkSendBuffer(serverChannel);
-      long rejectionsBefore = meterCount(BrokerMeter.NETTY_CONNECTION_UNWRITABLE_REJECTIONS);
+      long rejectionsBefore = meterCount(BrokerMeter.NETTY_CONNECTION_UNWRITABLE_REJECTIONS, instance);
 
       // The first request is accepted: the queue was empty. It then sits in the queue because the peer does not drain.
       serverChannels.sendRequest("testTable", mock(AsyncQueryResponse.class), instance,
@@ -881,7 +1016,7 @@ public class ServerChannelsTest {
           () -> serverChannels.sendRequest("testTable", rejectedResponse, instance, smallInstanceRequest(), 10_000L));
       assertTrue(System.currentTimeMillis() - startTimeMs < 2_000L, "The rejection must not wait");
       assertTrue(e.getMessage().contains("not writable"), e.getMessage());
-      assertEquals(meterCount(BrokerMeter.NETTY_CONNECTION_UNWRITABLE_REJECTIONS), rejectionsBefore + 1);
+      assertEquals(meterCount(BrokerMeter.NETTY_CONNECTION_UNWRITABLE_REJECTIONS, instance), rejectionsBefore + 1);
       verify(rejectedResponse, never()).markRequestSent(any(), anyInt());
       // Rejecting does not close the channel; the write timeout handler owns that decision
       assertTrue(channel.isActive());
@@ -908,10 +1043,10 @@ public class ServerChannelsTest {
       Channel staleChannel = staleEntry._channel;
       assertTrue(staleChannel.isActive());
       assertTrue(serverChannels.hasChannel(instance));
-      long evictionsBefore = meterCount(BrokerMeter.NETTY_CONNECTION_CHANNEL_EVICTIONS);
+      long evictionsBefore = meterCount(BrokerMeter.NETTY_CONNECTION_CHANNEL_EVICTIONS, instance);
 
       assertTrue(serverChannels.evictChannel(instance));
-      assertEquals(meterCount(BrokerMeter.NETTY_CONNECTION_CHANNEL_EVICTIONS), evictionsBefore + 1);
+      assertEquals(meterCount(BrokerMeter.NETTY_CONNECTION_CHANNEL_EVICTIONS, instance), evictionsBefore + 1);
       TestUtils.waitForCondition(aVoid -> !staleChannel.isActive(), 10L, 5_000L, "Evicted channel was not closed");
       assertFalse(serverChannels.evictChannel(instance), "Already evicted");
       // The transport has no channel to vouch for any more
@@ -939,16 +1074,17 @@ public class ServerChannelsTest {
     ServerChannels serverChannels =
         new ServerChannels(mock(QueryRouter.class), null, null, ThreadAccountantUtils.getNoOpAccountant());
     try (StalledServer server = new StalledServer()) {
-      long evictionsBefore = meterCount(BrokerMeter.NETTY_CONNECTION_CHANNEL_EVICTIONS);
-
       ServerRoutingInstance neverConnected =
           new ServerRoutingInstance("localhost", server.getPort(), TableType.OFFLINE);
+      ServerRoutingInstance closed = new ServerRoutingInstance("localhost", server.getPort(), TableType.REALTIME);
+      long evictionsBefore = meterCount(BrokerMeter.NETTY_CONNECTION_CHANNEL_EVICTIONS, neverConnected)
+          + meterCount(BrokerMeter.NETTY_CONNECTION_CHANNEL_EVICTIONS, closed);
+
       ServerChannels.ServerChannel neverConnectedEntry = serverChannels.getOrCreateServerChannel(neverConnected);
       assertFalse(serverChannels.evictChannel(neverConnected));
       assertNotSame(serverChannels.getOrCreateServerChannel(neverConnected), neverConnectedEntry,
           "The entry is dropped even though it is not counted");
 
-      ServerRoutingInstance closed = new ServerRoutingInstance("localhost", server.getPort(), TableType.REALTIME);
       ServerChannels.ServerChannel closedEntry = serverChannels.getOrCreateServerChannel(closed);
       serverChannels.connect(closed);
       Channel closedChannel = closedEntry._channel;
@@ -957,7 +1093,8 @@ public class ServerChannelsTest {
       assertNotSame(serverChannels.getOrCreateServerChannel(closed), closedEntry,
           "The entry is dropped even though it is not counted");
 
-      assertEquals(meterCount(BrokerMeter.NETTY_CONNECTION_CHANNEL_EVICTIONS), evictionsBefore);
+      assertEquals(meterCount(BrokerMeter.NETTY_CONNECTION_CHANNEL_EVICTIONS, neverConnected)
+          + meterCount(BrokerMeter.NETTY_CONNECTION_CHANNEL_EVICTIONS, closed), evictionsBefore);
     } finally {
       serverChannels.shutDown();
     }
@@ -983,7 +1120,7 @@ public class ServerChannelsTest {
 
       // A sender still holding the evicted entry: refused, and the entry is not reconnected
       AsyncQueryResponse staleResponse = mock(AsyncQueryResponse.class);
-      assertNull(staleEntry.sendRequest("testTable", staleResponse, instance, new byte[]{1, 2, 3}, 10_000L));
+      assertNull(staleEntry.sendRequest("testTable", staleResponse, instance, new byte[]{1, 2, 3}, true, 10_000L));
       assertSame(staleEntry._channel, staleChannel, "An evicted entry must not reconnect");
       verify(staleResponse, never()).markRequestSent(any(), anyInt());
       // Nor can the failure detector's probe or startup pre-connect resurrect it
@@ -1052,6 +1189,14 @@ public class ServerChannelsTest {
 
   private static long meterCount(BrokerMeter meter) {
     return BrokerMetrics.get().getMeteredValue(meter).count();
+  }
+
+  /// Count of a meter tagged with the server's short name, as the per-server channel meters are.
+  private static long meterCount(BrokerMeter meter, ServerRoutingInstance instance) {
+    String fullName = CommonConstants.Broker.DEFAULT_METRICS_NAME_PREFIX + meter.getMeterName() + "."
+        + instance.getShortName();
+    return PinotMetricUtils.makePinotMeter(BrokerMetrics.get().getMetricsRegistry(),
+        PinotMetricUtils.makePinotMetricName(BrokerMetrics.class, fullName), meter.getUnit(), TimeUnit.SECONDS).count();
   }
 
   private static InstanceRequest smallInstanceRequest() {
