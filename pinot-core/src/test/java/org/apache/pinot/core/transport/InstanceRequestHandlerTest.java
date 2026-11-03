@@ -42,6 +42,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.datatable.DataTableFactory;
+import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
@@ -265,15 +266,37 @@ public class InstanceRequestHandlerTest {
       throws Exception {
     List<ServerQueryRequest> submitted = new ArrayList<>();
     InstanceRequestHandler handler = createHandler(new PinotConfiguration(), submitted);
+    long expiredBefore = ServerMetrics.get().getMeteredValue(ServerMeter.QUERIES_EXPIRED_ON_ARRIVAL).count();
 
-    DataTable response = handle(handler, 123L, () -> Long.toString(System.currentTimeMillis() - 5_000L));
+    DataTable response = handle(handler, 123L, () -> Long.toString(System.currentTimeMillis() - 60_000L));
 
     assertTrue(submitted.isEmpty(), "an expired request must not be scheduled");
     assertEquals(response.getMetadata().get(MetadataKey.REQUEST_ID.getName()), "123");
     Map<Integer, String> exceptions = response.getExceptions();
     assertEquals(exceptions.size(), 1);
     String message = exceptions.get(QueryErrorCode.QUERY_SCHEDULING_TIMEOUT.getId());
-    assertTrue(message != null && message.contains("after the broker deadline"), String.valueOf(exceptions));
+    // The fixed prefix is what tells this rejection apart from a scheduler queue timeout, which has the same code
+    assertTrue(message != null && message.startsWith(InstanceRequestHandler.EXPIRED_ON_ARRIVAL_MESSAGE_PREFIX)
+        && message.contains("after the broker deadline"), String.valueOf(exceptions));
+    assertEquals(ServerMetrics.get().getMeteredValue(ServerMeter.QUERIES_EXPIRED_ON_ARRIVAL).count(),
+        expiredBefore + 1);
+  }
+
+  /// The deadline is read before the query is compiled, so the backlog of a recovered connection costs only its
+  /// deserialization on the event loop: an expired request whose query could not even be compiled is answered with
+  /// the timeout rather than with the compile error that [#testRepliesWithErrorWhenQueryCannotBeCompiled] gets.
+  @Test
+  public void testExpiredRequestIsNotCompiled()
+      throws Exception {
+    List<ServerQueryRequest> submitted = new ArrayList<>();
+    InstanceRequestHandler handler = createHandler(new PinotConfiguration(), submitted);
+
+    DataTable response = handle(handler, 123L, "SELECT EXPR_MIN(a, b) FROM testTable_OFFLINE",
+        () -> Long.toString(System.currentTimeMillis() - 60_000L));
+
+    assertTrue(submitted.isEmpty());
+    assertEquals(response.getExceptions().keySet(), Set.of(QueryErrorCode.QUERY_SCHEDULING_TIMEOUT.getId()),
+        String.valueOf(response.getExceptions()));
   }
 
   /// A deadline that is in the past by less than the allowance is treated as clock skew, not as a stale request.
@@ -388,7 +411,13 @@ public class InstanceRequestHandlerTest {
   private static DataTable handle(InstanceRequestHandler handler, long requestId,
       @Nullable Supplier<String> requestDeadlineMs)
       throws Exception {
-    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable_OFFLINE");
+    return handle(handler, requestId, "SELECT * FROM testTable_OFFLINE", requestDeadlineMs);
+  }
+
+  private static DataTable handle(InstanceRequestHandler handler, long requestId, String sql,
+      @Nullable Supplier<String> requestDeadlineMs)
+      throws Exception {
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
     Map<String, String> queryOptions = new HashMap<>();
     queryOptions.put(QueryOptionKey.TIMEOUT_MS, "10000");
     if (requestDeadlineMs != null) {

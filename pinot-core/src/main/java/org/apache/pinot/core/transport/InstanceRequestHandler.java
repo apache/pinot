@@ -49,6 +49,7 @@ import org.apache.pinot.common.metrics.ServerQueryPhase;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
@@ -58,6 +59,7 @@ import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.metrics.PinotMeter;
 import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -73,6 +75,11 @@ import org.slf4j.LoggerFactory;
 /// instance requests sent from Pinot Broker.
 @ChannelHandler.Sharable
 public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf> {
+  /// Start of the error message that answers a request which arrived after the broker's deadline for it. The response
+  /// carries [QueryErrorCode#QUERY_SCHEDULING_TIMEOUT], which a scheduler queue timeout carries as well, so this fixed
+  /// prefix is what tells the two apart in broker responses and logs.
+  public static final String EXPIRED_ON_ARRIVAL_MESSAGE_PREFIX = "Expired on arrival:";
+
   private static final Logger LOGGER = LoggerFactory.getLogger(InstanceRequestHandler.class);
 
   // TODO: make it configurable
@@ -101,6 +108,10 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
   private final AtomicLong _expiredRequestsSinceLastLog = new AtomicLong();
   private final AtomicLong _nextExpiredRequestLogTimeMs = new AtomicLong();
   private final ServerMetrics _serverMetrics = ServerMetrics.get();
+  // Looked up once, as it is marked on the event loop for every request of a burst. It is server-wide: what expires is
+  // the backlog of a connection rather than of a table, and the server removes every table meter when a table is
+  // deleted, so a cached table meter could silently stop being reported.
+  private final PinotMeter _queriesExpiredOnArrivalMeter;
 
   public InstanceRequestHandler(String instanceName, PinotConfiguration config, QueryScheduler queryScheduler,
       AccessControl accessControl, ThreadAccountant threadAccountant) {
@@ -123,6 +134,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     } else {
       LOGGER.info("Requests arriving after the broker deadline are executed (check disabled)");
     }
+    _queriesExpiredOnArrivalMeter = _serverMetrics.getMeteredValue(ServerMeter.QUERIES_EXPIRED_ON_ARRIVAL);
   }
 
   @Override
@@ -158,6 +170,18 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
       sendPingResponse(ctx, instanceRequest.getRequestId());
       return;
     }
+    try {
+      if (rejectIfExpired(instanceRequest, ctx, queryArrivalTimeMs)) {
+        return;
+      }
+    } catch (Exception e) {
+      long requestId = instanceRequest.getRequestId();
+      String tableNameWithType = getTableNameWithType(instanceRequest);
+      LOGGER.error("Failed to read the deadline of query request: {} on table: {}", requestId, tableNameWithType, e);
+      sendErrorResponse(ctx, requestId, tableNameWithType, queryArrivalTimeMs,
+          DataTableBuilderFactory.getEmptyDataTable(), e);
+      return;
+    }
     ServerQueryRequest queryRequest;
     try {
       queryRequest = new ServerQueryRequest(instanceRequest, _serverMetrics, queryArrivalTimeMs);
@@ -175,9 +199,6 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     queryRequest.getTimerContext().startNewPhaseTimer(ServerQueryPhase.REQUEST_DESERIALIZATION, queryArrivalTimeMs)
         .stopAndRecord();
     try {
-      if (rejectIfExpired(queryRequest, ctx, queryArrivalTimeMs)) {
-        return;
-      }
       submitQuery(queryRequest, ctx, queryArrivalTimeMs);
     } catch (Exception e) {
       long requestId = queryRequest.getRequestId();
@@ -211,15 +232,21 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
   /// than [Server#CONFIG_OF_REQUEST_DEADLINE_CLOCK_SKEW_MS] in the past before the request is dropped. Without this
   /// check a request that spent minutes in the socket buffers of a stalled connection, and is delivered when the
   /// connection recovers, is executed with a full timeout budget measured from its arrival, for a broker that gave up
-  /// on it long ago. The response is still sent: it costs a few bytes and tells the broker side that the channel is
-  /// alive, even though the broker no longer has a query waiting for it. A malformed option propagates to the caller,
-  /// which answers with the parse error under the right request id.
-  private boolean rejectIfExpired(ServerQueryRequest queryRequest, ChannelHandlerContext ctx,
+  /// on it long ago. The check reads the option straight from the deserialized request, before the query is compiled,
+  /// so that such a backlog costs no more than its deserialization on the event loop. The response is still sent: it
+  /// costs a few bytes and tells the broker side that the channel is alive, even though the broker no longer has a
+  /// query waiting for it. A malformed option propagates to the caller, which answers with the parse error under the
+  /// right request id.
+  private boolean rejectIfExpired(InstanceRequest instanceRequest, ChannelHandlerContext ctx,
       long queryArrivalTimeMs) {
     if (_requestDeadlineClockSkewMs < 0) {
       return false;
     }
-    Long requestDeadlineMs = QueryOptionsUtils.getRequestDeadlineMs(queryRequest.getQueryContext().getQueryOptions());
+    Map<String, String> queryOptions = getQueryOptions(instanceRequest);
+    if (queryOptions == null) {
+      return false;
+    }
+    Long requestDeadlineMs = QueryOptionsUtils.getRequestDeadlineMs(queryOptions);
     if (requestDeadlineMs == null) {
       return false;
     }
@@ -228,16 +255,16 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     if (lateByMs <= _requestDeadlineClockSkewMs) {
       return false;
     }
-    long requestId = queryRequest.getRequestId();
-    String tableNameWithType = queryRequest.getTableNameWithType();
-    _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.QUERIES_EXPIRED_ON_ARRIVAL, 1);
-    logExpiredRequest(queryRequest, queryArrivalTimeMs, requestDeadlineMs, lateByMs);
+    long requestId = instanceRequest.getRequestId();
+    String tableNameWithType = getTableNameWithType(instanceRequest);
+    _serverMetrics.addMeteredGlobalValue(ServerMeter.QUERIES_EXPIRED_ON_ARRIVAL, 1, _queriesExpiredOnArrivalMeter);
+    logExpiredRequest(instanceRequest, tableNameWithType, queryArrivalTimeMs, requestDeadlineMs, lateByMs);
     try {
       DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
       dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
       dataTable.addException(QueryErrorCode.QUERY_SCHEDULING_TIMEOUT,
-          String.format("Request arrived on: %s at %d, %dms after the broker deadline %d, and was not executed",
-              _instanceName, queryArrivalTimeMs, lateByMs, requestDeadlineMs));
+          String.format("%s request reached %s at %d, %dms after the broker deadline %d, and was not executed",
+              EXPIRED_ON_ARRIVAL_MESSAGE_PREFIX, _instanceName, queryArrivalTimeMs, lateByMs, requestDeadlineMs));
       sendResponse(ctx, requestId, tableNameWithType, queryArrivalTimeMs, dataTable.toDataBuffer());
     } catch (Exception e) {
       LOGGER.error("Exception while sending the expired response for request: {}", requestId, e);
@@ -249,8 +276,8 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
   /// requests since the previous line and the details of the latest one. The handler is shared by every channel,
   /// hence the atomics. The count is approximate: an increment that races the winning CAS lands in this line or the
   /// next, never nowhere; the meter is exact.
-  private void logExpiredRequest(ServerQueryRequest queryRequest, long queryArrivalTimeMs, long requestDeadlineMs,
-      long lateByMs) {
+  private void logExpiredRequest(InstanceRequest instanceRequest, @Nullable String tableNameWithType,
+      long queryArrivalTimeMs, long requestDeadlineMs, long lateByMs) {
     _expiredRequestsSinceLastLog.incrementAndGet();
     long nowMs = System.currentTimeMillis();
     long nextLogTimeMs = _nextExpiredRequestLogTimeMs.get();
@@ -260,9 +287,9 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     }
     long count = _expiredRequestsSinceLastLog.getAndSet(0);
     LOGGER.warn("Not executing about {} request(s) that arrived after the broker deadline since the previous "
-            + "report, latest: request: {} (query: {}) on table: {} arrived at {}, {}ms after its deadline {}", count,
-        queryRequest.getRequestId(), queryRequest.getQueryId(), queryRequest.getTableNameWithType(),
-        queryArrivalTimeMs, lateByMs, requestDeadlineMs);
+            + "report, latest: request: {} from broker: {} on table: {} arrived at {}, {}ms after its deadline {}",
+        count, instanceRequest.getRequestId(), instanceRequest.getBrokerId(), tableNameWithType, queryArrivalTimeMs,
+        lateByMs, requestDeadlineMs);
   }
 
   /// Submit query for execution and register callback for execution results.
@@ -375,8 +402,16 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     return new HashSet<>(_executionContexts.keySet());
   }
 
-  /// Returns the table name of a deserialized request that could not be compiled, or `null` if the request does not
-  /// carry one.
+  /// Returns the query options of a deserialized request that is not compiled yet, or `null` if it carries none.
+  @Nullable
+  private static Map<String, String> getQueryOptions(InstanceRequest instanceRequest) {
+    BrokerRequest brokerRequest = instanceRequest.getQuery();
+    PinotQuery pinotQuery = brokerRequest != null ? brokerRequest.getPinotQuery() : null;
+    return pinotQuery != null ? pinotQuery.getQueryOptions() : null;
+  }
+
+  /// Returns the table name of a deserialized request that is not compiled yet (or could not be), or `null` if the
+  /// request does not carry one.
   @Nullable
   private static String getTableNameWithType(InstanceRequest instanceRequest) {
     BrokerRequest brokerRequest = instanceRequest.getQuery();

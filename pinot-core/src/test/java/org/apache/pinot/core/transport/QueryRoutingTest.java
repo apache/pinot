@@ -502,17 +502,17 @@ public class QueryRoutingTest {
     initializeTestFixtures(startAndGetPort(_queryServer));
     String serverId = _serverInstance.getInstanceId();
 
-    // The deadline is already 5 seconds in the past when the request is written: the server must not execute it.
+    // The deadline is already a minute in the past when the request is written: the server must not execute it.
     AsyncQueryResponse asyncQueryResponse = _queryRouter.submitQuery(requestId, "testTable",
-        brokerRequestWithDeadline(System.currentTimeMillis() - 5_000L), _routingTable, null, null, 10_000L);
+        brokerRequestWithDeadline(System.currentTimeMillis() - 60_000L), _routingTable, null, null, 10_000L);
     Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
     assertEquals(asyncQueryResponse.getStatus(), QueryResponse.Status.COMPLETED);
     ServerResponse serverResponse = response.get(_offlineServerRoutingInstance);
     assertNotNull(serverResponse.getDataTable());
     Map<Integer, String> exceptions = serverResponse.getDataTable().getExceptions();
     assertEquals(exceptions.keySet(), Set.of(QueryErrorCode.QUERY_SCHEDULING_TIMEOUT.getId()));
-    assertTrue(exceptions.get(QueryErrorCode.QUERY_SCHEDULING_TIMEOUT.getId()).contains("after the broker deadline"),
-        String.valueOf(exceptions));
+    assertTrue(exceptions.get(QueryErrorCode.QUERY_SCHEDULING_TIMEOUT.getId())
+        .startsWith(InstanceRequestHandler.EXPIRED_ON_ARRIVAL_MESSAGE_PREFIX), String.valueOf(exceptions));
     assertEquals(submitted.get(), 0);
     _requestCount += 2;
     waitForStatsUpdate(_requestCount);

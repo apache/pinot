@@ -1859,12 +1859,15 @@ public class CommonConstants {
     /// slow hop nor a short `timeoutMs` changes that, since the query's timeout is not part of the comparison. The one
     /// exposure is a server clock running ahead of the broker's by more than this allowance: it rejects requests that
     /// arrive within the excess of their deadline, i.e. every request of a query whose remaining timeout is shorter
-    /// than the excess. A server clock behind the broker's only makes the check more lenient. Rejections show up as
-    /// `QuerySchedulingTimeoutError` responses carrying the arrival time and the deadline, and in the
-    /// `QUERIES_EXPIRED_ON_ARRIVAL` meter. A negative value disables the check.
+    /// than the excess. A server clock behind the broker's only makes the check more lenient. The default, 10
+    /// seconds, is far above the skew between hosts that synchronize their clocks and far below the minutes a backlog
+    /// on a stalled connection can be old. Rejections show up as `QuerySchedulingTimeoutError` responses (error code
+    /// 240, the code of a scheduler queue timeout as well) whose message starts with `Expired on arrival:` and
+    /// carries the arrival time and the deadline, and in the server-wide `QUERIES_EXPIRED_ON_ARRIVAL` meter. A
+    /// negative value disables the check.
     public static final String CONFIG_OF_REQUEST_DEADLINE_CLOCK_SKEW_MS =
         "pinot.server.request.deadline.clock.skew.ms";
-    public static final long DEFAULT_REQUEST_DEADLINE_CLOCK_SKEW_MS = 1_000L;
+    public static final long DEFAULT_REQUEST_DEADLINE_CLOCK_SKEW_MS = 10_000L;
     public static final String CONFIG_OF_NETTY_SERVER_ENABLED = "pinot.server.netty.enabled";
     public static final boolean DEFAULT_NETTY_SERVER_ENABLED = true;
     public static final String CONFIG_OF_ENABLE_GRPC_SERVER = "pinot.server.grpc.enable";
