@@ -28,7 +28,6 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -719,7 +718,7 @@ public class S3PinotFS extends BasePinotFS {
       if (!s3Object.key().equals(fileUri.getPath())) {
         FileMetadata.Builder fileBuilder = new FileMetadata.Builder().setFilePath(
                 scheme + SCHEME_SEPARATOR + fileUri.getHost() + DELIMITER + getNormalizedFileKey(s3Object))
-            .setLastModifiedTime(getListedLastModifiedTimeMillis(s3Object)).setLength(s3Object.size())
+            .setLastModifiedTime(s3Object.lastModified().toEpochMilli()).setLength(s3Object.size())
             .setIsDirectory(s3Object.key().endsWith(DELIMITER));
         listBuilder.add(fileBuilder.build());
       }
@@ -778,7 +777,7 @@ public class S3PinotFS extends BasePinotFS {
           if (pathFilter.test(filePath)) {
             result.add(new FileMetadata.Builder()
                 .setFilePath(filePath)
-                .setLastModifiedTime(getListedLastModifiedTimeMillis(s3Object))
+                .setLastModifiedTime(s3Object.lastModified().toEpochMilli())
                 .setLength(s3Object.size())
                 .setIsDirectory(false)
                 .build());
@@ -796,11 +795,6 @@ public class S3PinotFS extends BasePinotFS {
     LOGGER.info("Listed {} files (max: {}) from URI: {}, is recursive: {}",
         result.size(), maxResults, fileUri, recursive);
     return result;
-  }
-
-  private static long getListedLastModifiedTimeMillis(S3Object s3Object) {
-    // Match the whole-second Last-Modified value returned by HEAD, while keeping the result in epoch milliseconds.
-    return s3Object.lastModified().truncatedTo(ChronoUnit.SECONDS).toEpochMilli();
   }
 
   private static String getNormalizedFileKey(S3Object s3Object) {
@@ -973,6 +967,12 @@ public class S3PinotFS extends BasePinotFS {
   public long lastModified(URI uri)
       throws IOException {
     return getS3ObjectMetadata(uri).lastModified().toEpochMilli();
+  }
+
+  @Override
+  public int compareLastModifiedTimes(long leftTimestampMs, long rightTimestampMs) {
+    // LIST can report milliseconds, while the Last-Modified header from HEAD has whole-second precision.
+    return Long.compare(Math.floorDiv(leftTimestampMs, 1_000L), Math.floorDiv(rightTimestampMs, 1_000L));
   }
 
   @Override
