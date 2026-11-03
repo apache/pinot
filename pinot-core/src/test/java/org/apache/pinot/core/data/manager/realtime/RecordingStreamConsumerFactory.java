@@ -38,6 +38,7 @@ public class RecordingStreamConsumerFactory extends FakeStreamConsumerFactory {
   static final AtomicReference<RetryPolicy> LAST_RETRY_POLICY = new AtomicReference<>();
   static final AtomicBoolean FAIL_CREATE = new AtomicBoolean();
   static final AtomicReference<Runnable> BEFORE_CREATE_WITH_POLICY = new AtomicReference<>();
+  static final AtomicReference<MessageBatch<?>> MESSAGE_BATCH = new AtomicReference<>();
   static final AtomicInteger CLOSE_COUNT = new AtomicInteger();
 
   static void reset() {
@@ -47,6 +48,7 @@ public class RecordingStreamConsumerFactory extends FakeStreamConsumerFactory {
     FAIL_CREATE.set(false);
     BEFORE_CREATE_WITH_POLICY.set(null);
     CLOSE_COUNT.set(0);
+    MESSAGE_BATCH.set(null);
   }
 
   @Override
@@ -91,7 +93,8 @@ public class RecordingStreamConsumerFactory extends FakeStreamConsumerFactory {
     @Override
     public MessageBatch fetchMessages(StreamPartitionMsgOffset startOffset, int timeoutMs)
         throws TimeoutException {
-      return _delegate.fetchMessages(startOffset, timeoutMs);
+      MessageBatch<?> batch = MESSAGE_BATCH.get();
+      return batch != null ? batch : _delegate.fetchMessages(startOffset, timeoutMs);
     }
 
     @Override

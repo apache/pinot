@@ -28,6 +28,7 @@ import java.time.Instant;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -52,17 +53,22 @@ import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamMessageDecoder;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
+import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImplTestUtils;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.segment.creator.Fixtures;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.local.upsert.ConcurrentMapPartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
+import org.apache.pinot.segment.local.upsert.RecordInfo;
 import org.apache.pinot.segment.local.upsert.UpsertContext;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
+import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
@@ -70,13 +76,18 @@ import org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPol
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.LongMsgOffsetFactory;
-import org.apache.pinot.spi.stream.PartitionGroupConsumer;
+import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.PermanentConsumerException;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
+import org.apache.pinot.spi.stream.StreamDataDecoder;
+import org.apache.pinot.spi.stream.StreamDataDecoderResult;
+import org.apache.pinot.spi.stream.StreamMessage;
+import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -104,6 +115,9 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 
 
 // TODO Re-write this test using the stream abstraction
@@ -329,6 +343,140 @@ public class RealtimeSegmentDataManagerTest {
       Assert.assertNotNull(segmentDataManager.getPartitionGroupConsumer());
       Assert.assertEquals(RecordingStreamConsumerFactory.CLOSE_COUNT.get(), 0);
       Assert.assertFalse(segmentDataManager._postConsumeStoppedCalled);
+    }
+  }
+
+  @DataProvider
+  public Object[][] consumerInitStopPaths() {
+    return new Object[][]{{true}, {false}};
+  }
+
+  @Test(dataProvider = "consumerInitStopPaths")
+  public void testStopDuringConsumerInitExpiresUpsertMetadataBeforeCatchup(boolean stopDuringInit)
+      throws Exception {
+    TableConfig tableConfig = Fixtures.createTableConfig(RecordingStreamConsumerFactory.class.getName(),
+        FakeStreamMessageDecoder.class.getName());
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(false, new TimeSupplier(), null,
+        null, tableConfig)) {
+      Schema schema = Fixtures.createSchema();
+      schema.setPrimaryKeyColumns(List.of("d"));
+      File tableIndexDir = new File(TEMP_DIR, "ttl-catchup-" + stopDuringInit);
+      FileUtils.forceMkdir(tableIndexDir);
+      UpsertContext context = new UpsertContext.Builder().setTableConfig(tableConfig).setSchema(schema)
+          .setPrimaryKeyColumns(List.of("d")).setComparisonColumns(List.of("m"))
+          .setEnableSnapshot(true).setMetadataTTL(20).setTableDataManager(segmentDataManager._tableDataManager)
+          .setTableIndexDir(tableIndexDir).build();
+      ConcurrentMapPartitionUpsertMetadataManager manager =
+          new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, PARTITION_GROUP_ID, context);
+      try {
+        ThreadSafeMutableRoaringBitmap previousValidDocIds = new ThreadSafeMutableRoaringBitmap();
+        MutableSegment previousSegment = mock(MutableSegment.class);
+        when(previousSegment.getValidDocIds()).thenReturn(previousValidDocIds);
+        when(previousSegment.getSegmentName()).thenReturn("previous");
+        manager.addRecord(previousSegment, new RecordInfo(new PrimaryKey(new Object[]{"A"}), 0, 10L, false));
+        manager.addRecord(previousSegment, new RecordInfo(new PrimaryKey(new Object[]{"B"}), 1, 100L, false));
+        assertTrue(previousValidDocIds.contains(0));
+        assertEquals(previousValidDocIds.getCardinality(), 2);
+
+        MutableSegmentImpl currentSegment = MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Set.of(),
+            Set.of(), Set.of(), false, false, "minutesSinceEpoch", manager, null);
+        segmentDataManager.getSegment().destroy();
+        segmentDataManager.setRealtimeSegment(currentSegment);
+        segmentDataManager.setPartitionUpsertMetadataManager(manager);
+        if (stopDuringInit) {
+          RecordingStreamConsumerFactory.BEFORE_CREATE_WITH_POLICY.set(segmentDataManager::stop);
+        } else {
+          segmentDataManager._consumeOffsets.add(START_OFFSET);
+        }
+        segmentDataManager.createPartitionConsumer().run();
+        assertNotNull(segmentDataManager.getPartitionGroupConsumer());
+
+        GenericRow row = new GenericRow();
+        row.putValue("d", "A");
+        row.putValue("m", 110L);
+        row.putValue("minutesSinceEpoch", 12345L);
+        StreamMessageMetadata metadata = new StreamMessageMetadata.Builder()
+            .setOffset(START_OFFSET, new LongMsgOffset(START_OFFSET_VALUE + 1))
+            .setSerializedValueSize(1).build();
+        StreamMessage<byte[]> message = new StreamMessage<>(null, new byte[]{1}, 1, metadata);
+        MessageBatch batch = mock(MessageBatch.class);
+        when(batch.getMessageCount()).thenReturn(1);
+        when(batch.getUnfilteredMessageCount()).thenReturn(1);
+        when(batch.getStreamMessage(0)).thenReturn(message);
+        when(batch.getOffsetOfNextBatch()).thenReturn(metadata.getNextOffset());
+        RecordingStreamConsumerFactory.MESSAGE_BATCH.set(batch);
+        StreamDataDecoder decoder = mock(StreamDataDecoder.class);
+        when(decoder.decode(message)).thenReturn(new StreamDataDecoderResult(row, null));
+        Field decoderField = RealtimeSegmentDataManager.class.getDeclaredField("_streamDataDecoder");
+        decoderField.setAccessible(true);
+        decoderField.set(segmentDataManager, decoder);
+        segmentDataManager._stubConsumeLoop = false;
+        SegmentZKMetadata committedMetadata = createZkMetadata();
+        committedMetadata.setEndOffset(metadata.getNextOffset().toString());
+
+        segmentDataManager.goOnlineFromConsuming(committedMetadata);
+
+        assertEquals(segmentDataManager.getCurrentOffset().toString(), metadata.getNextOffset().toString());
+        assertEquals(currentSegment.getNumDocsIndexed(), 1);
+        assertTrue(currentSegment.getValidDocIds().contains(0));
+        assertTrue(segmentDataManager._buildAndReplaceCalled);
+        assertFalse(segmentDataManager._downloadAndReplaceCalled);
+        assertTrue(previousValidDocIds.contains(0),
+            "TTL expiration must preserve historical A@10 during A@110 catchup");
+        assertTrue(previousValidDocIds.contains(1));
+        assertNotNull(manager.getLastSnapshotPass());
+      } finally {
+        manager.stop();
+        manager.close();
+      }
+    }
+  }
+
+  @Test
+  public void testStoppedConsumerWithFailedMetadataInitializationDownloads()
+      throws Exception {
+    TableConfig tableConfig = Fixtures.createTableConfig(RecordingStreamConsumerFactory.class.getName(),
+        FakeStreamMessageDecoder.class.getName());
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(false, new TimeSupplier(), null,
+        null, tableConfig)) {
+      PartitionUpsertMetadataManager manager = mockUpsertMetadataManager(segmentDataManager, 20);
+      doThrow(new IllegalStateException("TTL cleanup failed")).when(manager).removeExpiredPrimaryKeys();
+      RecordingStreamConsumerFactory.BEFORE_CREATE_WITH_POLICY.set(segmentDataManager::stop);
+      segmentDataManager.createPartitionConsumer().run();
+      assertNotNull(segmentDataManager.getPartitionGroupConsumer());
+      segmentDataManager._consumeOffsets.add(new LongMsgOffset(START_OFFSET_VALUE + 1));
+      SegmentZKMetadata committedMetadata = createZkMetadata();
+      committedMetadata.setEndOffset(Long.toString(START_OFFSET_VALUE + 1));
+
+      segmentDataManager.goOnlineFromConsuming(committedMetadata);
+
+      assertTrue(segmentDataManager._downloadAndReplaceCalled);
+      assertFalse(segmentDataManager._buildAndReplaceCalled);
+      assertEquals(segmentDataManager.getCurrentOffset().toString(), START_OFFSET.toString());
+      verify(manager).removeExpiredPrimaryKeys();
+    }
+  }
+
+  @Test
+  public void testStopBeforeConsumerInitDownloadsWithoutCatchup()
+      throws Exception {
+    TableConfig tableConfig = Fixtures.createTableConfig(RecordingStreamConsumerFactory.class.getName(),
+        FakeStreamMessageDecoder.class.getName());
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(false, new TimeSupplier(), null,
+        null, tableConfig)) {
+      PartitionUpsertMetadataManager manager = mockUpsertMetadataManager(segmentDataManager, 20);
+      segmentDataManager.stop();
+
+      segmentDataManager.createPartitionConsumer().run();
+      SegmentZKMetadata committedMetadata = createZkMetadata();
+      committedMetadata.setEndOffset(Long.toString(START_OFFSET_VALUE + 1));
+      segmentDataManager.goOnlineFromConsuming(committedMetadata);
+
+      assertEquals(RecordingStreamConsumerFactory.CREATE_WITH_POLICY_COUNT.get(), 0);
+      assertTrue(segmentDataManager._downloadAndReplaceCalled);
+      assertFalse(segmentDataManager._buildAndReplaceCalled);
+      verify(manager, never()).removeExpiredPrimaryKeys();
+      assertEquals(segmentDataManager.getCurrentOffset().toString(), START_OFFSET.toString());
     }
   }
 
@@ -863,8 +1011,8 @@ public class RealtimeSegmentDataManagerTest {
 
     // If catching up, but we did not get to the final offset, then download and replace
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
-      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
-      segmentDataManager.setPartitionGroupConsumer(mock(PartitionGroupConsumer.class));
+      segmentDataManager._consumeOffsets.add(START_OFFSET);
+      segmentDataManager.createPartitionConsumer().run();
       segmentDataManager._stopWaitTimeMs = 0;
       segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.CATCHING_UP);
       segmentDataManager._consumeOffsets.add(new LongMsgOffset(finalOffsetValue - 1));
@@ -875,8 +1023,8 @@ public class RealtimeSegmentDataManagerTest {
 
     // But then if we get to the exact offset, we get to build and replace, not download
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
-      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
-      segmentDataManager.setPartitionGroupConsumer(mock(PartitionGroupConsumer.class));
+      segmentDataManager._consumeOffsets.add(START_OFFSET);
+      segmentDataManager.createPartitionConsumer().run();
       segmentDataManager._stopWaitTimeMs = 0;
       segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.CATCHING_UP);
       segmentDataManager._consumeOffsets.add(finalOffset);

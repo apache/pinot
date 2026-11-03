@@ -303,6 +303,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private volatile boolean _forceCommitMessageReceived = false;
   private volatile StreamPartitionMsgOffset _finalOffset; // Exclusive, used when we want to catch up to this one
   private volatile boolean _shouldStop = false;
+  // A stopped initialization failure can retain a consumer without completing the metadata prerequisites for catchup.
+  private volatile boolean _metadataInitialized;
 
   // It takes 30s to locate controller leader, and more if there are multiple controller failures.
   // For now, we let 31s pass for this state transition.
@@ -832,13 +834,13 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           return;
         }
         makeStreamConsumer("Starting");
-        if (_shouldStop) {
-          // Leave a successfully created consumer in place so CONSUMING -> ONLINE can catch up.
-          return;
-        }
         if (_partitionGroupConsumer.get() == null) {
+          if (_shouldStop) {
+            return;
+          }
           throw new IllegalStateException("Stream consumer was not created for " + _clientId);
         }
+        // Finish metadata initialization even after stop(), because CONSUMING -> ONLINE can reuse this consumer.
 
         // TODO:
         //   When reaching here, the current consuming segment has already acquired the consumer semaphore, but there is
@@ -883,6 +885,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             && _partitionDedupMetadataManager.getContext().getMetadataTTL() > 0) {
           _partitionDedupMetadataManager.removeExpiredPrimaryKeys();
         }
+        _metadataInitialized = true;
 
         // NOTE: _shouldStop is set to true when stop() is called to terminate the consumer thread. We check this flag
         //       after every operation that can take a long time, such as consuming messages, communicating with
@@ -1745,18 +1748,17 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             }
           } else {
             boolean success = false;
-            // ONLINE can arrive before the consumer thread has acquired the semaphore or finished first
-            // create. Catch up only when both are true; otherwise download. The semaphore used to imply a
-            // live consumer because the Helix constructor created it. It no longer does.
-            if (_consumerSemaphoreAcquired.get() && _partitionGroupConsumer.get() != null) {
+            // stop() joins the consumer thread, but an initialization failure after stop() can leave a consumer
+            // without completed metadata initialization. Catch up only after all prerequisites have succeeded.
+            if (_consumerSemaphoreAcquired.get() && _partitionGroupConsumer.get() != null && _metadataInitialized) {
               _segmentLogger.info("Attempting to catch up from offset {} to {} ", _currentOffset, endOffset);
               success = catchupToFinalOffset(endOffset,
                   TimeUnit.MILLISECONDS.convert(MAX_TIME_FOR_CONSUMING_TO_ONLINE_IN_SECONDS, TimeUnit.SECONDS));
             } else {
               _segmentLogger.warn(
-                  "Skipping catch up from offset {} to {} (consumerSemaphoreAcquired={}, consumerPresent={})",
-                  _currentOffset, endOffset, _consumerSemaphoreAcquired.get(),
-                  _partitionGroupConsumer.get() != null);
+                  "Skipping catch up from offset {} to {} (consumerSemaphoreAcquired={}, consumerPresent={}, "
+                      + "metadataInitialized={})", _currentOffset, endOffset, _consumerSemaphoreAcquired.get(),
+                  _partitionGroupConsumer.get() != null, _metadataInitialized);
             }
 
             if (success) {
