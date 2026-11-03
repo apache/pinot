@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -63,6 +64,20 @@ public class SelectionOperatorUtils {
 
   public static final ExpressionContext IDENTIFIER_STAR = ExpressionContext.forIdentifier("*");
   public static final int MAX_ROW_HOLDER_INITIAL_CAPACITY = 10_000;
+
+  /// Returns the first non-literal expression in the given order-by prefix, or null if the prefix is all literals.
+  /// Literals impose no ordering constraint, regardless of their ASC/DESC or NULLS FIRST/LAST modifiers.
+  @Nullable
+  public static OrderByExpressionContext getFirstNonLiteralOrderByExpression(
+      List<OrderByExpressionContext> orderByExpressions, int prefixSize) {
+    for (int i = 0; i < prefixSize; i++) {
+      OrderByExpressionContext orderByExpression = orderByExpressions.get(i);
+      if (orderByExpression.getExpression().getType() != ExpressionContext.Type.LITERAL) {
+        return orderByExpression;
+      }
+    }
+    return null;
+  }
 
   /// Extracts the expressions from a selection query, expands `'SELECT *'` to all physical columns if applies.
   ///

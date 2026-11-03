@@ -31,6 +31,7 @@ import org.apache.pinot.core.operator.query.EmptySelectionOperator;
 import org.apache.pinot.core.operator.query.SelectionPartiallyOrderedByDescOperation;
 import org.apache.pinot.core.operator.query.SelectionPartiallyOrderedByLinearOperator;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -42,6 +43,103 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
   private static final String SELECT_STAR_QUERY = "SELECT * FROM testTable";
   private static final String SELECTION_QUERY = "SELECT column1, column5, column11 FROM testTable";
   private static final String ORDER_BY = " ORDER BY column6, column1";
+
+  @DataProvider(name = "literalOrderByOptions")
+  public Object[][] literalOrderByOptions() {
+    return new Object[][]{{false, false}, {false, true}, {true, false}, {true, true}};
+  }
+
+  @Test(dataProvider = "literalOrderByOptions")
+  public void testSelectionOrderByLiterals(boolean allowReverseOrder, boolean enableNullHandling) {
+    String options = "SET allowReverseOrder = " + allowReverseOrder + "; SET enableNullHandling = "
+        + enableNullHandling + "; ";
+    for (String orderBy : List.of("2 DESC", "2 ASC", "2", "now() DESC", "'a' DESC, 'b' ASC")) {
+      String query = options + "SELECT column1, now() AS t FROM testTable ORDER BY " + orderBy + " LIMIT 5 OFFSET 3";
+      BaseOperator<SelectionResultsBlock> operator = getOperator(query);
+      assertTrue(operator instanceof SelectionPartiallyOrderedByLinearOperator, query);
+      assertEquals(operator.nextBlock().getRows().size(), 8, query);
+      assertEquals(operator.getExecutionStatistics().getNumDocsScanned(), 8L, query);
+      BrokerResponseNative response = getBrokerResponse(query);
+      assertTrue(response.getExceptions().isEmpty(), query);
+      assertEquals(response.getResultTable().getRows().size(), 5, query);
+      assertEquals(response.getResultTable().getDataSchema().getColumnNames(), new String[]{"column1", "t"});
+    }
+
+    // Exercise the path where every projected expression is also an order-by expression.
+    BaseOperator<SelectionResultsBlock> operator =
+        getOperator(options + "SELECT now() AS t FROM testTable ORDER BY 1 DESC LIMIT 5 OFFSET 3");
+    assertTrue(operator instanceof SelectionPartiallyOrderedByLinearOperator);
+    assertEquals(operator.nextBlock().getRows().size(), 8);
+    assertEquals(operator.getExecutionStatistics().getNumDocsScanned(), 8L);
+
+    // The broker sees four copies of the 30,000-row segment and must still apply the offset to tied rows.
+    BrokerResponseNative response = getBrokerResponse(options
+        + "SELECT 'constant' AS value FROM testTable ORDER BY 1 DESC LIMIT 10 OFFSET 119997");
+    assertTrue(response.getExceptions().isEmpty());
+    assertEquals(response.getResultTable().getRows().size(), 3);
+    for (Object[] row : response.getResultTable().getRows()) {
+      assertEquals(row, new Object[]{"constant"});
+    }
+    response = getBrokerResponse(options
+        + "SELECT column1 FROM testTable WHERE column1 < 0 ORDER BY 'constant' DESC LIMIT 5 OFFSET 3");
+    assertTrue(response.getExceptions().isEmpty());
+    assertTrue(response.getResultTable().getRows().isEmpty());
+  }
+
+  @Test(dataProvider = "literalOrderByOptions")
+  public void testSelectionOrderByLiteralsAndSortedColumn(boolean allowReverseOrder, boolean enableNullHandling) {
+    String options = "SET allowReverseOrder = " + allowReverseOrder + "; SET enableNullHandling = "
+        + enableNullHandling + "; ";
+    for (boolean asc : List.of(true, false)) {
+      String direction = asc ? " ASC" : " DESC";
+      String literalDirection = asc ? " DESC" : " ASC";
+      String query = options + "SELECT daysSinceEpoch FROM testTable ORDER BY 'leading'" + literalDirection
+          + ", daysSinceEpoch" + direction + ", 'trailing'" + literalDirection + " LIMIT 5 OFFSET 3";
+      BaseOperator<SelectionResultsBlock> operator = getOperator(query);
+      if (asc || allowReverseOrder) {
+        assertTrue(operator instanceof SelectionPartiallyOrderedByLinearOperator, query);
+      } else {
+        assertTrue(operator instanceof SelectionPartiallyOrderedByDescOperation, query);
+      }
+      assertEquals(operator.nextBlock().getRows().size(), 8, query);
+      assertEquals(operator.getExecutionStatistics().getNumDocsScanned(),
+          asc || allowReverseOrder ? 8L : 30000L, query);
+      BrokerResponseNative response = getBrokerResponse(query);
+      assertTrue(response.getExceptions().isEmpty(), query);
+      List<Object[]> expectedRows = getBrokerResponse(options
+          + "SELECT daysSinceEpoch FROM testTable ORDER BY daysSinceEpoch" + direction + " LIMIT 5 OFFSET 3")
+          .getResultTable().getRows();
+      List<Object[]> rows = response.getResultTable().getRows();
+      assertEquals(rows.size(), expectedRows.size(), query);
+      for (int i = 0; i < rows.size(); i++) {
+        assertEquals(rows.get(i), expectedRows.get(i), query);
+      }
+    }
+  }
+
+  @Test(dataProvider = "literalOrderByOptions")
+  public void testOrderByLiteralPrefixAndUnsortedSuffix(boolean allowReverseOrder, boolean enableNullHandling) {
+    String options = "SET allowReverseOrder = " + allowReverseOrder + "; SET enableNullHandling = "
+        + enableNullHandling + "; ";
+    for (String suffix : List.of("column1 DESC, column6 ASC", "add(column1, 1) ASC, column6 DESC")) {
+      String query = options + "SELECT column1, column6 FROM testTable ORDER BY 'constant' ASC, " + suffix
+          + " LIMIT 5 OFFSET 3";
+      BaseOperator<SelectionResultsBlock> operator = getOperator(query);
+      assertTrue(operator instanceof SelectionPartiallyOrderedByLinearOperator, query);
+      assertEquals(operator.nextBlock().getRows().size(), 8, query);
+      assertEquals(operator.getExecutionStatistics().getNumDocsScanned(), 30000L, query);
+      BrokerResponseNative response = getBrokerResponse(query);
+      assertTrue(response.getExceptions().isEmpty(), query);
+      List<Object[]> expectedRows = getBrokerResponse(options
+          + "SELECT column1, column6 FROM testTable ORDER BY " + suffix + " LIMIT 5 OFFSET 3")
+          .getResultTable().getRows();
+      List<Object[]> rows = response.getResultTable().getRows();
+      assertEquals(rows.size(), expectedRows.size(), query);
+      for (int i = 0; i < rows.size(); i++) {
+        assertEquals(rows.get(i), expectedRows.get(i), query);
+      }
+    }
+  }
 
   @Test
   public void testSelectLimitZero() {

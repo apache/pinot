@@ -22,18 +22,21 @@ import java.util.List;
 import java.util.function.IntFunction;
 import java.util.function.Supplier;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.DocIdOrderedOperator;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.query.QueryScanCostContext;
 
 
 /// The operator used when selecting with order-by on a way that the segment layout can be used to prune results.
 ///
-/// This requires that the first order-by expression is on a column that is sorted in the segment and:
+/// Literals impose no ordering constraint. When the sorted prefix contains a non-literal expression, its first column
+/// must be sorted in the segment and:
 /// 1. The order-by is ASC
 /// 2. The order-by is DESC and the input operators support descending iteration (e.g. full scan)
 ///
@@ -47,15 +50,15 @@ public class SelectionPartiallyOrderedByLinearOperator extends LinearSelectionOr
   public SelectionPartiallyOrderedByLinearOperator(IndexSegment indexSegment, QueryContext queryContext,
       List<ExpressionContext> expressions, BaseProjectOperator<?> projectOperator, int numSortedExpressions) {
     super(indexSegment, queryContext, expressions, projectOperator, numSortedExpressions);
-    boolean firstColIsAsc = queryContext.getOrderByExpressions().stream()
-        .filter(expr -> expr.getExpression().getType() == ExpressionContext.Type.IDENTIFIER)
-        .findFirst()
-        .orElseThrow(() -> new IllegalArgumentException("The query is not order by identifiers"))
-        .isAsc();
-    DocIdOrderedOperator.DocIdOrder docIdOrder = DocIdOrderedOperator.DocIdOrder.fromAsc(firstColIsAsc);
-    if (!projectOperator.isCompatibleWith(docIdOrder)) {
-      throw new IllegalStateException(EXPLAIN_NAME + " requires the input operator to be compatible with order: "
-          + docIdOrder + ", but found: " + projectOperator.toExplainString());
+    OrderByExpressionContext firstSortedExpression = SelectionOperatorUtils.getFirstNonLiteralOrderByExpression(
+        queryContext.getOrderByExpressions(), numSortedExpressions);
+    if (firstSortedExpression != null) {
+      DocIdOrderedOperator.DocIdOrder docIdOrder =
+          DocIdOrderedOperator.DocIdOrder.fromAsc(firstSortedExpression.isAsc());
+      if (!projectOperator.isCompatibleWith(docIdOrder)) {
+        throw new IllegalStateException(EXPLAIN_NAME + " requires the input operator to be compatible with order: "
+            + docIdOrder + ", but found: " + projectOperator.toExplainString());
+      }
     }
   }
 
