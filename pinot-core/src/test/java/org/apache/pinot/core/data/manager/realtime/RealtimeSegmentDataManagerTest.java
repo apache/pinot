@@ -471,18 +471,25 @@ public class RealtimeSegmentDataManagerTest {
 
   @DataProvider
   public Object[][] keepAfterReachedPosition() {
-    return new Object[][]{{"initial"}, {"catchup"}, {"capped"}, {"settled"}};
+    return new Object[][]{
+        {"initial", "match"}, {"initial", "mismatch"}, {"catchup", "mismatch"},
+        {"capped", "match"}, {"capped", "mismatch"}, {"capped", "pauseless"},
+        {"settled", "match"}, {"settled", "mismatch"}, {"settled", "pauseless"}
+    };
   }
 
   /// When the committer stopped one past a commit marker, the followers reach the same offset and post it: by adopting
-  /// the position while consuming, by adopting it during protocol catch-up (capped at the target there), or by
-  /// settling on the target in front of the next transaction's record. A KEEP then builds and retains the local
-  /// segment like any other, without fetching committed metadata.
+  /// the position while consuming, by adopting it during protocol catch-up, by capping a position past the target
+  /// there, or by settling on the target in front of the next transaction's record. A KEEP builds and retains the
+  /// local segment. A capped or settled one is first verified against the committed CRC, since a stream that never
+  /// reports loss would let a replica that skipped the committer's last messages settle too: a mismatch discards it
+  /// and the ONLINE transition downloads, and a pauseless table builds locally as on the ONLINE path.
   @Test(dataProvider = "keepAfterReachedPosition")
-  public void testKeepRetainsSegmentAtReachedPosition(String positionKind)
+  public void testKeepRetainsSegmentAtReachedPosition(String positionKind, String crcPolicy)
       throws Exception {
+    TableConfig tableConfig = "pauseless".equals(crcPolicy) ? createPauselessTableConfig() : null;
     try (FakeRealtimeSegmentDataManager segmentDataManager =
-        createFakeSegmentManager(true, new TimeSupplier(), null, null, null)) {
+        createFakeSegmentManager(true, new TimeSupplier(), null, null, tableConfig)) {
       long target = START_OFFSET_VALUE + 20;
       if ("initial".equals(positionKind)) {
         consumeEmptyPosition(segmentDataManager, target, false);
@@ -503,6 +510,9 @@ public class RealtimeSegmentDataManagerTest {
             new ScriptedPartitionGroupConsumer(segmentDataManager, batch, emptyBatch(null)));
       }
       segmentDataManager._useRealBuildAndReplace = true;
+      segmentDataManager._localSegmentCrcMatchesZk = !"mismatch".equals(crcPolicy);
+      SegmentZKMetadata committed = crcMetadata(target, 12345L);
+      when(segmentDataManager._tableDataManager.fetchZKMetadata(SEGMENT_NAME_STR)).thenReturn(committed);
       segmentDataManager._responses.add(new SegmentCompletionProtocol.Response(
           new SegmentCompletionProtocol.Response.Params().withStreamPartitionMsgOffset(Long.toString(target))
               .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.KEEP)));
@@ -511,9 +521,23 @@ public class RealtimeSegmentDataManagerTest {
 
       assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(), target);
       assertEquals(segmentDataManager.getSegment().getNumDocsIndexed(), 0);
-      assertEquals(segmentDataManager._state.get(segmentDataManager), RealtimeSegmentDataManager.State.RETAINED);
-      verify(segmentDataManager._tableDataManager).replaceConsumingSegment(eq(SEGMENT_NAME_STR), any());
-      verify(segmentDataManager._tableDataManager, never()).fetchZKMetadata(anyString());
+      boolean settled = "capped".equals(positionKind) || "settled".equals(positionKind);
+      verify(segmentDataManager._tableDataManager, times(settled ? 1 : 0)).fetchZKMetadata(SEGMENT_NAME_STR);
+      if (settled && "mismatch".equals(crcPolicy)) {
+        assertEquals(segmentDataManager._state.get(segmentDataManager), RealtimeSegmentDataManager.State.DISCARDED);
+        verify(segmentDataManager._tableDataManager, never()).replaceConsumingSegment(anyString(), any());
+        segmentDataManager._stopWaitTimeMs = 0;
+        segmentDataManager.goOnlineFromConsuming(committed);
+        assertTrue(segmentDataManager._downloadAndReplaceCalled);
+      } else {
+        assertEquals(segmentDataManager._state.get(segmentDataManager), RealtimeSegmentDataManager.State.RETAINED);
+        if (settled && "match".equals(crcPolicy)) {
+          verify(segmentDataManager._tableDataManager).replaceConsumingSegment(eq(SEGMENT_NAME_STR), same(committed));
+        } else {
+          verify(segmentDataManager._tableDataManager)
+              .replaceConsumingSegment(eq(SEGMENT_NAME_STR), argThat(m -> m != committed));
+        }
+      }
     }
   }
 

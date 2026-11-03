@@ -303,6 +303,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private volatile boolean _endOfPartitionGroup = false;
   private volatile boolean _forceCommitMessageReceived = false;
   private volatile StreamPartitionMsgOffset _finalOffset; // Exclusive, used when we want to catch up to this one
+  // Whether catch-up capped a position at _finalOffset or settled on it in front of a message, i.e. reached it without
+  // a message ending there. Only accessed by the consumer thread.
+  private boolean _settledOnFinalOffset = false;
   private volatile boolean _shouldStop = false;
 
   // It takes 30s to locate controller leader, and more if there are multiple controller failures.
@@ -661,12 +664,14 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   /// only filtered ones such as tombstones) when that position lies past the final offset. The final offset then lies
   /// inside an interval no replica indexes rows from, so this replica holds exactly the rows below it. A committer can
   /// stop at such an offset, e.g. one past a Kafka commit marker it skipped on an empty poll. A batch reporting loss is
-  /// not capped and keeps the existing overshoot handling.
+  /// not capped and keeps the existing overshoot handling. A capped segment is verified against the committed CRC on
+  /// KEEP.
   @Nullable
   private StreamPartitionMsgOffset capAtFinalOffset(MessageBatch messageBatch,
       @Nullable StreamPartitionMsgOffset nextBatchOffset) {
     if (nextBatchOffset != null && isCatchingUpToFinalOffset() && !messageBatch.hasDataLoss()
         && nextBatchOffset.compareTo(_finalOffset) > 0) {
+      _settledOnFinalOffset = true;
       return _finalOffset;
     }
     return nextBatchOffset;
@@ -675,7 +680,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   /// While catching up to a final offset, stops before a message that starts at or past it and settles on the final
   /// offset. This happens when the final offset is one past offsets the stream never delivers, such as a Kafka commit
   /// marker the committer skipped on an empty poll. The offsets below the message are a gap like any other inside a
-  /// data poll, so this replica then holds exactly the rows below the final offset.
+  /// data poll, so this replica then holds exactly the rows below the final offset, unless the stream skipped messages
+  /// without reporting loss. A settled segment is therefore verified against the committed CRC on KEEP.
   ///
   /// The existing overshoot handling, which ends in a download, is kept for a batch reporting loss, for a message
   /// straddling the final offset (starting below it), and for a message whose offset equals its next offset (inclusive
@@ -691,6 +697,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
     _segmentLogger.info("Next message starts at {}, at or past the final offset {}. Settling on it from {}", offset,
         _finalOffset, _currentOffset);
+    _settledOnFinalOffset = true;
     _currentOffset = _finalOffset;
     return true;
   }
@@ -1045,6 +1052,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
                     "CompletionMode is DOWNLOAD but download URL is missing for segment: {} and peer download "
                         + "is disabled. Falling back to RETAINING mode", _segmentNameStr);
               }
+              // A final offset settled on is only as good as the stream's loss reporting, which some streams (e.g.
+              // Pulsar, Kafka read_committed) never do, so a replica that skipped the committer's last messages would
+              // settle too. Verify such a segment against the committed CRC.
+              SegmentZKMetadata committedSegmentZKMetadata =
+                  _settledOnFinalOffset ? _realtimeTableDataManager.fetchZKMetadata(_segmentNameStr) : null;
               _state = State.RETAINING;
               // Lock the segment to avoid multiple threads touching the same segment.
               Lock segmentLock = _realtimeTableDataManager.getSegmentLock(_segmentNameStr);
@@ -1052,8 +1064,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
               //       CONSUMING -> ONLINE state transition.
               segmentLock.lockInterruptibly();
               try {
-                if (buildSegmentAndReplace()) {
+                if (buildSegmentAndReplace(committedSegmentZKMetadata)) {
                   _state = State.RETAINED;
+                } else if (committedSegmentZKMetadata != null) {
+                  _segmentLogger.warn("Could not reuse the local segment built at the settled final offset {}. "
+                      + "Downloading it on the ONLINE transition", _currentOffset);
+                  _state = State.DISCARDED;
                 } else {
                   // Could not build segment for some reason. We can only download it.
                   _state = State.ERROR;
