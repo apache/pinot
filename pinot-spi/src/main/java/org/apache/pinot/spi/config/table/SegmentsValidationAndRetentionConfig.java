@@ -203,6 +203,7 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
     return _hybridTableRetentionStrategy == null ? Enablement.DEFAULT : _hybridTableRetentionStrategy;
   }
 
+  @JsonProperty("hybridTableRetentionStrategy")
   public void setHybridTableRetentionStrategy(@Nullable Enablement hybridTableRetentionStrategy) {
     _hybridTableRetentionStrategy =
         hybridTableRetentionStrategy == Enablement.DEFAULT ? null : hybridTableRetentionStrategy;

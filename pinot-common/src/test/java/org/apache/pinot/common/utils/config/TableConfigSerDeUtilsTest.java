@@ -427,6 +427,18 @@ public class TableConfigSerDeUtilsTest {
       tableConfigToCompare = JsonUtils.jsonNodeToObject(tableConfigJson, TableConfig.class);
       assertEquals(tableConfigToCompare.getValidationConfig().getHybridTableRetentionStrategy(), Enablement.DEFAULT);
       assertEquals(tableConfigToCompare, tableConfig);
+
+      // Explicit DEFAULT deserializes to DEFAULT and is not serialized
+      tableConfigJson = (ObjectNode) tableConfig.toJsonNode();
+      ((ObjectNode) tableConfigJson.get(TableConfig.VALIDATION_CONFIG_KEY)).put(hybridTableRetentionStrategy,
+          Enablement.DEFAULT.name());
+      tableConfigToCompare = JsonUtils.jsonNodeToObject(tableConfigJson, TableConfig.class);
+      assertEquals(tableConfigToCompare.getValidationConfig().getHybridTableRetentionStrategy(), Enablement.DEFAULT);
+      assertFalse(
+          tableConfigToCompare.toJsonNode().get(TableConfig.VALIDATION_CONFIG_KEY).has(hybridTableRetentionStrategy));
+      assertEquals(tableConfigToCompare, tableConfig);
+      tableConfigToCompare = TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfigToCompare));
+      assertEquals(tableConfigToCompare, tableConfig);
     }
   }
 
