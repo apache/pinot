@@ -21,6 +21,7 @@ package org.apache.pinot.queries;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -32,7 +33,14 @@ import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
 import org.apache.pinot.core.operator.query.SelectionOrderByOperator;
 import org.apache.pinot.core.operator.query.SelectionPartiallyOrderedByDescOperation;
 import org.apache.pinot.core.operator.query.SelectionPartiallyOrderedByLinearOperator;
+import org.apache.pinot.core.plan.SelectionPlanNode;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.apache.pinot.sql.parsers.rewriter.OrderByLiteralRemover;
+import org.apache.pinot.sql.parsers.rewriter.QueryRewriter;
+import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -55,7 +63,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
   public void testSelectionOrderByLiterals(boolean allowReverseOrder, boolean enableNullHandling) {
     String options = "SET allowReverseOrder = " + allowReverseOrder + "; SET enableNullHandling = "
         + enableNullHandling + "; ";
-    for (String orderBy : List.of("2 DESC", "2 ASC", "2", "now() DESC", "'a' DESC, 'b' ASC")) {
+    for (String orderBy : List.of("2 DESC", "2 ASC", "2", "now() DESC", "NULL DESC", "'a' DESC, 'b' ASC")) {
       String query = options + "SELECT column1, now() AS t FROM testTable ORDER BY " + orderBy + " LIMIT 5 OFFSET 3";
       BaseOperator<SelectionResultsBlock> operator = getOperator(query);
       assertTrue(operator instanceof SelectionOnlyOperator, query);
@@ -141,6 +149,74 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
         assertEquals(rows.get(i), expectedRows.get(i), query);
       }
     }
+  }
+
+  @Test(dataProvider = "literalOrderByOptions")
+  public void testLiteralOrderByWithoutRewriter(boolean allowReverseOrder, boolean enableNullHandling) {
+    // Custom rewriter lists and requests from older brokers can retain literal ORDER BY keys.
+    for (String orderBy : List.of("2 DESC", "2 ASC", "now() DESC", "'a' DESC, 'b' ASC", "'a' ASC, 'b' DESC")) {
+      String sql = "SELECT column1, now() AS t FROM testTable ORDER BY " + orderBy + " LIMIT 5 OFFSET 3";
+      PinotQuery query = compileWithoutLiteralRemoval(sql, allowReverseOrder, enableNullHandling);
+      SelectionResultsBlock block = new SelectionPlanNode(new SegmentContext(getIndexSegment()),
+          QueryContextConverterUtils.getQueryContext(query)).run().nextBlock();
+      assertEquals(block.getRows().size(), 8, sql);
+      BrokerResponseNative response = getBrokerResponse(query, PLAN_MAKER);
+      assertTrue(response.getExceptions().isEmpty(), sql);
+      assertEquals(response.getResultTable().getRows().size(), 5, sql);
+      assertEquals(response.getResultTable().getDataSchema().getColumnNames(), new String[]{"column1", "t"});
+    }
+
+    // Retaining ORDER BY also retains its OFFSET handling at the broker.
+    PinotQuery query = compileWithoutLiteralRemoval(
+        "SELECT 'constant' AS value FROM testTable ORDER BY 1 DESC LIMIT 10 OFFSET 119997",
+        allowReverseOrder, enableNullHandling);
+    BrokerResponseNative response = getBrokerResponse(query, PLAN_MAKER);
+    assertTrue(response.getExceptions().isEmpty());
+    assertEquals(response.getResultTable().getRows().size(), 3);
+    for (Object[] row : response.getResultTable().getRows()) {
+      assertEquals(row, new Object[]{"constant"});
+    }
+  }
+
+  @Test(dataProvider = "literalOrderByOptions")
+  public void testLiteralPrefixWithoutRewriter(boolean allowReverseOrder, boolean enableNullHandling) {
+    String options = "SET allowReverseOrder = " + allowReverseOrder + "; SET enableNullHandling = "
+        + enableNullHandling + "; ";
+    for (String direction : List.of("ASC", "DESC")) {
+      for (String[] expressions : List.of(
+          new String[]{"daysSinceEpoch", "daysSinceEpoch ASC"},
+          new String[]{"daysSinceEpoch", "daysSinceEpoch DESC"},
+          new String[]{"column1, column6", "column1 DESC, column6 ASC"},
+          new String[]{"column1, column6", "add(column1, 1) ASC, column6 DESC"})) {
+        String select = "SELECT " + expressions[0] + " FROM testTable ORDER BY ";
+        String suffix = expressions[1] + " LIMIT 5 OFFSET 3";
+        String sql = select + "'constant' " + direction + ", " + suffix;
+        PinotQuery query = compileWithoutLiteralRemoval(sql, allowReverseOrder, enableNullHandling);
+        BrokerResponseNative response = getBrokerResponse(query, PLAN_MAKER);
+        assertTrue(response.getExceptions().isEmpty(), sql);
+        List<Object[]> expectedRows = getBrokerResponse(options + select + suffix).getResultTable().getRows();
+        List<Object[]> rows = response.getResultTable().getRows();
+        assertEquals(rows.size(), expectedRows.size(), sql);
+        for (int i = 0; i < rows.size(); i++) {
+          assertEquals(rows.get(i), expectedRows.get(i), sql);
+        }
+      }
+    }
+  }
+
+  private static PinotQuery compileWithoutLiteralRemoval(String sql, boolean allowReverseOrder,
+      boolean enableNullHandling) {
+    PinotQuery query = CalciteSqlParser.compileToPinotQueryWithoutRewrites(sql);
+    // Apply a custom pipeline without modifying the global parser configuration used by other tests.
+    for (QueryRewriter rewriter : QueryRewriterFactory.getQueryRewriters()) {
+      if (!(rewriter instanceof OrderByLiteralRemover)) {
+        query = rewriter.rewrite(query);
+      }
+    }
+    query.setQueryOptions(new HashMap<>(Map.of("allowReverseOrder", Boolean.toString(allowReverseOrder),
+        "enableNullHandling", Boolean.toString(enableNullHandling))));
+    assertTrue(query.getOrderByListSize() > 0, sql);
+    return query;
   }
 
   @Test
