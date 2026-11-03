@@ -247,6 +247,12 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   // cluster or moved to another address. Entries whose channel had already closed are dropped without being counted.
   public static final BrokerMeter NETTY_CONNECTION_CHANNEL_EVICTIONS = create(
       "NETTY_CONNECTION_CHANNEL_EVICTIONS", "nettyConnection", false);
+  // Channels marked suspect because the server left the configured number of consecutive queries unanswered on them
+  // (see CommonConstants.Broker.FailureDetector.CONFIG_OF_UNANSWERED_QUERIES_THRESHOLD); the next query replaces each.
+  // With CONFIG_OF_REPORT_UNANSWERED_SERVERS on and pings off, each is also a report to the failure detector. Tagged
+  // with the server's short name.
+  public static final BrokerMeter NETTY_CONNECTION_SUSPECT_CHANNELS = create(
+      "NETTY_CONNECTION_SUSPECT_CHANNELS", "nettyConnection", false);
 
   public static final BrokerMeter PROACTIVE_CLUSTER_CHANGE_CHECK = create(
       "PROACTIVE_CLUSTER_CHANGE_CHECK", "proactiveClusterChangeCheck", true);

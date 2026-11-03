@@ -85,6 +85,8 @@ public class DataTableHandler extends SimpleChannelInboundHandler<ByteBuf> {
 
   @Override
   protected void channelRead0(ChannelHandlerContext ctx, ByteBuf msg) {
+    // Before decoding: a frame proves the server alive even if it then fails to decode
+    _queryRouter.recordResponse(_serverRoutingInstance);
     int responseSize = msg.readableBytes();
     _brokerMetrics.addMeteredGlobalValue(BrokerMeter.NETTY_CONNECTION_BYTES_RECEIVED, responseSize);
     try {

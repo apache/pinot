@@ -470,8 +470,9 @@ public class ServerChannels {
     // closed once they are past their deadline. Compared by identity, so it never applies to a connection opened since.
     volatile Channel _retiredChannel;
     // Set when the server stopped answering queries on this channel while the socket still looked active (see
-    // judgeUnansweredQuery), or when the channel stopped draining (see sendRequestWithoutLocking).
-    // connectWithoutLocking() then replaces the channel rather than trusting it.
+    // judgeUnansweredQuery). connectWithoutLocking() then replaces the channel rather than trusting it. A full outbound
+    // queue does not set it: a healthy server draining a large request fills it too, and replacing the channel would
+    // fail that request; a stall that lasts is the write timeout's to judge.
     volatile boolean _suspect;
     // Liveness bookkeeping, guarded by _livenessLock: when the server last sent anything on this channel (the start of
     // the current connection for a fresh one) and how many consecutive queries it has left unanswered since. The lock
@@ -622,6 +623,8 @@ public class ServerChannels {
       }
       LOGGER.warn("Server: {} has left {} consecutive queries unanswered on its channel, each judged {}ms past its "
           + "timeout; marking the channel suspect", _serverRoutingInstance, unansweredQueries, _unansweredQueryGraceMs);
+      _brokerMetrics.addMeteredValue(BrokerMeter.NETTY_CONNECTION_SUSPECT_CHANNELS, 1,
+          _serverRoutingInstance.getShortName());
       _queryRouter.reportUnansweredServer(_serverRoutingInstance);
     }
 
@@ -820,7 +823,6 @@ public class ServerChannels {
           // request buffer in direct memory behind a closed send window. The rejection is backpressure, not a verdict
           // on the server, so it does not report the server (see UnwritableChannelException); a stall that lasts is
           // judged by the write timeout handler, which closes the channel.
-          _suspect = true;
           _brokerMetrics.addMeteredValue(BrokerMeter.NETTY_CONNECTION_UNWRITABLE_REJECTIONS, 1,
               serverRoutingInstance.getShortName());
           throw new UnwritableChannelException(String.format(

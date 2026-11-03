@@ -155,10 +155,12 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
       Preconditions.checkArgument(_pingTimeoutMs > 0, "'%s' must be positive, got: %s",
           CommonConstants.Broker.FailureDetector.CONFIG_OF_PING_TIMEOUT_MS, _pingTimeoutMs);
       _failureDetector.registerServerNotRespondedChecker(this::checkServerNotResponded);
-    } else {
-      // Without pings nothing else acts on a timeout: a server that has gone silent on one of its channels is reported
-      // like a server the transport saw go down, and leaves routing until the retry probe re-establishes the channel.
-      // With pings, the ping that follows every timeout makes that call, and the silent channel is only replaced.
+    } else if (_config.getProperty(CommonConstants.Broker.FailureDetector.CONFIG_OF_REPORT_UNANSWERED_SERVERS,
+        CommonConstants.Broker.FailureDetector.DEFAULT_REPORT_UNANSWERED_SERVERS)) {
+      // Opted in: without pings nothing else acts on a timeout, so a server that has gone silent on one of its channels
+      // is reported like a server the transport saw go down, and leaves routing until the retry probe re-establishes
+      // the channel. Otherwise, and always with pings (the ping that follows every timeout makes that call), the
+      // silent channel is only replaced.
       _queryRouter.setUnansweredServerReporter(serverRoutingInstance -> _failureDetector.markServerUnhealthy(
           serverRoutingInstance.getInstanceId(), serverRoutingInstance.getHostname()));
     }

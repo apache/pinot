@@ -86,6 +86,7 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.core.transport.QueryServerTestUtils.startAndGetPort;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -1180,6 +1181,24 @@ public class QueryRoutingTest {
     } finally {
       gate.get().set(PinotByteBuffer.wrap(new byte[0]));
       queryRouter.shutDown();
+    }
+  }
+
+  /// A response frame counts as an answer from the server as soon as it arrives, before it is decoded: one that fails
+  /// to deserialize, a heap OOM included, still proves the server alive, so it must not count towards the unanswered
+  /// queries that get a channel replaced.
+  @Test
+  public void testUndecodableResponseStillCountsAsAnswer() {
+    QueryRouter queryRouter = mock(QueryRouter.class);
+    ServerRoutingInstance routingInstance = new ServerRoutingInstance("localhost", 12345, TableType.OFFLINE);
+    EmbeddedChannel channel = new EmbeddedChannel(
+        new DataTableHandler(queryRouter, ThreadAccountantUtils.getNoOpAccountant(), routingInstance));
+    try {
+      channel.writeInbound(Unpooled.wrappedBuffer(new byte[]{1, 2, 3}));
+      verify(queryRouter).recordResponse(routingInstance);
+      verify(queryRouter, never()).receiveDataTable(any(), any(), anyInt(), anyInt());
+    } finally {
+      channel.finishAndReleaseAll();
     }
   }
 

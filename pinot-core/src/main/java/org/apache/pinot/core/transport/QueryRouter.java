@@ -79,8 +79,8 @@ public class QueryRouter {
   private final BrokerMetrics _brokerMetrics = BrokerMetrics.get();
   private final ConcurrentHashMap<Long, AsyncQueryResponse> _asyncQueryResponseMap = new ConcurrentHashMap<>();
   // Told about a server that stopped answering queries on one of its channels (see ServerChannels). The request
-  // handler points it at the failure detector when pings are off; with or without it, the suspect channel is replaced
-  // by the next query to it, so recovery does not depend on the failure detector being configured.
+  // handler points it at the failure detector when pings are off and reporting is enabled; with or without it, the
+  // suspect channel is replaced by the next query to it, so recovery does not depend on the failure detector.
   private volatile Consumer<ServerRoutingInstance> _unansweredServerReporter = serverRoutingInstance -> {
   };
   /// Ping request ids count down from -1, so they can never collide with query request ids, which are non-negative
@@ -442,10 +442,15 @@ public class QueryRouter {
     }
   }
 
+  /// Records that a response frame arrived from the server, before it is decoded: any response proves the server and
+  /// its channel alive, whether or not the query it answers is still waiting, and whether or not it decodes (a heap
+  /// OOM while deserializing is the broker's problem, not a silent server). Called by [DataTableHandler].
+  void recordResponse(ServerRoutingInstance serverRoutingInstance) {
+    serverChannelsFor(serverRoutingInstance).recordResponse(serverRoutingInstance);
+  }
+
   void receiveDataTable(ServerRoutingInstance serverRoutingInstance, DataTable dataTable, int responseSize,
       int deserializationTimeMs) {
-    // Any response proves the server and its channel alive, whether or not the query it answers is still waiting
-    serverChannelsFor(serverRoutingInstance).recordResponse(serverRoutingInstance);
     long requestId = Long.parseLong(dataTable.getMetadata().get(MetadataKey.REQUEST_ID.getName()));
     AsyncQueryResponse asyncQueryResponse = _asyncQueryResponseMap.get(requestId);
 

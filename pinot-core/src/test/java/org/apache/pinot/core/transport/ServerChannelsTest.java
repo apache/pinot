@@ -499,8 +499,9 @@ public class ServerChannelsTest {
       verify(mockChannel, never()).close();
       verify(asyncQueryResponse, never()).markRequestSent(any(), anyInt());
       verify(asyncQueryResponse, never()).markServerUnavailable(any(), any(), any(Exception.class), anyBoolean());
-      // The channel is now suspect: the next query replaces it rather than trusting a socket that stopped draining
-      assertTrue(serverChannel._suspect);
+      // Not marked suspect: a healthy server draining a large request fills the queue too, and replacing the channel
+      // would fail that request
+      assertFalse(serverChannel._suspect);
     } finally {
       serverChannels.shutDown();
     }
@@ -1032,20 +1033,10 @@ public class ServerChannelsTest {
       assertTrue(e.getMessage().contains("not writable"), e.getMessage());
       assertEquals(meterCount(BrokerMeter.NETTY_CONNECTION_UNWRITABLE_REJECTIONS, instance), rejectionsBefore + 1);
       verify(rejectedResponse, never()).markRequestSent(any(), anyInt());
-      // Rejecting does not close the channel on the spot, but marks it suspect ...
+      // Rejecting neither closes nor replaces the channel; the write timeout handler owns that decision
       assertTrue(channel.isActive());
       assertSame(serverChannel._channel, channel);
-      assertTrue(serverChannel._suspect);
-
-      // ... so the next request goes out on a fresh connection, and the stalled one is closed along with the request
-      // buffers queued in it
-      AsyncQueryResponse nextResponse = mock(AsyncQueryResponse.class);
-      serverChannels.sendRequest("testTable", nextResponse, instance, smallInstanceRequest(), 10_000L);
-      assertNotSame(serverChannel._channel, channel);
-      assertTrue(serverChannel._channel.isActive());
       assertFalse(serverChannel._suspect);
-      TestUtils.waitForCondition(aVoid -> !channel.isActive(), 10L, 5_000L, "Stalled channel was not closed");
-      verify(nextResponse, timeout(5_000L)).markRequestSent(eq(instance), anyInt());
     } finally {
       serverChannels.shutDown();
     }
@@ -1253,6 +1244,7 @@ public class ServerChannelsTest {
         new ServerChannels(queryRouter, null, null, ThreadAccountantUtils.getNoOpAccountant(), 2, graceMs);
     try (StalledServer server = new StalledServer()) {
       ServerRoutingInstance instance = new ServerRoutingInstance("localhost", server.getPort(), TableType.REALTIME);
+      long suspectsBefore = meterCount(BrokerMeter.NETTY_CONNECTION_SUSPECT_CHANNELS, instance);
       // Unknown channel: nothing to judge
       serverChannels.recordUnansweredQuery(instance, System.currentTimeMillis(), null);
       serverChannels.sendRequest("testTable", mock(AsyncQueryResponse.class), instance, smallInstanceRequest(),
@@ -1267,6 +1259,7 @@ public class ServerChannelsTest {
           "The unanswered query was not counted after the grace period");
       assertFalse(entry._suspect);
       verify(queryRouter, never()).reportUnansweredServer(any());
+      assertEquals(meterCount(BrokerMeter.NETTY_CONNECTION_SUSPECT_CHANNELS, instance), suspectsBefore);
 
       // A response from the server, even to some other query, clears the count ...
       serverChannels.recordResponse(instance);
@@ -1286,6 +1279,7 @@ public class ServerChannelsTest {
       verify(queryRouter, timeout(5_000L)).reportUnansweredServer(instance);
       assertTrue(entry._suspect);
       assertEquals(serverChannels.getUnansweredQueries(instance), 0, "Reset once reported");
+      assertEquals(meterCount(BrokerMeter.NETTY_CONNECTION_SUSPECT_CHANNELS, instance), suspectsBefore + 1);
     } finally {
       serverChannels.shutDown();
     }
