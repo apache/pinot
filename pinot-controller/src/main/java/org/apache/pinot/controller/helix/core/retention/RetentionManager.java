@@ -356,8 +356,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     // Scan all segment ZK metadata and purge segments if necessary
     if (TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
       if (validationConfig.getHybridTableRetentionStrategy() != Enablement.DEFAULT) {
-        LOGGER.warn(
-            "hybridTableRetentionStrategy is only applicable to realtime tables, "
+        LOGGER.warn("hybridTableRetentionStrategy is only applicable to realtime tables, "
             + "ignoring it for offline table: {}", tableNameWithType);
       }
       manageRetentionForOfflineTable(tableNameWithType, retentionStrategy, untrackedSegmentsDeletionBatchSize,
