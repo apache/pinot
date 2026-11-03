@@ -1548,9 +1548,22 @@ public class ServerChannelsTest {
       serverChannel._bootstrap.option(ChannelOption.SO_SNDBUF, SOCKET_BUFFER_BYTES);
     }
 
+    /// Returns once the port refuses connections. On Linux a socket closed while the acceptor is blocked in
+    /// `accept()` keeps listening until that call returns, so a connect right after closing could still succeed.
     @Override
     public void close() {
       IOUtils.closeQuietly(_serverSocket);
+      closeAccepted();
+      try {
+        _acceptor.join(5_000L);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+      // Anything the acceptor took in before it returned
+      closeAccepted();
+    }
+
+    private void closeAccepted() {
       for (Socket socket : _accepted) {
         IOUtils.closeQuietly(socket);
       }
