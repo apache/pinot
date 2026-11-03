@@ -57,10 +57,10 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
 
   // Offset the consumer is positioned to read NEXT. -1 means the consumer has not been
   // positioned for any caller-requested startOffset yet (we have not issued a seek).
-  // After a successful fetch, this is lastRecord.offset + 1. After an empty fetch, this is the
+  // After a successful fetch, this is lastRecord.offset + 1. After an empty fetch under
+  // read_committed (where the batch may have been filtered as aborted), this is the
   // consumer's actual KafkaConsumer.position(), which may have advanced past the caller's
-  // startOffset even though zero records were returned (skipped transaction control records,
-  // or aborted records under read_committed).
+  // startOffset even though zero records were returned.
   private long _nextReadOffset = -1;
   // The caller's startOffset on the previous fetchMessages() call. Used to distinguish
   // "caller is passing the same startOffset back because RealtimeSegmentDataManager's
@@ -151,15 +151,18 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
         }
         lastMessageMetadata = messageMetadata;
       }
-    } else {
-      // No records returned, but the underlying KafkaConsumer may still have moved past offsets it will never
-      // deliver: transaction control records (commit/abort markers) under either isolation level, and records of
-      // aborted transactions under read_committed. Snap _nextReadOffset to the consumer's actual position so the
-      // returned batch reports where consumption really resumes. RealtimeSegmentDataManager doesn't advance its
-      // offset on an empty batch and calls us again with the same startOffset; the no-re-seek rule above keeps
-      // the consumer's progress in that case. position() is answered from the client's local state once a
-      // position is known, and is bounded by the same timeout as poll() otherwise, so a sick broker can't stall
-      // this loop.
+    } else if (_isReadCommitted) {
+      // No records returned. With read_committed isolation, the underlying KafkaConsumer's
+      // internal position may still have advanced past offsets filtered out as aborted
+      // transactional records, so snap _nextReadOffset to the consumer's actual position.
+      // RealtimeSegmentDataManager doesn't advance _currentOffset on empty batches and will
+      // call us again with the same startOffset; without this update the seek-check would
+      // re-seek to startOffset and undo the consumer's progress through the aborted region.
+      //
+      // For read_uncommitted (the default), empty polls can never advance the internal
+      // position past records that didn't exist, so we skip the position() call in the
+      // hot path. The call is bounded by the same timeout as poll() so a sick broker
+      // can't stall this loop unbounded.
       long currentPosition;
       try {
         currentPosition = _consumer.position(_topicPartition, Duration.ofMillis(timeoutMs));
@@ -174,17 +177,13 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
       }
     }
     long offsetOfNextBatch = _nextReadOffset;
-    // A gap between the requested startOffset and the first returned offset does NOT by itself imply data loss.
-    // Transactional producers write commit/abort control records that occupy offsets but are never delivered to
-    // the consumer (under either isolation level), so a contiguous stream of user records legitimately has offset
-    // gaps. On a low-traffic transactional topic every transaction produces one: after record N the caller is
-    // parked at the marker offset N + 1 and the next record lands at N + 2. The Kafka client gives no way to tell
-    // a skipped control record from an out-of-range reset (both just move the position), so the only reliable
-    // signal is the broker's log start offset: real data loss means records at/after startOffset were deleted
-    // (retention or truncation), i.e. the log start offset is now above startOffset. That lookup is one round
-    // trip per gap, never on the contiguous hot path. For read_committed we never flag loss because aborted-record
-    // gaps are always expected, and the caller's startOffset can lag far behind the consumer's position through
-    // an aborted region.
+    // A gap between the requested startOffset and the first returned offset does NOT by itself
+    // imply data loss. Transactional producers write commit/abort control records that occupy
+    // offsets but are never delivered to the consumer (even under read_uncommitted), so a
+    // contiguous stream of user records legitimately has offset gaps. Real data loss only
+    // happens when the requested startOffset is below the log's start offset, i.e. the broker
+    // has already deleted (via retention or truncation) records at or after startOffset. For
+    // read_committed we never flag loss because aborted-record gaps are always expected.
     boolean hasDataLoss = false;
     if (!_isReadCommitted && firstOffset > startOffset) {
       hasDataLoss = getLogStartOffset(timeoutMs) > startOffset;

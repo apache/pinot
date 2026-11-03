@@ -79,14 +79,9 @@ import org.slf4j.LoggerFactory;
 
 /// Segment writer to ingest streaming data from a start offset to an end offset.
 ///
-/// Like `RealtimeSegmentDataManager`, the writer never moves its offset on a batch without unfiltered messages: it
-/// polls again from the same offset and lets the consumer keep its own progress. A Kafka consumer, for one, moves past
-/// transaction control records without returning anything, so such a batch can report a next offset ahead of the
-/// requested one, either because only commit/abort markers were skipped (routine on a transactional topic) or because
-/// the client reset after an out-of-range fetch. The gap from the retained offset to the first record of the next
-/// non-empty batch is validated by the consumer's data-loss check, so a batch reporting data loss fails the replay
-/// before anything from it is indexed. A range whose tail holds no records completes once a batch delivers a record
-/// at or after the end offset; the caller's consumption timeout bounds a stream that delivers nothing.
+/// A batch that reports data loss (records between the requested offset and the batch were deleted from the stream
+/// before they could be replayed) fails the replay before anything from it is indexed: the replayed segment would
+/// otherwise silently miss part of its offset range.
 ///
 /// TODO:
 ///   1. Clean up this class and only keep the necessary parts.
@@ -283,10 +278,6 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
           MessageBatch messageBatch = _consumer.fetchMessages(_currentOffset, _fetchTimeoutMs);
           Preconditions.checkState(!messageBatch.hasDataLoss(), "Stream data loss at offset %s while replaying to %s",
               _currentOffset, _endOffset);
-          if (messageBatch.getUnfilteredMessageCount() == 0) {
-            // Keep the offset and poll again (see the class Javadoc): the next non-empty batch is validated against it.
-            continue;
-          }
 
           int messageCount = messageBatch.getMessageCount();
 
