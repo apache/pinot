@@ -192,11 +192,15 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
     _lineageEntryCleanupRetentionPeriod = lineageEntryCleanupRetentionPeriod;
   }
 
-  /// Whether to use the hybrid table retention strategy for this table. Only applicable to realtime tables. DEFAULT
-  /// falls back to the controller-level config `controller.enable.hybrid.table.retention.strategy`.
+  /// Whether to use the hybrid table retention strategy as the time-based retention policy for this table. Only
+  /// applicable to realtime tables. DEFAULT falls back to the controller-level config
+  /// `controller.enable.hybrid.table.retention.strategy`.
   ///
-  /// When enabled and an OFFLINE counterpart exists, realtime segments are retained until the OFFLINE time boundary
-  /// moves past them instead of by `retentionTimeValue`, so data is not dropped before the OFFLINE table covers it.
+  /// When enabled and an OFFLINE counterpart exists, realtime segments are purged once the OFFLINE time boundary moves
+  /// past them instead of by `retentionTimeValue`. Valid `retentionTimeUnit` and `retentionTimeValue` are still
+  /// required for time-based retention to run. When disabled, or when there is no OFFLINE counterpart, ordinary
+  /// realtime time-based retention applies. Size-based retention ([#getRetentionSize()]) runs independently and may
+  /// still delete realtime data newer than the OFFLINE time boundary.
   // Ignored for serialization so that DEFAULT is omitted, see the field
   @JsonIgnore
   public Enablement getHybridTableRetentionStrategy() {
