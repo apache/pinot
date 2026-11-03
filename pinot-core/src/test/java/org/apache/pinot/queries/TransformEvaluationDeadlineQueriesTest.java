@@ -55,11 +55,11 @@ import static org.testng.Assert.expectThrows;
 /// Checks that the query deadline stops the group-by processing of a block between two transform evaluations.
 ///
 /// The segment has one block. `DefaultGroupByExecutor.process()` handles the whole block in one call. Each aggregation
-/// evaluates `sleep(...)` on the whole block, which takes
-/// `NUM_RECORDS * SLEEP_MS` = 100 ms. The 10 aggregations take 1 s in total. No termination check runs inside one
-/// block, except the check that `TransformBlockValSet` runs before each transform evaluation. So with a 200 ms
-/// deadline, the query must fail with a timeout after about 300 ms. Without that check, the query completes after 1 s
-/// without an error.
+/// evaluates `sleep(col) + k` on the whole block. `col` is `SLEEP_MS` in every row, so one evaluation takes
+/// `NUM_RECORDS * SLEEP_MS` = 200 ms, and the 10 aggregations take 2 s in total. No termination check runs inside one
+/// block, except the check that `TransformBlockValSet` runs before each transform evaluation. So with a 500 ms
+/// deadline, the query must fail with a timeout from inside the block after about 600 ms. Without that check, the
+/// block runs to the end (2 s), and the timeout only comes from the `nextBlock()` check at the next block boundary.
 public class TransformEvaluationDeadlineQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR =
       new File(FileUtils.getTempDirectory(), "TransformEvaluationDeadlineQueriesTest");
@@ -67,12 +67,14 @@ public class TransformEvaluationDeadlineQueriesTest extends BaseQueriesTest {
   private static final String SEGMENT_NAME = "testSegment";
   private static final String COLUMN = "col";
   private static final int NUM_RECORDS = 20;
-  private static final int SLEEP_MS = 5;
+  private static final int SLEEP_MS = 10;
   private static final int NUM_AGGREGATIONS = 10;
-  private static final long DEADLINE_MS = 200;
-  // The full query takes NUM_AGGREGATIONS * NUM_RECORDS * SLEEP_MS = 1 s. Stopping at the deadline plus at most one
-  // more evaluation (100 ms) is well below this limit.
-  private static final long MAX_ELAPSED_MS = 800;
+  // The first transform evaluation must start before the deadline. The margin covers class loading and GC pauses on
+  // slow CI runners.
+  private static final long DEADLINE_MS = 500;
+  // The full block takes NUM_AGGREGATIONS * NUM_RECORDS * SLEEP_MS = 2 s. Stopping at the deadline plus at most one
+  // more evaluation (200 ms) is well below this limit.
+  private static final long MAX_ELAPSED_MS = 1500;
 
   private static final Schema SCHEMA = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
       .addSingleValueDimension(COLUMN, DataType.LONG)
@@ -104,7 +106,7 @@ public class TransformEvaluationDeadlineQueriesTest extends BaseQueriesTest {
     List<GenericRow> records = new ArrayList<>(NUM_RECORDS);
     for (int i = 0; i < NUM_RECORDS; i++) {
       GenericRow record = new GenericRow();
-      // Every row sleeps SLEEP_MS: the aggregations call sleep(col + k) with k >= 0, and sleep(0) does not sleep.
+      // Every row sleeps SLEEP_MS: the aggregations call sleep(col).
       record.putValue(COLUMN, (long) SLEEP_MS);
       records.add(record);
     }
@@ -126,8 +128,9 @@ public class TransformEvaluationDeadlineQueriesTest extends BaseQueriesTest {
     }
     StringBuilder query = new StringBuilder("SELECT col");
     for (int k = 0; k < NUM_AGGREGATIONS; k++) {
-      // A different constant per aggregation, so that each one is a different transform expression.
-      query.append(", SUM(sleep(col + ").append(k).append("))");
+      // A different constant per aggregation, so that each one is a different transform expression. The constant is
+      // outside sleep(), so that every evaluation sleeps the same time.
+      query.append(", SUM(sleep(col) + ").append(k).append(")");
     }
     query.append(" FROM testTable GROUP BY col");
 
