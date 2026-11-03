@@ -222,6 +222,19 @@ public class PauselessDedupErrorReplicaRepairTest extends BaseClusterIntegration
       return false;
     }, 1000L, 600_000L, "ERROR replicas were not repaired with the override");
 
+    // Wait for the broker to route to the repaired server again: each routing table it builds picks one replica
+    // group, alternating between them
+    Set<String> routedServers = new HashSet<>();
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        getDebugInfo("debug/routingTable/" + _realtimeTableName).get(_realtimeTableName).fieldNames()
+            .forEachRemaining(routedServers::add);
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+      return routedServers.size() == getNumReplicas();
+    }, 1000L, 60_000L, "Broker does not route to both replica groups");
+
     // With all its replicas repaired, the lagging server catches up. Strict replica-group routing sends consecutive
     // queries to alternating replica groups, so both must return the deduplicated count.
     waitForAllDocsLoaded(600_000L);

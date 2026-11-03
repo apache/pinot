@@ -3081,6 +3081,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
         SegmentStateModel.ERROR, SegmentStateModel.ERROR);
     addSegmentForErrorRepair(mockHelixResourceManager, idealState, externalView, 1, 2, Status.IN_PROGRESS,
         SegmentStateModel.CONSUMING, SegmentStateModel.ERROR);
+    addSegmentForErrorRepair(mockHelixResourceManager, idealState, externalView, 2, 0, Status.UPLOADED,
+        SegmentStateModel.ONLINE, SegmentStateModel.ERROR);
     segmentManager._idealState = idealState;
     when(mockHelixResourceManager.getTableExternalView(REALTIME_TABLE_NAME)).thenReturn(externalView);
 
@@ -3097,13 +3099,17 @@ public class PinotLLCRealtimeSegmentManagerTest {
     verify(mockControllerMetrics).setOrUpdateTableGauge(REALTIME_TABLE_NAME,
         ControllerGauge.PAUSELESS_SEGMENTS_IN_ERROR_COUNT, 3L);
     verify(mockControllerMetrics).setOrUpdateTableGauge(REALTIME_TABLE_NAME,
-        ControllerGauge.PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT, 6L);
+        ControllerGauge.PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT, 7L);
   }
 
   @DataProvider
   public Object[][] tableConfigsAllowingResets() {
     TableConfig pauselessDedupTableConfigWithDisasterRecovery = createPauselessTableConfig(new DedupConfig(), null);
     pauselessDedupTableConfigWithDisasterRecovery.getIngestionConfig().getStreamIngestionConfig()
+        .setDisasterRecoveryMode(DisasterRecoveryMode.ALWAYS);
+    TableConfig pauselessPartialUpsertTableConfigWithDisasterRecovery =
+        createPauselessTableConfig(null, new UpsertConfig(UpsertConfig.Mode.PARTIAL));
+    pauselessPartialUpsertTableConfigWithDisasterRecovery.getIngestionConfig().getStreamIngestionConfig()
         .setDisasterRecoveryMode(DisasterRecoveryMode.ALWAYS);
     TableConfig nonPauselessDedupTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
         .setNumReplicas(2)
@@ -3116,6 +3122,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
         {createPauselessTableConfig(null, new UpsertConfig(UpsertConfig.Mode.PARTIAL)), true},
         // Opted in for the table
         {pauselessDedupTableConfigWithDisasterRecovery, false},
+        {pauselessPartialUpsertTableConfigWithDisasterRecovery, false},
         // Not gated
         {createPauselessTableConfig(null, new UpsertConfig(UpsertConfig.Mode.FULL)), false},
         {nonPauselessDedupTableConfig, false}
@@ -3138,6 +3145,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
         0, Status.DONE, SegmentStateModel.ONLINE, SegmentStateModel.ERROR);
     String doneAllErrorSegment = addSegmentForErrorRepair(mockHelixResourceManager, idealState, externalView, 2, 0,
         Status.DONE, SegmentStateModel.ERROR, SegmentStateModel.ERROR);
+    String uploadedPartialErrorSegment = addSegmentForErrorRepair(mockHelixResourceManager, idealState, externalView,
+        3, 0, Status.UPLOADED, SegmentStateModel.ONLINE, SegmentStateModel.ERROR);
     segmentManager._idealState = idealState;
     when(mockHelixResourceManager.getTableExternalView(REALTIME_TABLE_NAME)).thenReturn(externalView);
 
@@ -3145,7 +3154,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     // Only the ERROR replicas are reset, so they reload from the ONLINE replica or the deep store
     verify(mockHelixResourceManager).resetErrorReplicas(REALTIME_TABLE_NAME,
-        Set.of(committingPartialErrorSegment, donePartialErrorSegment, doneAllErrorSegment));
+        Set.of(committingPartialErrorSegment, donePartialErrorSegment, doneAllErrorSegment,
+            uploadedPartialErrorSegment));
     verify(mockHelixResourceManager, never()).resetSegment(any(), any(), any());
     if (PauselessConsumptionUtils.isPauselessEnabled(tableConfig)) {
       verify(mockControllerMetrics).setOrUpdateTableGauge(REALTIME_TABLE_NAME,
