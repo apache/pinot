@@ -137,11 +137,6 @@ public class NoClosePinotFS implements PinotFS {
   }
 
   @Override
-  public int compareLastModifiedTimes(long leftTimestampMs, long rightTimestampMs) {
-    return _delegate.compareLastModifiedTimes(leftTimestampMs, rightTimestampMs);
-  }
-
-  @Override
   public boolean touch(URI uri)
       throws IOException {
     return _delegate.touch(uri);

@@ -259,18 +259,18 @@ public class S3PinotFSPaginatedListTest {
     when(_mockS3Client.headObject(any(HeadObjectRequest.class)))
         .thenReturn(HeadObjectResponse.builder().lastModified(headMtime).build());
 
-    final List<FileMetadata> result = _s3PinotFS.listFilesWithMetadata(
-        URI.create("s3://bucket/data/"), true, ACCEPT_ALL, 10);
+    final URI directory = URI.create("s3://bucket/data/");
+    final List<FileMetadata> result = _s3PinotFS.listFilesWithMetadata(directory, true, ACCEPT_ALL, 10);
 
     assertEquals(result.size(), 1);
     final FileMetadata fm = result.get(0);
     assertEquals(fm.getFilePath(), "s3://bucket/data/file.parquet");
     assertEquals(fm.getLength(), 4096L);
-    assertEquals(fm.getLastModifiedTime(), listedMtime.toEpochMilli());
     assertEquals(fm.isDirectory(), false);
     final long observedMtime = _s3PinotFS.lastModified(URI.create(fm.getFilePath()));
-    assertEquals(_s3PinotFS.compareLastModifiedTimes(fm.getLastModifiedTime(), observedMtime), 0);
-    assertTrue(_s3PinotFS.compareLastModifiedTimes(fm.getLastModifiedTime(), observedMtime + 1_000) < 0);
+    assertEquals(observedMtime, headMtime.toEpochMilli());
+    assertEquals(fm.getLastModifiedTime(), observedMtime);
+    assertEquals(_s3PinotFS.listFilesWithMetadata(directory, true).get(0).getLastModifiedTime(), observedMtime);
   }
 
   @Test
