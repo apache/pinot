@@ -229,18 +229,6 @@ public interface PinotFS extends Closeable, Serializable {
   long lastModified(URI uri)
       throws IOException;
 
-  /// Compares modification timestamps returned by file listings or [#lastModified(URI)] without performing I/O.
-  /// Filesystems whose APIs report different precision can override this to compare at their common precision.
-  /// The default compares the millisecond values directly.
-  ///
-  /// @param leftTimestampMs first timestamp in milliseconds since the Unix epoch
-  /// @param rightTimestampMs second timestamp in milliseconds since the Unix epoch
-  /// @return a negative integer, zero, or a positive integer if the first timestamp is older than, equal to, or
-  /// newer than the second at the filesystem's comparison precision
-  default int compareLastModifiedTimes(long leftTimestampMs, long rightTimestampMs) {
-    return Long.compare(leftTimestampMs, rightTimestampMs);
-  }
-
   /// Updates the last modified time of an existing file or directory to be current time. If the file system object
   /// does not exist, creates an empty file.
   /// @param uri location of file or directory
