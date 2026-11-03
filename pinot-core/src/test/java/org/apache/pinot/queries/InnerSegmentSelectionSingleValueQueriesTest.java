@@ -28,6 +28,8 @@ import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.operator.query.EmptySelectionOperator;
+import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
+import org.apache.pinot.core.operator.query.SelectionOrderByOperator;
 import org.apache.pinot.core.operator.query.SelectionPartiallyOrderedByDescOperation;
 import org.apache.pinot.core.operator.query.SelectionPartiallyOrderedByLinearOperator;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
@@ -56,27 +58,27 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     for (String orderBy : List.of("2 DESC", "2 ASC", "2", "now() DESC", "'a' DESC, 'b' ASC")) {
       String query = options + "SELECT column1, now() AS t FROM testTable ORDER BY " + orderBy + " LIMIT 5 OFFSET 3";
       BaseOperator<SelectionResultsBlock> operator = getOperator(query);
-      assertTrue(operator instanceof SelectionPartiallyOrderedByLinearOperator, query);
-      assertEquals(operator.nextBlock().getRows().size(), 8, query);
-      assertEquals(operator.getExecutionStatistics().getNumDocsScanned(), 8L, query);
+      assertTrue(operator instanceof SelectionOnlyOperator, query);
+      assertEquals(operator.nextBlock().getRows().size(), 5, query);
+      assertEquals(operator.getExecutionStatistics().getNumDocsScanned(), 5L, query);
       BrokerResponseNative response = getBrokerResponse(query);
       assertTrue(response.getExceptions().isEmpty(), query);
       assertEquals(response.getResultTable().getRows().size(), 5, query);
       assertEquals(response.getResultTable().getDataSchema().getColumnNames(), new String[]{"column1", "t"});
     }
 
-    // Exercise the path where every projected expression is also an order-by expression.
+    // A literal referenced by a select-list ordinal is also removed from ORDER BY.
     BaseOperator<SelectionResultsBlock> operator =
         getOperator(options + "SELECT now() AS t FROM testTable ORDER BY 1 DESC LIMIT 5 OFFSET 3");
-    assertTrue(operator instanceof SelectionPartiallyOrderedByLinearOperator);
-    assertEquals(operator.nextBlock().getRows().size(), 8);
-    assertEquals(operator.getExecutionStatistics().getNumDocsScanned(), 8L);
+    assertTrue(operator instanceof SelectionOnlyOperator);
+    assertEquals(operator.nextBlock().getRows().size(), 5);
+    assertEquals(operator.getExecutionStatistics().getNumDocsScanned(), 5L);
 
-    // The broker sees four copies of the 30,000-row segment and must still apply the offset to tied rows.
+    // With no remaining sort keys, preserve selection-only semantics: OFFSET is ignored.
     BrokerResponseNative response = getBrokerResponse(options
         + "SELECT 'constant' AS value FROM testTable ORDER BY 1 DESC LIMIT 10 OFFSET 119997");
     assertTrue(response.getExceptions().isEmpty());
-    assertEquals(response.getResultTable().getRows().size(), 3);
+    assertEquals(response.getResultTable().getRows().size(), 10);
     for (Object[] row : response.getResultTable().getRows()) {
       assertEquals(row, new Object[]{"constant"});
     }
@@ -125,7 +127,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
       String query = options + "SELECT column1, column6 FROM testTable ORDER BY 'constant' ASC, " + suffix
           + " LIMIT 5 OFFSET 3";
       BaseOperator<SelectionResultsBlock> operator = getOperator(query);
-      assertTrue(operator instanceof SelectionPartiallyOrderedByLinearOperator, query);
+      assertTrue(operator instanceof SelectionOrderByOperator, query);
       assertEquals(operator.nextBlock().getRows().size(), 8, query);
       assertEquals(operator.getExecutionStatistics().getNumDocsScanned(), 30000L, query);
       BrokerResponseNative response = getBrokerResponse(query);

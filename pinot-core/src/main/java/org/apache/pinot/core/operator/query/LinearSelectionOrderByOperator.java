@@ -63,7 +63,6 @@ import org.roaringbitmap.RoaringBitmap;
 
 /// A selection Operator used when the first expressions in the order by are identifier expressions of columns that are
 /// already sorted (either ascendingly or descendingly), even if the tail of order by expressions are not sorted.
-/// Literal expressions in the prefix impose no ordering constraint, and a literal-only prefix accepts any input order.
 ///
 /// ie: SELECT ... FROM Table WHERE predicates ORDER BY sorted_column DESC LIMIT 10 OFFSET 5
 /// or: SELECT ... FROM Table WHERE predicates ORDER BY sorted_column, not_sorted LIMIT 10 OFFSET 5

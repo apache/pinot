@@ -25,12 +25,10 @@ import java.util.List;
 import java.util.function.IntFunction;
 import java.util.function.Supplier;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.query.QueryScanCostContext;
 
@@ -48,10 +46,12 @@ public class SelectionPartiallyOrderedByDescOperation extends LinearSelectionOrd
       List<ExpressionContext> expressions, BaseProjectOperator<?> projectOperator, int numSortedExpressions) {
     super(indexSegment, queryContext, expressions, projectOperator, numSortedExpressions);
     assert queryContext.getOrderByExpressions() != null;
-    OrderByExpressionContext firstSortedExpression = SelectionOperatorUtils.getFirstNonLiteralOrderByExpression(
-        queryContext.getOrderByExpressions(), numSortedExpressions);
-    Preconditions.checkArgument(firstSortedExpression == null || !firstSortedExpression.isAsc(),
-        "%s can only be used when the first non-literal expression in the sorted prefix is DESC", EXPLAIN_NAME);
+    Preconditions.checkArgument(!queryContext.getOrderByExpressions().stream()
+            .filter(expr -> expr.getExpression().getType() == ExpressionContext.Type.IDENTIFIER)
+            .findFirst()
+            .orElseThrow(() -> new IllegalArgumentException("The query is not order by identifiers"))
+            .isAsc(),
+        "%s can only be used when the first column in order by is DESC", EXPLAIN_NAME);
   }
 
   @Override

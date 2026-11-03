@@ -19,7 +19,6 @@
 package org.apache.pinot.core.plan;
 
 import java.util.List;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
@@ -88,15 +87,12 @@ public class SelectionPlanNode implements PlanNode {
         maxDocsPerCall = Math.min(limit + _queryContext.getOffset(), DocIdSetPlanNode.MAX_DOC_PER_CALL);
       }
 
-      OrderByExpressionContext firstSortedExpression =
-          SelectionOperatorUtils.getFirstNonLiteralOrderByExpression(orderByExpressions, sortedColumnsPrefixSize);
-      DocIdOrderedOperator.DocIdOrder queryOrder = firstSortedExpression != null
-          ? DocIdOrderedOperator.DocIdOrder.fromAsc(firstSortedExpression.isAsc())
-          : null;
-      BaseProjectOperator<?> projectOperator = getSortedByProject(expressionsToProject, maxDocsPerCall, queryOrder);
-      // A literal-only prefix accepts any input order. Keep the ordered-result path so the broker applies OFFSET.
-      // Empty operators support both directions, so check compatibility with the query order otherwise.
-      if (queryOrder == null || projectOperator.isCompatibleWith(queryOrder)) {
+      BaseProjectOperator<?> projectOperator =
+          getSortedByProject(expressionsToProject, maxDocsPerCall, orderByExpressions);
+      // Empty operators support both directions, so check compatibility with the query order.
+      DocIdOrderedOperator.DocIdOrder queryOrder =
+          DocIdOrderedOperator.DocIdOrder.fromAsc(orderByExpressions.get(0).isAsc());
+      if (projectOperator.isCompatibleWith(queryOrder)) {
         return new SelectionPartiallyOrderedByLinearOperator(_indexSegment, _queryContext, expressions, projectOperator,
             sortedColumnsPrefixSize);
       } else {
@@ -110,11 +106,12 @@ public class SelectionPlanNode implements PlanNode {
   }
 
   private BaseProjectOperator<?> getSortedByProject(List<ExpressionContext> expressions, int maxDocsPerCall,
-      @Nullable DocIdOrderedOperator.DocIdOrder queryOrder) {
+      List<OrderByExpressionContext> orderByExpressions) {
     BaseProjectOperator<?> projectOperator =
         new ProjectPlanNode(_segmentContext, _queryContext, expressions, maxDocsPerCall).run();
 
-    if (queryOrder == DocIdOrderedOperator.DocIdOrder.DESC
+    boolean asc = orderByExpressions.get(0).isAsc();
+    if (!asc
         && QueryOptionsUtils.isReverseOrderAllowed(_queryContext.getQueryOptions())
         && !projectOperator.isCompatibleWith(DocIdOrderedOperator.DocIdOrder.DESC)) {
       try {
@@ -143,12 +140,7 @@ public class SelectionPlanNode implements PlanNode {
   /// @return the max number that guarantees that from the first expression to the returned number, the index is already
   /// sorted.
   private int getSortedColumnsPrefix(List<OrderByExpressionContext> orderByExpressions, boolean isNullHandlingEnabled) {
-    OrderByExpressionContext firstNonLiteralExpression =
-        SelectionOperatorUtils.getFirstNonLiteralOrderByExpression(orderByExpressions, orderByExpressions.size());
-    if (firstNonLiteralExpression == null) {
-      return orderByExpressions.size();
-    }
-    boolean asc = firstNonLiteralExpression.isAsc();
+    boolean asc = orderByExpressions.get(0).isAsc();
     for (int i = 0; i < orderByExpressions.size(); i++) {
       if (!isSorted(orderByExpressions.get(i), asc, isNullHandlingEnabled)) {
         return i;
