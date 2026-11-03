@@ -29,6 +29,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.ExternalView;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.MetricValueUtils;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
@@ -170,15 +171,18 @@ public class PauselessDedupErrorReplicaRepairTest extends BaseClusterIntegration
     _realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
     TestUtils.waitForCondition(aVoid -> {
       Map<String, Set<String>> errorReplicas = getErrorReplicas();
-      if (errorReplicas.size() < NUM_PARTITIONS) {
-        return false;
-      }
       Map<String, Map<String, String>> idealStateMaps =
           _helixResourceManager.getTableIdealState(_realtimeTableName).getRecord().getMapFields();
+      Set<Integer> partitionIds = new HashSet<>();
       for (String segmentName : errorReplicas.keySet()) {
-        if (idealStateMaps.get(segmentName).containsValue(SegmentStateModel.CONSUMING)) {
+        Map<String, String> idealStateMap = idealStateMaps.get(segmentName);
+        if (idealStateMap == null || idealStateMap.containsValue(SegmentStateModel.CONSUMING)) {
           return false;
         }
+        partitionIds.add(new LLCSegmentName(segmentName).getPartitionGroupId());
+      }
+      if (partitionIds.size() < NUM_PARTITIONS) {
+        return false;
       }
       _errorReplicas = errorReplicas;
       return true;

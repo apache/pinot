@@ -76,6 +76,7 @@ import org.apache.pinot.common.restlet.resources.PauseStatusDetails;
 import org.apache.pinot.common.restlet.resources.TableLLCSegmentUploadResponse;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
@@ -3091,11 +3092,12 @@ public class PinotLLCRealtimeSegmentManagerTest {
     verify(mockHelixResourceManager, never()).resetSegment(any(), any(), any());
     verify(mockHelixResourceManager, never()).getDataInstanceAdminEndpoints(any());
     // The error count keeps counting segments with every replica in ERROR. Every segment left unrepaired is
-    // unrecoverable, except the IN_PROGRESS segment with a healthy replica, which waits for its commit.
+    // unrecoverable, including the IN_PROGRESS segment with a healthy replica, whose ERROR replica its commit will not
+    // let a reset repair either.
     verify(mockControllerMetrics).setOrUpdateTableGauge(REALTIME_TABLE_NAME,
         ControllerGauge.PAUSELESS_SEGMENTS_IN_ERROR_COUNT, 3L);
     verify(mockControllerMetrics).setOrUpdateTableGauge(REALTIME_TABLE_NAME,
-        ControllerGauge.PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT, 5L);
+        ControllerGauge.PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT, 6L);
   }
 
   @DataProvider
@@ -3134,6 +3136,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
         externalView, 0, 0, Status.COMMITTING, SegmentStateModel.ONLINE, SegmentStateModel.ERROR);
     String donePartialErrorSegment = addSegmentForErrorRepair(mockHelixResourceManager, idealState, externalView, 1,
         0, Status.DONE, SegmentStateModel.ONLINE, SegmentStateModel.ERROR);
+    String doneAllErrorSegment = addSegmentForErrorRepair(mockHelixResourceManager, idealState, externalView, 2, 0,
+        Status.DONE, SegmentStateModel.ERROR, SegmentStateModel.ERROR);
     segmentManager._idealState = idealState;
     when(mockHelixResourceManager.getTableExternalView(REALTIME_TABLE_NAME)).thenReturn(externalView);
 
@@ -3141,8 +3145,12 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     // Only the ERROR replicas are reset, so they reload from the ONLINE replica or the deep store
     verify(mockHelixResourceManager).resetErrorReplicas(REALTIME_TABLE_NAME,
-        Set.of(committingPartialErrorSegment, donePartialErrorSegment));
+        Set.of(committingPartialErrorSegment, donePartialErrorSegment, doneAllErrorSegment));
     verify(mockHelixResourceManager, never()).resetSegment(any(), any(), any());
+    if (PauselessConsumptionUtils.isPauselessEnabled(tableConfig)) {
+      verify(mockControllerMetrics).setOrUpdateTableGauge(REALTIME_TABLE_NAME,
+          ControllerGauge.PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT, 0L);
+    }
   }
 
   @Test
