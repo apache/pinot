@@ -25,6 +25,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
@@ -101,6 +102,7 @@ import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.stream.LongMsgOffset;
@@ -136,6 +138,7 @@ import static org.apache.pinot.controller.ControllerConf.ControllerPeriodicTasks
 import static org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager.COMMITTING_SEGMENTS;
 import static org.apache.pinot.spi.utils.CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.testng.Assert.*;
 
@@ -1626,6 +1629,69 @@ public class PinotLLCRealtimeSegmentManagerTest {
       FileUtils.deleteQuietly(segmentFile);
       FileUtils.deleteQuietly(previousSidecar);
     }
+  }
+
+  @Test
+  public void testMoveSegmentFileFailsWhenSidecarExistsCheckThrows()
+      throws Exception {
+    PinotFS pinotFS = mock(PinotFS.class);
+    when(pinotFS.exists(any(URI.class))).thenThrow(new IOException("exists failed"));
+    ControllerMetrics controllerMetrics = mock(ControllerMetrics.class);
+    FakePinotLLCRealtimeSegmentManager segmentManager =
+        new FakePinotLLCRealtimeSegmentManager(mock(PinotHelixResourceManager.class), controllerMetrics);
+    String segmentName = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+
+    IOException e = Assert.expectThrows(IOException.class,
+        () -> segmentManager.moveSegmentFile(RAW_TABLE_NAME, segmentName, SCHEME + "/tmp/tmpSegment", pinotFS));
+
+    // The segment file must not be replaced while the previous sidecar could not be ruled out.
+    verify(pinotFS, never()).move(any(URI.class), any(URI.class), anyBoolean());
+    assertTrue(e.getMessage().contains(segmentName));
+    assertEquals(e.getCause().getMessage(), "exists failed");
+    verify(controllerMetrics).addMeteredTableValue(REALTIME_TABLE_NAME,
+        ControllerMeter.REALTIME_METADATA_TAR_INVALIDATE_FAILURE, 1L);
+  }
+
+  @Test
+  public void testMoveSegmentFileFailsWhenSidecarDeleteReturnsFalse()
+      throws Exception {
+    PinotFS pinotFS = mock(PinotFS.class);
+    when(pinotFS.exists(any(URI.class))).thenReturn(true);
+    when(pinotFS.delete(any(URI.class), anyBoolean())).thenReturn(false);
+    ControllerMetrics controllerMetrics = mock(ControllerMetrics.class);
+    FakePinotLLCRealtimeSegmentManager segmentManager =
+        new FakePinotLLCRealtimeSegmentManager(mock(PinotHelixResourceManager.class), controllerMetrics);
+    String segmentName = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+
+    IOException e = Assert.expectThrows(IOException.class,
+        () -> segmentManager.moveSegmentFile(RAW_TABLE_NAME, segmentName, SCHEME + "/tmp/tmpSegment", pinotFS));
+
+    verify(pinotFS, never()).move(any(URI.class), any(URI.class), anyBoolean());
+    verify(pinotFS).delete(any(URI.class), eq(true));
+    assertTrue(e.getMessage().contains(segmentName));
+    verify(controllerMetrics).addMeteredTableValue(REALTIME_TABLE_NAME,
+        ControllerMeter.REALTIME_METADATA_TAR_INVALIDATE_FAILURE, 1L);
+  }
+
+  @Test
+  public void testMoveSegmentFileFailsWhenSidecarDeleteThrows()
+      throws Exception {
+    PinotFS pinotFS = mock(PinotFS.class);
+    when(pinotFS.exists(any(URI.class))).thenReturn(true);
+    when(pinotFS.delete(any(URI.class), anyBoolean())).thenThrow(new IOException("delete failed"));
+    ControllerMetrics controllerMetrics = mock(ControllerMetrics.class);
+    FakePinotLLCRealtimeSegmentManager segmentManager =
+        new FakePinotLLCRealtimeSegmentManager(mock(PinotHelixResourceManager.class), controllerMetrics);
+    String segmentName = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+
+    IOException e = Assert.expectThrows(IOException.class,
+        () -> segmentManager.moveSegmentFile(RAW_TABLE_NAME, segmentName, SCHEME + "/tmp/tmpSegment", pinotFS));
+
+    verify(pinotFS, never()).move(any(URI.class), any(URI.class), anyBoolean());
+    assertTrue(e.getMessage().contains(segmentName));
+    assertEquals(e.getCause().getMessage(), "delete failed");
+    verify(controllerMetrics).addMeteredTableValue(REALTIME_TABLE_NAME,
+        ControllerMeter.REALTIME_METADATA_TAR_INVALIDATE_FAILURE, 1L);
   }
 
   @Test

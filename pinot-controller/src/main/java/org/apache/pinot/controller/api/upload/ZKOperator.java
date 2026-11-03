@@ -41,13 +41,16 @@ import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.FileUploadDownloadClient.FileUploadType;
+import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.api.resources.ResourceUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -344,6 +347,7 @@ public class ZKOperator {
             "New segment crc {} is different than the existing segment crc {}. Updating ZK metadata and refreshing "
                 + "segment {}", newCrc, existingCrc, segmentName);
         if (finalSegmentLocationURI != null) {
+          invalidateStaleMetadataTar(segmentName, uploadType, sourceDownloadURIStr, finalSegmentLocationURI);
           copySegmentToDeepStore(tableNameWithType, segmentName, uploadType, segmentFile, sourceDownloadURIStr,
               finalSegmentLocationURI);
         }
@@ -676,6 +680,24 @@ public class ZKOperator {
       Preconditions.checkState(sourceDownloadURI.getScheme().equals(finalSegmentLocationURI.getScheme()));
       LOGGER.info("Copying segment from: {} to: {}", sourceDownloadURI, finalSegmentLocationURI);
       PinotFSFactory.create(finalSegmentLocationURI.getScheme()).copy(sourceDownloadURI, finalSegmentLocationURI);
+    }
+  }
+
+  /// A refresh replaces the full segment, so a sidecar left by the previous build would describe the wrong bytes (a
+  /// metadata push trusts an existing sidecar). Not needed when a METADATA push already points at the final location:
+  /// nothing is copied and the sidecar there belongs to that push. Failing to invalidate fails the refresh.
+  private void invalidateStaleMetadataTar(String segmentName, FileUploadType uploadType, String sourceDownloadURIStr,
+      URI finalSegmentLocationURI)
+      throws Exception {
+    if (uploadType == FileUploadType.METADATA && new URI(sourceDownloadURIStr).equals(finalSegmentLocationURI)) {
+      return;
+    }
+    URI metadataTarURI = URIUtils.getUri(finalSegmentLocationURI + Constants.METADATA_TAR_GZ_FILE_EXT);
+    PinotFS pinotFS = PinotFSFactory.create(finalSegmentLocationURI.getScheme());
+    if (pinotFS.exists(metadataTarURI)) {
+      Preconditions.checkState(pinotFS.delete(metadataTarURI, true), "Failed to delete stale metadata tar: %s",
+          metadataTarURI);
+      LOGGER.info("Deleted stale metadata tar of refreshed segment: {} at: {}", segmentName, metadataTarURI);
     }
   }
 }

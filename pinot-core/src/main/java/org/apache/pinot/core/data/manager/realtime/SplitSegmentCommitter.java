@@ -29,10 +29,9 @@ import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.common.utils.TarCompressionUtils;
+import org.apache.pinot.segment.local.utils.SegmentPushUtils;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
-import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -134,7 +133,7 @@ public class SplitSegmentCommitter implements SegmentCommitter {
         CommonConstants.Segment.PEER_SEGMENT_DOWNLOAD_SCHEME.length());
   }
 
-  /// Best-effort: builds a tar containing one directory with metadata.properties and creation.meta, and uploads it
+  /// Best-effort: builds the metadata tar (one directory with metadata.properties and creation.meta) and uploads it
   /// under a tmp name next to the segment. Returns the tmp location for the controller to move at commit end, or
   /// null on any problem. Never fails or throws; a sidecar problem must not affect the segment commit.
   @Nullable
@@ -143,21 +142,13 @@ public class SplitSegmentCommitter implements SegmentCommitter {
       return null;
     }
     String rawTableName = null;
-    File stagingDir = null;
-    File metadataTarFile = null;
+    File outputDir = null;
     try {
       LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
       rawTableName = TableNameBuilder.extractRawTableName(llcSegmentName.getTableName());
-      stagingDir = new File(FileUtils.getTempDirectory(), segmentName + "_meta_" + UUID.randomUUID());
-      FileUtils.forceMkdir(stagingDir);
-      for (Map.Entry<String, File> entry : metadataFiles.entrySet()) {
-        // Byte-for-byte copy: creation.meta is binary.
-        FileUtils.copyFile(entry.getValue(), new File(stagingDir, entry.getKey()));
-      }
-      metadataTarFile = new File(FileUtils.getTempDirectory(),
-          segmentName + "_" + UUID.randomUUID() + Constants.METADATA_TAR_GZ_FILE_EXT);
-      // Tar the DIRECTORY so that the first archive entry is a directory, as DefaultMetadataExtractor expects.
-      TarCompressionUtils.createCompressedTarFile(stagingDir, metadataTarFile);
+      outputDir = new File(FileUtils.getTempDirectory(), segmentName + "_meta_" + UUID.randomUUID());
+      FileUtils.forceMkdir(outputDir);
+      File metadataTarFile = SegmentPushUtils.generateSegmentMetadataFile(metadataFiles, outputDir, segmentName);
       URI metadataTarLocation = _segmentUploader.uploadMetadataTar(metadataTarFile, llcSegmentName,
           _metadataTarUploadTimeoutMs);
       return metadataTarLocation == null ? null : metadataTarLocation.toString();
@@ -168,11 +159,10 @@ public class SplitSegmentCommitter implements SegmentCommitter {
       }
       return null;
     } finally {
-      // After an upload timeout the copy may still be reading metadataTarFile on the uploader's thread. Deleting it is
-      // still safe: only the tmp object can end up partial, and the controller moves it only when a location was
-      // returned, which a timed-out upload never does.
-      FileUtils.deleteQuietly(stagingDir);
-      FileUtils.deleteQuietly(metadataTarFile);
+      // After an upload timeout the copy may still be reading the tar on the uploader's thread. Deleting it is still
+      // safe: only the tmp object can end up partial, and the controller moves it only when a location was returned,
+      // which a timed-out upload never does.
+      FileUtils.deleteQuietly(outputDir);
     }
   }
 }

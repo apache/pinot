@@ -652,20 +652,24 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
         1L);
   }
 
-  /// Best effort, like [#moveMetadataTarFile]: a failure is logged and counted, and never fails the commit.
-  private void deleteMetadataTarFile(String rawTableName, String segmentName, PinotFS pinotFS) {
+  /// Drops the sidecar of a segment that is about to be replaced, so a sidecar only ever describes the segment file
+  /// next to it. Unlike sidecar publication this is not best effort: if the previous sidecar cannot be ruled out, the
+  /// replace fails and is retried.
+  private void deleteMetadataTarFile(String rawTableName, String segmentName, PinotFS pinotFS)
+      throws IOException {
     URI metadataTarUri = createSegmentPath(rawTableName, segmentName + METADATA_TAR_GZ_FILE_EXT);
     try {
-      if (!pinotFS.exists(metadataTarUri) || pinotFS.delete(metadataTarUri, true)) {
-        return;
+      if (pinotFS.exists(metadataTarUri) && !pinotFS.delete(metadataTarUri, true)) {
+        throw new IOException("Failed to delete previous metadata tar of segment: " + segmentName + " at: "
+            + metadataTarUri);
       }
-      LOGGER.warn("Failed to delete previous metadata tar of segment: {} at: {}", segmentName, metadataTarUri);
     } catch (Exception e) {
-      LOGGER.warn("Caught exception while deleting previous metadata tar of segment: {} at: {}", segmentName,
-          metadataTarUri, e);
+      LOGGER.warn("Cannot invalidate previous metadata tar of segment: {} at: {}", segmentName, metadataTarUri, e);
+      _controllerMetrics.addMeteredTableValue(TableNameBuilder.REALTIME.tableNameWithType(rawTableName),
+          ControllerMeter.REALTIME_METADATA_TAR_INVALIDATE_FAILURE, 1L);
+      throw new IOException("Failed to invalidate previous metadata tar of segment: " + segmentName + " at: "
+          + metadataTarUri, e);
     }
-    _controllerMetrics.addMeteredTableValue(TableNameBuilder.REALTIME.tableNameWithType(rawTableName),
-        ControllerMeter.REALTIME_METADATA_TAR_MOVE_FAILURE, 1L);
   }
 
   /// This method is invoked after the realtime segment is uploaded but before a response is sent to the server.

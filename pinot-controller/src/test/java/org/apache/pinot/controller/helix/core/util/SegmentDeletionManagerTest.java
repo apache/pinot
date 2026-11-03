@@ -634,16 +634,41 @@ public class SegmentDeletionManagerTest {
 
     Assert.assertEquals(tableDir.list().length, 0);
     List<String> names = sortedNames(deletedTableDir);
-    // sorted: "metadata" < "seg1__..."
+    // sorted: "seg1__..." < "~metadata"
     Assert.assertEquals(names.size(), 2);
-    Assert.assertEquals(names.get(0), SegmentDeletionManager.DELETED_SEGMENT_METADATA_DIR);
-    String segment = names.get(1);
+    String segment = names.get(0);
+    Assert.assertEquals(names.get(1), SegmentDeletionManager.DELETED_SEGMENT_METADATA_DIR);
     Assert.assertTrue(segment.startsWith("seg1" + RETENTION_UNTIL_SEPARATOR), segment);
     Assert.assertEquals(StringUtils.substringAfter(segment, RETENTION_UNTIL_SEPARATOR).length(),
         RETENTION_DATE_FORMAT_STR.length());
     // Same name, so the sidecar carries the segment's retention suffix and expires at the same time.
     Assert.assertEquals(
         sortedNames(new File(deletedTableDir, SegmentDeletionManager.DELETED_SEGMENT_METADATA_DIR)), List.of(segment));
+  }
+
+  @Test
+  public void testSegmentNamedMetadataNeverClobbersRetainedSidecars()
+      throws Exception {
+    for (boolean sidecarFirst : new boolean[]{true, false}) {
+      File dataDir = Files.createTempDirectory("pinot-test-").toFile();
+      dataDir.deleteOnExit();
+      SegmentDeletionManager manager = newManagerWithLocalFs(dataDir, true);
+      createLiveSegment(dataDir, "foo", true, true);
+      createLiveSegment(dataDir, "metadata", true, false);
+      File deletedTableDir = new File(dataDir, SegmentDeletionManager.DELETED_SEGMENTS + File.separator + TABLE_NAME);
+      // Null retention archives a segment without a suffix, i.e. to exactly its own name.
+      String first = sidecarFirst ? "foo" : "metadata";
+      String second = sidecarFirst ? "metadata" : "foo";
+
+      manager.removeSegmentsFromStoreInBatch(TABLE_NAME, Collections.singletonList(first), null);
+      manager.removeSegmentsFromStoreInBatch(TABLE_NAME, Collections.singletonList(second), null);
+
+      File sidecarDir = new File(deletedTableDir, SegmentDeletionManager.DELETED_SEGMENT_METADATA_DIR);
+      Assert.assertTrue(sidecarDir.isDirectory(), "sidecar dir lost, sidecarFirst=" + sidecarFirst);
+      Assert.assertEquals(sortedNames(sidecarDir), List.of("foo"));
+      Assert.assertTrue(new File(deletedTableDir, "metadata").isFile(), "archived segment 'metadata' lost");
+      Assert.assertTrue(new File(deletedTableDir, "foo").isFile(), "archived segment 'foo' lost");
+    }
   }
 
   @Test
@@ -691,7 +716,7 @@ public class SegmentDeletionManagerTest {
 
     Assert.assertEquals(tableDir.list().length, 0);
     Assert.assertEquals(sortedNames(deletedTableDir),
-        Arrays.asList(SegmentDeletionManager.DELETED_SEGMENT_METADATA_DIR, "seg1"));
+        Arrays.asList("seg1", SegmentDeletionManager.DELETED_SEGMENT_METADATA_DIR));
     File metadataDir = new File(deletedTableDir, SegmentDeletionManager.DELETED_SEGMENT_METADATA_DIR);
     Assert.assertEquals(sortedNames(metadataDir), List.of("seg1"));
     // Files were created 30 days old; touch() must have refreshed them so the default retention applies from now.
@@ -778,7 +803,7 @@ public class SegmentDeletionManagerTest {
     manager.removeAgedDeletedSegments(leadControllerManager);
 
     TestUtils.waitForCondition(aVoid -> sortedNames(metadataDir).equals(List.of(retained))
-            && sortedNames(tableDir).equals(List.of(SegmentDeletionManager.DELETED_SEGMENT_METADATA_DIR, retained)),
+            && sortedNames(tableDir).equals(List.of(retained, SegmentDeletionManager.DELETED_SEGMENT_METADATA_DIR)),
         100L, 10_000L, "Unable to verify aged segment and sidecar expiry");
   }
 
@@ -824,11 +849,11 @@ public class SegmentDeletionManagerTest {
     LeadControllerManager leadControllerManager = mock(LeadControllerManager.class);
     when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
     File deletedDir = new File(dataDir, SegmentDeletionManager.DELETED_SEGMENTS);
-    // A segment named "metadata" deleted with null retention is archived without a suffix, i.e. as a plain file at the
-    // metadata directory's path. 30 days old, so it is expired under the 7 day default retention.
+    // A segment named metadata is an ordinary archived file. 30 days old, so it is expired under the 7 day default
+    // retention.
     File tableA = new File(deletedDir, "tableA");
     tableA.mkdirs();
-    File segmentNamedMetadata = new File(tableA, SegmentDeletionManager.DELETED_SEGMENT_METADATA_DIR);
+    File segmentNamedMetadata = new File(tableA, "metadata");
     createTestFileWithAge(segmentNamedMetadata.getAbsolutePath(), 30);
     File tableB = new File(deletedDir, "tableB");
     tableB.mkdirs();

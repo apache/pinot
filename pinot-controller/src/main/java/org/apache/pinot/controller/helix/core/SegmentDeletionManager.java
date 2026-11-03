@@ -79,7 +79,8 @@ public class SegmentDeletionManager {
   public static final String DELETED_SEGMENTS = "Deleted_Segments";
   private static final String RETENTION_UNTIL_SEPARATOR = "__RETENTION_UNTIL__";
   // Subdirectory of Deleted_Segments/<table>/ holding retained metadata sidecars, named like the archived segment.
-  public static final String DELETED_SEGMENT_METADATA_DIR = "metadata";
+  // '~' is never produced by URIUtils.encode (URLEncoder), so no archived segment name can equal this directory name.
+  public static final String DELETED_SEGMENT_METADATA_DIR = "~metadata";
   // DateTimeFormatter is immutable and thread-safe; this is shared by the deletion executor, table deletion and the
   // RetentionManager sweep.
   private static final DateTimeFormatter RETENTION_DATE_FORMAT =
@@ -391,8 +392,9 @@ public class SegmentDeletionManager {
   private void moveSegmentMetadataToDeletedDir(PinotFS pinotFS, URI segmentFileUri, String segmentId,
       String rawTableName, String retentionSuffix) {
     // Retained sidecars live in their own subdirectory, so they can never take the archive name of a segment (e.g. the
-    // sidecar of "foo" vs. a segment named "foo.metadata"). The name matches the archived segment, so both carry the
-    // same retention suffix and expire at the same time.
+    // sidecar of "foo" vs. a segment named "foo.metadata"), and the directory name cannot be an encoded segment name
+    // (e.g. a segment named "metadata"). The name matches the archived segment, so both carry the same retention
+    // suffix and expire at the same time.
     try {
       URI segmentMetadataUri = SegmentPushUtils.generateSegmentMetadataURI(segmentFileUri.toString(), segmentId);
       if (!pinotFS.exists(segmentMetadataUri)) {
@@ -500,9 +502,8 @@ public class SegmentDeletionManager {
             // A failure on one table must not skip the tables after it.
             try {
               URI tableNameURI = URIUtils.getUri(deletedDirURI.toString(), URIUtils.encode(tableName));
-              // Sweep the retained metadata sidecars first. Both checks are needed: exists alone is true for a segment
-              // named "metadata" archived without a retention suffix (a file at that path, swept with the table
-              // directory), and isDirectory alone throws for a missing path on some file systems (e.g. ADLS Gen2).
+              // Sweep the retained metadata sidecars first. exists is checked before isDirectory because isDirectory
+              // throws for a missing path on some file systems (e.g. ADLS Gen2).
               URI metadataDirURI = URIUtils.getUri(tableNameURI.toString(), DELETED_SEGMENT_METADATA_DIR);
               boolean metadataDirExists = pinotFS.exists(metadataDirURI) && pinotFS.isDirectory(metadataDirURI);
               if (metadataDirExists) {

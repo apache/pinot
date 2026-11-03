@@ -93,6 +93,10 @@ public interface InstanceDataManagerConfig {
 
   boolean isDimensionTablePreloadDisabled();
 
+  /// Whether to upload a metadata tar sidecar with each committed REALTIME segment. Needs the direct server-to-store
+  /// uploader and non-pauseless consumption; controller-upload commits and pauseless consumption create no sidecars.
+  /// Keeping the sidecar after segment deletion is a controller setting (`controller.deleted.segments.preserveMetadata`
+  /// with positive retention).
   default boolean isUploadSegmentMetadataTarGz() {
     return false;
   }
