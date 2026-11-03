@@ -717,7 +717,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           }
           List<GenericRow> transformedRows = result.getTransformedRows();
           for (GenericRow transformedRow : transformedRows) {
-            int docsBeforeIndex = _realtimeSegment.getNumDocsIndexed();
             try {
               canTakeMore = _realtimeSegment.index(transformedRow, metadata);
               indexedMessageCount++;
@@ -742,7 +741,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
               _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
               // continueOnError=false finishes a started row, then rethrows. A published repair is consumed;
               // only an unpublished failure is a drop. An unrecoverable repair is terminal.
-              if (_realtimeSegment.getNumDocsIndexed() > docsBeforeIndex) {
+              if (_realtimeSegment.wasLastIndexingOperationPublished()) {
                 indexedMessageCount++;
                 _lastRowMetadata = metadata;
                 _lastConsumedTimestampMs = System.currentTimeMillis();
@@ -755,7 +754,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
                 _numBytesDropped += rowSizeInBytes;
               }
               canTakeMore = _realtimeSegment.canTakeMoreRows();
-              if (!canTakeMore) {
+              if (_realtimeSegment.hasUnrecoverableIndexingFailure()) {
                 throw new RuntimeException(errorMessage, e);
               }
             }

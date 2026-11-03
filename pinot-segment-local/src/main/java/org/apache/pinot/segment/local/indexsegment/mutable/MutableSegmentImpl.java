@@ -174,6 +174,7 @@ public class MutableSegmentImpl implements MutableSegment {
   /// Set when a started row cannot be completed or repaired. Further [#index] calls are rejected so the hole
   /// cannot be preserved by appending at the next document ID (issue #16316).
   private volatile boolean _unrecoverableIndexingFailure;
+  private boolean _lastIndexingOperationPublished;
   /// Test-only interceptor invoked immediately before each mutable-index write, including fallback writes.
   @Nullable
   IndexWriteInterceptor _indexWriteInterceptor;
@@ -654,6 +655,7 @@ public class MutableSegmentImpl implements MutableSegment {
   @Override
   public boolean index(GenericRow row, @Nullable StreamMessageMetadata metadata)
       throws IOException {
+    _lastIndexingOperationPublished = false;
     if (_unrecoverableIndexingFailure) {
       throw new IllegalStateException(
           "Mutable segment " + _segmentName + " is terminal after an unrecoverable indexing failure");
@@ -720,6 +722,7 @@ public class MutableSegmentImpl implements MutableSegment {
       numDocsIndexed++;
       canTakeMore = numDocsIndexed < _capacity;
       _numDocsIndexed = numDocsIndexed;
+      _lastIndexingOperationPublished = true;
       // Index the record and update _numDocsIndexed counter before updating the upsert metadata so that the record
       // becomes queryable before validDocIds bitmaps are updated. This order is important for consistent upsert view,
       // otherwise the latest doc can be missed by query due to 'docId < _numDocs' check in query filter operators.
@@ -736,14 +739,19 @@ public class MutableSegmentImpl implements MutableSegment {
     DedupRecordInfo pendingDedupRecordInfo = null;
     if (isDedupEnabled()) {
       DedupRecordInfo dedupRecordInfo = getDedupRecordInfo(row);
-      if (_partitionDedupMetadataManager.isRecordPresent(dedupRecordInfo)) {
+      boolean deferredPublication = _partitionDedupMetadataManager.supportsRecordPresenceCheck();
+      boolean duplicate = deferredPublication ? _partitionDedupMetadataManager.isRecordPresent(dedupRecordInfo)
+          : _partitionDedupMetadataManager.checkRecordPresentOrUpdate(dedupRecordInfo, this);
+      if (duplicate) {
         if (_serverMetrics != null) {
           _serverMetrics.addMeteredTableValue(_realtimeTableName, ServerMeter.REALTIME_DEDUP_DROPPED, 1);
         }
         updateIndexedAndIngestionTime(metadata);
         return canAddMore();
       }
-      pendingDedupRecordInfo = dedupRecordInfo;
+      if (deferredPublication) {
+        pendingDedupRecordInfo = dedupRecordInfo;
+      }
     }
 
     // Dictionary ids are prepared before the rollup key is computed and before any forward/secondary write.
@@ -758,7 +766,8 @@ public class MutableSegmentImpl implements MutableSegment {
     int docId = getOrCreateDocId();
 
     boolean canTakeMore;
-    if (docId == numDocsIndexed) {
+    boolean newDocument = docId == numDocsIndexed;
+    if (newDocument) {
       // New row: complete every column (or repair) before publishing _numDocsIndexed.
       boolean rowHadError = addNewRow(numDocsIndexed, row, state);
       if (dictHadError || rowHadError) {
@@ -774,6 +783,7 @@ public class MutableSegmentImpl implements MutableSegment {
       assert isAggregateMetricsEnabled();
       try {
         aggregateMetrics(row, docId);
+        _lastIndexingOperationPublished = true;
         if (dictHadError) {
           recordIncompleteRow();
         }
@@ -787,6 +797,9 @@ public class MutableSegmentImpl implements MutableSegment {
       canTakeMore = true;
     }
     _numDocsIndexed = numDocsIndexed;
+    if (newDocument) {
+      _lastIndexingOperationPublished = true;
+    }
     if (pendingDedupRecordInfo != null) {
       // Claim the key only after the doc is published so an unpublished failure cannot drop a later retry.
       // Consume is single-writer per partition; a lost race with another consuming segment is not rolled back.
@@ -898,12 +911,34 @@ public class MutableSegmentImpl implements MutableSegment {
     }
   }
 
+  /// Metadata was derived from these values before the physical write. Substitution would publish a row under
+  /// a different primary key, version, delete state, TTL, or partition, so these columns cannot be repaired.
+  private boolean isMetadataColumn(String column) {
+    return column.equals(_partitionColumn)
+        || (isUpsertEnabled() && (_upsertPrimaryKeyColumns.contains(column) || _upsertComparisonColumns.contains(column)
+        || column.equals(_deleteRecordColumn)))
+        || (isDedupEnabled() && (_dedupPrimaryKeyColumns.contains(column) || column.equals(_dedupTimeColumn)));
+  }
+
+  /// Aggregation keys have already been registered by the time forward indexes are written. Dictionary fallback
+  /// before key creation remains safe, but changing a registered key's physical value is terminal.
+  private boolean isRegisteredAggregationKeyColumn(IndexContainer indexContainer) {
+    FieldSpec.FieldType fieldType = indexContainer._fieldSpec.getFieldType();
+    return isAggregateMetricsEnabled() && (fieldType == FieldSpec.FieldType.DIMENSION
+        || fieldType == FieldSpec.FieldType.DATE_TIME || fieldType == FieldSpec.FieldType.TIME);
+  }
+
+  private static void updateDictionaryBounds(IndexContainer indexContainer) {
+    indexContainer._minValue = indexContainer._dictionary.getMinVal();
+    indexContainer._maxValue = indexContainer._dictionary.getMaxVal();
+  }
+
   /// Runs dictionary + forward/secondary indexing for a new docId and meters an incomplete row when either step had
   /// to fall back to defaults (issue #16316).
   private void indexPhysicalRow(int docId, GenericRow row) {
     RowWriteState state = _rowWriteState;
     boolean dictHadError = updateDictionary(row, state);
-    boolean rowHadError = addNewRow(docId, row, state);
+    boolean rowHadError = !state._repairFailed && addNewRow(docId, row, state);
     if (dictHadError || rowHadError) {
       recordIncompleteRow();
     }
@@ -932,6 +967,12 @@ public class MutableSegmentImpl implements MutableSegment {
           recordIndexingError("DICTIONARY");
           hadError = true;
           state.markIncomplete();
+          if (isMetadataColumn(column)) {
+            IllegalStateException error = new IllegalStateException("Missing value for metadata column: " + column);
+            state.noteError(error);
+            state.noteRepairFailure(error);
+            continue;
+          }
           value = getDefaultNullValueForIndexing(indexContainer._fieldSpec);
           row.putDefaultNullValue(column, value);
         }
@@ -940,14 +981,17 @@ public class MutableSegmentImpl implements MutableSegment {
         } else {
           indexContainer._dictIds = dictionary.index((Object[]) value);
         }
-        indexContainer._minValue = dictionary.getMinVal();
-        indexContainer._maxValue = dictionary.getMaxVal();
+        updateDictionaryBounds(indexContainer);
       } catch (Exception e) {
         recordOrDeferIndexingError("DICTIONARY", e);
         hadError = true;
         state.noteError(e);
         indexContainer._dictId = Integer.MIN_VALUE;
         indexContainer._dictIds = null;
+        if (isMetadataColumn(column)) {
+          state.noteRepairFailure(e);
+          continue;
+        }
         try {
           // Index the field default instead of leaving the sentinel: with metrics aggregation the rollup key is built
           // from the dict ids (see getOrCreateDocId), and Integer.MIN_VALUE is not a real dict id.
@@ -958,8 +1002,7 @@ public class MutableSegmentImpl implements MutableSegment {
             indexContainer._dictIds = dictionary.index((Object[]) defaultValue);
           }
           row.putDefaultNullValue(column, defaultValue);
-          indexContainer._minValue = dictionary.getMinVal();
-          indexContainer._maxValue = dictionary.getMaxVal();
+          updateDictionaryBounds(indexContainer);
         } catch (Exception fallbackError) {
           _logger.error("Failed to index default null value into dictionary for column: {}", column, fallbackError);
           state.noteRepairFailure(fallbackError);
@@ -1089,6 +1132,12 @@ public class MutableSegmentImpl implements MutableSegment {
     boolean defaultSubstituted = false;
     if (value == null) {
       recordIndexingError("NULL_VALUE");
+      if (isMetadataColumn(column)) {
+        IllegalStateException error = new IllegalStateException("Missing value for metadata column: " + column);
+        state.noteError(error);
+        state.noteRepairFailure(error);
+        return false;
+      }
       value = getDefaultNullValueForIndexing(fieldSpec);
       isNull = true;
       defaultSubstituted = true;
@@ -1105,6 +1154,7 @@ public class MutableSegmentImpl implements MutableSegment {
           Object defaultValue = getDefaultNullValueForIndexing(fieldSpec);
           dictId = indexContainer._dictionary.index(defaultValue);
           indexContainer._dictId = dictId;
+          updateDictionaryBounds(indexContainer);
           value = defaultValue;
           isNull = true;
           defaultSubstituted = true;
@@ -1129,6 +1179,7 @@ public class MutableSegmentImpl implements MutableSegment {
         Object[] defaultValues = (Object[]) getDefaultNullValueForIndexing(fieldSpec);
         dictIds = indexContainer._dictionary.index(defaultValues);
         indexContainer._dictIds = dictIds;
+        updateDictionaryBounds(indexContainer);
         values = defaultValues;
         isNull = true;
         defaultSubstituted = true;
@@ -1155,6 +1206,10 @@ public class MutableSegmentImpl implements MutableSegment {
       } catch (Exception e) {
         recordOrDeferIndexingError(StandardIndexes.openStruct(), e);
         state.noteError(e);
+        if (isMetadataColumn(column) || isRegisteredAggregationKeyColumn(indexContainer)) {
+          state.noteRepairFailure(e);
+          return false;
+        }
         try {
           Object defaultValue = getDefaultNullValueForIndexing(indexContainer._fieldSpec);
           maybeIntercept(column, StandardIndexes.openStruct(), defaultValue, docId);
@@ -1189,12 +1244,17 @@ public class MutableSegmentImpl implements MutableSegment {
         recordOrDeferIndexingError(StandardIndexes.forward(), e);
         state.noteError(e);
         hadError = true;
+        if (isMetadataColumn(column) || isRegisteredAggregationKeyColumn(indexContainer)) {
+          state.noteRepairFailure(e);
+          return true;
+        }
         try {
           Object defaultValue = getDefaultNullValueForIndexing(fieldSpec);
           int defaultDictId = dictId;
           if (indexContainer._dictionary != null) {
             defaultDictId = indexContainer._dictionary.index(defaultValue);
             indexContainer._dictId = defaultDictId;
+            updateDictionaryBounds(indexContainer);
           }
           value = defaultValue;
           dictId = defaultDictId;
@@ -1264,12 +1324,17 @@ public class MutableSegmentImpl implements MutableSegment {
         recordOrDeferIndexingError(StandardIndexes.forward(), e);
         state.noteError(e);
         hadError = true;
+        if (isMetadataColumn(column) || isRegisteredAggregationKeyColumn(indexContainer)) {
+          state.noteRepairFailure(e);
+          return true;
+        }
         try {
           Object[] defaultValues = (Object[]) getDefaultNullValueForIndexing(indexContainer._fieldSpec);
           int[] defaultDictIds = dictIds;
           if (indexContainer._dictionary != null) {
             defaultDictIds = indexContainer._dictionary.index(defaultValues);
             indexContainer._dictIds = defaultDictIds;
+            updateDictionaryBounds(indexContainer);
           }
           values = defaultValues;
           dictIds = defaultDictIds;
@@ -1361,6 +1426,9 @@ public class MutableSegmentImpl implements MutableSegment {
     if (state._columnsWithCanonicalForward.contains(column)) {
       return;
     }
+    if (isMetadataColumn(column) || isRegisteredAggregationKeyColumn(indexContainer)) {
+      throw new IllegalStateException("Cannot substitute default for metadata or aggregation key column: " + column);
+    }
     FieldSpec fieldSpec = indexContainer._fieldSpec;
     Object defaultValue = getDefaultNullValueForIndexing(fieldSpec);
     if (indexContainer._nullValueVector != null) {
@@ -1386,6 +1454,7 @@ public class MutableSegmentImpl implements MutableSegment {
       if (indexContainer._dictionary != null) {
         dictId = indexContainer._dictionary.index(defaultValue);
         indexContainer._dictId = dictId;
+        updateDictionaryBounds(indexContainer);
       }
       maybeIntercept(column, StandardIndexes.forward(), defaultValue, docId);
       forwardIndex.add(defaultValue, dictId, docId);
@@ -1398,6 +1467,7 @@ public class MutableSegmentImpl implements MutableSegment {
       if (indexContainer._dictionary != null) {
         dictIds = indexContainer._dictionary.index(defaultValues);
         indexContainer._dictIds = dictIds;
+        updateDictionaryBounds(indexContainer);
       }
       maybeIntercept(column, StandardIndexes.forward(), defaultValues, docId);
       forwardIndex.add(defaultValues, dictIds, docId);
@@ -1516,7 +1586,7 @@ public class MutableSegmentImpl implements MutableSegment {
 
   private void markUnrecoverable(RowWriteState state) {
     _unrecoverableIndexingFailure = true;
-    if (state._firstError != null && state._repairError != null) {
+    if (state._firstError != null && state._repairError != null && state._firstError != state._repairError) {
       state._firstError.addSuppressed(state._repairError);
     }
     if (_pendingRowIndexingException == null && state._firstError != null) {
@@ -1601,16 +1671,16 @@ public class MutableSegmentImpl implements MutableSegment {
               docId);
           restoreMetricWrite(committed.get(i), docId);
         } catch (Exception restoreException) {
+          _unrecoverableIndexingFailure = true;
           if (restoreError == null) {
             restoreError = restoreException;
-          } else {
+          } else if (restoreError != restoreException) {
             restoreError.addSuppressed(restoreException);
           }
         }
       }
-      if (restoreError != null) {
+      if (restoreError != null && restoreError != e) {
         e.addSuppressed(restoreError);
-        _unrecoverableIndexingFailure = true;
       }
       throw wrapIndexingException("AGGREGATE_METRICS", e);
     }
@@ -1683,8 +1753,10 @@ public class MutableSegmentImpl implements MutableSegment {
       }
       case BYTES: {
         Object oldValue = valueAggregator.deserializeAggregatedValue(forwardIndex.getBytes(docId));
+        // AVG and sketch aggregators can mutate oldValue in place. Preserve rollback bytes before applying the row.
+        byte[] oldBytes = valueAggregator.serializeAggregatedValue(oldValue);
         Object newValue = valueAggregator.applyRawValue(oldValue, rawValue);
-        return PreparedMetricWrite.bytes(column, forwardIndex, valueAggregator.serializeAggregatedValue(oldValue),
+        return PreparedMetricWrite.bytes(column, forwardIndex, oldBytes,
             valueAggregator.serializeAggregatedValue(newValue));
       }
       default:
@@ -2177,6 +2249,19 @@ public class MutableSegmentImpl implements MutableSegment {
     return !_indexCapacityThresholdBreached && !_unrecoverableIndexingFailure;
   }
 
+  /// Whether the most recent [#index] call physically published a new document or committed a metric rollup.
+  /// Read immediately after that call on the same thread under the segment's single-writer contract. Reset on every
+  /// call, including rejected writes. Later metadata or diagnostic failures do not undo physical publication;
+  /// terminal state is reported separately by [#hasUnrecoverableIndexingFailure].
+  public boolean wasLastIndexingOperationPublished() {
+    return _lastIndexingOperationPublished;
+  }
+
+  /// Returns whether a failed canonical write or rollback has made this segment unusable for further ingestion.
+  public boolean hasUnrecoverableIndexingFailure() {
+    return _unrecoverableIndexingFailure;
+  }
+
   /// Row-count capacity plus [#canAddMore]. Consumers use this after a published-then-rethrown repair.
   public boolean canTakeMoreRows() {
     return _numDocsIndexed < _capacity && canAddMore();
@@ -2270,7 +2355,7 @@ public class MutableSegmentImpl implements MutableSegment {
       _repairFailed = true;
       if (_repairError == null) {
         _repairError = exception;
-      } else {
+      } else if (_repairError != exception) {
         _repairError.addSuppressed(exception);
       }
     }

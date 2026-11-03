@@ -477,11 +477,10 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
   static void indexTransformedRow(MutableSegmentImpl segment, GenericRow row,
       @Nullable StreamMessageMetadata metadata)
       throws Exception {
-    int docsBefore = segment.getNumDocsIndexed();
     try {
       segment.index(row, metadata);
     } catch (Exception e) {
-      if (segment.getNumDocsIndexed() > docsBefore && segment.canTakeMoreRows()) {
+      if (segment.wasLastIndexingOperationPublished() && !segment.hasUnrecoverableIndexingFailure()) {
         return;
       }
       throw e;

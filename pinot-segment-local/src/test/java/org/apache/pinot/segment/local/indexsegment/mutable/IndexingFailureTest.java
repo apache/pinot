@@ -20,15 +20,20 @@ package org.apache.pinot.segment.local.indexsegment.mutable;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.partition.function.ModuloPartitionFunction;
 import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.local.dedup.DedupContext;
+import org.apache.pinot.segment.local.dedup.DedupRecordInfo;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
 import org.apache.pinot.segment.local.dedup.TableDedupMetadataManager;
 import org.apache.pinot.segment.local.dedup.TableDedupMetadataManagerFactory;
@@ -45,6 +50,7 @@ import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManagerFactory;
 import org.apache.pinot.segment.local.upsert.UpsertContext;
 import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -53,6 +59,7 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
@@ -62,8 +69,10 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
@@ -73,6 +82,7 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.eq;
@@ -81,6 +91,7 @@ import static org.mockito.Mockito.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 import static org.testng.Assert.fail;
@@ -1007,6 +1018,306 @@ public class IndexingFailureTest implements PinotBuffersAfterMethodCheckRule {
       }
       segment.destroy();
       FileUtils.deleteQuietly(tmpDir);
+    }
+  }
+
+  @Test
+  public void testLegacyDedupManagerStillDropsDuplicates()
+      throws Exception {
+    LegacyDedupMetadataManager manager = new LegacyDedupMetadataManager();
+    MutableSegmentImpl segment =
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(upsertSchema(), true, TIME_COL, null, manager);
+    try {
+      segment.index(upsertRow("A", "first", 10L), METADATA);
+      segment.index(upsertRow("A", "duplicate", 20L), METADATA);
+      assertEquals(segment.getNumDocsIndexed(), 1, "legacy duplicate result must be honored before publication");
+      assertEquals(segment.getRecord(0, new GenericRow()).getValue(STRING_COL), "first");
+      assertEquals(manager.getNumPrimaryKeys(), 1);
+    } finally {
+      segment.destroy();
+    }
+  }
+
+  @Test
+  public void testDedupClaimFailureAfterPublicationRetainsPublicationStatus()
+      throws Exception {
+    DedupContext context = mock(DedupContext.class);
+    when(context.getPrimaryKeyColumns()).thenReturn(List.of(PK_COL));
+    PartitionDedupMetadataManager manager = mock(PartitionDedupMetadataManager.class);
+    when(manager.getContext()).thenReturn(context);
+    when(manager.supportsRecordPresenceCheck()).thenReturn(true);
+    RuntimeException failure = new RuntimeException("dedup claim failed after physical publication");
+    when(manager.checkRecordPresentOrUpdate(any(), any())).thenThrow(failure);
+    MutableSegmentImpl segment =
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(upsertSchema(), true, TIME_COL, null, manager);
+    try {
+      RuntimeException thrown = expectThrows(RuntimeException.class,
+          () -> segment.index(upsertRow("A", "published", 10L), METADATA));
+      assertSame(thrown, failure);
+      assertEquals(segment.getNumDocsIndexed(), 1);
+      assertEquals(segment.getRecord(0, new GenericRow()).getValue(PK_COL), "A");
+      assertTrue(segment.wasLastIndexingOperationPublished());
+      assertFalse(segment.hasUnrecoverableIndexingFailure());
+    } finally {
+      segment.destroy();
+    }
+  }
+
+  @DataProvider
+  public Object[][] metadataFields() {
+    return new Object[][]{{PK_COL, false}, {TIME_COL, false}, {"deleted", false},
+        {PK_COL, true}, {TIME_COL, true}, {"deleted", true}};
+  }
+
+  @Test(dataProvider = "metadataFields")
+  public void testUpsertMetadataFieldForwardFailureDoesNotPublish(String failedColumn, boolean raw)
+      throws Exception {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension(PK_COL, DataType.STRING)
+        .addSingleValueDimension("deleted", DataType.BOOLEAN)
+        .addDateTime(TIME_COL, DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .setPrimaryKeyColumns(List.of(PK_COL)).build();
+    UpsertConfig config = new UpsertConfig(UpsertConfig.Mode.FULL);
+    config.setDeleteRecordColumn("deleted");
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COL).setUpsertConfig(config).setNullHandlingEnabled(true).build();
+    TableUpsertMetadataManager tableManager = TableUpsertMetadataManagerFactory.create(new PinotConfiguration(),
+        tableConfig, schema, mock(TableDataManager.class), null);
+    PartitionUpsertMetadataManager manager = tableManager.getOrCreatePartitionManager(0);
+    MutableSegmentImpl segment = MutableSegmentImplTestUtils.createMutableSegmentImpl(schema,
+        raw ? Set.of(failedColumn) : Set.of(), Set.of(), Set.of(), Map.of(), Map.of(), false, null, true,
+        TIME_COL, manager, null, mock(ServerMetrics.class), true);
+    MutableSegmentImpl retry = null;
+    try {
+      segment._indexWriteInterceptor = (column, indexType, value, docId) -> {
+        if (failedColumn.equals(column) && indexType.equals(StandardIndexes.forward())
+            && !value.equals(schema.getFieldSpecFor(column).getDefaultNullValue())) {
+          throw new RuntimeException("metadata field forward failure");
+        }
+      };
+      GenericRow bad = new GenericRow();
+      bad.putValue(PK_COL, "A");
+      bad.putValue(TIME_COL, 20L);
+      bad.putValue("deleted", 1);
+      Exception failure = expectThrows(Exception.class, () -> segment.index(bad, METADATA));
+      assertEquals(failure.getMessage(), "metadata field forward failure");
+      assertFalse(segment.wasLastIndexingOperationPublished());
+      assertEquals(segment.getNumDocsIndexed(), 0);
+      assertTrue(segment.getValidDocIds().getMutableRoaringBitmap().isEmpty());
+      assertFalse(segment.canAddMore(), "metadata fields cannot be repaired under an original metadata claim");
+      retry = MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, true, TIME_COL, manager, null);
+      GenericRow good = new GenericRow();
+      good.putValue(PK_COL, "A");
+      good.putValue(TIME_COL, 10L);
+      good.putValue("deleted", 0);
+      retry.index(good, METADATA);
+      assertTrue(retry.getValidDocIds().getMutableRoaringBitmap().contains(0));
+      assertTrue(retry.getQueryableDocIds().getMutableRoaringBitmap().contains(0));
+      assertEquals(retry.getRecord(0, new GenericRow()).getValue(TIME_COL), 10L);
+    } finally {
+      if (retry != null) {
+        retry.destroy();
+      }
+      segment.destroy();
+      manager.stop();
+      manager.close();
+    }
+  }
+
+  @Test
+  public void testUpsertComparisonDictionaryFailureDoesNotClaimOriginalVersion()
+      throws Exception {
+    Schema schema = upsertSchema();
+    UpsertConfig config = new UpsertConfig(UpsertConfig.Mode.FULL);
+    config.setDropOutOfOrderRecord(true);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COL).setUpsertConfig(config).setNullHandlingEnabled(true).build();
+    TableUpsertMetadataManager tableManager = TableUpsertMetadataManagerFactory.create(new PinotConfiguration(),
+        tableConfig, schema, mock(TableDataManager.class), null);
+    PartitionUpsertMetadataManager manager = tableManager.getOrCreatePartitionManager(0);
+    MutableSegmentImpl segment = MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Set.of(), Set.of(),
+        Set.of(), Map.of(), Map.of(), false, null, true, TIME_COL, manager, null, mock(ServerMetrics.class), true);
+    MutableSegmentImpl retry = null;
+    try {
+      GenericRow bad = upsertRow("A", "bad version", 20L);
+      bad.putValue(TIME_COL, "20");
+      expectThrows(Exception.class, () -> segment.index(bad, METADATA));
+      assertEquals(segment.getNumDocsIndexed(), 0);
+      assertTrue(segment.getValidDocIds().getMutableRoaringBitmap().isEmpty());
+      assertFalse(segment.canAddMore());
+      retry = MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, true, TIME_COL, manager, null);
+      retry.index(upsertRow("A", "lower valid version", 10L), METADATA);
+      assertEquals(retry.getNumDocsIndexed(), 1);
+      assertTrue(retry.getValidDocIds().getMutableRoaringBitmap().contains(0));
+    } finally {
+      if (retry != null) {
+        retry.destroy();
+      }
+      segment.destroy();
+      manager.stop();
+      manager.close();
+    }
+  }
+
+  @DataProvider
+  public Object[][] dedupMetadataFields() {
+    return new Object[][]{{PK_COL}, {TIME_COL}};
+  }
+
+  @Test(dataProvider = "dedupMetadataFields")
+  public void testDedupMetadataForwardFailureDoesNotClaimSubstitutedKey(String failedColumn)
+      throws Exception {
+    Schema schema = upsertSchema();
+    DedupConfig config = new DedupConfig();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COL).setDedupConfig(config).build();
+    config.setMetadataTTL(20);
+    config.setDedupTimeColumn(TIME_COL);
+    File tmpDir = new File(FileUtils.getTempDirectory(), "dedup-key-failure-" + System.nanoTime());
+    FileUtils.forceMkdir(tmpDir);
+    TableDataManager dataManager = mock(TableDataManager.class);
+    when(dataManager.getTableDataDir()).thenReturn(tmpDir);
+    TableDedupMetadataManager tableManager = TableDedupMetadataManagerFactory.create(new PinotConfiguration(),
+        tableConfig, schema, dataManager, null);
+    PartitionDedupMetadataManager manager = tableManager.getOrCreatePartitionManager(0);
+    MutableSegmentImpl segment = MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Set.of(), Set.of(),
+        Set.of(), Map.of(), Map.of(), false, null, false, TIME_COL, null, manager, mock(ServerMetrics.class), true);
+    try {
+      segment._indexWriteInterceptor = (column, indexType, value, docId) -> {
+        if (failedColumn.equals(column) && indexType.equals(StandardIndexes.forward())
+            && !value.equals(schema.getFieldSpecFor(column).getDefaultNullValue())) {
+          throw new RuntimeException("dedup key forward failure");
+        }
+      };
+      expectThrows(Exception.class, () -> segment.index(upsertRow("A", "value", 20L), METADATA));
+      assertEquals(segment.getNumDocsIndexed(), 0);
+      assertEquals(manager.getNumPrimaryKeys(), 0);
+      assertFalse(segment.canAddMore());
+    } finally {
+      segment.destroy();
+      manager.stop();
+      manager.close();
+      FileUtils.deleteQuietly(tmpDir);
+    }
+  }
+
+  @Test
+  public void testPartitionColumnForwardFailureDoesNotPublishMismatchedMetadata()
+      throws Exception {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension(INT_COL, DataType.INT).build();
+    PartitionFunction function = new ModuloPartitionFunction(3, null);
+    int originalPartition = function.getPartition("42");
+    assertFalse(originalPartition == function.getPartition(Integer.toString(Integer.MIN_VALUE)));
+    MutableSegmentImpl segment = MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, INT_COL,
+        function, originalPartition, false);
+    try {
+      segment._indexWriteInterceptor = (column, indexType, value, docId) -> {
+        if (indexType.equals(StandardIndexes.forward()) && Integer.valueOf(42).equals(value)) {
+          throw new RuntimeException("partition column forward failure");
+        }
+      };
+      GenericRow row = new GenericRow();
+      row.putValue(INT_COL, 42);
+      expectThrows(Exception.class, () -> segment.index(row, METADATA));
+      assertEquals(segment.getNumDocsIndexed(), 0,
+          "a substituted partition value must not be published with partitions from the original value");
+      assertFalse(segment.canAddMore());
+      assertEquals(segment.getDataSource(INT_COL).getDataSourceMetadata().getPartitions(), Set.of(originalPartition));
+    } finally {
+      segment.destroy();
+    }
+  }
+
+  @DataProvider
+  public Object[][] fallbackDictionaryBounds() {
+    return new Object[][]{{false, Integer.MIN_VALUE}, {true, Integer.MIN_VALUE}, {false, 42}, {true, 42},
+        {false, 100}, {true, 100}};
+  }
+
+  @Test(dataProvider = "fallbackDictionaryBounds")
+  public void testForwardFallbackRefreshesDictionaryBounds(boolean multiValue, int defaultValue)
+      throws Exception {
+    Schema.SchemaBuilder builder = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME);
+    Schema schema = (multiValue ? builder.addMultiValueDimension(INT_COL, DataType.INT, defaultValue)
+        : builder.addSingleValueDimension(INT_COL, DataType.INT, defaultValue)).build();
+    MutableSegmentImpl segment = MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Set.of(), Set.of(),
+        Set.of(), false, false, true);
+    try {
+      AtomicBoolean failOnce = new AtomicBoolean(true);
+      segment._indexWriteInterceptor = (column, indexType, value, docId) -> {
+        if (indexType.equals(StandardIndexes.forward()) && failOnce.getAndSet(false)) {
+          throw new RuntimeException("forward failure before fallback dictionary insertion");
+        }
+      };
+      GenericRow row = new GenericRow();
+      row.putValue(INT_COL, multiValue ? new Object[]{42, 43} : 42);
+      segment.index(row, METADATA);
+      assertEquals(segment.getDataSource(INT_COL).getDataSourceMetadata().getMinValue(), Math.min(42, defaultValue));
+      assertEquals(segment.getDataSource(INT_COL).getDataSourceMetadata().getMaxValue(),
+          Math.max(multiValue ? 43 : 42, defaultValue));
+      assertEquals(segment.getDataSource(INT_COL).getDictionary().getIntValue(
+          segment.getDataSource(INT_COL).getDictionary().indexOf(defaultValue)), defaultValue);
+    } finally {
+      segment.destroy();
+    }
+  }
+
+  /// Simulates a single-writer plugin compiled against the original dedup interface.
+  private static final class LegacyDedupMetadataManager implements PartitionDedupMetadataManager {
+    private final Set<PrimaryKey> _keys = new HashSet<>();
+    private final DedupContext _context = mock(DedupContext.class);
+
+    private LegacyDedupMetadataManager() {
+      when(_context.getPrimaryKeyColumns()).thenReturn(List.of(PK_COL));
+    }
+
+    @Override
+    public DedupContext getContext() {
+      return _context;
+    }
+
+    @Override
+    public boolean checkRecordPresentOrUpdate(DedupRecordInfo info, IndexSegment segment) {
+      return !_keys.add(info.getPrimaryKey());
+    }
+
+    @Override
+    public long getNumPrimaryKeys() {
+      return _keys.size();
+    }
+
+    @Override
+    public void addSegment(IndexSegment segment) {
+    }
+
+    @Override
+    public void preloadSegments(IndexLoadingConfig config) {
+    }
+
+    @Override
+    public boolean isPreloading() {
+      return false;
+    }
+
+    @Override
+    public void preloadSegment(ImmutableSegment segment) {
+    }
+
+    @Override
+    public void removeSegment(IndexSegment segment) {
+    }
+
+    @Override
+    public void removeExpiredPrimaryKeys() {
+    }
+
+    @Override
+    public void stop() {
+    }
+
+    @Override
+    public void close() {
     }
   }
 

@@ -109,6 +109,11 @@ class ConcurrentMapPartitionDedupMetadataManager extends BasePartitionDedupMetad
   }
 
   @Override
+  public boolean supportsRecordPresenceCheck() {
+    return true;
+  }
+
+  @Override
   public boolean isRecordPresent(DedupRecordInfo dedupRecordInfo) {
     if (!startOperation()) {
       // Stopped managers must not accept a write that we can never claim.
