@@ -614,10 +614,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _partitionRateLimiter.throttle(messageBatch);
     _serverRateLimiter.throttle(messageBatch);
 
+    // One local per meter: addMeteredTableValue() marks the meter it is passed, so sharing a local between two meters
+    // would count one meter's rows on the other
     PinotMeter realtimeBytesIngestedMeter = null;
-    PinotMeter realtimeBytesDroppedMeter = null;
     PinotMeter realtimeRowsConsumedMeter = null;
     PinotMeter realtimeRowsDroppedMeter = null;
+    PinotMeter realtimeRowsFilteredMeter = null;
     PinotMeter realtimeIncompleteRowsConsumedMeter = null;
     PinotMeter realtimeRowsSanitizedMeter = null;
 
@@ -698,9 +700,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         }
         if (result != null) {
           if (result.getSkippedRowCount() > 0) {
-            realtimeRowsDroppedMeter =
+            realtimeRowsFilteredMeter =
                 _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_FILTERED,
-                    result.getSkippedRowCount(), realtimeRowsDroppedMeter);
+                    result.getSkippedRowCount(), realtimeRowsFilteredMeter);
             if (_trackFilteredMessageOffsets) {
               _filteredMessageOffsets.add(offset.toString());
             }
