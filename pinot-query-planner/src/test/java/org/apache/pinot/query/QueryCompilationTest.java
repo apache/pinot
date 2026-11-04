@@ -1615,6 +1615,13 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
       }
     }
     assertEquals(merge != null, expected, query);
+    if (!enabled || !capability) {
+      PlanNode finalStage = plan.getQueryStageMap().get(1).getPlanFragment().getFragmentRoot();
+      SortNode finalSort = findNodeOfType(finalStage, SortNode.class);
+      assertNotNull(finalSort, "The standard plan must retain its final sort");
+      assertEquals(finalSort.getFetch(), 10);
+      assertEquals(finalSort.getOffset(), 5);
+    }
     if (merge != null) {
       assertEquals(merge.getFetch(), 10);
       assertEquals(merge.getOffset(), 5);

@@ -39,8 +39,6 @@ import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.planner.physical.MailboxIdUtils;
 import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
-import org.apache.pinot.query.planner.plannode.PlanNode;
-import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.routing.MailboxInfo;
 import org.apache.pinot.query.routing.MailboxInfos;
 import org.apache.pinot.query.routing.SharedMailboxInfos;
@@ -121,24 +119,21 @@ public class SortedMailboxMergeReceiveOperatorTest {
   }
 
   @Test
-  public void shouldStreamLimitOverMatchingMergeBeforeSenderEos() {
+  public void shouldStreamBoundedMergeBeforeSenderEos() {
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
     when(_mailbox1.poll()).thenReturn(
         OperatorTestUtil.blockWithStats(DATA_SCHEMA, new Object[]{1, 1}),
         OperatorTestUtil.blockWithStats(DATA_SCHEMA, new Object[]{2, 1}),
         OperatorTestUtil.blockWithStats(DATA_SCHEMA, new Object[]{3, 1}),
         OperatorTestUtil.eosWithEmptyStats());
-    try (SortedMailboxMergeReceiveOperator receive = getOperator(_stageMetadata1, RelDistribution.Type.SINGLETON)) {
-      SortOperator sort = SortOperator.create(OperatorTestUtil.getTracingContext(), receive,
-          new SortNode(0, DATA_SCHEMA, PlanNode.NodeHint.EMPTY, List.of(), FIELD_COLLATIONS, 1, 1));
-      assertTrue(sort instanceof LimitSortOperator);
-      assertTrue(receive.isSortedOn(FIELD_COLLATIONS));
-      assertFalse(receive.isSortedOn(List.of()));
-      assertFalse(receive.isSortedOn(List.of(new RelFieldCollation(0, Direction.DESCENDING))));
-      assertEquals(((MseBlock.Data) sort.nextBlock()).asRowHeap().getRows().get(0), new Object[]{2, 1});
+    OpChainExecutionContext context =
+        OperatorTestUtil.getOpChainContext(_mailboxService, Long.MAX_VALUE, _stageMetadata1);
+    try (SortedMailboxMergeReceiveOperator receive = getOperator(context, RelDistribution.Type.SINGLETON,
+        DATA_SCHEMA, FIELD_COLLATIONS, 1, 1)) {
+      assertEquals(((MseBlock.Data) receive.nextBlock()).asRowHeap().getRows().get(0), new Object[]{2, 1});
       verify(_mailbox1, times(2)).poll();
       verify(_mailbox1).earlyTerminate();
-      assertTrue(sort.nextBlock().isSuccess());
+      assertTrue(receive.nextBlock().isSuccess());
     }
   }
 
