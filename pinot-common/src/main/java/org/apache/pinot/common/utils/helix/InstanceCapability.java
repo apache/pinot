@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.utils.helix;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Collection;
 import java.util.HashMap;
@@ -36,9 +35,13 @@ import org.apache.pinot.spi.config.instance.InstanceType;
 /// advertises it. At startup an instance writes the map field `capabilities`
 /// (`CommonConstants.Helix.Instance.CAPABILITIES_KEY`) of its instance config with
 /// `HelixHelper.updateCapabilities`: the key is the name of a capability of its instance type and the value is its
-/// [#getRevision()] as a decimal integer, for example `{"MSE_FEATURE": "1"}`. Another component reads the map,
+/// [#revision()] as a decimal integer, for example `{"MSE_FEATURE": "1"}`. Another component reads the map,
 /// for example with [InstanceCapabilityTracker], to decide whether it can use a feature that instances of an older
 /// version do not support. A missing map, a missing key or a malformed value means revision 0: not supported.
+///
+/// The broker reads the capabilities of the servers from the instance configs that its routing manager already reads,
+/// see `RoutingManager.getMinServerCapabilityRevision`. Other components can compute the same minimum over their own
+/// set of instances with [InstanceCapabilityTracker].
 ///
 /// The map also holds the reserved entry `pinotVersion`, the Pinot version that wrote it. A reader ignores the map
 /// when that entry is not string-equal to the simple field `pinotVersion` of the same instance config, so the
@@ -53,7 +56,16 @@ import org.apache.pinot.spi.config.instance.InstanceType;
 ///   the same change as the code that supports the feature. An instance must never advertise a feature it cannot run.
 /// - The names are persisted in ZooKeeper: never rename or remove a capability.
 ///
+/// Extensions: a distribution or a plugin built on Pinot can define its own capabilities with the public constructor.
+/// It passes them, together with [#values()], to `HelixHelper.updateCapabilities` when the instance starts, so that
+/// one write advertises both. Their names must start with a prefix that is unique to the extension, so that they never
+/// clash with a capability of Pinot. Readers need no change: they read every capability that an instance advertises.
+///
 /// Two capabilities are equal when their names are equal. Instances are immutable and thread-safe.
+///
+/// This class should be a `record`, but `pinot-common` compiles to Java 11 bytecode, and records need Java 16. Until
+/// that changes, it keeps the shape of a record and of an enum: the accessors use the record style (`name()`,
+/// `instanceType()`, `revision()`) instead of getters, and [#values()] and `name()` follow `Enum`.
 public final class InstanceCapability {
   // Declare the constants above this field: it reads them when the class initializes.
   private static final List<InstanceCapability> VALUES = checkUniqueNames(List.of());
@@ -62,8 +74,9 @@ public final class InstanceCapability {
   private final InstanceType _instanceType;
   private final int _revision;
 
-  /// Package-private: production capabilities are the constants of this class. Tests create their own.
-  InstanceCapability(String name, InstanceType instanceType, int revision) {
+  /// Creates a capability. Pinot declares its capabilities as constants of this class. An extension declares its own,
+  /// see the class Javadoc.
+  public InstanceCapability(String name, InstanceType instanceType, int revision) {
     // Upper case keeps the name apart from the reserved entry pinotVersion of the capabilities map.
     Preconditions.checkArgument(name.matches("[A-Z][A-Z0-9_]*"), "Capability name must be upper case: %s", name);
     Preconditions.checkArgument(revision > 0, "Revision of capability %s must be positive: %s", name, revision);
@@ -83,12 +96,12 @@ public final class InstanceCapability {
   }
 
   /// The type of the instances that advertise this capability.
-  public InstanceType getInstanceType() {
+  public InstanceType instanceType() {
     return _instanceType;
   }
 
   /// The revision of this capability that this version of Pinot supports. Always positive.
-  public int getRevision() {
+  public int revision() {
     return _revision;
   }
 
@@ -100,7 +113,7 @@ public final class InstanceCapability {
   }
 
   /// Same as [#toMapField(InstanceType)] over the given capabilities instead of [#values()].
-  static Map<String, String> toMapField(Collection<InstanceCapability> capabilities, InstanceType instanceType) {
+  public static Map<String, String> toMapField(Collection<InstanceCapability> capabilities, InstanceType instanceType) {
     Map<String, String> mapField = new HashMap<>();
     for (InstanceCapability capability : capabilities) {
       if (capability._instanceType == instanceType) {
@@ -111,8 +124,8 @@ public final class InstanceCapability {
   }
 
   /// Fails when two capabilities have the same name. Equality is by name, so a duplicate name is a definition error.
-  @VisibleForTesting
-  static List<InstanceCapability> checkUniqueNames(List<InstanceCapability> capabilities) {
+  /// Returns the given list.
+  public static List<InstanceCapability> checkUniqueNames(List<InstanceCapability> capabilities) {
     Set<String> names = new HashSet<>();
     for (InstanceCapability capability : capabilities) {
       Preconditions.checkState(names.add(capability._name), "Duplicate capability name: %s", capability._name);

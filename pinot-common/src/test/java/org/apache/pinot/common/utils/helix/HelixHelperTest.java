@@ -324,7 +324,8 @@ public class HelixHelperTest {
     // The stamp is the version in the simple field pinotVersion, so a reader uses the capabilities.
     assertEquals(mapField.get(CommonConstants.Helix.Instance.CAPABILITIES_PINOT_VERSION_KEY),
         instanceConfig.getRecord().getSimpleField(CommonConstants.Helix.Instance.PINOT_VERSION_KEY));
-    assertEquals(InstanceCapabilityTracker.readRevisions(instanceConfig, capabilities), Map.of(serverCapability, 2));
+    assertEquals(InstanceCapabilityTracker.readRevisions(instanceConfig.getRecord()),
+        Map.of("TEST_SERVER_CAPABILITY", 2));
     // Writing the same capabilities again does not change the instance config.
     assertFalse(HelixHelper.updateCapabilities(instanceConfig, InstanceType.SERVER, capabilities));
 
@@ -346,5 +347,11 @@ public class HelixHelperTest {
     assertTrue(HelixHelper.updateCapabilities(minionConfig, InstanceType.MINION, capabilities));
     assertEquals(minionConfig.getRecord().getMapField(CommonConstants.Helix.Instance.CAPABILITIES_KEY),
         Map.of(CommonConstants.Helix.Instance.CAPABILITIES_PINOT_VERSION_KEY, PinotVersion.VERSION));
+
+    // Two capabilities with the same name are a definition error.
+    List<InstanceCapability> duplicates =
+        List.of(serverCapability, new InstanceCapability("TEST_SERVER_CAPABILITY", InstanceType.SERVER, 3));
+    assertThrows(IllegalStateException.class,
+        () -> HelixHelper.updateCapabilities(instanceConfig, InstanceType.SERVER, duplicates));
   }
 }

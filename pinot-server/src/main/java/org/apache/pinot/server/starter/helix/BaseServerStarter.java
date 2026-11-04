@@ -25,6 +25,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -76,6 +77,7 @@ import org.apache.pinot.common.utils.config.QueryWorkloadConfigUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.common.utils.helix.InstanceCapability;
 import org.apache.pinot.common.utils.regex.PatternFactory;
 import org.apache.pinot.common.utils.tls.PinotInsecureMode;
 import org.apache.pinot.common.utils.tls.RenewableTlsUtils;
@@ -480,6 +482,12 @@ public abstract class BaseServerStarter implements ServiceStartable {
     return consumingSegments;
   }
 
+  /// The capabilities that this server advertises in its instance config at startup, see [InstanceCapability]. A
+  /// distribution or a plugin built on Pinot overrides it to add its own capabilities to [InstanceCapability#values()].
+  protected Collection<InstanceCapability> getInstanceCapabilities() {
+    return InstanceCapability.values();
+  }
+
   private void updateInstanceConfigIfNeeded(ServerConf serverConf) {
     InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(_helixManager, _instanceId);
 
@@ -530,7 +538,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
           serverConf.getMultiStageMailboxPort());
     }
     updated |= HelixHelper.updatePinotVersion(instanceConfig);
-    updated |= HelixHelper.updateCapabilities(instanceConfig, InstanceType.SERVER);
+    updated |= HelixHelper.updateCapabilities(instanceConfig, InstanceType.SERVER, getInstanceCapabilities());
 
     // Update environment properties
     if (_pinotEnvironmentProvider != null) {

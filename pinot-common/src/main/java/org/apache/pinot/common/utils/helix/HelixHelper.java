@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.utils.helix;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -732,11 +731,12 @@ public class HelixHelper {
   }
 
   /// Same as [#updateCapabilities(InstanceConfig, InstanceType)] with the given capabilities instead of
-  /// [InstanceCapability#values()].
-  @VisibleForTesting
-  static boolean updateCapabilities(InstanceConfig instanceConfig, InstanceType instanceType,
+  /// [InstanceCapability#values()]. An extension passes the capabilities of Pinot together with its own, see
+  /// [InstanceCapability]. Fails when two capabilities have the same name.
+  public static boolean updateCapabilities(InstanceConfig instanceConfig, InstanceType instanceType,
       Collection<InstanceCapability> capabilities) {
     ZNRecord record = instanceConfig.getRecord();
+    InstanceCapability.checkUniqueNames(List.copyOf(capabilities));
     Map<String, String> currentCapabilities = InstanceCapability.toMapField(capabilities, instanceType);
     currentCapabilities.put(CommonConstants.Helix.Instance.CAPABILITIES_PINOT_VERSION_KEY, PinotVersion.VERSION);
     Map<String, String> oldCapabilities = record.getMapField(CommonConstants.Helix.Instance.CAPABILITIES_KEY);

@@ -22,20 +22,12 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.stream.Collectors;
+import java.util.TreeSet;
 import javax.annotation.Nullable;
-import org.apache.helix.HelixAdmin;
-import org.apache.helix.HelixManager;
-import org.apache.helix.NotificationContext;
-import org.apache.helix.api.listeners.BatchMode;
-import org.apache.helix.api.listeners.InstanceConfigChangeListener;
-import org.apache.helix.api.listeners.PreFetch;
-import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -44,19 +36,20 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/// Tracks the capabilities that the instances of one type advertise, see [InstanceCapability]. It tracks the
-/// capabilities of [InstanceCapability#values()].
+/// Computes, for each capability, the minimum revision across a set of instances of one type, see
+/// [InstanceCapability].
 ///
-/// The tracker is a Helix [InstanceConfigChangeListener]. Register it with
-/// `HelixManager.addInstanceConfigChangeListener`. Each instance advertises its capabilities in the map field
-/// `capabilities` of its instance config ([CommonConstants.Helix.Instance#CAPABILITIES_KEY]). For each capability,
-/// [#getMinRevision] returns the minimum revision across all the instances of the tracked type in the cluster. A
-/// missing map, a missing key or a malformed value counts as revision 0 (not supported). A malformed value is logged
-/// as a warning. Instances of other types are ignored.
+/// The tracker does not read ZooKeeper and does not listen to Helix. Its owner calls [#update] with the instance
+/// config records that it already reads, for example the broker routing manager on each instance config change. Each
+/// call replaces the whole set: the tracker keeps the records of the tracked type and ignores the others. The owner
+/// decides which instances count. A wider set is fail-safe: an instance that never receives the work can only lower
+/// the minimum, and a lower minimum only keeps the plan that every version can run.
 ///
-/// The minimum covers every instance config of the tracked type in the cluster, including the instances that are
-/// disabled, not live, or serve other tenants. Such an instance can lower the minimum although it never receives the
-/// query. This is fail-safe: a lower minimum only keeps the plan that every version can run.
+/// Each instance advertises its capabilities in the map field `capabilities` of its instance config
+/// ([CommonConstants.Helix.Instance#CAPABILITIES_KEY]). The tracker reads every entry of the map, so it also tracks
+/// the capabilities that an extension defines (see [InstanceCapability]). A missing map, a missing key or a malformed
+/// value counts as revision 0 (not supported). [#getMinRevision] returns 0 before the first [#update] and while the
+/// set has no instance of the tracked type.
 ///
 /// Rollback guard: the map also holds the reserved entry `pinotVersion`
 /// ([CommonConstants.Helix.Instance#CAPABILITIES_PINOT_VERSION_KEY]), the Pinot version that wrote the capabilities.
@@ -65,173 +58,144 @@ import org.slf4j.LoggerFactory;
 /// the instance as supporting no capability (revision 0). Every Pinot version rewrites the simple field at startup,
 /// but a version that predates the capabilities does not clear the map. So after a rollback to such a version the two
 /// values differ, and the stale capabilities are ignored. This is an equality check between two fields of one instance
-/// config. It does not order versions and it does not compare the versions of different instances.
-/// Residual gap: `PinotHelixResourceManager.updateInstance` reads the instance config and writes the full record back
-/// without a version check. When an instance restarts on another version between that read and that write, the write
-/// restores the previous simple field `pinotVersion` and the previous map, so stale capabilities can be trusted. The
-/// simple field `pinotVersion` has the same problem today. A follow-up can make the controller keep the fields that
-/// the instance owns.
+/// config. It does not order versions, and it cannot detect a rollback between two builds with the same version
+/// string. Residual gap: `PinotHelixResourceManager.updateInstance` reads the instance config and writes the full
+/// record back without a version check. When an instance restarts on another version between that read and that
+/// write, the write restores the previous simple field `pinotVersion` and the previous map, so stale capabilities can
+/// be trusted. The simple field `pinotVersion` has the same problem today.
 ///
-/// [#getMinRevision] returns 0 before the first notification and while the cluster has no instance of the tracked
-/// type. Helix sends the `INIT` notification when the listener is registered.
+/// Logging: when the parsed capabilities of the set change, the tracker logs at INFO the instances below the revision
+/// that this version supports, for the capabilities given to the constructor, at most [#MAX_LOGGED_INSTANCES] per
+/// list. It lists separately the instances whose capabilities are ignored because the version stamp does not match.
+/// It logs a malformed value at WARN when the capabilities of that instance change. A call that changes nothing logs
+/// nothing.
 ///
-/// When the instance config of one instance cannot be read on a `CALLBACK` notification (for example because of a
-/// transient ZooKeeper error), the instance counts as revision 0 until its instance config changes again or a new
-/// session sends `INIT`. This is fail-safe.
-///
-/// When the instances below the revision that this version supports ([InstanceCapability#getRevision()]) change, the
-/// tracker logs their ids at INFO, at most [#MAX_LOGGED_INSTANCES] per list. It lists separately the instances that
-/// advertise no or an older revision and the instances whose capabilities are ignored because the version stamp does
-/// not match. It never logs on the query path.
-///
-/// Thread safety: Helix callback threads call [#onInstanceConfigChange] and query threads call [#getMinRevision]. The
-/// notification handling is `synchronized` and owns the per-instance bookkeeping. It publishes an immutable snapshot
-/// of the minimum revisions through a `volatile` field, so readers never block and see the result of the last
-/// processed notification.
-@BatchMode(enabled = false)
-@PreFetch(enabled = false)
-public class InstanceCapabilityTracker implements InstanceConfigChangeListener {
+/// Thread safety: [#update] is `synchronized`. It publishes an immutable snapshot of the minimum revisions through a
+/// `volatile` field, so [#getMinRevision] never blocks and sees the result of the last [#update].
+public class InstanceCapabilityTracker {
   private static final Logger LOGGER = LoggerFactory.getLogger(InstanceCapabilityTracker.class);
-  /// The maximum number of instance ids that the tracker logs for each capability.
+  /// The maximum number of instance ids that the tracker logs for each list.
   static final int MAX_LOGGED_INSTANCES = 20;
+  /// The revision stored for a malformed value. Counts as 0.
+  private static final int MALFORMED_REVISION = -1;
 
-  private final HelixManager _helixManager;
   private final String _clusterName;
   private final InstanceType _instanceType;
-  private final List<InstanceCapability> _capabilities;
-  // Guarded by this
-  private final Map<String, Map<InstanceCapability, Integer>> _revisionsByInstance = new HashMap<>();
+  private final List<InstanceCapability> _loggedCapabilities;
+  // Guarded by this. For each tracked instance, the revision of each capability that it advertises.
+  private Map<String, Map<String, Integer>> _revisionsByInstance = Map.of();
   // Guarded by this. The instances whose capabilities are ignored because the version stamp does not match.
-  private final Set<String> _staleInstances = new HashSet<>();
-  // Guarded by this. For each capability, the sorted ids of the instances below InstanceCapability.getRevision(),
-  // and the sorted ids of the stale instances, as last logged.
-  private Map<InstanceCapability, List<String>> _laggingInstances = Map.of();
-  private List<String> _loggedStaleInstances = List.of();
+  private Set<String> _staleInstances = Set.of();
 
-  private HelixAdmin _helixAdmin;
-  private volatile Map<InstanceCapability, Integer> _minRevisions = Map.of();
+  private volatile Map<String, Integer> _minRevisions = Map.of();
 
-  /// Tracks the instances of `instanceType`. The Helix manager does not need to be connected yet. It must be connected
-  /// before the tracker is registered.
-  public InstanceCapabilityTracker(HelixManager helixManager, InstanceType instanceType) {
-    this(helixManager, instanceType, InstanceCapability.values());
+  /// Tracks the instances of `instanceType` in the given cluster. Logs the lagging instances for the capabilities of
+  /// [InstanceCapability#values()].
+  public InstanceCapabilityTracker(String clusterName, InstanceType instanceType) {
+    this(clusterName, instanceType, InstanceCapability.values());
   }
 
-  /// Tracks the given capabilities instead of [InstanceCapability#values()].
-  @VisibleForTesting
-  InstanceCapabilityTracker(HelixManager helixManager, InstanceType instanceType,
-      Collection<InstanceCapability> capabilities) {
-    _helixManager = helixManager;
-    _clusterName = helixManager.getClusterName();
+  /// Same as [#InstanceCapabilityTracker(String, InstanceType)], but logs the lagging instances for the given
+  /// capabilities, for example the capabilities of Pinot and those of an extension. Every capability that the
+  /// instances advertise is tracked either way.
+  public InstanceCapabilityTracker(String clusterName, InstanceType instanceType,
+      Collection<InstanceCapability> loggedCapabilities) {
+    _clusterName = clusterName;
     _instanceType = instanceType;
-    _capabilities = List.copyOf(capabilities);
-  }
-
-  /// The Helix manager of the tracked cluster.
-  public HelixManager getHelixManager() {
-    return _helixManager;
-  }
-
-  /// The name of the tracked cluster.
-  public String getClusterName() {
-    return _clusterName;
-  }
-
-  /// The minimum revision of the capability across all the instances of the tracked type, 0 when one of them does not
-  /// support it or when the cluster has no such instance. Never blocks.
-  public int getMinRevision(InstanceCapability capability) {
-    return _minRevisions.getOrDefault(capability, 0);
-  }
-
-  @Override
-  public synchronized void onInstanceConfigChange(List<InstanceConfig> instanceConfigs, NotificationContext context) {
-    if (_helixAdmin == null) {
-      _helixAdmin = _helixManager.getClusterManagmentTool();
+    List<InstanceCapability> capabilities = new ArrayList<>();
+    for (InstanceCapability capability : loggedCapabilities) {
+      if (capability.instanceType() == instanceType) {
+        capabilities.add(capability);
+      }
     }
-    NotificationContext.Type type = context.getType();
-    if (type != NotificationContext.Type.INIT && type != NotificationContext.Type.CALLBACK) {
-      LOGGER.warn("Ignoring notification type: {} for instance config change", type);
+    _loggedCapabilities = List.copyOf(capabilities);
+  }
+
+  /// The minimum revision of the capability across the tracked instances, 0 when one of them does not support it or
+  /// when there is no tracked instance. Never blocks.
+  public int getMinRevision(InstanceCapability capability) {
+    return _minRevisions.getOrDefault(capability.name(), 0);
+  }
+
+  /// Replaces the set of instances with the given instance config records. Keeps the records of the tracked type and
+  /// ignores the others. Never throws because of the content of a record.
+  public synchronized void update(Collection<ZNRecord> instanceConfigRecords) {
+    Map<String, Map<String, Integer>> revisionsByInstance = new HashMap<>();
+    Set<String> staleInstances = new TreeSet<>();
+    for (ZNRecord record : instanceConfigRecords) {
+      String instanceId = record.getId();
+      if (InstanceTypeUtils.getInstanceType(instanceId) != _instanceType) {
+        continue;
+      }
+      if (hasStaleCapabilities(record)) {
+        staleInstances.add(instanceId);
+      }
+      Map<String, Integer> revisions = readRevisions(record);
+      revisionsByInstance.put(instanceId, revisions);
+      if (revisions.containsValue(MALFORMED_REVISION) && !revisions.equals(_revisionsByInstance.get(instanceId))) {
+        LOGGER.warn("Malformed capability revisions for instance: {} of cluster: {}, treating them as 0: {}",
+            instanceId, _clusterName, record.getMapField(CommonConstants.Helix.Instance.CAPABILITIES_KEY));
+      }
+    }
+    if (revisionsByInstance.equals(_revisionsByInstance) && staleInstances.equals(_staleInstances)) {
       return;
     }
-    if (type == NotificationContext.Type.INIT || context.getIsChildChange()) {
-      // Instances may have been added or removed: read them all.
-      _revisionsByInstance.clear();
-      _staleInstances.clear();
-      for (String instance : _helixAdmin.getInstancesInCluster(_clusterName)) {
-        if (isTrackedType(instance)) {
-          try {
-            putInstance(instance, _helixAdmin.getInstanceConfig(_clusterName, instance));
-          } catch (Exception e) {
-            LOGGER.warn("Failed to get instance config for instance: {}, treating it as supporting no capability",
-                instance, e);
-            putInstance(instance, null);
-          }
-        }
-      }
-    } else {
-      String pathChanged = context.getPathChanged();
-      String instanceName = pathChanged.substring(pathChanged.lastIndexOf('/') + 1);
-      if (isTrackedType(instanceName)) {
-        try {
-          putInstance(instanceName, _helixAdmin.getInstanceConfig(_clusterName, instanceName));
-        } catch (Exception e) {
-          // Keep the instance as supporting no capability, as the INIT path does: a read failure must not raise the
-          // minimum. When the instance was removed, the child change notification removes it.
-          LOGGER.warn("Failed to get instance config for instance: {}, treating it as supporting no capability",
-              instanceName, e);
-          putInstance(instanceName, null);
-        }
-      }
-    }
-    Map<InstanceCapability, Integer> minRevisions = computeMinRevisions();
+    _revisionsByInstance = revisionsByInstance;
+    _staleInstances = staleInstances;
+    Map<String, Integer> minRevisions = computeMinRevisions(revisionsByInstance);
     if (!minRevisions.equals(_minRevisions)) {
       LOGGER.info("Minimum capability revisions across {} {} instances of cluster: {} changed from {} to {}",
-          _revisionsByInstance.size(), _instanceType, _clusterName, _minRevisions, minRevisions);
+          revisionsByInstance.size(), _instanceType, _clusterName, _minRevisions, minRevisions);
       _minRevisions = minRevisions;
     }
-    logLaggingInstancesIfChanged();
+    logLaggingInstances();
   }
 
   /// The sorted ids of the tracked instances whose capabilities are ignored because the version stamp does not match.
   @VisibleForTesting
   synchronized List<String> getStaleInstances() {
-    return _staleInstances.stream().filter(_revisionsByInstance::containsKey).sorted().collect(Collectors.toList());
+    return List.copyOf(_staleInstances);
   }
 
-  /// Stores the revisions of one instance, and whether its capabilities are ignored because of the version stamp. A
-  /// null instance config (it could not be read) counts as supporting no capability.
-  private void putInstance(String instanceName, @Nullable InstanceConfig instanceConfig) {
-    _revisionsByInstance.put(instanceName, readRevisions(instanceConfig, _capabilities));
-    if (instanceConfig != null && hasStaleCapabilities(instanceConfig)) {
-      _staleInstances.add(instanceName);
-    } else {
-      _staleInstances.remove(instanceName);
+  /// For each capability that some instance advertises, the minimum revision across all the instances. A capability
+  /// with minimum 0 has no entry.
+  private static Map<String, Integer> computeMinRevisions(Map<String, Map<String, Integer>> revisionsByInstance) {
+    if (revisionsByInstance.isEmpty()) {
+      return Map.of();
     }
-  }
-
-  /// Logs at INFO, when they changed since the last log, the instances below the revision that this version supports,
-  /// in two lists: the instances that advertise no or an older revision, and the instances whose capabilities are
-  /// ignored because the version stamp does not match.
-  private void logLaggingInstancesIfChanged() {
-    Map<InstanceCapability, List<String>> laggingInstances = computeLaggingInstances();
-    List<String> staleInstances = getStaleInstances();
-    if (laggingInstances.equals(_laggingInstances) && staleInstances.equals(_loggedStaleInstances)) {
-      return;
-    }
-    _laggingInstances = laggingInstances;
-    _loggedStaleInstances = staleInstances;
-    for (InstanceCapability capability : _capabilities) {
-      if (capability.getInstanceType() != _instanceType) {
-        continue;
+    Map<String, Integer> minRevisions = new HashMap<>();
+    // Every instance must advertise a capability, so the candidates are the capabilities of any one instance.
+    for (String name : revisionsByInstance.values().iterator().next().keySet()) {
+      int minRevision = Integer.MAX_VALUE;
+      for (Map<String, Integer> revisions : revisionsByInstance.values()) {
+        minRevision = Math.min(minRevision, revisions.getOrDefault(name, 0));
       }
+      if (minRevision > 0) {
+        minRevisions.put(name, minRevision);
+      }
+    }
+    return Map.copyOf(minRevisions);
+  }
+
+  /// Logs at INFO, for each logged capability, the instances below the revision that this version supports, in two
+  /// lists: the instances that advertise no or an older revision, and the instances whose capabilities are ignored
+  /// because the version stamp does not match.
+  private void logLaggingInstances() {
+    Map<String, Map<String, Integer>> sortedRevisions = new TreeMap<>(_revisionsByInstance);
+    for (InstanceCapability capability : _loggedCapabilities) {
       List<String> olderInstances = new ArrayList<>();
       List<String> ignoredInstances = new ArrayList<>();
-      for (String instance : laggingInstances.getOrDefault(capability, List.of())) {
-        (_staleInstances.contains(instance) ? ignoredInstances : olderInstances).add(instance);
+      for (Map.Entry<String, Map<String, Integer>> entry : sortedRevisions.entrySet()) {
+        if (entry.getValue().getOrDefault(capability.name(), 0) < capability.revision()) {
+          (_staleInstances.contains(entry.getKey()) ? ignoredInstances : olderInstances).add(entry.getKey());
+        }
+      }
+      if (olderInstances.isEmpty() && ignoredInstances.isEmpty()) {
+        continue;
       }
       LOGGER.info("{} {} instances of cluster: {} are below revision {} of capability {}. With no or an older revision "
               + "({}): {}. With capabilities ignored because of a version stamp mismatch ({}): {}",
-          olderInstances.size() + ignoredInstances.size(), _instanceType, _clusterName, capability.getRevision(),
+          olderInstances.size() + ignoredInstances.size(), _instanceType, _clusterName, capability.revision(),
           capability, olderInstances.size(), truncate(olderInstances), ignoredInstances.size(),
           truncate(ignoredInstances));
     }
@@ -244,86 +208,39 @@ public class InstanceCapabilityTracker implements InstanceConfigChangeListener {
     return instances.subList(0, MAX_LOGGED_INSTANCES) + " ...";
   }
 
-  /// For each capability of the tracked type, the sorted ids of the instances below the revision that this version
-  /// supports. A capability without such instances has no entry.
-  private Map<InstanceCapability, List<String>> computeLaggingInstances() {
-    Map<InstanceCapability, List<String>> laggingInstances = new HashMap<>();
-    Map<String, Map<InstanceCapability, Integer>> sortedRevisions = new TreeMap<>(_revisionsByInstance);
-    for (InstanceCapability capability : _capabilities) {
-      if (capability.getInstanceType() != _instanceType) {
-        continue;
-      }
-      List<String> instances = new ArrayList<>();
-      for (Map.Entry<String, Map<InstanceCapability, Integer>> entry : sortedRevisions.entrySet()) {
-        if (entry.getValue().getOrDefault(capability, 0) < capability.getRevision()) {
-          instances.add(entry.getKey());
-        }
-      }
-      if (!instances.isEmpty()) {
-        laggingInstances.put(capability, List.copyOf(instances));
-      }
-    }
-    return Map.copyOf(laggingInstances);
-  }
-
-  private Map<InstanceCapability, Integer> computeMinRevisions() {
-    if (_revisionsByInstance.isEmpty()) {
-      return Map.of();
-    }
-    Map<InstanceCapability, Integer> minRevisions = new HashMap<>();
-    for (InstanceCapability capability : _capabilities) {
-      int minRevision = Integer.MAX_VALUE;
-      for (Map<InstanceCapability, Integer> revisions : _revisionsByInstance.values()) {
-        minRevision = Math.min(minRevision, revisions.getOrDefault(capability, 0));
-      }
-      minRevisions.put(capability, minRevision);
-    }
-    return Map.copyOf(minRevisions);
-  }
-
-  /// Reads the revisions of the given capabilities that an instance advertises. Returns an empty map (revision 0 for
-  /// every capability) when the instance config has no capabilities, or when the capabilities were written by another
-  /// Pinot version than the one in the simple field `pinotVersion`. See the rollback guard in the class Javadoc.
+  /// Reads the revision of every capability that an instance advertises, by name. Returns an empty map (revision 0
+  /// for every capability) when the instance config has no capabilities, or when the capabilities were written by
+  /// another Pinot version than the one in the simple field `pinotVersion`. See the rollback guard in the class
+  /// Javadoc. A malformed value is stored as [#MALFORMED_REVISION], which counts as 0.
   @VisibleForTesting
-  static Map<InstanceCapability, Integer> readRevisions(@Nullable InstanceConfig instanceConfig,
-      Collection<InstanceCapability> capabilities) {
-    if (instanceConfig == null) {
+  static Map<String, Integer> readRevisions(@Nullable ZNRecord record) {
+    if (record == null) {
       return Map.of();
     }
-    ZNRecord record = instanceConfig.getRecord();
     Map<String, String> mapField = record.getMapField(CommonConstants.Helix.Instance.CAPABILITIES_KEY);
-    if (mapField == null) {
+    if (mapField == null || hasStaleCapabilities(record)) {
       return Map.of();
     }
-    if (hasStaleCapabilities(instanceConfig)) {
-      return Map.of();
-    }
-    Map<InstanceCapability, Integer> revisions = new HashMap<>();
-    for (InstanceCapability capability : capabilities) {
-      String value = mapField.get(capability.name());
-      if (value == null) {
+    Map<String, Integer> revisions = new HashMap<>();
+    for (Map.Entry<String, String> entry : mapField.entrySet()) {
+      String name = entry.getKey();
+      if (name.equals(CommonConstants.Helix.Instance.CAPABILITIES_PINOT_VERSION_KEY)) {
         continue;
       }
       int revision;
       try {
-        revision = Integer.parseInt(value.trim());
+        revision = entry.getValue() != null ? Integer.parseInt(entry.getValue().trim()) : MALFORMED_REVISION;
       } catch (NumberFormatException e) {
-        revision = -1;
+        revision = MALFORMED_REVISION;
       }
-      if (revision < 0) {
-        LOGGER.warn("Malformed revision: '{}' of capability: {} for instance: {}, treating it as 0", value,
-            capability, instanceConfig.getInstanceName());
-        continue;
-      }
-      revisions.put(capability, revision);
+      revisions.put(name, revision < 0 ? MALFORMED_REVISION : revision);
     }
     return revisions;
   }
 
   /// Whether the instance config has a capabilities map that was not written by the Pinot version in its simple field
   /// `pinotVersion`: the version stamp is missing or not string-equal. Not an ordering of versions.
-  private static boolean hasStaleCapabilities(InstanceConfig instanceConfig) {
-    ZNRecord record = instanceConfig.getRecord();
+  private static boolean hasStaleCapabilities(ZNRecord record) {
     Map<String, String> mapField = record.getMapField(CommonConstants.Helix.Instance.CAPABILITIES_KEY);
     if (mapField == null) {
       return false;
@@ -331,9 +248,5 @@ public class InstanceCapabilityTracker implements InstanceConfigChangeListener {
     String writtenByVersion = mapField.get(CommonConstants.Helix.Instance.CAPABILITIES_PINOT_VERSION_KEY);
     return writtenByVersion == null
         || !writtenByVersion.equals(record.getSimpleField(CommonConstants.Helix.Instance.PINOT_VERSION_KEY));
-  }
-
-  private boolean isTrackedType(String instanceName) {
-    return InstanceTypeUtils.getInstanceType(instanceName) == _instanceType;
   }
 }

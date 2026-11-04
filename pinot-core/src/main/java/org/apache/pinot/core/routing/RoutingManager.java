@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.utils.helix.InstanceCapability;
 import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
@@ -53,6 +54,15 @@ public interface RoutingManager {
   /// implementations that do not track exclusions separately.
   default Map<String, ServerInstance> getRoutableServerInstanceMap() {
     return getEnabledServerInstanceMap();
+  }
+
+  /// Returns the minimum revision of the capability across the servers, see [InstanceCapability]. 0 means that at least
+  /// one server does not support the capability. The minimum covers every server with an instance config, including
+  /// the disabled ones, so it never overstates what a routable server supports. Never blocks.
+  ///
+  /// The default implementation returns 0: no capability is supported.
+  default int getMinServerCapabilityRevision(InstanceCapability capability) {
+    return 0;
   }
 
   /// Returns whether the given table is enabled
