@@ -250,7 +250,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     if (requestDeadlineMs == null) {
       return false;
     }
-    // Subtract rather than add, so that a huge deadline cannot overflow into a rejection.
+    // Subtract rather than add, so that an absurdly far deadline still runs instead of overflowing into a rejection.
     long lateByMs = queryArrivalTimeMs - requestDeadlineMs;
     if (lateByMs <= _requestDeadlineClockSkewMs) {
       return false;

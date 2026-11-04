@@ -2402,8 +2402,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   /// it is this broker's deadline, whatever the user set.
   ///
   /// `AsyncQueryResponse` measures the remaining time from its own start in `QueryRouter#submitQuery`, after this
-  /// runs. The server applies a clock-skew allowance; dispatch delays or clock differences beyond that allowance
-  /// can still cause a request to be rejected before the broker's actual wait ends.
+  /// runs, so the deadline is early by the time in between, which the server's clock-skew allowance absorbs. A
+  /// request is rejected while the broker still waits for it only if that time, plus any lead of the server's clock
+  /// over the broker's, exceeds the allowance, so nothing slow belongs between this call and the dispatch.
   private static void setRequestDeadline(long remainingTimeMs, @Nullable BrokerRequest offlineBrokerRequest,
       @Nullable BrokerRequest realtimeBrokerRequest, @Nullable BrokerRequest materializedViewBrokerRequest) {
     String requestDeadlineMs = Long.toString(System.currentTimeMillis() + remainingTimeMs);
