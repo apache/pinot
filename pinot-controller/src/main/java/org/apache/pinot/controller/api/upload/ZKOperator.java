@@ -46,6 +46,7 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.api.resources.ResourceUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.segment.local.utils.SegmentPushUtils;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.filesystem.PinotFS;
@@ -684,15 +685,18 @@ public class ZKOperator {
   }
 
   /// A refresh replaces the full segment, so a sidecar left by the previous build would describe the wrong bytes (a
-  /// metadata push trusts an existing sidecar). Not needed when a METADATA push already points at the final location:
-  /// nothing is copied and the sidecar there belongs to that push. Failing to invalidate fails the refresh.
+  /// metadata push trusts an existing sidecar). The exception is a METADATA push whose own sidecar (next to the source
+  /// tar, describing the bytes about to be copied) is exactly the file we would delete: it is kept. This runs for every
+  /// refresh regardless of the preserve flags because batch jobs write sidecars independent of them. Failing to
+  /// invalidate fails the refresh.
   private void invalidateStaleMetadataTar(String segmentName, FileUploadType uploadType, String sourceDownloadURIStr,
       URI finalSegmentLocationURI)
       throws Exception {
-    if (uploadType == FileUploadType.METADATA && new URI(sourceDownloadURIStr).equals(finalSegmentLocationURI)) {
+    URI metadataTarURI = URIUtils.getUri(finalSegmentLocationURI + Constants.METADATA_TAR_GZ_FILE_EXT);
+    if (uploadType == FileUploadType.METADATA
+        && SegmentPushUtils.generateSegmentMetadataURI(sourceDownloadURIStr, segmentName).equals(metadataTarURI)) {
       return;
     }
-    URI metadataTarURI = URIUtils.getUri(finalSegmentLocationURI + Constants.METADATA_TAR_GZ_FILE_EXT);
     PinotFS pinotFS = PinotFSFactory.create(finalSegmentLocationURI.getScheme());
     if (pinotFS.exists(metadataTarURI)) {
       Preconditions.checkState(pinotFS.delete(metadataTarURI, true), "Failed to delete stale metadata tar: %s",

@@ -78,9 +78,10 @@ public class SegmentDeletionManager {
   // file will be permanently deleted after Feb 2nd 2022 12PM.
   public static final String DELETED_SEGMENTS = "Deleted_Segments";
   private static final String RETENTION_UNTIL_SEPARATOR = "__RETENTION_UNTIL__";
-  // Subdirectory of Deleted_Segments/<table>/ holding retained metadata sidecars, named like the archived segment.
-  // '~' is never produced by URIUtils.encode (URLEncoder), so no archived segment name can equal this directory name.
-  public static final String DELETED_SEGMENT_METADATA_DIR = "~metadata";
+  // Retained sidecars live in a separate root, <dataDir>/Deleted_Segments_Metadata/<table>/<enc(seg)><retentionSuffix>,
+  // so they never share a directory with archived segments (any name inside Deleted_Segments/<table>/ can equal some
+  // segment ID).
+  public static final String DELETED_SEGMENTS_METADATA = "Deleted_Segments_Metadata";
   // DateTimeFormatter is immutable and thread-safe; this is shared by the deletion executor, table deletion and the
   // RetentionManager sweep.
   private static final DateTimeFormatter RETENTION_DATE_FORMAT =
@@ -391,16 +392,13 @@ public class SegmentDeletionManager {
 
   private void moveSegmentMetadataToDeletedDir(PinotFS pinotFS, URI segmentFileUri, String segmentId,
       String rawTableName, String retentionSuffix) {
-    // Retained sidecars live in their own subdirectory, so they can never take the archive name of a segment (e.g. the
-    // sidecar of "foo" vs. a segment named "foo.metadata"), and the directory name cannot be an encoded segment name
-    // (e.g. a segment named "metadata"). The name matches the archived segment, so both carry the same retention
-    // suffix and expire at the same time.
+    // Same retention suffix as the archived segment so both expire together; the separate root cannot collide with it.
     try {
       URI segmentMetadataUri = SegmentPushUtils.generateSegmentMetadataURI(segmentFileUri.toString(), segmentId);
       if (!pinotFS.exists(segmentMetadataUri)) {
         return;
       }
-      URI deletedMetadataUri = URIUtils.getUri(_dataDir, DELETED_SEGMENTS, rawTableName, DELETED_SEGMENT_METADATA_DIR,
+      URI deletedMetadataUri = URIUtils.getUri(_dataDir, DELETED_SEGMENTS_METADATA, rawTableName,
           URIUtils.encode(segmentId) + retentionSuffix);
       if (pinotFS.move(segmentMetadataUri, deletedMetadataUri, true)) {
         pinotFS.touch(deletedMetadataUri);
@@ -468,61 +466,58 @@ public class SegmentDeletionManager {
   public void removeAgedDeletedSegments(LeadControllerManager leadControllerManager,
       int agedSegmentsDeletionBatchSize) {
     if (_dataDir != null) {
-      URI deletedDirURI = URIUtils.getUri(_dataDir, DELETED_SEGMENTS);
-      PinotFS pinotFS = PinotFSFactory.create(deletedDirURI.getScheme());
-
-      try {
-        // Directly return when the deleted directory does not exist (no segment deleted yet)
-        if (!pinotFS.exists(deletedDirURI)) {
-          return;
-        }
-
-        if (!pinotFS.isDirectory(deletedDirURI)) {
-          LOGGER.warn("Deleted segments URI: {} is not a directory", deletedDirURI);
-          return;
-        }
-
-        String[] tableNameDirs = pinotFS.listFiles(deletedDirURI, false);
-        if (tableNameDirs == null) {
-          LOGGER.warn("Failed to list files from the deleted segments directory: {}", deletedDirURI);
-          return;
-        }
-
-        // Clean the array of tableNameDirs by removing trailing slashes
-        // This is crucial to fetch the right tableName from the uri
-        for (int i = 0; i < tableNameDirs.length; i++) {
-          if (tableNameDirs[i].endsWith(DELIMITER)) {
-            tableNameDirs[i] = tableNameDirs[i].substring(0, tableNameDirs[i].length() - 1);
-          }
-        }
-
-        for (String tableNameDir : tableNameDirs) {
-          String tableName = URIUtils.getLastPart(tableNameDir);
-          if (leadControllerManager.isLeaderForTable(tableName)) {
-            // A failure on one table must not skip the tables after it.
-            try {
-              URI tableNameURI = URIUtils.getUri(deletedDirURI.toString(), URIUtils.encode(tableName));
-              // Sweep the retained metadata sidecars first. exists is checked before isDirectory because isDirectory
-              // throws for a missing path on some file systems (e.g. ADLS Gen2).
-              URI metadataDirURI = URIUtils.getUri(tableNameURI.toString(), DELETED_SEGMENT_METADATA_DIR);
-              boolean metadataDirExists = pinotFS.exists(metadataDirURI) && pinotFS.isDirectory(metadataDirURI);
-              if (metadataDirExists) {
-                removeAgedFiles(pinotFS, metadataDirURI, tableName, agedSegmentsDeletionBatchSize, true);
-              }
-              // The table directory is only removed by a sweep that finds no metadata directory: non-recursive
-              // listings may omit it (e.g. S3 common prefixes), so the table directory could look empty while it is
-              // not.
-              removeAgedFiles(pinotFS, tableNameURI, tableName, agedSegmentsDeletionBatchSize, !metadataDirExists);
-            } catch (Exception e) {
-              LOGGER.error("Failed to remove aged deleted segments for table: {}", tableName, e);
-            }
-          }
-        }
-      } catch (IOException e) {
-        LOGGER.error("Had trouble deleting directories: {}", deletedDirURI.toString(), e);
-      }
+      // Each root is swept independently.
+      removeAgedDeletedFiles(leadControllerManager, agedSegmentsDeletionBatchSize, DELETED_SEGMENTS);
+      removeAgedDeletedFiles(leadControllerManager, agedSegmentsDeletionBatchSize, DELETED_SEGMENTS_METADATA);
     } else {
       LOGGER.info("dataDir is not configured, won't delete any expired segments from deleted directory.");
+    }
+  }
+
+  private void removeAgedDeletedFiles(LeadControllerManager leadControllerManager, int agedSegmentsDeletionBatchSize,
+      String rootName) {
+    URI deletedDirURI = URIUtils.getUri(_dataDir, rootName);
+    PinotFS pinotFS = PinotFSFactory.create(deletedDirURI.getScheme());
+
+    try {
+      // Directly return when the deleted directory does not exist (nothing deleted yet)
+      if (!pinotFS.exists(deletedDirURI)) {
+        return;
+      }
+
+      if (!pinotFS.isDirectory(deletedDirURI)) {
+        LOGGER.warn("Deleted segments URI: {} is not a directory", deletedDirURI);
+        return;
+      }
+
+      String[] tableNameDirs = pinotFS.listFiles(deletedDirURI, false);
+      if (tableNameDirs == null) {
+        LOGGER.warn("Failed to list files from the deleted segments directory: {}", deletedDirURI);
+        return;
+      }
+
+      // Clean the array of tableNameDirs by removing trailing slashes
+      // This is crucial to fetch the right tableName from the uri
+      for (int i = 0; i < tableNameDirs.length; i++) {
+        if (tableNameDirs[i].endsWith(DELIMITER)) {
+          tableNameDirs[i] = tableNameDirs[i].substring(0, tableNameDirs[i].length() - 1);
+        }
+      }
+
+      for (String tableNameDir : tableNameDirs) {
+        String tableName = URIUtils.getLastPart(tableNameDir);
+        if (leadControllerManager.isLeaderForTable(tableName)) {
+          // A failure on one table must not skip the tables after it.
+          try {
+            URI tableNameURI = URIUtils.getUri(deletedDirURI.toString(), URIUtils.encode(tableName));
+            removeAgedFiles(pinotFS, tableNameURI, tableName, agedSegmentsDeletionBatchSize, true);
+          } catch (Exception e) {
+            LOGGER.error("Failed to remove aged deleted segments for table: {}", tableName, e);
+          }
+        }
+      }
+    } catch (IOException e) {
+      LOGGER.error("Had trouble deleting directories: {}", deletedDirURI.toString(), e);
     }
   }
 
@@ -551,8 +546,7 @@ public class SegmentDeletionManager {
     int numFilesScheduledForDeletion = 0;
     List<URI> targetURIs = new ArrayList<>();
     for (FileMetadata targetFile : targetFiles) {
-      // Some file system implementations also return the current directory, and the table directory contains the
-      // metadata directory; neither must be deleted here.
+      // Some file system implementations also return the current directory itself; it must not be deleted here.
       if (targetFile.isDirectory()) {
         continue;
       }

@@ -355,7 +355,7 @@ public class ControllerConf extends PinotConfiguration {
       "controller.enable.instance.change.propagation";
   public static final String DELETED_SEGMENTS_RETENTION_IN_DAYS = "controller.deleted.segments.retentionInDays";
   // When enabled, a segment's metadata sidecar (<segment>.metadata.tar.gz) is kept under
-  // Deleted_Segments/<table>/~metadata/ when the segment is deleted with retention > 0; otherwise (or when disabled) it
+  // Deleted_Segments_Metadata/<table>/ when the segment is deleted with retention > 0; otherwise (or when disabled) it
   // is deleted with the segment.
   public static final String DELETED_SEGMENTS_PRESERVE_METADATA = "controller.deleted.segments.preserveMetadata";
   public static final String TABLE_MIN_REPLICAS = "table.minReplicas";
