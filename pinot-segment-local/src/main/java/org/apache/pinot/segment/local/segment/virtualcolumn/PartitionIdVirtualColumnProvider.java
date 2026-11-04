@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.segment.virtualcolumn;
 
-import com.google.common.base.Utf8;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -37,6 +36,7 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.Utf8Utils;
 
 
 /// Virtual column provider that returns the partition information of the segment.
@@ -212,7 +212,7 @@ public class PartitionIdVirtualColumnProvider implements VirtualColumnProvider {
 
     @Override
     public int getValueSize(int dictId) {
-      return Utf8.encodedLength(_values.get(dictId));
+      return Utf8Utils.encodedLength(_values.get(dictId));
     }
 
     @Override
